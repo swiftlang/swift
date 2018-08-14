@@ -1304,7 +1304,7 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
       VarDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
       ctx.getIdentifier("$return_value"), SourceLoc(),
       ctx.getIdentifier("$return_value"),
-      resultStorageType.getASTType(), pass.F->getDeclContext());
+      pass.F->getDeclContext());
   pass.F->begin()->insertFunctionArgument(0, resultStorageType.getAddressType(),
                                           ValueOwnershipKind::Trivial, var);
 }

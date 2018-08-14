@@ -929,6 +929,12 @@ NOTE(unwrap_with_default_value,none,
 NOTE(unwrap_with_force_value,none,
      "force-unwrap using '!' to abort execution if the optional value contains "
      "'nil'", ())
+NOTE(unwrap_iuo_initializer,none,
+     "value inferred to be type %0 when initialized with an implicitly "
+     "unwrapped value", (Type))
+NOTE(unwrap_with_guard,none,
+     "short-circuit using 'guard' to exit this function early "
+     "if the optional value contains 'nil'", ())
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclName, Type))
@@ -974,9 +980,6 @@ ERROR(wrong_argument_labels,none,
       "incorrect argument label%select{|s}0 in %select{call|subscript}3 "
       "(have '%1', expected '%2')",
       (bool, StringRef, StringRef, bool))
-ERROR(extra_named_single_element_tuple,none,
-      "cannot treat single-element named tuple as a scalar; use '.%0' to "
-      "access its element", (StringRef))
 ERROR(argument_out_of_order_named_named,none,
       "argument %0 must precede argument %1", (Identifier, Identifier))
 ERROR(argument_out_of_order_named_unnamed,none,
@@ -1063,16 +1066,6 @@ ERROR(c_function_pointer_from_function_with_context,none,
 //------------------------------------------------------------------------------
 // MARK: Type Check Declarations
 //------------------------------------------------------------------------------
-
-ERROR(var_type_not_materializable,none,
-      "variable has type %0 which includes nested inout parameters",
-      (Type))
-ERROR(param_type_non_materializable_tuple,none,
-      "named parameter has type %0 which includes nested inout parameters",
-      (Type))
-ERROR(enum_element_not_materializable,none,
-      "enum case has type %0 which includes nested inout parameters",
-      (Type))
 
 ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
@@ -3614,9 +3607,6 @@ WARNING(attribute_meaningless_when_nonobjc,none,
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
       "because its type cannot be represented in Objective-C", (unsigned))
-ERROR(objc_invalid_subscript_key_type,none,
-      "subscript cannot be %" OBJC_ATTR_SELECT "0 because its key "
-      "type %1 is neither an integer nor an object", (unsigned, Type))
 ERROR(objc_invalid_on_subscript,none,
       "subscript cannot be %" OBJC_ATTR_SELECT "0 because its type "
       "cannot be represented in Objective-C", (unsigned))

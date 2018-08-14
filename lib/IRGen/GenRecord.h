@@ -46,7 +46,7 @@ template <class FieldImpl> class RecordField {
 
 protected:
   explicit RecordField(const TypeInfo &elementTI)
-    : Layout(ElementLayout::getIncomplete(elementTI, elementTI)) {}
+    : Layout(ElementLayout::getIncomplete(elementTI)) {}
 
   explicit RecordField(const ElementLayout &layout,
                        unsigned begin, unsigned end)
@@ -56,7 +56,7 @@ protected:
     return static_cast<const FieldImpl*>(this);
   }
 public:
-  const TypeInfo &getTypeInfo() const { return Layout.getTypeForLayout(); }
+  const TypeInfo &getTypeInfo() const { return Layout.getType(); }
 
   void completeFrom(const ElementLayout &layout) {
     Layout.completeFrom(layout);
@@ -71,7 +71,7 @@ public:
   }
 
   IsABIAccessible_t isABIAccessible() const {
-    return Layout.getTypeForLayout().isABIAccessible();
+    return Layout.getType().isABIAccessible();
   }
 
   Address projectAddress(IRGenFunction &IGF, Address seq,

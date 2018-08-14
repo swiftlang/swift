@@ -214,9 +214,7 @@ void TypeChecker::resolveTrailingWhereClause(ProtocolDecl *proto) {
 
 void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
                                        GenericTypeResolver *resolver) {
-  TypeResolutionOptions options;
-
-  options |= TypeResolutionFlags::ProtocolWhereClause;
+  TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
 
   if (auto whereClause = protocol->getTrailingWhereClause()) {
     revertGenericRequirements(whereClause->getRequirements());
@@ -242,17 +240,15 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
 /// to which this type declaration conforms.
 void TypeChecker::checkInheritanceClause(Decl *decl,
                                          GenericTypeResolver *resolver) {
-  TypeResolutionOptions options;
+  TypeResolutionOptions options = None;
   DeclContext *DC;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     DC = nominal;
-    options |= TypeResolutionFlags::GenericSignature;
-    options |= TypeResolutionFlags::InheritanceClause;
+    options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     DC = ext;
-    options |= TypeResolutionFlags::GenericSignature;
-    options |= TypeResolutionFlags::InheritanceClause;
+    options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   } else if (isa<GenericTypeParamDecl>(decl)) {
     // For generic parameters, we want name lookup to look at just the
@@ -260,13 +256,13 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     DC = decl->getDeclContext();
     if (auto nominal = dyn_cast<NominalTypeDecl>(DC)) {
       DC = nominal;
-      options |= TypeResolutionFlags::GenericSignature;
+      options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     } else if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
       DC = ext;
-      options |= TypeResolutionFlags::GenericSignature;
+      options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     } else if (auto func = dyn_cast<AbstractFunctionDecl>(DC)) {
       DC = func;
-      options |= TypeResolutionFlags::GenericSignature;
+      options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     } else if (!DC->isModuleScopeContext()) {
       // Skip the generic parameter's context entirely.
       DC = DC->getParent();
@@ -356,7 +352,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
   SourceRange superclassRange;
-  llvm::SmallDenseMap<CanType, std::pair<unsigned, SourceRange>> inheritedTypes;
+  Optional<std::pair<unsigned, SourceRange>> inheritedAnyObject;
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
 
@@ -372,37 +368,37 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedTy->hasError())
       continue;
 
-    // Check whether we inherited from the same type twice.
-    CanType inheritedCanTy = inheritedTy->getCanonicalType();
-    auto knownType = inheritedTypes.find(inheritedCanTy);
-    if (knownType != inheritedTypes.end()) {
-      // If the duplicated type is 'AnyObject', check whether the first was
-      // written as 'class'. Downgrade the error to a warning in such cases
-      // for backward compatibility with Swift <= 4.
-      if (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
-          inheritedTy->isAnyObject() &&
-          (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
-          Lexer::getTokenAtLocation(Context.SourceMgr,
-                                    knownType->second.second.Start)
-            .is(tok::kw_class)) {
-        SourceLoc classLoc = knownType->second.second.Start;
-        SourceRange removeRange = getRemovalRange(knownType->second.first);
+    // Check whether we inherited from 'AnyObject' twice.
+    // Other redundant-inheritance scenarios are checked below, the
+    // GenericSignatureBuilder (for protocol inheritance) or the
+    // ConformanceLookupTable (for protocol conformance).
+    if (inheritedTy->isAnyObject()) {
+      if (inheritedAnyObject) {
+        // If the first occurrence was written as 'class', downgrade the error
+        // to a warning in such cases
+        // for backward compatibility with Swift <= 4.
+        auto knownIndex = inheritedAnyObject->first;
+        auto knownRange = inheritedAnyObject->second;
+        SourceRange removeRange = getRemovalRange(knownIndex);
+        if (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
+            (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+            Lexer::getTokenAtLocation(Context.SourceMgr, knownRange.Start)
+              .is(tok::kw_class)) {
+          SourceLoc classLoc = knownRange.Start;
 
-        diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
-          .fixItRemoveChars(removeRange.Start, removeRange.End);
-        inherited.setInvalidType(Context);
+          diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        } else {
+          diagnose(inherited.getSourceRange().Start,
+                 diag::duplicate_inheritance, inheritedTy)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        }
         continue;
       }
 
-      auto removeRange = getRemovalRange(i);
-      diagnose(inherited.getSourceRange().Start,
-               diag::duplicate_inheritance, inheritedTy)
-        .fixItRemoveChars(removeRange.Start, removeRange.End)
-        .highlight(knownType->second.second);
-      inherited.setInvalidType(Context);
-      continue;
+      // Note that we saw inheritance from 'AnyObject'.
+      inheritedAnyObject = { i, inherited.getSourceRange() };
     }
-    inheritedTypes[inheritedCanTy] = { i, inherited.getSourceRange() };
 
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();
@@ -459,10 +455,16 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (isa<EnumDecl>(decl)) {
       // Check if we already had a raw type.
       if (superclassTy) {
-        diagnose(inherited.getSourceRange().Start,
-                 diag::multiple_enum_raw_types, superclassTy, inheritedTy)
-          .highlight(superclassRange);
-        inherited.setInvalidType(Context);
+        if (superclassTy->isEqual(inheritedTy)) {
+          auto removeRange = getRemovalRange(i);
+          diagnose(inherited.getSourceRange().Start,
+                   diag::duplicate_inheritance, inheritedTy)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        } else {
+          diagnose(inherited.getSourceRange().Start,
+                   diag::multiple_enum_raw_types, superclassTy, inheritedTy)
+            .highlight(superclassRange);
+        }
         continue;
       }
       
@@ -491,12 +493,19 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       if (superclassTy) {
         // FIXME: Check for shadowed protocol names, i.e., NSObject?
 
-        // Complain about multiple inheritance.
-        // Don't emit a Fix-It here. The user has to think harder about this.
-        diagnose(inherited.getSourceRange().Start,
-                 diag::multiple_inheritance, superclassTy, inheritedTy)
-          .highlight(superclassRange);
-        inherited.setInvalidType(Context);
+        if (superclassTy->isEqual(inheritedTy)) {
+          // Duplicate superclass.
+          auto removeRange = getRemovalRange(i);
+          diagnose(inherited.getSourceRange().Start,
+                   diag::duplicate_inheritance, inheritedTy)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        } else {
+          // Complain about multiple inheritance.
+          // Don't emit a Fix-It here. The user has to think harder about this.
+          diagnose(inherited.getSourceRange().Start,
+                   diag::multiple_inheritance, superclassTy, inheritedTy)
+            .highlight(superclassRange);
+        }
         continue;
       }
 
@@ -1036,9 +1045,7 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // In particular, it's /not/ correct to check the PBD's DeclContext because
   // top-level variables in a script file are accessible from other files,
   // even though the PBD is inside a TopLevelCodeDecl.
-  TypeResolutionOptions options = TypeResolutionFlags::PatternBindingEntry;
-  options |= TypeResolutionFlags::InExpression;
-  options |= TypeResolutionFlags::Direct;
+  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
   if (binding->getInit(entryNumber)) {
     // If we have an initializer, we can also have unknown types.
@@ -1181,37 +1188,6 @@ static void configureImplicitSelf(TypeChecker &tc,
   selfDecl->setSpecifier(specifier);
 
   selfDecl->setInterfaceType(selfParam.getPlainType());
-
-  if (selfParam.getPlainType()->is<ErrorType>())
-    selfDecl->setInvalid();
-}
-
-static void recordParamContextTypes(AbstractFunctionDecl *func) {
-  auto *env = func->getGenericEnvironment();
-
-  if (auto *selfDecl = func->getImplicitSelfDecl()) {
-    if (!env)
-      selfDecl->setType(selfDecl->getInterfaceType());
-    else
-      selfDecl->setType(env->mapTypeIntoContext(selfDecl->getInterfaceType()));
-  }
-
-  for (auto param : *func->getParameters()) {
-    if (!env)
-      param->setType(param->getInterfaceType());
-    else
-      param->setType(env->mapTypeIntoContext(param->getInterfaceType()));
-  }
-}
-
-static void recordIndexContextTypes(SubscriptDecl *subscript) {
-  auto *env = subscript->getGenericEnvironment();
-  for (auto param : *subscript->getIndices()) {
-    if (!env)
-      param->setType(param->getInterfaceType());
-    else
-      param->setType(env->mapTypeIntoContext(param->getInterfaceType()));
-  }
 }
 
 /// Try to make the given declaration 'dynamic', checking any semantic
@@ -1865,8 +1841,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         // Build the parameter witness method.
         TC.completePropertyBehaviorParameter(decl, func,
                                              conformance,
-                                             interfaceSubsMap,
-                                             contextSubsMap);
+                                             interfaceSubsMap);
         continue;
       }
     }
@@ -3450,7 +3425,7 @@ void TypeChecker::typeCheckDecl(Decl *D) {
 
 /// Validate the underlying type of the given typealias.
 static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
-  TypeResolutionOptions options = TypeResolutionFlags::TypeAliasUnderlyingType;
+  TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
   if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
         /*functionsAreNonCascading*/true)) {
      options |= TypeResolutionFlags::KnownNonCascadingDependency;
@@ -3462,7 +3437,6 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   if (underlyingType.isNull()) {
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
     typeAlias->setInterfaceType(ErrorType::get(tc.Context));
-    typeAlias->setInvalid();
     return;
   }
 
@@ -3603,11 +3577,8 @@ void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
     auto paramType = param->getInterfaceType();
     if (!paramType) break;
 
-    // Look through 'inout'.
-    paramType = paramType->getInOutObjectType();
     // Look through a metatype reference, if there is one.
-    if (auto metatypeType = paramType->getAs<AnyMetatypeType>())
-      paramType = metatypeType->getInstanceType();
+    paramType = paramType->getMetatypeInstanceType();
 
     // Is it the same nominal type?
     if (paramType->getAnyNominal() == selfNominal) return;
@@ -4131,14 +4102,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       auto valueParams = accessor->getParameters();
 
       // Determine the value type.
-      Type valueIfaceTy, valueTy;
+      Type valueIfaceTy;
       if (auto VD = dyn_cast<VarDecl>(storage)) {
         valueIfaceTy = VD->getInterfaceType()->getReferenceStorageReferent();
-        valueTy = VD->getType()->getReferenceStorageReferent();
       } else {
         auto SD = cast<SubscriptDecl>(storage);
         valueIfaceTy = SD->getElementInterfaceType();
-        valueTy = SD->mapTypeIntoContext(valueIfaceTy);
 
         // Copy the index types instead of re-validating them.
         auto indices = SD->getIndices();
@@ -4148,10 +4117,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
             continue;
 
           Type paramIfaceTy = subscriptParam->getInterfaceType();
-          Type paramTy = SD->mapTypeIntoContext(paramIfaceTy);
 
           auto accessorParam = valueParams->get(valueParams->size() - e + i);
-          accessorParam->setType(paramTy);
           accessorParam->setInterfaceType(paramIfaceTy);
           accessorParam->getTypeLoc().setType(paramIfaceTy);
         }
@@ -4177,9 +4144,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
       case AccessorKind::Set: {
         auto newValueParam = valueParams->get(0);
-        newValueParam->setType(valueTy);
         newValueParam->setInterfaceType(valueIfaceTy);
-        newValueParam->getTypeLoc().setType(valueTy);
+        newValueParam->getTypeLoc().setType(valueIfaceTy);
         break;
       }
 
@@ -4208,18 +4174,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // If we have generic parameters, check the generic signature now.
     if (FD->getGenericParams() || !isa<AccessorDecl>(FD)) {
       validateGenericFuncSignature(FD);
-      recordParamContextTypes(FD);
     } else {
       // We've inherited all of the type information already.
       FD->setGenericEnvironment(
         FD->getDeclContext()->getGenericEnvironmentOfContext());
 
       FD->computeType();
-
-      if (FD->getInterfaceType()->hasError()) {
-        FD->setInterfaceType(ErrorType::get(Context));
-        FD->setInvalid();
-      }
     }
 
     if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
@@ -4340,7 +4300,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     configureImplicitSelf(*this, CD);
 
     validateGenericFuncSignature(CD);
-    recordParamContextTypes(CD);
 
     // We want the constructor to be available for name lookup as soon
     // as it has a valid interface type.
@@ -4360,26 +4319,16 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Destructor: {
     auto *DD = cast<DestructorDecl>(D);
 
-    auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext());
-    if (DD->isInvalid() ||
-        enclosingClass == nullptr) {
-      DD->setInterfaceType(ErrorType::get(Context));
-      DD->setInvalid();
-      return;
-    }
-
     DeclValidationRAII IBV(DD);
 
-    assert(DD->getDeclContext()->isTypeContext()
-           && "Decl parsing must prevent destructors outside of types!");
-
     checkDeclAttributesEarly(DD);
-    DD->copyFormalAccessFrom(enclosingClass, /*sourceIsParentContext*/true);
+
+    if (auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext()))
+      DD->copyFormalAccessFrom(enclosingClass, /*sourceIsParentContext*/true);
 
     configureImplicitSelf(*this, DD);
 
     validateGenericFuncSignature(DD);
-    recordParamContextTypes(DD);
 
     DD->setSignatureIsValidated();
 
@@ -4393,7 +4342,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     DeclValidationRAII IBV(SD);
 
     validateGenericSubscriptSignature(SD);
-    recordIndexContextTypes(SD);
 
     SD->setSignatureIsValidated();
 
@@ -4431,16 +4379,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (auto *PL = EED->getParameterList()) {
       CompleteGenericTypeResolver resolver(*this, ED->getGenericSignature());
 
-      bool isInvalid
-        = typeCheckParameterList(PL, EED->getParentEnum(),
-                                 TypeResolutionFlags::EnumCase, resolver);
-
-      if (isInvalid || EED->isInvalid()) {
-        EED->setInterfaceType(ErrorType::get(Context));
-        EED->setInvalid();
-      } else {
-        checkDefaultArguments(PL, EED);
-      }
+      typeCheckParameterList(PL, EED->getParentEnum(),
+                             TypeResolverContext::EnumElementDecl, resolver);
+      checkDefaultArguments(PL, EED);
     }
 
     // If we have a raw value, make sure there's a raw type as well.
@@ -4461,20 +4402,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Now that we have an argument type we can set the element's declared
     // type.
-    if (!EED->isInvalid())
-      EED->computeType();
+    EED->computeType();
 
     EED->setSignatureIsValidated();
 
-    // Require the carried type to be materializable.
     if (auto argTy = EED->getArgumentInterfaceType()) {
-      assert(!argTy->hasLValueType() && "enum element cannot carry @lvalue");
-
-      if (!argTy->isMaterializable()) {
-        diagnose(EED->getLoc(), diag::enum_element_not_materializable, argTy);
-        EED->setInterfaceType(ErrorType::get(Context));
-        EED->setInvalid();
-      }
+      assert(argTy->isMaterializable());
+      (void) argTy;
     }
 
     break;
@@ -4552,8 +4486,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
           (void) typealias->getFormalAccess();
 
           ProtocolRequirementTypeResolver resolver;
-          TypeResolutionOptions options =
-            TypeResolutionFlags::TypeAliasUnderlyingType;
+          TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
           if (validateType(typealias->getUnderlyingTypeLoc(),
                            typealias, options, &resolver)) {
             typealias->setInvalid();

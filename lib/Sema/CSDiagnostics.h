@@ -34,10 +34,17 @@ class FailureDiagnostic {
   const Solution &solution;
   ConstraintLocator *Locator;
 
+  Expr *Anchor;
+  /// Indicates whether locator could be simplified
+  /// down to anchor expression.
+  bool HasComplexLocator;
+
 public:
   FailureDiagnostic(Expr *expr, const Solution &solution,
                     ConstraintLocator *locator)
-      : E(expr), solution(solution), Locator(locator) {}
+      : E(expr), solution(solution), Locator(locator) {
+    std::tie(Anchor, HasComplexLocator) = computeAnchor();
+  }
 
   virtual ~FailureDiagnostic();
 
@@ -55,20 +62,48 @@ public:
 
   Expr *getParentExpr() const { return E; }
 
-  Expr *getAnchor() const { return Locator->getAnchor(); }
+  Expr *getAnchor() const { return Anchor; }
 
   ConstraintLocator *getLocator() const { return Locator; }
 
   Type getType(Expr *expr) const;
 
+  /// Resolve type variables present in the raw type, if any.
+  Type resolveType(Type rawType) const {
+    return solution.simplifyType(rawType);
+  }
+
   template <typename... ArgTypes>
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
 
 protected:
+  TypeChecker &getTypeChecker() const { return getConstraintSystem().TC; }
+
+  DeclContext *getDC() const { return getConstraintSystem().DC; }
+
   Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     return solution.getOverloadChoiceIfAvailable(locator);
   }
+
+  /// Retrieve overload choice resolved for given locator
+  /// by the constraint solver.
+  ResolvedOverloadSetListItem *getResolvedOverload(ConstraintLocator *locator) {
+    auto resolvedOverload = getConstraintSystem().getResolvedOverloadSets();
+    while (resolvedOverload) {
+      if (resolvedOverload->Locator == locator)
+        return resolvedOverload;
+      resolvedOverload = resolvedOverload->Previous;
+    }
+    return nullptr;
+  }
+
+  /// \returns true is locator hasn't been simplified down to expression.
+  bool hasComplexLocator() const { return HasComplexLocator; }
+
+private:
+  /// Compute anchor expression associated with current diagnostic.
+  std::pair<Expr *, bool> computeAnchor() const;
 };
 
 /// Base class for all of the diagnostics related to generic requirement
@@ -120,7 +155,7 @@ class MissingConformanceFailure final : public RequirementFailure {
 public:
   MissingConformanceFailure(Expr *expr, const Solution &solution,
                             ConstraintLocator *locator,
-                            std::pair<TypeBase *, ProtocolDecl *> conformance)
+                            std::pair<Type, ProtocolDecl *> conformance)
       : RequirementFailure(expr, solution, locator),
         NonConformingType(conformance.first), Protocol(conformance.second) {}
 
@@ -150,6 +185,106 @@ public:
   LabelingFailure(const Solution &solution, ConstraintLocator *locator,
                   ArrayRef<Identifier> labels)
       : FailureDiagnostic(nullptr, solution, locator), CorrectLabels(labels) {}
+
+  bool diagnose() override;
+};
+
+/// Diagnose errors related to converting function type which
+/// isn't explicitly '@escaping' to some other type.
+class NoEscapeFuncToTypeConversionFailure final : public FailureDiagnostic {
+  Type ConvertTo;
+
+public:
+  NoEscapeFuncToTypeConversionFailure(Expr *expr, const Solution &solution,
+                                      ConstraintLocator *locator,
+                                      Type toType = Type())
+      : FailureDiagnostic(expr, solution, locator), ConvertTo(toType) {}
+
+  bool diagnose() override;
+};
+
+class MissingForcedDowncastFailure final : public FailureDiagnostic {
+public:
+  MissingForcedDowncastFailure(Expr *expr, const Solution &solution,
+                               ConstraintLocator *locator)
+      : FailureDiagnostic(expr, solution, locator) {}
+
+  bool diagnose() override;
+};
+
+/// Diagnose failures related to passing value of some type
+/// to `inout` parameter, without explicitly specifying `&`.
+class MissingAddressOfFailure final : public FailureDiagnostic {
+public:
+  MissingAddressOfFailure(Expr *expr, const Solution &solution,
+                          ConstraintLocator *locator)
+      : FailureDiagnostic(expr, solution, locator) {}
+
+  bool diagnose() override;
+};
+
+/// Diagnose failures related attempt to implicitly convert types which
+/// do not support such implicit converstion.
+/// "as" or "as!" has to be specified explicitly in cases like that.
+class MissingExplicitConversionFailure final : public FailureDiagnostic {
+  Type ConvertingTo;
+
+public:
+  MissingExplicitConversionFailure(Expr *expr, const Solution &solution,
+                                   ConstraintLocator *locator, Type toType)
+      : FailureDiagnostic(expr, solution, locator), ConvertingTo(toType) {}
+
+  bool diagnose() override;
+
+private:
+  bool exprNeedsParensBeforeAddingAs(Expr *expr) {
+    auto *DC = getDC();
+    auto &TC = getTypeChecker();
+
+    auto asPG = TC.lookupPrecedenceGroup(
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+    if (!asPG)
+      return true;
+    return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
+  }
+
+  bool exprNeedsParensAfterAddingAs(Expr *expr, Expr *rootExpr) {
+    auto *DC = getDC();
+    auto &TC = getTypeChecker();
+
+    auto asPG = TC.lookupPrecedenceGroup(
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+    if (!asPG)
+      return true;
+
+    return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr,
+                                                   asPG);
+  }
+};
+
+/// Diagnose failures related to attempting member access on optional base
+/// type without optional chaining or force-unwrapping it first.
+class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
+  DeclName Member;
+  bool ResultTypeIsOptional;
+
+public:
+  MemberAccessOnOptionalBaseFailure(Expr *expr, const Solution &solution,
+                                    ConstraintLocator *locator,
+                                    DeclName memberName, bool resultOptional)
+      : FailureDiagnostic(expr, solution, locator), Member(memberName),
+        ResultTypeIsOptional(resultOptional) {}
+
+  bool diagnose() override;
+};
+
+/// Diagnose failures related to use of the unwrapped optional types,
+/// which require some type of force-unwrap e.g. "!" or "try!".
+class MissingOptionalUnwrapFailure final : public FailureDiagnostic {
+public:
+  MissingOptionalUnwrapFailure(Expr *expr, const Solution &solution,
+                               ConstraintLocator *locator)
+      : FailureDiagnostic(expr, solution, locator) {}
 
   bool diagnose() override;
 };

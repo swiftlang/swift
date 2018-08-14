@@ -13,6 +13,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/NumericParsing.swift
 // RUN: %line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %line-directive %t/NumericParsing.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 %{

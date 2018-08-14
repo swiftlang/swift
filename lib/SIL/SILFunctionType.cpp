@@ -604,9 +604,10 @@ private:
                                ParameterTypeFlags paramFlags, CanType ty) {
       CanTupleType tty = dyn_cast<TupleType>(ty);
       // If the abstraction pattern is opaque, and the tuple type is
-      // materializable -- if it doesn't contain an l-value type -- then it's
-      // a valid target for substitution and we should not expand it.
-      if (!tty || (pattern.isTypeParameter() && !tty->hasInOutElement())) {
+      // a valid target for substitution, don't expand it.
+      if (!tty ||
+          (pattern.isTypeParameter() &&
+           !shouldExpandTupleType(tty))) {
         visit(paramFlags.getValueOwnership(), /*forSelf=*/false, pattern, ty,
               silRepresentation);
         return;
@@ -2299,7 +2300,9 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
   auto baseInterfaceTy = baseInfo.FormalType;
   auto derivedInterfaceTy = derivedInfo.FormalType;
 
-  auto selfInterfaceTy = derivedInterfaceTy.getInput()->getRValueInstanceType();
+  auto params = derivedInterfaceTy.getParams();
+  assert(params.size() == 1);
+  auto selfInterfaceTy = params[0].getPlainType()->getMetatypeInstanceType();
 
   auto overrideInterfaceTy =
       selfInterfaceTy->adjustSuperclassMemberDeclType(
@@ -2425,8 +2428,8 @@ public:
       // The Self type can be nested in a few layers of metatypes (etc.), e.g.
       // for a mutable static variable the materializeForSet currently has its
       // last argument as a Self.Type.Type metatype.
-      while (1) {
-        auto next = selfType->getRValueInstanceType()->getCanonicalType();
+      while (auto metatypeType = dyn_cast<MetatypeType>(selfType)) {
+        auto next = metatypeType->getInstanceType()->getCanonicalType();
         if (next == selfType)
           break;
         selfType = next;

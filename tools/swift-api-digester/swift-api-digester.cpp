@@ -45,6 +45,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -120,6 +121,9 @@ AbortOnModuleLoadFailure("abort-on-module-fail",
 
 static llvm::cl::opt<bool>
 Verbose("v", llvm::cl::desc("Verbose"));
+
+static llvm::cl::opt<bool>
+Abi("abi", llvm::cl::desc("Dumping ABI interface"),  llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 PrintModule("print-module", llvm::cl::desc("Print module names in diagnostics"));
@@ -249,6 +253,7 @@ public:
 };
 
 class SDKContext {
+  bool ABI;
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
   UpdatedNodesMap UpdateMap;
@@ -256,6 +261,7 @@ class SDKContext {
   NodeMap RevertTypeAliasUpdateMap;
   TypeMemberDiffVector TypeMemberDiffs;
 public:
+  SDKContext(bool ABI): ABI(ABI) {}
   llvm::BumpPtrAllocator &allocator() {
     return Allocator;
   }
@@ -274,6 +280,7 @@ public:
   TypeMemberDiffVector &getTypeMemberDiffs() {
     return TypeMemberDiffs;
   }
+  bool checkingABI() const { return ABI; }
 };
 
 // A node matcher will traverse two trees of SDKNode and find matched nodes
@@ -367,8 +374,8 @@ struct SDKNodeInitInfo {
   std::vector<StringRef> ConformingProtocols;
   StringRef SuperclassUsr;
   StringRef EnumRawTypeName;
-  ParentExtensionInfo *ExtInfo = nullptr;
   TypeInitInfo TypeInfo;
+  StringRef GenericSig;
 
   SDKNodeInitInfo(SDKContext &Ctx) : Ctx(Ctx) {}
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
@@ -440,8 +447,7 @@ class SDKNodeDecl : public SDKNode {
   bool IsDeprecated;
   uint8_t ReferenceOwnership;
   bool hasDeclAttribute(DeclAttrKind DAKind) const;
-  // Non-null ExtInfo implies this decl is defined in an type extension.
-  ParentExtensionInfo *ExtInfo;
+  StringRef GenericSig;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
@@ -450,7 +456,7 @@ protected:
         DeclAttributes(Info.DeclAttrs), IsStatic(Info.IsStatic),
         IsDeprecated(Info.IsDeprecated),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
-        ExtInfo(Info.ExtInfo) {}
+        GenericSig(Info.GenericSig) {}
 
 public:
   StringRef getUsr() const { return Usr; }
@@ -470,11 +476,7 @@ public:
   bool isDeprecated() const { return IsDeprecated; };
   bool hasFixedLayout() const;
   bool isStatic() const { return IsStatic; };
-  bool isFromExtension() const { return ExtInfo; }
-  const ParentExtensionInfo& getExtensionInfo() const {
-    assert(isFromExtension());
-    return *ExtInfo;
-  }
+  StringRef getGenericSignature() const { return GenericSig; }
 };
 
 StringRef SDKNodeDecl::getHeaderName() const {
@@ -1026,14 +1028,6 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
                                       cast<llvm::yaml::MappingNode>(&Mapping)));
       }
       break;
-    case KeyKind::KK_parentExtensionReqs: {
-      assert(!Info.ExtInfo);
-      Info.ExtInfo = new (Ctx) ParentExtensionInfo();
-      for (auto &Req : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
-        Info.ExtInfo->Requirements.push_back(GetScalarString(&Req));
-      }
-      break;
-    }
     case KeyKind::KK_conformingProtocols: {
       assert(Info.ConformingProtocols.empty());
       for (auto &Name : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
@@ -1054,6 +1048,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       break;
     case KeyKind::KK_superclassUsr:
       Info.SuperclassUsr = GetScalarString(Pair.getValue());
+      break;
+    case KeyKind::KK_genericSig:
+      Info.GenericSig = GetScalarString(Pair.getValue());
       break;
     case KeyKind::KK_throwing:
       Info.IsThrowing = true;
@@ -1350,6 +1347,53 @@ static ReferenceOwnership getReferenceOwnership(ValueDecl *VD) {
   return ReferenceOwnership::Strong;
 }
 
+// Get a requirement with all types canonicalized.
+Requirement getCanonicalRequirement(Requirement &Req) {
+  auto kind = Req.getKind();
+  if (kind == RequirementKind::Layout) {
+    return Requirement(kind, Req.getFirstType()->getCanonicalType(),
+                       Req.getLayoutConstraint());
+  } else {
+    return Requirement(kind, Req.getFirstType()->getCanonicalType(),
+                       Req.getSecondType()->getCanonicalType());
+  }
+}
+
+static StringRef printGenericSignature(SDKContext &Ctx, ValueDecl *VD) {
+  llvm::SmallString<32> Result;
+  llvm::raw_svector_ostream OS(Result);
+  if (auto *PD = dyn_cast<ProtocolDecl>(VD)) {
+    if (PD->getRequirementSignature().empty())
+      return StringRef();
+    OS << "<";
+    bool First = true;
+    for (auto Req: PD->getRequirementSignature()) {
+      if (!First) {
+        OS << ", ";
+      } else {
+        First = false;
+      }
+      if (Ctx.checkingABI())
+        getCanonicalRequirement(Req).print(OS, PrintOptions::printInterface());
+      else
+        Req.print(OS, PrintOptions::printInterface());
+    }
+    OS << ">";
+    return Ctx.buffer(OS.str());
+  }
+
+  if (auto *GC = VD->getAsGenericContext()) {
+    if (auto *Sig = GC->getGenericSignature()) {
+      if (Ctx.checkingABI())
+        Sig->getCanonicalSignature()->print(OS);
+      else
+        Sig->print(OS);
+      return Ctx.buffer(OS.str());
+    }
+  }
+  return StringRef();
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
                                  TypeInitInfo TypeInfo) :
     Ctx(Ctx), Name(getTypeName(Ctx, Ty, TypeInfo.IsImplicitlyUnwrappedOptional)),
@@ -1372,8 +1416,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
       IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
       IsStatic(VD->isStatic()),
       IsDeprecated(VD->getAttrs().getDeprecated(VD->getASTContext())),
-      SelfIndex(getSelfIndex(VD)),
-      ReferenceOwnership(getReferenceOwnership(VD)), ExtInfo(nullptr) {
+      SelfIndex(getSelfIndex(VD)), ReferenceOwnership(getReferenceOwnership(VD)),
+      GenericSig(printGenericSignature(Ctx, VD)) {
 
   // Calculate usr for its super class.
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
@@ -1385,18 +1429,6 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   auto AllAttrs = VD->getAttrs();
   std::transform(AllAttrs.begin(), AllAttrs.end(), std::back_inserter(DeclAttrs),
                  [](DeclAttribute *attr) { return attr->getKind(); });
-
-  // If the decl is declared in an extension, calculate the extension info.
-  if (auto *Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
-    ExtInfo = new (Ctx) ParentExtensionInfo();
-    // Print each generic requirement to the extension info.
-    for (auto Req: Ext->getGenericRequirements()) {
-      llvm::SmallString<32> Result;
-      llvm::raw_svector_ostream OS(Result);
-      Req.print(OS, PrintOptions::printInterface());
-      ExtInfo->Requirements.emplace_back(Ctx.buffer(OS.str()));
-    }
-  }
 
   // Get all protocol names this type decl conforms to.
   if (auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
@@ -1430,6 +1462,9 @@ case SDKNodeKind::X:                                                           \
 // representing the return value type of a function decl.
 static SDKNode *constructTypeNode(SDKContext &Ctx, Type T,
                                   TypeInitInfo InitInfo = TypeInitInfo()) {
+  if (Ctx.checkingABI()) {
+    T = T->getCanonicalType();
+  }
   SDKNode* Root = SDKNodeInitInfo(Ctx, T, InitInfo)
     .createSDKNode(SDKNodeKind::TypeNominal);
 
@@ -1798,6 +1833,9 @@ namespace swift {
           out.mapRequired(getKeyContent(Ctx, KeyKind::KK_location).data(), Location);
           out.mapRequired(getKeyContent(Ctx, KeyKind::KK_moduleName).data(),
                           ModuleName);
+          auto GSig = D->getGenericSignature();
+          if (!GSig.empty())
+            out.mapRequired(getKeyContent(Ctx, KeyKind::KK_genericSig), GSig);
 
           if (auto isStatic = D->isStatic())
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_static).data(), isStatic);
@@ -1836,15 +1874,6 @@ namespace swift {
                               RawTypeName);
             }
 
-          }
-          if (D->isFromExtension()) {
-            // Even if we don't have any requirements on this parent extension,
-            // we still want to have this key present to indicate the member
-            // is from an extension.
-            auto Reqs = D->getExtensionInfo().getGenericRequirements();
-            out.mapRequired(getKeyContent(Ctx,
-                                          KeyKind::KK_parentExtensionReqs).data(),
-                            Reqs);
           }
           auto Attributes = D->getDeclAttributes();
           if (!Attributes.empty())
@@ -3812,7 +3841,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath) {
     llvm::errs() << RightPath << " does not exist\n";
     return 1;
   }
-  SDKContext Ctx;
+  SDKContext Ctx(options::Abi);
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
@@ -3864,7 +3893,7 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
     return 1;
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
-  SDKContext Ctx;
+  SDKContext Ctx(options::Abi);
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
@@ -3988,7 +4017,7 @@ static int dumpSwiftModules(const CompilerInvocation &InitInvok,
     Modules.push_back(M);
   }
 
-  SDKContext Ctx;
+  SDKContext Ctx(options::Abi);
   for (auto M : Modules) {
     SwiftDeclCollector Collector(Ctx);
     SmallVector<Decl*, 256> Decls;
@@ -4045,7 +4074,7 @@ static int dumpSDKContent(const CompilerInvocation &InitInvok,
   }
   if (options::Verbose)
     llvm::errs() << "Scanning symbols...\n";
-  SDKContext SDKCtx;
+  SDKContext SDKCtx(options::Abi);
   SwiftDeclCollector Collector(SDKCtx);
   Collector.lookupVisibleDecls(Modules);
   if (options::Verbose)
@@ -4200,7 +4229,7 @@ static int deserializeSDKDump(StringRef dumpPath, StringRef OutputPath) {
     llvm::errs() << dumpPath << " does not exist\n";
     return 1;
   }
-  SDKContext Ctx;
+  SDKContext Ctx(options::Abi);
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
   Collector.serialize(OutputPath);
@@ -4213,7 +4242,7 @@ static int findDeclUsr(StringRef dumpPath) {
     llvm::errs() << dumpPath << " does not exist\n";
     return 1;
   }
-  SDKContext Ctx;
+  SDKContext Ctx(options::Abi);
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
   struct FinderByLocation: SDKNodeVisitor {

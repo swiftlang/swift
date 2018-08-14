@@ -314,21 +314,6 @@ static SmallVector<Type, 4>
 enumerateDirectSupertypes(TypeChecker &tc, Type type) {
   SmallVector<Type, 4> result;
 
-  if (auto tupleTy = type->getAs<TupleType>()) {
-    // A tuple that can be constructed from a scalar has a value of that
-    // scalar type as its supertype.
-    // FIXME: There is a way more general property here, where we can drop
-    // one label from the tuple, maintaining the rest.
-    int scalarIdx = tupleTy->getElementForScalarInit();
-    if (scalarIdx >= 0) {
-      auto &elt = tupleTy->getElement(scalarIdx);
-      if (elt.isVararg()) // FIXME: Should we keep the name?
-        result.push_back(elt.getVarargBaseTy());
-      else if (elt.hasName())
-        result.push_back(elt.getType());
-    }
-  }
-
   if (type->mayHaveSuperclass()) {
     // FIXME: Can also weaken to the set of protocol constraints, but only
     // if there are any protocols that the type conforms to but the superclass
@@ -729,16 +714,6 @@ bool ConstraintSystem::tryTypeVariableBindings(
       }
 
       if (binding.Kind == AllowedBindingKind::Subtypes) {
-        if (auto tupleTy = type->getAs<TupleType>()) {
-          int scalarIdx = tupleTy->getElementForScalarInit();
-          if (scalarIdx >= 0) {
-            auto eltType = tupleTy->getElementType(scalarIdx);
-            if (exploredTypes.insert(eltType->getCanonicalType()).second)
-              newBindings.push_back(
-                  {eltType, binding.Kind, binding.BindingSource});
-          }
-        }
-
         // If we were unsuccessful solving for T?, try solving for T.
         if (auto objTy = type->getOptionalObjectType()) {
           if (exploredTypes.insert(objTy->getCanonicalType()).second) {
@@ -1219,8 +1194,7 @@ void ConstraintSystem::shrink(Expr *expr) {
             // instead of cloning representative.
             auto coercionRepr = typeRepr->clone(CS.getASTContext());
             // Let's try to resolve coercion type from cloned representative.
-            auto coercionType = CS.TC.resolveType(coercionRepr, CS.DC,
-                                                  TypeResolutionOptions());
+            auto coercionType = CS.TC.resolveType(coercionRepr, CS.DC, None);
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
             if (coercionType->hasError())

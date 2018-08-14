@@ -774,7 +774,7 @@ private:
     NextExplosionIndex += explosionSize;
     unsigned explosionEnd = NextExplosionIndex;
 
-    ElementLayout layout = ElementLayout::getIncomplete(fieldType, fieldType);
+    ElementLayout layout = ElementLayout::getIncomplete(fieldType);
     auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
     if (isEmpty)
       layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal),

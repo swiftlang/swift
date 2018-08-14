@@ -147,8 +147,6 @@ public protocol Strideable : Comparable {
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
   ) -> (index: Int?, value: Self)
-
-  associatedtype _DisabledRangeIndex = Never
 }
 
 extension Strideable {

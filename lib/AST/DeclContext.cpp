@@ -91,14 +91,8 @@ ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
 GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   assert(getAsProtocolOrProtocolExtensionContext() && "not a protocol");
 
-  auto genericParams = getGenericParamsOfContext();
-
-  if (!genericParams) {
-    if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-      getASTContext().getLazyResolver()
-          ->resolveDeclSignature(const_cast<ProtocolDecl *>(proto));
-      genericParams = getGenericParamsOfContext();
-    }
+  if (auto proto = dyn_cast<ProtocolDecl>(this)) {
+    const_cast<ProtocolDecl *>(proto)->createGenericParamsIfMissing();
   }
 
   return getGenericParamsOfContext()->getParams().front()

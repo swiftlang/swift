@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck -check-prefix=CHECKIR %s
 // REQUIRES: executable_test

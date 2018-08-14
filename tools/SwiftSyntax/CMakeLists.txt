@@ -4,6 +4,7 @@ add_swift_library(swiftSwiftSyntax SHARED
   SwiftSyntax.swift
   AbsolutePosition.swift
   AtomicCache.swift
+  ByteTreeDeserialization.swift
   Diagnostic.swift
   DiagnosticConsumer.swift
   DiagnosticEngine.swift

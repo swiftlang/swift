@@ -966,6 +966,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   auto oneCandidate = candidates.front();
   candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
+    TC.validateDeclForNameLookup(cand);
     return isAcceptableDynamicMemberLookupSubscript(cand, decl, TC);
   });
 
@@ -1773,10 +1774,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   SmallVector<Requirement, 4> convertedRequirements;
   SmallVector<RequirementRepr, 4> resolvedRequirements;
 
-  // Add all requirements from the "where" clause to the old signature
-  // to check if there are any inconsistencies.
-  auto options = TypeResolutionOptions();
-
   // Set of generic parameters being constrained. It is used to
   // determine if a full specialization misses requirements for
   // some of the generic parameters.
@@ -1785,8 +1782,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   // Go over the set of requirements and resolve their types.
   for (auto &req : trailingWhereClause->getRequirements()) {
     if (req.getKind() == RequirementReprKind::SameType) {
-      auto firstType = TC.resolveType(req.getFirstTypeRepr(), FD, options);
-      auto secondType = TC.resolveType(req.getSecondTypeRepr(), FD, options);
+      auto firstType = TC.resolveType(req.getFirstTypeRepr(), FD, None);
+      auto secondType = TC.resolveType(req.getSecondTypeRepr(), FD, None);
       Type interfaceFirstType;
       Type interfaceSecondType;
 
@@ -1836,7 +1833,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     }
 
     if (req.getKind() == RequirementReprKind::LayoutConstraint) {
-      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, options);
+      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, None);
       Type interfaceSubjectType;
 
       // Map types to their interface types.
@@ -1872,9 +1869,9 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     }
 
     if (req.getKind() == RequirementReprKind::TypeConstraint) {
-      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, options);
+      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, None);
       auto constraint = TC.resolveType(
-          req.getConstraintLoc().getTypeRepr(), FD, options);
+          req.getConstraintLoc().getTypeRepr(), FD, None);
 
       Type interfaceSubjectType;
 
@@ -2038,11 +2035,11 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   TypeLoc &ProtoTypeLoc = attr->getProtocolType();
-  auto options = TypeResolutionFlags::AllowUnboundGenerics;
+  TypeResolutionOptions options = None;
+  options |= TypeResolutionFlags::AllowUnboundGenerics;
 
   DeclContext *DC = D->getDeclContext();
-  Type T = TC.resolveType(ProtoTypeLoc.getTypeRepr(),
-                          DC, options);
+  Type T = TC.resolveType(ProtoTypeLoc.getTypeRepr(), DC, options);
   ProtoTypeLoc.setType(T);
 
   // Definite error-types were already diagnosed in resolveType.

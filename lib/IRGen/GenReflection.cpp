@@ -341,7 +341,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
     if (auto CD = dyn_cast<ClassDecl>(NTD)) {
       auto type = CD->getDeclaredType()->getCanonicalType();
-      auto RC = getReferenceCountingForType(IGM, type);
+      auto RC = type->getReferenceCounting();
       if (RC == ReferenceCounting::ObjC)
         kind = FieldDescriptorKind::ObjCClass;
       else

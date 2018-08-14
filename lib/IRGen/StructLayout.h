@@ -101,15 +101,7 @@ private:
   enum : unsigned { IncompleteKind  = 4 };
 
   /// The swift type information for this element's layout.
-  const TypeInfo *TypeLayout;
-
-  /// The swift type information for this element's access.
-  ///
-  /// Almost always the same as the layout type info, except for classes
-  /// we have a workaround where we must perform layout as if the type
-  /// was completely fragile, since the Objective-C runtime does not
-  /// support classes with an unknown instance size.
-  const TypeInfo *TypeAccess;
+  const TypeInfo *Type;
 
   /// The offset in bytes from the start of the struct.
   unsigned ByteOffset;
@@ -125,18 +117,16 @@ private:
   /// The kind of layout performed for this element.
   unsigned TheKind : 3;
 
-  explicit ElementLayout(const TypeInfo &typeLayout,
-                         const TypeInfo &typeAccess)
-    : TypeLayout(&typeLayout), TypeAccess(&typeAccess), TheKind(IncompleteKind) {}
+  explicit ElementLayout(const TypeInfo &type)
+    : Type(&type), TheKind(IncompleteKind) {}
 
   bool isCompleted() const {
     return (TheKind != IncompleteKind);
   }
 
 public:
-  static ElementLayout getIncomplete(const TypeInfo &typeLayout,
-                                     const TypeInfo &typeAccess) {
-    return ElementLayout(typeLayout, typeAccess);
+  static ElementLayout getIncomplete(const TypeInfo &type) {
+    return ElementLayout(type);
   }
 
   void completeFrom(const ElementLayout &other) {
@@ -181,9 +171,7 @@ public:
     Index = nonFixedElementIndex;
   }
 
-  const TypeInfo &getTypeForLayout() const { return *TypeLayout; }
-
-  const TypeInfo &getTypeForAccess() const { return *TypeAccess; }
+  const TypeInfo &getType() const { return *Type; }
 
   Kind getKind() const {
     assert(isCompleted());

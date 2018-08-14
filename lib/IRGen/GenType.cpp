@@ -1058,12 +1058,10 @@ TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
 }
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
-static ProtocolInfo *invalidProtocolInfo() { return (ProtocolInfo*) 1; }
 
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
-    FirstType(invalidTypeInfo()),
-    FirstProtocol(invalidProtocolInfo()) {
+    FirstType(invalidTypeInfo()) {
   // FIXME: In LLDB, everything is completely fragile, so that IRGen can query
   // the size of resilient types. Of course this is not the right long term
   // solution, because it won't work once the swiftmodule file is not in
@@ -1081,9 +1079,9 @@ TypeConverter::~TypeConverter() {
     delete Cur;
   }
   
-  for (const ProtocolInfo *I = FirstProtocol; I != invalidProtocolInfo(); ) {
+  for (const ProtocolInfo *I = FirstProtocol; I != nullptr; ) {
     const ProtocolInfo *Cur = I;
-    I = Cur->NextConverted;
+    I = Cur->NextConverted.getPointer();
     delete Cur;
   }
 }

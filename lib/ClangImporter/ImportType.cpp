@@ -1632,10 +1632,7 @@ ImportedType ClangImporter::Implementation::importFunctionType(
   if (clangDecl->isNoReturn())
     swiftResultTy = SwiftContext.getNeverType();
 
-  // Form the function type.
-  auto argTy = parameterList->getType(SwiftContext);
-  auto fnTy = FunctionType::get(argTy, swiftResultTy);
-  return {fnTy, importedType.isImplicitlyUnwrapped()};
+  return {swiftResultTy, importedType.isImplicitlyUnwrapped()};
 }
 
 ParameterList *ClangImporter::Implementation::importFunctionParameterList(
@@ -1697,7 +1694,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         param, AccessLevel::Private,
         VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
-        dc->mapTypeIntoContext(swiftParamTy),
         ImportedHeaderUnit);
 
     paramInfo->setInterfaceType(swiftParamTy);
@@ -1716,7 +1712,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     auto param = new (SwiftContext) ParamDecl(VarDecl::Specifier::Default,
                                               SourceLoc(), SourceLoc(),
                                               Identifier(), SourceLoc(),
-                                              name, paramTy,
+                                              name,
                                               ImportedHeaderUnit);
     param->setInterfaceType(paramTy);
 
@@ -1893,17 +1889,14 @@ getForeignErrorInfo(ForeignErrorConvention::Info errorInfo,
   llvm_unreachable("bad error convention");
 }
 
-// Sometimes re-mapping type from one context to another is required,
-// because the other context might have some of the generic parameters
-// bound to concerete types, which means that we might loose generic
-// signature when converting from class method to constructor and that
-// is going to result in incorrect type interpretation of the method.
-static Type mapTypeIntoContext(const DeclContext *fromDC,
-                               const DeclContext *toDC, Type type) {
+// 'toDC' must be a subclass or a type conforming to the protocol
+// 'fromDC'.
+static Type mapGenericArgs(const DeclContext *fromDC,
+                           const DeclContext *toDC, Type type) {
   if (fromDC == toDC)
-    return toDC->mapTypeIntoContext(type);
+    return type;
 
-  auto subs = toDC->getDeclaredTypeInContext()->getContextSubstitutionMap(
+  auto subs = toDC->getDeclaredInterfaceType()->getContextSubstitutionMap(
                                             toDC->getParentModule(), fromDC);
   return type.subst(subs);
 }
@@ -2003,7 +1996,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
   if (!swiftResultTy)
     return {Type(), false};
 
-  swiftResultTy = mapTypeIntoContext(origDC, dc, swiftResultTy);
+  swiftResultTy = mapGenericArgs(origDC, dc, swiftResultTy);
 
   CanType errorParamType;
 
@@ -2018,7 +2011,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
     auto type = TupleType::getEmpty(SwiftContext);
     auto var = new (SwiftContext) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                             SourceLoc(), argName,
-                                            SourceLoc(), argName, type,
+                                            SourceLoc(), argName,
                                             ImportedHeaderUnit);
     var->setInterfaceType(type);
     swiftParams.push_back(var);
@@ -2099,7 +2092,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
     if (!swiftParamTy)
       return {Type(), false};
 
-    swiftParamTy = mapTypeIntoContext(origDC, dc, swiftParamTy);
+    swiftParamTy = mapGenericArgs(origDC, dc, swiftParamTy);
 
     // If this is the error parameter, remember it, but don't build it
     // into the parameter type.
@@ -2143,9 +2136,8 @@ ImportedType ClangImporter::Implementation::importMethodType(
                                            SourceLoc(), SourceLoc(), name,
                                            importSourceLoc(param->getLocation()),
                                            bodyName,
-                                           swiftParamTy,
                                            ImportedHeaderUnit);
-    paramInfo->setInterfaceType(swiftParamTy->mapTypeOutOfContext());
+    paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, paramIsIUO);
 
     // Determine whether we have a default argument.
@@ -2198,20 +2190,13 @@ ImportedType ClangImporter::Implementation::importMethodType(
     swiftResultTy = SwiftContext.getNeverType();
   }
 
-  FunctionType::ExtInfo extInfo;
-
   if (errorInfo) {
     foreignErrorInfo = getForeignErrorInfo(*errorInfo, errorParamType,
                                            origSwiftResultTy);
-
-    // Mark that the function type throws.
-    extInfo = extInfo.withThrows(true);
   }
 
-  // Form the function type.
-  auto fnTy = FunctionType::get((*bodyParams)->getInterfaceType(SwiftContext),
-                                swiftResultTy->mapTypeOutOfContext(), extInfo);
-  return {fnTy, importedType.isImplicitlyUnwrapped()};
+  return {swiftResultTy,
+          importedType.isImplicitlyUnwrapped()};
 }
 
 ImportedType ClangImporter::Implementation::importAccessorMethodType(
@@ -2243,14 +2228,14 @@ ImportedType ClangImporter::Implementation::importAccessorMethodType(
   if (!importedType)
     return {Type(), false};
 
-  auto propertyTy = mapTypeIntoContext(origDC, dc, importedType.getType());
+  auto propertyTy = mapGenericArgs(origDC, dc, importedType.getType());
   bool isIUO = importedType.isImplicitlyUnwrapped();
 
   // Now build up the resulting FunctionType and parameters.
   Type resultTy;
   if (isGetter) {
     *params = ParameterList::createEmpty(SwiftContext);
-    resultTy = propertyTy->mapTypeOutOfContext();
+    resultTy = propertyTy;
   } else {
     const clang::ParmVarDecl *param = clangDecl->parameters().front();
     ImportedName fullBodyName = importFullName(param, CurrentVersion);
@@ -2263,18 +2248,15 @@ ImportedType ClangImporter::Implementation::importAccessorMethodType(
                                            /*let loc*/SourceLoc(),
                                            /*label loc*/SourceLoc(),
                                            argLabel, nameLoc, bodyName,
-                                           propertyTy,
                                            /*dummy DC*/ImportedHeaderUnit);
-    paramInfo->setInterfaceType(propertyTy->mapTypeOutOfContext());
+    paramInfo->setInterfaceType(propertyTy);
 
     *params = ParameterList::create(SwiftContext, paramInfo);
     resultTy = SwiftContext.getVoidDecl()->getDeclaredInterfaceType();
     isIUO = false;
   }
 
-  auto fnTy =
-      FunctionType::get((*params)->getInterfaceType(SwiftContext), resultTy);
-  return {fnTy, isIUO};
+  return {resultTy, isIUO};
 }
 
 

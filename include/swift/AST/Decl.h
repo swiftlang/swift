@@ -488,7 +488,7 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+2+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -510,9 +510,6 @@ protected:
     /// True if the protocol has requirements that cannot be satisfied (e.g.
     /// because they could not be imported from Objective-C).
     HasMissingRequirements : 1,
-
-    /// Whether we are currently computing inherited protocols.
-    ComputingInheritedProtocols : 1,
 
     /// The stage of the circularity check for this protocol.
     Circularity : 2,
@@ -4463,7 +4460,7 @@ protected:
   llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
-          SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
+          SourceLoc NameLoc, Identifier Name, DeclContext *DC)
     : AbstractStorageDecl(Kind, DC, Name, NameLoc, !isImmutableSpecifier(Sp))
   {
     Bits.VarDecl.IsStatic = IsStatic;
@@ -4472,7 +4469,6 @@ protected:
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
-    setType(Ty);
   }
 
   /// This is the type specified, including location information.
@@ -4482,9 +4478,8 @@ protected:
 
 public:
   VarDecl(bool IsStatic, Specifier Sp, bool IsCaptureList, SourceLoc NameLoc,
-          Identifier Name, Type Ty, DeclContext *DC)
-    : VarDecl(DeclKind::Var, IsStatic, Sp, IsCaptureList, NameLoc, Name, Ty,
-              DC) {}
+          Identifier Name, DeclContext *DC)
+    : VarDecl(DeclKind::Var, IsStatic, Sp, IsCaptureList, NameLoc, Name, DC) {}
 
   SourceRange getSourceRange() const;
 
@@ -4712,7 +4707,7 @@ public:
   ParamDecl(VarDecl::Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
-            Identifier parameterName, Type ty, DeclContext *dc);
+            Identifier parameterName, DeclContext *dc);
 
   /// Clone constructor, allocates a new ParamDecl identical to the first.
   /// Intentionally not defined as a typical copy constructor to avoid
@@ -4730,10 +4725,6 @@ public:
   /// The resulting source location will be valid if the argument name
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
-  
-  /// Retrieve the parameter type flags corresponding to the declaration of
-  /// this parameter's argument type.
-  ParameterTypeFlags getParameterFlags() const;
   
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
     
@@ -4824,8 +4815,6 @@ public:
   
 /// Describes the kind of subscripting used in Objective-C.
 enum class ObjCSubscriptKind {
-  /// Not an Objective-C subscripting kind.
-  None,
   /// Objective-C indexed subscripting, which is based on an integral
   /// index.
   Indexed,
@@ -5776,8 +5765,8 @@ public:
   }
 
   /// Set the interface type of this enum element to the constructor function
-  /// type; (Self) -> Result or (Self) -> (Args...) -> Result.
-  bool computeType();
+  /// type; (Self.Type) -> Self or (Self.Type) -> (Args...) -> Self.
+  void computeType();
 
   Type getArgumentInterfaceType() const;
 

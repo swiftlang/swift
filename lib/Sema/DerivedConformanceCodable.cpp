@@ -456,7 +456,7 @@ static VarDecl *createKeyedContainer(ASTContext &C, DeclContext *DC,
   // let container : Keyed*Container<KeyType>
   auto *containerDecl = new (C) VarDecl(/*IsStatic=*/false, spec,
                                         /*IsCaptureList=*/false, SourceLoc(),
-                                        C.Id_container, containerType, DC);
+                                        C.Id_container, DC);
   containerDecl->setImplicit();
   containerDecl->setInterfaceType(containerType);
   return containerDecl;
@@ -481,7 +481,7 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
   // (keyedBy:)
   auto *keyedByDecl = new (C)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                C.Id_keyedBy, SourceLoc(), C.Id_keyedBy, returnType, DC);
+                C.Id_keyedBy, SourceLoc(), C.Id_keyedBy, DC);
   keyedByDecl->setImplicit();
   keyedByDecl->setInterfaceType(returnType);
 
@@ -711,7 +711,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), conformanceDC);
   auto *encoderParam = new (C)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_to,
-                SourceLoc(), C.Id_encoder, encoderType, conformanceDC);
+                SourceLoc(), C.Id_encoder, conformanceDC);
   encoderParam->setInterfaceType(encoderType);
 
   ParameterList *params = ParameterList::createWithoutLoc(encoderParam);
@@ -1017,7 +1017,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   auto decoderType = C.getDecoderDecl()->getDeclaredInterfaceType();
   auto *decoderParamDecl = new (C) ParamDecl(
       VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_from,
-      SourceLoc(), C.Id_decoder, decoderType, conformanceDC);
+      SourceLoc(), C.Id_decoder, conformanceDC);
   decoderParamDecl->setImplicit();
   decoderParamDecl->setInterfaceType(decoderType);
 

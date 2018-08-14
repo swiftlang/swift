@@ -312,15 +312,15 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
   syntax::AbsolutePosition RunningPos;
 
   tokenize(
-      LangOpts, SM, BufferID, Offset, EndOffset,
-      Diags,
+      LangOpts, SM, BufferID, Offset, EndOffset, Diags,
       CommentRetentionMode::AttachToNextToken, TriviaRetentionMode::WithTrivia,
       /*TokenizeInterpolatedString=*/false,
       /*SplitTokens=*/ArrayRef<Token>(),
       [&](const Token &Tok, const Trivia &LeadingTrivia,
           const Trivia &TrailingTrivia) {
+        auto Text = OwnedString::makeRefCounted(Tok.getText());
         auto ThisToken =
-            RawSyntax::make(Tok.getKind(), Tok.getText(), LeadingTrivia.Pieces,
+            RawSyntax::make(Tok.getKind(), Text, LeadingTrivia.Pieces,
                             TrailingTrivia.Pieces, SourcePresence::Present);
 
         auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
@@ -1015,6 +1015,13 @@ struct ParserUnit::Implementation {
             SourceFile::ImplicitModuleImportKind::None,
             Opts.CollectParsedToken,
             Opts.BuildSyntaxTree)) {
+  }
+
+  ~Implementation() {
+    // We need to delete the parser before the context so that it can finalize
+    // its SourceFileSyntax while it is still alive
+    TheParser.reset();
+    delete &Ctx;
   }
 };
 

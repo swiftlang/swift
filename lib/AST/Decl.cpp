@@ -1982,12 +1982,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   if (curryLevels == 0) {
     // In an initializer, ignore optionality.
     if (isInitializer) {
-      if (auto inOutTy = type->getAs<InOutType>()) {
-        if (auto objectType =
-                inOutTy->getObjectType()->getOptionalObjectType()) {
-          type = InOutType::get(objectType);
-        }
-      } else if (auto objectType = type->getOptionalObjectType()) {
+      if (auto objectType = type->getOptionalObjectType()) {
         type = objectType;
       }
     }
@@ -1998,7 +1993,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   auto funcTy = type->castTo<AnyFunctionType>();
   SmallVector<AnyFunctionType::Param, 4> newParams;
   for (const auto &param : funcTy->getParams()) {
-    auto newParamType = mapSignatureParamType(ctx, param.getType());
+    auto newParamType = mapSignatureParamType(ctx, param.getPlainType());
     ParameterTypeFlags newFlags = param.getParameterFlags().withEscaping(false);
 
     // For the 'self' of a method, strip off 'inout'.
@@ -2006,8 +2001,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
       newFlags = newFlags.withInOut(false);
     }
 
-    AnyFunctionType::Param newParam(newParamType->getInOutObjectType(),
-                                    param.getLabel(), newFlags);
+    AnyFunctionType::Param newParam(newParamType, param.getLabel(), newFlags);
     newParams.push_back(newParam);
   }
 
@@ -2196,22 +2190,24 @@ Type ValueDecl::getInterfaceType() const {
 }
 
 void ValueDecl::setInterfaceType(Type type) {
-  if (!type.isNull()) {
+  if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
-    if (isa<ParamDecl>(this))
-      assert(!type->is<InOutType>() && "caller did not pass a base type");
-  }
-  // lldb creates global typealiases with archetypes in them.
-  // FIXME: Add an isDebugAlias() flag, like isDebugVar().
-  //
-  // Also, ParamDecls in closure contexts can have type variables
-  // archetype in them during constraint generation.
-  if (!type.isNull() &&
-      !isa<TypeAliasDecl>(this) &&
-      !(isa<ParamDecl>(this) &&
-        isa<AbstractClosureExpr>(getDeclContext()))) {
-    assert(!type->hasArchetype() &&
-           "Archetype in interface type");
+    assert(!type->is<InOutType>() && "Interface type must be materializable");
+
+    // lldb creates global typealiases with archetypes in them.
+    // FIXME: Add an isDebugAlias() flag, like isDebugVar().
+    //
+    // Also, ParamDecls in closure contexts can have type variables
+    // archetype in them during constraint generation.
+    if (!isa<TypeAliasDecl>(this) &&
+        !(isa<ParamDecl>(this) &&
+          isa<AbstractClosureExpr>(getDeclContext()))) {
+      assert(!type->hasArchetype() &&
+             "Archetype in interface type");
+    }
+
+    if (type->hasError())
+      setInvalid();
   }
 
   TypeAndAccess.setPointer(type);
@@ -3583,7 +3579,6 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.NumRequirementsInSignature = 0;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
-  Bits.ProtocolDecl.ComputingInheritedProtocols = false;
 }
 
 llvm::TinyPtrVector<ProtocolDecl *>
@@ -3600,8 +3595,6 @@ ProtocolDecl::getInheritedProtocols() const {
         result.push_back(proto);
     }
   }
-
-  // FIXME: ComputingInheritedProtocols is dynamically dead.
 
   return result;
 }
@@ -4330,8 +4323,6 @@ AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
   auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
     switch (SD->getObjCSubscriptKind()) {
-    case ObjCSubscriptKind::None:
-      llvm_unreachable("Not an Objective-C subscript");
     case ObjCSubscriptKind::Indexed:
       return ObjCSelector(ctx, 1, ctx.Id_objectAtIndexedSubscript);
     case ObjCSubscriptKind::Keyed:
@@ -4363,9 +4354,6 @@ AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
   auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
     switch (SD->getObjCSubscriptKind()) {
-    case ObjCSubscriptKind::None:
-      llvm_unreachable("Not an Objective-C subscript");
-
     case ObjCSubscriptKind::Indexed:
       return ObjCSelector(ctx, 2,
                           { ctx.Id_setObject, ctx.Id_atIndexedSubscript });
@@ -4416,15 +4404,12 @@ Type VarDecl::getType() const {
 void VarDecl::setType(Type t) {
   assert(t.isNull() || !t->is<InOutType>());
   typeInContext = t;
-  if (t && t->hasError())
-    setInvalid();
 }
 
 void VarDecl::markInvalid() {
   auto &Ctx = getASTContext();
   setType(ErrorType::get(Ctx));
   setInterfaceType(ErrorType::get(Ctx));
-  setInvalid();
 }
 
 /// \brief Returns whether the var is settable in the specified context: this
@@ -4697,9 +4682,9 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
 ParamDecl::ParamDecl(Specifier specifier,
                      SourceLoc specifierLoc, SourceLoc argumentNameLoc,
                      Identifier argumentName, SourceLoc parameterNameLoc,
-                     Identifier parameterName, Type ty, DeclContext *dc)
+                     Identifier parameterName, DeclContext *dc)
   : VarDecl(DeclKind::Param, /*IsStatic*/false, specifier,
-            /*IsCaptureList*/false, parameterNameLoc, parameterName, ty, dc),
+            /*IsCaptureList*/false, parameterNameLoc, parameterName, dc),
   ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc),
   SpecifierLoc(specifierLoc) {
 
@@ -4715,9 +4700,6 @@ ParamDecl::ParamDecl(Specifier specifier,
 ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
   : VarDecl(DeclKind::Param, /*IsStatic*/false, PD->getSpecifier(),
             /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
-            PD->hasType() && withTypes
-              ? PD->getType()
-              : Type(),
             PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
@@ -4730,7 +4712,7 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
     typeLoc.setType(Type());
 
   if (withTypes && PD->hasInterfaceType())
-    setInterfaceType(PD->getInterfaceType()->getInOutObjectType());
+    setInterfaceType(PD->getInterfaceType());
 
   // FIXME: We should clone the entire attribute list.
   if (PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
@@ -4760,7 +4742,6 @@ Type DeclContext::getSelfInterfaceType() const {
 }
 
 /// Create an implicit 'self' decl for a method in the specified decl context.
-/// If 'static' is true, then this is self for a static method in the type.
 ///
 /// Note that this decl is created, but it is returned with an incorrect
 /// DeclContext that needs to be set correctly.  This is automatically handled
@@ -4772,7 +4753,7 @@ ParamDecl *ParamDecl::createUnboundSelf(SourceLoc loc, DeclContext *DC) {
   ASTContext &C = DC->getASTContext();
   auto *selfDecl =
       new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        Identifier(), loc, C.Id_self, Type(), DC);
+                        Identifier(), loc, C.Id_self, DC);
   selfDecl->setImplicit();
   return selfDecl;
 }
@@ -4802,16 +4783,11 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
   }
 
   auto *selfDecl = new (C) ParamDecl(specifier, SourceLoc(),SourceLoc(),
-                                     Identifier(), loc, C.Id_self, Type(), DC);
+                                     Identifier(), loc, C.Id_self, DC);
   selfDecl->setImplicit();
   selfDecl->setInterfaceType(selfInterfaceType);
   selfDecl->setValidationToChecked();
   return selfDecl;
-}
-
-ParameterTypeFlags ParamDecl::getParameterFlags() const {
-  return ParameterTypeFlags::fromParameterType(getType(), isVariadic(),
-                                               getValueOwnership());
 }
 
 /// Return the full source range of this parameter.
@@ -4966,30 +4942,31 @@ void SubscriptDecl::setIndices(ParameterList *p) {
 
 Type SubscriptDecl::getIndicesInterfaceType() const {
   auto indicesTy = getInterfaceType();
-  if (indicesTy->hasError())
+  if (indicesTy->is<ErrorType>())
     return indicesTy;
   return indicesTy->castTo<AnyFunctionType>()->getInput();
 }
 
 Type SubscriptDecl::getElementInterfaceType() const {
   auto elementTy = getInterfaceType();
-  if (elementTy->hasError())
+  if (elementTy->is<ErrorType>())
     return elementTy;
   return elementTy->castTo<AnyFunctionType>()->getResult();
 }
 
 void SubscriptDecl::computeType() {
-  auto &ctx = getASTContext();
-
   auto elementTy = getElementTypeLoc().getType();
-  auto indicesTy = getIndices()->getInterfaceType(ctx);
-  Type funcTy;
 
+  SmallVector<AnyFunctionType::Param, 2> argTy;
+  getIndices()->getParams(argTy);
+
+  Type funcTy;
   if (auto *sig = getGenericSignature())
-    funcTy = GenericFunctionType::get(sig, indicesTy, elementTy,
+    funcTy = GenericFunctionType::get(sig, argTy, elementTy,
                                       AnyFunctionType::ExtInfo());
   else
-    funcTy = FunctionType::get(indicesTy, elementTy);
+    funcTy = FunctionType::get(argTy, elementTy,
+                               AnyFunctionType::ExtInfo());
 
   // Record the interface type.
   setInterfaceType(funcTy);
@@ -5413,8 +5390,7 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
 
   {
     SmallVector<AnyFunctionType::Param, 4> argTy;
-    AnyFunctionType::decomposeInput(
-      getParameters()->getInterfaceType(ctx), argTy);
+    getParameters()->getParams(argTy);
 
     // 'throws' only applies to the innermost function.
     info = info.withThrows(hasThrows());
@@ -5734,36 +5710,38 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
-bool EnumElementDecl::computeType() {
+void EnumElementDecl::computeType() {
   assert(!hasInterfaceType());
 
-  EnumDecl *ED = getParentEnum();
-  Type resultTy = ED->getDeclaredInterfaceType();
+  auto &ctx = getASTContext();
+  auto *ED = getParentEnum();
 
-  if (resultTy->hasError()) {
-    setInterfaceType(resultTy);
-    setInvalid();
-    return false;
-  }
+  // The type of the enum element is either (Self.Type) -> Self
+  // or (Self.Type) -> (Args...) -> Self.
+  auto resultTy = ED->getDeclaredInterfaceType();
 
-  Type selfTy = MetatypeType::get(resultTy);
+  SmallVector<AnyFunctionType::Param, 1> selfTy;
+  selfTy.emplace_back(MetatypeType::get(resultTy, ctx),
+                      Identifier(),
+                      ParameterTypeFlags());
 
-  // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
   if (auto *PL = getParameterList()) {
-    auto paramTy = PL->getInterfaceType(getASTContext());
-    resultTy = FunctionType::get(paramTy, resultTy);
+    SmallVector<AnyFunctionType::Param, 4> argTy;
+    PL->getParams(argTy);
+
+    resultTy = FunctionType::get(argTy, resultTy,
+                                 AnyFunctionType::ExtInfo());
   }
 
-  if (auto *genericSig = ED->getGenericSignatureOfContext())
+  if (auto *genericSig = ED->getGenericSignature())
     resultTy = GenericFunctionType::get(genericSig, selfTy, resultTy,
                                         AnyFunctionType::ExtInfo());
   else
-    resultTy = FunctionType::get(selfTy, resultTy);
+    resultTy = FunctionType::get(selfTy, resultTy,
+                                 AnyFunctionType::ExtInfo());
 
   // Record the interface type.
   setInterfaceType(resultTy);
-
-  return true;
 }
 
 Type EnumElementDecl::getArgumentInterfaceType() const {
@@ -5771,12 +5749,12 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
     return nullptr;
 
   auto interfaceType = getInterfaceType();
-  if (interfaceType->hasError()) {
+  if (interfaceType->is<ErrorType>()) {
     return interfaceType;
   }
 
   auto funcTy = interfaceType->castTo<AnyFunctionType>();
-  funcTy = funcTy->getResult()->castTo<AnyFunctionType>();
+  funcTy = funcTy->getResult()->castTo<FunctionType>();
   return funcTy->getInput();
 }
 

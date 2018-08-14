@@ -482,8 +482,9 @@ public:
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
-                              MaybeLoadInitExpr->getType(), TypeCheckDC);
-
+                              TypeCheckDC);
+    VD->setType(MaybeLoadInitExpr->getType());
+    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
     NamedPattern *NP = new (Context) NamedPattern(VD, /*implicit*/ true);

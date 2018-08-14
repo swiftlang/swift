@@ -78,33 +78,16 @@ static VarDecl *getFirstParamDecl(FuncDecl *fn) {
 
 static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
                                 StringRef name,
-                                Type type,
                                 Type interfaceType,
                                 VarDecl::Specifier specifier) {
   auto &context = DC->getASTContext();
   auto *param = new (context) ParamDecl(specifier, SourceLoc(), SourceLoc(),
                                         Identifier(), loc,
                                         context.getIdentifier(name),
-                                        type, DC);
+                                        DC);
   param->setImplicit();
   param->setInterfaceType(interfaceType);
   return param;
-}
-
-static Type getTypeOfStorage(AbstractStorageDecl *storage,
-                             bool wantInterfaceType) {
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    auto type = (wantInterfaceType
-                 ? var->getInterfaceType()
-                 : var->getType());
-    return type->getReferenceStorageReferent();
-  }
-
-  auto subscript = cast<SubscriptDecl>(storage);
-  auto type = subscript->getElementInterfaceType();
-  if (!wantInterfaceType)
-    type = storage->getDeclContext()->mapTypeIntoContext(type);
-  return type;
 }
 
 /// Build a parameter list which can forward the formal index parameters of a
@@ -182,7 +165,7 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
       staticLoc = var->getLoc();
   }
 
-  auto storageInterfaceType = getTypeOfStorage(storage, true);
+  auto storageInterfaceType = storage->getValueInterfaceType();
 
   auto getter = AccessorDecl::create(
       TC.Context, loc, /*AccessorKeywordLoc*/ loc,
@@ -240,10 +223,9 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
   }
   
   // Add a "(value : T, indices...)" argument list.
-  auto storageType = getTypeOfStorage(storage, false);
-  auto storageInterfaceType = getTypeOfStorage(storage, true);
+  auto storageInterfaceType = storage->getValueInterfaceType();
   auto valueDecl = buildArgument(storage->getLoc(), storage->getDeclContext(),
-                                 "value", storageType, storageInterfaceType,
+                                 "value", storageInterfaceType,
                                  VarDecl::Specifier::Default);
   auto *params = buildIndexForwardingParamList(storage, valueDecl);
 
@@ -356,9 +338,9 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   //                           indices...).
   ParamDecl *bufferElements[] = {
       buildArgument(loc, DC, "buffer", ctx.TheRawPointerType,
-                    ctx.TheRawPointerType, VarDecl::Specifier::Default),
+                    VarDecl::Specifier::Default),
       buildArgument(loc, DC, "callbackStorage", ctx.TheUnsafeValueBufferType,
-                    ctx.TheUnsafeValueBufferType, VarDecl::Specifier::InOut)};
+                    VarDecl::Specifier::InOut)};
   auto *params = buildIndexForwardingParamList(storage, bufferElements);
 
   // The accessor returns (temporary: Builtin.RawPointer,
@@ -1093,7 +1075,7 @@ static void synthesizeObservedSetterBody(TypeChecker &TC, AccessorDecl *Set,
 
     OldValue = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                  /*IsCaptureList*/false, SourceLoc(),
-                                 Ctx.getIdentifier("tmp"), Type(), Set);
+                                 Ctx.getIdentifier("tmp"), Set);
     OldValue->setImplicit();
     auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
     auto *tmpPBD = PatternBindingDecl::createImplicit(
@@ -1217,7 +1199,7 @@ static void synthesizeLazyGetterBody(TypeChecker &TC, AccessorDecl *Get,
   // Load the existing storage and store it into the 'tmp1' temporary.
   auto *Tmp1VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                    /*IsCaptureList*/false, SourceLoc(),
-                                   Ctx.getIdentifier("tmp1"), Type(), Get);
+                                   Ctx.getIdentifier("tmp1"), Get);
   Tmp1VD->setImplicit();
 
   auto *Tmp1PBDPattern = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
@@ -1255,8 +1237,9 @@ static void synthesizeLazyGetterBody(TypeChecker &TC, AccessorDecl *Get,
 
   auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                    /*IsCaptureList*/false, SourceLoc(),
-                                   Ctx.getIdentifier("tmp2"), VD->getType(),
+                                   Ctx.getIdentifier("tmp2"),
                                    Get);
+  Tmp2VD->setType(VD->getType());
   Tmp2VD->setImplicit();
 
 
@@ -1345,7 +1328,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                         : VarDecl::Specifier::Let;
   auto *Storage = new (Context) VarDecl(
       /*IsStatic*/VD->isStatic(), storageSpecifier,
-      /*IsCaptureList*/false, VD->getLoc(), StorageName, SubstStorageContextTy,
+      /*IsCaptureList*/false, VD->getLoc(), StorageName,
       DC);
   Storage->setInterfaceType(SubstStorageInterfaceTy);
   Storage->setUserAccessible(false);
@@ -1461,8 +1444,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
 void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                  FuncDecl *BehaviorParameter,
                                  NormalProtocolConformance *BehaviorConformance,
-                                 SubstitutionMap interfaceMap,
-                                 SubstitutionMap contextMap) {
+                                 SubstitutionMap interfaceMap) {
   // Create a method to witness the requirement.
   auto DC = VD->getDeclContext();
   SmallString<64> NameBuf = VD->getName().str();
@@ -1514,8 +1496,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     auto declaredParamTy = declaredParam->getInterfaceType();
     auto interfaceTy = declaredParamTy.subst(interfaceMap);
     assert(interfaceTy);
-    auto contextTy = declaredParamTy.subst(contextMap);
-    assert(contextTy);
     auto declaredSpecifier = declaredParam->getSpecifier();
 
     SmallString<64> ParamNameBuf;
@@ -1525,7 +1505,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     }
     auto param = new (Context) ParamDecl(
         declaredSpecifier, SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
-        Context.getIdentifier(ParamNameBuf), contextTy, DC);
+        Context.getIdentifier(ParamNameBuf), DC);
     param->setInterfaceType(interfaceTy);
     param->setImplicit();
     Params.push_back(param);
@@ -1622,7 +1602,7 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        VarDecl::Specifier::Var,
                                        /*IsCaptureList*/false, SourceLoc(),
                                        Context.getIdentifier("tempSelf"),
-                                       selfTy, fromAccessor);
+                                       fromAccessor);
       var->setInterfaceType(selfIfaceTy);
       var->setImplicit();
 
@@ -1726,7 +1706,7 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
 
   auto *Storage = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
                                         /*IsCaptureList*/false, VD->getLoc(),
-                                        StorageName, StorageTy,
+                                        StorageName,
                                         VD->getDeclContext());
   Storage->setInterfaceType(StorageInterfaceTy);
   Storage->setUserAccessible(false);
@@ -1866,8 +1846,7 @@ static void maybeAddAccessorsToBehaviorStorage(TypeChecker &TC, VarDecl *var) {
   };
 
   // Try to resolve the behavior to a protocol.
-  auto behaviorType = TC.resolveType(behavior->ProtocolName, dc,
-                                     TypeResolutionOptions());
+  auto behaviorType = TC.resolveType(behavior->ProtocolName, dc, None);
   if (!behaviorType) {
     return makeBehaviorAccessors();
   }
@@ -2165,8 +2144,6 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
-      auto varType = var->getType()
-        ->getReferenceStorageReferent();
       auto varInterfaceType = var->getValueInterfaceType();
 
       // If var is a lazy property, its value is provided for the underlying
@@ -2174,15 +2151,13 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       // need to do this because the implicit constructor is added before all
       // the properties are type checked.  Perhaps init() synth should be moved
       // later.
-      if (var->getAttrs().hasAttribute<LazyAttr>()) {
-        varType = OptionalType::get(varType);
+      if (var->getAttrs().hasAttribute<LazyAttr>())
         varInterfaceType = OptionalType::get(varInterfaceType);
-      }
 
       // Create the parameter.
       auto *arg = new (context)
           ParamDecl(VarDecl::Specifier::Default, SourceLoc(), Loc,
-                    var->getName(), Loc, var->getName(), varType, decl);
+                    var->getName(), Loc, var->getName(), decl);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       

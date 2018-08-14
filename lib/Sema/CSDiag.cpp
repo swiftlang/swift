@@ -147,7 +147,7 @@ void constraints::simplifyLocator(Expr *&anchor,
 
   while (!path.empty()) {
     switch (path[0].getKind()) {
-    case ConstraintLocator::ApplyArgument:
+    case ConstraintLocator::ApplyArgument: {
       // Extract application argument.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
         // The target anchor is the function being called.
@@ -167,7 +167,20 @@ void constraints::simplifyLocator(Expr *&anchor,
         path = path.slice(1);
         continue;
       }
+
+      if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+        // The target anchor is the method being called,
+        // no additional information could be retrieved
+        // about this call.
+        targetAnchor = nullptr;
+        targetPath.clear();
+
+        anchor = UME->getArgument();
+        path = path.slice(1);
+        continue;
+      }
       break;
+    }
 
     case ConstraintLocator::ApplyFunction:
       // Extract application function.
@@ -317,7 +330,7 @@ void constraints::simplifyLocator(Expr *&anchor,
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
-        
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -3469,9 +3482,24 @@ static Optional<unsigned> getElementForScalarInitOfArg(
   
   auto getElementForScalarInitSimple =
       [](const TupleType *tupleTy) -> Optional<unsigned> {
-    int index = tupleTy->getElementForScalarInit();
-    if (index < 0) return None;
-    return index;    
+    Optional<unsigned> result = None;
+    for (unsigned i = 0, e = tupleTy->getNumElements(); i != e; ++i) {
+      // If we already saw a non-vararg field, then we have more than
+      // one candidate field.
+      if (result.hasValue()) {
+        // Vararg fields are okay; they'll just end up being empty.
+        if (tupleTy->getElement(i).isVararg())
+          continue;
+
+        // Give up.
+        return None;
+      }
+
+      // Otherwise, remember this field number.
+      result = i;
+    }
+
+    return result;
   };
 
   // If there aren't any candidates, we're done.
@@ -4318,7 +4346,7 @@ public:
     // Explode inout type.
     if (param.isInOut()) {
       insertText << "&";
-      Ty = param.getType()->getInOutObjectType();
+      Ty = param.getPlainType();
     }
     // @autoclosure; the type should be the result type.
     if (auto FT = param.getType()->getAs<AnyFunctionType>())
@@ -6980,7 +7008,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     if (VD->hasType() && (VD->getType()->hasTypeVariable() ||
                           VD->getType()->hasError())) {
       VD->setType(CS.getASTContext().TheUnresolvedType);
-      VD->setInterfaceType(VD->getType()->getInOutObjectType());
+      VD->setInterfaceType(VD->getType());
     }
   }
 
@@ -8268,7 +8296,16 @@ bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
   }
   
   if (!variadicArgs.empty()) {
-    auto varargsTy = contextualTT->getVarArgsBaseType();
+    Type varargsTy;
+    for (auto &elt : contextualTT->getElements()) {
+      if (elt.isVararg()) {
+        varargsTy = elt.getVarargBaseTy();
+        break;
+      }
+    }
+
+    assert(varargsTy);
+
     for (unsigned i = 0, e = variadicArgs.size(); i != e; ++i) {
       unsigned inArgNo = variadicArgs[i];
 
@@ -9071,57 +9108,136 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   return true;
 }
 
-bool swift::diagnoseUnwrap(TypeChecker &TC, DeclContext *DC,
-                           Expr *expr, Type type) {
+// Suggest a default value via ?? <default value>
+static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr *expr) {
+  auto diag =
+  TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
+
+  // Figure out what we need to parenthesize.
+  bool needsParensInside =
+  exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
+  bool needsParensOutside =
+  exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, expr);
+
+  llvm::SmallString<2> insertBefore;
+  llvm::SmallString<32> insertAfter;
+  if (needsParensOutside) {
+    insertBefore += "(";
+  }
+  if (needsParensInside) {
+    insertBefore += "(";
+    insertAfter += ")";
+  }
+  insertAfter += " ?? <" "#default value#" ">";
+  if (needsParensOutside)
+  insertAfter += ")";
+
+  if (!insertBefore.empty()) {
+    diag.fixItInsert(expr->getStartLoc(), insertBefore);
+  }
+  diag.fixItInsertAfter(expr->getEndLoc(), insertAfter);
+}
+
+// Suggest a force-unwrap.
+static void offerForceUnwrapFixit(ConstraintSystem &CS, Expr *expr) {
+  auto diag = CS.TC.diagnose(expr->getLoc(), diag::unwrap_with_force_value);
+
+  // If expr is optional as the result of an optional chain and this last
+  // dot isn't a member returning optional, then offer to force the last
+  // link in the chain, rather than an ugly parenthesized postfix force.
+  if (auto optionalChain = dyn_cast<OptionalEvaluationExpr>(expr)) {
+    if (auto dotExpr =
+            dyn_cast<UnresolvedDotExpr>(optionalChain->getSubExpr())) {
+      auto bind = dyn_cast<BindOptionalExpr>(dotExpr->getBase());
+      if (bind && !CS.getType(dotExpr)->getOptionalObjectType()) {
+        diag.fixItReplace(SourceRange(bind->getLoc()), "!");
+        return;
+      }
+    }
+  }
+
+  if (expr->canAppendPostfixExpression(true)) {
+    diag.fixItInsertAfter(expr->getEndLoc(), "!");
+  } else {
+    diag.fixItInsert(expr->getStartLoc(), "(")
+    .fixItInsertAfter(expr->getEndLoc(), ")!");
+  }
+}
+
+class VarDeclMultipleReferencesChecker : public ASTWalker {
+  VarDecl *varDecl;
+  int count;
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+      if (DRE->getDecl() == varDecl)
+        count++;
+    }
+    return { true, E };
+  }
+
+public:
+  VarDeclMultipleReferencesChecker(VarDecl *varDecl) : varDecl(varDecl),count(0) {}
+  int referencesCount() { return count; }
+};
+
+bool swift::diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
   Type unwrappedType = type->getOptionalObjectType();
   if (!unwrappedType)
     return false;
 
-  TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
-              unwrappedType);
+  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
+                 unwrappedType);
 
-  // Suggest a default value via ?? <default value>
-  {
-    auto diag =
-      TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
+  // If the expression we're unwrapping is the only reference to a
+  // local variable whose type isn't explicit in the source, then
+  // offer unwrapping fixits on the initializer as well.
+  if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+    if (auto varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
 
-    // Figure out what we need to parenthesize.
-    bool needsParensInside =
-      exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
-    bool needsParensOutside =
-      exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, expr);
+      bool singleUse = false;
+      AbstractFunctionDecl *AFD = nullptr;
+      if (auto contextDecl = varDecl->getDeclContext()->getAsDeclOrDeclExtensionContext()) {
+        if ((AFD = dyn_cast<AbstractFunctionDecl>(contextDecl))) {
+          auto checker = VarDeclMultipleReferencesChecker(varDecl);
+          AFD->getBody()->walk(checker);
+          singleUse = checker.referencesCount() == 1;
+        }
+      }
 
-    llvm::SmallString<2> insertBefore;
-    llvm::SmallString<32> insertAfter;
-    if (needsParensOutside) {
-      insertBefore += "(";
+      PatternBindingDecl *binding = varDecl->getParentPatternBinding();
+      if (singleUse && binding && binding->getNumPatternEntries() == 1 &&
+          varDecl->getTypeSourceRangeForDiagnostics().isInvalid()) {
+
+        Expr *initializer = varDecl->getParentInitializer();
+        if (auto declRefExpr = dyn_cast<DeclRefExpr>(initializer)) {
+          if (declRefExpr->getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer, type);
+          }
+        }
+
+        auto fnTy = AFD->getInterfaceType()->castTo<AnyFunctionType>();
+        bool voidReturn = fnTy->getResult()->isEqual(TupleType::getEmpty(CS.DC->getASTContext()));
+
+        auto diag = CS.TC.diagnose(varDecl->getLoc(), diag::unwrap_with_guard);
+        diag.fixItInsert(binding->getStartLoc(), "guard ");
+        if (voidReturn) {
+          diag.fixItInsertAfter(binding->getEndLoc(), " else { return }");
+        } else {
+          diag.fixItInsertAfter(binding->getEndLoc(), " else { return <"
+                                "#default value#" "> }");
+        }
+        diag.flush();
+
+        offerDefaultValueUnwrapFixit(CS.TC, varDecl->getDeclContext(),
+                                     initializer);
+        offerForceUnwrapFixit(CS, initializer);
+      }
     }
-    if (needsParensInside) {
-      insertBefore += "(";
-      insertAfter += ")";
-    }
-    insertAfter += " ?? <" "#default value#" ">";
-    if (needsParensOutside)
-      insertAfter += ")";
-
-    if (!insertBefore.empty()) {
-      diag.fixItInsert(expr->getStartLoc(), insertBefore);
-    }
-    diag.fixItInsertAfter(expr->getEndLoc(), insertAfter);
   }
 
-  // Suggest a force-unwrap.
-  {
-    auto diag =
-      TC.diagnose(expr->getLoc(), diag::unwrap_with_force_value);
-    if (expr->canAppendPostfixExpression(true)) {
-      diag.fixItInsertAfter(expr->getEndLoc(), "!");
-    } else {
-      diag.fixItInsert(expr->getStartLoc(), "(")
-          .fixItInsertAfter(expr->getEndLoc(), ")!");
-    }
-  }
-
+  offerDefaultValueUnwrapFixit(CS.TC, CS.DC, expr);
+  offerForceUnwrapFixit(CS, expr);
   return true;
 }
 

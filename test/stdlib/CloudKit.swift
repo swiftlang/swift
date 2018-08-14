@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 4 -F %sdk/System/Library/PrivateFrameworks %s -o %t/a.out-4 && %target-run %t/a.out-4
-// RUN: %target-build-swift -swift-version 4.2 -F %sdk/System/Library/PrivateFrameworks %s -o %t/a.out-4.2 && %target-run %t/a.out-4.2
+// RUN: %target-build-swift -swift-version 4 -F %sdk/System/Library/PrivateFrameworks %s -o %t/a.out-4 && %target-codesign %t/a.out-4 && %target-run %t/a.out-4
+// RUN: %target-build-swift -swift-version 4.2 -F %sdk/System/Library/PrivateFrameworks %s -o %t/a.out-4.2 && %target-codesign %t/a.out-4.2 && %target-run %t/a.out-4.2
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 

@@ -340,7 +340,7 @@ diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
                                             bool SuppressDiagnostics) {
   auto &tc = cs.getTypeChecker();
   auto baseTy = cs.getType(base)->getRValueType();
-  auto instanceTy = baseTy->getRValueInstanceType();
+  auto instanceTy = baseTy->getMetatypeInstanceType();
 
   bool isStaticallyDerived =
     base->isStaticallyDerivedMetatype(
@@ -534,7 +534,7 @@ namespace {
 
       const auto &base = params.front();
       if (wantsRValueInstanceType)
-        return base.getType()->getRValueInstanceType();
+        return base.getPlainType()->getMetatypeInstanceType();
 
       return base.getType();
     }
@@ -1083,7 +1083,8 @@ namespace {
                  cs.UnevaluatedRootExprs.count(
                    memberLocator.getBaseLocator()->getAnchor()) &&
                  "Attempt to reference an instance member of a metatype");
-          auto baseInstanceTy = cs.getType(base)->getRValueInstanceType();
+          auto baseInstanceTy = cs.getType(base)
+              ->getInOutObjectType()->getMetatypeInstanceType();
           base = new (context) UnevaluatedInstanceExpr(base, baseInstanceTy);
           cs.cacheType(base);
           base->setImplicit();
@@ -6606,19 +6607,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                         /*isImplicit*/ true));
     }
 
-    // If we're actually turning this into an lvalue tuple element, don't
-    // load.
-    bool performLoad = true;
-    if (auto toTuple = toType->getAs<TupleType>()) {
-      int scalarIdx = toTuple->getElementForScalarInit();
-      if (scalarIdx >= 0 &&
-          toTuple->getElement(scalarIdx).isInOut())
-        performLoad = false;
-    }
-
-    if (performLoad) {
-      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
-    }
+    return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
   }
 
   // Coercions to tuple type.
@@ -7254,7 +7243,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                        nonescaping,
                                        callSubExpr,
                                        apply->getArg()->getEndLoc(),
-                                       escapable);
+                                       escapable,
+                                       apply);
         cs.setType(replacement, resultType);
         return replacement;
       }
@@ -7590,9 +7580,9 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(Expr *expr,
 /// Return true if, when replacing "<expr>" with "<expr> op <something>",
 /// parentheses must be added around "<expr>" to allow the new operator
 /// to bind correctly.
-static bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC,
-                                                   DeclContext *DC, Expr *expr,
-                                            PrecedenceGroupDecl *followingPG) {
+bool swift::exprNeedsParensInsideFollowingOperator(
+    TypeChecker &TC, DeclContext *DC, Expr *expr,
+    PrecedenceGroupDecl *followingPG) {
   if (expr->isInfixOperator()) {
     auto exprPG = TC.lookupPrecedenceGroupForInfixOperator(DC, expr);
     if (!exprPG) return true;
@@ -7613,10 +7603,9 @@ static bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC,
 /// within the given root expression, parentheses must be added around
 /// the new operator to prevent it from binding incorrectly in the
 /// surrounding context.
-static bool exprNeedsParensOutsideFollowingOperator(TypeChecker &TC,
-                                                    DeclContext *DC, Expr *expr,
-                                                    Expr *rootExpr,
-                                            PrecedenceGroupDecl *followingPG) {
+bool swift::exprNeedsParensOutsideFollowingOperator(
+    TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr,
+    PrecedenceGroupDecl *followingPG) {
   Expr *parent;
   unsigned index;
   std::tie(parent, index) = getPrecedenceParentAndIndex(expr, rootExpr);
@@ -7639,29 +7628,6 @@ static bool exprNeedsParensOutsideFollowingOperator(TypeChecker &TC,
   }
 
   return true;
-}
-
-// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
-// to be added around <expr> first in order to maintain the correct precedence.
-static bool exprNeedsParensBeforeAddingAs(TypeChecker &TC, DeclContext *DC,
-                                          Expr *expr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_CastingPrecedence,
-                             SourceLoc());
-  if (!asPG) return true;
-  return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
-}
-
-// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
-// to be added around the new expression in order to maintain the correct
-// precedence.
-static bool exprNeedsParensAfterAddingAs(TypeChecker &TC, DeclContext *DC,
-                                         Expr *expr, Expr *rootExpr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_CastingPrecedence,
-                             SourceLoc());
-  if (!asPG) return true;
-  return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
 }
 
 bool swift::exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
@@ -7796,12 +7762,11 @@ Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
 /// Emit the fixes computed as part of the solution, returning true if we were
 /// able to emit an error message, or false if none of the fixits worked out.
 bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
-  llvm::SmallDenseMap<Expr *,
-                      SmallVector<std::pair<Fix, ConstraintLocator *>, 4>>
+  llvm::SmallDenseMap<Expr *, SmallVector<const ConstraintFix *, 4>>
       fixesPerExpr;
 
-  for (const auto &fix : solution.Fixes)
-    fixesPerExpr[fix.second->getAnchor()].push_back(fix);
+  for (auto *fix : solution.Fixes)
+    fixesPerExpr[fix->getAnchor()].push_back(fix);
 
   auto diagnoseExprFailures = [&](Expr *expr) -> bool {
     auto fixes = fixesPerExpr.find(expr);
@@ -7809,8 +7774,8 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
       return false;
 
     bool diagnosed = false;
-    for (auto &fix : fixes->second)
-      diagnosed |= applySolutionFix(E, solution, fix);
+    for (const auto *fix : fixes->second)
+      diagnosed |= fix->diagnose(E, solution);
     return diagnosed;
   };
 
@@ -7826,225 +7791,6 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
   diagnosed |= diagnoseExprFailures(E);
   return diagnosed;
 }
-
-/// \brief Apply the specified Fix to this solution, producing a fix-it hint
-/// diagnostic for it and returning true.  If the fix-it hint turned out to be
-/// bogus, this returns false and doesn't emit anything.
-bool ConstraintSystem::applySolutionFix(
-    Expr *expr, const Solution &solution,
-    std::pair<Fix, ConstraintLocator *> &fix) {
-  // Some fixes need more information from the locator.
-  ConstraintLocator *locator = fix.second;
-
-  // In the case of us having applied a type member constraint against a
-  // synthesized type variable during diagnostic generation, we may not have
-  // a valid locator.
-  if (!locator)
-    return false;
-
-  // Resolve the locator to a specific expression.
-  SourceRange range;
-  bool isSubscriptMember =
-    (!locator->getPath().empty() &&
-     locator->getPath().back().getKind() == ConstraintLocator::SubscriptMember);
-  ConstraintLocator *resolved = simplifyLocator(*this, locator, range);
-
-  // If we didn't manage to resolve directly to an expression, we don't
-  // have a great diagnostic to give, so bail.
-  if (!resolved || !resolved->getAnchor() ||
-      (!resolved->getPath().empty() &&
-       fix.first.getKind() != FixKind::ExplicitlyEscaping &&
-       fix.first.getKind() != FixKind::ExplicitlyEscapingToAny &&
-       fix.first.getKind() != FixKind::AddConformance))
-    return false;
-  
-  Expr *affected = resolved->getAnchor();
-
-  // FIXME: Work around an odd locator representation that doesn't separate the
-  // base of a subscript member from the member access.
-  if (isSubscriptMember) {
-    if (auto subscript = dyn_cast<SubscriptExpr>(affected))
-      affected = subscript->getBase();
-  }
-    
-  switch (fix.first.getKind()) {
-  case FixKind::ForceOptional: {
-    Expr *unwrapped = affected->getValueProvidingExpr();
-    auto type = solution.simplifyType(getType(affected))->getRValueType();
-
-    if (auto tryExpr = dyn_cast<OptionalTryExpr>(unwrapped)) {
-      TC.diagnose(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try,
-                  type)
-        .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
-                      "try!");
-
-    } else {
-      return diagnoseUnwrap(TC, DC, unwrapped, type);
-    }
-    return true;
-  }
-          
-  case FixKind::UnwrapOptionalBase: {
-    auto type = solution.simplifyType(getType(affected))->getRValueType();
-    bool resultOptional = fix.first.isUnwrapOptionalBaseByOptionalChaining(*this);
-
-    // If we've resolved the member overload to one that returns an optional
-    // type, then the result of the expression is optional (and we want to offer
-    // only a '?' fixit) even though the constraint system didn't need to add any
-    // additional optionality.
-    auto resolvedOverload = getResolvedOverloadSets();
-    while (resolvedOverload) {
-      if (resolvedOverload->Locator == fix.second) {
-        if (resolvedOverload->ImpliedType->getOptionalObjectType())
-          resultOptional = true;
-        break;
-      }
-      resolvedOverload = resolvedOverload->Previous;
-    }
-
-    DeclName memberName = fix.first.getDeclNameArgument(*this);
-    return diagnoseBaseUnwrapForMemberAccess(affected, type, memberName,
-                                             resultOptional, SourceRange());
-  }
-
-  case FixKind::ForceDowncast: {
-    if (auto *paren = dyn_cast<ParenExpr>(affected))
-      affected = paren->getSubExpr();
-
-    auto fromType = solution.simplifyType(getType(affected))->getRValueType();
-    Type toType = solution.simplifyType(fix.first.getTypeArgument(*this));
-    bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
-    bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType,
-                                                        DC);
-    if (!useAs && !useAsBang)
-      return false;
-    
-    // If we're performing pattern matching, "as" means something completely different...
-    if (auto binOpExpr = dyn_cast<BinaryExpr>(expr)) {
-      auto overloadedFn = dyn_cast<OverloadedDeclRefExpr>(binOpExpr->getFn());
-      if (overloadedFn && !overloadedFn->getDecls().empty()) {
-        ValueDecl *decl0 = overloadedFn->getDecls()[0];
-        if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator)
-          return false;
-      }
-    }
-
-    bool needsParensInside = exprNeedsParensBeforeAddingAs(TC, DC, affected);
-    bool needsParensOutside = exprNeedsParensAfterAddingAs(TC, DC, affected,
-                                                           expr);
-    llvm::SmallString<2> insertBefore;
-    llvm::SmallString<32> insertAfter;
-    if (needsParensOutside) {
-      insertBefore += "(";
-    }
-    if (needsParensInside) {
-      insertBefore += "(";
-      insertAfter += ")";
-    }
-    insertAfter += useAs ? " as " : " as! ";
-    insertAfter += toType->getWithoutParens()->getString();
-    if (needsParensOutside)
-      insertAfter += ")";
-    
-    auto diagID = useAs ? diag::missing_explicit_conversion
-                        : diag::missing_forced_downcast;
-    auto diag = TC.diagnose(affected->getLoc(), diagID, fromType, toType);
-    if (!insertBefore.empty()) {
-      diag.fixItInsert(affected->getStartLoc(), insertBefore);
-    }
-    diag.fixItInsertAfter(affected->getEndLoc(), insertAfter);
-    return true;
-  }
-
-  case FixKind::AddressOf: {
-    auto type = solution.simplifyType(getType(affected))->getRValueType();
-    TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
-      .fixItInsert(affected->getStartLoc(), "&");
-    return true;
-  }
-
-  case FixKind::CoerceToCheckedCast: {
-    if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
-      Expr *subExpr = coerceExpr->getSubExpr();
-      auto fromType =
-        solution.simplifyType(getType(subExpr))->getRValueType();
-      auto toType =
-        solution.simplifyType(coerceExpr->getCastTypeLoc().getType());
-      auto castKind = TC.typeCheckCheckedCast(
-                        fromType, toType, CheckedCastContextKind::None, DC,
-                        coerceExpr->getLoc(), subExpr,
-                        coerceExpr->getCastTypeLoc().getSourceRange());
-      
-      switch (castKind) {
-      // Invalid cast.
-      case CheckedCastKind::Unresolved:
-        // Fix didn't work, let diagnoseFailureForExpr handle this.
-        return false;
-      case CheckedCastKind::Coercion:
-      case CheckedCastKind::BridgingCoercion:
-        llvm_unreachable("Coercions handled in other disjunction branch");
-
-      // Valid casts.
-      case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::ValueCast:
-        TC.diagnose(coerceExpr->getLoc(), diag::missing_forced_downcast,
-                    fromType, toType)
-          .highlight(coerceExpr->getSourceRange())
-          .fixItReplace(coerceExpr->getLoc(), "as!");
-        return true;
-      }
-    }
-    return false;
-  }
-
-  case FixKind::ExplicitlyEscaping: {
-    auto path = locator->getPath();
-    auto *anchor = locator->getAnchor();
-
-    if (path.empty())
-      return false;
-
-    auto &last = path.back();
-    if (last.getKind() == ConstraintLocator::Archetype) {
-      auto *archetype = last.getArchetype();
-      TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
-                  archetype);
-      return true;
-    }
-    break;
-  }
-
-  case FixKind::ExplicitlyEscapingToAny: {
-    auto *anchor = locator->getAnchor();
-    TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
-                getASTContext().TheAnyType);
-    return true;
-  }
-
-  case FixKind::RelabelArguments: {
-    LabelingFailure failure(solution, fix.second,
-                            fix.first.getArgumentLabels(*this));
-    return failure.diagnose();
-  }
-
-  case FixKind::AddConformance: {
-    auto *anchor = locator->getAnchor();
-    auto &reqLoc = locator->getPath().back();
-    MissingConformanceFailure failure(
-        expr, solution, fix.second,
-        MissingConformances[{anchor, reqLoc.getValue()}]);
-    return failure.diagnose();
-  }
-  }
-
-  // FIXME: It would be really nice to emit a follow-up note showing where
-  // we got the other type information from, e.g., the parameter we're
-  // initializing.
-  return false;
-}
-
 
 /// \brief Apply a given solution to the expression, producing a fully
 /// type-checked expression.
@@ -8339,6 +8085,7 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
   }
 
   // The method is not generic, so there are no substitutions.
+  tc.validateDeclForNameLookup(builtinMethod);
   auto builtinMethodType = builtinMethod->getInterfaceType()
     ->castTo<FunctionType>();
 

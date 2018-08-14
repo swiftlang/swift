@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name=_Test -import-objc-header %S/Inputs/check_class_for_archiving.h -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test

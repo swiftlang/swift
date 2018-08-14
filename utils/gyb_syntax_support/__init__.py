@@ -6,6 +6,8 @@ from CommonNodes import COMMON_NODES  # noqa: I201
 from DeclNodes import DECL_NODES  # noqa: I201
 from ExprNodes import EXPR_NODES  # noqa: I201
 from GenericNodes import GENERIC_NODES  # noqa: I201
+from NodeSerializationCodes import SYNTAX_NODE_SERIALIZATION_CODES, \
+    verify_syntax_node_serialization_codes
 from PatternNodes import PATTERN_NODES  # noqa: I201
 from StmtNodes import STMT_NODES  # noqa: I201
 import Token
@@ -20,6 +22,9 @@ SYNTAX_TOKENS = Token.SYNTAX_TOKENS
 SYNTAX_TOKEN_MAP = Token.SYNTAX_TOKEN_MAP
 SYNTAX_CLASSIFICATIONS = Classification.SYNTAX_CLASSIFICATIONS
 
+verify_syntax_node_serialization_codes(SYNTAX_NODES, 
+                                       SYNTAX_NODE_SERIALIZATION_CODES)
+
 
 def make_missing_child(child):
     """
@@ -29,7 +34,9 @@ def make_missing_child(child):
         token = child.main_token()
         tok_kind = token.kind if token else "unknown"
         tok_text = token.text if token else ""
-        return 'RawSyntax::missing(tok::%s, "%s")' % (tok_kind, tok_text)
+        return \
+            'RawSyntax::missing(tok::%s, OwnedString::makeUnowned("%s"))' % \
+            (tok_kind, tok_text)
     else:
         missing_kind = "Unknown" if child.syntax_kind == "Syntax" \
                        else child.syntax_kind

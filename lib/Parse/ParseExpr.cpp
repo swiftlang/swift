@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -532,10 +532,9 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   }
 
   ParserResult<Expr> SubExpr = parseExprUnary(Message, isExprBasic);
-  if (SubExpr.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Expr>();
+  ParserStatus Status = SubExpr;
   if (SubExpr.isNull())
-    return nullptr;
+    return Status;
 
   // We are sure we can create a prefix prefix operator expr now.
   UnaryContext.setCreateSyntax(SyntaxKind::PrefixOperatorExpr);
@@ -545,12 +544,13 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   if (auto *LE = dyn_cast<NumberLiteralExpr>(SubExpr.get())) {
     if (Operator->hasName() && Operator->getName().getBaseName() == "-") {
       LE->setNegative(Operator->getLoc());
-      return makeParserResult(LE);
+      return makeParserResult(Status, LE);
     }
   }
 
-  return makeParserResult(new (Context) PrefixUnaryExpr(
-      Operator, formUnaryArgument(Context, SubExpr.get())));
+  return makeParserResult(
+      Status, new (Context) PrefixUnaryExpr(
+                  Operator, formUnaryArgument(Context, SubExpr.get())));
 }
 
 /// expr-keypath-swift:
@@ -1612,35 +1612,11 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     DeclNameLoc NameLoc;
 
     if (Tok.is(tok::code_complete)) {
-      auto Expr = UnresolvedMemberExpr::create(
-                    Context, DotLoc, DeclNameLoc(DotLoc.getAdvancedLoc(1)),
-                    Context.getIdentifier("_"), /*implicit=*/false);
-      auto Result = makeParserResult(Expr);
+      auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+      auto Result = makeParserResult(CCE);
+      Result.setHasCodeCompletion();
       if (CodeCompletion) {
-
-        // FIXME: Code-completion should be able to find the contextual type
-        // from AST.
-        std::vector<StringRef> Identifiers;
-        bool HasReturn = false;
-        {
-          ParserPositionRAII PPR(*this);
-          // Move lexer to the start of the current line.
-          L->backtrackToState(L->getStateForBeginningOfTokenLoc(
-            L->getLocForStartOfLine(SourceMgr, Tok.getLoc())));
-
-          // Until we see the code completion token, collect identifiers.
-          for (L->lex(Tok); !Tok.isAny(tok::code_complete, tok::eof);
-              consumeTokenWithoutFeedingReceiver()) {
-            if (!HasReturn)
-              HasReturn = Tok.is(tok::kw_return);
-            if (Tok.is(tok::identifier)) {
-              Identifiers.push_back(Tok.getText());
-            }
-          }
-        }
-        CodeCompletion->completeUnresolvedMember(Expr, Identifiers, HasReturn);
-      } else {
-        Result.setHasCodeCompletion();
+        CodeCompletion->completeUnresolvedMember(CCE, DotLoc);
       }
       consumeToken();
       return Result;
@@ -1667,9 +1643,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                           rParenLoc,
                                           trailingClosure,
                                           SyntaxKind::FunctionCallArgumentList);
-      if (status.isError())
-        return nullptr;
-
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       return makeParserResult(
                  status,
@@ -1765,6 +1738,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
   // by the lexer, so there is no reason to emit another diagnostic.
   case tok::unknown:
+    if (Tok.getText().startswith("\"\"\"")) {
+      // This was due to unterminated multi-line string.
+      IsInputIncomplete = true;
+    }
     consumeToken(tok::unknown);
     return nullptr;
 
@@ -2469,7 +2446,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       auto *VD = new (Context) VarDecl(/*isStatic*/false,
                                        specifierKind,
                                        /*isCaptureList*/true,
-                                       nameLoc, name, Type(), CurDeclContext);
+                                       nameLoc, name, CurDeclContext);
 
       // Attributes.
       if (ownershipKind != ReferenceOwnership::Strong)
@@ -2523,7 +2500,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
             Context.getIdentifier(Tok.getText()) : Identifier();
         auto var = new (Context)
             ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                      Identifier(), Tok.getLoc(), name, Type(), nullptr);
+                      Identifier(), Tok.getLoc(), name, nullptr);
         elements.push_back(var);
         consumeToken();
 
@@ -2825,7 +2802,7 @@ Expr *Parser::parseExprAnonClosureArg() {
     SourceLoc varLoc = leftBraceLoc;
     auto *var = new (Context)
         ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                  Identifier(), varLoc, ident, Type(), closure);
+                  Identifier(), varLoc, ident, closure);
     var->setImplicit();
     decls.push_back(var);
   }

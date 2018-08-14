@@ -446,7 +446,7 @@ public:
 
     // Metatypes and bases of non-mutating setters on value types
     //  are always rvalues.
-    if (!SubstSelfType->getRValueInstanceType()->mayHaveSuperclass()) {
+    if (!SubstSelfType->getMetatypeInstanceType()->mayHaveSuperclass()) {
       return LValue::forValue(self, SubstSelfType);
     }
 
@@ -908,6 +908,12 @@ MaterializeForSetEmitter::emitUsingGetterSetter(SILGenFunction &SGF,
   CanType indicesFormalType;
   if (isa<SubscriptDecl>(WitnessStorage)) {
     indicesFormalType = indices.getType();
+
+    // Unwrap one-element tuples, since we cannot lower them.
+    if (auto tupleType = dyn_cast<TupleType>(indicesFormalType))
+      if (tupleType->getNumElements() == 1)
+        indicesFormalType = tupleType.getElementType(0);
+
     indicesTL = &SGF.getTypeLowering(indicesFormalType);
     SILValue allocatedCallbackBuffer =
       SGF.B.createAllocValueBuffer(loc, indicesTL->getLoweredType(),

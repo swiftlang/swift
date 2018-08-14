@@ -636,9 +636,12 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     if (instanceType->mayHaveMembers()) {
       auto ctors = CS.TC.lookupConstructors(
                                             CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
-      for (auto ctor : ctors)
+      for (auto ctor : ctors) {
+        if (!ctor.getValueDecl()->hasInterfaceType())
+          CS.getTypeChecker().validateDeclForNameLookup(ctor.getValueDecl());
         if (ctor.getValueDecl()->hasInterfaceType())
           candidates.push_back({ ctor.getValueDecl(), 1 });
+      }
     }
     
     declName = instanceType->getString();
@@ -675,7 +678,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
         if (baseType && C.level == 1 && C.getDecl()) {
           baseType = baseType
             ->getWithoutSpecifierType()
-            ->getRValueInstanceType();
+            ->getMetatypeInstanceType();
 
           if (baseType->isAnyObject())
             baseType = Type();
@@ -868,7 +871,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
       if (substType)
         substType = substType
         ->getWithoutSpecifierType()
-        ->getRValueInstanceType();
+        ->getMetatypeInstanceType();
       
       // If this is a DeclViaUnwrappingOptional, then we're actually looking
       // through an optional to get the member, and baseType is an Optional or
@@ -1032,7 +1035,7 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     // Check for optional near miss.
     if (auto argOptType = substitution->getOptionalObjectType()) {
       if (isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
-        if (diagnoseUnwrap(CS.TC, CS.DC, badArgExpr, substitution)) {
+        if (diagnoseUnwrap(CS, badArgExpr, substitution)) {
           foundFailure = true;
           break;
         }

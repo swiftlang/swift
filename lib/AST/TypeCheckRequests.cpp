@@ -13,6 +13,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
@@ -36,7 +37,10 @@ void swift::simple_display(
 
   auto ext = value.get<ExtensionDecl *>();
   out << "extension of ";
-  ext->getAsNominalTypeOrNominalTypeExtensionContext()->dumpRef(out);
+  if (auto typeRepr = ext->getExtendedTypeLoc().getTypeRepr())
+    typeRepr->print(out);
+  else
+    ext->getAsNominalTypeOrNominalTypeExtensionContext()->dumpRef(out);
 }
 
 //----------------------------------------------------------------------------//

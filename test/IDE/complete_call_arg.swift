@@ -46,6 +46,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FORCED_IUO | %FileCheck %s -check-prefix=MEMBEROF_IUO
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TO_GENERIC | %FileCheck %s -check-prefix=GENERIC_TO_GENERIC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE | %FileCheck %s -check-prefix=NESTED_CLOSURE
 
 var i1 = 1
 var i2 = 2
@@ -415,4 +416,12 @@ class Bar {
   // MEMBEROF_IUO: Keyword[self]/CurrNominal: self[#Foo#]; name=self
   // MEMBEROF_IUO: Decl[InstanceVar]/CurrNominal: x[#Int#]; name=x
   // MEMBEROF_IUO: End completions
+}
+
+func curry<T1, T2, R>(_ f: @escaping (T1, T2) -> R) -> (T1) -> (T2) -> R {
+  return { t1 in { t2 in f(#^NESTED_CLOSURE^#, t2) } }
+  // NESTED_CLOSURE: Begin completions
+  // FIXME: Should be '/TypeRelation[Invalid]: t2[#T2#]'
+  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2; name=t2
+  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t1[#T1#]; name=t1
 }

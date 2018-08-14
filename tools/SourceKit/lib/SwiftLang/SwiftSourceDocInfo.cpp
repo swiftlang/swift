@@ -387,7 +387,7 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
   if (!VD->getDeclContext()->isTypeContext())
     return Type();
 
-  return Ty->getRValueType()->getRValueInstanceType();
+  return Ty->getRValueType()->getInOutObjectType()->getMetatypeInstanceType();
 }
 
 static void printAnnotatedDeclaration(const ValueDecl *VD,

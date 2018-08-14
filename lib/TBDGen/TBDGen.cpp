@@ -137,6 +137,12 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 }
 
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+  // A @_silgen_name("...") function without a body only exists
+  // to forward-declare a symbol from another library.
+  if (!AFD->hasBody() && AFD->getAttrs().hasAttribute<SILGenNameAttr>()) {
+    return;
+  }
+
   addSymbol(SILDeclRef(AFD));
 
   if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
@@ -416,6 +422,8 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   tapi::internal::InterfaceFile file;
   file.setFileType(tapi::internal::FileType::TBD_V3);
   file.setInstallName(opts.InstallName);
+  file.setCompatibilityVersion(tapi::internal::PackedVersion(1, 0, 0));
+  file.setTwoLevelNamespace();
   // FIXME: proper version
   file.setCurrentVersion(tapi::internal::PackedVersion(1, 0, 0));
   file.setSwiftABIVersion(TAPI_SWIFT_ABI_VERSION);

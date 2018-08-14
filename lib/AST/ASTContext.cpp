@@ -1733,7 +1733,7 @@ ASTContext::getBehaviorConformance(Type conformingType,
   auto conformance = new (*this, AllocationArena::Permanent)
     NormalProtocolConformance(conformingType, protocol, loc, storage, state);
 
-  if (auto nominal = conformingType->getRValueInstanceType()->getAnyNominal()) {
+  if (auto nominal = conformingType->getAnyNominal()) {
     // Note: this is an egregious hack. The conformances need to be associated
     // with the actual storage declarations.
     SmallVector<ProtocolConformance *, 2> conformances;
@@ -2974,7 +2974,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
                           Fields[0].getParameterFlags());
 
   RecursiveTypeProperties properties;
-  bool hasInOut = false;
+  bool hasElementWithOwnership = false;
   for (const TupleTypeElt &Elt : Fields) {
     auto eltTy = Elt.getType();
     if (!eltTy) continue;
@@ -2984,11 +2984,13 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
     // non-paren tuples are malformed and will be diagnosed later.
     if (auto *TTy = Elt.getType()->getAs<TupleType>()) {
       if (TTy->getNumElements() == 1)
-        hasInOut |= TTy->hasInOutElement();
+        hasElementWithOwnership |= TTy->hasElementWithOwnership();
     } else if (auto *Pty = dyn_cast<ParenType>(Elt.getType().getPointer())) {
-      hasInOut |= Pty->getParameterFlags().isInOut();
+      hasElementWithOwnership |= (Pty->getParameterFlags().getValueOwnership() !=
+                                  ValueOwnership::Default);
     } else {
-      hasInOut |= Elt.getParameterFlags().isInOut();
+      hasElementWithOwnership |= (Elt.getParameterFlags().getValueOwnership() !=
+                                  ValueOwnership::Default);
     }
   }
 
@@ -3016,7 +3018,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
                          sizeof(TupleTypeElt) * Fields.size(),
                          alignof(TupleType), arena);
   auto New = new (mem) TupleType(Fields, IsCanonical ? &C : nullptr, properties,
-                                 hasInOut);
+                                 hasElementWithOwnership);
   C.getImpl().getArena(arena).TupleTypes.InsertNode(New, InsertPos);
   return New;
 }
@@ -3585,7 +3587,9 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
   for (const auto &param : params) {
     Type eltType = param.getPlainType();
     if (param.isVariadic()) {
-      if (canonicalVararg)
+      if (!ctx.getArrayDecl())
+        eltType = ErrorType::get(ctx);
+      else if (canonicalVararg)
         eltType = BoundGenericType::get(ctx.getArrayDecl(), Type(), {eltType});
       else
         eltType = ArraySliceType::get(eltType);

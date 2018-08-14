@@ -2256,29 +2256,20 @@ public:
       verifyCheckedBase(E);
     }
 
-    static bool hasEnclosingFunctionContext(DeclContext *dc) {
-      switch (dc->getContextKind()) {
-      case DeclContextKind::AbstractClosureExpr:
-      case DeclContextKind::AbstractFunctionDecl:
-      case DeclContextKind::SerializedLocal:
-        return true;
-
-      case DeclContextKind::TopLevelCodeDecl:
-      case DeclContextKind::Module:
-      case DeclContextKind::FileUnit:
-        return false;
-
-      case DeclContextKind::Initializer:
-      case DeclContextKind::GenericTypeDecl:
-      case DeclContextKind::ExtensionDecl:
-      case DeclContextKind::SubscriptDecl:
-        return hasEnclosingFunctionContext(dc->getParent());
+    void verifyChecked(ValueDecl *VD) {
+      if (VD->getInterfaceType()->hasError()) {
+        Out << "checked decl cannot have error type\n";
+        VD->dump(Out);
+        abort();
       }
 
-      llvm_unreachable("Unhandled DeclContextKind in switch.");
-    }
+      // Make sure that there are no archetypes in the interface type.
+      if (!isa<VarDecl>(VD) && VD->getInterfaceType()->hasArchetype()) {
+        Out << "Interface type contains archetypes\n";
+        VD->dump(Out);
+        abort();
+      }
 
-    void verifyChecked(ValueDecl *VD) {
       if (VD->hasAccess()) {
         if (VD->getFormalAccess() == AccessLevel::Open) {
           if (!isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
@@ -2293,24 +2284,11 @@ public:
           }
         }
       } else {
-        if (!VD->getDeclContext()->isLocalContext() &&
-            !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
+        if (!isa<GenericTypeParamDecl>(VD) && !isa<VarDecl>(VD)) {
           dumpRef(VD);
-          Out << " does not have access";
+          Out << " does not have access\n";
           abort();
         }
-      }
-
-      // Make sure that there are no archetypes in the interface type.
-      if (VD->getDeclContext()->isTypeContext() &&
-          !hasEnclosingFunctionContext(VD->getDeclContext()) &&
-          VD->getInterfaceType()->hasArchetype() &&
-          VD->getInterfaceType().findIf([](Type type) {
-            return type->is<ArchetypeType>();
-          })) {
-        Out << "Interface type contains archetypes\n";
-        VD->dump(Out);
-        abort();
       }
 
       verifyCheckedBase(VD);
@@ -2435,8 +2413,7 @@ public:
         abort();
       }
 
-      Type typeForAccessors =
-          var->getInterfaceType()->getReferenceStorageReferent();
+      Type typeForAccessors = var->getValueInterfaceType();
       if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
         typeForAccessors =
             var->getDeclContext()->mapTypeIntoContext(typeForAccessors);
@@ -2511,31 +2488,6 @@ public:
         if (ext->getExtendedType())
           ext->getExtendedType().print(Out);
       }
-    }
-
-    /// Check the given list of protocols.
-    void verifyProtocolList(Decl *decl, ArrayRef<ProtocolDecl *> protocols) {
-      PrettyStackTraceDecl debugStack("verifying ProtocolList", decl);
-
-      // Make sure that the protocol list is fully expanded.
-      SmallVector<ProtocolDecl *, 4> nominalProtocols(protocols.begin(),
-                                                      protocols.end());
-      ProtocolType::canonicalizeProtocols(nominalProtocols);
-
-      SmallVector<Type, 4> protocolTypes;
-      for (auto proto : protocols)
-        protocolTypes.push_back(proto->getDeclaredType());
-      auto type = ProtocolCompositionType::get(Ctx, protocolTypes,
-                                               /*HasExplicitAnyObject=*/false);
-      auto layout = type->getExistentialLayout();
-      SmallVector<ProtocolDecl *, 4> canonicalProtocols;
-      for (auto *protoTy : layout.getProtocols())
-        canonicalProtocols.push_back(protoTy->getDecl());
-      if (nominalProtocols != canonicalProtocols) {
-        dumpRef(decl);
-        Out << " doesn't have a complete set of protocols\n";
-        abort();
-      }      
     }
 
     /// Verify that the given conformance makes sense for the given
@@ -2754,9 +2706,6 @@ public:
     }
 
     void verifyChecked(NominalTypeDecl *nominal) {
-      // Make sure that the protocol list is fully expanded.
-      verifyProtocolList(nominal, nominal->getLocalProtocols());
-
       // Make sure that the protocol conformances are complete.
       // Only do so within the source file of the nominal type,
       // because anywhere else this can trigger new type-check requests.
@@ -2772,9 +2721,6 @@ public:
     }
 
     void verifyChecked(ExtensionDecl *ext) {
-      // Make sure that the protocol list is fully expanded.
-      verifyProtocolList(ext, ext->getLocalProtocols());
-
       // Make sure that the protocol conformances are complete.
       for (auto conformance : ext->getLocalConformances()) {
         verifyConformance(ext, conformance);

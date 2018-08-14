@@ -361,8 +361,9 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 1+32,
-    /// Whether an element of the tuple is inout.
-    HasInOutElement : 1,
+    /// Whether an element of the tuple is inout, __shared or __owned.
+    /// Values cannot have such tuple types in the language.
+    HasElementWithOwnership : 1,
 
     : NumPadBits,
 
@@ -840,13 +841,9 @@ public:
   /// unknown-released.
   bool hasRetainablePointerRepresentation();
 
-  /// \brief Given that this type is a reference type, is it known to use
-  /// Swift-native reference counting?
-  bool usesNativeReferenceCounting(ResilienceExpansion resilience);
-
   /// Given that this type is a reference type, which kind of reference
   /// counting does it use?
-  ReferenceCounting getReferenceCounting(ResilienceExpansion resilience);
+  ReferenceCounting getReferenceCounting();
 
   /// Determines whether this type has a bridgeable object
   /// representation, i.e., whether it is always represented as a single
@@ -946,8 +943,8 @@ public:
   /// Otherwise, returns the type itself.
   Type getWithoutSpecifierType();
 
-  /// getRValueInstanceType - Looks through inout types and metatypes.
-  Type getRValueInstanceType();
+  /// getMetatypeInstanceType - Looks through metatypes.
+  Type getMetatypeInstanceType();
 
   /// For a ReferenceStorageType like @unowned, this returns the referent.
   /// Otherwise, it returns the type itself.
@@ -1876,19 +1873,9 @@ public:
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
   
-  /// getElementForScalarInit - If a tuple of this type can be initialized with
-  /// a scalar, return the element number that the scalar is assigned to.  If
-  /// not, return -1.
-  int getElementForScalarInit() const;
-  
-  /// If this tuple has a varargs element to it, return the base type of the
-  /// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
-  /// Otherwise, this returns Type().
-  Type getVarArgsBaseType() const;
-  
-  /// Returns true if this tuple has inout elements.
-  bool hasInOutElement() const {
-    return static_cast<bool>(Bits.TupleType.HasInOutElement);
+  /// Returns true if this tuple has inout, __shared or __owned elements.
+  bool hasElementWithOwnership() const {
+    return static_cast<bool>(Bits.TupleType.HasElementWithOwnership);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -1905,9 +1892,9 @@ public:
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties,
-            bool hasInOut)
+            bool hasElementWithOwnership)
      : TypeBase(TypeKind::Tuple, CanCtx, properties) {
-     Bits.TupleType.HasInOutElement = hasInOut;
+     Bits.TupleType.HasElementWithOwnership = hasElementWithOwnership;
      Bits.TupleType.Count = elements.size();
      std::uninitialized_copy(elements.begin(), elements.end(),
                              getTrailingObjects<TupleTypeElt>());
@@ -4990,13 +4977,13 @@ inline bool TypeBase::isTypeParameter() {
 inline bool TypeBase::isMaterializable() {
   if (hasLValueType())
     return false;
-  
+
   if (is<InOutType>())
     return false;
-  
+
   if (auto *TTy = getAs<TupleType>())
-    return !TTy->hasInOutElement();
-  
+    return !TTy->hasElementWithOwnership();
+
   return true;
 }
 

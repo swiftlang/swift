@@ -3740,7 +3740,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      storageParam->getArgumentName(),
                                      storageParam->getNameLoc(),
                                      storageParam->getName(),
-                                     Type(),
                                      P->CurDeclContext);
         accessorParam->setVariadic(storageParam->isVariadic());
 
@@ -3825,7 +3824,7 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
 
   auto result = new (P.Context)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                Identifier(), nameLoc, name, Type(), P.CurDeclContext);
+                Identifier(), nameLoc, name, P.CurDeclContext);
   if (isNameImplicit)
     result->setImplicit();
 
@@ -4457,7 +4456,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
     storage = new (Context) VarDecl(StaticLoc.isValid(),
                                     VarDecl::Specifier::Var,
                                     /*is capture list*/ false,
-                                    VarLoc, Identifier(), Type(),
+                                    VarLoc, Identifier(),
                                     CurDeclContext);
     storage->setImplicit(true);
     storage->setInvalid(true);

@@ -2448,10 +2448,12 @@ private:
     //
     // FIXME: Once -swift-version 3 code generation goes away, we
     // can simplify this.
-    if (isUnmaterializableTupleType(substArgType)) {
-      assert(origParamType.isTypeParameter());
-      emitExpanded(std::move(arg), origParamType);
-      return;
+    if (auto substTupleType = dyn_cast<TupleType>(substArgType)) {
+      if (shouldExpandTupleType(substTupleType)) {
+        assert(origParamType.isTypeParameter());
+        emitExpanded(std::move(arg), origParamType);
+        return;
+      }
     }
 
     // Okay, everything else will be passed as a single value, one
@@ -2536,13 +2538,6 @@ private:
     auto dest = &SpecialDests->front();
     SpecialDests = SpecialDests->slice(1);
     return (dest->isValid() ? dest : nullptr);
-  }
-
-  bool isUnmaterializableTupleType(CanType type) {
-    if (auto tuple = dyn_cast<TupleType>(type))
-      if (tuple->hasInOutElement())
-        return true;
-    return false;
   }
 
   /// Emit an argument as an expanded tuple.

@@ -163,9 +163,9 @@ void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
     return;
 
   auto &Arena = getArena();
-  addRawSyntax(RawSyntax::getToken(Arena, Tok.getKind(), Tok.getText(),
-                                   LeadingTrivia.Pieces,
-                                   TrailingTrivia.Pieces));
+  auto Text = OwnedString::makeRefCounted(Tok.getText());
+  addRawSyntax(RawSyntax::getToken(
+      Arena, Tok.getKind(), Text, LeadingTrivia.Pieces, TrailingTrivia.Pieces));
 }
 
 /// Add Syntax to the parts.
@@ -313,7 +313,7 @@ void finalizeSourceFile(RootContextData &RootData,
   }
 
   if (!EOFToken)
-    EOFToken = RawSyntax::missing(tok::eof, "");
+    EOFToken = RawSyntax::missing(tok::eof, OwnedString::makeUnowned(""));
 
   auto newRaw = SyntaxFactory::createRaw(
       SyntaxKind::SourceFile,
@@ -352,7 +352,8 @@ void SyntaxParsingContext::synthesize(tok Kind, StringRef Text) {
     return;
   if (Text.empty())
     Text = getTokenText(Kind);
-  getStorage().push_back(RawSyntax::missing(Kind, Text));
+  auto OwnedText = OwnedString::makeRefCounted(Text);
+  getStorage().push_back(RawSyntax::missing(Kind, OwnedText));
 }
 
 void SyntaxParsingContext::synthesize(SyntaxKind Kind) {

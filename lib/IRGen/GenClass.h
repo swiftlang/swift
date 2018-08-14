@@ -126,16 +126,6 @@ namespace irgen {
                                     llvm::Value *selfValue,
                                     llvm::Value *metadataValue);
 
-  /// Emit the constant fragile instance size of the class, or null if the class
-  /// does not have fixed layout. For resilient classes this does not
-  /// correspond to the runtime alignment of instances of the class.
-  llvm::Constant *tryEmitClassConstantFragileInstanceSize(IRGenModule &IGM,
-                                                   ClassDecl *theClass);
-  /// Emit the constant fragile instance alignment mask of the class, or null if
-  /// the class does not have fixed layout. For resilient classes this does not
-  /// correspond to the runtime alignment of instances of the class.
-  llvm::Constant *tryEmitClassConstantFragileInstanceAlignMask(IRGenModule &IGM,
-                                                        ClassDecl *theClass);
   /// Emit the constant fragile offset of the given property inside an instance
   /// of the class.
   llvm::Constant *
@@ -157,10 +147,6 @@ namespace irgen {
   /// The caller is responsible for deleting the returned StructLayout.
   StructLayout *getClassLayoutWithTailElems(IRGenModule &IGM, SILType classType,
                                             llvm::ArrayRef<SILType> tailTypes);
-
-  /// What reference counting mechanism does a class-like type use?
-  ReferenceCounting getReferenceCountingForType(IRGenModule &IGM,
-                                                CanType type);
 
   ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *theClass);
 

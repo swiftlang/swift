@@ -712,3 +712,10 @@ extension Node {
       })!
   }
 }
+
+// Make sure we don't allow this anymore
+func takesTwo(_: (Int, Int) -> ()) {}
+func takesTwoInOut(_: (Int, inout Int) -> ()) {}
+
+takesTwo { _ in } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
+takesTwoInOut { _ in } // expected-error {{contextual closure type '(Int, inout Int) -> ()' expects 2 arguments, but 1 was used in closure body}}

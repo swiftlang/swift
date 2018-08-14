@@ -920,7 +920,8 @@ llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
     
     // Find the offset of the associated type entry in witness tables of this
     // protocol.
-    auto &protoInfo = getProtocolInfo(assocType->getProtocol());
+    auto &protoInfo = getProtocolInfo(assocType->getProtocol(),
+                                      ProtocolInfoKind::RequirementSignature);
     auto index = protoInfo.getAssociatedTypeIndex(AssociatedType(assocType))
       .getValue();
     
@@ -3724,7 +3725,6 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
   // Otherwise, we need to create it.
   LinkInfo link = LinkInfo::get(IGM, entity, forDefinition);
   auto addr = createVariable(IGM, link, type, alignment);
-  addr->setConstant(true);
 
   entry = addr;
   return Address(addr, alignment);
@@ -3747,8 +3747,13 @@ Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
 Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
                                        ForDefinition_t forDefinition) {
   LinkEntity entity = LinkEntity::forEnumCase(Case);
-  return getAddrOfSimpleVariable(*this, GlobalVars, entity, Int32Ty,
-                                 getPointerAlignment(), forDefinition);
+  auto addr = getAddrOfSimpleVariable(*this, GlobalVars, entity, Int32Ty,
+                                      getPointerAlignment(), forDefinition);
+
+  auto *global = cast<llvm::GlobalVariable>(addr.getAddress());
+  global->setConstant(true);
+
+  return addr;
 }
 
 void IRGenModule::emitNestedTypeDecls(DeclRange members) {

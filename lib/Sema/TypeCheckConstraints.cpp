@@ -1244,17 +1244,14 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   auto *PL = closure->getParameters();
 
   // Validate the parameters.
-  TypeResolutionOptions options;
+  TypeResolutionOptions options(TypeResolverContext::ClosureExpr);
   options |= TypeResolutionFlags::AllowUnspecifiedTypes;
   options |= TypeResolutionFlags::AllowUnboundGenerics;
-  options |= TypeResolutionFlags::InExpression;
   bool hadParameterError = false;
 
   GenericTypeToArchetypeResolver resolver(closure);
 
   if (TC.typeCheckParameterList(PL, DC, options, resolver)) {
-    closure->setType(ErrorType::get(TC.Context));
-
     // If we encounter an error validating the parameter list, don't bail.
     // Instead, go on to validate any potential result type, and bail
     // afterwards.  This allows for better diagnostics, and keeps the
@@ -1265,8 +1262,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
       TC.validateType(closure->getExplicitResultTypeLoc(), DC,
-                      TypeResolutionFlags::InExpression, &resolver)) {
-    closure->setType(ErrorType::get(TC.Context));
+                      TypeResolverContext::InExpression, &resolver)) {
     return false;
   }
 
@@ -1348,8 +1344,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     // Resolve the TypeRepr to get the base type for the lookup.
     // Disable availability diagnostics here, because the final
     // TypeRepr will be resolved again when generating constraints.
-    TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
-    options |= TypeResolutionFlags::InExpression;
+    TypeResolutionOptions options(TypeResolverContext::InExpression);
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
     options |= TypeResolutionFlags::AllowUnavailable;
     auto BaseTy = TC.resolveType(InnerTypeRepr, DC, options);
 
@@ -1865,9 +1861,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (typeExpr->getTypeLoc().wasValidated()) {
     type = typeExpr->getTypeLoc().getType();
   } else if (auto *rep = typeExpr->getTypeRepr()) {
-    TypeResolutionOptions options;
+    TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-    options |= TypeResolutionFlags::InExpression;
     type = TC.resolveType(rep, DC, options);
     typeExpr->getTypeLoc().setType(type);
   }
@@ -2231,9 +2226,6 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   // Ensure the output expression is up to date.
   assert(exprAsBinOp == expr && isa<BinaryExpr>(expr) && "found wrong expr?");
 
-  // Add type variable for the code-completion expression.
-  CCE->setActivated();
-
   if (auto generated = CS.generateConstraints(expr)) {
     expr = generated;
   } else {
@@ -2424,34 +2416,14 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   auto resultTy = typeCheckExpression(initializer, DC, contextualType,
                                       contextualPurpose, flags, &listener);
-
-  // If we detected that the initializer would have a non-materializable type,
-  // complain.
-  if (resultTy && listener.isInOut()) {
-    diagnose(pattern->getStartLoc(), diag::var_type_not_materializable,
-             resultTy);
-
-    pattern->setType(ErrorType::get(Context));
-    pattern->forEachVariable([&](VarDecl *var) {
-      // Don't change the type of a variable that we've been able to
-      // compute a type for.
-      if (var->hasType() &&
-          !var->getType()->hasUnboundGenericType() &&
-          !var->getType()->hasError())
-        return;
-
-      var->markInvalid();
-    });
-
-    return true;
-  }
+  assert(!listener.isInOut());
 
   if (resultTy) {
-    TypeResolutionOptions options = TypeResolutionFlags::OverrideType;
-    options |= TypeResolutionFlags::InExpression;
-    if (isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())) {
-      options |= TypeResolutionFlags::EditorPlaceholder;
-    }
+    TypeResolutionOptions options =
+        isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
+        ? TypeResolverContext::EditorPlaceholderExpr
+        : TypeResolverContext::InExpression;
+    options |= TypeResolutionFlags::OverrideType;
 
     // FIXME: initTy should be the same as resultTy; now that typeCheckExpression()
     // returns a Type and not bool, we should be able to simplify the listener
@@ -2677,9 +2649,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       // Apply the solution to the iteration pattern as well.
       Pattern *pattern = Stmt->getPattern();
-      TypeResolutionOptions options = TypeResolutionFlags::OverrideType;
-      options |= TypeResolutionFlags::EnumerationVariable;
-      options |= TypeResolutionFlags::InExpression;
+      TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
+      options |= TypeResolutionFlags::OverrideType;
       if (tc.coercePatternToType(pattern, cs.DC, InitType, options)) {
         return nullptr;
       }
@@ -2848,7 +2819,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
 
     // Check the pattern, it allows unspecified types because the pattern can
     // provide type information.
-    TypeResolutionOptions options = TypeResolutionFlags::InExpression;
+    TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     if (typeCheckPattern(pattern, dc, options)) {
@@ -2887,8 +2858,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          /*IsCaptureList*/false,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),
-                                         rhsType,
                                          DC);
+  matchVar->setType(rhsType);
   matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
 
   matchVar->setImplicit();
@@ -3380,11 +3351,9 @@ void Solution::dump(raw_ostream &out) const {
 
   if (!Fixes.empty()) {
     out << "\nFixes:\n";
-    for (auto &fix : Fixes) {
+    for (auto *fix : Fixes) {
       out.indent(2);
-      fix.first.print(out, &getConstraintSystem());
-      out << " @ ";
-      fix.second->dump(sm, out);
+      fix->print(out, &ctx.SourceMgr);
       out << "\n";
     }
   }
@@ -3577,11 +3546,9 @@ void ConstraintSystem::print(raw_ostream &out) {
 
   if (!Fixes.empty()) {
     out << "\nFixes:\n";
-    for (auto &fix : Fixes) {
+    for (auto *fix : Fixes) {
       out.indent(2);
-      fix.first.print(out, this);
-      out << " @ ";
-      fix.second->dump(&getTypeChecker().Context.SourceMgr, out);
+      fix->print(out, &getTypeChecker().Context.SourceMgr);
       out << "\n";
     }
   }

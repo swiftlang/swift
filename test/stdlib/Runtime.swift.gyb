@@ -2,6 +2,7 @@
 //
 // RUN: %gyb %s -o %t/Runtime.swift
 // RUN: %target-build-swift -parse-stdlib -module-name a %t/Runtime.swift -o %t.out
+// RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 
