@@ -3279,7 +3279,7 @@ public:
   }
 
 private:
-  /// In the more-then-max case, just pass all the arguments as an array.
+  /// In the more-than-max case, just pass all the arguments as an array.
   MetadataResponse applyMany(MetadataRequest request,
                              const void * const *args) const {
     using FnN = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
