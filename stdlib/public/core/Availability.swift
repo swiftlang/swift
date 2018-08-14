@@ -17,11 +17,8 @@ import SwiftShims
 ///
 /// This is a magic entry point known to the compiler. It is called in
 /// generated code for API availability checking.
-/// Note: It is important not to make this function inlinable. There is a pass
-/// that relies on being able to tell whether this function is called. It does
-/// this using the semantics attribute.
 @_semantics("availability.osversion")
-@inline(never)
+@inlinable
 public func _stdlib_isOSVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
