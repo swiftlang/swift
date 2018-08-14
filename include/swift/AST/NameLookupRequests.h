@@ -184,6 +184,30 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// Request the nominal types that occur as the right-hand side of "Self: Foo"
+/// constraints in the "where" clause of a protocol extension.
+class SelfBoundsFromWhereClauseRequest :
+    public SimpleRequest<SelfBoundsFromWhereClauseRequest,
+                         CacheKind::Uncached,
+                         llvm::TinyPtrVector<NominalTypeDecl *>,
+                         ExtensionDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend class SimpleRequest;
+
+  // Evaluation.
+  llvm::TinyPtrVector<NominalTypeDecl *> evaluate(Evaluator &evaluator,
+                                                  ExtensionDecl *ext) const;
+
+public:
+  // Cycle handling
+  llvm::TinyPtrVector<NominalTypeDecl *> breakCycle() const { return { }; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 /// The zone number for name-lookup requests.
 #define SWIFT_NAME_LOOKUP_REQUESTS_TYPEID_ZONE 9
 

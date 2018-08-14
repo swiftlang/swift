@@ -636,9 +636,12 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     if (instanceType->mayHaveMembers()) {
       auto ctors = CS.TC.lookupConstructors(
                                             CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
-      for (auto ctor : ctors)
+      for (auto ctor : ctors) {
+        if (!ctor.getValueDecl()->hasInterfaceType())
+          CS.getTypeChecker().validateDeclForNameLookup(ctor.getValueDecl());
         if (ctor.getValueDecl()->hasInterfaceType())
           candidates.push_back({ ctor.getValueDecl(), 1 });
+      }
     }
     
     declName = instanceType->getString();

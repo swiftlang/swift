@@ -4685,13 +4685,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.offset: 119,
         key.length: 31,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
-        key.conforms: [
-          {
-            key.kind: source.lang.swift.ref.function.constructor,
-            key.name: "init(rawValue:)",
-            key.usr: "s:SY8rawValuexSg03RawB0Qz_tcfc"
-          }
-        ],
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -4708,14 +4701,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:So8FooEnum1V8rawValues6UInt32Vvp",
         key.offset: 156,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
-        key.conforms: [
-          {
-            key.kind: source.lang.swift.ref.var.instance,
-            key.name: "rawValue",
-            key.usr: "s:SY8rawValue03RawB0Qzvp"
-          }
-        ]
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.operator.infix,
@@ -4798,13 +4784,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.offset: 357,
         key.length: 31,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
-        key.conforms: [
-          {
-            key.kind: source.lang.swift.ref.function.constructor,
-            key.name: "init(rawValue:)",
-            key.usr: "s:SY8rawValuexSg03RawB0Qz_tcfc"
-          }
-        ],
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -4821,14 +4800,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:So8FooEnum2V8rawValues6UInt32Vvp",
         key.offset: 394,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
-        key.conforms: [
-          {
-            key.kind: source.lang.swift.ref.var.instance,
-            key.name: "rawValue",
-            key.usr: "s:SY8rawValue03RawB0Qzvp"
-          }
-        ]
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.operator.infix,
@@ -4918,13 +4890,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.offset: 627,
         key.length: 31,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
-        key.conforms: [
-          {
-            key.kind: source.lang.swift.ref.function.constructor,
-            key.name: "init(rawValue:)",
-            key.usr: "s:SY8rawValuexSg03RawB0Qz_tcfc"
-          }
-        ],
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -4941,14 +4906,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:So8FooEnum3V8rawValues6UInt32Vvp",
         key.offset: 664,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
-        key.conforms: [
-          {
-            key.kind: source.lang.swift.ref.var.instance,
-            key.name: "rawValue",
-            key.usr: "s:SY8rawValue03RawB0Qzvp"
-          }
-        ]
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.operator.infix,
@@ -5085,18 +5043,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.offset: 1055,
         key.length: 28,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
-        key.conforms: [
-          {
-            key.kind: source.lang.swift.ref.function.constructor,
-            key.name: "init(rawValue:)",
-            key.usr: "s:s9OptionSetP8rawValuex03RawD0Qz_tcfc"
-          },
-          {
-            key.kind: source.lang.swift.ref.function.constructor,
-            key.name: "init(rawValue:)",
-            key.usr: "s:SY8rawValuexSg03RawB0Qz_tcfc"
-          }
-        ],
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7237,13 +7183,6 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.offset: 7707,
         key.length: 31,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
-        key.conforms: [
-          {
-            key.kind: source.lang.swift.ref.function.constructor,
-            key.name: "init(rawValue:)",
-            key.usr: "s:SY8rawValuexSg03RawB0Qz_tcfc"
-          }
-        ],
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7260,14 +7199,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:So11FooSubEnum1V8rawValues6UInt32Vvp",
         key.offset: 7744,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
-        key.conforms: [
-          {
-            key.kind: source.lang.swift.ref.var.instance,
-            key.name: "rawValue",
-            key.usr: "s:SY8rawValue03RawB0Qzvp"
-          }
-        ]
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.operator.infix,

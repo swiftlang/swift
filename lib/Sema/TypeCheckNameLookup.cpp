@@ -240,8 +240,9 @@ namespace {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
         // not a class constraint if any.
-        assert(foundInType->isExistentialType());
-        addResult(found);
+        assert(foundInType->isExistentialType() || foundInType->hasError());
+        if (foundInType->isExistentialType())
+          addResult(found);
         return;
       }
 

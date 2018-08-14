@@ -473,6 +473,68 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   llvm_unreachable("Unhandled ASTScopeKind in switch.");
 }
 
+/// Retrieve the set of type declarations that are directly referenced from
+/// the given parsed type representation.
+static DirectlyReferencedTypeDecls
+directReferencesForTypeRepr(Evaluator &evaluator,
+                            ASTContext &ctx, TypeRepr *typeRepr,
+                            DeclContext *dc);
+
+/// Retrieve the set of type declarations that are directly referenced from
+/// the given type.
+static DirectlyReferencedTypeDecls directReferencesForType(Type type);
+
+/// Given a set of type declarations, find all of the nominal type declarations
+/// that they reference, looking through typealiases as appropriate.
+static TinyPtrVector<NominalTypeDecl *>
+resolveTypeDeclsToNominal(Evaluator &evaluator,
+                          ASTContext &ctx,
+                          ArrayRef<TypeDecl *> typeDecls,
+                          SmallVectorImpl<ModuleDecl *> &modulesFound,
+                          bool &anyObject);
+
+TinyPtrVector<NominalTypeDecl *>
+SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
+                                           ExtensionDecl *ext) const {
+  auto proto = ext->getAsProtocolExtensionContext();
+  assert(proto && "Not a protocol extension?");
+
+  ASTContext &ctx = proto->getASTContext();
+  TinyPtrVector<NominalTypeDecl *> result;
+  for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
+    // We only care about type constraints.
+    if (req.getKind() != RequirementReprKind::TypeConstraint)
+      continue;
+
+    // The left-hand side of the type constraint must be 'Self'.
+    bool isSelfLHS = false;
+    if (auto typeRepr = req.getSubjectRepr()) {
+      if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr))
+        isSelfLHS = (identTypeRepr->getIdentifier() == ctx.Id_Self);
+    } else if (Type type = req.getSubject()) {
+      isSelfLHS = type->isEqual(proto->getSelfInterfaceType());
+    }
+    if (!isSelfLHS)
+      continue;
+
+    // Resolve the right-hand side.
+    DirectlyReferencedTypeDecls rhsDecls;
+    if (auto typeRepr = req.getConstraintRepr()) {
+      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+    } else if (Type type = req.getConstraint()) {
+      rhsDecls = directReferencesForType(type);
+    }
+
+    SmallVector<ModuleDecl *, 2> modulesFound;
+    bool anyObject = false;
+    auto rhsNominals = resolveTypeDeclsToNominal(evaluator, ctx, rhsDecls,
+                                                 modulesFound, anyObject);
+    result.insert(result.end(), rhsNominals.begin(), rhsNominals.end());
+  }
+
+  return result;
+}
+
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver, SourceLoc Loc,
                                      Options options)
@@ -610,15 +672,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (!nominal) continue;
 
         // Dig out the type we're looking into.
-        // FIXME: We shouldn't need to compute a type to perform this lookup.
-        Type lookupType;
+        SmallVector<NominalTypeDecl *, 2> lookupDecls;
+        lookupDecls.push_back(nominal);
+
+        // For a protocol extension, check whether there are additional
+        // "Self" constraints that can affect name lookup.
         if (isa<ProtocolDecl>(nominal)) {
           if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-            TypeResolver->bindExtension(ext);
-
-            lookupType = dc->getSelfTypeInContext();
-
-            if (lookupType->hasError()) continue;
+            for (auto bound :
+                    Ctx.evaluator(SelfBoundsFromWhereClauseRequest{ext}))
+              lookupDecls.push_back(bound);
           }
         }
 
@@ -630,10 +693,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           options |= NL_KnownNonCascadingDependency;
 
         SmallVector<ValueDecl *, 4> lookup;
-        if (lookupType)
-          dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
-        else
-          dc->lookupQualified(nominal, Name, options, lookup);
+        dc->lookupQualified(lookupDecls, Name, options, lookup);
 
         auto startIndex = Results.size();
         for (auto result : lookup) {
@@ -687,7 +747,29 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         DeclContext *BaseDC = nullptr;
         DeclContext *MetaBaseDC = nullptr;
         GenericParamList *GenericParams = nullptr;
-        Type ExtendedType;
+
+        // Dig out the type we're looking into.
+        SmallVector<NominalTypeDecl *, 2> lookupDecls;
+
+        // Local function to populate the set of lookup declarations from
+        // the given DeclContext.
+        auto populateLookupDeclsFromContext = [&](DeclContext *dc) {
+          auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+          if (!nominal)
+            return;
+
+          lookupDecls.push_back(nominal);
+
+          // For a protocol extension, check whether there are additional
+          // "Self" constraints that can affect name lookup.
+          if (isa<ProtocolDecl>(nominal)) {
+            if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+              for (auto bound :
+                       Ctx.evaluator(SelfBoundsFromWhereClauseRequest{ext}))
+                lookupDecls.push_back(bound);
+            }
+          }
+        };
 
         if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC)) {
           auto *PBD = PBI->getBinding();
@@ -703,7 +785,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
             DC = DC->getParent();
 
-            ExtendedType = DC->getSelfTypeInContext();
+            populateLookupDeclsFromContext(DC);
             MetaBaseDC = DC;
             BaseDC = PBI;
           }
@@ -712,7 +794,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           else if (PBD->getDeclContext()->isTypeContext()) {
             DC = DC->getParent();
 
-            ExtendedType = DC->getSelfTypeInContext();
+            populateLookupDeclsFromContext(DC);
             MetaBaseDC = DC;
             BaseDC = MetaBaseDC;
 
@@ -750,7 +832,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             isCascadingUse = AFD->isCascadingContextForLookup(false);
 
           if (AFD->getDeclContext()->isTypeContext()) {
-            ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
+            populateLookupDeclsFromContext(AFD->getDeclContext());
             BaseDC = AFD;
             MetaBaseDC = AFD->getDeclContext();
             DC = DC->getParent();
@@ -796,18 +878,14 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             continue;
           }
 
-          if (TypeResolver) {
-            TypeResolver->bindExtension(ED);
-          }
-
-          ExtendedType = ED->getSelfTypeInContext();
+          populateLookupDeclsFromContext(ED);
 
           BaseDC = ED;
           MetaBaseDC = ED;
           if (!isCascadingUse.hasValue())
             isCascadingUse = ED->isCascadingContextForLookup(false);
         } else if (auto *ND = dyn_cast<NominalTypeDecl>(DC)) {
-          ExtendedType = ND->getDeclaredType();
+          populateLookupDeclsFromContext(ND);
           BaseDC = DC;
           MetaBaseDC = DC;
           if (!isCascadingUse.hasValue())
@@ -834,7 +912,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             return;
         }
 
-        if (BaseDC && ExtendedType && !ExtendedType->hasError()) {
+        if (BaseDC && !lookupDecls.empty()) {
           NLOptions options = baseNLOptions;
           if (isCascadingUse.getValue())
             options |= NL_KnownCascadingDependency;
@@ -842,7 +920,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             options |= NL_KnownNonCascadingDependency;
 
           SmallVector<ValueDecl *, 4> Lookup;
-          DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
+          DC->lookupQualified(lookupDecls, Name, options, Lookup);
           bool FoundAny = false;
           auto startIndex = Results.size();
           for (auto Result : Lookup) {
@@ -2143,8 +2221,6 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
   return current;
 }
 
-/// Retrieve the set of type declarations that are directly referenced from
-/// the given parsed type representation.
 static DirectlyReferencedTypeDecls
 directReferencesForTypeRepr(Evaluator &evaluator,
                             ASTContext &ctx, TypeRepr *typeRepr,
@@ -2201,8 +2277,6 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   }
 }
 
-/// Retrieve the set of type declarations that are directly referenced from
-/// the given type.
 static DirectlyReferencedTypeDecls
 directReferencesForType(Type type) {
   // If it's a typealias, return that.
