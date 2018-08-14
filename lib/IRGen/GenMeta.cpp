@@ -1957,9 +1957,9 @@ namespace {
     }
   };
 
-  /// Utility class for building member metadata for classes that inherit
-  /// from a class in a different resilience domain, or have fields whose
-  /// size is not known at compile time.
+  /// Utility class for building member metadata for classes with resilient
+  /// ancestry. The total size of the class metadata is not known at compile
+  /// time, and requires relocation.
   class ResilientClassMemberBuilder {
     IRGenModule &IGM;
     SILVTable *VTable;
@@ -2317,7 +2317,7 @@ namespace {
     llvm::Value *emitFinishInitializationOfClassMetadata(IRGenFunction &IGF,
                                                          llvm::Value *metadata,
                                        MetadataDependencyCollector *collector) {
-      if (doesClassMetadataRequireDynamicInitialization(IGF.IGM, Target)) {
+      if (doesClassMetadataRequireInitialization(IGF.IGM, Target)) {
         // We need to:
         //   - fill out the subclass's field offset vector
         //   - copy field offsets and generic arguments from higher in the
@@ -2468,7 +2468,7 @@ namespace {
         // There's an interesting special case where we can do the
         // initialization idempotently and thus avoid the need for a lock.
         if (!HasUnfilledSuperclass &&
-            !doesClassMetadataRequireDynamicInitialization(IGM, Target)) {
+            !doesClassMetadataRequireInitialization(IGM, Target)) {
           auto type = Target->getDeclaredType()->getCanonicalType();
           auto metadata = IGF.IGM.getAddrOfTypeMetadata(type);
           return MetadataResponse::forComplete(
@@ -2501,7 +2501,10 @@ namespace {
 
       // Relocate the metadata if it has a superclass that is resilient
       // to us.
-      if (doesClassMetadataRequireDynamicInitialization(IGM, Target)) {
+      //
+      // FIXME: This should instead be checking
+      // doesClassMetadataRequireRelocation().
+      if (doesClassMetadataRequireInitialization(IGM, Target)) {
         auto templateSize = IGM.getSize(Size(B.getNextOffsetFromGlobal()));
         auto numImmediateMembers = IGM.getSize(
           Size(IGM.getClassMetadataLayout(Target).getNumImmediateMembers()));
@@ -2768,7 +2771,16 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     canBeConstant = false;
 
     builder.createMetadataAccessFunction();
-  } else if (doesClassMetadataRequireDynamicInitialization(IGM, classDecl)) {
+  } else if (doesClassMetadataRequireRelocation(IGM, classDecl)) {
+    ResilientClassMetadataBuilder builder(IGM, classDecl, init,
+                                          fieldLayout);
+    builder.layout();
+    isPattern = false;
+    canBeConstant = builder.canBeConstant();
+
+    builder.createMetadataAccessFunction();
+  } else if (doesClassMetadataRequireInitialization(IGM, classDecl)) {
+    // FIXME: Introduce InPlaceClassMetadataBuilder
     ResilientClassMetadataBuilder builder(IGM, classDecl, init,
                                           fieldLayout);
     builder.layout();
@@ -2803,8 +2815,10 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
 
   // Add classes that don't require dynamic initialization to the
   // ObjC class list.
+  //
+  // FIXME: This is where we check the completely fragile layout.
   if (IGM.ObjCInterop && !isPattern && !isIndirect &&
-      !doesClassMetadataRequireDynamicInitialization(IGM, classDecl)) {
+      !doesClassMetadataRequireInitialization(IGM, classDecl)) {
     // Emit the ObjC class symbol to make the class visible to ObjC.
     if (classDecl->isObjC()) {
       emitObjCClassSymbol(IGM, classDecl, var);
