@@ -309,8 +309,7 @@ inline NameLookupOptions operator|(NameLookupFlags flag1,
 
 /// Default options for member name lookup.
 const NameLookupOptions defaultMemberLookupOptions
-  = NameLookupFlags::DynamicLookup |
-    NameLookupFlags::ProtocolMembers |
+  = NameLookupFlags::ProtocolMembers |
     NameLookupFlags::PerformConformanceCheck;
 
 /// Default options for constructor lookup.

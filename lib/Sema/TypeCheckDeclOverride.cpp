@@ -628,10 +628,6 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     auto lookupOptions = defaultMemberLookupOptions;
 
     // Class methods cannot override declarations only
-    // visible via dynamic dispatch.
-    lookupOptions -= NameLookupFlags::DynamicLookup;
-
-    // Class methods cannot override declarations only
     // visible as protocol requirements or protocol
     // extension members.
     lookupOptions -= NameLookupFlags::ProtocolMembers;

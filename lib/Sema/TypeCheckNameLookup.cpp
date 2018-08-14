@@ -370,8 +370,6 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   NLOptions subOptions = NL_QualifiedDefault;
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
-  if (options.contains(NameLookupFlags::DynamicLookup))
-    subOptions |= NL_DynamicLookup;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 
