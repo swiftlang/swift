@@ -129,12 +129,19 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
 /*****************************************************************************/
 
 /// Does the metadata for the given type, which we are currently emitting,
-/// require in-place metadata initialiation structures and functions?
+/// require in-place metadata initialization structures and functions?
 static bool needsInPlaceMetadataInitialization(IRGenModule &IGM,
                                                NominalTypeDecl *typeDecl) {
   // Generic types never have in-place metadata initialization.
   if (typeDecl->isGenericContext())
     return false;
+
+  // Classes require in-place initialization if they have generic ancestry
+  // or resiliently-sized fields, but not resilient ancestry.
+  if (auto *classDecl = dyn_cast<ClassDecl>(typeDecl)) {
+    return (doesClassMetadataRequireInitialization(IGM, classDecl) &&
+            !doesClassMetadataRequireRelocation(IGM, classDecl));
+  }
 
   assert(isa<StructDecl>(typeDecl) || isa<EnumDecl>(typeDecl));
 
@@ -926,14 +933,6 @@ namespace {
         return TypeContextDescriptorFlags::ForeignMetadataInitialization;
 
       // The only other option is in-place initialization.
-
-      // Only struct and enums for now.  Classes currently use an eager
-      // mechanism that doesn't properly support recursive dependencies, so
-      // their equivalent of in-place initialization does not yet use this
-      // infrastructure.
-      if (!isa<StructDecl>(Type) && !isa<EnumDecl>(Type))
-        return TypeContextDescriptorFlags::NoMetadataInitialization;
-
       if (needsInPlaceMetadataInitialization(IGM, Type))
         return TypeContextDescriptorFlags::InPlaceMetadataInitialization;
 
@@ -961,7 +960,7 @@ namespace {
     }
 
     void addInPlaceMetadataInitialization() {
-      if (isa<StructDecl>(Type) || isa<EnumDecl>(Type)) {
+      if (isa<StructDecl>(Type) || isa<EnumDecl>(Type) || isa<ClassDecl>(Type)) {
         asImpl().addInPlaceValueMetadataInitialization();
       } else {
         llvm_unreachable("unexpected type allowing in-place initialization");
@@ -1852,6 +1851,28 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
                   IGF.IGM.getPointerSize() * storedProperties.size());
 }
 
+/// Create an access function for the given type which triggers the
+/// in-place initialization path.
+static void
+createInPlaceInitializationMetadataAccessFunction(IRGenModule &IGM,
+                                                  NominalTypeDecl *typeDecl,
+                                                  CanType type) {
+  assert(!typeDecl->isGenericContext());
+
+  (void) createTypeMetadataAccessFunction(IGM, type,
+                                          CacheStrategy::InPlaceInitialization,
+                                          [&](IRGenFunction &IGF,
+                                              DynamicMetadataRequest request,
+                                              llvm::Constant *cacheVariable) {
+    llvm::Value *descriptor =
+      IGF.IGM.getAddrOfTypeContextDescriptor(typeDecl, RequireMetadata);
+    auto responsePair =
+      IGF.Builder.CreateCall(IGF.IGM.getGetInPlaceMetadataFn(),
+                             {request.get(IGF), descriptor});
+    return MetadataResponse::handle(IGF, request, responsePair);
+  });
+}
+
 // Classes
 
 static void emitFieldOffsetGlobals(IRGenModule &IGM,
@@ -2517,6 +2538,26 @@ namespace {
         return;
       }
 
+      // In-place case.
+      if (!doesClassMetadataRequireRelocation(IGM, Target)) {
+        createInPlaceInitializationMetadataAccessFunction(IGM, Target, type);
+
+        emitMetadataCompletionFunction(
+            IGM, Target,
+            [&](IRGenFunction &IGF, llvm::Value *metadata,
+                MetadataDependencyCollector *collector) {
+          // Initialize the superclass if we didn't do so as a constant.
+          if (HasUnfilledSuperclass) {
+            auto superclass = type->getSuperclass()->getCanonicalType();
+            this->emitStoreOfSuperclass(IGF, superclass, metadata, collector);
+          }
+
+          emitFinishInitializationOfClassMetadata(IGF, metadata, collector);
+        });
+
+        return;
+      }
+
       // Resilient case.
       //
       // FIXME: Needs to support two-phase initialization.
@@ -2546,16 +2587,13 @@ namespace {
         this->emitStoreOfSuperclass(IGF, superclass, metadata, collector);
       }
 
-      // Relocate the metadata if it has a superclass that is resilient
-      // to us.
-      if (doesClassMetadataRequireRelocation(IGM, Target)) {
-        auto templateSize = IGM.getSize(Size(B.getNextOffsetFromGlobal()));
-        auto numImmediateMembers = IGM.getSize(
-          Size(IGM.getClassMetadataLayout(Target).getNumImmediateMembers()));
-        metadata = IGF.Builder.CreateCall(IGF.IGM.getRelocateClassMetadataFn(),
-                                          {metadata, templateSize,
-                                           numImmediateMembers});
-      }
+      // Relocate the metadata.
+      auto templateSize = IGM.getSize(Size(B.getNextOffsetFromGlobal()));
+      auto numImmediateMembers = IGM.getSize(
+        Size(IGM.getClassMetadataLayout(Target).getNumImmediateMembers()));
+      metadata = IGF.Builder.CreateCall(IGF.IGM.getRelocateClassMetadataFn(),
+                                        {metadata, templateSize,
+                                         numImmediateMembers});
 
       return emitFinishInitializationOfClassMetadata(IGF, metadata, collector);
     }
@@ -3002,28 +3040,6 @@ namespace {
       });
     }
   };
-}
-
-/// Create an access function for the given type which triggers the
-/// in-place initialization path.
-static void
-createInPlaceInitializationMetadataAccessFunction(IRGenModule &IGM,
-                                                  NominalTypeDecl *typeDecl,
-                                                  CanType type) {
-  assert(!typeDecl->isGenericContext());
-
-  (void) createTypeMetadataAccessFunction(IGM, type,
-                                          CacheStrategy::InPlaceInitialization,
-                                          [&](IRGenFunction &IGF,
-                                              DynamicMetadataRequest request,
-                                              llvm::Constant *cacheVariable) {
-    llvm::Value *descriptor =
-      IGF.IGM.getAddrOfTypeContextDescriptor(typeDecl, RequireMetadata);
-    auto responsePair =
-      IGF.Builder.CreateCall(IGF.IGM.getGetInPlaceMetadataFn(),
-                             {request.get(IGF), descriptor});
-    return MetadataResponse::handle(IGF, request, responsePair);
-  });
 }
 
 /// Create an access function for the given non-generic type.

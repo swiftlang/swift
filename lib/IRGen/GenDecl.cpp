@@ -3246,7 +3246,7 @@ IRGenModule::getAddrOfTypeMetadataInPlaceInitializationCache(
                                            ForDefinition_t forDefinition) {
   // Build the cache type.
   llvm::Type *cacheTy;
-  if (isa<StructDecl>(D) || isa<EnumDecl>(D)) {
+  if (isa<StructDecl>(D) || isa<EnumDecl>(D) || isa<ClassDecl>(D)) {
     // This is struct InPlaceValueMetadataCache.
     cacheTy = llvm::StructType::get(getLLVMContext(),
                                     {TypeMetadataPtrTy, Int8PtrTy});
