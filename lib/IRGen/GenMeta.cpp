@@ -1929,13 +1929,12 @@ namespace {
     void emitInitializeMethodOverrides(IRGenFunction &IGF,
                                        llvm::Value *metadata) {}
 
-    void addGenericArgument(CanType argTy, ClassDecl *forClass) {
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
+    void addGenericArgument(ClassDecl *forClass) {
+      llvm_unreachable("Fixed class metadata cannot have generic parameters");
     }
 
-    void addGenericWitnessTable(CanType argTy, ProtocolConformanceRef conf,
-                                ClassDecl *forClass) {
-      B.addNullPointer(IGM.WitnessTablePtrTy);
+    void addGenericWitnessTable(ClassDecl *forClass) {
+      llvm_unreachable("Fixed class metadata cannot have generic requirements");
     }
   };
 
@@ -1986,10 +1985,9 @@ namespace {
       }
     }
 
-    void addGenericArgument(CanType argTy, ClassDecl *forClass) {}
+    void addGenericArgument(ClassDecl *forClass) {}
 
-    void addGenericWitnessTable(CanType argTy, ProtocolConformanceRef conf,
-                                ClassDecl *forClass) {}
+    void addGenericWitnessTable(ClassDecl *forClass) {}
   };
 
   /// Base class for laying out class metadata.
@@ -2275,13 +2273,12 @@ namespace {
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
 
-    void addGenericArgument(CanType argTy, ClassDecl *forClass) {
-      Members.addGenericArgument(argTy, forClass);
+    void addGenericArgument(ClassDecl *forClass) {
+      Members.addGenericArgument(forClass);
     }
 
-    void addGenericWitnessTable(CanType argTy, ProtocolConformanceRef conf,
-                                ClassDecl *forClass) {
-      Members.addGenericWitnessTable(argTy, conf, forClass);
+    void addGenericWitnessTable(ClassDecl *forClass) {
+      Members.addGenericWitnessTable(forClass);
     }
 
   protected:
@@ -3036,11 +3033,11 @@ namespace {
       B.addAlignmentPadding(super::IGM.getPointerAlignment());
     }
 
-    void addGenericArgument(CanType type) {
+    void addGenericArgument() {
       B.addNullPointer(IGM.TypeMetadataPtrTy);
     }
 
-    void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf) {
+    void addGenericWitnessTable() {
       B.addNullPointer(IGM.WitnessTablePtrTy);
     }
 
@@ -3188,7 +3185,6 @@ namespace {
 
 /// Emit the type metadata or metadata template for a struct.
 void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
-  // TODO: structs nested within generic types
   ConstantInitBuilder initBuilder(IGM);
   auto init = initBuilder.beginStruct();
   init.setPacked(true);
@@ -3288,11 +3284,11 @@ namespace {
       B.add(emitNominalTypeDescriptor());
     }
 
-    void addGenericArgument(CanType type) {
+    void addGenericArgument() {
       B.addNullPointer(IGM.TypeMetadataPtrTy);
     }
 
-    void addGenericWitnessTable(CanType type, ProtocolConformanceRef conf) {
+    void addGenericWitnessTable() {
       B.addNullPointer(IGM.WitnessTablePtrTy);
     }
 
@@ -3405,7 +3401,6 @@ namespace {
 } // end anonymous namespace
 
 void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
-  // TODO: enums nested inside generic types
   ConstantInitBuilder initBuilder(IGM);
   auto init = initBuilder.beginStruct();
   init.setPacked(true);

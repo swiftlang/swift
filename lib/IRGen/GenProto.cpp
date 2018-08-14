@@ -3004,8 +3004,7 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
 }
 
 /// The information we need to record in generic type metadata
-/// is the information in the type's generic signature, minus the
-/// information recoverable from the type's parent type.  This is
+/// is the information in the type's generic signature.  This is
 /// simply the information that would be passed to a generic function
 /// that takes the (thick) parent metatype as an argument.
 GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
