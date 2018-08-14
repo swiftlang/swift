@@ -287,10 +287,9 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(
   eraseFromParentWithDebugInsts(AI);
 }
 
-bool swift::runSROAOnInsts(llvm::ArrayRef<AllocStackInst *> Worklist) {
+bool swift::runSROAOnInsts(ArrayRef<AllocStackInst *> Insts) {
   bool Changed = false;
-  llvm::SmallVector<AllocStackInst *, 16> WorklistVec(Worklist.begin(),
-                                                      Worklist.end());
+  SmallVector<AllocStackInst *, 16> WorklistVec(Insts.begin(), Insts.end());
   while (!WorklistVec.empty()) {
     AllocStackInst *AI = WorklistVec.back();
     WorklistVec.pop_back();
@@ -307,7 +306,7 @@ bool swift::runSROAOnInsts(llvm::ArrayRef<AllocStackInst *> Worklist) {
 }
 
 static bool runSROAOnFunction(SILFunction &Fn) {
-  llvm::SmallVector<AllocStackInst *, 16> Worklist;
+  SmallVector<AllocStackInst *, 16> Worklist;
 
   // For each basic block BB in Fn...
   for (auto &BB : Fn)
