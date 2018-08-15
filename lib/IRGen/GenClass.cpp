@@ -2101,6 +2101,7 @@ namespace {
 llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
                                             ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", cls);
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
 
@@ -2121,6 +2122,7 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
                                   ConstantStructBuilder &init,
                                   ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", cls);
 
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
@@ -2157,8 +2159,8 @@ llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
   ClassDecl *cls = ext->getAsClassOrClassExtensionContext();
   assert(cls && "generating category metadata for a non-class extension");
   
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", ext);
   ClassDataBuilder builder(IGM, cls, ext);
-  
   return builder.emitCategory();
 }
   
@@ -2166,6 +2168,7 @@ llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
 llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
                                             ProtocolDecl *proto) {
   assert(proto->isObjC() && "not an objc protocol");
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", proto);
   ClassDataBuilder builder(IGM, proto);
   return builder.emitProtocol();
 }
