@@ -2482,10 +2482,12 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
       // Just check the base type. If it's a constrained extension, Sema should
       // have already enforced access more strictly.
       if (auto nominal = enclosingExt->getExtendedNominal()) {
-        auto nominalAccess =
-            getAdjustedFormalAccess(nominal, useDC,
-                                    treatUsableFromInlineAsPublic);
-        access = std::min(access, nominalAccess);
+        if (nominal->getParentModule() == enclosingExt->getParentModule()) {
+          auto nominalAccess =
+              getAdjustedFormalAccess(nominal, useDC,
+                                      treatUsableFromInlineAsPublic);
+          access = std::min(access, nominalAccess);
+        }
       }
 
     } else {
