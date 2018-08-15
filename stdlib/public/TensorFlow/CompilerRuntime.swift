@@ -104,7 +104,7 @@ public enum _RuntimeConfig {
   /// needed. Otherwise, The entire GPU memory region is pre-allocated.
   // TODO: assess whether we should default to true.
   static public var gpuMemoryAllowGrowth = false
-  
+
   /// When non-nil, run metadata (with full trace) of each session execution
   /// will be dumped to the give path.
   static public var runMetadataOutputPath: String? = nil
@@ -183,7 +183,7 @@ private func configureRuntimeFromEnvironment() {
     _RuntimeConfig.session = .remote(grpcAddress: address)
     debugLog("Setting TF server address to \(address) from env.")
   }
-  
+
   if let value = getenv("SWIFT_TENSORFLOW_RUN_METADATA_OUTPUT") {
     let path = String(cString: value)
     _RuntimeConfig.runMetadataOutputPath = path
@@ -215,7 +215,7 @@ public final class _ExecutionContext {
   public static let global: _ExecutionContext = _ExecutionContext()
 
   public let cpuDeviceName: String
- 
+
   /// Only set when there is a usable GPU.
   public let gpuDeviceName: String?
 
@@ -577,7 +577,7 @@ extension TFState {
       exit(-1)
     }
     debugLog("Done running TF computation.")
-    
+
     // If run metadata path was set, dump the run metadata proto to a file.
     if let path = _RuntimeConfig.runMetadataOutputPath {
       TF_DeleteBuffer(runOptions)
@@ -871,7 +871,7 @@ public func _TFCStartTensorComputation(
     """)
 
   internalConsistencyCheck(programByteCount > 0, "Cannot run an empty graph!")
-  
+
   return _TensorComputation(programByteAddress: programByteAddress,
                             programByteCount: programByteCount,
                             entryFunctionBaseNameAddress: entryFunctionBaseNameAddress,
