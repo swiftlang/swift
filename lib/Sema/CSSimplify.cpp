@@ -4930,8 +4930,6 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
 
   if (existingFix == Fixes.end())
     Fixes.push_back(fix);
-  else // if fix couldn't be recorded, it means that it's no longer needed.
-    Allocator.Deallocate(fix);
 
   return false;
 }
