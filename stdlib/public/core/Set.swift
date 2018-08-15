@@ -391,25 +391,6 @@ extension Set: Collection {
   }
 }
 
-/// Check for both subset and equality relationship between
-/// a set and some sequence (which may itself be a `Set`).
-///
-/// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
-@inlinable
-internal func _compareSets<Element>(
-  _ lhs: Set<Element>,
-  _ rhs: Set<Element>
-) -> (isSubset: Bool, isEqual: Bool) {
-  // FIXME(performance): performance could be better if we start by comparing
-  // counts.
-  for member in lhs {
-    if !rhs.contains(member) {
-      return (false, false)
-    }
-  }
-  return (true, lhs.count == rhs.count)
-}
-
 // FIXME: rdar://problem/23549059 (Optimize == for Set)
 // Look into initially trying to compare the two sets by directly comparing the
 // contents of both buffers in order. If they happen to have the exact same
@@ -1316,8 +1297,13 @@ extension Set {
   /// - Returns: `true` if the set is a subset of `other`; otherwise, `false`.
   @inlinable
   public func isSubset(of other: Set<Element>) -> Bool {
-    let (isSubset, isEqual) = _compareSets(self, other)
-    return isSubset || isEqual
+    guard self.count <= other.count else { return false }
+    for member in self {
+      if !other.contains(member) {
+        return false
+      }
+    }
+    return true
   }
 
   /// Returns a Boolean value that indicates whether this set is a superset of
