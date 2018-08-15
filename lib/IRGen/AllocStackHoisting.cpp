@@ -332,6 +332,20 @@ private:
 };
 } // end anonymous namespace
 
+bool indicatesDynamicAvailabilityCheckUse(SILInstruction *I) {
+  auto *Apply = dyn_cast<ApplyInst>(I);
+  if (!Apply)
+    return false;
+  if (Apply->hasSemantics("availability.osversion"))
+    return true;
+  auto *FunRef = Apply->getReferencedFunction();
+  if (!FunRef)
+    return false;
+  if (FunRef->getName().equals("_swift_stdlib_operatingSystemVersion"))
+    return true;
+  return false;
+}
+
 /// Collect generic alloc_stack instructions in the current function can be
 /// hoisted.
 /// We can hoist generic alloc_stack instructions if they are not dependent on a
@@ -349,11 +363,9 @@ void HoistAllocStack::collectHoistableInstructions() {
         continue;
       }
       // Don't perform alloc_stack hoisting in functions with availability.
-      if (auto *Apply = dyn_cast<ApplyInst>(&Inst)) {
-        if (Apply->hasSemantics("availability.osversion")) {
-          AllocStackToHoist.clear();
-          return;
-        }
+      if (indicatesDynamicAvailabilityCheckUse(&Inst)) {
+        AllocStackToHoist.clear();
+        return;
       }
       auto *ASI = dyn_cast<AllocStackInst>(&Inst);
       if (!ASI) {
