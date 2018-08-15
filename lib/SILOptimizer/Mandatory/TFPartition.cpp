@@ -4060,9 +4060,11 @@ static void contractUncondBranches(SILFunction *fn) {
 /// Return true if a user instruction is returning or forming a return value.
 static bool isReturning(SILInstruction *user) {
   if (isa<ReturnInst>(user)) return true;
-  if (auto *TI = dyn_cast<TupleInst>(user))
-    return llvm::all_of(TI->getUses(),
-                        [&](Operand *use) { return isReturning(user); });
+  if (auto *TI = dyn_cast<TupleInst>(user)) {
+    return llvm::all_of(TI->getUses(), [&](Operand *use) {
+      return isReturning(use->getUser());
+    });
+  }
   return false;
 }
 

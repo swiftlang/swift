@@ -512,3 +512,22 @@ public func test77437755(_ hiddenSize: Float) {
 // CHECK: [[STDDEVT:%.*]] = graph_op "tfc.scalarToTensor,s"([[STDDEV]] : $Builtin.FPIEEE32) {{.*}} : $TensorHandle<Float>
 // CHECK:  graph_op "Mul,i,i"({{.*}} : $TensorHandle<Float>, [[STDDEVT]] : $TensorHandle<Float>) {{.*}}
 // CHECK-LABEL: ---- END OF INPUT FUNCTION ----------
+
+
+@TensorFlowGraph
+public func graphFuncReturningOpaqueHandles() -> (ResourceHandle, ResourceHandle) {
+  let iterator : ResourceHandle =
+    #tfop("Iterator", shared_name: "foo", container: "bar",
+    output_shapes: [TensorShape()], output_types: [Float.self])
+  let iterator2 : ResourceHandle =
+    #tfop("Iterator", shared_name: "foo", container: "bar",
+    output_shapes: [TensorShape()], output_types: [Float.self])
+  return (iterator, iterator2)
+}
+// CHECK-LABEL --- TFPartition Accelerator Result: {{.*}}graphFuncReturningOpaqueHandles{{.*}}
+// CHECK: bb0:
+// CHECK:  [[A:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types: [$Float.Type: $Float], __device: "/device:CPU:0"} : $ResourceHandle 
+// CHECK:  [[B:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types: [$Float.Type: $Float], __device: "/device:CPU:0"} : $ResourceHandle 
+// CHECK:  [[C:%.*]] = tuple ([[A]] : $ResourceHandle, [[B]] : $ResourceHandle)
+// CHECK:  return [[C]] : $(ResourceHandle, ResourceHandle)   
+
