@@ -606,3 +606,11 @@ struct S {
     // expected-error@-1 2 {{overlapping accesses to 'self', but modification requires exclusive access; consider copying to a local variable}}
   }
 }
+
+// TODO: A conflict should also be detected here. However, the
+// typechecker does not allow it. Enable the following test if we ever
+// remove this case from the typechecker test:
+// diag_invalid_inout_captures.swift.
+// public func nestedConflict(x: inout Int) {
+//   doit(x: &x, x == 0 ? { x = 1 } : { x = 2})
+// }
