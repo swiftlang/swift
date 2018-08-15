@@ -14,6 +14,7 @@
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/Version.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -261,6 +262,16 @@ public:
 
   /// The install_name to use in the TBD file.
   std::string TBDInstallName;
+
+  // The current project version to use in the generated TBD file. Defaults
+  // to 1, which matches the default if the DYLIB_CURRENT_VERSION build setting
+  // is not set.
+  version::Version TBDCurrentVersion = {1, 0, 0};
+
+  // The dylib compatibility-version to use in the generated TBD file. Defaults
+  // to 1, which matches the default if the DYLIB_COMPATIBILITY_VERSION build
+  // setting is not set.
+  version::Version TBDCompatibilityVersion = {1, 0, 0};
 
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {
