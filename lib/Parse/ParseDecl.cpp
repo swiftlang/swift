@@ -4768,7 +4768,7 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // Allow the sil_stored attribute to override all the accessors we parsed
   // when making the final classification.
   if (attrs.hasAttribute<SILStoredAttr>()) {
-    return StorageImplInfo::getSimpleStored(Set != nullptr);
+    return StorageImplInfo::getSimpleStored(StorageIsMutable_t(Set != nullptr));
   }
 
   return StorageImplInfo(readImpl, writeImpl, readWriteImpl);

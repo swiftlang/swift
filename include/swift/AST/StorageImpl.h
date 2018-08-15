@@ -22,6 +22,11 @@
 
 namespace swift {
 
+enum StorageIsMutable_t : bool {
+  StorageIsNotMutable = false,
+  StorageIsMutable = true
+};
+
 // Note that the values of these enums line up with %select values in
 // diagnostics.
 enum class AccessorKind {
@@ -309,16 +314,17 @@ public:
 #endif
   }
 
-  static StorageImplInfo getSimpleStored(bool supportsMutation) {
+  static StorageImplInfo getSimpleStored(StorageIsMutable_t isMutable) {
     return { ReadImplKind::Stored,
-             supportsMutation ? WriteImplKind::Stored
-                              : WriteImplKind::Immutable,
-             supportsMutation ? ReadWriteImplKind::Stored
-                              : ReadWriteImplKind::Immutable };
+             isMutable ? WriteImplKind::Stored
+                       : WriteImplKind::Immutable,
+             isMutable ? ReadWriteImplKind::Stored
+                       : ReadWriteImplKind::Immutable };
   }
 
-  static StorageImplInfo getOpaque(bool supportsMutation) {
-    return (supportsMutation ? getMutableOpaque() : getImmutableOpaque());
+  static StorageImplInfo getOpaque(StorageIsMutable_t isMutable) {
+    return (isMutable ? getMutableOpaque()
+                      : getImmutableOpaque());
   }
 
   /// Describe the implementation of a immutable property implemented opaquely.
@@ -332,8 +338,9 @@ public:
              ReadWriteImplKind::MaterializeForSet };
   }
 
-  static StorageImplInfo getComputed(bool supportsMutation) {
-    return (supportsMutation ? getMutableComputed() : getImmutableComputed());
+  static StorageImplInfo getComputed(StorageIsMutable_t isMutable) {
+    return (isMutable ? getMutableComputed()
+                      : getImmutableComputed());
   }
 
   /// Describe the implementation of an immutable property implemented
@@ -362,8 +369,8 @@ public:
   }
 
   /// Does this describe storage that supports mutation?
-  bool supportsMutation() const {
-    return getWriteImpl() != WriteImplKind::Immutable;
+  StorageIsMutable_t supportsMutation() const {
+    return StorageIsMutable_t(getWriteImpl() != WriteImplKind::Immutable);
   }
 
   ReadImplKind getReadImpl() const {

@@ -4143,7 +4143,7 @@ private:
 
 protected:
   AbstractStorageDecl(DeclKind Kind, DeclContext *DC, DeclName Name,
-                      SourceLoc NameLoc, bool supportsMutation)
+                      SourceLoc NameLoc, StorageIsMutable_t supportsMutation)
     : ValueDecl(Kind, DC, Name, NameLoc) {
     Bits.AbstractStorageDecl.HasStorage = true;
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
@@ -4151,7 +4151,7 @@ protected:
     Bits.AbstractStorageDecl.IsSetterMutating = true;
   }
 
-  void setSupportsMutationIfStillStored(bool supportsMutation) {
+  void setSupportsMutationIfStillStored(StorageIsMutable_t supportsMutation) {
     if (auto ptr = Accessors.getPointer()) {
       auto impl = ptr->getImplInfo();
       if (!impl.isSimpleStored()) return;
@@ -4210,8 +4210,8 @@ public:
   /// don't support mutation (e.g. to initialize them), and sometimes we
   /// can't mutate things that do support mutation (e.g. because their
   /// setter is private).
-  bool supportsMutation() const {
-    return Bits.AbstractStorageDecl.SupportsMutation;
+  StorageIsMutable_t supportsMutation() const {
+    return StorageIsMutable_t(Bits.AbstractStorageDecl.SupportsMutation);
   }
 
   /// Are there any accessors for this declaration, including implicit ones?
@@ -4452,7 +4452,8 @@ protected:
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
           SourceLoc NameLoc, Identifier Name, DeclContext *DC)
-    : AbstractStorageDecl(Kind, DC, Name, NameLoc, !isImmutableSpecifier(Sp))
+    : AbstractStorageDecl(Kind, DC, Name, NameLoc,
+                          StorageIsMutable_t(!isImmutableSpecifier(Sp)))
   {
     Bits.VarDecl.IsStatic = IsStatic;
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
@@ -4853,7 +4854,7 @@ public:
                 GenericParamList *GenericParams)
     : GenericContext(DeclContextKind::SubscriptDecl, Parent),
       AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc,
-                          /*supports mutation (will be overwritten)*/ true),
+                          /*will be overwritten*/ StorageIsNotMutable),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     setIndices(Indices);
     setGenericParams(GenericParams);
