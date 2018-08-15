@@ -964,6 +964,9 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }
 
+  if (writeTBDIfNeeded(Invocation, Instance))
+    return true;
+
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.
   bool moduleIsPublic =
