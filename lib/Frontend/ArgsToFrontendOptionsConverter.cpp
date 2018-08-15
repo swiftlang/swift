@@ -214,21 +214,6 @@ void ArgsToFrontendOptionsConverter::computeTBDOptions() {
                      A->getOption().getPrefixedName(), value);
     }
   }
-  if (const Arg *A = Args.getLastArg(OPT_tbd_install_name)) {
-    Opts.TBDInstallName = A->getValue();
-  }
-  if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
-    if (auto vers = version::Version::parseVersionString(
-          A->getValue(), SourceLoc(), &Diags)) {
-      Opts.TBDCompatibilityVersion = *vers;
-    }
-  }
-  if (const Arg *A = Args.getLastArg(OPT_tbd_current_version)) {
-    if (auto vers = version::Version::parseVersionString(
-          A->getValue(), SourceLoc(), &Diags)) {
-      Opts.TBDCurrentVersion = *vers;
-    }
-  }
 }
 
 void ArgsToFrontendOptionsConverter::setUnsignedIntegerArgument(

@@ -417,7 +417,7 @@ void TBDGenVisitor::addFirstFileSymbols() {
 /// Converts a version tuple into a packed version, ignoring components beyond
 /// major, minor, and subminor.
 static tapi::internal::PackedVersion
-convertToPacked(version::Version &version) {
+convertToPacked(const version::Version &version) {
   // FIXME: Warn if version is greater than 3 components?
   unsigned major = 0, minor = 0, subminor = 0;
   if (version.size() > 0) major = version[0];
@@ -429,7 +429,7 @@ convertToPacked(version::Version &version) {
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet *symbols,
                                            llvm::raw_ostream *os,
-                                           TBDGenOptions &opts) {
+                                           const TBDGenOptions &opts) {
   auto isWholeModule = singleFile == nullptr;
   const auto &target = M->getASTContext().LangOpts.Target;
   UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, isWholeModule);
@@ -484,15 +484,15 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
-                                   TBDGenOptions &opts) {
+                                   const TBDGenOptions &opts) {
   enumeratePublicSymbolsAndWrite(file->getParentModule(), file, &symbols,
                                  nullptr, opts);
 }
 void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
-                                   TBDGenOptions &opts) {
+                                   const TBDGenOptions &opts) {
   enumeratePublicSymbolsAndWrite(M, nullptr, &symbols, nullptr, opts);
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                         TBDGenOptions &opts) {
+                         const TBDGenOptions &opts) {
   enumeratePublicSymbolsAndWrite(M, nullptr, nullptr, &os, opts);
 }
