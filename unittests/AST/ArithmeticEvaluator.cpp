@@ -244,13 +244,8 @@ TEST(ArithmeticEvaluator, Simple) {
   // Dependency printing.
 
   // Cache some values first, so they show up in the result.
-  auto cachedResult = evaluator(InternallyCachedEvaluationRule(product));
-  if (auto err = cachedResult.takeError()) {
-    llvm::handleAllErrors(std::move(err),
-      [](const CyclicalRequestError<InternallyCachedEvaluationRule> &E) {
-        llvm_unreachable("no explicit cycles were requested");
-      });
-  }
+  (void)llvm::cantFail(evaluator(InternallyCachedEvaluationRule(product)),
+                       "no explicit cycles were requested");
 
   std::string productDependencies;
   {

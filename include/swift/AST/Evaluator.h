@@ -78,14 +78,12 @@ struct CyclicalRequestError :
 public:
   static char ID;
   const Request &request;
+  const Evaluator &evaluator;
 
-  CyclicalRequestError(const Request &request): request(request) {}
+  CyclicalRequestError(const Request &request, const Evaluator &evaluator)
+    : request(request), evaluator(evaluator) {}
 
-  virtual void log(llvm::raw_ostream &out) const {
-    out << "Cycle detected:\n";
-    simple_display(out, request);
-    out << "\n";
-  }
+  virtual void log(llvm::raw_ostream &out) const;
 
   virtual std::error_code convertToErrorCode() const {
     // This is essentially unused, but is a temporary requirement for
@@ -259,7 +257,7 @@ public:
     // Check for a cycle.
     if (checkDependency(AnyRequest(request))) {
       return llvm::Error(
-        llvm::make_unique<CyclicalRequestError<Request>>(request));
+        llvm::make_unique<CyclicalRequestError<Request>>(request, *this));
     }
 
     // Make sure we remove this from the set of active requests once we're
@@ -428,6 +426,13 @@ public:
     void dumpDependenciesGraphviz() const LLVM_ATTRIBUTE_USED,
     "Only meant for use in the debugger");
 };
+
+template <typename Request>
+void CyclicalRequestError<Request>::log(llvm::raw_ostream &out) const {
+  out << "Cycle detected:\n";
+  evaluator.printDependencies(request, out);
+  out << "\n";
+}
 
 } // end namespace evaluator
 
