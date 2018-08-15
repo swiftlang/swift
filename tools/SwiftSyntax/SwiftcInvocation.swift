@@ -146,7 +146,7 @@ struct SwiftcRunner {
   ///           - lib/
   ///             - swift/
   ///               - ${target}/
-  ///                 - ${arch}/ (only on !Darwin)
+  ///                 - ${arch}/ (only on !Darwin and if launched from Xcode)
   ///                   - libswiftSwiftSyntax.[dylib|so]
   ///         ```
   static func locateSwiftc() -> URL? {
@@ -156,9 +156,13 @@ struct SwiftcRunner {
                                .deletingLastPathComponent()
                                .deletingLastPathComponent()
                                .deletingLastPathComponent()
-#if !os(macOS)
-    swiftcURL = swiftcURL.deletingLastPathComponent()
-#endif
+
+    if swiftcURL.lastPathComponent == "lib" {
+      // We are still one level to deep because we started in ${arch},
+      // not ${target}, see comment above). Traverse one more level upwards
+      swiftcURL = swiftcURL.deletingLastPathComponent()
+    }
+
     swiftcURL = swiftcURL.appendingPathComponent("bin")
                          .appendingPathComponent("swiftc")
     guard FileManager.default.fileExists(atPath: swiftcURL.path) else {
