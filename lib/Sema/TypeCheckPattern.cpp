@@ -132,8 +132,7 @@ lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
 
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
-  NameLookupOptions lookupOptions
-    = defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
+  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   LookupResult foundElements = TC.lookupMember(DC, ty, name, lookupOptions);
   return filterForEnumElement(TC, DC, UseLoc,
                               /*unqualifiedLookup=*/false, foundElements);

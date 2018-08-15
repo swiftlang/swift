@@ -2176,8 +2176,8 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     if (decl) {
       SmallVector<ValueDecl *, 2> foundMembers;
       decl->getParentModule()->lookupQualified(
-          typeToSearch, name,
-          NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers, nullptr,
+          decl, name,
+          NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers,
           foundMembers);
       for (auto member : foundMembers) {
         if (auto type = dyn_cast<TypeDecl>(member)) {
