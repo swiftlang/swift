@@ -679,35 +679,7 @@ public:
   const FieldDescriptor **end() const { return End; }
 };
 
-struct FieldCacheState {
-  ConcurrentMap<FieldDescriptorCacheEntry> FieldCache;
-
-  ConcurrentReadableArray<StaticFieldSection> StaticSections;
-  ConcurrentReadableArray<DynamicFieldSection> DynamicSections;
-
-  FieldCacheState() {
-    initializeTypeFieldLookup();
-  }
-};
-
-static Lazy<FieldCacheState> FieldCache;
 } // namespace
-
-void swift::swift_registerFieldDescriptors(const FieldDescriptor **records,
-                                           size_t size) {
-  auto &cache = FieldCache.get();
-  cache.DynamicSections.push_back({records, size});
-}
-
-void swift::addImageTypeFieldDescriptorBlockCallback(const void *recordsBegin,
-                                                     uintptr_t size) {
-  auto sectionBytes = reinterpret_cast<const char *>(recordsBegin);
-  auto recordsEnd = reinterpret_cast<const void *>(sectionBytes + size);
-
-  // Field cache should always be sufficiently initialized by this point.
-  auto &cache = FieldCache.unsafeGetAlreadyInitialized();
-  cache.StaticSections.push_back({recordsBegin, recordsEnd});
-}
 
 #pragma mark Metadata lookup via mangled name
 

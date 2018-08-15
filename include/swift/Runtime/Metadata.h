@@ -740,11 +740,6 @@ SWIFT_RUNTIME_EXPORT
 void swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
                                        const TypeMetadataRecord *end);
 
-/// Register a block of type field records for dynamic lookup.
-SWIFT_RUNTIME_EXPORT
-void swift_registerFieldDescriptors(const reflection::FieldDescriptor **records,
-                                    size_t size);
-
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
 SWIFT_CC(swift)

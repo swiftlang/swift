@@ -1116,11 +1116,6 @@ FUNCTION(RegisterTypeMetadataRecords,
          RETURNS(VoidTy),
          ARGS(TypeMetadataRecordPtrTy, TypeMetadataRecordPtrTy),
          ATTRS(NoUnwind))
-FUNCTION(RegisterFieldDescriptors,
-         swift_registerFieldDescriptors, DefaultCC,
-         RETURNS(VoidTy),
-         ARGS(FieldDescriptorPtrPtrTy, SizeTy),
-         ATTRS(NoUnwind))
 
 // void swift_beginAccess(void *pointer, ValueBuffer *scratch, size_t flags);
 FUNCTION(BeginAccess, swift_beginAccess, C_CC,
