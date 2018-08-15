@@ -1570,9 +1570,9 @@ ERROR(objc_protocol_cannot_have_conditional_conformance,none,
       (Type, Type))
 ERROR(objc_protocol_in_generic_extension,none,
       "conformance of "
-      "%select{|subclass of a }2%select{class from generic context|generic class}3"
-      " %0 to @objc protocol %1 cannot be in an extension",
-      (Type, Type, bool, bool))
+      "%select{class from generic context|generic class}0 "
+      "%1 to @objc protocol %2 cannot be in an extension",
+      (bool, Type, Type))
 ERROR(conditional_conformances_cannot_imply_conformances,none,
       "conditional conformance of type %0 to protocol %1 does not imply conformance to "
       "inherited protocol %2",
@@ -3539,7 +3539,9 @@ ERROR(invalid_nonobjc_extension,none,
 ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
-      "@objc is not supported within extensions of generic classes or classes that inherit from generic classes", ())
+      "members of extensions of "
+      "%select{classes from generic context|generic classes}0 "
+      "cannot be declared @objc", (bool))
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,

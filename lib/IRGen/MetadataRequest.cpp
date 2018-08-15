@@ -409,9 +409,6 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
 
   // If the class must not require dynamic initialization --- e.g. if it
   // is a super reference --- then respect everything that might impose that.
-  //
-  // FIXME: This should only care about relocation, not initialization, so
-  // that we can emit categories for concrete subclasses of generic classes.
   if (!allowDynamicUninitialized) {
     if (doesClassMetadataRequireInitialization(IGM, theDecl))
       return nullptr;
