@@ -579,6 +579,41 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
+namespace {
+
+/// Determine whether unqualified lookup should look at the members of the
+/// given nominal type or extension, vs. only looking at type parameters.
+template<typename D>
+bool shouldLookupMembers(D *decl, SourceLoc loc) {
+  // Only look at members of this type (or its inherited types) when
+  // inside the body or a protocol's top-level 'where' clause. (Why the
+  // 'where' clause? Because that's where you put constraints on
+  // inherited associated types.)
+
+  // When we have no source-location information, we have to perform member
+  // lookup.
+  if (loc.isInvalid() || decl->getBraces().isInvalid())
+    return true;
+
+  // Within the braces, always look for members.
+  auto &ctx = decl->getASTContext();
+  if (ctx.SourceMgr.rangeContainsTokenLoc(decl->getBraces(), loc))
+    return true;
+
+  // Within 'where' clause, we can also look for members.
+  if (auto *whereClause = decl->getTrailingWhereClause()) {
+    SourceRange whereClauseRange = whereClause->getSourceRange();
+    if (whereClauseRange.isValid() &&
+        ctx.SourceMgr.rangeContainsTokenLoc(whereClauseRange, loc)) {
+      return true;
+    }
+  }
+
+  // Don't look at the members.
+  return false;
+}
+} // end anonymous namespace
+
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver, SourceLoc Loc,
                                      Options options)
@@ -922,14 +957,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             continue;
           }
 
-          populateLookupDeclsFromContext(ED);
+          if (shouldLookupMembers(ED, Loc))
+            populateLookupDeclsFromContext(ED);
 
           BaseDC = ED;
           MetaBaseDC = ED;
           if (!isCascadingUse.hasValue())
             isCascadingUse = ED->isCascadingContextForLookup(false);
         } else if (auto *ND = dyn_cast<NominalTypeDecl>(DC)) {
-          populateLookupDeclsFromContext(ND);
+          if (shouldLookupMembers(ND, Loc))
+            populateLookupDeclsFromContext(ND);
           BaseDC = DC;
           MetaBaseDC = DC;
           if (!isCascadingUse.hasValue())
