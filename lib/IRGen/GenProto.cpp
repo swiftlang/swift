@@ -33,6 +33,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
@@ -2213,6 +2214,9 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     return;
 
   auto *conf = wt->getConformance();
+  PrettyStackTraceType stackTraceRAII(Context, "emitting witness table for",
+                                      conf->getType());
+  PrettyStackTraceDecl stackTraceRAII2("...conforming to", conf->getProtocol());
 
   // Build the witnesses.
   ConstantInitBuilder builder(*this);
