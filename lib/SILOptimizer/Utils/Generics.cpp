@@ -2482,7 +2482,6 @@ static const char *const KnownPrespecializations[] = {
     "UTF16",
     "String",
     "_StringBuffer",
-    "_toStringReadOnlyPrintable",
 };
 
 bool swift::isKnownPrespecialization(StringRef SpecName) {
