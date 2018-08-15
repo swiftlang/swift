@@ -332,7 +332,7 @@ private:
 };
 } // end anonymous namespace
 
-bool indicatesAvailabilityMacroUse(SILInstruction *I) {
+bool indicatesDynamicAvailabilityCheckUse(SILInstruction *I) {
   auto *Apply = dyn_cast<ApplyInst>(I);
   if (!Apply)
     return false;
@@ -363,7 +363,7 @@ void HoistAllocStack::collectHoistableInstructions() {
         continue;
       }
       // Don't perform alloc_stack hoisting in functions with availability.
-      if (indicatesAvailabilityMacroUse(&Inst)) {
+      if (indicatesDynamicAvailabilityCheckUse(&Inst)) {
         AllocStackToHoist.clear();
         return;
       }

@@ -25,6 +25,9 @@ public func _stdlib_isOSVersionAtLeast(
   _ patch: Builtin.Word
 ) -> Builtin.Int1 {
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  // The call to _swift_stdlib_operatingSystemVersion is used as an indicator
+  // that this function was called by a compiler optimization pass. If it is
+  // replaced that pass needs to be updated.
   let runningVersion = _swift_stdlib_operatingSystemVersion()
   let queryVersion = _SwiftNSOperatingSystemVersion(
     majorVersion: Int(major),
