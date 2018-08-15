@@ -591,7 +591,7 @@ bool shouldLookupMembers(D *decl, SourceLoc loc) {
   // inherited associated types.)
 
   // When we have no source-location information, we have to perform member
-  // lookuo.
+  // lookup.
   if (loc.isInvalid() || decl->getBraces().isInvalid())
     return true;
 
