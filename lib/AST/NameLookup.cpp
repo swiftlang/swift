@@ -579,9 +579,12 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
+namespace {
+
 /// Determine whether unqualified lookup should look at the members of the
-/// given type, vs. only looking at type parameters.
-static bool shouldLookupMembers(NominalTypeDecl *nominal, SourceLoc loc) {
+/// given nominal type or extension, vs. only looking at type parameters.
+template<typename D>
+bool shouldLookupMembers(D *decl, SourceLoc loc) {
   // Only look at members of this type (or its inherited types) when
   // inside the body or a protocol's top-level 'where' clause. (Why the
   // 'where' clause? Because that's where you put constraints on
@@ -589,18 +592,18 @@ static bool shouldLookupMembers(NominalTypeDecl *nominal, SourceLoc loc) {
 
   // When we have no source-location information, we have to perform member
   // lookuo.
-  if (loc.isInvalid() || nominal->getBraces().isInvalid())
+  if (loc.isInvalid() || decl->getBraces().isInvalid())
     return true;
 
   // Within the braces, always look for members.
-  auto &ctx = nominal->getASTContext();
-  if (ctx.SourceMgr.rangeContainsTokenLoc(nominal->getBraces(), loc))
+  auto &ctx = decl->getASTContext();
+  if (ctx.SourceMgr.rangeContainsTokenLoc(decl->getBraces(), loc))
     return true;
 
   // Within a protocol 'where' clause, we can also look for members of the
   // protocol.
-  if (isa<ProtocolDecl>(nominal)) {
-    if (auto *whereClause = nominal->getTrailingWhereClause()) {
+  if (decl->getAsProtocolOrProtocolExtensionContext()) {
+    if (auto *whereClause = decl->getTrailingWhereClause()) {
       SourceRange whereClauseRange = whereClause->getSourceRange();
       if (whereClauseRange.isValid() &&
           ctx.SourceMgr.rangeContainsTokenLoc(whereClauseRange, loc)) {
@@ -612,6 +615,7 @@ static bool shouldLookupMembers(NominalTypeDecl *nominal, SourceLoc loc) {
   // Don't look at the members.
   return false;
 }
+} // end anonymous namespace
 
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver, SourceLoc Loc,
@@ -956,7 +960,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             continue;
           }
 
-          populateLookupDeclsFromContext(ED);
+          if (shouldLookupMembers(ED, Loc))
+            populateLookupDeclsFromContext(ED);
 
           BaseDC = ED;
           MetaBaseDC = ED;
