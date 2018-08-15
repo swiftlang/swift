@@ -48,7 +48,7 @@ public:
 
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
-  TBDGenOptions &Opts;
+  const TBDGenOptions &Opts;
 
 private:
   bool FileHasEntryPoint = false;
@@ -68,7 +68,7 @@ public:
   TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
                 tapi::internal::ArchitectureSet archs, StringSet *stringSymbols,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, TBDGenOptions &opts)
+                ModuleDecl *swiftModule, const TBDGenOptions &opts)
       : Symbols(symbols), Archs(archs), StringSymbols(stringSymbols),
         UniversalLinkInfo(universalLinkInfo), SwiftModule(swiftModule),
         Opts(opts) {}
