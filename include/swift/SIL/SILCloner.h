@@ -1020,10 +1020,10 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitConvertFunctionInst(ConvertFunctionInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createConvertFunction(getOpLocation(Inst->getLoc()),
-                                       getOpValue(Inst->getOperand()),
-                                       getOpType(Inst->getType())));
+  doPostProcess(
+      Inst, getBuilder().createConvertFunction(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()), Inst->withoutActuallyEscaping()));
 }
 
 template <typename ImplClass>
