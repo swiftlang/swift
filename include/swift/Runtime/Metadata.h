@@ -746,12 +746,6 @@ SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_API
 const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
 
-SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_API
-void swift_getFieldAt(
-  const Metadata *base, unsigned index, 
-  void (*callback)(const char *name, const Metadata *type, void *ctx), void *callbackCtx);
-
 #if !NDEBUG
 /// Verify that the given metadata pointer correctly roundtrips its
 /// mangled name through the demangler.
