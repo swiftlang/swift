@@ -4765,7 +4765,7 @@ namespace {
           // If we're importing into the primary @interface for something, as
           // opposed to an extension, make sure we don't try to load any
           // categories...by just looking into the super type.
-          lookupContext = classDecl->getSuperclassDecl  ();
+          lookupContext = classDecl->getSuperclassDecl();
         }
 
         if (lookupContext) {
@@ -7651,8 +7651,8 @@ void ClangImporter::Implementation::startedImportingEntity() {
 static void finishTypeWitnesses(
     NormalProtocolConformance *conformance) {
   auto *dc = conformance->getDeclContext();
+  auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
   auto *module = dc->getParentModule();
-  auto &ctx = module->getASTContext();
 
   auto *proto = conformance->getProtocol();
   auto selfType = conformance->getType();
@@ -7669,8 +7669,8 @@ static void finishTypeWitnesses(
                            NL_OnlyTypes |
                            NL_ProtocolMembers);
 
-      dc->lookupQualified(selfType, assocType->getFullName(), options,
-                          ctx.getLazyResolver(), lookupResults);
+      dc->lookupQualified(nominal, assocType->getFullName(), options,
+                          lookupResults);
       for (auto member : lookupResults) {
         auto typeDecl = cast<TypeDecl>(member);
         if (isa<AssociatedTypeDecl>(typeDecl)) continue;

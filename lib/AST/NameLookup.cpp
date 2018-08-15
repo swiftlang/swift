@@ -716,7 +716,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (!nominal) continue;
 
         // Dig out the type we're looking into.
-        SmallVector<NominalTypeDecl *, 2> lookupDecls;
+        SmallVector<TypeDecl *, 2> lookupDecls;
         lookupDecls.push_back(nominal);
 
         // For a protocol extension, check whether there are additional
@@ -793,7 +793,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         GenericParamList *GenericParams = nullptr;
 
         // Dig out the type we're looking into.
-        SmallVector<NominalTypeDecl *, 2> lookupDecls;
+        SmallVector<TypeDecl *, 2> lookupDecls;
 
         // Local function to populate the set of lookup declarations from
         // the given DeclContext.
@@ -1824,10 +1824,15 @@ bool DeclContext::lookupQualified(Type type,
   SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
   extractDirectlyReferencedNominalTypes(type, nominalTypesToLookInto);
 
-  return lookupQualified(nominalTypesToLookInto, member, options, decls);
+  SmallVector<TypeDecl *, 4> typeDeclsToLookInto;
+  typeDeclsToLookInto.reserve(nominalTypesToLookInto.size());
+  for (auto nominal : nominalTypesToLookInto)
+    typeDeclsToLookInto.push_back(nominal);
+
+  return lookupQualified(typeDeclsToLookInto, member, options, decls);
 }
 
-bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
+bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
                                   DeclName member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
@@ -1856,10 +1861,31 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     return true;
   };
 
-  // Look through the type declarations we were given, resolving
+  // Look through the type declarations we were given, resolving them down
+  // to nominal type declarations, module declarations, and
   ASTContext &ctx = getASTContext();
-  for (auto nominal : typeDecls) {
+  SmallVector<ModuleDecl *, 2> moduleDecls;
+  bool anyObject = false;
+  auto nominalTypeDecls =
+    resolveTypeDeclsToNominal(ctx.evaluator, ctx, typeDecls, moduleDecls,
+                              anyObject);
+
+  // If the only declaration we were given was AnyObject, this is AnyObject
+  // lookup.
+  if (anyObject && nominalTypeDecls.empty() && moduleDecls.empty())
+    return lookupAnyObject(member, options, decls);
+
+  // Add all of the nominal types to the stack.
+  for (auto nominal : nominalTypeDecls) {
     addNominalType(nominal);
+  }
+
+  // Search all of the modules.
+  for (auto module : moduleDecls) {
+    auto innerOptions = options;
+    innerOptions &= ~NL_RemoveOverridden;
+    innerOptions &= ~NL_RemoveNonVisible;
+    lookupQualified(module, member, innerOptions, decls);
   }
 
   // Whether we only want to return complete object initializers.
@@ -1960,7 +1986,6 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
-  assert(decls.empty() && "additive lookup not supported");
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
@@ -2185,14 +2210,6 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
                                        ArrayRef<TypeDecl *> baseTypes,
                                        DeclName name,
                                        DeclContext *dc) {
-  // Look through the base types to find something on which we can perform
-  // qualified name lookup.
-  SmallVector<ModuleDecl *, 2> moduleBaseTypes;
-  bool anyObject = false;
-  auto nominalBaseTypes =
-      resolveTypeDeclsToNominal(evaluator, ctx, baseTypes, moduleBaseTypes,
-                                anyObject);
-
   DirectlyReferencedTypeDecls result;
   auto addResults = [&result](ArrayRef<ValueDecl *> found){
     for (auto decl : found){
@@ -2203,21 +2220,11 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
   };
 
   {
-    // Look through nominal types.
-    SmallVector<ValueDecl *, 4> nominalMembers;
+    // Look into the base types.
+    SmallVector<ValueDecl *, 4> members;
     auto options = NL_RemoveNonVisible | NL_OnlyTypes;
-    dc->lookupQualified(nominalBaseTypes, name, options, nominalMembers);
-    addResults(nominalMembers);
-  }
-
-  {
-    // Look through modules.
-    auto options = NL_RemoveNonVisible | NL_OnlyTypes;
-    for (auto module : moduleBaseTypes) {
-      SmallVector<ValueDecl *, 4> moduleMembers;
-      dc->lookupQualified(module, name, options, moduleMembers);
-      addResults(moduleMembers);
-    }
+    dc->lookupQualified(baseTypes, name, options, members);
+    addResults(members);
   }
 
   return result;
