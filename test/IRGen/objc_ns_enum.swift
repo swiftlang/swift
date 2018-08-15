@@ -8,9 +8,9 @@
 import Foundation
 import gizmo
 
-// CHECK: @"$SSo16NSRuncingOptionsVWV" = linkonce_odr hidden constant
 // CHECK: @"$SSo16NSRuncingOptionsVMn" = linkonce_odr hidden constant
 // CHECK: @"$SSo16NSRuncingOptionsVN" = linkonce_odr hidden constant
+//   CHECK-SAME: @"$SBi{{[0-9]+}}_WV"
 // CHECK: @"$SSo16NSRuncingOptionsVSQSCMc" = linkonce_odr hidden constant %swift.protocol_conformance_descriptor { {{.*}}@"$SSo16NSRuncingOptionsVSQSCWa
 // CHECK: @"$SSo28NeverActuallyMentionedByNameVSQSCWp" = linkonce_odr hidden constant
 
