@@ -1183,11 +1183,9 @@ public extension Tensor {
     }
     @inline(__always)
     set {
-      let range1: Range = 0..<index
-      let t1 = self[range1]
-      let range2: Range = index+1..<self.shape[0]
-      let t2 = self[range2]
-      self = Raw.concatV2([t1, Tensor([newValue]), t2], axis: Tensor<Int32>(0))
+      let left = self[0..<index]
+      let right = self[index+1..<_TFGetScalarOrDie(shapeTensor[0].handle)]
+      self = Raw.concatV2([left, Tensor([newValue]), right], axis: Tensor<Int32>(0))
     }
   }
 
