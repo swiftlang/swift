@@ -579,6 +579,40 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
+/// Determine whether unqualified lookup should look at the members of the
+/// given type, vs. only looking at type parameters.
+static bool shouldLookupMembers(NominalTypeDecl *nominal, SourceLoc loc) {
+  // Only look at members of this type (or its inherited types) when
+  // inside the body or a protocol's top-level 'where' clause. (Why the
+  // 'where' clause? Because that's where you put constraints on
+  // inherited associated types.)
+
+  // When we have no source-location information, we have to perform member
+  // lookuo.
+  if (loc.isInvalid() || nominal->getBraces().isInvalid())
+    return true;
+
+  // Within the braces, always look for members.
+  auto &ctx = nominal->getASTContext();
+  if (ctx.SourceMgr.rangeContainsTokenLoc(nominal->getBraces(), loc))
+    return true;
+
+  // Within a protocol 'where' clause, we can also look for members of the
+  // protocol.
+  if (isa<ProtocolDecl>(nominal)) {
+    if (auto *whereClause = nominal->getTrailingWhereClause()) {
+      SourceRange whereClauseRange = whereClause->getSourceRange();
+      if (whereClauseRange.isValid() &&
+          ctx.SourceMgr.rangeContainsTokenLoc(whereClauseRange, loc)) {
+        return true;
+      }
+    }
+  }
+
+  // Don't look at the members.
+  return false;
+}
+
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver, SourceLoc Loc,
                                      Options options)
@@ -929,29 +963,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (!isCascadingUse.hasValue())
             isCascadingUse = ED->isCascadingContextForLookup(false);
         } else if (auto *ND = dyn_cast<NominalTypeDecl>(DC)) {
-          // Only look at members of this type (or its inherited types) when
-          // inside the body or a protocol's top-level 'where' clause. (Why the
-          // 'where' clause? Because that's where you put constraints on
-          // inherited associated types.)
-          bool wantsMemberLookup = false;
-          if (Loc.isValid() && ND->getBraces().isValid()) {
-            if (Ctx.SourceMgr.rangeContainsTokenLoc(ND->getBraces(), Loc)) {
-              wantsMemberLookup = true;
-            } else if (isa<ProtocolDecl>(ND)) {
-              if (auto *whereClause = ND->getTrailingWhereClause()) {
-                SourceRange whereClauseRange = whereClause->getSourceRange();
-                if (whereClauseRange.isValid() &&
-                    Ctx.SourceMgr.rangeContainsTokenLoc(whereClauseRange, Loc)){
-                  wantsMemberLookup = true;
-                }
-              }
-            }
-          } else {
-            // FIXME: Is this possible? Can we do unqualified lookup in a
-            // nominal type without a source location?
-            wantsMemberLookup = true;
-          }
-          if (wantsMemberLookup)
+          if (shouldLookupMembers(ND, Loc))
             populateLookupDeclsFromContext(ND);
           BaseDC = DC;
           MetaBaseDC = DC;
