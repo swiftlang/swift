@@ -19,12 +19,7 @@
 /// A `SingleValueDataset` can be used to represent an input pipeline as a
 /// collection of element tensors.
 @_fixed_layout
-public struct SingleValueDataset {
-  // NOTE: SingleValueDataset is currently specialzed on `Float` to work around
-  // deabstraction bug SR-8463. This is to avoid indirect passing in SIL. When
-  // the bug gets resolved, `SingleValueDataset` will have generic parameter
-  // `Scalar`.
-  public typealias Scalar = Float
+public struct SingleValueDataset<ScalarOfElement : AccelerableByTensorFlow> {
   @usableFromInline let _handle: VariantHandle
   public let elementShape: TensorShape
 
@@ -45,13 +40,13 @@ public extension SingleValueDataset {
   // FIXME: Due to inability to perform shape inference during deabstraction,
   // users must specify the element shape for today.
   @inlinable @inline(__always)
-  public init(elements: Tensor<Scalar>, elementShape: TensorShape) {
+  public init(elements: Tensor<ScalarOfElement>, elementShape: TensorShape) {
     // A dataset creation op only runs on TF CPU.
     enableCPU()
     self.init(
       _handle: #tfop(
         "TensorSliceDataset", [elements],
-        Toutput_types: [Scalar.self],
+        Toutput_types: [ScalarOfElement.self],
         output_shapes: [elementShape]
       ),
       elementShape: elementShape
@@ -60,15 +55,15 @@ public extension SingleValueDataset {
 }
 
 extension SingleValueDataset : Sequence {
-  public typealias Element = Tensor<Scalar>
+  public typealias Element = Tensor<ScalarOfElement>
 
   public typealias Iterator = SingleValueDatasetIterator
 
   /// Returns an iterator over the elements of this dataset.
   @inlinable @inline(__always)
-  public func makeIterator() -> SingleValueDatasetIterator {
+  public func makeIterator() -> SingleValueDatasetIterator<ScalarOfElement> {
     let resource: ResourceHandle = #tfop("AnonymousIterator",
-                                         output_types: [Scalar.self],
+                                         output_types: [ScalarOfElement.self],
                                          output_shapes: [elementShape])
     #tfop("MakeIterator", _handle, resource) as Void
     return SingleValueDatasetIterator(_handle: resource,
@@ -78,15 +73,15 @@ extension SingleValueDataset : Sequence {
 
 public extension SingleValueDataset {
   @inlinable @inline(__always)
-  func map<T>(
-    _ transform: @convention(tensorflow) (Tensor<Scalar>) -> Tensor<T>
-  ) -> SingleValueDataset {
-    // A dataset creation op only runs on TF CPU.
+  func map<T : AccelerableByTensorFlow>(
+    _ transform: @convention(tensorflow) (Tensor<ScalarOfElement>) -> Tensor<T>
+  ) -> SingleValueDataset<T> {
+    // A dataset map op only runs on TF CPU.
     enableCPU()
-    return SingleValueDataset(
+    return SingleValueDataset<T>(
       _handle: #tfop(
         "MapDataset", _handle, [], f: transform, Targuments: [],
-        output_types: [Scalar.self], output_shapes: [elementShape]
+        output_types: [ScalarOfElement.self], output_shapes: [elementShape]
       ),
       elementShape: elementShape
     )
@@ -94,14 +89,15 @@ public extension SingleValueDataset {
 
   @inlinable @inline(__always)
   func filter(
-    _ isIncluded: @convention(tensorflow) (Tensor<Scalar>) -> Tensor<Bool>
+    _ isIncluded:
+      @convention(tensorflow) (Tensor<ScalarOfElement>) -> Tensor<Bool>
   ) -> SingleValueDataset {
-    // A dataset creation op only runs on TF CPU.
+    // A dataset filter op only runs on TF CPU.
     enableCPU()
     return SingleValueDataset(
       _handle: #tfop(
         "FilterDataset", _handle, [], predicate: isIncluded, Targuments: [],
-        output_types: [Scalar.self], output_shapes: [elementShape]
+        output_types: [ScalarOfElement.self], output_shapes: [elementShape]
       ),
       elementShape: elementShape
     )
@@ -110,12 +106,8 @@ public extension SingleValueDataset {
 
 /// Represents the state of iterating through a `SingleValueDataset`.
 @_fixed_layout
-public struct SingleValueDatasetIterator {
-  // NOTE: SingleValueDataset is currently specialzed on `Float` to work around
-  // deabstraction bug SR-8463. This is to avoid indirect passing in SIL. When
-  // the bug gets resolved, `SingleValueDataset` will have generic parameter
-  // `Scalar`.
-  public typealias Scalar = Float
+public struct SingleValueDatasetIterator<ScalarOfElement>
+  where ScalarOfElement : AccelerableByTensorFlow {
   @usableFromInline let handle: ResourceHandle
   public let elementShape: TensorShape
 
@@ -127,21 +119,21 @@ public struct SingleValueDatasetIterator {
 }
 
 extension SingleValueDatasetIterator : IteratorProtocol {
-  public typealias Element = Tensor<Scalar>
+  public typealias Element = Tensor<ScalarOfElement>
 
   // Advances to the next element and returns it, or nil if no next element
   // exists.
   @inlinable @inline(__always)
   // FIXME: Make this `mutating` when SR-8463 is fixed.
-  public /*mutating*/ func next() -> Tensor<Scalar>? {
+  public mutating func next() -> Tensor<ScalarOfElement>? {
     let optional: VariantHandle =
       #tfop("IteratorGetNextAsOptional", handle,
-            output_types: [Scalar.self], output_shapes: [elementShape])
+            output_types: [ScalarOfElement.self], output_shapes: [elementShape])
     guard _TFGetScalarOrDie(#tfop("OptionalHasValue", optional)) else {
       return nil
     }
     return Tensor(handle: #tfop("OptionalGetValue", optional,
-                                output_types: [Scalar.self],
+                                output_types: [ScalarOfElement.self],
                                 output_shapes: [elementShape]))
   }
 }

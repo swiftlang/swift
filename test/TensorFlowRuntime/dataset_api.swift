@@ -38,15 +38,17 @@ DatasetAPITests.testAllBackends("SingleValueDatasetIteration") {
   }
 }
 
-// Higher-order operator tests are blocked by SR-8478.
-//
-// DatasetAPITests.testAllBackends("SingleValueDatasetMap") {
-//   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
-//   let dataset = SingleValueDataset(elements: scalars, elementShape: [1])
-//   let evenDataset: SingleValueDataset = dataset.filter {
-//     x % 2 == Tensor<Float>(0) ? Tensor(true) : Tensor(false)
-//   }
-//   expectEqual(evenDataset.flatMap { $0.scalars }, [0, 2, 4])
-// }
+DatasetAPITests.testAllBackends("SingleValueMapAndFilter") {
+  let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+  let dataset = SingleValueDataset(elements: scalars, elementShape: [1])
+  @TensorFlowGraph
+  func isEven(_ x: Tensor<Float>) -> Tensor<Bool> {
+    return x % 2 == Tensor<Float>(0) ? Tensor(true) : Tensor(false)
+  }
+  let booleanFlags: SingleValueDataset = dataset.map(isEven)
+  expectEqual(booleanFlags.flatMap { $0.scalars }, [true, false, true, false, true])
+  let evenDataset: SingleValueDataset = dataset.filter(isEven)
+  expectEqual(evenDataset.flatMap { $0.scalars }, [0, 2, 4])
+}
 
 runAllTests()
