@@ -46,8 +46,8 @@ public extension SingleValueDataset {
   // users must specify the element shape for today.
   @inlinable @inline(__always)
   public init(elements: Tensor<Scalar>, elementShape: TensorShape) {
-    // A dataset graph function must run on TF CPU.
-    TensorFlow.enableCPU()
+    // A dataset creation op only runs on TF CPU.
+    enableCPU()
     self.init(
       _handle: #tfop(
         "TensorSliceDataset", [elements],
@@ -81,8 +81,8 @@ public extension SingleValueDataset {
   func map<T>(
     _ transform: @convention(tensorflow) (Tensor<Scalar>) -> Tensor<T>
   ) -> SingleValueDataset {
-    // A dataset graph function must run on TF CPU.
-    TensorFlow.enableCPU()
+    // A dataset creation op only runs on TF CPU.
+    enableCPU()
     return SingleValueDataset(
       _handle: #tfop(
         "MapDataset", _handle, [], f: transform, Targuments: [],
@@ -96,8 +96,8 @@ public extension SingleValueDataset {
   func filter(
     _ isIncluded: @convention(tensorflow) (Tensor<Scalar>) -> Tensor<Bool>
   ) -> SingleValueDataset {
-    // A dataset graph function must run on TF CPU.
-    TensorFlow.enableCPU()
+    // A dataset creation op only runs on TF CPU.
+    enableCPU()
     return SingleValueDataset(
       _handle: #tfop(
         "FilterDataset", _handle, [], predicate: isIncluded, Targuments: [],
