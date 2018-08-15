@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include "swift/Basic/Version.h"
 
 namespace llvm {
 class raw_ostream;
@@ -35,6 +36,10 @@ struct TBDGenOptions {
   llvm::StringRef InstallName;
   /// \brief The module link name (for force loading).
   llvm::StringRef ModuleLinkName;
+  /// \brief The current dylib version.
+  version::Version CurrentVersion;
+  /// \brief The dylib compatibility version.
+  version::Version CompatibilityVersion;
 };
 
 void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
