@@ -4728,7 +4728,8 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       Impl->HadAnyError = true;
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
                      TypeLoc::withoutLoc(subjectType),
-                     TypeLoc::withoutLoc(constraintType));
+                     TypeLoc::withoutLoc(constraintType))
+        .fixItReplace(source.getLoc(), " == ");
     }
 
     return ConstraintResult::Conflicting;
