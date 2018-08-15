@@ -21,7 +21,7 @@ import CTensorFlow
 /// on to determine the datatypes of parameters when they are extracted
 /// into a tensor program.
 @_fixed_layout // required because the compiler accesses cTensorHandle directly.
-public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
+public final class TensorHandle<Scalar : _TensorFlowDataTypeCompatible> {
   /// The underlying `TF_TensorHandle *`.
   ///
   /// - Note: The compiler knows that `TensorHandle` has a single stored
@@ -79,7 +79,7 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
   }
 }
 
-internal extension TensorHandle {
+internal extension TensorHandle where Scalar : AccelerableByTensorFlow {
   /// Create a `ShapedArray` with contents of the underlying `TensorHandle`. If
   /// the `TensorHandle` is on the accelerator, it will be copied to the host.
   /// - Returns: A `ShapedArray`.
@@ -108,7 +108,7 @@ extension TensorHandle : TensorSendableReceivable {
     TF_DeleteTensor(cTensor!)
     if _RuntimeConfig.printsDebugLog {
       debugLog("The received tensor of id \(tensorId) has content:")
-      dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
+      // dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
     }
     return tensorHandle
   }
@@ -118,7 +118,7 @@ extension TensorHandle : TensorSendableReceivable {
                          _ tensorId: Int) {
     if _RuntimeConfig.printsDebugLog {
       debugLog("Sending tensor of id \(tensorId) and type \(Scalar.self) with:")
-      dumpTensorContent(self.cTensorHandle, Scalar.self)
+      // dumpTensorContent(self.cTensorHandle, Scalar.self)
     }
     let status = TF_NewStatus()
     let cTensor = TFE_TensorHandleResolve(self.cTensorHandle, status)

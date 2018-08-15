@@ -73,14 +73,18 @@ func _TFReceive<Scalar>(_ handle: TensorHandle<Scalar>)
 /// where it is known that the op always returns a 0-d tensor. It is not for use
 /// in general code.
 @inlinable @inline(__always)
-func _TFGetScalarOrDie<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar {
+func _TFGetScalarOrDie<Scalar : AccelerableByTensorFlow>(
+  _ handle: TensorHandle<Scalar>
+) -> Scalar {
   return Scalar._getScalarOrDie(handle)
 }
 
 /// This function converts a `TensorHandle` into a scalar if it is 0-d, or
 /// returns nil otherwise.
 @inlinable @inline(__always)
-func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
+func _TFGetScalar<Scalar : AccelerableByTensorFlow>(
+  _ handle: TensorHandle<Scalar>
+) -> Scalar? {
   return Scalar._getScalar(handle)
 }
 
@@ -106,7 +110,9 @@ func _TFTensorFromScalars<Scalar>(
 }
 
 @inlinable @inline(__always)
-func _TFMakeScalarTensor<Scalar>(_ scalar: Scalar) -> TensorHandle<Scalar> {
+func _TFMakeScalarTensor<Scalar : AccelerableByTensorFlow>(
+  _ scalar: Scalar
+) -> TensorHandle<Scalar> {
   return Scalar._makeScalarTensor(scalar)
 }
 
