@@ -258,7 +258,7 @@ extension Set: Sequence {
   /// - Complexity: O(1)
   @inlinable
   public func contains(_ member: Element) -> Bool {
-    return _variant.maybeGet(member) != nil
+    return _variant.contains(member)
   }
 
   @inlinable
@@ -1499,6 +1499,7 @@ internal protocol _SetBuffer { // FIXME: Remove or refactor for Set.
   func index(forKey key: Element) -> Index?
   var count: Int { get }
 
+  func contains(_ member: Element) -> Bool
   func assertingGet(at i: Index) -> Element
   func maybeGet(_ key: Element) -> Element?
 }
@@ -2235,6 +2236,16 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
     return found ? i : nil
   }
 
+  @inlinable
+  @inline(__always)
+  internal func contains(_ member: Element) -> Bool {
+    if count == 0 {
+      // Fast path that avoids computing the hash of the key.
+      return false
+    }
+    return _find(member).found
+  }
+
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal func maybeGet(_ key: Element) -> Element? {
@@ -2558,6 +2569,11 @@ internal struct _CocoaSet: _SetBuffer {
   @inlinable // FIXME(sil-serialize-all)
   internal var count: Int {
     return object.count
+  }
+
+  @inlinable
+  internal func contains(_ element: AnyObject) -> Bool {
+    return object.member(element) != nil
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2886,6 +2902,23 @@ extension Set._Variant: _SetBuffer {
       let anyObjectValue = cocoaSet.assertingGet(at: i._asCocoa)
       let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Element.self)
       return nativeValue
+#endif
+    }
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func contains(_ member: Element) -> Bool {
+    if _fastPath(guaranteedNative) {
+      return asNative.contains(member)
+    }
+    switch self {
+    case .native(let native):
+      return native.contains(member)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      let cocoaKey = _bridgeAnythingToObjectiveC(member)
+      return cocoa.contains(cocoaKey)
 #endif
     }
   }
