@@ -1183,18 +1183,11 @@ public extension Tensor {
     }
     @inline(__always)
     set {
-      let orig = self[index]
-      // FIXME: Currently there's no existing non-in-place slice updating
-      // operator in TensorFlow. But since most scalar types are numeric, we do
-      // a hack by using arithmetic operations. We need to find a proper
-      // solution soon.
-      let diff = Tensor(handle: #tfop("Sub", newValue, orig))
-      let scatteredDiff = Raw.scatterNd(
-        indices: Tensor<Int32>(shape: [1, 1], scalars: [index]),
-        updates: Tensor([diff]),
-        shape: shapeTensor
-      )
-      self = Tensor(handle: #tfop("Add", handle, scatteredDiff))
+      let range1: Range = 0..<index
+      let t1 = self[range1]
+      let range2: Range = index+1..<self.shape[0]
+      let t2 = self[range2]
+      self = Raw.concatV2([t1, Tensor([newValue]), t2], axis: Tensor<Int32>(0))
     }
   }
 

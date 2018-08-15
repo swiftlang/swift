@@ -199,6 +199,8 @@ TensorTests.testAllBackends("SliceUpdate") {
   t2[0][2] = Tensor(3)
   expectEqual(ShapedArray(shape:[2, 3], scalars: [0, 0, 0, 4, 5, 6]), t1.array)
   expectEqual(ShapedArray(shape:[2, 3], scalars: [0, 0, 3, 4, 5, 6]), t2.array)
+  t2[1][2] = Tensor(10)
+  expectEqual(ShapedArray(shape:[2, 3], scalars: [0, 0, 3, 4, 5, 10]), t2.array)
 }
 
 TensorTests.test("WholeTensorSlicing") {
