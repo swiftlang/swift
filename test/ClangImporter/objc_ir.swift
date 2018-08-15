@@ -117,7 +117,7 @@ func protocolMetatype(p: FooProto) -> FooProto.Type {
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processFooType(i8* {{%.+}})
   // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
-  // CHECK-NOT: call void @swift_unknownRelease(%objc_object* %0)
+  // CHECK-NOT: call void @swift_unknownObjectRelease(%objc_object* %0)
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
   let type = processFooType(Swift.type(of: p))
   return type
