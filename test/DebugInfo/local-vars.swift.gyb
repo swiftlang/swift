@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend %t.swift -g -c -o %t.o
 // RUN: %llvm-dwarfdump %t.o \
 // RUN:   | %FileCheck %t.swift --check-prefix=DWARF
-// RUN: %llvm-dwarfdump --verify %t.o
+// DISABLED_RDAR_43340064 %llvm-dwarfdump --verify %t.o
 // RUN: %target-swift-frontend %t.swift -O -g -emit-ir -o - \
 // RUN:   | %FileCheck %t.swift --check-prefix=OPTZNS
 
