@@ -98,4 +98,36 @@ DatasetTests.testAllBackends("Basic") {
   model()
 }
 
+DatasetTests.testAllBackends("MultiValue") {
+  enableCPU()
+  let elements1: Tensor<Int32> = [0, 1, 2]
+  let elements2: Tensor<Int32> = [10, 11, 12]
+  let outputTypes = [Int32.self, Int32.self]
+  let outputShapes: [TensorShape] = [[], []]
+  let dataset: VariantHandle = #tfop(
+    "TensorSliceDataset", [elements1, elements2],
+    Toutput_types: outputTypes,
+    output_shapes: outputShapes
+  )
+  let iterator: VariantHandle = #tfop(
+    "IteratorV2", dataset, shared_name: "blah", container: "earth"
+  )
+  #tfop("MakeIterator", dataset, iterator) as Void
+  var next: (Tensor<Int32>, Tensor<Int32>) = #tfop(
+    "IteratorGetNext", iterator,
+    output_types: outputTypes, output_shapes: outputShapes
+  )
+  expectTrue(next == (Tensor(0), Tensor(10)))
+  next = #tfop(
+    "IteratorGetNext", iterator,
+    output_types: outputTypes, output_shapes: outputShapes
+  )
+  expectTrue(next == (Tensor(1), Tensor(11)))
+  next = #tfop(
+    "IteratorGetNext", iterator,
+    output_types: outputTypes, output_shapes: outputShapes
+  )
+  expectTrue(next == (Tensor(2), Tensor(12)))
+}
+
 runAllTests()
