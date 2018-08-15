@@ -979,6 +979,9 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }
 
+  if (writeTBDIfNeeded(Invocation, Instance))
+    return true;
+
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.
   bool moduleIsPublic =
@@ -1000,9 +1003,6 @@ static bool performCompile(CompilerInstance &Instance,
 
     return hadPrintAsObjCError || hadEmitIndexDataError || Context.hadError();
   }
-
-  if (writeTBDIfNeeded(Invocation, Instance))
-    return true;
 
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&
          "All actions not requiring SILGen must have been handled!");
