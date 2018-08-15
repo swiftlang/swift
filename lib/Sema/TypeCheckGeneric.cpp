@@ -242,18 +242,9 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
   assert(genericParams->size() > 0 &&
          "Parsed an empty generic parameter list?");
 
-  // Determine where and how to perform name lookup for the generic
-  // parameter lists and where clause.
+  // Determine where and how to perform name lookup.
   TypeResolutionOptions options = None;
   DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
-  if (!lookupDC->isModuleScopeContext()) {
-    assert((isa<GenericTypeDecl>(lookupDC) ||
-            isa<ExtensionDecl>(lookupDC) ||
-            isa<AbstractFunctionDecl>(lookupDC) ||
-            isa<SubscriptDecl>(lookupDC)) &&
-           "not a proper generic parameter context?");
-    options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-  }    
 
   // First, add the generic parameters to the generic signature builder.
   // Do this before checking the inheritance clause, since it may

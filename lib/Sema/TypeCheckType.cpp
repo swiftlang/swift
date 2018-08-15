@@ -297,8 +297,12 @@ Type TypeChecker::resolveTypeInContext(
       //
       // Get the superclass of the 'Self' type parameter.
       auto *sig = foundDC->getGenericSignatureOfContext();
+      if (!sig)
+        return ErrorType::get(Context);
       auto superclassType = sig->getSuperclassBound(selfType);
-      assert(superclassType);
+      if (!superclassType)
+        return ErrorType::get(Context);
+
       selfType = superclassType;
     }
   }
@@ -763,15 +767,12 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
 
     // Try ignoring access control.
     DeclContext *lookupDC = dc;
-    if (options.getBaseContext() == TypeResolverContext::GenericSignature)
-      lookupDC = dc->getParentForLookup();
-
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
-        tc.lookupUnqualifiedType(lookupDC, comp->getIdentifier(), comp->getIdLoc(),
-                                 relookupOptions);
+        tc.lookupUnqualifiedType(lookupDC, comp->getIdentifier(),
+                                 comp->getIdLoc(), relookupOptions);
     if (!inaccessibleResults.empty()) {
       // FIXME: What if the unviable candidates have different levels of access?
       auto first = cast<TypeDecl>(inaccessibleResults.front().getValueDecl());
@@ -890,84 +891,6 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
   return ErrorType::get(tc.Context);
 }
 
-static Type
-resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
-                                  ComponentIdentTypeRepr *comp,
-                                  TypeResolutionOptions options,
-                                  GenericTypeResolver *resolver);
-
-static Type
-resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
-                                 ComponentIdentTypeRepr *comp,
-                                 TypeResolutionOptions options,
-                                 GenericTypeResolver *resolver) {
-  if (!DC->isInnermostContextGeneric())
-    return Type();
-
-  auto *genericParams = DC->getGenericParamsOfContext();
-
-  if (!isa<ExtensionDecl>(DC)) {
-    auto matchingParam =
-      std::find_if(genericParams->begin(), genericParams->end(),
-                   [comp](const GenericTypeParamDecl *param) {
-                     return param->getFullName().matchesRef(comp->getIdentifier());
-                   });
-
-    if (matchingParam == genericParams->end())
-      return Type();
-
-    comp->setValue(*matchingParam, nullptr);
-    return resolveTopLevelIdentTypeComponent(TC, DC, comp, options, resolver);
-  }
-
-  // If we are inside an extension of a nested type, we have to visit
-  // all outer parameter lists. Otherwise, we will visit them when
-  // name lookup goes ahead and checks the outer DeclContext.
-  for (auto *outerParams = genericParams;
-       outerParams != nullptr;
-       outerParams = outerParams->getOuterParameters()) {
-    auto matchingParam =
-      std::find_if(outerParams->begin(), outerParams->end(),
-                   [comp](const GenericTypeParamDecl *param) {
-                     return param->getFullName().matchesRef(comp->getIdentifier());
-                   });
-
-    if (matchingParam != outerParams->end()) {
-      comp->setValue(*matchingParam, nullptr);
-      return resolveTopLevelIdentTypeComponent(TC, DC, comp, options, resolver);
-    }
-  }
-
-  // If the lookup occurs from within a trailing 'where' clause of
-  // a constrained extension, also look for associated types and typealiases
-  // in the protocol.
-  if (genericParams->hasTrailingWhereClause() &&
-      comp->getIdLoc().isValid() &&
-      TC.Context.SourceMgr.rangeContainsTokenLoc(
-        genericParams->getTrailingWhereClauseSourceRange(),
-          comp->getIdLoc())) {
-    auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-    SmallVector<ValueDecl *, 4> decls;
-    if (DC->lookupQualified(nominal,
-                            comp->getIdentifier(),
-                            NL_OnlyTypes|NL_QualifiedDefault|NL_ProtocolMembers,
-                            decls)) {
-      for (const auto decl : decls) {
-        // FIXME: Better ambiguity handling.
-        auto typeDecl = cast<TypeDecl>(decl);
-
-        if (!isa<ProtocolDecl>(typeDecl->getDeclContext())) continue;
-
-        comp->setValue(typeDecl, DC);
-        return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                 resolver);
-      }
-    }
-  }
-
-  return Type();
-}
-
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 ///
@@ -1008,20 +931,6 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     auto selfType = resolver->mapTypeIntoContext(
       func->getDeclContext()->getSelfInterfaceType());
     return DynamicSelfType::get(selfType, TC.Context);
-  }
-
-  // For lookups within the generic signature, look at the generic
-  // parameters (only), then move up to the enclosing context.
-  if (options.getBaseContext() == TypeResolverContext::GenericSignature) {
-    Type type = resolveGenericSignatureComponent(
-      TC, DC, comp, options, resolver);
-    if (type)
-      return type;
-
-    if (!DC->isCascadingContextForLookup(/*excludeFunctions*/false))
-      options |= TypeResolutionFlags::KnownNonCascadingDependency;
-
-    lookupDC = DC->getParentForLookup();
   }
 
   auto id = comp->getIdentifier();
@@ -2692,7 +2601,6 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::EnumPatternPayload:
   case TypeResolverContext::TypeAliasDecl:
   case TypeResolverContext::GenericRequirement:
-  case TypeResolverContext::GenericSignature:
   case TypeResolverContext::ImmediateOptionalTypeArgument:
   case TypeResolverContext::InExpression:
   case TypeResolverContext::EditorPlaceholderExpr:
@@ -2945,7 +2853,10 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
           nominalDecl, baseTy,
           nominalDecl->getASTContext());
     }
-    
+
+    if (baseTy && baseTy->is<ErrorType>())
+      return baseTy;
+
     return NominalType::get(
         nominalDecl, baseTy,
         nominalDecl->getASTContext());
