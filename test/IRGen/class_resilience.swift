@@ -420,13 +420,15 @@ extension ResilientGenericOutsideParent {
 
 // CHECK-LABEL: define private void @initialize_metadata_ResilientChild(i8*)
 
+// Relocate metadata if necessary...
+// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type_descriptor* bitcast ({{.*}} @"$S16class_resilience14ResilientChildCMn" to %swift.type_descriptor*), %swift.type* bitcast ({{.*}} @"$S16class_resilience14ResilientChildCMf", {{.*}}), [[INT]] {{60|96}})
+
 // Initialize the superclass field...
 // CHECK:              [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class22ResilientOutsideParentCMa"([[INT]] 1)
 // CHECK:              [[SUPER:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:              store %swift.type* [[SUPER]], %swift.type** getelementptr inbounds ({{.*}})
-
-// Relocate metadata if necessary...
-// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type* {{.*}}, [[INT]] {{60|96}}, [[INT]] 4)
+// CHECK:              [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
+// CHECK:              [[SUPER_SLOT:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[METADATA_ADDR]], i32 1
+// CHECK:              store %swift.type* [[SUPER]], %swift.type** [[SUPER_SLOT]]
 
 // Initialize field offset vector...
 // CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S16class_resilience14ResilientChildCMo", i32 0, i32 0)
@@ -475,14 +477,17 @@ extension ResilientGenericOutsideParent {
 
 // CHECK-LABEL: define private void @initialize_metadata_FixedLayoutChild(i8*)
 
+// Relocate metadata if necessary...
+// CHECK:              call %swift.type* @swift_relocateClassMetadata(%swift.type_descriptor* {{.*}}, %swift.type* {{.*}}, [[INT]] {{60|96}})
+
 // Initialize the superclass field...
 // CHECK:              [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class22ResilientOutsideParentCMa"([[INT]] 1)
 // CHECK:              [[SUPER:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:              store %swift.type* [[SUPER]], %swift.type** getelementptr inbounds ({{.*}})
+// CHECK:              [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
+// CHECK:              [[SUPER_SLOT:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[METADATA_ADDR]], i32 1
+// CHECK:              store %swift.type* [[SUPER]], %swift.type** [[SUPER_SLOT]]
 
-// Relocate metadata if necessary...
-// CHECK:              call %swift.type* @swift_relocateClassMetadata(%swift.type* {{.*}}, [[INT]] {{60|96}}, [[INT]] 4)
-
+// CHECK:              call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0, [[INT]] 1, i8*** {{%.*}}, [[INT]]* {{%.*}})
 // CHECK:              ret void
 
 

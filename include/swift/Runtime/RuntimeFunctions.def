@@ -808,13 +808,13 @@ FUNCTION(GetExistentialMetadata,
               ProtocolDescriptorRefTy->getPointerTo()),
          ATTRS(NoUnwind, ReadOnly))
 
-// Metadata *swift_relocateClassMetadata(Metadata *self,
-//                                       size_t templateSize,
-//                                       size_t numImmediateMembers);
+// Metadata *swift_relocateClassMetadata(TypeContextDescriptor *descriptor,
+//                                       Metadata *pattern,
+//                                       size_t patternSize);
 FUNCTION(RelocateClassMetadata,
          swift_relocateClassMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
+         ARGS(TypeContextDescriptorPtrTy, TypeMetadataPtrTy, SizeTy),
          ATTRS(NoUnwind))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };

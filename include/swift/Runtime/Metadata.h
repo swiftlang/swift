@@ -580,9 +580,9 @@ void swift_initStructMetadata(StructMetadata *self,
 /// members.
 SWIFT_RUNTIME_EXPORT
 ClassMetadata *
-swift_relocateClassMetadata(ClassMetadata *self,
-                            size_t templateSize,
-                            size_t numImmediateMembers);
+swift_relocateClassMetadata(ClassDescriptor *descriptor,
+                            ClassMetadata *pattern,
+                            size_t patternSize);
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.

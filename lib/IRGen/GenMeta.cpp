@@ -2581,19 +2581,18 @@ namespace {
 
       MetadataDependencyCollector *collector = nullptr;
 
+      // Relocate the metadata.
+      llvm::Value *descriptor =
+          IGF.IGM.getAddrOfTypeContextDescriptor(Target, RequireMetadata);
+      auto patternSize = IGM.getSize(Size(B.getNextOffsetFromGlobal()));
+      metadata = IGF.Builder.CreateCall(IGF.IGM.getRelocateClassMetadataFn(),
+                                        {descriptor, metadata, patternSize});
+
       // Initialize the superclass if we didn't do so as a constant.
       if (HasUnfilledSuperclass) {
         auto superclass = type->getSuperclass()->getCanonicalType();
         this->emitStoreOfSuperclass(IGF, superclass, metadata, collector);
       }
-
-      // Relocate the metadata.
-      auto templateSize = IGM.getSize(Size(B.getNextOffsetFromGlobal()));
-      auto numImmediateMembers = IGM.getSize(
-        Size(IGM.getClassMetadataLayout(Target).getNumImmediateMembers()));
-      metadata = IGF.Builder.CreateCall(IGF.IGM.getRelocateClassMetadataFn(),
-                                        {metadata, templateSize,
-                                         numImmediateMembers});
 
       return emitFinishInitializationOfClassMetadata(IGF, metadata, collector);
     }

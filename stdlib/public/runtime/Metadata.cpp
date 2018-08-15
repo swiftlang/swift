@@ -2125,44 +2125,30 @@ static MetadataAllocator &getResilientMetadataAllocator() {
 #endif
 
 ClassMetadata *
-swift::swift_relocateClassMetadata(ClassMetadata *self,
-                                   size_t templateSize,
-                                   size_t numImmediateMembers) {
-  // Force the initialization of the metadata layout.
-  (void) self->getDescription()->getMetadataBounds();
+swift::swift_relocateClassMetadata(ClassDescriptor *description,
+                                   ClassMetadata *pattern,
+                                   size_t patternSize) {
+  auto bounds = description->getMetadataBounds();
+  auto metadataSize = bounds.getTotalSizeInBytes();
 
-  const ClassMetadata *superclass = self->Superclass;
+  if (patternSize < metadataSize) {
+    auto bytes = (char*) malloc(metadataSize);
 
-  size_t metadataSize;
-  if (superclass && superclass->isTypeMetadata()) {
-    metadataSize = (superclass->getClassSize() -
-                    superclass->getClassAddressPoint() +
-                    self->getClassAddressPoint() +
-                    numImmediateMembers * sizeof(void *));
-  } else {
-    metadataSize = (templateSize +
-                    numImmediateMembers * sizeof(void *));
+    auto fullPattern = (const char*) pattern;
+    fullPattern -= pattern->getClassAddressPoint();
+    memcpy(bytes, fullPattern, patternSize);
+    memset(bytes + patternSize, 0,
+           metadataSize - patternSize);
+
+    auto addressPoint = bytes + bounds.getAddressPointInBytes();
+    auto metadata = reinterpret_cast<ClassMetadata *>(addressPoint);
+
+    metadata->setClassSize(metadataSize);
+    assert(metadata->isTypeMetadata());
+    return metadata;
   }
 
-  if (templateSize < metadataSize) {
-    auto rawNewClass = (char*) malloc(metadataSize);
-    auto rawOldClass = (const char*) self;
-    rawOldClass -= self->getClassAddressPoint();
-
-    memcpy(rawNewClass, rawOldClass, templateSize);
-    memset(rawNewClass + templateSize, 0,
-           metadataSize - templateSize);
-
-    rawNewClass += self->getClassAddressPoint();
-    auto *newClass = (ClassMetadata *) rawNewClass;
-    newClass->setClassSize(metadataSize);
-
-    assert(newClass->isTypeMetadata());
-
-    return newClass;
-  }
-
-  return self;
+  return pattern;
 }
 
 /// Initialize the field offset vector for a dependent-layout class, using the
