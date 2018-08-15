@@ -132,16 +132,14 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
 /// require in-place metadata initialization structures and functions?
 static bool needsInPlaceMetadataInitialization(IRGenModule &IGM,
                                                NominalTypeDecl *typeDecl) {
-  // Generic types never have in-place metadata initialization.
+  // Generic types never have singleton metadata initialization.
   if (typeDecl->isGenericContext())
     return false;
 
-  // Classes require in-place initialization if they have generic ancestry
-  // or resiliently-sized fields, but not resilient ancestry.
-  if (auto *classDecl = dyn_cast<ClassDecl>(typeDecl)) {
-    return (doesClassMetadataRequireInitialization(IGM, classDecl) &&
-            !doesClassMetadataRequireRelocation(IGM, classDecl));
-  }
+  // Non-generic classes use singleton initialization if they have anything
+  // non-trivial about their metadata.
+  if (auto *classDecl = dyn_cast<ClassDecl>(typeDecl))
+    return doesClassMetadataRequireInitialization(IGM, classDecl);
 
   assert(isa<StructDecl>(typeDecl) || isa<EnumDecl>(typeDecl));
 
@@ -990,15 +988,24 @@ namespace {
                                                               NotForDefinition);
       B.addRelativeAddress(cache);
 
-      // Relative pointer to the metadata.
-      auto type = Type->getDeclaredTypeInContext()->getCanonicalType();
-      auto metadata = IGM.getAddrOfTypeMetadata(type);
-      B.addRelativeAddress(metadata);
+      asImpl().addIncompleteMetadataOrRelocationFunction();
 
       // Completion function.
       auto completionFunction =
         IGM.getAddrOfTypeMetadataCompletionFunction(Type, NotForDefinition);
       B.addRelativeAddress(completionFunction);
+    }
+
+    void addIncompleteMetadata() {
+      // Relative pointer to the metadata.
+      auto type = Type->getDeclaredTypeInContext()->getCanonicalType();
+      auto metadata = IGM.getAddrOfTypeMetadata(type);
+      B.addRelativeAddress(metadata);
+    }
+
+    /// Customization point for ClassContextDescriptorBuilder.
+    void addIncompleteMetadataOrRelocationFunction() {
+      addIncompleteMetadata();
     }
 
     // Subclasses should provide:
@@ -1231,6 +1238,19 @@ namespace {
       addVTable();
     }
 
+    void addIncompleteMetadataOrRelocationFunction() {
+      if (MetadataLayout == nullptr ||
+          !MetadataLayout->hasResilientSuperclass()) {
+        addIncompleteMetadata();
+        return;
+      }
+
+      llvm::Function *relocationFunction =
+        IGM.getAddrOfTypeMetadataInstantiationFunction(getType(),
+                                                       NotForDefinition);
+      B.addRelativeAddress(relocationFunction);
+    }
+
     ContextDescriptorKind getContextKind() {
       return ContextDescriptorKind::Class;
     }
@@ -1291,7 +1311,7 @@ namespace {
       
       addVTableEntries(getType());
     }
-    
+
     void addMethod(SILDeclRef fn) {
       assert(VTable && "no vtable?!");
 
@@ -2528,51 +2548,54 @@ namespace {
         return;
       }
 
-      // In-place case.
-      if (!doesClassMetadataRequireRelocation(IGM, Target)) {
-        createInPlaceInitializationMetadataAccessFunction(IGM, Target, type);
+      // Otherwise, we have to initialize metadata at runtime.
+      createInPlaceInitializationMetadataAccessFunction(IGM, Target, type);
 
-        emitMetadataCompletionFunction(
-            IGM, Target,
-            [&](IRGenFunction &IGF, llvm::Value *metadata,
-                MetadataDependencyCollector *collector) {
-          emitFinishInitializationOfClassMetadata(IGF, metadata, collector);
-        });
-
-        return;
-      }
-
-      // Resilient case.
-      //
-      // FIXME: Needs to support two-phase initialization.
-      (void) createTypeMetadataAccessFunction(IGM, type, CacheStrategy::Lazy,
-      [&](IRGenFunction &IGF, DynamicMetadataRequest request,
-          llvm::Constant *cacheVar) -> MetadataResponse {
-        return emitOnceTypeMetadataAccessFunctionBody(IGF, type, cacheVar,
-          [&](IRGenFunction &IGF, llvm::Value *metadata) {
-            return emitOnceMetadataInitialization(IGF, type, metadata);
-          });
+      emitMetadataCompletionFunction(
+          IGM, Target,
+          [&](IRGenFunction &IGF, llvm::Value *metadata,
+              MetadataDependencyCollector *collector) {
+        emitFinishInitializationOfClassMetadata(IGF, metadata, collector);
       });
+
+      // If the class has resilient ancestry we also need a relocation
+      // function.
+      if (doesClassMetadataRequireRelocation(IGM, Target))
+        emitRelocationFunction();
     }
 
   private:
-    llvm::Value *emitOnceMetadataInitialization(IRGenFunction &IGF,
-                                                CanClassType type,
-                                                llvm::Value *metadata) {
-      // Many of the things done by generic instantiation are unnecessary here:
-      //   initializing the metaclass pointer
-      //   initializing the ro-data pointer
+    /// Emit the create function for a class with resilient ancestry.
+    void emitRelocationFunction() {
+      // using MetadataRelocator =
+      //   Metadata *(TypeContextDescriptor *type,
+      //              Metadata *metadata);
+      llvm::Function *f =
+        IGM.getAddrOfTypeMetadataInstantiationFunction(Target, ForDefinition);
+      f->setAttributes(IGM.constructInitialAttributes());
 
-      MetadataDependencyCollector *collector = nullptr;
+      IRGenFunction IGF(IGM, f);
+
+      // Skip instrumentation when building for TSan to avoid false positives.
+      // The synchronization for this happens in the Runtime and we do not see it.
+      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
+        f->removeFnAttr(llvm::Attribute::SanitizeThread);
+
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, f);
+
+      Explosion params = IGF.collectParameters();
+      llvm::Value *descriptor = params.claimNext();
+
+      llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(
+        Target->getDeclaredType()->getCanonicalType());
 
       // Relocate the metadata.
-      llvm::Value *descriptor =
-          IGF.IGM.getAddrOfTypeContextDescriptor(Target, RequireMetadata);
       auto patternSize = IGM.getSize(Size(B.getNextOffsetFromGlobal()));
       metadata = IGF.Builder.CreateCall(IGF.IGM.getRelocateClassMetadataFn(),
                                         {descriptor, metadata, patternSize});
 
-      return emitFinishInitializationOfClassMetadata(IGF, metadata, collector);
+      IGF.Builder.CreateRet(metadata);
     }
   };
 

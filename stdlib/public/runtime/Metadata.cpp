@@ -563,7 +563,9 @@ namespace {
     AllocationResult allocate(const TypeContextDescriptor *description) {
       auto &initialization = description->getInPlaceMetadataInitialization();
 
-      auto metadata = initialization.IncompleteMetadata.get();
+      // Classes with resilient superclasses might require their metadata to
+      // be relocated.
+      auto metadata = initialization.allocate(description);
 
       auto state = inferStateForMetadata(metadata);
       return { metadata, state };

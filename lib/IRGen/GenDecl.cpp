@@ -3555,16 +3555,36 @@ IRGenModule::getAddrOfTypeMetadataInstantiationFunction(NominalTypeDecl *D,
     return entry;
   }
 
-  llvm::Type *argTys[] = {
-    /// Type descriptor.
-    TypeContextDescriptorPtrTy,
-    /// Generic arguments.
-    Int8PtrPtrTy,
-    /// Generic metadata pattern.
-    Int8PtrPtrTy
-  };
-  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy,
-                                        argTys, /*isVarArg*/ false);
+  // This function is used in two cases -- allocating generic type metadata,
+  // and relocating non-generic resilient class metadata.
+  llvm::FunctionType *fnType;
+
+  if (D->isGenericContext()) {
+    // MetadataInstantiator in ABI/Metadata.h
+    llvm::Type *argTys[] = {
+      /// Type descriptor.
+      TypeContextDescriptorPtrTy,
+      /// Generic arguments.
+      Int8PtrPtrTy,
+      /// Generic metadata pattern.
+      Int8PtrPtrTy
+    };
+
+    fnType = llvm::FunctionType::get(TypeMetadataPtrTy, argTys,
+                                     /*isVarArg*/ false);
+  } else {
+    assert(isa<ClassDecl>(D));
+
+    // MetadataRelocator in ABI/Metadata.h
+    llvm::Type *argTys[] = {
+      /// Type descriptor.
+      TypeContextDescriptorPtrTy,
+    };
+
+    fnType = llvm::FunctionType::get(TypeMetadataPtrTy, argTys,
+                                     /*isVarArg*/ false);
+  }
+
   Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);

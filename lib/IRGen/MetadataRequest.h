@@ -548,15 +548,6 @@ getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
                                      NominalTypeDecl *nominal,
                                      ForDefinition_t shouldDefine);
 
-using OnceMetadataInitializer =
-  llvm::function_ref<llvm::Value*(IRGenFunction &IGF, llvm::Value *metadata)>;
-
-MetadataResponse
-emitOnceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
-                                       CanNominalType type,
-                                       llvm::Constant *cacheVariable,
-                                       OnceMetadataInitializer initializer);
-
 using CacheEmitter =
   llvm::function_ref<MetadataResponse(IRGenFunction &IGF, Explosion &params)>;
 

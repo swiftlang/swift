@@ -3316,6 +3316,11 @@ struct TargetInPlaceValueMetadataCache {
 using InPlaceValueMetadataCache =
   TargetInPlaceValueMetadataCache<InProcess>;
 
+/// An instantiation pattern for non-generic resilient class metadata.
+/// Used in conjunction with InPlaceValueMetadataInitialization.
+using MetadataRelocator =
+  Metadata *(const TargetTypeContextDescriptor<InProcess> *description);
+
 /// The control structure for performing non-trivial initialization of
 /// singleton value metadata, which is required when e.g. a non-generic
 /// value type has a resilient component type.
@@ -3326,13 +3331,37 @@ struct TargetInPlaceValueMetadataInitialization {
                               TargetInPlaceValueMetadataCache<Runtime>>
     InitializationCache;
 
-  /// The incomplete metadata.
-  TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>>
-    IncompleteMetadata;
+  union {
+    /// The incomplete metadata, for structs, enums and classes without
+    /// resilient ancestry.
+    TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>>
+      IncompleteMetadata;
+
+    /// If the class descriptor's hasResilientSuperclass() flag is set,
+    /// this field instead points at a function that allocates metadata
+    /// with the correct size at runtime.
+    TargetRelativeDirectPointer<Runtime, MetadataRelocator>
+      RelocationFunction;
+  };
 
   /// The completion function.  The pattern will always be null.
   TargetRelativeDirectPointer<Runtime, MetadataCompleter>
     CompletionFunction;
+
+  bool hasRelocationFunction(
+      const TargetTypeContextDescriptor<Runtime> *description) const {
+    auto *classDescription =
+      dyn_cast<TargetClassDescriptor<Runtime>>(description);
+    return (classDescription != nullptr &&
+            classDescription->hasResilientSuperclass());
+  }
+
+  TargetMetadata<Runtime> *allocate(
+      const TargetTypeContextDescriptor<Runtime> *description) const {
+    if (hasRelocationFunction(description))
+      return RelocationFunction(description);
+    return IncompleteMetadata.get();
+  }
 };
 
 template <typename Runtime>
