@@ -120,7 +120,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S14generic_vtable7DerivedCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
-// CHECK: call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
+// CHECK: call void @swift_initClassMetadata(%swift.type* [[METADATA]], %swift.type* {{%.*}}, [[INT]] 0, {{.*}})
 
 // -- method override for 'm2()'
 // CHECK: [[WORDS:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
@@ -151,12 +151,9 @@ public class Concrete : Derived<Int> {
 // CHECK-NEXT: br i1 [[RESULT]], label %dependency-satisfied, label %metadata-dependencies.cont
 
 // CHECK: dependency-satisfied:
-// CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* %0 to %swift.type**
-// CHECK-NEXT: [[SUPERCLASS_SLOT:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[METADATA_ADDR]], i32 1
-// CHECK-NEXT: store %swift.type* [[SUPERCLASS]], %swift.type** [[SUPERCLASS_SLOT]]
 
 // -- ClassLayoutFlags is 256 / 0x100, HasStaticVTable
-// CHECK: call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, {{.*}})
+// CHECK: call void @swift_initClassMetadata(%swift.type* %0, %swift.type* [[SUPERCLASS]], [[INT]] 256, {{.*}})
 // CHECK: br label %metadata-dependencies.cont
 
 // CHECK: metadata-dependencies.cont:

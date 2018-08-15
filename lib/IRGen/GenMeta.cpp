@@ -1823,25 +1823,47 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
     ++index;
   }
 
-  // Ask the runtime to lay out the class.  This can relocate it if it
-  // wasn't allocated with swift_allocateGenericClassMetadata.
+  // Ask the runtime to lay out the struct or class.
   auto numFields = IGF.IGM.getSize(Size(storedProperties.size()));
 
   if (auto *classDecl = dyn_cast<ClassDecl>(target)) {
+    // Compute class layout flags.
     ClassLayoutFlags flags = ClassLayoutFlags::Swift5Algorithm;
-
     if (!doesClassMetadataRequireRelocation(IGF.IGM, classDecl))
       flags |= ClassLayoutFlags::HasStaticVTable;
 
+    // Get the superclass metadata, if the class has one.
+    llvm::Value *superclassMetadata;
+    if (auto superclassType = classDecl->getSuperclass()) {
+      superclassType = classDecl->mapTypeIntoContext(superclassType);
+
+      auto request = DynamicMetadataRequest::getNonBlocking(
+                               MetadataState::NonTransitiveComplete, collector);
+
+      superclassMetadata =
+        emitClassHeapMetadataRef(IGF, superclassType->getCanonicalType(),
+                                 MetadataValueType::TypeMetadata,
+                                 request,
+                                 /*allowUninit*/ false);
+    } else {
+      superclassMetadata =
+        llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
+    }
+
+    // Call swift_initClassMetadata().
     IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataFn(),
-                           {metadata, IGF.IGM.getSize(Size(uintptr_t(flags))),
+                           {metadata, superclassMetadata,
+                            IGF.IGM.getSize(Size(uintptr_t(flags))),
                             numFields, fields.getAddress(), fieldVector});
   } else {
     assert(isa<StructDecl>(target));
+
+    // Compute struct layout flags.
     StructLayoutFlags flags = StructLayoutFlags::Swift5Algorithm;
     if (isVWTMutable)
       flags |= StructLayoutFlags::IsVWTMutable;
 
+    // Call swift_initStructMetadata().
     IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataFn(),
                            {metadata, IGF.IGM.getSize(Size(uintptr_t(flags))),
                             numFields, fields.getAddress(), fieldVector});
@@ -2252,18 +2274,6 @@ namespace {
                                           NotForDefinition);
     }
 
-    bool addReferenceToHeapMetadata(CanType type, bool allowUninitialized) {
-      if (llvm::Constant *metadata
-            = tryEmitConstantHeapMetadataRef(IGM, type, allowUninitialized)) {
-        B.add(metadata);
-        return true;
-      } else {
-        // Leave a null pointer placeholder to be filled at runtime
-        B.addNullPointer(IGM.TypeMetadataPtrTy);
-        return false;
-      }
-    }
-
     void addClassFlags() {
       auto flags = ClassFlags();
 
@@ -2392,10 +2402,8 @@ namespace {
                                        MetadataDependencyCollector *collector) {
       assert(doesClassMetadataRequireInitialization(IGF.IGM, Target));
 
-      // We need to:
-      //   - fill out the subclass's field offset vector
-      //   - copy field offsets and generic arguments from higher in the
-      //     class hierarchy
+      // Set the superclass, fill out the field offset vector, and copy vtable
+      // entries, generic requirements and field offsets from superclasses.
       auto classTy = Target->getDeclaredTypeInContext()->getCanonicalType();
       auto loweredClassTy = IGF.IGM.getLoweredType(classTy);
       emitInitializeFieldOffsetVector(IGF, loweredClassTy,
@@ -2412,27 +2420,6 @@ namespace {
       emitInitializeMethodOverrides(IGF, metadata);
 
       return metadata;
-    }
-
-    /// Materialize type metadata for the given type and store it into the
-    /// superclass field of the given metadata.
-    void emitStoreOfSuperclass(IRGenFunction &IGF, CanType superclassType,
-                               llvm::Value *metadata,
-                               MetadataDependencyCollector *collector) {
-      auto request = DynamicMetadataRequest::getNonBlocking(
-                               MetadataState::NonTransitiveComplete, collector);
-
-      llvm::Value *superMetadata =
-        emitClassHeapMetadataRef(IGF, superclassType,
-                                 MetadataValueType::TypeMetadata,
-                                 request,
-                                 /*allowUninit*/ false);
-
-      Address superField =
-        emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
-      superField = IGF.Builder.CreateElementBitCast(superField,
-                                                    IGM.TypeMetadataPtrTy);
-      IGF.Builder.CreateStore(superMetadata, superField);
     }
 
     // Update vtable entries for method overrides. The runtime copies in
@@ -2475,10 +2462,8 @@ namespace {
     using super::IGM;
     using super::Target;
     using super::B;
-    using super::addReferenceToHeapMetadata;
     using super::emitFinishInitializationOfClassMetadata;
 
-    bool HasUnfilledSuperclass = false;
     Size AddressPoint;
 
   public:
@@ -2493,6 +2478,12 @@ namespace {
     }
 
     void addSuperclass() {
+      if (doesClassMetadataRequireInitialization(IGM, Target)) {
+        // Leave a null pointer placeholder to be filled at runtime
+        B.addNullPointer(IGM.TypeMetadataPtrTy);
+        return;
+      }
+
       // If this is a root class, use SwiftObject as our formal parent.
       if (!Target->hasSuperclass()) {
         // This is only required for ObjC interoperation.
@@ -2510,13 +2501,12 @@ namespace {
         return;
       }
 
-      Type superclassTy = Target->mapTypeIntoContext(Target->getSuperclass());
-
-      if (!addReferenceToHeapMetadata(superclassTy->getCanonicalType(),
-                                      /*allowUninit*/ false)) {
-        assert(doesClassMetadataRequireInitialization(IGM, Target));
-        HasUnfilledSuperclass = true;
-      }
+      Type type = Target->mapTypeIntoContext(Target->getSuperclass());
+      auto *metadata = tryEmitConstantHeapMetadataRef(
+          IGM, type->getCanonicalType(),
+          /*allowUninit*/ false);
+      assert(metadata != nullptr);
+      B.add(metadata);
     }
 
     bool canBeConstant() {
@@ -2546,12 +2536,6 @@ namespace {
             IGM, Target,
             [&](IRGenFunction &IGF, llvm::Value *metadata,
                 MetadataDependencyCollector *collector) {
-          // Initialize the superclass if we didn't do so as a constant.
-          if (HasUnfilledSuperclass) {
-            auto superclass = type->getSuperclass()->getCanonicalType();
-            this->emitStoreOfSuperclass(IGF, superclass, metadata, collector);
-          }
-
           emitFinishInitializationOfClassMetadata(IGF, metadata, collector);
         });
 
@@ -2587,12 +2571,6 @@ namespace {
       auto patternSize = IGM.getSize(Size(B.getNextOffsetFromGlobal()));
       metadata = IGF.Builder.CreateCall(IGF.IGM.getRelocateClassMetadataFn(),
                                         {descriptor, metadata, patternSize});
-
-      // Initialize the superclass if we didn't do so as a constant.
-      if (HasUnfilledSuperclass) {
-        auto superclass = type->getSuperclass()->getCanonicalType();
-        this->emitStoreOfSuperclass(IGF, superclass, metadata, collector);
-      }
 
       return emitFinishInitializationOfClassMetadata(IGF, metadata, collector);
     }
@@ -2803,15 +2781,6 @@ namespace {
                                 bool isVWTMutable,
                                 MetadataDependencyCollector *collector) {
       assert(!HasDependentVWT && "class should never have dependent VWT");
-
-      // Install the superclass.  The runtime takes care of installing
-      // SwiftObject if we're building with ObjC interop and don't have
-      // a formal superclass.
-      if (Target->hasSuperclass()) {
-        CanType superclass = Target->mapTypeIntoContext(Target->getSuperclass())
-                                   ->getCanonicalType();
-        emitStoreOfSuperclass(IGF, superclass, metadata, collector);
-      }
 
       // We can assume that this never relocates the metadata because
       // it should have been allocated properly for the class.

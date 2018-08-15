@@ -588,6 +588,7 @@ swift_relocateClassMetadata(ClassDescriptor *descriptor,
 /// "Universal" layout strategy.
 SWIFT_RUNTIME_EXPORT
 void swift_initClassMetadata(ClassMetadata *self,
+                             ClassMetadata *super,
                              ClassLayoutFlags flags,
                              size_t numFields,
                              const TypeLayout * const *fieldTypes,

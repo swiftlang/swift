@@ -358,7 +358,7 @@ extension ResilientGenericOutsideParent {
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK:      void @swift_initClassMetadata(%swift.type* %0, %swift.type* null, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvWvd"
@@ -397,7 +397,7 @@ extension ResilientGenericOutsideParent {
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK:      call void @swift_initClassMetadata(%swift.type* %0, %swift.type* null, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvWvd"
@@ -426,15 +426,9 @@ extension ResilientGenericOutsideParent {
 // Initialize the superclass field...
 // CHECK:              [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class22ResilientOutsideParentCMa"([[INT]] 1)
 // CHECK:              [[SUPER:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:              [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
-// CHECK:              [[SUPER_SLOT:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[METADATA_ADDR]], i32 1
-// CHECK:              store %swift.type* [[SUPER]], %swift.type** [[SUPER_SLOT]]
 
 // Initialize field offset vector...
-// CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S16class_resilience14ResilientChildCMo", i32 0, i32 0)
-// CHECK:              [[OFFSET:%.*]] = add [[INT]] [[BASE]], {{12|24}}
-
-// CHECK:              call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0, [[INT]] 1, i8*** {{.*}}, [[INT]]* {{.*}})
+// CHECK:              call void @swift_initClassMetadata(%swift.type* [[METADATA]], %swift.type* [[SUPER]], [[INT]] 0, [[INT]] 1, i8*** {{.*}}, [[INT]]* {{.*}})
 
 // Initialize constructor vtable override...
 // CHECK:              [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S15resilient_class22ResilientOutsideParentCMo", i32 0, i32 0)
@@ -483,11 +477,8 @@ extension ResilientGenericOutsideParent {
 // Initialize the superclass field...
 // CHECK:              [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class22ResilientOutsideParentCMa"([[INT]] 1)
 // CHECK:              [[SUPER:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:              [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
-// CHECK:              [[SUPER_SLOT:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[METADATA_ADDR]], i32 1
-// CHECK:              store %swift.type* [[SUPER]], %swift.type** [[SUPER_SLOT]]
 
-// CHECK:              call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0, [[INT]] 1, i8*** {{%.*}}, [[INT]]* {{%.*}})
+// CHECK:              call void @swift_initClassMetadata(%swift.type* [[METADATA]], %swift.type* [[SUPER]], [[INT]] 0, [[INT]] 1, i8*** {{%.*}}, [[INT]]* {{%.*}})
 // CHECK:              ret void
 
 
@@ -506,11 +497,8 @@ extension ResilientGenericOutsideParent {
 // CHECK:              [[SUPER_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
 // CHECK:              [[SUPER_OK:%.*]] = icmp ule [[INT]] [[SUPER_STATUS]], 1
 // CHECK:              br i1 [[SUPER_OK]],
-// CHECK:              [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
-// CHECK:              [[SUPER_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i32 1
-// CHECK:              store %swift.type* [[SUPER]], %swift.type** [[SUPER_ADDR]],
 
-// CHECK:              call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0,
+// CHECK:              call void @swift_initClassMetadata(%swift.type* [[METADATA]], %swift.type* [[SUPER]], [[INT]] 0,
 // CHECK:              [[DEP:%.*]] = phi %swift.type* [ [[SUPER]], {{.*}} ], [ null, {{.*}} ]
 // CHECK:              [[DEP_REQ:%.*]] = phi [[INT]] [ 1, {{.*}} ], [ 0, {{.*}} ]
 // CHECK:              [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[DEP]], 0

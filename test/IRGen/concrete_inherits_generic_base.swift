@@ -90,12 +90,8 @@ presentBase(Base(x: 2))
 
 // CHECK: dependency-satisfied:
 
-// CHECK-NEXT:    [[METADATA_ADDR:%.*]] = bitcast %swift.type* %0 to %swift.type**
-// CHECK-NEXT:    [[SUPERCLASS_SLOT:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[METADATA_ADDR]], i32 1
-// CHECK-NEXT:    store %swift.type* [[SUPERCLASS]], %swift.type** [[SUPERCLASS_SLOT]]
-
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:         call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, {{.*}})
+// CHECK:         call void @swift_initClassMetadata(%swift.type* %0, %swift.type* [[SUPERCLASS]], [[INT]] 256, {{.*}})
 
 // CHECK: metadata-dependencies.cont:
 // CHECK:         ret %swift.metadata_response

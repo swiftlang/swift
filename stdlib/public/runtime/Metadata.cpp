@@ -379,13 +379,6 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
 
   // Superclass.
   metadata->Superclass = nullptr;
-#if SWIFT_OBJC_INTEROP
-  // If the class doesn't have a formal superclass, automatically set
-  // it to SwiftObject.
-  if (!description->hasSuperclass()) {
-    metadata->Superclass = getRootSuperclass();
-  }
-#endif
 
 #if SWIFT_OBJC_INTEROP
   // Cache data.  Install the same initializer that the compiler is
@@ -2155,11 +2148,18 @@ swift::swift_relocateClassMetadata(ClassDescriptor *description,
 /// "Universal" layout strategy.
 void
 swift::swift_initClassMetadata(ClassMetadata *self,
+                               ClassMetadata *super,
                                ClassLayoutFlags layoutFlags,
                                size_t numFields,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets) {
+  self->Superclass = super;
+
 #if SWIFT_OBJC_INTEROP
+  // Set the superclass to SwiftObject if this is a root class.
+  if (!super)
+    self->Superclass = getRootSuperclass();
+
   // Register our custom implementation of class_getImageName.
   static swift_once_t onceToken;
   swift_once(&onceToken, [](void *unused) {
@@ -2198,8 +2198,6 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 
   // If we have a superclass, start from its size and alignment instead.
   if (classHasSuperclass(self)) {
-    const ClassMetadata *super = self->Superclass;
-
     // This is straightforward if the superclass is Swift.
 #if SWIFT_OBJC_INTEROP
     if (super->isTypeMetadata()) {
