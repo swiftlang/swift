@@ -758,8 +758,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // "Self" constraints that can affect name lookup.
         if (isa<ProtocolDecl>(nominal)) {
           if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-            for (auto bound :
-                    Ctx.evaluator(SelfBoundsFromWhereClauseRequest{ext}))
+            auto bounds = evaluateOrDefault(Ctx.evaluator,
+              SelfBoundsFromWhereClauseRequest{ext}, {});
+            for (auto bound : bounds)
               lookupDecls.push_back(bound);
           }
         }
@@ -843,8 +844,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           // "Self" constraints that can affect name lookup.
           if (isa<ProtocolDecl>(nominal)) {
             if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-              for (auto bound :
-                       Ctx.evaluator(SelfBoundsFromWhereClauseRequest{ext}))
+              auto bounds = evaluateOrDefault(Ctx.evaluator,
+                SelfBoundsFromWhereClauseRequest{ext}, {});
+              for (auto bound : bounds)
                 lookupDecls.push_back(bound);
             }
           }

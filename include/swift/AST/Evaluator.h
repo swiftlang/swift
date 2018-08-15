@@ -372,7 +372,6 @@ private:
   template<
       typename Request,
       typename std::enable_if<!Request::hasExternalCache>::type * = nullptr>
-  typename Request::OutputType getResultCached(const Request &request) {
   llvm::Expected<typename Request::OutputType>
   getResultCached(const Request &request) {
     AnyRequest anyRequest{request};
