@@ -1,3 +1,10 @@
+%{
+  # -*- mode: Swift -*-
+  from gyb_syntax_support import *
+  # Ignore the following admonition it applies to the resulting .def file only
+}%
+//// Automatically Generated From TokenKinds.def.gyb.
+//// Do Not Edit Directly!
 //===--- TokenKinds.def - Swift Tokenizer Metaprogramming -----------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -137,29 +144,18 @@
 #endif
 
 // Keywords that start decls.
-DECL_KEYWORD(associatedtype)
-DECL_KEYWORD(class)
-DECL_KEYWORD(deinit)
-DECL_KEYWORD(enum)
-DECL_KEYWORD(extension)
-DECL_KEYWORD(func)
-DECL_KEYWORD(import)
-DECL_KEYWORD(init)
-DECL_KEYWORD(inout)
-DECL_KEYWORD(let)
-DECL_KEYWORD(operator)
-DECL_KEYWORD(precedencegroup)
-DECL_KEYWORD(protocol)
-DECL_KEYWORD(struct)
-DECL_KEYWORD(subscript)
-DECL_KEYWORD(typealias)
-DECL_KEYWORD(var)
+% for token in SYNTAX_TOKENS:
+%   if isinstance(token, Token.Punctuator):
+${token.macro_name()}(${token.unprefixed_kind}, "${token.text}")
+%   elif isinstance(token, Token.PoundObjectLiteral):
+${token.macro_name()}(${token.unprefixed_kind}, "${token.description}", ${token.protocol})
+%   else:
+${token.macro_name()}(${token.unprefixed_kind})
+%   end
+%   end
 
-DECL_KEYWORD(fileprivate)
-DECL_KEYWORD(internal)
-DECL_KEYWORD(private)
-DECL_KEYWORD(public)
-DECL_KEYWORD(static)
+// The following tokens are irrelevant for swiftSyntax and thus only declared 
+// in this .def file
 
 SIL_KEYWORD(undef)
 SIL_KEYWORD(sil)
@@ -172,137 +168,14 @@ SIL_KEYWORD(sil_default_witness_table)
 SIL_KEYWORD(sil_coverage_map)
 SIL_KEYWORD(sil_scope)
 
-// Statement keywords.
-STMT_KEYWORD(defer)
-STMT_KEYWORD(if)
-STMT_KEYWORD(guard)
-STMT_KEYWORD(do)
-STMT_KEYWORD(repeat)
-STMT_KEYWORD(else)
-STMT_KEYWORD(for)
-STMT_KEYWORD(in)
-STMT_KEYWORD(while)
-STMT_KEYWORD(return)
-STMT_KEYWORD(break)
-STMT_KEYWORD(continue)
-STMT_KEYWORD(fallthrough)
-STMT_KEYWORD(switch)
-STMT_KEYWORD(case)
-STMT_KEYWORD(default)
-STMT_KEYWORD(where)
-STMT_KEYWORD(catch)
-STMT_KEYWORD(throw)
-
-// Expression keywords.
-EXPR_KEYWORD(as)
-EXPR_KEYWORD(Any)
-EXPR_KEYWORD(false)
-EXPR_KEYWORD(is)
-EXPR_KEYWORD(nil)
-EXPR_KEYWORD(rethrows)
-EXPR_KEYWORD(super)
-EXPR_KEYWORD(self)
-EXPR_KEYWORD(Self)
-EXPR_KEYWORD(true)
-EXPR_KEYWORD(try)
-EXPR_KEYWORD(throws)
-KEYWORD(__FILE__)
-KEYWORD(__LINE__)
-KEYWORD(__COLUMN__)
-KEYWORD(__FUNCTION__)
-KEYWORD(__DSO_HANDLE__)
-
-// Pattern keywords.
-PAT_KEYWORD(_)
-
-// Punctuators.
-PUNCTUATOR(l_paren,       "(")
-PUNCTUATOR(r_paren,       ")")
-PUNCTUATOR(l_brace,       "{")
-PUNCTUATOR(r_brace,       "}")
-PUNCTUATOR(l_square,      "[")
-PUNCTUATOR(r_square,      "]")
-PUNCTUATOR(l_angle,       "<")
-PUNCTUATOR(r_angle,       ">")
-
-PUNCTUATOR(period,        ".")
-PUNCTUATOR(period_prefix, ".")
-PUNCTUATOR(comma,         ",")
-PUNCTUATOR(colon,         ":")
-PUNCTUATOR(semi,          ";")
-PUNCTUATOR(equal,         "=")
-PUNCTUATOR(at_sign,       "@")
-PUNCTUATOR(pound,         "#")
-
-PUNCTUATOR(amp_prefix,    "&")
-PUNCTUATOR(arrow,         "->")
-
-PUNCTUATOR(backtick,      "`")
-
-PUNCTUATOR(backslash, "\\")
-
-PUNCTUATOR(exclaim_postfix, "!") // if left-bound
-
-PUNCTUATOR(question_postfix, "?") // if left-bound
-PUNCTUATOR(question_infix,"?")    // if not left-bound
-
 PUNCTUATOR(sil_dollar,    "$")    // Only in SIL mode.
 PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.
 
-// string_literal might be exploded to {quote segment quote} in the Parser.
-PUNCTUATOR(string_quote, "\"")
-PUNCTUATOR(multiline_string_quote, "\"\"\"")
-
-// Keywords prefixed with a '#'.  "keyPath" becomes "tok::pound_keyPath".
-POUND_KEYWORD(keyPath)
-POUND_KEYWORD(line)
-POUND_KEYWORD(selector)
-POUND_KEYWORD(file)
-POUND_KEYWORD(column)
-POUND_KEYWORD(function)
-POUND_KEYWORD(dsohandle)
-
-// Directive '#' keywords.
-POUND_DIRECTIVE_KEYWORD(sourceLocation)
-POUND_DIRECTIVE_KEYWORD(warning)
-POUND_DIRECTIVE_KEYWORD(error)
-
-// Conditional compilation '#' keywords.
-POUND_COND_DIRECTIVE_KEYWORD(if)
-POUND_COND_DIRECTIVE_KEYWORD(else)
-POUND_COND_DIRECTIVE_KEYWORD(elseif)
-POUND_COND_DIRECTIVE_KEYWORD(endif)
-
-// Keywords prefixed with a '#' that are build configurations.
-POUND_CONFIG(available)
-
-// Object literals and their corresponding protocols.
-POUND_OBJECT_LITERAL(fileLiteral, "file reference", ExpressibleByFileReferenceLiteral)
-POUND_OBJECT_LITERAL(imageLiteral, "image", ExpressibleByImageLiteral)
-POUND_OBJECT_LITERAL(colorLiteral, "color", ExpressibleByColorLiteral)
-
-// Single-token literals
-LITERAL(integer_literal)
-LITERAL(floating_literal)
-LITERAL(string_literal)
-
-// Miscellaneous tokens.
-MISC(unknown)
 MISC(eof)
 MISC(code_complete)
-MISC(identifier)
-MISC(oper_binary_unspaced)   // "x+y"
-MISC(oper_binary_spaced)     // "x + y"
-MISC(oper_postfix)
-MISC(oper_prefix)
-MISC(dollarident)
 MISC(sil_local_name)       // %42 in SIL mode.
 MISC(comment)
 
-MISC(contextual_keyword)
-MISC(string_segment)
-MISC(string_interpolation_anchor)
-MISC(kw_yield)               // the contextual "yield" keyword
 
 #undef TOKEN
 #undef KEYWORD
