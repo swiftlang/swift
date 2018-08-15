@@ -193,7 +193,7 @@ TensorTests.testAllBackends("SliceIndexing") {
 }
 
 TensorTests.testAllBackends("SliceUpdate") {
-  var t1 = Tensor<Float>([[1, 2, 3],[4, 5, 6]])
+  var t1 = Tensor<Float>([[1, 2, 3], [4, 5, 6]])
   t1[0] = Tensor(zeros: [3])
   var t2 = t1
   t2[0][2] = Tensor(3)
@@ -201,6 +201,14 @@ TensorTests.testAllBackends("SliceUpdate") {
   expectEqual(ShapedArray(shape:[2, 3], scalars: [0, 0, 3, 4, 5, 6]), t2.array)
   t2[1][2] = Tensor(10)
   expectEqual(ShapedArray(shape:[2, 3], scalars: [0, 0, 3, 4, 5, 10]), t2.array)
+
+  var t3 = Tensor<Bool>([[true, true, true], [false, false, false]])
+  t3[0][1] = Tensor(false)
+  expectEqual(ShapedArray(shape:[2, 3],
+                          scalars: [true, false, true, false, false, false]),
+              t3.array)
+  t3[0] = Tensor(shape: [3], repeating: false)
+  expectEqual(ShapedArray(shape:[2, 3], repeating: false), t3.array)
 }
 
 TensorTests.test("WholeTensorSlicing") {
