@@ -3266,6 +3266,8 @@ class DiagnosisEmitter : public SDKNodeVisitor {
       llvm::outs() << " */\n";
       removeRedundantAndSort(Diags);
       std::for_each(Diags.begin(), Diags.end(), [](T &Diag) {
+        if (Diag.isABISpecific() && !options::Abi)
+          return;
         Diag.outputModule();
         Diag.output();
       });
@@ -3275,12 +3277,15 @@ class DiagnosisEmitter : public SDKNodeVisitor {
   struct MetaInfo {
     StringRef ModuleName;
     StringRef HeaderName;
-    MetaInfo(const SDKNodeDecl *Node):
-      ModuleName(Node->getModuleName()), HeaderName(Node->getHeaderName()) {}
+    bool IsABISpecific;
+    MetaInfo(const SDKNodeDecl *Node, bool IsABISpecific = false):
+      ModuleName(Node->getModuleName()), HeaderName(Node->getHeaderName()),
+      IsABISpecific(IsABISpecific) {}
   };
 
-  struct DiagBase {
+  class DiagBase {
     MetaInfo Info;
+  public:
     DiagBase(MetaInfo Info): Info(Info) {}
     virtual ~DiagBase() = default;
     void outputModule() const {
@@ -3292,6 +3297,7 @@ class DiagnosisEmitter : public SDKNodeVisitor {
       }
     }
     virtual void output() const = 0;
+    bool isABISpecific() const { return Info.IsABISpecific; }
   };
 
   struct RemovedDeclDiag: public DiagBase  {
@@ -3535,9 +3541,9 @@ void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
 void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   assert(Node->isAnnotatedAs(Anno));
   auto &Ctx = Node->getSDKContext();
-  MetaInfo ScreenInfo(Node);
   switch(Anno) {
   case NodeAnnotation::Removed: {
+    MetaInfo ScreenInfo(Node, false);
     // If we can find a type alias decl with the same name of this type, we
     // consider the type is not removed.
     if (findTypeAliasDecl(Node))
@@ -3599,6 +3605,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     return;
   }
   case NodeAnnotation::Rename: {
+    MetaInfo ScreenInfo(Node, false);
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
     RenamedDecls.Diags.emplace_back(ScreenInfo,
                                     Node->getDeclKind(), Count->getDeclKind(),
@@ -3607,6 +3614,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     return;
   }
   case NodeAnnotation::NowMutating: {
+    MetaInfo ScreenInfo(Node, false);
     AttrChangedDecls.Diags.emplace_back(ScreenInfo,
                                         Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
@@ -3614,6 +3622,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     return;
   }
   case NodeAnnotation::NowThrowing: {
+    MetaInfo ScreenInfo(Node, false);
     AttrChangedDecls.Diags.emplace_back(ScreenInfo,
                                         Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
@@ -3621,6 +3630,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     return;
   }
   case NodeAnnotation::StaticChange: {
+    MetaInfo ScreenInfo(Node, false);
     AttrChangedDecls.Diags.emplace_back(ScreenInfo,
                                         Node->getDeclKind(),
                                         Node->getFullyQualifiedName(),
@@ -3628,6 +3638,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     return;
   }
   case NodeAnnotation::OwnershipChange: {
+    MetaInfo ScreenInfo(Node, false);
     auto getOwnershipDescription = [&](swift::ReferenceOwnership O) {
       if (O == ReferenceOwnership::Strong)
         return Ctx.buffer("strong");
@@ -3692,7 +3703,7 @@ void DiagnosisEmitter::visit(NodePtr Node) {
   }
 }
 
-  typedef std::vector<NoEscapeFuncParam> NoEscapeFuncParamVector;
+typedef std::vector<NoEscapeFuncParam> NoEscapeFuncParamVector;
 
 class NoEscapingFuncEmitter : public SDKNodeVisitor {
   NoEscapeFuncParamVector &AllItems;
