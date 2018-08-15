@@ -1,12 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %gyb %s -o %t/ArrayTraps.swift
-// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug -Onone -swift-version 3
-// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Release -O -swift-version 3
-//
-// RUN: %target-codesign %t/a.out_Debug
-// RUN: %target-codesign %t/a.out_Release
-// RUN: %line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Debug
-// RUN: %line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Release
+// RUN: %target-build-swift %s -o %t/a.out_Debug -Onone -swift-version 4.2 && %target-codesign %t/a.out_Debug && %target-run %t/a.out_Debug
+// RUN: %target-build-swift %s -o %t/a.out_Release -O -swift-version 4.2 && %target-codesign %t/a.out_Release && %target-run %t/a.out_Release
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -24,11 +18,11 @@ class Derived2 : Derived { }
 ArrayTraps.test("downcast1")
   .skip(.custom(
     { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+    reason: "this trap is not guaranteed to happen in -Unchecked"))
   .code {
   let ba: [Base] = [ Derived(), Base() ]
   let da = ba as! [Derived]
-  let d0 = da[0]
+  _ = da[0]
   expectCrashLater()
   _ = da[1]
 }
@@ -40,7 +34,7 @@ ArrayTraps.test("downcast2")
   .code {
   let a: [AnyObject] = ["String" as NSString, 1 as NSNumber]
   let sa = a as! [NSString]
-  let s0 = sa[0]
+  _ = sa[0]
   expectCrashLater()
   _ = sa[1]
 }
@@ -52,10 +46,10 @@ ArrayTraps.test("downcast3")
   .code {
   let ba: [Base] = [ Derived2(), Derived(), Base() ]
   let d2a = ba as! [Derived2]
-  let d2a0 = d2a[0]
+  _ = d2a[0]
   let d1a = d2a as [Derived]
-  let d1a0 = d1a[0]
-  let d1a1 = d1a[1]
+  _ = d1a[0]
+  _ = d1a[1]
   expectCrashLater()
   _ = d1a[2]
 }
@@ -71,7 +65,7 @@ ArrayTraps.test("downcast4")
   .code {
   let ba: [ObjCProto] = [ ObjCDerived(), ObjCBase() ]
   let da = ba as! [ObjCDerived]
-  let d0 = da[0]
+  _ = da[0]
   expectCrashLater()
   _ = da[1]
 }
@@ -86,7 +80,7 @@ ArrayTraps.test("bounds_with_downcast")
   let ba: [Base] = [ Derived(), Base() ]
   let da = ba as! [Derived]
   expectCrashLater()
-  let x = da[2]
+  _ = da[2]
 }
 
 var ArraySemanticOptzns = TestSuite("ArraySemanticOptzns" + testSuiteSuffix)
@@ -138,7 +132,7 @@ ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "Fatal error: inout rules were violated: the array was overwritten" : "")
+    "Fatal access conflict detected." : "")
   .code {
   let v = ViolateInoutSafetySwitchToObjcBuffer()
   expectCrashLater()
@@ -181,7 +175,7 @@ ArraySemanticOptzns.test("inout_rule_violated_needsElementTypeCheck")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "Fatal error: inout rules were violated: the array was overwritten" : "")
+    "Fatal access conflict detected." : "")
   .code {
   let v = ViolateInoutSafetyNeedElementTypeCheck()
   expectCrashLater()
