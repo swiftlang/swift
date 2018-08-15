@@ -263,8 +263,10 @@ public:
   /// The install_name to use in the TBD file.
   std::string TBDInstallName;
 
-  // The compatibility_version to use in the TBD file.
+  // The current project version to use in the generated TBD file.
   version::Version TBDCurrentVersion = {1, 0, 0};
+
+  // The dylib compatibility-version to use in the generated TBD file.
   version::Version TBDCompatibilityVersion = {1, 0, 0};
 
   /// An enum with different modes for automatically crashing at defined times.

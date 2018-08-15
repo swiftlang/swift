@@ -36,7 +36,7 @@ struct TBDGenOptions {
   llvm::StringRef InstallName;
   /// \brief The module link name (for force loading).
   llvm::StringRef ModuleLinkName;
-  /// \brief The current dylib version.
+  /// \brief The current project version.
   version::Version CurrentVersion;
   /// \brief The dylib compatibility version.
   version::Version CompatibilityVersion;
