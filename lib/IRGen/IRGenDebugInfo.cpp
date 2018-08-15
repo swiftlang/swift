@@ -2003,9 +2003,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     return;
 
   // A dbg.declare is only meaningful if there is a single alloca for
-  // the variable that is live throughout the function. With SIL
-  // optimizations this is not guaranteed and a variable can end up in
-  // two allocas (for example, one function inlined twice).
+  // the variable that is live throughout the function.
   if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage)) {
     auto *ParentBB = Alloca->getParent();
     auto InsertBefore = std::next(Alloca->getIterator());
@@ -2013,11 +2011,17 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       DBuilder.insertDeclare(Alloca, Var, Expr, DL, &*InsertBefore);
     else
       DBuilder.insertDeclare(Alloca, Var, Expr, DL, ParentBB);
-    return;
+  } else if (isa<llvm::IntrinsicInst>(Storage) &&
+             cast<llvm::IntrinsicInst>(Storage)->getIntrinsicID() ==
+                 llvm::Intrinsic::coro_alloca_get) {
+    // FIXME: The live range of a coroutine alloca within the function may be
+    // limited, so using a dbg.addr instead of a dbg.declare would be more
+    // appropriate.
+    DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
+  } else {
+    // Insert a dbg.value at the current insertion point.
+    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
   }
-
-  // Insert a dbg.value at the current insertion point.
-  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(

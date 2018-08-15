@@ -4001,9 +4001,15 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   VarDecl *Decl = i->getDecl();
   // Describe the underlying alloca. This way an llvm.dbg.declare instrinsic
   // is used, which is valid for the entire lifetime of the alloca.
-  if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr))
-    if (auto *Alloca = dyn_cast<llvm::AllocaInst>(BitCast->getOperand(0)))
+  if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr)) {
+    auto *Op0 = BitCast->getOperand(0);
+    if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Op0))
       addr = Alloca;
+    else if (auto *CoroAllocaGet = dyn_cast<llvm::IntrinsicInst>(Op0)) {
+      if (CoroAllocaGet->getIntrinsicID() == llvm::Intrinsic::coro_alloca_get)
+        addr = CoroAllocaGet;
+    }
+  }
 
   auto DS = i->getDebugScope();
   if (!DS)
@@ -4016,7 +4022,9 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   StringRef Name = getVarName(i, IsAnonymous);
 
   // At this point addr must be an alloca or an undef.
-  assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr));
+  assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr) ||
+         isa<llvm::IntrinsicInst>(addr));
+
   auto Indirection = DirectValue;
   if (!IGM.IRGen.Opts.shouldOptimize())
     if (auto *Alloca = dyn_cast<llvm::AllocaInst>(addr))
