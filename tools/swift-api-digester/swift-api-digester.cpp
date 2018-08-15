@@ -252,16 +252,43 @@ public:
   }
 };
 
+// Describing some attributes with ABI impact. The addition or removal of these
+// attributes is considerred ABI-breaking.
+struct ABIAttributeInfo {
+  const DeclAttrKind Kind;
+  const NodeAnnotation Annotation;
+  const StringRef Content;
+};
+
 class SDKContext {
-  bool ABI;
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
   UpdatedNodesMap UpdateMap;
   NodeMap TypeAliasUpdateMap;
   NodeMap RevertTypeAliasUpdateMap;
   TypeMemberDiffVector TypeMemberDiffs;
+
+  bool ABI;
+  std::vector<ABIAttributeInfo> ABIAttrs;
+
+  static StringRef getAttrName(DeclAttrKind Kind) {
+    switch (Kind) {
+#define DECL_ATTR(NAME, CLASS, ...) case DAK_##CLASS: return "@"#NAME;
+#include "swift/AST/Attr.def"
+    case DAK_Count:
+      llvm_unreachable("unrecognized attribute kind.");
+    }
+  }
+
 public:
-  SDKContext(bool ABI): ABI(ABI) {}
+  SDKContext(bool ABI): ABI(ABI) {
+#define ADD(NAME) ABIAttrs.push_back({DeclAttrKind::DAK_##NAME, \
+      NodeAnnotation::Change##NAME, getAttrName(DeclAttrKind::DAK_##NAME)});
+    ADD(ObjC)
+    ADD(FixedLayout)
+    ADD(Frozen)
+#undef ADD
+  }
   llvm::BumpPtrAllocator &allocator() {
     return Allocator;
   }
@@ -281,6 +308,7 @@ public:
     return TypeMemberDiffs;
   }
   bool checkingABI() const { return ABI; }
+  ArrayRef<ABIAttributeInfo> getABIAttributeInfo() const { return ABIAttrs; }
 };
 
 // A node matcher will traverse two trees of SDKNode and find matched nodes
@@ -446,7 +474,6 @@ class SDKNodeDecl : public SDKNode {
   bool IsStatic;
   bool IsDeprecated;
   uint8_t ReferenceOwnership;
-  bool hasDeclAttribute(DeclAttrKind DAKind) const;
   StringRef GenericSig;
 
 protected:
@@ -464,6 +491,7 @@ public:
   StringRef getModuleName() const {return ModuleName;}
   StringRef getHeaderName() const;
   ArrayRef<DeclAttrKind> getDeclAttributes() const;
+  bool hasAttributeChange(const SDKNodeDecl &Another) const;
   swift::ReferenceOwnership getReferenceOwnership() const {
     return swift::ReferenceOwnership(ReferenceOwnership);
   }
@@ -474,7 +502,7 @@ public:
   StringRef getFullyQualifiedName() const;
   bool isSDKPrivate() const;
   bool isDeprecated() const { return IsDeprecated; };
-  bool hasFixedLayout() const;
+  bool hasDeclAttribute(DeclAttrKind DAKind) const;
   bool isStatic() const { return IsStatic; };
   StringRef getGenericSignature() const { return GenericSig; }
 };
@@ -761,10 +789,6 @@ SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
   return Info.createSDKNode(SDKNodeKind::Root);
 }
 
-bool SDKNodeDecl::hasFixedLayout() const {
-  return hasDeclAttribute(DeclAttrKind::DAK_FixedLayout);
-}
-
 bool SDKNodeDecl::isSDKPrivate() const {
   if (getName().startswith("__"))
     return true;
@@ -816,6 +840,16 @@ bool SDKNodeDecl::hasDeclAttribute(DeclAttrKind DAKind) const {
 
 ArrayRef<DeclAttrKind> SDKNodeDecl::getDeclAttributes() const {
   return llvm::makeArrayRef(DeclAttributes.data(), DeclAttributes.size());
+}
+
+bool SDKNodeDecl::hasAttributeChange(const SDKNodeDecl &Another) const {
+  if (getDeclAttributes().size() != Another.getDeclAttributes().size())
+    return true;
+  for (auto K: getDeclAttributes()) {
+    if (!Another.hasDeclAttribute(K))
+      return true;
+  }
+  return false;
 }
 
 SDKNodeDecl *SDKNodeType::getClosestParentDecl() const {
@@ -1174,6 +1208,10 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       if (Left->isStatic() ^ Right->isStatic())
         return false;
       if (Left->getReferenceOwnership() != Right->getReferenceOwnership())
+        return false;
+      if (Left->hasAttributeChange(*Right))
+        return false;
+      if (Left->getGenericSignature() != Right->getGenericSignature())
         return false;
       LLVM_FALLTHROUGH;
     }
@@ -2454,6 +2492,7 @@ static bool isOwnershipEquivalent(ReferenceOwnership Left,
 
 static void detectDeclChange(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
+  auto &Ctx = L->getSDKContext();
   if (auto LD = dyn_cast<SDKNodeDecl>(L)) {
     auto *RD = R->getAs<SDKNodeDecl>();
     if (LD->isStatic() ^ RD->isStatic())
@@ -2461,6 +2500,11 @@ static void detectDeclChange(NodePtr L, NodePtr R) {
     if (!isOwnershipEquivalent(LD->getReferenceOwnership(),
                                RD->getReferenceOwnership()))
       L->annotate(NodeAnnotation::OwnershipChange);
+    // Check if some attributes with ABI-impact have been added/removed.
+    for (auto &Info: Ctx.getABIAttributeInfo()) {
+      if (LD->hasDeclAttribute(Info.Kind) != RD->hasDeclAttribute(Info.Kind))
+        L->annotate(Info.Annotation);
+    }
     detectRename(L, R);
   }
 }
@@ -3519,7 +3563,9 @@ void DiagnosisEmitter::DeclTypeChangeDiag::output() const {
 bool DiagnosisEmitter::DeclAttrDiag::operator<(DeclAttrDiag Other) const {
   if (Kind != Other.Kind)
     return Kind < Other.Kind;
-  return DeclName.compare_lower(Other.DeclName);
+  if (DeclName != Other.DeclName)
+    return DeclName.compare(Other.DeclName) < 0;
+  return AttrAfter.compare(Other.AttrAfter) < 0;
 }
 
 void DiagnosisEmitter::DeclAttrDiag::output() const {
@@ -3651,8 +3697,21 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
         getOwnershipDescription(Count->getReferenceOwnership()));
     return;
   }
-  default:
+  default: {
+    // Diagnose the addition/removal of attributes with ABI impact.
+    auto Infos = Ctx.getABIAttributeInfo();
+    auto It = std::find_if(Infos.begin(), Infos.end(),
+      [&](const ABIAttributeInfo &I) { return I.Annotation == Anno; });
+    if (It == Infos.end())
+      return;
+    MetaInfo ScreenInfo(Node, true);
+    auto Desc = Node->hasDeclAttribute(It->Kind) ?
+      Ctx.buffer((llvm::Twine("without ") + It->Content).str()):
+      Ctx.buffer((llvm::Twine("with ") + It->Content).str());
+    AttrChangedDecls.Diags.emplace_back(ScreenInfo, Node->getDeclKind(),
+                                        Node->getFullyQualifiedName(), Desc);
     return;
+  }
   }
 }
 
