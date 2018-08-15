@@ -463,15 +463,16 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
   GenericEnvironmentID genericEnvID;
-  unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
-      inlineStrategy, optimizationMode, effect, numSpecAttrs,
-      hasQualifiedOwnership, isWeakLinked;
+  unsigned rawLinkage, isTransparent, isSerialized, isThunk,
+      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      isWeakLinked;
   ArrayRef<uint64_t> SemanticsIDs;
-  SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
-                                isThunk, isGlobal, inlineStrategy,
-                                optimizationMode, effect, numSpecAttrs,
-                                hasQualifiedOwnership, isWeakLinked, funcTyID,
-                                genericEnvID, clangNodeOwnerID, SemanticsIDs);
+  SILFunctionLayout::readRecord(
+      scratch, rawLinkage, isTransparent, isSerialized, isThunk,
+      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      isWeakLinked, funcTyID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -556,6 +557,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setSerialized(IsSerialized_t(isSerialized));
     fn->setThunk(IsThunk_t(isThunk));
+    fn->setWithoutActuallyEscapingThunk(bool(isWithoutactuallyEscapingThunk));
     fn->setInlineStrategy(Inline_t(inlineStrategy));
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind(EffectsKind(effect));
@@ -1132,7 +1134,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(ObjCToThickMetatype)
   ONEOPERAND_ONETYPE_INST(ObjCMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ObjCExistentialMetatypeToObject)
-  ONEOPERAND_ONETYPE_INST(ConvertFunction)
   ONEOPERAND_ONETYPE_INST(ThinFunctionToPointer)
   ONEOPERAND_ONETYPE_INST(PointerToThinFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
@@ -1161,7 +1162,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         isLifetimeGuaranteed);
     break;
   }
-
+  case SILInstructionKind::ConvertFunctionInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND
+           && "Layout should be OneTypeOneOperand.");
+    bool withoutActuallyEscaping = Attr & 0x01;
+    ResultVal = Builder.createConvertFunction(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                        (SILValueCategory)TyCategory2)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
+        withoutActuallyEscaping);
+    break;
+  }
   case SILInstructionKind::PointerToAddressInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
@@ -2480,15 +2492,16 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   DeclID clangOwnerID;
   TypeID funcTyID;
   GenericEnvironmentID genericEnvID;
-  unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
-    inlineStrategy, optimizationMode, effect, numSpecAttrs,
-    hasQualifiedOwnership, isWeakLinked;
+  unsigned rawLinkage, isTransparent, isSerialized, isThunk,
+      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      isWeakLinked;
   ArrayRef<uint64_t> SemanticsIDs;
-  SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
-                                isThunk, isGlobal, inlineStrategy,
-                                optimizationMode, effect, numSpecAttrs,
-                                hasQualifiedOwnership, isWeakLinked, funcTyID,
-                                genericEnvID, clangOwnerID, SemanticsIDs);
+  SILFunctionLayout::readRecord(
+      scratch, rawLinkage, isTransparent, isSerialized, isThunk,
+      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
+      optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
+      isWeakLinked, funcTyID, genericEnvID, clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage

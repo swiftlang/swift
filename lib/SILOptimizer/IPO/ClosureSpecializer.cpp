@@ -670,7 +670,8 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
     calleeValue = cloneCalleeConversion(CFI->getOperand(), NewClosure, Builder,
                                         NeedsRelease);
     return Builder.createConvertFunction(CallSiteDesc.getLoc(), calleeValue,
-                                         CFI->getType());
+                                         CFI->getType(),
+                                         CFI->withoutActuallyEscaping());
   }
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(calleeValue)) {

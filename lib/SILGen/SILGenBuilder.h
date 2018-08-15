@@ -365,7 +365,8 @@ public:
 
   using SILBuilder::createConvertFunction;
   ManagedValue createConvertFunction(SILLocation loc, ManagedValue fn,
-                                     SILType resultTy);
+                                     SILType resultTy,
+                                     bool WithoutActuallyEscaping = false);
 
   using SILBuilder::createConvertEscapeToNoEscape;
   ManagedValue
