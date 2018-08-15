@@ -31,8 +31,8 @@
 // CHECK: @"$S16class_resilience14ResilientChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS]] zeroinitializer
 
 // CHECK: @"$S16class_resilience14ResilientChildCMn" = {{(protected )?}}{{(dllexport )?}}constant <{{.*}}> <{
-// --       flags: class, unique, reflectable, has vtable, has resilient superclass
-// CHECK-SAME:   <i32 0xC401_0050>
+// --       flags: class, unique, has vtable, has resilient superclass
+// CHECK-SAME:   <i32 0xC400_0050>
 // --       name:
 // CHECK-SAME:   [15 x i8]* [[RESILIENTCHILD_NAME]]
 // --       num fields

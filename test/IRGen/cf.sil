@@ -14,8 +14,8 @@
 // CHECK: [[MUTABLE_REFRIGERATOR_NAME:@.*]] = private constant [52 x i8] c"CCMutableRefrigerator\00NCCMutableRefrigeratorRef\00St\00\00"
 
 // CHECK-64: @"$SSo24CCMutableRefrigeratorRefaMn" = linkonce_odr hidden constant
-// -- is imported, foreign init, reflectable, is class, is nonunique
-// CHECK-64-SAME: <i32 0x000d_0010>
+// -- is imported, foreign init, is class, is nonunique
+// CHECK-64-SAME: <i32 0x0006_0010>
 // CHECK-64-SAME: [[MUTABLE_REFRIGERATOR_NAME]]
 // CHECK-64-SAME: @"$SSo24CCMutableRefrigeratorRefaMa"
 // CHECK-64-SAME: @"$SSo24CCMutableRefrigeratorRefaMr"

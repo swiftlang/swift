@@ -260,7 +260,7 @@ struct StructImpl : ReflectionMirrorImpl {
   bool isReflectable() {
     const auto *Struct = static_cast<const StructMetadata *>(type);
     const auto &Description = Struct->getDescription();
-    return Description->getTypeContextDescriptorFlags().isReflectable();
+    return Description->isReflectable();
   }
 
   char displayStyle() {
@@ -316,7 +316,7 @@ struct EnumImpl : ReflectionMirrorImpl {
   bool isReflectable() {
     const auto *Enum = static_cast<const EnumMetadata *>(type);
     const auto &Description = Enum->getDescription();
-    return Description->getTypeContextDescriptorFlags().isReflectable();
+    return Description->isReflectable();
   }
   
   const char *getInfo(unsigned *tagPtr = nullptr,
@@ -412,7 +412,7 @@ struct ClassImpl : ReflectionMirrorImpl {
   bool isReflectable() {
     const auto *Class = static_cast<const ClassMetadata *>(type);
     const auto &Description = Class->getDescription();
-    return Description->getTypeContextDescriptorFlags().isReflectable();
+    return Description->isReflectable();
   }
 
   char displayStyle() {

@@ -228,23 +228,24 @@ protected:
     }
   }
 
-  llvm::GlobalVariable *emit(Optional<LinkEntity> entity,
-                             const char *section) {
+  // A function signature for a lambda wrapping an IRGenModule::getAddrOf*
+  // method.
+  using GetAddrOfEntityFn = llvm::Constant* (IRGenModule &, ConstantInit);
+
+  llvm::GlobalVariable *emit(
+                        Optional<llvm::function_ref<GetAddrOfEntityFn>> getAddr,
+                        const char *section) {
     layout();
 
     llvm::GlobalVariable *var;
 
     // Some reflection records have a mangled symbol name, for uniquing
     // imported type metadata.
-    if (entity) {
-      auto info = LinkInfo::get(IGM, *entity, ForDefinition);
-
+    if (getAddr) {
       auto init = B.finishAndCreateFuture();
 
-      var = createVariable(IGM, info, init.getType(), Alignment(4));
+      var = cast<llvm::GlobalVariable>((*getAddr)(IGM, init));
       var->setConstant(true);
-      init.installInGlobal(var);
-
     // Others, such as capture descriptors, do not have a name.
     } else {
       var = B.finishAndCreateGlobal("\x01l__swift5_reflection_descriptor",
@@ -259,6 +260,19 @@ protected:
     disableAddressSanitizer(IGM, var);
 
     return var;
+  }
+
+  // Helpers to guide the C++ type system into converting lambda arguments
+  // to Optional<function_ref>
+  llvm::GlobalVariable *emit(llvm::function_ref<GetAddrOfEntityFn> getAddr,
+                             const char *section) {
+    return emit(Optional<llvm::function_ref<GetAddrOfEntityFn>>(getAddr),
+                section);
+  }
+  llvm::GlobalVariable *emit(NoneType none,
+                             const char *section) {
+    return emit(Optional<llvm::function_ref<GetAddrOfEntityFn>>(),
+                section);
   }
 
   virtual void layout() = 0;
@@ -301,9 +315,12 @@ public:
       AssociatedTypes(AssociatedTypes) {}
 
   llvm::GlobalVariable *emit() {
-    auto entity = LinkEntity::forReflectionAssociatedTypeDescriptor(Conformance);
     auto section = IGM.getAssociatedTypeMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(entity, section);
+    return ReflectionMetadataBuilder::emit(
+      [&](IRGenModule &IGM, ConstantInit init) -> llvm::Constant* {
+       return IGM.getAddrOfReflectionAssociatedTypeDescriptor(Conformance,init);
+      },
+      section);
   }
 };
 
@@ -460,10 +477,13 @@ public:
     : ReflectionMetadataBuilder(IGM), NTD(NTD) {}
 
   llvm::GlobalVariable *emit() {
-    auto entity = LinkEntity::forReflectionFieldDescriptor(
-        NTD->getDeclaredType()->getCanonicalType());
     auto section = IGM.getFieldTypeMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(entity, section);
+    return ReflectionMetadataBuilder::emit(
+      [&](IRGenModule &IGM, ConstantInit definition) -> llvm::Constant* {
+        return IGM.getAddrOfReflectionFieldDescriptor(
+          NTD->getDeclaredType()->getCanonicalType(), definition);
+      },
+      section);
   }
 };
 
@@ -500,9 +520,12 @@ public:
   }
 
   llvm::GlobalVariable *emit() {
-    auto entity = LinkEntity::forReflectionBuiltinDescriptor(type);
     auto section = IGM.getBuiltinTypeMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(entity, section);
+    return ReflectionMetadataBuilder::emit(
+      [&](IRGenModule &IGM, ConstantInit definition) -> llvm::Constant * {
+        return IGM.getAddrOfReflectionBuiltinDescriptor(type, definition);
+      },
+      section);
   }
 };
 

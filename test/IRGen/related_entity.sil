@@ -15,7 +15,7 @@ bb0:
 
 // CHECK:         [[TagError1_NAME:@[0-9]+]] = private constant [14 x i8] c"TagError1\00Re\00\00"
 // CHECK:         @"$SSC9TagError1LeVMn" = linkonce_odr hidden constant
-// CHECK-SAME:    <i32 0x000d_0011>
+// CHECK-SAME:    <i32 0x0006_0011>
 // CHECK-SAME:    @"$SSCMXM"
 // CHECK-SAME:    [14 x i8]* [[TagError1_NAME]]
   %0 = metatype $@thick TagError1.Type
@@ -23,7 +23,7 @@ bb0:
 
 // CHECK:         [[TagError2_NAME:@[0-9]+]] = private constant [17 x i8] c"Code\00NTagError2\00\00"
 // CHECK:         @"$SSo9TagError2VMn" = linkonce_odr hidden constant
-// CHECK-SAME:    <i32 0x000c_0012>
+// CHECK-SAME:    <i32 0x0006_0012>
 // CHECK-SAME:    @"$SSoMXM"
 // CHECK-SAME:    [17 x i8]* [[TagError2_NAME]]
   %1 = metatype $@thick TagError2.Code.Type
@@ -31,7 +31,7 @@ bb0:
 
 // CHECK:         [[TypedefError1_NAME:@[0-9]+]] = private constant [18 x i8] c"TypedefError1\00RE\00\00"
 // CHECK:         @"$SSC13TypedefError1LEVMn" = linkonce_odr hidden constant
-// CHECK-SAME:    <i32 0x000d_0011>
+// CHECK-SAME:    <i32 0x0006_0011>
 // CHECK-SAME:    @"$SSCMXM"
 // CHECK-SAME:    [18 x i8]* [[TypedefError1_NAME]]
   %2 = metatype $@thick TypedefError1.Type
@@ -39,7 +39,7 @@ bb0:
 
 // CHECK:         [[TypedefError2Code_NAME:@[0-9]+]] = private constant [24 x i8] c"Code\00NTypedefError2\00St\00\00"
 // CHECK:         @"$SSo13TypedefError2aMn" = linkonce_odr hidden constant
-// CHECK-SAME:    <i32 0x000c_0012>
+// CHECK-SAME:    <i32 0x0006_0012>
 // CHECK-SAME:    @"$SSoMXM"
 // CHECK-SAME:    [24 x i8]* [[TypedefError2Code_NAME]]
   %3 = metatype $@thick TypedefError2.Code.Type

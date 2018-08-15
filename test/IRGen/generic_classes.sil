@@ -15,8 +15,8 @@ import Swift
 // CHECK: [[ROOTGENERIC_NAME:@.*]] = private constant [12 x i8] c"RootGeneric\00"
 
 // CHECK-LABEL: @"$S15generic_classes11RootGenericCMn" =
-// --       flags: class, generic, unique, reflectable, has vtable
-// CHECK-SAME:   <i32 0x8001_00D0>
+// --       flags: class, generic, unique, has vtable
+// CHECK-SAME:   <i32 0x8000_00D0>
 // --       name
 // CHECK-SAME:   [12 x i8]* [[ROOTGENERIC_NAME]]
 // --       negative size in words
@@ -79,8 +79,8 @@ import Swift
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [15 x i8] c"RootNonGeneric\00"
 // CHECK: @"$S15generic_classes14RootNonGenericCMn" = hidden constant <{ {{.*}} %swift.method_descriptor }> <{
-// --       flags: class, unique, has vtable, reflectable
-// CHECK-SAME:   <i32 0x8001_0050>
+// --       flags: class, unique, has vtable
+// CHECK-SAME:   <i32 0x8000_0050>
 // --       name
 // CHECK-SAME:   [15 x i8]* [[ROOTNONGENERIC_NAME]]
 // --       num fields

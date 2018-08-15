@@ -66,6 +66,10 @@ struct RuntimeTarget<8> {
   static constexpr size_t PointerSize = 8;
 };
 
+namespace reflection {
+  class FieldDescriptor;
+}
+
 /// In-process native runtime target.
 ///
 /// For interactions in the runtime, this should be the equivalent of working
@@ -3311,6 +3315,12 @@ public:
   /// convention for a given number of arguments.
   TargetRelativeDirectPointer<Runtime, MetadataResponse(...),
                               /*Nullable*/ true> AccessFunctionPtr;
+  
+  /// A pointer to the field descriptor for the type, if any.
+  TargetRelativeDirectPointer<Runtime, const reflection::FieldDescriptor,
+                              /*nullable*/ true> Fields;
+      
+  bool isReflectable() const { return (bool)Fields; }
 
   MetadataAccessFunction getAccessFunction() const {
     return MetadataAccessFunction(AccessFunctionPtr.get());

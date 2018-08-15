@@ -91,7 +91,7 @@ use_metadata(NSRuncingOptions.mince)
 
 // CHECK-LABEL: define linkonce_odr hidden i8** @"$SSo16NSRuncingOptionsVSQSCWa"()
 // CHECK:  [[NONUNIQUE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$SSo16NSRuncingOptionsVSQSCWG", %swift.type* null, i8*** null)
-// CHECK:  [[UNIQUE:%.*]] = call i8** @swift_getForeignWitnessTable(i8** [[NONUNIQUE]], %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32 }>* @"$SSo16NSRuncingOptionsVMn" to %swift.type_descriptor*), %swift.protocol* @"$SSQMp")
+// CHECK:  [[UNIQUE:%.*]] = call i8** @swift_getForeignWitnessTable(i8** [[NONUNIQUE]], %swift.type_descriptor* bitcast (<{ {{.*}} }>* @"$SSo16NSRuncingOptionsVMn" to %swift.type_descriptor*), %swift.protocol* @"$SSQMp")
 // CHECK:  ret i8** [[UNIQUE]]
 
 @objc enum ExportedToObjC: Int {

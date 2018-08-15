@@ -3621,6 +3621,36 @@ llvm::Constant *IRGenModule::getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
                                DebugTypeInfo());
 }
 
+llvm::Constant *IRGenModule::
+getAddrOfReflectionBuiltinDescriptor(CanType type,
+                                     ConstantInit definition) {
+  auto entity = LinkEntity::forReflectionBuiltinDescriptor(type);
+  return getAddrOfLLVMVariable(entity, Alignment(4),
+                               definition,
+                               FieldDescriptorTy,
+                               DebugTypeInfo());
+}
+
+llvm::Constant *IRGenModule::
+getAddrOfReflectionFieldDescriptor(CanType type,
+                                   ConstantInit definition) {
+  auto entity = LinkEntity::forReflectionFieldDescriptor(type);
+  return getAddrOfLLVMVariable(entity, Alignment(4),
+                               definition,
+                               FieldDescriptorTy,
+                               DebugTypeInfo());
+}
+
+llvm::Constant *IRGenModule::
+getAddrOfReflectionAssociatedTypeDescriptor(const ProtocolConformance *c,
+                                            ConstantInit definition) {
+  auto entity = LinkEntity::forReflectionAssociatedTypeDescriptor(c);
+  return getAddrOfLLVMVariable(entity, Alignment(4),
+                               definition,
+                               FieldDescriptorTy,
+                               DebugTypeInfo());
+}
+
 /// Return the address of a property descriptor.
 llvm::Constant *IRGenModule::getAddrOfPropertyDescriptor(AbstractStorageDecl *D,
                                                       ConstantInit definition) {

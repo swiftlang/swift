@@ -1329,47 +1329,17 @@ void swift::_swift_getFieldAt(
 
   };
 
-  auto dem = getDemanglerForRuntimeTypeResolution();
-  auto &cache = FieldCache.get();
-  auto isRequestedDescriptor = [&](const FieldDescriptor &descriptor) {
-    assert(descriptor.hasMangledTypeName());
-    auto mangledName = descriptor.getMangledTypeName(0);
-
-    if (!_contextDescriptorMatchesMangling(baseDesc,
-                                           dem.demangleType(mangledName)))
-      return false;
-
-    cache.FieldCache.getOrInsert(base, &descriptor);
-    getFieldAt(descriptor);
-    return true;
-  };
-
-
-  // Fast path: If we already have field descriptor cached.
-  if (auto Value = cache.FieldCache.find(base)) {
-    getFieldAt(*Value->getDescription());
+  auto *fields = baseDesc->Fields.get();
+  if (fields) {
+    getFieldAt(*fields);
     return;
-  }
-
-  // Otherwise let's try to find it in one of the sections.
-  for (auto &section : cache.DynamicSections.snapshot()) {
-    for (const auto *descriptor : section) {
-      if (isRequestedDescriptor(*descriptor))
-        return;
-    }
-  }
-
-  for (const auto &section : cache.StaticSections.snapshot()) {
-    for (auto &descriptor : section) {
-      if (isRequestedDescriptor(descriptor))
-        return;
-    }
   }
 
   // If we failed to find the field descriptor metadata for the type, fall
   // back to returning an empty tuple as a standin.
   auto typeName = swift_getTypeName(base, /*qualified*/ true);
-  warning(0, "SWIFT RUNTIME BUG: unable to find field metadata for type '%*s'\n",
+  warning(0, "SWIFT RUNTIME BUG: no field metadata for type '%*s' that claims "
+             "to be reflectable\n",
              (int)typeName.length, typeName.data);
   callback("unknown",
            FieldType()
