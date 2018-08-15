@@ -248,20 +248,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     DC = ext;
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
-  } else if (isa<GenericTypeParamDecl>(decl)) {
-    // For generic parameters, we want name lookup to look at just the
-    // signature of the enclosing entity.
-    DC = decl->getDeclContext();
-    if (auto nominal = dyn_cast<NominalTypeDecl>(DC)) {
-      DC = nominal;
-    } else if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
-      DC = ext;
-    } else if (auto func = dyn_cast<AbstractFunctionDecl>(DC)) {
-      DC = func;
-    } else if (!DC->isModuleScopeContext()) {
-      // Skip the generic parameter's context entirely.
-      DC = DC->getParent();
-    }
   } else {
     DC = decl->getDeclContext();
   }

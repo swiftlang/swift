@@ -33,21 +33,6 @@ Type InheritedTypeRequest::evaluate(
       options |= TypeResolutionFlags::AllowUnavailableProtocol;
     } else {
       dc = typeDecl->getDeclContext();
-
-      if (isa<GenericTypeParamDecl>(typeDecl)) {
-        // For generic parameters, we want name lookup to look at just the
-        // signature of the enclosing entity.
-        if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-          dc = nominal;
-        } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-          dc = ext;
-        } else if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-          dc = func;
-        } else if (!dc->isModuleScopeContext()) {
-          // Skip the generic parameter's context entirely.
-          dc = dc->getParent();
-        }
-      }
     }
   } else {
     auto ext = decl.get<ExtensionDecl *>();
