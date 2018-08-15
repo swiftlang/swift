@@ -300,7 +300,9 @@ Type TypeChecker::resolveTypeInContext(
       if (!sig)
         return ErrorType::get(Context);
       auto superclassType = sig->getSuperclassBound(selfType);
-      assert(superclassType);
+      if (!superclassType)
+        return ErrorType::get(Context);
+
       selfType = superclassType;
     }
   }
