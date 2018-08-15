@@ -414,6 +414,18 @@ void TBDGenVisitor::addFirstFileSymbols() {
   }
 }
 
+/// Converts a version tuple into a packed version, ignoring components beyond
+/// major, minor, and subminor.
+static tapi::internal::PackedVersion
+convertToPacked(version::Version &version) {
+  // FIXME: Warn if version is greater than 3 components?
+  unsigned major = 0, minor = 0, subminor = 0;
+  if (version.size() > 0) major = version[0];
+  if (version.size() > 1) minor = version[1];
+  if (version.size() > 2) subminor = version[2];
+  return tapi::internal::PackedVersion(major, minor, subminor);
+}
+
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet *symbols,
                                            llvm::raw_ostream *os,
@@ -425,10 +437,9 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   tapi::internal::InterfaceFile file;
   file.setFileType(tapi::internal::FileType::TBD_V3);
   file.setInstallName(opts.InstallName);
-  file.setCompatibilityVersion(tapi::internal::PackedVersion(1, 0, 0));
+  file.setCurrentVersion(convertToPacked(opts.CurrentVersion));
+  file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
   file.setTwoLevelNamespace();
-  // FIXME: proper version
-  file.setCurrentVersion(tapi::internal::PackedVersion(1, 0, 0));
   file.setSwiftABIVersion(TAPI_SWIFT_ABI_VERSION);
   file.setPlatform(tapi::internal::mapToSinglePlatform(target));
   auto arch = tapi::internal::getArchType(target.getArchName());

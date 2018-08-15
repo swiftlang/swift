@@ -786,6 +786,8 @@ static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
   opts.InstallName = installName;
   opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
   opts.ModuleLinkName = frontendOpts.ModuleLinkName;
+  opts.CurrentVersion = frontendOpts.TBDCurrentVersion;
+  opts.CompatibilityVersion = frontendOpts.TBDCompatibilityVersion;
 
   return writeTBD(Instance.getMainModule(), TBDPath, opts);
 }
