@@ -22,6 +22,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -2730,6 +2731,7 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
 void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                               const ClassLayout &fieldLayout) {
   assert(!classDecl->isForeign());
+  PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
 
   emitFieldOffsetGlobals(IGM, classDecl, fieldLayout);
 
@@ -3185,6 +3187,7 @@ namespace {
 
 /// Emit the type metadata or metadata template for a struct.
 void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
+  PrettyStackTraceDecl stackTraceRAII("emitting metadata for", structDecl);
   ConstantInitBuilder initBuilder(IGM);
   auto init = initBuilder.beginStruct();
   init.setPacked(true);
@@ -3401,6 +3404,7 @@ namespace {
 } // end anonymous namespace
 
 void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
+  PrettyStackTraceDecl stackTraceRAII("emitting metadata for", theEnum);
   ConstantInitBuilder initBuilder(IGM);
   auto init = initBuilder.beginStruct();
   init.setPacked(true);
@@ -3837,6 +3841,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
 /// the protocol descriptor, and for ObjC interop, references to the descriptor
 /// that the ObjC runtime uses for uniquing.
 void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
+  PrettyStackTraceDecl stackTraceRAII("emitting metadata for", protocol);
+
   // Emit remote reflection metadata for the protocol.
   emitFieldMetadataRecord(protocol);
 
