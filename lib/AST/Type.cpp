@@ -3192,7 +3192,8 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
 
     t = t->getSuperclass(useArchetypes);
   }
-  llvm_unreachable("no inheritance relationship between given classes");
+
+  return ErrorType::get(this);
 }
 
 TypeSubstitutionMap

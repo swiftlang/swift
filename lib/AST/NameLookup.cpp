@@ -600,15 +600,12 @@ bool shouldLookupMembers(D *decl, SourceLoc loc) {
   if (ctx.SourceMgr.rangeContainsTokenLoc(decl->getBraces(), loc))
     return true;
 
-  // Within a protocol 'where' clause, we can also look for members of the
-  // protocol.
-  if (decl->getAsProtocolOrProtocolExtensionContext()) {
-    if (auto *whereClause = decl->getTrailingWhereClause()) {
-      SourceRange whereClauseRange = whereClause->getSourceRange();
-      if (whereClauseRange.isValid() &&
-          ctx.SourceMgr.rangeContainsTokenLoc(whereClauseRange, loc)) {
-        return true;
-      }
+  // Within 'where' clause, we can also look for members.
+  if (auto *whereClause = decl->getTrailingWhereClause()) {
+    SourceRange whereClauseRange = whereClause->getSourceRange();
+    if (whereClauseRange.isValid() &&
+        ctx.SourceMgr.rangeContainsTokenLoc(whereClauseRange, loc)) {
+      return true;
     }
   }
 

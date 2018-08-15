@@ -561,10 +561,6 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are checking the underlying type of a typealias.
   TypeAliasDecl,
 
-  /// Whether we are looking only in the generic signature of the context
-  /// we're searching, rather than the entire context.
-  GenericSignature,
-
   /// Whether we are in a requirement of a generic declaration
   GenericRequirement,
 
@@ -650,7 +646,6 @@ public:
     case Context::EnumElementDecl:
     case Context::EnumPatternPayload:
     case Context::TypeAliasDecl:
-    case Context::GenericSignature:
     case Context::GenericRequirement:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:

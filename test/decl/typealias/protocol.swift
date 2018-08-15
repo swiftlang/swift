@@ -272,7 +272,7 @@ extension P10 where T == Int { } // expected-warning{{neither type in same-type 
 
 extension P10 where A == X<T> { }
 
-extension P10 where A == X<U> { } // expected-error{{use of undeclared type 'U'}}
+extension P10 where A == X<U> { }
 
 extension P10 where A == X<Self.U> { }
 
