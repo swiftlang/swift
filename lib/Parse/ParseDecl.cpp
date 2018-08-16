@@ -4086,11 +4086,23 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
                              SourceLoc &LastValidLoc, SourceLoc StaticLoc,
                              SourceLoc VarLBLoc) {
   // Properties in protocols use a very limited syntax.
-  // SIL mode uses the same syntax.
+  // SIL mode and textual interfaces use the same syntax.
   // Otherwise, we have a normal var or subscript declaration and we need
   // parse the full complement of specifiers, along with their bodies.
-  bool parsingLimitedSyntax =
-    Flags.contains(PD_InProtocol) || isInSILMode();
+  bool parsingLimitedSyntax = Flags.contains(PD_InProtocol);
+  if (!parsingLimitedSyntax) {
+    switch (SF.Kind) {
+    case SourceFileKind::Interface:
+      // FIXME: Textual interfaces /can/ have inlinable code but don't have to.
+    case SourceFileKind::SIL:
+      parsingLimitedSyntax = true;
+      break;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::REPL:
+      break;
+    }
+  }
 
   // If the body is completely empty, preserve it.  This is at best a getter with
   // an implicit fallthrough off the end.

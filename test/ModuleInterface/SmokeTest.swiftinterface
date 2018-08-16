@@ -6,5 +6,11 @@
 // RUN: %target-swift-frontend -emit-module -o %t/SmokeTest.swiftmodule %s
 // RUN: %target-swift-ide-test -print-module -module-to-print SmokeTest -I %t -source-filename x -print-access | %FileCheck %s
 
+// CHECK: public var readOnlyVar: Int { get }{{$}}
+public var readOnlyVar: Int { get }
+
+// CHECK: public var readWriteVar: Int{{$}}
+public var readWriteVar: Int { get set }
+
 // CHECK: public func verySimpleFunction(){{$}}
 public func verySimpleFunction()
