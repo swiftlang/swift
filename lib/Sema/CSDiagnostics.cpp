@@ -14,10 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ConstraintSystem.h"
 #include "CSDiagnostics.h"
+#include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 
@@ -67,7 +68,7 @@ Type RequirementFailure::getOwnerType() const {
   return getType(getAnchor())->getInOutObjectType()->getMetatypeInstanceType();
 }
 
-const Requirement &RequirementFailure::getRequirement() {
+const Requirement &RequirementFailure::getRequirement() const {
   auto *genericCtx = AffectedDecl->getAsGenericContext();
   return genericCtx->getGenericRequirements()[getRequirementIndex()];
 }
@@ -98,6 +99,27 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return NA->getDecl();
 
   return ownerType->getAnyGeneric();
+}
+
+const DeclContext *RequirementFailure::getRequirementDC() const {
+  const auto &req = getRequirement();
+  auto *DC = AffectedDecl->getDeclContext();
+
+  do {
+    auto *D = DC->getInnermostDeclarationDeclContext();
+    if (!D)
+      break;
+
+    if (auto *GC = D->getAsGenericContext()) {
+      auto *sig = GC->getGenericSignature();
+      if (sig && sig->isRequirementSatisfied(req))
+        return DC;
+    }
+
+    DC = DC->getParent();
+  } while (DC);
+
+  return AffectedDecl->getAsGenericContext();
 }
 
 bool MissingConformanceFailure::diagnose() {
@@ -175,21 +197,10 @@ bool MissingConformanceFailure::diagnose() {
   } else {
     const auto &req = getRequirement();
     auto *genericCtx = AffectedDecl->getAsGenericContext();
+    const auto *reqDC = getRequirementDC();
 
-    std::function<const DeclContext *(Type)> getAffectedCtx =
-        [&](Type type) -> const DeclContext * {
-      if (auto *DMT = type->getAs<DependentMemberType>())
-        return getAffectedCtx(DMT->getBase());
-
-      if (auto *GPT = type->getAs<GenericTypeParamType>())
-        return GPT->getDecl()->getDeclContext();
-
-      return genericCtx;
-    };
-
-    const auto *affected = getAffectedCtx(req.getFirstType());
-    if (affected != genericCtx) {
-      auto *NTD = affected->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (reqDC != genericCtx) {
+      auto *NTD = reqDC->getAsNominalTypeOrNominalTypeExtensionContext();
       emitDiagnostic(anchor->getLoc(), diag::type_does_not_conform_in_decl_ref,
                      AffectedDecl->getDescriptiveKind(),
                      AffectedDecl->getFullName(), NTD->getDeclaredType(), type,
@@ -200,7 +211,7 @@ bool MissingConformanceFailure::diagnose() {
                      AffectedDecl->getFullName(), type, protocolType);
     }
 
-    emitDiagnostic(affected->getAsDeclOrDeclExtensionContext(),
+    emitDiagnostic(reqDC->getAsDeclOrDeclExtensionContext(),
                    diag::where_type_does_not_conform_type, req.getFirstType(),
                    type);
   }
