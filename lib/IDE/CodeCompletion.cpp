@@ -412,7 +412,8 @@ static void prepareForRetypechecking(Expr *E) {
   assert(E);
   struct Eraser : public ASTWalker {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (expr && expr->getType() && expr->getType()->hasError())
+      if (expr && expr->getType() && (expr->getType()->hasError() ||
+                                      expr->getType()->hasUnresolvedType()))
         expr->setType(Type());
       if (auto *ACE = dyn_cast_or_null<AutoClosureExpr>(expr)) {
         return { true, ACE->getSingleExpressionBody() };
@@ -420,13 +421,15 @@ static void prepareForRetypechecking(Expr *E) {
       return { true, expr };
     }
     bool walkToTypeLocPre(TypeLoc &TL) override {
-      if (TL.getType() && TL.getType()->hasError())
+      if (TL.getType() && (TL.getType()->hasError() ||
+                           TL.getType()->hasUnresolvedType()))
         TL.setType(Type());
       return true;
     }
 
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      if (P && P->hasType() && P->getType()->hasError()) {
+      if (P && P->hasType() && (P->getType()->hasError() ||
+                                P->getType()->hasUnresolvedType())) {
         P->setType(Type());
       }
       return { true, P };
@@ -3252,6 +3255,7 @@ public:
       // FIXME: This is workaround for getTypeOfExpressionWithoutApplying()
       // modifies type of 'expr'.
       expr->setType(Ty);
+      prepareForRetypechecking(expr);
     };
 
     // We allocate these expressions on the stack because we know they can't
@@ -3373,8 +3377,8 @@ public:
     Expr *expr = SE;
     if (!typeCheckCompletionSequence(const_cast<DeclContext *>(CurrDeclContext),
                                      expr)) {
-
-      if (!LHS->getType()->getRValueType()->getOptionalObjectType()) {
+      if (!LHS->getType() ||
+          !LHS->getType()->getRValueType()->getOptionalObjectType()) {
         // Don't complete optional operators on non-optional types.
         // FIXME: can we get the type-checker to disallow these for us?
         if (op->getName().str() == "??")
