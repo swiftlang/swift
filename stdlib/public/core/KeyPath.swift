@@ -758,6 +758,9 @@ internal struct RawKeyPathComponent {
     internal static var endOfReferencePrefixFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_EndOfReferencePrefixFlag
     }
+    internal static var storedMutableFlag: UInt32 {
+      return _SwiftKeyPathComponentHeader_StoredMutableFlag
+    }
     internal static var storedOffsetPayloadMask: UInt32 {
       return _SwiftKeyPathComponentHeader_StoredOffsetPayloadMask
     }
@@ -772,6 +775,11 @@ internal struct RawKeyPathComponent {
     }
     internal static var maximumOffsetPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_MaximumOffsetPayload
+    }
+
+    internal var isStoredMutable: Bool {
+      _sanityCheck(kind == .struct || kind == .class)
+      return _value & Header.storedMutableFlag != 0
     }
 
     internal static var computedMutatingFlag: UInt32 {
@@ -2281,6 +2289,17 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       return true
     }())
 
+    func setStoredCapability(for header: RawKeyPathComponent.Header) {
+      // Mutable class properties can be the root of a reference mutation.
+      // Mutable struct properties pass through the existing capability.
+      if header.isStoredMutable {
+        if header.kind == .class { capability = .reference }
+      } else {
+        // Immutable properties can only be read.
+        capability = .readOnly
+      }
+    }
+
     func setComputedCapability(for header: RawKeyPathComponent.Header) {
       let settable = header.isComputedSettable
       let mutating = header.isComputedMutating
@@ -2301,14 +2320,8 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     }
 
     switch header.kind {
-    case .class:
-      // The rest of the key path could be reference-writable.
-      capability = .reference
-      fallthrough
-    case .struct:
-      // No effect on the capability.
-      // TODO: we should dynamically prevent "let" properties from being
-      // reassigned.
+    case .class, .struct:
+      setStoredCapability(for: header)
 
       // Check the final instantiated size of the offset.
       if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload
@@ -2368,13 +2381,9 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       // Measure the instantiated size of the external component.
       let newComponentSize: Int
       switch descriptorHeader.kind {
-      case .class:
-        // A stored class property is reference-writable.
-        // TODO: we should dynamically prevent "let" properties from being
-        // reassigned (in both the struct and class cases).
-        capability = .reference
-        fallthrough
-      case .struct:
+      case .class, .struct:
+        setStoredCapability(for: descriptorHeader)
+
         // Discard the local candidate.
         _ = buffer.popRaw(size: localCandidateSize,
                           alignment: Int32.self)
@@ -2769,9 +2778,11 @@ internal func _instantiateKeyPathBuffer(
       tryToResolveOffset(header: header,
                          getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
     case .class:
-      // Crossing a class can end the reference prefix, and makes the following
-      // key path potentially reference-writable.
-      endOfReferencePrefixComponent = previousComponentAddr
+      // Accessing a mutable class property can end the reference prefix, and
+      // makes the following key path potentially reference-writable.
+      if header.isStoredMutable {
+        endOfReferencePrefixComponent = previousComponentAddr
+      }
       // The offset may need to be resolved dynamically.
       tryToResolveOffset(header: header,
                          getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
@@ -2821,9 +2832,11 @@ internal func _instantiateKeyPathBuffer(
       // descriptor.
       switch descriptorHeader.kind {
       case .class:
-        // Crossing a class can end the reference prefix, and makes the following
-        // key path potentially reference-writable.
-        endOfReferencePrefixComponent = previousComponentAddr
+        // Accessing a mutable class property can end the reference prefix,
+        // and makes the following key path potentially reference-writable.
+        if descriptorHeader.isStoredMutable {
+          endOfReferencePrefixComponent = previousComponentAddr
+        }
         fallthrough
 
       case .struct:

@@ -42,12 +42,12 @@ public struct ExternalReabstractions<T> {
 // -- struct property, offset resolved from field offset vector in metadata
 // CHECK-64: @"$S19property_descriptor15ExternalGenericV2roxvpMV" =
 // CHECK-32: @"$S19property_descriptor15ExternalGenericV2roxvpMV" =
-// CHECK-SAME: <{ <i32 0x017f_fffe>,
+// CHECK-SAME: <{ <i32 0x01ff_fffe>,
 sil_property #ExternalGeneric.ro <T: Comparable> (
   stored_property #ExternalGeneric.ro : $T)
 // CHECK-64: @"$S19property_descriptor15ExternalGenericV2rwxvpMV" =
 // CHECK-32: @"$S19property_descriptor15ExternalGenericV2rwxvpMV" =
-// CHECK-SAME: <{ <i32 0x017f_fffe>,
+// CHECK-SAME: <{ <i32 0x01ff_fffe>,
 sil_property #ExternalGeneric.rw <T: Comparable> (
   stored_property #ExternalGeneric.rw : $T)
 
