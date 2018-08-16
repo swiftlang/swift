@@ -18,7 +18,7 @@ class Derived2 : Derived { }
 ArrayTraps.test("downcast1")
   .skip(.custom(
     { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Unchecked"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let ba: [Base] = [ Derived(), Base() ]
   let da = ba as! [Derived]
