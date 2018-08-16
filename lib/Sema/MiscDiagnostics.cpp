@@ -3758,8 +3758,8 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 
     void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
       E->forEachSegment(TC.Context,
-          [&](InterpolatedStringLiteralExpr::SegmentInfo segment) -> void {
-        if (segment.isInterpolation) {
+          [&](bool isInterpolation, CallExpr *segment) -> void {
+        if (isInterpolation) {
           diagnoseIfUnintendedInterpolation(segment,
                               UnintendedInterpolationKind::Optional);
           diagnoseIfUnintendedInterpolation(segment,
@@ -3768,11 +3768,10 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       });
     }
 
-    void diagnoseIfUnintendedInterpolation(
-           InterpolatedStringLiteralExpr::SegmentInfo segment,
-           UnintendedInterpolationKind kind) {
-      if (interpolationWouldBeUnintended(segment.appendMethod, kind))
-        if (auto firstArg = getFirstArgIfUnintendedInterpolation(segment.arg,
+    void diagnoseIfUnintendedInterpolation(CallExpr *segment,
+                                           UnintendedInterpolationKind kind) {
+      if (interpolationWouldBeUnintended(segment->getCalledValue(), kind))
+        if (auto firstArg = getFirstArgIfUnintendedInterpolation(segment->getArg(),
                                                                  kind))
           diagnoseUnintendedInterpolation(firstArg, kind);
     }
