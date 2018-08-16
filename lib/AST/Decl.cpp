@@ -984,14 +984,14 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 
 NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(
-      ExtendedNominalRequest{const_cast<ExtensionDecl *>(this)});;
+  return evaluateOrDefault(ctx.evaluator,
+    ExtendedNominalRequest{const_cast<ExtensionDecl *>(this)}, nullptr);
 }
 
 Type ExtensionDecl::getInheritedType(unsigned index) const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(InheritedTypeRequest{const_cast<ExtensionDecl *>(this),
-                                            index});
+  return evaluateOrDefault(ctx.evaluator,
+    InheritedTypeRequest{const_cast<ExtensionDecl *>(this), index}, Type());
 }
 
 bool ExtensionDecl::isConstrainedExtension() const {
@@ -1017,14 +1017,16 @@ bool ExtensionDecl::isEquivalentToExtendedContext() const {
 
 AccessLevel ExtensionDecl::getDefaultAccessLevel() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(
-    DefaultAndMaxAccessLevelRequest{const_cast<ExtensionDecl *>(this)}).first;
+  return evaluateOrDefault(ctx.evaluator,
+    DefaultAndMaxAccessLevelRequest{const_cast<ExtensionDecl *>(this)},
+    {AccessLevel::Private, AccessLevel::Private}).first;
 }
 
 AccessLevel ExtensionDecl::getMaxAccessLevel() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(
-    DefaultAndMaxAccessLevelRequest{const_cast<ExtensionDecl *>(this)}).second;
+  return evaluateOrDefault(ctx.evaluator,
+    DefaultAndMaxAccessLevelRequest{const_cast<ExtensionDecl *>(this)},
+    {AccessLevel::Private, AccessLevel::Private}).second;
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -2087,7 +2089,8 @@ CanType ValueDecl::getOverloadSignatureType() const {
 
 llvm::TinyPtrVector<ValueDecl *> ValueDecl::getOverriddenDecls() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(OverriddenDeclsRequest{const_cast<ValueDecl *>(this)});
+  return evaluateOrDefault(ctx.evaluator,
+    OverriddenDeclsRequest{const_cast<ValueDecl *>(this)}, {});
 }
 
 void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
@@ -2098,7 +2101,9 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
 
 bool ValueDecl::isObjC() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(IsObjCRequest{const_cast<ValueDecl *>(this)});
+  return evaluateOrDefault(ctx.evaluator,
+    IsObjCRequest{const_cast<ValueDecl *>(this)},
+    getAttrs().hasAttribute<ObjCAttr>());
 }
 
 void ValueDecl::setIsObjC(bool value) {
@@ -2115,7 +2120,9 @@ void ValueDecl::setIsObjC(bool value) {
 
 bool ValueDecl::isDynamic() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(IsDynamicRequest{const_cast<ValueDecl *>(this)});
+  return evaluateOrDefault(ctx.evaluator,
+    IsDynamicRequest{const_cast<ValueDecl *>(this)},
+    getAttrs().hasAttribute<DynamicAttr>());
 }
 
 void ValueDecl::setIsDynamic(bool value) {
@@ -2440,7 +2447,8 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
 
 AccessLevel ValueDecl::getFormalAccess() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(AccessLevelRequest{const_cast<ValueDecl *>(this)});
+  return evaluateOrDefault(ctx.evaluator,
+    AccessLevelRequest{const_cast<ValueDecl *>(this)}, AccessLevel::Private);
 }
 
 bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
@@ -2664,8 +2672,8 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
 
 Type TypeDecl::getInheritedType(unsigned index) const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(InheritedTypeRequest{const_cast<TypeDecl *>(this),
-                                            index});
+  return evaluateOrDefault(ctx.evaluator,
+    InheritedTypeRequest{const_cast<TypeDecl *>(this), index}, Type());
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
@@ -3168,7 +3176,8 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
 
 Type EnumDecl::getRawType() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(EnumRawTypeRequest{const_cast<EnumDecl *>(this)});
+  return evaluateOrDefault(ctx.evaluator,
+    EnumRawTypeRequest{const_cast<EnumDecl *>(this)}, Type());
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -3617,12 +3626,14 @@ ProtocolDecl::getAssociatedTypeMembers() const {
 
 Type ProtocolDecl::getSuperclass() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(SuperclassTypeRequest{const_cast<ProtocolDecl *>(this)});
+  return evaluateOrDefault(ctx.evaluator,
+    SuperclassTypeRequest{const_cast<ProtocolDecl *>(this)}, Type());
 }
 
 ClassDecl *ProtocolDecl::getSuperclassDecl() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(SuperclassDeclRequest{const_cast<ProtocolDecl *>(this)});
+  return evaluateOrDefault(ctx.evaluator,
+    SuperclassDeclRequest{const_cast<ProtocolDecl *>(this)}, nullptr);
 }
 
 void ProtocolDecl::setSuperclass(Type superclass) {
@@ -4230,8 +4241,9 @@ bool AbstractStorageDecl::AccessorRecord::registerAccessor(AccessorDecl *decl,
 AccessLevel
 AbstractStorageDecl::getSetterFormalAccess() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(
-        SetterAccessLevelRequest{const_cast<AbstractStorageDecl *>(this)});
+  return evaluateOrDefault(ctx.evaluator,
+        SetterAccessLevelRequest{const_cast<AbstractStorageDecl *>(this)},
+        AccessLevel::Private);
 }
 
 void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
@@ -6081,12 +6093,14 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 
 Type ClassDecl::getSuperclass() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(SuperclassTypeRequest{const_cast<ClassDecl *>(this)});
+  return evaluateOrDefault(ctx.evaluator,
+    SuperclassTypeRequest{const_cast<ClassDecl *>(this)}, Type());
 }
 
 ClassDecl *ClassDecl::getSuperclassDecl() const {
   ASTContext &ctx = getASTContext();
-  return ctx.evaluator(SuperclassDeclRequest{const_cast<ClassDecl *>(this)});
+  return evaluateOrDefault(ctx.evaluator,
+    SuperclassDeclRequest{const_cast<ClassDecl *>(this)}, nullptr);
 }
 
 void ClassDecl::setSuperclass(Type superclass) {

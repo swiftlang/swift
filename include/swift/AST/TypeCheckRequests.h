@@ -52,13 +52,13 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator,
-                llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                unsigned index) const;
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator,
+           llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+           unsigned index) const;
 
 public:
   // Cycle handling
-  Type breakCycle() const { return Type(); }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -81,11 +81,11 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl) const;
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl) const;
 
 public:
   // Cycle handling
-  Type breakCycle() const { return Type(); }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -108,11 +108,11 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const;
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const;
 
 public:
   // Cycle handling
-  Type breakCycle() const { return Type(); }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -136,12 +136,11 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  llvm::TinyPtrVector<ValueDecl *> evaluate(Evaluator &evaluator,
-                                            ValueDecl *decl) const;
+  llvm::Expected<llvm::TinyPtrVector<ValueDecl *>>
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Cycle handling
-  llvm::TinyPtrVector<ValueDecl *> breakCycle() const { return { }; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -164,11 +163,10 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Cycle handling
-  bool breakCycle() const;
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -191,11 +189,10 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Cycle handling
-  bool breakCycle() const;
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
