@@ -568,6 +568,22 @@ void SILPassManager::execute() {
 SILPassManager::~SILPassManager() {
   assert(IRGenPasses.empty() && "Must add IRGen SIL passes that were "
                                 "registered to the list of transformations");
+  // Before we do anything further, verify the module and our analyses. These
+  // are natural points with which to verify.
+  //
+  // TODO: We currently do not verify the module here since the verifier asserts
+  // in the normal build. This should be enabled and those problems resolved
+  // either by changing the verifier or treating those asserts as signs of a
+  // bug.
+  for (auto *A : Analyses) {
+    // We use verify full instead of just verify to ensure that passes that want
+    // to run more expensive verification after a pass manager is destroyed
+    // properly trigger.
+    //
+    // NOTE: verifyFull() has a default implementation that just calls
+    // verify(). So functionally, there is no difference here.
+    A->verifyFull();
+  }
 
   // Remove our deserialization notification handler.
   Mod->removeDeserializationNotificationHandler(
