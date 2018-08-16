@@ -16,6 +16,7 @@
 import argparse
 import glob
 import logging
+import math
 import os
 import re
 import subprocess
@@ -185,6 +186,11 @@ class BenchmarkDoctor(object):
             LoggingReportFormatter(use_color=sys.stdout.isatty()))
         self.log.addHandler(self.console_handler)
         self.log.debug('Checking tests: %s', ', '.join(self.driver.tests))
+        self.requirements = [
+            self._name_matches_capital_words_convention,
+            self._name_is_at_most_40_chars_long,
+            self._optimized_runtime_in_range,
+        ]
 
     def __del__(self):
         """Unregister handler on exit."""
@@ -193,10 +199,11 @@ class BenchmarkDoctor(object):
     capital_words_re = re.compile('[A-Z][a-zA-Z0-9]+')
 
     @staticmethod
-    def _name_matches_capital_words_convention(test):
-        name = test
+    def _name_matches_capital_words_convention(measurements):
+        name = measurements['name']
         match = BenchmarkDoctor.capital_words_re.match(name)
         matched = match.group(0) if match else ''
+
         if name != matched:
             BenchmarkDoctor.log_naming.error(
                 "'%s' name doesn't conform to UpperCamelCase convention.",
@@ -205,24 +212,101 @@ class BenchmarkDoctor(object):
                 'See http://bit.ly/UpperCamelCase')
 
     @staticmethod
-    def _name_is_at_most_40_chars_long(test):
-        if len(test) > 40:
-            BenchmarkDoctor.log_naming.warning(
-                "'%s' name is longer than 40 characters.", test)
+    def _name_is_at_most_40_chars_long(measurements):
+        name = measurements['name']
+
+        if len(name) > 40:
+            BenchmarkDoctor.log_naming.error(
+                "'%s' name is %d characters long.", name, len(name))
+            BenchmarkDoctor.log_naming.info(
+                'Benchmark name should not be longer than 40 characters.')
+
+    @staticmethod
+    def _select(measurements, num_iters=None, opt_level='O'):
+        prefix = measurements['name'] + ' ' + opt_level
+        prefix += '' if num_iters is None else (' i' + str(num_iters))
+        return [series for name, series in measurements.items()
+                if name.startswith(prefix)]
+
+    @staticmethod
+    def _optimized_runtime_in_range(measurements):
+        name = measurements['name']
+        runtime = min(BenchmarkDoctor._select(measurements),
+                      key=lambda r: r.min).min
+        if 2500 < runtime < 500000:
+            BenchmarkDoctor.log_runtime.warning(
+                "'%s' execution takes at least %d μs.", name, runtime)
+        elif 500000 <= runtime:
+            BenchmarkDoctor.log_runtime.error(
+                "'%s' execution takes at least %d μs.", name, runtime)
+        if 2500 < runtime:
+            factor = int(pow(2, math.ceil(math.log(runtime / 2500.0, 2))))
+            BenchmarkDoctor.log_runtime.info(
+                "Decrease the workload of '%s' by a factor of %d, "
+                "to be less than 2500 μs.", name, factor)
+
+    @staticmethod
+    def _adjusted_1s_samples(runtime):
+        u"""Return sample count that can be taken in approximately 1 second.
+
+        Based on the runtime (μs) of one sample taken with num-iters=1.
+        """
+        if runtime == 0:
+            return 2
+        s = 1000000 / float(runtime)  # samples for 1s run
+        s = int(pow(2, round(math.log(s, 2))))  # rounding to power of 2
+        return s if s > 2 else 2  # always take at least 2 samples
+
+    def measure(self, benchmark):
+        """Measure benchmark with varying iterations and optimization levels.
+
+        Returns a dictionary with benchmark name and `PerformanceTestResult`s.
+        """
+        self.log.debug('Calibrating num-samples for {0}:'.format(benchmark))
+        r = self.driver.run(benchmark, num_samples=3, num_iters=1)  # calibrate
+        num_samples = self._adjusted_1s_samples(r.min)
+
+        def capped(s):
+            return min(s, 2048)
+        run_args = [(capped(num_samples), 1), (capped(num_samples / 2), 2)]
+        opts = self.driver.args.optimization
+        opts = opts if isinstance(opts, list) else [opts]
+        self.log.debug(
+            'Runtime {0} μs yields {1} adjusted samples per second.'.format(
+                r.min, num_samples))
+        self.log.debug(
+            'Measuring {0}, 5 x i1 ({1} samples), 5 x i2 ({2} samples)'.format(
+                benchmark, run_args[0][0], run_args[1][0]))
+
+        measurements = dict(
+            [('{0} {1} i{2}{3}'.format(benchmark, o, i, suffix),
+              self.driver.run(benchmark, num_samples=s, num_iters=i,
+                              measure_memory=True))
+             for o in opts
+             for s, i in run_args
+             for suffix in list('abcde')
+             ]
+        )
+        measurements['name'] = benchmark
+        return measurements
+
+    def analyze(self, benchmark_measurements):
+        """Analyze whether benchmark fullfills all requirtements."""
+        self.log.debug('Analyzing %s', benchmark_measurements['name'])
+        for rule in self.requirements:
+            rule(benchmark_measurements)
 
     def check(self):
-        checks = [
-            self._name_matches_capital_words_convention,
-            self._name_is_at_most_40_chars_long,
-            ]
+        """Measure and analyse all enabled tests."""
         for test in self.driver.tests:
-            for check in checks:
-                check(test)
+            self.analyze(self.measure(test))
 
     @staticmethod
     def run_check(args):
         doctor = BenchmarkDoctor(args)
         doctor.check()
+        # TODO non-zero error code when errors are logged
+        # See https://stackoverflow.com/a/31142078/41307
         return 0
 
 

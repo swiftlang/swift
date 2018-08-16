@@ -290,7 +290,7 @@ class BenchmarkDriverMock(Mock):
                            verbose, measure_memory):
         args = (test, num_samples, num_iters, verbose, measure_memory)
         self.calls.append(args)
-        return self.respond.get(args, '')
+        return self.respond.get(args, Stub(min=700))
 
 
 class TestLoggingReportFormatter(unittest.TestCase):
@@ -324,6 +324,13 @@ class TestLoggingReportFormatter(unittest.TestCase):
             'levelname': 'INFO', 'msg': 'Hi!'})
         f = LoggingReportFormatter()
         self.assertEquals(f.format(lr), 'INFO Hi!')
+
+
+def _run(test, num_samples=None, num_iters=None, verbose=None,
+         measure_memory=False):
+    """Helper function that constructs tuple with arguments for run method."""
+    return (
+        test, num_samples, num_iters, verbose, measure_memory)
 
 
 class TestBenchmarkDoctor(unittest.TestCase):
@@ -367,6 +374,41 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assertTrue(isinstance(console_handler.formatter,
                                    LoggingReportFormatter))
 
+    def test_measure_10_independent_1s_benchmark_series(self):
+        """Measurement strategy takes 5 i2 and 5 i1 series.
+
+        Num-samples for Benchmark Driver are calibrated to be powers of two,
+        take measurements for approximately 1s
+        based on short initial runtime sampling. Capped at 2k samples.
+        """
+        driver = BenchmarkDriverMock(tests=['B1'], responses=([
+            # calibration run, returns a stand-in for PerformanceTestResult
+            (_run('B1', num_samples=3, num_iters=1), Stub(min=300))] +
+            # 5x i1 series, with 300 μs runtime its possible to take 4098
+            # samples/s, but it should be capped at 2k
+            ([(_run('B1', num_samples=2048, num_iters=1,
+                    measure_memory=True), Stub(min=300))] * 5) +
+            # 5x i2 series
+            ([(_run('B1', num_samples=2048, num_iters=2,
+                    measure_memory=True), Stub(min=300))] * 5)
+        ))
+        doctor = BenchmarkDoctor(self.args, driver)
+        with captured_output() as (out, _):
+            measurements = doctor.measure('B1')
+
+        driver.assert_called_all_expected()
+        self.assert_contains(
+            ['name',
+             'B1 O i1a', 'B1 O i1b', 'B1 O i1c', 'B1 O i1d', 'B1 O i1e',
+             'B1 O i2a', 'B1 O i2b', 'B1 O i2c', 'B1 O i2d', 'B1 O i2e'],
+            measurements.keys())
+        self.assertEquals(measurements['name'], 'B1')
+        self.assert_contains(
+            ['Calibrating num-samples for B1:',
+             'Runtime 300 μs yields 4096 adjusted samples per second.',
+             'Measuring B1, 5 x i1 (2048 samples), 5 x i2 (2048 samples)'],
+            self.logs['debug'])
+
     def test_benchmark_name_matches_capital_words_conventions(self):
         driver = BenchmarkDriverMock(tests=[
             'BenchmarkName', 'CapitalWordsConvention', 'ABBRName',
@@ -400,7 +442,45 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assertNotIn('BenchmarkName', output)
         self.assert_contains(
             ["'ThisTestNameIsTooLongAndCausesOverflowsInReports' name is "
-             "longer than 40 characters."], output)
+             "48 characters long."], self.logs['error'])
+        self.assert_contains(
+            ["Benchmark name should not be longer than 40 characters."],
+            self.logs['info'])
+
+    def test_benchmark_runtime_range(self):
+        """Optimized benchmark should run in less then 2500 μs.
+
+        With runtimes less than 2500 μs there is better than 1:4 chance of
+        being interrupted in the middle of measurement due to elapsed 10 ms
+        quantum used by macos scheduler.
+
+        Warn about longer runtime. Runtimes over half a second are an error.
+        """
+        def measurements(name, runtime):
+            return {'name': name,
+                    name + ' O i1a': Stub(min=runtime + 2),
+                    name + ' O i2a': Stub(min=runtime)}
+
+        with captured_output() as (out, _):
+            doctor = BenchmarkDoctor(self.args, BenchmarkDriverMock([]))
+            doctor.analyze(measurements('Cheetah', 200))
+            doctor.analyze(measurements('Hare', 2501))
+            doctor.analyze(measurements('Tortoise', 500000))
+        output = out.getvalue()
+
+        self.assertIn('runtime: ', output)
+        self.assertNotIn('Cheetah', output)
+        self.assert_contains(["'Hare' execution takes at least 2501 μs."],
+                             self.logs['warning'])
+        self.assert_contains(
+            ["Decrease the workload of 'Hare' by a factor of 2, "
+             "to be less than 2500 μs."], self.logs['info'])
+        self.assert_contains(
+            ["'Tortoise' execution takes at least 500000 μs."],
+            self.logs['error'])
+        self.assert_contains(
+            ["Decrease the workload of 'Tortoise' by a factor of 256, "
+             "to be less than 2500 μs."], self.logs['info'])
 
 
 if __name__ == '__main__':
