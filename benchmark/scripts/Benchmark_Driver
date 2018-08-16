@@ -14,69 +14,14 @@
 # ===---------------------------------------------------------------------===//
 
 import argparse
-import datetime
 import glob
-import json
 import os
 import re
 import subprocess
 import sys
 import time
-import urllib
-import urllib2
 
 DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
-
-
-def parse_results(res, optset):
-    # Parse lines like this
-    # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),PEAK_MEMORY(B)
-    score_re = re.compile(r"(\d+),[ \t]*(\w+)," +
-                          ",".join([r"[ \t]*([\d.]+)"] * 7))
-    # The Totals line would be parsed like this.
-    total_re = re.compile(r"()(Totals)," +
-                          ",".join([r"[ \t]*([\d.]+)"] * 7))
-    key_group = 2
-    val_group = 4
-    mem_group = 9
-
-    tests = []
-    for line in res.split():
-        m = score_re.match(line)
-        if not m:
-            m = total_re.match(line)
-            if not m:
-                continue
-        testresult = int(m.group(val_group))
-        testname = m.group(key_group)
-        test = {}
-        test['Data'] = [testresult]
-        test['Info'] = {}
-        test['Name'] = "nts.swift/" + optset + "." + testname + ".exec"
-        tests.append(test)
-        if testname != 'Totals':
-            mem_testresult = int(m.group(mem_group))
-            mem_test = {}
-            mem_test['Data'] = [mem_testresult]
-            mem_test['Info'] = {}
-            mem_test['Name'] = "nts.swift/mem_maxrss." + \
-                optset + "." + testname + ".mem"
-            tests.append(mem_test)
-    return tests
-
-
-def submit_to_lnt(data, url):
-    print("\nSubmitting results to LNT server...")
-    json_report = {'input_data': json.dumps(data), 'commit': '1'}
-    data = urllib.urlencode(json_report)
-    response_str = urllib2.urlopen(urllib2.Request(url, data))
-    response = json.loads(response_str.read())
-    if 'success' in response:
-        print("Server response:\tSuccess")
-    else:
-        print("Server response:\tError")
-        print("Error:\t", response['error'])
-        sys.exit(1)
 
 
 def instrument_test(driver_path, test, num_samples):
@@ -242,43 +187,6 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
     return formatted_output
 
 
-def submit(args):
-    print("SVN revision:\t", args.revision)
-    print("Machine name:\t", args.machine)
-    print("Iterations:\t", args.iterations)
-    print("Optimizations:\t", ','.join(args.optimization))
-    print("LNT host:\t", args.lnt_host)
-    starttime = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-    print("Start time:\t", starttime)
-    data = {}
-    data['Tests'] = []
-    data['Machine'] = {'Info': {'name': args.machine}, 'Name': args.machine}
-    print("\nRunning benchmarks...")
-    for optset in args.optimization:
-        print("Opt level:\t", optset)
-        file = os.path.join(args.tests, "Benchmark_" + optset)
-        try:
-            res = run_benchmarks(
-                file, benchmarks=get_tests(file, args),
-                num_samples=args.iterations)
-            data['Tests'].extend(parse_results(res, optset))
-        except subprocess.CalledProcessError as e:
-            print("Execution failed.. Test results are empty.")
-            print("Process output:\n", e.output)
-
-    endtime = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-    data['Run'] = {'End Time': endtime,
-                   'Info': {'inferred_run_order': str(args.revision),
-                            'run_order': str(args.revision),
-                            'tag': 'nts',
-                            'test_suite_revision': 'None'},
-                   'Start Time': starttime}
-    print("End time:\t", endtime)
-
-    submit_to_lnt(data, args.lnt_host)
-    return 0
-
-
 def run(args):
     optset = args.optimization
     file = os.path.join(args.tests, "Benchmark_" + optset)
@@ -416,29 +324,6 @@ def main():
         '(default: DRIVER_DIR)',
         default=DRIVER_DIR)
 
-    submit_parser = subparsers.add_parser(
-        'submit',
-        help='Run benchmarks and submit results to LNT',
-        parents=[parent_parser])
-    submit_parser.add_argument(
-        '-o', '--optimization', nargs='+',
-        help='optimization levels to use (default: O Onone Osize)',
-        default=['O', 'Onone', 'Osize'])
-    submit_parser.add_argument(
-        '-i', '--iterations',
-        help='number of times to run each test (default: 10)',
-        type=positive_int, default=10)
-    submit_parser.add_argument(
-        '-m', '--machine', required=True,
-        help='LNT machine name')
-    submit_parser.add_argument(
-        '-r', '--revision', required=True,
-        help='SVN revision of compiler to identify the LNT run', type=int)
-    submit_parser.add_argument(
-        '-l', '--lnt_host', required=True,
-        help='LNT host to submit results to')
-    submit_parser.set_defaults(func=submit)
-
     run_parser = subparsers.add_parser(
         'run',
         help='Run benchmarks and output results to stdout',
@@ -480,8 +365,6 @@ def main():
     compare_parser.set_defaults(func=compare)
 
     args = parser.parse_args()
-    if args.func != compare and isinstance(args.optimization, list):
-        args.optimization = sorted(list(set(args.optimization)))
     return args.func(args)
 
 
