@@ -3765,47 +3765,6 @@ public:
     SDKNode::postorderVisit(Root, Emitter);
   }
 };
-
-class OverloadMemberFunctionEmitter : public SDKNodeVisitor {
-
-  std::vector<OverloadedFuncInfo> &AllItems;
-
-  void visit(NodePtr Node) override {
-    if (Node->getKind() != SDKNodeKind::DeclFunction)
-      return;
-    auto Parent = Node->getParent();
-    if (Parent->getKind() != SDKNodeKind::DeclType)
-      return;
-    DeclNameViewer CurrentViewer(Node->getPrintedName());
-    if (CurrentViewer.args().empty())
-      return;
-    for (auto &C : Parent->getChildren()) {
-      if (C == Node)
-        continue;
-      if (C->getKind() != SDKNodeKind::DeclFunction)
-        continue;
-      DeclNameViewer ChildViewer(C->getPrintedName());
-      if (ChildViewer.args().empty())
-        continue;
-      if (CurrentViewer.commonPartsCount(ChildViewer) >=
-          CurrentViewer.partsCount() - 1) {
-        AllItems.emplace_back(Node->getAs<SDKNodeDecl>()->getUsr());
-        return;
-      }
-    }
-  }
-
-  OverloadMemberFunctionEmitter(std::vector<OverloadedFuncInfo> &AllItems) :
-    AllItems(AllItems) {}
-
-public:
-  static void collectDiffItems(NodePtr Root,
-                               std::vector<OverloadedFuncInfo> &AllItems) {
-    OverloadMemberFunctionEmitter Emitter(AllItems);
-    SDKNode::postorderVisit(Root, Emitter);
-  }
-};
-
 } // end anonymous namespace
 
 namespace fs = llvm::sys::fs;
