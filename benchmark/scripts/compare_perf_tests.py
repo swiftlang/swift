@@ -22,8 +22,9 @@ from __future__ import print_function
 import argparse
 import re
 import sys
-from math import sqrt
+from bisect import bisect, bisect_left, bisect_right
 from collections import namedtuple
+from math import sqrt
 
 
 class Sample(namedtuple('Sample', 'i num_iters runtime')):
@@ -50,24 +51,74 @@ class PerformanceTestSamples(object):
         """Initialized with benchmark name and optional list of Samples."""
         self.name = name  # Name of the performance test
         self.samples = []
+        self.outliers = []
+        self._runtimes = []
         self.mean = 0.0
         self.S_runtime = 0.0  # For computing running variance
         for sample in samples or []:
             self.add(sample)
 
+    def __str__(self):
+        """Text summary of benchmark statisctics."""
+        return (
+            '{0.name!s} n={0.count!r} '
+            'Min={0.min!r} Q1={0.q1!r} M={0.median!r} Q3={0.q3!r} '
+            'Max={0.max!r} '
+            'R={0.range!r} {0.spread:.2%} IQR={0.iqr!r} '
+            'Mean={0.mean:.0f} SD={0.sd:.0f} CV={0.cv:.2%}'
+            .format(self) if self.samples else
+            '{0.name!s} n=0'.format(self))
+
     def add(self, sample):
         """Add sample to collection and recompute statistics."""
         assert isinstance(sample, Sample)
-        state = (self.count, self.mean, self.S_runtime)
-        state = self.running_mean_variance(state, sample.runtime)
-        _, self.mean, self.S_runtime = state
-        self.samples.append(sample)
-        self.samples.sort(key=lambda s: s.runtime)
+        self._update_stats(sample)
+        i = bisect(self._runtimes, sample.runtime)
+        self._runtimes.insert(i, sample.runtime)
+        self.samples.insert(i, sample)
+
+    def _update_stats(self, sample):
+        old_stats = (self.count, self.mean, self.S_runtime)
+        _, self.mean, self.S_runtime = (
+            self.running_mean_variance(old_stats, sample.runtime))
+
+    def exclude_outliers(self):
+        """Exclude outliers by applying Interquartile Range Rule.
+
+        Moves the samples outside of the inner fences
+        (Q1 - 1.5*IQR and Q3 + 1.5*IQR) into outliers list and recomputes
+        statistics for the remaining sample population. Optionally apply
+        only the top inner fence, preserving the small outliers.
+
+        Experimentally, this rule seems to perform well-enough on the
+        benchmark runtimes in the microbenchmark range to filter out
+        the environment noise caused by preemtive multitasking.
+        """
+        lo = bisect_left(self._runtimes, int(self.q1 - 1.5 * self.iqr))
+        hi = bisect_right(self._runtimes, int(self.q3 + 1.5 * self.iqr))
+
+        outliers = self.samples[:lo] + self.samples[hi:]
+        samples = self.samples[lo:hi]
+
+        self.__init__(self.name)  # re-initialize
+        for sample in samples:  # and
+            self.add(sample)  # re-compute stats
+        self.outliers = outliers
 
     @property
     def count(self):
         """Number of samples used to compute the statistics."""
         return len(self.samples)
+
+    @property
+    def num_samples(self):
+        """Number of all samples in the collection."""
+        return len(self.samples) + len(self.outliers)
+
+    @property
+    def all_samples(self):
+        """List of all samples in ascending order."""
+        return sorted(self.samples + self.outliers, key=lambda s: s.i)
 
     @property
     def min(self):
@@ -83,6 +134,21 @@ class PerformanceTestSamples(object):
     def median(self):
         """Median sampled value."""
         return self.samples[self.count / 2].runtime
+
+    @property
+    def q1(self):
+        """First Quartile (25th Percentile)."""
+        return self.samples[self.count / 4].runtime
+
+    @property
+    def q3(self):
+        """Third Quartile (75th Percentile)."""
+        return self.samples[(self.count / 2) + (self.count / 4)].runtime
+
+    @property
+    def iqr(self):
+        """Interquartile Range."""
+        return self.q3 - self.q1
 
     @property
     def sd(self):
@@ -107,6 +173,16 @@ class PerformanceTestSamples(object):
     def cv(self):
         """Coeficient of Variation (%)."""
         return (self.sd / self.mean) if self.mean else 0
+
+    @property
+    def range(self):
+        """Range of samples values (Max - Min)."""
+        return self.max - self.min
+
+    @property
+    def spread(self):
+        """Sample Spread; i.e. Range as (%) of Min."""
+        return self.range / float(self.min) if self.min else 0
 
 
 class PerformanceTestResult(object):
@@ -160,7 +236,7 @@ class PerformanceTestResult(object):
         if self.samples and r.samples:
             map(self.samples.add, r.samples.samples)
             sams = self.samples
-            self.num_samples = sams.count
+            self.num_samples = sams.num_samples
             self.min, self.max, self.median, self.mean, self.sd = \
                 sams.min, sams.max, sams.median, sams.mean, sams.sd
         else:
@@ -237,6 +313,7 @@ class LogParser(object):
             r.involuntary_cs = self.involuntary_cs
         if self.samples:
             r.samples = PerformanceTestSamples(r.name, self.samples)
+            r.samples.exclude_outliers()
         self.results.append(r)
         self._reset()
 
