@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public extension DispatchIO {
+extension DispatchIO {
 
 	public enum StreamType : UInt  {
 		case stream = 0
