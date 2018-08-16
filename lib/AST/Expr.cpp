@@ -1466,36 +1466,26 @@ DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                                   Ty);
 }
 
-template<typename T> static T getFromCalledDeclRefExpr(Expr *E,
-     llvm::function_ref<T(const DeclRefExpr *)> DREFn,
-     llvm::function_ref<T(const OtherConstructorDeclRefExpr *)> OCREFn) {
+static ValueDecl *getCalledValue(Expr *E) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-    return DREFn(DRE);
-
+    return DRE->getDecl();
+  
   if (auto *OCRE = dyn_cast<OtherConstructorDeclRefExpr>(E))
-    return OCREFn(OCRE);
-
+    return OCRE->getDecl();
+  
   // Look through SelfApplyExpr.
   if (auto *SAE = dyn_cast<SelfApplyExpr>(E))
-    return getFromCalledDeclRefExpr(SAE->getFn(), DREFn, OCREFn);
-
+    return SAE->getCalledValue();
+  
   Expr *E2 = E->getValueProvidingExpr();
   if (E != E2)
-    return getFromCalledDeclRefExpr(E2, DREFn, OCREFn);
-
+    return getCalledValue(E2);
+  
   return nullptr;
 }
 
 ValueDecl *ApplyExpr::getCalledValue() const {
-  return getFromCalledDeclRefExpr<ValueDecl*>(Fn,
-    [&](const DeclRefExpr *E) -> ValueDecl* { return E->getDecl(); },
-    [&](const OtherConstructorDeclRefExpr *E) -> ValueDecl* { return E->getDecl(); });
-}
-
-static ConcreteDeclRef getCalledDeclRef(ApplyExpr *apply) {
-  return getFromCalledDeclRefExpr<ConcreteDeclRef>(apply->getFn(),
-    [&](const DeclRefExpr *E) -> ConcreteDeclRef { return E->getDeclRef(); },
-    [&](const OtherConstructorDeclRefExpr *E) -> ConcreteDeclRef { return E->getDeclRef(); });
+  return ::getCalledValue(Fn);
 }
 
 SubscriptExpr::SubscriptExpr(Expr *base, Expr *index,
@@ -2235,7 +2225,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
 }
 
 void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx, 
-    llvm::function_ref<void(SegmentInfo)> callback) {
+    llvm::function_ref<void(bool, CallExpr *)> callback) {
   auto appendingExpr = getAppendingExpr();
   if (SemanticExpr) {
     SemanticExpr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
@@ -2249,23 +2239,18 @@ void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx,
   
   for (auto stmt : appendingExpr->getBody()->getElements()) {
     if (auto expr = stmt.dyn_cast<Expr*>()) {
-      if (auto apply = dyn_cast<ApplyExpr>(expr)) {
-        SegmentInfo segment;
-        
-        segment.arg = apply->getArg();
-        segment.appendMethod = getCalledDeclRef(apply);
-        
+      if (auto call = dyn_cast<CallExpr>(expr)) {
         DeclName name;
-        if (segment.appendMethod) {
-          name = segment.appendMethod.getDecl()->getFullName();
+        if (auto fn = call->getCalledValue()) {
+          name = fn->getFullName();
         } else if (auto unresolvedDot =
-                     dyn_cast<UnresolvedDotExpr>(apply->getFn())) {
+                      dyn_cast<UnresolvedDotExpr>(call->getFn())) {
           name = unresolvedDot->getName();
         }
         
-        segment.isInterpolation = (name.getBaseName() == Ctx.Id_appendInterpolation);
+        bool isInterpolation = (name.getBaseName() == Ctx.Id_appendInterpolation);
         
-        callback(segment);
+        callback(isInterpolation, call);
       }
     }
   }

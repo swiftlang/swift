@@ -57,6 +57,7 @@ namespace swift {
   class PatternBindingDecl;
   class ParameterList;
   class EnumElementDecl;
+  class CallExpr;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -1014,14 +1015,8 @@ public:
     return Loc;
   }
 
-  struct SegmentInfo {
-    Expr *arg;
-    ConcreteDeclRef appendMethod;
-    bool isInterpolation;
-  };
-
   /// \brief Call the \c callback with information about each segment in turn.
-  void forEachSegment(ASTContext &Ctx, llvm::function_ref<void(SegmentInfo)> callback);
+  void forEachSegment(ASTContext &Ctx, llvm::function_ref<void(bool, CallExpr *)> callback);
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::InterpolatedStringLiteral;
