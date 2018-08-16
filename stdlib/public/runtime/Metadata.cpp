@@ -46,6 +46,7 @@
 #endif
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
+#include "CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "swift/Runtime/Debug.h"
@@ -4239,3 +4240,14 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
 const TypeContextDescriptor *swift::swift_getTypeContextDescriptor(const Metadata *type) {
     return type->getTypeContextDescriptor();
 }
+
+// Emit compatibility override shims for keypath runtime functionality. The
+// implementation of these functions is in the standard library in
+// KeyPath.swift.
+
+SWIFT_RUNTIME_STDLIB_SPI
+const HeapObject *swift_getKeyPathImpl(const void *pattern,
+                                       const void *arguments);
+
+#define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"
