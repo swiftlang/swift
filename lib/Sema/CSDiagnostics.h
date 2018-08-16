@@ -134,7 +134,12 @@ public:
   Type getOwnerType() const;
 
   /// Generic requirement associated with the failure.
-  const Requirement &getRequirement();
+  const Requirement &getRequirement() const;
+
+protected:
+  /// Retrieve declaration contextual where current
+  /// requirement has been introduced.
+  const DeclContext *getRequirementDC() const;
 
 private:
   /// Retrieve declaration associated with failing generic requirement.
