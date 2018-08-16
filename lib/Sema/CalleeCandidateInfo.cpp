@@ -1032,16 +1032,6 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     
     // FIXME: Add specific error for not subclass, if the archetype has a superclass?
     
-    // Check for optional near miss.
-    if (auto argOptType = substitution->getOptionalObjectType()) {
-      if (isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
-        if (diagnoseUnwrap(CS, badArgExpr, substitution)) {
-          foundFailure = true;
-          break;
-        }
-      }
-    }
-    
     for (auto proto : paramArchetype->getConformsTo()) {
       if (!CS.TC.conformsToProtocol(substitution, proto, CS.DC,
                                     ConformanceCheckFlags::InExpression)) {

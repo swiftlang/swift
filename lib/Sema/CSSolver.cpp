@@ -713,7 +713,11 @@ bool ConstraintSystem::tryTypeVariableBindings(
           newBindings.push_back({subtype, binding.Kind, binding.BindingSource});
       }
 
-      if (binding.Kind == AllowedBindingKind::Subtypes) {
+      // Allow solving for T even for a binding kind where that's invalid
+      // if fixes are allowed, because that gives us the opportunity to
+      // match T? values to the T binding by adding an unwrap fix.
+      if (binding.Kind == AllowedBindingKind::Subtypes ||
+          shouldAttemptFixes()) {
         // If we were unsuccessful solving for T?, try solving for T.
         if (auto objTy = type->getOptionalObjectType()) {
           if (exploredTypes.insert(objTy->getCanonicalType()).second) {
