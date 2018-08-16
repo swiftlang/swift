@@ -2881,14 +2881,15 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
   if (Kind != CheckedCastKind::Unresolved) {
     SmallString<32> buffer;
     llvm::raw_svector_ostream OS(buffer);
-    toType->print(OS);
     bool canUseAs = Kind == CheckedCastKind::Coercion ||
       Kind == CheckedCastKind::BridgingCoercion;
+    if (bothOptional && canUseAs)
+      toType = OptionalType::get(toType);
+    toType->print(OS);
     diag.fixItInsert(
         Lexer::getLocForEndOfToken(CS.DC->getASTContext().SourceMgr,
                                    expr->getEndLoc()),
-        (llvm::Twine(canUseAs ? " as " : " as! ") + OS.str() +
-         llvm::Twine(canUseAs && bothOptional ? "?" : "")).str());
+        (llvm::Twine(canUseAs ? " as " : " as! ") + OS.str()).str());
     return true;
   }
   return false;
