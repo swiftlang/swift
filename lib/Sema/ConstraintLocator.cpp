@@ -243,9 +243,26 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "conditional requirement #" << llvm::utostr(elt.getValue());
       break;
 
-    case TypeParameterRequirement:
-      out << "type parameter requirement #" << llvm::utostr(elt.getValue());
+    case TypeParameterRequirement: {
+      out << "type parameter requirement #" << llvm::utostr(elt.getValue())
+          << " (";
+      switch (static_cast<RequirementKind>(elt.getValue2())) {
+      case RequirementKind::Conformance:
+        out << "conformance";
+        break;
+      case RequirementKind::Superclass:
+        out << "superclass";
+        break;
+      case RequirementKind::SameType:
+        out << "same-type";
+        break;
+      case RequirementKind::Layout:
+        out << "layout";
+        break;
+      }
+      out << ")";
       break;
+    }
 
     case ImplicitlyUnwrappedDisjunctionChoice:
       out << "implicitly unwrapped disjunction choice";
