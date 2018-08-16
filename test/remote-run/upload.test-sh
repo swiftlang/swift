@@ -1,3 +1,5 @@
+REQUIRES: sftp_server
+
 RUN: %debug-remote-run --input-prefix %S/Inputs/upload/ ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt | %FileCheck -check-prefix CHECK-REMOTE %s
 RUN: ls %t-REMOTE/input/ | %FileCheck %s
 

@@ -119,22 +119,14 @@ class RemoteCommandRunner(CommandRunner):
                 [self.remote_host])
 
 class LocalCommandRunner(CommandRunner):
-    def __init__(self):
-        self.cached_sftp_server_path = None
-
-    def sftp_server_path(self):
-        if not self.cached_sftp_server_path:
-            paths_to_try = ['/usr/libexec/sftp-server', '/usr/lib/sftp-server']
-            self.cached_sftp_server_path = next(
-                (path for path in paths_to_try if os.path.exists(path)),
-                paths_to_try[0])
-        return self.cached_sftp_server_path
+    def __init__(self, sftp_server_path):
+        self.sftp_server_path = sftp_server_path
 
     def remote_invocation(self, command):
         return command
 
     def sftp_invocation(self):
-        return ['/usr/bin/sftp', '-b', '-', '-q', '-D', self.sftp_server_path()]
+        return ['/usr/bin/sftp', '-b', '-', '-q', '-D', self.sftp_server_path]
 
 def find_transfers(args, source_prefix, dest_prefix):
     if source_prefix.endswith(os.path.sep):
@@ -172,7 +164,7 @@ def main():
 
     parser.add_argument('-i', '--identity', dest='identity', metavar='FILE',
                         help='an SSH identity file (private key) to use')
-    parser.add_argument('--debug-as-local', action='store_true',
+    parser.add_argument('--debug-as-local', metavar='/PATH/TO/SFTP-SERVER',
                         help='run commands locally instead of over SSH, for '
                              'debugging purposes. The "host" argument is '
                              'omitted.')
@@ -185,7 +177,7 @@ def main():
     args = parser.parse_args()
 
     if args.debug_as_local:
-        runner = LocalCommandRunner()
+        runner = LocalCommandRunner(args.debug_as_local)
         args.command.insert(0, args.host)
         del args.host
     else:
