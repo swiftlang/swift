@@ -10,6 +10,15 @@
 
 // CHECK-LABEL: public class Test
 public class Test {
+  // CHECK: public init(){{$}}
+  public init()
+
+  // CHECK: public func method(){{$}}
+  public func method()
+
+  // CHECK: public subscript(_: Int) -> Void{{$}}
+  public subscript(_: Int) -> Void { get set }
+
   // NEGATIVE-NOT: deinit
   deinit
 } // CHECK: {{^}$}}
