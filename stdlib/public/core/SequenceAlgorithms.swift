@@ -521,8 +521,8 @@ extension Sequence where Element : Equatable {
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
-  /// Returns the number of many elements in the sequence that satisfy the
-  /// given predicate.
+  /// Returns the number of elements in the sequence that satisfy the given
+  /// predicate.
   ///
   /// You can use this method to count the number of elements that pass a test.
   /// For example, this code finds the number of names that are fewer than
