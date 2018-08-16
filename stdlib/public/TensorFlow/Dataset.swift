@@ -36,9 +36,6 @@ public extension SingleValueDataset {
   /// - Parameter
   ///   - elements: The batch of elements.
   ///   - elementShape: The shape that the 
-  ///
-  // FIXME: Due to inability to perform shape inference during deabstraction,
-  // users must specify the element shape for today.
   @inlinable @inline(__always)
   public init(elements: Tensor<ScalarOfElement>, elementShape: TensorShape) {
     // A dataset creation op only runs on TF CPU.
@@ -76,13 +73,15 @@ public extension SingleValueDataset {
   func map<T : AccelerableByTensorFlow>(
     _ transform: @convention(tensorflow) (Tensor<ScalarOfElement>) -> Tensor<T>
   ) -> SingleValueDataset<T> {
-    // A dataset map op only runs on TF CPU.
-    enableCPU()
+    // FIXME: If we pass an empty Array<TensorHandle<T>> as other_arguments and
+    // an empty Array<Any.Type> as Targuments, partitioning won't recognize the
+    // attribute:
+    //    error: unknown array attribute
     return SingleValueDataset<T>(
       _handle: #tfop(
-        "MapDataset", _handle, [] as [TensorHandle<Float>], f: transform,
-        Targuments: [] as [Any.Type],
-        output_types: [ScalarOfElement.self], output_shapes: [elementShape]
+        "MapDataset", _handle, [Tensor<Int32>(0)], f: transform,
+        Targuments: [Int32.self],
+        output_types: [T.self], output_shapes: [elementShape]
       ),
       elementShape: elementShape
     )
@@ -93,12 +92,14 @@ public extension SingleValueDataset {
     _ isIncluded:
       @convention(tensorflow) (Tensor<ScalarOfElement>) -> Tensor<Bool>
   ) -> SingleValueDataset {
-    // A dataset filter op only runs on TF CPU.
-    enableCPU()
+    // FIXME: If we pass an empty Array<TensorHandle<T>> as other_arguments and
+    // an empty Array<Any.Type> as Targuments, partitioning won't recognize the
+    // attribute:
+    //    error: unknown array attribute
     return SingleValueDataset(
       _handle: #tfop(
-        "FilterDataset", _handle, [] as [TensorHandle<Float>],
-        predicate: isIncluded, Targuments: [] as [Any.Type],
+        "FilterDataset", _handle, [Tensor<Int32>(0)],
+        predicate: isIncluded, Targuments: [Int32.self],
         output_types: [ScalarOfElement.self], output_shapes: [elementShape]
       ),
       elementShape: elementShape
@@ -126,7 +127,6 @@ extension SingleValueDatasetIterator : IteratorProtocol {
   // Advances to the next element and returns it, or nil if no next element
   // exists.
   @inlinable @inline(__always)
-  // FIXME: Make this `mutating` when SR-8463 is fixed.
   public mutating func next() -> Tensor<ScalarOfElement>? {
     let optional: VariantHandle =
       #tfop("IteratorGetNextAsOptional", handle,
