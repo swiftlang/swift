@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out3 -swift-version 3 && %target-codesign %t/a.out3 && %target-run %t/a.out3
 // RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-codesign %t/a.out4 && %target-run %t/a.out4
+// RUN: %target-build-swift %s -o %t/a.out42 -swift-version 4.2 && %target-codesign %t/a.out42 && %target-run %t/a.out42
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -11,11 +11,7 @@ import StdlibUnittest
 
 let IntentsTestSuite = TestSuite("Intents")
 
-#if swift(>=4)
 let swiftVersion = "4"
-#else
-let swiftVersion = "3"
-#endif
 
 if #available(OSX 10.12, iOS 10.0, watchOS 3.2, *) {
 
@@ -46,10 +42,6 @@ if #available(iOS 11.0, *) {
     func f(profile: INSetProfileInCarIntent) {
       var isDefaultProfile = profile.isDefaultProfile
       expectType(Bool?.self, &isDefaultProfile)
-#if !swift(>=4)
-      var defaultProfile = profile.defaultProfile
-      expectType(Int?.self, &defaultProfile)
-#endif
     }
   }
 }
