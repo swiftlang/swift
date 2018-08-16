@@ -482,7 +482,7 @@ public:
       return YS;
     }
 
-    SmallVector<AnyFunctionRef::YieldResult, 4> buffer;
+    SmallVector<AnyFunctionType::Yield, 4> buffer;
     auto yieldResults = TheFunc->getBodyYieldResults(buffer);
 
     auto yieldExprs = YS->getMutableYields();
@@ -493,7 +493,7 @@ public:
     }
 
     for (auto i : indices(yieldExprs)) {
-      Type yieldType = yieldResults[i].Ty;
+      Type yieldType = yieldResults[i].getType();
       auto exprToCheck = yieldExprs[i];
 
       InOutExpr *inout = nullptr;
@@ -501,7 +501,7 @@ public:
       // Classify whether we're yielding by reference or by value.
       ContextualTypePurpose contextTypePurpose;
       Type contextType = yieldType;
-      if (yieldResults[i].Specifier == VarDecl::Specifier::InOut) {
+      if (yieldResults[i].isInOut()) {
         contextTypePurpose = CTP_YieldByReference;
         contextType = LValueType::get(contextType);
 

@@ -1508,7 +1508,8 @@ public:
                             sgm.Types.getEmptyTupleType(), {}, {error});
 
         // Signal an abnormal exit by returning 1.
-        SGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(moduleLoc));
+        SGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(moduleLoc),
+                                           IsForUnwind);
         SGF.B.createBranch(returnLoc, returnBB, emitTopLevelReturnValue(1));
       }
 

@@ -4577,7 +4577,8 @@ bool VarDecl::isSelfParameter() const {
 
 void VarDecl::setSpecifier(Specifier specifier) {
   Bits.VarDecl.Specifier = static_cast<unsigned>(specifier);
-  setSupportsMutationIfStillStored(!isImmutableSpecifier(specifier));
+  setSupportsMutationIfStillStored(
+                          StorageIsMutable_t(!isImmutableSpecifier(specifier)));
 }
 
 bool VarDecl::isAnonClosureParam() const {
