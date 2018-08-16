@@ -8,8 +8,8 @@
 // RUN: %FileCheck %s < %t/SmokeTest.txt
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t/SmokeTest.txt
 
-// CHECK-LABEL: public class Test
-public class Test {
+// CHECK-LABEL: public class TestClass
+public class TestClass {
   // CHECK: public init(){{$}}
   public init()
 
@@ -19,8 +19,44 @@ public class Test {
   // CHECK: public subscript(_: Int) -> Void{{$}}
   public subscript(_: Int) -> Void { get set }
 
+  // CHECK: public var prop: Int{{$}}
+  public var prop: Int { get set }
+
   // NEGATIVE-NOT: deinit
   deinit
+} // CHECK: {{^}$}}
+
+// CHECK-LABEL: public enum TestEnum
+public enum TestEnum {
+  // CHECK: case a
+  case a
+
+  // CHECK: public init(){{$}}
+  public init()
+
+  // CHECK: public func method(){{$}}
+  public func method()
+
+  // CHECK: public subscript(_: Int) -> Void{{$}}
+  public subscript(_: Int) -> Void { get set }
+
+  // CHECK: public var prop: Int{{$}}
+  public var prop: Int { get set }
+} // CHECK: {{^}$}}
+
+// CHECK-LABEL: public struct TestStruct
+public struct TestStruct {
+  // CHECK: public init(){{$}}
+  public init()
+
+  // CHECK: public func method(){{$}}
+  public func method()
+
+  // CHECK: public subscript(_: Int) -> Void{{$}}
+  public subscript(_: Int) -> Void { get set }
+
+  // CHECK: public var prop: Int{{$}}
+  public var prop: Int { get set }
 } // CHECK: {{^}$}}
 
 // CHECK: public var readOnlyVar: Int { get }{{$}}
