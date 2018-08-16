@@ -49,6 +49,12 @@ public:
     return f;
   }
 
+  void eraseFunction(SILFunction *f) {
+    auto &pm = getPassManager();
+    pm.notifyWillDeleteFunction(f);
+    pm.getModule()->eraseFunction(f);
+  }
+
 private:
   SILPassManager &getPassManager() const {
     return *transform.getPassManager();

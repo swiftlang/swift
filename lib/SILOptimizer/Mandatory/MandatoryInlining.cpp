@@ -676,10 +676,8 @@ class MandatoryInlining : public SILModuleTransform {
       if (F.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
         continue;
 
-      notifyWillDeleteFunction(&F);
-
       // Okay, just erase the function from the module.
-      M->eraseFunction(&F);
+      FuncBuilder.eraseFunction(&F);
     }
   }
 
