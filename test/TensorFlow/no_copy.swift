@@ -243,3 +243,60 @@ public func SR8413() {
     kernelSize: (64, 65, 66, 67), strides: (64, 65, 66, 67), padding: .same
   )
 }
+
+
+@inlinable @inline(__always)
+func createStringTensorConst(_ str: String) -> TensorHandle<String> {
+  // Const tfops with String cannot be placed on GPU/TPU. 
+  // TODO: Find a better API to write string consts.
+  return #tfop("Const",
+               dtype: String.self,
+               value$tensor: str,
+               __device: "/device:CPU:0")
+}
+
+// Consider moving this test to a different test suite, if we add more tests
+// related to summaries.
+public func testScalarSummaryStraightline() {
+  TensorFlow.enableGPU()
+  let summaryWriter: ResourceHandle = #tfop("SummaryWriter",
+                                            container: "",
+                                            shared_name: "some_writer")
+  let logdir = createStringTensorConst("logdir_s4tf")
+  let maxQueueLen = Tensor<Int32>(0)
+  let flushMs = Tensor<Int32>(120000)
+  let filenameSuffix = createStringTensorConst(".v2")
+  #tfop("CreateSummaryFileWriter", summaryWriter, logdir, maxQueueLen,
+                         flushMs, filenameSuffix) as Void
+  let familyName = createStringTensorConst("scalar")
+  // The x-axis value.
+  let step1 = Tensor<Int64>(0)
+  // Scalar is the y-axis value.
+  let scalar = Tensor<Int64>(2)
+  #tfop("WriteScalarSummary", summaryWriter, step1, familyName, scalar) as Void
+  let step2 = Tensor<Int64>(10)
+  #tfop("WriteScalarSummary", summaryWriter, step2, familyName, scalar + 3) as Void
+}
+
+public func testScalarSummaryInALoop(n: Int64) {
+  TensorFlow.enableGPU()
+  let summaryWriter: ResourceHandle = #tfop("SummaryWriter",
+                                            container: "",
+                                            shared_name: "some_writer")
+  let logdir = createStringTensorConst("logdir_s4tf")
+  let maxQueueLen = Tensor<Int32>(0)
+  let flushMs = Tensor<Int32>(120000)
+  let filenameSuffix = createStringTensorConst(".v2")
+  #tfop("CreateSummaryFileWriter", summaryWriter, logdir, maxQueueLen,
+                         flushMs, filenameSuffix) as Void
+  let familyName = createStringTensorConst("scalar")
+  // The x-axis value.
+  var i: Int64 = 0
+  // The y-axis value.
+  let initialVal = Tensor<Int64>(2)
+  while i < n {
+    let step1 = Tensor<Int64>(i)
+    #tfop("WriteScalarSummary", summaryWriter, step1, familyName, initialVal + i) as Void
+    i += 1
+  }
+}

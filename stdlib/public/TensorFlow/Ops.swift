@@ -1158,7 +1158,7 @@ public extension Tensor {
       // Gather implementation is below:
       // return #tfop("GatherV2", self, Tensor<Int32>(index), Tensor<Int32>(0),
       //              Tindices: Int32.self)
-      let indexTensor = Tensor<Int32>([index])
+      let indexTensor = Tensor<Int32>(index).rankLifted()
       let remainingZeros: Tensor<Int32> = Raw.fill(
         dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
       let startIndices = indexTensor.concatenated(with: remainingZeros)
