@@ -282,17 +282,7 @@ static StringRef getImportKindString(ImportKind value) {
   
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
-static StringRef getAccessLevelString(AccessLevel value) {
-  switch (value) {
-  case AccessLevel::Private: return "private";
-  case AccessLevel::FilePrivate: return "fileprivate";
-  case AccessLevel::Internal: return "internal";
-  case AccessLevel::Public: return "public";
-  case AccessLevel::Open: return "open";
-  }
 
-  llvm_unreachable("Unhandled AccessLevel in switch.");
-}
 static StringRef
 getForeignErrorConventionKindString(ForeignErrorConvention::Kind value) {
   switch (value) {
@@ -763,7 +753,7 @@ namespace {
 
       if (VD->hasAccess()) {
         PrintWithColorRAII(OS, AccessLevelColor) << " access="
-          << getAccessLevelString(VD->getFormalAccess());
+          << getAccessLevelSpelling(VD->getFormalAccess());
       }
 
       if (auto Overridden = VD->getOverriddenDecl()) {
