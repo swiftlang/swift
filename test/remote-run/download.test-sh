@@ -1,3 +1,5 @@
+REQUIRES: sftp_server
+
 RUN: %empty-directory(%t)
 RUN: %empty-directory(%t-REMOTE)
 RUN: %debug-remote-run --output-prefix %t touch %t/output
