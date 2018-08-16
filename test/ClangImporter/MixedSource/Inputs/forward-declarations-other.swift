@@ -1,0 +1,1 @@
+@objc class ClassInOtherFile {}
