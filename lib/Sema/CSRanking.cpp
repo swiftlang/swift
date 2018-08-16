@@ -559,6 +559,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           computeSelfTypeRelationship(tc, dc, decl1, decl2);
       auto relationshipKind = selfTypeRelationship.first;
       auto conformance = selfTypeRelationship.second;
+      (void)conformance;
       switch (relationshipKind) {
       case SelfTypeRelationship::Unrelated:
         // Skip the self types parameter entirely.

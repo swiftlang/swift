@@ -730,6 +730,8 @@ void AccessConflictAndMergeAnalysis::mergePredAccesses(
     assert((predRegion->getParentID() == bbRegionParentID) &&
            "predecessor is not part of the parent region - unhandled control "
            "flow");
+    (void)predRegion;
+    (void)bbRegionParentID;
     if (localRegionInfos.find(pred) == localRegionInfos.end()) {
       // Backedge / irreducable control flow - bail
       info.reset();

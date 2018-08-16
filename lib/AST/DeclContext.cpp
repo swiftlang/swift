@@ -492,6 +492,42 @@ void DeclContext::dumpContext() const {
   printContext(llvm::errs());
 }
 
+void AccessScope::dump() const {
+  llvm::errs() << getAccessLevelSpelling(accessLevelForDiagnostics()) << ": ";
+
+  if (isPublic()) {
+    llvm::errs() << "(null)\n";
+    return;
+  }
+
+  if (auto *file = dyn_cast<SourceFile>(getDeclContext())) {
+    llvm::errs() << "file '" << file->getFilename() << "'\n";
+    return;
+  }
+
+  if (auto *decl = getDeclContext()->getAsDeclOrDeclExtensionContext()) {
+    llvm::errs() << Decl::getKindName(decl->getKind()) << " ";
+    if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+      llvm::errs() << ext->getExtendedNominal()->getName();
+    else if (auto *named = dyn_cast<ValueDecl>(decl))
+      llvm::errs() << named->getFullName();
+    else
+      llvm::errs() << (const void *)decl;
+
+    SourceLoc loc = decl->getLoc();
+    if (loc.isValid()) {
+      llvm::errs() << " at ";
+      loc.print(llvm::errs(), decl->getASTContext().SourceMgr);
+    }
+    llvm::errs() << "\n";
+
+    return;
+  }
+
+  // If all else fails, dump the DeclContext tree.
+  getDeclContext()->printContext(llvm::errs());
+}
+
 template <typename DCType>
 static unsigned getLineNumber(DCType *DC) {
   SourceLoc loc = DC->getLoc();

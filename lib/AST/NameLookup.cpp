@@ -2112,6 +2112,7 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
     auto dc = decl->getDeclContext();
     auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
     assert(nominal && "Couldn't find nominal type?");
+    (void)nominal;
 
     // If we didn't see this declaration before, and it's an acceptable
     // result, add it to the list.

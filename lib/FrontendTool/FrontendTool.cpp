@@ -283,6 +283,7 @@ static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
   auto bufferID = SF->getBufferID();
   assert(bufferID && "frontend should have a buffer ID "
          "for the main source file");
+  (void)bufferID;
 
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;

@@ -317,6 +317,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   assert(equatableProto);
   assert(tc.conformsToProtocol(rawType, equatableProto, enumDecl, None));
   (void)equatableProto;
+  (void)rawType;
 
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
                                          /*static*/false, /*inout*/true);
