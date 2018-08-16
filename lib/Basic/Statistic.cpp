@@ -492,7 +492,7 @@ void updateProcessWideFrontendCounters(
 #if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
   struct rusage_info_v4 ru;
   if (0 == proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru)) {
-    C.NumInstructions = ru.ri_instructions;
+    C.NumInstructionsExecuted = ru.ri_instructions;
   }
 #endif
 }
