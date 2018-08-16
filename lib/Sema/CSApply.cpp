@@ -4586,7 +4586,7 @@ namespace {
       auto type = simplifyType(cs.getType(E));
 
       E->getVar()->setType(type);
-      E->getVar()->setInterfaceType(type);
+      E->getVar()->setInterfaceType(type->mapTypeOutOfContext());
 
       cs.setType(E, type);
       E->setType(type);
@@ -7597,7 +7597,7 @@ namespace {
   class ExprWalker : public ASTWalker {
     ExprRewriter &Rewriter;
     SmallVector<ClosureExpr *, 4> ClosuresToTypeCheck;
-    SmallVector<std::tuple<TapExpr *, DeclContext *>, 4> TapsToTypeCheck;
+    SmallVector<std::pair<TapExpr *, DeclContext *>, 4> TapsToTypeCheck;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
@@ -7606,7 +7606,7 @@ namespace {
       return ClosuresToTypeCheck;
     }
 
-    const SmallVectorImpl<std::tuple<TapExpr *, DeclContext *>> &getTapsToTypeCheck() const {
+    const SmallVectorImpl<std::pair<TapExpr *, DeclContext *>> &getTapsToTypeCheck() const {
       return TapsToTypeCheck;
     }
 

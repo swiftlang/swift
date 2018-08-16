@@ -937,7 +937,7 @@ class TapExpr : public Expr {
   BraceStmt *Body;
   
 public:
-  TapExpr(Expr * SubExpr, BraceStmt *Body);
+  TapExpr(Expr *SubExpr, BraceStmt *Body);
   
   Expr * getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr * se) { SubExpr = se; }
@@ -1021,7 +1021,7 @@ public:
   };
 
   /// \brief Call the \c callback with information about each segment in turn.
-  void forEachSegment(llvm::function_ref<void(SegmentInfo)> callback);
+  void forEachSegment(ASTContext &Ctx, llvm::function_ref<void(SegmentInfo)> callback);
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::InterpolatedStringLiteral;

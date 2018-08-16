@@ -3757,7 +3757,8 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     };
 
     void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
-      E->forEachSegment([&](InterpolatedStringLiteralExpr::SegmentInfo segment) -> void {
+      E->forEachSegment(TC.Context,
+          [&](InterpolatedStringLiteralExpr::SegmentInfo segment) -> void {
         if (segment.isInterpolation) {
           diagnoseIfUnintendedInterpolation(segment,
                               UnintendedInterpolationKind::Optional);

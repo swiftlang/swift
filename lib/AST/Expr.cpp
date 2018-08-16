@@ -1466,9 +1466,9 @@ DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,
                                   Ty);
 }
 
-template<typename T>
-static T getFromCalledDeclRefExpr(Expr *E, llvm::function_ref<T(const DeclRefExpr *)> DREFn,
-                       llvm::function_ref<T(const OtherConstructorDeclRefExpr *)> OCREFn) {
+template<typename T> static T getFromCalledDeclRefExpr(Expr *E,
+     llvm::function_ref<T(const DeclRefExpr *)> DREFn,
+     llvm::function_ref<T(const OtherConstructorDeclRefExpr *)> OCREFn) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E))
     return DREFn(DRE);
 
@@ -2234,7 +2234,8 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   }
 }
 
-void InterpolatedStringLiteralExpr::forEachSegment(llvm::function_ref<void(SegmentInfo)> callback) {
+void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx, 
+    llvm::function_ref<void(SegmentInfo)> callback) {
   auto appendingExpr = getAppendingExpr();
   if (SemanticExpr) {
     SemanticExpr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
@@ -2262,7 +2263,7 @@ void InterpolatedStringLiteralExpr::forEachSegment(llvm::function_ref<void(Segme
           name = unresolvedDot->getName();
         }
         
-        segment.isInterpolation = (name.getBaseName() == "appendInterpolation");
+        segment.isInterpolation = (name.getBaseName() == Ctx.Id_appendInterpolation);
         
         callback(segment);
       }
