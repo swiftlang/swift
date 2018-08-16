@@ -1860,26 +1860,29 @@ static Constraint *selectBestBindingDisjunction(
   // type variable.
   SmallVector<Constraint *, 8> bindingDisjunctions;
   for (auto *disjunction : disjunctions) {
-    llvm::Optional<TypeVariableType *> commonTypeVariable;
+    TypeVariableType *commonTypeVariable = nullptr;
     if (llvm::all_of(
             disjunction->getNestedConstraints(),
             [&](Constraint *bindingConstraint) {
               if (bindingConstraint->getKind() != ConstraintKind::Bind)
                 return false;
 
-              auto *tv =
-                  bindingConstraint->getFirstType()->getAs<TypeVariableType>();
+              auto *tv = cs.simplifyType(bindingConstraint->getFirstType())
+                             ->getRValueType()
+                             ->getAs<TypeVariableType>();
               // Only do this for simple type variable bindings, not for
               // bindings like: ($T1) -> $T2 bind String -> Int
               if (!tv)
                 return false;
 
-              if (!commonTypeVariable.hasValue())
-                commonTypeVariable = tv;
-
-              if (commonTypeVariable.getValue() != tv)
+              // If we've seen a variable before, make sure that this is
+              // the same one.
+              if (commonTypeVariable == tv)
+                return true;
+              if (commonTypeVariable)
                 return false;
 
+              commonTypeVariable = tv;
               return true;
             })) {
       bindingDisjunctions.push_back(disjunction);
