@@ -3559,12 +3559,6 @@ public:
   size_t getNumSkippedParameters() const { return NumSkippedParameters; }
 };
 
-/// Diagnose an attempt to recover when we have a value of optional type
-/// that needs to be unwrapped.
-///
-/// \returns true if a diagnostic was produced.
-bool diagnoseUnwrap(constraints::ConstraintSystem &CS, Expr *expr, Type type);
-
 /// Diagnose an attempt to recover from a member access into a value of
 /// optional type which needed to be unwrapped for the member to be found.
 ///

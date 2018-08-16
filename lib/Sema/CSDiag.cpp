@@ -9108,139 +9108,6 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   return true;
 }
 
-// Suggest a default value via ?? <default value>
-static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr *expr) {
-  auto diag =
-  TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
-
-  // Figure out what we need to parenthesize.
-  bool needsParensInside =
-  exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
-  bool needsParensOutside =
-  exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, expr);
-
-  llvm::SmallString<2> insertBefore;
-  llvm::SmallString<32> insertAfter;
-  if (needsParensOutside) {
-    insertBefore += "(";
-  }
-  if (needsParensInside) {
-    insertBefore += "(";
-    insertAfter += ")";
-  }
-  insertAfter += " ?? <" "#default value#" ">";
-  if (needsParensOutside)
-  insertAfter += ")";
-
-  if (!insertBefore.empty()) {
-    diag.fixItInsert(expr->getStartLoc(), insertBefore);
-  }
-  diag.fixItInsertAfter(expr->getEndLoc(), insertAfter);
-}
-
-// Suggest a force-unwrap.
-static void offerForceUnwrapFixit(ConstraintSystem &CS, Expr *expr) {
-  auto diag = CS.TC.diagnose(expr->getLoc(), diag::unwrap_with_force_value);
-
-  // If expr is optional as the result of an optional chain and this last
-  // dot isn't a member returning optional, then offer to force the last
-  // link in the chain, rather than an ugly parenthesized postfix force.
-  if (auto optionalChain = dyn_cast<OptionalEvaluationExpr>(expr)) {
-    if (auto dotExpr =
-            dyn_cast<UnresolvedDotExpr>(optionalChain->getSubExpr())) {
-      auto bind = dyn_cast<BindOptionalExpr>(dotExpr->getBase());
-      if (bind && !CS.getType(dotExpr)->getOptionalObjectType()) {
-        diag.fixItReplace(SourceRange(bind->getLoc()), "!");
-        return;
-      }
-    }
-  }
-
-  if (expr->canAppendPostfixExpression(true)) {
-    diag.fixItInsertAfter(expr->getEndLoc(), "!");
-  } else {
-    diag.fixItInsert(expr->getStartLoc(), "(")
-    .fixItInsertAfter(expr->getEndLoc(), ")!");
-  }
-}
-
-class VarDeclMultipleReferencesChecker : public ASTWalker {
-  VarDecl *varDecl;
-  int count;
-
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) {
-    if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-      if (DRE->getDecl() == varDecl)
-        count++;
-    }
-    return { true, E };
-  }
-
-public:
-  VarDeclMultipleReferencesChecker(VarDecl *varDecl) : varDecl(varDecl),count(0) {}
-  int referencesCount() { return count; }
-};
-
-bool swift::diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
-  Type unwrappedType = type->getOptionalObjectType();
-  if (!unwrappedType)
-    return false;
-
-  CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
-                 unwrappedType);
-
-  // If the expression we're unwrapping is the only reference to a
-  // local variable whose type isn't explicit in the source, then
-  // offer unwrapping fixits on the initializer as well.
-  if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
-    if (auto varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
-
-      bool singleUse = false;
-      AbstractFunctionDecl *AFD = nullptr;
-      if (auto contextDecl = varDecl->getDeclContext()->getAsDeclOrDeclExtensionContext()) {
-        if ((AFD = dyn_cast<AbstractFunctionDecl>(contextDecl))) {
-          auto checker = VarDeclMultipleReferencesChecker(varDecl);
-          AFD->getBody()->walk(checker);
-          singleUse = checker.referencesCount() == 1;
-        }
-      }
-
-      PatternBindingDecl *binding = varDecl->getParentPatternBinding();
-      if (singleUse && binding && binding->getNumPatternEntries() == 1 &&
-          varDecl->getTypeSourceRangeForDiagnostics().isInvalid()) {
-
-        Expr *initializer = varDecl->getParentInitializer();
-        if (auto declRefExpr = dyn_cast<DeclRefExpr>(initializer)) {
-          if (declRefExpr->getDecl()->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-            CS.TC.diagnose(declRefExpr->getLoc(), diag::unwrap_iuo_initializer, type);
-          }
-        }
-
-        auto fnTy = AFD->getInterfaceType()->castTo<AnyFunctionType>();
-        bool voidReturn = fnTy->getResult()->isEqual(TupleType::getEmpty(CS.DC->getASTContext()));
-
-        auto diag = CS.TC.diagnose(varDecl->getLoc(), diag::unwrap_with_guard);
-        diag.fixItInsert(binding->getStartLoc(), "guard ");
-        if (voidReturn) {
-          diag.fixItInsertAfter(binding->getEndLoc(), " else { return }");
-        } else {
-          diag.fixItInsertAfter(binding->getEndLoc(), " else { return <"
-                                "#default value#" "> }");
-        }
-        diag.flush();
-
-        offerDefaultValueUnwrapFixit(CS.TC, varDecl->getDeclContext(),
-                                     initializer);
-        offerForceUnwrapFixit(CS, initializer);
-      }
-    }
-  }
-
-  offerDefaultValueUnwrapFixit(CS.TC, CS.DC, expr);
-  offerForceUnwrapFixit(CS, expr);
-  return true;
-}
-
 bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
                                               DeclName memberName,
                                               bool resultOptional,
@@ -9257,7 +9124,8 @@ bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
   // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
   // for non-optional results where that would be appropriate. For the moment
   // always offering "?" means that if the user chooses chaining, we'll end up
-  // in diagnoseUnwrap() to offer a default value during the next compile.
+  // in MissingOptionalUnwrapFailure:diagnose() to offer a default value during
+  // the next compile.
   diags.diagnose(baseExpr->getLoc(), diag::optional_base_chain, memberName)
     .fixItInsertAfter(baseExpr->getEndLoc(), "?");
 
