@@ -73,7 +73,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.SkipImports = true;
 
   class UsableFromInlineOnly : public ShouldPrintChecker {
-    bool shouldPrint(const Decl *D, PrintOptions &options) override {
+    bool shouldPrint(const Decl *D, const PrintOptions &options) override {
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         AccessScope accessScope =
             VD->getFormalAccessScope(/*useDC*/nullptr,
@@ -1303,7 +1303,8 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
-bool ShouldPrintChecker::shouldPrint(const Pattern *P, PrintOptions &Options) {
+bool ShouldPrintChecker::shouldPrint(const Pattern *P,
+                                     const PrintOptions &Options) {
   bool ShouldPrint = false;
   P->forEachVariable([&](const VarDecl *VD) {
     ShouldPrint |= shouldPrint(VD, Options);
@@ -1311,7 +1312,8 @@ bool ShouldPrintChecker::shouldPrint(const Pattern *P, PrintOptions &Options) {
   return ShouldPrint;
 }
 
-bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
+bool ShouldPrintChecker::shouldPrint(const Decl *D,
+                                     const PrintOptions &Options) {
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;

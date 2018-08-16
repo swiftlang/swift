@@ -26,7 +26,7 @@
 
 using namespace swift;
 
-static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
+static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {
   if (!Options.TransformContext ||
       !D->getDeclContext()->isExtensionContext() ||
       !Options.TransformContext->isPrintingSynthesizedExtension())
@@ -42,7 +42,7 @@ static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
 }
 
 class ModulePrinterPrintableChecker: public ShouldPrintChecker {
-  bool shouldPrint(const Decl *D, PrintOptions &Options) override {
+  bool shouldPrint(const Decl *D, const PrintOptions &Options) override {
     if (!shouldPrintAsFavorable(D, Options))
       return false;
     return ShouldPrintChecker::shouldPrint(D, Options);

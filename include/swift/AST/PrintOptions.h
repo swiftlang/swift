@@ -112,8 +112,8 @@ public:
 };
 
 struct ShouldPrintChecker {
-  virtual bool shouldPrint(const Decl *D, PrintOptions &Options);
-  bool shouldPrint(const Pattern *P, PrintOptions &Options);
+  virtual bool shouldPrint(const Decl *D, const PrintOptions &Options);
+  bool shouldPrint(const Pattern *P, const PrintOptions &Options);
   virtual ~ShouldPrintChecker() = default;
 };
 
