@@ -18,13 +18,15 @@ import unittest
 
 from imp import load_source
 
-from test_utils import captured_output
+from test_utils import Mock, captured_output
+
 # import Benchmark_Driver  # doesn't work because it misses '.py' extension
 Benchmark_Driver = load_source(
     'Benchmark_Driver', os.path.join(os.path.dirname(
         os.path.abspath(__file__)), 'Benchmark_Driver'))
 # from Benchmark_Driver import parse_args
 parse_args = Benchmark_Driver.parse_args
+BenchmarkDriver = Benchmark_Driver.BenchmarkDriver
 
 
 class Test_parse_args(unittest.TestCase):
@@ -87,6 +89,87 @@ class Test_parse_args(unittest.TestCase):
              "argument -o/--optimization: invalid choice: 'bogus'",
              "(choose from 'O', 'Onone', 'Osize')"],
             err.getvalue())
+
+
+class ArgsStub(object):
+    def __init__(self):
+        self.benchmarks = None
+        self.filters = None
+        self.tests = '/benchmarks/'
+        self.optimization = 'O'
+
+
+class SubprocessMock(Mock):
+    """Mock for subprocess module's `check_output` method."""
+    STDOUT = object()
+
+    def __init__(self, responses=None):
+        super(SubprocessMock, self).__init__()
+
+        def _check_output(args, stdin=None, stdout=None, stderr=None,
+                          shell=False):
+            return self.record_and_respond(args, stdin, stdout, stderr, shell)
+        self.check_output = _check_output
+
+    def record_and_respond(self, args, stdin, stdout, stderr, shell):
+        # _ = stdin, stdout, shell  # ignored in mock
+        assert stderr == self.STDOUT, 'Errors are NOT redirected to STDOUT'
+        args = tuple(args)
+        self.calls.append(args)
+        return self.respond.get(args, '')
+
+
+class TestBenchmarkDriverInitialization(unittest.TestCase):
+    def setUp(self):
+        self.args = ArgsStub()
+        self.subprocess_mock = SubprocessMock()
+
+    def test_test_harness(self):
+        self.assertEquals(
+            BenchmarkDriver(self.args, tests=['ignored']).test_harness,
+            '/benchmarks/Benchmark_O')
+        self.args.tests = '/path'
+        self.args.optimization = 'Suffix'
+        self.assertEquals(
+            BenchmarkDriver(self.args, tests=['ignored']).test_harness,
+            '/path/Benchmark_Suffix')
+
+    def test_gets_list_of_precommit_benchmarks(self):
+        self.subprocess_mock.expect(
+            '/benchmarks/Benchmark_O --list --delim=\t'.split(' '),
+            '#\tTest\t[Tags]\n1\tBenchmark1\t[t1, t2]\n1\tBenchmark2\t[t3]\n')
+        driver = BenchmarkDriver(
+            self.args, _subprocess=self.subprocess_mock)
+        self.subprocess_mock.assert_called_all_expected()
+        self.assertEquals(driver.tests,
+                          ['Benchmark1', 'Benchmark2'])
+        self.assertEquals(driver.all_tests,
+                          ['Benchmark1', 'Benchmark2'])
+
+    list_all_tests = (
+        '/benchmarks/Benchmark_O --list --delim=\t --skip-tags='.split(' '),
+        """#	Test	[Tags]
+1	Benchmark1	[t1, t2]
+2	Benchmark2	[t3]
+3	Benchmark3	[t3, t4]
+""")
+
+    def test_gets_list_of_all_benchmarks_when_benchmarks_args_exist(self):
+        """Filters tests by name or test number, ignoring unknown."""
+        self.args.benchmarks = '1 Benchmark3 1 bogus'.split()
+        self.subprocess_mock.expect(*self.list_all_tests)
+        driver = BenchmarkDriver(
+            self.args, _subprocess=self.subprocess_mock)
+        self.subprocess_mock.assert_called_all_expected()
+        self.assertEquals(driver.tests, ['Benchmark1', 'Benchmark3'])
+
+    def test_filters_benchmarks_by_pattern(self):
+        self.args.filters = '-f .+3'.split()
+        self.subprocess_mock.expect(*self.list_all_tests)
+        driver = BenchmarkDriver(
+            self.args, _subprocess=self.subprocess_mock)
+        self.subprocess_mock.assert_called_all_expected()
+        self.assertEquals(driver.tests, ['Benchmark3'])
 
 
 if __name__ == '__main__':

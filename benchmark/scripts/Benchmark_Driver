@@ -24,6 +24,59 @@ import time
 DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
+class BenchmarkDriver(object):
+    def __init__(self, args, tests=None, _subprocess=None):
+        self.args = args
+        self._subprocess = _subprocess or subprocess
+        self.tests = tests or self._get_tests()
+
+    def _invoke(self, cmd):
+        return self._subprocess.check_output(
+            cmd, stderr=self._subprocess.STDOUT)
+
+    @property
+    def test_harness(self):
+        return os.path.join(self.args.tests,
+                            "Benchmark_" + self.args.optimization)
+
+    @property
+    def _cmd_list_benchmarks(self):
+        # Use tab delimiter for easier parsing to override the default comma.
+        # (The third 'column' is always comma-separated list of tags in square
+        # brackets -- currently unused here.)
+        return [self.test_harness, '--list', '--delim=\t'] + (
+            ['--skip-tags='] if (self.args.benchmarks or
+                                 self.args.filters) else [])
+
+    def _get_tests(self):
+        """Return a list of performance tests to run."""
+        index_name_pairs = [
+            line.split('\t')[:2] for line in
+            self._invoke(self._cmd_list_benchmarks).split('\n')[1:-1]
+        ]
+        # unzip list of pairs into 2 lists
+        indices, self.all_tests = map(list, zip(*index_name_pairs))
+        if self.args.filters:
+            return self._tests_matching_patterns()
+        if self.args.benchmarks:
+            return self._tests_by_name_or_index(indices)
+        return self.all_tests
+
+    def _tests_matching_patterns(self):
+        regexes = [re.compile(pattern) for pattern in self.args.filters]
+        return sorted(list(set([name for pattern in regexes
+                                for name in self.all_tests
+                                if pattern.match(name)])))
+
+    def _tests_by_name_or_index(self, indices):
+        benchmarks = set(self.args.benchmarks)
+        index_to_name = dict(zip(indices, self.all_tests))
+        indexed_names = [index_to_name[i]
+                         for i in benchmarks.intersection(set(indices))]
+        return sorted(list(
+            benchmarks.intersection(set(self.all_tests)).union(indexed_names)))
+
+
 def instrument_test(driver_path, test, num_samples):
     """Run a test and instrument its peak memory use"""
     test_outputs = []
@@ -61,34 +114,6 @@ def instrument_test(driver_path, test, num_samples):
     avg_test_output = map(str, avg_test_output)
 
     return avg_test_output
-
-
-def get_tests(driver_path, args):
-    """Return a list of available performance tests"""
-    driver = ([driver_path, '--list'])
-    # Use tab delimiter for easier parsing to override the default comma.
-    # (The third 'column' is always comma-separated list of tags in square
-    # brackets -- currently unused here.)
-    driver.append('--delim=\t')
-    if args.benchmarks or args.filters:
-        driver.append('--skip-tags=')  # list all tests, don't skip any tags
-    index_name_pairs = [
-        line.split('\t')[:2] for line in
-        subprocess.check_output(driver).split('\n')[1:-1]
-    ]
-    indices, names = zip(*index_name_pairs)  # unzip list of pairs into 2 lists
-    if args.filters:
-        regexes = [re.compile(pattern) for pattern in args.filters]
-        return sorted(list(set([name for pattern in regexes
-                                for name in names if pattern.match(name)])))
-    if not args.benchmarks:
-        return names
-    benchmarks = set(args.benchmarks)
-    index_to_name = dict(index_name_pairs)
-    indexed_names = [index_to_name[i]
-                     for i in benchmarks.intersection(set(indices))]
-    return sorted(list(
-        benchmarks.intersection(set(names)).union(indexed_names)))
 
 
 def get_current_git_branch(git_repo_path):
@@ -188,10 +213,9 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
 
 
 def run(args):
-    optset = args.optimization
-    file = os.path.join(args.tests, "Benchmark_" + optset)
+    driver = BenchmarkDriver(args)
     run_benchmarks(
-        file, benchmarks=get_tests(file, args),
+        driver.test_harness, benchmarks=driver.tests,
         num_samples=args.iterations, verbose=True,
         log_directory=args.output_dir,
         swift_repo=args.swift_repo)
