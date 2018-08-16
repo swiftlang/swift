@@ -542,11 +542,9 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex") {
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
-  for _ in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-  }
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
@@ -602,11 +600,9 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
-  for _ in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-  }
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 
   buffer.deallocate()
   _fixLifetime(a)
@@ -815,11 +811,9 @@ ArrayTestSuite.test("BridgedToObjC/Custom/objectAtIndex") {
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
-  for _ in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-  }
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
@@ -876,11 +870,9 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
-  for _ in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
-  }
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 
   buffer.deallocate()
   _fixLifetime(a)
