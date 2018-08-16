@@ -137,6 +137,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto result = llvm::support::endian::read32le(cursor);
     cursor += sizeof(result);
     assert(cursor <= end);
+    (void)end;
     return result;
   };
 

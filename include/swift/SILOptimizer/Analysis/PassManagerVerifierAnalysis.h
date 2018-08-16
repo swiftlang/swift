@@ -25,6 +25,7 @@ namespace swift {
 /// All methods are no-ops when asserts are disabled.
 class PassManagerVerifierAnalysis : public SILAnalysis {
   /// The module that we are processing.
+  LLVM_ATTRIBUTE_UNUSED
   SILModule &mod;
 
   /// The set of "live" functions that we are tracking.
