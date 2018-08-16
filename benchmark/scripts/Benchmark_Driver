@@ -300,16 +300,17 @@ def positive_int(value):
     return ivalue
 
 
-def main():
+def parse_args(args):
+    """Parse command line arguments and set default values."""
     parser = argparse.ArgumentParser(
         epilog='Example: ./Benchmark_Driver run -i 5 -f Prefix -f .*Suffix.*'
     )
     subparsers = parser.add_subparsers(
         title='Swift benchmark driver commands',
-        help='See COMMAND -h for additional arguments', metavar='<command>')
+        help='See COMMAND -h for additional arguments', metavar='COMMAND')
 
-    parent_parser = argparse.ArgumentParser(add_help=False)
-    benchmarks_group = parent_parser.add_mutually_exclusive_group()
+    shared_benchmarks_parser = argparse.ArgumentParser(add_help=False)
+    benchmarks_group = shared_benchmarks_parser.add_mutually_exclusive_group()
     benchmarks_group.add_argument(
         'benchmarks',
         default=[],
@@ -318,22 +319,22 @@ def main():
         '-f', '--filter', dest='filters', action='append',
         help='run all tests whose name match regular expression PATTERN, ' +
         'multiple filters are supported', metavar="PATTERN")
-    parent_parser.add_argument(
+    shared_benchmarks_parser.add_argument(
         '-t', '--tests',
         help='directory containing Benchmark_O{,none,size} ' +
         '(default: DRIVER_DIR)',
         default=DRIVER_DIR)
-
-    run_parser = subparsers.add_parser(
-        'run',
-        help='Run benchmarks and output results to stdout',
-        parents=[parent_parser])
-    run_parser.add_argument(
+    shared_benchmarks_parser.add_argument(
         '-o', '--optimization',
         metavar='OPT',
         choices=['O', 'Onone', 'Osize'],
         help='optimization level to use: {O,Onone,Osize}, (default: O)',
         default='O')
+
+    run_parser = subparsers.add_parser(
+        'run',
+        help='Run benchmarks and output results to stdout',
+        parents=[shared_benchmarks_parser])
     run_parser.add_argument(
         '-i', '--iterations',
         help='number of times to run each test (default: 1)',
@@ -343,7 +344,7 @@ def main():
         help='log results to directory (default: no logging)')
     run_parser.add_argument(
         '--swift-repo',
-        help='absolute path to Swift source repo for branch comparison')
+        help='absolute path to the Swift source repository')
     run_parser.set_defaults(func=run)
 
     compare_parser = subparsers.add_parser(
@@ -354,7 +355,7 @@ def main():
         help='directory containing benchmark logs')
     compare_parser.add_argument(
         '--swift-repo', required=True,
-        help='absolute path to Swift source repo')
+        help='absolute path to the Swift source repository')
     compare_parser.add_argument(
         '--compare-script', required=True,
         help='absolute path to compare script')
@@ -364,7 +365,11 @@ def main():
              'branch (default: master)')
     compare_parser.set_defaults(func=compare)
 
-    args = parser.parse_args()
+    return parser.parse_args(args)
+
+
+def main():
+    args = parse_args(sys.argv[1:])
     return args.func(args)
 
 
