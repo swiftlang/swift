@@ -1836,8 +1836,9 @@ static void maybeAddAccessorsToBehaviorStorage(TypeChecker &TC, VarDecl *var) {
 
     SmallVector<AccessorDecl*, 2> accessors;
     accessors.push_back(getter);
-    if (setter) accessors.push_back(setter);
-    var->setAccessors(StorageImplInfo::getComputed(setter != nullptr),
+    auto isMutable = StorageIsMutable_t(setter != nullptr);
+    if (isMutable) accessors.push_back(setter);
+    var->setAccessors(StorageImplInfo::getComputed(isMutable),
                       SourceLoc(), accessors, SourceLoc());
     
     // Save the conformance and 'value' decl for later type checking.

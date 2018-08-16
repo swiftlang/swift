@@ -631,7 +631,7 @@ void MaterializeForSetEmitter::emit(SILGenFunction &SGF) {
 
   // Form the result and return.
   auto result = SGF.B.createTuple(loc, resultTupleTy, { address, callback });
-  SGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc));
+  SGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc), NotForUnwind);
   SGF.B.createReturn(loc, result);
 }
 

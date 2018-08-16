@@ -258,7 +258,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     SILGenSavedInsertionPoint savedIP(*this, failureBB,
                                       FunctionSection::Postmatter);
     failureExitBB = createBasicBlock();
-    Cleanups.emitCleanupsForReturn(ctor);
+    Cleanups.emitCleanupsForReturn(ctor, IsForUnwind);
     // Return nil.
     if (F.getConventions().hasIndirectSILResults()) {
       // Inject 'nil' into the indirect return.
@@ -658,7 +658,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     failureExitArg = failureExitBB->createPHIArgument(
         resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
 
-    Cleanups.emitCleanupsForReturn(ctor);
+    Cleanups.emitCleanupsForReturn(ctor, IsForUnwind);
     SILValue nilResult =
         B.createEnum(loc, SILValue(), getASTContext().getOptionalNoneDecl(),
                      resultLowering.getLoweredType());
