@@ -1189,7 +1189,8 @@ void ConstraintSystem::openGenericRequirements(
     addConstraint(
         *openedReq,
         locator.withPathElement(ConstraintLocator::OpenedGeneric)
-            .withPathElement(LocatorPathElt::getTypeRequirementComponent(pos)));
+            .withPathElement(
+                LocatorPathElt::getTypeRequirementComponent(pos, kind)));
   }
 }
 

@@ -174,9 +174,9 @@ public:
     case TupleElement:
     case KeyPathComponent:
     case ConditionalRequirement:
-    case TypeParameterRequirement:
       return 1;
 
+    case TypeParameterRequirement:
     case ApplyArgToParam:
       return 2;
     }
@@ -365,8 +365,10 @@ public:
       return PathElement(ConditionalRequirement, index);
     }
 
-    static PathElement getTypeRequirementComponent(unsigned index) {
-      return PathElement(TypeParameterRequirement, index);
+    static PathElement getTypeRequirementComponent(unsigned index,
+                                                   RequirementKind kind) {
+      return PathElement(TypeParameterRequirement, index,
+                         static_cast<unsigned>(kind));
     }
 
     /// \brief Retrieve the kind of path element.
