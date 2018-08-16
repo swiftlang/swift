@@ -21,8 +21,10 @@ import unittest
 
 from compare_perf_tests import LogParser
 from compare_perf_tests import PerformanceTestResult
+from compare_perf_tests import PerformanceTestSamples
 from compare_perf_tests import ReportFormatter
 from compare_perf_tests import ResultComparison
+from compare_perf_tests import Sample
 from compare_perf_tests import TestComparator
 from compare_perf_tests import main
 from compare_perf_tests import parse_args
@@ -30,14 +32,82 @@ from compare_perf_tests import parse_args
 from test_utils import captured_output
 
 
-class TestPerformanceTestResult(unittest.TestCase):
+class TestSample(unittest.TestCase):
+    def test_has_named_fields(self):
+        s = Sample(1, 2, 3)
+        self.assertEquals(s.i, 1)
+        self.assertEquals(s.num_iters, 2)
+        self.assertEquals(s.runtime, 3)
 
+    def test_is_iterable(self):
+        s = Sample(1, 2, 3)
+        self.assertEquals(s[0], 1)
+        self.assertEquals(s[1], 2)
+        self.assertEquals(s[2], 3)
+
+
+class TestPerformanceTestSamples(unittest.TestCase):
+    def setUp(self):
+        self.rs = [Sample(*map(int, line.split())) for line in
+                   '0 316 233,'  # this is anomalous sample - max
+                   '1 4417 208, 2 4745 216, 3 4867 208, 4 4934 197,'
+                   '5 5209 205, 6 4271 204, 7 4971 208, 8 5276 206,'
+                   '9 4596 221, 10 5278 198'.split(',')]
+        self.samples = PerformanceTestSamples('DropFirstAnyCollection')
+        self.samples.add(self.rs[1])
+
+    def test_has_name(self):
+        self.assertEquals(self.samples.name, 'DropFirstAnyCollection')
+
+    def test_stores_samples(self):
+        self.assertEquals(self.samples.count, 1)
+        s = self.samples.samples[0]
+        self.assertTrue(isinstance(s, Sample))
+        self.assertEquals(s.i, 1)
+        self.assertEquals(s.num_iters, 4417)
+        self.assertEquals(s.runtime, 208)
+
+    def test_computes_min_max_median(self):
+        self.assertEquals(self.samples.min, 208)
+        self.assertEquals(self.samples.max, 208)
+        self.assertEquals(self.samples.median, 208)
+        self.samples.add(self.rs[2])
+        self.assertEquals(self.samples.min, 208)
+        self.assertEquals(self.samples.max, 216)
+        self.assertEquals(self.samples.median, 216)
+        self.samples.add(self.rs[4])
+        self.assertEquals(self.samples.min, 197)
+        self.assertEquals(self.samples.max, 216)
+        self.assertEquals(self.samples.median, 208)
+
+    def assertEqualStats(self, expected_stats):
+        stats = (self.samples.mean, self.samples.sd, self.samples.cv)
+        for actual, expected in zip(stats, expected_stats):
+            self.assertAlmostEquals(actual, expected, places=2)
+
+    def test_computes_mean_sd_cv(self):
+        self.assertEqualStats((208.0, 0.0, 0.0))
+        self.samples.add(self.rs[2])
+        self.assertEqualStats((212.0, 5.66, 2.67 / 100))
+        self.samples.add(self.rs[3])
+        self.assertEqualStats((210.67, 4.62, 2.19 / 100))
+
+    def test_init_with_samples(self):
+        ss = PerformanceTestSamples('Lots', self.rs[1:])
+        self.assertEquals(ss.count, 10)
+        self.samples = ss
+        self.assertEqualStats((207.10, 7.26, 3.51 / 100))
+
+
+class TestPerformanceTestResult(unittest.TestCase):
     def test_init(self):
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
         r = PerformanceTestResult(log_line.split(','))
         self.assertEquals(r.name, 'AngryPhonebook')
-        self.assertEquals((r.samples, r.min, r.max, r.mean, r.sd, r.median),
-                          (20, 10664, 12933, 11035, 576, 10884))
+        self.assertEquals(
+            (r.num_samples, r.min, r.max, r.mean, r.sd, r.median),
+            (20, 10664, 12933, 11035, 576, 10884))
+        self.assertEquals(r.samples, None)
 
         log_line = '1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336'
         r = PerformanceTestResult(log_line.split(','))
@@ -49,7 +119,7 @@ class TestPerformanceTestResult(unittest.TestCase):
         self.assertEquals(
             str(r),
             '<PerformanceTestResult name:\'AngryPhonebook\' samples:20 '
-            'min:10664 max:12933 mean:11035 sd:576.0 median:10884>'
+            'min:10664 max:12933 mean:11035 sd:576 median:10884>'
         )
 
     def test_merge(self):
@@ -61,21 +131,21 @@ class TestPerformanceTestResult(unittest.TestCase):
                       [line.split(',') for line in tests])
 
         def as_tuple(r):
-            return (r.min, r.max, round(r.mean, 2), round(r.sd, 2), r.median,
-                    r.max_rss)
+            return (r.num_samples, r.min, r.max, round(r.mean, 2),
+                    r.sd, r.median, r.max_rss)
 
         r = results[0]
         self.assertEquals(as_tuple(r),
-                          (12045, 12045, 12045, 0, 12045, 10510336))
+                          (1, 12045, 12045, 12045, 0, 12045, 10510336))
         r.merge(results[1])
-        self.assertEquals(as_tuple(r),
-                          (12045, 12325, 12185, 197.99, 12045, 10510336))
+        self.assertEquals(as_tuple(r),  # drops SD and median
+                          (2, 12045, 12325, 12185, 0, 0, 10510336))
         r.merge(results[2])
-        self.assertEquals(as_tuple(r),
-                          (11616, 12325, 11995.33, 357.10, 12045, 10510336))
+        self.assertEquals(as_tuple(r),  # picks smaller of the MAX_RSS
+                          (3, 11616, 12325, 11995.33, 0, 0, 10502144))
         r.merge(results[3])
         self.assertEquals(as_tuple(r),
-                          (11616, 12325, 12064, 322.29, 12045, 10510336))
+                          (4, 11616, 12325, 12064, 0, 0, 10498048))
 
 
 class TestResultComparison(unittest.TestCase):
@@ -235,8 +305,9 @@ Totals,2"""
             (r.name, r.min, r.max, int(r.mean), int(r.sd), r.median),
             ('AngryPhonebook', 11467, 13898, 12392, 1315, 11812)
         )
-        self.assertEquals(r.samples, len(r.all_samples))
-        self.assertEquals(results[0].all_samples,
+        self.assertEquals(r.num_samples, r.samples.count)
+        self.assertEquals(sorted(results[0].samples.samples,
+                                 key=lambda s: s.i),
                           [(0, 78, 11812), (1, 90, 13898), (2, 91, 11467)])
 
         r = results[1]
@@ -244,8 +315,9 @@ Totals,2"""
             (r.name, r.min, r.max, int(r.mean), int(r.sd), r.median),
             ('Array2D', 369900, 381039, 373994, 6127, 371043)
         )
-        self.assertEquals(r.samples, len(r.all_samples))
-        self.assertEquals(results[1].all_samples,
+        self.assertEquals(r.num_samples, r.samples.count)
+        self.assertEquals(sorted(results[1].samples.samples,
+                                 key=lambda s: s.i),
                           [(0, 1, 369900), (1, 1, 381039), (2, 1, 371043)])
 
     def test_parse_environment_verbose(self):
@@ -274,6 +346,35 @@ Totals,2"""
         self.assertTrue(isinstance(result, PerformanceTestResult))
         self.assertEquals(result.min, 20000)
         self.assertEquals(result.max, 29000)
+
+    def test_results_from_merge_verbose(self):
+        """Parsing verbose log  merges all PerformanceTestSamples.
+        ...this should technically be on TestPerformanceTestResult, but it's
+        easier to write here. ¯\_(ツ)_/¯"""
+        concatenated_logs = """
+    Sample 0,355883
+    Sample 1,358817
+    Sample 2,353552
+    Sample 3,350815
+3,Array2D,4,350815,358817,354766,3403,355883
+    Sample 0,363094
+    Sample 1,369169
+    Sample 2,376131
+    Sample 3,364245
+3,Array2D,4,363094,376131,368159,5931,369169"""
+        results = LogParser.results_from_string(concatenated_logs)
+        self.assertEquals(results.keys(), ['Array2D'])
+        result = results['Array2D']
+        self.assertTrue(isinstance(result, PerformanceTestResult))
+        self.assertEquals(result.min, 350815)
+        self.assertEquals(result.max, 376131)
+        self.assertEquals(result.median, 363094)
+        self.assertAlmostEquals(result.sd, 8443.37, places=2)
+        self.assertAlmostEquals(result.mean, 361463.25, places=2)
+        self.assertEquals(result.num_samples, 8)
+        samples = result.samples
+        self.assertTrue(isinstance(samples, PerformanceTestSamples))
+        self.assertEquals(samples.count, 8)
 
 
 class TestTestComparator(OldAndNewLog):

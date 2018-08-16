@@ -23,6 +23,90 @@ import argparse
 import re
 import sys
 from math import sqrt
+from collections import namedtuple
+
+
+class Sample(namedtuple('Sample', 'i num_iters runtime')):
+    u"""Single benchmark measurement.
+
+    Initialized with:
+    `i`: ordinal number of the sample taken,
+    `num-num_iters`:  number or iterations used to compute it,
+    `runtime`: in microseconds (μs).
+    """
+
+    def __repr__(self):
+        """Shorter Sample formating for debugging purposes."""
+        return 's({0.i!r}, {0.num_iters!r}, {0.runtime!r})'.format(self)
+
+
+class PerformanceTestSamples(object):
+    """Collection of runtime samples from the benchmark execution.
+
+    Computes the sample population statistics.
+    """
+
+    def __init__(self, name, samples=None):
+        """Initialized with benchmark name and optional list of Samples."""
+        self.name = name  # Name of the performance test
+        self.samples = []
+        self.mean = 0.0
+        self.S_runtime = 0.0  # For computing running variance
+        for sample in samples or []:
+            self.add(sample)
+
+    def add(self, sample):
+        """Add sample to collection and recompute statistics."""
+        assert isinstance(sample, Sample)
+        state = (self.count, self.mean, self.S_runtime)
+        state = self.running_mean_variance(state, sample.runtime)
+        _, self.mean, self.S_runtime = state
+        self.samples.append(sample)
+        self.samples.sort(key=lambda s: s.runtime)
+
+    @property
+    def count(self):
+        """Number of samples used to compute the statistics."""
+        return len(self.samples)
+
+    @property
+    def min(self):
+        """Minimum sampled value."""
+        return self.samples[0].runtime
+
+    @property
+    def max(self):
+        """Maximum sampled value."""
+        return self.samples[-1].runtime
+
+    @property
+    def median(self):
+        """Median sampled value."""
+        return self.samples[self.count / 2].runtime
+
+    @property
+    def sd(self):
+        u"""Standard Deviation (μs)."""
+        return (0 if self.count < 2 else
+                sqrt(self.S_runtime / (self.count - 1)))
+
+    @staticmethod
+    def running_mean_variance((k, M_, S_), x):
+        """Compute running variance, B. P. Welford's method.
+
+        See Knuth TAOCP vol 2, 3rd edition, page 232, or
+        https://www.johndcook.com/blog/standard_deviation/
+        M is mean, Standard Deviation is defined as sqrt(S/k-1)
+        """
+        k = float(k + 1)
+        M = M_ + (x - M_) / k
+        S = S_ + (x - M_) * (x - M)
+        return (k, M, S)
+
+    @property
+    def cv(self):
+        """Coeficient of Variation (%)."""
+        return (self.sd / self.mean) if self.mean else 0
 
 
 class PerformanceTestResult(object):
@@ -46,67 +130,48 @@ class PerformanceTestResult(object):
         """
         # csv_row[0] is just an ordinal number of the test - skip that
         self.name = csv_row[1]          # Name of the performance test
-        self.samples = int(csv_row[2])  # Number of measurement samples taken
-        self.min = int(csv_row[3])      # Minimum runtime (ms)
-        self.max = int(csv_row[4])      # Maximum runtime (ms)
-        self.mean = int(csv_row[5])     # Mean (average) runtime (ms)
-        sd = int(csv_row[6])            # Standard Deviation (ms)
-        # For computing running variance
-        self.S_runtime = (0 if self.samples < 2 else
-                          (sd * sd) * (self.samples - 1))
-        self.median = int(csv_row[7])   # Median runtime (ms)
+        self.num_samples = (            # Number of measurement samples taken
+            int(csv_row[2]))
+        self.min = int(csv_row[3])      # Minimum runtime (μs)
+        self.max = int(csv_row[4])      # Maximum runtime (μs)
+        self.mean = float(csv_row[5])   # Mean (average) runtime (μs)
+        self.sd = float(csv_row[6])     # Standard Deviation (μs)
+        self.median = int(csv_row[7])   # Median runtime (μs)
         self.max_rss = (                # Maximum Resident Set Size (B)
             int(csv_row[8]) if len(csv_row) > 8 else None)
-        # Sample lists for statistical analysis of measured results
-        self.all_samples = None
+        self.samples = None
 
     def __repr__(self):
         """Short summary for debugging purposes."""
         return (
             '<PerformanceTestResult name:{0.name!r} '
-            'samples:{0.samples!r} min:{0.min!r} max:{0.max!r} '
-            'mean:{0.mean!r} sd:{0.sd!r} median:{0.median!r}>'.format(self))
-
-    @property
-    def sd(self):
-        """Standard Deviation (ms)"""
-        return (0 if self.samples < 2 else
-                sqrt(self.S_runtime / (self.samples - 1)))
-
-    @staticmethod
-    def running_mean_variance((k, M_, S_), x):
-        """
-        Compute running variance, B. P. Welford's method
-        See Knuth TAOCP vol 2, 3rd edition, page 232, or
-        https://www.johndcook.com/blog/standard_deviation/
-        M is mean, Standard Deviation is defined as sqrt(S/k-1)
-        """
-        k = float(k + 1)
-        M = M_ + (x - M_) / k
-        S = S_ + (x - M_) * (x - M)
-        return (k, M, S)
+            'samples:{0.num_samples!r} min:{0.min!r} max:{0.max!r} '
+            'mean:{0.mean:.0f} sd:{0.sd:.0f} median:{0.median!r}>'
+            .format(self))
 
     def merge(self, r):
-        """Merging test results recomputes min and max.
-        It attempts to recompute mean and standard deviation when all_samples
-        are available. There is no correct way to compute these values from
-        test results that are summaries from more than 3 samples.
+        """Merge two results.
 
-        The use case here is comparing tests results parsed from concatenated
+        Recomputes min, max and mean statistics. If all `samples` are
+        avaliable, it recomputes all the statistics.
+        The use case here is comparing test results parsed from concatenated
         log files from multiple runs of benchmark driver.
         """
-        self.min = min(self.min, r.min)
-        self.max = max(self.max, r.max)
-        # self.median = None # unclear what to do here
-
-        def push(x):
-            state = (self.samples, self.mean, self.S_runtime)
-            state = self.running_mean_variance(state, x)
-            (self.samples, self.mean, self.S_runtime) = state
-
-        # Merging test results with up to 3 samples is exact
-        values = [r.min, r.max, r.median][:min(r.samples, 3)]
-        map(push, values)
+        if self.samples and r.samples:
+            map(self.samples.add, r.samples.samples)
+            sams = self.samples
+            self.num_samples = sams.count
+            self.min, self.max, self.median, self.mean, self.sd = \
+                sams.min, sams.max, sams.median, sams.mean, sams.sd
+        else:
+            self.min = min(self.min, r.min)
+            self.max = max(self.max, r.max)
+            self.mean = (  # pooled mean is the weighted sum of means
+                (self.mean * self.num_samples) + (r.mean * r.num_samples)
+            ) / float(self.num_samples + r.num_samples)
+            self.num_samples += r.num_samples
+            self.max_rss = min(self.max_rss, r.max_rss)
+            self.median, self.sd = 0, 0
 
 
 class ResultComparison(object):
@@ -119,7 +184,7 @@ class ResultComparison(object):
         """Initialize with old and new `PerformanceTestResult`s to compare."""
         self.old = old
         self.new = new
-        assert(old.name == new.name)
+        assert old.name == new.name
         self.name = old.name  # Test name, convenience accessor
 
         # Speedup ratio
@@ -171,7 +236,7 @@ class LogParser(object):
             r.voluntary_cs = self.voluntary_cs
             r.involuntary_cs = self.involuntary_cs
         if self.samples:
-            r.all_samples = self.samples
+            r.samples = PerformanceTestSamples(r.name, self.samples)
         self.results.append(r)
         self._reset()
 
@@ -190,8 +255,8 @@ class LogParser(object):
 
         re.compile(r'\s+Sample (\d+),(\d+)'):
         (lambda self, i, runtime:
-         self.samples.append((int(i), int(self.num_iters), int(runtime)))
-        ),
+         self.samples.append(
+             Sample(int(i), int(self.num_iters), int(runtime)))),
 
         # Environmental statistics: memory usage and context switches
         re.compile(r'\s+MAX_RSS \d+ - \d+ = (\d+) \((\d+) pages\)'):
