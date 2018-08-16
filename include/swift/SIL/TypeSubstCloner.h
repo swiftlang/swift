@@ -361,7 +361,7 @@ protected:
         // If the function was newly created with an empty body mark it as
         // undead.
         if (ParentFunction->empty()) {
-          M.eraseFunction(ParentFunction);
+          FuncBuilder.eraseFunction(ParentFunction);
           ParentFunction->setGenericEnvironment(OriginalEnvironment);
         }
       }
