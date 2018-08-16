@@ -36,3 +36,11 @@ public class C5 {}
 public struct C6 {}
 
 public enum IceKind {}
+
+public protocol P1 {}
+
+public protocol P2 {}
+
+public extension P1 {
+  func P1Constraint() {}
+}

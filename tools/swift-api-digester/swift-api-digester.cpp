@@ -2505,6 +2505,9 @@ static void detectDeclChange(NodePtr L, NodePtr R) {
       if (LD->hasDeclAttribute(Info.Kind) != RD->hasDeclAttribute(Info.Kind))
         L->annotate(Info.Annotation);
     }
+    // Mark generic signature change
+    if (LD->getGenericSignature() != RD->getGenericSignature())
+      L->annotate(NodeAnnotation::ChangeGenericSignature);
     detectRename(L, R);
   }
 }
@@ -3441,6 +3444,27 @@ class DiagnosisEmitter : public SDKNodeVisitor {
     static void theme(raw_ostream &OS) { OS << "RawRepresentable Changes"; };
   };
 
+  struct GenericSignatureChangeDiag: public DiagBase {
+    DeclKind Kind;
+    StringRef DeclName;
+    StringRef GSBefore;
+    StringRef GSAfter;
+    GenericSignatureChangeDiag(MetaInfo Info, DeclKind Kind, StringRef DeclName,
+      StringRef GSBefore, StringRef GSAfter): DiagBase(Info), Kind(Kind),
+      DeclName(DeclName), GSBefore(GSBefore), GSAfter(GSAfter) {}
+    bool operator<(GenericSignatureChangeDiag Other) const {
+      if (Kind != Other.Kind)
+        return Kind < Other.Kind;
+      return DeclName.compare(Other.DeclName) < 0;
+    }
+    void output() const override {
+      llvm::outs() << Kind << " " << printName(DeclName)
+        << " has generic signature change from " << GSBefore << " to "
+        << GSAfter << "\n";
+    }
+    static void theme(raw_ostream &OS) { OS << "Generic Signature Changes"; };
+  };
+
   std::set<SDKNodeDecl*> AddedDecls;
   DiagBag<DeclAttrDiag> AttrChangedDecls;
   DiagBag<DeclTypeChangeDiag> TypeChangedDecls;
@@ -3448,6 +3472,7 @@ class DiagnosisEmitter : public SDKNodeVisitor {
   DiagBag<MovedDeclDiag> MovedDecls;
   DiagBag<RemovedDeclDiag> RemovedDecls;
   DiagBag<RawRepresentableChangeDiag> RawRepresentableDecls;
+  DiagBag<GenericSignatureChangeDiag> GSChangeDecls;
 
   UpdatedNodesMap &UpdateMap;
   NodeMap &TypeAliasUpdateMap;
@@ -3697,6 +3722,15 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
         getOwnershipDescription(Count->getReferenceOwnership()));
     return;
   }
+  case NodeAnnotation::ChangeGenericSignature: {
+    MetaInfo ScreenInfo(Node, false);
+    GSChangeDecls.Diags.emplace_back(ScreenInfo, Node->getDeclKind(),
+      Node->getFullyQualifiedName(), Node->getGenericSignature(),
+      UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>()->
+                                     getGenericSignature());
+    return;
+  }
+
   default: {
     // Diagnose the addition/removal of attributes with ABI impact.
     auto Infos = Ctx.getABIAttributeInfo();

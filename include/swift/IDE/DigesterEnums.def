@@ -62,6 +62,7 @@ NODE_ANNOTATION(OwnershipChange)
 NODE_ANNOTATION(ChangeObjC)
 NODE_ANNOTATION(ChangeFixedLayout)
 NODE_ANNOTATION(ChangeFrozen)
+NODE_ANNOTATION(ChangeGenericSignature)
 NODE_ANNOTATION(RawTypeLeft)
 NODE_ANNOTATION(RawTypeRight)
 

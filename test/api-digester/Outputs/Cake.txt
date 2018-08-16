@@ -1,4 +1,7 @@
 
+/* Generic Signature Changes */
+cake1: Func P1.P1Constraint() has generic signature change from <Self where Self : P1, Self : P2> to <Self where Self : P1>
+
 /* RawRepresentable Changes */
 
 /* Removed Decls */

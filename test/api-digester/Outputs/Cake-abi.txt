@@ -1,4 +1,7 @@
 
+/* Generic Signature Changes */
+cake1: Func P1.P1Constraint() has generic signature change from <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> to <τ_0_0 where τ_0_0 : P1>
+
 /* RawRepresentable Changes */
 
 /* Removed Decls */
