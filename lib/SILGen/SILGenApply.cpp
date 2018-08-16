@@ -4589,7 +4589,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
     B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
                     SGM.Types.getEmptyTupleType(), {}, {error});
 
-    Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc));
+    Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc), IsForUnwind);
     B.createThrow(loc, error);
   }
 
