@@ -429,10 +429,10 @@ public extension CGRect {
   }
 
   @available(*, unavailable, renamed: "minX")
-  public var x: CGFloat { return minX }
+  var x: CGFloat { return minX }
 
   @available(*, unavailable, renamed: "minY")
-  public var y: CGFloat { return minY }
+  var y: CGFloat { return minY }
 }
 
 extension CGRect : CustomReflectable {
