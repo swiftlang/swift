@@ -7,6 +7,5 @@
 // CHECK: "arch":"{{[^"]*}}"
 // CHECK: "swiftmodules":[
 // CHECK: "{{[^"]*}}/Swift.swiftmodule"
-// CHECK: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule"
 // CHECK: ]
 // CHECK: }

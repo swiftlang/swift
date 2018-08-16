@@ -1,5 +1,3 @@
-import SwiftOnoneSupport
-
 class C1 : Prot {
 
     typealias Element = Int

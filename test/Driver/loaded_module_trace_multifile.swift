@@ -13,7 +13,6 @@
 // CHECK: "{{[^"]*}}/Module2.swiftmodule"
 // CHECK: "{{[^"]*}}/Module.swiftmodule"
 // CHECK: "{{[^"]*}}/Swift.swiftmodule"
-// CHECK: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule"
 // CHECK: ]
 // CHECK: }
 

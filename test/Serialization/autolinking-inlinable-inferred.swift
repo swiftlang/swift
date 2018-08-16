@@ -20,10 +20,9 @@ import autolinking_module_inferred
 
 bfunc()
 
-// CHECK: !llvm.linker.options = !{[[MODULE:![0-9]+]], [[PUBLIC:![0-9]+]], [[SWIFTONONESUPPORT:![0-9]+]], [[SWIFTCORE:![0-9]+]], [[PRIVATE:![0-9]+]], [[OTHER:![0-9]+]], [[INDIRECT:![0-9]+]], [[OTHER2:![0-9]+]], [[OBJC:![0-9]+]]}
+// CHECK: !llvm.linker.options = !{[[MODULE:![0-9]+]], [[PUBLIC:![0-9]+]], [[SWIFTCORE:![0-9]+]], [[PRIVATE:![0-9]+]], [[OTHER:![0-9]+]], [[INDIRECT:![0-9]+]], [[OTHER2:![0-9]+]], [[OBJC:![0-9]+]]}
 
 // CHECK-DAG: [[SWIFTCORE]] = !{!"-lswiftCore"}
-// CHECK-DAG: [[SWIFTONONESUPPORT]] = !{!"-lswiftSwiftOnoneSupport"}
 // CHECK-DAG: [[MODULE]] = !{!"-lautolinking_module_inferred"}
 // CHECK-DAG: [[PUBLIC]] = !{!"-lautolinking_public"}
 // CHECK-DAG: [[OTHER]] = !{!"-lautolinking_other"}

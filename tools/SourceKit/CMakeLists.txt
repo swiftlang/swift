@@ -129,9 +129,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
                        swift
                        copy_shim_headers
                        swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
-                       swiftSwiftOnoneSupport-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
-                       swiftCore-swiftmodule-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
-                       swiftSwiftOnoneSupport-swiftmodule-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+                       swiftCore-swiftmodule-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
   endif()
 
   ExternalProject_Get_Property(libdispatch install_dir)

@@ -42,6 +42,5 @@ attributes #2 = { noreturn nounwind }
 !5 = !{i32 1, !"wchar_size", i32 4}
 !6 = !{i32 7, !"PIC Level", i32 2}
 !7 = !{i32 1, !"Swift Version", i32 6}
-!8 = !{!"-lswiftSwiftOnoneSupport"}
 !9 = !{!"-lswiftCore"}
 !10 = !{!"-lobjc"}

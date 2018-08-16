@@ -11,7 +11,6 @@
 // CHECK: "{{[^"]*}}/Darwin.swiftmodule"
 // CHECK: "{{[^"]*}}/Foundation.swiftmodule"
 // CHECK: "{{[^"]*}}/Swift.swiftmodule"
-// CHECK: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule"
 // CHECK: ]
 // CHECK: }
 

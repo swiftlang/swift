@@ -1,5 +1,3 @@
-import SwiftOnoneSupport
-
 protocol P1 {
 
     func foo1()
