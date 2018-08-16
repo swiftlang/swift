@@ -1027,9 +1027,18 @@ bool AbstractionPattern::hasSameBasicTypeStructure(CanType l, CanType r) {
   auto lFunction = dyn_cast<AnyFunctionType>(l);
   auto rFunction = dyn_cast<AnyFunctionType>(r);
   if (lFunction && rFunction) {
-    return hasSameBasicTypeStructure(lFunction.getInput(),
-                                     rFunction.getInput())
-        && hasSameBasicTypeStructure(lFunction.getResult(),
+    auto lParam = lFunction.getParams();
+    auto rParam = rFunction.getParams();
+    if (lParam.size() != rParam.size())
+      return false;
+
+    for (unsigned i : indices(lParam)) {
+      if (!hasSameBasicTypeStructure(lParam[i].getPlainType(),
+                                     rParam[i].getPlainType()))
+        return false;
+    }
+
+    return hasSameBasicTypeStructure(lFunction.getResult(),
                                      rFunction.getResult());
   } else if (lFunction || rFunction) {
     return false;
