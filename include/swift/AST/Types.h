@@ -1745,6 +1745,70 @@ public:
   uint8_t toRaw() const { return value.toRaw(); }
 };
 
+class YieldTypeFlags {
+  enum YieldFlags : uint8_t {
+    None        = 0,
+    InOut       = 1 << 1,
+    Shared      = 1 << 2,
+    Owned       = 1 << 3,
+
+    NumBits = 3
+  };
+  OptionSet<YieldFlags> value;
+
+  static_assert(NumBits < 8 * sizeof(OptionSet<YieldFlags>), "overflowed");
+
+  YieldTypeFlags(OptionSet<YieldFlags, uint8_t> val) : value(val) {}
+
+public:
+  YieldTypeFlags() = default;
+  static YieldTypeFlags fromRaw(uint8_t raw) {
+    return YieldTypeFlags(OptionSet<YieldFlags>(raw));
+  }
+
+  YieldTypeFlags(ValueOwnership ownership)
+      : value((ownership == ValueOwnership::InOut ? InOut : 0) |
+              (ownership == ValueOwnership::Shared ? Shared : 0) |
+              (ownership == ValueOwnership::Owned ? Owned : 0)) {}
+
+  bool isInOut() const { return value.contains(InOut); }
+  bool isShared() const { return value.contains(Shared); }
+  bool isOwned() const { return value.contains(Owned); }
+
+  ValueOwnership getValueOwnership() const {
+    if (isInOut())
+      return ValueOwnership::InOut;
+    else if (isShared())
+      return ValueOwnership::Shared;
+    else if (isOwned())
+      return ValueOwnership::Owned;
+
+    return ValueOwnership::Default;
+  }
+
+  YieldTypeFlags withInOut(bool isInout) const {
+    return YieldTypeFlags(isInout ? value | InOut : value - InOut);
+  }
+  
+  YieldTypeFlags withShared(bool isShared) const {
+    return YieldTypeFlags(isShared ? value | Shared : value - Shared);
+  }
+
+  YieldTypeFlags withOwned(bool isOwned) const {
+    return YieldTypeFlags(isOwned ? value | Owned : value - Owned);
+  }
+
+  bool operator ==(const YieldTypeFlags &other) const {
+    return value.toRaw() == other.value.toRaw();
+  }
+
+  bool operator!=(const YieldTypeFlags &other) const {
+    return value.toRaw() != other.value.toRaw();
+  }
+
+  uint8_t toRaw() const { return value.toRaw(); }
+};
+
 /// ParenType - A paren type is a type that's been written in parentheses.
 class ParenType : public SugarType {
   friend class ASTContext;
@@ -2560,7 +2624,7 @@ class AnyFunctionType : public TypeBase {
   
 public:
   using Representation = FunctionTypeRepresentation;
-  
+
   class Param {
   public:
     explicit Param(const TupleTypeElt &tte);
@@ -2635,6 +2699,50 @@ public:
   using CanParamArrayRef =
     ArrayRefView<Param,CanParam,CanParam::getFromParam,/*AccessOriginal*/true>;
   
+  class CanYield;
+  class Yield {
+    Type Ty;
+    YieldTypeFlags Flags;
+  public:
+    explicit Yield(Type type, YieldTypeFlags flags)
+      : Ty(type), Flags(flags) {}
+
+    Type getType() const { return Ty; }
+
+    YieldTypeFlags getFlags() const { return Flags; }
+    ValueOwnership getValueOwnership() const {
+      return getFlags().getValueOwnership();
+    }
+    bool isInOut() const { return getFlags().isInOut(); }
+
+    CanYield getCanonical() const;
+
+    Yield subst(SubstitutionMap subs, SubstOptions options = None) const {
+      return Yield(getType().subst(subs, options), getFlags());
+    }
+
+    bool operator==(const Yield &other) const {
+      return getType()->isEqual(other.getType()) &&
+             getFlags() == other.getFlags();
+    }
+    bool operator!=(const Yield &other) const {
+      return !operator==(other);
+    }
+  };
+
+  class CanYield : public Yield {
+  public:
+    explicit CanYield(CanType type, YieldTypeFlags flags)
+      : Yield(type, flags) {}
+
+    CanType getType() const { return CanType(Yield::getType()); }
+
+    CanYield subst(SubstitutionMap subs, SubstOptions options = None) const {
+      return CanYield(getType().subst(subs, options)->getCanonicalType(),
+                      getFlags());
+    }
+  };
+
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
@@ -2895,6 +3003,10 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
     return CanAnyFunctionType(getPointer()->withExtInfo(info));
   }
 END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
+
+inline AnyFunctionType::CanYield AnyFunctionType::Yield::getCanonical() const {
+  return CanYield(getType()->getCanonicalType(), getFlags());
+}
 
 /// FunctionType - A monomorphic function type, specified with an arrow.
 ///
