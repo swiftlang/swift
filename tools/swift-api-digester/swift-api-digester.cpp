@@ -273,7 +273,9 @@ class SDKContext {
 
   static StringRef getAttrName(DeclAttrKind Kind) {
     switch (Kind) {
-#define DECL_ATTR(NAME, CLASS, ...) case DAK_##CLASS: return "@"#NAME;
+#define DECL_ATTR(NAME, CLASS, ...)                                           \
+    case DAK_##CLASS:                                                         \
+        return DeclAttribute::isDeclModifier(DAK_##CLASS) ? #NAME : "@"#NAME;
 #include "swift/AST/Attr.def"
     case DAK_Count:
       llvm_unreachable("unrecognized attribute kind.");
@@ -287,6 +289,7 @@ public:
     ADD(ObjC)
     ADD(FixedLayout)
     ADD(Frozen)
+    ADD(Dynamic)
 #undef ADD
   }
   llvm::BumpPtrAllocator &allocator() {

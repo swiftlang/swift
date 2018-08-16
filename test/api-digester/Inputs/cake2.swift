@@ -30,7 +30,10 @@ public struct NSSomestruct2 {
 
 public class C4: NewType {}
 
-public class C5 {}
+public class C5 {
+  @objc
+  public dynamic func dy_foo() {}
+}
 
 @_fixed_layout
 public struct C6 {}
