@@ -1185,7 +1185,7 @@ public extension Tensor {
     set {
       let left = self[0..<index]
       let right = self[index+1..<_TFGetScalarOrDie(shapeTensor[0].handle)]
-      self = Raw.concatV2([left, Tensor([newValue]), right], axis: Tensor<Int32>(0))
+      self = Raw.concatV2([left, newValue.rankLifted(), right], axis: Tensor<Int32>(0))
     }
   }
 
