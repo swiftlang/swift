@@ -165,26 +165,25 @@ enum class ProtocolInfoKind : uint8_t {
 class ProtocolInfo final :
     private llvm::TrailingObjects<ProtocolInfo, WitnessTableEntry> {
   friend TrailingObjects;
-
-  /// A singly-linked-list of all the protocols that have been laid out.
-  llvm::PointerIntPair<const ProtocolInfo *, 1, ProtocolInfoKind> NextConverted;
   friend class TypeConverter;
-
-  ProtocolInfoKind getKind() const {
-    return NextConverted.getInt();
-  }
 
   /// The number of table entries in this protocol layout.
   unsigned NumTableEntries;
 
+  ProtocolInfoKind Kind;
+
+  ProtocolInfoKind getKind() const {
+    return Kind;
+  }
+
   ProtocolInfo(ArrayRef<WitnessTableEntry> table, ProtocolInfoKind kind)
-      : NextConverted(nullptr, kind), NumTableEntries(table.size()) {
+      : NumTableEntries(table.size()), Kind(kind) {
     std::uninitialized_copy(table.begin(), table.end(),
                             getTrailingObjects<WitnessTableEntry>());
   }
 
-  static ProtocolInfo *create(ArrayRef<WitnessTableEntry> table,
-                              ProtocolInfoKind kind);
+  static std::unique_ptr<ProtocolInfo> create(ArrayRef<WitnessTableEntry> table,
+                                              ProtocolInfoKind kind);
 
 public:
   /// The number of witness slots in a conformance to this protocol;

@@ -67,10 +67,9 @@ public:
 private:
   bool CompletelyFragile = false;
 
-  llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
+  llvm::DenseMap<ProtocolDecl*, std::unique_ptr<const ProtocolInfo>> Protocols;
   const TypeInfo *FirstType;
   
-  const ProtocolInfo *FirstProtocol = nullptr;
   const LoadableTypeInfo *NativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
