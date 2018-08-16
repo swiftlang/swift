@@ -4975,11 +4975,9 @@ void SubscriptDecl::computeType() {
 
   Type funcTy;
   if (auto *sig = getGenericSignature())
-    funcTy = GenericFunctionType::get(sig, argTy, elementTy,
-                                      AnyFunctionType::ExtInfo());
+    funcTy = GenericFunctionType::get(sig, argTy, elementTy);
   else
-    funcTy = FunctionType::get(argTy, elementTy,
-                               AnyFunctionType::ExtInfo());
+    funcTy = FunctionType::get(argTy, elementTy);
 
   // Record the interface type.
   setInterfaceType(funcTy);
@@ -5742,16 +5740,13 @@ void EnumElementDecl::computeType() {
     SmallVector<AnyFunctionType::Param, 4> argTy;
     PL->getParams(argTy);
 
-    resultTy = FunctionType::get(argTy, resultTy,
-                                 AnyFunctionType::ExtInfo());
+    resultTy = FunctionType::get(argTy, resultTy);
   }
 
   if (auto *genericSig = ED->getGenericSignature())
-    resultTy = GenericFunctionType::get(genericSig, selfTy, resultTy,
-                                        AnyFunctionType::ExtInfo());
+    resultTy = GenericFunctionType::get(genericSig, selfTy, resultTy);
   else
-    resultTy = FunctionType::get(selfTy, resultTy,
-                                 AnyFunctionType::ExtInfo());
+    resultTy = FunctionType::get(selfTy, resultTy);
 
   // Record the interface type.
   setInterfaceType(resultTy);

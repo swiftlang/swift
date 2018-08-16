@@ -1472,8 +1472,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
       genericEnv = DC->getGenericEnvironmentOfContext();
       SubstInterfaceTy = GenericFunctionType::get(genericSig,
                                                   DC->getSelfInterfaceType(),
-                                                  SubstInterfaceTy,
-                                                  AnyFunctionType::ExtInfo());
+                                                  SubstInterfaceTy);
     } else {
       SubstInterfaceTy = FunctionType::get(DC->getSelfInterfaceType(),
                                            SubstInterfaceTy);

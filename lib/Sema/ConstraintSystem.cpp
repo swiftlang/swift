@@ -1320,8 +1320,7 @@ ConstraintSystem::getTypeOfMemberReference(
       }
 
       auto indicesTy = subscript->getIndicesInterfaceType();
-      refType = FunctionType::get(indicesTy, elementTy,
-                                  AnyFunctionType::ExtInfo());
+      refType = FunctionType::get(indicesTy, elementTy);
     } else {
       refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
                                            base, /*wantInterfaceType=*/true);
@@ -1340,11 +1339,9 @@ ConstraintSystem::getTypeOfMemberReference(
     // If the storage is generic, add a generic signature.
     auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), selfFlags);
     if (auto *sig = innerDC->getGenericSignatureOfContext()) {
-      funcType = GenericFunctionType::get(sig, {selfParam}, refType,
-                                          AnyFunctionType::ExtInfo());
+      funcType = GenericFunctionType::get(sig, {selfParam}, refType);
     } else {
-      funcType = FunctionType::get({selfParam}, refType,
-                                   AnyFunctionType::ExtInfo());
+      funcType = FunctionType::get({selfParam}, refType);
     }
   }
 

@@ -1409,7 +1409,7 @@ public:
                                                     .getOptionalObjectType());
       substFormalType = CanFunctionType::get(
         dynamicMemberRef->getBase()->getType()->getCanonicalType(),
-        substFormalType, AnyFunctionType::ExtInfo());
+        substFormalType);
 
       setCallee(Callee::forDynamic(SGF, member,
                                    memberRef.getSubstitutions(),

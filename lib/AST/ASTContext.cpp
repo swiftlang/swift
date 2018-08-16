@@ -3612,14 +3612,14 @@ bool AnyFunctionType::equalParams(CanParamArrayRef a, CanParamArrayRef b) {
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
-                                Type result, const ExtInfo &info,
+                                Type result, ExtInfo info,
                                 bool canonicalVararg) {
   return get(composeInput(result->getASTContext(), params, canonicalVararg),
              result, info);
 }
 
 FunctionType *FunctionType::get(Type input, Type result,
-                                const ExtInfo &info) {
+                                ExtInfo info) {
   auto properties = getFunctionRecursiveProperties(input, result);
   auto arena = getArena(properties);
   uint16_t attrKey = info.getFuncAttrKey();
@@ -3643,7 +3643,7 @@ FunctionType *FunctionType::get(Type input, Type result,
 FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                            Type input, Type output,
                            RecursiveTypeProperties properties,
-                           const ExtInfo &Info)
+                           ExtInfo Info)
     : AnyFunctionType(TypeKind::Function,
                       (isCanonicalFunctionInputType(input) &&
                        output->isCanonical())
@@ -3658,7 +3658,7 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature *sig,
                                   Type input,
                                   Type result,
-                                  const ExtInfo &info) {
+                                  ExtInfo info) {
   ID.AddPointer(sig);
   ID.AddPointer(input.getPointer());
   ID.AddPointer(result.getPointer());
@@ -3677,7 +3677,7 @@ static Type unwrapParenType(Type type) {
 GenericFunctionType *GenericFunctionType::get(GenericSignature *sig,
                                               ArrayRef<Param> params,
                                               Type result,
-                                              const ExtInfo &info,
+                                              ExtInfo info,
                                               bool canonicalVararg) {
   return get(sig, composeInput(result->getASTContext(), params,
                                canonicalVararg),
@@ -3688,7 +3688,7 @@ GenericFunctionType *
 GenericFunctionType::get(GenericSignature *sig,
                          Type input,
                          Type output,
-                         const ExtInfo &info) {
+                         ExtInfo info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!input->hasTypeVariable() && !output->hasTypeVariable());
 
@@ -3738,7 +3738,7 @@ GenericFunctionType::GenericFunctionType(
                        ArrayRef<AnyFunctionType::Param> params,
                        Type input,
                        Type result,
-                       const ExtInfo &info,
+                       ExtInfo info,
                        const ASTContext *ctx,
                        RecursiveTypeProperties properties)
   : AnyFunctionType(TypeKind::GenericFunction, ctx, input, result,

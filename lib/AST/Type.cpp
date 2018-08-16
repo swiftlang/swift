@@ -434,12 +434,10 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   }
 
   auto selfTy = dc->getDeclaredInterfaceType();
-  auto selfParam = AnyFunctionType::Param(selfTy,
-                                          Identifier(), ParameterTypeFlags());
+  auto selfParam = AnyFunctionType::Param(selfTy);
   if (sig)
-    return GenericFunctionType::get(sig, {selfParam}, type,
-                                    AnyFunctionType::ExtInfo());
-  return FunctionType::get({selfParam}, type, AnyFunctionType::ExtInfo());
+    return GenericFunctionType::get(sig, {selfParam}, type);
+  return FunctionType::get({selfParam}, type);
 }
 
 void

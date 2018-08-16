@@ -1688,8 +1688,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   // The number of elements must match exactly.
   // TODO: incomplete tuple patterns, with some syntax.
   if (!hadError && params.size() != P->size()) {
-    auto fnType =
-        FunctionType::get(params, FN->getResult(), FunctionType::ExtInfo());
+    auto fnType = FunctionType::get(params, FN->getResult());
     diagnose(P->getStartLoc(), diag::closure_argument_list_tuple, fnType,
              params.size(), P->size(), (P->size() == 1));
     hadError = true;

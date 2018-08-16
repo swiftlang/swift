@@ -2045,7 +2045,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   if (!decl->hasInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
     if (isa<AbstractFunctionDecl>(decl))
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
-                                  C.TheErrorType, AnyFunctionType::ExtInfo());
+                                  C.TheErrorType);
     return C.TheErrorType;
   }
 

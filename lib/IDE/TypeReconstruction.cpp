@@ -712,8 +712,7 @@ static void VisitNodeAddressor(
   // level
   CanFunctionType swift_can_func_type =
     CanFunctionType::get(AnyFunctionType::CanParamArrayRef(),
-                         ast->TheRawPointerType,
-                         AnyFunctionType::ExtInfo());
+                         ast->TheRawPointerType);
   result._types.push_back(swift_can_func_type.getPointer());
 }
 
