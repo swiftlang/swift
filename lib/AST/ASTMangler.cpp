@@ -2055,7 +2055,7 @@ CanType ASTMangler::getDeclTypeForMangling(
     genericSig = gft.getGenericSignature();
     CurGenericSignature = gft.getGenericSignature();
 
-    type = CanFunctionType::get(gft->getParams(), gft.getResult(),
+    type = CanFunctionType::get(gft.getParams(), gft.getResult(),
                                 gft->getExtInfo());
   }
 

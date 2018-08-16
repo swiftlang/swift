@@ -1109,11 +1109,11 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
                                     /*throws*/ false);
   if (withContext) {
     auto ContextTy = Context.TheRawPointerType;
-    auto ContextArg = ParenType::get(Context, ContextTy);
-    auto BlockTy = FunctionType::get(ContextArg, VoidTy, Thin);
+    auto ContextArg = FunctionType::Param(ContextTy);
+    auto BlockTy = FunctionType::get({ContextArg}, VoidTy, Thin);
     return getBuiltinFunction(Id, {HandleTy, BlockTy, ContextTy}, VoidTy);
   } else {
-    auto BlockTy = FunctionType::get(VoidTy, VoidTy, Thin);
+    auto BlockTy = FunctionType::get({}, VoidTy, Thin);
     return getBuiltinFunction(Id, {HandleTy, BlockTy}, VoidTy);
   }
 }

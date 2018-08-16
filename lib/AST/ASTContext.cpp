@@ -3052,14 +3052,12 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   // Determine the type of the container.
   auto containerTy = dc->getDeclaredInterfaceType();
   if (!containerTy || containerTy->hasError())
-    return AnyFunctionType::Param(ErrorType::get(Ctx), Identifier(),
-                                  ParameterTypeFlags());
+    return AnyFunctionType::Param(ErrorType::get(Ctx));
 
   // Determine the type of 'self' inside the container.
   auto selfTy = dc->getSelfInterfaceType();
   if (!selfTy || selfTy->hasError())
-    return AnyFunctionType::Param(ErrorType::get(Ctx), Identifier(),
-                                  ParameterTypeFlags());
+    return AnyFunctionType::Param(ErrorType::get(Ctx));
 
   bool isStatic = false;
   bool isMutating = false;
@@ -3101,13 +3099,11 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
 
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
-    return AnyFunctionType::Param(MetatypeType::get(selfTy, Ctx), Identifier(),
-                                  ParameterTypeFlags());
+    return AnyFunctionType::Param(MetatypeType::get(selfTy, Ctx));
 
   // Reference types have 'self' of type T.
   if (containerTy->hasReferenceSemantics())
-    return AnyFunctionType::Param(selfTy, Identifier(),
-                                  ParameterTypeFlags());
+    return AnyFunctionType::Param(selfTy);
 
   return AnyFunctionType::Param(selfTy, Identifier(),
                                 ParameterTypeFlags().withInOut(isMutating));
@@ -3524,10 +3520,10 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
 
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
-    return FunctionType::get(getInput(), getResult(), info);
+    return FunctionType::getOld(getInput(), getResult(), info);
   if (auto *genFnTy = dyn_cast<GenericFunctionType>(this))
-    return GenericFunctionType::get(genFnTy->getGenericSignature(),
-                                    getInput(), getResult(), info);
+    return GenericFunctionType::getOld(genFnTy->getGenericSignature(),
+                                       getInput(), getResult(), info);
 
   static_assert(2 - 1 ==
                   static_cast<int>(TypeKind::Last_AnyFunctionType) -
@@ -3614,12 +3610,12 @@ bool AnyFunctionType::equalParams(CanParamArrayRef a, CanParamArrayRef b) {
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, ExtInfo info,
                                 bool canonicalVararg) {
-  return get(composeInput(result->getASTContext(), params, canonicalVararg),
-             result, info);
+  return getOld(composeInput(result->getASTContext(), params, canonicalVararg),
+                result, info);
 }
 
-FunctionType *FunctionType::get(Type input, Type result,
-                                ExtInfo info) {
+FunctionType *FunctionType::getOld(Type input, Type result,
+                                   ExtInfo info) {
   auto properties = getFunctionRecursiveProperties(input, result);
   auto arena = getArena(properties);
   uint16_t attrKey = info.getFuncAttrKey();
@@ -3679,16 +3675,16 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature *sig,
                                               Type result,
                                               ExtInfo info,
                                               bool canonicalVararg) {
-  return get(sig, composeInput(result->getASTContext(), params,
-                               canonicalVararg),
-             result, info);
+  return getOld(sig, composeInput(result->getASTContext(), params,
+                                  canonicalVararg),
+                result, info);
 }
 
 GenericFunctionType *
-GenericFunctionType::get(GenericSignature *sig,
-                         Type input,
-                         Type output,
-                         ExtInfo info) {
+GenericFunctionType::getOld(GenericSignature *sig,
+                            Type input,
+                            Type output,
+                            ExtInfo info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!input->hasTypeVariable() && !output->hasTypeVariable());
 

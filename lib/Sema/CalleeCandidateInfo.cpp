@@ -83,7 +83,8 @@ UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
   if (isa<AbstractStorageDecl>(decl)) {
     if (decl->getDeclContext()->isTypeContext()) {
       auto instanceTy = decl->getDeclContext()->getSelfTypeInContext();
-      entityType = FunctionType::get(instanceTy, entityType);
+      entityType = FunctionType::get({FunctionType::Param(instanceTy)},
+                                     entityType);
     }
   }
 }

@@ -1357,10 +1357,10 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
     auto InitStorageRef = new (Context) DeclRefExpr(SpecializeInitStorage,
                                                     DeclNameLoc(),
                                                     /*implicit*/ true);
-    auto InitStorageMethodTy = FunctionType::get(Context.TheEmptyTupleType,
-                                                 SubstStorageContextTy);
-    auto InitStorageRefTy = FunctionType::get(SelfTypeRef->getType(),
-                                              InitStorageMethodTy);
+    auto InitStorageMethodTy = FunctionType::get({}, SubstStorageContextTy);
+
+    FunctionType::Param SelfParam(SelfTypeRef->getType());
+    auto InitStorageRefTy = FunctionType::get({SelfParam}, InitStorageMethodTy);
     InitStorageRef->setType(InitStorageRefTy);
 
     auto SelfApply = new (Context) DotSyntaxCallExpr(InitStorageRef,
@@ -1467,15 +1467,16 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   
   // Add the Self type back to the interface and context types.
   if (DC->isTypeContext()) {
+    FunctionType::Param SelfParam(DC->getSelfInterfaceType());
+
     if (DC->isGenericContext()) {
       genericSig = DC->getGenericSignatureOfContext();
       genericEnv = DC->getGenericEnvironmentOfContext();
-      SubstInterfaceTy = GenericFunctionType::get(genericSig,
-                                                  DC->getSelfInterfaceType(),
-                                                  SubstInterfaceTy);
+      SubstInterfaceTy =
+        GenericFunctionType::get(genericSig, {SelfParam}, SubstInterfaceTy);
     } else {
-      SubstInterfaceTy = FunctionType::get(DC->getSelfInterfaceType(),
-                                           SubstInterfaceTy);
+      SubstInterfaceTy =
+        FunctionType::get({SelfParam}, SubstInterfaceTy);
     }
   }
   

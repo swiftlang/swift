@@ -2259,7 +2259,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
   // (T1 -> T2) +> (S1 -> S2) = (T1 +> S1) -> (T2 +> S2)
   if (auto derivedFunc = dyn_cast<AnyFunctionType>(derived)) {
     if (auto baseFunc = dyn_cast<AnyFunctionType>(base)) {
-      return CanAnyFunctionType::get(
+      return CanAnyFunctionType::getOld(
         baseFunc.getOptGenericSignature(),
         copyOptionalityFromDerivedToBase(tc,
                                          derivedFunc.getInput(),
@@ -2577,7 +2577,7 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   CanGenericSignature genericSig = t.getOptGenericSignature();
 
   auto rebuild = [&](CanType input, CanType result) -> CanAnyFunctionType {
-    return CanAnyFunctionType::get(genericSig, input, result, extInfo);
+    return CanAnyFunctionType::getOld(genericSig, input, result, extInfo);
   };
 
   switch (auto rep = t->getExtInfo().getSILRepresentation()) {
@@ -2768,14 +2768,14 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   auto buildFinalFunctionType =
       [&](CanType inputType, CanType resultType) -> CanAnyFunctionType {
-    return CanAnyFunctionType::get(genericSig, inputType, resultType, extInfo);
+    return CanAnyFunctionType::getOld(genericSig, inputType, resultType, extInfo);
   };
 
   // Build the curried function type.
   CanType curriedResultType = resultType;
   for (auto input : llvm::makeArrayRef(inputs).drop_back()) {
-    curriedResultType = CanFunctionType::get(CanType(input.getType()),
-                                             curriedResultType);
+    curriedResultType = CanFunctionType::getOld(CanType(input.getType()),
+                                                curriedResultType);
   }
   auto curried = buildFinalFunctionType(CanType(inputs.back().getType()),
                                         curriedResultType);

@@ -711,8 +711,7 @@ static void VisitNodeAddressor(
   // and they bear no connection to their original variable at the interface
   // level
   CanFunctionType swift_can_func_type =
-    CanFunctionType::get(AnyFunctionType::CanParamArrayRef(),
-                         ast->TheRawPointerType);
+    CanFunctionType::get({}, ast->TheRawPointerType);
   result._types.push_back(swift_can_func_type.getPointer());
 }
 
@@ -1496,9 +1495,10 @@ static void CreateFunctionType(ASTContext *ast,
 
   if (arg_clang_type && return_clang_type) {
     result._types.push_back(
-        FunctionType::get(arg_clang_type, return_clang_type,
-                          FunctionType::ExtInfo().withNoEscape(!escaping)
-                          .withThrows(throws)));
+        FunctionType::getOld(arg_clang_type, return_clang_type,
+                            FunctionType::ExtInfo()
+                              .withNoEscape(!escaping)
+                              .withThrows(throws)));
   }
 }
 

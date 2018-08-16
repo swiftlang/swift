@@ -523,7 +523,7 @@ namespace {
       if (!resultTy)
         return Type();
 
-      SmallVector<TupleTypeElt, 4> params;
+      SmallVector<FunctionType::Param, 4> params;
       for (auto param = type->param_type_begin(),
              paramEnd = type->param_type_end();
            param != paramEnd; ++param) {
@@ -537,14 +537,11 @@ namespace {
         // names. The probably doesn't matter outside of a FuncDecl, which
         // we'll have to special-case, but it's an interesting bit of data loss.
         // We also lose `noescape`. <https://bugs.swift.org/browse/SR-2529>
-        params.push_back(swiftParamTy);
+        params.push_back(FunctionType::Param(swiftParamTy));
       }
 
-      // Form the parameter tuple.
-      auto paramsTy = TupleType::get(params, Impl.SwiftContext);
-
       // Form the function type.
-      return FunctionType::get(paramsTy, resultTy);
+      return FunctionType::get(params, resultTy);
     }
 
     ImportResult
@@ -556,7 +553,7 @@ namespace {
       if (!resultTy)
         return Type();
 
-      return FunctionType::get(TupleType::getEmpty(Impl.SwiftContext),resultTy);
+      return FunctionType::get({}, resultTy);
     }
 
     ImportResult VisitParenType(const clang::ParenType *type) {

@@ -2979,9 +2979,9 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   using ExtInfo = AnyFunctionType::ExtInfo;
   using CanParamArrayRef = AnyFunctionType::CanParamArrayRef;
 
-  static CanAnyFunctionType get(CanGenericSignature signature,
-                                CanType input, CanType result,
-                                ExtInfo extInfo = ExtInfo());
+  static CanAnyFunctionType getOld(CanGenericSignature signature,
+                                   CanType input, CanType result,
+                                   ExtInfo extInfo = ExtInfo());
   static CanAnyFunctionType get(CanGenericSignature signature,
                                 CanParamArrayRef params,
                                 CanType result,
@@ -3018,8 +3018,8 @@ class FunctionType final : public AnyFunctionType,
       
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *get(Type Input, Type Result,
-                           ExtInfo Info = ExtInfo());
+  static FunctionType *getOld(Type Input, Type Result,
+                              ExtInfo Info = ExtInfo());
       
   static FunctionType *get(ArrayRef<Param> params,
                            Type result,
@@ -3043,9 +3043,9 @@ private:
                ExtInfo Info);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  static CanFunctionType get(CanType input, CanType result,
-                             ExtInfo info = ExtInfo()) {
-    auto fnType = FunctionType::get(input, result, info);
+  static CanFunctionType getOld(CanType input, CanType result,
+                                ExtInfo info = ExtInfo()) {
+    auto fnType = FunctionType::getOld(input, result, info);
     return cast<FunctionType>(fnType->getCanonicalType());
   }
   static CanFunctionType get(CanParamArrayRef params, CanType result,
@@ -3103,10 +3103,10 @@ class GenericFunctionType final : public AnyFunctionType,
       
 public:
   /// Create a new generic function type.
-  static GenericFunctionType *get(GenericSignature *sig,
-                                  Type input,
-                                  Type result,
-                                  ExtInfo info = ExtInfo());
+  static GenericFunctionType *getOld(GenericSignature *sig,
+                                     Type input,
+                                     Type result,
+                                     ExtInfo info = ExtInfo());
 
   /// Create a new generic function type.
   static GenericFunctionType *get(GenericSignature *sig,
@@ -3152,12 +3152,12 @@ public:
 };
 
 BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
-  static CanGenericFunctionType get(CanGenericSignature sig,
-                                    CanType input, CanType result,
-                                    ExtInfo info = ExtInfo()) {
+  static CanGenericFunctionType getOld(CanGenericSignature sig,
+                                       CanType input, CanType result,
+                                       ExtInfo info = ExtInfo()) {
     // Knowing that the argument types are independently canonical is
     // not sufficient to guarantee that the function type will be canonical.
-    auto fnType = GenericFunctionType::get(sig, input, result, info);
+    auto fnType = GenericFunctionType::getOld(sig, input, result, info);
     return cast<GenericFunctionType>(fnType->getCanonicalType());
   }
 
@@ -3189,12 +3189,12 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 
 inline CanAnyFunctionType
-CanAnyFunctionType::get(CanGenericSignature signature,
-                        CanType input, CanType result, ExtInfo extInfo) {
+CanAnyFunctionType::getOld(CanGenericSignature signature,
+                           CanType input, CanType result, ExtInfo extInfo) {
   if (signature) {
-    return CanGenericFunctionType::get(signature, input, result, extInfo);
+    return CanGenericFunctionType::getOld(signature, input, result, extInfo);
   } else {
-    return CanFunctionType::get(input, result, extInfo);
+    return CanFunctionType::getOld(input, result, extInfo);
   }
 }
 
