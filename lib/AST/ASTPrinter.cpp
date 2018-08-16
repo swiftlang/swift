@@ -495,7 +495,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printAccess(const ValueDecl *D) {
-    if (!Options.PrintAccess || !D->hasAccess())
+    if (!Options.PrintAccess || !D->hasAccess() ||
+        isa<ProtocolDecl>(D->getDeclContext()))
       return;
     if (D->getAttrs().hasAttribute<AccessControlAttr>() &&
         !llvm::is_contained(Options.ExcludeAttrList, DAK_AccessControl))
