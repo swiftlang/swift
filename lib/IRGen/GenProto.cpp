@@ -2031,6 +2031,8 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
   Explosion params = IGF.collectParameters();
   Address wtable(params.claimNext(), PointerAlignment);
   llvm::Value *metadata = params.claimNext();
+  IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, metadata,
+                                        MetadataState::Complete);
   llvm::Value *instantiationArgs = params.claimNext();
   Address conditionalTables(
       IGF.Builder.CreateBitCast(instantiationArgs,
