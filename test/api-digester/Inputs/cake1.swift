@@ -28,3 +28,11 @@ public struct Somestruct2 {
 public class C4: OldType {
   public func foo() {}
 }
+
+@objc
+public class C5 {}
+
+public struct C6 {}
+
+@_frozen
+public enum IceKind {}
