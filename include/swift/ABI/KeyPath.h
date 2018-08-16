@@ -88,7 +88,8 @@ public:
   }
 
   constexpr static KeyPathComponentHeader
-  forStructComponentWithInlineOffset(unsigned offset) {
+  forStructComponentWithInlineOffset(bool isLet,
+                                     unsigned offset) {
     return KeyPathComponentHeader(
       (_SwiftKeyPathComponentHeader_StructTag
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
@@ -96,7 +97,7 @@ public:
   }
   
   constexpr static KeyPathComponentHeader
-  forStructComponentWithOutOfLineOffset() {
+  forStructComponentWithOutOfLineOffset(bool isLet) {
     return KeyPathComponentHeader(
       (_SwiftKeyPathComponentHeader_StructTag
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
@@ -104,7 +105,7 @@ public:
   }
 
   constexpr static KeyPathComponentHeader
-  forStructComponentWithUnresolvedFieldOffset() {
+  forStructComponentWithUnresolvedFieldOffset(bool isLet) {
     return KeyPathComponentHeader(
       (_SwiftKeyPathComponentHeader_StructTag
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
@@ -112,7 +113,8 @@ public:
   }
   
   constexpr static KeyPathComponentHeader
-  forClassComponentWithInlineOffset(unsigned offset) {
+  forClassComponentWithInlineOffset(bool isLet,
+                                    unsigned offset) {
     return KeyPathComponentHeader(
       (_SwiftKeyPathComponentHeader_ClassTag
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
@@ -120,7 +122,7 @@ public:
   }
 
   constexpr static KeyPathComponentHeader
-  forClassComponentWithOutOfLineOffset() {
+  forClassComponentWithOutOfLineOffset(bool isLet) {
     return KeyPathComponentHeader(
       (_SwiftKeyPathComponentHeader_ClassTag
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
@@ -128,7 +130,7 @@ public:
   }
   
   constexpr static KeyPathComponentHeader
-  forClassComponentWithUnresolvedFieldOffset() {
+  forClassComponentWithUnresolvedFieldOffset(bool isLet) {
     return KeyPathComponentHeader(
       (_SwiftKeyPathComponentHeader_ClassTag
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)
@@ -136,7 +138,7 @@ public:
   }
   
   constexpr static KeyPathComponentHeader
-  forClassComponentWithUnresolvedIndirectOffset() {
+  forClassComponentWithUnresolvedIndirectOffset(bool isLet) {
     return KeyPathComponentHeader(
       (_SwiftKeyPathComponentHeader_ClassTag
       << _SwiftKeyPathComponentHeader_DiscriminatorShift)

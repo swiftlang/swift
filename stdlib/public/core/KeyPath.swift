@@ -758,6 +758,9 @@ internal struct RawKeyPathComponent {
     internal static var endOfReferencePrefixFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_EndOfReferencePrefixFlag
     }
+    internal static var storedOffsetPayloadMask: UInt32 {
+      return _SwiftKeyPathComponentHeader_StoredOffsetPayloadMask
+    }
     internal static var outOfLineOffsetPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload
     }
@@ -852,6 +855,20 @@ internal struct RawKeyPathComponent {
         _value = _value & ~Header.payloadMask | newValue
       }
     }
+    internal var storedOffsetPayload: UInt32 {
+      get {
+        _sanityCheck(kind == .struct || kind == .class,
+                     "not a stored component")
+        return _value & Header.storedOffsetPayloadMask
+      }
+      set {
+        _sanityCheck(kind == .struct || kind == .class,
+                     "not a stored component")
+        _sanityCheck(newValue & Header.storedOffsetPayloadMask == newValue,
+                     "payload too big")
+        _value = _value & ~Header.storedOffsetPayloadMask | newValue
+      }
+    }
     internal var endOfReferencePrefix: Bool {
       get {
         return _value & Header.endOfReferencePrefixFlag != 0
@@ -913,12 +930,12 @@ internal struct RawKeyPathComponent {
     internal func _componentBodySize(forPropertyDescriptor: Bool) -> Int {
       switch kind {
       case .struct, .class:
-        if payload == Header.unresolvedFieldOffsetPayload
-           || payload == Header.outOfLineOffsetPayload {
+        if storedOffsetPayload == Header.unresolvedFieldOffsetPayload
+           || storedOffsetPayload == Header.outOfLineOffsetPayload {
           // A 32-bit offset is stored in the body.
           return MemoryLayout<UInt32>.size
         }
-        if payload == Header.unresolvedIndirectOffsetPayload {
+        if storedOffsetPayload == Header.unresolvedIndirectOffsetPayload {
           // A pointer-aligned, pointer-sized pointer is stored in the body.
           return Header.pointerAlignmentSkew + MemoryLayout<Int>.size
         }
@@ -959,7 +976,9 @@ internal struct RawKeyPathComponent {
     let ptrSize = MemoryLayout<Int>.size
     switch header.kind {
     case .struct, .class:
-      if header.payload == Header.payloadMask { return 4 } // overflowed
+      if header.storedOffsetPayload == Header.outOfLineOffsetPayload {
+        return 4 // overflowed
+      }
       return 0
     case .external:
       // align to pointer + pointer to external descriptor
@@ -993,13 +1012,13 @@ internal struct RawKeyPathComponent {
                  "no offset for this kind")
     // An offset too large to fit inline is represented by a signal and stored
     // in the body.
-    if header.payload == Header.outOfLineOffsetPayload {
+    if header.storedOffsetPayload == Header.outOfLineOffsetPayload {
       // Offset overflowed into body
       _sanityCheck(body.count >= MemoryLayout<UInt32>.size,
                    "component not big enough")
       return Int(body.load(as: UInt32.self))
     }
-    return Int(header.payload)
+    return Int(header.storedOffsetPayload)
   }
 
   internal var _computedIDValue: Int {
@@ -1165,7 +1184,7 @@ internal struct RawKeyPathComponent {
     switch header.kind {
     case .struct,
          .class:
-      if header.payload == Header.outOfLineOffsetPayload {
+      if header.storedOffsetPayload == Header.outOfLineOffsetPayload {
         let overflowOffset = body.load(as: UInt32.self)
         buffer.storeBytes(of: overflowOffset, toByteOffset: 4,
                           as: UInt32.self)
@@ -2292,11 +2311,11 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       // reassigned.
 
       // Check the final instantiated size of the offset.
-      if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload
-        || header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload
+        || header.storedOffsetPayload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
         _ = buffer.pop(UInt32.self)
       }
-      if header.payload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
         _ = buffer.pop(Int.self)
         // On 64-bit systems the pointer to the ivar offset variable is
         // pointer-sized and -aligned, but the resulting offset ought to be
@@ -2363,7 +2382,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
         // The final component will be a stored component with just an offset.
         // If the offset requires resolution, then it'll be stored out of
         // line after the header.
-        if descriptorHeader.payload
+        if descriptorHeader.storedOffsetPayload
             > RawKeyPathComponent.Header.maximumOffsetPayload {
           newComponentSize = MemoryLayout<RawKeyPathComponent.Header>.size
                            + MemoryLayout<UInt32>.size
@@ -2617,7 +2636,7 @@ internal func _instantiateKeyPathBuffer(
 
     func tryToResolveOffset(header: RawKeyPathComponent.Header,
                             getOutOfLineOffset: () -> UInt32) {
-      if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload {
         // Look up offset in type metadata. The value in the pattern is the
         // offset within the metadata object.
         let metadataPtr = unsafeBitCast(base, to: UnsafeRawPointer.self)
@@ -2634,20 +2653,20 @@ internal func _instantiateKeyPathBuffer(
 
         // Rewrite the header for a resolved offset.
         var newHeader = header
-        newHeader.payload = RawKeyPathComponent.Header.outOfLineOffsetPayload
+        newHeader.storedOffsetPayload = RawKeyPathComponent.Header.outOfLineOffsetPayload
         pushDest(newHeader)
         pushDest(offset)
         return
       }
 
-      if header.payload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
         // Look up offset in the indirectly-referenced variable we have a
         // pointer.
         let offsetVar = patternBuffer.pop(UnsafeRawPointer.self)
         let offsetValue = UInt32(offsetVar.load(as: UInt.self))
         // Rewrite the header for a resolved offset.
         var newHeader = header
-        newHeader.payload = RawKeyPathComponent.Header.outOfLineOffsetPayload
+        newHeader.storedOffsetPayload = RawKeyPathComponent.Header.outOfLineOffsetPayload
         pushDest(newHeader)
         pushDest(offsetValue)
         return
@@ -2655,7 +2674,7 @@ internal func _instantiateKeyPathBuffer(
 
       // Otherwise, just transfer the pre-resolved component.
       pushDest(header)
-      if header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
         let offset = getOutOfLineOffset() //patternBuffer.pop(UInt32.self)
         pushDest(offset)
       }

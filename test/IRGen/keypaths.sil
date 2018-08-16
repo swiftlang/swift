@@ -205,7 +205,7 @@ sil_vtable C {}
 // CHECK-SAME: i32 8,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 //             -- struct with runtime-resolved offset
-// CHECK-SAME: <i32 0x01fffffe>,
+// CHECK-SAME: <i32 0x017ffffe>,
 // CHECK-32-SAME: i32 16 }>
 // CHECK-64-SAME: i32 32 }>
 
@@ -218,7 +218,7 @@ sil_vtable C {}
 // CHECK-SAME: i32 8,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 //             -- struct with runtime-resolved offset
-// CHECK-SAME: <i32 0x01fffffe>,
+// CHECK-SAME: <i32 0x017ffffe>,
 // CHECK-32-SAME: i32 20 }>
 // CHECK-64-SAME: i32 36 }>
 
