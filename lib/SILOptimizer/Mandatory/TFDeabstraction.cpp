@@ -1508,21 +1508,21 @@ propagateSSAOperand(SILValue v, SmallPtrSet<SILPHIArgument *, 8> &checkedPhis) {
 
       // Handle the case of deabstracting an array, such as the tfop attr %181
       // below. In this example, we need to propagate %188 to %190, which
-      // eventually feeds %181. Note %189 is not a const struct. So the goal of
-      // SS value propagation here is that we let const expr eval only process
+      // eventually feeds %181. Note %189 is not a const struct. The goal of
+      // SSA value propagation here is to have const expr eval only process
       // the (const) struct field %188, and not the struct %189.
       //
       // function_ref _allocateUninitializedArray<A>(_:)
       // %179 = function_ref @$Ss27_allocateUninitializedArrayySayxG_BptBwlF ...
       // %180 = apply %179<TensorShape>(%178) ...
-      // %181 = tuple_extract %180 : $(Array<TensorShape>, Builtin.RawPointer),
-      // 0 %183 = tuple_extract %180 : $(Array<TensorShape>,
-      // Builtin.RawPointer), 1 %185 = pointer_to_address %183 %188 = struct
-      // $TensorShape (%187 : $Array<Int32>) %189 = struct $SimpleIterator (%145
-      // : $ResourceHandle, %188 : $TensorShape) %190 = struct_extract %189 :
-      // $SimpleIterator, #SimpleIterator.elementShape store %190 to %185 :
-      // $*TensorShape %193 = builtin "__tfop_someOp,...,shapes"(..., %181 :
-      // $Array<TensorShape>
+      // %181 = tuple_extract %180 : $(Array<TensorShape>, Builtin.RawPointer),0
+      // %183 = tuple_extract %180 : $(Array<TensorShape>, Builtin.RawPointer),1
+      // %185 = pointer_to_address %183
+      // %188 = struct $TensorShape (%187 : $Array<Int32>)
+      // %189 = struct $SimpleIter(...: $ResourceHandle, %188 :$TensorShape)
+      // %190 = struct_extract %189 : $SimpleIter, #SimpleIter.elementShape
+      // store %190 to %185 : $*TensorShape
+      // %193 = builtin "__tfop_Foo,...,shapes"(..., %181 : $Array<TensorShape>
       ArrayElementDecoder arrayDecoder;
       if (!arrayDecoder.decode(extract))
         continue;
@@ -1530,8 +1530,7 @@ propagateSSAOperand(SILValue v, SmallPtrSet<SILPHIArgument *, 8> &checkedPhis) {
       for (auto *use : arrayDecoder.elementsAtInit) {
         auto *store = dyn_cast<StoreInst>(use->getUser());
         if (!store) {
-          // TODO: we may need to handle a few other instruction types here as
-          // well.
+          // TODO: May need to handle other inst types too, such as CopyAddr.
           continue;
         }
 
