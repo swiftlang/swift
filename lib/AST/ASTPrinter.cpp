@@ -72,8 +72,9 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.FullyQualifiedTypes = true;
   result.SkipImports = true;
 
-  class UsableFromInlineOnly : public ShouldPrintChecker {
+  class ShouldPrintForTextualInterface : public ShouldPrintChecker {
     bool shouldPrint(const Decl *D, const PrintOptions &options) override {
+      // Skip anything that isn't 'public' or '@usableFromInline'.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         AccessScope accessScope =
             VD->getFormalAccessScope(/*useDC*/nullptr,
@@ -81,10 +82,29 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
         if (!accessScope.isPublic())
           return false;
       }
+
+      // Skip typealiases that just redeclare generic parameters.
+      if (auto *alias = dyn_cast<TypeAliasDecl>(D)) {
+        if (alias->isImplicit()) {
+          const Decl *parent =
+              D->getDeclContext()->getAsDeclOrDeclExtensionContext();
+          if (auto *genericCtx = parent->getAsGenericContext()) {
+            bool matchesGenericParam =
+                llvm::any_of(genericCtx->getInnermostGenericParamTypes(),
+                             [alias](const GenericTypeParamType *param) {
+              return param->getName() == alias->getName();
+            });
+            if (matchesGenericParam)
+              return false;
+          }
+        }
+      }
+
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
-  result.CurrentPrintabilityChecker = std::make_shared<UsableFromInlineOnly>();
+  result.CurrentPrintabilityChecker =
+      std::make_shared<ShouldPrintForTextualInterface>();
 
   // FIXME: We don't really need 'public' on everything; we could just change
   // the default to 'public' and mark the 'internal' things.
