@@ -758,8 +758,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // "Self" constraints that can affect name lookup.
         if (isa<ProtocolDecl>(nominal)) {
           if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-            for (auto bound :
-                    Ctx.evaluator(SelfBoundsFromWhereClauseRequest{ext}))
+            auto bounds = evaluateOrDefault(Ctx.evaluator,
+              SelfBoundsFromWhereClauseRequest{ext}, {});
+            for (auto bound : bounds)
               lookupDecls.push_back(bound);
           }
         }
@@ -843,8 +844,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           // "Self" constraints that can affect name lookup.
           if (isa<ProtocolDecl>(nominal)) {
             if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-              for (auto bound :
-                       Ctx.evaluator(SelfBoundsFromWhereClauseRequest{ext}))
+              auto bounds = evaluateOrDefault(Ctx.evaluator,
+                SelfBoundsFromWhereClauseRequest{ext}, {});
+              for (auto bound : bounds)
                 lookupDecls.push_back(bound);
             }
           }
@@ -2169,8 +2171,9 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       if (!typealiases.insert(typealias).second)
         continue;
 
-      auto underlyingTypeReferences
-        = evaluator(UnderlyingTypeDeclsReferencedRequest{typealias});
+      auto underlyingTypeReferences = evaluateOrDefault(evaluator,
+        UnderlyingTypeDeclsReferencedRequest{typealias}, {});
+
       auto underlyingNominalReferences
         = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences,
                                     modulesFound, anyObject, typealiases);
@@ -2444,12 +2447,13 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
 }
 
 /// Evaluate a superclass declaration request.
-ClassDecl *SuperclassDeclRequest::evaluate(Evaluator &evaluator,
-                                           NominalTypeDecl *subject) const {
+llvm::Expected<ClassDecl *>
+SuperclassDeclRequest::evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *subject) const {
   for (unsigned i : indices(subject->getInherited())) {
     // Find the inherited declarations referenced at this position.
-    auto inheritedTypes =
-      evaluator(InheritedDeclsReferencedRequest{subject, i});
+    auto inheritedTypes = evaluateOrDefault(evaluator,
+      InheritedDeclsReferencedRequest{subject, i}, {});
 
     // Resolve those type declarations to nominal type declarations.
     SmallVector<ModuleDecl *, 2> modulesFound;
@@ -2468,8 +2472,9 @@ ClassDecl *SuperclassDeclRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
-NominalTypeDecl *ExtendedNominalRequest::evaluate(Evaluator &evaluator,
-                                                  ExtensionDecl *ext) const {
+llvm::Expected<NominalTypeDecl *>
+ExtendedNominalRequest::evaluate(Evaluator &evaluator,
+                                 ExtensionDecl *ext) const {
   DirectlyReferencedTypeDecls referenced;
   ASTContext &ctx = ext->getASTContext();
 
@@ -2505,7 +2510,8 @@ void swift::getDirectlyInheritedNominalTypeDecls(
                              : extDecl->getASTContext();
 
   // Find inherited declarations.
-  auto referenced = ctx.evaluator(InheritedDeclsReferencedRequest{decl, i});
+  auto referenced = evaluateOrDefault(ctx.evaluator,
+    InheritedDeclsReferencedRequest{decl, i}, {});
 
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;

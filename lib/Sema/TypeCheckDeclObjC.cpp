@@ -1259,7 +1259,8 @@ static void markAsObjC(ValueDecl *D, ObjCReason reason,
                        Optional<ForeignErrorConvention> errorConvention);
 
 
-bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
+llvm::Expected<bool>
+IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   auto dc = VD->getDeclContext();
   Optional<ObjCReason> isObjC;
   if (dc->getAsClassOrClassExtensionContext() && !isa<TypeDecl>(VD)) {

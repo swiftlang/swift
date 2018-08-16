@@ -42,11 +42,11 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  AccessLevel evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  llvm::Expected<AccessLevel> evaluate(Evaluator &evaluator,
+                                       ValueDecl *decl) const;
 
 public:
   // Cycle handling
-  AccessLevel breakCycle() const { return AccessLevel::Private; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -71,11 +71,11 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  AccessLevel evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+  llvm::Expected<AccessLevel>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
   // Cycle handling
-  AccessLevel breakCycle() const { return AccessLevel::Private; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -98,14 +98,11 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  DefaultAndMax
+  llvm::Expected<DefaultAndMax>
   evaluate(Evaluator &evaluator, ExtensionDecl *decl) const;
 
 public:
   // Cycle handling
-  DefaultAndMax
-  breakCycle() const { return std::make_pair(AccessLevel::Private,
-                                             AccessLevel::Private); }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
