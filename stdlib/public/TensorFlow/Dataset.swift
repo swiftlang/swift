@@ -80,7 +80,8 @@ public extension SingleValueDataset {
     enableCPU()
     return SingleValueDataset<T>(
       _handle: #tfop(
-        "MapDataset", _handle, [], f: transform, Targuments: [],
+        "MapDataset", _handle, [] as [TensorHandle<Float>], f: transform,
+        Targuments: [] as [Any.Type],
         output_types: [ScalarOfElement.self], output_shapes: [elementShape]
       ),
       elementShape: elementShape
@@ -96,7 +97,8 @@ public extension SingleValueDataset {
     enableCPU()
     return SingleValueDataset(
       _handle: #tfop(
-        "FilterDataset", _handle, [], predicate: isIncluded, Targuments: [],
+        "FilterDataset", _handle, [] as [TensorHandle<Float>],
+        predicate: isIncluded, Targuments: [] as [Any.Type],
         output_types: [ScalarOfElement.self], output_shapes: [elementShape]
       ),
       elementShape: elementShape
