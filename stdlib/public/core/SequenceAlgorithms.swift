@@ -521,33 +521,31 @@ extension Sequence where Element : Equatable {
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
-  /// Returns a Int value indicating how many elements in the sequence
-  /// satisfy the given predicate.
+  /// Returns the number of many elements in the sequence that satisfy the
+  /// given predicate.
   ///
-  /// You can use the predicate to check for an element of a type that
-  /// doesn't conform to the `Equatable` protocol, such as the
-  /// `HTTPResponse` enumeration in this example.
+  /// You can use this method to count the number of elements that pass a test.
+  /// For example, this code finds the number of names that are fewer than
+  /// five characters long:
   ///
-  ///     enum HTTPResponse {
-  ///         case ok
-  ///         case error(Int)
-  ///     }
+  ///     let names = ["Jacqueline", "Ian", "Amy", "Juan", "Soroush", "Tiffany"]
+  ///     let shortNameCount = names.count(where: { $0.count < 5 })
+  ///     // shortNameCount == 3
   ///
-  ///     let responses: [HTTPResponse] = [.ok, .error(500), .error(404)]
-  ///     let numberOfErrors = responses.count { element in
-  ///         if case .error = element {
-  ///             return true
-  ///         } else {
-  ///             return false
-  ///         }
-  ///     }
-  ///     // 'numberOfErrors' == 2
+  /// To find the number of times a specific element appears in the sequence,
+  /// use the equal-to operator (`==`) in the closure to test for a match.
   ///
-  /// - Parameter predicate: A closure that takes an element of the sequence
-  ///   as its argument and returns a Boolean value that indicates whether
-  ///   the passed element should be included in the count.
-  /// - Returns: a value indicating how many elements in the sequence
-  ///   satisfy the given predicate.
+  ///     let birds = ["duck", "duck", "duck", "duck", "goose"]
+  ///     let duckCount = birds.count(where: { $0 == "duck" })
+  ///     // duckCount == 4
+  ///
+  /// The sequence must be finite.
+  ///
+  /// - Parameter predicate: A closure that takes each element of the sequence
+  ///   as its argument and returns a Boolean value indicating whether
+  ///   the element should be included in the count.
+  /// - Returns: The number of elements in the sequence that satisfy the given
+  ///   predicate.
   @inlinable
   public func count(
     where predicate: (Element) throws -> Bool
