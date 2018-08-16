@@ -19,6 +19,7 @@ import unittest
 from imp import load_source
 
 from test_utils import Mock, captured_output
+from compare_perf_tests import PerformanceTestResult
 
 # import Benchmark_Driver  # doesn't work because it misses '.py' extension
 Benchmark_Driver = load_source(
@@ -162,6 +163,8 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
             self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
         self.assertEquals(driver.tests, ['Benchmark1', 'Benchmark3'])
+        self.assertEquals(driver.all_tests,
+                          ['Benchmark1', 'Benchmark2', 'Benchmark3'])
 
     def test_filters_benchmarks_by_pattern(self):
         self.args.filters = '-f .+3'.split()
@@ -170,6 +173,58 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
             self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
         self.assertEquals(driver.tests, ['Benchmark3'])
+        self.assertEquals(driver.all_tests,
+                          ['Benchmark1', 'Benchmark2', 'Benchmark3'])
+
+
+class LogParserStub(object):
+    results_from_string_called = False
+
+    @staticmethod
+    def results_from_string(log_contents):
+        LogParserStub.results_from_string_called = True
+        r = PerformanceTestResult('3,b1,1,123,123,123,0,123'.split(','))
+        return {'b1': r}
+
+
+class TestBenchmarkDriverRunningTests(unittest.TestCase):
+    def setUp(self):
+        self.args = ArgsStub()
+        self.parser_stub = LogParserStub()
+        self.subprocess_mock = SubprocessMock()
+        self.subprocess_mock.expect(
+            '/benchmarks/Benchmark_O --list --delim=\t'.split(' '),
+            '#\tTest\t[Tags]\n1\tb1\t[tag]\n')
+        self.driver = BenchmarkDriver(
+            self.args, _subprocess=self.subprocess_mock,
+            parser=self.parser_stub)
+
+    def test_run_benchmark_with_multiple_samples(self):
+        self.driver.run('b1')
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b1'))
+        self.driver.run('b2', num_samples=5)
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b2', '--num-samples=5'))
+
+    def test_run_benchmark_with_specified_number_of_iterations(self):
+        self.driver.run('b', num_iters=1)
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b', '--num-iters=1'))
+
+    def test_run_benchmark_in_verbose_mode(self):
+        self.driver.run('b', verbose=True)
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b', '--verbose'))
+
+    def test_parse_results_from_running_benchmarks(self):
+        self.driver.run('b')
+        self.assertTrue(self.parser_stub.results_from_string_called)
+
+    def test_measure_memory(self):
+        self.driver.run('b', measure_memory=True)
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b', '--memory'))
 
 
 if __name__ == '__main__':

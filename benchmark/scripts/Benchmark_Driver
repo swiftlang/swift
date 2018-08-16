@@ -21,14 +21,25 @@ import subprocess
 import sys
 import time
 
+from compare_perf_tests import LogParser
+
 DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 class BenchmarkDriver(object):
-    def __init__(self, args, tests=None, _subprocess=None):
+    """Executes tests from Swift Benchmark Suite."""
+
+    def __init__(self, args, tests=None, _subprocess=None, parser=None):
+        """Initialized with command line arguments.
+
+        Optional parameters for injecting dependencies; used for testing.
+        """
         self.args = args
         self._subprocess = _subprocess or subprocess
+        self.all_tests = []
         self.tests = tests or self._get_tests()
+        self.parser = parser or LogParser()
+        self.results = {}
 
     def _invoke(self, cmd):
         return self._subprocess.check_output(
@@ -36,8 +47,10 @@ class BenchmarkDriver(object):
 
     @property
     def test_harness(self):
-        return os.path.join(self.args.tests,
-                            "Benchmark_" + self.args.optimization)
+        """Full path to test harness binary."""
+        suffix = (self.args.optimization if hasattr(self.args, 'optimization')
+                  else 'O')
+        return os.path.join(self.args.tests, "Benchmark_" + suffix)
 
     @property
     def _cmd_list_benchmarks(self):
@@ -75,6 +88,30 @@ class BenchmarkDriver(object):
                          for i in benchmarks.intersection(set(indices))]
         return sorted(list(
             benchmarks.intersection(set(self.all_tests)).union(indexed_names)))
+
+    def run(self, test, num_samples=None, num_iters=None,
+            verbose=None, measure_memory=False):
+        """Execute benchmark and gather results."""
+        num_samples = num_samples or 1
+        num_iters = num_iters or 0  # automatically determine N to run for 1s
+
+        cmd = self._cmd_run(
+            test, num_samples, num_iters, verbose, measure_memory)
+        output = self._invoke(cmd)
+        result = self.parser.results_from_string(output).items()[0][1]
+        return result
+
+    def _cmd_run(self, test, num_samples, num_iters, verbose, measure_memory):
+        cmd = [self.test_harness, test]
+        if num_samples > 1:
+            cmd.append('--num-samples={0}'.format(num_samples))
+        if num_iters > 0:
+            cmd.append('--num-iters={0}'.format(num_iters))
+        if verbose:
+            cmd.append('--verbose')
+        if measure_memory:
+            cmd.append('--memory')
+        return cmd
 
 
 def instrument_test(driver_path, test, num_samples):
