@@ -182,6 +182,7 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
   if (binding.Kind == AllowedBindingKind::Supertypes &&
+      !binding.BindingType->hasUnresolvedType() &&
       !binding.BindingType->hasTypeVariable() &&
       !binding.BindingType->hasUnboundGenericType() &&
       !binding.DefaultedProtocol && !binding.isDefaultableBinding() &&
