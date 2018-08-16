@@ -6318,22 +6318,19 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Parse extraneous parentheses and remove them with a fixit.
   auto skipParameterListIfPresent = [this] {
-    if (Tok.is(tok::l_paren)) {
-      SourceRange ParenRange;
-      SourceLoc LParenLoc = consumeToken();
-      SourceLoc RParenLoc;
-      skipUntil(tok::r_paren);
+    SourceLoc LParenLoc;
+    if (!consumeIf(tok::l_paren, LParenLoc))
+      return;
+    SourceLoc RParenLoc;
+    skipUntil(tok::r_paren);
 
-      if (Tok.is(tok::r_paren)) {
-        SourceLoc RParenLoc = consumeToken();
-        ParenRange = SourceRange(LParenLoc, RParenLoc);
-
-        diagnose(ParenRange.Start, diag::destructor_params)
-          .fixItRemove(ParenRange);
-      } else {
-        diagnose(Tok, diag::opened_destructor_expected_rparen);
-        diagnose(LParenLoc, diag::opening_paren);
-      }
+    if (Tok.is(tok::r_paren)) {
+      SourceLoc RParenLoc = consumeToken();
+      diagnose(LParenLoc, diag::destructor_params)
+        .fixItRemove(SourceRange(LParenLoc, RParenLoc));
+    } else {
+      diagnose(Tok, diag::opened_destructor_expected_rparen);
+      diagnose(LParenLoc, diag::opening_paren);
     }
   };
 
