@@ -205,7 +205,7 @@ class PerformanceTestResult(object):
 
         The row is an iterable, such as a row provided by the CSV parser.
         """
-        # csv_row[0] is just an ordinal number of the test - skip that
+        self.test_num = csv_row[0]      # Ordinal number of the test
         self.name = csv_row[1]          # Name of the performance test
         self.num_samples = (            # Number of measurement samples taken
             int(csv_row[2]))

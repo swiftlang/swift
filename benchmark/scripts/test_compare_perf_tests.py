@@ -181,6 +181,7 @@ class TestPerformanceTestResult(unittest.TestCase):
     def test_init(self):
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
         r = PerformanceTestResult(log_line.split(','))
+        self.assertEquals(r.test_num, '1')
         self.assertEquals(r.name, 'AngryPhonebook')
         self.assertEquals(
             (r.num_samples, r.min, r.max, r.mean, r.sd, r.median),
@@ -346,7 +347,7 @@ Totals,269
         log = ("""
 # TEST      SAMPLES MIN(μs) MAX(μs) MEAN(μs) SD(μs) MEDIAN(μs) MAX_RSS(B)
 3 Array2D        20    2060    2188     2099      0       2099   20915200
-Totals        281 2693794 2882846  2748843      0          0          0""")
+Totals        281""")
         parser = LogParser()
         results = parser.parse_results(log.splitlines()[1:])  # without 1st \n
         self.assertTrue(isinstance(results[0], PerformanceTestResult))

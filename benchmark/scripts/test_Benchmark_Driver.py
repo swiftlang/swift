@@ -18,7 +18,7 @@ import unittest
 
 from imp import load_source
 
-from test_utils import Mock, captured_output
+from test_utils import Mock, Stub, captured_output
 from compare_perf_tests import PerformanceTestResult
 
 # import Benchmark_Driver  # doesn't work because it misses '.py' extension
@@ -89,6 +89,17 @@ class Test_parse_args(unittest.TestCase):
             ['error:',
              "argument -o/--optimization: invalid choice: 'bogus'",
              "(choose from 'O', 'Onone', 'Osize')"],
+            err.getvalue())
+
+    def test_iterations(self):
+        self.assertEquals(parse_args(['run']).iterations, 1)
+        self.assertEquals(parse_args(['run', '-i', '3']).iterations, 3)
+        with captured_output() as (out, err):
+            self.assertRaises(SystemExit,
+                              parse_args, ['run', '-i', '-3'])
+        self.assert_contains(
+            ['error:',
+             "argument -i/--iterations: invalid positive_int value: '-3'"],
             err.getvalue())
 
 
@@ -225,6 +236,32 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.driver.run('b', measure_memory=True)
         self.subprocess_mock.assert_called_with(
             ('/benchmarks/Benchmark_O', 'b', '--memory'))
+
+    def test_run_benchmark_independent_samples(self):
+        self.driver.args.iterations = 3
+        r = self.driver.run_independent_samples('b1')
+        self.assertEquals(self.subprocess_mock.calls.count(
+            ('/benchmarks/Benchmark_O', 'b1', '--memory')), 3)
+        self.assertEquals(r.num_samples, 3)  # results are merged
+
+    def test_run_bechmarks(self):
+        def mock_run(test):
+            self.assertEquals(test, 'b1')
+            return PerformanceTestResult(
+                '3,b1,1,123,123,123,0,123,888'.split(','))
+        driver = Stub(tests=['b1'])
+        driver.run_independent_samples = mock_run
+        run_benchmarks = Benchmark_Driver.run_benchmarks
+
+        with captured_output() as (out, _):
+            run_benchmarks(driver)
+        self.assertEquals('\n'.join("""
+#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
+3,b1,1,123,123,123,0,123,888
+
+Totals,1
+
+""".splitlines()[1:]), out.getvalue())  # removes 1st \n from multiline string
 
 
 if __name__ == '__main__':

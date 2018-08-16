@@ -113,44 +113,18 @@ class BenchmarkDriver(object):
             cmd.append('--memory')
         return cmd
 
+    def run_independent_samples(self, test):
+        """Run benchmark multiple times, gathering independent samples.
 
-def instrument_test(driver_path, test, num_samples):
-    """Run a test and instrument its peak memory use"""
-    test_outputs = []
-    for _ in range(num_samples):
-        test_output_raw = subprocess.check_output(
-            ['time', '-lp', driver_path, test],
-            stderr=subprocess.STDOUT
-        )
-        peak_memory = re.match('\s*(\d+)\s*maximum resident set size',
-                               test_output_raw.split('\n')[-15]).group(1)
-        test_outputs.append(test_output_raw.split()[1].split(',') +
-                            [peak_memory])
+        Returns the aggregated result of independent benchmark invocations.
+        """
+        def merge_results(a, b):
+            a.merge(b)
+            return a
 
-    # Average sample results
-    num_samples_index = 2
-    min_index = 3
-    max_index = 4
-    avg_start_index = 5
-
-    # TODO: Correctly take stdev
-    avg_test_output = test_outputs[0]
-    avg_test_output[avg_start_index:] = map(int,
-                                            avg_test_output[avg_start_index:])
-    for test_output in test_outputs[1:]:
-        for i in range(avg_start_index, len(test_output)):
-            avg_test_output[i] += int(test_output[i])
-    for i in range(avg_start_index, len(avg_test_output)):
-        avg_test_output[i] = int(round(avg_test_output[i] /
-                                       float(len(test_outputs))))
-    avg_test_output[num_samples_index] = num_samples
-    avg_test_output[min_index] = min(
-        test_outputs, key=lambda x: int(x[min_index]))[min_index]
-    avg_test_output[max_index] = max(
-        test_outputs, key=lambda x: int(x[max_index]))[max_index]
-    avg_test_output = map(str, avg_test_output)
-
-    return avg_test_output
+        return reduce(merge_results,
+                      [self.run(test, measure_memory=True)
+                       for _ in range(self.args.iterations)])
 
 
 def get_current_git_branch(git_repo_path):
@@ -197,11 +171,10 @@ def log_results(log_directory, driver, formatted_output, swift_repo=None):
         f.write(formatted_output)
 
 
-def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
+def run_benchmarks(driver,
                    log_directory=None, swift_repo=None):
     """Run perf tests individually and return results in a format that's
-    compatible with `parse_results`. If `benchmarks` is not empty,
-    only run tests included in it.
+    compatible with `LogParser`.
     """
     # Set a constant hash seed. Some tests are currently sensitive to
     # fluctuations in the number of hash collisions.
@@ -210,50 +183,43 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
     # that runs the tests.
     os.environ["SWIFT_DETERMINISTIC_HASHING"] = "1"
 
-    (total_tests, total_min, total_max, total_mean) = (0, 0, 0, 0)
     output = []
     headings = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)', 'MEAN(μs)',
                 'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)']
     line_format = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
-    if verbose and log_directory:
+    if log_directory:
         print(line_format.format(*headings))
-    for test in benchmarks:
-        test_output = instrument_test(driver, test, num_samples)
-        if test_output[0] == 'Totals':
-            continue
-        if verbose:
-            if log_directory:
-                print(line_format.format(*test_output))
-            else:
-                print(','.join(test_output))
+    else:
+        print(','.join(headings))
+    for test in driver.tests:
+        r = driver.run_independent_samples(test)
+        test_output = map(str, [
+            r.test_num, r.name, r.num_samples, r.min, r.max, int(r.mean),
+            int(r.sd), r.median, r.max_rss])
+        if log_directory:
+            print(line_format.format(*test_output))
+        else:
+            print(','.join(test_output))
         output.append(test_output)
-        (samples, _min, _max, mean) = map(int, test_output[2:6])
-        total_tests += 1
-        total_min += _min
-        total_max += _max
-        total_mean += mean
     if not output:
         return
     formatted_output = '\n'.join([','.join(l) for l in output])
-    totals = map(str, ['Totals', total_tests, total_min, total_max,
-                       total_mean, '0', '0', '0'])
+    totals = ['Totals', str(len(driver.tests))]
     totals_output = '\n\n' + ','.join(totals)
-    if verbose:
-        if log_directory:
-            print(line_format.format(*([''] + totals)))
-        else:
-            print(totals_output[1:])
+    if log_directory:
+        print(line_format.format(*([''] + totals + ([''] * 6))))
+    else:
+        print(totals_output[1:])
     formatted_output += totals_output
     if log_directory:
-        log_results(log_directory, driver, formatted_output, swift_repo)
+        log_results(log_directory, driver.test_harness, formatted_output,
+                    swift_repo)
     return formatted_output
 
 
 def run(args):
-    driver = BenchmarkDriver(args)
     run_benchmarks(
-        driver.test_harness, benchmarks=driver.tests,
-        num_samples=args.iterations, verbose=True,
+        BenchmarkDriver(args),
         log_directory=args.output_dir,
         swift_repo=args.swift_repo)
     return 0
