@@ -29,3 +29,10 @@ public struct NSSomestruct2 {
 }
 
 public class C4: NewType {}
+
+public class C5 {}
+
+@_fixed_layout
+public struct C6 {}
+
+public enum IceKind {}

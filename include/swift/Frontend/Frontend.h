@@ -38,6 +38,7 @@
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
+#include "swift/TBDGen/TBDGen.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
@@ -70,6 +71,7 @@ class CompilerInvocation {
   MigratorOptions MigratorOpts;
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
+  TBDGenOptions TBDGenOpts;
   /// The \c SyntaxParsingCache to use when parsing the main file of this
   /// invocation
   SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
@@ -196,6 +198,9 @@ public:
 
   FrontendOptions &getFrontendOptions() { return FrontendOpts; }
   const FrontendOptions &getFrontendOptions() const { return FrontendOpts; }
+
+  TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
+  const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }
 
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
