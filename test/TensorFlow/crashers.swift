@@ -246,6 +246,7 @@ public func testMultiResultOp_send_recv() {
   let results = TensorFlow.Raw.softmaxCrossEntropyWithLogits(features: x, labels: x)
   // Accelerator -> Host
   _hostOp(results.loss)
+  // expected-note @+1{{value used here}}
   let adjustedLoss = results.loss.scalar! + 3.0
   // Host -> Accelerator
   let y = Tensor<Float>(adjustedLoss)

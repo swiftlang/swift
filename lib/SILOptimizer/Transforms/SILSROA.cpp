@@ -44,6 +44,9 @@ namespace {
 class SROAMemoryUseAnalyzer {
   // The allocation we are analyzing.
   AllocStackInst *AI;
+  // Only explode those alloc_stack insts over which shouldExplode() return
+  // true.
+  const std::function<bool(AllocStackInst *)> &shouldExplode;
 
   // Loads from AI.
   llvm::SmallVector<LoadInst *, 4> Loads;
@@ -57,7 +60,10 @@ class SROAMemoryUseAnalyzer {
   // StructDecl if we are visiting a struct.
   StructDecl *SD = nullptr;
 public:
-  SROAMemoryUseAnalyzer(AllocStackInst *AI) : AI(AI) {
+  SROAMemoryUseAnalyzer(
+      AllocStackInst *AI,
+      const std::function<bool(AllocStackInst *)> &shouldExplode)
+      : AI(AI), shouldExplode(shouldExplode) {
     assert(AI && "AI should never be null here.");
   }
 
@@ -228,8 +234,10 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(
   //
   // TODO: Change this into an assert. For some reason I am running into compile
   // issues when I try it now.
-  for (auto *AI : NewAllocations)
-    Worklist.push_back(AI);
+  for (auto *AI : NewAllocations) {
+    if (shouldExplode(AI))
+      Worklist.push_back(AI);
+  }
 
   // Change any aggregate loads into field loads + aggregate structure.
   for (auto *LI : Loads) {
@@ -287,14 +295,16 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(
   eraseFromParentWithDebugInsts(AI);
 }
 
-bool swift::runSROAOnInsts(ArrayRef<AllocStackInst *> Insts) {
+bool swift::runSROAOnInsts(
+    ArrayRef<AllocStackInst *> Insts,
+    const std::function<bool(AllocStackInst *)> &shouldExplode) {
   bool Changed = false;
   SmallVector<AllocStackInst *, 16> WorklistVec(Insts.begin(), Insts.end());
   while (!WorklistVec.empty()) {
     AllocStackInst *AI = WorklistVec.back();
     WorklistVec.pop_back();
 
-    SROAMemoryUseAnalyzer Analyzer(AI);
+    SROAMemoryUseAnalyzer Analyzer(AI, shouldExplode);
 
     if (!Analyzer.analyze())
       continue;
@@ -317,7 +327,7 @@ static bool runSROAOnFunction(SILFunction &Fn) {
         if (shouldExpand(Fn.getModule(), AI->getElementType()))
           Worklist.push_back(AI);
 
-  return runSROAOnInsts(Worklist);
+  return runSROAOnInsts(Worklist, [](AllocStackInst *alloc) { return true; });
 }
 
 namespace {
