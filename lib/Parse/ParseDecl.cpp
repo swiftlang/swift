@@ -6317,34 +6317,45 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc DestructorLoc = consumeToken(tok::kw_deinit);
 
   // Parse extraneous parentheses and remove them with a fixit.
-  if (Tok.is(tok::l_paren)) {
-    SourceRange ParenRange;
-    SourceLoc LParenLoc = consumeToken();
-    SourceLoc RParenLoc;
-    skipUntil(tok::r_paren);
+  auto skipParameterListIfPresent = [this] {
+    if (Tok.is(tok::l_paren)) {
+      SourceRange ParenRange;
+      SourceLoc LParenLoc = consumeToken();
+      SourceLoc RParenLoc;
+      skipUntil(tok::r_paren);
 
-    if (Tok.is(tok::r_paren)) {
-      SourceLoc RParenLoc = consumeToken();
-      ParenRange = SourceRange(LParenLoc, RParenLoc);
-      
-      diagnose(ParenRange.Start, diag::destructor_params)
-      .fixItRemoveChars(Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                   DestructorLoc),
-                        Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                   ParenRange.End));
-    } else {
-      diagnose(Tok, diag::opened_destructor_expected_rparen);
-      diagnose(LParenLoc, diag::opening_paren);
+      if (Tok.is(tok::r_paren)) {
+        SourceLoc RParenLoc = consumeToken();
+        ParenRange = SourceRange(LParenLoc, RParenLoc);
+
+        diagnose(ParenRange.Start, diag::destructor_params)
+          .fixItRemove(ParenRange);
+      } else {
+        diagnose(Tok, diag::opened_destructor_expected_rparen);
+        diagnose(LParenLoc, diag::opening_paren);
+      }
     }
-  }
+  };
 
   // '{'
   if (!Tok.is(tok::l_brace)) {
-    if (!Tok.is(tok::l_brace) && !isInSILMode()) {
+    switch (SF.Kind) {
+    case SourceFileKind::Interface:
+    case SourceFileKind::SIL:
+      // It's okay to have no body for SIL code or textual interfaces.
+      break;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::REPL:
       if (Tok.is(tok::identifier)) {
         diagnose(Tok, diag::destructor_has_name).fixItRemove(Tok.getLoc());
-      } else
-        diagnose(Tok, diag::expected_lbrace_destructor);
+        consumeToken();
+      }
+      skipParameterListIfPresent();
+      if (Tok.is(tok::l_brace))
+        break;
+
+      diagnose(Tok, diag::expected_lbrace_destructor);
       return nullptr;
     }
   }
