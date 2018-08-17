@@ -556,6 +556,20 @@ makeTuple(const Gs & ...elementGenerators) {
   };
 }
 
+template <class... Gs>
+static BuiltinGenericSignatureBuilder::LambdaGenerator
+makeBoundGenericType(NominalTypeDecl *decl,
+                     const Gs & ...argumentGenerators) {
+  return {
+    [=](BuiltinGenericSignatureBuilder &builder) -> Type {
+      Type args[] = {
+        argumentGenerators.build(builder)...
+      };
+      return BoundGenericType::get(decl, Type(), args);
+    }
+  };
+}
+
 template <class T>
 static BuiltinGenericSignatureBuilder::MetatypeGenerator<T>
 makeMetatype(const T &object, Optional<MetatypeRepresentation> repr = None) {
@@ -969,6 +983,15 @@ static ValueDecl *getTypeJoinMetaOperation(ASTContext &Context, Identifier Id) {
   builder.addParameter(makeMetatype(makeGenericParam(0)));
   builder.addParameter(makeMetatype(makeGenericParam(1)));
   builder.setResult(makeMetatype(makeGenericParam(2)));
+  return builder.build(Id);
+}
+
+static ValueDecl *getIdentityKeyPathOperation(ASTContext &Context,
+                                              Identifier Id) {
+  BuiltinGenericSignatureBuilder builder(Context, 1);
+  auto arg = makeGenericParam();
+  builder.setResult(makeBoundGenericType(Context.getWritableKeyPathDecl(),
+                                         arg, arg));
   return builder.build(Id);
 }
 
@@ -1865,6 +1888,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TypeJoinMeta:
     return getTypeJoinMetaOperation(Context, Id);
+      
+  case BuiltinValueKind::IdentityKeyPath:
+    return getIdentityKeyPathOperation(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

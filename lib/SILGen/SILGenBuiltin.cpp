@@ -21,6 +21,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/SIL/SILArgument.h"
@@ -1054,6 +1055,58 @@ static ManagedValue emitBuiltinProjectTailElems(SILGenFunction &SGF,
   result = SGF.B.createAddressToPointer(loc, result, rawPointerType);
   return ManagedValue::forUnmanaged(result);
 }
+
+static ManagedValue emitBuiltinIdentityKeyPath(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               SubstitutionMap subs,
+                                               ArrayRef<ManagedValue> args,
+                                               SGFContext C) {
+  assert(subs.getReplacementTypes().size() == 1 &&
+         "identityKeyPath should have one substitution");
+  assert(args.size() == 0 &&
+         "identityKeyPath should have no args");
+
+  auto identityTy = subs.getReplacementTypes()[0]->getCanonicalType();
+  
+  // The `self` key can be used for identity in Cocoa KVC as well.
+  StringRef objcString = SGF.getASTContext().LangOpts.EnableObjCInterop
+    ? "self" : "";
+  
+  // The key path pattern has to capture some generic context if the type is
+  // dependent on this generic context. We only need the specific type, though,
+  // not the entire generic environment.
+  bool isDependent = identityTy->hasArchetype();
+  CanType identityPatternTy = identityTy;
+  CanGenericSignature patternSig = nullptr;
+  SubstitutionMap patternSubs;
+  if (isDependent) {
+    auto param = GenericTypeParamType::get(0, 0, SGF.getASTContext());
+    identityPatternTy = param->getCanonicalType();
+    patternSig = GenericSignature::get(param, {})->getCanonicalSignature();
+    patternSubs = SubstitutionMap::get(patternSig,
+                                       llvm::makeArrayRef((Type)identityTy),
+                                       {});
+  }
+  
+  auto identityPattern = KeyPathPattern::get(SGF.SGM.M,
+                                             patternSig,
+                                             identityPatternTy,
+                                             identityPatternTy,
+                                             {},
+                                             objcString);
+  
+  auto kpTy = BoundGenericType::get(SGF.getASTContext().getWritableKeyPathDecl(),
+                                    Type(),
+                                    {identityTy, identityTy})
+    ->getCanonicalType();
+  
+  auto keyPath = SGF.B.createKeyPath(loc, identityPattern,
+                                     patternSubs,
+                                     {},
+                                     SILType::getPrimitiveObjectType(kpTy));
+  return SGF.emitManagedRValueWithCleanup(keyPath);
+}
+
 
 /// Specialized emitter for type traits.
 template<TypeTraitResult (TypeBase::*Trait)(),

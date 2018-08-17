@@ -583,8 +583,6 @@ ERROR(sil_keypath_computed_property_missing_part,none,
 ERROR(sil_keypath_external_missing_part,none,
       "keypath external component with indices needs an indices_equals and "
       "indices_hash function", ())
-ERROR(sil_keypath_no_components,none,
-      "keypath must have at least one component", ())
 ERROR(sil_keypath_no_root,none,
       "keypath must have a root component declared",())
 ERROR(sil_keypath_index_not_hashable,none,
