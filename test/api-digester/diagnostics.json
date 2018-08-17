@@ -2,6 +2,8 @@
   "kind": "Root",
   "name": "TopLevel",
   "printedName": "TopLevel",
-  "children": [],
-  "badKey": ["foo", "bar", "baz"]
+  "badKey": ["foo", "bar", "baz"],
+  "children": [
+    { "kind": "Zyzyx" }
+  ]
 }

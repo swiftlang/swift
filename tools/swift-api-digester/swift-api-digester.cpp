@@ -1057,7 +1057,14 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
     if (auto keyKind = parseKeyKind(keyString)) {
       switch(*keyKind) {
       case KeyKind::KK_kind:
-        Kind = parseSDKNodeKind(GetScalarString(Pair.getValue()));
+        if (auto parsedKind = parseSDKNodeKind(GetScalarString(Pair.getValue()))) {
+          Kind = *parsedKind;
+        } else {
+          auto range = convertRange(Pair.getValue()->getSourceRange());
+          Ctx.getDiags().diagnose(range.Start, diag::sdk_node_unrecognized_node_kind,
+                                  GetScalarString(Pair.getValue()))
+            .highlight(range);
+        }
         break;
       case KeyKind::KK_name:
         Info.Name = GetScalarString(Pair.getValue());

@@ -33,7 +33,7 @@ enum class SDKNodeKind: uint8_t {
 #include "DigesterEnums.def"
 };
 
-SDKNodeKind parseSDKNodeKind(StringRef Content);
+Optional<SDKNodeKind> parseSDKNodeKind(StringRef Content);
 
 enum class NodeAnnotation: uint8_t{
 #define NODE_ANNOTATION(NAME) NAME,
