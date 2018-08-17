@@ -646,12 +646,32 @@ swift::matchWitness(
   return finalize(anyRenaming, optionalAdjustments);
 }
 
-RequirementMatch swift::matchWitness(TypeChecker &tc,
-                                     ProtocolDecl *proto,
-                                     ProtocolConformance *conformance,
-                                     DeclContext *dc,
-                                     ValueDecl *req,
-                                     ValueDecl *witness) {
+/// Checks \p reqEnvCache for a requirement environment appropriate for
+/// \p reqSig and \p covariantSelf. If one isn't there, it gets created from
+/// the rest of the parameters.
+///
+/// Note that this means RequirementEnvironmentCaches must not be shared across
+/// multiple protocols or conformances.
+static const RequirementEnvironment &getOrCreateRequirementEnvironment(
+    WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
+    DeclContext *dc, GenericSignature *reqSig, ProtocolDecl *proto,
+    ClassDecl *covariantSelf, ProtocolConformance *conformance) {
+  WitnessChecker::RequirementEnvironmentCacheKey cacheKey(reqSig,
+                                                          covariantSelf);
+  auto cacheIter = reqEnvCache.find(cacheKey);
+  if (cacheIter == reqEnvCache.end()) {
+    RequirementEnvironment reqEnv(dc, reqSig, proto, covariantSelf,
+                                  conformance);
+    cacheIter = reqEnvCache.insert({cacheKey, std::move(reqEnv)}).first;
+  }
+  return cacheIter->getSecond();
+}
+
+RequirementMatch
+swift::matchWitness(TypeChecker &tc,
+                    WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
+                    ProtocolDecl *proto, ProtocolConformance *conformance,
+                    DeclContext *dc, ValueDecl *req, ValueDecl *witness) {
   using namespace constraints;
 
   // Initialized by the setup operation.
@@ -719,8 +739,9 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
     }
   }
 
-  Optional<RequirementEnvironment> reqEnvironment(
-      RequirementEnvironment(dc, reqSig, proto, covariantSelf, conformance));
+  const RequirementEnvironment &reqEnvironment =
+      getOrCreateRequirementEnvironment(reqEnvCache, dc, reqSig, proto,
+                                        covariantSelf, conformance);
 
   // Set up the constraint system for matching.
   auto setup = [&]() -> std::tuple<Optional<RequirementMatch>, Type, Type> {
@@ -728,8 +749,8 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
     // the required type and the witness type.
     cs.emplace(tc, dc, ConstraintSystemOptions());
 
-    auto reqGenericEnv = reqEnvironment->getSyntheticEnvironment();
-    auto reqSubMap = reqEnvironment->getRequirementToSyntheticMap();
+    auto reqGenericEnv = reqEnvironment.getSyntheticEnvironment();
+    auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
 
     Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
     if (reqGenericEnv)
@@ -820,7 +841,7 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
                               : anyRenaming ? MatchKind::RenamedMatch
                                             : MatchKind::ExactMatch,
                             witnessType,
-                            std::move(reqEnvironment),
+                            reqEnvironment,
                             optionalAdjustments);
 
     // Compute the set of substitutions we'll need for the witness.
@@ -1020,7 +1041,7 @@ bool WitnessChecker::findBestWitness(
         }
       }
 
-      auto match = matchWitness(TC, Proto, conformance, DC,
+      auto match = matchWitness(TC, ReqEnvironmentCache, Proto, conformance, DC,
                                 requirement, witness);
       if (match.isViable()) {
         ++numViable;
@@ -3038,7 +3059,8 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     return ResolveWitnessResult::ExplicitFailed;
 
   // Try to match the derived requirement.
-  auto match = matchWitness(TC, Proto, Conformance, DC, requirement, derived);
+  auto match = matchWitness(TC, ReqEnvironmentCache, Proto, Conformance, DC,
+                            requirement, derived);
   if (match.isViable()) {
     recordWitness(requirement, match);
     return ResolveWitnessResult::Success;
@@ -4445,9 +4467,10 @@ static void diagnosePotentialWitness(TypeChecker &tc,
               proto->getFullName());
 
   // Describe why the witness didn't satisfy the requirement.
+  WitnessChecker::RequirementEnvironmentCache oneUseCache;
   auto dc = conformance->getDeclContext();
-  auto match = matchWitness(tc, conformance->getProtocol(), conformance,
-                            dc, req, witness);
+  auto match = matchWitness(tc, oneUseCache, conformance->getProtocol(),
+                            conformance, dc, req, witness);
   if (match.Kind == MatchKind::ExactMatch &&
       req->isObjC() && !witness->isObjC()) {
     // Special case: note to add @objc.
@@ -4921,6 +4944,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     }
   }
 
+  WitnessChecker::RequirementEnvironmentCache reqEnvCache;
   ASTContext &ctx = nominal->getASTContext();
   for (auto proto : nominal->getAllProtocols()) {
     // We only care about Objective-C protocols.
@@ -4976,7 +5000,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
         auto lazyResolver = ctx.getLazyResolver();
         assert(lazyResolver && "Need a type checker to match witnesses");
         auto &tc = *static_cast<TypeChecker *>(lazyResolver);
-        if (matchWitness(tc, proto, *conformance,
+        if (matchWitness(tc, reqEnvCache, proto, *conformance,
                          witnessToMatch->getDeclContext(), req,
                          const_cast<ValueDecl *>(witnessToMatch))
               .Kind == MatchKind::ExactMatch) {
@@ -5214,8 +5238,9 @@ void TypeChecker::recordKnownWitness(NormalProtocolConformance *conformance,
   // (because property behaviors rely on renaming).
   validateDecl(witness);
   auto dc = conformance->getDeclContext();
-  auto match = matchWitness(*this, conformance->getProtocol(), conformance,
-                            dc, req, witness);
+  WitnessChecker::RequirementEnvironmentCache oneUseCache;
+  auto match = matchWitness(*this, oneUseCache, conformance->getProtocol(),
+                            conformance, dc, req, witness);
   if (match.Kind != MatchKind::ExactMatch &&
       match.Kind != MatchKind::RenamedMatch) {
     diagnose(witness, diag::property_behavior_conformance_broken,
