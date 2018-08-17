@@ -29,6 +29,14 @@ public class TestClass {
   deinit
 } // CHECK: {{^}$}}
 
+// CHECK-LABEL: public class TestEmptyClass {
+public class TestEmptyClass {
+} // CHECK-NEXT: {{^}$}}
+
+// CHECK-LABEL: public struct TestEmptyStruct {
+public struct TestEmptyStruct {
+} // CHECK-NEXT: {{^}$}}
+
 // CHECK-LABEL: public enum TestEnum
 public enum TestEnum {
   // CHECK: case a

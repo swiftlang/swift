@@ -5138,6 +5138,19 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
 }
 
 void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
+  if (auto *SF = classDecl->getParentSourceFile()) {
+    // Allow classes without initializers in SIL and textual interface files.
+    switch (SF->Kind) {
+    case SourceFileKind::SIL:
+    case SourceFileKind::Interface:
+      return;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::REPL:
+      break;
+    }
+  }
+
   // Some heuristics to skip emitting a diagnostic if the class is already
   // irreperably busted.
   if (classDecl->isInvalid() ||
