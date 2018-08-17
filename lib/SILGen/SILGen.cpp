@@ -776,9 +776,9 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
           postEmitFunction(constant, f);
         });
 
-    // If this constructor was imported, we don't need the initializing
-    // constructor to be emitted.
-    if (!decl->hasClangNode()) {
+    // Constructors may not have bodies if they've been imported, or if they've
+    // been parsed from a textual interface.
+    if (decl->hasBody()) {
       SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
       emitOrDelayFunction(
           *this, initConstant,
@@ -796,14 +796,16 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
     }
   } else {
     // Struct and enum constructors do everything in a single function.
-    emitOrDelayFunction(
-        *this, constant, [this, constant, decl, declCtx](SILFunction *f) {
-          preEmitFunction(constant, decl, f, decl);
-          PrettyStackTraceSILFunction X("silgen emitConstructor", f);
-          f->setProfiler(getOrCreateProfilerForConstructors(declCtx, decl));
-          SILGenFunction(*this, *f, decl).emitValueConstructor(decl);
-          postEmitFunction(constant, f);
-        });
+    if (decl->hasBody()) {
+      emitOrDelayFunction(
+          *this, constant, [this, constant, decl, declCtx](SILFunction *f) {
+            preEmitFunction(constant, decl, f, decl);
+            PrettyStackTraceSILFunction X("silgen emitConstructor", f);
+            f->setProfiler(getOrCreateProfilerForConstructors(declCtx, decl));
+            SILGenFunction(*this, *f, decl).emitValueConstructor(decl);
+            postEmitFunction(constant, f);
+          });
+    }
   }
 }
 
@@ -941,7 +943,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
 
   // Emit the destroying destructor.
   // Destructors are a necessary part of class metadata, so can't be delayed.
-  {
+  if (dd->hasBody()) {
     SILDeclRef destroyer(dd, SILDeclRef::Kind::Destroyer);
     SILFunction *f = getFunction(destroyer, ForDefinition);
     preEmitFunction(destroyer, dd, f, dd);
