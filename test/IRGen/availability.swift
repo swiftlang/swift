@@ -26,3 +26,29 @@ public func dontHoist() {
       print("Not measurement")
   }
 }
+
+
+// With optimizations on, multiple #availability checks should generate only
+// a single call into _swift_stdlib_operatingSystemVersion.
+
+// CHECK-LABEL: define{{.*}} @{{.*}}multipleAvailabilityChecks
+// CHECK: call swiftcc i1 @"$Ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
+// CHECK: call swiftcc i1 @"$Ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
+// CHECK: call swiftcc i1 @"$Ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
+// CHECK: ret void
+
+// OPT-LABEL: define{{.*}} @{{.*}}multipleAvailabilityChecks
+// OPT: call void @_swift_stdlib_operatingSystemVersion
+// OPT-NOT: call void @_swift_stdlib_operatingSystemVersion
+// OPT: ret void
+public func multipleAvailabilityChecks() {
+  if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+    print("test one")
+  }
+  if #available(OSX 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *) {
+    print("test two")
+  }
+  if #available(OSX 10.10, iOS 8.0, watchOS 1.0, tvOS 8.0, *) {
+    print("test three")
+  }
+}
