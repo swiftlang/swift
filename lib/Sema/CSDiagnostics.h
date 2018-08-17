@@ -19,6 +19,7 @@
 #include "Constraint.h"
 #include "ConstraintSystem.h"
 #include "OverloadChoice.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -110,15 +111,30 @@ private:
 /// failures, provides common information like failed requirement,
 /// declaration where such requirement comes from, etc.
 class RequirementFailure : public FailureDiagnostic {
-  using PathEltKind = ConstraintLocator::PathElementKind;
-
 protected:
+  using PathEltKind = ConstraintLocator::PathElementKind;
+  using DiagOnDecl = Diag<DescriptiveDeclKind, DeclName, Type, Type>;
+  using DiagInReference = Diag<DescriptiveDeclKind, DeclName, Type, Type, Type>;
+
   const ValueDecl *AffectedDecl;
+  /// If possible, find application expression associated
+  /// with current generic requirement failure, that helps
+  /// to diagnose failures related to arguments.
+  const ApplyExpr *Apply = nullptr;
 
 public:
   RequirementFailure(Expr *expr, const Solution &solution,
                      ConstraintLocator *locator)
       : FailureDiagnostic(expr, solution, locator), AffectedDecl(getDeclRef()) {
+    auto *anchor = getAnchor();
+    expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+      auto *AE = dyn_cast<ApplyExpr>(subExpr);
+      if (!AE || AE->getFn() != anchor)
+        return subExpr;
+
+      Apply = AE;
+      return nullptr;
+    });
   }
 
   unsigned getRequirementIndex() const {
@@ -136,14 +152,40 @@ public:
   /// Generic requirement associated with the failure.
   const Requirement &getRequirement() const;
 
+  virtual Type getLHS() const = 0;
+  virtual Type getRHS() const = 0;
+
+  bool diagnose() override;
+
 protected:
   /// Retrieve declaration contextual where current
   /// requirement has been introduced.
   const DeclContext *getRequirementDC() const;
 
+  virtual DiagOnDecl getDiagnosticOnDecl() const = 0;
+  virtual DiagInReference getDiagnosticInRereference() const = 0;
+
+  /// Determine whether it would be possible to diagnose
+  /// current requirement failure.
+  bool canDiagnoseFailure() const {
+    // For static/initializer calls there is going to be
+    // a separate fix, attached to the argument, which is
+    // much easier to diagnose.
+    // For operator calls we can't currently produce a good
+    // diagnostic, so instead let's refer to expression diagnostics.
+    return !(Apply && (isOperator(Apply) || isa<TypeExpr>(getAnchor())));
+  }
+
+  static bool isOperator(const ApplyExpr *apply) {
+    return isa<PrefixUnaryExpr>(apply) || isa<PostfixUnaryExpr>(apply) ||
+           isa<BinaryExpr>(apply);
+  }
+
 private:
   /// Retrieve declaration associated with failing generic requirement.
   ValueDecl *getDeclRef() const;
+
+  void emitRequirementNote(const Decl *anchor) const;
 };
 
 /// Diagnostics for failed conformance checks originating from
@@ -169,10 +211,19 @@ public:
 private:
   /// The type which was expected, by one of the generic requirements,
   /// to conform to associated protocol.
-  Type getNonConformingType() const { return NonConformingType; }
+  Type getLHS() const override { return NonConformingType; }
 
   /// The protocol generic requirement expected associated type to conform to.
-  Type getProtocolType() const { return Protocol->getDeclaredType(); }
+  Type getRHS() const override { return Protocol->getDeclaredType(); }
+
+protected:
+  DiagOnDecl getDiagnosticOnDecl() const override {
+    return diag::type_does_not_conform_decl_owner;
+  }
+
+  DiagInReference getDiagnosticInRereference() const override {
+    return diag::type_does_not_conform_in_decl_ref;
+  }
 };
 
 /// Diagnose errors associated with missing, extraneous
