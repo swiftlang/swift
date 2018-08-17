@@ -17,16 +17,21 @@
 
 /// #define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs)
 ///   Provides information about an overridable function.
-///   - name is the name of the function, without any leading swift_ or namespace.
+///   - name is the name of the function, without any leading swift_ or
+///     namespace.
 ///   - ret is the return type of the function.
 ///   - attrs is the attributes, if any, applied to the function definition.
-///   - namespace is the namespace, if any, the function is in, including a trailing ::
-///   - typedArgs is the argument list, including types, surrounded by parentheses
-///   - namedArgs is the list of argument names, with no types, surrounded by parentheses
+///   - namespace is the namespace, if any, the function is in, including a
+///     trailing ::
+///   - typedArgs is the argument list, including types, surrounded by
+///     parentheses
+///   - namedArgs is the list of argument names, with no types, surrounded by
+///     parentheses
 ///
-/// The entries are organized by group. A user may define OVERRIDE to get all entries,
-/// or define one or more of OVERRIDE_METADATALOOKUP, OVERRIDE_CASTING, OVERRIDE_OBJC,
-/// OVERRIDE_FOREIGN, or OVERRIDE_PROTOCOLCONFORMANCE to get only those entries.
+/// The entries are organized by group. A user may define OVERRIDE to get all
+/// entries, or define one or more of OVERRIDE_METADATALOOKUP, OVERRIDE_CASTING,
+/// OVERRIDE_OBJC, OVERRIDE_FOREIGN, OVERRIDE_PROTOCOLCONFORMANCE,
+/// and OVERRIDE_KEYPATH to get only those entries.
 
 // NOTE: this file is used to build the definition of OverrideSection in
 // CompatibilityOverride.cpp, which is part of the ABI. Do not move or remove entries
@@ -38,6 +43,7 @@
 #  define OVERRIDE_OBJC OVERRIDE
 #  define OVERRIDE_FOREIGN OVERRIDE
 #  define OVERRIDE_PROTOCOLCONFORMANCE OVERRIDE
+#  define OVERRIDE_KEYPATH OVERRIDE
 #else
 #  ifndef OVERRIDE_METADATALOOKUP
 #    define OVERRIDE_METADATALOOKUP(...)
@@ -53,6 +59,9 @@
 #  endif
 #  ifndef OVERRIDE_PROTOCOLCONFORMANCE
 #    define OVERRIDE_PROTOCOLCONFORMANCE(...)
+#  endif
+#  ifndef OVERRIDE_KEYPATH
+#    define OVERRIDE_KEYPATH(...)
 #  endif
 #endif
 
@@ -127,6 +136,10 @@ OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocol, const WitnessTable *, , swift::
                               const ProtocolDescriptor *protocol),
                              (type, protocol))
 
+OVERRIDE_KEYPATH(getKeyPath, const HeapObject *, , swift::,
+                 (const void *pattern, const void *arguments),
+                 (pattern, arguments))
+
 #if SWIFT_OBJC_INTEROP
 
 OVERRIDE_OBJC(dynamicCastObjCClass, const void *, , swift::,
@@ -169,3 +182,4 @@ OVERRIDE_FOREIGN(dynamicCastForeignClassUnconditional, const void *, , swift::,
 #undef OVERRIDE_OBJC
 #undef OVERRIDE_FOREIGN
 #undef OVERRIDE_PROTOCOLCONFORMANCE
+#undef OVERRIDE_KEYPATH

@@ -766,6 +766,10 @@ void verifyMangledNameRoundtrip(const Metadata *metadata);
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type);
 
+// Defined in KeyPath.swift in the standard library.
+SWIFT_RUNTIME_EXPORT
+const HeapObject *swift_getKeyPath(const void *pattern, const void *arguments);
+
 } // end namespace swift
 
 #endif // SWIFT_RUNTIME_METADATA_H
