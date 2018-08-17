@@ -259,9 +259,9 @@ public func double_concrete_concrete() {
 
 // witness table instantiator for Single : P1
 
-// CHECK-LABEL: define internal void @"$S42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWI"(i8**, %swift.type*, i8**)
+// CHECK-LABEL: define internal void @"$S42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWI"(i8**, %swift.type* %"Single<A>", i8**)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TABLES:%.*]] = bitcast i8** %2 to i8***
+// CHECK-NEXT:    [[TABLES:%.*]] = bitcast i8** %1 to i8***
 
 // CHECK-NEXT:    [[A_P2_SRC:%.*]] = getelementptr inbounds i8**, i8*** [[TABLES]], i32 0
 // CHECK-NEXT:    [[A_P2_DEST:%.*]] = getelementptr inbounds i8*, i8** %0, i32 -1
@@ -274,9 +274,9 @@ public func double_concrete_concrete() {
 
 // witness table instantiator for Double : P1
 
-// CHECK-LABEL: define internal void @"$S42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWI"(i8**, %swift.type*, i8**)
+// CHECK-LABEL: define internal void @"$S42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWI"(i8**, %swift.type* %"Double<B, C>", i8**)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TABLES:%.*]] = bitcast i8** %2 to i8***
+// CHECK-NEXT:    [[TABLES:%.*]] = bitcast i8** %1 to i8***
 
 // CHECK-NEXT:    [[B_P2_SRC:%.*]] = getelementptr inbounds i8**, i8*** [[TABLES]], i32 0
 // CHECK-NEXT:    [[B_P2_DEST:%.*]] = getelementptr inbounds i8*, i8** %0, i32 -1

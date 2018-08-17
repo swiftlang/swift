@@ -178,9 +178,9 @@ public func subclassgenericconcrete() {
 
 // witness tabel instantiation function for Base : P1
 
-// CHECK-LABEL: define internal void @"$S32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWI"(i8**, %swift.type*, i8**)
+// CHECK-LABEL: define internal void @"$S32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWI"(i8**, %swift.type* %"Base<A>", i8**)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TABLES:%.*]] = bitcast i8** %2 to i8***
+// CHECK-NEXT:    [[TABLES:%.*]] = bitcast i8** %1 to i8***
 
 // CHECK-NEXT:    [[A_P2_SRC:%.*]] = getelementptr inbounds i8**, i8*** [[TABLES]], i32 0
 // CHECK-NEXT:    [[A_P2_DEST:%.*]] = getelementptr inbounds i8*, i8** %0, i32 -1
