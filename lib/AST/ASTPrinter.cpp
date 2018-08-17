@@ -1863,16 +1863,13 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     printInherited(decl);
 
     if (auto *genericSig = decl->getGenericSignature()) {
+      auto *baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
+      assert(baseGenericSig &&
+             "an extension can't be generic if the base type isn't");
       printGenericSignature(genericSig, PrintRequirements | InnermostOnly,
-                            [decl](const Requirement &req) -> bool {
-        // For protocol extensions, omit the implicit
-        // "Self: TheProtoBeingExtended" requirement.
-        if (req.getKind() != RequirementKind::Conformance)
-          return true;
-        auto proto = cast<ProtocolDecl>(req.getSecondType()->getAnyNominal());
-        if (proto != decl->getExtendedNominal())
-          return true;
-        return !req.getFirstType()->isEqual(proto->getSelfInterfaceType());
+                            [baseGenericSig](const Requirement &req) -> bool {
+        // Only include constraints that are not satisfied by the base type.
+        return !baseGenericSig->isRequirementSatisfied(req);
       });
     }
   }

@@ -65,9 +65,14 @@ protocol P3 {
     func p3Required()
 }
 
-extension Dictionary.Keys where Key : Hashable {
+extension Dictionary.Keys {
 
     func foo()
+}
+
+extension Dictionary.Keys where Key : P1 {
+
+    func bar()
 }
 
 
@@ -600,29 +605,58 @@ extension Dictionary.Keys where Key : Hashable {
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 739,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 745,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.protocol,
-    key.name: "Hashable",
-    key.usr: "s:SH",
-    key.offset: 751,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 767,
+    key.offset: 746,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 772,
+    key.offset: 751,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 760,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Dictionary",
+    key.usr: "s:SD",
+    key.offset: 770,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Keys",
+    key.usr: "s:SD4KeysV",
+    key.offset: 781,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 786,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 792,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "P1",
+    key.usr: "s:5cake12P1P",
+    key.offset: 798,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 808,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 813,
     key.length: 3
   }
 ]
@@ -1015,7 +1049,7 @@ extension Dictionary.Keys where Key : Hashable {
       }
     ],
     key.offset: 713,
-    key.length: 66,
+    key.length: 45,
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "Keys",
@@ -1026,9 +1060,37 @@ extension Dictionary.Keys where Key : Hashable {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo()",
         key.usr: "s:SD4KeysV5cake1E3fooyyF",
-        key.offset: 767,
+        key.offset: 746,
         key.length: 10,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.method.instance>"
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.extension.struct,
+    key.generic_requirements: [
+      {
+        key.description: "Key : Hashable"
+      },
+      {
+        key.description: "Key : P1"
+      }
+    ],
+    key.offset: 760,
+    key.length: 60,
+    key.extends: {
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "Keys",
+      key.usr: "s:SD4KeysV"
+    },
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "bar()",
+        key.usr: "s:SD4KeysV5cake1AC2P1RzrlE3baryyF",
+        key.offset: 808,
+        key.length: 10,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar</decl.name>()</decl.function.method.instance>"
       }
     ]
   }
