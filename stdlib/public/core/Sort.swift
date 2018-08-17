@@ -458,32 +458,22 @@ func _introSort<C: MutableCollection & RandomAccessCollection>(
   }
   // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
   // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
-  let depthLimit = 2 * count._binaryLogarithm()
   try _introSortImpl(
     &elements,
     subRange: range,
-    by: areInIncreasingOrder,
-    depthLimit: depthLimit)
+    by: areInIncreasingOrder)
 }
 
 @inlinable
 internal func _introSortImpl<C: MutableCollection & RandomAccessCollection>(
   _ elements: inout C,
   subRange range: Range<C.Index>
-  , by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool,
-  depthLimit: Int
+  , by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
 ) rethrows {
 
   // Insertion sort is better at handling smaller regions.
   if elements.distance(from: range.lowerBound, to: range.upperBound) < 20 {
     try _insertionSort(
-      &elements,
-      subRange: range
-      , by: areInIncreasingOrder)
-    return
-  }
-  if depthLimit == 0 {
-    try _heapSort(
       &elements,
       subRange: range
       , by: areInIncreasingOrder)
@@ -500,94 +490,9 @@ internal func _introSortImpl<C: MutableCollection & RandomAccessCollection>(
   try _introSortImpl(
     &elements,
     subRange: range.lowerBound..<partIdx,
-    by: areInIncreasingOrder, 
-    depthLimit: depthLimit &- 1)
+    by: areInIncreasingOrder)
   try _introSortImpl(
     &elements,
     subRange: partIdx..<range.upperBound,
-    by: areInIncreasingOrder, 
-    depthLimit: depthLimit &- 1)
-}
-
-@inlinable
-internal func _siftDown<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  index: C.Index,
-  subRange range: Range<C.Index>,
-  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
-  var i = index
-  var countToIndex = elements.distance(from: range.lowerBound, to: i)
-  var countFromIndex = elements.distance(from: i, to: range.upperBound)
-  // Check if left child is within bounds. If not, stop iterating, because there are
-  // no children of the given node in the heap.
-  while countToIndex + 1 < countFromIndex {
-    let left = elements.index(i, offsetBy: countToIndex + 1)
-    var largest = i
-    if try areInIncreasingOrder(elements[largest], elements[left]) {
-      largest = left
-    }
-    // Check if right child is also within bounds before trying to examine it.
-    if countToIndex + 2 < countFromIndex {
-      let right = elements.index(after: left)
-      if try areInIncreasingOrder(elements[largest], elements[right]) {
-        largest = right
-      }
-    }
-    // If a child is bigger than the current node, swap them and continue sifting
-    // down.
-    if largest != i {
-      elements.swapAt(index, largest)
-      i = largest
-      countToIndex = elements.distance(from: range.lowerBound, to: i)
-      countFromIndex = elements.distance(from: i, to: range.upperBound)
-    } else {
-      break
-    }
-  }
-}
-
-@inlinable
-internal func _heapify<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>, 
-  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
-  // Here we build a heap starting from the lowest nodes and moving to the root.
-  // On every step we sift down the current node to obey the max-heap property:
-  //   parent >= max(leftChild, rightChild)
-  //
-  // We skip the rightmost half of the array, because these nodes don't have
-  // any children.
-  let root = range.lowerBound
-  var node = elements.index(
-    root,
-    offsetBy: elements.distance(
-      from: range.lowerBound, to: range.upperBound) / 2)
-
-  while node != root {
-    elements.formIndex(before: &node)
-    try _siftDown(
-      &elements,
-      index: node,
-      subRange: range
-      , by: areInIncreasingOrder)
-  }
-}
-
-@inlinable
-internal func _heapSort<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>
-  , by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
-  var hi = range.upperBound
-  let lo = range.lowerBound
-  try _heapify(&elements, subRange: range, by: areInIncreasingOrder)
-  elements.formIndex(before: &hi)
-  while hi != lo {
-    elements.swapAt(lo, hi)
-    try _siftDown(&elements, index: lo, subRange: lo..<hi, by: areInIncreasingOrder)
-    elements.formIndex(before: &hi)
-  }
+    by: areInIncreasingOrder)
 }
