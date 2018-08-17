@@ -634,8 +634,7 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
   // If one of the conformances comes from the same file as the type
   // declaration, pick that one; this is so that conformance synthesis works if
   // there's any implied conformance in the same file as the type.
-  auto NTD =
-      lhs->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto NTD = lhs->getDeclContext()->getSelfNominalTypeDecl();
   auto typeSF = NTD->getParentSourceFile();
   if (typeSF) {
     if (typeSF == lhsSF)
@@ -805,8 +804,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     }
   }
 
-  auto *conformingNominal =
-    conformingDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *conformingNominal = conformingDC->getSelfNominalTypeDecl();
 
   // Form the conformance.
   Type type = entry->getDeclContext()->getDeclaredInterfaceType();
@@ -895,7 +893,7 @@ void ConformanceLookupTable::registerProtocolConformance(
        bool synthesized) {
   auto protocol = conformance->getProtocol();
   auto dc = conformance->getDeclContext();
-  auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = dc->getSelfNominalTypeDecl();
 
   // If there is an entry to update, do so.
   auto &dcConformances = AllConformances[dc];

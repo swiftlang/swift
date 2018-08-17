@@ -431,13 +431,13 @@ canReplaceWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
   // a witness for a subscript on MutableCollection?
   bool IsSubscriptOnMutableCollection = false;
   ProtocolDecl *ProtocolForDecl =
-      Decl1->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      Decl1->getDeclContext()->getSelfProtocolDecl();
   if (ProtocolForDecl) {
     IsSubscriptOnMutableCollection = (ProtocolForDecl == MutableCollectionDecl);
   } else {
     for (ValueDecl *Req : Decl1->getSatisfiedProtocolRequirements()) {
       DeclContext *ReqDC = Req->getDeclContext();
-      ProtocolDecl *ReqProto = ReqDC->getAsProtocolOrProtocolExtensionContext();
+      ProtocolDecl *ReqProto = ReqDC->getSelfProtocolDecl();
       assert(ReqProto && "Protocol requirement not in a protocol?");
 
       if (ReqProto == MutableCollectionDecl) {

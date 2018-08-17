@@ -136,7 +136,7 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
     // For lazy properties, steal the 'self' from the initializer context.
     if (storage->getAttrs().hasAttribute<LazyAttr>()) {
       // The getter is considered mutating if it's on a value type.
-      if (!storage->getDeclContext()->getAsClassOrClassExtensionContext() &&
+      if (!storage->getDeclContext()->getSelfClassDecl() &&
           !storage->isStatic()) {
         storage->setIsGetterMutating(true);
       }
@@ -274,7 +274,7 @@ static bool needsDynamicMaterializeForSet(AbstractStorageDecl *storage) {
 /// interface to the storage and they should not be transparent.
 static void maybeMarkTransparent(TypeChecker &TC, AccessorDecl *accessor) {
   auto *DC = accessor->getDeclContext();
-  auto *nominalDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominalDecl = DC->getSelfNominalTypeDecl();
 
   // Global variable accessors are not @_transparent.
   if (!nominalDecl)
@@ -1334,7 +1334,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   Storage->setUserAccessible(false);
   // Mark the vardecl to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
-  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
+  if (VD->getDeclContext()->getSelfClassDecl())
     makeFinal(Context, Storage);
   Storage->setImplicit();
   Storage->setAccess(AccessLevel::Private);
@@ -1528,7 +1528,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 
   // Mark the method to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
-  if (DC->getAsClassOrClassExtensionContext())
+  if (DC->getSelfClassDecl())
     makeFinal(Context, Parameter);
   Parameter->setImplicit();
   Parameter->setAccess(AccessLevel::Private);
@@ -1734,7 +1734,7 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   // prevents it from being dynamically dispatched.  Note that we do this after
   // the accessors are set up, because we don't want the setter for the lazy
   // property to inherit these properties from the storage.
-  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
+  if (VD->getDeclContext()->getSelfClassDecl())
     makeFinal(Context, Storage);
   Storage->setImplicit();
   Storage->overwriteAccess(AccessLevel::Private);
@@ -1995,7 +1995,7 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
     return;
 
   // NSManaged properties on classes require special handling.
-  } else if (dc->getAsClassOrClassExtensionContext()) {
+  } else if (dc->getSelfClassDecl()) {
     auto var = dyn_cast<VarDecl>(storage);
     if (var && var->getAttrs().hasAttribute<NSManagedAttr>()) {
       convertNSManagedStoredVarToComputed(var, TC);
@@ -2203,7 +2203,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 /// Create a stub body that emits a fatal error message.
 static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   auto unimplementedInitDecl = tc.Context.getUnimplementedInitializerDecl(&tc);
-  auto classDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto classDecl = ctor->getDeclContext()->getSelfClassDecl();
   if (!unimplementedInitDecl) {
     tc.diagnose(classDecl->getLoc(), diag::missing_unimplemented_init_runtime);
     return;
@@ -2383,7 +2383,7 @@ configureInheritedDesignatedInitAttributes(TypeChecker &tc,
     Decl *parentDecl = classDecl;
     while (parentDecl != nullptr) {
       asAvailableAs.push_back(parentDecl);
-      parentDecl = parentDecl->getDeclContext()->getAsDeclOrDeclExtensionContext();
+      parentDecl = parentDecl->getDeclContext()->getAsDecl();
     }
     AvailabilityInference::applyInferredAvailableAttrs(
         ctor, asAvailableAs, ctx);
@@ -2421,8 +2421,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // FIXME: Remove this when lookup of initializers becomes restricted to our
   // immediate superclass.
   auto *superclassCtorDecl =
-      superclassCtor->getDeclContext()
-          ->getAsNominalTypeOrNominalTypeExtensionContext();
+      superclassCtor->getDeclContext()->getSelfNominalTypeDecl();
   Type superclassTy = classDecl->getSuperclass();
   NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
   if (superclassCtorDecl != superclassDecl) {

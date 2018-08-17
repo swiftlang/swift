@@ -1046,7 +1046,7 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
   // This is important when extending a nested type, because the generic
   // parameters will line up with the (semantic) nesting of the nominal type.
   if (auto ext = dyn_cast<ExtensionDecl>(decl))
-    decl = ext->getAsNominalTypeOrNominalTypeExtensionContext();
+    decl = ext->getSelfNominalTypeDecl();
 
   // Handle the generic arguments of the parent.
   unsigned currentGenericParamIdx =
@@ -1424,7 +1424,7 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
       appendModule(ExtD->getParentModule());
       if (sig && ExtD->isConstrainedExtension()) {
         Mod = ExtD->getModuleContext();
-        auto nominalSig = ExtD->getAsNominalTypeOrNominalTypeExtensionContext()
+        auto nominalSig = ExtD->getSelfNominalTypeDecl()
                             ->getGenericSignatureOfContext();
         appendGenericSignature(sig, nominalSig);
       }

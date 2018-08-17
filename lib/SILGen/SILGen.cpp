@@ -506,7 +506,7 @@ SILGenModule::getOrCreateProfilerForConstructors(DeclContext *ctx,
   if (ctx->isExtensionContext())
     decl = cd;
   else
-    decl = ctx->getAsNominalTypeOrNominalTypeExtensionContext();
+    decl = ctx->getSelfNominalTypeDecl();
   assert(decl && "No decl available for profiling in this context");
 
   SILProfiler *&profiler = constructorProfilers[decl];
@@ -765,7 +765,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
   bool ForCoverageMapping = doesASTRequireProfiling(M, decl);
 
-  if (declCtx->getAsClassOrClassExtensionContext()) {
+  if (declCtx->getSelfClassDecl()) {
     // Class constructors have separate entry points for allocation and
     // initialization.
     emitOrDelayFunction(

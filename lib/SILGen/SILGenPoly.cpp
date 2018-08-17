@@ -3339,7 +3339,7 @@ enum class WitnessDispatchKind {
 static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness) {
   auto *decl = witness.getDecl();
 
-  ClassDecl *C = decl->getDeclContext()->getAsClassOrClassExtensionContext();
+  ClassDecl *C = decl->getDeclContext()->getSelfClassDecl();
   if (!C)
     return WitnessDispatchKind::Static;
 

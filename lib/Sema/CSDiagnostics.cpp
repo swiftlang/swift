@@ -132,7 +132,7 @@ bool RequirementFailure::diagnose() {
   auto *genericCtx = AffectedDecl->getAsGenericContext();
 
   if (reqDC != genericCtx) {
-    auto *NTD = reqDC->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto *NTD = reqDC->getSelfNominalTypeDecl();
     emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
                    AffectedDecl->getDescriptiveKind(),
                    AffectedDecl->getFullName(), NTD->getDeclaredType(),
@@ -143,7 +143,7 @@ bool RequirementFailure::diagnose() {
                    AffectedDecl->getFullName(), getLHS(), getRHS());
   }
 
-  emitRequirementNote(reqDC->getAsDeclOrDeclExtensionContext());
+  emitRequirementNote(reqDC->getAsDecl());
   return true;
 }
 
@@ -479,7 +479,7 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
 
       bool singleUse = false;
       AbstractFunctionDecl *AFD = nullptr;
-      if (auto contextDecl = varDecl->getDeclContext()->getAsDeclOrDeclExtensionContext()) {
+      if (auto contextDecl = varDecl->getDeclContext()->getAsDecl()) {
         if ((AFD = dyn_cast<AbstractFunctionDecl>(contextDecl))) {
           auto checker = VarDeclMultipleReferencesChecker(varDecl);
           AFD->getBody()->walk(checker);

@@ -375,7 +375,7 @@ public:
     // callback storage.)
     
     // This can happen if the witness is in a protocol extension...
-    if (Witness->getDeclContext()->getAsProtocolOrProtocolExtensionContext())
+    if (Witness->getDeclContext()->getSelfProtocolDecl())
       return true;
 
     // ...if the witness is in a constrained extension that adds protocol

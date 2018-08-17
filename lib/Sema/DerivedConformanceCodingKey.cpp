@@ -209,7 +209,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
   auto *parentDC = strValDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
-  auto *enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto *enumDecl = parentDC->getSelfEnumDecl();
   Type enumType = parentDC->getDeclaredTypeInContext();
 
   BraceStmt *body = nullptr;
@@ -276,7 +276,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
   auto *parentDC = initDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
-  auto *enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto *enumDecl = parentDC->getSelfEnumDecl();
   Type enumType = parentDC->getDeclaredTypeInContext();
 
   auto elements = enumDecl->getAllElements();

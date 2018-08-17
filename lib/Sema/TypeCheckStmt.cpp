@@ -1719,8 +1719,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     return HadError;
 
   // Determine whether we need to introduce a super.init call.
-  auto nominalDecl = ctor->getDeclContext()
-    ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominalDecl = ctor->getDeclContext()->getSelfNominalTypeDecl();
 
   // Error case.
   if (nominalDecl == nullptr)

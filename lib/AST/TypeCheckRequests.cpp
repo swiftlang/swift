@@ -40,7 +40,7 @@ void swift::simple_display(
   if (auto typeRepr = ext->getExtendedTypeLoc().getTypeRepr())
     typeRepr->print(out);
   else
-    ext->getAsNominalTypeOrNominalTypeExtensionContext()->dumpRef(out);
+    ext->getSelfNominalTypeDecl()->dumpRef(out);
 }
 
 //----------------------------------------------------------------------------//

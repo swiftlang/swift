@@ -2521,7 +2521,7 @@ namespace {
       assert(typeContext && "constructor without parent context?!");
 
       auto &tc = CS.getTypeChecker();
-      ClassDecl *classDecl = typeContext->getAsClassOrClassExtensionContext();
+      ClassDecl *classDecl = typeContext->getSelfClassDecl();
       if (!classDecl) {
         tc.diagnose(diagLoc, diag_not_in_class);
         return Type();
@@ -3208,8 +3208,7 @@ namespace {
             if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(call->getFn())) {
               auto RefD = DSCE->getFn()->getReferencedDecl().getDecl();
               if (RefD->getBaseName() == TC.Context.Id_getBuiltinLogicValue &&
-                  RefD->getDeclContext()
-                          ->getAsNominalTypeOrNominalTypeExtensionContext() ==
+                  RefD->getDeclContext()->getSelfNominalTypeDecl() ==
                       TC.Context.getBoolDecl()) {
                 expr = DSCE->getBase();
                 continue;

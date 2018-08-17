@@ -1356,7 +1356,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
     if (auto parent = CS.DC->getInnermostTypeContext()) {
       // If we are in a protocol extension of 'Proto' and we see
       // 'Proto.static', suggest 'Self.static'
-      if (auto extensionContext = parent->getAsProtocolExtensionContext()) {
+      if (auto extensionContext = parent->getExtendedProtocolDecl()) {
         if (extensionContext->getDeclaredType()->isEqual(instanceTy)) {
           Diag->fixItReplace(baseRange, "Self");
         }
@@ -1428,9 +1428,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
   }
 
   // Fall back to a fix-it with a full type qualifier
-  auto nominal =
-      member->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = member->getDeclContext()->getSelfNominalTypeDecl();
   SmallString<32> typeName;
   llvm::raw_svector_ostream typeNameStream(typeName);
   typeNameStream << nominal->getSelfInterfaceType() << ".";
@@ -1618,8 +1616,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         }
         assert(TypeDC->isTypeContext() && "Expected type decl context!");
 
-        if (TypeDC->getAsNominalTypeOrNominalTypeExtensionContext() ==
-            instanceTy->getAnyNominal()) {
+        if (TypeDC->getSelfNominalTypeDecl() == instanceTy->getAnyNominal()) {
           if (propertyInitializer)
             CS.TC.diagnose(nameLoc, diag::instance_member_in_initializer,
                            memberName);
@@ -3768,7 +3765,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 }
 
 static DeclName getBaseName(DeclContext *context) {
-  if (auto generic = context->getAsNominalTypeOrNominalTypeExtensionContext()) {
+  if (auto generic = context->getSelfNominalTypeDecl()) {
     return generic->getName();
   } else if (context->isModuleScopeContext())
     return context->getParentModule()->getName();
@@ -3796,14 +3793,13 @@ void ConstraintSystem::diagnoseDeprecatedConditionalConformanceOuterAccess(
   auto exampleInner = result.front();
   auto innerChoice = exampleInner.getValueDecl();
   auto innerDC = exampleInner.getDeclContext()->getInnermostTypeContext();
-  auto innerParentDecl =
-      innerDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto innerParentDecl = innerDC->getSelfNominalTypeDecl();
   auto innerBaseName = getBaseName(innerDC);
 
   auto choiceKind = choice->getDescriptiveKind();
   auto choiceDC = choice->getDeclContext();
   auto choiceBaseName = getBaseName(choiceDC);
-  auto choiceParentDecl = choiceDC->getAsDeclOrDeclExtensionContext();
+  auto choiceParentDecl = choiceDC->getAsDecl();
   auto choiceParentKind = choiceParentDecl
                               ? choiceParentDecl->getDescriptiveKind()
                               : DescriptiveDeclKind::Module;
@@ -4105,8 +4101,7 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
         }
         assert(TypeDC->isTypeContext() && "Expected type decl context!");
 
-        if (TypeDC->getAsNominalTypeOrNominalTypeExtensionContext() ==
-            instanceType->getAnyNominal()) {
+        if (TypeDC->getSelfNominalTypeDecl() == instanceType->getAnyNominal()) {
           if (propertyInitializer)
             TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
                         UDE->getName());

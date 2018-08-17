@@ -106,8 +106,7 @@ static bool isInSystemModule(DeclContext *D) {
 }
 
 static AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
-  return (dc->getAsClassOrClassExtensionContext()
-            ? AccessLevel::Open : AccessLevel::Public);
+  return (dc->getSelfClassDecl() ? AccessLevel::Open : AccessLevel::Public);
 }
 
 /// Create a typedpattern(namedpattern(decl))
@@ -1929,8 +1928,7 @@ static bool shouldAlsoImportAsClassMethod(FuncDecl *method) {
     return false;
 
   // Must be a method within a class or extension thereof.
-  auto classDecl =
-      method->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto classDecl = method->getDeclContext()->getSelfClassDecl();
   if (!classDecl)
     return false;
 
@@ -3708,7 +3706,7 @@ namespace {
                                        importedType.isImplicitlyUnwrapped());
 
       // If imported as member, the member should be final.
-      if (dc->getAsClassOrClassExtensionContext())
+      if (dc->getSelfClassDecl())
         result->getAttrs().add(new (Impl.SwiftContext)
                                  FinalAttr(/*IsImplicit=*/true));
 
@@ -4754,12 +4752,11 @@ namespace {
         return nullptr;
 
       VarDecl *overridden = nullptr;
-      if (dc->getAsClassOrClassExtensionContext()) {
+      if (dc->getSelfClassDecl()) {
         // Check whether there is a function with the same name as this
         // property. If so, suppress the property; the user will have to use
         // the methods directly, to avoid ambiguities.
-        NominalTypeDecl *lookupContext =
-          dc->getAsNominalTypeOrNominalTypeExtensionContext();
+        NominalTypeDecl *lookupContext = dc->getSelfNominalTypeDecl();
 
         if (auto *classDecl = dyn_cast<ClassDecl>(dc)) {
           // If we're importing into the primary @interface for something, as
@@ -4795,8 +4792,8 @@ namespace {
           // It's okay to compare interface types directly because Objective-C
           // does not have constrained extensions.
           if (overrideContext != dc && overridden->hasClangNode() &&
-              overrideContext->getAsNominalTypeOrNominalTypeExtensionContext()
-                == dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
+              overrideContext->getSelfNominalTypeDecl()
+                == dc->getSelfNominalTypeDecl()) {
             // We've encountered a redeclaration of the property.
             // HACK: Just update the original declaration instead of importing a
             // second property.
@@ -5534,7 +5531,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   assert(dc->isTypeContext() && "cannot import as member onto non-type");
 
   // Check for some invalid imports
-  if (dc->getAsProtocolOrProtocolExtensionContext()) {
+  if (dc->getSelfProtocolDecl()) {
     // FIXME: clang source location
     Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
                                      /*isInit=*/true);
@@ -5613,7 +5610,7 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
     Optional<unsigned> selfIdx,
     Optional<ImportedName> correctSwiftName,
     Optional<AccessorInfo> accessorInfo) {
-  if (dc->getAsProtocolOrProtocolExtensionContext() && !selfIdx) {
+  if (dc->getSelfProtocolDecl() && !selfIdx) {
     // FIXME: source location...
     Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
                                      /*isInit=*/false);
@@ -5648,8 +5645,7 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
       // If there's a swift_newtype, check the levels of indirection: self is
       // only inout if this is a pointer to the typedef type (which itself is a
       // pointer).
-      if (auto nominalTypeDecl =
-              dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      if (auto nominalTypeDecl = dc->getSelfNominalTypeDecl()) {
         if (auto clangDCTy = dyn_cast_or_null<clang::TypedefNameDecl>(
                 nominalTypeDecl->getClangDecl()))
           if (getSwiftNewtypeAttr(clangDCTy, getVersion()))
@@ -5697,7 +5693,7 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
   assert(selfIdx ? result->getSelfIndex() == *selfIdx
                  : result->isImportAsStaticMember());
 
-  if (dc->getAsClassOrClassExtensionContext())
+  if (dc->getSelfClassDecl())
     // FIXME: only if the class itself is not marked final
     result->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
@@ -5853,7 +5849,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
 
   // If this property is in a class or class extension context,
   // add "final".
-  if (dc->getAsClassOrClassExtensionContext())
+  if (dc->getSelfClassDecl())
     property->getAttrs().add(new (Impl.SwiftContext)
                                  FinalAttr(/*IsImplicit=*/true));
 
@@ -6054,7 +6050,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   redundant = false;
 
   // Figure out the type of the container.
-  auto ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto ownerNominal = dc->getSelfNominalTypeDecl();
   assert(ownerNominal && "Method in non-type context?");
 
   // Find the interface, if we can.
@@ -6285,7 +6281,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
   };
 
   // Figure out the class in which this method occurs.
-  auto classDecl = decl->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto classDecl = decl->getDeclContext()->getSelfClassDecl();
   if (!classDecl)
     return;
   auto superDecl = classDecl->getSuperclassDecl();
@@ -6333,8 +6329,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
 
 void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   // Figure out the class in which this subscript occurs.
-  auto classTy =
-      subscript->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto classTy = subscript->getDeclContext()->getSelfClassDecl();
   if (!classTy)
     return;
 
@@ -6409,8 +6404,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   auto findCounterpart = [&](clang::Selector sel) -> FuncDecl * {
     // If the declaration we're starting from is in a class, first
     // look for a class member with the appropriate selector.
-    if (auto classDecl =
-            decl->getDeclContext()->getAsClassOrClassExtensionContext()) {
+    if (auto classDecl = decl->getDeclContext()->getSelfClassDecl()) {
       auto swiftSel = Impl.importSelector(sel);
       for (auto found : classDecl->lookupDirect(swiftSel, true)) {
         if (auto foundFunc = dyn_cast<FuncDecl>(found))
@@ -6526,10 +6520,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
     // Are the getter and the setter in the same type.
     getterAndSetterInSameType =
-        (getter->getDeclContext()
-             ->getAsNominalTypeOrNominalTypeExtensionContext() ==
-         setter->getDeclContext()
-             ->getAsNominalTypeOrNominalTypeExtensionContext());
+        (getter->getDeclContext()->getSelfNominalTypeDecl() ==
+         setter->getDeclContext()->getSelfNominalTypeDecl());
 
     // Whether we can update the types involved in the subscript
     // operation.
@@ -7651,7 +7643,7 @@ void ClangImporter::Implementation::startedImportingEntity() {
 static void finishTypeWitnesses(
     NormalProtocolConformance *conformance) {
   auto *dc = conformance->getDeclContext();
-  auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = dc->getSelfNominalTypeDecl();
   auto *module = dc->getParentModule();
 
   auto *proto = conformance->getProtocol();
@@ -8072,7 +8064,7 @@ ClangImporter::Implementation::importDeclContextOf(
   ext->setValidationToChecked();
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 
-  if (auto protoDecl = ext->getAsProtocolExtensionContext()) {
+  if (auto protoDecl = ext->getExtendedProtocolDecl()) {
     ext->setGenericParams(protoDecl->createGenericParams(ext));
 
     auto *env = buildGenericEnvironment(ext->getGenericParams(), ext);

@@ -1786,7 +1786,7 @@ public:
     return D->getKind() == DeclKind::Extension;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -2117,7 +2117,7 @@ public:
     return D->getKind() == DeclKind::TopLevelCode;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -2645,7 +2645,7 @@ public:
   using TypeDecl::getDeclaredInterfaceType;
 
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -2719,7 +2719,7 @@ public:
     return D->getKind() == DeclKind::TypeAlias;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -3205,7 +3205,7 @@ public:
   }
 
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -3313,7 +3313,7 @@ public:
     return D->getKind() == DeclKind::Enum;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -3408,7 +3408,7 @@ public:
     return D->getKind() == DeclKind::Struct;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -3693,7 +3693,7 @@ public:
     return D->getKind() == DeclKind::Class;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -4025,7 +4025,7 @@ public:
     return D->getKind() == DeclKind::Protocol;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -4900,7 +4900,7 @@ public:
   }
   
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -5281,7 +5281,7 @@ public:
   }
 
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -5508,7 +5508,7 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -5648,7 +5648,7 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -6042,7 +6042,7 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -6078,7 +6078,7 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -6581,7 +6581,7 @@ inline bool Decl::isPotentiallyOverridable() const {
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
-    return getDeclContext()->getAsClassOrClassExtensionContext();
+    return getDeclContext()->getSelfClassDecl();
   } else {
     return false;
   }
@@ -6602,7 +6602,7 @@ inline const GenericContext *Decl::getAsGenericContext() const {
 }
 
 inline bool DeclContext::isExtensionContext() const {
-  if (auto D = getAsDeclOrDeclExtensionContext())
+  if (auto D = getAsDecl())
     return ExtensionDecl::classof(D);
   return false;
 }

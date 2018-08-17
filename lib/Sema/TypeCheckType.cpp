@@ -224,8 +224,7 @@ Type TypeChecker::resolveTypeInContext(
       for (auto parentDC = fromDC;
            !parentDC->isModuleScopeContext();
            parentDC = parentDC->getParent()) {
-        auto *parentNominal =
-          parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
+        auto *parentNominal = parentDC->getSelfNominalTypeDecl();
         if (parentNominal == nominalType)
           return resolver->mapTypeIntoContext(
             parentDC->getSelfInterfaceType());
@@ -235,8 +234,7 @@ Type TypeChecker::resolveTypeInContext(
             if (extendedType == nominalType)
               return resolver->mapTypeIntoContext(
                 extendedType->getDeclaredInterfaceType());
-            extendedType = extendedType->getParent()
-              ->getAsNominalTypeOrNominalTypeExtensionContext();
+            extendedType = extendedType->getParent()->getSelfNominalTypeDecl();
           }
         }
       }
@@ -275,7 +273,7 @@ Type TypeChecker::resolveTypeInContext(
   // parent type instead.
   Type selfType;
   if (isa<NominalTypeDecl>(typeDecl) &&
-      typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      typeDecl->getDeclContext()->getSelfProtocolDecl()) {
     // When looking up a nominal type declaration inside of a
     // protocol extension, always use the nominal type and
     // not the protocol 'Self' type.
@@ -291,7 +289,7 @@ Type TypeChecker::resolveTypeInContext(
       foundDC->getSelfInterfaceType());
 
     if (selfType->is<GenericTypeParamType>() &&
-        typeDecl->getDeclContext()->getAsClassOrClassExtensionContext()) {
+        typeDecl->getDeclContext()->getSelfClassDecl()) {
       // We found a member of a class from a protocol or protocol
       // extension.
       //
@@ -695,8 +693,7 @@ static std::string getDeclNameFromContext(DeclContext *dc,
     auto *parentNominal = nominal;
     while (parentNominal != nullptr) {
       idents.push_back(parentNominal->getName());
-      parentNominal = parentNominal->getDeclContext()
-        ->getAsNominalTypeOrNominalTypeExtensionContext();
+      parentNominal = parentNominal->getDeclContext()->getSelfNominalTypeDecl();
     }
     std::reverse(idents.begin(), idents.end());
     std::string result;
@@ -735,7 +732,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       DeclContext *nominalDC = nullptr;
       NominalTypeDecl *nominal = nullptr;
       if ((nominalDC = dc->getInnermostTypeContext()) &&
-          (nominal = nominalDC->getAsNominalTypeOrNominalTypeExtensionContext())) {
+          (nominal = nominalDC->getSelfNominalTypeDecl())) {
         // Attempt to refer to 'Self' within a non-protocol nominal
         // type. Fix this by replacing 'Self' with the nominal type name.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
@@ -2828,8 +2825,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 
   // For type members of a base class, make sure we use the right
   // derived class as the parent type.
-  if (auto *ownerClass = member->getDeclContext()
-          ->getAsClassOrClassExtensionContext()) {
+  if (auto *ownerClass = member->getDeclContext()->getSelfClassDecl()) {
     baseTy = baseTy->getSuperclassForDecl(ownerClass, useArchetypes);
   }
 
@@ -2844,7 +2840,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     // If the base type is not a nominal type, we might be looking up a
     // nominal member of a generic parameter. This is not supported right
     // now, but at least don't crash.
-    if (member->getDeclContext()->getAsProtocolOrProtocolExtensionContext())
+    if (member->getDeclContext()->getSelfProtocolDecl())
       return nominalDecl->getDeclaredType();
 
     if (!isa<ProtocolDecl>(nominalDecl) &&

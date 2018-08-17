@@ -1217,7 +1217,7 @@ public:
     // Determine whether we'll need to use an allocating constructor (vs. the
     // initializing constructor).
     auto nominal = ctorRef->getDecl()->getDeclContext()
-                     ->getAsNominalTypeOrNominalTypeExtensionContext();
+                     ->getSelfNominalTypeDecl();
     bool useAllocatingCtor;
 
     // Value types only have allocating initializers.

@@ -2693,8 +2693,7 @@ ClangModuleUnit::lookupNestedType(Identifier name,
       else if (originalDecl == decl)
         return true;
 
-      auto *importedContext = decl->getDeclContext()->
-          getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *importedContext = decl->getDeclContext()->getSelfNominalTypeDecl();
       if (importedContext != baseType)
         return true;
 
@@ -3473,7 +3472,7 @@ ClangImporter::Implementation::loadNamedMembers(
   auto *CDC = cast<clang::DeclContext>(CD);
   assert(CD && "loadNamedMembers on a Decl without a clangDecl");
 
-  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominal = DC->getSelfNominalTypeDecl();
   auto effectiveClangContext = getEffectiveClangContext(nominal);
 
   // FIXME: The legacy of mirroring protocol members rears its ugly head,

@@ -748,7 +748,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   SmallVector<ValueDecl *, 4> otherDefinitions;
   if (currentDC->isTypeContext()) {
     // Look within a type context.
-    if (auto nominal = currentDC->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
       auto found = nominal->lookupDirect(current->getBaseName());
       otherDefinitions.append(found.begin(), found.end());
       if (tracker)
@@ -1007,8 +1007,7 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   auto StaticSpelling = binding->getStaticSpelling();
   if (StaticSpelling != StaticSpellingKind::None &&
       binding->getDeclContext()->isExtensionContext()) {
-    if (auto *NTD = binding->getDeclContext()
-        ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (auto *NTD = binding->getDeclContext()->getSelfNominalTypeDecl()) {
       if (!isa<ClassDecl>(NTD)) {
         if (StaticSpelling == StaticSpellingKind::KeywordClass) {
           tc.diagnose(binding, diag::class_var_not_in_class, false)
@@ -1112,7 +1111,7 @@ enum class ImplicitlyFinalReason : unsigned {
 
 static void inferFinalAndDiagnoseIfNeeded(TypeChecker &TC, ValueDecl *D,
                                           StaticSpellingKind staticSpelling) {
-  auto cls = D->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto cls = D->getDeclContext()->getSelfClassDecl();
   if (!cls)
     return;
 
@@ -1177,7 +1176,7 @@ static void configureImplicitSelf(TypeChecker &tc,
 /// \returns true if it can be made dynamic, false otherwise.
 static bool makeDynamic(ValueDecl *decl) {
   // Only  members of classes can be dynamic.
-  auto classDecl = decl->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto classDecl = decl->getDeclContext()->getSelfClassDecl();
   if (!classDecl) {
     auto attr = decl->getAttrs().getAttribute<DynamicAttr>();
     decl->diagnose(diag::dynamic_not_in_class)
@@ -1262,7 +1261,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // @objc declarations in class extensions are implicitly dynamic.
   // This is intended to enable overriding the declarations.
   auto dc = decl->getDeclContext();
-  if (isa<ExtensionDecl>(dc) && dc->getAsClassOrClassExtensionContext()) {
+  if (isa<ExtensionDecl>(dc) && dc->getSelfClassDecl()) {
     return makeDynamic(decl);
   }
 
@@ -2394,12 +2393,12 @@ public:
 
         // Stored type variables in a generic context need to logically
         // occur once per instantiation, which we don't yet handle.
-        } else if (DC->getAsProtocolExtensionContext()) {
+        } else if (DC->getExtendedProtocolDecl()) {
           unimplementedStatic(ProtocolExtensions);
         } else if (DC->isGenericContext()
                && !DC->getGenericSignatureOfContext()->areAllParamsConcrete()) {
           unimplementedStatic(GenericTypes);
-        } else if (DC->getAsClassOrClassExtensionContext()) {
+        } else if (DC->getSelfClassDecl()) {
           auto StaticSpelling = PBD->getStaticSpelling();
           if (StaticSpelling != StaticSpellingKind::KeywordStatic)
             unimplementedStatic(Classes);
@@ -2668,8 +2667,8 @@ public:
     // We don't support nested types in generics yet.
     if (NTD->isGenericContext()) {
       auto DC = NTD->getDeclContext();
-      if (auto proto = DC->getAsProtocolOrProtocolExtensionContext()) {
-        if (DC->getAsProtocolExtensionContext()) {
+      if (auto proto = DC->getSelfProtocolDecl()) {
+        if (DC->getExtendedProtocolDecl()) {
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_protocol_extension,
                       NTD->getName(),
@@ -3231,7 +3230,7 @@ public:
     // nominal type.
     // FIXME: This is a hack to make sure that the type checker precomputes
     // enough information for later passes that might query conformances.
-    if (auto nominal = ED->getAsNominalTypeOrNominalTypeExtensionContext())
+    if (auto nominal = ED->getSelfNominalTypeDecl())
       (void)nominal->getAllConformances();
   }
 
@@ -3335,8 +3334,7 @@ public:
     }
 
     if (CD->isRequired()) {
-      if (auto nominal = CD->getDeclContext()
-              ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      if (auto nominal = CD->getDeclContext()->getSelfNominalTypeDecl()) {
         AccessLevel requiredAccess;
         switch (nominal->getFormalAccess()) {
         case AccessLevel::Open:
@@ -3391,7 +3389,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   if (!dc->getParentSourceFile())
     return true;
 
-  NominalTypeDecl *conformingDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *conformingDecl = dc->getSelfNominalTypeDecl();
   assert(conformingDecl && "Must have conforming declaration");
 
   // Make sure that any access of the witness through the protocol
@@ -3474,7 +3472,7 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
                      "static ");
 
       FD->setStatic();
-    } else if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
+    } else if (auto classDecl = dc->getSelfClassDecl()) {
       // For a class, we also need the function or class to be 'final'.
       if (!classDecl->isFinal() && !FD->isFinal() &&
           FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
@@ -3575,7 +3573,7 @@ void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
   if (FD->isInvalid()) return;
 
   auto *DC = FD->getDeclContext();
-  auto selfNominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto selfNominal = DC->getSelfNominalTypeDecl();
   if (!selfNominal) return;
 
   // Check the parameters for a reference to 'Self'.
@@ -3660,7 +3658,7 @@ bool checkDynamicSelfReturn(FuncDecl *func) {
     return false;
 
   // 'Self' on a free function is not dynamic 'Self'.
-  if (!func->getDeclContext()->getAsClassOrClassExtensionContext() &&
+  if (!func->getDeclContext()->getSelfClassDecl() &&
       !isa<ProtocolDecl>(func->getDeclContext()))
     return false;
 
@@ -4020,8 +4018,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateAttributes(*this, VD);
 
     // Properties need some special validation logic.
-    if (auto *nominalDecl = VD->getDeclContext()
-            ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (auto *nominalDecl = VD->getDeclContext()->getSelfNominalTypeDecl()) {
       // If this variable is a class member, mark it final if the
       // class is final, or if it was declared with 'let'.
       auto staticSpelling =
@@ -4074,8 +4071,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto StaticSpelling = FD->getStaticSpelling();
     if (StaticSpelling != StaticSpellingKind::None &&
         FD->getDeclContext()->isExtensionContext()) {
-      if (auto *NTD = FD->getDeclContext()
-              ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      if (auto *NTD = FD->getDeclContext()->getSelfNominalTypeDecl()) {
         if (!isa<ClassDecl>(NTD)) {
           if (StaticSpelling == StaticSpellingKind::KeywordClass) {
             diagnose(FD, diag::class_func_not_in_class, false)
@@ -4144,7 +4140,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       case AccessorKind::WillSet:
         // Make sure that observing accessors are marked final if in a class.
         if (!accessor->isFinal() &&
-            accessor->getDeclContext()->getAsClassOrClassExtensionContext()) {
+            accessor->getDeclContext()->getSelfClassDecl()) {
           makeFinal(Context, accessor);
         }
         LLVM_FALLTHROUGH;
@@ -4299,7 +4295,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
           .fixItInsert(CD->getLoc(), "convenience ");
         CD->setInitKind(CtorInitializerKind::Convenience);
-      } else if (CD->getDeclContext()->getAsProtocolExtensionContext()) {
+      } else if (CD->getDeclContext()->getExtendedProtocolDecl()) {
         CD->setInitKind(CtorInitializerKind::Convenience);
       }
     }
@@ -4570,7 +4566,7 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
     requestNominalLayout(protocolDecl);
 
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    if (ext->getAsClassOrClassExtensionContext()) {
+    if (ext->getSelfClassDecl()) {
       // Finalize members of class extensions, to ensure we compute their
       // @objc and dynamic state.
       DeclsToFinalize.insert(member);
@@ -5706,7 +5702,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
   auto checkObjCDeclContext = [](Decl *D) {
     DeclContext *DC = D->getDeclContext();
-    if (DC->getAsClassOrClassExtensionContext())
+    if (DC->getSelfClassDecl())
       return true;
     if (auto *PD = dyn_cast<ProtocolDecl>(DC))
       if (PD->isObjC())
@@ -5721,7 +5717,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         isa<ProtocolDecl>(D)) {
       /* ok */
     } else if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
-      if (!Ext->getAsClassOrClassExtensionContext())
+      if (!Ext->getSelfClassDecl())
         error = diag::objc_extension_not_class;
     } else if (auto ED = dyn_cast<EnumDecl>(D)) {
       if (ED->isGenericContext())
@@ -5839,7 +5835,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
 
     if (auto ext = dyn_cast<ExtensionDecl>(D)) {
-      if (!ext->getAsClassOrClassExtensionContext())
+      if (!ext->getSelfClassDecl())
         error = diag::invalid_nonobjc_extension;
     }
 

@@ -60,10 +60,8 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
 
   // If the declaration we found isn't in the same nominal type as the
   // constant, ignore it.
-  if (ctorExpr->getDecl()->getDeclContext()
-          ->getAsNominalTypeOrNominalTypeExtensionContext() != 
-        constant->getDeclContext()
-          ->getAsNominalTypeOrNominalTypeExtensionContext())
+  if (ctorExpr->getDecl()->getDeclContext()->getSelfNominalTypeDecl() !=
+        constant->getDeclContext()->getSelfNominalTypeDecl())
     return nullptr;
 
   return dyn_cast<EnumElementDecl>(ctorExpr->getDecl());
