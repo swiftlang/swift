@@ -23164,6 +23164,7 @@
       "usr": "s:s32ExpressibleByStringInterpolationP",
       "location": "",
       "moduleName": "Swift",
+      "genericSig": "<Self : ExpressibleByStringLiteral, Self.StringInterpolation : StringInterpolationProtocol, Self.StringLiteralType == Self.StringInterpolation.StringLiteralType>",
       "conformingProtocols": [
         "ExpressibleByStringLiteral",
         "ExpressibleByExtendedGraphemeClusterLiteral",
@@ -23178,6 +23179,7 @@
           "usr": "s:s32ExpressibleByStringInterpolationP06stringD0x0cD0Qz_tcfc",
           "location": "",
           "moduleName": "Swift",
+          "genericSig": "<Self where Self : ExpressibleByStringInterpolation>",
           "children": [
             {
               "kind": "TypeNominal",
@@ -23199,10 +23201,7 @@
           "usr": "s:s32ExpressibleByStringInterpolationPss07DefaultcD0V0cD0RtzrlE06stringD0xAD_tcfc",
           "location": "",
           "moduleName": "Swift",
-          "parentExtensionReqs": [
-            "Self : ExpressibleByStringInterpolation",
-            "Self.StringInterpolation == DefaultStringInterpolation"
-          ],
+          "genericSig": "<Self where Self : ExpressibleByStringInterpolation, Self.StringInterpolation == DefaultStringInterpolation>",
           "children": [
             {
               "kind": "TypeNominal",
@@ -23227,6 +23226,7 @@
       "usr": "s:s27StringInterpolationProtocolP",
       "location": "",
       "moduleName": "Swift",
+      "genericSig": "<Self.StringLiteralType : _ExpressibleByBuiltinStringLiteral>",
       "children": [
         {
           "kind": "Constructor",
@@ -23236,6 +23236,7 @@
           "usr": "s:s27StringInterpolationProtocolP15literalCapacity18interpolationCountxSi_Sitcfc",
           "location": "",
           "moduleName": "Swift",
+          "genericSig": "<Self where Self : StringInterpolationProtocol>",
           "children": [
             {
               "kind": "TypeNominal",
@@ -23264,6 +23265,7 @@
           "usr": "s:s27StringInterpolationProtocolP13appendLiteralyy0aE4TypeQzF",
           "location": "",
           "moduleName": "Swift",
+          "genericSig": "<Self where Self : StringInterpolationProtocol>",
           "mutating": true,
           "children": [
             {
@@ -37286,6 +37288,7 @@
         "LosslessStringConvertible",
         "CustomStringConvertible",
         "CustomDebugStringConvertible",
+        "TextOutputStreamable",
         "BinaryFloatingPoint",
         "FloatingPoint",
         "ExpressibleByFloatLiteral",
@@ -37484,6 +37487,31 @@
                   "usr": "s:SS"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "write",
+          "printedName": "write(to:)",
+          "declKind": "Func",
+          "usr": "s:Sf5write2toyxz_ts16TextOutputStreamRzlF",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Target where Target : TextOutputStream>",
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Target"
             }
           ]
         },
@@ -40117,6 +40145,7 @@
         "LosslessStringConvertible",
         "CustomStringConvertible",
         "CustomDebugStringConvertible",
+        "TextOutputStreamable",
         "BinaryFloatingPoint",
         "FloatingPoint",
         "ExpressibleByFloatLiteral",
@@ -40315,6 +40344,31 @@
                   "usr": "s:SS"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "write",
+          "printedName": "write(to:)",
+          "declKind": "Func",
+          "usr": "s:Sd5write2toyxz_ts16TextOutputStreamRzlF",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Target where Target : TextOutputStream>",
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Target"
             }
           ]
         },
@@ -42948,6 +43002,7 @@
         "LosslessStringConvertible",
         "CustomStringConvertible",
         "CustomDebugStringConvertible",
+        "TextOutputStreamable",
         "BinaryFloatingPoint",
         "FloatingPoint",
         "ExpressibleByFloatLiteral",
@@ -43089,6 +43144,31 @@
                   "usr": "s:SS"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "write",
+          "printedName": "write(to:)",
+          "declKind": "Func",
+          "usr": "s:s7Float80V5write2toyxz_ts16TextOutputStreamRzlF",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Target where Target : TextOutputStream>",
+          "declAttributes": [
+            "Inlinable"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Target"
             }
           ]
         },
@@ -89704,7 +89784,6 @@
           "usr": "s:SS19StringInterpolationa",
           "location": "",
           "moduleName": "Swift",
-          "parentExtensionReqs": [],
           "children": [
             {
               "kind": "TypeNominal",
@@ -93924,7 +94003,7 @@
           "usr": "s:SS10describingSSx_tcs23CustomStringConvertibleRzlufc",
           "location": "",
           "moduleName": "Swift",
-          "parentExtensionReqs": [],
+          "genericSig": "<Subject where Subject : CustomStringConvertible>",
           "declAttributes": [
             "Inlinable"
           ],
@@ -93950,7 +94029,7 @@
           "usr": "s:SS10describingSSx_tcs20TextOutputStreamableRzlufc",
           "location": "",
           "moduleName": "Swift",
-          "parentExtensionReqs": [],
+          "genericSig": "<Subject where Subject : TextOutputStreamable>",
           "declAttributes": [
             "Inlinable"
           ],
@@ -93976,7 +94055,7 @@
           "usr": "s:SS10describingSSx_tcs23CustomStringConvertibleRzs20TextOutputStreamableRzlufc",
           "location": "",
           "moduleName": "Swift",
-          "parentExtensionReqs": [],
+          "genericSig": "<Subject where Subject : CustomStringConvertible, Subject : TextOutputStreamable>",
           "declAttributes": [
             "Inlinable"
           ],
@@ -94030,7 +94109,7 @@
       "usr": "s:Sy",
       "location": "",
       "moduleName": "Swift",
-      "genericSig": "<Self : BidirectionalCollection, Self : Comparable, Self : ExpressibleByStringLiteral, Self : Hashable, Self : LosslessStringConvertible, Self : TextOutputStream, Self : TextOutputStreamable, Self.Element == Character, Self.SubSequence : StringProtocol, Self.UTF16View : BidirectionalCollection, Self.UTF8View : Collection, Self.UnicodeScalarView : BidirectionalCollection, Self.UTF16View.Element == UInt16, Self.UTF8View.Element == UInt8, Self.UnicodeScalarView.Element == Unicode.Scalar>",
+      "genericSig": "<Self : BidirectionalCollection, Self : Comparable, Self : ExpressibleByStringInterpolation, Self : Hashable, Self : LosslessStringConvertible, Self : TextOutputStream, Self : TextOutputStreamable, Self.Element == Character, Self.StringInterpolation == DefaultStringInterpolation, Self.SubSequence : StringProtocol, Self.UTF16View : BidirectionalCollection, Self.UTF8View : Collection, Self.UnicodeScalarView : BidirectionalCollection, Self.UTF16View.Element == UInt16, Self.UTF8View.Element == UInt8, Self.UnicodeScalarView.Element == Unicode.Scalar>",
       "conformingProtocols": [
         "BidirectionalCollection",
         "TextOutputStream",
@@ -94704,6 +94783,7 @@
           "usr": "s:s26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzs20TextOutputStreamableRzlF",
           "location": "",
           "moduleName": "Swift",
+          "genericSig": "<T where T : CustomStringConvertible, T : TextOutputStreamable>",
           "mutating": true,
           "declAttributes": [
             "Inlinable"
@@ -94729,6 +94809,7 @@
           "usr": "s:s26DefaultStringInterpolationV06appendC0yyxs20TextOutputStreamableRzlF",
           "location": "",
           "moduleName": "Swift",
+          "genericSig": "<T where T : TextOutputStreamable>",
           "mutating": true,
           "declAttributes": [
             "Inlinable"
@@ -94754,6 +94835,7 @@
           "usr": "s:s26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzlF",
           "location": "",
           "moduleName": "Swift",
+          "genericSig": "<T where T : CustomStringConvertible>",
           "mutating": true,
           "declAttributes": [
             "Inlinable"
@@ -94779,6 +94861,7 @@
           "usr": "s:s26DefaultStringInterpolationV06appendC0yyxlF",
           "location": "",
           "moduleName": "Swift",
+          "genericSig": "<T>",
           "mutating": true,
           "declAttributes": [
             "Inlinable"
@@ -94821,7 +94904,6 @@
           "usr": "s:s26DefaultStringInterpolationV11descriptionSSvp",
           "location": "",
           "moduleName": "Swift",
-          "parentExtensionReqs": [],
           "children": [
             {
               "kind": "TypeNominal",
@@ -94837,7 +94919,6 @@
               "usr": "s:s26DefaultStringInterpolationV11descriptionSSvg",
               "location": "",
               "moduleName": "Swift",
-              "parentExtensionReqs": [],
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -95801,7 +95882,6 @@
           "usr": "s:Ss19stringInterpolationSss013DefaultStringB0V_tcfc",
           "location": "",
           "moduleName": "Swift",
-          "parentExtensionReqs": [],
           "declAttributes": [
             "Effects",
             "Inlinable"
