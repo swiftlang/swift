@@ -21,6 +21,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 using namespace constraints;
@@ -122,27 +123,59 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
   return AffectedDecl->getAsGenericContext();
 }
 
+bool RequirementFailure::diagnose() {
+  if (!canDiagnoseFailure())
+    return false;
+
+  auto *anchor = getAnchor();
+  const auto *reqDC = getRequirementDC();
+  auto *genericCtx = AffectedDecl->getAsGenericContext();
+
+  if (reqDC != genericCtx) {
+    auto *NTD = reqDC->getAsNominalTypeOrNominalTypeExtensionContext();
+    emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
+                   AffectedDecl->getDescriptiveKind(),
+                   AffectedDecl->getFullName(), NTD->getDeclaredType(),
+                   getLHS(), getRHS());
+  } else {
+    emitDiagnostic(anchor->getLoc(), getDiagnosticOnDecl(),
+                   AffectedDecl->getDescriptiveKind(),
+                   AffectedDecl->getFullName(), getLHS(), getRHS());
+  }
+
+  emitRequirementNote(reqDC->getAsDeclOrDeclExtensionContext());
+  return true;
+}
+
+void RequirementFailure::emitRequirementNote(const Decl *anchor) const {
+  auto &req = getRequirement();
+
+  if (getRHS()->isEqual(req.getSecondType())) {
+    emitDiagnostic(anchor, diag::where_requirement_failure_one_subst,
+                   req.getFirstType(), getLHS());
+    return;
+  }
+
+  if (getLHS()->isEqual(req.getFirstType())) {
+    emitDiagnostic(anchor, diag::where_requirement_failure_one_subst,
+                   req.getSecondType(), getRHS());
+    return;
+  }
+
+  emitDiagnostic(anchor, diag::where_requirement_failure_both_subst,
+                 req.getFirstType(), getLHS(), req.getSecondType(), getRHS());
+}
+
 bool MissingConformanceFailure::diagnose() {
+  if (!canDiagnoseFailure())
+    return false;
+
   auto *anchor = getAnchor();
   auto ownerType = getOwnerType();
-  auto type = getNonConformingType();
-  auto protocolType = getProtocolType();
+  auto nonConformingType = getLHS();
+  auto protocolType = getRHS();
 
-  //  Find `ApplyExpr` based on a function expression attached to it.
-  auto findApplyExpr = [](Expr *parent, Expr *fnExpr) -> ApplyExpr * {
-    ApplyExpr *applyExpr = nullptr;
-    parent->forEachChildExpr([&applyExpr, &fnExpr](Expr *subExpr) -> Expr * {
-      auto *AE = dyn_cast<ApplyExpr>(subExpr);
-      if (!AE || AE->getFn() != fnExpr)
-        return subExpr;
-
-      applyExpr = AE;
-      return nullptr;
-    });
-    return applyExpr;
-  };
-
-  auto getArgumentAt = [](ApplyExpr *AE, unsigned index) -> Expr * {
+  auto getArgumentAt = [](const ApplyExpr *AE, unsigned index) -> Expr * {
     assert(AE);
 
     auto *arg = AE->getArg();
@@ -156,24 +189,15 @@ bool MissingConformanceFailure::diagnose() {
     return arg;
   };
 
-  auto *applyExpr = findApplyExpr(getParentExpr(), anchor);
-
   Optional<unsigned> atParameterPos;
   // Sometimes fix is recorded by type-checking sub-expression
   // during normal diagnostics, in such case call expression
   // is unavailable.
-  if (applyExpr) {
-    // If this is a static, initializer or operator call,
-    // let's not try to diagnose it here, but refer to expression
-    // diagnostics.
-    if (isa<PrefixUnaryExpr>(applyExpr) || isa<PostfixUnaryExpr>(applyExpr) ||
-        isa<BinaryExpr>(applyExpr) || isa<TypeExpr>(anchor))
-      return false;
-
+  if (Apply) {
     if (auto *fnType = ownerType->getAs<AnyFunctionType>()) {
       auto parameters = fnType->getParams();
       for (auto index : indices(parameters)) {
-        if (parameters[index].getType()->isEqual(type)) {
+        if (parameters[index].getType()->isEqual(nonConformingType)) {
           atParameterPos = index;
           break;
         }
@@ -181,41 +205,29 @@ bool MissingConformanceFailure::diagnose() {
     }
   }
 
-  if (type->isExistentialType()) {
+  if (nonConformingType->isExistentialType()) {
     auto diagnostic = diag::protocol_does_not_conform_objc;
-    if (type->isObjCExistentialType())
+    if (nonConformingType->isObjCExistentialType())
       diagnostic = diag::protocol_does_not_conform_static;
 
-    emitDiagnostic(anchor->getLoc(), diagnostic, type, protocolType);
-  } else if (atParameterPos) {
+    emitDiagnostic(anchor->getLoc(), diagnostic, nonConformingType,
+                   protocolType);
+    return true;
+  }
+
+  if (atParameterPos) {
     // Requirement comes from one of the parameter types,
     // let's try to point diagnostic to the argument expression.
-    auto *argExpr = getArgumentAt(applyExpr, *atParameterPos);
+    auto *argExpr = getArgumentAt(Apply, *atParameterPos);
     emitDiagnostic(argExpr->getLoc(),
-                   diag::cannot_convert_argument_value_protocol, type,
-                   protocolType);
-  } else {
-    const auto &req = getRequirement();
-    auto *genericCtx = AffectedDecl->getAsGenericContext();
-    const auto *reqDC = getRequirementDC();
-
-    if (reqDC != genericCtx) {
-      auto *NTD = reqDC->getAsNominalTypeOrNominalTypeExtensionContext();
-      emitDiagnostic(anchor->getLoc(), diag::type_does_not_conform_in_decl_ref,
-                     AffectedDecl->getDescriptiveKind(),
-                     AffectedDecl->getFullName(), NTD->getDeclaredType(), type,
-                     protocolType);
-    } else {
-      emitDiagnostic(anchor->getLoc(), diag::type_does_not_conform_decl_owner,
-                     AffectedDecl->getDescriptiveKind(),
-                     AffectedDecl->getFullName(), type, protocolType);
-    }
-
-    emitDiagnostic(reqDC->getAsDeclOrDeclExtensionContext(),
-                   diag::where_type_does_not_conform_type, req.getFirstType(),
-                   type);
+                   diag::cannot_convert_argument_value_protocol,
+                   nonConformingType, protocolType);
+    return true;
   }
-  return true;
+
+  // If none of the special cases could be diagnosed,
+  // let's fallback to the most general diagnostic.
+  return RequirementFailure::diagnose();
 }
 
 bool LabelingFailure::diagnose() {
