@@ -68,6 +68,9 @@ enum class FixKind : uint8_t {
 
   /// Add a new conformance to the type to satisfy a requirement.
   AddConformance,
+
+  /// Treat rvalue as lvalue
+  TreatRValueAsLValue,
 };
 
 class ConstraintFix {
@@ -167,6 +170,20 @@ public:
 
   static AddAddressOf *create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
+
+// Treat rvalue as if it was an lvalue
+class TreatRValueAsLValue final : public ConstraintFix {
+  TreatRValueAsLValue(ConstraintLocator *locator)
+    : ConstraintFix(FixKind::TreatRValueAsLValue, locator) {}
+
+public:
+  std::string getName() const override { return "treat rvalue as lvalue"; }
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
+
+  static TreatRValueAsLValue *create(ConstraintSystem &cs, ConstraintLocator *locator);
+};
+
 
 /// Replace a coercion ('as') with a forced checked cast ('as!').
 class CoerceToCheckedCast final : public ConstraintFix {

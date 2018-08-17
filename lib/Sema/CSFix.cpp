@@ -104,6 +104,17 @@ AddAddressOf *AddAddressOf::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) AddAddressOf(locator);
 }
 
+bool TreatRValueAsLValue::diagnose(Expr *root, const Solution &solution) const {
+  RValueTreatedAsLValueFailure failure(solution, getLocator());
+  return failure.diagnose();
+}
+
+TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) TreatRValueAsLValue(locator);
+}
+
+
 bool CoerceToCheckedCast::diagnose(Expr *root, const Solution &solution) const {
   MissingForcedDowncastFailure failure(root, solution, getLocator());
   return failure.diagnose();

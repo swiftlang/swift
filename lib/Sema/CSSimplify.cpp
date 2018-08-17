@@ -2446,7 +2446,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           AddAddressOf::create(*this, getConstraintLocator(locator)));
       } else if (!isTypeVarOrMember1) {
         // If we have a concrete type that's an rvalue, "fix" it.
-        conversionsOrFixes.push_back(FixKind::TreatRValueAsLValue);
+        conversionsOrFixes.push_back(
+          TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
       }
     }
   }
@@ -4990,7 +4991,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     auto result = matchTypes(LValueType::get(type1), type2,
                              matchKind, subflags, locator);
     if (result == SolutionKind::Solved)
-      if (recordFix(fix, locator))
+      if (recordFix(fix))
         return SolutionKind::Error;
 
     return result;
