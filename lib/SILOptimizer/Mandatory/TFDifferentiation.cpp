@@ -1289,7 +1289,7 @@ public:
   bool isUseful(SILValue value,
                 unsigned dependentVariableIndex) const;
   bool isVaried(SILValue value,
-                     const llvm::SmallBitVector &parameterIndices) const;
+                const llvm::SmallBitVector &parameterIndices) const;
   bool isActive(SILValue value,
                 const SILReverseAutoDiffIndices &indices) const;
 };
