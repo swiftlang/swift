@@ -28,8 +28,7 @@ DerivedConformance::DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
                                        ProtocolDecl *protocol)
     : TC(tc), ConformanceDecl(conformanceDecl), Nominal(nominal),
       Protocol(protocol) {
-  assert(getConformanceContext()
-             ->getAsNominalTypeOrNominalTypeExtensionContext() == nominal);
+  assert(getConformanceContext()->getSelfNominalTypeDecl() == nominal);
 }
 
 DeclContext *DerivedConformance::getConformanceContext() const {
@@ -303,9 +302,8 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   getterDecl->setStatic(isStatic);
 
   // If this is supposed to be a final method, mark it as such.
-  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
-  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
-      !getterDecl->isFinal())
+  assert(isFinal || !parentDC->getSelfClassDecl());
+  if (isFinal && parentDC->getSelfClassDecl() && !getterDecl->isFinal())
     getterDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   // Compute the interface type of the getter.
@@ -338,9 +336,8 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->setValidationToChecked();
 
   // If this is supposed to be a final property, mark it as such.
-  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
-  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
-      !propDecl->isFinal())
+  assert(isFinal || !parentDC->getSelfClassDecl());
+  if (isFinal && parentDC->getSelfClassDecl() && !propDecl->isFinal())
     propDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);

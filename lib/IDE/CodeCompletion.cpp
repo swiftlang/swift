@@ -1318,7 +1318,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     auto *DC = CurDeclContext->getInnermostTypeContext();
     if (!DC)
       return;
-    auto *CD = DC->getAsClassOrClassExtensionContext();
+    auto *CD = DC->getSelfClassDecl();
     if (!CD)
       return;
     Type ST = CD->getSuperclass();
@@ -2682,9 +2682,7 @@ public:
       auto underlyingType = TAD->getUnderlyingTypeLoc().getType();
       if (underlyingType->hasError()) {
         Type parentType;
-        if (auto nominal =
-              TAD->getDeclContext()
-                ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+        if (auto nominal = TAD->getDeclContext()->getSelfNominalTypeDecl()) {
           parentType = nominal->getDeclaredInterfaceType();
         }
         addTypeAnnotation(
@@ -4071,15 +4069,14 @@ public:
 
   bool missingOverride(DeclVisibilityKind Reason) {
     return !hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
-           !CurrDeclContext->getAsProtocolOrProtocolExtensionContext();
+           !CurrDeclContext->getSelfProtocolDecl();
   }
 
   void addAccessControl(const ValueDecl *VD,
                         CodeCompletionResultBuilder &Builder) {
-    assert(CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext());
+    assert(CurrDeclContext->getSelfNominalTypeDecl());
     auto AccessOfContext =
-      CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext()
-        ->getFormalAccess();
+        CurrDeclContext->getSelfNominalTypeDecl()->getFormalAccess();
     auto Access = std::min(VD->getFormalAccess(), AccessOfContext);
     // Only emit 'public', not needed otherwise.
     if (Access >= AccessLevel::Public)
@@ -4189,7 +4186,7 @@ public:
     // and 1) this is a protocol conformance and the class is not final, or 2)
     // this is subclass and the initializer is marked as required.
     bool needRequired = false;
-    auto C = CurrDeclContext->getAsClassOrClassExtensionContext();
+    auto C = CurrDeclContext->getSelfClassDecl();
     if (C && !isKeywordSpecified("required")) {
       if (Reason ==
             DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal &&
@@ -4314,7 +4311,7 @@ public:
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
-    if (!CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext())
+    if (!CurrDeclContext->getSelfNominalTypeDecl())
       return;
     if (isa<ProtocolDecl>(CurrDeclContext))
       return;

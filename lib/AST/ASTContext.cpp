@@ -2418,8 +2418,7 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
         continue;
     }
 
-    auto classDecl =
-      method->getDeclContext()->getAsClassOrClassExtensionContext();
+    auto classDecl = method->getDeclContext()->getSelfClassDecl();
     if (!classDecl)
       continue; // error-recovery path, only
 
@@ -2698,8 +2697,7 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
   bool anyDiagnosed = false;
   for (const auto &unsatisfied : localReqs) {
     // Check whether there is a conflict here.
-    ClassDecl *classDecl =
-      unsatisfied.first->getAsClassOrClassExtensionContext();
+    ClassDecl *classDecl = unsatisfied.first->getSelfClassDecl();
     auto req = unsatisfied.second;
     auto selector = req->getObjCSelector();
     bool isInstanceMethod = req->isInstanceMember();

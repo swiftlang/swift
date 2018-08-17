@@ -277,7 +277,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
 
   ProtocolDecl *proto = nullptr;
   if (auto *typeDC = DC->getInnermostTypeContext())
-    proto = typeDC->getAsProtocolOrProtocolExtensionContext();
+    proto = typeDC->getSelfProtocolDecl();
 
   for (auto &Req : GenericSig->getRequirements()) {
     // Skip protocol Self requirement.

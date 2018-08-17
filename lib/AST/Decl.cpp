@@ -1226,7 +1226,7 @@ SourceRange PatternBindingDecl::getSourceRange() const {
 }
 
 static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
-  if (!D->getDeclContext()->getAsClassOrClassExtensionContext())
+  if (!D->getDeclContext()->getSelfClassDecl())
     return StaticSpellingKind::KeywordStatic;
 
   return StaticSpellingKind::KeywordClass;
@@ -1690,7 +1690,7 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
     return DC->isLocalContext();
   }
 
-  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominal = DC->getSelfNominalTypeDecl();
   if (nominal == nullptr)
     return false;
 
@@ -1718,7 +1718,7 @@ bool AbstractStorageDecl::isFormallyResilient() const {
   // If we're an instance property of a nominal type, query the type.
   auto *dc = getDeclContext();
   if (!isStatic())
-    if (auto *nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext())
+    if (auto *nominalDecl = dc->getSelfNominalTypeDecl())
       return nominalDecl->isResilient();
 
   return true;
@@ -2030,7 +2030,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
 
   signature.Name = getFullName();
   signature.InProtocolExtension
-    = static_cast<bool>(getDeclContext()->getAsProtocolExtensionContext());
+    = static_cast<bool>(getDeclContext()->getExtendedProtocolDecl());
   signature.IsInstanceMember = isInstanceMember();
   signature.IsVariable = isa<VarDecl>(this);
   signature.IsFunction = isa<AbstractFunctionDecl>(this);
@@ -2144,8 +2144,7 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
 
   // Dynamic lookup can only find class and protocol members, or extensions of
   // classes.
-  auto nominalDC =
-  getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominalDC = getDeclContext()->getSelfNominalTypeDecl();
   if (!nominalDC ||
       (!isa<ClassDecl>(nominalDC) && !isa<ProtocolDecl>(nominalDC)))
     return false;
@@ -2169,8 +2168,7 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
 ArrayRef<ValueDecl *>
 ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   // Dig out the nominal type.
-  NominalTypeDecl *NTD =
-    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *NTD = getDeclContext()->getSelfNominalTypeDecl();
   if (!NTD || isa<ProtocolDecl>(NTD))
     return {};
 
@@ -2262,8 +2260,7 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
 
   // Only makes sense when this declaration is within a nominal type
   // or extension thereof.
-  auto nominal =
-    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = getDeclContext()->getSelfNominalTypeDecl();
   if (!nominal) return false;
 
   // If there is already an @objc attribute with an explicit name, we
@@ -2559,7 +2556,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   auto *sourceDC = VD->getDeclContext();
 
   if (!forConformance) {
-    if (auto *proto = sourceDC->getAsProtocolOrProtocolExtensionContext()) {
+    if (auto *proto = sourceDC->getSelfProtocolDecl()) {
       // FIXME: Swift 4.1 allowed accessing protocol extension methods that were
       // marked 'public' if the protocol was '@_versioned' (now
       // '@usableFromInline'). Which works at the ABI level, so let's keep
@@ -2615,7 +2612,7 @@ bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
   // because we're finding internal operators within private types. Fortunately
   // we have a requirement that a member operator take the enclosing type as an
   // argument, so it won't ever match.
-  assert(getDeclContext()->getAsProtocolOrProtocolExtensionContext() ||
+  assert(getDeclContext()->getSelfProtocolDecl() ||
          isOperator() ||
          result == checkAccessUsingAccessScopes(useDC, this, access));
 
@@ -2718,8 +2715,8 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
       return result;
   }
 
-  auto nominal1 = dc1->getAsNominalTypeOrNominalTypeExtensionContext();
-  auto nominal2 = dc2->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal1 = dc1->getSelfNominalTypeDecl();
+  auto nominal2 = dc2->getSelfNominalTypeDecl();
   if (static_cast<bool>(nominal1) != static_cast<bool>(nominal2)) {
     return static_cast<bool>(nominal1) ? -1 : +1;
   }
@@ -2844,7 +2841,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   if (dc->isTypeContext()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType: {
-      auto *nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *nominal = dc->getSelfNominalTypeDecl();
       if (nominal)
         Ty = nominal->getDeclaredType();
       else
@@ -3018,7 +3015,7 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 
   Type parentTy;
   auto parentDC = getDeclContext();
-  if (auto nominal = parentDC->getAsNominalTypeOrNominalTypeExtensionContext())
+  if (auto nominal = parentDC->getSelfNominalTypeDecl())
     parentTy = nominal->getDeclaredType();
 
   return UnboundGenericType::get(
@@ -4455,14 +4452,14 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
     auto *CDC = CD->getDeclContext();
 
     // 'let' properties are not valid inside protocols.
-    if (CDC->getAsProtocolExtensionContext())
+    if (CDC->getExtendedProtocolDecl())
       return false;
 
     // If this init is defined inside of the same type (or in an extension
     // thereof) as the let property, then it is mutable.
     if (!CDC->isTypeContext() ||
-        CDC->getAsNominalTypeOrNominalTypeExtensionContext() !=
-        getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext())
+        CDC->getSelfNominalTypeDecl() !=
+        getDeclContext()->getSelfNominalTypeDecl())
       return false;
 
     if (base && CD->getImplicitSelfDecl() != base->getDecl())
@@ -4742,7 +4739,7 @@ Type DeclContext::getSelfTypeInContext() const {
   assert(isTypeContext());
 
   // For a protocol or extension thereof, the type is 'Self'.
-  if (getAsProtocolOrProtocolExtensionContext())
+  if (getSelfProtocolDecl())
     return mapTypeIntoContext(getProtocolSelfType());
   return getDeclaredTypeInContext();
 }
@@ -4752,7 +4749,7 @@ Type DeclContext::getSelfInterfaceType() const {
   assert(isTypeContext());
 
   // For a protocol or extension thereof, the type is 'Self'.
-  if (getAsProtocolOrProtocolExtensionContext())
+  if (getSelfProtocolDecl())
     return getProtocolSelfType();
   return getDeclaredInterfaceType();
 }
@@ -5929,7 +5926,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // get the kind out of the finder.
   auto Kind = finder.Kind;
 
-  auto *NTD = getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *NTD = getDeclContext()->getSelfNominalTypeDecl();
 
   // Protocol extension and enum initializers are always delegating.
   if (Kind == BodyInitKind::None) {
@@ -5971,7 +5968,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   // If we still don't know, check whether we have a class with a superclass: it
   // gets an implicit chained initializer.
   if (Kind == BodyInitKind::None) {
-    if (auto classDecl = getDeclContext()->getAsClassOrClassExtensionContext()) {
+    if (auto classDecl = getDeclContext()->getSelfClassDecl()) {
       if (classDecl->hasSuperclass())
         Kind = BodyInitKind::ImplicitChained;
     }
@@ -6068,7 +6065,7 @@ bool FuncDecl::isDeferBody() const {
 
 bool FuncDecl::isPotentialIBActionTarget() const {
   return isInstanceMember() &&
-    getDeclContext()->getAsClassOrClassExtensionContext() &&
+    getDeclContext()->getSelfClassDecl() &&
     !isa<AccessorDecl>(this);
 }
 
@@ -6183,7 +6180,7 @@ DeclContext *TypeOrExtensionDecl::getAsDeclContext() const {
   return getAsDecl()->getInnermostDeclContext();
 }
 NominalTypeDecl *TypeOrExtensionDecl::getBaseNominal() const {
-  return getAsDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  return getAsDeclContext()->getSelfNominalTypeDecl();
 }
 bool TypeOrExtensionDecl::isNull() const { return Decl.isNull(); }
 

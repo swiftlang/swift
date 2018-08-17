@@ -187,9 +187,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   if (!concrete->hasInterfaceType())
     return ErrorType::get(tc.Context);
   if (baseTy->isTypeParameter()) {
-    if (auto proto =
-          concrete->getDeclContext()
-            ->getAsProtocolOrProtocolExtensionContext()) {
+    if (auto proto = concrete->getDeclContext()->getSelfProtocolDecl()) {
       // Fast path: if there are no type parameters in the concrete type, just
       // return it.
       if (!concrete->getDeclaredInterfaceType()->hasTypeParameter())
@@ -982,7 +980,7 @@ static void visitOuterToInner(
 
 /// Retrieve the generic parameter depth of the extended type.
 static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
-  auto nominal = ext->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = ext->getSelfNominalTypeDecl();
   if (!nominal) return static_cast<unsigned>(-1);
 
   auto sig = nominal->getGenericSignatureOfContext();
@@ -1073,8 +1071,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     }
   } else {
     // Re-use the signature of the type being extended.
-    sig = ext->getAsNominalTypeOrNominalTypeExtensionContext()
-            ->getGenericSignatureOfContext();
+    sig = ext->getSelfNominalTypeDecl()->getGenericSignatureOfContext();
   }
 
   CompleteGenericTypeResolver completeResolver(*this, sig);

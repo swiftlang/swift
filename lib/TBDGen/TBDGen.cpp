@@ -328,7 +328,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 }
 
 void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
-  if (CD->getParent()->getAsClassOrClassExtensionContext()) {
+  if (CD->getParent()->getSelfClassDecl()) {
     // Class constructors come in two forms, allocating and non-allocating. The
     // default ValueDecl handling gives the allocating one, so we have to
     // manually include the non-allocating one.
@@ -342,7 +342,7 @@ void TBDGenVisitor::visitDestructorDecl(DestructorDecl *DD) {
   // like constructors above. This is the deallocating one:
   visitAbstractFunctionDecl(DD);
 
-  auto parentClass = DD->getParent()->getAsClassOrClassExtensionContext();
+  auto parentClass = DD->getParent()->getSelfClassDecl();
 
   // But the non-deallocating one doesn't apply to some @objc classes.
   if (!Lowering::usesObjCAllocator(parentClass)) {

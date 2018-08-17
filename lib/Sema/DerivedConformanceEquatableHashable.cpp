@@ -868,7 +868,7 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
   auto parentDC = hashIntoDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto enumDecl = parentDC->getSelfEnumDecl();
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
 
   // generate: switch self {...}
@@ -911,7 +911,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   auto parentDC = hashIntoDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto enumDecl = parentDC->getSelfEnumDecl();
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
 
   Type enumType = selfDecl->getType();
@@ -991,7 +991,7 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   auto parentDC = hashIntoDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto structDecl = parentDC->getAsStructOrStructExtensionContext();
+  auto structDecl = parentDC->getSelfStructDecl();
   SmallVector<ASTNode, 6> statements;
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
 

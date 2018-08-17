@@ -87,7 +87,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
       if (auto *alias = dyn_cast<TypeAliasDecl>(D)) {
         if (alias->isImplicit()) {
           const Decl *parent =
-              D->getDeclContext()->getAsDeclOrDeclExtensionContext();
+              D->getDeclContext()->getAsDecl();
           if (auto *genericCtx = parent->getAsGenericContext()) {
             bool matchesGenericParam =
                 llvm::any_of(genericCtx->getInnermostGenericParamTypes(),
@@ -791,7 +791,7 @@ void PrintAST::printAttributes(const Decl *D) {
   // Don't print a redundant 'final' if we are printing a 'static' decl.
   unsigned originalExcludeAttrCount = Options.ExcludeAttrList.size();
   if (Options.PrintImplicitAttrs &&
-      D->getDeclContext()->getAsClassOrClassExtensionContext() &&
+      D->getDeclContext()->getSelfClassDecl() &&
       getCorrectStaticSpelling(D) == StaticSpellingKind::KeywordStatic) {
     Options.ExcludeAttrList.push_back(DAK_Final);
   }
@@ -1411,7 +1411,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
         // If the Clang declaration is from a protocol but was mirrored into
         // class or extension thereof, treat it as an override.
         if (isa<clang::ObjCProtocolDecl>(clangDecl->getDeclContext()) &&
-            VD->getDeclContext()->getAsClassOrClassExtensionContext())
+            VD->getDeclContext()->getSelfClassDecl())
           return false;
 
         // Check whether Clang considers it an override.
@@ -1874,7 +1874,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       if (auto *genericSig = decl->getGenericSignature()) {
         // For protocol extensions, don't print the 'Self : ...' requirement.
         unsigned flags = PrintRequirements | InnermostOnly;
-        if (decl->getAsProtocolExtensionContext())
+        if (decl->getExtendedProtocolDecl())
           flags |= SkipSelfRequirement;
         printGenericSignature(genericSig, flags);
       }
@@ -2183,7 +2183,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 }
 
 static bool isStructOrClassContext(DeclContext *dc) {
-  auto *nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominal = dc->getSelfNominalTypeDecl();
   if (nominal == nullptr)
     return false;
   return isa<ClassDecl>(nominal) || isa<StructDecl>(nominal);
@@ -3902,7 +3902,7 @@ public:
       Printer << "<anonymous>";
     else {
       if (T->getDecl() &&
-          T->getDecl()->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+          T->getDecl()->getDeclContext()->getSelfProtocolDecl()) {
         Printer.printTypeRef(T, T->getDecl(), Name);
         return;
       }

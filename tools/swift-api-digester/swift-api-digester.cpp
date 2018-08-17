@@ -1656,9 +1656,8 @@ static SDKNode *constructTypeDeclNode(SDKContext &Ctx, NominalTypeDecl *NTD,
 static SDKNode *constructExternalExtensionNode(SDKContext &Ctx, SDKNode *Root,
                                                ExtensionDecl *Ext,
                                         std::set<ExtensionDecl*> &HandledExts) {
-  auto *TypeNode = SDKNodeInitInfo(Ctx,
-    Ext->getAsNominalTypeOrNominalTypeExtensionContext()).
-      createSDKNode(SDKNodeKind::DeclType);
+  auto *TypeNode = SDKNodeInitInfo(Ctx, Ext->getSelfNominalTypeDecl())
+      .createSDKNode(SDKNodeKind::DeclType);
 
   // The members of the extension are the only members of this synthesized type.
   addMembersToRoot(Ctx, TypeNode, Ext, HandledExts);

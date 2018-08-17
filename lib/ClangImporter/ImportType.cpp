@@ -2481,9 +2481,7 @@ Type ClangImporter::Implementation::getSugaredTypeReference(TypeDecl *type) {
   if (auto typealias = dyn_cast<TypeAliasDecl>(type)) {
     // If this typealias is nested, retrieve the parent type.
     Type parentType;
-    if (auto nominal =
-          typealias->getDeclContext()
-            ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (auto nominal = typealias->getDeclContext()->getSelfNominalTypeDecl()) {
       if (!nominal->getGenericSignature())
         parentType = nominal->getDeclaredInterfaceType();
     }

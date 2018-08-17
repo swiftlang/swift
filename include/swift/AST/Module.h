@@ -484,7 +484,7 @@ public:
   SourceRange getSourceRange() const { return SourceRange(); }
 
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -1231,7 +1231,7 @@ public:
 };
 
 inline bool DeclContext::isModuleContext() const {
-  if (auto D = getAsDeclOrDeclExtensionContext())
+  if (auto D = getAsDecl())
     return ModuleDecl::classof(D);
   return false;
 }

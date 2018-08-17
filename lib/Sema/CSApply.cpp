@@ -353,7 +353,7 @@ diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
       !isStaticallyDerived &&
       !ctorDecl->hasClangNode() &&
       !(ctorDecl->isRequired() ||
-        ctorDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext())) {
+        ctorDecl->getDeclContext()->getSelfProtocolDecl())) {
     if (SuppressDiagnostics)
       return false;
 
@@ -961,7 +961,7 @@ namespace {
       // If this is a method whose result type is dynamic Self, or a
       // construction, replace the result type with the actual object type.
       Type dynamicSelfFnType;
-      if (!member->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      if (!member->getDeclContext()->getSelfProtocolDecl()) {
         if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
           if ((isa<FuncDecl>(func) &&
                cast<FuncDecl>(func)->hasDynamicSelf()) ||
@@ -1043,7 +1043,7 @@ namespace {
                         member->getDescriptiveKind(),
                         member->getFullName(),
                         member->getDeclContext()
-                          ->getAsNominalTypeOrNominalTypeExtensionContext()
+                          ->getSelfNominalTypeDecl()
                           ->getName());
             tc.diagnose(member, diag::make_decl_objc,
                         member->getDescriptiveKind())
@@ -2681,8 +2681,7 @@ namespace {
           // Determine whether 'super' would have made sense as a base.
           bool hasSuper = false;
           if (auto func = cs.DC->getInnermostMethodContext()) {
-            if (auto classDecl = func->getDeclContext()
-                    ->getAsClassOrClassExtensionContext()) {
+            if (auto classDecl = func->getDeclContext()->getSelfClassDecl()) {
               hasSuper = classDecl->hasSuperclass();
             }
           }
@@ -4241,7 +4240,7 @@ namespace {
           tc.diagnose(E->getLoc(), diag::expr_selector_swift3_objc_inference,
                       foundDecl->getDescriptiveKind(), foundDecl->getFullName(),
                       foundDecl->getDeclContext()
-                        ->getAsNominalTypeOrNominalTypeExtensionContext()
+                        ->getSelfNominalTypeDecl()
                         ->getName())
             .highlight(subExpr->getSourceRange());
           tc.diagnose(foundDecl, diag::make_decl_objc,
