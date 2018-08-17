@@ -1,3 +1,4 @@
+// REQUIRES: experiment_please_ignore
 // RUN: %empty-directory(%t)
 // RUN: %swift -emit-module -o %t/test_module.swiftmodule %S/Inputs/test_module.swift
 

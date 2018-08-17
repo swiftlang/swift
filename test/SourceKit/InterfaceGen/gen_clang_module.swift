@@ -1,3 +1,4 @@
+// REQUIRES: experiment_please_ignore
 import Foo
 
 var x: FooClassBase

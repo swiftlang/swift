@@ -1,3 +1,4 @@
+// REQUIRES: experiment_please_ignore
 // RUN: %empty-directory(%t)
 //
 // Build swift modules this test depends on.
