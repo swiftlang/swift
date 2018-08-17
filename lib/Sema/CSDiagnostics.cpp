@@ -530,42 +530,50 @@ bool MissingOptionalUnwrapFailure::diagnose() {
 }
 
 bool RValueTreatedAsLValueFailure::diagnose() {
-  if (auto callExpr = dyn_cast<ApplyExpr>(getAnchor())) {
-    Expr *argExpr = callExpr->getArg();
+  Diag<StringRef> subElementDiagID;
+  Diag<Type> rvalueDiagID;
+  Expr *diagExpr = getLocator()->getAnchor();
+  SourceLoc loc;
 
-    Diag<StringRef> subElementDiagID;
-    Diag<Type> rvalueDiagID;
-    Expr *diagExpr = nullptr;
+  auto callExpr = dyn_cast<ApplyExpr>(diagExpr);
+  if (!callExpr)
+    return false; // currently only creating these for args, so should be
+                  // unreachable
 
-    if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
-      subElementDiagID = diag::cannot_apply_lvalue_unop_to_subelement;
-      rvalueDiagID = diag::cannot_apply_lvalue_unop_to_rvalue;
-      diagExpr = argExpr;
-    } else if (isa<BinaryExpr>(callExpr)) {
-      subElementDiagID = diag::cannot_apply_lvalue_binop_to_subelement;
-      rvalueDiagID = diag::cannot_apply_lvalue_binop_to_rvalue;
-      auto argTuple = dyn_cast<TupleExpr>(argExpr);
-      diagExpr = argTuple->getElement(0);
-    } else {
-      auto lastPathElement = getLocator()->getPath().back();
-      assert(lastPathElement.getKind() == ConstraintLocator::PathElementKind::ApplyArgToParam);
+  Expr *argExpr = callExpr->getArg();
+  loc = callExpr->getFn()->getLoc();
 
-      subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
-      rvalueDiagID = diag::cannot_pass_rvalue_inout;
-      if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
-        diagExpr = argTuple->getElement(lastPathElement.getValue());
-      else if (auto parens = dyn_cast<ParenExpr>(argExpr))
-        diagExpr = parens->getSubExpr();
-    }
+  if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
+    subElementDiagID = diag::cannot_apply_lvalue_unop_to_subelement;
+    rvalueDiagID = diag::cannot_apply_lvalue_unop_to_rvalue;
+    diagExpr = argExpr;
+  } else if (isa<BinaryExpr>(callExpr)) {
+    subElementDiagID = diag::cannot_apply_lvalue_binop_to_subelement;
+    rvalueDiagID = diag::cannot_apply_lvalue_binop_to_rvalue;
+    auto argTuple = dyn_cast<TupleExpr>(argExpr);
+    diagExpr = argTuple->getElement(0);
+  } else {
+    auto lastPathElement = getLocator()->getPath().back();
+    assert(lastPathElement.getKind() ==
+           ConstraintLocator::PathElementKind::ApplyArgToParam);
 
-    // FIXME: Would like for this to be unnecessary.
-    getConstraintSystem().TC.typeCheckExpression(diagExpr, getConstraintSystem().DC);
-
-    diagnoseSubElementFailure(diagExpr, callExpr->getFn()->getLoc(),
-                              getConstraintSystem(),
-                              subElementDiagID, rvalueDiagID);
-    return true;
+    subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
+    rvalueDiagID = diag::cannot_pass_rvalue_inout;
+    if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
+      diagExpr = argTuple->getElement(lastPathElement.getValue());
+    else if (auto parens = dyn_cast<ParenExpr>(argExpr))
+      diagExpr = parens->getSubExpr();
   }
-  // These fixes are only being created for matching arg types right now, so this is unreachable.
-  return false;
+
+  // FIXME: Needed right now to apply correct overload choices to diagExpr for
+  // use by diagnoseSubElementFailure(). Once all callers are routed through
+  // here, that function can be rewritten to take the current Solution and use
+  // it for determining chosen decl bindings instead, making this extra
+  // typecheck unnecessary.
+  getConstraintSystem().TC.typeCheckExpression(diagExpr,
+                                               getConstraintSystem().DC);
+
+  diagnoseSubElementFailure(diagExpr, loc, getConstraintSystem(),
+                            subElementDiagID, rvalueDiagID);
+  return true;
 }
