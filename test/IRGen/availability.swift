@@ -38,8 +38,8 @@ public func dontHoist() {
 // CHECK: ret void
 
 // OPT-LABEL: define{{.*}} @{{.*}}multipleAvailabilityChecks
-// OPT: call void @_swift_stdlib_operatingSystemVersion
-// OPT-NOT: call void @_swift_stdlib_operatingSystemVersion
+// OPT: call {{.*}} @_swift_stdlib_operatingSystemVersion
+// OPT-NOT: call {{.*}} @_swift_stdlib_operatingSystemVersion
 // OPT: ret void
 public func multipleAvailabilityChecks() {
   if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
