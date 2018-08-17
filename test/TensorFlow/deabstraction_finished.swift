@@ -191,7 +191,7 @@ public func testShapeList2() {
 
 @TensorFlowGraph
 func isZero(_ x: Tensor<Float>) -> Tensor<Bool> {
-  return Tensor(x.scalarized() == 0)
+  return x.elementsEqual(Tensor<Float>(0));
 }
 
 public func noescapeFuncAsAttr(_ f: @convention(tensorflow) (Tensor<Float>) -> Tensor<Bool>) {
@@ -206,6 +206,13 @@ public func noescapeFuncAsAttr(_ f: @convention(tensorflow) (Tensor<Float>) -> T
     Targuments: [Int32.self], output_types: [Float.self], output_shapes: [TensorShape()]
   )
 }
+// Ensure that private functions are partitioned and lowered
+// if they are referred to in graph ops as attributes.
+// CHECK-LABEL:--- TFPartition Accelerator Result: {{.*}}isZero{{.*}}
+// CHECK: bb0(%0 : @unowned $TensorHandle<Float>):
+// CHECK:  [[A:%.*]] = graph_op "Const"()
+// CHECK:  [[B:%.*]] = graph_op "Equal,i,i"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Bool>
+// CHECK:  return [[B]] : $TensorHandle<Bool>                 // id: %3
 
 // CHECK-LABEL: ---- INPUT FUNCTION {{.*}}noescapeFuncAsAttr
 // CHECK: graph_op "FilterDataset,i,L,e"(%{{.*}} : $VariantHandle, %{{.*}} : $TensorHandle<Int32>) {predicate: @{{.*}}isZero{{.*}} : $@convention(tensorflow) (@guaranteed Tensor<Float>) -> @owned Tensor<Bool>
