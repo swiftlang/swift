@@ -406,25 +406,25 @@ extension RawSyntax: ByteTreeObjectDecodable {
     }
   }
 
-  static func read(from reader: ByteTreeObjectReader, numFields: Int,
-                   userInfo: [ByteTreeUserInfoKey: Any]
+  static func read(from reader: UnsafeMutablePointer<ByteTreeObjectReader>,
+                   numFields: Int, userInfo: [ByteTreeUserInfoKey: Any]
   ) -> RawSyntax {
     let syntaxNode: RawSyntax
-    let type = reader.readField(SyntaxType.self, index: 0)
-    let id = reader.readField(SyntaxNodeId.self, index: 1)
+    let type = reader.pointee.readField(SyntaxType.self, index: 0)
+    let id = reader.pointee.readField(SyntaxNodeId.self, index: 1)
     switch type {
     case .token:
-      let presence = reader.readField(SourcePresence.self, index: 2)
-      let kind = reader.readField(TokenKind.self, index: 3)
-      let leadingTrivia = reader.readField(Trivia.self, index: 4)
-      let trailingTrivia = reader.readField(Trivia.self, index: 5)
+      let presence = reader.pointee.readField(SourcePresence.self, index: 2)
+      let kind = reader.pointee.readField(TokenKind.self, index: 3)
+      let leadingTrivia = reader.pointee.readField(Trivia.self, index: 4)
+      let trailingTrivia = reader.pointee.readField(Trivia.self, index: 5)
       syntaxNode = RawSyntax(kind: kind, leadingTrivia: leadingTrivia,
                              trailingTrivia: trailingTrivia,
                              presence: presence, id: id)
     case .layout:
-      let presence = reader.readField(SourcePresence.self, index: 2)
-      let kind = reader.readField(SyntaxKind.self, index: 3)
-      let layout = reader.readField([RawSyntax?].self, index: 4)
+      let presence = reader.pointee.readField(SourcePresence.self, index: 2)
+      let kind = reader.pointee.readField(SyntaxKind.self, index: 3)
+      let layout = reader.pointee.readField([RawSyntax?].self, index: 4)
       syntaxNode = RawSyntax(kind: kind, layout: layout, presence: presence,
                              id: id)
     case .omitted:
