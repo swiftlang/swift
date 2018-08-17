@@ -1139,12 +1139,14 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
         std::transform(Seq->begin(), Seq->end(),
                        std::back_inserter(Info.TypeAttrs),
-          [](llvm::yaml::Node &N) {
+          [&](llvm::yaml::Node &N) {
             auto Result = llvm::StringSwitch<TypeAttrKind>(GetScalarString(&N))
   #define TYPE_ATTR(X) .Case(#X, TypeAttrKind::TAK_##X)
   #include "swift/AST/Attr.def"
             .Default(TypeAttrKind::TAK_Count);
-            assert(Result != TypeAttrKind::TAK_Count);
+            if (Result == TAK_Count)
+              Ctx.diagnose(&N, diag::sdk_node_unrecognized_type_attr_kind,
+                           GetScalarString(&N));
             return Result;
           });
         break;
@@ -1152,22 +1154,31 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       case KeyKind::KK_declAttributes: {
         auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
         std::transform(Seq->begin(), Seq->end(), std::back_inserter(Info.DeclAttrs),
-          [](llvm::yaml::Node &N) {
+          [&](llvm::yaml::Node &N) {
             auto Result = llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
   #define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::DAK_##NAME)
   #include "swift/AST/Attr.def"
             .Default(DeclAttrKind::DAK_Count);
-            assert(Result != DeclAttrKind::DAK_Count);
+            if (Result == DAK_Count)
+              Ctx.diagnose(&N, diag::sdk_node_unrecognized_decl_attr_kind,
+                           GetScalarString(&N));
             return Result;
           });
         break;
       }
-      case KeyKind::KK_declKind:
-        Info.DKind = llvm::StringSwitch<DeclKind>(GetScalarString(Pair.getValue()))
+      case KeyKind::KK_declKind: {
+        auto dKind = llvm::StringSwitch<Optional<DeclKind>>(
+          GetScalarString(Pair.getValue()))
   #define DECL(X, PARENT) .Case(#X, DeclKind::X)
   #include "swift/AST/DeclNodes.def"
-        ;
+        .Default(None);
+        if (dKind)
+          Info.DKind = *dKind;
+        else
+          Ctx.diagnose(Pair.getValue(), diag::sdk_node_unrecognized_decl_kind,
+                       GetScalarString(Pair.getValue()));
         break;
+      }
       }
     }
     else {
