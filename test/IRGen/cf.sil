@@ -9,7 +9,7 @@
 // CHECK: [[MUTABLE_REFRIGERATOR:%TSo24CCMutableRefrigeratorRefa]] = type
 // CHECK: [[OBJC:%objc_object]] = type
 
-// CHECK: @"$SSo17CCRefrigeratorRefaN" = linkonce_odr hidden constant <{ {{.*}} }> <{ i8** @"$SBOWV", [[INT]] 16, {{.*}}"$SSo17CCRefrigeratorRefaMn", [[TYPE]]* null, i8* null }>
+// CHECK: @"$SSo17CCRefrigeratorRefaN" = linkonce_odr hidden constant <{ {{.*}} }> <{ i8** @"$SBOWV", [[INT]] 515, {{.*}}"$SSo17CCRefrigeratorRefaMn", [[TYPE]]* null, i8* null }>
 
 // CHECK: [[MUTABLE_REFRIGERATOR_NAME:@.*]] = private constant [52 x i8] c"CCMutableRefrigerator\00NCCMutableRefrigeratorRef\00St\00\00"
 
@@ -21,7 +21,7 @@
 // CHECK-64-SAME: @"$SSo24CCMutableRefrigeratorRefaMr"
 
 // CHECK-64: @"$SSo24CCMutableRefrigeratorRefaN" = linkonce_odr hidden global <{ {{.*}} }> <{
-// CHECK-64-SAME: i8** @"$SBOWV", i64 16, {{.*}}"$SSo24CCMutableRefrigeratorRefaMn", %swift.type* null, i8* null }>
+// CHECK-64-SAME: i8** @"$SBOWV", i64 515, {{.*}}"$SSo24CCMutableRefrigeratorRefaMn", %swift.type* null, i8* null }>
 
 sil_stage canonical
 

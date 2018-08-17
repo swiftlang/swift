@@ -233,7 +233,7 @@ namespace {
 /// corresponding to the given metadata kind.
 static llvm::ConstantInt *getMetadataKind(IRGenModule &IGM,
                                           MetadataKind kind) {
-  return llvm::ConstantInt::get(IGM.MetadataKindTy, uint8_t(kind));
+  return llvm::ConstantInt::get(IGM.MetadataKindTy, uint32_t(kind));
 }
 
 /// Perform the layout required for a heap object.
