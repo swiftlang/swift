@@ -112,8 +112,9 @@
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
         "Dictionary.swift",
-        "HashedCollectionsAnyHashableExtensions.swift",
         "Set.swift",
+        "HashedCollectionsAnyHashableExtensions.swift",
+        "HashTable.swift"
       ]
     }
   ],
