@@ -93,6 +93,11 @@ ERROR(attr_only_on_parameters, none,
 ERROR(function_type_no_parens,none,
       "single argument function types require parentheses", ())
 
+// FIXME: Used by swift-api-digester. Don't want to set up a separate diagnostics
+// file just for one error.
+ERROR(sdk_node_unrecognized_key,none,
+      "unrecognized key '%0' in SDK node", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Circular reference diagnostics
 //------------------------------------------------------------------------------

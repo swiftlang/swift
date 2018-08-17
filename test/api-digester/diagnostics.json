@@ -1,0 +1,7 @@
+{
+  "kind": "Root",
+  "name": "TopLevel",
+  "printedName": "TopLevel",
+  "children": [],
+  "badKey": ["foo", "bar", "baz"]
+}

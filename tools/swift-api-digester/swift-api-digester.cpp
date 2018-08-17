@@ -331,10 +331,11 @@ enum class KeyKind {
 #include "swift/IDE/DigesterEnums.def"
 };
 
-static KeyKind parseKeyKind(StringRef Content) {
-  return llvm::StringSwitch<KeyKind>(Content)
+static Optional<KeyKind> parseKeyKind(StringRef Content) {
+  return llvm::StringSwitch<Optional<KeyKind>>(Content)
 #define KEY(NAME) .Case(#NAME, KeyKind::KK_##NAME)
 #include "swift/IDE/DigesterEnums.def"
+    .Default(None)
   ;
 }
 
@@ -1043,113 +1044,127 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   static auto getAsInt = [&](llvm::yaml::Node *N) -> int {
     return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
   };
+  
+  static auto convertRange = [](llvm::SMRange Range) -> SourceRange {
+    return SourceRange(SourceLoc(Range.Start), SourceLoc(Range.End));
+  };
   SDKNodeKind Kind;
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
 
   for (auto &Pair : *Node) {
-    switch(parseKeyKind(GetScalarString(Pair.getKey()))) {
-    case KeyKind::KK_kind:
-      Kind = parseSDKNodeKind(GetScalarString(Pair.getValue()));
-      break;
-    case KeyKind::KK_name:
-      Info.Name = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_selfIndex:
-      Info.SelfIndex = getAsInt(Pair.getValue());
-      break;
-    case KeyKind::KK_usr:
-      Info.USR = GetScalarString(Pair.getValue());
-      break;
+    auto keyString = GetScalarString(Pair.getKey()); 
+    if (auto keyKind = parseKeyKind(keyString)) {
+      switch(*keyKind) {
+      case KeyKind::KK_kind:
+        Kind = parseSDKNodeKind(GetScalarString(Pair.getValue()));
+        break;
+      case KeyKind::KK_name:
+        Info.Name = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_selfIndex:
+        Info.SelfIndex = getAsInt(Pair.getValue());
+        break;
+      case KeyKind::KK_usr:
+        Info.USR = GetScalarString(Pair.getValue());
+        break;
 
-    case KeyKind::KK_location:
-      Info.Location = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_children:
-      for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
-        Children.push_back(constructSDKNode(Ctx,
-                                      cast<llvm::yaml::MappingNode>(&Mapping)));
+      case KeyKind::KK_location:
+        Info.Location = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_children:
+        for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
+          Children.push_back(constructSDKNode(Ctx,
+                                        cast<llvm::yaml::MappingNode>(&Mapping)));
+        }
+        break;
+      case KeyKind::KK_conformingProtocols: {
+        assert(Info.ConformingProtocols.empty());
+        for (auto &Name : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
+          Info.ConformingProtocols.push_back(GetScalarString(&Name));
+        }
+        break;
       }
-      break;
-    case KeyKind::KK_conformingProtocols: {
-      assert(Info.ConformingProtocols.empty());
-      for (auto &Name : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
-        Info.ConformingProtocols.push_back(GetScalarString(&Name));
+      case KeyKind::KK_enumRawTypeName: {
+        assert(Info.DKind == DeclKind::Enum);
+        Info.EnumRawTypeName = GetScalarString(Pair.getValue());
+        break;
       }
-      break;
-    }
-    case KeyKind::KK_enumRawTypeName: {
-      assert(Info.DKind == DeclKind::Enum);
-      Info.EnumRawTypeName = GetScalarString(Pair.getValue());
-      break;
-    }
-    case KeyKind::KK_printedName:
-      Info.PrintedName = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_moduleName:
-      Info.ModuleName = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_superclassUsr:
-      Info.SuperclassUsr = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_genericSig:
-      Info.GenericSig = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_throwing:
-      Info.IsThrowing = true;
-      break;
-    case KeyKind::KK_mutating:
-      Info.IsMutating = true;
-      break;
-    case KeyKind::KK_hasDefaultArg:
-      Info.TypeInfo.hasDefaultArgument = true;
-      break;
-    case KeyKind::KK_static:
-      Info.IsStatic = true;
-      break;
-    case KeyKind::KK_deprecated:
-      Info.IsDeprecated = true;
-      break;
-    case KeyKind::KK_ownership:
-      Info.ReferenceOwnership =
-          swift::ReferenceOwnership(getAsInt(Pair.getValue()));
-      assert(Info.ReferenceOwnership != swift::ReferenceOwnership::Strong &&
-             "Strong is implied.");
-      break;
+      case KeyKind::KK_printedName:
+        Info.PrintedName = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_moduleName:
+        Info.ModuleName = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_superclassUsr:
+        Info.SuperclassUsr = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_genericSig:
+        Info.GenericSig = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_throwing:
+        Info.IsThrowing = true;
+        break;
+      case KeyKind::KK_mutating:
+        Info.IsMutating = true;
+        break;
+      case KeyKind::KK_hasDefaultArg:
+        Info.TypeInfo.hasDefaultArgument = true;
+        break;
+      case KeyKind::KK_static:
+        Info.IsStatic = true;
+        break;
+      case KeyKind::KK_deprecated:
+        Info.IsDeprecated = true;
+        break;
+      case KeyKind::KK_ownership:
+        Info.ReferenceOwnership =
+            swift::ReferenceOwnership(getAsInt(Pair.getValue()));
+        assert(Info.ReferenceOwnership != swift::ReferenceOwnership::Strong &&
+               "Strong is implied.");
+        break;
 
-    case KeyKind::KK_typeAttributes: {
-      auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-      std::transform(Seq->begin(), Seq->end(),
-                     std::back_inserter(Info.TypeAttrs),
-        [](llvm::yaml::Node &N) {
-          auto Result = llvm::StringSwitch<TypeAttrKind>(GetScalarString(&N))
-#define TYPE_ATTR(X) .Case(#X, TypeAttrKind::TAK_##X)
-#include "swift/AST/Attr.def"
-          .Default(TypeAttrKind::TAK_Count);
-          assert(Result != TypeAttrKind::TAK_Count);
-          return Result;
-        });
-      break;
+      case KeyKind::KK_typeAttributes: {
+        auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
+        std::transform(Seq->begin(), Seq->end(),
+                       std::back_inserter(Info.TypeAttrs),
+          [](llvm::yaml::Node &N) {
+            auto Result = llvm::StringSwitch<TypeAttrKind>(GetScalarString(&N))
+  #define TYPE_ATTR(X) .Case(#X, TypeAttrKind::TAK_##X)
+  #include "swift/AST/Attr.def"
+            .Default(TypeAttrKind::TAK_Count);
+            assert(Result != TypeAttrKind::TAK_Count);
+            return Result;
+          });
+        break;
+      }
+      case KeyKind::KK_declAttributes: {
+        auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
+        std::transform(Seq->begin(), Seq->end(), std::back_inserter(Info.DeclAttrs),
+          [](llvm::yaml::Node &N) {
+            auto Result = llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
+  #define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::DAK_##NAME)
+  #include "swift/AST/Attr.def"
+            .Default(DeclAttrKind::DAK_Count);
+            assert(Result != DeclAttrKind::DAK_Count);
+            return Result;
+          });
+        break;
+      }
+      case KeyKind::KK_declKind:
+        Info.DKind = llvm::StringSwitch<DeclKind>(GetScalarString(Pair.getValue()))
+  #define DECL(X, PARENT) .Case(#X, DeclKind::X)
+  #include "swift/AST/DeclNodes.def"
+        ;
+        break;
+      }
     }
-    case KeyKind::KK_declAttributes: {
-      auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-      std::transform(Seq->begin(), Seq->end(), std::back_inserter(Info.DeclAttrs),
-        [](llvm::yaml::Node &N) {
-          auto Result = llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
-#define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::DAK_##NAME)
-#include "swift/AST/Attr.def"
-          .Default(DeclAttrKind::DAK_Count);
-          assert(Result != DeclAttrKind::DAK_Count);
-          return Result;
-        });
-      break;
-    }
-    case KeyKind::KK_declKind:
-      Info.DKind = llvm::StringSwitch<DeclKind>(GetScalarString(Pair.getValue()))
-#define DECL(X, PARENT) .Case(#X, DeclKind::X)
-#include "swift/AST/DeclNodes.def"
-      ;
-      break;
+    else {
+      auto range = convertRange(Pair.getKey()->getSourceRange());
+      Ctx.getDiags().diagnose(range.Start, diag::sdk_node_unrecognized_key,
+                              keyString)
+        .highlight(range);
+      Pair.skip();
     }
   };
   SDKNode *Result = Info.createSDKNode(Kind);
