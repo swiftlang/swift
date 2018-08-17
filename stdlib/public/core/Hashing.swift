@@ -39,25 +39,19 @@ internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bo
 ///
 /// Accesses the underlying raw memory as Unmanaged<AnyObject> using untyped
 /// memory accesses. The memory remains bound to managed AnyObjects.
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal struct _UnmanagedAnyObjectArray {
   /// Underlying pointer.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var value: UnsafeMutableRawPointer
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init(_ up: UnsafeMutablePointer<AnyObject>) {
     self.value = UnsafeMutableRawPointer(up)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init?(_ up: UnsafeMutablePointer<AnyObject>?) {
     guard let unwrapped = up else { return nil }
     self.init(unwrapped)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal subscript(i: Int) -> AnyObject {
     get {
       let unmanaged = value.load(

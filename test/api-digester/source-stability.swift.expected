@@ -1,0 +1,15 @@
+/* FIXME: Bogus */
+TypeAlias DictionaryIterator.Element has been removed
+TypeAlias SetIterator.Element has been removed
+Var DictionaryIterator.customMirror has been removed
+Var SetIterator.customMirror has been removed
+Func DictionaryIterator.next() has been removed
+Func SetIterator.next() has been removed
+
+/* Renamed Decls (FIXME: Targets are Dictionary.Iterator & Set.Iterator) */
+Struct DictionaryIterator has been renamed to Struct Iterator
+Struct SetIterator has been renamed to Struct Iterator
+
+/* FIXME: Bogus */
+Func Dictionary.makeIterator() has return type change from DictionaryIterator<Dictionary<Key, Value>.Key, Dictionary<Key, Value>.Value> to Dictionary<Key, Value>.Iterator
+Func Set.makeIterator() has return type change from SetIterator<Element> to Set<Element>.Iterator
