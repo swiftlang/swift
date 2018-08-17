@@ -72,8 +72,9 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.FullyQualifiedTypes = true;
   result.SkipImports = true;
 
-  class UsableFromInlineOnly : public ShouldPrintChecker {
-    bool shouldPrint(const Decl *D, PrintOptions &options) override {
+  class ShouldPrintForTextualInterface : public ShouldPrintChecker {
+    bool shouldPrint(const Decl *D, const PrintOptions &options) override {
+      // Skip anything that isn't 'public' or '@usableFromInline'.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         AccessScope accessScope =
             VD->getFormalAccessScope(/*useDC*/nullptr,
@@ -81,10 +82,29 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
         if (!accessScope.isPublic())
           return false;
       }
+
+      // Skip typealiases that just redeclare generic parameters.
+      if (auto *alias = dyn_cast<TypeAliasDecl>(D)) {
+        if (alias->isImplicit()) {
+          const Decl *parent =
+              D->getDeclContext()->getAsDeclOrDeclExtensionContext();
+          if (auto *genericCtx = parent->getAsGenericContext()) {
+            bool matchesGenericParam =
+                llvm::any_of(genericCtx->getInnermostGenericParamTypes(),
+                             [alias](const GenericTypeParamType *param) {
+              return param->getName() == alias->getName();
+            });
+            if (matchesGenericParam)
+              return false;
+          }
+        }
+      }
+
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
-  result.CurrentPrintabilityChecker = std::make_shared<UsableFromInlineOnly>();
+  result.CurrentPrintabilityChecker =
+      std::make_shared<ShouldPrintForTextualInterface>();
 
   // FIXME: We don't really need 'public' on everything; we could just change
   // the default to 'public' and mark the 'internal' things.
@@ -1308,7 +1328,8 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
-bool ShouldPrintChecker::shouldPrint(const Pattern *P, PrintOptions &Options) {
+bool ShouldPrintChecker::shouldPrint(const Pattern *P,
+                                     const PrintOptions &Options) {
   bool ShouldPrint = false;
   P->forEachVariable([&](const VarDecl *VD) {
     ShouldPrint |= shouldPrint(VD, Options);
@@ -1316,7 +1337,8 @@ bool ShouldPrintChecker::shouldPrint(const Pattern *P, PrintOptions &Options) {
   return ShouldPrint;
 }
 
-bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
+bool ShouldPrintChecker::shouldPrint(const Decl *D,
+                                     const PrintOptions &Options) {
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
