@@ -189,6 +189,7 @@ class BenchmarkDoctor(object):
         self.requirements = [
             self._name_matches_capital_words_convention,
             self._name_is_at_most_40_chars_long,
+            self._no_setup_overhead,
             self._optimized_runtime_in_range,
         ]
 
@@ -231,19 +232,44 @@ class BenchmarkDoctor(object):
     @staticmethod
     def _optimized_runtime_in_range(measurements):
         name = measurements['name']
-        runtime = min(BenchmarkDoctor._select(measurements),
-                      key=lambda r: r.min).min
-        if 2500 < runtime < 500000:
-            BenchmarkDoctor.log_runtime.warning(
-                "'%s' execution takes at least %d μs.", name, runtime)
-        elif 500000 <= runtime:
-            BenchmarkDoctor.log_runtime.error(
-                "'%s' execution takes at least %d μs.", name, runtime)
+        setup, ratio = BenchmarkDoctor._setup_overhead(measurements)
+        setup = 0 if ratio < 0.05 else setup
+        runtime = min(
+            [(result.min - correction) for i_series in
+             [BenchmarkDoctor._select(measurements, num_iters=i)
+              for correction in [(setup / i) for i in [1, 2]]
+              ] for result in i_series])
+
         if 2500 < runtime:
+            log = (BenchmarkDoctor.log_runtime.warning if runtime < 500000 else
+                   BenchmarkDoctor.log_runtime.error)
+            caveat = '' if setup == 0 else ' (excluding the setup overhead)'
+            log("'%s' execution took at least %d μs%s.", name, runtime, caveat)
             factor = int(pow(2, math.ceil(math.log(runtime / 2500.0, 2))))
             BenchmarkDoctor.log_runtime.info(
                 "Decrease the workload of '%s' by a factor of %d, "
                 "to be less than 2500 μs.", name, factor)
+
+    @staticmethod
+    def _setup_overhead(measurements):
+        select = BenchmarkDoctor._select
+        ti1, ti2 = [float(min(mins)) for mins in
+                    [[result.min for result in i_series] for i_series in
+                     [select(measurements, num_iters=i) for i in [1, 2]]]]
+        setup = int(round(2.0 * (ti1 - ti2)))
+        ratio = (setup / ti1) if ti1 > 0 else 0
+        return (setup, ratio)
+
+    @staticmethod
+    def _no_setup_overhead(measurements):
+        setup, ratio = BenchmarkDoctor._setup_overhead(measurements)
+        if ratio > 0.05:
+            BenchmarkDoctor.log_runtime.error(
+                "'%s' has setup overhead of %d μs (%.1f%%).",
+                measurements['name'], setup, round((100 * ratio), 1))
+            BenchmarkDoctor.log_runtime.info(
+                'Move initialization of benchmark data to the `setUpFunction` '
+                'registered in `BenchmarkInfo`.')
 
     @staticmethod
     def _adjusted_1s_samples(runtime):

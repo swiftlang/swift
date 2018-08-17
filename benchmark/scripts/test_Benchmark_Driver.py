@@ -466,21 +466,53 @@ class TestBenchmarkDoctor(unittest.TestCase):
             doctor.analyze(measurements('Cheetah', 200))
             doctor.analyze(measurements('Hare', 2501))
             doctor.analyze(measurements('Tortoise', 500000))
+            doctor.analyze({'name': 'OverheadTurtle',
+                            'OverheadTurtle O i1a': Stub(min=800000),
+                            'OverheadTurtle O i2a': Stub(min=700000)})
         output = out.getvalue()
 
         self.assertIn('runtime: ', output)
         self.assertNotIn('Cheetah', output)
-        self.assert_contains(["'Hare' execution takes at least 2501 μs."],
+        self.assert_contains(["'Hare' execution took at least 2501 μs."],
                              self.logs['warning'])
         self.assert_contains(
             ["Decrease the workload of 'Hare' by a factor of 2, "
              "to be less than 2500 μs."], self.logs['info'])
         self.assert_contains(
-            ["'Tortoise' execution takes at least 500000 μs."],
+            ["'Tortoise' execution took at least 500000 μs."],
             self.logs['error'])
         self.assert_contains(
             ["Decrease the workload of 'Tortoise' by a factor of 256, "
              "to be less than 2500 μs."], self.logs['info'])
+        self.assert_contains(
+            ["'OverheadTurtle' execution took at least 600000 μs"
+             " (excluding the setup overhead)."],
+            self.logs['error'])
+
+    def test_benchmark_has_no_significant_setup_overhead(self):
+        with captured_output() as (out, _):
+            doctor = BenchmarkDoctor(self.args, BenchmarkDriverMock([]))
+            doctor.analyze({
+                'name': 'NoOverhead',  # not 'significant' enough
+                # Based on DropFirstArray a10/e10: overhead 3.7% (6 μs)
+                'NoOverhead O i1a': Stub(min=162),
+                'NoOverhead O i2a': Stub(min=159)})
+            doctor.analyze({
+                'name': 'SO',  # Setup Overhead
+                # Based on SuffixArrayLazy a10/e10: overhead 5.8% (4 μs)
+                'SO O i1a': Stub(min=69), 'SO O i1b': Stub(min=70),
+                'SO O i2a': Stub(min=67), 'SO O i2b': Stub(min=68)})
+            # TODO tests with TypeFlood (0 runtime)
+        output = out.getvalue()
+
+        self.assertIn('runtime: ', output)
+        self.assertNotIn('NoOverhead', output)
+        self.assert_contains(
+            ["'SO' has setup overhead of 4 μs (5.8%)."],
+            self.logs['error'])
+        self.assert_contains(
+            ["Move initialization of benchmark data to the `setUpFunction` "
+             "registered in `BenchmarkInfo`."], self.logs['info'])
 
 
 if __name__ == '__main__':
