@@ -2520,45 +2520,61 @@ public:
         if (!var->hasStorage())
           return;
 
+        if (var->isInvalid() || PBD->isInvalid())
+          return;
+
         auto *varDC = var->getDeclContext();
+
+        auto markVarAndPBDInvalid = [PBD, var] {
+          PBD->setInvalid();
+          var->setInvalid();
+          if (!var->hasType())
+            var->markInvalid();
+        };
 
         // Non-member observing properties need an initializer.
         if (var->getWriteImpl() == WriteImplKind::StoredWithObservers &&
-            !isTypeContext && !var->isInvalid() && !PBD->isInvalid()) {
+            !isTypeContext) {
           TC.diagnose(var->getLoc(), diag::observingprop_requires_initializer);
-          PBD->setInvalid();
-          var->setInvalid();
-          if (!var->hasType()) {
-            var->markInvalid();
-          }
+          markVarAndPBDInvalid();
           return;
         }
 
         // Static/class declarations require an initializer unless in a
         // protocol.
-        if (var->isStatic() && !isa<ProtocolDecl>(varDC) &&
-            !var->isInvalid() && !PBD->isInvalid()) {
+        if (var->isStatic() && !isa<ProtocolDecl>(varDC)) {
+          // ...but don't enforce this for SIL or textual interface files.
+          switch (varDC->getParentSourceFile()->Kind) {
+          case SourceFileKind::Interface:
+          case SourceFileKind::SIL:
+            return;
+          case SourceFileKind::Main:
+          case SourceFileKind::REPL:
+          case SourceFileKind::Library:
+            break;
+          }
+
           TC.diagnose(var->getLoc(), diag::static_requires_initializer,
                       var->getCorrectStaticSpelling());
-          PBD->setInvalid();
-          var->setInvalid();
-          if (!var->hasType()) {
-            var->markInvalid();
-          }
+          markVarAndPBDInvalid();
           return;
         }
 
-        // Global variables require an initializer (except in top level code).
-        if (varDC->isModuleScopeContext() &&
-            !varDC->getParentSourceFile()->isScriptMode() &&
-            !var->isInvalid() && !PBD->isInvalid()) {
-          TC.diagnose(var->getLoc(),
-                      diag::global_requires_initializer, var->isLet());
-          PBD->setInvalid();
-          var->setInvalid();
-          if (!var->hasType()) {
-            var->markInvalid();
+        // Global variables require an initializer in normal source files.
+        if (varDC->isModuleScopeContext()) {
+          switch (varDC->getParentSourceFile()->Kind) {
+          case SourceFileKind::Main:
+          case SourceFileKind::REPL:
+          case SourceFileKind::Interface:
+          case SourceFileKind::SIL:
+            return;
+          case SourceFileKind::Library:
+            break;
           }
+
+          TC.diagnose(var->getLoc(), diag::global_requires_initializer,
+                      var->isLet());
+          markVarAndPBDInvalid();
           return;
         }
       });
