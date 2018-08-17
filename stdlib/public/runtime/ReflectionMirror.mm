@@ -133,7 +133,7 @@ static bool loadSpecialReferenceStorage(OpaqueValue *fieldData,
   assert(type->getKind() == MetadataKind::Optional);
 
   auto *weakField = reinterpret_cast<WeakReference *>(fieldData);
-  auto *strongValue = swift_unknownWeakLoadStrong(weakField);
+  auto *strongValue = swift_unknownObjectWeakLoadStrong(weakField);
 
   // Now that we have a strong reference, we need to create a temporary buffer
   // from which to copy the whole value, which might be a native class-bound

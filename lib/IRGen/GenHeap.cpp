@@ -1245,9 +1245,10 @@ void IRGenFunction::emitUnknownStrongRetain(llvm::Value *value,
                                             Atomicity atomicity) {
   if (doesNotRequireRefCounting(value))
     return;
-  emitUnaryRefCountCall(*this, (atomicity == Atomicity::Atomic)
-                                   ? IGM.getUnknownRetainFn()
-                                   : IGM.getNonAtomicUnknownRetainFn(),
+  emitUnaryRefCountCall(*this,
+                        (atomicity == Atomicity::Atomic)
+                            ? IGM.getUnknownObjectRetainFn()
+                            : IGM.getNonAtomicUnknownObjectRetainFn(),
                         value);
 }
 
@@ -1255,9 +1256,10 @@ void IRGenFunction::emitUnknownStrongRelease(llvm::Value *value,
                                              Atomicity atomicity) {
   if (doesNotRequireRefCounting(value))
     return;
-  emitUnaryRefCountCall(*this, (atomicity == Atomicity::Atomic)
-                                   ? IGM.getUnknownReleaseFn()
-                                   : IGM.getNonAtomicUnknownReleaseFn(),
+  emitUnaryRefCountCall(*this,
+                        (atomicity == Atomicity::Atomic)
+                            ? IGM.getUnknownObjectReleaseFn()
+                            : IGM.getNonAtomicUnknownObjectReleaseFn(),
                         value);
 }
 

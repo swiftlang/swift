@@ -21,8 +21,8 @@
 //   - FunctionPointerBox is a box for function pointers.
 //   - ObjCRetainableBox is a box for Objective-C object pointers,
 //     using objc_{retain,release}.
-//   - UnknownRetainableBox is a box for void* using
-//     swift_unknown{Retain,Release}.
+//   - UnknownObjectRetainableBox is a box for void* using
+//     swift_unknownObject{Retain,Release}.
 //   - AggregateBox<T...> is a box which uses swift layout rules to
 //     combine a number of different boxes.
 //
@@ -320,26 +320,26 @@ struct ObjCUnownedRetainableBox
   }
 
   static void destroy(UnownedReference *ref) {
-    swift_unknownUnownedDestroy(ref);
+    swift_unknownObjectUnownedDestroy(ref);
   }
   static UnownedReference *initializeWithCopy(UnownedReference *dest,
                                               UnownedReference *src) {
-    swift_unknownUnownedCopyInit(dest, src);
+    swift_unknownObjectUnownedCopyInit(dest, src);
     return dest;
   }
   static UnownedReference *initializeWithTake(UnownedReference *dest,
                                               UnownedReference *src) {
-    swift_unknownUnownedTakeInit(dest, src);
+    swift_unknownObjectUnownedTakeInit(dest, src);
     return dest;
   }
   static UnownedReference *assignWithCopy(UnownedReference *dest,
                                           UnownedReference *src) {
-    swift_unknownUnownedCopyAssign(dest, src);
+    swift_unknownObjectUnownedCopyAssign(dest, src);
     return dest;
   }
   static UnownedReference *assignWithTake(UnownedReference *dest,
                                           UnownedReference *src) {
-    swift_unknownUnownedTakeAssign(dest, src);
+    swift_unknownObjectUnownedTakeAssign(dest, src);
     return dest;
   }
 };
@@ -348,26 +348,26 @@ struct ObjCUnownedRetainableBox
 struct ObjCWeakRetainableBox :
     WeakRetainableBoxBase<ObjCWeakRetainableBox, WeakReference> {
   static void destroy(WeakReference *ref) {
-    swift_unknownWeakDestroy(ref);
+    swift_unknownObjectWeakDestroy(ref);
   }
   static WeakReference *initializeWithCopy(WeakReference *dest,
                                            WeakReference *src) {
-    swift_unknownWeakCopyInit(dest, src);
+    swift_unknownObjectWeakCopyInit(dest, src);
     return dest;
   }
   static WeakReference *initializeWithTake(WeakReference *dest,
                                            WeakReference *src) {
-    swift_unknownWeakTakeInit(dest, src);
+    swift_unknownObjectWeakTakeInit(dest, src);
     return dest;
   }
   static WeakReference *assignWithCopy(WeakReference *dest,
                                        WeakReference *src) {
-    swift_unknownWeakCopyAssign(dest, src);
+    swift_unknownObjectWeakCopyAssign(dest, src);
     return dest;
   }
   static WeakReference *assignWithTake(WeakReference *dest,
                                        WeakReference *src) {
-    swift_unknownWeakTakeAssign(dest, src);
+    swift_unknownObjectWeakTakeAssign(dest, src);
     return dest;
   }
 };
@@ -375,10 +375,11 @@ struct ObjCWeakRetainableBox :
 #endif
 
 /// A box implementation class for unknown-retainable object pointers.
-struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
+struct UnknownObjectRetainableBox
+    : RetainableBoxBase<UnknownObjectRetainableBox, void *> {
   static void *retain(void *obj) {
 #if SWIFT_OBJC_INTEROP
-    swift_unknownRetain(obj);
+    swift_unknownObjectRetain(obj);
     return obj;
 #else
     if (isAtomic) {
@@ -392,7 +393,7 @@ struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
 
   static void release(void *obj) {
 #if SWIFT_OBJC_INTEROP
-    swift_unknownRelease(obj);
+    swift_unknownObjectRelease(obj);
 #else
     if (isAtomic) {
       swift_release(static_cast<HeapObject *>(obj));

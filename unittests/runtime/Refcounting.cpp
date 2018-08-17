@@ -120,17 +120,17 @@ TEST(RefcountingTest, unknown_retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  swift_unknownRetain_n(object, 32);
-  swift_unknownRetain(object);
+  swift_unknownObjectRetain_n(object, 32);
+  swift_unknownObjectRetain(object);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(34u, swift_retainCount(object));
-  swift_unknownRelease_n(object, 31);
+  swift_unknownObjectRelease_n(object, 31);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(3u, swift_retainCount(object));
-  swift_unknownRelease(object);
+  swift_unknownObjectRelease(object);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(2u, swift_retainCount(object));
-  swift_unknownRelease_n(object, 1);
+  swift_unknownObjectRelease_n(object, 1);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(1u, swift_retainCount(object));
 }
@@ -290,19 +290,19 @@ TEST(RefcountingTest, nonatomic_unknown_retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  auto res = swift_nonatomic_unknownRetain_n(object, 32);
+  auto res = swift_nonatomic_unknownObjectRetain_n(object, 32);
   EXPECT_EQ(object, res);
-  res = swift_nonatomic_unknownRetain(object);
+  res = swift_nonatomic_unknownObjectRetain(object);
   EXPECT_EQ(object, res);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(34u, swift_retainCount(object));
-  swift_nonatomic_unknownRelease_n(object, 31);
+  swift_nonatomic_unknownObjectRelease_n(object, 31);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(3u, swift_retainCount(object));
-  swift_nonatomic_unknownRelease(object);
+  swift_nonatomic_unknownObjectRelease(object);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(2u, swift_retainCount(object));
-  swift_nonatomic_unknownRelease_n(object, 1);
+  swift_nonatomic_unknownObjectRelease_n(object, 1);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(1u, swift_retainCount(object));
 }
