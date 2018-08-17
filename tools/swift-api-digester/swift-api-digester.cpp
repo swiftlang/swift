@@ -263,7 +263,8 @@ struct ABIAttributeInfo {
 class SDKContext {
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
-  llvm::SourceMgr SM;
+  SourceManager SourceMgr;
+  DiagnosticEngine Diags;
   
   UpdatedNodesMap UpdateMap;
   NodeMap TypeAliasUpdateMap;
@@ -283,7 +284,7 @@ class SDKContext {
   }
 
 public:
-  SDKContext(bool ABI): ABI(ABI) {
+  SDKContext(bool ABI): Diags(SourceMgr), ABI(ABI) {
 #define ADD(NAME) ABIAttrs.push_back({DeclAttrKind::DAK_##NAME, \
       NodeAnnotation::Change##NAME, getAttrName(DeclAttrKind::DAK_##NAME)});
     ADD(ObjC)
@@ -309,8 +310,11 @@ public:
   TypeMemberDiffVector &getTypeMemberDiffs() {
     return TypeMemberDiffs;
   }
-  llvm::SourceMgr &getSourceMgr() {
-    return SM;
+  SourceManager &getSourceMgr() {
+    return SourceMgr;
+  }
+  DiagnosticEngine &getDiags() {
+    return Diags;
   }
   bool checkingABI() const { return ABI; }
   ArrayRef<ABIAttributeInfo> getABIAttributeInfo() const { return ABIAttrs; }
@@ -2010,19 +2014,21 @@ parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-  llvm::MemoryBuffer::getFileOrSTDIN(FileName);
+    vfs::getFileOrSTDIN(*Ctx.getSourceMgr().getFileSystem(), FileName);
   if (!FileBufOrErr) {
     llvm_unreachable("Failed to read JSON file");
   }
   StringRef Buffer = FileBufOrErr->get()->getBuffer();
   yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, FileName),
-                      Ctx.getSourceMgr());
+                      Ctx.getSourceMgr().getLLVMSourceMgr());
   SDKNode *Result = nullptr;
   for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
     assert(DI != Stream.end() && "Failed to read a document");
     yaml::Node *N = DI->getRoot();
     assert(N && "Failed to find a root");
     Result = SDKNode::constructSDKNode(Ctx, cast<yaml::MappingNode>(N));
+    if (Ctx.getDiags().hadAnyError())
+      exit(1);
   }
   return {std::move(FileBufOrErr.get()), Result};
 }
@@ -3916,7 +3922,10 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath) {
     llvm::errs() << RightPath << " does not exist\n";
     return 1;
   }
+  PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(options::Abi);
+  Ctx.getDiags().addConsumer(PDC);
+
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
@@ -3968,7 +3977,11 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
     return 1;
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
+
+  PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(options::Abi);
+  Ctx.getDiags().addConsumer(PDC);
+
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
@@ -4092,7 +4105,10 @@ static int dumpSwiftModules(const CompilerInvocation &InitInvok,
     Modules.push_back(M);
   }
 
+  PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(options::Abi);
+  Ctx.getDiags().addConsumer(PDC);
+
   for (auto M : Modules) {
     SwiftDeclCollector Collector(Ctx);
     SmallVector<Decl*, 256> Decls;
@@ -4304,7 +4320,10 @@ static int deserializeSDKDump(StringRef dumpPath, StringRef OutputPath) {
     llvm::errs() << dumpPath << " does not exist\n";
     return 1;
   }
+  PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(options::Abi);
+  Ctx.getDiags().addConsumer(PDC);
+
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
   Collector.serialize(OutputPath);
@@ -4317,7 +4336,10 @@ static int findDeclUsr(StringRef dumpPath) {
     llvm::errs() << dumpPath << " does not exist\n";
     return 1;
   }
+  PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(options::Abi);
+  Ctx.getDiags().addConsumer(PDC);
+
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
   struct FinderByLocation: SDKNodeVisitor {
