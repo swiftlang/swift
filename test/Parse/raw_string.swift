@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -dump-ast %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast %s 2>&1 | %FileCheck --strict-whitespace %s
 
 import Swift
 
@@ -7,8 +7,14 @@ _ = #"""
 ## This source file is part of the Swift.org open source project ##
 ###################################################################
 """#
-
 // CHECK: "###################################################################\n## This source file is part of the Swift.org open source project ##\n###################################################################"
+
+_ = #"""
+    # H1 #
+    ## H2 ##
+    ### H3 ###
+    """#
+// CHECK: "# H1 #\n## H2 ##\n### H3 ###"
 
 // ===---------- Multiline RawString --------===
 

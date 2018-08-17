@@ -2552,7 +2552,7 @@ class EncodedDiagnosticMessage {
 public:
   /// \param S A string with an encoded message
   EncodedDiagnosticMessage(StringRef S)
-      : Message(Lexer::getEncodedStringSegment(S, Buf)) {}
+      : Message(Lexer::getEncodedStringSegment(S, Buf, true, true, ~0, ~0)) {}
 
   /// The unescaped message to display to the user.
   const StringRef Message;

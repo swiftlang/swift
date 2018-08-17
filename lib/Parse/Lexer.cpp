@@ -2065,13 +2065,34 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          bool IsFirstSegment,
                                          bool IsLastSegment,
                                          unsigned IndentToStrip,
-                                         unsigned DelmiterLength) {
+                                         unsigned DelimiterLength) {
 
   TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
   // range check subscripting on the StringRef.
   const char *BytesPtr = Bytes.begin();
+
+  // Special case when being called from EncodedDiagnosticMessage(...)
+  // This allows multiline and delimited strings to work in attributes.
+  // The string has already been validated by the initial parse.
+  if (IndentToStrip == ~0u && DelimiterLength == ~0u) {
+    IndentToStrip = DelimiterLength = 0;
+
+    // restore trailing indent removal for multiline
+    const char *Backtrack = BytesPtr - 1;
+    if (Backtrack[-1] == '"' && Backtrack[-2] == '"') {
+      Backtrack -= 2;
+      for (const char *Trailing = Bytes.end() - 1;
+           *Trailing == ' ' || *Trailing == '\t'; Trailing--)
+        IndentToStrip++;
+    }
+
+    // restore delimiter if any
+    while (*--Backtrack == '#')
+      DelimiterLength++;
+  }
+
   bool IsEscapedNewline = false;
   while (BytesPtr < Bytes.end()) {
     char CurChar = *BytesPtr++;
@@ -2092,7 +2113,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
       continue;
     }
 
-    if (CurChar != '\\' || !delimiterMatches(DelmiterLength, BytesPtr)) {
+    if (CurChar != '\\' || !delimiterMatches(DelimiterLength, BytesPtr)) {
       TempString.push_back(CurChar);
       continue;
     }

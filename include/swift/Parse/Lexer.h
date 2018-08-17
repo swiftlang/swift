@@ -494,9 +494,9 @@ private:
   void lexTrivia(syntax::Trivia &T, bool IsForTrailingTrivia);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
-  unsigned lexCharacter(const char *&CurPtr,
-                        char StopQuote, bool EmitDiagnostics,
-                        bool Multiline = false, unsigned DelimiterLength = 0);
+  unsigned lexCharacter(const char *&CurPtr, char StopQuote,
+                        bool EmitDiagnostics, bool MultilineString = false,
+                        unsigned DelimiterLength = 0);
   void lexStringLiteral(unsigned DelimiterLength = 0);
   void lexEscapedIdentifier();
 
