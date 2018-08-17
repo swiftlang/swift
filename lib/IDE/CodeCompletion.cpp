@@ -4311,7 +4311,7 @@ public:
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
-    if (!CurrDeclContext->getSelfNominalTypeDecl())
+    if (!CurrDeclContext->isTypeContext())
       return;
     if (isa<ProtocolDecl>(CurrDeclContext))
       return;
