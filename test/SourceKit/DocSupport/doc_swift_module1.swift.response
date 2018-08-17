@@ -55,7 +55,7 @@ extension P2 {
     subscript(_ a: Int) -> Int
 }
 
-extension P2 {
+extension P2 where Self : P3 {
 
     func fooConstraint()
 }
@@ -532,78 +532,97 @@ extension Dictionary.Keys where Key : Hashable {
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 633,
+    key.offset: 626,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.name: "Self",
+    key.usr: "s:5cake12P2PA2A2P3RzrlE4Selfxmfp",
+    key.offset: 632,
     key.length: 4
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 638,
-    key.length: 13
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 657,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 666,
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "P3",
+    key.usr: "s:5cake12P3P",
+    key.offset: 639,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 676,
+    key.offset: 649,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 681,
+    key.offset: 654,
+    key.length: 13
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 673,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 682,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 692,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 697,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 697,
+    key.offset: 713,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Dictionary",
     key.usr: "s:SD",
-    key.offset: 707,
+    key.offset: 723,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Keys",
     key.usr: "s:SD4KeysV",
-    key.offset: 718,
+    key.offset: 734,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 723,
+    key.offset: 739,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 729,
+    key.offset: 745,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Hashable",
     key.usr: "s:SH",
-    key.offset: 735,
+    key.offset: 751,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 751,
+    key.offset: 767,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 756,
+    key.offset: 772,
     key.length: 3
   }
 ]
@@ -944,7 +963,7 @@ extension Dictionary.Keys where Key : Hashable {
       }
     ],
     key.offset: 613,
-    key.length: 42,
+    key.length: 58,
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
       key.name: "P2",
@@ -956,7 +975,7 @@ extension Dictionary.Keys where Key : Hashable {
         key.name: "fooConstraint()",
         key.usr: "s:5cake12P2PA2A2P3RzrlE13fooConstraintyyF",
         key.default_implementation_of: "s:5cake12P1P13fooConstraintyyF",
-        key.offset: 633,
+        key.offset: 649,
         key.length: 20,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooConstraint</decl.name>()</decl.function.method.instance>"
       }
@@ -966,7 +985,7 @@ extension Dictionary.Keys where Key : Hashable {
     key.kind: source.lang.swift.decl.protocol,
     key.name: "P3",
     key.usr: "s:5cake12P3P",
-    key.offset: 657,
+    key.offset: 673,
     key.length: 38,
     key.fully_annotated_decl: "<decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P3</decl.name></decl.protocol>",
     key.entities: [
@@ -974,7 +993,7 @@ extension Dictionary.Keys where Key : Hashable {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "p3Required()",
         key.usr: "s:5cake12P3P10p3RequiredyyF",
-        key.offset: 676,
+        key.offset: 692,
         key.length: 17,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>p3Required</decl.name>()</decl.function.method.instance>"
       }
@@ -995,7 +1014,7 @@ extension Dictionary.Keys where Key : Hashable {
         key.description: "Key : Hashable"
       }
     ],
-    key.offset: 697,
+    key.offset: 713,
     key.length: 66,
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
@@ -1007,7 +1026,7 @@ extension Dictionary.Keys where Key : Hashable {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo()",
         key.usr: "s:SD4KeysV5cake1E3fooyyF",
-        key.offset: 751,
+        key.offset: 767,
         key.length: 10,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.method.instance>"
       }

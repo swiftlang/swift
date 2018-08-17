@@ -638,9 +638,8 @@ public:
     PrintParams = 1,
     PrintRequirements = 2,
     InnermostOnly = 4,
-    SkipSelfRequirement = 8,
-    SwapSelfAndDependentMemberType = 16,
-    PrintInherited = 32,
+    SwapSelfAndDependentMemberType = 8,
+    PrintInherited = 16,
   };
 
   void printInheritedFromRequirementSignature(ProtocolDecl *proto,
@@ -1226,13 +1225,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
 
       if (req.getKind() != RequirementKind::Layout)
         second = req.getSecondType();
-
-      if ((flags & SkipSelfRequirement) &&
-          req.getKind() == RequirementKind::Conformance) {
-        auto proto = cast<ProtocolDecl>(second->getAnyNominal());
-        if (first->isEqual(proto->getSelfInterfaceType()))
-          continue;
-      }
 
       if (!subMap.empty()) {
         if (Type subFirst = substParam(first))
@@ -1870,14 +1862,19 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     });
     printInherited(decl);
 
-    if (decl->getGenericParams())
-      if (auto *genericSig = decl->getGenericSignature()) {
-        // For protocol extensions, don't print the 'Self : ...' requirement.
-        unsigned flags = PrintRequirements | InnermostOnly;
-        if (decl->getExtendedProtocolDecl())
-          flags |= SkipSelfRequirement;
-        printGenericSignature(genericSig, flags);
-      }
+    if (auto *genericSig = decl->getGenericSignature()) {
+      printGenericSignature(genericSig, PrintRequirements | InnermostOnly,
+                            [decl](const Requirement &req) -> bool {
+        // For protocol extensions, omit the implicit
+        // "Self: TheProtoBeingExtended" requirement.
+        if (req.getKind() != RequirementKind::Conformance)
+          return true;
+        auto proto = cast<ProtocolDecl>(req.getSecondType()->getAnyNominal());
+        if (proto != decl->getExtendedNominal())
+          return true;
+        return !req.getFirstType()->isEqual(proto->getSelfInterfaceType());
+      });
+    }
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false,
