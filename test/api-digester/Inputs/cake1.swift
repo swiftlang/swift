@@ -30,7 +30,10 @@ public class C4: OldType {
 }
 
 @objc
-public class C5 {}
+public class C5 {
+  @objc
+  public func dy_foo() {}
+}
 
 public struct C6 {}
 
