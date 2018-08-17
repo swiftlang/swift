@@ -456,8 +456,7 @@ func _introSort<C: MutableCollection & RandomAccessCollection>(
   if count < 2 {
     return
   }
-  // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
-  // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
+
   try _introSortImpl(
     &elements,
     subRange: range,
