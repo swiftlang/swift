@@ -246,19 +246,6 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
         return val;
       }
     }
-    // Even though the entire struct is not a const value, the field we are
-    // extracting could be, so we try evaluating just that field.
-    //
-    // Note: This is used in the TF deabstraction context. For example, a tensor
-    // shape attribute value is provided via [someStruct.tensorShape], where
-    // someStruct has non-const fields, and due to the wrapping of the
-    // singleton-array, we are not able to propagate the struct element SSA
-    // value to the use of that attribute in a graph_op inst.
-    if (auto *si = dyn_cast<StructInst>(aggValue)) {
-      assert(si->getElements().size() > sei->getFieldNo());
-      auto &field = si->getElementOperands()[sei->getFieldNo()];
-      return getConstantValue(field.get());
-    }
     // Not a const.
     return val;
   }
