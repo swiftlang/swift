@@ -1227,12 +1227,12 @@ public extension Tensor {
       // TODO: The horrendous mess of type-casting is necessary due to GPU ops
       // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
       // if possible.
-      let lowerBound = Tensor<Int32>([bounds.lowerBound])
+      let lowerBound = Tensor<Int32>(bounds.lowerBound).rankLifted()
       let remainingZeros: Tensor<Int32> = Raw.fill(
         dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
       let startIndices = lowerBound.concatenated(with: remainingZeros)
 
-      let boundSize = Tensor<Int32>([bounds.upperBound])
+      let boundSize = Tensor<Int32>(bounds.upperBound).rankLifted()
         - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
       let scatterIndices: Tensor<Int32> = [[0]]
       let offset: Tensor<Int32> = Tensor<Int32>(
