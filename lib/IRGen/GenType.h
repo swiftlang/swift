@@ -90,7 +90,7 @@ private:
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     PODBoxTI;
   const LoadableTypeInfo *SwiftRetainablePointerBoxTI = nullptr,
-                         *UnknownRetainablePointerBoxTI = nullptr;
+                         *UnknownObjectRetainablePointerBoxTI = nullptr;
 
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);

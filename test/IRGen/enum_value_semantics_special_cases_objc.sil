@@ -14,7 +14,7 @@ enum NullableObjCRefcounted {
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO*
 // CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO* %0 to %objc_object**
 // CHECK:   %2 = load %objc_object*, %objc_object** %1, align 8
-// CHECK:   call void @swift_unknownRelease(%objc_object* %2) {{#[0-9]+}}
+// CHECK:   call void @swift_unknownObjectRelease(%objc_object* %2) {{#[0-9]+}}
 // CHECK:   ret void
 // CHECK: }
 
@@ -56,7 +56,7 @@ enum AllMixedRefcountedTwoSimple {
 struct Val {
 }
 
-// Currently, swift_unknownRelease does not support the indirect heap object.
+// Currently, swift_unknownObjectRelease does not support the indirect heap object.
 
 enum MixedRefcountedWithIndirect {
   indirect case Indirect(Builtin.Int64)
@@ -95,7 +95,7 @@ enum MixedRefcountedWithIndirect {
 // CHECK: ; <label>:6:
 // CHECK:   %7 = and i64 %0, 4611686018427387903
 // CHECK:   %8 = inttoptr i64 %7 to %objc_object*
-// CHECK:   call void @swift_unknownRelease(%objc_object* %8) #1
+// CHECK:   call void @swift_unknownObjectRelease(%objc_object* %8) #1
 // CHECK:   br label %9
 
 // CHECK: ; <label>:9:

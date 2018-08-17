@@ -383,7 +383,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
 
   template <class Container, class... A>
   static void destroy(Container *value, A... args) {
-    swift_unknownRelease(*value->getValueSlot());
+    swift_unknownObjectRelease(*value->getValueSlot());
   }
   
   template <class Container, class... A>
@@ -392,7 +392,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
     src->copyTypeInto(dest, args...);
     auto newValue = *src->getValueSlot();
     *dest->getValueSlot() = newValue;
-    swift_unknownRetain(newValue);
+    swift_unknownObjectRetain(newValue);
     return dest;  
   }
 
@@ -411,8 +411,8 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
     auto newValue = *src->getValueSlot();
     auto oldValue = *dest->getValueSlot();
     *dest->getValueSlot() = newValue;
-    swift_unknownRetain(newValue);
-    swift_unknownRelease(oldValue);
+    swift_unknownObjectRetain(newValue);
+    swift_unknownObjectRelease(oldValue);
     return dest;
   }
 
@@ -423,7 +423,7 @@ struct LLVM_LIBRARY_VISIBILITY ClassExistentialBoxBase
     auto newValue = *src->getValueSlot();
     auto oldValue = *dest->getValueSlot();
     *dest->getValueSlot() = newValue;
-    swift_unknownRelease(oldValue);
+    swift_unknownObjectRelease(oldValue);
     return dest;
   }
 

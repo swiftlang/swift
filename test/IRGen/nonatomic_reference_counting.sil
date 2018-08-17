@@ -47,8 +47,8 @@ bb0:
 }
 
 // CHECK-LABEL: define {{.*}}@test_unknown_nonatomic_rr
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRetain|swift_nonatomic_retain)}}
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRelease|swift_nonatomic_release)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRetain|swift_nonatomic_retain)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRelease|swift_nonatomic_release)}}
 // CHECK: ret
 sil @test_unknown_nonatomic_rr: $@convention(thin) <T where T : P> (@owned T) -> () {
 bb0(%0 : $T):
@@ -93,8 +93,8 @@ bb0:
 }
 
 // CHECK-LABEL: define {{.*}}@test_unknown_nonatomic_rr_n
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRetain_n|swift_nonatomic_retain_n)}}
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRelease_n|swift_nonatomic_release_n)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRetain_n|swift_nonatomic_retain_n)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRelease_n|swift_nonatomic_release_n)}}
 // CHECK: ret
 sil @test_unknown_nonatomic_rr_n: $@convention(thin) <T where T : P> (@owned T) -> () {
 bb0(%0 : $T):
@@ -109,8 +109,8 @@ bb0(%0 : $T):
 }
 
 // CHECK-LABEL: define {{.*}}@test_unknown_mixed_rr_n
-// CHECK: call {{.*}}@{{(swift_unknownRetain_n|swift_retain_n)}}
-// CHECK: call {{.*}}@{{(swift_unknownRelease_n|swift_release_n)}}
+// CHECK: call {{.*}}@{{(swift_unknownObjectRetain_n|swift_retain_n)}}
+// CHECK: call {{.*}}@{{(swift_unknownObjectRelease_n|swift_release_n)}}
 // CHECK: ret
 sil @test_unknown_mixed_rr_n: $@convention(thin) <T where T : P> (@owned T) -> () {
 bb0(%0 : $T):
