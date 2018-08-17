@@ -75,7 +75,7 @@ public struct SyntaxNodeId: Hashable, Codable {
 }
 
 /// The data that is specific to a tree or token node
-fileprivate indirect enum RawSyntaxData {
+fileprivate enum RawSyntaxData {
   /// A tree node with a kind and an array of children
   case node(kind: SyntaxKind, layout: [RawSyntax?])
   /// A token with a token kind, leading trivia, and trailing trivia
