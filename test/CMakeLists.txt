@@ -44,6 +44,9 @@ function(get_test_dependencies SDK result_var_name)
       sil-func-extractor sil-llvm-gen sil-nm sil-passpipeline-dumper
       lldb-moduleimport-test swift-reflection-dump swift-remoteast-test
       swift-api-digester swift-refactor swift-demangle-yamldump)
+  if (TARGET swift-swiftsyntax-test)
+    list(APPEND deps_binaries swift-swiftsyntax-test)
+  endif()
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
          clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
