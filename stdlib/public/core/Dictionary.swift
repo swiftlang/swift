@@ -585,6 +585,15 @@ extension Dictionary: Sequence {
   public func makeIterator() -> DictionaryIterator<Key, Value> {
     return _variantBuffer.makeIterator()
   }
+
+  /// A value less than or eequal to the number of key-value pairs in the
+  /// dictionary.
+  ///
+  /// - Complexity: O(1).
+  @_inlineable // FIXME(sil-serialize-all)
+  public var underestimatedCount: Int {
+    return _variantBuffer.count
+  }
 }
 
 // This is not quite Sequence.filter, because that returns [Element], not Self
@@ -1290,6 +1299,14 @@ extension Dictionary {
       return _variantBuffer.count
     }
 
+    /// A value less than or equal to the number of keys in the dictionary.
+    ///
+    /// - Complexity: O(1).
+    @inlinable // FIXME(sil-serialize-all)
+    public var underestimatedCount: Int {
+      return _variantBuffer.count
+    }
+
     @inlinable // FIXME(sil-serialize-all)
     public var isEmpty: Bool {
       return count == 0
@@ -1397,6 +1414,14 @@ extension Dictionary {
     /// - Complexity: O(1).
     @inlinable // FIXME(sil-serialize-all)
     public var count: Int {
+      return _variantBuffer.count
+    }
+
+    /// A value less than or equal to the number of values in the dictionary.
+    ///
+    /// - Complexity: O(1).
+    @inlinable // FIXME(sil-serialize-all)
+    public var underestimatedCount: Int {
       return _variantBuffer.count
     }
 

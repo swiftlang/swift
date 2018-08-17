@@ -107,6 +107,11 @@ extension ReversedCollection: Sequence {
   public func makeIterator() -> Iterator {
     return Iterator(_base: _base)
   }
+
+  @_inlineable
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
+  }
 }
 
 extension ReversedCollection {

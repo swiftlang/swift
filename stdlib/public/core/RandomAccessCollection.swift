@@ -273,6 +273,14 @@ extension RandomAccessCollection {
     }
     return index(i, offsetBy: distance)
   }
+
+  /// A value less than or equal to the number of elements in the collection.
+  ///
+  /// - Complexity: O(1)
+  @_inlineable
+  public var underestimatedCount: Int {
+    return count
+  }
 }
 
 // Provides an alternative default associated type witness for Indices

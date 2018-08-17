@@ -535,7 +535,7 @@ extension LazyCollection where Base : TestProtocol1 {
 
 LazyTestSuite.test("Lazy${TraversalCollection}.array") {
   let base = Minimal${TraversalCollection}(
-    elements: [ 0, 30, 10, 90 ], underestimatedCount: .value(42))
+    elements: [ 0, 30, 10, 90 ], underestimatedCount: .overestimate)
   let arrayFromLazy = Array(base.lazy)
 
   expectEqual([ 0, 30, 10, 90 ], arrayFromLazy)
@@ -551,7 +551,7 @@ LazyTestSuite.test("Lazy${TraversalCollection}.array") {
 LazyTestSuite.test("Lazy${TraversalCollection}.reversed") {
   let base = Minimal${TraversalCollection}(
     elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
-    underestimatedCount: .value(42))
+    underestimatedCount: .precise)
   var reversed = base.lazy.reversed()
   expectType(
     LazyCollection<

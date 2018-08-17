@@ -3582,6 +3582,11 @@ ${assignmentOperatorComment(x.operator, True)}
     }
 
     @inlinable // FIXME(sil-serialize-all)
+    public var underestimatedCount: Int {
+      return (${bits} + ${word_bits} - 1) / ${word_bits}
+    }
+
+    @inlinable // FIXME(sil-serialize-all)
     public var count: Int {
       return (${bits} + ${word_bits} - 1) / ${word_bits}
     }

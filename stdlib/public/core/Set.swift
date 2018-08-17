@@ -245,6 +245,14 @@ extension Set: Sequence {
     return _variantBuffer.makeIterator()
   }
 
+  /// A value less than or eequal to the number of elements in the set.
+  ///
+  /// - Complexity: O(1).
+  @_inlineable // FIXME(sil-serialize-all)
+  public var underestimatedCount: Int {
+    return _variantBuffer.count
+  }
+
   /// Returns a Boolean value that indicates whether the given element exists
   /// in the set.
   ///

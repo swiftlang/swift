@@ -352,7 +352,7 @@ CollectionTypeTests.test("underestimatedCount/Collection/DefaultImplementation")
   }
   do {
     let s = CollectionWithDefaultUnderestimatedCount(count: 5)
-    expectEqual(5, callGenericUnderestimatedCount(s))
+    expectEqual(0, callGenericUnderestimatedCount(s))
   }
 }
 

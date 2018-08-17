@@ -1226,13 +1226,10 @@ extension Collection {
 
   /// A value less than or equal to the number of elements in the collection.
   ///
-  /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
-  ///   of the collection.
+  /// - Complexity: O(1)
   @inlinable
   public var underestimatedCount: Int {
-    // TODO: swift-3-indexing-model - review the following
-    return count
+    return 0
   }
 
   /// The number of elements in the collection.
