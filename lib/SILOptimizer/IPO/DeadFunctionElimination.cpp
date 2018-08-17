@@ -16,6 +16,9 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/SILConstants.h"
+// SWIFT_ENABLE_TENSORFLOW end
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -25,6 +28,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
+
 
 STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 
@@ -365,6 +369,17 @@ protected:
         } else if (auto *KPI = dyn_cast<KeyPathInst>(&I)) {
           for (auto &component : KPI->getPattern()->getComponents())
             ensureKeyPathComponentIsAlive(component);
+        } else if (auto *graphOp = dyn_cast<GraphOperationInst>(&I)) {
+          // SWIFT_ENABLE_TENSORFLOW
+          //
+          // Mark function attributes as live so that it is not eliminated
+          // before partitioning and graph lowering has a chance to look at
+          // it. This should be removed once partition is moved into the
+          // deabstraction pass.
+          for (const auto &attr : graphOp->getAttributes()) {
+            if (attr.value.getKind() == SymbolicValue::Function)
+              ensureAlive(attr.value.getFunctionValue());
+          }
         }
       }
     }

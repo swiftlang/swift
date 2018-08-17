@@ -670,6 +670,12 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
     }
   }
 
+  // Graph functions always get partitioned because they can be used as
+  // attributes.
+  if (fn->getLoweredFunctionType()->getRepresentation() ==
+      SILFunctionType::Representation::TensorFlow)
+    return true;
+
   // If the function is marked public, but it isn't marked inlinable, then it is
   // a public entrypoint that cannot be deabstracted through, so we must
   // transform it.
