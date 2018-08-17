@@ -290,7 +290,7 @@ class BenchmarkDriverMock(Mock):
                            verbose, measure_memory):
         args = (test, num_samples, num_iters, verbose, measure_memory)
         self.calls.append(args)
-        return self.respond.get(args, Stub(min=700))
+        return self.respond.get(args, _PTR(min=700))
 
 
 class TestLoggingReportFormatter(unittest.TestCase):
@@ -324,6 +324,11 @@ class TestLoggingReportFormatter(unittest.TestCase):
             'levelname': 'INFO', 'msg': 'Hi!'})
         f = LoggingReportFormatter()
         self.assertEquals(f.format(lr), 'INFO Hi!')
+
+
+def _PTR(min=700, mem_pages=1000):
+    """Create PerformanceTestResult Stub."""
+    return Stub(min=min, mem_pages=mem_pages)
 
 
 def _run(test, num_samples=None, num_iters=None, verbose=None,
@@ -383,14 +388,14 @@ class TestBenchmarkDoctor(unittest.TestCase):
         """
         driver = BenchmarkDriverMock(tests=['B1'], responses=([
             # calibration run, returns a stand-in for PerformanceTestResult
-            (_run('B1', num_samples=3, num_iters=1), Stub(min=300))] +
+            (_run('B1', num_samples=3, num_iters=1), _PTR(min=300))] +
             # 5x i1 series, with 300 μs runtime its possible to take 4098
             # samples/s, but it should be capped at 2k
             ([(_run('B1', num_samples=2048, num_iters=1,
-                    measure_memory=True), Stub(min=300))] * 5) +
+                    verbose=True), _PTR(min=300))] * 5) +
             # 5x i2 series
             ([(_run('B1', num_samples=2048, num_iters=2,
-                    measure_memory=True), Stub(min=300))] * 5)
+                    verbose=True), _PTR(min=300))] * 5)
         ))
         doctor = BenchmarkDoctor(self.args, driver)
         with captured_output() as (out, _):
@@ -458,8 +463,8 @@ class TestBenchmarkDoctor(unittest.TestCase):
         """
         def measurements(name, runtime):
             return {'name': name,
-                    name + ' O i1a': Stub(min=runtime + 2),
-                    name + ' O i2a': Stub(min=runtime)}
+                    name + ' O i1a': _PTR(min=runtime + 2),
+                    name + ' O i2a': _PTR(min=runtime)}
 
         with captured_output() as (out, _):
             doctor = BenchmarkDoctor(self.args, BenchmarkDriverMock([]))
@@ -467,8 +472,8 @@ class TestBenchmarkDoctor(unittest.TestCase):
             doctor.analyze(measurements('Hare', 2501))
             doctor.analyze(measurements('Tortoise', 500000))
             doctor.analyze({'name': 'OverheadTurtle',
-                            'OverheadTurtle O i1a': Stub(min=800000),
-                            'OverheadTurtle O i2a': Stub(min=700000)})
+                            'OverheadTurtle O i1a': _PTR(min=800000),
+                            'OverheadTurtle O i2a': _PTR(min=700000)})
         output = out.getvalue()
 
         self.assertIn('runtime: ', output)
@@ -495,24 +500,67 @@ class TestBenchmarkDoctor(unittest.TestCase):
             doctor.analyze({
                 'name': 'NoOverhead',  # not 'significant' enough
                 # Based on DropFirstArray a10/e10: overhead 3.7% (6 μs)
-                'NoOverhead O i1a': Stub(min=162),
-                'NoOverhead O i2a': Stub(min=159)})
+                'NoOverhead O i1a': _PTR(min=162),
+                'NoOverhead O i2a': _PTR(min=159)})
             doctor.analyze({
                 'name': 'SO',  # Setup Overhead
                 # Based on SuffixArrayLazy a10/e10: overhead 5.8% (4 μs)
-                'SO O i1a': Stub(min=69), 'SO O i1b': Stub(min=70),
-                'SO O i2a': Stub(min=67), 'SO O i2b': Stub(min=68)})
-            # TODO tests with TypeFlood (0 runtime)
+                'SO O i1a': _PTR(min=69), 'SO O i1b': _PTR(min=70),
+                'SO O i2a': _PTR(min=67), 'SO O i2b': _PTR(min=68)})
+            doctor.analyze({'name': 'Zero', 'Zero O i1a': _PTR(min=0),
+                            'Zero O i2a': _PTR(min=0)})
         output = out.getvalue()
 
         self.assertIn('runtime: ', output)
         self.assertNotIn('NoOverhead', output)
+        self.assertNotIn('ZeroRuntime', output)
         self.assert_contains(
             ["'SO' has setup overhead of 4 μs (5.8%)."],
             self.logs['error'])
         self.assert_contains(
             ["Move initialization of benchmark data to the `setUpFunction` "
              "registered in `BenchmarkInfo`."], self.logs['info'])
+
+    def test_benchmark_has_constant_memory_use(self):
+        """Benchmark's memory footprint must not vary with num-iters."""
+        with captured_output() as (out, _):
+            doctor = BenchmarkDoctor(self.args, BenchmarkDriverMock([]))
+            doctor.analyze({
+                # The threshold of 15 pages was estimated from previous
+                # measurements. The normal range should be probably aproximated
+                # by a function instead of a simple constant.
+                # TODO: re-evaluate normal range from whole SBS
+                'name': 'ConstantMemory',
+                'ConstantMemory O i1a': _PTR(mem_pages=1460),
+                'ConstantMemory O i2a': _PTR(mem_pages=(1460 + 15))})
+            doctor.analyze({
+                'name': 'VariableMemory',  # ObserverForwardStruct
+                'VariableMemory O i1a': _PTR(mem_pages=1460),
+                'VariableMemory O i1b': _PTR(mem_pages=1472),
+                # i2 series start at 290 pages higher
+                'VariableMemory O i2a': _PTR(mem_pages=1750),
+                'VariableMemory O i2b': _PTR(mem_pages=1752)})
+            measurements = dict([
+                ('HighVariance O i{0}{1}'.format(num_iters, suffix),
+                 _PTR(mem_pages=num_pages))
+                for num_iters, pages in [
+                    (1, [6200, 5943, 4818, 5612, 5469]),
+                    (2, [6244, 5832, 4674, 5176, 5490])]
+                for num_pages, suffix in zip(pages, list('abcde'))])
+            measurements['name'] = 'HighVariance'  # Array2D
+            doctor.analyze(measurements)
+        output = out.getvalue()
+
+        self.assertIn('memory: ', output)
+        self.assertNotIn('ConstantMemory', output)
+        self.assert_contains(
+            ["'VariableMemory' varies the memory footprint of the base "
+             "workload depending on the `num-iters`."],
+            self.logs['error'])
+        self.assert_contains(
+            ["'HighVariance' has very wide range of memory used between "
+             "independent, repeated measurements."],
+            self.logs['warning'])
 
 
 if __name__ == '__main__':
