@@ -1,4 +1,6 @@
 /* FIXME: Bogus */
+Struct DictionaryIterator has generic signature change from <Key, Value where Key : Hashable> to <Element>
+Struct SetIterator has generic signature change from <Element where Element : Hashable> to <Key, Value>
 TypeAlias DictionaryIterator.Element has been removed
 TypeAlias SetIterator.Element has been removed
 Var DictionaryIterator.customMirror has been removed
