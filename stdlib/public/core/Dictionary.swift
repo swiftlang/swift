@@ -1338,7 +1338,6 @@ extension Dictionary {
       return true
     }
 
-    @inlinable
     public var description: String {
       return _makeCollectionDescription(for: self, withTypeName: nil)
     }
@@ -1409,7 +1408,6 @@ extension Dictionary {
       return count == 0
     }
 
-    @inlinable
     public var description: String {
       return _makeCollectionDescription(for: self, withTypeName: nil)
     }
