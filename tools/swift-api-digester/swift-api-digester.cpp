@@ -263,6 +263,8 @@ struct ABIAttributeInfo {
 class SDKContext {
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
+  llvm::SourceMgr SM;
+  
   UpdatedNodesMap UpdateMap;
   NodeMap TypeAliasUpdateMap;
   NodeMap RevertTypeAliasUpdateMap;
@@ -306,6 +308,9 @@ public:
   }
   TypeMemberDiffVector &getTypeMemberDiffs() {
     return TypeMemberDiffs;
+  }
+  llvm::SourceMgr &getSourceMgr() {
+    return SM;
   }
   bool checkingABI() const { return ABI; }
   ArrayRef<ABIAttributeInfo> getABIAttributeInfo() const { return ABIAttrs; }
@@ -2010,8 +2015,8 @@ parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
     llvm_unreachable("Failed to read JSON file");
   }
   StringRef Buffer = FileBufOrErr->get()->getBuffer();
-  llvm::SourceMgr SM;
-  yaml::Stream Stream(Buffer, SM);
+  yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, FileName),
+                      Ctx.getSourceMgr());
   SDKNode *Result = nullptr;
   for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
     assert(DI != Stream.end() && "Failed to read a document");
