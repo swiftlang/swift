@@ -318,6 +318,15 @@ public:
   }
   bool checkingABI() const { return ABI; }
   ArrayRef<ABIAttributeInfo> getABIAttributeInfo() const { return ABIAttrs; }
+  
+  template<class YAMLNodeTy, typename ...ArgTypes>
+  void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
+                typename detail::PassArgument<ArgTypes>::type... args) {
+    auto smRange = node->getSourceRange();
+    auto range = SourceRange(SourceLoc(smRange.Start), SourceLoc(smRange.End));
+    Diags.diagnose(range.Start, ID, std::forward<ArgTypes>(args)...)
+      .highlight(range);
+  }
 };
 
 // A node matcher will traverse two trees of SDKNode and find matched nodes
@@ -1045,9 +1054,6 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
     return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
   };
   
-  static auto convertRange = [](llvm::SMRange Range) -> SourceRange {
-    return SourceRange(SourceLoc(Range.Start), SourceLoc(Range.End));
-  };
   SDKNodeKind Kind;
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
@@ -1060,10 +1066,8 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         if (auto parsedKind = parseSDKNodeKind(GetScalarString(Pair.getValue()))) {
           Kind = *parsedKind;
         } else {
-          auto range = convertRange(Pair.getValue()->getSourceRange());
-          Ctx.getDiags().diagnose(range.Start, diag::sdk_node_unrecognized_node_kind,
-                                  GetScalarString(Pair.getValue()))
-            .highlight(range);
+          Ctx.diagnose(Pair.getValue(), diag::sdk_node_unrecognized_node_kind,
+                       GetScalarString(Pair.getValue()));
         }
         break;
       case KeyKind::KK_name:
@@ -1167,10 +1171,8 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       }
     }
     else {
-      auto range = convertRange(Pair.getKey()->getSourceRange());
-      Ctx.getDiags().diagnose(range.Start, diag::sdk_node_unrecognized_key,
-                              keyString)
-        .highlight(range);
+      Ctx.diagnose(Pair.getKey(), diag::sdk_node_unrecognized_key,
+                              keyString);
       Pair.skip();
     }
   };
