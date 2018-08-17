@@ -90,6 +90,8 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
+  result.ExcludeAttrList.push_back(DAK_AccessControl);
+
   // FIXME: We'll need the actual default parameter expression.
   result.PrintDefaultParameterPlaceholder = false;
 
@@ -494,7 +496,10 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printAccess(const ValueDecl *D) {
     if (!Options.PrintAccess || !D->hasAccess() ||
-        D->getAttrs().hasAttribute<AccessControlAttr>())
+        isa<ProtocolDecl>(D->getDeclContext()))
+      return;
+    if (D->getAttrs().hasAttribute<AccessControlAttr>() &&
+        !llvm::is_contained(Options.ExcludeAttrList, DAK_AccessControl))
       return;
 
     printAccess(D->getFormalAccess());

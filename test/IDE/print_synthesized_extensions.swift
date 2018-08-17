@@ -315,13 +315,13 @@ extension S13 : P5 {
 // CHECK11-NEXT: }</synthesized>
 
 // CHECK12:       <decl:Protocol>public protocol <loc>P6</loc> {
-// CHECK12-NEXT:    <decl:Func(HasDefault)>public func <loc>foo1()</loc></decl>
-// CHECK12-NEXT:    <decl:Func>public func <loc>foo2()</loc></decl>
+// CHECK12-NEXT:    <decl:Func(HasDefault)>func <loc>foo1()</loc></decl>
+// CHECK12-NEXT:    <decl:Func>func <loc>foo2()</loc></decl>
 // CHECK12-NEXT:  }</decl>
 
 // CHECK13:       <decl:Protocol>public protocol <loc>P7</loc> {
 // CHECK13-NEXT:   <decl:AssociatedType>associatedtype <loc>T1</loc></decl>
-// CHECK13-NEXT:   <decl:Func(HasDefault)>public func <loc>f1(<decl:Param>t: <ref:GenericTypeParam>Self</ref>.T1</decl>)</loc></decl>
+// CHECK13-NEXT:   <decl:Func(HasDefault)>func <loc>f1(<decl:Param>t: <ref:GenericTypeParam>Self</ref>.T1</decl>)</loc></decl>
 // CHECK13-NEXT:  }</decl>
 
 // CHECK13:       <decl:Extension>extension <loc><ref:Protocol>P7</ref></loc> {
