@@ -88,7 +88,7 @@ static bool printObjCUSRFragment(const ValueDecl *D, StringRef ObjCName,
 static bool printObjCUSRContext(const Decl *D, raw_ostream &OS) {
   OS << clang::index::getUSRSpacePrefix();
   auto *DC = D->getDeclContext();
-  if (auto *Parent = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
+  if (auto *Parent = DC->getSelfNominalTypeDecl()) {
     auto *extContextD = dyn_cast<ExtensionDecl>(DC);
     auto ObjCName = objc_translation::getObjCNameForSwiftDecl(Parent);
     if (printObjCUSRFragment(Parent, ObjCName.first.str(), extContextD, OS))
@@ -156,7 +156,7 @@ static bool shouldUseObjCUSR(const Decl *D) {
   }
 
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    if (auto baseClass = ED->getAsClassOrClassExtensionContext()) {
+    if (auto baseClass = ED->getSelfClassDecl()) {
       return shouldUseObjCUSR(baseClass) && !baseClass->isForeign();
     }
   }

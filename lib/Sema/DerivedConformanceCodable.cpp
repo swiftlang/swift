@@ -531,8 +531,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // }
 
   // The enclosing type decl.
-  auto *targetDecl = encodeDecl->getDeclContext()
-                         ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *targetDecl = encodeDecl->getDeclContext()->getSelfNominalTypeDecl();
 
   auto *funcDC = cast<DeclContext>(encodeDecl);
   auto &C = funcDC->getASTContext();
@@ -771,8 +770,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
 
   // The enclosing type decl.
   auto conformanceDC = initDecl->getDeclContext();
-  auto *targetDecl =
-      conformanceDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *targetDecl = conformanceDC->getSelfNominalTypeDecl();
 
   auto *funcDC = cast<DeclContext>(initDecl);
   auto &C = funcDC->getASTContext();

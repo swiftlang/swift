@@ -3907,8 +3907,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
                                    TypeDecl *concreteDecl) {
   assert(concreteDecl);
 
-  auto *proto =
-      concreteDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+  auto *proto = concreteDecl->getDeclContext()->getSelfProtocolDecl();
 
   if (!concreteDecl->hasInterfaceType())
     builder.getLazyResolver()->resolveDeclSignature(concreteDecl);
@@ -4421,8 +4420,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         // to that typealias.
         if (source->kind == RequirementSource::RequirementSignatureSelf) {
           auto inheritedOwningDecl =
-            inheritedType->getDeclContext()
-              ->getAsNominalTypeOrNominalTypeExtensionContext();
+              inheritedType->getDeclContext()->getSelfNominalTypeDecl();
           Diags.diagnose(assocTypeDecl,
                          diag::associated_type_override_typealias,
                          assocTypeDecl->getFullName(),

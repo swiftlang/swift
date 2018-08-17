@@ -2156,7 +2156,7 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
 llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
                                         ExtensionDecl *ext) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
-  ClassDecl *cls = ext->getAsClassOrClassExtensionContext();
+  ClassDecl *cls = ext->getSelfClassDecl();
   assert(cls && "generating category metadata for a non-class extension");
   
   PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", ext);

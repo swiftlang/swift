@@ -1420,7 +1420,7 @@ private:
     llvm::DIScope *Scope = nullptr;
     DeclContext *Context = DbgTy.getType()->getNominalOrBoundGenericNominal();
     if (Context) {
-      if (auto *D = Context->getAsNominalTypeOrNominalTypeExtensionContext())
+      if (auto *D = Context->getSelfNominalTypeDecl())
         if (auto *ClangDecl = D->getClangDecl()) {
           clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
           auto Idx = ClangDecl->getOwningModuleID();

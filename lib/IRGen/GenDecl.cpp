@@ -144,7 +144,7 @@ public:
     class_replaceMethod = IGM.getClassReplaceMethodFn();
     class_addProtocol = IGM.getClassAddProtocolFn();
 
-    CanType origTy = ext->getAsNominalTypeOrNominalTypeExtensionContext()
+    CanType origTy = ext->getSelfNominalTypeDecl()
         ->getDeclaredType()->getCanonicalType();
     classMetadata =
       tryEmitConstantHeapMetadataRef(IGM, origTy, /*allowUninit*/ true);
@@ -3843,7 +3843,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   // Generate a category if the extension either introduces a
   // conformance to an ObjC protocol or introduces a method
   // that requires an Objective-C entry point.
-  ClassDecl *origClass = ext->getAsClassOrClassExtensionContext();
+  ClassDecl *origClass = ext->getSelfClassDecl();
   if (!origClass)
     return;
 

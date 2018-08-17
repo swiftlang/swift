@@ -163,7 +163,7 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
 
   // If the parent declaration is not in a class (or extension thereof), we
   // cannot override it.
-  if (!parentDecl->getDeclContext()->getAsClassOrClassExtensionContext())
+  if (!parentDecl->getDeclContext()->getSelfClassDecl())
     return false;
 
   // The declarations must be of the same kind.
@@ -590,7 +590,7 @@ OverrideMatcher::OverrideMatcher(ValueDecl *decl)
     return;
 
   auto *dc = decl->getDeclContext();
-  auto classDecl = dc->getAsClassOrClassExtensionContext();
+  auto classDecl = dc->getSelfClassDecl();
   if (!classDecl)
     return;
 
@@ -765,7 +765,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // strips out dynamic self via replaceCovariantResultType(), and that
   // is helpful in several cases - just not this one.
   auto dc = decl->getDeclContext();
-  auto classDecl = dc->getAsClassOrClassExtensionContext();
+  auto classDecl = dc->getSelfClassDecl();
   if (decl->getASTContext().isSwiftVersionAtLeast(5) &&
       baseDecl->getInterfaceType()->hasDynamicSelfType() &&
       !decl->getInterfaceType()->hasDynamicSelfType() &&
@@ -1214,7 +1214,7 @@ namespace  {
                      Override->getDescriptiveKind(),
                      Override->getFullName(),
                      Base->getDeclContext()
-                       ->getAsNominalTypeOrNominalTypeExtensionContext()
+                       ->getSelfNominalTypeDecl()
                        ->getName());
       Diags.diagnose(Base, diag::make_decl_objc, Base->getDescriptiveKind())
         .fixItInsert(Base->getAttributeInsertionLoc(false),
@@ -1514,8 +1514,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // Overrides of NSObject.hashValue are deprecated; one should override
   // NSObject.hash instead.
   if (auto baseVar = dyn_cast<VarDecl>(base)) {
-    if (auto classDecl =
-          baseVar->getDeclContext()->getAsClassOrClassExtensionContext()) {
+    if (auto classDecl = baseVar->getDeclContext()->getSelfClassDecl()) {
       if (baseVar->getName() == ctx.Id_hashValue &&
           classDecl->getName().is("NSObject") &&
           (classDecl->getModuleContext()->getName() == ctx.Id_Foundation ||
@@ -1636,7 +1635,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto noResults = llvm::TinyPtrVector<ValueDecl *>();
 
   // Only members of classes can override other declarations.
-  if (!decl->getDeclContext()->getAsClassOrClassExtensionContext())
+  if (!decl->getDeclContext()->getSelfClassDecl())
     return noResults;
 
   // Types that aren't associated types cannot be overridden.

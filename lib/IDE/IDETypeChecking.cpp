@@ -557,7 +557,7 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                                                        VD->getFullName());
       assert(Result);
       for (auto *Default : Result.getMemberDecls(InterestedMemberKind::All)) {
-        if (PD == Default->getDeclContext()->getAsProtocolExtensionContext()) {
+        if (PD == Default->getDeclContext()->getExtendedProtocolDecl()) {
           DefaultMap.insert({Default, VD});
         }
       }

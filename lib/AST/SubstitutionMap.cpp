@@ -484,10 +484,8 @@ SubstitutionMap
 SubstitutionMap::getOverrideSubstitutions(const ValueDecl *baseDecl,
                                           const ValueDecl *derivedDecl,
                                           Optional<SubstitutionMap> derivedSubs) {
-  auto *baseClass = baseDecl->getDeclContext()
-      ->getAsClassOrClassExtensionContext();
-  auto *derivedClass = derivedDecl->getDeclContext()
-      ->getAsClassOrClassExtensionContext();
+  auto *baseClass = baseDecl->getDeclContext()->getSelfClassDecl();
+  auto *derivedClass = derivedDecl->getDeclContext()->getSelfClassDecl();
 
   auto *baseSig = baseDecl->getInnermostDeclContext()
       ->getGenericSignatureOfContext();

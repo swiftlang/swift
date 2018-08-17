@@ -803,7 +803,7 @@ static void VisitNodeGenericTypealias(ASTContext *ast,
                                   ArrayRef<ProtocolConformanceRef>({}));
   Type parentType;
   if (auto nominal = genericTypeAlias->getDeclContext()
-                         ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+                         ->getSelfNominalTypeDecl()) {
     parentType = nominal->getDeclaredInterfaceType().subst(subMap);
   }
   NameAliasType *NAT = NameAliasType::get(

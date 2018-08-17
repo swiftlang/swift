@@ -444,7 +444,7 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     return;
   }
 
-  auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = DC->getSelfNominalTypeDecl();
   auto typeSig = nominal->getGenericSignature();
 
   // A non-generic type won't have conditional requirements.
@@ -1227,8 +1227,7 @@ ArrayRef<ValueDecl *>
 NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
                                              const ValueDecl *member,
                                              bool sorted) const {
-  assert(member->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext()
-           == this);
+  assert(member->getDeclContext()->getSelfNominalTypeDecl() == this);
   assert(!isa<ProtocolDecl>(this));
   prepareConformanceTable();
   return ConformanceTable->getSatisfiedProtocolRequirementsForMember(member,
@@ -1245,7 +1244,7 @@ DeclContext::getLocalProtocols(
   SmallVector<ProtocolDecl *, 2> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = getAsNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
   if (!nominal)
     return result;
 
@@ -1276,7 +1275,7 @@ DeclContext::getLocalConformances(
   SmallVector<ProtocolConformance *, 2> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = getAsNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
   if (!nominal)
     return result;
 
@@ -1405,7 +1404,7 @@ struct ProtocolConformanceTraceFormatter
     if (auto const *NPC = dyn_cast<NormalProtocolConformance>(C)) {
       NPC->getLoc().print(OS, *SM);
     } else if (auto const *DC = C->getDeclContext()) {
-      if (auto const *D = DC->getAsDeclOrDeclExtensionContext())
+      if (auto const *D = DC->getAsDecl())
         D->getLoc().print(OS, *SM);
     }
   }
