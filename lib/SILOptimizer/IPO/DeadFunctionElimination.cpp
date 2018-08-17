@@ -377,10 +377,8 @@ protected:
           // it. This should be removed once partition is moved into the
           // deabstraction pass.
           for (const auto &attr : graphOp->getAttributes()) {
-            if (attr.value.getKind() != SymbolicValue::Function) {
-              continue;
-            }
-            ensureAlive(attr.value.getFunctionValue());
+            if (attr.value.getKind() == SymbolicValue::Function)
+              ensureAlive(attr.value.getFunctionValue());
           }
         }
       }
