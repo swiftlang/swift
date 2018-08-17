@@ -22,9 +22,20 @@ public class TestClass {
   // CHECK: public var prop: Int{{$}}
   public var prop: Int { get set }
 
+  // CHECK: public static var propWithNoAccessors: Int{{$}}
+  public static var propWithNoAccessors: Int
+
   // NEGATIVE-NOT: deinit
   deinit
 } // CHECK: {{^}$}}
+
+// CHECK-LABEL: public class TestEmptyClass {
+public class TestEmptyClass {
+} // CHECK-NEXT: {{^}$}}
+
+// CHECK-LABEL: public struct TestEmptyStruct {
+public struct TestEmptyStruct {
+} // CHECK-NEXT: {{^}$}}
 
 // CHECK-LABEL: public enum TestEnum
 public enum TestEnum {
@@ -42,6 +53,9 @@ public enum TestEnum {
 
   // CHECK: public var prop: Int{{$}}
   public var prop: Int { get set }
+
+  // CHECK: public static var propWithNoAccessors: Int{{$}}
+  public static var propWithNoAccessors: Int
 } // CHECK: {{^}$}}
 
 // CHECK-LABEL: public struct TestStruct
@@ -57,7 +71,13 @@ public struct TestStruct {
 
   // CHECK: public var prop: Int{{$}}
   public var prop: Int { get set }
+
+  // CHECK: public static var propWithNoAccessors: Int{{$}}
+  public static var propWithNoAccessors: Int
 } // CHECK: {{^}$}}
+
+// CHECK: public let globalWithNoAccessors: Int{{$}}
+public let globalWithNoAccessors: Int
 
 // CHECK: public var readOnlyVar: Int { get }{{$}}
 public var readOnlyVar: Int { get }
