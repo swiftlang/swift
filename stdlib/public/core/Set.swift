@@ -1720,7 +1720,6 @@ internal struct _NativeSet<Element: Hashable> {
 }
 
 extension _NativeSet {
-  @inlinable
   internal var bucketCount: Int {
     return _assumeNonNegative(_storage.hashTable.bucketCount)
   }

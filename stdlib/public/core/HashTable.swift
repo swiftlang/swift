@@ -19,23 +19,22 @@ internal protocol _HashTableDelegate {
 @_fixed_layout
 internal struct _HashTable {
   @usableFromInline
-  internal let scale: Int
-  @usableFromInline
   internal let capacity: Int
   @usableFromInline
   internal var count: Int
-  @usableFromInline
-  internal let rawMap: UnsafeMutableRawPointer
+
+  internal let scale: Int
+  internal let map: UnsafeMutablePointer<MapEntry>
 
   internal init(scale: Int, count: Int, map: UnsafeMutablePointer<MapEntry>) {
     _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
     _sanityCheck(count >= 0 && count < (1 << scale) - 1)
     let capacity = Int(Double(1 &<< scale) / _HashTable.maxLoadFactorInverse)
     _sanityCheck(count <= capacity)
-    self.scale = scale
     self.capacity = capacity
     self.count = count
-    self.rawMap = UnsafeMutableRawPointer(map)
+    self.scale = scale
+    self.map = map
 
     map.assign(repeating: .unoccupied, count: bucketCount)
   }
@@ -48,7 +47,6 @@ extension _HashTable {
     return 4 / 3
   }
 
-  @usableFromInline
   internal static func scale(
     forCapacity capacity: Int
   ) -> Int {
@@ -100,24 +98,15 @@ extension _HashTable {
         payload: UInt8(truncatingIfNeeded: payload) & MapEntry.payloadMask)
     }
   }
-
-  internal var map: UnsafeMutablePointer<MapEntry> {
-    @inline(__always)
-    get {
-      return rawMap.assumingMemoryBound(to: MapEntry.self)
-    }
-  }
 }
 
 extension _HashTable {
-  @usableFromInline
   internal var bucketCount: Int {
     @inline(__always) get {
       return 1 &<< scale
     }
   }
 
-  @usableFromInline
   internal var bucketMask: Int {
     @inline(__always) get {
       // The bucket count is a positive power of two, so subtracting 1 will
@@ -126,14 +115,12 @@ extension _HashTable {
     }
   }
 
-  @inlinable
   @inline(__always)
   internal func _isValid(_ bucket: Int) -> Bool {
     return bucket >= 0 && bucket < bucketCount
   }
 
-  @usableFromInline
-  @_effects(readonly)
+  @inline(__always)
   internal func _isOccupied(_ bucket: Int) -> Bool {
     _sanityCheck(_isValid(bucket))
     return map[bucket].isOccupied
@@ -195,14 +182,12 @@ extension _HashTable {
     internal let count: Int
     internal let base: UnsafeMutablePointer<MapEntry>
 
-    @usableFromInline
-    @_effects(releasenone)
     internal init(
-      base: UnsafeMutableRawPointer,
+      base: UnsafeMutablePointer<MapEntry>,
       count: Int) {
       self.bucket = -1
       self.count = count
-      self.base = base.assumingMemoryBound(to: MapEntry.self)
+      self.base = base
     }
 
     @usableFromInline
@@ -218,9 +203,12 @@ extension _HashTable {
     }
   }
 
-  @inlinable
+  @usableFromInline
   var occupiedIndices: OccupiedIndices {
-    return OccupiedIndices(base: rawMap, count: bucketCount)
+    @_effects(readonly)
+    get {
+      return OccupiedIndices(base: map, count: count > 0 ? bucketCount : 0)
+    }
   }
 }
 
@@ -256,7 +244,8 @@ extension _HashTable.Index: Comparable {
 
 
 extension _HashTable {
-  @inlinable
+  @usableFromInline
+  @_effects(readonly)
   internal func isValid(_ i: Index) -> Bool {
     return _isValid(i.bucket)
   }
@@ -284,9 +273,12 @@ extension _HashTable {
     }
   }
 
-  @inlinable
+  @usableFromInline
   internal var endIndex: Index {
-    return Index(bucket: bucketCount)
+    @_effects(readonly)
+    get {
+      return Index(bucket: bucketCount)
+    }
   }
 
   @usableFromInline
