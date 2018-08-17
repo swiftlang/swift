@@ -1288,7 +1288,7 @@ public:
                 unsigned independentVariableIndex) const;
   bool isUseful(SILValue value,
                 unsigned dependentVariableIndex) const;
-  bool isVariedByAny(SILValue value,
+  bool isVaried(SILValue value,
                      const llvm::SmallBitVector &parameterIndices) const;
   bool isActive(SILValue value,
                 const SILReverseAutoDiffIndices &indices) const;
@@ -1421,7 +1421,7 @@ isVaried(SILValue value, unsigned independentVariableIndex) const {
 }
 
 bool DifferentiableActivityInfo::
-isVariedByAny(SILValue value, const llvm::SmallBitVector &parameterIndices) const {
+isVaried(SILValue value, const llvm::SmallBitVector &parameterIndices) const {
   for (auto paramIdx : parameterIndices.set_bits())
     if (isVaried(value, paramIdx))
       return true;
@@ -1436,7 +1436,7 @@ isUseful(SILValue value, unsigned dependentVariableIndex) const {
 
 bool DifferentiableActivityInfo::
 isActive(SILValue value, const SILReverseAutoDiffIndices &indices) const {
-  return isVariedByAny(value, indices.parameters) && isUseful(value, indices.source);
+  return isVaried(value, indices.parameters) && isUseful(value, indices.source);
 }
 
 static void dumpActivityInfo(SILValue value,
@@ -1446,7 +1446,7 @@ static void dumpActivityInfo(SILValue value,
   s << '[';
   if (activityInfo.isActive(value, indices))
     s << "ACTIVE";
-  else if (activityInfo.isVariedByAny(value, indices.parameters))
+  else if (activityInfo.isVaried(value, indices.parameters))
     s << "VARIED";
   else if (activityInfo.isUseful(value, indices.source))
     s << "USEFUL";
