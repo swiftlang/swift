@@ -104,3 +104,11 @@ struct Modify {
     nonmutating set {} // expected-note {{setter defined here}}
   }
 }
+
+struct ImplicitlyUnwrapped {
+  var x: Int!
+  var y: Int? {
+    _read { yield x }
+    _modify { yield &x }
+  }
+}
