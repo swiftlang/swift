@@ -2050,6 +2050,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                             Context.Id_dollarInterpolation, CurDeclContext);
     InterpolationVar->setImplicit(true);
     InterpolationVar->setHasNonPatternBindingInit(true);
+    InterpolationVar->setUserAccessible(false);
     addToScope(InterpolationVar);
     setLocalDiscriminator(InterpolationVar);
     
