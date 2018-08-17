@@ -1390,10 +1390,11 @@ void DifferentiableActivityInfo::analyze() {
   usefulValueSets.append(outputValues.size(), {});
   variedValueSets.append(inputValues.size(), {});
   // Mark varied values for each independent varible.
-  SmallDenseSet<SILValue> visitedVariedValues;
-  for (auto valAndIdx : enumerate(inputValues))
+  for (auto valAndIdx : enumerate(inputValues)) {
+    SmallDenseSet<SILValue> visitedVariedValues;
     collectVariedValues(valAndIdx.first, variedValueSets[valAndIdx.second],
                         valAndIdx.second, visitedVariedValues);
+  }
   // Mark useful values for each dependent variable.
   for (auto valAndIdx : enumerate(outputValues))
     collectUsefulValues(valAndIdx.first, usefulValueSets[valAndIdx.second],
@@ -1422,9 +1423,9 @@ isVaried(SILValue value, unsigned independentVariableIndex) const {
 bool DifferentiableActivityInfo::
 isVaried(SILValue value, const llvm::SmallBitVector &parameterIndices) const {
   for (auto paramIdx : parameterIndices.set_bits())
-    if (!isVaried(value, paramIdx))
-      return false;
-  return true;
+    if (isVaried(value, paramIdx))
+      return true;
+  return false;
 }
 
 bool DifferentiableActivityInfo::
@@ -1440,7 +1441,7 @@ isActive(SILValue value, const SILReverseAutoDiffIndices &indices) const {
 
 static void dumpActivityInfo(SILValue value,
                              const SILReverseAutoDiffIndices &indices,
-                             DifferentiableActivityInfo &activityInfo,
+                             const DifferentiableActivityInfo &activityInfo,
                              llvm::raw_ostream &s = llvm::dbgs()) {
   s << '[';
   if (activityInfo.isActive(value, indices))
@@ -2924,12 +2925,15 @@ public:
     getBuilder().setInsertionPoint(adjointEntry);
     
     SmallVector<SILValue, 8> retElts;
-    for (auto param : originalParametersInAdj) {
-      auto adjVal = getAdjointValue(param);
-      if (param->getType().isObject())
+    for (auto paramPair : zip(original.getArgumentsWithoutIndirectResults(),
+                              originalParametersInAdj)) {
+      auto origParam = std::get<0>(paramPair);
+      auto adjParam = std::get<1>(paramPair);
+      auto adjVal = getAdjointValue(origParam);
+      if (adjParam->getType().isObject())
         retElts.push_back(materializeAdjoint(adjVal, adjLoc));
       else
-        materializeAdjointIndirect(adjVal, param);
+        materializeAdjointIndirect(adjVal, adjParam);
     }
     SILValue retVal;
     if (retElts.size() == 1)
