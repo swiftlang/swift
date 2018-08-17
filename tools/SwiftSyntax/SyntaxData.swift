@@ -18,14 +18,6 @@ import Foundation
 /// exposed to clients.
 typealias NodeIdentifier = [Int]
 
-/// Box a value type into a reference type
-fileprivate class Box<T> {
-  let value: T
-
-  init(_ value: T) {
-    self.value = value
-  }
-}
 
 /// SyntaxData is the underlying storage for each Syntax node.
 /// It's modelled as an array that stores and caches a SyntaxData for each raw
