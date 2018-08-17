@@ -15,6 +15,7 @@
 
 import argparse
 import glob
+import logging
 import os
 import re
 import subprocess
@@ -125,6 +126,104 @@ class BenchmarkDriver(object):
         return reduce(merge_results,
                       [self.run(test, measure_memory=True)
                        for _ in range(self.args.iterations)])
+
+
+class LoggingReportFormatter(logging.Formatter):
+    """Format logs as plain text or with colors on the terminal.
+
+    Plain text outputs level, category and massage: 'DEBUG category: Hi!'
+    Colored output uses color coding based on the level.
+    """
+
+    import logging as log
+    colors = {log.DEBUG: '9', log.INFO: '2', log.WARNING: '3', log.ERROR: '1',
+              log.CRITICAL: '5'}
+
+    def __init__(self, use_color=False):
+        """Specify if report should use colors; defaults to False."""
+        super(LoggingReportFormatter, self).__init__('%(message)s')
+        self.use_color = use_color
+
+    def format(self, record):
+        """Format the log record with level and category."""
+        msg = super(LoggingReportFormatter, self).format(record)
+        category = ((record.name.split('.')[-1] + ': ') if '.' in record.name
+                    else '')
+        return ('\033[1;3{0}m{1}{2}\033[1;0m'.format(
+            self.colors[record.levelno], category, msg) if self.use_color else
+            '{0} {1}{2}'.format(record.levelname, category, msg))
+
+
+class BenchmarkDoctor(object):
+    """Checks that the benchmark conforms to the standard set of requirements.
+
+    Benchmarks that are part of Swift Benchmark Suite are required to follow
+    a set of rules that ensure quality measurements. These include naming
+    convention, robustness when varying execution parameters like
+    `num-iters` and `num-samples` (no setup overhead, constant memory
+    consumption).
+    """
+
+    log = logging.getLogger('BenchmarkDoctor')
+    log_naming = log.getChild('naming')
+    log_runtime = log.getChild('runtime')
+    log_memory = log.getChild('memory')
+    log.setLevel(logging.DEBUG)
+
+    def __init__(self, args, driver=None):
+        """Initialize with command line parameters.
+
+        Optional `driver` parameter for injecting dependency; used for testing.
+        """
+        super(BenchmarkDoctor, self).__init__()
+        self.driver = driver or BenchmarkDriver(args)
+        self.results = {}
+        self.console_handler = logging.StreamHandler(sys.stdout)
+        self.console_handler.setLevel(logging.DEBUG if args.verbose else
+                                      logging.INFO)
+        self.console_handler.setFormatter(
+            LoggingReportFormatter(use_color=sys.stdout.isatty()))
+        self.log.addHandler(self.console_handler)
+        self.log.debug('Checking tests: %s', ', '.join(self.driver.tests))
+
+    def __del__(self):
+        """Unregister handler on exit."""
+        self.log.removeHandler(self.console_handler)
+
+    capital_words_re = re.compile('[A-Z][a-zA-Z0-9]+')
+
+    @staticmethod
+    def _name_matches_capital_words_convention(test):
+        name = test
+        match = BenchmarkDoctor.capital_words_re.match(name)
+        matched = match.group(0) if match else ''
+        if name != matched:
+            BenchmarkDoctor.log_naming.error(
+                "'%s' name doesn't conform to UpperCamelCase convention.",
+                name)
+            BenchmarkDoctor.log_naming.info(
+                'See http://bit.ly/UpperCamelCase')
+
+    @staticmethod
+    def _name_is_at_most_40_chars_long(test):
+        if len(test) > 40:
+            BenchmarkDoctor.log_naming.warning(
+                "'%s' name is longer than 40 characters.", test)
+
+    def check(self):
+        checks = [
+            self._name_matches_capital_words_convention,
+            self._name_is_at_most_40_chars_long,
+            ]
+        for test in self.driver.tests:
+            for check in checks:
+                check(test)
+
+    @staticmethod
+    def run_check(args):
+        doctor = BenchmarkDoctor(args)
+        doctor.check()
+        return 0
 
 
 def get_current_git_branch(git_repo_path):
@@ -373,6 +472,15 @@ def parse_args(args):
         '--swift-repo',
         help='absolute path to the Swift source repository')
     run_parser.set_defaults(func=run)
+
+    check_parser = subparsers.add_parser(
+        'check',
+        help='',
+        parents=[shared_benchmarks_parser])
+    check_parser.add_argument(
+        '-v', '--verbose', action='store_true',
+        help='show more details during benchmark analysis',)
+    check_parser.set_defaults(func=BenchmarkDoctor.run_check)
 
     compare_parser = subparsers.add_parser(
         'compare',

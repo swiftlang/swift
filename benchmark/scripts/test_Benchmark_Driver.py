@@ -13,13 +13,15 @@
 #
 # ===---------------------------------------------------------------------===//
 
+import logging
 import os
 import unittest
 
 from imp import load_source
 
-from test_utils import Mock, Stub, captured_output
 from compare_perf_tests import PerformanceTestResult
+
+from test_utils import Mock, MockLoggingHandler, Stub, captured_output
 
 # import Benchmark_Driver  # doesn't work because it misses '.py' extension
 Benchmark_Driver = load_source(
@@ -28,6 +30,8 @@ Benchmark_Driver = load_source(
 # from Benchmark_Driver import parse_args
 parse_args = Benchmark_Driver.parse_args
 BenchmarkDriver = Benchmark_Driver.BenchmarkDriver
+BenchmarkDoctor = Benchmark_Driver.BenchmarkDoctor
+LoggingReportFormatter = Benchmark_Driver.LoggingReportFormatter
 
 
 class Test_parse_args(unittest.TestCase):
@@ -45,7 +49,7 @@ class Test_parse_args(unittest.TestCase):
     def test_command_help_lists_commands(self):
         with captured_output() as (out, _):
             self.assertRaises(SystemExit, parse_args, ['-h'])
-        self.assert_contains(['COMMAND', 'run', 'compare'],
+        self.assert_contains(['COMMAND', 'run', 'compare', 'check'],
                              out.getvalue())
 
     def test_run_benchmarks_by_name_or_ordinal(self):
@@ -101,6 +105,11 @@ class Test_parse_args(unittest.TestCase):
             ['error:',
              "argument -i/--iterations: invalid positive_int value: '-3'"],
             err.getvalue())
+
+    def test_check_supports_vebose_output(self):
+        self.assertFalse(parse_args(['check']).verbose)
+        self.assertTrue(parse_args(['check', '-v']).verbose)
+        self.assertTrue(parse_args(['check', '--verbose']).verbose)
 
 
 class ArgsStub(object):
@@ -262,6 +271,136 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
 Totals,1
 
 """.splitlines()[1:]), out.getvalue())  # removes 1st \n from multiline string
+
+
+class BenchmarkDriverMock(Mock):
+    """Mock for BenchmarkDriver's `run` method"""
+    def __init__(self, tests, responses=None):
+        super(BenchmarkDriverMock, self).__init__(responses)
+        self.tests = tests
+        self.args = ArgsStub()
+
+        def _run(test, num_samples=None, num_iters=None,
+                 verbose=None, measure_memory=False):
+            return self.record_and_respond(test, num_samples, num_iters,
+                                           verbose, measure_memory)
+        self.run = _run
+
+    def record_and_respond(self, test, num_samples, num_iters,
+                           verbose, measure_memory):
+        args = (test, num_samples, num_iters, verbose, measure_memory)
+        self.calls.append(args)
+        return self.respond.get(args, '')
+
+
+class TestLoggingReportFormatter(unittest.TestCase):
+    def test_plain_log_format(self):
+        lr = logging.makeLogRecord({
+            'name': 'Base.category', 'level': logging.DEBUG,
+            'levelname': 'DEBUG', 'msg': 'Hi!'})
+        f = LoggingReportFormatter()
+        self.assertEquals(f.format(lr), 'DEBUG category: Hi!')
+
+    def test_colored_log_format(self):
+        def record(level, level_name):
+            return logging.makeLogRecord({
+                'name': 'Base.category', 'levelno': level,
+                'levelname': level_name, 'msg': 'Hi!'})
+        f = LoggingReportFormatter(use_color=True)
+        self.assertEquals(f.format(record(logging.DEBUG, 'DEBUG')),
+                          '\x1b[1;39mcategory: Hi!\x1b[1;0m')
+        self.assertEquals(f.format(record(logging.INFO, 'INFO')),
+                          '\x1b[1;32mcategory: Hi!\x1b[1;0m')
+        self.assertEquals(f.format(record(logging.WARNING, 'WARNING')),
+                          '\x1b[1;33mcategory: Hi!\x1b[1;0m')
+        self.assertEquals(f.format(record(logging.ERROR, 'ERROR')),
+                          '\x1b[1;31mcategory: Hi!\x1b[1;0m')
+        self.assertEquals(f.format(record(logging.CRITICAL, 'CRITICAL')),
+                          '\x1b[1;35mcategory: Hi!\x1b[1;0m')
+
+    def test_no_prefix_for_base_logging(self):
+        lr = logging.makeLogRecord({
+            'name': 'Base', 'level': logging.INFO,
+            'levelname': 'INFO', 'msg': 'Hi!'})
+        f = LoggingReportFormatter()
+        self.assertEquals(f.format(lr), 'INFO Hi!')
+
+
+class TestBenchmarkDoctor(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super(TestBenchmarkDoctor, cls).setUpClass()
+        doctor_log = logging.getLogger('BenchmarkDoctor')
+        cls._doctor_log_handler = MockLoggingHandler(level='DEBUG')
+        doctor_log.addHandler(cls._doctor_log_handler)
+
+    def setUp(self):
+        super(TestBenchmarkDoctor, self).setUp()
+        self.args = Stub(verbose=False)
+        self._doctor_log_handler.reset()
+        self.logs = self._doctor_log_handler.messages
+
+    def assert_contains(self, texts, output):
+        assert not isinstance(texts, str)
+        for text in texts:
+            self.assertIn(text, output)
+
+    def test_uses_logging(self):
+        driver = BenchmarkDriverMock(tests=['B1', 'B2'])
+        with captured_output() as (out, _):
+            BenchmarkDoctor(self.args, driver)
+        self.assert_contains(['Checking tests: B1, B2'], self.logs['debug'])
+        self.assertEquals(out.getvalue(), '')
+
+    def test_supports_verbose_output(self):
+        driver = BenchmarkDriverMock(tests=['B1', 'B2'])
+        driver.verbose = True
+        with captured_output() as (out, _):
+            BenchmarkDoctor(Stub(verbose=True), driver)
+        self.assert_contains(['Checking tests: B1, B2'], out.getvalue())
+
+    def test_uses_report_formatter(self):
+        doctor = BenchmarkDoctor(self.args, BenchmarkDriverMock(tests=['B1']))
+        console_handler = logging.getLogger('BenchmarkDoctor').handlers[1]
+        self.assertTrue(doctor)
+        self.assertTrue(isinstance(console_handler, logging.StreamHandler))
+        self.assertTrue(isinstance(console_handler.formatter,
+                                   LoggingReportFormatter))
+
+    def test_benchmark_name_matches_capital_words_conventions(self):
+        driver = BenchmarkDriverMock(tests=[
+            'BenchmarkName', 'CapitalWordsConvention', 'ABBRName',
+            'wrongCase', 'Wrong_convention'])
+        with captured_output() as (out, _):
+            doctor = BenchmarkDoctor(self.args, driver)
+            doctor.check()
+        output = out.getvalue()
+
+        self.assertIn('naming: ', output)
+        self.assertNotIn('BenchmarkName', output)
+        self.assertNotIn('CapitalWordsConvention', output)
+        self.assertNotIn('ABBRName', output)
+        self.assert_contains(
+            ["'wrongCase' name doesn't conform to UpperCamelCase convention.",
+             "'Wrong_convention' name doesn't conform to UpperCamelCase "
+             "convention."], self.logs['error'])
+        self.assert_contains(
+            ['See http://bit.ly/UpperCamelCase'], self.logs['info'])
+
+    def test_benchmark_name_is_at_most_40_chars_long(self):
+        driver = BenchmarkDriverMock(tests=[
+            'BenchmarkName',
+            'ThisTestNameIsTooLongAndCausesOverflowsInReports'])
+        with captured_output() as (out, _):
+            doctor = BenchmarkDoctor(self.args, driver)
+            doctor.check()
+        output = out.getvalue()
+
+        self.assertIn('naming: ', output)
+        self.assertNotIn('BenchmarkName', output)
+        self.assert_contains(
+            ["'ThisTestNameIsTooLongAndCausesOverflowsInReports' name is "
+             "longer than 40 characters."], output)
 
 
 if __name__ == '__main__':

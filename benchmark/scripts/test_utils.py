@@ -22,6 +22,7 @@ on Python 2.7.
 common unit testing patterns that is used in this project.
 """
 
+import logging
 import sys
 
 from StringIO import StringIO
@@ -86,3 +87,22 @@ class Mock(object):
         assert self.calls == self.expected, (
             '\nExpected: {0}, \n  Called: {1}'.format(
                 self.expected, self.calls))
+
+
+class MockLoggingHandler(logging.Handler):
+    """Mock logging handler to check for expected logs."""
+
+    def __init__(self, *args, **kwargs):
+        """Prepare the logger for recording messages for each log level."""
+        self.reset()
+        super(MockLoggingHandler, self).__init__(*args, **kwargs)
+
+    def emit(self, record):
+        """Store the message in list for the given log level."""
+        self.messages[record.levelname.lower()].append(record.getMessage())
+
+    def reset(self):
+        """Clear all log messages."""
+        self.messages = {
+            'debug': [], 'info': [], 'warning': [], 'error': [], 'critical': []
+        }
