@@ -1933,26 +1933,6 @@ extension _NativeSet {
 #endif
 }
 
-extension _NativeSet: CustomStringConvertible {
-  /// A textual representation of `self`.
-  @usableFromInline
-  internal var description: String {
-    var result = ""
-#if INTERNAL_CHECKS_ENABLED
-    for i in indices {
-      let element = uncheckedElement(at: i)
-      let hashValue = self.hashValue(for: element)
-      let ideal = hashValue & _storage.hashTable.bucketMask
-      let delta = ideal < i.bucket // Distance from ideal bucket
-        ? i.bucket - ideal
-        : i.bucket - ideal + bucketCount
-      result += "bucket: \(i.bucket), delta: \(delta), element: \(element)\n"
-    }
-#endif
-    return result
-  }
-}
-
 extension _NativeSet {
   @inlinable
   @inline(__always)
@@ -3462,3 +3442,54 @@ extension Set {
 
 public typealias SetIndex<Element: Hashable> = Set<Element>.Index
 public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
+
+extension _NativeSet {
+  // FIXME: Remove
+  internal func _dump() -> String {
+    var result = ""
+    defer { _fixLifetime(self) }
+    let hashTable = _storage.hashTable
+    let bits = String(unsafeBitCast(self, to: UInt.self), radix: 16)
+    result += "Native set of \(Element.self) at 0x\(bits)\n"
+    result += "  count: \(hashTable.count)\n"
+    result += "  capacity: \(hashTable.capacity)\n"
+    result += "  scale: \(hashTable.scale)\n"
+    result += "  bucketCount: \(hashTable.bucketCount)\n"
+    for i in indices {
+      let element = uncheckedElement(at: i)
+      let hashValue = self.hashValue(for: element)
+      let delta = self.displacement(ofElementAt: i)
+      let h = String(UInt(bitPattern: hashValue), radix: 16)
+      let hl = String(hashTable.map[i.bucket].payload << 1, radix: 16)
+      result += "  <bucket \(i.bucket)> "
+      result += "delta: \(delta), "
+      result += "hash: \(hl)/\(h): "
+      result += "\(element)\n"
+    }
+    return result
+  }
+}
+
+#if _runtime(_ObjC)
+extension _CocoaSet {
+  // FIXME: Remove
+  internal func _dump() -> String {
+    let bits = String(unsafeBitCast(self, to: UInt.self), radix: 16)
+    return "Cocoa set of \(Element.self) at 0x\(bits)\n"
+  }
+}
+#endif
+
+extension Set {
+  // FIXME: Remove
+  public func _dump() {
+    switch _variant {
+    case .native(let native):
+      print("\(native._dump())")
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      print("\(cocoa._dump())")
+#endif
+    }
+  }
+}
