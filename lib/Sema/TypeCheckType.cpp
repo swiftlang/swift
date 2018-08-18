@@ -2533,6 +2533,7 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
   if (auto dictTy = TC.getDictionaryType(repr->getBrackets().Start, keyTy, 
                                          valueTy)) {
     // Check the requirements on the generic arguments.
+    TC.validateDecl(dictDecl);
     auto unboundTy = dictDecl->getDeclaredType()->castTo<UnboundGenericType>();
 
     Type args[] = {keyTy, valueTy};
