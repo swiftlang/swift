@@ -57,7 +57,7 @@ protocol ByteTreeObjectDecodable {
 /// Helper object for reading objects out a ByteTree. Keeps track that fields
 /// are not read out of order and discards all trailing fields that were present
 /// in the binary format but were not handled when reading the object.
-class ByteTreeObjectReader {
+struct ByteTreeObjectReader {
   /// The reader that holds a reference to the data from which the object is
   /// read
   private let reader: ByteTreeReader
@@ -73,7 +73,7 @@ class ByteTreeObjectReader {
     self.numFields = numFields
   }
 
-  private func advanceAndValidateIndex(_ index: Int) {
+  private mutating func advanceAndValidateIndex(_ index: Int) {
     assert(index == nextIndex, "Reading fields out of order")
     assert(index < numFields)
     nextIndex += 1
@@ -88,7 +88,7 @@ class ByteTreeObjectReader {
   ///   - objectType: The type as which this field should be read
   ///   - index: The index of this field
   /// - Returns: The decoded field
-  func readField<FieldType: ByteTreeScalarDecodable>(
+  mutating func readField<FieldType: ByteTreeScalarDecodable>(
     _ objectType: FieldType.Type, index: Int
   ) -> FieldType {
     advanceAndValidateIndex(index)
@@ -103,7 +103,7 @@ class ByteTreeObjectReader {
   ///   - objectType: The type as which this field should be read
   ///   - index: The index of this field
   /// - Returns: The decoded field
-  func readField<FieldType: ByteTreeObjectDecodable>(
+  mutating func readField<FieldType: ByteTreeObjectDecodable>(
     _ objectType: FieldType.Type, index: Int
   ) -> FieldType {
     advanceAndValidateIndex(index)
@@ -114,12 +114,12 @@ class ByteTreeObjectReader {
   /// advances the reader by one field so that the next field can be read.
   ///
   /// - Parameter index: The index of the field that shall be discarded
-  func discardField(index: Int) {
+  mutating func discardField(index: Int) {
     advanceAndValidateIndex(index)
     reader.discardField()
   }
 
-  deinit {
+  fileprivate mutating func finalize() {
     // Discard all fields that have not been read
     while nextIndex < numFields {
       discardField(index: nextIndex)
@@ -267,6 +267,9 @@ class ByteTreeReader {
     let numFields = readFieldLength()
     var objectReader = ByteTreeObjectReader(reader: self,
                                             numFields: numFields)
+    defer {
+      objectReader.finalize()
+    }
     return T.read(from: &objectReader, numFields: numFields, userInfo: userInfo)
   }
 
