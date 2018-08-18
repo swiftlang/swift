@@ -312,72 +312,73 @@ extension MutableCollection where Self: BidirectionalCollection {
   }
 }
 
-/// Sorts the elements at `elements[a]`, `elements[b]`, and `elements[c]`.
-/// Stable.
-///
-/// The indices passed as `a`, `b`, and `c` do not need to be consecutive, but
-/// must be in strict increasing order.
-///
-/// - Precondition: `a < b && b < c`
-/// - Postcondition: `elements[a] <= elements[b] && elements[b] <= elements[c]`
-@inlinable
-public // @testable
-func _sort3<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  _ a: C.Index, _ b: C.Index, _ c: C.Index, 
-  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
-  // There are thirteen possible permutations for the original ordering of
-  // the elements at indices `a`, `b`, and `c`. The comments in the code below
-  // show the relative ordering of the three elements using a three-digit
-  // number as shorthand for the position and comparative relationship of
-  // each element. For example, "312" indicates that the element at `a` is the
-  // largest of the three, the element at `b` is the smallest, and the element
-  // at `c` is the median. This hypothetical input array has a 312 ordering for
-  // `a`, `b`, and `c`:
-  //
-  //      [ 7, 4, 3, 9, 2, 0, 3, 7, 6, 5 ]
-  //        ^              ^           ^
-  //        a              b           c
-  //
-  // - If each of the three elements is distinct, they could be ordered as any
-  //   of the permutations of 1, 2, and 3: 123, 132, 213, 231, 312, or 321.
-  // - If two elements are equivalent and one is distinct, they could be
-  //   ordered as any permutation of 1, 1, and 2 or 1, 2, and 2: 112, 121, 211,
-  //   122, 212, or 221.
-  // - If all three elements are equivalent, they are already in order: 111.
+extension MutableCollection {
+  /// Sorts the elements at `elements[a]`, `elements[b]`, and `elements[c]`.
+  /// Stable.
+  ///
+  /// The indices passed as `a`, `b`, and `c` do not need to be consecutive, but
+  /// must be in strict increasing order.
+  ///
+  /// - Precondition: `a < b && b < c`
+  /// - Postcondition: `self[a] <= self[b] && self[b] <= self[c]`
+  @inlinable
+  public // @testable
+  mutating func _sort3(
+    _ a: Index, _ b: Index, _ c: Index, 
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows {
+    // There are thirteen possible permutations for the original ordering of
+    // the elements at indices `a`, `b`, and `c`. The comments in the code below
+    // show the relative ordering of the three elements using a three-digit
+    // number as shorthand for the position and comparative relationship of
+    // each element. For example, "312" indicates that the element at `a` is the
+    // largest of the three, the element at `b` is the smallest, and the element
+    // at `c` is the median. This hypothetical input array has a 312 ordering for
+    // `a`, `b`, and `c`:
+    //
+    //      [ 7, 4, 3, 9, 2, 0, 3, 7, 6, 5 ]
+    //        ^              ^           ^
+    //        a              b           c
+    //
+    // - If each of the three elements is distinct, they could be ordered as any
+    //   of the permutations of 1, 2, and 3: 123, 132, 213, 231, 312, or 321.
+    // - If two elements are equivalent and one is distinct, they could be
+    //   ordered as any permutation of 1, 1, and 2 or 1, 2, and 2: 112, 121, 211,
+    //   122, 212, or 221.
+    // - If all three elements are equivalent, they are already in order: 111.
 
-  switch ((try areInIncreasingOrder(elements[b], elements[a])),
-    (try areInIncreasingOrder(elements[c], elements[b]))) {
-  case (false, false):
-    // 0 swaps: 123, 112, 122, 111
-    break
+    switch try (areInIncreasingOrder(self[b], self[a]),
+                areInIncreasingOrder(self[c], self[b])) {
+    case (false, false):
+      // 0 swaps: 123, 112, 122, 111
+      break
 
-  case (true, true):
-    // 1 swap: 321
-    // swap(a, c): 312->123
-    elements.swapAt(a, c)
+    case (true, true):
+      // 1 swap: 321
+      // swap(a, c): 312->123
+      swapAt(a, c)
 
-  case (true, false):
-    // 1 swap: 213, 212 --- 2 swaps: 312, 211
-    // swap(a, b): 213->123, 212->122, 312->132, 211->121
-    elements.swapAt(a, b)
+    case (true, false):
+      // 1 swap: 213, 212 --- 2 swaps: 312, 211
+      // swap(a, b): 213->123, 212->122, 312->132, 211->121
+      swapAt(a, b)
 
-    if (try areInIncreasingOrder(elements[c], elements[b])) {
-      // 132 (started as 312), 121 (started as 211)
-      // swap(b, c): 132->123, 121->112
-      elements.swapAt(b, c)
-    }
+      if try areInIncreasingOrder(self[c], self[b]) {
+        // 132 (started as 312), 121 (started as 211)
+        // swap(b, c): 132->123, 121->112
+        swapAt(b, c)
+      }
 
-  case (false, true):
-    // 1 swap: 132, 121 --- 2 swaps: 231, 221
-    // swap(b, c): 132->123, 121->112, 231->213, 221->212
-    elements.swapAt(b, c)
+    case (false, true):
+      // 1 swap: 132, 121 --- 2 swaps: 231, 221
+      // swap(b, c): 132->123, 121->112, 231->213, 221->212
+      swapAt(b, c)
 
-    if (try areInIncreasingOrder(elements[b], elements[a])) {
-      // 213 (started as 231), 212 (started as 221)
-      // swap(a, b): 213->123, 212->122
-      elements.swapAt(a, b)
+      if try areInIncreasingOrder(self[b], self[a]) {
+        // 213 (started as 231), 212 (started as 221)
+        // swap(a, b): 213->123, 212->122
+        swapAt(a, b)
+      }
     }
   }
 }
@@ -401,7 +402,7 @@ internal func _partition<C: MutableCollection & RandomAccessCollection>(
   // as the pivot for the partition.
   let half = numericCast(elements.distance(from: lo, to: hi)) as UInt / 2
   let mid = elements.index(lo, offsetBy: numericCast(half))
-  try _sort3(&elements, lo, mid, hi
+  try elements._sort3(lo, mid, hi
     , by: areInIncreasingOrder)
   let pivot = elements[mid]
 
