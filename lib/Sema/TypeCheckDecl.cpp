@@ -208,7 +208,7 @@ public:
 static void validateAttributes(TypeChecker &TC, Decl *D);
 
 void TypeChecker::resolveTrailingWhereClause(ProtocolDecl *proto) {
-  ProtocolRequirementTypeResolver resolver;
+  DependentGenericTypeResolver resolver;
   validateWhereClauses(proto, &resolver);
 }
 
@@ -4488,7 +4488,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         auto helper = [&] {
           (void) typealias->getFormalAccess();
 
-          ProtocolRequirementTypeResolver resolver;
+          DependentGenericTypeResolver resolver;
           TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
           if (validateType(typealias->getUnderlyingTypeLoc(),
                            typealias, options, &resolver)) {

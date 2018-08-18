@@ -40,7 +40,7 @@ InheritedTypeRequest::evaluate(
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
-  ProtocolRequirementTypeResolver protoResolver;
+  DependentGenericTypeResolver protoResolver;
   GenericTypeToArchetypeResolver archetypeResolver(dc);
   GenericTypeResolver *resolver;
   if (isa<ProtocolDecl>(dc)) {
