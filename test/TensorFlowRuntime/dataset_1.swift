@@ -110,24 +110,34 @@ DatasetTests.testAllBackends("MultiValue") {
     output_shapes: outputShapes
   )
   let iterator: VariantHandle = #tfop(
-    "IteratorV2", dataset, shared_name: "blah", container: "earth"
+    "IteratorV2", shared_name: "blah", container: "earth",
+    output_types: outputTypes, output_shapes: outputShapes
   )
   #tfop("MakeIterator", dataset, iterator) as Void
-  var next: (Tensor<Int32>, Tensor<Int32>) = #tfop(
+  var next: (TensorHandle<Int32>, TensorHandle<Int32>) = #tfop(
     "IteratorGetNext", iterator,
     output_types: outputTypes, output_shapes: outputShapes
   )
-  expectTrue(next == (Tensor(0), Tensor(10)))
+  _hostOp(next.0)
+  _hostOp(next.1)
+  expectEqual(0, Tensor(handle: next.0).scalarized())
+  expectEqual(10, Tensor(handle: next.1).scalarized())
   next = #tfop(
     "IteratorGetNext", iterator,
     output_types: outputTypes, output_shapes: outputShapes
   )
-  expectTrue(next == (Tensor(1), Tensor(11)))
+  _hostOp(next.0)
+  _hostOp(next.1)
+  expectEqual(1, Tensor(handle: next.0).scalarized())
+  expectEqual(11, Tensor(handle: next.1).scalarized())
   next = #tfop(
     "IteratorGetNext", iterator,
     output_types: outputTypes, output_shapes: outputShapes
   )
-  expectTrue(next == (Tensor(2), Tensor(12)))
+  _hostOp(next.0)
+  _hostOp(next.1)
+  expectEqual(2, Tensor(handle: next.0).scalarized())
+  expectEqual(12, Tensor(handle: next.1).scalarized())
 }
 
 runAllTests()
