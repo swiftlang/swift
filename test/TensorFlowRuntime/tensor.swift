@@ -192,24 +192,6 @@ TensorTests.testAllBackends("SliceIndexing") {
   expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D.scalars)
 }
 
-TensorTests.testAllBackends("SliceUpdate") {
-  var t1 = Tensor<Float>([[1, 2, 3], [4, 5, 6]])
-  t1[0] = Tensor(zeros: [3])
-  var t2 = t1
-  t2[0][2] = Tensor(3)
-  var t3 = Tensor<Bool>([[true, true, true], [false, false, false]])
-  t3[0][1] = Tensor(false)
-  var t4 = Tensor<Bool>([[true, true, true], [false, false, false]])
-  t4[0] = Tensor(shape: [3], repeating: false)
-  expectEqual(ShapedArray(shape:[2, 3], scalars: [0, 0, 0, 4, 5, 6]), t1.array)
-  expectEqual(ShapedArray(shape:[2, 3], scalars: [0, 0, 3, 4, 5, 6]), t2.array)
-  expectEqual(ShapedArray(shape:[2, 3],
-                          scalars: [true, false, true, false, false, false]),
-              t3.array)
-  expectEqual(ShapedArray(shape:[2, 3], repeating: false), t4.array)
-
-}
-
 TensorTests.test("WholeTensorSlicing") {
   let t: Tensor<Int32> = [[[1, 1, 1], [2, 2, 2]],
                           [[3, 3, 3], [4, 4, 4]],
