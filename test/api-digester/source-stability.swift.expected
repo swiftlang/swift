@@ -1,26 +1,20 @@
 
 /* Generic Signature Changes */
-Struct DictionaryIterator has generic signature change from <Key, Value where Key : Hashable> to <Element>
-Struct SetIterator has generic signature change from <Element where Element : Hashable> to <Key, Value>
 
 /* RawRepresentable Changes */
 
 /* Removed Decls */
 TypeAlias AbsoluteValuable has been removed
 TypeAlias BitwiseOperations has been removed (deprecated)
-TypeAlias DictionaryIterator.Element has been removed
 TypeAlias IntMax has been removed
 TypeAlias Integer has been removed
 TypeAlias IntegerArithmetic has been removed
-TypeAlias SetIterator.Element has been removed
 TypeAlias SignedNumber has been removed
 TypeAlias StringProtocol.UTF16Index has been removed (deprecated)
 TypeAlias StringProtocol.UTF8Index has been removed (deprecated)
 TypeAlias StringProtocol.UnicodeScalarIndex has been removed (deprecated)
 TypeAlias UIntMax has been removed
-Var DictionaryIterator.customMirror has been removed
 Var FixedWidthInteger.allZeros has been removed (deprecated)
-Var SetIterator.customMirror has been removed
 Constructor Int.init(truncatingBitPattern:) has been removed
 Constructor Int16.init(truncatingBitPattern:) has been removed
 Constructor Int32.init(truncatingBitPattern:) has been removed
@@ -31,7 +25,6 @@ Constructor UInt16.init(truncatingBitPattern:) has been removed
 Constructor UInt32.init(truncatingBitPattern:) has been removed
 Constructor UInt8.init(truncatingBitPattern:) has been removed
 Func BinaryInteger.toIntMax() has been removed
-Func DictionaryIterator.next() has been removed
 Func FixedWidthInteger.addWithOverflow(_:_:) has been removed
 Func FixedWidthInteger.divideWithOverflow(_:_:) has been removed
 Func FixedWidthInteger.multiplyWithOverflow(_:_:) has been removed
@@ -53,7 +46,6 @@ Func Int32.toUIntMax() has been removed
 Func Int64.toUIntMax() has been removed
 Func Int8.toUIntMax() has been removed
 Func Sequence.flatMap(_:) has been removed
-Func SetIterator.next() has been removed
 Func SignedNumeric.abs(_:) has been removed
 Func String.UTF16View.distance(from:to:) has been removed
 Func String.UTF16View.index(_:offsetBy:) has been removed
@@ -76,8 +68,6 @@ Func UnsignedInteger.toUIntMax() has been removed
 /* Moved Decls */
 
 /* Renamed Decls */
-Struct DictionaryIterator has been renamed to Struct Iterator
-Struct SetIterator has been renamed to Struct Iterator
 Func Dictionary.filter(_:obsoletedInSwift4:) has been renamed to Func Dictionary.filter(_:)
 Func Set.filter(_:obsoletedInSwift4:) has been renamed to Func Set.filter(_:)
 

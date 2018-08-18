@@ -250,6 +250,10 @@ enum class NodeMatchReason: uint8_t {
 
   // The first node is a global variable and the second node is an enum element.
   ModernizeEnum,
+
+  // The first node is a type declaration and the second node is a type alias
+  // of another type declaration.
+  TypeToTypeAlias,
 };
 
 // During the matching phase, any matched node will be reported using this API.
@@ -2169,6 +2173,18 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     return N->getUsr().substr(LastPartIndex + 1);
   }
 
+  bool detectTypeAliasChange(SDKNodeDecl *R, SDKNodeDecl *A) {
+    if (R->getPrintedName() != A->getPrintedName())
+      return false;
+    if (R->getKind() == SDKNodeKind::DeclType &&
+        A->getKind() == SDKNodeKind::DeclTypeAlias) {
+      foundMatch(R, A, NodeMatchReason::TypeToTypeAlias);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   bool detectModernizeEnum(SDKNodeDecl *R, SDKNodeDecl *A) {
     if (!isAnonymousEnum(R) || !isNominalEnum(A))
       return false;
@@ -2295,7 +2311,7 @@ public:
         auto RD = R->getAs<SDKNodeDecl>();
         auto AD = A->getAs<SDKNodeDecl>();
         if (detectFuncToProperty(RD, AD) || detectModernizeEnum(RD, AD) ||
-            detectSameAnonymousEnum(RD, AD)) {
+            detectSameAnonymousEnum(RD, AD) || detectTypeAliasChange(RD, AD)) {
           break;
         }
       }
@@ -2564,6 +2580,7 @@ public:
       return;
     case NodeMatchReason::FuncToProperty:
     case NodeMatchReason::ModernizeEnum:
+    case NodeMatchReason::TypeToTypeAlias:
       Left->annotate(NodeAnnotation::Removed);
       Right->annotate(NodeAnnotation::Added);
       return;
