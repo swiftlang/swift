@@ -351,7 +351,7 @@ public protocol RangeReplaceableCollection : Collection
   /// array of numbers:
   ///
   ///     var numbers = [5, 6, 7, 8, 9, 10, 11]
-  ///     numbers.removeAll(where: { $0 % 2 == 1 })
+  ///     numbers.removeAll(where: { $0 % 2 != 0 })
   ///     // numbers == [6, 8, 10]
   ///
   /// - Parameter shouldBeRemoved: A closure that takes an element of the
@@ -1097,7 +1097,7 @@ extension RangeReplaceableCollection where Self: MutableCollection {
   /// array of numbers:
   ///
   ///     var numbers = [5, 6, 7, 8, 9, 10, 11]
-  ///     numbers.removeAll(where: { $0 % 2 == 1 })
+  ///     numbers.removeAll(where: { $0 % 2 != 0 })
   ///     // numbers == [6, 8, 10]
   ///
   /// - Parameter shouldBeRemoved: A closure that takes an element of the
