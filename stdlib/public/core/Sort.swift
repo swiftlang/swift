@@ -260,55 +260,54 @@ extension MutableCollection where Self: RandomAccessCollection {
   }
 }
 
-@inlinable
-internal func _insertionSort<C: MutableCollection & BidirectionalCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>, 
-  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
+extension MutableCollection where Self: BidirectionalCollection {
+  @inlinable
+  internal mutating func _insertionSort(
+    within range: Range<Index>, 
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows {
 
-  if !range.isEmpty {
+    guard !range.isEmpty else { return }
+
     let start = range.lowerBound
 
-    // Keep track of the end of the initial sequence of sorted
-    // elements.
-    var sortedEnd = start
+    // Keep track of the end of the initial sequence of sorted elements. One
+    // element is trivially already-sorted, thus pre-increment Continue until
+    // the sorted elements cover the whole sequence
+    var sortedEnd = index(after: start)
 
-    // One element is trivially already-sorted, thus pre-increment
-    // Continue until the sorted elements cover the whole sequence
-    elements.formIndex(after: &sortedEnd)
     while sortedEnd != range.upperBound {
       // get the first unsorted element
-      let x: C.Element = elements[sortedEnd]
+      let x = self[sortedEnd]
 
       // Look backwards for x's position in the sorted sequence,
       // moving elements forward to make room.
       var i = sortedEnd
       repeat {
-        let predecessor: C.Element = elements[elements.index(before: i)]
+        let j = index(before: i)
+        let predecessor = self[j]
 
-        // If clouser throws the error, We catch the error put the element at right
-        // place and rethrow the error.
+        // If closure throws, put the element at right place and rethrow.
         do {
           // if x doesn't belong before y, we've found its position
-          if !(try areInIncreasingOrder(x, predecessor)) {
+          if try !areInIncreasingOrder(x, predecessor) {
             break
           }
         } catch {
-          elements[i] = x
+          self[i] = x
           throw error
         }
 
         // Move y forward
-        elements[i] = predecessor
-        elements.formIndex(before: &i)
+        self[i] = predecessor
+        i = j
       } while i != start
 
       if i != sortedEnd {
         // Plop x into position
-        elements[i] = x
+        self[i] = x
       }
-      elements.formIndex(after: &sortedEnd)
+      formIndex(after: &sortedEnd)
     }
   }
 }
@@ -467,10 +466,7 @@ internal func _introSortImpl<C: MutableCollection & RandomAccessCollection>(
 
   // Insertion sort is better at handling smaller regions.
   if elements.distance(from: range.lowerBound, to: range.upperBound) < 20 {
-    try _insertionSort(
-      &elements,
-      subRange: range
-      , by: areInIncreasingOrder)
+    try elements._insertionSort(within: range, by: areInIncreasingOrder)
     return
   }
   if depthLimit == 0 {
