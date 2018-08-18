@@ -256,8 +256,6 @@ StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
     return "immutable";
   case ReadWriteImplKind::Stored:
     return "stored";
-  case ReadWriteImplKind::MaterializeForSet:
-    return "materialize_for_set";
   case ReadWriteImplKind::MutableAddress:
     return "mutable_addressor";
   case ReadWriteImplKind::MaterializeToTemporary:

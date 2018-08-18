@@ -1286,14 +1286,31 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
   };
 
   // If we have already emitted a diagnostic about an unsafe override
-  // for a getter or a setter, no need to complain about materializeForSet,
-  // which is synthesized to be as available as both the getter and
-  // the setter.
-  if (overrideFn->isMaterializeForSet()) {
+  // for a getter or a setter, no need to complain about the read or
+  // modify coroutines, which are synthesized to be as available as either
+  // the getter and the setter.
+  switch (overrideFn->getAccessorKind()) {
+  case AccessorKind::Get:
+  case AccessorKind::Set:
+    break;
+
+  case AccessorKind::Read:
+    if (accessorOverrideAlreadyDiagnosed(AccessorKind::Get))
+      return true;
+    break;
+
+  case AccessorKind::Modify:
     if (accessorOverrideAlreadyDiagnosed(AccessorKind::Get) ||
         accessorOverrideAlreadyDiagnosed(AccessorKind::Set)) {
       return true;
     }
+    break;
+
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+  case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
+    llvm_unreachable("checking override for non-opaque accessor");
   }
 
   return false;
@@ -1651,40 +1668,40 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     auto kind = accessor->getAccessorKind();
 
-    // Find the base accessor; if there isn't one, we're done.
-    auto baseAccessor = baseASD->getAccessor(kind);
-    if (!baseAccessor) return noResults;
+    // If the base doesn't consider this an opaque accessor,
+    // this isn't really an override.
+    if (!baseASD->requiresOpaqueAccessor(kind))
+      return noResults;
 
     switch (kind) {
-      case AccessorKind::Get:
-        break;
-
-      case AccessorKind::MaterializeForSet:
-        // A materializeForSet for an override of storage with a
-        // forced static dispatch materializeForSet is not itself an
-        // override.
-        if (baseAccessor->hasForcedStaticDispatch())
-          return noResults;
-
-        LLVM_FALLTHROUGH;
-
-      case AccessorKind::Set:
-        // For setter accessors, we need the base's setter to be
-        // accessible from the overriding context, or it's not an override.
-        if (!baseASD->isSetterAccessibleFrom(overridingASD->getDeclContext()))
-          return noResults;
-        break;
-
-      case AccessorKind::Address:
-      case AccessorKind::DidSet:
-      case AccessorKind::MutableAddress:
-      case AccessorKind::WillSet:
-      case AccessorKind::Read:
-      case AccessorKind::Modify:
+    case AccessorKind::Read:
+      if (baseASD->getReadCoroutine()->hasForcedStaticDispatch())
         return noResults;
+      LLVM_FALLTHROUGH;
+    case AccessorKind::Get:
+      break;
+
+    case AccessorKind::Modify:
+      if (baseASD->getModifyCoroutine()->hasForcedStaticDispatch())
+        return noResults;
+      LLVM_FALLTHROUGH;
+    case AccessorKind::Set:
+      // For setter accessors, we need the base's setter to be
+      // accessible from the overriding context, or it's not an override.
+      if (!baseASD->isSetterAccessibleFrom(overridingASD->getDeclContext()))
+        return noResults;
+      break;
+
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+    case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
+      llvm_unreachable("non-opaque accessor was required as opaque by base");
     }
 
     // We are overriding the base accessor.
+    auto baseAccessor = baseASD->getAccessor(kind);
+    assert(baseAccessor);
 
     // Check the correctness of the override.
     OverrideMatcher matcher(accessor);

@@ -128,8 +128,7 @@ enum class TSanKind : bool {
 
 /// Represents an LValue opened for mutating access.
 ///
-/// This is used by LogicalPathComponent::getMaterialized() and
-/// SILGenFunction::emitMaterializeForSetAccessor().
+/// This is used by LogicalPathComponent::getMaterialized().
 struct MaterializedLValue {
   ManagedValue temporary;
 
@@ -254,16 +253,6 @@ public:
 
   /// \brief The current context where formal evaluation cleanups are managed.
   FormalEvaluationContext FormalEvalContext;
-
-  /// \brief Values to end dynamic access enforcement on.  A hack for
-  /// materializeForSet.
-  struct UnpairedAccesses {
-    SILValue Buffer;
-    unsigned NumAccesses = 0; // Values besides 0 and 1 are unsupported.
-
-    explicit UnpairedAccesses(SILValue buffer) : Buffer(buffer) {}
-  };
-  UnpairedAccesses *UnpairedAccessesForMaterializeForSet = nullptr;
 
   /// VarLoc - representation of an emitted local variable or constant.  There
   /// are three scenarios here:
@@ -558,6 +547,7 @@ public:
   void emitProtocolWitness(AbstractionPattern reqtOrigTy,
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement,
+                           SubstitutionMap reqtSubs,
                            SILDeclRef witness,
                            SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree);
@@ -1145,13 +1135,6 @@ public:
                        PreparedArguments &&optionalSubscripts,
                        ArgumentSource &&value);
 
-  MaterializedLValue
-  emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
-                                SubstitutionMap substitutions,
-                                ArgumentSource &&optionalSelfValue,
-                                bool isSuper, bool isDirectAccessorUse,
-                                RValue &&optionalSubscripts,
-                                SILValue buffer, SILValue callbackStorage);
   bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
                                        Type selfInterfaceType, Type selfType,
@@ -1159,7 +1142,6 @@ public:
                                        AccessorDecl *requirement,
                                        AccessorDecl *witness,
                                        SubstitutionMap witnessSubs);
-  void emitMaterializeForSet(AccessorDecl *decl);
 
   std::pair<ManagedValue,ManagedValue>
   emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
@@ -1319,6 +1301,8 @@ public:
   void emitYield(SILLocation loc, MutableArrayRef<ArgumentSource> yieldValues,
                  ArrayRef<AbstractionPattern> origTypes,
                  JumpDest unwindDest);
+  void emitRawYield(SILLocation loc, ArrayRef<ManagedValue> yieldArgs,
+                    JumpDest unwindDest, bool isUniqueYield);
 
   RValue emitAnyHashableErasure(SILLocation loc,
                                 ManagedValue value,
@@ -1383,6 +1367,13 @@ public:
                                 SILType substFnType,
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
+
+  SILValue emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
+                                     SILType substFnType,
+                                     SubstitutionMap subs,
+                                     ArrayRef<SILValue> args,
+                                     SmallVectorImpl<SILValue> &yields);
+  void emitEndApplyWithRethrow(SILLocation loc, SILValue token);
 
   /// Emit a literal that applies the various initializers.
   RValue emitLiteral(LiteralExpr *literal, SGFContext C);
@@ -1652,8 +1643,7 @@ public:
                               CanType outputSubstType,
                               SGFContext ctx = SGFContext());
 
-  /// Used for emitting SILArguments of bare functions, such as thunks and
-  /// open-coded materializeForSet.
+  /// Used for emitting SILArguments of bare functions, such as thunks.
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<SILArgument *> *indirectResultParams = nullptr);

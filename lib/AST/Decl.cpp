@@ -199,9 +199,6 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
      case AccessorKind::MutableAddress:
        return DescriptiveDeclKind::MutableAddressor;
 
-     case AccessorKind::MaterializeForSet:
-       return DescriptiveDeclKind::MaterializeForSet;
-
      case AccessorKind::Read:
        return DescriptiveDeclKind::ReadAccessor;
 
@@ -283,7 +280,6 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Setter, "setter");
   ENTRY(WillSet, "willSet observer");
   ENTRY(DidSet, "didSet observer");
-  ENTRY(MaterializeForSet, "materializeForSet accessor");
   ENTRY(Addressor, "address accessor");
   ENTRY(MutableAddressor, "mutableAddress accessor");
   ENTRY(ReadAccessor, "_read accessor");
@@ -1481,9 +1477,6 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
     return AccessStrategy::getStorage();
   case ReadWriteImplKind::Stored:
     return AccessStrategy::getStorage();
-  case ReadWriteImplKind::MaterializeForSet:
-    return AccessStrategy::getAccessor(AccessorKind::MaterializeForSet,
-                                       /*dispatch*/ false);
   case ReadWriteImplKind::MutableAddress:
     return AccessStrategy::getAccessor(AccessorKind::MutableAddress,
                                        /*dispatch*/ false);
@@ -1508,32 +1501,14 @@ getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch){
   return AccessStrategy::getAccessor(AccessorKind::Set, dispatch);
 }
 
-static bool hasDispatchedMaterializeForSet(const AbstractStorageDecl *storage) {
-  // If the declaration is dynamic, there's no materializeForSet.
-  if (storage->isDynamic())
-    return false;
-
-  // If the declaration was imported from C, we won't gain anything
-  // from using materializeForSet, and furthermore, it might not
-  // exist.
-  if (storage->hasClangNode())
-    return false;
-
-  // If the declaration is not in type context, there's no
-  // materializeForSet.
-  auto dc = storage->getDeclContext();
-  if (!dc->isTypeContext())
-    return false;
-
-  // @objc protocols count also don't have materializeForSet declarations.
-  if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
-    if (proto->isObjC())
-      return false;
-  }
-
-  // Otherwise it should have a materializeForSet if we might be
-  // accessing it opaquely.
-  return true;
+static AccessStrategy
+getOpaqueReadWriteAccessStrategy(const AbstractStorageDecl *storage,
+                                 bool dispatch) {
+  if (storage->requiresOpaqueModifyCoroutine())
+    return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
+  return AccessStrategy::getMaterializeToTemporary(
+           getOpaqueReadAccessStrategy(storage, dispatch),
+           getOpaqueWriteAccessStrategy(storage, dispatch));
 }
 
 static AccessStrategy
@@ -1545,12 +1520,7 @@ getOpaqueAccessStrategy(const AbstractStorageDecl *storage,
   case AccessKind::Write:
     return getOpaqueWriteAccessStrategy(storage, dispatch);
   case AccessKind::ReadWrite:
-    if (hasDispatchedMaterializeForSet(storage))
-      return AccessStrategy::getAccessor(AccessorKind::MaterializeForSet,
-                                         dispatch);
-    return AccessStrategy::getMaterializeToTemporary(
-             getOpaqueReadAccessStrategy(storage, dispatch),
-             getOpaqueWriteAccessStrategy(storage, dispatch));
+    return getOpaqueReadWriteAccessStrategy(storage, dispatch);
   }
   llvm_unreachable("bad access kind");
 }
@@ -1626,26 +1596,52 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
   llvm_unreachable("bad access semantics");
 }
 
-bool AbstractStorageDecl::requiresMaterializeForSet() const {
+bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
+  switch (kind) {
+  case AccessorKind::Get:
+    return requiresOpaqueGetter();
+  case AccessorKind::Set:
+    return requiresOpaqueSetter();
+  case AccessorKind::Read:
+    return requiresOpaqueReadCoroutine();
+  case AccessorKind::Modify:
+    return requiresOpaqueModifyCoroutine();
+
+  // Other accessors are never part of the opaque-accessors set.
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+  case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
+    return false;
+  }
+  llvm_unreachable("bad accessor kind");
+}
+
+bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   // Only for mutable storage.
   if (!supportsMutation())
     return false;
 
-  // We only need materializeForSet in type contexts.
+  // Imported storage declarations don't have eagerly-generated modify
+  // accessors.
+  if (hasClangNode())
+    return false;
+
+  // Dynamic storage suppresses the modify coroutine.
+  // If we add a Swift-native concept of `dynamic`, this should be restricted
+  // to the ObjC-supported concept.
+  if (isDynamic())
+    return false;
+
+  // We only need the modify coroutine in type contexts.
   // TODO: resilient global variables?
   auto *dc = getDeclContext();
   if (!dc->isTypeContext())
     return false;
 
-  // Requirements of ObjC protocols don't need materializeForSet.
+  // Requirements of ObjC protocols don't support the modify coroutine.
   if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
     if (protoDecl->isObjC())
-      return false;
-
-  // Members of structs imported by Clang don't need an eagerly-synthesized
-  // materializeForSet.
-  if (auto structDecl = dyn_cast<StructDecl>(dc))
-    if (structDecl->hasClangNode())
       return false;
 
   return true;
@@ -1653,18 +1649,19 @@ bool AbstractStorageDecl::requiresMaterializeForSet() const {
 
 void AbstractStorageDecl::visitExpectedOpaqueAccessors(
                         llvm::function_ref<void (AccessorKind)> visit) const {
-  // For now, always assume storage declarations should have getters
-  // instead of read accessors.
-  visit(AccessorKind::Get);
+  if (requiresOpaqueGetter())
+    visit(AccessorKind::Get);
 
-  if (supportsMutation()) {
-    // All mutable storage should have a setter.
+  if (requiresOpaqueReadCoroutine())
+    visit(AccessorKind::Read);
+
+  // All mutable storage should have a setter.
+  if (requiresOpaqueSetter())
     visit(AccessorKind::Set);
 
-    // Include materializeForSet if necessary.
-    if (requiresMaterializeForSet())
-      visit(AccessorKind::MaterializeForSet);
-  }
+  // Include the modify coroutine if it's required.
+  if (requiresOpaqueModifyCoroutine())
+    visit(AccessorKind::Modify);
 }
 
 void AbstractStorageDecl::visitOpaqueAccessors(
@@ -3937,12 +3934,6 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
 
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
-      // materializeForSet has a funny type signature.
-      if (auto accessor = dyn_cast<AccessorDecl>(member)) {
-        if (accessor->getAccessorKind() == AccessorKind::MaterializeForSet)
-          continue;
-      }
-
       if (resolver && !valueMember->hasInterfaceType())
         resolver->resolveDeclSignature(valueMember);
 
@@ -4069,7 +4060,6 @@ void AbstractStorageDecl::configureAccessor(AccessorDecl *accessor) {
     return;
 
   case AccessorKind::Set:
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
@@ -4256,6 +4246,22 @@ AbstractStorageDecl::setSynthesizedGetter(AccessorDecl *accessor) {
 }
 
 void
+AbstractStorageDecl::setSynthesizedReadCoroutine(AccessorDecl *accessor) {
+  assert(!getReadCoroutine() && "already has a read accessor");
+  assert(isAccessor(accessor, AccessorKind::Read, this));
+
+  auto accessors = Accessors.getPointer();
+  if (!accessors) {
+    accessors = AccessorRecord::create(getASTContext(), SourceRange(),
+                                       getImplInfo(), {});
+    Accessors.setPointer(accessors);
+  }
+
+  accessors->addOpaqueAccessor(accessor);
+  configureAccessor(accessor);
+}
+
+void
 AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
   assert(getGetter() && "declaration doesn't already have getter!");
   assert(supportsMutation() && "adding setter to immutable storage");
@@ -4266,12 +4272,12 @@ AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
 }
 
 void
-AbstractStorageDecl::setSynthesizedMaterializeForSet(AccessorDecl *accessor) {
+AbstractStorageDecl::setSynthesizedModifyCoroutine(AccessorDecl *accessor) {
   assert(getGetter() && "declaration doesn't already have getter!");
   assert(getSetter() && "declaration doesn't already have setter!");
-  assert(supportsMutation() && "adding materializeForSet to immutable storage");
-  assert(!getMaterializeForSetFunc() && "already has a materializeForSet");
-  assert(isAccessor(accessor, AccessorKind::MaterializeForSet, this));
+  assert(supportsMutation() && "adding modify to immutable storage");
+  assert(!getModifyCoroutine() && "already has a modify accessor");
+  assert(isAccessor(accessor, AccessorKind::Modify, this));
 
   Accessors.getPointer()->addOpaqueAccessor(accessor);
   configureAccessor(accessor);
@@ -4996,15 +5002,11 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
                                   ArrayRef<Identifier>());
 
     case AccessorKind::Set:
-    case AccessorKind::MaterializeForSet:
     case AccessorKind::DidSet:
     case AccessorKind::WillSet: {
       SmallVector<Identifier, 4> argNames;
       // The implicit value/buffer parameter.
       argNames.push_back(Identifier());
-      // The callback storage parameter on materializeForSet.
-      if (accessorKind  == AccessorKind::MaterializeForSet)
-        argNames.push_back(Identifier());
       // The subscript index parameters.
       if (subscript) {
         argNames.append(subscript->getFullName().getArgumentNames().begin(),
@@ -5253,27 +5255,10 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
     return false;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
-    switch (accessor->getAccessorKind()) {
-    case AccessorKind::Get:
-    case AccessorKind::Set:
-      break;
-    case AccessorKind::Address:
-    case AccessorKind::MutableAddress:
-    case AccessorKind::Read:
-    case AccessorKind::Modify:
+    // Check to see if it's one of the opaque accessors for the declaration.
+    auto storage = accessor->getStorage();
+    if (!storage->requiresOpaqueAccessor(accessor->getAccessorKind()))
       return false;
-    case AccessorKind::MaterializeForSet:
-      // Special case -- materializeForSet on dynamic storage is not
-      // itself dynamic, but should be treated as such for the
-      // purpose of constructing a vtable.
-      // FIXME: It should probably just be 'final'.
-      if (accessor->getStorage()->isDynamic())
-        return false;
-      break;
-    case AccessorKind::WillSet:
-    case AccessorKind::DidSet:
-      return false;
-    }
   }
 
   auto base = decl->getOverriddenDecl();

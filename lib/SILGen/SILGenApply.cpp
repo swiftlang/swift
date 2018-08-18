@@ -260,8 +260,6 @@ public:
 
   const Kind kind;
 
-  bool isMaterializeForSet = false;
-
   // Move, don't copy.
   Callee(const Callee &) = delete;
   Callee &operator=(const Callee &) = delete;
@@ -4023,15 +4021,6 @@ CallEmission::applyNormalCall(SGFContext C) {
 
   auto mv = callee.getFnValue(SGF, isCurried, borrowedSelf);
 
-  // Materialize for set could temporarily escape its arguments.
-  if (callee.isMaterializeForSet) {
-    auto indices = ArrayRef<ManagedValue>(uncurriedArgs).slice(2);
-    for (auto index : indices) {
-      auto *toNoEscape = dyn_cast<ConvertEscapeToNoEscapeInst>(index.getValue());
-      if (!toNoEscape) continue;
-      toNoEscape->setEscapedByUser();
-    }
-  }
   // Emit the uncurried call.
   firstLevelResult.value = SGF.emitApply(
       std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
@@ -4649,6 +4638,30 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   return normalBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
 }
 
+SILValue SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
+                                                   SILType substFnType,
+                                                   SubstitutionMap subs,
+                                                   ArrayRef<SILValue> args,
+                                            SmallVectorImpl<SILValue> &yields) {
+  // TODO: adjust this to create try_begin_apply when appropriate.
+  assert(!substFnType.castTo<SILFunctionType>()->hasErrorResult());
+
+  auto beginApply = B.createBeginApply(loc, fn, subs, args);
+
+  auto yieldResults = beginApply->getYieldedValues();
+  yields.append(yieldResults.begin(), yieldResults.end());
+
+  return beginApply->getTokenResult();
+}
+
+void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc, SILValue token) {
+  // TODO: adjust this to handle TryBeginApplyResult.
+  assert(isa<BeginApplyResult>(token));
+  assert(cast<BeginApplyResult>(token)->isTokenResult());
+
+  B.createEndApply(loc, token);
+}
+
 void SILGenFunction::emitYield(SILLocation loc,
                                MutableArrayRef<ArgumentSource> valueSources,
                                ArrayRef<AbstractionPattern> origTypes,
@@ -4682,6 +4695,15 @@ void SILGenFunction::emitYield(SILLocation loc,
   if (!delayedArgs.empty())
     emitDelayedArguments(*this, delayedArgs, yieldArgs);
 
+  emitRawYield(loc, yieldArgs, unwindDest, /*unique*/ false);
+
+  evalScope.pop();
+}
+
+void SILGenFunction::emitRawYield(SILLocation loc,
+                                  ArrayRef<ManagedValue> yieldArgs,
+                                  JumpDest unwindDest,
+                                  bool isUniqueYield) {
   SmallVector<SILValue, 4> yieldValues;
   for (auto arg : yieldArgs)
     yieldValues.push_back(arg.getValue());
@@ -4692,6 +4714,7 @@ void SILGenFunction::emitYield(SILLocation loc,
   // The unwind block.  We can use the dest block we were passed
   // directly if there are no active cleanups between here and it.
   bool requiresSeparateUnwindBB =
+    !isUniqueYield ||
     Cleanups.hasAnyActiveCleanups(unwindDest.getDepth());
   auto unwindBB = requiresSeparateUnwindBB
                     ? createBasicBlock(FunctionSection::Postmatter)
@@ -4709,7 +4732,6 @@ void SILGenFunction::emitYield(SILLocation loc,
 
   // Emit the resumption path.
   B.emitBlock(resumeBB);
-  evalScope.pop();
 }
 
 /// Emits SIL instructions to create an enum value. Attempts to avoid
@@ -5533,9 +5555,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     unsigned paramIndex = 1;
     for (auto &component : std::move(subscriptIndices).getSources()) {
       auto param = accessType.getParams()[paramIndex++];
-      auto paramType = param.getType();
-      if (param.isVariadic())
-        paramType = ArraySliceType::get(paramType)->getCanonicalType();
+      auto paramType = param.getParameterType();
 
       auto argLoc = component.getKnownRValueLocation();
       RValue &&arg = std::move(component).asKnownRValue(*this);
@@ -5547,88 +5567,6 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   emission.addCallSite(loc, std::move(values), accessType);
   // ()
   emission.apply();
-}
-
-SILDeclRef
-SILGenModule::getMaterializeForSetDeclRef(AbstractStorageDecl *storage) {
-  return SILDeclRef(storage->getMaterializeForSetFunc(),
-                    SILDeclRef::Kind::Func);
-}
-
-MaterializedLValue SILGenFunction::
-emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
-                              SubstitutionMap substitutions,
-                              ArgumentSource &&selfValue,
-                              bool isSuper, bool isDirectUse,
-                              RValue &&subscripts, SILValue buffer,
-                              SILValue callbackStorage) {
-  // Scope any further writeback just within this operation.
-  FormalEvaluationScope writebackScope(*this);
-
-  Callee callee = emitSpecializedAccessorFunctionRef(*this, loc,
-                                                     materializeForSet,
-                                                     substitutions, selfValue,
-                                                     isSuper, isDirectUse);
-  callee.isMaterializeForSet = true;
-
-  bool hasSelf = (bool)selfValue;
-  auto accessType = callee.getSubstFormalType();
-
-  CallEmission emission(*this, std::move(callee), std::move(writebackScope));
-  // Self ->
-  if (hasSelf) {
-    emission.addCallSite(loc, std::move(selfValue), accessType);
-    accessType = cast<FunctionType>(accessType.getResult());
-  }
-
-  // (buffer, callbackStorage)  or (buffer, callbackStorage, indices) ->
-  // Note that this "RValue" stores a mixed LValue/RValue tuple.
-  RValue args = [&] () -> RValue {
-    SmallVector<ManagedValue, 4> elts;
-
-    auto bufferPtr =
-      B.createAddressToPointer(loc, buffer,
-                               SILType::getRawPointerType(getASTContext()));
-    elts.push_back(ManagedValue::forUnmanaged(bufferPtr));
-
-    elts.push_back(ManagedValue::forLValue(callbackStorage));
-
-    if (!subscripts.isNull()) {
-      std::move(subscripts).getAll(elts);
-    }
-    return RValue(*this, elts, accessType.getInput());
-  }();
-  emission.addCallSite(loc, ArgumentSource(loc, std::move(args)), accessType);
-  // (buffer, optionalCallback)
-  SmallVector<ManagedValue, 2> results;
-  emission.apply().getAll(results);
-
-  // Project out the materialized address. The address directly returned by
-  // materialize for set is strictly typed, whether it is the local buffer or
-  // stored property.
-  SILValue address = results[0].getUnmanagedValue();
-  address = B.createPointerToAddress(loc, address, buffer->getType(),
-                                     /*isStrict*/ true,
-                                     /*isInvariant*/ false);
-
-  // Project out the optional callback.
-  SILValue optionalCallback = results[1].getUnmanagedValue();
-
-  auto origAccessType = SGM.Types.getConstantInfo(materializeForSet).FormalType;
-
-  assert(origAccessType->getParams().size() == 1 &&
-         "more than one self parameter?");
-  auto origSelfType = origAccessType
-      ->getParams()[0].getPlainType()
-      ->getCanonicalType();
-
-  CanGenericSignature genericSig;
-  if (auto genericFnType = dyn_cast<GenericFunctionType>(origAccessType))
-    genericSig = genericFnType.getGenericSignature();
-
-  return MaterializedLValue(ManagedValue::forLValue(address),
-                            origSelfType, genericSig,
-                            optionalCallback, callbackStorage);
 }
 
 SILDeclRef SILGenModule::getAddressorDeclRef(AbstractStorageDecl *storage) {

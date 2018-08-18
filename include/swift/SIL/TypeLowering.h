@@ -807,15 +807,6 @@ public:
 
   SILType getLoweredTypeOfGlobal(VarDecl *var);
 
-  /// The return type of a materializeForSet contains a callback
-  /// whose type cannot be represented in the AST because it is
-  /// a polymorphic function value. This function returns the
-  /// unsubstituted lowered type of this callback.
-  CanSILFunctionType getMaterializeForSetCallbackType(
-      AbstractStorageDecl *storage, CanGenericSignature genericSig,
-      Type selfType, SILFunctionTypeRepresentation rep,
-      Optional<ProtocolConformanceRef> witnessMethodConformance);
-
   /// Return the SILFunctionType for a native function value of the
   /// given type.
   CanSILFunctionType getSILFunctionType(AbstractionPattern origType,

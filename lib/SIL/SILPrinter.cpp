@@ -274,10 +274,6 @@ void SILDeclRef::print(raw_ostream &OS) const {
         printValueDecl(accessor->getStorage(), OS);
         OS << "!setter";
         break;
-      case AccessorKind::MaterializeForSet:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!materializeForSet";
-        break;
       case AccessorKind::Address:
         printValueDecl(accessor->getStorage(), OS);
         OS << "!addressor";

@@ -485,10 +485,24 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
 
 namespace {
   struct Accessors {
+    uint8_t OpaqueReadOwnership;
     uint8_t ReadImpl, WriteImpl, ReadWriteImpl;
     SmallVector<AccessorDecl *, 8> Decls;
   };
 } // end anonymous namespace
+
+static uint8_t getRawOpaqueReadOwnership(swift::OpaqueReadOwnership ownership) {
+  switch (ownership) {
+#define CASE(KIND)                                            \
+  case swift::OpaqueReadOwnership::KIND:                      \
+    return uint8_t(serialization::OpaqueReadOwnership::KIND);
+  CASE(Owned)
+  CASE(Borrowed)
+  CASE(OwnedOrBorrowed)
+#undef CASE
+  }
+  llvm_unreachable("bad kind");  
+}
 
 static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   switch (kind) {
@@ -529,7 +543,6 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
     return uint8_t(serialization::ReadWriteImplKind::KIND);
   CASE(Immutable)
   CASE(Stored)
-  CASE(MaterializeForSet)
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
@@ -540,6 +553,8 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
 
 static Accessors getAccessors(const AbstractStorageDecl *storage) {
   Accessors accessors;
+  accessors.OpaqueReadOwnership =
+    getRawOpaqueReadOwnership(storage->getOpaqueReadOwnership());
   auto impl = storage->getImplInfo();
   accessors.ReadImpl = getRawReadImplKind(impl.getReadImpl());
   accessors.WriteImpl = getRawWriteImplKind(impl.getWriteImpl());
@@ -3161,6 +3176,7 @@ void Serializer::writeDecl(const Decl *D) {
                           var->hasNonPatternBindingInit(),
                           var->isGetterMutating(),
                           var->isSetterMutating(),
+                          accessors.OpaqueReadOwnership,
                           accessors.ReadImpl,
                           accessors.WriteImpl,
                           accessors.ReadWriteImpl,
@@ -3396,6 +3412,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 subscript->isObjC(),
                                 subscript->isGetterMutating(),
                                 subscript->isSetterMutating(),
+                                accessors.OpaqueReadOwnership,
                                 accessors.ReadImpl,
                                 accessors.WriteImpl,
                                 accessors.ReadWriteImpl,

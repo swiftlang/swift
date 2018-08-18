@@ -3413,7 +3413,6 @@ public:
             name = bestAccessor->getStorage()->getFullName();
             break;
 
-          case AccessorKind::MaterializeForSet:
           case AccessorKind::Address:
           case AccessorKind::MutableAddress:
           case AccessorKind::Read:

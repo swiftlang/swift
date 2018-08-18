@@ -56,7 +56,6 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
       return storage->getFormalAccess();
     case AccessorKind::Set:
     case AccessorKind::MutableAddress:
-    case AccessorKind::MaterializeForSet:
     case AccessorKind::Modify:
       return storage->getSetterFormalAccess();
     case AccessorKind::WillSet:

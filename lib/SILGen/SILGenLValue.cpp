@@ -543,21 +543,8 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
     }
   }();
 
-  // Hack for materializeForSet emission, where we can't safely
-  // push a begin/end access.
-  if (!SGF.InFormalEvaluationScope) {
-    auto unpairedAccesses = SGF.UnpairedAccessesForMaterializeForSet;
-    assert(unpairedAccesses &&
-           "tried to enter access scope without a writeback scope!");
-    if (enforcement == SILAccessEnforcement::Dynamic) {
-      SGF.B.createBeginUnpairedAccess(loc, addr, unpairedAccesses->Buffer,
-                                      silAccessKind, enforcement,
-                                      /*hasNoNestedConflict=*/false,
-                                      /*fromBuiltin=*/false);
-      unpairedAccesses->NumAccesses++;
-    }
-    return addr;
-  }
+  assert(SGF.InFormalEvaluationScope &&
+         "tried to enter access scope without a writeback scope!");
 
   // Enter the access.
   addr = SGF.B.createBeginAccess(loc, addr, silAccessKind, enforcement,
@@ -1256,8 +1243,7 @@ namespace {
                                baseFormalType, typeData, subscriptIndexExpr,
                                std::move(indices))
     {
-      assert(getAccessorDecl()->isGetterOrSetter() ||
-             getAccessorDecl()->isMaterializeForSet());
+      assert(getAccessorDecl()->isGetterOrSetter());
     }
     
     GetterSetterComponent(const GetterSetterComponent &copied,
@@ -1333,218 +1319,12 @@ namespace {
                                  SILLocation loc,
                                  ManagedValue base,
                                  AccessKind accessKind) && override {
-      assert(accessKind == AccessKind::Read ||
-             accessKind == AccessKind::ReadWrite);
-      if (accessKind == AccessKind::Read) {
-        return std::move(*this).LogicalPathComponent::getMaterialized(SGF,
-                                                        loc, base, accessKind);
-      }
-
-      assert(getAccessorDecl()->isMaterializeForSet());
-
-      assert(Storage->getMaterializeForSetFunc() &&
-             "polymorphic storage without materializeForSet");
-      assert(SGF.InFormalEvaluationScope &&
-             "materializing l-value for modification without writeback scope");
-
-      // Allocate opaque storage for the callback to use.
-      SILValue callbackStorage = SGF.emitTemporaryAllocation(loc,
-        SILType::getPrimitiveObjectType(
-                                SGF.getASTContext().TheUnsafeValueBufferType));
-
-      // Allocate a temporary.
-      SILValue buffer =
-        SGF.emitTemporaryAllocation(loc, getTypeOfRValue());
-
-      // Clone the component without cloning the indices.  We don't actually
-      // consume them in writeback().
-      std::unique_ptr<LogicalPathComponent> clonedComponent(
-          [&]() -> LogicalPathComponent* {
-        // Steal the subscript values without copying them so that we
-        // can peek at them in diagnoseWritebackConflict.
-        //
-        // This is *amazingly* unprincipled.
-        RValue borrowedIndices;
-        RValue *optIndices = nullptr;
-        if (!Indices.isNull()) {
-          CanType type = Indices.getType();
-          SmallVector<ManagedValue, 4> values;
-          std::move(Indices).getAll(values);
-          Indices = RValue(SGF, values, type);
-          borrowedIndices = RValue(SGF, values, type);
-          optIndices = &borrowedIndices;
-        }
-        return new GetterSetterComponent(Storage, Accessor, IsSuper,
-                                         IsDirectAccessorUse,
-                                         Substitutions, BaseFormalType,
-                                         getTypeData(), IndexExprForDiagnostics,
-                                         optIndices);
-      }());
-
-      SILDeclRef materializeForSet = Accessor;
-
-      MaterializedLValue materialized;
-      {
-        FormalEvaluationScope Scope(SGF);
-
-        // If the base is a +1 r-value, just borrow it for materializeForSet.
-        // prepareAccessorArgs will copy it if necessary.
-        ManagedValue borrowedBase =
-            base ? base.formalAccessBorrow(SGF, loc) : ManagedValue();
-
-        auto args = std::move(*this).prepareAccessorArgs(SGF, loc, borrowedBase,
-                                                         materializeForSet);
-        materialized = SGF.emitMaterializeForSetAccessor(
-            loc, materializeForSet, Substitutions,
-            std::move(args.base),
-            IsSuper, IsDirectAccessorUse, std::move(args.Indices), buffer,
-            callbackStorage);
-
-        // Mark a value-dependence on the base.  We do this regardless
-        // of whether the base is trivial because even a trivial base
-        // may be value-dependent on something non-trivial.
-        if (base) {
-          SILValue temporary = materialized.temporary.getLValueAddress();
-          materialized.temporary = ManagedValue::forLValue(
-              SGF.B.createMarkDependence(loc, temporary, base.getValue()));
-        }
-      }
-      // Enter an access scope for the temporary.
-      materialized.temporary =
-        enterAccessScope(SGF, loc, materialized.temporary, getTypeData(),
-                         accessKind, SILAccessEnforcement::Unsafe);
-
-      // TODO: maybe needsWriteback should be a thin function pointer
-      // to which we pass the base?  That would let us use direct
-      // access for stored properties with didSet.
-      pushWriteback(SGF, loc, std::move(clonedComponent), base, materialized);
-
-      return ManagedValue::forLValue(materialized.temporary.getValue());
+      assert(accessKind == AccessKind::Read &&
+             "shouldn't be using this path to call modify");
+      return std::move(*this).LogicalPathComponent::getMaterialized(SGF,
+                                                      loc, base, accessKind);
     }
 
-    void writeback(SILGenFunction &SGF, SILLocation loc,
-                   ManagedValue base, MaterializedLValue materialized,
-                   bool isFinal) override {
-      // If we don't have a callback, we don't have to conditionalize
-      // the writeback.
-      if (!materialized.callback) {
-        LogicalPathComponent::writeback(SGF, loc,
-                                        base, materialized,
-                                        isFinal);
-        return;
-      }
-
-      // Otherwise, 'materialized' holds an optional callback and the
-      // callback storage.
-
-      // Mark the writeback as auto-generated so that we don't get
-      // warnings if we manage to devirtualize materializeForSet.
-      loc.markAutoGenerated();
-
-      SILModule &M = SGF.SGM.M;
-      ASTContext &ctx = SGF.getASTContext();
-
-      SILBasicBlock *contBB = SGF.createBasicBlock();
-      SILBasicBlock *writebackBB =
-        SGF.createBasicBlockAfter(SGF.B.getInsertionBB());
-
-      SGF.B.createSwitchEnum(loc, materialized.callback, /*defaultDest*/ nullptr,
-                             { { ctx.getOptionalSomeDecl(), writebackBB },
-                               { ctx.getOptionalNoneDecl(), contBB } });
-
-      // The writeback block.
-      SGF.B.setInsertionPoint(writebackBB); {
-        FullExpr scope(SGF.Cleanups, CleanupLocation::get(loc));
-
-        auto emptyTupleTy =
-          SILType::getPrimitiveObjectType(TupleType::getEmpty(ctx));
-        auto rawPointerTy = SILType::getRawPointerType(ctx);
-
-        // The callback is a BB argument from the switch_enum.
-        SILValue callback = writebackBB->createPHIArgument(
-            rawPointerTy, ValueOwnershipKind::Trivial);
-
-        // Cast the callback to the correct polymorphic function type.
-        SILFunctionTypeRepresentation rep;
-        Optional<ProtocolConformanceRef> witnessMethodConformance;
-        if (auto proto = dyn_cast<ProtocolDecl>(Storage->getDeclContext())) {
-          rep = SILFunctionTypeRepresentation::WitnessMethod;
-          witnessMethodConformance = ProtocolConformanceRef(proto);
-        } else {
-          rep = SILFunctionTypeRepresentation::Method;
-        }
-
-        auto origCallbackFnType =
-            SGF.SGM.Types.getMaterializeForSetCallbackType(
-                Storage, materialized.genericSig, materialized.origSelfType,
-                rep, witnessMethodConformance);
-        auto origCallbackType = SILType::getPrimitiveObjectType(origCallbackFnType);
-        callback = SGF.B.createPointerToThinFunction(loc, callback, origCallbackType);
-
-        auto substCallbackFnType = origCallbackFnType->substGenericArgs(
-            M, Substitutions);
-        auto metatypeType =
-            SGF.getSILType(substCallbackFnType->getParameters().back());
-
-        // We need to borrow the base here.  We can't just consume it
-        // because we're in conditionally-executed code (and because
-        // this might be a non-final use).  We also need to pass it
-        // indirectly.
-        SILValue baseAddress;
-        SILValue baseMetatype;
-        UnenforcedAccess baseAccess;
-        if (base) {
-          if (base.getType().isAddress()) {
-            baseAddress = base.getValue();
-          } else {
-            AbstractionPattern origSelfType(materialized.genericSig,
-                                            materialized.origSelfType);
-            base = SGF.emitSubstToOrigValue(loc, base, origSelfType,
-                                            BaseFormalType);
-
-            baseAddress = SGF.emitTemporaryAllocation(loc, base.getType());
-            // Create an unenforced formal access for the temporary base, which
-            // is passed @inout to the callback.
-            baseAddress = baseAccess.beginAccess(SGF, loc, baseAddress,
-                                                 SILAccessKind::Modify);
-            if (base.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
-              SGF.B.createStoreBorrow(loc, base.getValue(), baseAddress);
-            } else {
-              SGF.B.emitStoreValueOperation(loc, base.getValue(), baseAddress,
-                                            StoreOwnershipQualifier::Init);
-            }
-          }
-          baseMetatype = SGF.B.createMetatype(loc, metatypeType);
-
-        // Otherwise, we have to pass something; use an empty tuple
-        // and an undef metatype.
-        } else {
-          baseAddress = SILUndef::get(emptyTupleTy.getAddressType(), M);
-          baseMetatype = SILUndef::get(metatypeType, M);
-        }
-
-        SILValue temporaryPointer =
-          SGF.B.createAddressToPointer(loc,
-                                       materialized.temporary.getValue(),
-                                       rawPointerTy);
-
-        // Apply the callback.
-        SGF.B.createApply(loc, callback,
-                          Substitutions, {
-                            temporaryPointer,
-                            materialized.callbackStorage,
-                            baseAddress,
-                            baseMetatype
-                          }, false);
-
-        if (baseAccess.beginAccessPtr)
-          baseAccess.endAccess(SGF);
-      }
-
-      // Continue.
-      SGF.B.emitBlock(contBB, loc);
-    }
-    
     RValue get(SILGenFunction &SGF, SILLocation loc,
                ManagedValue base, SGFContext c) && override {
       assert(getAccessorDecl()->isGetter());
@@ -1745,22 +1525,34 @@ namespace {
 
   class EndApplyPseudoComponent : public WritebackPseudoComponent {
     CleanupHandle EndApplyHandle;
+    Optional<AccessedStorage> Access;
   public:
     EndApplyPseudoComponent(const LValueTypeData &typeData,
-                            CleanupHandle endApplyHandle)
-      : WritebackPseudoComponent(typeData), EndApplyHandle(endApplyHandle) {}
+                            CleanupHandle endApplyHandle,
+                            Optional<AccessedStorage> access)
+      : WritebackPseudoComponent(typeData),
+        EndApplyHandle(endApplyHandle),
+        Access(access) {}
 
   private:
     void writeback(SILGenFunction &SGF, SILLocation loc,
                    ManagedValue base,
                    MaterializedLValue materialized,
                    bool isFinal) override {
+      // Just let the cleanup get emitted normally if the writeback is for
+      // an unwind.
+      if (!isFinal) return;
+
       SGF.Cleanups.popAndEmitCleanup(EndApplyHandle, CleanupLocation::get(loc),
                                      NotForUnwind);
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
       OS.indent(indent) << "EndApplyPseudoComponent";
+    }
+
+    Optional<AccessedStorage> getAccessedStorage() const override {
+      return Access;
     }
   };
 
@@ -1791,6 +1583,10 @@ namespace {
 
       ManagedValue result;
 
+      LogicalPathComponent::AccessedStorage abstractStorage = {
+        Storage, IsSuper, /*indices*/ nullptr, IndexExprForDiagnostics
+      };
+
       auto args =
         std::move(*this).prepareAccessorArgs(SGF, loc, base, Accessor);
       SmallVector<ManagedValue, 4> yields;
@@ -1801,7 +1597,8 @@ namespace {
 
       // Push a writeback that ends the access.
       std::unique_ptr<LogicalPathComponent>
-        component(new EndApplyPseudoComponent(getTypeData(), endApplyHandle));
+        component(new EndApplyPseudoComponent(getTypeData(), endApplyHandle,
+                                              abstractStorage));
       pushWriteback(SGF, loc, std::move(component), ManagedValue(),
                     MaterializedLValue());
 
@@ -1961,6 +1758,10 @@ namespace {
                        ManagedValue base,
                        MaterializedLValue materialized,
                        bool isFinal) override {
+          // Just let the cleanup get emitted normally if the writeback is for
+          // an unwind.
+          if (!isFinal) return;
+
           SGF.Cleanups.popAndEmitCleanup(owner.getCleanup(),
                                          CleanupLocation::get(loc),
                                          NotForUnwind);
@@ -2495,14 +2296,11 @@ namespace {
     void emitUsingAccessor(AccessorKind accessorKind, bool isDirect) {
       switch (accessorKind) {
       case AccessorKind::Get:
-      case AccessorKind::Set:
-      case AccessorKind::MaterializeForSet: {
+      case AccessorKind::Set: {
         auto accessor =
           accessorKind == AccessorKind::Get ?
             SGF.SGM.getGetterDeclRef(Storage) :
-          accessorKind == AccessorKind::Set ?
-            SGF.SGM.getSetterDeclRef(Storage) :
-            SGF.SGM.getMaterializeForSetDeclRef(Storage);
+            SGF.SGM.getSetterDeclRef(Storage);
         auto typeData = getLogicalStorageTypeData(SGF.SGM, FormalRValueType);
         return asImpl().emitUsingGetterSetter(accessor, isDirect, typeData);
       }

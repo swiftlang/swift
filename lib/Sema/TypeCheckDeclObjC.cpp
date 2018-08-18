@@ -476,10 +476,6 @@ bool swift::isRepresentableInObjC(
     case AccessorKind::Set:
       return true;
 
-    case AccessorKind::MaterializeForSet:
-      // materializeForSet is synthesized, so never complain about it
-      return false;
-
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
       if (Diagnose) {
