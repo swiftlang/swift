@@ -107,18 +107,11 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
   auto *DC = AffectedDecl->getDeclContext();
 
   do {
-    auto *D = DC->getInnermostDeclarationDeclContext();
-    if (!D)
-      break;
-
-    if (auto *GC = D->getAsGenericContext()) {
-      auto *sig = GC->getGenericSignature();
-      if (sig && sig->isRequirementSatisfied(req))
+    if (auto *sig = DC->getGenericSignatureOfContext()) {
+      if (sig->isRequirementSatisfied(req))
         return DC;
     }
-
-    DC = DC->getParent();
-  } while (DC);
+  } while ((DC = DC->getParent()));
 
   return AffectedDecl->getAsGenericContext();
 }
