@@ -5587,7 +5587,7 @@ RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
   // Get the original pointer value, abstracted to the converter function's
   // expected level.
   AbstractionPattern origTy(converter->getInterfaceType());
-  origTy = origTy.getFunctionInputType();
+  origTy = origTy.getFunctionParamType(0);
 
   CanType inputTy = E->getSubExpr()->getType()->getCanonicalType();
   auto &origTL = SGF.getTypeLowering(origTy, inputTy);
