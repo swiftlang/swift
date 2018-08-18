@@ -2979,9 +2979,6 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   using ExtInfo = AnyFunctionType::ExtInfo;
   using CanParamArrayRef = AnyFunctionType::CanParamArrayRef;
 
-  static CanAnyFunctionType getOld(CanGenericSignature signature,
-                                   CanType input, CanType result,
-                                   ExtInfo extInfo = ExtInfo());
   static CanAnyFunctionType get(CanGenericSignature signature,
                                 CanParamArrayRef params,
                                 CanType result,
@@ -3043,11 +3040,6 @@ private:
                ExtInfo Info);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  static CanFunctionType getOld(CanType input, CanType result,
-                                ExtInfo info = ExtInfo()) {
-    auto fnType = FunctionType::getOld(input, result, info);
-    return cast<FunctionType>(fnType->getCanonicalType());
-  }
   static CanFunctionType get(CanParamArrayRef params, CanType result,
                              ExtInfo info = ExtInfo()) {
     auto fnType = FunctionType::get(params.getOriginalArray(),
@@ -3152,15 +3144,6 @@ public:
 };
 
 BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
-  static CanGenericFunctionType getOld(CanGenericSignature sig,
-                                       CanType input, CanType result,
-                                       ExtInfo info = ExtInfo()) {
-    // Knowing that the argument types are independently canonical is
-    // not sufficient to guarantee that the function type will be canonical.
-    auto fnType = GenericFunctionType::getOld(sig, input, result, info);
-    return cast<GenericFunctionType>(fnType->getCanonicalType());
-  }
-
   /// Create a new generic function type.
   static CanGenericFunctionType get(CanGenericSignature sig,
                                     CanParamArrayRef params,
@@ -3187,16 +3170,6 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
                     cast<GenericFunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
-
-inline CanAnyFunctionType
-CanAnyFunctionType::getOld(CanGenericSignature signature,
-                           CanType input, CanType result, ExtInfo extInfo) {
-  if (signature) {
-    return CanGenericFunctionType::getOld(signature, input, result, extInfo);
-  } else {
-    return CanFunctionType::getOld(input, result, extInfo);
-  }
-}
 
 inline CanAnyFunctionType
 CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
