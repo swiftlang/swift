@@ -1910,7 +1910,7 @@ namespace {
         ConcreteDeclRef concreteDeclRef(nilDecl, subs);
 
         auto nilType = FunctionType::get(
-            {MetatypeType::get(type)}, type);
+            {FunctionType::Param(MetatypeType::get(type))}, type);
         auto *nilRefExpr = new (tc.Context) DeclRefExpr(
             concreteDeclRef, DeclNameLoc(expr->getLoc()),
               /*implicit=*/true, AccessSemantics::Ordinary,

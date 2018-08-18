@@ -205,8 +205,8 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
                                funTy->getResult()->getCanonicalType(),
                                /*non-optional*/false);
 
-      return FunctionType::get(newInput, newResult,
-                               funTy->getExtInfo().withSILRepresentation(
+      return FunctionType::getOld(newInput, newResult,
+                                  funTy->getExtInfo().withSILRepresentation(
                                        SILFunctionType::Representation::Block));
     }
     }

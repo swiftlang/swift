@@ -1131,7 +1131,7 @@ namespace {
 
       // Add the member constraint for a subscript declaration.
       // FIXME: weak name!
-      auto fnTy = FunctionType::get(inputTv, outputTy);
+      auto fnTy = FunctionType::getOld(inputTv, outputTy);
 
       // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
       // a known subscript here. This might be cleaner if we split off a new
@@ -1528,7 +1528,7 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::RValueAdjustment));
 
         // The function/enum case must be callable with the given argument.
-        auto funcTy = FunctionType::get(CS.getType(arg), outputTy);
+        auto funcTy = FunctionType::getOld(CS.getType(arg), outputTy);
         CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
           memberTy,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
@@ -1578,7 +1578,7 @@ namespace {
                           TVO_CanBindToLValue |
                           TVO_PrefersSubtypeBinding);
         auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr));
-        auto methodTy = FunctionType::get(argsTy, resultTy);
+        auto methodTy = FunctionType::getOld(argsTy, resultTy);
         CS.addValueMemberConstraint(
             baseTy, expr->getName(), methodTy, CurDC,
             expr->getFunctionRefKind(),
@@ -2503,8 +2503,8 @@ namespace {
       if (isa<ClosureExpr>(fnExpr->getSemanticsProvidingExpr()))
         extInfo = extInfo.withNoEscape();
       
-      auto funcTy = FunctionType::get(CS.getType(expr->getArg()), outputTy,
-                                      extInfo);
+      auto funcTy = FunctionType::getOld(CS.getType(expr->getArg()), outputTy,
+                                         extInfo);
 
       CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
                        CS.getType(expr->getFn()),

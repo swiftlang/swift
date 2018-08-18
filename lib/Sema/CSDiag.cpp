@@ -5093,7 +5093,7 @@ namespace {
       // this allows things that are throws and not throws, and allows escape
       // and noescape functions.
       auto extInfo = FunctionType::ExtInfo().withThrows();
-      auto fTy = FunctionType::get(tv, contextualType, extInfo);
+      auto fTy = FunctionType::getOld(tv, contextualType, extInfo);
 
       auto locator = cs.getConstraintLocator(expr);
 
@@ -5540,8 +5540,9 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
                                         TVO_PrefersSubtypeBinding);
 
         auto extInfo = FunctionType::ExtInfo().withThrows();
-        auto fTy = FunctionType::get(ParenType::get(cs.getASTContext(), tv),
-                                     expectedResultType, extInfo);
+
+        FunctionType::Param tvParam(tv);
+        auto fTy = FunctionType::get({tvParam}, expectedResultType, extInfo);
 
         // Add a conversion constraint between the types.
         cs.addConstraint(ConstraintKind::Conversion, typeVar, fTy, locator,
@@ -5629,7 +5630,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
           if (!InputType || !ResultType)
             return false;
 
-          auto expectedType = FunctionType::get(InputType, ResultType);
+          auto expectedType = FunctionType::getOld(InputType, ResultType);
           cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                            expectedType, cs.getConstraintLocator(expr),
                            /*isFavored*/ true);

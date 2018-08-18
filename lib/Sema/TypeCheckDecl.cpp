@@ -1701,13 +1701,13 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         //   static func initStorage(_: Value) -> Storage
         // for parameterized initialization.
         auto expectedDefaultInitStorageTy =
-          FunctionType::get(TC.Context.TheEmptyTupleType, storageTy);
+          FunctionType::get({}, storageTy);
         Type valueTy = DependentMemberType::get(
                                           behaviorProto->getSelfInterfaceType(),
                                           valueReqt);
         
         auto expectedParameterizedInitStorageTy =
-          FunctionType::get(valueTy, storageTy);
+          FunctionType::get({FunctionType::Param(valueTy)}, storageTy);
 
         auto lookup = TC.lookupMember(dc, behaviorProtoTy,
                                       TC.Context.Id_initStorage);

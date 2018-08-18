@@ -1952,8 +1952,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     if (!ty) return true;
 
     if (ty->hasError()) {
-      elements.emplace_back(ErrorType::get(Context), Identifier(),
-                            ParameterTypeFlags());
+      elements.emplace_back(ErrorType::get(Context));
       continue;
     }
 

@@ -2603,7 +2603,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   // constraint itself.
   addValueMemberConstraint(MetatypeType::get(valueType, TC.Context),
                            DeclBaseName::createConstructor(),
-                           FunctionType::get(tv, resultType),
+                           FunctionType::getOld(tv, resultType),
                            useDC, functionRefKind,
                            /*outerAlternatives=*/{},
                            getConstraintLocator(
