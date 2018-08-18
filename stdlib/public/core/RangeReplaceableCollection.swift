@@ -343,7 +343,16 @@ public protocol RangeReplaceableCollection : Collection
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func removeAll(keepingCapacity keepCapacity: Bool /*= false*/)
 
-  /// Removes from the collection all elements that satisfy the given predicate.
+  /// Removes all the elements that satisfy the given predicate.
+  ///
+  /// Use this method to remove every element in a collection that meets
+  /// particular criteria. The order of the remaining elements is preserved.
+  /// This example removes all the odd values from an
+  /// array of numbers:
+  ///
+  ///     var numbers = [5, 6, 7, 8, 9, 10, 11]
+  ///     numbers.removeAll(where: { $0 % 2 != 0 })
+  ///     // numbers == [6, 8, 10]
   ///
   /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
@@ -1083,11 +1092,12 @@ extension RangeReplaceableCollection where Self: MutableCollection {
   /// Removes all the elements that satisfy the given predicate.
   ///
   /// Use this method to remove every element in a collection that meets
-  /// particular criteria. This example removes all the odd values from an
+  /// particular criteria. The order of the remaining elements is preserved.
+  /// This example removes all the odd values from an
   /// array of numbers:
   ///
   ///     var numbers = [5, 6, 7, 8, 9, 10, 11]
-  ///     numbers.removeAll(where: { $0 % 2 == 1 })
+  ///     numbers.removeAll(where: { $0 % 2 != 0 })
   ///     // numbers == [6, 8, 10]
   ///
   /// - Parameter shouldBeRemoved: A closure that takes an element of the
@@ -1108,7 +1118,8 @@ extension RangeReplaceableCollection {
   /// Removes all the elements that satisfy the given predicate.
   ///
   /// Use this method to remove every element in a collection that meets
-  /// particular criteria. This example removes all the vowels from a string:
+  /// particular criteria. The order of the remaining elements is preserved.
+  /// This example removes all the vowels from a string:
   ///
   ///     var phrase = "The rain in Spain stays mainly in the plain."
   ///
