@@ -2530,7 +2530,9 @@ static void removeArgument(SILBasicBlock *BB, unsigned i) {
   // Determine the set of predecessors in case any predecessor has
   // two edges to this block (e.g. a conditional branch where both
   // sides reach this block).
-  llvm::SmallPtrSet<SILBasicBlock *, 4> PredBBs;
+  llvm::SetVector<SILBasicBlock *,SmallVector<SILBasicBlock *, 8>,
+                  SmallPtrSet<SILBasicBlock *, 8>> PredBBs;
+
   for (auto *Pred : BB->getPredecessorBlocks())
     PredBBs.insert(Pred);
 

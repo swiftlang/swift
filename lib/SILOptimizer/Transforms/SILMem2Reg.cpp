@@ -54,7 +54,7 @@ typedef llvm::DenseMap<DomTreeNode *, unsigned> DomTreeLevelMap;
 
 /// Promotes a single AllocStackInst into registers..
 class StackAllocationPromoter {
-  typedef llvm::DenseSet<SILBasicBlock *> BlockSet;
+  typedef llvm::SmallSetVector<SILBasicBlock *, 16> BlockSet;
   typedef llvm::DenseMap<SILBasicBlock *, SILInstruction *> BlockToInstMap;
 
   // Use a priority queue keyed on dominator tree level so that inserted nodes
@@ -794,7 +794,7 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
 
         // The successor node is a new PHINode. If this is a new PHI node
         // then it may require additional definitions, so add it to the PQ.
-        if (PhiBlocks.insert(Succ).second)
+        if (PhiBlocks.insert(Succ))
           PQ.push(std::make_pair(SuccNode, SuccLevel));
       }
 
