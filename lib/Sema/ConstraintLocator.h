@@ -343,7 +343,7 @@ public:
       return PathElement(NamedTupleElement, position);
     }
 
-    /// Retrieve a patch element for an argument/parameter comparison in a
+    /// Retrieve a path element for an argument/parameter comparison in a
     /// function application.
     static PathElement getApplyArgToParam(unsigned argIdx, unsigned paramIdx) {
       return PathElement(ApplyArgToParam, argIdx, paramIdx);
