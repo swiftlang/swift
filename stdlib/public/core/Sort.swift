@@ -383,57 +383,58 @@ extension MutableCollection {
   }
 }
 
-/// Reorders `elements` and returns an index `p` such that every element in
-/// `elements[range.lowerBound..<p]` is less than every element in
-/// `elements[p..<range.upperBound]`.
-///
-/// - Precondition: The count of `range` must be >= 3:
-///   `elements.distance(from: range.lowerBound, to: range.upperBound) >= 3`
-@inlinable
-internal func _partition<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>, 
-  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows -> C.Index {
-  var lo = range.lowerBound
-  var hi = elements.index(before: range.upperBound)
+extension MutableCollection where Self: RandomAccessCollection {
+  /// Reorders the collection and returns an index `p` such that every element
+  /// in `range.lowerBound..<p` is less than every element in
+  /// `p..<range.upperBound`.
+  ///
+  /// - Precondition: The count of `range` must be >= 3 i.e.
+  ///   `distance(from: range.lowerBound, to: range.upperBound) >= 3`
+  @inlinable
+  internal mutating func _partition(
+    within range: Range<Index>,
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows -> Index {
+    var lo = range.lowerBound
+    var hi = index(before: range.upperBound)
 
-  // Sort the first, middle, and last elements, then use the middle value
-  // as the pivot for the partition.
-  let half = numericCast(elements.distance(from: lo, to: hi)) as UInt / 2
-  let mid = elements.index(lo, offsetBy: numericCast(half))
-  try elements._sort3(lo, mid, hi
-    , by: areInIncreasingOrder)
-  let pivot = elements[mid]
+    // Sort the first, middle, and last elements, then use the middle value
+    // as the pivot for the partition.
+    let half = distance(from: lo, to: hi) / 2
+    let mid = index(lo, offsetBy: half)
+    try _sort3(lo, mid, hi, by: areInIncreasingOrder)
+    let pivot = self[mid]
 
-  // Loop invariants:
-  // * lo < hi
-  // * elements[i] < pivot, for i in range.lowerBound..<lo
-  // * pivot <= elements[i] for i in hi..<range.upperBound
-  Loop: while true {
-    FindLo: do {
-      elements.formIndex(after: &lo)
-      while lo != hi {
-        if !(try areInIncreasingOrder(elements[lo], pivot)) { break FindLo }
-        elements.formIndex(after: &lo)
+    // Loop invariants:
+    // * lo < hi
+    // * self[i] < pivot, for i in range.lowerBound..<lo
+    // * pivot <= self[i] for i in hi..<range.upperBound
+    Loop: while true {
+      FindLo: do {
+        formIndex(after: &lo)
+        while lo != hi {
+          if try !areInIncreasingOrder(self[lo], pivot) { break FindLo }
+          formIndex(after: &lo)
+        }
+        break Loop
       }
-      break Loop
+
+      FindHi: do {
+        formIndex(before: &hi)
+        while hi != lo {
+          if try areInIncreasingOrder(self[hi], pivot) { break FindHi }
+          formIndex(before: &hi)
+        }
+        break Loop
+      }
+
+      swapAt(lo, hi)
     }
 
-    FindHi: do {
-      elements.formIndex(before: &hi)
-      while hi != lo {
-        if (try areInIncreasingOrder(elements[hi], pivot)) { break FindHi }
-        elements.formIndex(before: &hi)
-      }
-      break Loop
-    }
-
-    elements.swapAt(lo, hi)
+    return lo
   }
-
-  return lo
 }
+
 
 @inlinable
 public // @testable
@@ -481,10 +482,7 @@ internal func _introSortImpl<C: MutableCollection & RandomAccessCollection>(
   // Partition and sort.
   // We don't check the depthLimit variable for underflow because this variable
   // is always greater than zero (see check above).
-  let partIdx: C.Index = try _partition(
-    &elements,
-    subRange: range
-    , by: areInIncreasingOrder)
+  let partIdx = try elements._partition(within: range, by: areInIncreasingOrder)
   try _introSortImpl(
     &elements,
     subRange: range.lowerBound..<partIdx,
