@@ -3486,6 +3486,10 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
       auto witness = Conformance->getWitness(requirement, nullptr).getDecl();
       if (!witness) return;
 
+      // Make sure that we finalize the witness, so we can emit this
+      // witness table.
+      TC.DeclsToFinalize.insert(witness);
+
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&
           requirement->getFullName() == witness->getFullName() &&
