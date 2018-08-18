@@ -883,7 +883,7 @@ void swift::diagnoseSubElementFailure(Expr *destExpr,
     }
   }
 
-  auto type = destExpr->getType() ?: CS.getType(destExpr);
+  auto type = destExpr->getType() ?: CS.simplifyType(CS.getType(destExpr));
   TC.diagnose(loc, unknownDiagID, type)
       .highlight(immInfo.first->getSourceRange());
 }

@@ -565,14 +565,6 @@ bool RValueTreatedAsLValueFailure::diagnose() {
       diagExpr = parens->getSubExpr();
   }
 
-  // FIXME: Needed right now to apply correct overload choices to diagExpr for
-  // use by diagnoseSubElementFailure(). Once all callers are routed through
-  // here, that function can be rewritten to take the current Solution and use
-  // it for determining chosen decl bindings instead, making this extra
-  // typecheck unnecessary.
-  getConstraintSystem().TC.typeCheckExpression(diagExpr,
-                                               getConstraintSystem().DC);
-
   diagnoseSubElementFailure(diagExpr, loc, getConstraintSystem(),
                             subElementDiagID, rvalueDiagID);
   return true;
