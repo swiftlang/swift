@@ -1,3 +1,4 @@
+// REQUIRES: experiment_please_ignore
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 // RUN: %sourcekitd-test -req=index %s -- %s -module-name Swift %mcp_opt -target %target-triple %clang-importer-sdk-nosource -I %t | %sed_clean > %t.response1

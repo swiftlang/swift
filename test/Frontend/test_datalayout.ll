@@ -32,7 +32,7 @@ attributes #1 = { nounwind readnone speculatable }
 attributes #2 = { noreturn nounwind }
 
 !llvm.module.flags = !{!0, !1, !2, !3, !4, !5, !6, !7}
-!llvm.linker.options = !{!8, !9, !10}
+!llvm.linker.options = !{!8, !9}
 
 !0 = !{i32 1, !"Objective-C Version", i32 2}
 !1 = !{i32 1, !"Objective-C Image Info Version", i32 0}
@@ -42,6 +42,5 @@ attributes #2 = { noreturn nounwind }
 !5 = !{i32 1, !"wchar_size", i32 4}
 !6 = !{i32 7, !"PIC Level", i32 2}
 !7 = !{i32 1, !"Swift Version", i32 6}
-!8 = !{!"-lswiftSwiftOnoneSupport"}
-!9 = !{!"-lswiftCore"}
-!10 = !{!"-lobjc"}
+!8 = !{!"-lswiftCore"}
+!9 = !{!"-lobjc"}

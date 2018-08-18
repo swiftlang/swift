@@ -12,14 +12,6 @@
 // CHECK: Hello World
 // CHECK: Hello Bob, today is Tuesday.
 
-// This test intentionally mirrors /Driver/emit-sib-single-file to ensure that
-// SwiftOnoneSupport is always a dependency of -Onone -emit-si*gen builds.
-
-// FIXME: The Frontend's understanding of the situations in which to load
-// SwiftOnoneSupport is a tacit part of the rest of the compile pipeline and
-// pervades the AST.  SIL could probably sink knowledge of module dependencies
-// internally and make this test unnecessary.
-
 @inlinable
 @usableFromInline
 func greet(_ name: String, _ day: String) -> String {

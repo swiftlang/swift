@@ -11,7 +11,6 @@
 // CHECK: "swiftmodules":[
 // CHECK: "{{[^"]*}}/Module2.swiftmodule"
 // CHECK: "{{[^"]*}}/Swift.swiftmodule"
-// CHECK: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule"
 // CHECK: ]
 // CHECK: }
 

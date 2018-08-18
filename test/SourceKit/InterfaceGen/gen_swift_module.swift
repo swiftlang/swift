@@ -1,3 +1,5 @@
+// REQUIRES: experiment_please_ignore
+
 import swift_mod_syn
 
 func f(s : inout [Int]) {

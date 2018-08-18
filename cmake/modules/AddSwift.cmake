@@ -1539,28 +1539,6 @@ function(add_swift_library name)
         Core)
   endif()
 
-  if(SWIFTLIB_HAS_SWIFT_CONTENT AND NOT SWIFTLIB_IS_STDLIB_CORE)
-    # All Swift code depends on the SwiftOnoneSupport in non-optimized mode,
-    # except for the standard library itself.
-    is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" optimized)
-    if(NOT optimized)
-      list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
-    endif()
-  endif()
-
-  if((NOT "${SWIFT_BUILD_STDLIB}") AND
-    (NOT "${SWIFTLIB_SWIFT_MODULE_DEPENDS}" STREQUAL ""))
-    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
-        SwiftOnoneSupport)
-  endif()
-
-  # swiftSwiftOnoneSupport does not depend on itself,
-  # obviously.
-  if("${name}" STREQUAL "swiftSwiftOnoneSupport")
-    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
-        SwiftOnoneSupport)
-  endif()
-
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
   precondition(SWIFTLIB_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
 
@@ -2167,8 +2145,6 @@ function(add_swift_target_executable name)
 
   # All Swift executables depend on the standard library.
   list(APPEND SWIFTEXE_TARGET_LINK_FAT_LIBRARIES swiftCore)
-  # All Swift executables depend on the swiftSwiftOnoneSupport library.
-  list(APPEND SWIFTEXE_TARGET_DEPENDS swiftSwiftOnoneSupport)
 
   if(NOT "${SWIFT_BUILD_STDLIB}")
     list(REMOVE_ITEM SWIFTEXE_TARGET_LINK_FAT_LIBRARIES

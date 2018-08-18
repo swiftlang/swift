@@ -1,7 +1,5 @@
 import Foo
 import FooHelper
-import SwiftOnoneSupport
-
 
 public func fooSubFunc1(_ a: Int32) -> Int32
 

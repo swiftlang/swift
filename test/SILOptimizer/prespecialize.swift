@@ -1,3 +1,4 @@
+// REQUIRES: experiment_please_ignore
 // RUN: %target-swift-frontend  %s -Onone -Xllvm -sil-inline-generics=false -emit-sil | %FileCheck %s
 
 // REQUIRES: optimized_stdlib

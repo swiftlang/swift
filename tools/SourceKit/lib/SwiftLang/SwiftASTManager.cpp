@@ -469,8 +469,7 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   FrontendOpts.IndexStorePath.clear();
   ImporterOpts.IndexStorePath.clear();
 
-  // Force the action type to be -typecheck. This affects importing the
-  // SwiftONoneSupport module.
+  // Force the action type to be -typecheck.
   FrontendOpts.RequestedAction = FrontendOptions::ActionType::Typecheck;
 
   // We don't care about LLVMArgs
