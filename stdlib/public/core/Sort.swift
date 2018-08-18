@@ -275,6 +275,8 @@ extension MutableCollection where Self: BidirectionalCollection {
 
     while sortedEnd != range.upperBound {
       // get the first unsorted element
+      // FIXME: by stashing the element, instead of using indexing and swapAt,
+      // this method won't work for collections of move-only types.
       let x = self[sortedEnd]
 
       // Look backwards for x's position in the sorted sequence,
@@ -460,25 +462,22 @@ extension MutableCollection where Self: RandomAccessCollection {
     // Insertion sort is better at handling smaller regions.
     if distance(from: range.lowerBound, to: range.upperBound) < 20 {
       try _insertionSort(within: range, by: areInIncreasingOrder)
-      return
-    }
-    if depthLimit == 0 {
+    } else if depthLimit == 0 {
       try _heapSort(within: range, by: areInIncreasingOrder)
-      return
+    } else {
+      // Partition and sort.
+      // We don't check the depthLimit variable for underflow because this
+      // variable is always greater than zero (see check above).
+      let partIdx = try _partition(within: range, by: areInIncreasingOrder)
+      try _introSortImpl(
+        within: range.lowerBound..<partIdx,
+        by: areInIncreasingOrder, 
+        depthLimit: depthLimit &- 1)
+      try _introSortImpl(
+        within: partIdx..<range.upperBound,
+        by: areInIncreasingOrder, 
+        depthLimit: depthLimit &- 1)      
     }
-
-    // Partition and sort.
-    // We don't check the depthLimit variable for underflow because this variable
-    // is always greater than zero (see check above).
-    let partIdx = try _partition(within: range, by: areInIncreasingOrder)
-    try _introSortImpl(
-      within: range.lowerBound..<partIdx,
-      by: areInIncreasingOrder, 
-      depthLimit: depthLimit &- 1)
-    try _introSortImpl(
-      within: partIdx..<range.upperBound,
-      by: areInIncreasingOrder, 
-      depthLimit: depthLimit &- 1)
   }
 
   @inlinable
