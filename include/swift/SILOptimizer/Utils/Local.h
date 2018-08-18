@@ -355,7 +355,7 @@ public:
     auto *Fn = BI->getFunction();
     auto *SrcBB = BI->getParent();
     auto *DestBB = BI->getDestBB();
-    auto *EdgeBB = Fn->createBasicBlock(SrcBB);
+    auto *EdgeBB = Fn->createBasicBlockAfter(SrcBB);
 
     // Create block arguments.
     for (unsigned ArgIdx : range(DestBB->getNumArguments())) {

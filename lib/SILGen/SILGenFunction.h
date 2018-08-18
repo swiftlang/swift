@@ -636,7 +636,9 @@ public:
   /// first block.  (This is clearly desirable behavior when blocks
   /// are created by different emissions; it's just a little
   /// counter-intuitive within a single emission.)
-  SILBasicBlock *createBasicBlock(SILBasicBlock *afterBB = nullptr);  
+  SILBasicBlock *createBasicBlock();
+  SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
+  SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
   /// Create a new basic block at the end of the given function
   /// section.
