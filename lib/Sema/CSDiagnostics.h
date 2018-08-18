@@ -345,6 +345,17 @@ public:
   bool diagnose() override;
 };
 
+/// Diagnose errors associated with rvalues in positions
+/// where an lvalue is required, such as inout arguments.
+class RValueTreatedAsLValueFailure final : public FailureDiagnostic {
+
+public:
+  RValueTreatedAsLValueFailure(const Solution &solution, ConstraintLocator *locator)
+    : FailureDiagnostic(nullptr, solution, locator) {}
+
+  bool diagnose() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

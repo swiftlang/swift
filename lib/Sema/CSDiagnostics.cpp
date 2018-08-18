@@ -16,6 +16,7 @@
 
 #include "CSDiagnostics.h"
 #include "ConstraintSystem.h"
+#include "CSDiag.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
@@ -530,5 +531,46 @@ bool MissingOptionalUnwrapFailure::diagnose() {
 
   emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
       .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
+  return true;
+}
+
+bool RValueTreatedAsLValueFailure::diagnose() {
+  Diag<StringRef> subElementDiagID;
+  Diag<Type> rvalueDiagID;
+  Expr *diagExpr = getLocator()->getAnchor();
+  SourceLoc loc;
+
+  auto callExpr = dyn_cast<ApplyExpr>(diagExpr);
+  if (!callExpr)
+    return false; // currently only creating these for args, so should be
+                  // unreachable
+
+  Expr *argExpr = callExpr->getArg();
+  loc = callExpr->getFn()->getLoc();
+
+  if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
+    subElementDiagID = diag::cannot_apply_lvalue_unop_to_subelement;
+    rvalueDiagID = diag::cannot_apply_lvalue_unop_to_rvalue;
+    diagExpr = argExpr;
+  } else if (isa<BinaryExpr>(callExpr)) {
+    subElementDiagID = diag::cannot_apply_lvalue_binop_to_subelement;
+    rvalueDiagID = diag::cannot_apply_lvalue_binop_to_rvalue;
+    auto argTuple = dyn_cast<TupleExpr>(argExpr);
+    diagExpr = argTuple->getElement(0);
+  } else {
+    auto lastPathElement = getLocator()->getPath().back();
+    assert(lastPathElement.getKind() ==
+           ConstraintLocator::PathElementKind::ApplyArgToParam);
+
+    subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
+    rvalueDiagID = diag::cannot_pass_rvalue_inout;
+    if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
+      diagExpr = argTuple->getElement(lastPathElement.getValue());
+    else if (auto parens = dyn_cast<ParenExpr>(argExpr))
+      diagExpr = parens->getSubExpr();
+  }
+
+  diagnoseSubElementFailure(diagExpr, loc, getConstraintSystem(),
+                            subElementDiagID, rvalueDiagID);
   return true;
 }

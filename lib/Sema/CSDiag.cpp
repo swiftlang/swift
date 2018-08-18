@@ -738,7 +738,7 @@ static void fixItChangeInoutArgType(const Expr * arg,
     .fixItReplaceChars(startLoc, endLoc, scratch);
 }
 
-static void diagnoseSubElementFailure(Expr *destExpr,
+void swift::diagnoseSubElementFailure(Expr *destExpr,
                                       SourceLoc loc,
                                       ConstraintSystem &CS,
                                       Diag<StringRef> diagID,
@@ -883,7 +883,8 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     }
   }
 
-  TC.diagnose(loc, unknownDiagID, CS.getType(destExpr))
+  auto type = destExpr->getType() ?: CS.simplifyType(CS.getType(destExpr));
+  TC.diagnose(loc, unknownDiagID, type)
       .highlight(immInfo.first->getSourceRange());
 }
 
@@ -6152,33 +6153,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                                                 calleeInfo, TCC_ForceRecheck);
   if (!argExpr)
     return true; // already diagnosed.
-  
-  // A common error is to apply an operator that only has inout forms (e.g. +=)
-  // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
-  // case.
-  if (calleeInfo.closeness == CC_NonLValueInOut) {
-    Diag<StringRef> subElementDiagID;
-    Diag<Type> rvalueDiagID;
-    Expr *diagExpr = nullptr;
-    
-    if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
-      subElementDiagID = diag::cannot_apply_lvalue_unop_to_subelement;
-      rvalueDiagID = diag::cannot_apply_lvalue_unop_to_rvalue;
-      diagExpr = argExpr;
-    } else if (isa<BinaryExpr>(callExpr)) {
-      subElementDiagID = diag::cannot_apply_lvalue_binop_to_subelement;
-      rvalueDiagID = diag::cannot_apply_lvalue_binop_to_rvalue;
-      
-      if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
-        diagExpr = argTuple->getElement(0);
-    }
-    
-    if (diagExpr) {
-      diagnoseSubElementFailure(diagExpr, callExpr->getFn()->getLoc(), CS,
-                                subElementDiagID, rvalueDiagID);
-      return true;
-    }
-  }
   
   // Handle argument label mismatches when we have multiple candidates.
   if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {

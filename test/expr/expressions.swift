@@ -614,7 +614,7 @@ func unaryOps(_ i8: inout Int8, i64: inout Int64) {
   i64 += 1
   i8 -= 1
 
-  Int64(5) += 1 // expected-error{{left side of mutating operator isn't mutable: function call returns immutable value}}
+  Int64(5) += 1 // expected-error{{left side of mutating operator has immutable type 'Int64'}}
   
   // <rdar://problem/17691565> attempt to modify a 'let' variable with ++ results in typecheck error not being able to apply ++ to Float
   let a = i8 // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}

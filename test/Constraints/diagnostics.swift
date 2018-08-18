@@ -719,14 +719,13 @@ func overloadSetResultType(_ a : Int, b : Int) -> Int {
 }
 
 postfix operator +++
-postfix func +++ <T>(_: inout T) -> T { fatalError() } // expected-note {{in call to operator '+++'}}
+postfix func +++ <T>(_: inout T) -> T { fatalError() }
 
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
 func r21523291(_ bytes : UnsafeMutablePointer<UInt8>) {
-  let i = 42
+  let i = 42 // expected-note {{change 'let' to 'var' to make it mutable}}
 
-  // FIXME: rdar://41416382
-  _ = bytes[i+++]  // expected-error {{generic parameter 'T' could not be inferred}}
+  _ = bytes[i+++]  // expected-error {{cannot pass immutable value to mutating operator: 'i' is a 'let' constant}}
 }
 
 

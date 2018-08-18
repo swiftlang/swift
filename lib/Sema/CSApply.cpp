@@ -7764,6 +7764,8 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
   llvm::SmallDenseMap<Expr *, SmallVector<const ConstraintFix *, 4>>
       fixesPerExpr;
 
+  applySolution(solution);
+
   for (auto *fix : solution.Fixes)
     fixesPerExpr[fix->getAnchor()].push_back(fix);
 
