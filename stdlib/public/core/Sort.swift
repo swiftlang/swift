@@ -45,9 +45,7 @@ extension Sequence where Element: Comparable {
   /// - Complexity: O(*n* log *n*), where *n* is the length of the sequence.
   @inlinable
   public func sorted() -> [Element] {
-    var result = ContiguousArray(self)
-    result.sort()
-    return Array(result)
+    return sorted(by: <)
   }
 }
 
@@ -142,7 +140,6 @@ extension Sequence {
 
 extension MutableCollection
 where Self: RandomAccessCollection, Element: Comparable {
-
   /// Sorts the collection in place.
   ///
   /// You can sort any mutable collection of elements that conform to the
@@ -171,13 +168,7 @@ where Self: RandomAccessCollection, Element: Comparable {
   /// - Complexity: O(*n* log *n*), where *n* is the length of the collection.
   @inlinable
   public mutating func sort() {
-    let didSortUnsafeBuffer = _withUnsafeMutableBufferPointerIfSupported {
-      buffer -> Void? in
-       buffer.sort()
-    }
-    if didSortUnsafeBuffer == nil {
-      _introSort(&self, subRange: startIndex..<endIndex, by: <)
-    }
+    sort(by: <)
   }
 }
 
