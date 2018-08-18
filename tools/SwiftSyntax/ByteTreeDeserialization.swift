@@ -149,10 +149,10 @@ struct ByteTreeReader {
   /// A pointer pointing to the next byte of serialized data to be read
   private var pointer: UnsafeRawPointer
 
-  private var userInfo: [ByteTreeUserInfoKey: Any]
+  private var userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
 
   private init(pointer: UnsafeRawPointer,
-               userInfo: [ByteTreeUserInfoKey: Any]) {
+               userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>) {
     self.pointer = pointer
     self.userInfo = userInfo
   }
@@ -172,7 +172,7 @@ struct ByteTreeReader {
   ///            failed
   static func read<T: ByteTreeObjectDecodable>(
     _ rootObjectType: T.Type, from pointer: UnsafeRawPointer,
-    userInfo: [ByteTreeUserInfoKey: Any],
+    userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>,
     protocolVersionValidation: (ProtocolVersion) -> Bool
   ) throws -> T {
     var reader = ByteTreeReader(pointer: pointer, userInfo: userInfo)
@@ -192,7 +192,7 @@ struct ByteTreeReader {
   /// - Returns: The deserialized tree
   static func read<T: ByteTreeObjectDecodable>(
     _ rootObjectType: T.Type, from data: Data,
-    userInfo: [ByteTreeUserInfoKey: Any],
+    userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>,
     protocolVersionValidation versionValidate: (ProtocolVersion) -> Bool
   ) throws -> T {
     return try data.withUnsafeBytes { (pointer: UnsafePointer<UInt8>) in
@@ -273,7 +273,7 @@ struct ByteTreeReader {
       objectReader.finalize()
     }
     return T.read(from: &objectReader, numFields: numFields,
-                  userInfo: &userInfo)
+                  userInfo: userInfo)
   }
 
   /// Read the next field in the tree as a scalar of the specified type.
@@ -287,7 +287,7 @@ struct ByteTreeReader {
     defer {
       pointer = pointer.advanced(by: fieldSize)
     }
-    return T.read(from: pointer, size: fieldSize, userInfo: &userInfo)
+    return T.read(from: pointer, size: fieldSize, userInfo: userInfo)
   }
 
   /// Discard the next scalar field, advancing the pointer to the next field
