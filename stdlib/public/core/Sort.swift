@@ -252,10 +252,7 @@ extension MutableCollection where Self: RandomAccessCollection {
         try buffer.sort(by: areInIncreasingOrder)
     }
     if didSortUnsafeBuffer == nil {
-      try _introSort(
-        &self,
-        subRange: startIndex..<endIndex,
-        by: areInIncreasingOrder)
+      try _introSort(within: startIndex..<endIndex, by: areInIncreasingOrder)
     }
   }
 }
@@ -433,66 +430,56 @@ extension MutableCollection where Self: RandomAccessCollection {
 
     return lo
   }
-}
 
+  @inlinable
+  public // @testable
+  mutating func _introSort(
+    within range: Range<Index>,
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows {
 
-@inlinable
-public // @testable
-func _introSort<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>
-  , by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
+    let n = distance(from: range.lowerBound, to: range.upperBound)
+    guard n > 1 else { return }
 
-  let count = elements.distance(from: range.lowerBound, to: range.upperBound)
-  if count < 2 {
-    return
-  }
-  // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
-  // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
-  let depthLimit = 2 * count._binaryLogarithm()
-  try _introSortImpl(
-    &elements,
-    subRange: range,
-    by: areInIncreasingOrder,
-    depthLimit: depthLimit)
-}
-
-@inlinable
-internal func _introSortImpl<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>
-  , by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool,
-  depthLimit: Int
-) rethrows {
-
-  // Insertion sort is better at handling smaller regions.
-  if elements.distance(from: range.lowerBound, to: range.upperBound) < 20 {
-    try elements._insertionSort(within: range, by: areInIncreasingOrder)
-    return
-  }
-  if depthLimit == 0 {
-    try _heapSort(
-      &elements,
-      subRange: range
-      , by: areInIncreasingOrder)
-    return
+    // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
+    // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
+    let depthLimit = 2 * n._binaryLogarithm()
+    try _introSortImpl(
+      within: range,
+      by: areInIncreasingOrder,
+      depthLimit: depthLimit)
   }
 
-  // Partition and sort.
-  // We don't check the depthLimit variable for underflow because this variable
-  // is always greater than zero (see check above).
-  let partIdx = try elements._partition(within: range, by: areInIncreasingOrder)
-  try _introSortImpl(
-    &elements,
-    subRange: range.lowerBound..<partIdx,
-    by: areInIncreasingOrder, 
-    depthLimit: depthLimit &- 1)
-  try _introSortImpl(
-    &elements,
-    subRange: partIdx..<range.upperBound,
-    by: areInIncreasingOrder, 
-    depthLimit: depthLimit &- 1)
+  @inlinable
+  internal mutating func _introSortImpl(
+    within range: Range<Index>,
+    by areInIncreasingOrder: (Element, Element) throws -> Bool,
+    depthLimit: Int
+  ) rethrows {
+
+    // Insertion sort is better at handling smaller regions.
+    if distance(from: range.lowerBound, to: range.upperBound) < 20 {
+      try _insertionSort(within: range, by: areInIncreasingOrder)
+      return
+    }
+    if depthLimit == 0 {
+      try _heapSort(&self, subRange: range, by: areInIncreasingOrder)
+      return
+    }
+
+    // Partition and sort.
+    // We don't check the depthLimit variable for underflow because this variable
+    // is always greater than zero (see check above).
+    let partIdx = try _partition(within: range, by: areInIncreasingOrder)
+    try _introSortImpl(
+      within: range.lowerBound..<partIdx,
+      by: areInIncreasingOrder, 
+      depthLimit: depthLimit &- 1)
+    try _introSortImpl(
+      within: partIdx..<range.upperBound,
+      by: areInIncreasingOrder, 
+      depthLimit: depthLimit &- 1)
+  }
 }
 
 @inlinable
