@@ -27,7 +27,6 @@ TensorNonTPUTests.testAllBackends("SliceUpdate") {
   var t4 = Tensor<Bool>([[true, true, true], [false, false, false]])
   t4[0] = Tensor(shape: [3], repeating: false)
   expectEqual(ShapedArray(shape:[2, 3], repeating: false), t4.array)
-
 }
 
 runAllTests()
