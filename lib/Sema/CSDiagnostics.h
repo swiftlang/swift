@@ -226,6 +226,42 @@ protected:
   }
 };
 
+/// Diagnose failures related to same-type generic requirements, e.g.
+/// ```swift
+/// protocol P {
+///   associatedtype T
+/// }
+///
+/// struct S : P {
+///   typealias T = String
+/// }
+///
+/// func foo<U: P>(_ t: [U]) where U.T == Int {}
+/// foo([S()])
+/// ```
+///
+/// `S.T` is not the same type as `Int`, which is required by `foo`.
+class SameTypeRequirementFailure final : public RequirementFailure {
+  Type LHS, RHS;
+
+public:
+  SameTypeRequirementFailure(Expr *expr, const Solution &solution, Type lhs,
+                             Type rhs, ConstraintLocator *locator)
+      : RequirementFailure(expr, solution, locator), LHS(lhs), RHS(rhs) {}
+
+  Type getLHS() const override { return LHS; }
+  Type getRHS() const override { return RHS; }
+
+protected:
+  DiagOnDecl getDiagnosticOnDecl() const override {
+    return diag::types_not_equal_decl;
+  }
+
+  DiagInReference getDiagnosticInRereference() const override {
+    return diag::types_not_equal_in_decl_ref;
+  }
+};
+
 /// Diagnose errors associated with missing, extraneous
 /// or incorrect labels supplied by arguments, e.g.
 /// ```swift
