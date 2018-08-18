@@ -226,13 +226,38 @@ public:
   virtual ~SDKNodeVisitor() = default;
 };
 
+enum class NodeMatchReason: uint8_t {
+
+  // Two nodes are matched because they're both roots.
+  Root,
+
+  // The first node is missing.
+  Added,
+
+  // The second node is missing.
+  Removed,
+
+  // The nodes are considered a pair becuase they have same/similar name.
+  Name,
+
+  // The nodes are matched because they're in the same order, e.g. ith child of
+  // a type declaration.
+  Sequential,
+
+  // The first node is a function and it chanaged to a propery as the second
+  // node.
+  FuncToProperty,
+
+  // The first node is a global variable and the second node is an enum element.
+  ModernizeEnum,
+};
+
 // During the matching phase, any matched node will be reported using this API.
 // For update Node left = {Node before change} Right = {Node after change};
 // For added Node left = {NilNode} Right = {Node after change};
 // For removed Node left = {Node before change} Right = {NilNode}
 struct MatchedNodeListener {
-  virtual void foundMatch(NodePtr Left, NodePtr Right) = 0;
-  virtual void foundRemoveAddMatch(NodePtr Removed, NodePtr Added) {}
+  virtual void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) = 0;
   virtual ~MatchedNodeListener() = default;
 };
 
@@ -240,13 +265,13 @@ using NodePairVector = llvm::MapVector<NodePtr, NodePtr>;
 
 // This map keeps track of updated nodes; thus we can conveniently find out what
 // is the counterpart of a node before or after being updated.
-class UpdatedNodesMap : public MatchedNodeListener {
+class UpdatedNodesMap {
   NodePairVector MapImpl;
   UpdatedNodesMap(const UpdatedNodesMap& that) = delete;
 public:
   UpdatedNodesMap() = default;
   NodePtr findUpdateCounterpart(const SDKNode *Node) const;
-  void foundMatch(NodePtr Left, NodePtr Right) override {
+  void insert(NodePtr Left, NodePtr Right) {
     assert(Left && Right && "Not update operation.");
     MapImpl.insert({Left, Right});
   }
@@ -2029,9 +2054,10 @@ public:
       if (L && R && *L == *R)
         continue;
       if (!L || !R)
-        Listener.foundRemoveAddMatch(L, R);
+        Listener.foundMatch(L, R,
+          L ? NodeMatchReason::Removed : NodeMatchReason::Added);
       else
-        Listener.foundMatch(L, R);
+        Listener.foundMatch(L, R, NodeMatchReason::Sequential);
     }
   }
 };
@@ -2045,6 +2071,7 @@ class BestMatchMatcher : public NodeMatcher {
   NodeVector &Right;
   llvm::function_ref<bool(NodePtr, NodePtr)> CanMatch;
   llvm::function_ref<bool(NodeMatch, NodeMatch)> IsFirstMatchBetter;
+  NodeMatchReason Reason;
   MatchedNodeListener &Listener;
   llvm::SmallPtrSet<NodePtr, 16> MatchedRight;
 
@@ -2068,16 +2095,17 @@ public:
   BestMatchMatcher(NodeVector &Left, NodeVector &Right,
                    llvm::function_ref<bool(NodePtr, NodePtr)> CanMatch,
                    llvm::function_ref<bool(NodeMatch, NodeMatch)> IsFirstMatchBetter,
+                   NodeMatchReason Reason,
                    MatchedNodeListener &Listener) : Left(Left), Right(Right),
   CanMatch(CanMatch),
-  IsFirstMatchBetter(IsFirstMatchBetter),
+  IsFirstMatchBetter(IsFirstMatchBetter), Reason(Reason),
   Listener(Listener){}
 
   void match() override {
     for (auto L : Left) {
       if (auto Best = findBestMatch(L, Right)) {
         MatchedRight.insert(Best.getValue());
-        Listener.foundMatch(L, Best.getValue());
+        Listener.foundMatch(L, Best.getValue(), Reason);
       }
     }
   }
@@ -2096,9 +2124,9 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
       if (contains(Matched, A))
         continue;
       if (Left)
-        Listener.foundRemoveAddMatch(A, nullptr);
+        Listener.foundMatch(A, nullptr, NodeMatchReason::Removed);
       else
-        Listener.foundRemoveAddMatch(nullptr, A);
+        Listener.foundMatch(nullptr, A, NodeMatchReason::Added);
     }
   }
 
@@ -2117,7 +2145,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
           return false;
         }
         R->annotate(NodeAnnotation::PropertyName, A->getPrintedName());
-        foundMatch(R, A);
+        foundMatch(R, A, NodeMatchReason::FuncToProperty);
         return true;
       }
     }
@@ -2157,7 +2185,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
             Child->getName()).str();
           R->annotate(NodeAnnotation::ModernizeEnum,
                       R->getSDKContext().buffer(FullName));
-          foundMatch(R, A);
+          foundMatch(R, A, NodeMatchReason::ModernizeEnum);
           return true;
         }
       }
@@ -2171,7 +2199,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     auto LastR = getLastPartOfUsr(R);
     auto LastA = getLastPartOfUsr(A);
     if (LastR && LastA && LastR.getValue() == LastA.getValue()) {
-      foundMatch(R, A);
+      foundMatch(R, A, NodeMatchReason::Name);
       return true;
     }
     return false;
@@ -2249,8 +2277,8 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
 #undef DIST
   }
 
-  void foundMatch(NodePtr R, NodePtr A) override {
-    Listener.foundRemoveAddMatch(R, A);
+  void foundMatch(NodePtr R, NodePtr A, NodeMatchReason Reason) override {
+    Listener.foundMatch(R, A, Reason);
     RemovedMatched.push_back(R);
     AddedMatched.push_back(A);
   }
@@ -2277,7 +2305,6 @@ public:
     NodeVector RenameLeft;
     NodeVector RenameRight;
 
-
     for (auto Remain : Removed) {
       if (!contains(RemovedMatched, Remain))
         RenameLeft.push_back(Remain);
@@ -2289,7 +2316,7 @@ public:
     }
 
     BestMatchMatcher RenameMatcher(RenameLeft, RenameRight, isRename,
-                                   isBetterMatch, *this);
+                                   isBetterMatch, NodeMatchReason::Name, *this);
     RenameMatcher.match();
     // Rename detection ends.
 
@@ -2393,7 +2420,7 @@ void SameNameNodeMatcher::match() {
     // match kind list.
     if (auto Match = findBestNameMatch(Candidates,
                                     getNameMatchKindPriority(LN->getKind()))) {
-      Listener.foundMatch(LN, Match);
+      Listener.foundMatch(LN, Match, NodeMatchReason::Name);
       MatchedRight.push_back(Match);
     } else {
       Removed.push_back(LN);
@@ -2416,7 +2443,7 @@ class SequentialRecursiveMatcher : public NodeMatcher {
   MatchedNodeListener &Listener;
 
   void matchInternal(NodePtr L, NodePtr R) {
-    Listener.foundMatch(L, R);
+    Listener.foundMatch(L, R, NodeMatchReason::Sequential);
     if (!L || !R)
       return;
     for (unsigned I = 0; I < std::max(L->getChildrenCount(),
@@ -2525,25 +2552,31 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
 public:
   PrunePass(UpdatedNodesMap &UpdateMap) : UpdateMap(UpdateMap) {}
 
-  void foundRemoveAddMatch(NodePtr Left, NodePtr Right) override {
-    if (!Left)
+  void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
+    switch (Reason) {
+    case NodeMatchReason::Added:
+      assert(!Left);
       Right->annotate(NodeAnnotation::Added);
-    else if (!Right) {
+      return;
+    case NodeMatchReason::Removed:
+      assert(!Right);
       Left->annotate(NodeAnnotation::Removed);
-    } else if (Right->getKind() == Left->getKind()) {
-      foundMatch(Left, Right);
-    } else {
+      return;
+    case NodeMatchReason::FuncToProperty:
+    case NodeMatchReason::ModernizeEnum:
       Left->annotate(NodeAnnotation::Removed);
       Right->annotate(NodeAnnotation::Added);
+      return;
+    case NodeMatchReason::Root:
+    case NodeMatchReason::Name:
+    case NodeMatchReason::Sequential:
+      break;
     }
-  }
-
-  void foundMatch(NodePtr Left, NodePtr Right) override {
     assert(Left && Right);
     Left->annotate(NodeAnnotation::Updated);
     Right->annotate(NodeAnnotation::Updated);
     // Push the updated node to the map for future reference.
-    UpdateMap.foundMatch(Left, Right);
+    UpdateMap.insert(Left, Right);
 
     if (Left->getKind() != Right->getKind()) {
       assert(isa<SDKNodeType>(Left) && isa<SDKNodeType>(Right) &&
@@ -2589,14 +2622,14 @@ public:
       auto LC = Left->getChildren()[0];
       auto RC = Right->getChildren()[0];
       if (!(*LC == *RC))
-        foundMatch(LC, RC);
+        foundMatch(LC, RC, NodeMatchReason::Sequential);
       break;
     }
     }
   }
 
   void pass(NodePtr Left, NodePtr Right) override {
-    foundMatch(Left, Right);
+    foundMatch(Left, Right, NodeMatchReason::Root);
   }
 };
 
@@ -3762,7 +3795,7 @@ class RenameDetectorForMemberDiff : public MatchedNodeListener {
   InterfaceTypeChangeDetector RightDetector;
 public:
   RenameDetectorForMemberDiff(): LeftDetector(true), RightDetector(false) {}
-  void foundMatch(NodePtr Left, NodePtr Right) override {
+  void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
     detectRename(Left, Right);
     LeftDetector.detect(Left, Right);
     RightDetector.detect(Right, Left);
