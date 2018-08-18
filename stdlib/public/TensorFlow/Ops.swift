@@ -1183,18 +1183,9 @@ public extension Tensor {
     }
     @inline(__always)
     set {
-      let orig = self[index]
-      // FIXME: Currently there's no existing non-in-place slice updating
-      // operator in TensorFlow. But since most scalar types are numeric, we do
-      // a hack by using arithmetic operations. We need to find a proper
-      // solution soon.
-      let diff = Tensor(handle: #tfop("Sub", newValue, orig))
-      let scatteredDiff = Raw.scatterNd(
-        indices: Tensor<Int32>(shape: [1, 1], scalars: [index]),
-        updates: Tensor([diff]),
-        shape: shapeTensor
-      )
-      self = Tensor(handle: #tfop("Add", handle, scatteredDiff))
+      let left = self[0..<index]
+      let right = self[index+1..<_TFGetScalarOrDie(shapeTensor[0].handle)]
+      self = Raw.concatV2([left, newValue.rankLifted(), right], axis: Tensor<Int32>(0))
     }
   }
 
@@ -1236,12 +1227,12 @@ public extension Tensor {
       // TODO: The horrendous mess of type-casting is necessary due to GPU ops
       // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
       // if possible.
-      let lowerBound = Tensor<Int32>([bounds.lowerBound])
+      let lowerBound = Tensor<Int32>(bounds.lowerBound).rankLifted()
       let remainingZeros: Tensor<Int32> = Raw.fill(
         dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
       let startIndices = lowerBound.concatenated(with: remainingZeros)
 
-      let boundSize = Tensor<Int32>([bounds.upperBound])
+      let boundSize = Tensor<Int32>(bounds.upperBound).rankLifted()
         - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
       let scatterIndices: Tensor<Int32> = [[0]]
       let offset: Tensor<Int32> = Tensor<Int32>(
