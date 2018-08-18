@@ -112,7 +112,8 @@ extension TokenKind: Equatable {
 
 extension TokenKind: ByteTreeObjectDecodable {
   static func read(from reader: UnsafeMutablePointer<ByteTreeObjectReader>,
-                   numFields: Int, userInfo: [ByteTreeUserInfoKey: Any]
+                   numFields: Int,
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
   ) -> TokenKind {
     // Explicitly spell out all TokenKinds to keep the serialized value stable
     // even if its members get reordered or members get removed

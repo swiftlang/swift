@@ -396,7 +396,7 @@ extension RawSyntax: ByteTreeObjectDecodable {
     case omitted = 2
 
     static func read(from pointer: UnsafeRawPointer, size: Int,
-                     userInfo: [ByteTreeUserInfoKey: Any]
+                     userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
     ) -> SyntaxType {
       let rawValue = UInt8.read(from: pointer, size: size, userInfo: userInfo)
       guard let type = SyntaxType(rawValue: rawValue) else {
@@ -407,7 +407,8 @@ extension RawSyntax: ByteTreeObjectDecodable {
   }
 
   static func read(from reader: UnsafeMutablePointer<ByteTreeObjectReader>,
-                   numFields: Int, userInfo: [ByteTreeUserInfoKey: Any]
+                   numFields: Int,
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
   ) -> RawSyntax {
     let syntaxNode: RawSyntax
     let type = reader.pointee.readField(SyntaxType.self, index: 0)
@@ -428,7 +429,7 @@ extension RawSyntax: ByteTreeObjectDecodable {
       syntaxNode = RawSyntax(kind: kind, layout: layout, presence: presence,
                              id: id)
     case .omitted:
-      guard let lookupFunc = userInfo[.omittedNodeLookupFunction] as?
+      guard let lookupFunc = userInfo.pointee[.omittedNodeLookupFunction] as?
         (SyntaxNodeId) -> RawSyntax? else {
           fatalError("omittedNodeLookupFunction is required when decoding an " +
                      "incrementally transferred syntax tree")
@@ -438,7 +439,7 @@ extension RawSyntax: ByteTreeObjectDecodable {
       }
       syntaxNode = lookupNode
     }
-    if let callback = userInfo[.rawSyntaxDecodedCallback] as?
+    if let callback = userInfo.pointee[.rawSyntaxDecodedCallback] as?
       (RawSyntax) -> Void {
       callback(syntaxNode)
     }
@@ -448,7 +449,7 @@ extension RawSyntax: ByteTreeObjectDecodable {
 
 extension SyntaxNodeId: ByteTreeScalarDecodable {
   static func read(from pointer: UnsafeRawPointer, size: Int,
-                   userInfo: [ByteTreeUserInfoKey: Any]
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
   ) -> SyntaxNodeId {
     let rawValue = UInt32.read(from: pointer, size: size, userInfo: userInfo)
     return SyntaxNodeId(rawValue: UInt(rawValue))
