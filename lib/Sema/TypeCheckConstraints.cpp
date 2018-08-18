@@ -755,8 +755,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       // conditional conformance for the type with the method in question
       // (NB. that type may not be the type associated with DC, for tested types
       // with static methods).
-      if (auto Proto = Value->getDeclContext()
-                           ->getAsProtocolOrProtocolExtensionContext()) {
+      if (auto Proto = Value->getDeclContext()->getSelfProtocolDecl()) {
         auto contextSelfType =
             BaseDC->getInnermostTypeContext()->getDeclaredInterfaceType();
         auto conformance = conformsToProtocol(

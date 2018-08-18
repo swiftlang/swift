@@ -780,7 +780,7 @@ static bool isPseudogeneric(SILDeclRef c) {
   dc = dc->getInnermostTypeContext();
   if (!dc) return false;
 
-  auto classDecl = dc->getAsClassOrClassExtensionContext();
+  auto classDecl = dc->getSelfClassDecl();
   return (classDecl && classDecl->usesObjCGenericsModel());
 }
 
@@ -1996,9 +1996,7 @@ getUncachedSILFunctionTypeForConstant(SILModule &M,
 
     if (extInfo.getSILRepresentation() ==
         SILFunctionTypeRepresentation::WitnessMethod) {
-      auto proto = constant.getDecl()
-                       ->getDeclContext()
-                       ->getAsProtocolOrProtocolExtensionContext();
+      auto proto = constant.getDecl()->getDeclContext()->getSelfProtocolDecl();
       witnessMethodConformance = ProtocolConformanceRef(proto);
     }
 

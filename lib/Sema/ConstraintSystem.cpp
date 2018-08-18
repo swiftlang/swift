@@ -508,7 +508,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
     if (parentTy && extension && extension->isConstrainedExtension()) {
       auto contextSubMap = parentTy->getContextSubstitutionMap(
           extension->getParentModule(),
-          extension->getAsNominalTypeOrNominalTypeExtensionContext());
+          extension->getSelfNominalTypeDecl());
       if (!subMap) {
         // The substitution map wasn't set above, meaning we should grab the map
         // for the extension itself.
@@ -938,7 +938,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
-    if (!func->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    if (!func->getDeclContext()->getSelfProtocolDecl()) {
       if (func->hasDynamicSelf()) {
         auto params = openedFnType->getParams();
         assert(params.size() == 1);
@@ -1089,7 +1089,7 @@ static void bindArchetypesFromContext(
        !parentDC->isModuleScopeContext();
        parentDC = parentDC->getParent()) {
     if (parentDC->isTypeContext()) {
-      if (parentDC != outerDC && parentDC->getAsProtocolOrProtocolExtensionContext()) {
+      if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
         auto contextTy = cs.TC.Context.TheUnresolvedType;
         bindContextArchetype(selfTy, contextTy);
@@ -1352,7 +1352,7 @@ ConstraintSystem::getTypeOfMemberReference(
                                 locator, replacements, innerDC, outerDC,
                                 /*skipProtocolSelfConstraint=*/true);
 
-  if (!outerDC->getAsProtocolOrProtocolExtensionContext()) {
+  if (!outerDC->getSelfProtocolDecl()) {
     // Class methods returning Self as well as constructors get the
     // result replaced with the base object type.
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
@@ -1384,7 +1384,7 @@ ConstraintSystem::getTypeOfMemberReference(
   assert(openedParams.size() == 1);
 
   Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
-  if (outerDC->getAsProtocolOrProtocolExtensionContext()) {
+  if (outerDC->getSelfProtocolDecl()) {
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
@@ -1412,7 +1412,7 @@ ConstraintSystem::getTypeOfMemberReference(
   // the access will operate on existentials and not type parameters.
   if (!isDynamicResult &&
       baseObjTy->isExistentialType() &&
-      outerDC->getAsProtocolOrProtocolExtensionContext()) {
+      outerDC->getSelfProtocolDecl()) {
     auto selfTy = replacements[
       cast<GenericTypeParamType>(outerDC->getSelfInterfaceType()
                                  ->getCanonicalType())];

@@ -39,10 +39,11 @@ operator<<(raw_ostream &Out, const NodeAnnotation Value) {
   llvm_unreachable("Undefined SDK node kind.");
 }
 
-SDKNodeKind swift::ide::api::parseSDKNodeKind(StringRef Content) {
-  return llvm::StringSwitch<SDKNodeKind>(Content)
+Optional<SDKNodeKind> swift::ide::api::parseSDKNodeKind(StringRef Content) {
+  return llvm::StringSwitch<Optional<SDKNodeKind>>(Content)
 #define NODE_KIND(NAME, VALUE) .Case(#VALUE, SDKNodeKind::NAME)
 #include "swift/IDE/DigesterEnums.def"
+    .Default(None)
   ;
 }
 
@@ -326,7 +327,7 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
   switch (parseDiffItemKind(DiffItemKind)) {
   case APIDiffItemKind::ADK_CommonDiffItem: {
     return new (Alloc.Allocate<CommonDiffItem>())
-      CommonDiffItem(parseSDKNodeKind(NodeKind),
+      CommonDiffItem(*parseSDKNodeKind(NodeKind),
                      parseSDKNodeAnnotation(NodeAnnotation), ChildIndex,
                      LeftUsr, RightUsr, LeftComment, RightComment, ModuleName);
   }

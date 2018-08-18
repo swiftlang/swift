@@ -1088,7 +1088,7 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     (void)baseMeta;
     assert(!baseMeta->is<BoundGenericType>() &&
            "generic static stored properties not implemented");
-    if (field->getDeclContext()->getAsClassOrClassExtensionContext() &&
+    if (field->getDeclContext()->getSelfClassDecl() &&
         field->hasStorage())
       // FIXME: don't need to check hasStorage, already done above
       assert(field->isFinal() && "non-final class stored properties not implemented");
@@ -2867,7 +2867,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
     // Use the opened archetype from the AST for a protocol member, or make a
     // new one (which we'll upcast immediately below) for a class member.
     ArchetypeType *opened;
-    if (storage->getDeclContext()->getAsClassOrClassExtensionContext()) {
+    if (storage->getDeclContext()->getSelfClassDecl()) {
       opened = ArchetypeType::getOpened(baseType);
     } else {
       opened = subs.getReplacementTypes()[0]->castTo<ArchetypeType>();
@@ -2888,8 +2888,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   }
   
   // Upcast a class instance to the property's declared type if necessary.
-  if (auto propertyClass = storage->getDeclContext()
-                                  ->getAsClassOrClassExtensionContext()) {
+  if (auto propertyClass = storage->getDeclContext()->getSelfClassDecl()) {
     if (baseType->getClassOrBoundGenericClass() != propertyClass) {
       baseType = baseType->getSuperclassForDecl(propertyClass)
         ->getCanonicalType();

@@ -921,7 +921,7 @@ ParserResult<Pattern> Parser::parsePattern() {
   }
     
   case tok::code_complete:
-    if (!CurDeclContext->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (!CurDeclContext->getSelfNominalTypeDecl()) {
       // This cannot be an overridden property, so just eat the token. We cannot
       // code complete anything here -- we expect an identifier.
       consumeToken(tok::code_complete);

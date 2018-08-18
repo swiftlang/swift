@@ -51,7 +51,7 @@ ValueDecl *LookupResultEntry::getBaseDecl() const {
     return selfDecl;
   }
 
-  auto *nominalDecl = BaseDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominalDecl = BaseDC->getSelfNominalTypeDecl();
   assert(nominalDecl);
   return nominalDecl;
 }
@@ -179,12 +179,9 @@ static void recordShadowedDeclsAfterSignatureMatch(
 
       // If one declaration is in a protocol or extension thereof and the
       // other is not, prefer the one that is not.
-      if ((bool)firstDecl->getDeclContext()
-            ->getAsProtocolOrProtocolExtensionContext()
-            != (bool)secondDecl->getDeclContext()
-                 ->getAsProtocolOrProtocolExtensionContext()) {
-        if (firstDecl->getDeclContext()
-              ->getAsProtocolOrProtocolExtensionContext()) {
+      if ((bool)firstDecl->getDeclContext()->getSelfProtocolDecl() !=
+            (bool)secondDecl->getDeclContext()->getSelfProtocolDecl()) {
+        if (firstDecl->getDeclContext()->getSelfProtocolDecl()) {
           shadowed.insert(firstDecl);
           break;
         } else {
@@ -302,8 +299,7 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
     // either init methods or factory methods.
     if (decl->hasClangNode()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-        auto nominal = ctor->getDeclContext()
-            ->getAsNominalTypeOrNominalTypeExtensionContext();
+        auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl();
         auto &knownInits = objCInitializerCollisions[nominal];
         if (knownInits.size() == 1) {
           objCInitializerCollisionNominals.push_back(nominal);
@@ -540,7 +536,7 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 TinyPtrVector<NominalTypeDecl *>
 SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
                                            ExtensionDecl *ext) const {
-  auto proto = ext->getAsProtocolExtensionContext();
+  auto proto = ext->getExtendedProtocolDecl();
   assert(proto && "Not a protocol extension?");
 
   ASTContext &ctx = proto->getASTContext();
@@ -747,7 +743,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         // We have a nominal type or an extension thereof. Perform lookup into
         // the nominal type.
-        auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+        auto nominal = dc->getSelfNominalTypeDecl();
         if (!nominal) continue;
 
         // Dig out the type we're looking into.
@@ -834,7 +830,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // Local function to populate the set of lookup declarations from
         // the given DeclContext.
         auto populateLookupDeclsFromContext = [&](DeclContext *dc) {
-          auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+          auto nominal = dc->getSelfNominalTypeDecl();
           if (!nominal)
             return;
 
@@ -2112,7 +2108,7 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
       continue;
 
     auto dc = decl->getDeclContext();
-    auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto nominal = dc->getSelfNominalTypeDecl();
     assert(nominal && "Couldn't find nominal type?");
     (void)nominal;
 

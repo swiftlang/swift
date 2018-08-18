@@ -39,17 +39,15 @@ public struct ExternalReabstractions<T> {
   @sil_stored public var reabstracted: () -> () { get set }
 }
 
-// -- 0xff_fffe - struct property, offset resolved from field offset vector in metadata
+// -- struct property, offset resolved from field offset vector in metadata
 // CHECK-64: @"$S19property_descriptor15ExternalGenericV2roxvpMV" =
-// CHECK-64-SAME: <{ <i32 0x01ff_fffe>, i32 32 }>, align 8
 // CHECK-32: @"$S19property_descriptor15ExternalGenericV2roxvpMV" =
-// CHECK-32-SAME: <{ <i32 0x01ff_fffe>, i32 16 }>, align 4
+// CHECK-SAME: <{ <i32 0x01ff_fffe>,
 sil_property #ExternalGeneric.ro <T: Comparable> (
   stored_property #ExternalGeneric.ro : $T)
 // CHECK-64: @"$S19property_descriptor15ExternalGenericV2rwxvpMV" =
-// CHECK-64-SAME: <{ <i32 0x01ff_fffe>, i32 36 }>, align 8
 // CHECK-32: @"$S19property_descriptor15ExternalGenericV2rwxvpMV" =
-// CHECK-32-SAME: <{ <i32 0x01ff_fffe>, i32 20 }>, align 4
+// CHECK-SAME: <{ <i32 0x01ff_fffe>,
 sil_property #ExternalGeneric.rw <T: Comparable> (
   stored_property #ExternalGeneric.rw : $T)
 

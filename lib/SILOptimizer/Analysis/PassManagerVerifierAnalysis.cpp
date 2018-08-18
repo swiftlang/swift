@@ -19,7 +19,7 @@ static llvm::cl::opt<bool>
     EnableVerifier("enable-sil-passmanager-verifier-analysis",
                    llvm::cl::desc("Enable verification of the passmanagers "
                                   "function notification infrastructure"),
-                   llvm::cl::init(false));
+                   llvm::cl::init(true));
 
 using namespace swift;
 

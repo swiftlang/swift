@@ -417,7 +417,7 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
   }
 
   if (type->isExistentialType() &&
-      typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      typeDecl->getDeclContext()->getSelfProtocolDecl()) {
     // TODO: Temporarily allow typealias and associated type lookup on
     //       existential type iff it doesn't have any type parameters.
     if (isa<TypeAliasDecl>(typeDecl) || isa<AssociatedTypeDecl>(typeDecl))
@@ -475,7 +475,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     // If we're looking up an associated type of a concrete type,
     // record it later for conformance checking; we might find a more
     // direct typealias with the same name later.
-    if (typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
         if (!type->is<ArchetypeType>() &&
             !type->isTypeParameter()) {

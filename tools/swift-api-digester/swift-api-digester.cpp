@@ -292,6 +292,9 @@ struct ABIAttributeInfo {
 class SDKContext {
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
+  SourceManager SourceMgr;
+  DiagnosticEngine Diags;
+  
   UpdatedNodesMap UpdateMap;
   NodeMap TypeAliasUpdateMap;
   NodeMap RevertTypeAliasUpdateMap;
@@ -312,7 +315,7 @@ class SDKContext {
   }
 
 public:
-  SDKContext(bool ABI): ABI(ABI) {
+  SDKContext(bool ABI): Diags(SourceMgr), ABI(ABI) {
 #define ADD(NAME) ABIAttrs.push_back({DeclAttrKind::DAK_##NAME, \
       NodeAnnotation::Change##NAME, getAttrName(DeclAttrKind::DAK_##NAME)});
     ADD(ObjC)
@@ -339,8 +342,23 @@ public:
   TypeMemberDiffVector &getTypeMemberDiffs() {
     return TypeMemberDiffs;
   }
+  SourceManager &getSourceMgr() {
+    return SourceMgr;
+  }
+  DiagnosticEngine &getDiags() {
+    return Diags;
+  }
   bool checkingABI() const { return ABI; }
   ArrayRef<ABIAttributeInfo> getABIAttributeInfo() const { return ABIAttrs; }
+  
+  template<class YAMLNodeTy, typename ...ArgTypes>
+  void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
+                typename detail::PassArgument<ArgTypes>::type... args) {
+    auto smRange = node->getSourceRange();
+    auto range = SourceRange(SourceLoc(smRange.Start), SourceLoc(smRange.End));
+    Diags.diagnose(range.Start, ID, std::forward<ArgTypes>(args)...)
+      .highlight(range);
+  }
 };
 
 // A node matcher will traverse two trees of SDKNode and find matched nodes
@@ -354,10 +372,11 @@ enum class KeyKind {
 #include "swift/IDE/DigesterEnums.def"
 };
 
-static KeyKind parseKeyKind(StringRef Content) {
-  return llvm::StringSwitch<KeyKind>(Content)
+static Optional<KeyKind> parseKeyKind(StringRef Content) {
+  return llvm::StringSwitch<Optional<KeyKind>>(Content)
 #define KEY(NAME) .Case(#NAME, KeyKind::KK_##NAME)
 #include "swift/IDE/DigesterEnums.def"
+    .Default(None)
   ;
 }
 
@@ -1050,113 +1069,138 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   static auto getAsInt = [&](llvm::yaml::Node *N) -> int {
     return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
   };
+  
   SDKNodeKind Kind;
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
 
   for (auto &Pair : *Node) {
-    switch(parseKeyKind(GetScalarString(Pair.getKey()))) {
-    case KeyKind::KK_kind:
-      Kind = parseSDKNodeKind(GetScalarString(Pair.getValue()));
-      break;
-    case KeyKind::KK_name:
-      Info.Name = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_selfIndex:
-      Info.SelfIndex = getAsInt(Pair.getValue());
-      break;
-    case KeyKind::KK_usr:
-      Info.USR = GetScalarString(Pair.getValue());
-      break;
+    auto keyString = GetScalarString(Pair.getKey()); 
+    if (auto keyKind = parseKeyKind(keyString)) {
+      switch(*keyKind) {
+      case KeyKind::KK_kind:
+        if (auto parsedKind = parseSDKNodeKind(GetScalarString(Pair.getValue()))) {
+          Kind = *parsedKind;
+        } else {
+          Ctx.diagnose(Pair.getValue(), diag::sdk_node_unrecognized_node_kind,
+                       GetScalarString(Pair.getValue()));
+        }
+        break;
+      case KeyKind::KK_name:
+        Info.Name = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_selfIndex:
+        Info.SelfIndex = getAsInt(Pair.getValue());
+        break;
+      case KeyKind::KK_usr:
+        Info.USR = GetScalarString(Pair.getValue());
+        break;
 
-    case KeyKind::KK_location:
-      Info.Location = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_children:
-      for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
-        Children.push_back(constructSDKNode(Ctx,
-                                      cast<llvm::yaml::MappingNode>(&Mapping)));
+      case KeyKind::KK_location:
+        Info.Location = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_children:
+        for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
+          Children.push_back(constructSDKNode(Ctx,
+                                        cast<llvm::yaml::MappingNode>(&Mapping)));
+        }
+        break;
+      case KeyKind::KK_conformingProtocols: {
+        assert(Info.ConformingProtocols.empty());
+        for (auto &Name : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
+          Info.ConformingProtocols.push_back(GetScalarString(&Name));
+        }
+        break;
       }
-      break;
-    case KeyKind::KK_conformingProtocols: {
-      assert(Info.ConformingProtocols.empty());
-      for (auto &Name : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
-        Info.ConformingProtocols.push_back(GetScalarString(&Name));
+      case KeyKind::KK_enumRawTypeName: {
+        assert(Info.DKind == DeclKind::Enum);
+        Info.EnumRawTypeName = GetScalarString(Pair.getValue());
+        break;
       }
-      break;
-    }
-    case KeyKind::KK_enumRawTypeName: {
-      assert(Info.DKind == DeclKind::Enum);
-      Info.EnumRawTypeName = GetScalarString(Pair.getValue());
-      break;
-    }
-    case KeyKind::KK_printedName:
-      Info.PrintedName = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_moduleName:
-      Info.ModuleName = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_superclassUsr:
-      Info.SuperclassUsr = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_genericSig:
-      Info.GenericSig = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_throwing:
-      Info.IsThrowing = true;
-      break;
-    case KeyKind::KK_mutating:
-      Info.IsMutating = true;
-      break;
-    case KeyKind::KK_hasDefaultArg:
-      Info.TypeInfo.hasDefaultArgument = true;
-      break;
-    case KeyKind::KK_static:
-      Info.IsStatic = true;
-      break;
-    case KeyKind::KK_deprecated:
-      Info.IsDeprecated = true;
-      break;
-    case KeyKind::KK_ownership:
-      Info.ReferenceOwnership =
-          swift::ReferenceOwnership(getAsInt(Pair.getValue()));
-      assert(Info.ReferenceOwnership != swift::ReferenceOwnership::Strong &&
-             "Strong is implied.");
-      break;
+      case KeyKind::KK_printedName:
+        Info.PrintedName = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_moduleName:
+        Info.ModuleName = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_superclassUsr:
+        Info.SuperclassUsr = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_genericSig:
+        Info.GenericSig = GetScalarString(Pair.getValue());
+        break;
+      case KeyKind::KK_throwing:
+        Info.IsThrowing = true;
+        break;
+      case KeyKind::KK_mutating:
+        Info.IsMutating = true;
+        break;
+      case KeyKind::KK_hasDefaultArg:
+        Info.TypeInfo.hasDefaultArgument = true;
+        break;
+      case KeyKind::KK_static:
+        Info.IsStatic = true;
+        break;
+      case KeyKind::KK_deprecated:
+        Info.IsDeprecated = true;
+        break;
+      case KeyKind::KK_ownership:
+        Info.ReferenceOwnership =
+            swift::ReferenceOwnership(getAsInt(Pair.getValue()));
+        assert(Info.ReferenceOwnership != swift::ReferenceOwnership::Strong &&
+               "Strong is implied.");
+        break;
 
-    case KeyKind::KK_typeAttributes: {
-      auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-      std::transform(Seq->begin(), Seq->end(),
-                     std::back_inserter(Info.TypeAttrs),
-        [](llvm::yaml::Node &N) {
-          auto Result = llvm::StringSwitch<TypeAttrKind>(GetScalarString(&N))
-#define TYPE_ATTR(X) .Case(#X, TypeAttrKind::TAK_##X)
-#include "swift/AST/Attr.def"
-          .Default(TypeAttrKind::TAK_Count);
-          assert(Result != TypeAttrKind::TAK_Count);
-          return Result;
-        });
-      break;
+      case KeyKind::KK_typeAttributes: {
+        auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
+        std::transform(Seq->begin(), Seq->end(),
+                       std::back_inserter(Info.TypeAttrs),
+          [&](llvm::yaml::Node &N) {
+            auto Result = llvm::StringSwitch<TypeAttrKind>(GetScalarString(&N))
+  #define TYPE_ATTR(X) .Case(#X, TypeAttrKind::TAK_##X)
+  #include "swift/AST/Attr.def"
+            .Default(TypeAttrKind::TAK_Count);
+            if (Result == TAK_Count)
+              Ctx.diagnose(&N, diag::sdk_node_unrecognized_type_attr_kind,
+                           GetScalarString(&N));
+            return Result;
+          });
+        break;
+      }
+      case KeyKind::KK_declAttributes: {
+        auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
+        std::transform(Seq->begin(), Seq->end(), std::back_inserter(Info.DeclAttrs),
+          [&](llvm::yaml::Node &N) {
+            auto Result = llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
+  #define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::DAK_##NAME)
+  #include "swift/AST/Attr.def"
+            .Default(DeclAttrKind::DAK_Count);
+            if (Result == DAK_Count)
+              Ctx.diagnose(&N, diag::sdk_node_unrecognized_decl_attr_kind,
+                           GetScalarString(&N));
+            return Result;
+          });
+        break;
+      }
+      case KeyKind::KK_declKind: {
+        auto dKind = llvm::StringSwitch<Optional<DeclKind>>(
+          GetScalarString(Pair.getValue()))
+  #define DECL(X, PARENT) .Case(#X, DeclKind::X)
+  #include "swift/AST/DeclNodes.def"
+        .Default(None);
+        if (dKind)
+          Info.DKind = *dKind;
+        else
+          Ctx.diagnose(Pair.getValue(), diag::sdk_node_unrecognized_decl_kind,
+                       GetScalarString(Pair.getValue()));
+        break;
+      }
+      }
     }
-    case KeyKind::KK_declAttributes: {
-      auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-      std::transform(Seq->begin(), Seq->end(), std::back_inserter(Info.DeclAttrs),
-        [](llvm::yaml::Node &N) {
-          auto Result = llvm::StringSwitch<DeclAttrKind>(GetScalarString(&N))
-#define DECL_ATTR(_, NAME, ...) .Case(#NAME, DeclAttrKind::DAK_##NAME)
-#include "swift/AST/Attr.def"
-          .Default(DeclAttrKind::DAK_Count);
-          assert(Result != DeclAttrKind::DAK_Count);
-          return Result;
-        });
-      break;
-    }
-    case KeyKind::KK_declKind:
-      Info.DKind = llvm::StringSwitch<DeclKind>(GetScalarString(Pair.getValue()))
-#define DECL(X, PARENT) .Case(#X, DeclKind::X)
-#include "swift/AST/DeclNodes.def"
-      ;
-      break;
+    else {
+      Ctx.diagnose(Pair.getKey(), diag::sdk_node_unrecognized_key,
+                              keyString);
+      Pair.skip();
     }
   };
   SDKNode *Result = Info.createSDKNode(Kind);
@@ -1669,9 +1713,8 @@ static SDKNode *constructTypeDeclNode(SDKContext &Ctx, NominalTypeDecl *NTD,
 static SDKNode *constructExternalExtensionNode(SDKContext &Ctx, SDKNode *Root,
                                                ExtensionDecl *Ext,
                                         std::set<ExtensionDecl*> &HandledExts) {
-  auto *TypeNode = SDKNodeInitInfo(Ctx,
-    Ext->getAsNominalTypeOrNominalTypeExtensionContext()).
-      createSDKNode(SDKNodeKind::DeclType);
+  auto *TypeNode = SDKNodeInitInfo(Ctx, Ext->getSelfNominalTypeDecl())
+      .createSDKNode(SDKNodeKind::DeclType);
 
   // The members of the extension are the only members of this synthesized type.
   addMembersToRoot(Ctx, TypeNode, Ext, HandledExts);
@@ -2021,19 +2064,21 @@ parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-  llvm::MemoryBuffer::getFileOrSTDIN(FileName);
+    vfs::getFileOrSTDIN(*Ctx.getSourceMgr().getFileSystem(), FileName);
   if (!FileBufOrErr) {
     llvm_unreachable("Failed to read JSON file");
   }
   StringRef Buffer = FileBufOrErr->get()->getBuffer();
-  llvm::SourceMgr SM;
-  yaml::Stream Stream(Buffer, SM);
+  yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, FileName),
+                      Ctx.getSourceMgr().getLLVMSourceMgr());
   SDKNode *Result = nullptr;
   for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
     assert(DI != Stream.end() && "Failed to read a document");
     yaml::Node *N = DI->getRoot();
     assert(N && "Failed to find a root");
     Result = SDKNode::constructSDKNode(Ctx, cast<yaml::MappingNode>(N));
+    if (Ctx.getDiags().hadAnyError())
+      exit(1);
   }
   return {std::move(FileBufOrErr.get()), Result};
 }
@@ -3884,7 +3929,10 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath) {
     llvm::errs() << RightPath << " does not exist\n";
     return 1;
   }
+  PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(options::Abi);
+  Ctx.getDiags().addConsumer(PDC);
+
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
@@ -3936,7 +3984,11 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
     return 1;
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
+
+  PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(options::Abi);
+  Ctx.getDiags().addConsumer(PDC);
+
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
@@ -4060,7 +4112,10 @@ static int dumpSwiftModules(const CompilerInvocation &InitInvok,
     Modules.push_back(M);
   }
 
+  PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(options::Abi);
+  Ctx.getDiags().addConsumer(PDC);
+
   for (auto M : Modules) {
     SwiftDeclCollector Collector(Ctx);
     SmallVector<Decl*, 256> Decls;
@@ -4272,7 +4327,10 @@ static int deserializeSDKDump(StringRef dumpPath, StringRef OutputPath) {
     llvm::errs() << dumpPath << " does not exist\n";
     return 1;
   }
+  PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(options::Abi);
+  Ctx.getDiags().addConsumer(PDC);
+
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
   Collector.serialize(OutputPath);
@@ -4285,7 +4343,10 @@ static int findDeclUsr(StringRef dumpPath) {
     llvm::errs() << dumpPath << " does not exist\n";
     return 1;
   }
+  PrintingDiagnosticConsumer PDC;
   SDKContext Ctx(options::Abi);
+  Ctx.getDiags().addConsumer(PDC);
+
   SwiftDeclCollector Collector(Ctx);
   Collector.deSerialize(dumpPath);
   struct FinderByLocation: SDKNodeVisitor {
