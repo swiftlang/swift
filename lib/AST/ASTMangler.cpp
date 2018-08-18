@@ -2045,7 +2045,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   if (!decl->hasInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
     if (isa<AbstractFunctionDecl>(decl))
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
-                                  C.TheErrorType, AnyFunctionType::ExtInfo());
+                                  C.TheErrorType);
     return C.TheErrorType;
   }
 
@@ -2055,7 +2055,7 @@ CanType ASTMangler::getDeclTypeForMangling(
     genericSig = gft.getGenericSignature();
     CurGenericSignature = gft.getGenericSignature();
 
-    type = CanFunctionType::get(gft->getParams(), gft.getResult(),
+    type = CanFunctionType::get(gft.getParams(), gft.getResult(),
                                 gft->getExtInfo());
   }
 

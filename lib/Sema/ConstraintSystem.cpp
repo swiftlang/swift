@@ -1251,6 +1251,8 @@ ConstraintSystem::getTypeOfMemberReference(
     return getTypeOfReference(value, functionRefKind, locator, useDC, base);
   }
 
+  FunctionType::Param baseObjParam(baseObjTy);
+
   // Don't open existentials when accessing typealias members of
   // protocols.
   if (auto *alias = dyn_cast<TypeAliasDecl>(value)) {
@@ -1259,7 +1261,7 @@ ConstraintSystem::getTypeOfMemberReference(
       // If we end up with a protocol typealias here, it's underlying
       // type must be fully concrete.
       assert(!memberTy->hasTypeParameter());
-      auto openedType = FunctionType::get(baseObjTy, memberTy);
+      auto openedType = FunctionType::get({baseObjParam}, memberTy);
       return { openedType, memberTy };
     }
   }
@@ -1275,7 +1277,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
 
-    auto openedType = FunctionType::get(baseObjTy, memberTy);
+    auto openedType = FunctionType::get({baseObjParam}, memberTy);
     return { openedType, memberTy };
   }
 
@@ -1319,9 +1321,9 @@ ConstraintSystem::getTypeOfMemberReference(
           elementTy = OptionalType::get(elementTy->getRValueType());
       }
 
-      auto indicesTy = subscript->getIndicesInterfaceType();
-      refType = FunctionType::get(indicesTy, elementTy,
-                                  AnyFunctionType::ExtInfo());
+      auto indices = subscript->getInterfaceType()
+                              ->castTo<AnyFunctionType>()->getParams();
+      refType = FunctionType::get(indices, elementTy);
     } else {
       refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
                                            base, /*wantInterfaceType=*/true);
@@ -1338,13 +1340,11 @@ ConstraintSystem::getTypeOfMemberReference(
       selfFlags = selfFlags.withInOut(true);
 
     // If the storage is generic, add a generic signature.
-    auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), selfFlags);
+    FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
     if (auto *sig = innerDC->getGenericSignatureOfContext()) {
-      funcType = GenericFunctionType::get(sig, {selfParam}, refType,
-                                          AnyFunctionType::ExtInfo());
+      funcType = GenericFunctionType::get(sig, {selfParam}, refType);
     } else {
-      funcType = FunctionType::get({selfParam}, refType,
-                                   AnyFunctionType::ExtInfo());
+      funcType = FunctionType::get({selfParam}, refType);
     }
   }
 
@@ -1586,12 +1586,12 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     auto output = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
 
-    auto inputArg = TupleTypeElt(input, CS.getASTContext().getIdentifier("of"));
-    auto inputTuple = TupleType::get(inputArg, CS.getASTContext());
+    FunctionType::Param inputArg(input,
+                                 CS.getASTContext().getIdentifier("of"));
     
     CS.addConstraint(ConstraintKind::DynamicTypeOf, output, input,
         CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
-    refType = FunctionType::get(inputTuple, output);
+    refType = FunctionType::get({inputArg}, output);
     openedFullType = refType;
     return true;
   }
@@ -1608,19 +1608,18 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
          CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
-    auto bodyClosure = FunctionType::get(
-      ParenType::get(CS.getASTContext(), escapeClosure), result,
+    FunctionType::Param arg(escapeClosure);
+    auto bodyClosure = FunctionType::get(arg, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*autoclosure*/ false,
                               /*noescape*/ true,
                               /*throws*/ true));
-    TupleTypeElt argTupleElts[] = {
-      TupleTypeElt(noescapeClosure),
-      TupleTypeElt(bodyClosure, CS.getASTContext().getIdentifier("do")),
+    FunctionType::Param args[] = {
+      FunctionType::Param(noescapeClosure),
+      FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
     
-    auto argTuple = TupleType::get(argTupleElts, CS.getASTContext());
-    refType = FunctionType::get(argTuple, result,
+    refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*autoclosure*/ false,
                             /*noescape*/ false,
@@ -1640,18 +1639,17 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
          CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
-    auto bodyClosure = FunctionType::get(
-      ParenType::get(CS.getASTContext(), openedTy), result,
+    FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
+    auto bodyClosure = FunctionType::get(bodyArgs, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*autoclosure*/ false,
                               /*noescape*/ true,
                               /*throws*/ true));
-    TupleTypeElt argTupleElts[] = {
-      TupleTypeElt(existentialTy),
-      TupleTypeElt(bodyClosure, CS.getASTContext().getIdentifier("do")),
+    FunctionType::Param args[] = {
+      FunctionType::Param(existentialTy),
+      FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
-    auto argTuple = TupleType::get(argTupleElts, CS.getASTContext());
-    refType = FunctionType::get(argTuple, result,
+    refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*autoclosure*/ false,
                             /*noescape*/ false,
@@ -1887,12 +1885,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     addKeyPathApplicationConstraint(
                   keyPathIndexTy, choice.getBaseType(), elementTy, locator);
     
-    TupleTypeElt indexTupleElts[] = {
-      TupleTypeElt(keyPathIndexTy, getASTContext().Id_keyPath),
+    FunctionType::Param indices[] = {
+      FunctionType::Param(keyPathIndexTy, getASTContext().Id_keyPath),
     };
-    auto indexTuple = TupleType::get(indexTupleElts, getASTContext());
-    auto subscriptTy = FunctionType::get(indexTuple, elementTy);
-    auto fullTy = FunctionType::get(choice.getBaseType(), subscriptTy);
+    auto subscriptTy = FunctionType::get(indices, elementTy);
+
+    FunctionType::Param baseParam(choice.getBaseType());
+    auto fullTy = FunctionType::get({baseParam}, subscriptTy);
     openedFullType = fullTy;
     refType = subscriptTy;
 

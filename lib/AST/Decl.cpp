@@ -4975,11 +4975,9 @@ void SubscriptDecl::computeType() {
 
   Type funcTy;
   if (auto *sig = getGenericSignature())
-    funcTy = GenericFunctionType::get(sig, argTy, elementTy,
-                                      AnyFunctionType::ExtInfo());
+    funcTy = GenericFunctionType::get(sig, argTy, elementTy);
   else
-    funcTy = FunctionType::get(argTy, elementTy,
-                               AnyFunctionType::ExtInfo());
+    funcTy = FunctionType::get(argTy, elementTy);
 
   // Record the interface type.
   setInterfaceType(funcTy);
@@ -5418,34 +5416,30 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
     }
   }
 
-  Type initFuncTy;
-
   // (Self) -> (Args...) -> Result
   if (hasSelf) {
-    SmallVector<AnyFunctionType::Param, 1> argTy;
-    SmallVector<AnyFunctionType::Param, 1> initArgTy;
+    // Constructors have an initializer type that takes an instance
+    // instead of a metatype.
+    if (auto *ctor = dyn_cast<ConstructorDecl>(this)) {
+      auto initSelfParam = computeSelfParam(this, /*isInitializingCtor=*/true);
+      Type initFuncTy;
+      if (sig)
+        initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, funcTy);
+      else
+        initFuncTy = FunctionType::get({initSelfParam}, funcTy);
+      ctor->setInitializerInterfaceType(initFuncTy);
+    }
 
     // Substitute in our own 'self' parameter.
-    argTy.push_back(computeSelfParam(this));
-    if (isa<ConstructorDecl>(this))
-      initArgTy.push_back(computeSelfParam(this, /*isInitializingCtor=*/true));
-
-    AnyFunctionType::ExtInfo info;
-    if (sig) {
-      if (isa<ConstructorDecl>(this))
-        initFuncTy = GenericFunctionType::get(sig, initArgTy, funcTy, info);
-      funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
-    } else {
-      if (isa<ConstructorDecl>(this))
-        initFuncTy = FunctionType::get(initArgTy, funcTy, info);
-      funcTy = FunctionType::get(argTy, funcTy, info);
-    }
+    auto selfParam = computeSelfParam(this);
+    if (sig)
+      funcTy = GenericFunctionType::get(sig, {selfParam}, funcTy);
+    else
+      funcTy = FunctionType::get({selfParam}, funcTy);
   }
 
   // Record the interface type.
   setInterfaceType(funcTy);
-  if (auto *ctor = dyn_cast<ConstructorDecl>(this))
-    ctor->setInitializerInterfaceType(initFuncTy);
 }
 
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
@@ -5733,25 +5727,19 @@ void EnumElementDecl::computeType() {
   // or (Self.Type) -> (Args...) -> Self.
   auto resultTy = ED->getDeclaredInterfaceType();
 
-  SmallVector<AnyFunctionType::Param, 1> selfTy;
-  selfTy.emplace_back(MetatypeType::get(resultTy, ctx),
-                      Identifier(),
-                      ParameterTypeFlags());
+  AnyFunctionType::Param selfTy(MetatypeType::get(resultTy, ctx));
 
   if (auto *PL = getParameterList()) {
     SmallVector<AnyFunctionType::Param, 4> argTy;
     PL->getParams(argTy);
 
-    resultTy = FunctionType::get(argTy, resultTy,
-                                 AnyFunctionType::ExtInfo());
+    resultTy = FunctionType::get(argTy, resultTy);
   }
 
   if (auto *genericSig = ED->getGenericSignature())
-    resultTy = GenericFunctionType::get(genericSig, selfTy, resultTy,
-                                        AnyFunctionType::ExtInfo());
+    resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy);
   else
-    resultTy = FunctionType::get(selfTy, resultTy,
-                                 AnyFunctionType::ExtInfo());
+    resultTy = FunctionType::get({selfTy}, resultTy);
 
   // Record the interface type.
   setInterfaceType(resultTy);

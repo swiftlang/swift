@@ -519,7 +519,7 @@ class RestateFilteringConsumer : public VisibleDeclConsumer {
     }
     auto newSig = GenericSignature::get(params, newReqs, false);
 
-    return GenericFunctionType::get(newSig, GFT->getInput(),
+    return GenericFunctionType::get(newSig, GFT->getParams(),
                                     GFT->getResult(), GFT->getExtInfo())
       ->getCanonicalType();
   }

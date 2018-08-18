@@ -464,7 +464,8 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
   auto reinterpretCastRef
     = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
-  reinterpretCastRef->setType(FunctionType::get({rawTy}, enumTy));
+  reinterpretCastRef->setType(FunctionType::get({FunctionType::Param(rawTy)},
+                                                enumTy));
 
   auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
                                                 { paramRef }, { Identifier() });
@@ -549,7 +550,8 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
 
   auto reinterpretCastRef
     = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
-  reinterpretCastRef->setType(FunctionType::get({enumTy}, rawTy));
+  reinterpretCastRef->setType(FunctionType::get({FunctionType::Param(enumTy)},
+                                                rawTy));
 
   auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
                                                 { selfRef }, { Identifier() });
@@ -1175,7 +1177,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   auto zeroInitializerRef =
     new (context) DeclRefExpr(concreteDeclRef, DeclNameLoc(),
                               /*implicit*/ true);
-  zeroInitializerRef->setType(FunctionType::get(emptyTuple, selfType));
+  zeroInitializerRef->setType(FunctionType::get({}, selfType));
 
   auto call = CallExpr::createImplicit(context, zeroInitializerRef, {}, {});
   call->setType(selfType);

@@ -54,6 +54,7 @@ namespace swift {
   class GenericParamList;
   class GenericSignature;
   class Identifier;
+  class InOutType;
   enum class ReferenceCounting : uint8_t;
   enum class ResilienceExpansion : unsigned;
   class SILModule;
@@ -2627,9 +2628,13 @@ public:
 
   class Param {
   public:
-    explicit Param(const TupleTypeElt &tte);
-    explicit Param(Type t, Identifier l, ParameterTypeFlags f);
-    
+    explicit Param(Type t,
+                   Identifier l = Identifier(),
+                   ParameterTypeFlags f = ParameterTypeFlags())
+        : Ty(t), Label(l), Flags(f) {
+      assert(!t || !t->is<InOutType>() && "set flags instead");
+    }
+
   private:
     /// The type of the parameter. For a variadic parameter, this is the
     /// element type.
@@ -2642,14 +2647,10 @@ public:
     ParameterTypeFlags Flags = {};
     
   public:
-    Type getType() const;
-    CanType getCanType() const {
-      assert(getType()->isCanonical());
-      return CanType(getType());
-    }
-    
     /// FIXME(Remove InOutType): This is mostly for copying between param
     /// types and should go away.
+    Type getType() const;
+
     Type getPlainType() const { return Ty; }
 
     bool hasLabel() const { return !Label.empty(); }
@@ -2694,6 +2695,7 @@ public:
     static CanParam getFromParam(const Param &param) { return CanParam(param); }
 
     CanType getType() const { return CanType(Param::getType()); }
+    CanType getPlainType() const { return CanType(Param::getPlainType()); }
   };
 
   using CanParamArrayRef =
@@ -2890,7 +2892,7 @@ public:
 protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
                   Type Input, Type Output, RecursiveTypeProperties properties,
-                  unsigned NumParams, const ExtInfo &Info)
+                  unsigned NumParams, ExtInfo Info)
   : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
     Bits.AnyFunctionType.ExtInfo = Info.Bits;
     Bits.AnyFunctionType.NumParams = NumParams;
@@ -2904,7 +2906,7 @@ protected:
 public:
   /// \brief Break an input type into an array of \c AnyFunctionType::Params.
   static void decomposeInput(Type type,
-                             SmallVectorImpl<AnyFunctionType::Param> &result);
+                             SmallVectorImpl<Param> &result);
 
   /// \brief Take an array of parameters and turn it into an input type.
   ///
@@ -2918,15 +2920,14 @@ public:
   }
 
   /// \brief Given two arrays of parameters determine if they are equal.
-  static bool equalParams(ArrayRef<AnyFunctionType::Param> a,
-                          ArrayRef<AnyFunctionType::Param> b);
+  static bool equalParams(ArrayRef<Param> a, ArrayRef<Param> b);
 
   /// \brief Given two arrays of parameters determine if they are equal.
   static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
 
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
-  ArrayRef<AnyFunctionType::Param> getParams() const;
+  ArrayRef<Param> getParams() const;
   unsigned getNumParams() const { return Bits.AnyFunctionType.NumParams; }
 
   GenericSignature *getOptGenericSignature() const;
@@ -2978,14 +2979,13 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   using ExtInfo = AnyFunctionType::ExtInfo;
   using CanParamArrayRef = AnyFunctionType::CanParamArrayRef;
 
-  static CanAnyFunctionType get(CanGenericSignature signature,
-                                CanType input, CanType result);
-  static CanAnyFunctionType get(CanGenericSignature signature,
-                                CanType input, CanType result,
-                                const ExtInfo &extInfo);
+  static CanAnyFunctionType getOld(CanGenericSignature signature,
+                                   CanType input, CanType result,
+                                   ExtInfo extInfo = ExtInfo());
   static CanAnyFunctionType get(CanGenericSignature signature,
                                 CanParamArrayRef params,
-                                CanType result, const ExtInfo &info);
+                                CanType result,
+                                ExtInfo info = ExtInfo());
 
   CanGenericSignature getOptGenericSignature() const;
 
@@ -3018,19 +3018,17 @@ class FunctionType final : public AnyFunctionType,
       
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *get(Type Input, Type Result) {
-    return get(Input, Result, ExtInfo());
-  }
-
-  static FunctionType *get(Type Input, Type Result, const ExtInfo &Info);
+  static FunctionType *getOld(Type Input, Type Result,
+                              ExtInfo Info = ExtInfo());
       
-  static FunctionType *get(ArrayRef<AnyFunctionType::Param> params,
-                           Type result, const ExtInfo &info,
+  static FunctionType *get(ArrayRef<Param> params,
+                           Type result,
+                           ExtInfo info = ExtInfo(),
                            bool canonicalVararg = false);
 
   // Retrieve the input parameters of this function type.
-  ArrayRef<AnyFunctionType::Param> getParams() const {
-    return {getTrailingObjects<AnyFunctionType::Param>(), getNumParams()};
+  ArrayRef<Param> getParams() const {
+    return {getTrailingObjects<Param>(), getNumParams()};
   }
       
   // Implement isa/cast/dyncast/etc.
@@ -3039,23 +3037,19 @@ public:
   }
       
 private:
-  FunctionType(ArrayRef<AnyFunctionType::Param> params,
+  FunctionType(ArrayRef<Param> params,
                Type Input, Type Result,
                RecursiveTypeProperties properties,
-               const ExtInfo &Info);
+               ExtInfo Info);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  static CanFunctionType get(CanType input, CanType result) {
-    auto fnType = FunctionType::get(input, result);
-    return cast<FunctionType>(fnType->getCanonicalType());
-  }
-  static CanFunctionType get(CanType input, CanType result,
-                             const ExtInfo &info) {
-    auto fnType = FunctionType::get(input, result, info);
+  static CanFunctionType getOld(CanType input, CanType result,
+                                ExtInfo info = ExtInfo()) {
+    auto fnType = FunctionType::getOld(input, result, info);
     return cast<FunctionType>(fnType->getCanonicalType());
   }
   static CanFunctionType get(CanParamArrayRef params, CanType result,
-                             const ExtInfo &info) {
+                             ExtInfo info = ExtInfo()) {
     auto fnType = FunctionType::get(params.getOriginalArray(),
                                     result, info, /*canonicalVararg=*/true);
     return cast<FunctionType>(fnType->getCanonicalType());
@@ -3100,30 +3094,30 @@ class GenericFunctionType final : public AnyFunctionType,
 
   /// Construct a new generic function type.
   GenericFunctionType(GenericSignature *sig,
-                      ArrayRef<AnyFunctionType::Param> params,
+                      ArrayRef<Param> params,
                       Type input,
                       Type result,
-                      const ExtInfo &info,
+                      ExtInfo info,
                       const ASTContext *ctx,
                       RecursiveTypeProperties properties);
       
 public:
   /// Create a new generic function type.
-  static GenericFunctionType *get(GenericSignature *sig,
-                                  Type input,
-                                  Type result,
-                                  const ExtInfo &info);
+  static GenericFunctionType *getOld(GenericSignature *sig,
+                                     Type input,
+                                     Type result,
+                                     ExtInfo info = ExtInfo());
 
   /// Create a new generic function type.
   static GenericFunctionType *get(GenericSignature *sig,
                                   ArrayRef<Param> params,
                                   Type result,
-                                  const ExtInfo &info,
+                                  ExtInfo info = ExtInfo(),
                                   bool canonicalVararg = false);
 
   // Retrieve the input parameters of this function type.
-  ArrayRef<AnyFunctionType::Param> getParams() const {
-    return {getTrailingObjects<AnyFunctionType::Param>(), getNumParams()};
+  ArrayRef<Param> getParams() const {
+    return {getTrailingObjects<Param>(), getNumParams()};
   }
       
   /// Retrieve the generic signature of this function type.
@@ -3149,7 +3143,7 @@ public:
                       GenericSignature *sig,
                       Type input,
                       Type result,
-                      const ExtInfo &info);
+                      ExtInfo info);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3158,19 +3152,20 @@ public:
 };
 
 BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
-  static CanGenericFunctionType get(CanGenericSignature sig,
-                                    CanType input, CanType result,
-                                    const ExtInfo &info) {
+  static CanGenericFunctionType getOld(CanGenericSignature sig,
+                                       CanType input, CanType result,
+                                       ExtInfo info = ExtInfo()) {
     // Knowing that the argument types are independently canonical is
     // not sufficient to guarantee that the function type will be canonical.
-    auto fnType = GenericFunctionType::get(sig, input, result, info);
+    auto fnType = GenericFunctionType::getOld(sig, input, result, info);
     return cast<GenericFunctionType>(fnType->getCanonicalType());
   }
 
   /// Create a new generic function type.
   static CanGenericFunctionType get(CanGenericSignature sig,
-                                    CanParamArrayRef params, CanType result,
-                                    const ExtInfo &info) {
+                                    CanParamArrayRef params,
+                                    CanType result,
+                                    ExtInfo info = ExtInfo()) {
     // Knowing that the argument types are independently canonical is
     // not sufficient to guarantee that the function type will be canonical.
     auto fnType = GenericFunctionType::get(sig, params.getOriginalArray(),
@@ -3194,24 +3189,18 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 
 inline CanAnyFunctionType
-CanAnyFunctionType::get(CanGenericSignature signature,
-                        CanType input, CanType result) {
-  return get(signature, input, result, ExtInfo());
-}
-
-inline CanAnyFunctionType
-CanAnyFunctionType::get(CanGenericSignature signature,
-                        CanType input, CanType result, const ExtInfo &extInfo) {
+CanAnyFunctionType::getOld(CanGenericSignature signature,
+                           CanType input, CanType result, ExtInfo extInfo) {
   if (signature) {
-    return CanGenericFunctionType::get(signature, input, result, extInfo);
+    return CanGenericFunctionType::getOld(signature, input, result, extInfo);
   } else {
-    return CanFunctionType::get(input, result, extInfo);
+    return CanFunctionType::getOld(input, result, extInfo);
   }
 }
 
 inline CanAnyFunctionType
 CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
-                        CanType result, const ExtInfo &extInfo) {
+                        CanType result, ExtInfo extInfo) {
   if (signature) {
     return CanGenericFunctionType::get(signature, params, result, extInfo);
   } else {

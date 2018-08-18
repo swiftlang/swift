@@ -108,8 +108,7 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
     // For subscripts, we don't have a 'Self' type, but turn it
     // into a monomorphic function type.
     auto funcTy = memberType->castTo<AnyFunctionType>();
-    memberType = FunctionType::get(funcTy->getParams(), funcTy->getResult(),
-                                   FunctionType::ExtInfo());
+    memberType = FunctionType::get(funcTy->getParams(), funcTy->getResult());
   } else {
     // For properties, strip off ownership.
     memberType = memberType->getReferenceStorageReferent();

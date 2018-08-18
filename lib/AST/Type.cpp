@@ -434,12 +434,10 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   }
 
   auto selfTy = dc->getDeclaredInterfaceType();
-  auto selfParam = AnyFunctionType::Param(selfTy,
-                                          Identifier(), ParameterTypeFlags());
+  auto selfParam = AnyFunctionType::Param(selfTy);
   if (sig)
-    return GenericFunctionType::get(sig, {selfParam}, type,
-                                    AnyFunctionType::ExtInfo());
-  return FunctionType::get({selfParam}, type, AnyFunctionType::ExtInfo());
+    return GenericFunctionType::get(sig, {selfParam}, type);
+  return FunctionType::get({selfParam}, type);
 }
 
 void
@@ -1204,8 +1202,8 @@ CanType TypeBase::computeCanonicalType() {
       return type->getCanonicalType(sig);
     });
     auto resultTy = function->getResult()->getCanonicalType(sig);
-    Result = GenericFunctionType::get(sig, inputTy, resultTy,
-                                      function->getExtInfo());
+    Result = GenericFunctionType::getOld(sig, inputTy, resultTy,
+                                         function->getExtInfo());
     assert(Result->isCanonical());
     break;
   }
@@ -1221,7 +1219,7 @@ CanType TypeBase::computeCanonicalType() {
     auto In = getCanonicalInputType(
         FT, [](Type type) -> CanType { return type->getCanonicalType(); });
     Type Out = FT->getResult()->getCanonicalType();
-    Result = FunctionType::get(In, Out, FT->getExtInfo());
+    Result = FunctionType::getOld(In, Out, FT->getExtInfo());
     break;
   }
   case TypeKind::ProtocolComposition: {
@@ -3810,14 +3808,14 @@ case TypeKind::Id:
       if (isUnchanged) return *this;
       
       auto genericSig = genericFnType->getGenericSignature();
-      return GenericFunctionType::get(genericSig, inputTy, resultTy,
-                                      function->getExtInfo());
+      return GenericFunctionType::getOld(genericSig, inputTy, resultTy,
+                                         function->getExtInfo());
     }
 
     if (isUnchanged) return *this;
 
-    return FunctionType::get(inputTy, resultTy,
-                             function->getExtInfo());
+    return FunctionType::getOld(inputTy, resultTy,
+                                function->getExtInfo());
   }
 
   case TypeKind::ArraySlice: {
