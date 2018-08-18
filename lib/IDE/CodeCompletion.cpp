@@ -4771,10 +4771,33 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addAnyTypeKeyword(Sink);
     break;
       
-  case CompletionKind::NominalMemberBeginning:
-    addDeclKeywords(Sink);
-    addLetVarKeywords(Sink);
+  case CompletionKind::NominalMemberBeginning: {
+    bool HasDeclIntroducer = llvm::find_if(ParsedKeywords, [](const StringRef kw) {
+      return llvm::StringSwitch<bool>(kw)
+        .Case("associatedtype", true)
+        .Case("class", true)
+        .Case("deinit", true)
+        .Case("enum", true)
+        .Case("extension", true)
+        .Case("func", true)
+        .Case("import", true)
+        .Case("init", true)
+        .Case("let", true)
+        .Case("operator", true)
+        .Case("precedencegroup", true)
+        .Case("protocol", true)
+        .Case("struct", true)
+        .Case("subscript", true)
+        .Case("typealias", true)
+        .Case("var", true)
+        .Default(false);
+    }) != ParsedKeywords.end();
+    if (!HasDeclIntroducer) {
+      addDeclKeywords(Sink);
+      addLetVarKeywords(Sink);
+    }
     break;
+  }
 
   case CompletionKind::AfterIfStmtElse:
     addKeyword(Sink, "if", CodeCompletionKeywordKind::kw_if);
