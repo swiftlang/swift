@@ -722,6 +722,25 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
     return constraints.front();
   }
 
+#ifndef NDEBUG
+  assert(!constraints.empty());
+  // Verify that all disjunction choices have the same left-hand side.
+  Type commonType;
+  assert(llvm::all_of(constraints, [&](const Constraint *choice) -> bool {
+    // if this disjunction is formed from "fixed"
+    // constraints let's not try to validate.
+    if (choice->HasRestriction || choice->getFix())
+      return true;
+
+    auto currentType = choice->getFirstType();
+    if (!commonType) {
+      commonType = currentType;
+      return true;
+    }
+    return commonType->isEqual(currentType);
+  }));
+#endif
+
   // Create the disjunction constraint.
   uniqueTypeVariables(typeVars);
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
