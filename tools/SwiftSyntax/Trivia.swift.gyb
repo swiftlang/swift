@@ -222,7 +222,8 @@ extension TriviaPiece {
 
 extension Trivia: ByteTreeObjectDecodable {
   static func read(from reader: UnsafeMutablePointer<ByteTreeObjectReader>,
-                   numFields: Int, userInfo: [ByteTreeUserInfoKey: Any]
+                   numFields: Int,
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
   ) -> Trivia {
     let pieces = [TriviaPiece].read(from: reader, numFields: numFields,
                                     userInfo: userInfo)
@@ -232,7 +233,8 @@ extension Trivia: ByteTreeObjectDecodable {
 
 extension TriviaPiece: ByteTreeObjectDecodable {
   static func read(from reader: UnsafeMutablePointer<ByteTreeObjectReader>,
-                   numFields: Int, userInfo: [ByteTreeUserInfoKey: Any]
+                   numFields: Int,
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
   ) -> TriviaPiece {
     let kind = reader.pointee.readField(UInt8.self, index: 0)
     switch kind {
