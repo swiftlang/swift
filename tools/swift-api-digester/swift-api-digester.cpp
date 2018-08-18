@@ -362,22 +362,6 @@ static raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value) {
   llvm_unreachable("Unhandled DeclKind in switch.");
 }
 
-/// We don't dump individual extension declaration in the digester. However,
-/// we still want to detect whether an extension's applicability changes. Therefore,
-/// by using ParentExtensionInfo, we keep track of extension's information in
-/// each member of the extension.
-class ParentExtensionInfo {
-  friend struct SDKNodeInitInfo;
-  friend class SDKNode;
-  std::vector<StringRef> Requirements;
-
-  void *operator new(size_t Bytes, SDKContext &C) {
-    return C.allocator().Allocate<ParentExtensionInfo>();
-  }
-public:
-  ArrayRef<StringRef> getGenericRequirements() const { return Requirements; }
-};
-
 /// The additional information we need to create a type node.
 struct TypeInitInfo {
   bool IsImplicitlyUnwrappedOptional = false;
