@@ -2707,10 +2707,25 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   if ((decl->getInitKind() == CtorInitializerKind::Convenience ||
        decl->getInitKind() == CtorInitializerKind::ConvenienceFactory) &&
       !decl->getAttrs().hasAttribute<ConvenienceAttr>()) {
-    Printer.printKeyword("convenience");
-    Printer << " ";
+    // Protocol extension initializers are modeled as convenience initializers,
+    // but they're not written that way in source. Check if we're actually
+    // printing onto a class.
+    bool isClassContext;
+    if (CurrentType) {
+      isClassContext = CurrentType->getClassOrBoundGenericClass() != nullptr;
+    } else {
+      const DeclContext *dc = decl->getDeclContext();
+      isClassContext = dc->getSelfClassDecl() != nullptr;
+    }
+    if (isClassContext) {
+      Printer.printKeyword("convenience");
+      Printer << " ";
+    } else {
+      assert(decl->getDeclContext()->getExtendedProtocolDecl() &&
+             "unexpected convenience initializer");
+    }
   } else if (decl->getInitKind() == CtorInitializerKind::Factory) {
-      Printer << "/*not inherited*/ ";
+    Printer << "/*not inherited*/ ";
   }
 
   printContextIfNeeded(decl);
