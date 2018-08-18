@@ -263,13 +263,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   InfoMap(collectSynthesizedExtensionInfo(AllGroups)) {}
 
   unsigned countInherits(ExtensionDecl *ED) {
-    unsigned Count = 0;
-    for (auto TL : ED->getInherited()) {
-      auto *nominal = TL.getType()->getAnyNominal();
-      if (nominal && Options.shouldPrint(nominal))
-        Count ++;
-    }
-    return Count;
+    SmallVector<TypeLoc, 4> Results;
+    getInheritedForPrinting(
+        ED, [&](const Decl *D) { return Options.shouldPrint(D); }, Results);
+    return Results.size();
   }
 
   std::pair<SynthesizedExtensionInfo, ExtensionMergeInfo>
