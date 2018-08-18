@@ -119,11 +119,6 @@ SILValue castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
 /// after \p ABI and returns it.
 ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index);
 
-/// Replace an apply with an instruction that produces the same value,
-/// then delete the apply and the instructions that produce its callee
-/// if possible.
-void replaceDeadApply(ApplySite Old, ValueBase *New);
-
 /// \brief Return true if any call inside the given function may bind dynamic
 /// 'Self' to a generic argument of the callee.
 bool mayBindDynamicSelf(SILFunction *F);
