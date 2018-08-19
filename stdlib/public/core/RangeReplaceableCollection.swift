@@ -62,9 +62,7 @@
 /// parameter. You can override any of the protocol's required methods to
 /// provide your own custom implementation.
 public protocol RangeReplaceableCollection : Collection
-  where SubSequence : RangeReplaceableCollection {
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
+where SubSequence : RangeReplaceableCollection {
 
   //===--- Fundamental Requirements ---------------------------------------===//
 
@@ -147,8 +145,7 @@ public protocol RangeReplaceableCollection : Collection
   ///
   /// - Parameter elements: The sequence of elements for the new collection.
   ///   `elements` must be finite.
-  init<S : Sequence>(_ elements: S)
-    where S.Element == Element
+  init<S : Sequence>(_ elements: S) where S.Element == Element
 
   /// Adds an element to the end of the collection.
   ///
@@ -361,12 +358,6 @@ public protocol RangeReplaceableCollection : Collection
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func removeAll(
     where shouldBeRemoved: (Element) throws -> Bool) rethrows
-
-  // FIXME(ABI): Associated type inference requires this.
-  subscript(bounds: Index) -> Element { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 
 //===----------------------------------------------------------------------===//
