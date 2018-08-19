@@ -4799,7 +4799,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     }
     
     if (conformance->getProtocol()->isSpecificProtocol(KnownProtocolKind::StringInterpolationProtocol)) {
-      if (auto typeDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      if (auto typeDecl = dc->getSelfNominalTypeDecl()) {
         diagnoseMissingAppendInterpolationMethod(*this, typeDecl);
       }
     }
