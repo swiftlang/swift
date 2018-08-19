@@ -1,24 +1,24 @@
-// RUN: %target-sil-opt -differentiation %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
 
 import Builtin
 import Swift
 
 sil_stage raw
 
-sil hidden @simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
+sil @simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
 bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   %2 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
   return %2 : $Builtin.FPIEEE32
 }
 
-sil hidden @chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
+sil @chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
 bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   %2 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
   return %3 : $Builtin.FPIEEE32
 }
 
-sil hidden @add_literals : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
+sil @add_literals : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
 bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   %2 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
@@ -26,8 +26,7 @@ bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   %5 = builtin "fsub_FPIEEE32"(%4 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
   return %5 : $Builtin.FPIEEE32
 }
-
-sil hidden @fanout : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
+sil @fanout : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
 bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   // f(x, y) =
   //   let v0 = x * x,
@@ -40,10 +39,8 @@ bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   return %4 : $Builtin.FPIEEE32
 }
 
-sil hidden @main : $@convention(thin) (Builtin.FPIEEE32) -> () {
+sil [Onone] @main : $@convention(thin) (Builtin.FPIEEE32) -> () {
 bb0(%0 : @trivial $Builtin.FPIEEE32):
-  // Cause the differentiator to generate gradients, primals, and adjoints.
-
   %simple_mul = function_ref @simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
   %simple_mul_grad = gradient [source 0] [wrt 0, 1] %simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
@@ -56,13 +53,19 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
   %fanout = function_ref @fanout : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
   %fanout_grad = gradient [source 0] [wrt 0, 1] %fanout : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
-  // Return
   %ret = tuple ()
   return %ret : $()
 }
 
-// chain_rule gradients intentionally omitted because they're the same as
-// simple_mul gradients.
+// CHECK-LABEL: struct simple_mul__Type
+// CHECK: struct chain_rule__Type
+// CHECK: struct add_literals__Type
+// CHECK: struct fanout__Type
+
+// CHECK-LABEL: [reverse_differentiable source 0 wrt 0, 1 primal @simple_mul__primal_src_0_wrt_0_1 adjoint @simple_mul__adjoint_src_0_wrt_0_1] @simple_mul
+// CHECK-LABEL: [reverse_differentiable source 0 wrt 0, 1 primal @chain_rule__primal_src_0_wrt_0_1 adjoint @chain_rule__adjoint_src_0_wrt_0_1] @chain_rule
+// CHECK-LABEL: [reverse_differentiable source 0 wrt 0, 1 primal @add_literals__primal_src_0_wrt_0_1 adjoint @add_literals__adjoint_src_0_wrt_0_1] @add_literals
+// CHECK-LABEL [reverse_differentiable source 0 wrt 0, 1 primal @fanout__primal_src_0_wrt_0_1 adjoint @fanout__adjoint_src_0_wrt_0_1] @fanout
 
 // CHECK-LABEL: @simple_mul__primal_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
@@ -95,180 +98,50 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK-LABEL: @fanout__primal_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
 // CHECK:   %2 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %4 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %5 = struct $fanout__Type ()
-// CHECK:   %6 = tuple (%5 : $fanout__Type, %4 : $Builtin.FPIEEE32)
-// CHECK:   return %6 : $(fanout__Type, Builtin.FPIEEE32)
+// CHECK:   %3 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %4 = struct $fanout__Type ()
+// CHECK:   %5 = tuple (%4 : $fanout__Type, %3 : $Builtin.FPIEEE32)
+// CHECK:   return %5 : $(fanout__Type, Builtin.FPIEEE32)
 // CHECK: }
 
-// CHECK-LABEL: @simple_mul__adjoint_src_0_wrt_0_1
+// CHECK: @simple_mul__adjoint_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $simple_mul__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
-// CHECK:   %5 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32
-// CHECK:   store %4 to %6 : $*Builtin.FPIEEE32
-// CHECK:   end_access %6 : $*Builtin.FPIEEE32
-// CHECK:   %9 = begin_access [read] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32
-// CHECK:   %10 = load %5 : $*Builtin.FPIEEE32
-// CHECK:   end_access %9 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %5 : $*Builtin.FPIEEE32
-// CHECK:   %13 = builtin "fmul_FPIEEE32"(%10 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %14 = builtin "fmul_FPIEEE32"(%10 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %15 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %16 = begin_access [init] [static] [no_nested_conflict] %15 : $*Builtin.FPIEEE32
-// CHECK:   store %13 to %16 : $*Builtin.FPIEEE32
-// CHECK:   end_access %16 : $*Builtin.FPIEEE32
-// CHECK:   %19 = begin_access [read] [static] [no_nested_conflict] %15 : $*Builtin.FPIEEE32
-// CHECK:   %20 = load %15 : $*Builtin.FPIEEE32
-// CHECK:   end_access %19 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %15 : $*Builtin.FPIEEE32
-// CHECK:   %23 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %24 = begin_access [init] [static] [no_nested_conflict] %23 : $*Builtin.FPIEEE32
-// CHECK:   store %14 to %24 : $*Builtin.FPIEEE32
-// CHECK:   end_access %24 : $*Builtin.FPIEEE32
-// CHECK:   %27 = begin_access [read] [static] [no_nested_conflict] %23 : $*Builtin.FPIEEE32
-// CHECK:   %28 = load %23 : $*Builtin.FPIEEE32
-// CHECK:   end_access %27 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %23 : $*Builtin.FPIEEE32
-// CHECK:   %31 = tuple (%20 : $Builtin.FPIEEE32, %28 : $Builtin.FPIEEE32)
-// CHECK:   return %31 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
+// CHECK:   %5 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %6 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %7 = tuple (%5 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32)
+// CHECK:   return %7 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
 // CHECK: }
 
-// CHECK-LABEL: @chain_rule__adjoint_src_0_wrt_0_1
+// CHECK: @chain_rule__adjoint_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $chain_rule__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
-// CHECK:   %5 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32
-// CHECK:   store %4 to %6 : $*Builtin.FPIEEE32
-// CHECK:   end_access %6 : $*Builtin.FPIEEE32
-// CHECK:   %9 = begin_access [read] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32
-// CHECK:   %10 = load %5 : $*Builtin.FPIEEE32
-// CHECK:   end_access %9 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %5 : $*Builtin.FPIEEE32
-// CHECK:   %13 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %14 = builtin "fmul_FPIEEE32"(%10 : $Builtin.FPIEEE32, %13 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %15 = builtin "fmul_FPIEEE32"(%10 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %16 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %17 = begin_access [init] [static] [no_nested_conflict] %16 : $*Builtin.FPIEEE32
-// CHECK:   store %15 to %17 : $*Builtin.FPIEEE32
-// CHECK:   end_access %17 : $*Builtin.FPIEEE32
-// CHECK:   %20 = begin_access [read] [static] [no_nested_conflict] %16 : $*Builtin.FPIEEE32
-// CHECK:   %21 = load %16 : $*Builtin.FPIEEE32
-// CHECK:   end_access %20 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %16 : $*Builtin.FPIEEE32
-// CHECK:   %24 = builtin "fneg_FPIEEE32"(%21 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %25 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %26 = begin_access [init] [static] [no_nested_conflict] %25 : $*Builtin.FPIEEE32
-// CHECK:   store %24 to %26 : $*Builtin.FPIEEE32
-// CHECK:   end_access %26 : $*Builtin.FPIEEE32
-// CHECK:   %29 = begin_access [read] [static] [no_nested_conflict] %25 : $*Builtin.FPIEEE32
-// CHECK:   %30 = load %25 : $*Builtin.FPIEEE32
-// CHECK:   end_access %29 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %25 : $*Builtin.FPIEEE32
-// CHECK:   %33 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %34 = begin_access [init] [static] [no_nested_conflict] %33 : $*Builtin.FPIEEE32
-// CHECK:   store %14 to %34 : $*Builtin.FPIEEE32
-// CHECK:   end_access %34 : $*Builtin.FPIEEE32
-// CHECK:   %37 = begin_access [read] [static] [no_nested_conflict] %33 : $*Builtin.FPIEEE32
-// CHECK:   %38 = load %33 : $*Builtin.FPIEEE32
-// CHECK:   end_access %37 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %33 : $*Builtin.FPIEEE32
-// CHECK:   %41 = tuple (%30 : $Builtin.FPIEEE32, %38 : $Builtin.FPIEEE32)
-// CHECK:   return %41 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
+// CHECK:   %5 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %6 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %5 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %7 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %8 = builtin "fneg_FPIEEE32"(%7 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %9 = tuple (%8 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32)
+// CHECK:   return %9 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
 // CHECK: }
 
-// CHECK-LABEL: @add_literals__adjoint_src_0_wrt_0_1
+// CHECK: @add_literals__adjoint_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $add_literals__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
-// CHECK:   %5 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32
-// CHECK:   store %4 to %6 : $*Builtin.FPIEEE32
-// CHECK:   end_access %6 : $*Builtin.FPIEEE32
-// CHECK:   %9 = begin_access [read] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32
-// CHECK:   %10 = load %5 : $*Builtin.FPIEEE32
-// CHECK:   end_access %9 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %5 : $*Builtin.FPIEEE32
-// CHECK:   %13 = builtin "fneg_FPIEEE32"(%10 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %14 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %15 = begin_access [init] [static] [no_nested_conflict] %14 : $*Builtin.FPIEEE32
-// CHECK:   store %13 to %15 : $*Builtin.FPIEEE32
-// CHECK:   end_access %15 : $*Builtin.FPIEEE32
-// CHECK:   %18 = begin_access [read] [static] [no_nested_conflict] %14 : $*Builtin.FPIEEE32
-// CHECK:   %19 = load %14 : $*Builtin.FPIEEE32
-// CHECK:   end_access %18 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %14 : $*Builtin.FPIEEE32
-// CHECK:   %22 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %23 = builtin "fmul_FPIEEE32"(%19 : $Builtin.FPIEEE32, %22 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %24 = builtin "fmul_FPIEEE32"(%19 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %25 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %26 = begin_access [init] [static] [no_nested_conflict] %25 : $*Builtin.FPIEEE32
-// CHECK:   store %24 to %26 : $*Builtin.FPIEEE32
-// CHECK:   end_access %26 : $*Builtin.FPIEEE32
-// CHECK:   %29 = begin_access [read] [static] [no_nested_conflict] %25 : $*Builtin.FPIEEE32
-// CHECK:   %30 = load %25 : $*Builtin.FPIEEE32
-// CHECK:   end_access %29 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %25 : $*Builtin.FPIEEE32
-// CHECK:   %33 = builtin "fneg_FPIEEE32"(%30 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %34 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %35 = begin_access [init] [static] [no_nested_conflict] %34 : $*Builtin.FPIEEE32
-// CHECK:   store %33 to %35 : $*Builtin.FPIEEE32
-// CHECK:   end_access %35 : $*Builtin.FPIEEE32
-// CHECK:   %38 = begin_access [read] [static] [no_nested_conflict] %34 : $*Builtin.FPIEEE32
-// CHECK:   %39 = load %34 : $*Builtin.FPIEEE32
-// CHECK:   end_access %38 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %34 : $*Builtin.FPIEEE32
-// CHECK:   %42 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %43 = begin_access [init] [static] [no_nested_conflict] %42 : $*Builtin.FPIEEE32
-// CHECK:   store %23 to %43 : $*Builtin.FPIEEE32
-// CHECK:   end_access %43 : $*Builtin.FPIEEE32
-// CHECK:   %46 = begin_access [read] [static] [no_nested_conflict] %42 : $*Builtin.FPIEEE32
-// CHECK:   %47 = load %42 : $*Builtin.FPIEEE32
-// CHECK:   end_access %46 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %42 : $*Builtin.FPIEEE32
-// CHECK:   %50 = tuple (%39 : $Builtin.FPIEEE32, %47 : $Builtin.FPIEEE32)
-// CHECK:   return %50 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
+// CHECK:   %5 = builtin "fneg_FPIEEE32"(%4 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %6 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %7 = builtin "fmul_FPIEEE32"(%5 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %8 = builtin "fmul_FPIEEE32"(%5 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %9 = builtin "fneg_FPIEEE32"(%8 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %10 = tuple (%9 : $Builtin.FPIEEE32, %7 : $Builtin.FPIEEE32)
+// CHECK:   return %10 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
 // CHECK: }
 
 // CHECK-LABEL: @fanout__adjoint_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $fanout__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
-// CHECK:   %5 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32
-// CHECK:   store %4 to %6 : $*Builtin.FPIEEE32
-// CHECK:   end_access %6 : $*Builtin.FPIEEE32
-// CHECK:   %9 = begin_access [read] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32
-// CHECK:   %10 = load %5 : $*Builtin.FPIEEE32
-// CHECK:   end_access %9 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %5 : $*Builtin.FPIEEE32
-// CHECK:   %13 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %14 = builtin "fmul_FPIEEE32"(%10 : $Builtin.FPIEEE32, %13 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %15 = builtin "fmul_FPIEEE32"(%10 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %16 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %17 = begin_access [init] [static] [no_nested_conflict] %16 : $*Builtin.FPIEEE32
-// CHECK:   store %15 to %17 : $*Builtin.FPIEEE32
-// CHECK:   end_access %17 : $*Builtin.FPIEEE32
-// CHECK:   %20 = begin_access [read] [static] [no_nested_conflict] %16 : $*Builtin.FPIEEE32
-// CHECK:   %21 = load %16 : $*Builtin.FPIEEE32
-// CHECK:   end_access %20 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %16 : $*Builtin.FPIEEE32
-// CHECK:   %24 = builtin "fmul_FPIEEE32"(%21 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %25 = builtin "fadd_FPIEEE32"(%14 : $Builtin.FPIEEE32, %24 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %26 = builtin "fmul_FPIEEE32"(%21 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %27 = builtin "fadd_FPIEEE32"(%25 : $Builtin.FPIEEE32, %26 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %28 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %29 = begin_access [init] [static] [no_nested_conflict] %28 : $*Builtin.FPIEEE32
-// CHECK:   store %27 to %29 : $*Builtin.FPIEEE32
-// CHECK:   end_access %29 : $*Builtin.FPIEEE32
-// CHECK:   %32 = begin_access [read] [static] [no_nested_conflict] %28 : $*Builtin.FPIEEE32
-// CHECK:   %33 = load %28 : $*Builtin.FPIEEE32
-// CHECK:   end_access %32 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %28 : $*Builtin.FPIEEE32
-// CHECK:   %36 = alloc_stack $Builtin.FPIEEE32
-// CHECK:   %37 = begin_access [init] [static] [no_nested_conflict] %36 : $*Builtin.FPIEEE32
-// CHECK:   %38 = float_literal $Builtin.FPIEEE32, 0x0
-// CHECK:   store %38 to %37 : $*Builtin.FPIEEE32
-// CHECK:   end_access %37 : $*Builtin.FPIEEE32
-// CHECK:   %41 = begin_access [read] [static] [no_nested_conflict] %36 : $*Builtin.FPIEEE32
-// CHECK:   %42 = load %36 : $*Builtin.FPIEEE32
-// CHECK:   end_access %41 : $*Builtin.FPIEEE32
-// CHECK:   dealloc_stack %36 : $*Builtin.FPIEEE32
-// CHECK:   %45 = tuple (%33 : $Builtin.FPIEEE32, %42 : $Builtin.FPIEEE32)
-// CHECK:   return %45 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
+// CHECK:   %5 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %6 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %5 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %7 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %8 = builtin "fmul_FPIEEE32"(%7 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %9 = builtin "fadd_FPIEEE32"(%6 : $Builtin.FPIEEE32, %8 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %10 = builtin "fadd_FPIEEE32"(%9 : $Builtin.FPIEEE32, %8 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %11 = float_literal $Builtin.FPIEEE32, 0x0
+// CHECK:   %12 = tuple (%10 : $Builtin.FPIEEE32, %11 : $Builtin.FPIEEE32)
+// CHECK:   return %12 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
 // CHECK: }
