@@ -223,8 +223,8 @@ static FunctionRefInst *findReferenceToVisibleFunction(SILValue value) {
         fn->isSerialized() == IsSerialized)
       return fri;
   }
-  if (auto *thinToThink = dyn_cast<ThinToThickFunctionInst>(inst))
-    return findReferenceToVisibleFunction(thinToThink->getOperand());
+  if (auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(inst))
+    return findReferenceToVisibleFunction(thinToThick->getOperand());
   if (auto *convertFn = dyn_cast<ConvertFunctionInst>(inst))
     return findReferenceToVisibleFunction(convertFn->getOperand());
   return nullptr;

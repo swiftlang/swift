@@ -1,159 +1,147 @@
-// RUN: %target-sil-opt -differentiation %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
 
 import Builtin
 import Swift
 
 sil_stage raw
 
-sil hidden @simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
+sil @simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
 bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   %2 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
   return %2 : $Builtin.FPIEEE32
 }
 
-sil hidden @chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
+sil @chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
 bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   %2 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
   return %3 : $Builtin.FPIEEE32
 }
 
-sil hidden @main : $@convention(thin) (Builtin.FPIEEE32) -> () {
+sil @add_literals : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
+bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
+  %2 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  %4 = float_literal $Builtin.FPIEEE32, 100
+  %5 = builtin "fsub_FPIEEE32"(%4 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  return %5 : $Builtin.FPIEEE32
+}
+sil @fanout : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
+bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
+  // f(x, y) =
+  //   let v0 = x * x,
+  //       v1 = y * v0,
+  //       v4 = x * v0
+  //    in v4
+  %2 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  %4 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  return %4 : $Builtin.FPIEEE32
+}
+
+sil [Onone] @main : $@convention(thin) (Builtin.FPIEEE32) -> () {
 bb0(%0 : @trivial $Builtin.FPIEEE32):
-  // Cause the differentiator to generate gradients, primals, and adjoints.
   %simple_mul = function_ref @simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
   %simple_mul_grad = gradient [source 0] [wrt 0, 1] %simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+
   %chain_rule = function_ref @chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
   %chain_rule_grad = gradient [source 0] [wrt 0, 1] %chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
-  // Return
+  %add_literals = function_ref @add_literals : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+  %add_literals_grad = gradient [source 0] [wrt 0, 1] %add_literals : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+
+  %fanout = function_ref @fanout : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+  %fanout_grad = gradient [source 0] [wrt 0, 1] %fanout : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+
   %ret = tuple ()
   return %ret : $()
 }
 
-// CHECK-LABEL: @simple_mul__grad_src_0_wrt_0_1_s_p
-// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32):
-// CHECK:   %3 = function_ref @simple_mul__primal_src_0_wrt_0_1 : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> (@owned simple_mul__Type, Builtin.FPIEEE32) // user: %4
-// CHECK:   %4 = apply %3(%0, %1) : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> (@owned simple_mul__Type, Builtin.FPIEEE32) // users: %6, %5
-// CHECK:   %5 = tuple_extract %4 : $(simple_mul__Type, Builtin.FPIEEE32), 0 // user: %8
-// CHECK:   %6 = tuple_extract %4 : $(simple_mul__Type, Builtin.FPIEEE32), 1 // users: %11, %8
-// CHECK:   %7 = function_ref @simple_mul__adjoint_src_0_wrt_0_1 : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32, simple_mul__Type, Builtin.FPIEEE32, Builtin.FPIEEE32) -> (Builtin.FPIEEE32, Builtin.FPIEEE32) // user: %8
-// CHECK:   %8 = apply %7(%0, %1, %5, %6, %2) : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32, simple_mul__Type, Builtin.FPIEEE32, Builtin.FPIEEE32) -> (Builtin.FPIEEE32, Builtin.FPIEEE32) // users: %10, %9
-// CHECK:   %9 = tuple_extract %8 : $(Builtin.FPIEEE32, Builtin.FPIEEE32), 0 // user: %11
-// CHECK:   %10 = tuple_extract %8 : $(Builtin.FPIEEE32, Builtin.FPIEEE32), 1 // user: %11
-// CHECK:   %11 = tuple (%6 : $Builtin.FPIEEE32, %9 : $Builtin.FPIEEE32, %10 : $Builtin.FPIEEE32) // user: %12
-// CHECK:   return %11 : $(Builtin.FPIEEE32, Builtin.FPIEEE32, Builtin.FPIEEE32) // id: %12
-// CHECK: } // end sil function 'simple_mul__grad_src_0_wrt_0_1_s_p'
+// CHECK-LABEL: struct simple_mul__Type
+// CHECK: struct chain_rule__Type
+// CHECK: struct add_literals__Type
+// CHECK: struct fanout__Type
 
-// CHECK-LABEL: @simple_mul__grad_src_0_wrt_0_1
-// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
-// CHECK:   %2 = alloc_stack $Builtin.FPIEEE32              // users: %10, %7, %4
-// CHECK:   %3 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1 // user: %5
-// CHECK:   %4 = begin_access [init] [static] [no_nested_conflict] %2 : $*Builtin.FPIEEE32 // users: %6, %5
-// CHECK:   store %3 to %4 : $*Builtin.FPIEEE32             // id: %5
-// CHECK:   end_access %4 : $*Builtin.FPIEEE32              // id: %6
-// CHECK:   %7 = begin_access [read] [static] %2 : $*Builtin.FPIEEE32 // users: %9, %8
-// CHECK:   %8 = load %7 : $*Builtin.FPIEEE32               // user: %12
-// CHECK:   end_access %7 : $*Builtin.FPIEEE32              // id: %9
-// CHECK:   dealloc_stack %2 : $*Builtin.FPIEEE32           // id: %10
-// CHECK:   %11 = function_ref @simple_mul__grad_src_0_wrt_0_1_s_p : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32, Builtin.FPIEEE32) -> (Builtin.FPIEEE32, Builtin.FPIEEE32, Builtin.FPIEEE32) // user: %12
-// CHECK:   %12 = apply %11(%0, %1, %8) : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32, Builtin.FPIEEE32) -> (Builtin.FPIEEE32, Builtin.FPIEEE32, Builtin.FPIEEE32) // users: %14, %13
-// CHECK:   %13 = tuple_extract %12 : $(Builtin.FPIEEE32, Builtin.FPIEEE32, Builtin.FPIEEE32), 1 // user: %15
-// CHECK:   %14 = tuple_extract %12 : $(Builtin.FPIEEE32, Builtin.FPIEEE32, Builtin.FPIEEE32), 2 // user: %15
-// CHECK:   %15 = tuple (%13 : $Builtin.FPIEEE32, %14 : $Builtin.FPIEEE32) // user: %16
-// CHECK:   return %15 : $(Builtin.FPIEEE32, Builtin.FPIEEE32) // id: %16
-// CHECK: } // end sil function 'simple_mul__grad_src_0_wrt_0_1'
-
-// chain_rule gradients intentionally omitted because they're the same as
-// simple_mul gradients.
+// CHECK-LABEL: [reverse_differentiable source 0 wrt 0, 1 primal @simple_mul__primal_src_0_wrt_0_1 adjoint @simple_mul__adjoint_src_0_wrt_0_1] @simple_mul
+// CHECK-LABEL: [reverse_differentiable source 0 wrt 0, 1 primal @chain_rule__primal_src_0_wrt_0_1 adjoint @chain_rule__adjoint_src_0_wrt_0_1] @chain_rule
+// CHECK-LABEL: [reverse_differentiable source 0 wrt 0, 1 primal @add_literals__primal_src_0_wrt_0_1 adjoint @add_literals__adjoint_src_0_wrt_0_1] @add_literals
+// CHECK-LABEL [reverse_differentiable source 0 wrt 0, 1 primal @fanout__primal_src_0_wrt_0_1 adjoint @fanout__adjoint_src_0_wrt_0_1] @fanout
 
 // CHECK-LABEL: @simple_mul__primal_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
-// CHECK:   %2 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %4
-// CHECK:   %3 = struct $simple_mul__Type ()                // user: %4
-// CHECK:   %4 = tuple (%3 : $simple_mul__Type, %2 : $Builtin.FPIEEE32) // user: %5
-// CHECK:   return %4 : $(simple_mul__Type, Builtin.FPIEEE32) // id: %5
-// CHECK: } // end sil function 'simple_mul__primal_src_0_wrt_0_1'
+// CHECK:   %2 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %3 = struct $simple_mul__Type ()
+// CHECK:   %4 = tuple (%3 : $simple_mul__Type, %2 : $Builtin.FPIEEE32)
+// CHECK:   return %4 : $(simple_mul__Type, Builtin.FPIEEE32)
+// CHECK: }
 
 // CHECK-LABEL: @chain_rule__primal_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
-// CHECK:   %2 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %3
-// CHECK:   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %5
-// CHECK:   %4 = struct $chain_rule__Type ()                // user: %5
-// CHECK:   %5 = tuple (%4 : $chain_rule__Type, %3 : $Builtin.FPIEEE32) // user: %6
-// CHECK:   return %5 : $(chain_rule__Type, Builtin.FPIEEE32) // id: %6
-// CHECK: } // end sil function 'chain_rule__primal_src_0_wrt_0_1'
+// CHECK:   %2 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %4 = struct $chain_rule__Type ()
+// CHECK:   %5 = tuple (%4 : $chain_rule__Type, %3 : $Builtin.FPIEEE32)
+// CHECK:   return %5 : $(chain_rule__Type, Builtin.FPIEEE32)
+// CHECK: }
 
-// CHECK-LABEL: @simple_mul__adjoint_src_0_wrt_0_1
+// CHECK-LABEL: @add_literals__primal_src_0_wrt_0_1
+// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
+// CHECK:   %2 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %4 = float_literal $Builtin.FPIEEE32, 0x64
+// CHECK:   %5 = builtin "fsub_FPIEEE32"(%4 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %6 = struct $add_literals__Type ()
+// CHECK:   %7 = tuple (%6 : $add_literals__Type, %5 : $Builtin.FPIEEE32)
+// CHECK:   return %7 : $(add_literals__Type, Builtin.FPIEEE32)
+// CHECK: }
+
+// CHECK-LABEL: @fanout__primal_src_0_wrt_0_1
+// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
+// CHECK:   %2 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %3 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %4 = struct $fanout__Type ()
+// CHECK:   %5 = tuple (%4 : $fanout__Type, %3 : $Builtin.FPIEEE32)
+// CHECK:   return %5 : $(fanout__Type, Builtin.FPIEEE32)
+// CHECK: }
+
+// CHECK: @simple_mul__adjoint_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $simple_mul__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
-// CHECK:   %5 = alloc_stack $Builtin.FPIEEE32              // users: %12, %10, %9, %6
-// CHECK:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32 // users: %8, %7
-// CHECK:   store %4 to %6 : $*Builtin.FPIEEE32             // id: %7
-// CHECK:   end_access %6 : $*Builtin.FPIEEE32              // id: %8
-// CHECK:   %9 = begin_access [read] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32 // user: %11
-// CHECK:   %10 = load %5 : $*Builtin.FPIEEE32              // users: %14, %13
-// CHECK:   end_access %9 : $*Builtin.FPIEEE32              // id: %11
-// CHECK:   dealloc_stack %5 : $*Builtin.FPIEEE32           // id: %12
-// CHECK:   %13 = builtin "fmul_FPIEEE32"(%10 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %17
-// CHECK:   %14 = builtin "fmul_FPIEEE32"(%10 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %25
-// CHECK:   %15 = alloc_stack $Builtin.FPIEEE32             // users: %22, %20, %19, %16
-// CHECK:   %16 = begin_access [init] [static] [no_nested_conflict] %15 : $*Builtin.FPIEEE32 // users: %18, %17
-// CHECK:   store %13 to %16 : $*Builtin.FPIEEE32           // id: %17
-// CHECK:   end_access %16 : $*Builtin.FPIEEE32             // id: %18
-// CHECK:   %19 = begin_access [read] [static] [no_nested_conflict] %15 : $*Builtin.FPIEEE32 // user: %21
-// CHECK:   %20 = load %15 : $*Builtin.FPIEEE32             // user: %31
-// CHECK:   end_access %19 : $*Builtin.FPIEEE32             // id: %21
-// CHECK:   dealloc_stack %15 : $*Builtin.FPIEEE32          // id: %22
-// CHECK:   %23 = alloc_stack $Builtin.FPIEEE32             // users: %30, %28, %27, %24
-// CHECK:   %24 = begin_access [init] [static] [no_nested_conflict] %23 : $*Builtin.FPIEEE32 // users: %26, %25
-// CHECK:   store %14 to %24 : $*Builtin.FPIEEE32           // id: %25
-// CHECK:   end_access %24 : $*Builtin.FPIEEE32             // id: %26
-// CHECK:   %27 = begin_access [read] [static] [no_nested_conflict] %23 : $*Builtin.FPIEEE32 // user: %29
-// CHECK:   %28 = load %23 : $*Builtin.FPIEEE32             // user: %31
-// CHECK:   end_access %27 : $*Builtin.FPIEEE32             // id: %29
-// CHECK:   dealloc_stack %23 : $*Builtin.FPIEEE32          // id: %30
-// CHECK:   %31 = tuple (%20 : $Builtin.FPIEEE32, %28 : $Builtin.FPIEEE32) // user: %32
-// CHECK:   return %31 : $(Builtin.FPIEEE32, Builtin.FPIEEE32) // id: %32
-// CHECK: } // end sil function 'simple_mul__adjoint_src_0_wrt_0_1'
+// CHECK:   %5 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %6 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %7 = tuple (%5 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32)
+// CHECK:   return %7 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
+// CHECK: }
 
-// CHECK-LABEL: @chain_rule__adjoint_src_0_wrt_0_1
+// CHECK: @chain_rule__adjoint_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $chain_rule__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
-// CHECK:   %5 = alloc_stack $Builtin.FPIEEE32              // users: %12, %10, %9, %6
-// CHECK:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32 // users: %8, %7
-// CHECK:   store %4 to %6 : $*Builtin.FPIEEE32             // id: %7
-// CHECK:   end_access %6 : $*Builtin.FPIEEE32              // id: %8
-// CHECK:   %9 = begin_access [read] [static] [no_nested_conflict] %5 : $*Builtin.FPIEEE32 // user: %11
-// CHECK:   %10 = load %5 : $*Builtin.FPIEEE32              // users: %15, %14
-// CHECK:   end_access %9 : $*Builtin.FPIEEE32              // id: %11
-// CHECK:   dealloc_stack %5 : $*Builtin.FPIEEE32           // id: %12
-// CHECK:   %13 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %14
-// CHECK:   %14 = builtin "fmul_FPIEEE32"(%10 : $Builtin.FPIEEE32, %13 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %35
-// CHECK:   %15 = builtin "fmul_FPIEEE32"(%10 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %18
-// CHECK:   %16 = alloc_stack $Builtin.FPIEEE32             // users: %23, %21, %20, %17
-// CHECK:   %17 = begin_access [init] [static] [no_nested_conflict] %16 : $*Builtin.FPIEEE32 // users: %19, %18
-// CHECK:   store %15 to %17 : $*Builtin.FPIEEE32           // id: %18
-// CHECK:   end_access %17 : $*Builtin.FPIEEE32             // id: %19
-// CHECK:   %20 = begin_access [read] [static] [no_nested_conflict] %16 : $*Builtin.FPIEEE32 // user: %22
-// CHECK:   %21 = load %16 : $*Builtin.FPIEEE32             // user: %24
-// CHECK:   end_access %20 : $*Builtin.FPIEEE32             // id: %22
-// CHECK:   dealloc_stack %16 : $*Builtin.FPIEEE32          // id: %23
-// CHECK:   %24 = builtin "fneg_FPIEEE32"(%21 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %27
-// CHECK:   %25 = alloc_stack $Builtin.FPIEEE32             // users: %32, %30, %29, %26
-// CHECK:   %26 = begin_access [init] [static] [no_nested_conflict] %25 : $*Builtin.FPIEEE32 // users: %28, %27
-// CHECK:   store %24 to %26 : $*Builtin.FPIEEE32           // id: %27
-// CHECK:   end_access %26 : $*Builtin.FPIEEE32             // id: %28
-// CHECK:   %29 = begin_access [read] [static] [no_nested_conflict] %25 : $*Builtin.FPIEEE32 // user: %31
-// CHECK:   %30 = load %25 : $*Builtin.FPIEEE32             // user: %41
-// CHECK:   end_access %29 : $*Builtin.FPIEEE32             // id: %31
-// CHECK:   dealloc_stack %25 : $*Builtin.FPIEEE32          // id: %32
-// CHECK:   %33 = alloc_stack $Builtin.FPIEEE32             // users: %40, %38, %37, %34
-// CHECK:   %34 = begin_access [init] [static] [no_nested_conflict] %33 : $*Builtin.FPIEEE32 // users: %36, %35
-// CHECK:   store %14 to %34 : $*Builtin.FPIEEE32           // id: %35
-// CHECK:   end_access %34 : $*Builtin.FPIEEE32             // id: %36
-// CHECK:   %37 = begin_access [read] [static] [no_nested_conflict] %33 : $*Builtin.FPIEEE32 // user: %39
-// CHECK:   %38 = load %33 : $*Builtin.FPIEEE32             // user: %41
-// CHECK:   end_access %37 : $*Builtin.FPIEEE32             // id: %39
-// CHECK:   dealloc_stack %33 : $*Builtin.FPIEEE32          // id: %40
-// CHECK:   %41 = tuple (%30 : $Builtin.FPIEEE32, %38 : $Builtin.FPIEEE32) // user: %42
-// CHECK:   return %41 : $(Builtin.FPIEEE32, Builtin.FPIEEE32) // id: %42
-// CHECK: } // end sil function 'chain_rule__adjoint_src_0_wrt_0_1'
+// CHECK:   %5 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %6 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %5 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %7 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %8 = builtin "fneg_FPIEEE32"(%7 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %9 = tuple (%8 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32)
+// CHECK:   return %9 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
+// CHECK: }
+
+// CHECK: @add_literals__adjoint_src_0_wrt_0_1
+// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $add_literals__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
+// CHECK:   %5 = builtin "fneg_FPIEEE32"(%4 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %6 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %7 = builtin "fmul_FPIEEE32"(%5 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %8 = builtin "fmul_FPIEEE32"(%5 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %9 = builtin "fneg_FPIEEE32"(%8 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %10 = tuple (%9 : $Builtin.FPIEEE32, %7 : $Builtin.FPIEEE32)
+// CHECK:   return %10 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
+// CHECK: }
+
+// CHECK-LABEL: @fanout__adjoint_src_0_wrt_0_1
+// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $fanout__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
+// CHECK:   %5 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %6 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %5 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %7 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %8 = builtin "fmul_FPIEEE32"(%7 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %9 = builtin "fadd_FPIEEE32"(%6 : $Builtin.FPIEEE32, %8 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %10 = builtin "fadd_FPIEEE32"(%9 : $Builtin.FPIEEE32, %8 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %11 = float_literal $Builtin.FPIEEE32, 0x0
+// CHECK:   %12 = tuple (%10 : $Builtin.FPIEEE32, %11 : $Builtin.FPIEEE32)
+// CHECK:   return %12 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
+// CHECK: }
