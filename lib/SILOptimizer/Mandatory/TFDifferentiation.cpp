@@ -2000,17 +2000,32 @@ protected:
       case SILInstructionKind::FunctionRefInst:
       case SILInstructionKind::ConvertFunctionInst:
       case SILInstructionKind::ThinToThickFunctionInst:
-      case SILInstructionKind::BuiltinInst:
       case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::GlobalValueInst:
       case SILInstructionKind::KeyPathInst:
       case SILInstructionKind::MetatypeInst:
       case SILInstructionKind::GradientInst:
         return PrimalValueKind::Conversion;
-      default:
+      case SILInstructionKind::BuiltinInst: {
+        auto *bi = cast<BuiltinInst>(inst);
+        auto kind = bi->getBuiltinKind();
+        if (!kind)
+          return PrimalValueKind::Conversion;
+        switch (*kind) {
+        case BuiltinValueKind::FAdd:
+        case BuiltinValueKind::FSub:
+        case BuiltinValueKind::FNeg:
+        case BuiltinValueKind::FMul:
+        case BuiltinValueKind::FDiv:
+          goto checkpoint;
+        default:
+          return PrimalValueKind::Conversion;
+        }
+      }
+      default: checkpoint:
         return postDomInfo.dominates(bb, entry)
-        ? PrimalValueKind::StaticCheckpoint
-        : PrimalValueKind::TapeCheckpoint;
+            ? PrimalValueKind::StaticCheckpoint
+            : PrimalValueKind::TapeCheckpoint;
     }
   }
 
@@ -2327,9 +2342,11 @@ public:
 bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // FIXME: If the original function has multiple basic blocks, bail out since
   // AD does not support control flow yet.
+  if (diagnoseUnsupportedControlFlow(context, item.task)) {
+    errorOccurred = true;
+    return true;
+  }
   // Compute necessary analyses on the original function.
-  errorOccurred |= diagnoseUnsupportedControlFlow(context, item.task);
-  // Synthesize the function.
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
     passManager.getAnalysis<DifferentiableActivityAnalysis>();
