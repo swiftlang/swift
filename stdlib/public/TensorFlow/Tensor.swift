@@ -93,7 +93,7 @@ func _TFGetScalar<Scalar : AccelerableByTensorFlow>(
 /// designed to align with the requirements of the `Const` TensorFlow operation.
 @usableFromInline @inline(never)
 @_silgen_name("__tf_tensor_from_scalars")
-func _TFTensorFromScalars<Scalar>(
+func _TFTensorFromScalars<Scalar : AccelerableByTensorFlow>(
   _ scalars: [Scalar], shape: [Int32]
 ) -> TensorHandle<Scalar> {
   let contiguousSize = shape.map(Int.init).reduce(1, *)
@@ -118,7 +118,7 @@ func _TFMakeScalarTensor<Scalar : AccelerableByTensorFlow>(
 
 @usableFromInline @inline(never)
 @_silgen_name("__tf_tensor_from_scalars_1d")
-func _TFTensorFromScalars1D<Scalar>(_ scalars: [Scalar])
+func _TFTensorFromScalars1D<Scalar : AccelerableByTensorFlow>(_ scalars: [Scalar])
   -> TensorHandle<Scalar> {
   return _TFTensorFromScalars(scalars, shape: [Int32(scalars.count)])
 }

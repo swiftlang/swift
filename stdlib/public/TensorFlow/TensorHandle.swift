@@ -44,6 +44,14 @@ public final class TensorHandle<Scalar : _TensorFlowDataTypeCompatible> {
     self.cTensorHandle = cTensorHandle
   }
 
+  deinit {
+    debugLog("De-initializing TensorHandle.")
+    TFE_DeleteTensorHandle(cTensorHandle)
+    debugLog("Returning from deinit of TensorHandle.")
+  }
+}
+
+internal extension TensorHandle where Scalar : AccelerableByTensorFlow {
   /// Create a `TensorHandle` with a closure that initializes the underlying
   /// buffer.
   ///
@@ -72,14 +80,6 @@ public final class TensorHandle<Scalar : _TensorFlowDataTypeCompatible> {
     TF_DeleteTensor(cTensor)
   }
 
-  deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(cTensorHandle)
-    debugLog("Returning from deinit of TensorHandle.")
-  }
-}
-
-internal extension TensorHandle where Scalar : AccelerableByTensorFlow {
   /// Create a `ShapedArray` with contents of the underlying `TensorHandle`. If
   /// the `TensorHandle` is on the accelerator, it will be copied to the host.
   /// - Returns: A `ShapedArray`.
@@ -90,7 +90,8 @@ internal extension TensorHandle where Scalar : AccelerableByTensorFlow {
   }
 }
 
-extension TensorHandle : TensorSendableReceivable {
+extension TensorHandle : TensorSendableReceivable where
+  Scalar : AccelerableByTensorFlow {
   @inlinable
   static func receiveFromAccelerator(_ computation: _TensorComputation,
                                      _ tensorId: Int
@@ -108,7 +109,7 @@ extension TensorHandle : TensorSendableReceivable {
     TF_DeleteTensor(cTensor!)
     if _RuntimeConfig.printsDebugLog {
       debugLog("The received tensor of id \(tensorId) has content:")
-      // dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
+      dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
     }
     return tensorHandle
   }
@@ -118,7 +119,7 @@ extension TensorHandle : TensorSendableReceivable {
                          _ tensorId: Int) {
     if _RuntimeConfig.printsDebugLog {
       debugLog("Sending tensor of id \(tensorId) and type \(Scalar.self) with:")
-      // dumpTensorContent(self.cTensorHandle, Scalar.self)
+      dumpTensorContent(self.cTensorHandle, Scalar.self)
     }
     let status = TF_NewStatus()
     let cTensor = TFE_TensorHandleResolve(self.cTensorHandle, status)
