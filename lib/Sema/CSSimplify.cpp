@@ -2450,6 +2450,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
       }
     }
+
+    if (type2->is<LValueType>() && !isTypeVarOrMember1) {
+      conversionsOrFixes.push_back(
+          TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+    }
   }
 
   if (conversionsOrFixes.empty()) {
@@ -4659,11 +4664,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     addContextualScore();
     // Unwrap an inout type.
     auto obj1 = type1->getInOutObjectType();
-    
+
     obj1 = getFixedTypeRecursive(obj1, false, false);
     
     auto t2 = type2->getDesugaredType();
-    
+
     auto baseType1 = getFixedTypeRecursive(*isArrayType(obj1), false, false);
     auto baseType2 = getBaseTypeForPointer(*this, t2);
 

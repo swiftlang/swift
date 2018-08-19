@@ -81,6 +81,8 @@ protected:
 
   DeclContext *getDC() const { return getConstraintSystem().DC; }
 
+  const Solution &getSolution() const { return solution; }
+
   Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     return solution.getOverloadChoiceIfAvailable(locator);
