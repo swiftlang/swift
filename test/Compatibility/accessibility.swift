@@ -641,12 +641,10 @@ fileprivate struct EquatablishOuter {
   internal struct Inner : Equatablish {}
 }
 private func ==(lhs: EquatablishOuter.Inner, rhs: EquatablishOuter.Inner) {}
-// expected-note@-1 {{candidate has non-matching type}}
 
 fileprivate struct EquatablishOuter2 {
   internal struct Inner : Equatablish {
     fileprivate static func ==(lhs: Inner, rhs: Inner) {}
-    // expected-note@-1 {{candidate has non-matching type}}
   }
 }
 
@@ -660,7 +658,6 @@ internal struct EquatablishOuterProblem2 {
   public struct Inner : Equatablish {
     fileprivate static func ==(lhs: Inner, rhs: Inner) {} // expected-error {{method '==' must be as accessible as its enclosing type because it matches a requirement in protocol 'Equatablish'}} {{none}}
     // expected-note@-1 {{mark the operator function as 'internal' to satisfy the requirement}} {{5-16=internal}}
-    // expected-note@-2 {{candidate has non-matching type}}
   }
 }
 
@@ -671,7 +668,6 @@ internal struct EquatablishOuterProblem3 {
 }
 private func ==(lhs: EquatablishOuterProblem3.Inner, rhs: EquatablishOuterProblem3.Inner) {}
 // expected-note@-1 {{mark the operator function as 'internal' to satisfy the requirement}} {{1-8=internal}}
-// expected-note@-2 {{candidate has non-matching type}}
 
 
 public protocol AssocTypeProto {
