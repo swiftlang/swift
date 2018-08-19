@@ -2342,9 +2342,11 @@ public:
 bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // FIXME: If the original function has multiple basic blocks, bail out since
   // AD does not support control flow yet.
+  if (diagnoseUnsupportedControlFlow(context, item.task)) {
+    errorOccurred = true;
+    return true;
+  }
   // Compute necessary analyses on the original function.
-  errorOccurred |= diagnoseUnsupportedControlFlow(context, item.task);
-  // Synthesize the function.
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
     passManager.getAnalysis<DifferentiableActivityAnalysis>();
