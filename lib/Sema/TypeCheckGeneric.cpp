@@ -15,11 +15,12 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
-#include "TypoCorrection.h"
+#include "TypeCheckType.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -95,112 +96,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                                     DeclContext *DC,
                                     SourceRange baseRange,
                                     ComponentIdentTypeRepr *ref) {
-  auto baseEquivClass =
-    builder->resolveEquivalenceClass(
-                                baseTy,
-                                ArchetypeResolutionKind::CompleteWellFormed);
-  if (!baseEquivClass)
-    return ErrorType::get(baseTy);
-
-  ASTContext &ctx = baseTy->getASTContext();
-
-  // Look for a nested type with the given name.
-  if (auto nestedType =
-          baseEquivClass->lookupNestedType(*builder, ref->getIdentifier())) {
-    // Record the type we found.
-    ref->setValue(nestedType, nullptr);
-  } else {
-    // Resolve the base to a potential archetype.
-    // Perform typo correction.
-    TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
-    TypoCorrectionResults corrections(tc, ref->getIdentifier(),
-                                      DeclNameLoc(ref->getIdLoc()));
-    tc.performTypoCorrection(DC, DeclRefKind::Ordinary,
-                             MetatypeType::get(baseTy),
-                             NameLookupFlags::ProtocolMembers,
-                             corrections, builder);
-
-    // Check whether we have a single type result.
-    auto singleType = cast_or_null<TypeDecl>(
-      corrections.getUniqueCandidateMatching([](ValueDecl *result) {
-        return isa<TypeDecl>(result);
-      }));
-
-    // If we don't have a single result, complain and fail.
-    if (!singleType) {
-      Identifier name = ref->getIdentifier();
-      SourceLoc nameLoc = ref->getIdLoc();
-      ctx.Diags.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
-        .highlight(baseRange);
-      corrections.noteAllCandidates();
-
-      return ErrorType::get(ctx);
-    }
-
-    // We have a single type result. Suggest it.
-    ctx.Diags.diagnose(ref->getIdLoc(), diag::invalid_member_type_suggest,
-                       baseTy, ref->getIdentifier(),
-                       singleType->getBaseName().getIdentifier())
-      .fixItReplace(ref->getIdLoc(),
-                    singleType->getBaseName().userFacingName());
-
-    // Correct to the single type result.
-    ref->overwriteIdentifier(singleType->getBaseName().getIdentifier());
-    ref->setValue(singleType, nullptr);
-  }
-
-  // If the nested type has been resolved to an associated type, use it.
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(ref->getBoundDecl())) {
-    return DependentMemberType::get(baseTy, assocType);
-  }
-
-  // Otherwise, the nested type comes from a concrete type. Substitute the
-  // base type into it.
-  auto concrete = ref->getBoundDecl();
-  auto lazyResolver = ctx.getLazyResolver();
-  if (lazyResolver)
-    lazyResolver->resolveDeclSignature(concrete);
-
-  if (auto typeAlias = dyn_cast<TypeAliasDecl>(concrete)) {
-    if (auto protocol = dyn_cast<ProtocolDecl>(typeAlias->getDeclContext())) {
-      // We need to make sure the generic environment of a surrounding protocol
-      // propagates to the typealias, since the former may not have existed when
-      // the typealiases type was first computed.
-      // FIXME: See the comment in the ProtocolDecl case of validateDecl().
-      if (lazyResolver)
-        lazyResolver->resolveProtocolEnvironment(protocol);
-    }
-  }
-  if (!concrete->hasInterfaceType())
-    return ErrorType::get(ctx);
-  if (baseTy->isTypeParameter()) {
-    if (auto proto = concrete->getDeclContext()->getSelfProtocolDecl()) {
-      // Fast path: if there are no type parameters in the concrete type, just
-      // return it.
-      if (!concrete->getDeclaredInterfaceType()->hasTypeParameter())
-        return concrete->getDeclaredInterfaceType();
-
-      if (lazyResolver)
-        lazyResolver->resolveProtocolEnvironment(proto);
-
-      auto subMap = SubstitutionMap::getProtocolSubstitutions(
-                      proto, baseTy, ProtocolConformanceRef(proto));
-      return concrete->getDeclaredInterfaceType().subst(subMap);
-    }
-
-    Type baseType = baseEquivClass->concreteType ? baseEquivClass->concreteType
-                                                 : baseEquivClass->superclass;
-
-    if (baseType) {
-      return baseType->getTypeOfMember(DC->getParentModule(), concrete,
-                                       concrete->getDeclaredInterfaceType());
-    }
-
-    llvm_unreachable("shouldn't have a concrete decl here");
-  }
-
-  return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), concrete,
-                                              baseTy);
+  return TypeResolution::forInterface(DC, genericSig)
+    .resolveDependentMemberType(baseTy, DC, baseRange, ref);
 }
 
 bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {

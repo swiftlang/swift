@@ -19,6 +19,8 @@
 #include "GenericTypeResolver.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckProtocol.h"
+#include "TypeCheckType.h"
+#include "TypoCorrection.h"
 
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
@@ -26,11 +28,13 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -47,6 +51,263 @@ using namespace swift;
 #define DEBUG_TYPE "TypeCheckType"
 
 GenericTypeResolver::~GenericTypeResolver() { }
+
+/// Type resolution.
+
+TypeResolution TypeResolution::forStructural(DeclContext *dc) {
+  return TypeResolution(dc, TypeResolutionStage::Structural);
+}
+
+TypeResolution TypeResolution::forInterface(DeclContext *dc,
+                                            GenericSignature *genericSig) {
+  TypeResolution result(dc, TypeResolutionStage::Interface);
+  result.complete.genericSig = genericSig;
+  result.complete.builder = nullptr;
+  return result;
+}
+
+TypeResolution TypeResolution::forContextual(DeclContext *dc) {
+  TypeResolution result(dc, TypeResolutionStage::Contextual);
+  result.genericEnv = dc->getGenericEnvironmentOfContext();
+  return result;
+}
+
+GenericTypeResolver *TypeResolution::getResolver() const {
+  if (!resolver) {
+    switch (stage) {
+    case TypeResolutionStage::Structural:
+      resolver = std::make_shared<DependentGenericTypeResolver>();
+      break;
+
+    case TypeResolutionStage::Interface:
+      resolver =
+        std::make_shared<CompleteGenericTypeResolver>(complete.genericSig);
+      break;
+
+    case TypeResolutionStage::Contextual:
+      resolver = std::make_shared<GenericTypeToArchetypeResolver>(dc);
+      break;
+    }
+  }
+
+  return resolver.get();
+}
+
+GenericSignatureBuilder *TypeResolution::getGenericSignatureBuilder() const {
+  assert(stage == TypeResolutionStage::Interface);
+  if (!complete.builder) {
+    auto genericSig = getGenericSignature();
+    ASTContext &ctx = genericSig->getASTContext();
+    complete.builder = ctx.getOrCreateGenericSignatureBuilder(
+                                          genericSig->getCanonicalSignature());
+
+  }
+
+  return complete.builder;
+}
+
+GenericSignature *TypeResolution::getGenericSignature() const {
+  switch (stage) {
+  case TypeResolutionStage::Contextual:
+    return dc->getGenericSignatureOfContext();
+
+  case TypeResolutionStage::Interface:
+    return complete.genericSig;
+
+  case TypeResolutionStage::Structural:
+    return nullptr;
+  }
+}
+
+bool TypeResolution::usesArchetypes() const {
+  switch (stage) {
+  case TypeResolutionStage::Structural:
+  case TypeResolutionStage::Interface:
+    return false;
+
+  case TypeResolutionStage::Contextual:
+    return true;
+  }
+}
+
+Type TypeResolution::mapTypeIntoContext(Type type) const {
+  switch (stage) {
+  case TypeResolutionStage::Structural:
+  case TypeResolutionStage::Interface:
+    return type;
+
+  case TypeResolutionStage::Contextual:
+    return GenericEnvironment::mapTypeIntoContext(genericEnv, type);
+  }
+}
+
+Type TypeResolution::resolveDependentMemberType(
+                                          Type baseTy, DeclContext *DC,
+                                          SourceRange baseRange,
+                                          ComponentIdentTypeRepr *ref) const {
+  switch (stage) {
+  case TypeResolutionStage::Structural:
+    return DependentMemberType::get(baseTy, ref->getIdentifier());
+
+  case TypeResolutionStage::Contextual:
+    llvm_unreachable("Dependent type after archetype substitution");
+
+  case TypeResolutionStage::Interface:
+    // Handled below.
+    break;
+  }
+
+  assert(stage == TypeResolutionStage::Interface);
+  auto builder = getGenericSignatureBuilder();
+  auto baseEquivClass =
+    builder->resolveEquivalenceClass(
+                                baseTy,
+                                ArchetypeResolutionKind::CompleteWellFormed);
+  if (!baseEquivClass)
+    return ErrorType::get(baseTy);
+
+  ASTContext &ctx = baseTy->getASTContext();
+
+  // Look for a nested type with the given name.
+  if (auto nestedType =
+          baseEquivClass->lookupNestedType(*builder, ref->getIdentifier())) {
+    // Record the type we found.
+    ref->setValue(nestedType, nullptr);
+  } else {
+    // Resolve the base to a potential archetype.
+    // Perform typo correction.
+    TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
+    TypoCorrectionResults corrections(tc, ref->getIdentifier(),
+                                      DeclNameLoc(ref->getIdLoc()));
+    tc.performTypoCorrection(DC, DeclRefKind::Ordinary,
+                             MetatypeType::get(baseTy),
+                             NameLookupFlags::ProtocolMembers,
+                             corrections, builder);
+
+    // Check whether we have a single type result.
+    auto singleType = cast_or_null<TypeDecl>(
+      corrections.getUniqueCandidateMatching([](ValueDecl *result) {
+        return isa<TypeDecl>(result);
+      }));
+
+    // If we don't have a single result, complain and fail.
+    if (!singleType) {
+      Identifier name = ref->getIdentifier();
+      SourceLoc nameLoc = ref->getIdLoc();
+      ctx.Diags.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
+        .highlight(baseRange);
+      corrections.noteAllCandidates();
+
+      return ErrorType::get(ctx);
+    }
+
+    // We have a single type result. Suggest it.
+    ctx.Diags.diagnose(ref->getIdLoc(), diag::invalid_member_type_suggest,
+                       baseTy, ref->getIdentifier(),
+                       singleType->getBaseName().getIdentifier())
+      .fixItReplace(ref->getIdLoc(),
+                    singleType->getBaseName().userFacingName());
+
+    // Correct to the single type result.
+    ref->overwriteIdentifier(singleType->getBaseName().getIdentifier());
+    ref->setValue(singleType, nullptr);
+  }
+
+  // If the nested type has been resolved to an associated type, use it.
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(ref->getBoundDecl())) {
+    return DependentMemberType::get(baseTy, assocType);
+  }
+
+  // Otherwise, the nested type comes from a concrete type. Substitute the
+  // base type into it.
+  auto concrete = ref->getBoundDecl();
+  auto lazyResolver = ctx.getLazyResolver();
+  if (lazyResolver)
+    lazyResolver->resolveDeclSignature(concrete);
+
+  if (auto typeAlias = dyn_cast<TypeAliasDecl>(concrete)) {
+    if (auto protocol = dyn_cast<ProtocolDecl>(typeAlias->getDeclContext())) {
+      // We need to make sure the generic environment of a surrounding protocol
+      // propagates to the typealias, since the former may not have existed when
+      // the typealiases type was first computed.
+      // FIXME: See the comment in the ProtocolDecl case of validateDecl().
+      if (lazyResolver)
+        lazyResolver->resolveProtocolEnvironment(protocol);
+    }
+  }
+  if (!concrete->hasInterfaceType())
+    return ErrorType::get(ctx);
+  if (baseTy->isTypeParameter()) {
+    if (auto proto = concrete->getDeclContext()->getSelfProtocolDecl()) {
+      // Fast path: if there are no type parameters in the concrete type, just
+      // return it.
+      if (!concrete->getDeclaredInterfaceType()->hasTypeParameter())
+        return concrete->getDeclaredInterfaceType();
+
+      if (lazyResolver)
+        lazyResolver->resolveProtocolEnvironment(proto);
+
+      auto subMap = SubstitutionMap::getProtocolSubstitutions(
+                      proto, baseTy, ProtocolConformanceRef(proto));
+      return concrete->getDeclaredInterfaceType().subst(subMap);
+    }
+
+    Type baseType = baseEquivClass->concreteType ? baseEquivClass->concreteType
+                                                 : baseEquivClass->superclass;
+
+    if (baseType) {
+      return baseType->getTypeOfMember(DC->getParentModule(), concrete,
+                                       concrete->getDeclaredInterfaceType());
+    }
+
+    llvm_unreachable("shouldn't have a concrete decl here");
+  }
+
+  return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), concrete,
+                                              baseTy);
+}
+
+bool TypeResolution::areSameType(Type type1, Type type2) const {
+  if (type1->isEqual(type2))
+    return true;
+
+  switch (stage) {
+  case TypeResolutionStage::Structural:
+  case TypeResolutionStage::Interface:
+    // If neither type has a type parameter, we're done.
+    if (!type1->hasTypeParameter() && !type2->hasTypeParameter())
+      return false;
+
+    break;
+
+  case TypeResolutionStage::Contextual:
+    // Contextual types have already been uniqued, so the isEqual() result
+    // above is complete.
+    return false;
+  }
+
+  // If we have a generic signature, canonicalize using it.
+  if (auto genericSig = getGenericSignature()) {
+    return genericSig->getCanonicalTypeInContext(type1)
+      == genericSig->getCanonicalTypeInContext(type2);
+  }
+
+  // Otherwise, perform a structural check.
+  assert(stage == TypeResolutionStage::Structural);
+
+  // FIXME: We should be performing a deeper equality check here.
+  // If both refer to associated types with the same name, they'll implicitly
+  // be considered equivalent.
+  auto depMem1 = type1->getAs<DependentMemberType>();
+  if (!depMem1) return false;
+
+  auto depMem2 = type2->getAs<DependentMemberType>();
+  if (!depMem2) return false;
+
+  if (depMem1->getName() != depMem2->getName()) return false;
+
+  return areSameType(depMem1->getBase(), depMem2->getBase());
+}
 
 Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
   if (!Context.getArrayDecl()) {
@@ -2870,7 +3131,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
         ctx.getLazyResolver()->resolveProtocolEnvironment(protoDecl);
       }
     }
-    
+
     if (aliasDecl->getGenericParams()) {
       return UnboundGenericType::get(
           aliasDecl, baseTy,

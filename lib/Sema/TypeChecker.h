@@ -44,6 +44,7 @@ class TypeChecker;
 class TypoCorrectionResults;
 class ExprPattern;
 class SynthesizedFunction;
+enum class TypeResolutionStage : uint8_t;
 
 namespace constraints {
   enum class ConstraintKind : char;
