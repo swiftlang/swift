@@ -109,7 +109,7 @@ extension TensorHandle : TensorSendableReceivable where
     TF_DeleteTensor(cTensor!)
     if _RuntimeConfig.printsDebugLog {
       debugLog("The received tensor of id \(tensorId) has content:")
-      dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
+      // dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
     }
     return tensorHandle
   }
@@ -119,7 +119,7 @@ extension TensorHandle : TensorSendableReceivable where
                          _ tensorId: Int) {
     if _RuntimeConfig.printsDebugLog {
       debugLog("Sending tensor of id \(tensorId) and type \(Scalar.self) with:")
-      dumpTensorContent(self.cTensorHandle, Scalar.self)
+      // dumpTensorContent(self.cTensorHandle, Scalar.self)
     }
     let status = TF_NewStatus()
     let cTensor = TFE_TensorHandleResolve(self.cTensorHandle, status)
