@@ -102,7 +102,16 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
     consumeToken();
     return makeParserError();
   }
-  
+
+  if (Tok.is(tok::pound) && Tok.isAtStartOfLine() &&
+      peekToken().is(tok::code_complete)) {
+    consumeToken();
+    if (CodeCompletion)
+      CodeCompletion->completeAfterPoundDirective();
+    consumeToken(tok::code_complete);
+    return makeParserCodeCompletionStatus();
+  }
+
   if (isStartOfStmt()) {
     ParserResult<Stmt> Res = parseStmt();
     if (Res.isNonNull())

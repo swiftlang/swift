@@ -2636,6 +2636,18 @@ Parser::parseDecl(ParseDeclOptions Flags,
     DeclResult = makeParserError();
     // Handled below.
     break;
+  case tok::pound:
+    if (Tok.isAtStartOfLine() &&
+        peekToken().is(tok::code_complete) &&
+        Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
+      consumeToken();
+      if (CodeCompletion)
+        CodeCompletion->completeAfterPoundDirective();
+      consumeToken(tok::code_complete);
+      DeclResult = makeParserCodeCompletionResult<Decl>();
+      break;
+    }
+    LLVM_FALLTHROUGH;
 
   case tok::pound_if:
   case tok::pound_sourceLocation:

@@ -1303,7 +1303,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   DeclContext *CurDeclContext = nullptr;
   DeclAttrKind AttrKind;
   int AttrParamIndex;
-  bool IsInSil;
+  bool IsInSil = false;
   bool HasSpace = false;
   bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
@@ -1468,6 +1468,7 @@ public:
                          Optional<unsigned> yieldIndex) override;
   void completeAfterPoundExpr(CodeCompletionExpr *E,
                               Optional<StmtKind> ParentKind) override;
+  void completeAfterPoundDirective() override;
   void completeGenericParams(TypeLoc TL) override;
   void completeAfterIfStmt(bool hasElse) override;
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
@@ -4617,6 +4618,11 @@ void CodeCompletionCallbacksImpl::completeAfterPoundExpr(
   ParentStmtKind = ParentKind;
 }
 
+void CodeCompletionCallbacksImpl::completeAfterPoundDirective() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::AfterPoundDirective;
+}
+
 void CodeCompletionCallbacksImpl::completeAfterIfStmt(bool hasElse) {
   CurDeclContext = P.CurDeclContext;
   if (hasElse) {
@@ -4741,6 +4747,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::UnresolvedMember:
   case CompletionKind::CallArg:
   case CompletionKind::AfterPoundExpr:
+  case CompletionKind::AfterPoundDirective:
   case CompletionKind::GenericParams:
   case CompletionKind::KeyPathExpr:
   case CompletionKind::KeyPathExprDot:
@@ -4808,6 +4815,62 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addKeyword(Sink, "if", CodeCompletionKeywordKind::kw_if);
     break;
   }
+}
+
+static void addPoundDirectives(CodeCompletionResultSink &Sink) {
+  auto addWithName =
+      [&](StringRef name, CodeCompletionKeywordKind K,
+          llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer =
+              nullptr) {
+        CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::Keyword,
+                                            SemanticContextKind::None, {});
+        Builder.addTextChunk(name);
+        Builder.setKeywordKind(K);
+        if (consumer)
+          consumer(Builder);
+      };
+
+  addWithName("sourceLocation", CodeCompletionKeywordKind::pound_sourceLocation,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addLeftParen();
+    Builder.addTextChunk("file");
+    Builder.addCallParameterColon();
+    Builder.addSimpleTypedParameter("String");
+    Builder.addComma();
+    Builder.addTextChunk("line");
+    Builder.addCallParameterColon();
+    Builder.addSimpleTypedParameter("Int");
+    Builder.addRightParen();
+  });
+  addWithName("warning", CodeCompletionKeywordKind::pound_warning,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addLeftParen();
+    Builder.addTextChunk("\"");
+    Builder.addSimpleNamedParameter("message");
+    Builder.addTextChunk("\"");
+    Builder.addRightParen();
+  });
+  addWithName("error", CodeCompletionKeywordKind::pound_error,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addLeftParen();
+    Builder.addTextChunk("\"");
+    Builder.addSimpleNamedParameter("message");
+    Builder.addTextChunk("\"");
+    Builder.addRightParen();
+  });
+
+  addWithName("if ", CodeCompletionKeywordKind::pound_if,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("condition");
+  });
+
+  // FIXME: These directives are only valid in conditional completion block.
+  addWithName("elseif ", CodeCompletionKeywordKind::pound_elseif,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("condition");
+  });
+  addWithName("else", CodeCompletionKeywordKind::pound_else);
+  addWithName("endif", CodeCompletionKeywordKind::pound_endif);
 }
 
 namespace  {
@@ -5408,6 +5471,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.addPoundAvailable(ParentStmtKind);
     Lookup.addPoundSelector(/*needPound=*/false);
     Lookup.addPoundKeyPath(/*needPound=*/false);
+    break;
+  }
+
+  case CompletionKind::AfterPoundDirective: {
+    addPoundDirectives(CompletionContext.getResultSink());
+    // FIXME: Add pound expressions (e.g. '#selector()') if it's at statements
+    // position.
     break;
   }
 

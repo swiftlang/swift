@@ -211,6 +211,8 @@ public:
   virtual void completeAfterPoundExpr(CodeCompletionExpr *E,
                                       Optional<StmtKind> ParentKind) = 0;
 
+  virtual void completeAfterPoundDirective() = 0;
+
   virtual void completeAfterIfStmt(bool hasElse) = 0;
 
   virtual void completeGenericParams(TypeLoc TL) = 0;
