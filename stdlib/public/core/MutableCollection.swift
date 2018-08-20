@@ -58,17 +58,7 @@
 ///     a[i] = x
 ///     let y = x
 public protocol MutableCollection: Collection
-where SubSequence: MutableCollection
-{
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Index
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
-
+where SubSequence: MutableCollection {
   /// Accesses the element at the specified position.
   ///
   /// For example, you can replace an element of an array by using its

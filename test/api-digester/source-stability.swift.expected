@@ -14,7 +14,13 @@ TypeAlias StringProtocol.UTF16Index has been removed (deprecated)
 TypeAlias StringProtocol.UTF8Index has been removed (deprecated)
 TypeAlias StringProtocol.UnicodeScalarIndex has been removed (deprecated)
 TypeAlias UIntMax has been removed
+Var BidirectionalCollection.endIndex has been removed
+Var BidirectionalCollection.indices has been removed
+Var BidirectionalCollection.startIndex has been removed
 Var FixedWidthInteger.allZeros has been removed (deprecated)
+Var RandomAccessCollection.endIndex has been removed
+Var RandomAccessCollection.indices has been removed
+Var RandomAccessCollection.startIndex has been removed
 Constructor Int.init(truncatingBitPattern:) has been removed
 Constructor Int16.init(truncatingBitPattern:) has been removed
 Constructor Int32.init(truncatingBitPattern:) has been removed
@@ -24,6 +30,8 @@ Constructor UInt.init(truncatingBitPattern:) has been removed
 Constructor UInt16.init(truncatingBitPattern:) has been removed
 Constructor UInt32.init(truncatingBitPattern:) has been removed
 Constructor UInt8.init(truncatingBitPattern:) has been removed
+Func BidirectionalCollection.formIndex(after:) has been removed
+Func BidirectionalCollection.index(after:) has been removed
 Func BinaryInteger.toIntMax() has been removed
 Func FixedWidthInteger.addWithOverflow(_:_:) has been removed
 Func FixedWidthInteger.divideWithOverflow(_:_:) has been removed
@@ -45,6 +53,10 @@ Func Int16.toUIntMax() has been removed
 Func Int32.toUIntMax() has been removed
 Func Int64.toUIntMax() has been removed
 Func Int8.toUIntMax() has been removed
+Func RandomAccessCollection.formIndex(after:) has been removed
+Func RandomAccessCollection.formIndex(before:) has been removed
+Func RandomAccessCollection.index(after:) has been removed
+Func RandomAccessCollection.index(before:) has been removed
 Func Sequence.flatMap(_:) has been removed
 Func SignedNumeric.abs(_:) has been removed
 Func String.UTF16View.distance(from:to:) has been removed

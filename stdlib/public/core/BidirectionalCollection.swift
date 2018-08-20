@@ -38,15 +38,6 @@
 public protocol BidirectionalCollection: Collection
 where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Index
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
-
-  // FIXME(ABI): Associated type inference requires this.
   associatedtype Indices
 
   /// Returns the position immediately before the given index.
@@ -61,23 +52,6 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   func formIndex(before i: inout Index)
-
-  /// Returns the position immediately after the given index.
-  ///
-  /// The successor of an index must be well defined. For an index `i` into a
-  /// collection `c`, calling `c.index(after: i)` returns the same index every
-  /// time.
-  ///
-  /// - Parameter i: A valid index of the collection. `i` must be less than
-  ///   `endIndex`.
-  /// - Returns: The index value immediately after `i`.
-  func index(after i: Index) -> Index
-
-  /// Replaces the given index with its successor.
-  ///
-  /// - Parameter i: A valid index of the collection. `i` must be less than
-  ///   `endIndex`.
-  func formIndex(after i: inout Index)
 
   /// Returns an index that is the specified distance from the given index.
   ///
@@ -172,25 +146,6 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> Int
 
-  /// The indices that are valid for subscripting the collection, in ascending
-  /// order.
-  ///
-  /// A collection's `indices` property can hold a strong reference to the
-  /// collection itself, causing the collection to be non-uniquely referenced.
-  /// If you mutate the collection while iterating over its indices, a strong
-  /// reference can cause an unexpected copy of the collection. To avoid the
-  /// unexpected copy, use the `index(after:)` method starting with
-  /// `startIndex` to produce indices instead.
-  ///
-  ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
-  ///     var i = c.startIndex
-  ///     while i != c.endIndex {
-  ///         c[i] /= 5
-  ///         i = c.index(after: i)
-  ///     }
-  ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
-  var indices: Indices { get }
-  
   // TODO: swift-3-indexing-model: tests.
   /// The last element of the collection.
   ///
@@ -204,40 +159,6 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   ///     
   /// - Complexity: O(1)
   var last: Element? { get }
-
-  /// Accesses a contiguous subrange of the collection's elements.
-  ///
-  /// The accessed slice uses the same indices for the same elements as the
-  /// original collection uses. Always use the slice's `startIndex` property
-  /// instead of assuming that its indices start at a particular value.
-  ///
-  /// This example demonstrates getting a slice of an array of strings, finding
-  /// the index of one of the strings in the slice, and then using that index
-  /// in the original array.
-  ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
-  ///     let streetsSlice = streets[2 ..< streets.endIndex]
-  ///     print(streetsSlice)
-  ///     // Prints "["Channing", "Douglas", "Evarts"]"
-  ///
-  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
-  ///     print(streets[index!])
-  ///     // Prints "Evarts"
-  ///
-  /// - Parameter bounds: A range of the collection's indices. The bounds of
-  ///   the range must be valid indices of the collection.
-  ///
-  /// - Complexity: O(1)
-  subscript(bounds: Range<Index>) -> SubSequence { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  subscript(position: Index) -> Element { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  var startIndex: Index { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  var endIndex: Index { get }
 }
 
 /// Default implementation for bidirectional collections.
