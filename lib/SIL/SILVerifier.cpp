@@ -4527,6 +4527,7 @@ public:
     SILModule &M = F->getModule();
     for (auto &BB : *F) {
       TermInst *TI = BB.getTerminator();
+      CurInstruction = TI;
 
       // Check for non-cond_br critical edges in canonical SIL.
       if (!isa<CondBranchInst>(TI) && M.getStage() == SILStage::Canonical) {

@@ -563,7 +563,7 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
       if (isConditional) {
         // In case of a conditional cast, we should handle it gracefully.
         auto CondBrSuccessBB =
-            NewAI->getFunction()->createBasicBlock(NewAI->getParent());
+            NewAI->getFunction()->createBasicBlockAfter(NewAI->getParent());
         CondBrSuccessBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned,
                                            nullptr);
         Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,

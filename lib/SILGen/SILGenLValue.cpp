@@ -1443,7 +1443,8 @@ namespace {
       ASTContext &ctx = SGF.getASTContext();
 
       SILBasicBlock *contBB = SGF.createBasicBlock();
-      SILBasicBlock *writebackBB = SGF.createBasicBlock(SGF.B.getInsertionBB());
+      SILBasicBlock *writebackBB =
+        SGF.createBasicBlockAfter(SGF.B.getInsertionBB());
 
       SGF.B.createSwitchEnum(loc, materialized.callback, /*defaultDest*/ nullptr,
                              { { ctx.getOptionalSomeDecl(), writebackBB },
