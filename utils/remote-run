@@ -93,19 +93,26 @@ class CommandRunner(object):
             sys.exit(sftp_proc.returncode)
 
 class RemoteCommandRunner(CommandRunner):
-    def __init__(self, host, identity_path):
+    def __init__(self, host, identity_path, ssh_options):
         if ':' in host:
             (self.remote_host, self.port) = host.rsplit(':', 1)
         else:
             self.remote_host = host
             self.port = None
         self.identity_path = identity_path
+        self.ssh_options = ssh_options
 
     def common_options(self, port_flag):
         port_option = [port_flag, self.port] if self.port else []
         identity_option = (
             ['-i', self.identity_path] if self.identity_path else [])
-        return port_option + identity_option
+        # Interleave '-o' with each custom option.
+        # From https://stackoverflow.com/a/8168526,
+        # with explanatory help from
+        # https://spapas.github.io/2016/04/27/python-nested-list-comprehensions/
+        extra_options = [arg for option in self.ssh_options
+                             for arg in ["-o", option]]
+        return port_option + identity_option + extra_options
 
     def remote_invocation(self, command):
         return (['/usr/bin/ssh', '-n'] +
@@ -164,6 +171,9 @@ def main():
 
     parser.add_argument('-i', '--identity', dest='identity', metavar='FILE',
                         help='an SSH identity file (private key) to use')
+    parser.add_argument('-o', '--ssh-option', action='append', default=[],
+                        dest='ssh_options', metavar='OPTION',
+                        help='extra SSH config options (man ssh_config)')
     parser.add_argument('--debug-as-local', metavar='/PATH/TO/SFTP-SERVER',
                         help='run commands locally instead of over SSH, for '
                              'debugging purposes. The "host" argument is '
@@ -181,7 +191,7 @@ def main():
         args.command.insert(0, args.host)
         del args.host
     else:
-        runner = RemoteCommandRunner(args.host, args.identity)
+        runner = RemoteCommandRunner(args.host, args.identity, args.ssh_options)
     runner.dry_run = args.dry_run
     runner.verbose = args.verbose or args.dry_run
 
