@@ -123,7 +123,11 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
 #if _runtime(_ObjC)
 func isNativeNSSet(_ s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(type(of: s)) as NSString
-  return ["_SwiftDeferredNSSet", "NativeSetStorage"].contains {
+  return [
+    "_SwiftDeferredNSSet",
+    "_SwiftEmptySetStorage",
+    "_SwiftNativeSetStorage"
+  ].contains {
     className.range(of: $0).length > 0
   }
 }
