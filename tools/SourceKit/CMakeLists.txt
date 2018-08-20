@@ -37,6 +37,7 @@ endif()
 # Now include AddSwiftSourceKit
 include(AddSwiftSourceKit)
 
+set(BUILD_SWIFT_SOURCEKITD_TEST FALSE)
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # Choose a deployment target if none was set.
   set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING
@@ -64,6 +65,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set(version_min_os "macosx")
     set(triple_os "macosx")
     set(SOURCEKIT_DEFAULT_TARGET_SDK "OSX")
+    set(BUILD_SWIFT_SOURCEKITD_TEST TRUE)
   else()
     message(FATAL_ERROR "Can't understand SOURCEKIT_DEPLOYMENT_OS '${SOURCEKIT_DEPLOYMENT_OS}';")
   endif()
@@ -154,6 +156,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
                             ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime)
 
   set(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH TRUE)
+  set(BUILD_SWIFT_SOURCEKITD_TEST TRUE)
 endif()
 
 add_subdirectory(include)

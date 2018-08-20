@@ -2322,10 +2322,17 @@ function(add_swift_host_tool executable)
 
   cmake_parse_arguments(
       ADDSWIFTHOSTTOOL # prefix
-      "" # options
+      "HAS_SWIFT_CONTENT" # options
       "" # single-value args
       "${ADDSWIFTHOSTTOOL_multiple_parameter_options}" # multi-value args
       ${ARGN})
+
+  # We cannot build Swift source without the stdlib on the platform
+  if (ADDSWIFTHOSTTOOL_HAS_SWIFT_CONTENT)
+    if (NOT ${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_SDKS)
+      return()
+    endif()
+  endif()
 
   # Configure variables for this subdirectory.
   set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
