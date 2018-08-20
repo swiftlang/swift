@@ -31,39 +31,7 @@
 /// `Strideable` protocol or you must implement the `index(_:offsetBy:)` and
 /// `distance(from:to:)` methods with O(1) efficiency.
 public protocol RandomAccessCollection: BidirectionalCollection
-where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
-{
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Index
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Indices
-
-  /// The indices that are valid for subscripting the collection, in ascending
-  /// order.
-  ///
-  /// A collection's `indices` property can hold a strong reference to the
-  /// collection itself, causing the collection to be nonuniquely referenced.
-  /// If you mutate the collection while iterating over its indices, a strong
-  /// reference can result in an unexpected copy of the collection. To avoid
-  /// the unexpected copy, use the `index(after:)` method starting with
-  /// `startIndex` to produce indices instead.
-  ///
-  ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
-  ///     var i = c.startIndex
-  ///     while i != c.endIndex {
-  ///         c[i] /= 5
-  ///         i = c.index(after: i)
-  ///     }
-  ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
-  var indices: Indices { get }
-
+where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection {
   /// Accesses a contiguous subrange of the collection's elements.
   ///
   /// The accessed slice uses the same indices for the same elements as the
@@ -88,45 +56,6 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///
   /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  subscript(position: Index) -> Element { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  var startIndex: Index { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  var endIndex: Index { get }
-
-  /// Returns the position immediately before the given index.
-  ///
-  /// - Parameter i: A valid index of the collection. `i` must be greater than
-  ///   `startIndex`.
-  /// - Returns: The index value immediately before `i`.
-  func index(before i: Index) -> Index
-
-  /// Replaces the given index with its predecessor.
-  ///
-  /// - Parameter i: A valid index of the collection. `i` must be greater than
-  ///   `startIndex`.
-  func formIndex(before i: inout Index)
-
-  /// Returns the position immediately after the given index.
-  ///
-  /// The successor of an index must be well defined. For an index `i` into a
-  /// collection `c`, calling `c.index(after: i)` returns the same index every
-  /// time.
-  ///
-  /// - Parameter i: A valid index of the collection. `i` must be less than
-  ///   `endIndex`.
-  /// - Returns: The index value immediately after `i`.
-  func index(after i: Index) -> Index
-
-  /// Replaces the given index with its successor.
-  ///
-  /// - Parameter i: A valid index of the collection. `i` must be less than
-  ///   `endIndex`.
-  func formIndex(after i: inout Index)
 
   /// Returns an index that is the specified distance from the given index.
   ///
