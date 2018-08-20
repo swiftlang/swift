@@ -3451,6 +3451,34 @@ extension Set {
 public typealias SetIndex<Element: Hashable> = Set<Element>.Index
 public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
 
+extension Set {
+  public // @testable performance metrics
+  var _stats: (maxLookups: Int, averageLookups: Double)? {
+    guard case .native(let native) = _variant else { return nil }
+    defer { _fixLifetime(self) }
+    var maxChainLength = 0
+    var sumChainLength = 0
+    for i in native.indices {
+      let delta = native.displacement(ofElementAt: i)
+      maxChainLength = Swift.max(maxChainLength, delta + 1)
+      sumChainLength += delta + 1
+    }
+    return (maxChainLength, Double(sumChainLength) / Double(count))
+  }
+}
+
+extension _NativeSet {
+  internal func displacement(ofElementAt index: Index) -> Int {
+    let element = uncheckedElement(at: index)
+    let hashValue = self.hashValue(for: element)
+    let ideal = hashValue & _storage.hashTable.bucketMask
+    let delta = ideal <= index.bucket
+      ? index.bucket - ideal
+      : index.bucket - ideal + bucketCount
+    return delta
+  }
+}
+
 extension _NativeSet {
   // FIXME: Remove
   internal func _dump() -> String {
