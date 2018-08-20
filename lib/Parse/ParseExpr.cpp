@@ -3123,7 +3123,7 @@ Parser::parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind) {
   auto CodeCompletionPos = consumeToken();
   auto Expr = new (Context) CodeCompletionExpr(CodeCompletionPos);
   if (CodeCompletion)
-    CodeCompletion->completeAfterPound(Expr, ParentKind);
+    CodeCompletion->completeAfterPoundExpr(Expr, ParentKind);
   return makeParserCodeCompletionResult(Expr);
 }
 

@@ -1466,7 +1466,8 @@ public:
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          Optional<unsigned> yieldIndex) override;
-  void completeAfterPound(CodeCompletionExpr *E, Optional<StmtKind> ParentKind) override;
+  void completeAfterPoundExpr(CodeCompletionExpr *E,
+                              Optional<StmtKind> ParentKind) override;
   void completeGenericParams(TypeLoc TL) override;
   void completeAfterIfStmt(bool hasElse) override;
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
@@ -4608,11 +4609,11 @@ void CodeCompletionCallbacksImpl::completeYieldStmt(CodeCompletionExpr *E,
   Kind = CompletionKind::YieldStmtExpr;
 }
 
-void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E,
-                                                     Optional<StmtKind> ParentKind) {
+void CodeCompletionCallbacksImpl::completeAfterPoundExpr(
+    CodeCompletionExpr *E, Optional<StmtKind> ParentKind) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
-  Kind = CompletionKind::AfterPound;
+  Kind = CompletionKind::AfterPoundExpr;
   ParentStmtKind = ParentKind;
 }
 
@@ -4739,7 +4740,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::Import:
   case CompletionKind::UnresolvedMember:
   case CompletionKind::CallArg:
-  case CompletionKind::AfterPound:
+  case CompletionKind::AfterPoundExpr:
   case CompletionKind::GenericParams:
   case CompletionKind::KeyPathExpr:
   case CompletionKind::KeyPathExprDot:
@@ -5403,7 +5404,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::AfterPound: {
+  case CompletionKind::AfterPoundExpr: {
     Lookup.addPoundAvailable(ParentStmtKind);
     Lookup.addPoundSelector(/*needPound=*/false);
     Lookup.addPoundKeyPath(/*needPound=*/false);
