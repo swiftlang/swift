@@ -122,3 +122,44 @@ func partial<A>(valueA: A,
   _ = valueB[keyPath: pkpB]
 }
 
+extension Int {
+  var b: Int { get { return 0 } set { } }
+  var u: Int { get { return 0 } set { } }
+  var tt: Int { get { return 0 } set { } }
+}
+
+// CHECK-LABEL: sil hidden @{{.*}}writebackNesting
+func writebackNesting(x: inout Int,
+                      y: WritableKeyPath<Int, Int>,
+                      z: WritableKeyPath<Int, Int>,
+                      w: Int) -> Int {
+  // -- get 'b'
+  // CHECK: function_ref @$SSi19keypath_applicationE1bSivg
+  // -- apply keypath y
+  // CHECK: [[PROJECT_FN:%.*]] = function_ref @{{.*}}_projectKeyPathWritable
+  // CHECK: [[PROJECT_RET:%.*]] = apply [[PROJECT_FN]]
+  // CHECK: [[PROJECT_RET_BORROW:%.*]] = begin_borrow [[PROJECT_RET]]
+  // CHECK: [[PROJECT_RET_BORROW_OWNER:%.*]] = tuple_extract [[PROJECT_RET_BORROW]] {{.*}}, 1
+  // CHECK: [[OWNER_Y:%.*]] = copy_value [[PROJECT_RET_BORROW_OWNER]]
+  // -- get 'u'
+  // CHECK: function_ref @$SSi19keypath_applicationE1uSivg
+  // -- apply keypath z
+  // CHECK: [[PROJECT_FN:%.*]] = function_ref @{{.*}}_projectKeyPathWritable
+  // CHECK: [[PROJECT_RET:%.*]] = apply [[PROJECT_FN]]
+  // CHECK: [[PROJECT_RET_BORROW:%.*]] = begin_borrow [[PROJECT_RET]]
+  // CHECK: [[PROJECT_RET_BORROW_OWNER:%.*]] = tuple_extract [[PROJECT_RET_BORROW]] {{.*}}, 1
+  // CHECK: [[OWNER_Z:%.*]] = copy_value [[PROJECT_RET_BORROW_OWNER]]
+
+  // -- set 'tt'
+  // CHECK: function_ref @$SSi19keypath_applicationE2ttSivs
+  // -- destroy owner for keypath projection z
+  // CHECK: destroy_value [[OWNER_Z]]
+  // -- set 'u'
+  // CHECK: function_ref @$SSi19keypath_applicationE1uSivs
+  // -- destroy owner for keypath projection y
+  // CHECK: destroy_value [[OWNER_Y]]
+  // -- set 'b'
+  // CHECK: function_ref @$SSi19keypath_applicationE1bSivs
+
+  x.b[keyPath: y].u[keyPath: z].tt = w
+}

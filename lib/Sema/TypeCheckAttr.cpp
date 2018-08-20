@@ -383,11 +383,9 @@ void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    if (auto extendedType = ED->getExtendedType()) {
-      if (auto *nominalDecl = extendedType->getAnyNominal()) {
-        if (!isa<ClassDecl>(nominalDecl))
-          diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
-      }
+    if (auto nominalDecl = ED->getExtendedNominal()) {
+      if (!isa<ClassDecl>(nominalDecl))
+        diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
     }
   }
 }
@@ -1523,7 +1521,7 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
     return false;
 
   // Find the extended class.
-  auto classDecl = ext->getExtendedType()->getClassOrBoundGenericClass();
+  auto classDecl = ext->getAsClassOrClassExtensionContext();
   if (!classDecl)
     return false;
 
@@ -1611,12 +1609,12 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
       return;
     }
 
-    Type extendedTy = extension->getExtendedType();
-    AccessLevel typeAccess = extendedTy->getAnyNominal()->getFormalAccess();
+    NominalTypeDecl *nominal = extension->getExtendedNominal();
+    AccessLevel typeAccess = nominal->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
       TC.diagnose(attr->getLocation(), diag::access_control_extension_more,
                   typeAccess,
-                  extendedTy->getAnyNominal()->getDescriptiveKind(),
+                  nominal->getDescriptiveKind(),
                   attr->getAccess())
         .fixItRemove(attr->getRange());
       attr->setInvalid();
@@ -2062,11 +2060,10 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
-  auto access = VD->getFormalAccess(/*useDC=*/nullptr,
-                                    /*treatUsableFromInlineAsPublic=*/true);
-  if (access < AccessLevel::Public) {
+  if (VD->getFormalAccess() < AccessLevel::Public &&
+      !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::fixed_layout_attr_on_internal_type,
-                          VD->getFullName(), access);
+                          VD->getFullName(), VD->getFormalAccess());
   }
 }
 
@@ -2221,9 +2218,8 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
     break;
   }
 
-  auto access = ED->getFormalAccess(/*useDC=*/nullptr,
-                                    /*treatUsableFromInlineAsPublic=*/true);
-  if (access < AccessLevel::Public) {
+  if (ED->getFormalAccess() < AccessLevel::Public &&
+      !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
   }
 }
@@ -2282,20 +2278,20 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return original->getParent() == func->getParent();
   };
 
+  auto isABIPublic = [&](FuncDecl *func) {
+    return func->getFormalAccess() >= AccessLevel::Public ||
+           func->getAttrs().hasAttribute<InlinableAttr>() ||
+           func->getAttrs().hasAttribute<UsableFromInlineAttr>();
+  };
+
   // If the original function is exported (i.e. it is public or
   // @usableFromInline), then the primal/adjoint must also be exported.
   // Returns true on error.
   using FuncSpecifier = DifferentiableAttr::FunctionSpecifier;
   auto checkAccessControl = [&](FuncDecl *func, FuncSpecifier funcSpec,
                                 bool isPrimal) {
-    auto originalAccess =
-      original->getFormalAccess(/*useDC*/ nullptr,
-		                /*treatUsableFromInlineAsPublic*/ true);
-    if (originalAccess < AccessLevel::Public) return false;
-    auto funcAccess =
-      func->getFormalAccess(/*useDC*/ nullptr,
-		            /*treatUsableFromInlineAsPublic*/ true);
-    if (funcAccess >= AccessLevel::Public) return false;
+    if (!isABIPublic(original)) return false;
+    if (isABIPublic(func)) return false;
     TC.diagnose(funcSpec.Loc.getBaseNameLoc(),
                 diag::differentiable_attr_invalid_access,
                 funcSpec.Name, original->getFullName(), isPrimal);

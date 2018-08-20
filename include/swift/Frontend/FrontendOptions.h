@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -138,9 +139,9 @@ public:
     EmitIR,       ///< Emit LLVM IR
     EmitBC,       ///< Emit LLVM BC
     EmitObject,   ///< Emit object file
-  };
 
-  bool isCreatingSIL() { return RequestedAction >= ActionType::EmitSILGen; }
+    DumpTypeInfo, ///< Dump IRGen type info
+  };
 
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = ActionType::NoneAction;
@@ -306,12 +307,14 @@ private:
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);
   static bool canActionEmitModuleDoc(ActionType);
+  static bool canActionEmitInterface(ActionType);
 
 public:
+  static bool doesActionGenerateSIL(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
-  static StringRef suffixForPrincipalOutputFileForAction(ActionType);
+  static file_types::ID formatForPrincipalOutputFileForAction(ActionType);
 };
 
 }

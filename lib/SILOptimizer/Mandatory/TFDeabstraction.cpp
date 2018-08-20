@@ -24,13 +24,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "tf-deabstraction"
-#include "TFUtilities.h"
 #include "TFConstExpr.h"
+#include "TFUtilities.h"
+#include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "swift/SIL/SILConstants.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
@@ -136,9 +137,9 @@ namespace {
     void inlineCalls();
     void simplifyTensorOperands();
 
-    void promoteToSSA(MutableArrayRef<AllocStackInst*> allocs);
+    void promoteToSSA(ArrayRef<AllocStackInst *> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
-    void propagateTensorValues();
+    void propagateSSAValues();
     void checkAttributesAndFormGraphOps();
     void formGraphOp(SILTensorOpInfo &opInfo,
                      DenseMap<SILValue, SymbolicValue> &constants,
@@ -200,7 +201,8 @@ void TFDeabstraction::inlineCalls() {
       for (auto &bb : fn)
         for (auto &i : bb)
           if (auto *inst = dyn_cast<GlobalAddrInst>(&i)) {
-            if (tfc.containsTensorFlowValue(inst->getType()))
+            if (tfc.containsTensorFlowValue(
+                    inst->getType(), /*checkHigherOrderFunctions*/ false))
               return true;
           }
       return false;
@@ -249,7 +251,7 @@ void TFDeabstraction::inlineCalls() {
 
     // If the call we found is to something that processes TensorFlow values,
     // then we want it inlined.
-    if (!tfc.containsTensorFlowValue(type))
+    if (!tfc.containsTensorFlowValue(type, /*checkHigherOrderFunctions*/ true))
       return false;
 
     return true;
@@ -458,7 +460,8 @@ static bool explodeAggregateInst(SILInstruction *inst,
   // Check to make sure that this operation is doing something on a value
   // containing a TensorFlow value.  If not, just leave it alone.
   auto type = inst->getOperand(0)->getType();
-  if (tfc && !tfc->containsTensorFlowValue(type))
+  if (tfc &&
+      !tfc->containsTensorFlowValue(type, /*checkHigherOrderFunctions*/ false))
     return false;
 
   // TODO: This is currently just handling loadable types.  We should be able to
@@ -493,8 +496,8 @@ static bool explodeAggregateInst(SILInstruction *inst,
     if (op != inst->getOperand(0) && op->getType().isAnyClassReferenceType())
       B.createStrongRetain(inst->getLoc(), op, Atomicity::Atomic);
     else
-      TL.emitLoweredCopyValueMostDerivedDescendents(B, inst->getLoc(),
-                                                    inst->getOperand(0));
+      TL.emitLoweredCopyValueDirectChildren(B, inst->getLoc(),
+                                            inst->getOperand(0));
   } else if (isa<ReleaseValueInst>(inst) || isa<StrongReleaseInst>(inst)) {
     // Turn a retain_value into a retain_value on its elements.  We peephole
     // StructInst values because they are so common and this generates cleaner
@@ -503,8 +506,8 @@ static bool explodeAggregateInst(SILInstruction *inst,
     if (op != inst->getOperand(0) && op->getType().isAnyClassReferenceType())
       B.createStrongRelease(inst->getLoc(), op, Atomicity::Atomic);
     else
-      TL.emitLoweredDestroyValueMostDerivedDescendents(B, inst->getLoc(),
-                                                       inst->getOperand(0));
+      TL.emitLoweredDestroyValueDirectChildren(B, inst->getLoc(),
+                                               inst->getOperand(0));
   } else {
     llvm_unreachable("unhandled instructions should be filtered above");
   }
@@ -679,8 +682,9 @@ bool PromotableMemoryFinder::run(ArrayRef<SILInstruction*> tensorOps) {
     auto convention = cast<SILFunctionArgument>(arg)->getArgumentConvention();
     // If this is an indirect argument working on tensors, it is a candidate.
     if (convention.isIndirectConvention() &&
-        tfc.containsTensorFlowValue(arg->getType()))
-      addressRoots.push_back({ arg, /*startsUninitialized*/false });
+        tfc.containsTensorFlowValue(arg->getType(),
+                                    /*checkHigherOrderFunctions*/ true))
+      addressRoots.push_back({arg, /*startsUninitialized*/ false});
   }
 
 
@@ -829,7 +833,8 @@ findMainFunctionGlobalAddressRootCandidates(
       // If we see an alloc global, remember where it is.
       if (auto agi = dyn_cast<AllocGlobalInst>(&inst)) {
         auto gv = agi->getReferencedGlobal();
-        if (tfc.containsTensorFlowValue(gv->getLoweredType())) {
+        if (tfc.containsTensorFlowValue(gv->getLoweredType(),
+                                        /*checkHigherOrderFunctions*/ false)) {
           assert(allocGlobals[agi->getReferencedGlobal()] == 0 &&
                  "more than one alloc_global instruction in the function?");
 
@@ -851,7 +856,8 @@ findMainFunctionGlobalAddressRootCandidates(
 
       // Process GlobalAddrInst's.
       auto ga = dyn_cast<GlobalAddrInst>(&inst);
-      if (!ga || !tfc.containsTensorFlowValue(ga->getType()))
+      if (!ga || !tfc.containsTensorFlowValue(
+                     ga->getType(), /*checkHigherOrderFunctions*/ false))
         continue;
 
       // Check to see if this is the first global_addr for this global
@@ -1064,53 +1070,76 @@ promoteAddressRootsToStack(ArrayRef<std::pair<SILValue, bool>> addressRoots) {
 
 /// Scan the function looking for TensorFlow value AllocStack instructions to
 /// promote.
-void TFDeabstraction::promoteToSSA(MutableArrayRef<AllocStackInst*> allocs) {
+void TFDeabstraction::promoteToSSA(ArrayRef<AllocStackInst *> allocs) {
   // If there is nothing to promote, don't bother calculating dominator info.
   if (allocs.empty())
     return;
 
   llvm::PrettyStackTraceFormat X("PromotableMemoryFinder::promoteToSSA");
 
-  // Do any necessary preprocessing of the stack allocations before promoting
-  // them.
-  for (auto alloc : allocs)
+  // Our first scan will look for begin/end access instructions and remove them,
+  // allowing later passes to be simpler.
+  // This is done repeatedly, since a begin_access itself can have another
+  // begin_access user.
+  for (auto *alloc : allocs) {
+    while (true) {
+      bool changed = false;
+      for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
+        auto *begin = dyn_cast<BeginAccessInst>((*UI++)->getUser());
+        if (!begin)
+          continue;
+
+        // If we have a begin_access instruction, replace uses of begin_access
+        // with uses of the original value and remove the end_access.
+        for (auto UI = begin->use_begin(); UI != begin->use_end();) {
+          auto *use = *UI++;
+          auto inst = use->getUser();
+          if (isa<EndAccessInst>(inst))
+            inst->eraseFromParent();
+          else
+            use->set(alloc);
+        }
+        begin->eraseFromParent();
+        changed = true;
+      }
+      if (!changed)
+        break;
+    }
+  }
+
+  // Now we explode the alloc / dealloc / load / store operations of aggregate
+  // values into per-field operations. For those tfop attr types that we will
+  // const-evaluate later (only "TensorShape" for now), stop exploding them, so
+  // that we can properly propagate SSA values for them in the subsequent
+  // propagateSSAValues() call.
+  (void)runSROAOnInsts(allocs, [](AllocStackInst *alloc) {
+    auto ty = alloc->getType().getASTType();
+    auto *structTy = ty->getAs<StructType>();
+    return !structTy || structTy->getDecl()->getNameStr() != "TensorShape";
+  });
+
+  // Since the SROA pass above may have mutate alloc insts, we again scan over
+  // all of the operands of the tensor ops (including tf op attributes), finding
+  // stack allocations that we want to promote to SSA.
+  SmallVector<AllocStackInst *, 16> newStackAllocs;
+  if (PromotableMemoryFinder(newStackAllocs, tfc, fn).run(tensorOps)) {
+    logCurrentState("After running SROA",
+                    /*detailed*/ true);
+  }
+
+  for (auto alloc : newStackAllocs)
     prepareStackAllocForPromotion(alloc);
 
   // Otherwise the function does have tensor operations, so lets promote any
   // stack allocations out of the way so we can do simple dataflow analysis.
   auto domInfo = passManager->getAnalysis<DominanceAnalysis>()->get(&fn);
-  promoteAllocsToSSA(allocs, domInfo);
+  promoteAllocsToSSA(newStackAllocs, domInfo);
 }
 
 /// Preprocess the specified allocation instruction to make it more suitable for
 /// promotion to SSA.  In particularly, we eliminate CopyAddrInst and other
 /// uses that could prevent us from promoting this.
 void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
-  // TODO: We will eventually need to do real SRoA to handle the case when
-  // we have tensor values mixed in with other random values that shouldn't
-  // (or can't) be loaded.  For now, we can just fail to deabstract these
-  // cases.
-
-  // Our first scan will look for begin_access instructions and remove them,
-  // allowing the second pass to be simpler.
-  for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
-    auto *begin = dyn_cast<BeginAccessInst>((*UI++)->getUser());
-    if (!begin)
-      continue;
-
-    // If we have a begin_access instruction, replace uses of begin_access with
-    // uses of the original value and remove the end_access.
-    for (auto UI = begin->use_begin(); UI != begin->use_end();) {
-      auto *use = *UI++;
-      auto inst = use->getUser();
-      if (isa<EndAccessInst>(inst))
-        inst->eraseFromParent();
-      else
-        use->set(alloc);
-    }
-    begin->eraseFromParent();
-  }
-
   // Our second pass looks for aggregate operations and struct_element_addrs
   // that poke inside the allocation.
   for (auto UI = alloc->use_begin(); UI != alloc->use_end();) {
@@ -1284,15 +1313,121 @@ static SILValue explodeSILStructArgument(SILPHIArgument *arg) {
   return replacement;
 }
 
+/// If the specified type is a Swift.Array or some element type, then return the
+/// element type.  Otherwise, return a null Type.
+static Type getArrayElementType(Type ty) {
+  if (auto bgst = ty->getAs<BoundGenericStructType>())
+    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
+      return bgst->getGenericArgs()[0];
+  return Type();
+}
+
+/// If the specified value is a single-element struct_inst wrapper, look through
+/// them.  We special case arrays, and return Array<T> values as themselves.
+static SILValue getValueInsideStructInst(SILValue value) {
+  // Dig through one-argument struct insts.
+  while (auto structVal = dyn_cast<StructInst>(value)) {
+    // If this is an ArrayType, don't dig in.
+    if (getArrayElementType(structVal->getType().getASTType()))
+      break;
+
+    if (structVal->getNumOperands() != 1)
+      break;
+    value = structVal->getOperand(0);
+  }
+  return value;
+}
+
+/// Return true if this is a reference to the _allocateUninitialized helper
+/// in array in the standard library allocating zero elements.
+bool isArrayAllocUninit(SILValue op, SILValue &numElements) {
+  auto *apply = dyn_cast<ApplyInst>(op->getDefiningInstruction());
+  if (!apply)
+    return false;
+  auto *callee = dyn_cast<FunctionRefInst>(apply->getOperand(0));
+  if (!callee)
+    return false;
+
+  auto calleeName = callee->getReferencedFunction()->getName();
+  // FIXME: Gross hack because this is specialized by perf optimizer.  Remove
+  // when deabstraction does arrays.
+  if (!calleeName.contains("_allocateUninitializedArray"))
+    return false;
+
+  numElements = getValueInsideStructInst(apply->getOperand(1));
+  return true;
+}
+
+namespace {
+/// This is a little helper for working with literal arrays that may want to get
+/// deleted if all references to them are removed.
+struct ArrayElementDecoder {
+  SmallVector<Operand *, 4> elementsAtInit;
+  SmallPtrSet<SILInstruction *, 8> arrayInsts;
+
+  /// Given a SILValue that may be an array, attempt to decode it into the
+  /// literal values that make up its elements.  This returns the element type
+  /// of the array if it succeeds, otherwise a null type.
+  Type decode(SILValue value) {
+    auto elementType = getArrayElementType(value->getType().getASTType());
+    if (!elementType)
+      return Type();
+
+    // The only pattern we support involves a call to
+    // _allocateUninitializedArray.  The array value will be a tuple extract
+    // from the 0th result of the call.
+    auto *teiValue = dyn_cast<TupleExtractInst>(value);
+    if (!teiValue || teiValue->getFieldNo() != 0 ||
+        !isa<ApplyInst>(teiValue->getOperand()))
+      return Type();
+
+    // Figure out the number of elements, which must be a constant integer.
+    auto *apply = cast<ApplyInst>(teiValue->getOperand());
+
+    if (decodeApply(apply))
+      return elementType;
+    return Type();
+  }
+
+  /// Given an applyinst for _allocateUninitialized, try to decode it.  This
+  /// returns true on success or false on failure.
+  bool decodeApply(ApplyInst *apply) {
+    // Verify we have a call to _allocateUninitializedArray.
+    SILValue numElementsVal;
+    if (!isArrayAllocUninit(apply, numElementsVal) ||
+        !isa<IntegerLiteralInst>(numElementsVal))
+      return false;
+    uint64_t numElements =
+        cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
+
+    return !tf::ConstExprEvaluator::decodeAllocUninitializedArray(
+        apply, numElements, elementsAtInit, &arrayInsts);
+  }
+
+  /// Try to remove the instructions that make up the array initialization.
+  void removeInstructionsIfPossible() {
+    if (arrayInsts.empty())
+      return;
+
+    // If we can remove it, drop all inter-dependent references.
+    for (auto inst : arrayInsts)
+      inst->dropAllReferences();
+    // Then erase the instructions themselves.
+    for (auto inst : arrayInsts)
+      inst->eraseFromParent();
+  }
+};
+} // end anonymous namespace
+
 /// We've promoted any stack allocations that are in the way of tensor operands
 /// so we now have proper SSA.  Look through struct and tuple injection and
-/// projection instructions to find the underlying value that feeds the tensor
-/// operation.  This is typically another tensor operation or a constant (for
-/// attributes) but may be variables or other things that cause a send.
+/// projection instructions to find the underlying value that can feed the
+/// tensor operation or attribute.  This is typically another tensor operation
+/// or a constant (for attributes) but may be variables or other things that
+/// cause a send.
 ///
 static SILValue
-propagateTensorOperand(SILValue v,
-                       SmallPtrSet<SILPHIArgument*, 8> &checkedPhis) {
+propagateSSAOperand(SILValue v, SmallPtrSet<SILPHIArgument *, 8> &checkedPhis) {
   // This is the series of struct/tuple extract indices that the value is
   // currently being projected through.  Consider an access like this:
   //     B = struct { #1, #2 }
@@ -1349,7 +1484,7 @@ propagateTensorOperand(SILValue v,
           // shift.  We know that recursive processing won't delete the bb arg
           // though, as it is in checkedPhis.
           auto incomingVal = br->getOperand(arg->getIndex());
-          incomingVal = propagateTensorOperand(incomingVal, checkedPhis);
+          incomingVal = propagateSSAOperand(incomingVal, checkedPhis);
           br->setOperand(arg->getIndex(), incomingVal);
         }
       }
@@ -1366,6 +1501,43 @@ propagateTensorOperand(SILValue v,
     if (auto extract = dyn_cast<TupleExtractInst>(inst)) {
       accessPath.push_back(extract->getFieldNo());
       v = extract->getOperand();
+
+      auto *apply = dyn_cast_or_null<ApplyInst>(v->getDefiningInstruction());
+      if (!apply)
+        continue;
+
+      // Handle the case of deabstracting an array, such as the tfop attr %181
+      // below. In this example, we need to propagate %188 to %190, which
+      // eventually feeds %181. Note %189 is not a const struct. The goal of
+      // SSA value propagation here is to have const expr eval only process
+      // the (const) struct field %188, and not the struct %189.
+      //
+      // function_ref _allocateUninitializedArray<A>(_:)
+      // %179 = function_ref @$Ss27_allocateUninitializedArrayySayxG_BptBwlF ...
+      // %180 = apply %179<TensorShape>(%178) ...
+      // %181 = tuple_extract %180 : $(Array<TensorShape>, Builtin.RawPointer),0
+      // %183 = tuple_extract %180 : $(Array<TensorShape>, Builtin.RawPointer),1
+      // %185 = pointer_to_address %183
+      // %188 = struct $TensorShape (%187 : $Array<Int32>)
+      // %189 = struct $SimpleIter(...: $ResourceHandle, %188 :$TensorShape)
+      // %190 = struct_extract %189 : $SimpleIter, #SimpleIter.elementShape
+      // store %190 to %185 : $*TensorShape
+      // %193 = builtin "__tfop_Foo,...,shapes"(..., %181 : $Array<TensorShape>
+      ArrayElementDecoder arrayDecoder;
+      if (!arrayDecoder.decode(extract))
+        continue;
+
+      for (auto *use : arrayDecoder.elementsAtInit) {
+        auto *store = dyn_cast<StoreInst>(use->getUser());
+        if (!store) {
+          // TODO: May need to handle other inst types too, such as CopyAddr.
+          continue;
+        }
+
+        auto newSrc = propagateSSAOperand(store->getOperand(0), checkedPhis);
+        store->setOperand(0, newSrc);
+      }
+
       continue;
     }
     if (auto extract = dyn_cast<StructExtractInst>(inst)) {
@@ -1395,20 +1567,22 @@ propagateTensorOperand(SILValue v,
 }
 
 /// Propagate the operand values for all tensors: this ensures that all tensor
-/// operands and results are directly linked together in the SSA graph at the
-/// TensorFlow value level, without going through intervening struct/tuple
-/// wrappers.
-void TFDeabstraction::propagateTensorValues() {
-  llvm::PrettyStackTraceFormat X("TFDeabstraction::propagateTensorValues");
+/// operands (including attributes) and results are directly linked together in
+/// the SSA graph at the TensorFlow value level, without going through
+/// intervening struct/tuple wrappers.
+/// This is essential in deabstracting constant tfop attribute values, and also
+/// helps reduce sends/recvs involving tensor operands.
+void TFDeabstraction::propagateSSAValues() {
+  llvm::PrettyStackTraceFormat X("TFDeabstraction::propagateSSAValues");
 
-  // Now that we have directly exposed retain/release instructions and tensor
-  // operations, go through and make sure they are directly linked to each
-  // other.
   SmallPtrSet<SILPHIArgument*, 8> checkedPhis;
   for (auto *op : tensorOps) {
     for (auto &operand : op->getAllOperands()) {
-      // Get the propagated value.  This call can change the tensor operand.
-      auto newVal = propagateTensorOperand(operand.get(), checkedPhis);
+      // Get the propagated value.
+      auto newVal = propagateSSAOperand(operand.get(), checkedPhis);
+
+      if (newVal == operand.get())
+        continue;
 
       // Get the (possibly-changed) instruction that used to be feeding the
       // tensor operation and set the new value.
@@ -1428,10 +1602,6 @@ void TFDeabstraction::propagateTensorValues() {
 ///
 /// On success, this removes the ApplyInst and returns a pointer to the new
 /// BuiltinInst that is created.  On failure, it returns a nullptr.
-///
-/// FIXME: This is a near duplication of the logic used by TFPartitioning in
-/// SILTensorOpInfo::decodeTensorFromScalars.  When constexpr propagation is
-/// done, we should remove the logic in SILTensorOpInfo.
 static GraphOperationInst *tryToPromoteTensorFromScalars(
     ApplyInst *inst, const DenseMap<SILValue, SymbolicValue> &constants,
     GraphFunctionDeviceInfo &deviceInfo) {
@@ -1612,8 +1782,10 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
       // removed at the beginning of the partition pass.
       // TODO: remove this inst in the getForFunction() call above, once
       // the partition pass is folded into deabstraction.
+      // FIXME: consider defining constexpr strings for these literals.
       if (opInfo->opName == "tfc.configureTPU" ||
-          opInfo->opName == "tfc.configureGPU")
+          opInfo->opName == "tfc.configureGPU" ||
+          opInfo->opName == "tfc.configureCPU")
         continue;
       formGraphOp(*opInfo, constants, deviceInfo);
     }
@@ -1640,83 +1812,6 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
     }
   }
 }
-
-/// If the specified type is a Swift.Array or some element type, then return the
-/// element type.  Otherwise, return a null Type.
-static Type getArrayElementType(Type ty) {
-  if (auto bgst = ty->getAs<BoundGenericStructType>())
-    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
-      return bgst->getGenericArgs()[0];
-  return Type();
-}
-
-/// Return true if this is a reference to the _allocateUninitialized helper
-/// in array in the standard library allocating zero elements.
-/// TODO: Move to deabstraction when other clients are removed.
-bool isArrayAllocUninit(SILValue op, SILValue &numElements);
-
-namespace {
-/// This is a little helper for working with literal arrays that may want to get
-/// deleted if all references to them are removed.
-struct ArrayElementDecoder {
-  SmallVector<Operand*, 4> elementsAtInit;
-  SmallPtrSet<SILInstruction *, 8> arrayInsts;
-
-  /// Given a SILValue that may be an array, attempt to decode it into the
-  /// literal values that make up its elements.  This returns the element type
-  /// of the array if it succeeds, otherwise a null type.
-  Type decode(SILValue value) {
-    auto elementType = getArrayElementType(value->getType().getASTType());
-    if (!elementType) return Type();
-
-    // The only pattern we support involves a call to
-    // _allocateUninitializedArray.  The array value will be a tuple extract
-    // from the 0th result of the call.
-    auto *teiValue = dyn_cast<TupleExtractInst>(value);
-    if (!teiValue || teiValue->getFieldNo() != 0 ||
-        !isa<ApplyInst>(teiValue->getOperand()))
-      return Type();
-
-    // Figure out the number of elements, which must be a constant integer.
-    auto *apply = cast<ApplyInst>(teiValue->getOperand());
-
-    if (decodeApply(apply))
-      return elementType;
-    return Type();
-  }
-
-  /// Given an applyinst for _allocateUninitialized, try to decode it.  This
-  /// returns true on success or false on failure.
-  bool decodeApply(ApplyInst *apply) {
-    // Verify we have a call to _allocateUninitializedArray.
-    SILValue numElementsVal;
-    if (!isArrayAllocUninit(apply, numElementsVal) ||
-        !isa<IntegerLiteralInst>(numElementsVal))
-      return false;
-    uint64_t numElements =
-    cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
-
-    return !tf::ConstExprEvaluator::
-    decodeAllocUninitializedArray(apply, numElements, elementsAtInit,
-                                  &arrayInsts);
-  }
-
-  /// Try to remove the instructions that make up the array initialization.
-  void removeInstructionsIfPossible() {
-    if (arrayInsts.empty())
-      return;
-
-    // If we can remove it, drop all inter-dependent references.
-    for (auto inst : arrayInsts)
-      inst->dropAllReferences();
-    // Then erase the instructions themselves.
-    for (auto inst : arrayInsts)
-      inst->eraseFromParent();
-  }
-};
-} // end anonymous namespace
-
-
 
 /// A reference to the specified array was just dropped.  If it was a literal
 /// array and this was the last use, clean up the instructions that fed it.
@@ -1779,10 +1874,97 @@ void TFDeabstraction::cleanupDeadInstructions() {
     removeArrayValueIfPossible(inst);
 }
 
+/// If the specified type conforms to the TensorProtocol protocol, return the
+/// Scalar type for it.  Otherwise return a null type.
+static Type conformsToTensorProtocol(Type ty, ModuleDecl *module) {
+  auto nominal = ty->getAnyNominal();
 
-// TODO: move this from TFUtilities when deabstraction is done.
-SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
-                                       SILBuilder &B);
+  auto &ctx = ty->getASTContext();
+  auto tensorProto = ctx.getProtocol(KnownProtocolKind::TensorProtocol);
+  if (!tensorProto || !nominal)
+    return Type();
+
+  SmallVector<ProtocolConformance *, 2> conformances;
+  nominal->lookupConformance(/*unused module*/ nullptr, tensorProto,
+                             conformances);
+  if (conformances.size() != 1)
+    return Type();
+
+  auto scalarMembers =
+      nominal->lookupDirect(DeclName(ctx.getIdentifier("Scalar")));
+  if (scalarMembers.size() != 1)
+    return Type();
+  if (auto member = dyn_cast<TypeDecl>(scalarMembers[0]))
+    return ty->getTypeOfMember(module, member,
+                               member->getDeclaredInterfaceType());
+  return Type();
+}
+
+/// Given something that conforms to the TensorProtocol protocol, extract the
+/// 'handle' out of it.
+static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
+                                              SILBuilder &B) {
+  // If we already have a TensorHandle, just use it.
+  if (isTensorHandle(v->getType()))
+    return v;
+
+  auto module = B.getFunction().getModule().getSwiftModule();
+
+  auto vType = v->getType().getASTType();
+  if (!vType->getStructOrBoundGenericStruct() ||
+      !conformsToTensorProtocol(vType, module))
+    return SILValue();
+
+  // If this value is just a struct wrapper around a TensorHandle, use the
+  // input of it.  In the case of Tensor2D, we have multiple levels of struct
+  // wrapper.
+  while (1) {
+    auto si = dyn_cast<StructInst>(v);
+    if (!si)
+      break;
+
+    if (si->getNumOperands() != 1)
+      break;
+
+    auto operand = si->getOperand(0);
+    // If we found the TensorHandle itself, then we win - return it.
+    if (isTensorHandle(operand->getType()))
+      return operand;
+
+    // If we found a wrapper around another TensorProtocol, dig deeper.
+    if (!conformsToTensorProtocol(operand->getType().getASTType(), module))
+      break;
+
+    v = operand;
+  }
+
+  // TODO(clattner): it would be more correct to generate a call to an accessor
+  // to get the handle out, but for now, we know we're always dealing with types
+  // that store the field by-value so we can dig it out in with an easier
+  // approach.  This handles structs of TensorHandle (like Tensor) and structs
+  // of structs of TensorHandle.
+  while (!isTensorHandle(v->getType())) {
+    auto vTy = v->getType().getASTType();
+    auto decl = vTy.getNominalOrBoundGenericNominal();
+    assert(decl && "Type must be nominal to conform to TensorProtocol");
+
+    auto fieldIt = decl->getStoredProperties().begin();
+    assert(fieldIt != decl->getStoredProperties().end() &&
+           "Tensor should have one member");
+    VarDecl *field = *fieldIt++;
+    assert(fieldIt == decl->getStoredProperties().end() &&
+           "Expected one stored field in TensorProtocol type");
+
+    // 'vTy' is usually a bound generic type.  Use getTypeOfMember to substitute
+    // the type bound into the member type.
+    auto fieldTy = vTy->getTypeOfMember(module, field);
+
+    auto silTy = SILType::getPrimitiveObjectType(fieldTy->getCanonicalType());
+    v = B.createStructExtract(loc, v, field, silTy);
+  }
+
+  return v;
+}
 
 /// Replace the specified tensor operation with a GraphOperation instruction,
 /// emitting errors if attribute arguments could not be constant folded, or if
@@ -1888,8 +2070,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputListElt);
 
       // Add each element to the input list we're building, drilling down
-      // through any struct wrappers (like Tensor/Tensor2D, etc) that may be
-      // around it.
+      // through any struct wrappers (like Tensor, etc) that may be around it.
       //
       // It is common to have arrays with repeated elements.  These will
       // generally be uniqued on entry to this routine.  If so, make sure to
@@ -2058,7 +2239,6 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       break;
     }
     case SILTensorOpInfo::OperandClass::ArrayElement:
-      // Match logic from checkAndDiagnoseOperands.
       inst->dump();
       assert(0 && "FIXME: array elem exprs aren't handled yet");
     case SILTensorOpInfo::OperandClass::Tensor:
@@ -2208,9 +2388,9 @@ void TFDeabstraction::doIt() {
   // Now that we've promoted all the allocations in the way of our dataflow,
   // go through and propagate any tuple/struct values that are in the way of
   // our analysis.
-  propagateTensorValues();
+  propagateSSAValues();
 
-  logCurrentState("After propagateTensorValues", /*detailed*/true);
+  logCurrentState("After propagateSSAValues", /*detailed*/ true);
 
   // Canonicalize attribute arguments, check that they have constants,
   // flatten array attributes, and form graph_op instructions.

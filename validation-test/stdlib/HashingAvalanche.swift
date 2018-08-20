@@ -15,7 +15,7 @@ func avalancheTest<Input: FixedWidthInteger & UnsignedInteger>(
 ) {
   typealias Output = Int
   let testsInBatch = 100000
-  let testData = randArray64(testsInBatch).map { Input(truncatingIfNeeded: $0) }
+  let testData = (0 ..< testsInBatch).map { _ in Input.random(in: .min ... .max) }
   let testDataHashed = testData.map { hashUnderTest($0) }
 
   for inputBit in 0..<Input.bitWidth {

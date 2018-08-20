@@ -19,7 +19,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/Attr.h"
@@ -207,4 +209,83 @@ bool SILModule::isTypeABIAccessible(SILType type) {
 
   // Otherwise, we need to be able to fetch layout-metadata for the type.
   return isTypeMetadataForLayoutAccessible(*this, type);
+}
+
+bool AbstractStorageDecl::exportsPropertyDescriptor() const {
+  // The storage needs a descriptor if it sits at a module's ABI boundary,
+  // meaning it has public linkage.
+  
+  // TODO: Global and static properties ought to eventually be referenceable
+  // as key paths from () or T.Type too.
+  if (!getDeclContext()->isTypeContext() || isStatic())
+    return false;
+  
+  // Protocol requirements do not need property descriptors.
+  if (isa<ProtocolDecl>(getDeclContext()))
+    return false;
+  
+  // Any property that's potentially resilient should have accessors
+  // synthesized.
+  if (!getGetter())
+    return false;
+
+  // If the getter is mutating, we cannot form a keypath to it at all.
+  if (isGetterMutating())
+    return false;
+
+  // TODO: If previous versions of an ABI-stable binary needed the descriptor,
+  // then we still do.
+
+  // Check the linkage of the declaration.
+  auto getter = SILDeclRef(getGetter());
+  auto getterLinkage = getter.getLinkage(ForDefinition);
+  
+  switch (getterLinkage) {
+  case SILLinkage::Public:
+  case SILLinkage::PublicNonABI:
+    // We may need a descriptor.
+    break;
+    
+  case SILLinkage::Shared:
+  case SILLinkage::Private:
+  case SILLinkage::Hidden:
+    // Don't need a public descriptor.
+    return false;
+    
+  case SILLinkage::HiddenExternal:
+  case SILLinkage::PrivateExternal:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::SharedExternal:
+    llvm_unreachable("should be definition linkage?");
+  }
+
+  // Subscripts with inout arguments (FIXME)and reabstracted arguments(/FIXME)
+  // don't have descriptors either.
+  if (auto sub = dyn_cast<SubscriptDecl>(this)) {
+    for (auto *index : *sub->getIndices()) {
+      // Keypaths can't capture inout indices.
+      if (index->isInOut())
+        return false;
+      
+      auto indexTy = index->getInterfaceType()
+                        ->getCanonicalType(sub->getGenericSignatureOfContext());
+      
+      // TODO: Handle reabstraction and tuple explosion in thunk generation.
+      // This wasn't previously a concern because anything that was Hashable
+      // had only one abstraction level and no explosion.
+      
+      if (isa<TupleType>(indexTy))
+        return false;
+      
+      auto indexObjTy = indexTy;
+      if (auto objTy = indexObjTy.getOptionalObjectType())
+        indexObjTy = objTy;
+      
+      if (isa<AnyFunctionType>(indexObjTy)
+          || isa<AnyMetatypeType>(indexObjTy))
+        return false;
+    }
+  }
+
+  return true;
 }

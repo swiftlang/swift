@@ -255,10 +255,10 @@ public struct PublicFixedStructWithInit {
 
 public struct KeypathStruct {
   var x: Int
-  // expected-note@-1 {{var 'x' is not '@usableFromInline' or public}}
+  // expected-note@-1 {{property 'x' is not '@usableFromInline' or public}}
 
   @inlinable public func usesKeypath() {
     _ = \KeypathStruct.x
-    // expected-error@-1 {{var 'x' is internal and cannot be referenced from an '@inlinable' function}}
+    // expected-error@-1 {{property 'x' is internal and cannot be referenced from an '@inlinable' function}}
   }
 }

@@ -13,7 +13,7 @@ CHECK-LABEL: --- INPUT FUNCTION {{.*}}trivialAdd
 CHECK: graph_op "Add,i,i"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
 
 CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}trivialAdd
-CHECK:      bb0(%0 : $TensorHandle<Float>):
+CHECK:      bb0(%0 : @unowned $TensorHandle<Float>):
 CHECK-NEXT:   %1 = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
 CHECK-NEXT:   return %1 : $TensorHandle<Float>
 
@@ -77,7 +77,7 @@ public func inputListMultipleUses(a: TensorHandle<Float>)
 
 /*
 CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}inputListMultipleUses
-CHECK: bb0(%0 : $TensorHandle<Float>):
+CHECK: bb0(%0 : @unowned $TensorHandle<Float>):
 CHECK:   %1 = graph_op "Pack,L,e,e,e"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>)
 CHECK:   return %1 : $TensorHandle<Float>
 CHECK-LABEL: ----
@@ -118,7 +118,7 @@ public func test75407624() {
  * CHECK: [[CX2:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */
  * CHECK:  graph_op "Fill,i,i"([[C1X]] : $TensorHandle<Int32>, [[CX2]] : $TensorHandle<Float>)
  * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */), (f32 0x40400000 /* 3 */), (f32 0x40800000 /* 4 */)], value$shape: [$Int32: (i32 2), (i32 2)],
- * CHECK-LABEL: ---- END OF 
+ * CHECK-LABEL: ---- END OF
 */
 
 
@@ -158,5 +158,75 @@ public func testShapeList() {
             output_shapes: [dataset.elementShape]) as ResourceHandle
 }
 
+// Another test case for SR-8463.
+struct SimpleIterator {
+  let handle: ResourceHandle
+  let elementShape: TensorShape
+
+  mutating func next() -> Tensor<Float> {
+    return #tfop("IteratorGetNext", handle,
+                 output_types: [Int32.self],
+                 output_shapes: [elementShape])
+  }
+}
+
+public func testShapeList2() {
+  let t = Tensor<Int32>([0])
+  let handle: VariantHandle = #tfop(
+    "TensorSliceDataset", [t],
+    Toutput_types: [Int32.self],
+    output_shapes: [TensorShape()]
+  )
+  let dataset = SimpleDataset(handle: handle, elementShape: TensorShape())
+  let resource = #tfop("AnonymousIterator",
+                       output_types: [Int32.self],
+                       output_shapes: [dataset.elementShape]) as ResourceHandle
+
+  var it = SimpleIterator(handle: resource, elementShape: dataset.elementShape)
+  _ = it.next()
+}
+
 // CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testShapeList
 // CHECK: graph_op "AnonymousIterator"() {output_types: [$Int32.Type: $Int32], output_shapes: [$TensorShape: ([$Int32: ])]
+
+@TensorFlowGraph
+func isZero(_ x: Tensor<Float>) -> Tensor<Bool> {
+  return x.elementsEqual(Tensor<Float>(0));
+}
+
+public func noescapeFuncAsAttr(_ f: @convention(tensorflow) (Tensor<Float>) -> Tensor<Bool>) {
+  let t = Tensor<Int32>([0])
+  let dataset: VariantHandle = #tfop(
+    "TensorSliceDataset", [t],
+    Toutput_types: [Int32.self],
+    output_shapes: [TensorShape()]
+  )
+  let _: VariantHandle = #tfop(
+    "FilterDataset", dataset, [Tensor<Int32>(0)], predicate: isZero,
+    Targuments: [Int32.self], output_types: [Float.self], output_shapes: [TensorShape()]
+  )
+}
+// Ensure that private functions are partitioned and lowered
+// if they are referred to in graph ops as attributes.
+// CHECK-LABEL:--- TFPartition Accelerator Result: {{.*}}isZero{{.*}}
+// CHECK: bb0(%0 : @unowned $TensorHandle<Float>):
+// CHECK:  [[A:%.*]] = graph_op "Const"()
+// CHECK:  [[B:%.*]] = graph_op "Equal,i,i"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Bool>
+// CHECK:  return [[B]] : $TensorHandle<Bool>                 // id: %3
+
+// CHECK-LABEL: ---- INPUT FUNCTION {{.*}}noescapeFuncAsAttr
+// CHECK: graph_op "FilterDataset,i,L,e"(%{{.*}} : $VariantHandle, %{{.*}} : $TensorHandle<Int32>) {predicate: @{{.*}}isZero{{.*}} : $@convention(tensorflow) (@guaranteed Tensor<Float>) -> @owned Tensor<Bool>
+
+// Support higher-order functions that process tensors.
+// foo() is not a partitionable function.
+public func foo(tfOp: () -> Tensor<Float>) {
+  let _ = tfOp()
+}
+
+// Deabstraction should inline foo into bar().
+public func bar() {
+  foo(tfOp: { return Tensor<Float>(1.0) })
+}
+
+// CHECK-LABEL: --- INPUT FUNCTION {{.*}}bar
+// CHECK: graph_op "Const"

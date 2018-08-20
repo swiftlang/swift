@@ -405,11 +405,20 @@ struct ObjectTraits<syntax::TriviaPiece> {
 
 /// Serialization traits for TriviaKind.
 template <>
-struct ScalarEnumerationTraits<syntax::TriviaKind> {
-  static void enumeration(Output &out, syntax::TriviaKind &value) {
+struct ScalarReferenceTraits<syntax::TriviaKind> {
+  static StringRef stringRef(const syntax::TriviaKind &value) {
+    switch (value) {
 % for trivia in TRIVIAS:
-    out.enumCase(value, "${trivia.name}", syntax::TriviaKind::${trivia.name});
+    case syntax::TriviaKind::${trivia.name}:
+      return "\"${trivia.name}\"";
 % end
+    }
+  }
+
+  static bool mustQuote(StringRef) {
+    // The string is already quoted. This is more efficient since it does not
+    // check for characters that need to be escaped
+    return false;
   }
 };
 } // namespace json

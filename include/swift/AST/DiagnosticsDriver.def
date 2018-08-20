@@ -136,6 +136,8 @@ ERROR(error_option_not_supported, none,
 
 WARNING(warn_ignore_embed_bitcode, none,
         "ignoring -embed-bitcode since no object file is being generated", ())
+WARNING(warn_ignore_embed_bitcode_marker, none,
+        "ignoring -embed-bitcode-marker since no object file is being generated", ())
 
 WARNING(verify_debug_info_requires_debug_option,none,
         "ignoring '-verify-debug-info'; no debug info is being generated", ())

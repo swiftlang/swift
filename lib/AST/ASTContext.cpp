@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -523,6 +523,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
 
   // Register any request-evaluator functions available at the AST layer.
   registerAccessRequestFunctions(evaluator);
+  registerNameLookupRequestFunctions(evaluator);
 }
 
 ASTContext::~ASTContext() {
@@ -2155,11 +2156,10 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
 
   if (auto accessor = dyn_cast<AccessorDecl>(member)) {
     switch (accessor->getAccessorKind()) {
-    case AccessorKind::Address:
-    case AccessorKind::DidSet:
-    case AccessorKind::MaterializeForSet:
-    case AccessorKind::MutableAddress:
-    case AccessorKind::WillSet:
+#define OBJC_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+    case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
       llvm_unreachable("Not an Objective-C entry point");
 
     case AccessorKind::Get:
@@ -2365,16 +2365,14 @@ void ASTContext::recordObjCMethod(AbstractFunctionDecl *func) {
 }
 
 /// Lookup for an Objective-C method with the given selector in the
-/// given class type or any of its superclasses.
-static AbstractFunctionDecl *lookupObjCMethodInType(
-                               Type classType,
+/// given class or any of its superclasses.
+static AbstractFunctionDecl *lookupObjCMethodInClass(
+                               ClassDecl *classDecl,
                                ObjCSelector selector,
                                bool isInstanceMethod,
                                bool isInitializer,
                                SourceManager &srcMgr,
                                bool inheritingInits = true) {
-  // Dig out the declaration of the class.
-  auto classDecl = classType->getClassOrBoundGenericClass();
   if (!classDecl)
     return nullptr;
 
@@ -2415,9 +2413,9 @@ static AbstractFunctionDecl *lookupObjCMethodInType(
   if (isInitializer && !inheritingInits)
     return nullptr;
 
-  return lookupObjCMethodInType(classDecl->getSuperclass(), selector,
-                                isInstanceMethod, isInitializer, srcMgr,
-                                inheritingInits);
+  return lookupObjCMethodInClass(classDecl->getSuperclassDecl(), selector,
+                                 isInstanceMethod, isInitializer, srcMgr,
+                                 inheritingInits);
 }
 
 void AbstractFunctionDecl::setForeignErrorConvention(
@@ -2503,11 +2501,11 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
     // extensions for many other reasons.
     auto selector = method->getObjCSelector();
     AbstractFunctionDecl *overriddenMethod
-      = lookupObjCMethodInType(classDecl->getSuperclass(),
-                               selector,
-                               method->isObjCInstanceMethod(),
-                               isa<ConstructorDecl>(method),
-                               SourceMgr);
+      = lookupObjCMethodInClass(classDecl->getSuperclassDecl(),
+                                selector,
+                                method->isObjCInstanceMethod(),
+                                isa<ConstructorDecl>(method),
+                                SourceMgr);
     if (!overriddenMethod)
       continue;
 
@@ -2887,7 +2885,7 @@ NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
   }
 
   // Record the substitutions.
-  if (auto genericSig = substitutions.getGenericSignature()) {
+  if (substitutions) {
     Bits.NameAliasType.HasSubstitutionMap = true;
     *getTrailingObjects<SubstitutionMap>() = substitutions;
   } else {
@@ -3597,6 +3595,8 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   static_assert(RecursiveTypeProperties::BitWidth == 10,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
+  if (Input->getRecursiveProperties().hasError())
+    properties |= RecursiveTypeProperties::HasError;
   if (Result->getRecursiveProperties().hasDynamicSelf())
     properties |= RecursiveTypeProperties::HasDynamicSelf;
   if (Result->getRecursiveProperties().hasError())
@@ -3666,6 +3666,18 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
 
 bool AnyFunctionType::equalParams(ArrayRef<AnyFunctionType::Param> a,
                                   ArrayRef<AnyFunctionType::Param> b) {
+  if (a.size() != b.size())
+    return false;
+
+  for (unsigned i = 0, n = a.size(); i != n; ++i) {
+    if (a[i] != b[i])
+      return false;
+  }
+
+  return true;
+}
+
+bool AnyFunctionType::equalParams(CanParamArrayRef a, CanParamArrayRef b) {
   if (a.size() != b.size())
     return false;
 

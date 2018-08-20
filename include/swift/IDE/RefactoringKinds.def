@@ -50,6 +50,8 @@ CURSOR_REFACTORING(ConvertToDoCatch, "Convert To Do/Catch", convert.do.catch)
 
 CURSOR_REFACTORING(TrailingClosure, "Convert To Trailing Closure", trailingclosure)
 
+CURSOR_REFACTORING(MemberwiseInitLocalRefactoring, "Generate Memberwise Initializer", memberwise.init.local.refactoring)
+
 RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr)
 
 RANGE_REFACTORING(ExtractFunction, "Extract Method", extract.function)

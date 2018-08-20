@@ -349,10 +349,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       }
       break;
 
-    case OPT_force_libsyntax_based_processing:
-      ForceLibSyntaxBasedProcessing = true;
-      break;
-
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'

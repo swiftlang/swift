@@ -10,7 +10,8 @@ import StdlibUnittest
 var StringTensorTests = TestSuite("String")
 
 StringTensorTests.test("StringComparison") {
-
+  // Const op over a String tensor cannot live on GPU.
+  TensorFlow.enableCPU()
   let t1 = Tensor("foo")
   let result1 = t1.elementsEqual(t1)
   expectEqual(ShapedArray(shape: [], scalars: [true]), result1.array)

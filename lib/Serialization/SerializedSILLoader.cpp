@@ -48,7 +48,7 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
   for (auto &Des : LoadedSILSections) {
     if (auto Func = Des->lookupSILFunction(Callee)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
-            << Des->getModuleIdentifier().str() << "\n");
+                 << Des->getModuleIdentifier().str() << "\n");
       if (!Func->empty())
         return Func;
       retVal = Func;
@@ -66,13 +66,14 @@ SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
   for (auto &Des : LoadedSILSections) {
     if (auto Func = Des->lookupSILFunction(Name, declarationOnly)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
-            << Des->getModuleIdentifier().str() << "\n");
+                 << Des->getModuleIdentifier().str() << "\n");
       if (Linkage) {
         // This is not the linkage we are looking for.
         if (Func->getLinkage() != *Linkage) {
           LLVM_DEBUG(llvm::dbgs()
-                << "Wrong linkage for Function: " << Func->getName() << " : "
-                << (int)Func->getLinkage() << "\n");
+                     << "Wrong linkage for Function: "
+                     << Func->getName() << " : "
+                     << (int)Func->getLinkage() << "\n");
           Des->invalidateFunction(Func);
           Func->getModule().eraseFunction(Func);
           continue;

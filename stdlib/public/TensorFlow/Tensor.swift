@@ -872,3 +872,22 @@ public extension Tensor {
     return array.scalars
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Codable conformance
+//===----------------------------------------------------------------------===//
+
+extension Tensor : Codable where Scalar : Codable {
+  @inlinable
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(array)
+  }
+
+  @inlinable
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let array = try container.decode(ShapedArray<Scalar>.self)
+    self.init(array)
+  }
+}

@@ -540,9 +540,6 @@ private:
 SymbolicValue SymbolicValue::getUnknown(SILNode *node, UnknownReason reason,
                                         llvm::ArrayRef<SourceLoc> callStack,
                                         llvm::BumpPtrAllocator &allocator) {
-  auto *rawCallStack = allocator.Allocate<SourceLoc>(callStack.size());
-  std::uninitialized_copy(callStack.begin(), callStack.end(), rawCallStack);
-
   assert(node && "node must be present");
   SymbolicValue result;
   result.representationKind = RK_Unknown;

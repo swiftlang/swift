@@ -40,9 +40,12 @@ llvm::raw_ostream *getTFDumpIntermediateStream();
 /// return null.
 VarDecl *getFieldIfContainsSingleField(NominalTypeDecl *decl);
 
-/// If the specified type is the well-known TensorHandle<T> type, then return
-/// "T".  If not, return a null type.
+/// Return true if the specified type is the well-known TensorHandle<T> type.
 bool isTensorHandle(SILType ty);
+  
+/// Return true if the specified type is the well-known opaque handle type such
+/// as VariantHandle and ResourceHandle.
+bool isOpaqueHandle(SILType ty);
 
 /// Determine whether the specified type is one of our well-known types, and
 /// if so, which one it is.
@@ -153,59 +156,6 @@ struct SILTensorOpInfo {
   /// result if the instruction is a valid tensor operation.  This is the
   /// way that SILTensorOpInfo's are created.
   static Optional<SILTensorOpInfo> decode(SILInstruction *inst);
-
-  /// Verify that all operands to this op are correctly formed, e.g. that
-  /// attribute operands are passed acceptable constants.  This returns a
-  /// non-empty error string to emit if an error is detected.
-  std::string checkAndDiagnoseOperands() const;
-
-  /// Replace any indirect memory operands with direct references to the
-  /// scalars they reference.  This potentially replaces the builtin
-  /// instruction, so it returns the right one to use.
-  ///
-  /// This also sets the TF device for the output instruction.
-  ///
-  /// TODO(clattner): Remove this when deabstraction exists.
-  SILInstruction *canonicalizeOperands(GraphFunctionDeviceInfo &deviceInfo);
-
-  /// Return the constant instruction that defines the specified attribute
-  /// operand, or null if the defining value isn't a valid constant for an
-  /// attribute.
-  SingleValueInstruction *getAttrOperand(unsigned operandNumber) const {
-    return getAttrOperand(inst->getOperand(operandNumber));
-  }
-  static SingleValueInstruction *getAttrOperand(SILValue v);
-
-  /// Given an array value on which we recently dropped a consuming use, try
-  /// to remove all the computation that produces the array if possible.  If
-  /// not, emit a destroy_value instruction to avoid leaking it.
-  ///
-  /// FIXME: Move this logic to deabstraction when it is done.
-  ///
-  static void removeOrDestroyArrayValue(SILValue array, SILLocation loc,
-                                        SILBuilder &B);
-
-  /// Return the device string associated with `inst`, which is required to
-  /// exist.
-  std::string getDeviceString() const;
-
-  int getIntAttrOperand(unsigned operandNumber, StringRef attrName) const {
-    auto operand = inst->getOperand(operandNumber);
-    auto opInfo = operandClasses[operandNumber];
-    assert(opInfo.first.str() == attrName);
-    auto *ili = cast<IntegerLiteralInst>(operand);
-    return ili->getValue().getLimitedValue();
-  }
-
-  std::string getStringAttrOperand(unsigned operandNumber,
-                                   StringRef attrName) const {
-    auto operand = inst->getOperand(operandNumber);
-    auto opInfo = operandClasses[operandNumber];
-    assert(opInfo.first.str() == attrName);
-    auto *sli = cast<StringLiteralInst>(operand);
-    assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8);
-    return sli->getValue().str();
-  }
 
 private:
   SILTensorOpInfo(BuiltinInst *inst) : inst(inst) {}
@@ -339,20 +289,25 @@ public:
   bool shouldBePartitioned(SILFunction *fn);
 
   /// Return true if the specified function type has TensorFlow values in its
-  /// argument or result list, even if they are abstracted by structs or
-  /// tuples.
+  /// argument or result list (and do so recursively, if `fnType` has an
+  /// argument or result that is itself function-typed), even if they are
+  /// abstracted by structs or tuples.
   bool containsTensorFlowValue(CanSILFunctionType fnType);
 
   /// Return true if the specified type contains a TensorFlow value type that
   /// will be exposed after deabstraction.
-  bool containsTensorFlowValue(Type ty) {
-    return tctfc.containsTensorFlowValue(ty);
+  /// If `checkHigherOrderFunctions`, also check for a function-typed `ty`, if
+  /// its parameter or result contains any TensorFlow value type.
+  bool containsTensorFlowValue(Type ty, bool checkHigherOrderFunctions) {
+    return tctfc.containsTensorFlowValue(ty, checkHigherOrderFunctions);
   }
 
   /// Return true if the specified type contains a TensorFlow value type that
   /// will be exposed after deabstraction.
-  bool containsTensorFlowValue(SILType ty) {
-    return containsTensorFlowValue(ty.getASTType());
+  /// If `checkHigherOrderFunctions`, also check for a function-typed `ty`, if
+  /// its parameter or result contains any TensorFlow value type.
+  bool containsTensorFlowValue(SILType ty, bool checkHigherOrderFunctions) {
+    return containsTensorFlowValue(ty.getASTType(), checkHigherOrderFunctions);
   }
 };
 

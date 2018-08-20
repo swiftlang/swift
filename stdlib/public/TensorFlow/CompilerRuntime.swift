@@ -57,6 +57,11 @@ public func enableGPU() {
   #tfop("tfc.configureGPU") as Void
 }
 
+@_transparent
+public func enableCPU() {
+  #tfop("tfc.configureCPU") as Void
+}
+
 @_frozen
 public enum _ExecutionMode : Equatable {
   /// CPU or GPU execution.

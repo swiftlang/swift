@@ -299,3 +299,19 @@ struct SomeConformingType : UnboundGenericAliasProto {
 protocol UnboundGenericAliasProto {
   typealias G = X
 }
+
+// If pre-checking cannot resolve a member type due to ambiguity,
+// we go down the usual member access path. Make sure its correct
+// for protocol typealiases.
+protocol Amb1 {
+  typealias T = Int
+}
+
+protocol Amb2 {
+  typealias T = String
+}
+
+typealias Amb = Amb1 & Amb2
+
+let _: Int.Type = Amb.T.self
+let _: String.Type = Amb.T.self

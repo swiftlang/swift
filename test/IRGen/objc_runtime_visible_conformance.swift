@@ -8,9 +8,10 @@ protocol YourProtocol {}
 extension A : MyProtocol {}
 extension A : YourProtocol {}
 
-// CHECK-LABEL: @"$SSo1ACMn" = linkonce_odr hidden constant <{ {{.*}} }>
-
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo1ACMa"({{i32|i64}}) {{.*}} {
-// CHECK: call %objc_class* @objc_lookUpClass
-// CHECK: call %swift.type* @swift_getObjCClassMetadata
-// CHECK: ret
+// CHECK-LABEL: @"$SSo1AC32objc_runtime_visible_conformance10MyProtocolACMc"
+// CHECK-SAME:    @"$S32objc_runtime_visible_conformance10MyProtocolMp"
+// CHECK-SAME:    [2 x i8]* [[STRING_A:@[0-9]+]]
+// CHECK-SAME:    @"$SSo1AC32objc_runtime_visible_conformance10MyProtocolACWP"
+//   DirectObjCClassName
+// CHECK-SAME:    i32 16
+// CHECK:       [[STRING_A]] = private unnamed_addr constant [2 x i8] c"A\00"

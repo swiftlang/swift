@@ -16,6 +16,8 @@
 
 include("../../../cmake/modules/FindPythonLibraries.cmake")
 
+set(SWIFT_PYTHON_EXISTS TRUE PARENT_SCOPE)
+
 set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY)
   list(APPEND SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES SHARED)
@@ -42,6 +44,8 @@ foreach(python_version ${PYTHON_INTEROP_VERSIONS})
 
   add_swift_library("swiftPython${python_version_short}" ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     Python.swift
+    NumpyConversion.swift
+
     DEPENDS "cpython_modulemap${python_version_short}"
     TARGET_SDKS OSX CYGWIN FREEBSD LINUX HAIKU
     SWIFT_MODULE_DEPENDS_IOS Darwin

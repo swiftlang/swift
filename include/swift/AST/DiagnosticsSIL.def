@@ -234,6 +234,8 @@ ERROR(tfop_invalid_tfop, none,
 ERROR(tfop_incorrect_definition, none,
       "tfop function doesn't align with TensorFlow op definition:\n%0",
       (StringRef))
+ERROR(tfop_value_no_send_receive, none,
+      "value cannot be used by non-TensorFlow API", ())
 ERROR(tf_multiple_device, none,
       "device configuration specified multiple times", ())
 NOTE(tf_multiple_device_prev, none,

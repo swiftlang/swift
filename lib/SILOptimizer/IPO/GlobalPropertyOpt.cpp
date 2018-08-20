@@ -190,8 +190,8 @@ class GlobalPropertyOpt {
   }
   
   void addDependency(Entry *from, Entry *to) {
-    LLVM_DEBUG(llvm::dbgs() << "    add dependency from: " << *from <<
-                          "      to: " << *to);
+    LLVM_DEBUG(llvm::dbgs() << "    add dependency from: " << *from
+                            << "      to: " << *to);
     from->Dependencies.push_back(to);
   }
   
@@ -308,7 +308,8 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       // If the address of an array-field escapes, we give up for that field.
       if (canAddressEscape(projection, true)) {
         setAddressEscapes(getAddrEntry(projection));
-        LLVM_DEBUG(llvm::dbgs() << "      field address escapes: " << *projection);
+        LLVM_DEBUG(llvm::dbgs() << "      field address escapes: "
+                                << *projection);
       }
       return;
     }
@@ -362,7 +363,7 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
     SILType Type = result->getType();
     if (isArrayType(Type) || isTupleWithArray(Type.getASTType())) {
       LLVM_DEBUG(llvm::dbgs() << "      value could be non-native array: "
-                         << *result);
+                              << *result);
       setNotNative(getValueEntry(result));
     }
   }
@@ -373,7 +374,8 @@ void GlobalPropertyOpt::scanInstructions() {
   for (auto &F : M) {
     LLVM_DEBUG(llvm::dbgs() << "  scan function " << F.getName() << "\n");
     for (auto &BB : F) {
-      LLVM_DEBUG(llvm::dbgs() << "    scan basic block " << BB.getDebugID() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "    scan basic block " << BB.getDebugID()
+                              << "\n");
 
       // Add dependencies from predecessor's terminator operands to the block
       // arguments.
@@ -455,8 +457,9 @@ void GlobalPropertyOpt::replacePropertyCalls() {
         (semCall.getKind() == ArrayCallKind::kArrayPropsIsNativeTypeChecked) &&
              "invalid semantics type");
   
-      LLVM_DEBUG(llvm::dbgs() << "  remove property check in function " <<
-            AI->getParent()->getParent()->getName() << ": " << *AI);
+      LLVM_DEBUG(llvm::dbgs() << "  remove property check in function "
+                              << AI->getParent()->getParent()->getName()
+                              << ": " << *AI);
       SILBuilder B(AI);
       SILType IntBoolTy = SILType::getBuiltinIntegerType(1, B.getASTContext());
       auto C1 = B.createIntegerLiteral(AI->getLoc(), IntBoolTy, 1);

@@ -108,8 +108,9 @@ public:
   /// and return True if and instructions were removed.
   bool removeCollectedRedundantInstructions() {
     if (ToRemove.size()) {
-      LLVM_DEBUG(llvm::dbgs()<<"Removing "<<ToRemove.size()<<" condfails in "
-                  <<getFunction()->getName()<<"\n");
+      LLVM_DEBUG(llvm::dbgs() << "Removing " << ToRemove.size()
+                              << " condfails in "
+                              << getFunction()->getName() << "\n");
 
       for (auto *CF : ToRemove) {
         CF->eraseFromParent();

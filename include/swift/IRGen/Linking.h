@@ -163,6 +163,10 @@ class LinkEntity {
     /// The pointer is a NominalTypeDecl*.
     TypeMetadataInstantiationFunction,
 
+    /// The in-place initialization cache for a generic nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    TypeMetadataInPlaceInitializationCache,
+
     /// The completion function for a generic or resilient nominal type.
     /// The pointer is a NominalTypeDecl*.
     TypeMetadataCompletionFunction,
@@ -174,10 +178,6 @@ class LinkEntity {
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
-
-    /// An array of protocol requirement descriptors for a protocol.
-    /// The pointer is a ProtocolDecl*.
-    ProtocolRequirementArray,
 
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
@@ -292,7 +292,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::ProtocolRequirementArray;
+    return k <= Kind::ProtocolDescriptor;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -507,9 +507,16 @@ public:
     return entity;
   }
 
-  static LinkEntity forTypeMetadataInstantiationFunction(NominalTypeDecl *decl){
+  static LinkEntity forTypeMetadataInstantiationFunction(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::TypeMetadataInstantiationFunction, decl);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataInPlaceInitializationCache(
+                                                      NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::TypeMetadataInPlaceInitializationCache, decl);
     return entity;
   }
 
@@ -576,12 +583,6 @@ public:
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ProtocolDescriptor, decl);
-    return entity;
-  }
-
-  static LinkEntity forProtocolRequirementArray(ProtocolDecl *decl) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::ProtocolRequirementArray, decl);
     return entity;
   }
 

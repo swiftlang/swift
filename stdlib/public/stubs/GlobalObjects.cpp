@@ -23,21 +23,21 @@
 #include <stdlib.h>
 
 namespace swift {
-// FIXME(ABI)#76 : does this declaration need SWIFT_RUNTIME_STDLIB_INTERFACE?
+// FIXME(ABI)#76 : does this declaration need SWIFT_RUNTIME_STDLIB_API?
 // _direct type metadata for Swift._EmptyArrayStorage
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 ClassMetadata CLASS_METADATA_SYM(s18_EmptyArrayStorage);
 
 // _direct type metadata for Swift._RawNativeDictionaryStorage
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);
 
 // _direct type metadata for Swift._RawNativeSetStorage
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 ClassMetadata CLASS_METADATA_SYM(s20_RawNativeSetStorage);
 } // namespace swift
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   // HeapObject header;
   {
@@ -51,7 +51,7 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   }
 };
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
   // HeapObject header;
   {
@@ -79,7 +79,7 @@ swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
   0 // int entries; (zero'd bits)
 };
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
   // HeapObject header;
   {
@@ -128,7 +128,7 @@ swift::_SwiftHashingParameters swift::_swift_stdlib_Hashing_parameters =
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void swift::_swift_instantiateInertHeapObject(void *address,
                                               const HeapMetadata *metadata) {
   ::new (address) HeapObject{metadata};

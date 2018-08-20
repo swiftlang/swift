@@ -25,7 +25,7 @@ open class d {
 }
 
 // CHECK-DAG: @"$S9dllexport2ciAA1cCvp" = dllexport global %T9dllexport1cC* null, align 4
-// CHECK-DAG: @"$S9dllexport1pMp" = dllexport constant %swift.protocol
+// CHECK-DAG: @"$S9dllexport1pMp" = dllexport constant
 // CHECK-DAG: @"$S9dllexport1cCMn" = dllexport constant
 // CHECK-DAG: @"$S9dllexport1cCN" = dllexport alias %swift.type
 // CHECK-DAG: @"$S9dllexport1dCN" = dllexport alias %swift.type, bitcast ({{.*}})

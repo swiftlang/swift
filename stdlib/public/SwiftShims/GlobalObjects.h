@@ -37,7 +37,7 @@ struct _SwiftEmptyArrayStorage {
   struct _SwiftArrayBodyStorage body;
 };
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
 struct _SwiftUnsafeBitMap {
@@ -72,10 +72,10 @@ struct _SwiftEmptySetStorage {
   __swift_uintptr_t entries;
 };
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 struct _SwiftEmptyDictionaryStorage _swiftEmptyDictionaryStorage;
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 struct _SwiftEmptySetStorage _swiftEmptySetStorage;
 
 struct _SwiftHashingParameters {
@@ -84,7 +84,7 @@ struct _SwiftHashingParameters {
   __swift_bool deterministic;
 };
   
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 struct _SwiftHashingParameters _swift_stdlib_Hashing_parameters;
 
 #ifdef __cplusplus

@@ -16,6 +16,9 @@
         "ObjcProt",
         "NSObjectProtocol"
       ],
+      "declAttributes": [
+        "ObjC"
+      ],
       "children": [
         {
           "kind": "Function",
@@ -25,6 +28,9 @@
           "usr": "c:objc(cs)ClangInterface(im)someFunction",
           "location": "",
           "moduleName": "Foo",
+          "declAttributes": [
+            "ObjC"
+          ],
           "children": [
             {
               "kind": "TypeNameAlias",
@@ -48,6 +54,10 @@
           "usr": "c:objc(cs)NSObject(im)init",
           "location": "",
           "moduleName": "Foo",
+          "declAttributes": [
+            "Override",
+            "ObjC"
+          ],
           "children": [
             {
               "kind": "TypeNominal",
@@ -67,6 +77,9 @@
       "usr": "c:objc(pl)ObjcProt",
       "location": "",
       "moduleName": "Foo",
+      "declAttributes": [
+        "ObjC"
+      ],
       "children": [
         {
           "kind": "Function",
@@ -76,6 +89,9 @@
           "usr": "c:objc(pl)ObjcProt(im)someFunctionFromProt",
           "location": "",
           "moduleName": "Foo",
+          "declAttributes": [
+            "ObjC"
+          ],
           "children": [
             {
               "kind": "TypeNameAlias",

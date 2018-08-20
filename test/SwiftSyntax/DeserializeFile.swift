@@ -21,8 +21,9 @@ var DecodeTests = TestSuite("DecodeSyntax")
 DecodeTests.test("Basic") {
   expectDoesNotThrow({
     let content = try SwiftLang.parse(getInput("visitor.swift"))
+    let contentData = content.data(using: .utf8)!
     let source = try String(contentsOf: getInput("visitor.swift"))
-    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(content)
+    let parsed = try SyntaxTreeDeserializer().deserialize(contentData)
     expectEqual("\(parsed)", source)
   })
 }

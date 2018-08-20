@@ -234,6 +234,7 @@ public:
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
+  bool hasModuleInterfaceOutputPath() const;
   bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;

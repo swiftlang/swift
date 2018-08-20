@@ -4,8 +4,8 @@ class A {}
 
 // CHECK:      [[A_NAME:@.*]] = private constant [2 x i8] c"A\00"
 // CHECK-LABEL: @"$S14class_metadata1ACMn" =
-//   Flags. -2147221424 == 0x8004_0050 == HasVTable | Reflectable | Unique | Class
-// CHECK-SAME: i32 -2147221424,
+//   Flags. -2147418032 == 0x8001_0050 == HasVTable | Reflectable | Unique | Class
+// CHECK-SAME: i32 -2147418032,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -33,8 +33,8 @@ class B : A {}
 
 // CHECK:      [[B_NAME:@.*]] = private constant [2 x i8] c"B\00"
 // CHECK-LABEL: @"$S14class_metadata1BCMn" =
-//   Flags. 262224 == 0x0004_0050 == Reflectable | Unique | Class
-// CHECK-SAME: i32 262224,
+//   Flags. 65616 == 0x0001_0050 == Reflectable | Unique | Class
+// CHECK-SAME: i32 65616,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -53,8 +53,8 @@ class C<T> : B {}
 
 // CHECK:      [[C_NAME:@.*]] = private constant [2 x i8] c"C\00"
 // CHECK-LABEL: @"$S14class_metadata1CCMn" =
-//   Flags. 262352 == 0x0004_00d0 == Reflectable | Generic | Unique | Class
-// CHECK-SAME: i32 262352,
+//   Flags. 65744 == 0x0001_00d0 == Reflectable | Generic | Unique | Class
+// CHECK-SAME: i32 65744,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -104,8 +104,8 @@ class D : E {}
 
 // CHECK:      [[D_NAME:@.*]] = private constant [2 x i8] c"D\00"
 // CHECK-LABEL: @"$S14class_metadata1DCMn" =
-//   Flags. 268697680 == 0x1004_0050 == Reflectable | IndirectSuperclass | Unique | Class
-// CHECK-SAME: i32 268697680,
+//   Flags. 67174480 == 0x0401_0050 == Reflectable | IndirectSuperclass | Unique | Class
+// CHECK-SAME: i32 67174480,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.

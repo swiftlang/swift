@@ -735,10 +735,9 @@ func invalidDictionaryLiteral() {
   var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}}
 }
 
-    
-// FIXME: The issue here is a type compatibility problem, there is no ambiguity.
-[4].joined(separator: [1]) // expected-error {{type of expression is ambiguous without more context}}
-[4].joined(separator: [[[1]]]) // expected-error {{type of expression is ambiguous without more context}}
+
+[4].joined(separator: [1]) // expected-error {{'() -> FlattenCollection<[Int]>' requires that 'Int' conform to 'Collection'}}
+[4].joined(separator: [[[1]]]) // expected-error {{'() -> FlattenCollection<[Int]>' requires that 'Int' conform to 'Collection'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons

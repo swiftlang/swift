@@ -595,8 +595,8 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     std::vector<WeakTrackingVH> Worklist;
     Deferred.swap(Worklist);
 
-    LLVM_DEBUG(dbgs() << "======\nbuild tree: worklist-size=" << Worklist.size() <<
-                    '\n');
+    LLVM_DEBUG(dbgs() << "======\nbuild tree: worklist-size="
+                      << Worklist.size() << '\n');
     LLVM_DEBUG(doSanityCheck(Worklist));
 
     SmallVector<FunctionEntry *, 8> FuncsToMerge;
@@ -629,7 +629,8 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
           FuncsToMerge.push_back(Eq.First);
       }
     }
-    LLVM_DEBUG(dbgs() << "merge functions: tree-size=" << FnTree.size() << '\n');
+    LLVM_DEBUG(dbgs() << "merge functions: tree-size=" << FnTree.size()
+                      << '\n');
 
     // Figure out the leaf functions. We want to do the merging in bottom-up
     // call order. This ensures that we don't parameterize on callee function
@@ -937,7 +938,8 @@ void SwiftMergeFunctions::removeEquivalenceClassFromTree(FunctionEntry *FE) {
   FunctionEntry *Unlink = Iter->First;
   Unlink->numUnhandledCallees = 0;
   while (Unlink) {
-    LLVM_DEBUG(dbgs() << "    remove from tree: " << Unlink->F->getName() << '\n');
+    LLVM_DEBUG(dbgs() << "    remove from tree: " << Unlink->F->getName()
+                      << '\n');
     if (!Unlink->isMerged)
       Deferred.emplace_back(Unlink->F);
     Unlink->TreeIter = FnTree.end();

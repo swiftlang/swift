@@ -23,7 +23,8 @@ public func os_signpost(
   name: StaticString,
   signpostID: OSSignpostID = .exclusive
 ) {
-  guard log.signpostsEnabled else { return }
+  let hasValidID = signpostID != .invalid && signpostID != .null
+  guard log.signpostsEnabled && hasValidID else { return }
   let ra = _swift_os_log_return_address()
   name.withUTF8Buffer { (nameBuf: UnsafeBufferPointer<UInt8>) in
     // Since dladdr is in libc, it is safe to unsafeBitCast
@@ -46,7 +47,8 @@ public func os_signpost(
   _ format: StaticString,
   _ arguments: CVarArg...
 ) {
-  guard log.signpostsEnabled else { return }
+  let hasValidID = signpostID != .invalid && signpostID != .null
+  guard log.signpostsEnabled && hasValidID else { return }
   let ra = _swift_os_log_return_address()
   name.withUTF8Buffer { (nameBuf: UnsafeBufferPointer<UInt8>) in
     // Since dladdr is in libc, it is safe to unsafeBitCast
@@ -80,12 +82,10 @@ extension OSSignpostType {
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public struct OSSignpostID {
   public let rawValue: os_signpost_id_t
-  public static let exclusive =
-      OSSignpostID(spid: _swift_os_signpost_id_exclusive())
-  public static let invalid =
-      OSSignpostID(spid: _swift_os_signpost_id_invalid())
-  public static let null =
-      OSSignpostID(spid: _swift_os_signpost_id_null())
+
+  public static let exclusive = OSSignpostID(_swift_os_signpost_id_exclusive())
+  public static let invalid = OSSignpostID(_swift_os_signpost_id_invalid())
+  public static let null = OSSignpostID(_swift_os_signpost_id_null())
 
   public init(log: OSLog) {
     self.rawValue = __os_signpost_id_generate(log)
@@ -96,8 +96,8 @@ public struct OSSignpostID {
         UnsafeRawPointer(Unmanaged.passUnretained(object).toOpaque()))
   }
 
-  fileprivate init(spid: os_signpost_id_t) {
-    self.rawValue = spid
+  public init(_ value: UInt64) {
+    self.rawValue = value
   }
 }
 

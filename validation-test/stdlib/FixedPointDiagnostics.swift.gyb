@@ -3,13 +3,13 @@
 // RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -swift-version 3 %t/main.swift
 
 func testUnaryMinusInUnsigned() {
-  var a: UInt8 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt8'}} expected-note * {{}} expected-warning * {{}}
+  var a: UInt8 = -(1) // expected-error {{argument type 'UInt8' does not conform to expected type 'SignedNumeric'}} expected-note * {{}} expected-warning * {{}}
 
-  var b: UInt16 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt16'}} expected-note * {{}} expected-warning * {{}}
+  var b: UInt16 = -(1) // expected-error {{argument type 'UInt16' does not conform to expected type 'SignedNumeric'}} expected-note * {{}} expected-warning * {{}}
 
-  var c: UInt32 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt32'}} expected-note * {{}} expected-warning * {{}}
+  var c: UInt32 = -(1) // expected-error {{argument type 'UInt32' does not conform to expected type 'SignedNumeric'}} expected-note * {{}} expected-warning * {{}}
 
-  var d: UInt64 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt64'}} expected-note * {{}} expected-warning * {{}}
+  var d: UInt64 = -(1) // expected-error {{argument type 'UInt64' does not conform to expected type 'SignedNumeric'}} expected-note * {{}} expected-warning * {{}}
 }
 
 // Int and UInt are not identical to any fixed-size integer type
@@ -35,22 +35,19 @@ func test_truncatingBitPatternAPIIsStableAcrossPlatforms() {
   _ = UInt8(truncatingBitPattern: UInt(0))
   _ = UInt16(truncatingBitPattern: UInt(0))
   _ = UInt32(truncatingBitPattern: UInt(0))
-  UInt64(truncatingBitPattern: UInt(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
-// expected-note @-1 {{overloads for 'UInt64' exist with these partially matching parameter lists}}
+  UInt64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
   UInt(truncatingBitPattern: UInt(0))   // expected-error {{}} expected-note * {{}}
 
   _ = Int8(truncatingBitPattern: UInt(0))
   _ = Int16(truncatingBitPattern: UInt(0))
   _ = Int32(truncatingBitPattern: UInt(0))
-  Int64(truncatingBitPattern: UInt(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
-// expected-note @-1 {{overloads for 'Int64' exist with}}
+  Int64(truncatingBitPattern: UInt(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
   Int(truncatingBitPattern: UInt(0))   // expected-error {{}} expected-note * {{}}
 
   _ = UInt8(truncatingBitPattern: Int(0))
   _ = UInt16(truncatingBitPattern: Int(0))
   _ = UInt32(truncatingBitPattern: Int(0))
-  UInt64(truncatingBitPattern: Int(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
-// expected-note @-1 {{overloads for 'UInt64' exist with these partially matching parameter lists}}
+  UInt64(truncatingBitPattern: Int(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
   UInt(truncatingBitPattern: Int(0))   // expected-error {{}} expected-note * {{}}
 
   _ = Int8(truncatingBitPattern: Int(0))

@@ -36,7 +36,6 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Config.h"
-#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Basic/CharInfo.h"
@@ -419,7 +418,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
 
   if (llvm::sys::path::extension(importerOpts.BridgingHeader)
-          .endswith(PCH_EXTENSION)) {
+          .endswith(file_types::getExtension(file_types::TY_PCH))) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
         "-include-pch", importerOpts.BridgingHeader
     });
@@ -802,7 +801,7 @@ Optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool &isExplicit) {
   if (llvm::sys::path::extension(ImporterOptions.BridgingHeader)
-        .endswith(PCH_EXTENSION)) {
+        .endswith(file_types::getExtension(file_types::TY_PCH))) {
     isExplicit = true;
     return ImporterOptions.BridgingHeader;
   }
@@ -893,8 +892,8 @@ ClangImporter::create(ASTContext &ctx,
   for (auto &argStr : invocationArgStrs)
     invocationArgs.push_back(argStr.c_str());
 
-  if (llvm::sys::path::extension(importerOpts.BridgingHeader).endswith(
-        PCH_EXTENSION)) {
+  if (llvm::sys::path::extension(importerOpts.BridgingHeader)
+        .endswith(file_types::getExtension(file_types::TY_PCH))) {
     importer->Impl.setSinglePCHImport(importerOpts.BridgingHeader);
     importer->Impl.IsReadingBridgingPCH = true;
     if (tracker) {
@@ -966,6 +965,7 @@ ClangImporter::create(ASTContext &ctx,
   }
   auto &instance = *importer->Impl.Instance;
   instance.setInvocation(importer->Impl.Invocation);
+
   if (tracker)
     instance.addDependencyCollector(tracker->getClangCollector());
 
@@ -976,6 +976,20 @@ ClangImporter::create(ASTContext &ctx,
         importer->Impl, instance.getDiagnosticOpts(),
         importerOpts.DumpClangDiagnostics);
     instance.createDiagnostics(actualDiagClient.release());
+  }
+
+  // Set up the file manager.
+  {
+    if (!ctx.SearchPathOpts.VFSOverlayFiles.empty()) {
+      // If the clang instance has overlays it means the user has provided
+      // -ivfsoverlay options and swift -vfsoverlay options.  We're going to
+      // clobber their file system with our own, so warn about it.
+      if (!instance.getHeaderSearchOpts().VFSOverlayFiles.empty()) {
+        ctx.Diags.diagnose(SourceLoc(), diag::clang_vfs_overlay_is_ignored);
+      }
+      instance.setVirtualFileSystem(ctx.SourceMgr.getFileSystem());
+    }
+    instance.createFileManager();
   }
 
   // Don't stop emitting messages if we ever can't load a module.
@@ -1303,7 +1317,8 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          SourceLoc diagLoc,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
-  if (llvm::sys::path::extension(header).endswith(PCH_EXTENSION)) {
+  if (llvm::sys::path::extension(header)
+        .endswith(file_types::getExtension(file_types::TY_PCH))) {
     Impl.ImportedHeaderOwners.push_back(adapter);
     // We already imported this with -include-pch above, so we should have
     // collected a bunch of PCH-encoded module imports that we just need to
@@ -3558,7 +3573,11 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
   }
 
   // If it's an @objc entity, go look for it.
-  if (nominal->isObjC()) {
+  // Note that we're stepping lightly here to avoid computing isObjC()
+  // too early.
+  if (isa<ClassDecl>(nominal) &&
+      (nominal->getAttrs().hasAttribute<ObjCAttr>() ||
+       (!nominal->getParentSourceFile() && nominal->isObjC()))) {
     // Map the name. If we can't represent the Swift name in Clang.
     // FIXME: We should be using the Objective-C name here!
     auto clangName = exportName(nominal->getName());

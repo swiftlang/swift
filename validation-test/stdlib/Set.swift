@@ -14,13 +14,8 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
-// For rand32
-import SwiftPrivate
 #if _runtime(_ObjC)
 import Foundation
-#else
-// for random, srandom
-import Glibc
 #endif
 
 extension Set {
@@ -106,14 +101,6 @@ func helperDeleteThree(_ k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
 
   s1.remove(k3)
   expectEqual(0, s1.count)
-}
-
-func uniformRandom(_ max: Int) -> Int {
-  return Int(rand32(exclusiveUpperBound: UInt32(max)))
-}
-
-func pickRandom<T>(_ a: [T]) -> T {
-  return a[uniformRandom(a.count)]
 }
 
 func equalsUnordered(_ lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
@@ -1142,12 +1129,12 @@ SetTestSuite.test("deleteChainCollision2") {
 }
 
 SetTestSuite.test("deleteChainCollisionRandomized") {
-  let timeNow = CUnsignedInt(time(nil))
-  print("time is \(timeNow)")
-  srandom(timeNow)
+  let seed = UInt64.random(in: .min ... .max)
+  var generator = LinearCongruentialGenerator(seed: seed)
+  print("using LinearCongruentialGenerator(seed: \(seed))")
 
   func check(_ s: Set<TestKeyTy>) {
-    var keys = Array(s)
+    let keys = Array(s)
     for i in 0..<keys.count {
       for j in 0..<i {
         expectNotEqual(keys[i], keys[j])
@@ -1159,13 +1146,8 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
     }
   }
 
-  var collisionChainsChoices = Array(1...8)
-  var chainOverlapChoices = Array(0...5)
-
-  var collisionChains = pickRandom(collisionChainsChoices)
-  var chainOverlap = pickRandom(chainOverlapChoices)
-  print("chose parameters: collisionChains=\(collisionChains) chainLength=\(chainOverlap)")
-
+  let collisionChains = Int.random(in: 1...8, using: &generator)
+  let chainOverlap = Int.random(in: 0...5, using: &generator)
   let chainLength = 7
 
   var knownKeys: [TestKeyTy] = []
@@ -1175,16 +1157,16 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
         return k
       }
     }
-    let hashValue = uniformRandom(chainLength - chainOverlap) * collisionChains
+    let hashValue = Int.random(in: 0 ..< (chainLength - chainOverlap), using: &generator) * collisionChains
     let k = TestKeyTy(value: value, hashValue: hashValue)
     knownKeys += [k]
     return k
   }
 
   var s = Set<TestKeyTy>(minimumCapacity: 30)
-  for i in 1..<300 {
-    let key = getKey(uniformRandom(collisionChains * chainLength))
-    if uniformRandom(chainLength * 2) == 0 {
+  for _ in 1..<300 {
+    let key = getKey(Int.random(in: 0 ..< (collisionChains * chainLength), using: &generator))
+    if Int.random(in: 0 ..< (chainLength * 2), using: &generator) == 0 {
       s.remove(key)
     } else {
       s.insert(TestKeyTy(key.value))

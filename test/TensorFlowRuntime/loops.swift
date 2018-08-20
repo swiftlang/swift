@@ -47,6 +47,8 @@ LoopsTests.testAllBackends("simpleCounterLoop_ab") {
   expectEqual(98, a.scalar)
 }
 
+// TODO: fix the disabled GPU tests below.
+#if !CUDA
 LoopsTests.testAllBackends("SR8164") {
   @inline(never)
   func SR8164(count: Int32, expectedVal: Int32) {
@@ -72,7 +74,9 @@ LoopsTests.testAllBackends("SR8164") {
   SR8164(count: 30, expectedVal: -30)
   SR8164(count: 70, expectedVal: 70)
 }
+#endif // CUDA
 
+#if !CUDA
 LoopsTests.testAllBackends("SR-8191") {
   let t = Tensor<Float>(1.0)
   var i = 0
@@ -86,6 +90,7 @@ LoopsTests.testAllBackends("SR-8191") {
   let extra = Tensor<Float>(1.0)
   _hostOp(extra)
 }
+#endif // CUDA
 
 // FIXME: Compiler bug (b/73607740)
 // error: internal error generating TensorFlow graph:

@@ -9,7 +9,7 @@ import Swift
 
 // CHECK-LABEL: sil @_TF9optional3fooFT1fGSqFT_T___T_ : $@convention(thin) (@guaranteed Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()>) -> ()
 sil @_TF9optional3fooFT1fGSqFT_T___T_ : $@convention(thin) (@guaranteed Optional<@callee_guaranteed (@in_guaranteed ()) -> (@out ())>) -> () {
-bb0(%0 : $Optional<@callee_guaranteed (@in_guaranteed ()) -> (@out ())>):
+bb0(%0 : @guaranteed $Optional<@callee_guaranteed (@in_guaranteed ()) -> (@out ())>):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<@callee_guaranteed (@in_guaranteed ()) -> (@out ())>>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Optional<@callee_guaranteed (@in_guaranteed ()) -> (@out ())>>, 0
   store %0 to [init] %1a : $*Optional<@callee_guaranteed (@in_guaranteed ()) -> (@out ())>

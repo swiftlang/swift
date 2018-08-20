@@ -1326,6 +1326,16 @@ Stmt *Traversal::visitReturnStmt(ReturnStmt *RS) {
   return RS;
 }
 
+Stmt *Traversal::visitYieldStmt(YieldStmt *YS) {
+  for (auto &yield : YS->getMutableYields()) {
+    if (Expr *E = doIt(yield))
+      yield = E;
+    else
+      return nullptr;
+  }
+  return YS;
+}
+
 Stmt *Traversal::visitDeferStmt(DeferStmt *DS) {
   if (doIt(DS->getTempDecl()))
     return nullptr;

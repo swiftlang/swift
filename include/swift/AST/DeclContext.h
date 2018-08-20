@@ -486,6 +486,32 @@ public:
                        LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
+  /// Look for the set of declarations with the given name within the
+  /// given set of nominal type declarations.
+  ///
+  /// \param types The type declarations to look into.
+  ///
+  /// \param member The member to search for.
+  ///
+  /// \param options Options that control name lookup, based on the
+  /// \c NL_* constants in \c NameLookupOptions.
+  ///
+  /// \param[out] decls Will be populated with the declarations found by name
+  /// lookup.
+  ///
+  /// \returns true if anything was found.
+  bool lookupQualified(ArrayRef<NominalTypeDecl *> types, DeclName member,
+                       NLOptions options,
+                       SmallVectorImpl<ValueDecl *> &decls) const;
+
+  /// Perform qualified lookup for the given member in the given module.
+  bool lookupQualified(ModuleDecl *module, DeclName member, NLOptions options,
+                       SmallVectorImpl<ValueDecl *> &decls) const;
+
+  /// Perform \c AnyObject lookup for the given member.
+  bool lookupAnyObject(DeclName member, NLOptions options,
+                       SmallVectorImpl<ValueDecl *> &decls) const;
+
   /// Look up all Objective-C methods with the given selector visible
   /// in the enclosing module.
   void lookupAllObjCMethods(

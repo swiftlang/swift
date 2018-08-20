@@ -48,11 +48,20 @@ set(SOURCES
   TensorHandle.swift
   TensorProtocol.swift
   TensorShape.swift
-  Utilities.swift)
+  Utilities.swift
+  # NumPy bridging for `ShapedArray` and `Tensor`.
+  NumpyConversion.swift)
 
 # Copy TensorFlow bindings file, if it exists.
 if (TENSORFLOW_SWIFT_BINDINGS)
   list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS}")
+endif()
+
+# When Python exists, NumpyConversion.swift imports it, so it must be
+# available at link time.
+set(TENSORFLOW_DEPENDS_PYTHON)
+if (SWIFT_PYTHON_EXISTS)
+  list(APPEND TENSORFLOW_DEPENDS_PYTHON SWIFT_MODULE_DEPENDS Python)
 endif()
 
 add_swift_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
@@ -70,6 +79,7 @@ add_swift_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
+  ${TENSORFLOW_DEPENDS_PYTHON}
   SWIFT_COMPILE_FLAGS "${swift_stdlib_compile_flags}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib

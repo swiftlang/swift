@@ -197,9 +197,9 @@ bool SILPerformanceInliner::profileBasedDecision(
   auto callerCount = bbIt->getSecond();
   if (callerCount < 1) {
     // Never called - do not inline
-    LLVM_DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs()
-                                        << "profiled decision: NO"
-                                        << ", reason= Never Called." << '\n';);
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "profiled decision: NO, "
+                               "reason= Never Called.\n");
     return false;
   }
   auto calleeCount = Callee->getEntryCount();
@@ -209,26 +209,24 @@ bool SILPerformanceInliner::profileBasedDecision(
     auto percent = (long double)callerCount / (long double)calleCountVal;
     if (percent < 0.8) {
       LLVM_DEBUG(dumpCaller(AI.getFunction());
-            llvm::dbgs() << "profiled decision: NO"
-                         << ", reason=SI " << std::to_string(percent) << "%"
-                         << '\n';);
+                 llvm::dbgs() << "profiled decision: NO, reason=SI "
+                              << std::to_string(percent) << "%\n");
       return false;
     }
-    LLVM_DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs() << "profiled decision: YES"
-                                                     << ", reason=SI "
-                                                     << std::to_string(percent)
-                                                     << "%" << '\n';);
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "profiled decision: YES, reason=SI "
+                            << std::to_string(percent) << "%\n");
   } else {
     // No callee count - use a "modified" aggressive IHF for now
     if (CalleeCost > Benefit && callerCount < 100) {
       LLVM_DEBUG(dumpCaller(AI.getFunction());
-            llvm::dbgs() << "profiled decision: NO"
-                         << ", reason=IHF " << callerCount << '\n';);
+                 llvm::dbgs() << "profiled decision: NO, reason=IHF "
+                              << callerCount << '\n');
       return false;
     }
-    LLVM_DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs() << "profiled decision: YES"
-                                                     << ", reason=IHF "
-                                                     << callerCount << '\n';);
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "profiled decision: YES, reason=IHF "
+                            << callerCount << '\n');
   }
   // We're gonna inline!
   NumCallerBlocks += Callee->size();
@@ -269,10 +267,9 @@ bool SILPerformanceInliner::isProfitableToInline(
   // It is always OK to inline a simple call.
   // TODO: May be consider also the size of the callee?
   if (isPureCall(AI, SEA)) {
-    LLVM_DEBUG(
-      dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    pure-call decision " << Callee->getName() << '\n';
-    );
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "    pure-call decision " << Callee->getName()
+                            << '\n');
     return true;
   }
 
@@ -348,9 +345,9 @@ bool SILPerformanceInliner::isProfitableToInline(
             isa<SuperMethodInst>(def)) {
           // TODO: Take AI.getSubstitutions() into account.
           if (canDevirtualizeApply(FAI, nullptr)) {
-            LLVM_DEBUG(llvm::dbgs() << "Devirtualization will be possible after "
-                                  "inlining for the call:\n";
-                  FAI.getInstruction()->dumpInContext());
+            LLVM_DEBUG(llvm::dbgs() << "Devirtualization will be possible "
+                                       "after inlining for the call:\n";
+                       FAI.getInstruction()->dumpInContext());
             BlockW.updateBenefit(Benefit, DevirtualizedCallBenefit);
           }
         }
@@ -360,9 +357,9 @@ bool SILPerformanceInliner::isProfitableToInline(
           auto CalleeF = FAI.getCalleeFunction();
           if (!canSpecializeGeneric(FAI, CalleeF, SubMap))
             continue;
-          LLVM_DEBUG(llvm::dbgs() << "Generic specialization will be possible after "
-                                "inlining for the call:\n";
-                FAI.getInstruction()->dumpInContext());
+          LLVM_DEBUG(llvm::dbgs() << "Generic specialization will be possible "
+                                     "after inlining for the call:\n";
+                     FAI.getInstruction()->dumpInContext());
           BlockW.updateBenefit(Benefit, GenericSpecializationBenefit);
         }
       } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
@@ -408,11 +405,9 @@ bool SILPerformanceInliner::isProfitableToInline(
       return false;
     }
 
-    LLVM_DEBUG(
-      dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    decision {" << CalleeCost << " into thunk} " <<
-          Callee->getName() << '\n';
-    );
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "    decision {" << CalleeCost << " into thunk} "
+                            << Callee->getName() << '\n');
     return true;
   }
 
@@ -449,13 +444,14 @@ bool SILPerformanceInliner::isProfitableToInline(
 
   NumCallerBlocks += Callee->size();
 
-  LLVM_DEBUG(
-    dumpCaller(AI.getFunction());
-    llvm::dbgs() << "    decision {c=" << CalleeCost << ", b=" << Benefit <<
-        ", l=" << SPA->getScopeLength(CalleeEntry, 0) <<
-        ", c-w=" << CallerWeight << ", bb=" << Callee->size() <<
-        ", c-bb=" << NumCallerBlocks << "} " << Callee->getName() << '\n';
-  );
+  LLVM_DEBUG(dumpCaller(AI.getFunction());
+             llvm::dbgs() << "    decision {c=" << CalleeCost
+                          << ", b=" << Benefit
+                          << ", l=" << SPA->getScopeLength(CalleeEntry, 0)
+                          << ", c-w=" << CallerWeight
+                          << ", bb=" << Callee->size()
+                          << ", c-bb=" << NumCallerBlocks
+                          << "} " << Callee->getName() << '\n');
   ORE.emit([&]() {
     using namespace OptRemark;
     return RemarkPassed("Inlined", *AI.getInstruction())
@@ -526,10 +522,9 @@ bool SILPerformanceInliner::decideInWarmBlock(
   SILFunction *Callee = AI.getReferencedFunction();
 
   if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
-    LLVM_DEBUG(
-      dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    always-inline decision " << Callee->getName() << '\n';
-    );
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "    always-inline decision "
+                            << Callee->getName() << '\n');
     return true;
   }
 
@@ -550,10 +545,9 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
   }
 
   if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
-    LLVM_DEBUG(
-      dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    always-inline decision " << Callee->getName() << '\n';
-      );
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "    always-inline decision "
+                            << Callee->getName() << '\n');
     return true;
   }
 
@@ -566,11 +560,9 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
         return false;
     }
   }
-  LLVM_DEBUG(
-    dumpCaller(AI.getFunction());
-    llvm::dbgs() << "    cold decision {" << CalleeCost << "} " <<
-              Callee->getName() << '\n';
-  );
+  LLVM_DEBUG(dumpCaller(AI.getFunction());
+             llvm::dbgs() << "    cold decision {" << CalleeCost << "} "
+                          << Callee->getName() << '\n');
   return true;
 }
 
@@ -823,11 +815,10 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     for (const auto &Arg : AI.getArguments())
       Args.push_back(Arg);
 
-    LLVM_DEBUG(
-      dumpCaller(Caller);
-      llvm::dbgs() << "    inline [" << Callee->size() << "->" <<
-          Caller->size() << "] " << Callee->getName() << "\n";
-    );
+    LLVM_DEBUG(dumpCaller(Caller);
+               llvm::dbgs() << "    inline [" << Callee->size() << "->"
+                            << Caller->size()
+                            << "] " << Callee->getName() << "\n");
 
     SILOpenedArchetypesTracker OpenedArchetypesTracker(Caller);
     Caller->getModule().registerDeleteNotificationHandler(&OpenedArchetypesTracker);

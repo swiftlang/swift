@@ -213,7 +213,7 @@ struct Foo {
   private(set) subscript(withPrivateSet x: Void) -> Void {
     // CHECK-DAG: sil hidden @$S9accessors3FooV14withPrivateSetyyt_tcig : $@convention(method) (Foo) -> () {
     get {}
-    // CHECK-DAG: sil private @$S9accessors3FooV14withPrivateSetyyt_tcis : $@convention(method) (@inout Foo) -> () {
+    // CHECK-DAG: sil hidden @$S9accessors3FooV14withPrivateSetyyt_tcis : $@convention(method) (@inout Foo) -> () {
     set {}
   }
   subscript(withNestedClass x: Void) -> Void {
@@ -229,7 +229,7 @@ struct Foo {
   private(set) var variableWithPrivateSet: Void {
     // CHECK-DAG: sil hidden @$S9accessors3FooV22variableWithPrivateSetytvg : $@convention(method) (Foo) -> () {
     get {}
-    // CHECK-DAG: sil private @$S9accessors3FooV22variableWithPrivateSetytvs : $@convention(method) (@inout Foo) -> () {
+    // CHECK-DAG: sil hidden @$S9accessors3FooV22variableWithPrivateSetytvs : $@convention(method) (@inout Foo) -> () {
     set {}
   }
   var propertyWithNestedClass: Void {

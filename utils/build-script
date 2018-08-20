@@ -493,13 +493,10 @@ class BuildScriptInvocation(object):
         # Set an appropriate default umask.
         os.umask(0o022)
 
-        if 'SDKROOT' in os.environ:
-            print('NOTE: Environment variable SDKROOT is set to "{}"'
-                  .format(os.environ['SDKROOT']))
-
         # Unset environment variables that might affect how tools behave.
         for v in [
                 'MAKEFLAGS',
+                'SDKROOT',
                 'MACOSX_DEPLOYMENT_TARGET',
                 'IPHONEOS_DEPLOYMENT_TARGET',
                 'TVOS_DEPLOYMENT_TARGET',

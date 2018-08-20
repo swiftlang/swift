@@ -23,7 +23,9 @@
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/Support/Debug.h"
 
 namespace swift {
@@ -277,6 +279,92 @@ protected:
     super::visitDestroyValueInst(Destroy);
   }
 
+  /// One abstract function in the debug info can only have one set of variables
+  /// and types. This function determines whether applying the substitutions in
+  /// \p SubsMap on the generic signature \p Sig will change the generic type
+  /// parameters in the signature. This is used to decide whether it's necessary
+  /// to clone a unique copy of the function declaration with the substitutions
+  /// applied for the debug info.
+  static bool substitutionsChangeGenericTypeParameters(SubstitutionMap SubsMap,
+                                                       GenericSignature *Sig) {
+
+    // If there are no substitutions, just reuse
+    // the original decl.
+    if (SubsMap.empty())
+      return false;
+
+    auto Params = Sig->getSubstitutableParams();
+    return std::any_of(Params.begin(), Params.end(), [&](Type ParamType) {
+      // FIXME: It would be more elegant to run
+      // SubsMap.mapReplacementTypesOutOfContext() bup front, but it can assert.
+      Type Substitution = Type(ParamType).subst(SubsMap)->mapTypeOutOfContext();
+      return !Substitution->isOpenedExistential() &&
+             (Substitution->getCanonicalType() !=
+              ParamType->getCanonicalType());
+    });
+  }
+
+  enum { ForInlining = true };
+  /// Helper function to clone the parent function of a SILDebugScope if
+  /// necessary when inlining said function into a new generic context.
+  /// \param SubsMap - the substitutions of the inlining/specialization process.
+  /// \param RemappedSig - the generic signature.
+  static SILFunction *remapParentFunction(SILModule &M,
+                                          SILFunction *ParentFunction,
+                                          SubstitutionMap SubsMap,
+                                          GenericSignature *RemappedSig,
+                                          bool ForInlining = false) {
+    // If the original, non-inlined version of the function had no generic
+    // environment, there is no need to remap it.
+    auto *OriginalEnvironment = ParentFunction->getGenericEnvironment();
+    if (!RemappedSig || !OriginalEnvironment)
+      return ParentFunction;
+
+    if (!substitutionsChangeGenericTypeParameters(SubsMap, RemappedSig))
+      return ParentFunction;
+
+    if (SubsMap.hasArchetypes())
+      SubsMap = SubsMap.mapReplacementTypesOutOfContext();
+
+    // This is a bug in mapReplacementTypesOutOfContext(). Archetypes can't be
+    // mangled, only type parameters can; ignore this for now.
+    if (SubsMap.hasArchetypes())
+      return ParentFunction;
+
+    // Clone the function with the substituted type for the debug info.
+    Mangle::GenericSpecializationMangler Mangler(
+        ParentFunction, SubsMap, IsNotSerialized, false, ForInlining);
+    std::string MangledName = Mangler.mangle(RemappedSig);
+
+    if (ParentFunction->getName() == MangledName)
+      return ParentFunction;
+    if (auto *CachedFn = M.lookUpFunction(MangledName))
+      ParentFunction = CachedFn;
+    else {
+      // Create a new function with this mangled name with an empty
+      // body. There won't be any IR generated for it (hence the linkage),
+      // but the symbol will be refered to by the debug info metadata.
+      SILFunctionBuilder B(M);
+      ParentFunction = B.getOrCreateFunction(
+          ParentFunction->getLocation(), MangledName, SILLinkage::Shared,
+          ParentFunction->getLoweredFunctionType(), ParentFunction->isBare(),
+          ParentFunction->isTransparent(), ParentFunction->isSerialized(), 0,
+          ParentFunction->isThunk(), ParentFunction->getClassSubclassScope());
+      // Increment the ref count for the inlined function, so it doesn't
+      // get deleted before we can emit abstract debug info for it.
+      if (!ParentFunction->isZombie()) {
+        ParentFunction->setInlined();
+        // If the function was newly created with an empty body mark it as
+        // undead.
+        if (ParentFunction->empty()) {
+          M.eraseFunction(ParentFunction);
+          ParentFunction->setGenericEnvironment(OriginalEnvironment);
+        }
+      }
+    }
+    return ParentFunction;
+  }
+
   /// The Swift module that the cloned function belongs to.
   ModuleDecl *SwiftMod;
   /// The substitutions list for the specialization.
@@ -287,7 +375,7 @@ protected:
   SILFunction &Original;
   /// True, if used for inlining.
   bool Inlining;
-};
+  };
 
 } // end namespace swift
 

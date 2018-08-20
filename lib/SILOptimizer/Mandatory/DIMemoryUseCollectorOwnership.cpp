@@ -819,8 +819,9 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     //
     // Note that partial_apply instructions always close over their argument.
     //
-    if (auto *Apply = dyn_cast<ApplyInst>(User)) {
-      auto substConv = Apply->getSubstCalleeConv();
+    auto Apply = FullApplySite::isa(User);
+    if (Apply) {
+      auto substConv = Apply.getSubstCalleeConv();
       unsigned ArgumentNumber = Op->getOperandNumber() - 1;
 
       // If this is an out-parameter, it is like a store.

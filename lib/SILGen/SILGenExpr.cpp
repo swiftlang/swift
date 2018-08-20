@@ -22,6 +22,7 @@
 #include "ResultPlan.h"
 #include "SILGen.h"
 #include "SILGenDynamicCast.h"
+#include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
 #include "Varargs.h"
@@ -966,9 +967,38 @@ static SILDeclRef getRValueAccessorDeclRef(SILGenFunction &SGF,
       return SGF.SGM.getAddressorDeclRef(storage);
     }
   }
-
   }
   llvm_unreachable("should already have been filtered out!");
+}
+
+static RValue getTargetRValue(SILGenFunction &SGF, SILLocation loc,
+                              ManagedValue value,
+                              AbstractionPattern origFormalType,
+                              CanType substFormalType,
+                              SGFContext C) {
+  SILType loweredSubstType = SGF.getLoweredType(substFormalType);
+
+  bool hasAbstraction =
+    (loweredSubstType.getObjectType() != value.getType().getObjectType());
+
+  if (value.isLValue() ||
+      (value.getType().isAddress() && !loweredSubstType.isAddress())) {
+    auto isTake =
+      IsTake_t(!value.isLValue() && !value.isPlusZeroRValueOrTrivial());
+    value = SGF.emitLoad(loc,
+                         (isTake ? value.forward(SGF)
+                                 : value.getUnmanagedValue()),
+                         SGF.getTypeLowering(value.getType()),
+                         (hasAbstraction ? SGFContext() : C),
+                         isTake);
+  }
+
+  RValue result(SGF, loc, substFormalType, value);
+  if (hasAbstraction) {
+    result = SGF.emitOrigToSubstValue(loc, std::move(result), origFormalType,
+                                      substFormalType, C);
+  }
+  return result;
 }
 
 static RValue
@@ -1002,19 +1032,8 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
                               std::move(baseRV), isSuper, isDirectUse,
                               std::move(subscriptRV), storageType);
 
-  SILValue address = addressorResult.first.getLValueAddress();
-
-  SILType loweredSubstType =
-    SGF.getLoweredType(substFormalType).getAddressType();
-  bool hasAbstraction = (loweredSubstType != storageType);
-
-  RValue result(SGF, loc, substFormalType,
-    SGF.emitLoad(loc, address, storageTL,
-                 (hasAbstraction ? SGFContext() : C), IsNotTake));
-  if (hasAbstraction) {
-    result = SGF.emitOrigToSubstValue(loc, std::move(result), origFormalType,
-                                      substFormalType, C);
-  }
+  RValue result = getTargetRValue(SGF, loc, addressorResult.first,
+                                  origFormalType, substFormalType, C);
 
   switch (cast<AccessorDecl>(accessor.getDecl())->getAddressorKind()) {
   case AddressorKind::NotAddressor: llvm_unreachable("inconsistent");
@@ -1107,15 +1126,20 @@ RValue SILGenFunction::emitRValueForStorageLoad(
   }
 
   // If the base is a reference type, just handle this as loading the lvalue.
+  ManagedValue result;
   if (baseFormalType->hasReferenceSemantics()) {
     LValue LV = emitPropertyLValue(loc, base, baseFormalType, field,
                                    LValueOptions(), AccessKind::Read,
                                    AccessSemantics::DirectToStorage);
-    return emitLoadOfLValue(loc, std::move(LV), C, isBaseGuaranteed);
-  }
-
-  ManagedValue result;
-  if (!base.getType().isAddress()) {
+    auto loaded = emitLoadOfLValue(loc, std::move(LV), C, isBaseGuaranteed);
+    // If we don't have to reabstract, the load is sufficient.
+    if (!hasAbstractionChange)
+      return loaded;
+    
+    // Otherwise, bring the component up to +1 so we can reabstract it.
+    result = std::move(loaded).getAsSingleValue(*this, loc)
+                              .copyUnmanaged(*this, loc);
+  } else if (!base.getType().isAddress()) {
     // For non-address-only structs, we emit a struct_extract sequence.
     result = B.createStructExtract(loc, base, field);
 
@@ -2359,7 +2383,7 @@ private:
     // If the field is not a let, bail. We need to use the lvalue logic.
     if (!Field->isLet())
       return None;
-
+    
     // If we are emitting a delegating init super and we have begun the
     // super.init call, since self has been exclusively borrowed, we need to be
     // conservative and use the lvalue machinery. This ensures that we properly
@@ -2977,14 +3001,8 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   if (!storage->getDeclContext()->isTypeContext())
     return ManagedValue();
   
-  ManagedValue paramOrigValue;
-  
-  if (subSGF.SGM.M.getOptions().EnableGuaranteedNormalArguments) {
-    paramOrigValue =
+  auto paramOrigValue =
       ManagedValue::forBorrowedRValue(paramArg).copy(subSGF, loc);
-  } else {
-    paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
-  }
   auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
                                              AbstractionPattern::getOpaque(),
                                              baseType);
@@ -3094,11 +3112,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                                              propertyType);
   }
   
-  ParameterConvention paramConvention;
-  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
-    paramConvention = ParameterConvention::Indirect_In_Guaranteed;
-  else
-    paramConvention = ParameterConvention::Indirect_In;
+  auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
 
   SmallVector<SILParameterInfo, 2> params;
   params.push_back({loweredBaseTy.getASTType(),
@@ -3129,7 +3143,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto name = Mangle::ASTMangler()
     .mangleKeyPathGetterThunkHelper(property, genericSig, baseType,
                                     interfaceSubs);
-  auto thunk = SGM.M.getOrCreateSharedFunction(
+  SILGenFunctionBuilder builder(SGM);
+  auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
       ProfileCounter(), IsThunk);
   if (!thunk->empty())
@@ -3213,11 +3228,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   
   auto &C = SGM.getASTContext();
   
-  ParameterConvention paramConvention;
-  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
-    paramConvention = ParameterConvention::Indirect_In_Guaranteed;
-  else
-    paramConvention = ParameterConvention::Indirect_In;
+  auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
 
   SmallVector<SILParameterInfo, 3> params;
   // property value
@@ -3254,7 +3265,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                                                                 genericSig,
                                                                 baseType,
                                                                 interfaceSubs);
-  auto thunk = SGM.M.getOrCreateSharedFunction(
+
+  SILGenFunctionBuilder builder(SGM);
+  auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
       ProfileCounter(), IsThunk);
   if (!thunk->empty())
@@ -3292,12 +3305,8 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                                                          indexes,
                                                          indexPtrArg);
   
-  ManagedValue valueOrig;
-  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
-    valueOrig = ManagedValue::forBorrowedRValue(valueArg)
+  auto valueOrig = ManagedValue::forBorrowedRValue(valueArg)
       .copy(subSGF, loc);
-  else
-    valueOrig = subSGF.emitManagedRValueWithCleanup(valueArg);
   auto valueSubst = subSGF.emitOrigToSubstValue(loc, valueOrig,
                                                 AbstractionPattern::getOpaque(),
                                                 propertyType);
@@ -3413,9 +3422,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     
     auto name = Mangle::ASTMangler().mangleKeyPathEqualsHelper(indexTypes,
                                                                genericSig);
-    equals = SGM.M.getOrCreateSharedFunction(loc, name, signature, IsBare,
-                                             IsNotTransparent, IsNotSerialized,
-                                             ProfileCounter(), IsThunk);
+    SILGenFunctionBuilder builder(SGM);
+    equals = builder.getOrCreateSharedFunction(
+        loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
+        ProfileCounter(), IsThunk);
     if (!equals->empty()) {
       return;
     }
@@ -3577,9 +3587,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     
     auto name = Mangle::ASTMangler().mangleKeyPathHashHelper(indexTypes,
                                                              genericSig);
-    hash = SGM.M.getOrCreateSharedFunction(loc, name, signature, IsBare,
-                                           IsNotTransparent, IsNotSerialized,
-                                           ProfileCounter(), IsThunk);
+    SILGenFunctionBuilder builder(SGM);
+    hash = builder.getOrCreateSharedFunction(loc, name, signature, IsBare,
+                                             IsNotTransparent, IsNotSerialized,
+                                             ProfileCounter(), IsThunk);
     if (!hash->empty()) {
       return;
     }
@@ -3779,7 +3790,13 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     [&]() -> bool {
       return getASTContext().LangOpts.EnableKeyPathResilience
         && !forPropertyDescriptor
-        && storage->getModuleContext() != SwiftModule;
+        && storage->getModuleContext() != SwiftModule
+        // Protocol requirements don't have nor need property descriptors.
+        && !isa<ProtocolDecl>(storage->getDeclContext())
+        // Properties that only dispatch via ObjC lookup do not have nor need
+        // property descriptors, since the selector identifies the storage.
+        && (!storage->hasAnyAccessors()
+            || !getGetterDeclRef(storage).isForeign);
     };
   
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
@@ -3805,11 +3822,21 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       }
     }
   }
+  
+  auto isSettableInComponent = [&]() -> bool {
+    // For storage we reference by a property descriptor, the descriptor will
+    // supply the settability if needed. We only reference it here if the
+    // setter is public.
+    if (shouldUseExternalKeyPathComponent())
+      return storage->isSettable(M.getSwiftModule())
+        && storage->isSetterAccessibleFrom(M.getSwiftModule());
+    return storage->isSettable(storage->getDeclContext());
+  };
 
   if (auto var = dyn_cast<VarDecl>(storage)) {
     CanType componentTy;
     if (!var->getDeclContext()->isTypeContext()) {
-      componentTy = storage->getStorageInterfaceType()->getCanonicalType();
+      componentTy = var->getInterfaceType()->getCanonicalType();
     } else {
       componentTy =
         GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)
@@ -3855,7 +3882,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                {},
                baseTy, componentTy);
       
-      if (var->isSettable(var->getDeclContext())) {
+      if (isSettableInComponent()) {
         auto setter = getOrCreateKeyPathSetter(*this, loc,
                var, subs,
                needsGenericContext ? genericEnv : nullptr,
@@ -3909,7 +3936,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
              baseTy, componentTy);
   
     auto indexPatternsCopy = getASTContext().AllocateCopy(indexPatterns);
-    if (decl->isSettable()) {
+    if (isSettableInComponent()) {
       auto setter = getOrCreateKeyPathSetter(*this, loc,
              decl, subs,
              needsGenericContext ? genericEnv : nullptr,

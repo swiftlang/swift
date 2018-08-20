@@ -6111,8 +6111,8 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 
   if (auto fixedTI = dyn_cast<FixedTypeInfo>(ti)) {
     LLVM_DEBUG(llvm::dbgs() << "Layout for enum ";
-          type->print(llvm::dbgs());
-          llvm::dbgs() << ":\n";);
+               type->print(llvm::dbgs());
+               llvm::dbgs() << ":\n";);
 
     SpareBitVector spareBits;
     fixedTI->applyFixedSpareBitsMask(spareBits);
@@ -6120,15 +6120,16 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
     auto bitMask = strategy->getBitMaskForNoPayloadElements();
     assert(bitMask.size() == fixedTI->getFixedSize().getValueInBits());
     LLVM_DEBUG(llvm::dbgs() << "  no-payload mask:\t";
-          displayBitMask(bitMask));
+               displayBitMask(bitMask));
     LLVM_DEBUG(llvm::dbgs() << "  spare bits mask:\t";
-          displayBitMask(spareBits));
+               displayBitMask(spareBits));
 
     for (auto &elt : strategy->getElementsWithNoPayload()) {
       auto bitPattern = strategy->getBitPatternForNoPayloadElement(elt.decl);
       assert(bitPattern.size() == fixedTI->getFixedSize().getValueInBits());
-      LLVM_DEBUG(llvm::dbgs() << "  no-payload case " << elt.decl->getName().str()
-                         << ":\t";
+      LLVM_DEBUG(llvm::dbgs() << "  no-payload case "
+                              << elt.decl->getName().str()
+                              << ":\t";
             displayBitMask(bitPattern));
 
       auto maskedBitPattern = bitPattern;
@@ -6140,7 +6141,7 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
             || static_cast<size_t>(static_cast<size_t>(1) << tagBits.count())
                >= strategy->getElementsWithPayload().size());
     LLVM_DEBUG(llvm::dbgs() << "  payload tag bits:\t";
-          displayBitMask(tagBits));
+               displayBitMask(tagBits));
 
     tagBits &= spareBits;
     assert(tagBits.none() && "tag bits overlap spare bits?!");

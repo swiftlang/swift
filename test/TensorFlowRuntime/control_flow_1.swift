@@ -48,12 +48,15 @@ public func weighPet(_ pet: Pet,
   let extra = Tensor<Float>(1.0)
   _hostOp(extra)
 }
+// TODO: fix the disabled GPU tests below.
+#if !CUDA
 ControlFlowTests.testAllBackends("weighPet") {
   weighPet(.bird, 2.0)
   weighPet(.cat, 6.0)
   weighPet(.dog, 11.0)
   weighPet(.fish, 1.0)
 }
+#endif // CUDA
 
 @inline(never)
 public func weighPetWithDefault(_ pet: Pet,
@@ -114,13 +117,14 @@ public func testEnumWithPayload(_ x: EnumWithPayload, _ expectedVal: Float) {
   val += 0.0
   expectNearlyEqualWithScalarTensor(expectedVal, val)
 }
+#if !CUDA
 ControlFlowTests.testAllBackends("testEnumWithPayload") {
   testEnumWithPayload(.a("Hello"), 3.0)
   testEnumWithPayload(.b(3.0), 5.0)
   testEnumWithPayload(.c(Tensor<Float>(1.0), Tensor<Float>(2.0)), 6.0)
   testEnumWithPayload(.d(.b(3.0)), 12.0)
 }
-
+#endif // CUDA
 
 @inline(never)
 public func testCondBranch(_ a: Bool,

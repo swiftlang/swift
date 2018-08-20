@@ -54,6 +54,7 @@ if(SWIFT_HOST_VARIANT STREQUAL "macosx")
   # Ensure we only build SwiftSyntax when we're building both.
   if(BUILD_FOUNDATION)
     add_subdirectory(SwiftSyntax)
+    add_subdirectory(swift-test-utils)
     add_swift_tool_subdirectory(swift-swiftsyntax-test)
   endif()
 endif()

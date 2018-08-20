@@ -220,6 +220,9 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
+  // Pass on file paths that should be remapped in debug info.
+  inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map);
+
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
@@ -432,6 +435,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_ModuleTrace:
   case file_types::TY_TBD:
   case file_types::TY_OptRecord:
+  case file_types::TY_SwiftModuleInterfaceFile:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -655,6 +659,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
     case file_types::TY_OptRecord:
+    case file_types::TY_SwiftModuleInterfaceFile:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");

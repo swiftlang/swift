@@ -23,6 +23,8 @@
 import CPython2
 #elseif PYTHON3
 import CPython3
+#else
+#error("Neither CPython2 nor CPython3 are supported.")
 #endif
 
 //===----------------------------------------------------------------------===//

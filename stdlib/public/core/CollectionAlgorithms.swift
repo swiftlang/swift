@@ -24,6 +24,8 @@ extension BidirectionalCollection {
   ///         print(lastNumber)
   ///     }
   ///     // Prints "50"
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public var last: Element? {
     return isEmpty ? nil : self[index(before: endIndex)]
@@ -53,6 +55,8 @@ extension Collection where Element : Equatable {
   /// - Parameter element: An element to search for in the collection.
   /// - Returns: The first index where `element` is found. If `element` is not
   ///   found in the collection, returns `nil`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func firstIndex(of element: Element) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
@@ -98,6 +102,8 @@ extension Collection {
   /// - Returns: The index of the first element for which `predicate` returns
   ///   `true`. If no elements in the collection satisfy the given predicate,
   ///   returns `nil`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func firstIndex(
     where predicate: (Element) throws -> Bool
@@ -144,6 +150,8 @@ extension BidirectionalCollection {
   ///   element is a match.
   /// - Returns: The last element of the sequence that satisfies `predicate`,
   ///   or `nil` if there is no element that satisfies `predicate`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func last(
     where predicate: (Element) throws -> Bool
@@ -170,6 +178,8 @@ extension BidirectionalCollection {
   ///   represents a match.
   /// - Returns: The index of the last element in the collection that matches
   ///   `predicate`, or `nil` if no elements match.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func lastIndex(
     where predicate: (Element) throws -> Bool
@@ -204,6 +214,8 @@ extension BidirectionalCollection where Element : Equatable {
   /// - Parameter element: An element to search for in the collection.
   /// - Returns: The last index where `element` is found. If `element` is not
   ///   found in the collection, returns `nil`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func lastIndex(of element: Element) -> Index? {
     if let result = _customLastIndexOfEquatableElement(element) {
@@ -253,7 +265,7 @@ extension MutableCollection {
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(*n*) where n is the length of the collection.
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
@@ -317,7 +329,7 @@ extension MutableCollection where Self : BidirectionalCollection {
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
@@ -387,7 +399,7 @@ extension Sequence {
   ///   the sequence.
   /// - Returns: An array of this sequence's elements in a shuffled order.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
   public func shuffled<T: RandomNumberGenerator>(
     using generator: inout T
@@ -411,7 +423,7 @@ extension Sequence {
   ///
   /// - Returns: A shuffled array of this sequence's elements.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
   public func shuffled() -> [Element] {
     var g = SystemRandomNumberGenerator()
@@ -434,7 +446,7 @@ extension MutableCollection where Self : RandomAccessCollection {
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the collection.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func shuffle<T: RandomNumberGenerator>(
     using generator: inout T
@@ -466,7 +478,7 @@ extension MutableCollection where Self : RandomAccessCollection {
   /// This method is equivalent to calling the version that takes a generator, 
   /// passing in the system's default random generator.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func shuffle() {
     var g = SystemRandomNumberGenerator()

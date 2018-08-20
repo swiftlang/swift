@@ -35,3 +35,7 @@ SWIFT_TYPEID_NAMED(void, Void)
 
 // C++ standard library types.
 SWIFT_TYPEID_TEMPLATE1_NAMED(std::vector, Vector, typename T, T)
+
+// LLVM ADT types.
+SWIFT_TYPEID_TEMPLATE1_NAMED(llvm::TinyPtrVector, TinyPtrVector, typename T, T)
+

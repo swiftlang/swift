@@ -137,7 +137,7 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
   allocNewUpdateID();
 
   LLVM_DEBUG(llvm::dbgs() << "recompute function-effect analysis with UpdateID "
-                     << getCurrentUpdateID() << '\n');
+                          << getCurrentUpdateID() << '\n');
 
   // Collect and analyze all functions to recompute, starting at initialInfo.
   FunctionOrder bottomUpOrder(getCurrentUpdateID());
@@ -158,8 +158,8 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
       if (!functionInfo->needUpdateCallers)
         continue;
 
-      LLVM_DEBUG(llvm::dbgs() << "  update callers of " << functionInfo->F->getName()
-                         << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "  update callers of "
+                              << functionInfo->F->getName() << '\n');
       functionInfo->needUpdateCallers = false;
 
       // Propagate the function effects to all callers.
@@ -170,8 +170,8 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
         if (!bottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller))
           continue;
 
-        LLVM_DEBUG(llvm::dbgs() << "    merge into caller " << E.Caller->F->getName()
-                           << '\n');
+        LLVM_DEBUG(llvm::dbgs() << "    merge into caller "
+                                << E.Caller->F->getName() << '\n');
 
         if (E.Caller->functionEffects.mergeFromApply(
                 functionInfo->functionEffects, FullApplySite(E.FAS))) {
@@ -358,7 +358,8 @@ bool FunctionSideEffects::summarizeFunction(SILFunction *F) {
 
   // Handle @_effects attributes
   if (setDefinedEffects(F)) {
-    LLVM_DEBUG(llvm::dbgs() << "  -- has defined effects " << F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  -- has defined effects " << F->getName()
+                            << '\n');
     return true;
   }
 

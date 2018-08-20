@@ -1471,9 +1471,8 @@ ConstantFolder::processWorkList() {
   // This is used to avoid duplicate error reporting in case we reach the same
   // instruction from different entry points in the WorkList.
   llvm::DenseSet<SILInstruction *> ErrorSet;
-
   llvm::SetVector<SILInstruction *> FoldedUsers;
-  CastOptimizer CastOpt(
+  CastOptimizer CastOpt(FuncBuilder,
       [&](SingleValueInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
 
         InvalidateInstructions = true;

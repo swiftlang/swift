@@ -44,6 +44,20 @@ import resilient_struct
 
 // CHECK: %T15enum_resilience10EitherFastO = type <{ [[REFERENCE_TYPE]] }>
 
+// CHECK: @"$S15enum_resilience24EnumWithResilientPayloadOMl" =
+// CHECK-SAME: internal global { %swift.type*, i8* } zeroinitializer, align
+
+// CHECK: @"$S15enum_resilience24EnumWithResilientPayloadOMn" = {{.*}}constant
+//    196690 == 0x00030052
+//              0x0002      - InPlaceMetadataInitialization
+//              0x0001      - IsReflectable
+//              0x    0040  - IsUnique
+//              0x    0012  - Enum
+// CHECK-SAME: i32 196690,
+// CHECK-SAME: @"$S15enum_resilience24EnumWithResilientPayloadOMl"
+// CHECK-SAME: @"$S15enum_resilience24EnumWithResilientPayloadOMf", i32 0, i32 1)
+// CHECK-SAME: @"$S15enum_resilience24EnumWithResilientPayloadOMr"
+
 public class Class {}
 
 public struct Reference {
@@ -267,17 +281,22 @@ public func getResilientEnumType() -> Any.Type {
 
 // Public metadata accessor for our resilient enum
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$S15enum_resilience24EnumWithResilientPayloadOMa"(
-// CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** @"$S15enum_resilience24EnumWithResilientPayloadOML"
-// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[METADATA]], null
+// CHECK: [[LOAD_METADATA:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$S15enum_resilience24EnumWithResilientPayloadOMl", i32 0, i32 0), align
+// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[LOAD_METADATA]], null
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK: cacheIsNull:
-// CHECK-NEXT: call void @swift_once([[INT]]* @"$S15enum_resilience24EnumWithResilientPayloadOMa.once_token", i8* bitcast (void (i8*)* @initialize_metadata_EnumWithResilientPayload to i8*), i8* undef)
-// CHECK-NEXT: [[METADATA2:%.*]] = load %swift.type*, %swift.type** @"$S15enum_resilience24EnumWithResilientPayloadOML"
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getInPlaceMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$S15enum_resilience24EnumWithResilientPayloadOMn" to %swift.type_descriptor*))
+// CHECK-NEXT: [[RESPONSE_METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK-NEXT: [[RESPONSE_STATE:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
 // CHECK-NEXT: br label %cont
 
 // CHECK: cont:
-// CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[METADATA]], %entry ], [ [[METADATA2]], %cacheIsNull ]
+// CHECK-NEXT: [[RESULT_METADATA:%.*]] = phi %swift.type* [ [[LOAD_METADATA]], %entry ], [ [[RESPONSE_METADATA]], %cacheIsNull ]
+// CHECK-NEXT: [[RESULT_STATE:%.*]] = phi [[INT]] [ 0, %entry ], [ [[RESPONSE_STATE]], %cacheIsNull ]
+// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[RESULT_METADATA]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[RESULT_STATE]], 1
+// CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
 // Methods inside extensions of resilient enums fish out type parameters
 // from metadata -- make sure we can do that
@@ -311,9 +330,28 @@ public func constructFullyFixed() -> FullyFixedLayout {
   return .noPayload
 }
 
-// CHECK-LABEL: define private void @initialize_metadata_EnumWithResilientPayload(i8*)
-// CHECK: call void @swift_initEnumMetadataMultiPayload(%swift.type* {{.*}}, [[INT]] 256, [[INT]] 2, i8*** {{.*}})
-
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S15enum_resilience24EnumWithResilientPayloadOMr"(%swift.type*, i8*, i8**)
+// CHECK:        [[TUPLE_LAYOUT:%.*]] = alloca %swift.full_type_layout
+// CHECK:        [[SIZE_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 319)
+// CHECK-NEXT:   [[SIZE_METADATA:%.*]] = extractvalue %swift.metadata_response [[SIZE_RESPONSE]], 0
+// CHECK-NEXT:   [[SIZE_STATE:%.*]] = extractvalue %swift.metadata_response [[SIZE_RESPONSE]], 1
+// CHECK-NEXT:   [[T0:%.*]] = icmp ule [[INT]] [[SIZE_STATE]], 63
+// CHECK-NEXT:   br i1 [[T0]], label %[[SATISFIED1:.*]], label
+// CHECK:      [[SATISFIED1]]:
+// CHECK-NEXT:   [[T0:%.*]] = bitcast %swift.type* [[SIZE_METADATA]] to i8***
+// CHECK-NEXT:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], [[INT]] -1
+// CHECK-NEXT:   [[SIZE_VWT:%.*]] = load i8**, i8*** [[T1]],
+// CHECK-NEXT:   [[SIZE_LAYOUT_1:%.*]] = getelementptr inbounds i8*, i8** [[SIZE_VWT]], i32 8
+// CHECK-NEXT:   store i8** [[SIZE_LAYOUT_1]],
+// CHECK-NEXT:   getelementptr
+// CHECK-NEXT:   [[SIZE_LAYOUT_2:%.*]] = getelementptr inbounds i8*, i8** [[SIZE_VWT]], i32 8
+// CHECK-NEXT:   [[SIZE_LAYOUT_3:%.*]] = getelementptr inbounds i8*, i8** [[SIZE_VWT]], i32 8
+// CHECK-NEXT:   call swiftcc [[INT]] @swift_getTupleTypeLayout2(%swift.full_type_layout* [[TUPLE_LAYOUT]], i8** [[SIZE_LAYOUT_2]], i8** [[SIZE_LAYOUT_3]])
+// CHECK-NEXT:   [[T0:%.*]] = bitcast %swift.full_type_layout* [[TUPLE_LAYOUT]] to i8**
+// CHECK-NEXT:   store i8** [[T0]],
+// CHECK:        call void @swift_initEnumMetadataMultiPayload
+// CHECK:        phi %swift.type* [ [[SIZE_METADATA]], %entry ], [ null, %[[SATISFIED1]] ]
+// CHECK:        phi [[INT]] [ 63, %entry ], [ 0, %[[SATISFIED1]] ]
 
 
 public protocol Prot {

@@ -578,6 +578,27 @@ extension ShapedArray : CustomReflectable {
   }
 }
 
+/// Codable conformance.
+extension ShapedArray : Codable where Scalar : Codable {
+  private enum CodingKeys: String, CodingKey {
+    case shape
+    case scalars
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let shape = try container.decode([Int].self, forKey: .shape)
+    let scalars = try container.decode([Scalar].self, forKey: .scalars)
+    self.init(shape: shape, scalars: scalars)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(shape, forKey: .shape)
+    try container.encode(scalars, forKey: .scalars)
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // ShapedArraySlice
 //===----------------------------------------------------------------------===//
@@ -887,5 +908,26 @@ extension ShapedArraySlice : CustomPlaygroundDisplayConvertible {
 extension ShapedArraySlice : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [], displayStyle: .struct)
+  }
+}
+
+/// Codable conformance.
+extension ShapedArraySlice : Codable where Scalar : Codable {
+  private enum CodingKeys : String, CodingKey {
+    case shape
+    case scalars
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(shape, forKey: .shape)
+    try container.encode(scalars, forKey: .scalars)
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let shape = try container.decode([Int].self, forKey: .shape)
+    let scalars = try container.decode([Scalar].self, forKey: .scalars)
+    self.init(shape: shape, scalars: scalars)
   }
 }

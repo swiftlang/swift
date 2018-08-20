@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
-// RUN: %target-swift-emit-ir(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/keypaths_objc.h %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -enable-key-path-resilience -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
+// RUN: %target-swift-emit-ir(mock-sdk: %clang-importer-sdk) -enable-key-path-resilience -import-objc-header %S/Inputs/keypaths_objc.h %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -87,4 +87,12 @@ func objcProtocolRequirement<T: ObjCProto>(_: T) {
   _ = \T.objcRequirement
   // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.1.foreign
   _ = \ObjCProto.objcRequirement
+}
+
+// CHECK-LABEL: sil hidden @{{.*}}externalObjCProperty
+func externalObjCProperty() {
+  // Pure ObjC-dispatched properties do not have external descriptors.
+  // CHECK: keypath $KeyPath<NSObject, String>, 
+  // CHECK-NOT: external #NSObject.description
+  _ = \NSObject.description
 }

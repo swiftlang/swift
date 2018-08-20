@@ -39,7 +39,7 @@ import Builtin
 // CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [14 x i8] c"SingleDynamic\00"
 // CHECK: @"$S15generic_structs13SingleDynamicVMn" = hidden constant 
 // --       flags: struct, unique, generic, reflectable
-// CHECK-SAME:   <i32 0x0004_00D1>
+// CHECK-SAME:   <i32 0x0001_00D1>
 // --       name
 // CHECK-SAME:   [14 x i8]* [[SINGLEDYNAMIC_NAME]]
 // --       field count
@@ -65,7 +65,7 @@ import Builtin
 // CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [24 x i8] c"DynamicWithRequirements\00"
 // CHECK: @"$S15generic_structs23DynamicWithRequirementsVMn" = hidden constant <{ {{.*}} i32 }> <{
 // --       flags: struct, unique, generic, reflectable
-// CHECK-SAME:   <i32 0x0004_00D1>
+// CHECK-SAME:   <i32 0x0001_00D1>
 // --       name
 // CHECK-SAME: [24 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]]
 // --       field count
@@ -82,14 +82,14 @@ import Builtin
 //   --       param 0
 // CHECK-SAME: i32 0
 //   --       protocol Req1
-// CHECK-SAME: %swift.protocol* @"$S15generic_structs4Req1Mp"
+// CHECK-SAME: @"$S15generic_structs4Req1Mp"
 
 //   --       protocol requirement with key arg
 // CHECK-SAME: i32 128
 //   --       param 1
 // CHECK-SAME: i32 2
 //   --       protocol Req2
-// CHECK-SAME: %swift.protocol* @"$S15generic_structs4Req2Mp"
+// CHECK-SAME: @"$S15generic_structs4Req2Mp"
 // CHECK-SAME: }>
 
 // CHECK: @"$S15generic_structs23DynamicWithRequirementsVMP" = internal constant <{ {{.*}} }> <{

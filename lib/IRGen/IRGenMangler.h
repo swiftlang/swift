@@ -82,6 +82,11 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mi");
   }
 
+  std::string mangleTypeMetadataInPlaceInitializationCache(
+                                                  const NominalTypeDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Ml");
+  }
+
   std::string mangleTypeMetadataCompletionFunction(const NominalTypeDecl *Decl){
     return mangleNominalTypeSymbol(Decl, "Mr");
   }
@@ -118,13 +123,6 @@ public:
     beginMangling();
     appendProtocolName(Decl);
     appendOperator("Mp");
-    return finalize();
-  }
-
-  std::string mangleProtocolRequirementArray(const ProtocolDecl *Decl) {
-    beginMangling();
-    appendProtocolName(Decl);
-    appendOperator("WR");
     return finalize();
   }
 

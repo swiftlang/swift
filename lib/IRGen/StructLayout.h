@@ -430,8 +430,14 @@ struct ClassLayout {
   ArrayRef<VarDecl*> InheritedStoredProperties;
   /// Lazily-initialized array of all field access methods.
   ArrayRef<FieldAccess> AllFieldAccesses;
-  /// Does the class metadata require dynamic initialization.
+  /// Does the class metadata require dynamic initialization?
   bool MetadataRequiresDynamicInitialization;
+  /// Do instances of this class have a size and layout known at compile time?
+  ///
+  /// Note: This is a stronger condition than the StructLayout of a class having
+  /// a fixed layout. The latter is true even when the class requires sliding
+  /// ivars by the Objective-C runtime.
+  bool HasFixedSize;
 
   unsigned getFieldIndex(VarDecl *field) const {
     // FIXME: This is algorithmically terrible.

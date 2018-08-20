@@ -53,7 +53,8 @@ static bool mayWriteTo(AliasAnalysis *AA, WriteSet &MayWrites,
                        UnaryInstructionBase<K, T> *Inst) {
   for (auto *W : MayWrites)
     if (AA->mayWriteToMemory(W, Inst->getOperand())) {
-      LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *Inst << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to "
+                              << *Inst << "\n");
       return true;
     }
   return false;
@@ -83,7 +84,8 @@ static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
     // Check if the memory addressed by the argument may alias any writes.
     for (auto *W : MayWrites) {
       if (AA->mayWriteToMemory(W, Arg)) {
-        LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *AI << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to "
+                                << *AI << "\n");
         return true;
       }
     }
@@ -128,7 +130,8 @@ static void getDominatingBlocks(SmallVectorImpl<SILBasicBlock *> &domBlocks,
                      [=](SILBasicBlock *ExitBB) {
           return DT->dominates(CurBB, ExitBB);
         })) {
-      LLVM_DEBUG(llvm::dbgs() << "  skipping conditional block " << *CurBB << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  skipping conditional block "
+                              << *CurBB << "\n");
       It.skipChildren();
       continue;
     }
@@ -260,14 +263,16 @@ static bool sinkInstruction(DominanceInfo *DT,
       };
       if (std::find_if(OutsideBB->begin(), OutsideBB->end(), matchPred) !=
           OutsideBB->end()) {
-        LLVM_DEBUG(llvm::errs() << "  instruction already at exit BB " << *Inst);
+        LLVM_DEBUG(llvm::errs() << "  instruction already at exit BB "
+                                << *Inst);
         ExitBB = nullptr;
       } else if (ExitBB) {
         // easy case
         LLVM_DEBUG(llvm::errs() << "  moving instruction to exit BB " << *Inst);
         Inst->moveBefore(&*OutsideBB->begin());
       } else {
-        LLVM_DEBUG(llvm::errs() << "  cloning instruction to exit BB " << *Inst);
+        LLVM_DEBUG(llvm::errs() << "  cloning instruction to exit BB "
+                                << *Inst);
         Inst->clone(&*OutsideBB->begin());
       }
       Changed = true;
@@ -652,8 +657,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
   for (auto *BI : BeginAccesses) {
     if (!handledEndAccesses(BI, Loop)) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping: " << *BI);
-      LLVM_DEBUG(llvm::dbgs() << "Some end accesses can't be handled"
-                         << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Some end accesses can't be handled\n");
       continue;
     }
     if (analyzeBeginAccess(BI, BeginAccesses)) {

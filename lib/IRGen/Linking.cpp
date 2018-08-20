@@ -96,6 +96,10 @@ std::string LinkEntity::mangleAsString() const {
       return mangler.mangleTypeMetadataInstantiationFunction(
                                               cast<NominalTypeDecl>(getDecl()));
 
+    case Kind::TypeMetadataInPlaceInitializationCache:
+      return mangler.mangleTypeMetadataInPlaceInitializationCache(
+                                              cast<NominalTypeDecl>(getDecl()));
+
     case Kind::TypeMetadataCompletionFunction:
       return mangler.mangleTypeMetadataCompletionFunction(
                                               cast<NominalTypeDecl>(getDecl()));
@@ -141,9 +145,6 @@ std::string LinkEntity::mangleAsString() const {
 
     case Kind::ProtocolDescriptor:
       return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
-
-    case Kind::ProtocolRequirementArray:
-      return mangler.mangleProtocolRequirementArray(cast<ProtocolDecl>(getDecl()));
 
     case Kind::ProtocolConformanceDescriptor:
       return mangler.mangleProtocolConformanceDescriptor(

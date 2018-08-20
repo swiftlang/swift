@@ -53,27 +53,7 @@ DeclContext::getAsTypeOrTypeExtensionContext() const {
   auto ext = dyn_cast<ExtensionDecl>(decl);
   if (!ext) return dyn_cast<GenericTypeDecl>(decl);
 
-  auto type = ext->getExtendedType();
-  if (!type) return nullptr;
-
-  while (true) {
-    // expected case: we reference a nominal type (potentially through sugar)
-    if (auto nominal = type->getAnyNominal())
-      return nominal;
-
-    // early type checking case: we have a typealias reference that is still
-    // unsugared, so explicitly look through the underlying type if there is
-    // one.
-    if (auto typealias =
-          dyn_cast_or_null<TypeAliasDecl>(type->getAnyGeneric())) {
-      type = typealias->getUnderlyingTypeLoc().getType();
-      if (!type) return nullptr;
-
-      continue;
-    }
-
-    return nullptr;
-  }
+  return ext->getExtendedNominal();
 }
 
 /// If this DeclContext is a NominalType declaration or an
@@ -104,8 +84,7 @@ ProtocolDecl *DeclContext::getAsProtocolOrProtocolExtensionContext() const {
 ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
   if (auto decl = const_cast<Decl*>(getAsDeclOrDeclExtensionContext()))
     if (auto ED = dyn_cast<ExtensionDecl>(decl))
-      if (auto type = ED->getExtendedType())
-        return dyn_cast_or_null<ProtocolDecl>(type->getAnyNominal());
+      return dyn_cast_or_null<ProtocolDecl>(ED->getExtendedNominal());
   return nullptr;
 }
 

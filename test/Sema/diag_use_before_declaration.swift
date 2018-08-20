@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 // SR-5163
 func sr5163() {
@@ -18,7 +18,7 @@ func test() {
   guard let bar = foo else {
     return
   }
-  let foo = String(bar)
+  let foo = String(bar) // expected-warning {{initialization of immutable value 'foo' was never used; consider replacing with assignment to '_' or removing it}}
 }
 
 // SR-7660
@@ -28,6 +28,18 @@ class C {
     guard let _ = variable else { return }
     let variable = 1 // expected-warning {{initialization of immutable value 'variable' was never used; consider replacing with assignment to '_' or removing it}}
   }
+}
+
+// SR-7517
+func testExample() {
+  let app = app2 // expected-error {{use of local variable 'app2' before its declaration}}
+  let app2 = app // expected-note {{'app2' declared here}}
+}
+
+// SR-8447
+func test_circular() {
+  let obj = sr8447 // expected-error {{use of local variable 'sr8447' before its declaration}}
+  let _ = obj.prop, sr8447 // expected-note {{'sr8447' declared here}} expected-error {{type annotation missing in pattern}}
 }
 
 //===----------------------------------------------------------------------===//

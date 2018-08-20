@@ -17,7 +17,7 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensor{{.*}}
 // CHECK:  sil private @{{.*}}testTensor{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
-// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
+// CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
 // CHECK-NEXT:   [[A:%.*]] = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
 // CHECK-NEXT:   {{.*}} = graph_op "Sub,i,i"([[A]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
 // CHECK:        graph_op "tfc.SendToHost
@@ -51,7 +51,7 @@ public func testScalar(f: Float) {
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testScalar{{.*}}
 // CHECK: sil private @{{.*}}testScalar{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Float> {
-// CHECK: bb0(%0 : $TensorHandle<Builtin.FPIEEE32>):
+// CHECK: bb0(%0 : @unowned $TensorHandle<Builtin.FPIEEE32>):
 // CHECK-NEXT:   %1 = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
 // CHECK:        [[CONST:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
 // CHECK:        [[ADD1:%.*]] = graph_op "Add,i,i"(%1 : $TensorHandle<Float>, [[CONST]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
@@ -128,7 +128,7 @@ public func testExitBranch2(i: Int) {
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch2{{.*}}
 // CHECK: sil private @{{.*}}testExitBranch2{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>) -> () {
-// CHECK: bb0(%0 : $TensorHandle<Builtin.Int1>):
+// CHECK: bb0(%0 : @unowned $TensorHandle<Builtin.Int1>):
 // CHECK:  graph_op "Const"()
 // CHECK:  cond_br {{.*}}, bb2, bb1
 
@@ -158,7 +158,7 @@ public func test_bool_param(cond: Bool, x: Tensor<Float>, y: Tensor<Float>) {
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param{{.*}}
 // CHECK: sil private @{{.*}}test_bool_param{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float>
-// CHECK: bb0(%0 : $TensorHandle<Builtin.Int1>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Float>):
+// CHECK: bb0(%0 : @unowned $TensorHandle<Builtin.Int1>, %1 : @unowned $TensorHandle<Float>, %2 : @unowned $TensorHandle<Float>):
 // CHECK: %3 = graph_op "tf_tensor_to_i1"(%0 : $TensorHandle<Builtin.Int1>) {{.*}} : $Builtin.Int1
 // CHECK: cond_br %3, bb2, bb1
 
@@ -190,7 +190,7 @@ public func test_bool_param2(cond: Bool, x: Tensor<Float>, y: Tensor<Float>) {
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param2{{.*}}
 // CHECK: sil private @{{.*}}test_bool_param2{{.*}}
-// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.Int1>):
+// CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>, %2 : @unowned $TensorHandle<Builtin.Int1>):
 // CHECK:         graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK-NEXT:    [[BOOL:%.*]] = graph_op "tf_tensor_to_i1"(%2 : $TensorHandle<Builtin.Int1>) {{.*}} : $Builtin.Int1
 // CHECK-NEXT:    cond_br [[BOOL]]
@@ -251,13 +251,13 @@ public func test_while1(maxCount: Int, arg1: Tensor<Float>, arg2: Tensor<Float>)
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_while1{{.*}}
 // CHECK: sil private @{{.*}}test_while1{{.*}}
-// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.Int1>, %3 : $TensorHandle<Builtin.Int64>):
+// CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>, %2 : @unowned $TensorHandle<Builtin.Int1>, %3 : @unowned $TensorHandle<Builtin.Int64>):
 // CHECK-NEXT: graph_op "Const"() {dtype$dtype: $Builtin.Int64, value$tensor: i64 0
 // CHECK:      graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
 // CHECK-NEXT: graph_op "tf_tensor_to_i1"(
 // CHECK-NEXT: cond_br {{.*}}, bb2, bb1
 
-// CHECK: bb3([[A:%.*]] : $TensorHandle<Float>, [[COUNT:%.*]] : $TensorHandle<Builtin.Int64>):
+// CHECK: bb3([[A:%.*]] : @trivial $TensorHandle<Float>, [[COUNT:%.*]] : @trivial $TensorHandle<Builtin.Int64>):
 // CHECK:       [[NEXTA:%.*]] = graph_op "Sub,i,i"([[A]] : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK:       [[NEXTCOUNT:%.*]] = graph_op "Add,i,i"([[COUNT]] : $TensorHandle<Builtin.Int64>
 // CHECK:       [[CONDT:%.*]] = graph_op "Less,i,i"([[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>
@@ -292,7 +292,7 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}scalar_manipulation{{.*}}
 // CHECK: sil private @{{.*}}scalar_manipulation{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Float> {
-// CHECK: bb0(%0 : $TensorHandle<Builtin.FPIEEE32>):
+// CHECK: bb0(%0 : @unowned $TensorHandle<Builtin.FPIEEE32>):
 // CHECK-NEXT:  %1 = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
 // CHECK-NEXT:  [[CONST:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
 // CHECK:       graph_op "Add,i,i"(%1 : $TensorHandle<Float>, [[CONST]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
@@ -313,7 +313,7 @@ public func testCast(x: Tensor<Float>) -> Tensor<Int32> {
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testCast
 // CHECK: sil private @{{.*}}testCast{{.*}} : $@callee_owned (TensorHandle<Float>) -> TensorHandle<Int32> {
-// CHECK: bb0(%0 : $TensorHandle<Float>):
+// CHECK: bb0(%0 : @unowned $TensorHandle<Float>):
 // CHECK:   [[ADD:%.*]] = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK:   [[CAST:%.*]] = graph_op "Cast,i"([[ADD]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Int32>
 // CHECK:   return [[CAST]] : $TensorHandle<Int32>
@@ -330,7 +330,7 @@ public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> 
 /*
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testInputListArguments
  CHECK: sil private @{{.*}}testInputListArguments{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
- CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
+ CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
  CHECK:  [[PACK1:%.*]] = graph_op "Pack,L,e,e,e"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
  CHECK:  [[PACK2:%.*]] = graph_op "Pack,L,e,e,e"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
  CHECK:  [[RET:%.*]] = graph_op "Add,i,i"([[PACK1]] : $TensorHandle<Float>, [[PACK2]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
@@ -351,7 +351,7 @@ public func liveOutTest(
 /*
 CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}liveOutTest
 CHECK: sil private @{{.*}}liveOutTest{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
-CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Float>):
+CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>, %2 : @unowned $TensorHandle<Float>):
 CHECK: return {{.*}} : $TensorHandle<Float>
 CHECK: }
 */
@@ -440,7 +440,7 @@ func shouldntInline(_ a: Tensor<Float>) -> Tensor<Float> {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}shouldntInline
-// CHECK: bb0(%0 : $TensorHandle<Float>):
+// CHECK: bb0(%0 : @unowned $TensorHandle<Float>):
 // CHECK:  [[RET:%.*]] = graph_op "Mul,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK:  return [[RET]] : $TensorHandle<Float>
 // CHECK-LABEL: ----
@@ -512,3 +512,22 @@ public func test77437755(_ hiddenSize: Float) {
 // CHECK: [[STDDEVT:%.*]] = graph_op "tfc.scalarToTensor,s"([[STDDEV]] : $Builtin.FPIEEE32) {{.*}} : $TensorHandle<Float>
 // CHECK:  graph_op "Mul,i,i"({{.*}} : $TensorHandle<Float>, [[STDDEVT]] : $TensorHandle<Float>) {{.*}}
 // CHECK-LABEL: ---- END OF INPUT FUNCTION ----------
+
+
+@TensorFlowGraph
+public func graphFuncReturningOpaqueHandles() -> (ResourceHandle, ResourceHandle) {
+  let iterator : ResourceHandle =
+    #tfop("Iterator", shared_name: "foo", container: "bar",
+    output_shapes: [TensorShape()], output_types: [Float.self])
+  let iterator2 : ResourceHandle =
+    #tfop("Iterator", shared_name: "foo", container: "bar",
+    output_shapes: [TensorShape()], output_types: [Float.self])
+  return (iterator, iterator2)
+}
+// CHECK-LABEL --- TFPartition Accelerator Result: {{.*}}graphFuncReturningOpaqueHandles{{.*}}
+// CHECK: bb0:
+// CHECK:  [[A:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types: [$Float.Type: $Float], __device: "/device:CPU:0"} : $ResourceHandle 
+// CHECK:  [[B:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types: [$Float.Type: $Float], __device: "/device:CPU:0"} : $ResourceHandle 
+// CHECK:  [[C:%.*]] = tuple ([[A]] : $ResourceHandle, [[B]] : $ResourceHandle)
+// CHECK:  return [[C]] : $(ResourceHandle, ResourceHandle)   
+

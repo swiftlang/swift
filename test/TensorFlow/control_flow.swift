@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 import TensorFlow
 
@@ -95,6 +95,25 @@ public func testCondBranch(_ a: Bool) {
   b -= 1.0
   _hostOp(b)
 }
+
+// For testCondBranch(), we are generating a stateless if op.
+// CHECK-LABEL: --- TFPartition GraphDef Proto:
+// CHECK:  op: "StatelessIf"
+
+public func testWhile(_ n: Int32) {
+  var i: Int32 = 0
+  var a = Tensor<Float>(2.0)
+  while i < n {
+    a += 1.0
+    i += 1
+  }
+  a += 0.0
+  _hostOp(a)
+}
+
+// For testWhile(), we are generating a stateless while op.
+// CHECK-LABEL: --- TFPartition GraphDef Proto:
+// CHECK:  op: "StatelessWhile"
 
 // CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testSwitchEnum
 // CHECK:       bb0:

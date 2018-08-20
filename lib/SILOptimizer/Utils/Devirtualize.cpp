@@ -493,7 +493,8 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
                                        OptRemark::Emitter *ORE,
                                        bool isEffectivelyFinalMethod) {
 
-  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
+  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize : "
+                          << *AI.getInstruction());
 
   SILModule &Mod = AI.getModule();
 
@@ -509,17 +510,17 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
   if (!F) {
-    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
-                          "vtable method for this class.\n");
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable "
+                               "or vtable method for this class.\n");
     return false;
   }
 
   // We need to disable the  “effectively final” opt if a function is inlinable
   if (isEffectivelyFinalMethod && AI.getFunction()->getResilienceExpansion() ==
                                       ResilienceExpansion::Minimal) {
-    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function because "
-                          "it is an effectively-final inlinable: "
-                       << AI.getFunction()->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function "
+                               "because it is an effectively-final inlinable: "
+                            << AI.getFunction()->getName() << "\n");
     return false;
   }
 
@@ -529,8 +530,8 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   if (F->getModule().getStage() != SILStage::Raw && !F->shouldOptimize()) {
     // Do not consider functions that should not be optimized.
     LLVM_DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function "
-                       << " because it is marked no-opt: " << F->getName()
-                       << "\n");
+                            << " because it is marked no-opt: " << F->getName()
+                            << "\n");
     return false;
   }
 
@@ -553,7 +554,8 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
 DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
                                                       SILValue ClassOrMetatype,
                                                       OptRemark::Emitter *ORE) {
-  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
+  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize : "
+                          << *AI.getInstruction());
 
   SILModule &Mod = AI.getModule();
   auto *MI = cast<MethodInst>(AI.getCallee());
@@ -985,7 +987,8 @@ swift::tryDevirtualizeWitnessMethod(ApplySite AI, OptRemark::Emitter *ORE) {
 DevirtualizationResult swift::tryDevirtualizeApply(ApplySite AI,
                                                    ClassHierarchyAnalysis *CHA,
                                                    OptRemark::Emitter *ORE) {
-  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
+  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize: "
+                          << *AI.getInstruction());
 
   // Devirtualize apply instructions that call witness_method instructions:
   //
@@ -1057,7 +1060,8 @@ DevirtualizationResult swift::tryDevirtualizeApply(ApplySite AI,
 }
 
 bool swift::canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
-  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
+  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize: "
+                          << *AI.getInstruction());
 
   // Devirtualize apply instructions that call witness_method instructions:
   //

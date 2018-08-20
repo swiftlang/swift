@@ -16,9 +16,14 @@
 using namespace swift;
 using namespace swift::syntax;
 
-bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
+bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t NodeStart,
+                                         size_t Position,
                                          SyntaxKind Kind) const {
-  auto NodeStart = Node.getAbsolutePositionBeforeLeadingTrivia().getOffset();
+  // Computing the value of NodeStart on the fly is faster than determining a
+  // node's absolute position, but make sure the values match in an assertion
+  // build
+  assert(NodeStart == Node.getAbsolutePositionBeforeLeadingTrivia().getOffset());
+
   if (NodeStart != Position)
     return false;
   if (Node.getKind() != Kind)
@@ -50,23 +55,26 @@ bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
 }
 
 llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
+                                                      size_t NodeStart,
                                                       size_t Position,
                                                       SyntaxKind Kind) {
-  if (nodeCanBeReused(Node, Position, Kind)) {
+  if (nodeCanBeReused(Node, NodeStart, Position, Kind)) {
     return Node;
   }
 
+  // Compute the child's position on the fly
+  size_t ChildStart = NodeStart;
   for (size_t I = 0, E = Node.getNumChildren(); I < E; ++I) {
     llvm::Optional<Syntax> Child = Node.getChild(I);
     if (!Child.hasValue()) {
       continue;
     }
-    auto ChildStart =
-        Child->getAbsolutePositionBeforeLeadingTrivia().getOffset();
     auto ChildEnd = ChildStart + Child->getTextLength();
     if (ChildStart <= Position && Position < ChildEnd) {
-      return lookUpFrom(Child.getValue(), Position, Kind);
+      return lookUpFrom(Child.getValue(), ChildStart, Position, Kind);
     }
+    // The next child starts where the previous child ended
+    ChildStart = ChildEnd;
   }
   return llvm::None;
 }
@@ -83,7 +91,7 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
     }
   }
 
-  auto Node = lookUpFrom(OldSyntaxTree, OldPosition, Kind);
+  auto Node = lookUpFrom(OldSyntaxTree, /*NodeStart=*/0, OldPosition, Kind);
   if (Node.hasValue()) {
     ReusedNodeIds.insert(Node->getId());
   }

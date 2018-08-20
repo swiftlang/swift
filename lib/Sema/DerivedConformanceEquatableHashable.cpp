@@ -260,20 +260,19 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                              AccessSemantics::Ordinary, intType);
 }
 
-/// Generates a guard statement that checks whether the given lhs and rhs
-/// variables are equal; if they are not, then the isEqual variable is set to
-/// false and a break statement is executed.
+/// Returns a generated guard statement that checks whether the given lhs and
+/// rhs expressions are equal. If not equal, the else block for the guard
+/// returns false.
 /// \p C The AST context.
-/// \p lhsVar The first variable to test for equality.
-/// \p rhsVar The second variable to test for equality.
-/// \p isEqualVar The variable to set to false if the guard condition fails.
+/// \p lhsExpr The first expression to compare for equality.
+/// \p rhsExpr The second expression to compare for equality.
 static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
                                         Expr *lhsExpr,
                                         Expr *rhsExpr) {
   SmallVector<StmtConditionElement, 1> conditions;
-  SmallVector<ASTNode, 2> statements;
+  SmallVector<ASTNode, 1> statements;
 
-  // First, generate the statements for the body of the guard.
+  // First, generate the statement for the body of the guard.
   // return false
   auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                               /*Implicit*/true);
@@ -551,7 +550,7 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl) {
 
 /// Derive an '==' operator implementation for an enum or a struct.
 static ValueDecl *
-deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
+deriveEquatable_eq(DerivedConformance &derived,
                    void (*bodySynthesizer)(AbstractFunctionDecl *)) {
   // enum SomeEnum<T...> {
   //   case A, B(Int), C(String, Int)
@@ -591,14 +590,14 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   ASTContext &C = derived.TC.Context;
 
   auto parentDC = derived.getConformanceContext();
-  auto enumTy = parentDC->getDeclaredTypeInContext();
-  auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
+  auto selfTy = parentDC->getDeclaredTypeInContext();
+  auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
     auto *param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                     SourceLoc(), Identifier(), SourceLoc(),
-                                    C.getIdentifier(s), enumTy, parentDC);
-    param->setInterfaceType(enumIfaceTy);
+                                    C.getIdentifier(s), selfTy, parentDC);
+    param->setInterfaceType(selfIfaceTy);
     return param;
   };
 
@@ -611,6 +610,17 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   });
 
   auto boolTy = C.getBoolDecl()->getDeclaredType();
+
+  Identifier generatedIdentifier;
+  if (parentDC->getParentModule()->getResilienceStrategy() ==
+      ResilienceStrategy::Resilient) {
+    generatedIdentifier = C.Id_EqualsOperator;
+  } else if (selfTy->getEnumOrBoundGenericEnum()) {
+    generatedIdentifier = C.Id_derived_enum_equals;
+  } else {
+    assert(selfTy->getStructOrBoundGenericStruct());
+    generatedIdentifier = C.Id_derived_struct_equals;
+  }
 
   DeclName name(C, generatedIdentifier, params);
   auto eqDecl =
@@ -627,17 +637,19 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
   eqDecl->getAttrs().add(new (C) InfixAttr(/*implicit*/false));
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
-  auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
-  auto equatableTy = equatableProto->getDeclaredType();
-  auto equatableTypeLoc = TypeLoc::withoutLoc(equatableTy);
-  SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
-  auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
-                                 argumentLabels);
-  eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
-                                                SourceRange(),
-                                                equatableTypeLoc,
-                                                equalsDeclName,
-                                                DeclNameLoc()));
+  if (generatedIdentifier != C.Id_EqualsOperator) {
+    auto equatableProto = C.getProtocol(KnownProtocolKind::Equatable);
+    auto equatableTy = equatableProto->getDeclaredType();
+    auto equatableTypeLoc = TypeLoc::withoutLoc(equatableTy);
+    SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
+    auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
+                                   argumentLabels);
+    eqDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
+                                                  SourceRange(),
+                                                  equatableTypeLoc,
+                                                  equalsDeclName,
+                                                  DeclNameLoc()));
+  }
 
   if (!C.getEqualIntDecl()) {
     derived.TC.diagnose(derived.ConformanceDecl->getLoc(),
@@ -647,25 +659,11 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
 
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Compute the type.
-  Type paramsTy = params->getInterfaceType(C);
-
   // Compute the interface type.
-  Type interfaceTy;
-  auto selfParam = computeSelfParam(eqDecl);
-  if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
-    eqDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
+  if (auto genericEnv = parentDC->getGenericEnvironmentOfContext())
+    eqDecl->setGenericEnvironment(genericEnv);
+  eqDecl->computeType();
 
-    interfaceTy = FunctionType::get(paramsTy, boolTy,
-                                    AnyFunctionType::ExtInfo());
-    interfaceTy = GenericFunctionType::get(genericSig, {selfParam}, interfaceTy,
-                                           AnyFunctionType::ExtInfo());
-  } else {
-    interfaceTy = FunctionType::get(paramsTy, boolTy);
-    interfaceTy = FunctionType::get({selfParam}, interfaceTy,
-                                    FunctionType::ExtInfo());
-  }
-  eqDecl->setInterfaceType(interfaceTy);
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
   eqDecl->setValidationToChecked();
 
@@ -679,7 +677,9 @@ deriveEquatable_eq(DerivedConformance &derived, Identifier generatedIdentifier,
 
 bool DerivedConformance::canDeriveEquatable(TypeChecker &tc, DeclContext *DC,
                                             NominalTypeDecl *type) {
-  auto equatableProto = tc.Context.getProtocol(KnownProtocolKind::Equatable);
+  ASTContext &ctx = DC->getASTContext();
+  auto equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
+  if (!equatableProto) return false;
   return canDeriveConformance(tc, DC, type, equatableProto);
 }
 
@@ -696,11 +696,9 @@ ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
               : ed->hasOnlyCasesWithoutAssociatedValues()
                     ? &deriveBodyEquatable_enum_noAssociatedValues_eq
                     : &deriveBodyEquatable_enum_hasAssociatedValues_eq;
-      return deriveEquatable_eq(*this, TC.Context.Id_derived_enum_equals,
-                                bodySynthesizer);
+      return deriveEquatable_eq(*this, bodySynthesizer);
     } else if (isa<StructDecl>(Nominal))
-      return deriveEquatable_eq(*this, TC.Context.Id_derived_struct_equals,
-                                &deriveBodyEquatable_struct_eq);
+      return deriveEquatable_eq(*this, &deriveBodyEquatable_struct_eq);
     else
       llvm_unreachable("todo");
   }
@@ -781,24 +779,9 @@ deriveHashable_hashInto(DerivedConformance &derived,
   hashDecl->setImplicit();
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Evaluate type of Self in (Self) -> (into: inout Hasher) -> ()
-  auto selfParam = computeSelfParam(hashDecl);
-  auto inoutFlag = ParameterTypeFlags().withInOut(true);
-  auto hasherParam = AnyFunctionType::Param(hasherType, C.Id_into, inoutFlag);
-  auto innerType = FunctionType::get({hasherParam}, returnType,
-                                     FunctionType::ExtInfo());
-
-  Type interfaceType;
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    hashDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, {selfParam}, innerType,
-                                             FunctionType::ExtInfo());
-  } else {
-    // (Self) -> innerType == (inout Hasher) -> ()
-    interfaceType = FunctionType::get({selfParam}, innerType,
-                                      FunctionType::ExtInfo());
-  }
-  hashDecl->setInterfaceType(interfaceType);
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    hashDecl->setGenericEnvironment(env);
+  hashDecl->computeType();
   hashDecl->copyFormalAccessFrom(derived.Nominal);
   hashDecl->setValidationToChecked();
 
@@ -1104,21 +1087,11 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
 
-  // Compute the type of hashValue().
-  Type methodType = FunctionType::get(TupleType::getEmpty(C), intType);
-
   // Compute the interface type of hashValue().
-  Type interfaceType;
-  auto selfParam = computeSelfParam(getterDecl);
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    getterDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, {selfParam}, methodType,
-                                             AnyFunctionType::ExtInfo());
-  } else
-    interfaceType = FunctionType::get({selfParam}, methodType,
-                                      AnyFunctionType::ExtInfo());
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    getterDecl->setGenericEnvironment(env);
+  getterDecl->computeType();
 
-  getterDecl->setInterfaceType(interfaceType);
   getterDecl->setValidationToChecked();
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
@@ -1174,8 +1147,7 @@ getHashableConformance(Decl *parentDecl) {
   return nullptr;
 }
 
-bool DerivedConformance::canDeriveHashable(TypeChecker &tc,
-                                           NominalTypeDecl *type) {
+bool DerivedConformance::canDeriveHashable(NominalTypeDecl *type) {
   if (!isa<EnumDecl>(type) && !isa<StructDecl>(type) && !isa<ClassDecl>(type))
     return false;
   // FIXME: This is not actually correct. We cannot promise to always

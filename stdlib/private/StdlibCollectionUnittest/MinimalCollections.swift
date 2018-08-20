@@ -705,7 +705,7 @@ public struct MinimalCollection<T> : Collection {
 
   public func distance(from start: MinimalIndex, to end: MinimalIndex)
     -> Int {
-    _precondition(start <= end,
+    precondition(start <= end,
       "Only BidirectionalCollections can have end come before start")
     // FIXME: swift-3-indexing-model: perform a range check properly.
     if start != endIndex {
@@ -718,7 +718,7 @@ public struct MinimalCollection<T> : Collection {
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    _precondition(n >= 0,
+    precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: perform a range check properly.
     if i != endIndex {
@@ -880,7 +880,7 @@ public struct MinimalRangeReplaceableCollection<T> : Collection, RangeReplaceabl
 
   public func distance(from start: MinimalIndex, to end: MinimalIndex)
     -> Int {
-    _precondition(start <= end,
+    precondition(start <= end,
       "Only BidirectionalCollections can have end come before start")
     // FIXME: swift-3-indexing-model: perform a range check properly.
     if start != endIndex {
@@ -893,7 +893,7 @@ public struct MinimalRangeReplaceableCollection<T> : Collection, RangeReplaceabl
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    _precondition(n >= 0,
+    precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: perform a range check properly.
     if i != endIndex {
@@ -1130,7 +1130,7 @@ public struct MinimalMutableCollection<T> : Collection, MutableCollection {
 
   public func distance(from start: MinimalIndex, to end: MinimalIndex)
     -> Int {
-    _precondition(start <= end,
+    precondition(start <= end,
       "Only BidirectionalCollections can have end come before start")
     // FIXME: swift-3-indexing-model: perform a range check properly.
     if start != endIndex {
@@ -1143,7 +1143,7 @@ public struct MinimalMutableCollection<T> : Collection, MutableCollection {
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    _precondition(n >= 0,
+    precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: perform a range check properly.
     if i != endIndex {
@@ -1313,7 +1313,7 @@ public struct MinimalMutableRangeReplaceableCollection<T> : Collection, MutableC
 
   public func distance(from start: MinimalIndex, to end: MinimalIndex)
     -> Int {
-    _precondition(start <= end,
+    precondition(start <= end,
       "Only BidirectionalCollections can have end come before start")
     // FIXME: swift-3-indexing-model: perform a range check properly.
     if start != endIndex {
@@ -1326,7 +1326,7 @@ public struct MinimalMutableRangeReplaceableCollection<T> : Collection, MutableC
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    _precondition(n >= 0,
+    precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
     // FIXME: swift-3-indexing-model: perform a range check properly.
     if i != endIndex {

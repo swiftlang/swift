@@ -143,8 +143,7 @@ public struct BenchmarkInfo {
   /// Shadow static variable for computed property tearDownFunction.
   private var _tearDownFunction: (() -> ())?
 
-  /// An optional function that if non-null is run immediately after a sample is
-  /// taken.
+  /// An optional function that if non-null is run after samples are taken.
   public var tearDownFunction: (() -> ())? {
     if !shouldRun {
       return nil

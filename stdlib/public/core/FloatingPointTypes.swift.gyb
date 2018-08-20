@@ -750,8 +750,7 @@ extension ${Self}: BinaryFloatingPoint {
     let provisional = Int(exponentBitPattern) - Int(${Self}._exponentBias)
     if isNormal { return provisional }
     let shift =
-      ${Self}.significandBitCount -
-        Int(significandBitPattern._binaryLogarithm())
+      ${Self}.significandBitCount - significandBitPattern._binaryLogarithm()
     return provisional + 1 - shift
   }
 
@@ -793,8 +792,7 @@ extension ${Self}: BinaryFloatingPoint {
     }
     if isSubnormal {
       let shift =
-        ${RawSignificand}(${Self}.significandBitCount) -
-          significandBitPattern._binaryLogarithm()
+        ${Self}.significandBitCount - significandBitPattern._binaryLogarithm()
       return ${Self}(sign: .plus,
         exponentBitPattern: ${Self}._exponentBias,
         significandBitPattern: significandBitPattern &<< shift)
@@ -1017,7 +1015,18 @@ extension ${Self}: BinaryFloatingPoint {
       _value = Builtin.int_ceil_FPIEEE${bits}(_value)
     case .down:
       _value = Builtin.int_floor_FPIEEE${bits}(_value)
+    @unknown default:
+      self._roundSlowPath(rule)
     }
+  }
+  
+  // Slow path for new cases that might have been inlined into an old
+  // ABI-stable version of round(_:) called from a newer version. If this is
+  // the case, this non-inlinable function will call into the _newer_ version
+  // which _will_ support this rounding rule.
+  @usableFromInline
+  internal mutating func _roundSlowPath(_ rule: FloatingPointRoundingRule) {
+    self.round(rule)
   }
 
   /// Replaces this value with its additive inverse.

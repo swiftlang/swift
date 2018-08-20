@@ -198,57 +198,6 @@ struct GraphFunctionDeviceInfo {
     ++numUsedDeviceTypes;
   }
 
-  // Chooses a device for this tfop, extends `operands` and `newInstName`
-  // accordingly with the device attribute, and tracks the chosen device in
-  // `usedDeviceTypes`.
-  //
-  // If `opDevice` is already set, respects that device choice. Otherwise,
-  // chooses a device based on this deviceInfo and op kernel device
-  // availability.
-  //
-  // For some tfops (e.g. "tfc.scalarToTensor"), device placement is handled
-  // specially, so this function call will be a no-op.
-  //
-  // TODO: remove this function once we complete the migration to GraphOpInst.
-  void handleDevicePlacementLegacy(llvm::StringRef opType,
-                                   llvm::StringRef opDevice, SILBuilder &B,
-                                   SILLocation loc,
-                                   SmallVectorImpl<SILValue> &operands,
-                                   std::string &newInstName) {
-    // No device placement for this special-case "pseudo-op" for
-    // scalar-to-tensor promotion. It will later be translated by compiler (in
-    // PartitionCloner) into real TF ops, where device placement is handled at
-    // that time.
-    if (opType == "tfc.scalarToTensor") {
-      assert(opDevice.empty());
-      return;
-    }
-
-    DeviceType chosenDevice;
-    if (!opDevice.empty())
-      chosenDevice = getOpDeviceType(opDevice);
-    else
-      chosenDevice = chooseDevice(opType);
-
-    markDeviceUsed(chosenDevice);
-
-    // Example output SIL:
-    // %2 = string_literal utf8 "/device:GPU:0"        // user: %3
-    // %3 = builtin "__tfop_Const,dtype,value$tensor,__device"(%0 : $@thin
-    // %Float.Type, %1 : $Builtin.FPIEEE64, %2 : $Builtin.RawPointer) :
-    // %$TensorHandle<Float> // user: %4
-    //
-    // Note we generate the StringLiteral inst for op device even when the input
-    // `opDevice` is not empty. This is redundant but keeps the code simple, and
-    // we expect the original StringLiteral inst for the op device to get DCE'd
-    // in a later compiler pass.
-    auto deviceString = getDeviceString(chosenDevice);
-    auto deviceStrInst = B.createStringLiteral(
-        loc, llvm::StringRef(deviceString), StringLiteralInst::Encoding::UTF8);
-    operands.push_back(deviceStrInst);
-    newInstName += std::string(",") + DEVICE_ATTR;
-  }
-
   // Choose a device for the graphOpInst under construction, extend `attributes`
   // accordingly with the device attribute, and track the chosen device in
   // `usedDeviceTypes`.
@@ -275,16 +224,7 @@ private:
     numUsedDeviceTypes = 1;
   }
 
-  DeviceType chooseDevice(llvm::StringRef opType) const {
-    if (opType == "tfc.RecvFromHost" || opType == "tfc.SendToHost")
-      return DeviceType::CPU;
-
-    // Place this inst on the device given by this deviceInfo.
-    // FIXME: Use the op kernel device availability info to select a device for
-    // `opType` -- if that op has no available kernel on `primaryDeviceType`, a
-    // different device should be returned.
-    return primaryDeviceType;
-  }
+  DeviceType chooseDevice(llvm::StringRef opType) const;
 
   // Actual TF devices involved in the tensor computation.
   // It cannot contain DeviceType::ALL.

@@ -54,7 +54,7 @@ typedef struct {
   __swift_intptr_t patchVersion;
 } _SwiftNSOperatingSystemVersion;
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 _SwiftNSOperatingSystemVersion _swift_stdlib_operatingSystemVersion();
 
 #ifdef __cplusplus

@@ -2077,6 +2077,9 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           case ReadImplKind::Get:
             collectFunctionCaptures(capturedVar->getGetter());
             break;
+          case ReadImplKind::Read:
+            collectFunctionCaptures(capturedVar->getReadCoroutine());
+            break;
           case ReadImplKind::Inherited:
             llvm_unreachable("inherited local variable?");
           }
@@ -2092,6 +2095,9 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           case WriteImplKind::MutableAddress:
             collectFunctionCaptures(capturedVar->getMutableAddressor());
             break;
+          case WriteImplKind::Modify:
+            collectFunctionCaptures(capturedVar->getModifyCoroutine());
+            break;
           case WriteImplKind::InheritedWithObservers:
             llvm_unreachable("inherited local variable");
           }
@@ -2105,6 +2111,9 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
             break;
           case ReadWriteImplKind::MutableAddress:
             collectFunctionCaptures(capturedVar->getMutableAddressor());
+            break;
+          case ReadWriteImplKind::Modify:
+            collectFunctionCaptures(capturedVar->getModifyCoroutine());
             break;
           case ReadWriteImplKind::MaterializeForSet:
             llvm_unreachable("local variable with materializeForSet?");

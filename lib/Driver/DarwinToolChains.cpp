@@ -339,8 +339,6 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     }
   }
 
-  context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
-  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   for (const Arg *arg :
        context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {
     Arguments.push_back("-F");
@@ -476,6 +474,10 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   }
 
   Arguments.push_back("-no_objc_category_merging");
+
+  // These custom arguments should be right before the object file at the end.
+  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");

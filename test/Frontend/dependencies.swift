@@ -25,12 +25,15 @@
 // NO-PRIMARY-FILE: warning: ignoring -emit-reference-dependencies (requires -primary-file)
 
 
-// RUN: %target-swift-frontend -emit-dependencies-path - -emit-module %S/../Inputs/empty\ file.swift -o %t/empty\ file.swiftmodule -emit-module-doc-path %t/empty\ file.swiftdoc -emit-objc-header-path %t/empty\ file.h | %FileCheck -check-prefix=CHECK-MULTIPLE-OUTPUTS %s
+// RUN: %target-swift-frontend -emit-dependencies-path - -emit-module %S/../Inputs/empty\ file.swift -o %t/empty\ file.swiftmodule -emit-module-doc-path %t/empty\ file.swiftdoc -emit-objc-header-path %t/empty\ file.h -emit-interface-path %t/empty\ file.swiftinterface | %FileCheck -check-prefix=CHECK-MULTIPLE-OUTPUTS %s
 
 // CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.swiftmodule :
 // CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.swiftdoc :
+// CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift
+// CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
+// CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.swiftinterface :
 // CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.h :
@@ -56,6 +59,8 @@
 
 // CHECK-IMPORT-TRACK-SYSTEM-LABEL: - :
 // CHECK-IMPORT-TRACK-SYSTEM: dependencies.swift
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: Swift.swiftmodule
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: SwiftOnoneSupport.swiftmodule
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: CoreFoundation.swift
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: CoreGraphics.swift
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: Foundation.swift

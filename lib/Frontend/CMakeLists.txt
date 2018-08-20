@@ -10,7 +10,6 @@ add_swift_library(swiftFrontend STATIC
   OutputFileMap.cpp
   PrintingDiagnosticConsumer.cpp
   SerializedDiagnosticConsumer.cpp
-  Types.cpp
   DEPENDS
     SwiftOptions
   LINK_LIBRARIES

@@ -44,6 +44,9 @@ namespace {
 class SROAMemoryUseAnalyzer {
   // The allocation we are analyzing.
   AllocStackInst *AI;
+  // Only explode those alloc_stack insts over which shouldExplode() return
+  // true.
+  const std::function<bool(AllocStackInst *)> &shouldExplode;
 
   // Loads from AI.
   llvm::SmallVector<LoadInst *, 4> Loads;
@@ -57,12 +60,15 @@ class SROAMemoryUseAnalyzer {
   // StructDecl if we are visiting a struct.
   StructDecl *SD = nullptr;
 public:
-  SROAMemoryUseAnalyzer(AllocStackInst *AI) : AI(AI) {
+  SROAMemoryUseAnalyzer(
+      AllocStackInst *AI,
+      const std::function<bool(AllocStackInst *)> &shouldExplode)
+      : AI(AI), shouldExplode(shouldExplode) {
     assert(AI && "AI should never be null here.");
   }
 
   bool analyze();
-  void chopUpAlloca(std::vector<AllocStackInst *> &Worklist);
+  void chopUpAlloca(llvm::SmallVectorImpl<AllocStackInst *> &Worklist);
 
 private:
   SILValue createAgg(SILBuilder &B, SILLocation Loc, SILType Ty,
@@ -148,12 +154,12 @@ bool SROAMemoryUseAnalyzer::analyze() {
     if (auto *SI = dyn_cast<StoreInst>(User)) {
       if (SI->getDest() == AI) {
         LLVM_DEBUG(llvm::dbgs() << "        Found a store into the "
-              "projection.\n");
+                                   "projection.\n");
         Stores.push_back(SI);
         continue;
       } else {
         LLVM_DEBUG(llvm::dbgs() << "        Found a store of the "
-              "projection pointer. Escapes!.\n");
+                                   "projection pointer. Escapes!.\n");
         ++NumEscapingAllocas;
         return false;
       }
@@ -188,7 +194,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     }
     
     // Otherwise we do not understand this instruction, so bail.
-    LLVM_DEBUG(llvm::dbgs() << "        Found unknown user, pointer escapes!\n");
+    LLVM_DEBUG(llvm::dbgs() <<"        Found unknown user, pointer escapes!\n");
     ++NumEscapingAllocas;
     return false;
   }
@@ -219,7 +225,8 @@ createAllocas(llvm::SmallVector<AllocStackInst *, 4> &NewAllocations) {
   }
 }
 
-void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist) {
+void SROAMemoryUseAnalyzer::chopUpAlloca(
+    llvm::SmallVectorImpl<AllocStackInst *> &Worklist) {
   // Create allocations for this instruction.
   llvm::SmallVector<AllocStackInst *, 4> NewAllocations;
   createAllocas(NewAllocations);
@@ -227,8 +234,10 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
   //
   // TODO: Change this into an assert. For some reason I am running into compile
   // issues when I try it now.
-  for (auto *AI : NewAllocations)
-    Worklist.push_back(AI);
+  for (auto *AI : NewAllocations) {
+    if (shouldExplode(AI))
+      Worklist.push_back(AI);
+  }
 
   // Change any aggregate loads into field loads + aggregate structure.
   for (auto *LI : Loads) {
@@ -286,9 +295,28 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
   eraseFromParentWithDebugInsts(AI);
 }
 
-static bool runSROAOnFunction(SILFunction &Fn) {
-  std::vector<AllocStackInst *> Worklist;
+bool swift::runSROAOnInsts(
+    ArrayRef<AllocStackInst *> Insts,
+    const std::function<bool(AllocStackInst *)> &shouldExplode) {
   bool Changed = false;
+  SmallVector<AllocStackInst *, 16> WorklistVec(Insts.begin(), Insts.end());
+  while (!WorklistVec.empty()) {
+    AllocStackInst *AI = WorklistVec.back();
+    WorklistVec.pop_back();
+
+    SROAMemoryUseAnalyzer Analyzer(AI, shouldExplode);
+
+    if (!Analyzer.analyze())
+      continue;
+
+    Changed = true;
+    Analyzer.chopUpAlloca(WorklistVec);
+  }
+  return Changed;
+}
+
+static bool runSROAOnFunction(SILFunction &Fn) {
+  SmallVector<AllocStackInst *, 16> Worklist;
 
   // For each basic block BB in Fn...
   for (auto &BB : Fn)
@@ -299,19 +327,7 @@ static bool runSROAOnFunction(SILFunction &Fn) {
         if (shouldExpand(Fn.getModule(), AI->getElementType()))
           Worklist.push_back(AI);
 
-  while (!Worklist.empty()) {
-    AllocStackInst *AI = Worklist.back();
-    Worklist.pop_back();
-
-    SROAMemoryUseAnalyzer Analyzer(AI);
-
-    if (!Analyzer.analyze())
-      continue;
-
-    Changed = true;
-    Analyzer.chopUpAlloca(Worklist);
-  }
-  return Changed;
+  return runSROAOnInsts(Worklist, [](AllocStackInst *alloc) { return true; });
 }
 
 namespace {
@@ -320,8 +336,8 @@ class SILSROA : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
-    LLVM_DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName() <<
-          " *****\n");
+    LLVM_DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName()
+                            << " *****\n");
 
     if (runSROAOnFunction(*F))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

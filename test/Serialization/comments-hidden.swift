@@ -44,10 +44,10 @@ private class PrivateClass {
 // NORMAL: Public Function Documentation
 
 // TESTING-NEGATIVE-NOT: NotForTesting
-// TESTING: InternalClass Documentation
-// TESTING: Internal Function Documentation
 // TESTING: PublicClass Documentation
 // TESTING: Public Function Documentation
+// TESTING: Internal Function Documentation
+// TESTING: InternalClass Documentation
 // TESTING: Internal Function Documentation
 
 

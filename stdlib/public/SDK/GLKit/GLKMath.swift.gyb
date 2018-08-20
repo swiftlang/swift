@@ -34,8 +34,8 @@ def defineSubscript(Type, limit):
   public subscript(i: Int) -> Float {{
     @inline(__always)
     get {{
-      _precondition(i >= 0, "Negative {0} index out of range")
-      _precondition(i < {1}, "{0} index out of range")
+      precondition(i >= 0, "Negative {0} index out of range")
+      precondition(i < {1}, "{0} index out of range")
 
       // We can't derive an UnsafePointer from a let binding. Lame.
       var clone = self

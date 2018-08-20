@@ -43,7 +43,7 @@ public func test1SendWithParam(x: Float) {
 
 // GPU function takes the input arg of x.
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}GPU{{.*}}
-// CHECK: bb0(%0 : $TensorHandle
+// CHECK: bb0(%0 : @unowned $TensorHandle
 // CHECK: graph_op "tfc.D2DTensorSend
 
 // The _Send node should be hooked up as a control dependency on the return
@@ -91,6 +91,22 @@ public func test2Sends() {
 
 // CHECK:      function_ref @_swift_tfc_FinishTensorComputation
 
+public func testSendsInABranch(_ c: Bool) {
+  var a = Tensor<Float>(1.0)
+  if c {
+    a += a
+    // One send.
+    _hostOp(a.toHost())
+  }
+  a += a
+  // This one should not be a send.
+  _hostOp(a.toHost())
+}
+
+// For testSendsInABranch(), we are generating a stateful while op.
+// CHECK-LABEL: --- TFPartition GraphDef Proto:
+// CHECK:  op: "If"
+
 public func testSendsInALoopCPU() {
   let maxCount = 10
   var count = 1
@@ -106,6 +122,9 @@ public func testSendsInALoopCPU() {
   _hostOp(a.toHost())
 }
 
+// For testSendsInALoopCPU(), we are generating a stateful while op.
+// CHECK-LABEL: --- TFPartition GraphDef Proto:
+// CHECK:  op: "While"
 
 public func testSendsInALoopGPU() {
   TensorFlow.enableGPU()
@@ -184,15 +203,6 @@ public func testSendsInALoopWithNoResultTensor() {
 // CHECK:      sil {{.*}}testSendsInALoopWithNoResultTensor{{.*}} () -> () {
 // CHECK:        return {{.*}} : $()
 // CHECK-NEXT: } // end sil function {{.*}}testSendsInALoopWithNoResultTensor{{.*}}
-
-public func testCannotSendResource() {
-  // expected-error @+2 {{This value type cannot be sent/received}}
-  let iterator: ResourceHandle =
-    #tfop("Iterator", shared_name: "foo", container: "bar")
-
-  _hostOp(iterator)
-  let _ = Tensor<Float>(1.0)
-}
 
 // FIXME: Eliminate the sends/receives in this case, since host does not use the
 // value x.scalar! in any interesting way other than sending it back to device.

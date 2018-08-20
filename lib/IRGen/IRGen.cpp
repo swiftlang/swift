@@ -74,6 +74,10 @@
 
 #include <thread>
 
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
 using namespace swift;
 using namespace irgen;
 using namespace llvm;
@@ -81,6 +85,14 @@ using namespace llvm;
 static cl::opt<bool> DisableObjCARCContract(
     "disable-objc-arc-contract", cl::Hidden,
     cl::desc("Disable running objc arc contract for testing purposes"));
+
+// This option is for performance benchmarking: to ensure a consistent
+// performance data, modules are aligned to the page size.
+// Warning: this blows up the text segment size. So use this option only for
+// performance benchmarking.
+static cl::opt<bool> AlignModuleToPageSize(
+    "align-module-to-page-size", cl::Hidden,
+    cl::desc("Align the text section of all LLVM modules to the page size"));
 
 namespace {
 // We need this to access IRGenOptions from extension functions
@@ -274,6 +286,23 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
 
   // Do it.
   ModulePasses.run(*Module);
+
+  if (AlignModuleToPageSize) {
+    // For performance benchmarking: Align the module to the page size by
+    // aligning the first function of the module.
+    unsigned pageSize =
+#if HAVE_UNISTD_H
+      sysconf(_SC_PAGESIZE));
+#else
+      4096; // Use a default value
+#endif
+    for (auto I = Module->begin(), E = Module->end(); I != E; ++I) {
+      if (!I->isDeclaration()) {
+        I->setAlignment(pageSize);
+        break;
+      }
+    }
+  }
 }
 
 namespace {
@@ -843,9 +872,10 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 static void ThreadEntryPoint(IRGenerator *irgen,
                              llvm::sys::Mutex *DiagMutex, int ThreadIdx) {
   while (IRGenModule *IGM = irgen->fetchFromQueue()) {
-    LLVM_DEBUG(DiagMutex->lock(); dbgs() << "thread " << ThreadIdx << ": fetched "
-                                    << IGM->OutputFilename << "\n";
-          DiagMutex->unlock(););
+    LLVM_DEBUG(DiagMutex->lock(); dbgs() << "thread " << ThreadIdx
+                                         << ": fetched "
+                                         << IGM->OutputFilename << "\n";
+               DiagMutex->unlock(););
     embedBitcode(IGM->getModule(), irgen->Opts);
     performLLVM(irgen->Opts, &IGM->Context.Diags, DiagMutex, IGM->ModuleHash,
                 IGM->getModule(), IGM->TargetMachine.get(),

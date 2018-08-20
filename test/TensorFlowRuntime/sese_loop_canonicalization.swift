@@ -8,6 +8,8 @@ import StdlibUnittest
 
 var ControlFlowTests = TestSuite("ControlFlow")
 
+// TODO: fix the disabled GPU tests below.
+#if !CUDA
 func powerOfTwo(_ N: Int32) -> Tensor<Float>{
   var a = Tensor<Float>(1.0)
   for _ in 0..<N {
@@ -87,5 +89,6 @@ ControlFlowTests.testAllBackends("sumOfProductsWithBound") {
   // Effectively no bound as natSum(3) * natSum(3) is 36.
   expectNearlyEqualWithScalarTensor(36, sumOfProductsWithBound(3, 3, 100))
 }
+#endif // CUDA
 
 runAllTests()

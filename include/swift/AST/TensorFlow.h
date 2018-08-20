@@ -46,6 +46,10 @@ namespace tf {
 
   /// Return true if the specified type is a TensorHandle<T>.
   bool isTensorHandle(Type ty);
+  
+  /// Return true if the specified type is an opaque handle such as
+  /// VariantHandle and ResourceHandle.
+  bool isOpaqueHandle(Type ty);
 
   /// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
   /// VariantHandle.
@@ -69,7 +73,9 @@ namespace tf {
 
     /// Return true if the specified type contains a TensorFlow value type that
     /// will be exposed after deabstraction.
-    bool containsTensorFlowValue(Type ty);
+    /// If `checkHigherOrderFunctions`, also check for a function-typed `ty`, if
+    /// its parameter or result contains any TensorFlow value type.
+    bool containsTensorFlowValue(Type ty, bool checkHigherOrderFunctions);
 
   private:
     bool structContainsTensorFlowValue(StructDecl *decl);

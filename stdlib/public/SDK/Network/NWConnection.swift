@@ -92,7 +92,9 @@ public final class NWConnection : CustomDebugStringConvertible {
 					newValue(self._state)
 				}
 			} else {
-				nw_connection_set_state_changed_handler(self.nw, nil)
+				nw_connection_set_state_changed_handler(self.nw) { (state, error) in
+					self._state = NWConnection.State(state, error)
+				}
 			}
 		}
 		get {
@@ -200,6 +202,9 @@ public final class NWConnection : CustomDebugStringConvertible {
 		self.endpoint = to
 		self.parameters = using
 		self.nw = connection
+		nw_connection_set_state_changed_handler(self.nw) { (state, error) in
+			self._state = NWConnection.State(state, error)
+		}
 	}
 
 	convenience internal init?(using: NWParameters, inbound: nw_connection_t) {
@@ -218,6 +223,9 @@ public final class NWConnection : CustomDebugStringConvertible {
 		self.endpoint = to
 		self.parameters = using
 		self.nw = nw_connection_create(to.nw!, using.nw)
+		nw_connection_set_state_changed_handler(self.nw) { (state, error) in
+			self._state = NWConnection.State(state, error)
+		}
 	}
 
 	/// Create a new outbound connection to a hostname and port, with parameters.

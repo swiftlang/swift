@@ -14,10 +14,10 @@ throw MyError.A
 // CHECK: builtin "willThrow"([[ERR]] : $Error)
 // CHECK: br bb2([[ERR]] : $Error)
 
-// CHECK: bb1([[T0:%.*]] : $Int32):
+// CHECK: bb1([[T0:%.*]] : @trivial $Int32):
 // CHECK: return [[T0]] : $Int32
 
-// CHECK: bb2([[T0:%.*]] : $Error):
+// CHECK: bb2([[T0:%.*]] : @owned $Error):
 // CHECK: builtin "errorInMain"([[T0]] : $Error)
 // CHECK: [[T0:%.*]] = integer_literal $Builtin.Int32, 1
 // CHECK: [[T1:%.*]] = struct $Int32 ([[T0]] : $Builtin.Int32)

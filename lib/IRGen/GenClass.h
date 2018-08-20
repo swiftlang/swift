@@ -170,20 +170,6 @@ namespace irgen {
   /// the runtime?
   bool doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
                                                      ClassDecl *theClass);
-    
-  /// If the superclass came from another module, we may have dropped
-  /// stored properties due to the Swift language version availability of
-  /// their types. In these cases we can't precisely lay out the ivars in
-  /// the class object at compile time so we need to do runtime layout.
-  bool classHasIncompleteLayout(IRGenModule &IGM,
-                                ClassDecl *theClass);
-
-  /// Load the fragile instance size and alignment mask from a reference to
-  /// class type metadata of the given type.
-  std::pair<llvm::Value *, llvm::Value *>
-  emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
-                                           ClassDecl *theClass,
-                                           llvm::Value *metadata);
 
   /// Load the instance size and alignment mask from a reference to
   /// class type metadata of the given type.

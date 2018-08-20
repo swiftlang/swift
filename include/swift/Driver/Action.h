@@ -13,9 +13,9 @@
 #ifndef SWIFT_DRIVER_ACTION_H
 #define SWIFT_DRIVER_ACTION_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Util.h"
-#include "swift/Frontend/FileTypes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"

@@ -83,6 +83,31 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getResultType();
   }
 
+  struct YieldResult {
+    Type Ty;
+    VarDecl::Specifier Specifier;
+  };
+
+  ArrayRef<YieldResult>
+  getBodyYieldResults(SmallVectorImpl<YieldResult> &buffer) const {
+    assert(buffer.empty());
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
+        if (AD->isCoroutine()) {
+          auto valueTy = AD->getStorage()->getValueInterfaceType();
+          valueTy = AD->mapTypeIntoContext(valueTy);
+          auto specifier =
+            AD->getAccessorKind() == AccessorKind::Modify
+              ? VarDecl::Specifier::InOut
+              : VarDecl::Specifier::Shared;
+          buffer.push_back({valueTy, specifier});
+          return buffer;
+        }
+      }
+    }
+    return {};
+  }
+
   BraceStmt *getBody() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getBody();

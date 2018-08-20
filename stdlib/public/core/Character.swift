@@ -394,6 +394,12 @@ extension Character {
     guard case .large(let storage) = _representation else { return nil }
     return storage
   }
+
+  @usableFromInline // @testable
+  internal var _isSmall: Bool {
+    guard case .smallUTF16(_) = _representation else { return false }
+    return true
+  }
 }
 
 extension Character {

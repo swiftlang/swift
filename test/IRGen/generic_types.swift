@@ -11,7 +11,7 @@
 // CHECK-LABEL: @"$S13generic_types1ACMI" = internal global [16 x i8*] zeroinitializer, align 8
 
 // CHECK-LABEL: @"$S13generic_types1ACMn" = hidden constant
-// CHECK-SAME:   i32 -2147221296,
+// CHECK-SAME:   i32 -2147417904,
 // CHECK-SAME:   @"$S13generic_typesMXM"
 //               <name>
 // CHECK-SAME:   @"$S13generic_types1ACMa"

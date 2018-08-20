@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -807,23 +807,6 @@ public:
   /// parameters if the class is nested inside a generic function.
   Type getSuperclassForDecl(const ClassDecl *classDecl,
                             bool useArchetypes = true);
-
-  /// \brief Whether this type or its superclasses has some form of generic
-  /// context.
-  ///
-  /// For example, given
-  ///
-  /// class A<X> {}
-  /// class B : A<Int> {}
-  /// struct C<T> {
-  ///   struct Inner {}
-  /// }
-  /// class D {}
-  /// class E: D {}
-  ///
-  /// Calling hasGenericAncestry() on `B` returns `A<Int>`, on `C<T>.Inner`
-  /// returns `C<T>.Inner`, but on `E` it returns null.
-  Type getGenericAncestor();
 
   /// \brief True if this type is the superclass of another type, or a generic
   /// type that could be bound to the superclass.
@@ -2878,6 +2861,9 @@ public:
   /// \brief Given two arrays of parameters determine if they are equal.
   static bool equalParams(ArrayRef<AnyFunctionType::Param> a,
                           ArrayRef<AnyFunctionType::Param> b);
+
+  /// \brief Given two arrays of parameters determine if they are equal.
+  static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
 
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
