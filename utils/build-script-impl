@@ -2873,7 +2873,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     with_pushd ${lldb_build_dir} \
                      call ${NINJA_BIN} unittests/LLDBUnitTests
                     with_pushd ${results_dir} \
-                          echo call "${llvm_build_dir}/bin/llvm-lit" \
+                          call "${llvm_build_dir}/bin/llvm-lit" \
                                "${lldb_build_dir}/lit" -sv \
                                --xunit-xml-output=${results_dir}/results.xml \
                                --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -E \"${DOTEST_EXTRA}\""
