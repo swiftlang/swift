@@ -4772,11 +4772,12 @@ namespace {
           dc->lookupQualified(lookupContext, name,
                               NL_QualifiedDefault | NL_KnownNoDependency,
                               lookup);
+          bool foundMethod = false;
           for (auto result : lookup) {
             if (isa<FuncDecl>(result) &&
                 result->isInstanceMember() == decl->isInstanceProperty() &&
                 result->getFullName().getArgumentNames().empty())
-              return nullptr;
+              foundMethod = true;
 
             if (auto var = dyn_cast<VarDecl>(result)) {
               // If the selectors of the getter match in Objective-C, we have an
@@ -4787,6 +4788,8 @@ namespace {
                 overridden = var;
             }
           }
+          if (foundMethod && !overridden)
+            return nullptr;
         }
 
         if (overridden) {
