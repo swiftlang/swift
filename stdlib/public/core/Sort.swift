@@ -257,10 +257,42 @@ extension MutableCollection where Self: RandomAccessCollection {
   }
 }
 
+extension Collection where Self: BidirectionalCollection {
+  /// This is a simple binary search like algorithm which is finding an index
+  /// where the first element that is greater than `key` should be located.
+  /// This algorithm works only on sorted collection.
+  @inlinable
+  internal func _findUpperBound(
+    forKey key: Element,
+    within range: Range<Index>,
+    by areInIncreasingOreder: (Element, Element) throws -> Bool
+    ) rethrows -> Index {
+    
+    var start = range.lowerBound
+    var end   = range.upperBound
+    
+    while start < end {
+      let mid = index(start,
+                      offsetBy: distance(from: start, to: end) &>> 1)
+      // the following if statement equals to self[mid] <= key
+      // <= is necessary for picking the first element that is greater
+      // than key
+      if try !areInIncreasingOreder(key, self[mid]) {
+        // move left bound closer to right
+        start = index(after: mid)
+      } else {
+        // move right bound closer to left
+        end = mid
+      }
+    }
+    return start
+  }
+}
+
 extension MutableCollection where Self: BidirectionalCollection {
   @inlinable
   internal mutating func _insertionSort(
-    within range: Range<Index>, 
+    within range: Range<Index>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {
 
@@ -274,38 +306,26 @@ extension MutableCollection where Self: BidirectionalCollection {
     var sortedEnd = index(after: start)
 
     while sortedEnd != range.upperBound {
-      // get the first unsorted element
-      // FIXME: by stashing the element, instead of using indexing and swapAt,
-      // this method won't work for collections of move-only types.
-      let x = self[sortedEnd]
 
-      // Look backwards for x's position in the sorted sequence,
-      // moving elements forward to make room.
+      // Find the position where should we put the left most element
+      // of unsorted part of our range.
+      let insertionPoint = try _findUpperBound(
+        forKey: self[sortedEnd],
+        within: start..<sortedEnd,
+        by: areInIncreasingOrder)
+
+      // Move elements forward until insertion point is reached.
       var i = sortedEnd
-      repeat {
+      let tmp = self[i]
+
+      while i != insertionPoint {
         let j = index(before: i)
-        let predecessor = self[j]
-
-        // If closure throws, put the element at right place and rethrow.
-        do {
-          // if x doesn't belong before y, we've found its position
-          if try !areInIncreasingOrder(x, predecessor) {
-            break
-          }
-        } catch {
-          self[i] = x
-          throw error
-        }
-
-        // Move y forward
-        self[i] = predecessor
+        self[i] = self[j]
         i = j
-      } while i != start
-
-      if i != sortedEnd {
-        // Plop x into position
-        self[i] = x
       }
+      
+      self[insertionPoint] = tmp
+
       formIndex(after: &sortedEnd)
     }
   }
