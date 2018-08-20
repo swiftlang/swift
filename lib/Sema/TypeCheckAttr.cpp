@@ -2260,19 +2260,16 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // if they both have no type context and are in different modules, then it's
   // an error.
   // Returns true on error.
-  std::function<bool(FuncDecl *)> hasValidTypeContext
-    = [&](FuncDecl *func) {
+  std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
+    // Check if both are top-level.
     if (!original->getInnermostTypeContext() &&
         !func->getInnermostTypeContext() &&
         original->getParentModule() == func->getParentModule())
       return true;
-    if (auto typeCtx1 = original->getInnermostTypeContext()) {
-      if (auto typeCtx2 = func->getInnermostTypeContext()) {
-        auto type1 = typeCtx1->getDeclaredInterfaceType();
-        auto type2 = typeCtx2->getDeclaredInterfaceType();
-        return type1->isEqual(type2);
-      }
-    }
+    if (auto typeCtx1 = original->getInnermostTypeContext())
+      if (auto typeCtx2 = func->getInnermostTypeContext())
+        return typeCtx1->getSelfNominalTypeDecl() ==
+            typeCtx2->getSelfNominalTypeDecl();
     return original->getParent() == func->getParent();
   };
 
@@ -2543,9 +2540,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   };
 
   auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
-    // Returns true if adjoint candidate has the expected type.
-    auto adjointType = adjointCandidate->getInterfaceType()
-      ->getUnlabeledType(ctx);
+    // TENSORFLOW MERGE FIXME:
+    // `adjointCandidate->getInterfaceType()` returns null here.
+    auto adjointType = adjointCandidate
+        ->getInterfaceType()->getUnlabeledType(ctx);
     return adjointType->isEqual(expectedAdjointFnTy);
   };
 
