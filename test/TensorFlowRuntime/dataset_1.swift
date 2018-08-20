@@ -98,4 +98,46 @@ DatasetTests.testAllBackends("Basic") {
   model()
 }
 
+DatasetTests.testAllBackends("MultiValue") {
+  enableCPU()
+  let elements1: Tensor<Int32> = [0, 1, 2]
+  let elements2: Tensor<Int32> = [10, 11, 12]
+  let outputTypes = [Int32.self, Int32.self]
+  let outputShapes: [TensorShape] = [[], []]
+  let dataset: VariantHandle = #tfop(
+    "TensorSliceDataset", [elements1, elements2],
+    Toutput_types: outputTypes,
+    output_shapes: outputShapes
+  )
+  let iterator: VariantHandle = #tfop(
+    "IteratorV2", shared_name: "blah", container: "earth",
+    output_types: outputTypes, output_shapes: outputShapes
+  )
+  #tfop("MakeIterator", dataset, iterator) as Void
+  var next: (TensorHandle<Int32>, TensorHandle<Int32>) = #tfop(
+    "IteratorGetNext", iterator,
+    output_types: outputTypes, output_shapes: outputShapes
+  )
+  _hostOp(next.0)
+  _hostOp(next.1)
+  expectEqual(0, Tensor(handle: next.0).scalarized())
+  expectEqual(10, Tensor(handle: next.1).scalarized())
+  next = #tfop(
+    "IteratorGetNext", iterator,
+    output_types: outputTypes, output_shapes: outputShapes
+  )
+  _hostOp(next.0)
+  _hostOp(next.1)
+  expectEqual(1, Tensor(handle: next.0).scalarized())
+  expectEqual(11, Tensor(handle: next.1).scalarized())
+  next = #tfop(
+    "IteratorGetNext", iterator,
+    output_types: outputTypes, output_shapes: outputShapes
+  )
+  _hostOp(next.0)
+  _hostOp(next.1)
+  expectEqual(2, Tensor(handle: next.0).scalarized())
+  expectEqual(12, Tensor(handle: next.1).scalarized())
+}
+
 runAllTests()
