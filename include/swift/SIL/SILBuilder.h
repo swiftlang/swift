@@ -1351,6 +1351,24 @@ public:
   }
 
   void
+  emitDestructureValueOperation(SILLocation Loc, SILValue Operand,
+                                function_ref<void(unsigned, SILValue)> Func) {
+    // Do a quick check to see if we have a tuple without elements. In that
+    // case, bail early since we are not going to ever invoke Func.
+    if (auto TTy = Operand->getType().castTo<TupleType>())
+      if (0 == TTy->getNumElements())
+        return;
+
+    auto *Destructure = emitDestructureValueOperation(Loc, Operand);
+    auto Results = Destructure->getResults();
+    // TODO: For some reason, llvm::enumerate(Results) does not
+    // compile.
+    for (unsigned i : indices(Results)) {
+      Func(i, Results[i]);
+    }
+  }
+
+  void
   emitShallowDestructureValueOperation(SILLocation Loc, SILValue Operand,
                                        llvm::SmallVectorImpl<SILValue> &Result);
 

@@ -961,3 +961,13 @@ ManagedValue SILGenBuilder::createUncheckedTrivialBitCast(SILLocation loc,
       SGF.B.createUncheckedTrivialBitCast(loc, original.getValue(), type);
   return ManagedValue::forUnmanaged(result);
 }
+
+void SILGenBuilder::emitDestructureValueOperation(
+    SILLocation loc, ManagedValue value,
+    llvm::function_ref<void(unsigned, ManagedValue)> func) {
+  CleanupCloner cloner(*this, value);
+  SILBuilder::emitDestructureValueOperation(
+      loc, value.forward(SGF), [&](unsigned index, SILValue subValue) {
+        return func(index, cloner.clone(subValue));
+      });
+}

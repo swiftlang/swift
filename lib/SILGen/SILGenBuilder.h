@@ -410,6 +410,12 @@ public:
 
   using SILBuilder::createReturn;
   ReturnInst *createReturn(SILLocation Loc, ManagedValue ReturnValue);
+
+  /// Perform either a tuple or struct destructure and then pass its components
+  /// as managed value one by one with an index to the closure.
+  void emitDestructureValueOperation(
+      SILLocation loc, ManagedValue value,
+      function_ref<void(unsigned, ManagedValue)> func);
 };
 
 } // namespace Lowering

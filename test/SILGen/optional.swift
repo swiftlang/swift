@@ -89,9 +89,11 @@ func wrap_then_unwrap<T>(_ x: T) -> T {
 func tuple_bind(_ x: (Int, String)?) -> String? {
   return x?.1
   // CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt.1: [[NONNULL:bb[0-9]+]], case #Optional.none!enumelt: [[NULL:bb[0-9]+]]
-  // CHECK: [[NONNULL]](
-  // CHECK:   [[STRING:%.*]] = tuple_extract {{%.*}} : $(Int, String), 1
-  // CHECK-NOT: destroy_value [[STRING]]
+  // CHECK: [[NONNULL]]([[TUPLE:%.*]] :
+  // CHECK:   ({{%.*}}, [[STRING:%.*]]) = destructure_tuple [[TUPLE]]
+  // CHECK:   [[RESULT:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[STRING]]
+  // CHECK-NOT:   destroy_value [[STRING]]
+  // CHECK:   br {{bb[0-9]+}}([[RESULT]] :
 }
 
 // rdar://21883752 - We were crashing on this function because the deallocation happened
