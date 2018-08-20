@@ -1184,7 +1184,8 @@ void Driver::buildInputs(const ToolChain &TC,
   llvm::StringMap<StringRef> SourceFileNames;
 
   for (Arg *A : Args) {
-    if (A->getOption().matches(options::OPT_e)) {
+    if (A->getOption().matches(options::OPT_e) ||
+        A->getOption().matches(options::OPT_M)) {
       Inputs.hasLinesToExecute = true;
     } else if (A->getOption().getKind() == Option::InputClass) {
       StringRef Value = A->getValue();

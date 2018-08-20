@@ -199,6 +199,10 @@ ERROR(verify_encountered_fatal,none,
 ERROR(error_parse_input_file,none,
       "error parsing input file '%0' (%1)", (StringRef, StringRef))
 
+ERROR(error_m_switch_without_e_switch,none,
+      "cannot use -M arguments to import modules without -e arguments "
+      "to use them", ())
+
 ERROR(error_write_index_unit,none,
       "writing index unit file: %0", (StringRef))
 ERROR(error_create_index_dir,none,

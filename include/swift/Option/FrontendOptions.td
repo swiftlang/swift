@@ -381,6 +381,10 @@ def enable_source_import : Flag<["-"], "enable-source-import">,
 def enable_throw_without_try : Flag<["-"], "enable-throw-without-try">,
   HelpText<"Allow throwing function calls without 'try'">;
 
+def import_module : Separate<["-"], "import-module">,
+  HelpText<"Implicitly import <module_name> in code being compiled">,
+  MetaVarName<"<module_name>">;
+
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 

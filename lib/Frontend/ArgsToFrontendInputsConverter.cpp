@@ -99,11 +99,22 @@ bool ArgsToFrontendInputsConverter::readInputFilesFromCommandLine() {
   }
   if (Args.hasArgNoClaim(options::OPT_e)) {
     SmallString<256> lines;
+    if (Args.hasArgNoClaim(options::OPT_M)) {
+      lines += "#sourceLocation(file: \"-M\", line: 1)\n";
+      for (StringRef module : Args.getAllArgValues(options::OPT_M)) {
+        lines += "import ";
+        lines += module;
+        lines += "\n";
+      }
+      lines += "#sourceLocation(file: \"-e\", line: 1)\n";
+    }
     for (StringRef line : Args.getAllArgValues(options::OPT_e)) {
       lines += line;
       lines += "\n";
     }
     LinesToExecute = llvm::MemoryBuffer::getMemBufferCopy(lines, "-e");
+  } else if (Args.hasArgNoClaim(options::OPT_M)) {
+    Diags.diagnose(SourceLoc(), diag::error_m_switch_without_e_switch);
   }
   return false; // FIXME: Don't bail out for duplicates, too many tests depend
   // on it.

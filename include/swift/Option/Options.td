@@ -188,10 +188,8 @@ def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption, ArgumentIsPath]>,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<I>;
 
-def import_module : Joined<["-"], "M">, Flags<[FrontendOption]>,
-  HelpText<"Implicitly import <module_name> in code being compiled">, MetaVarName<"<module_name>">;
-def import_module_long : Separate<["-"], "import-module">, Flags<[FrontendOption]>,
-  Alias<import_module>;
+def M : Joined<["-"], "M">, Flags<[FrontendOption]>,
+  HelpText<"Import <module_name> in code provided by -e arguments">, MetaVarName<"<module_name>">;
 
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
