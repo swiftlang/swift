@@ -774,7 +774,8 @@ public:
   const SILBasicBlock *getEntryBlock() const { return &front(); }
 
   SILBasicBlock *createBasicBlock();
-  SILBasicBlock *createBasicBlock(SILBasicBlock *After);
+  SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
+  SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
   /// Splice the body of \p F into this function at end.
   void spliceBody(SILFunction *F) {

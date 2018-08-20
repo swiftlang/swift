@@ -313,15 +313,6 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILValue V) {
   return FullApplySite();
 }
 
-// Replace a dead apply with a new instruction that computes the same
-// value, and delete the old apply.
-void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
-  auto *OldApply = Old.getInstruction();
-  if (!isa<TryApplyInst>(OldApply))
-    cast<SingleValueInstruction>(OldApply)->replaceAllUsesWith(New);
-  recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
-}
-
 bool swift::mayBindDynamicSelf(SILFunction *F) {
   if (!F->hasSelfMetadataParam())
     return false;

@@ -58,7 +58,7 @@ private:
 
   void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
 
-  SILBasicBlock(SILFunction *F, SILBasicBlock *afterBB = nullptr);
+  SILBasicBlock(SILFunction *F, SILBasicBlock *relativeToBB, bool after);
 
 public:
   ~SILBasicBlock();

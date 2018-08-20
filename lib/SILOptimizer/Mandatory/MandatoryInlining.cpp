@@ -434,14 +434,14 @@ static SILFunction *getCalleeFunction(
 static std::tuple<FullApplySite, SILBasicBlock::iterator>
 tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
                            ClassHierarchyAnalysis *CHA) {
-  auto NewInstPair = tryDevirtualizeApply(InnerAI, CHA);
-  if (!NewInstPair.second) {
+  auto NewInst = tryDevirtualizeApply(InnerAI, CHA);
+  if (!NewInst) {
     return std::make_tuple(InnerAI, I);
   }
 
-  replaceDeadApply(InnerAI, NewInstPair.first);
+  deleteDevirtualizedApply(InnerAI);
 
-  auto newApplyAI = NewInstPair.second.getInstruction();
+  auto newApplyAI = NewInst.getInstruction();
   assert(newApplyAI && "devirtualized but removed apply site?");
 
   return std::make_tuple(FullApplySite::isa(newApplyAI),
