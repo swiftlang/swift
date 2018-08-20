@@ -224,12 +224,6 @@ extension PythonError : CustomStringConvertible {
   }
 }
 
-extension PythonError : LocalizedError {
-  public var errorDescription: String? {
-    return self.description
-  }
-}
-
 // Reflect a Python error (which must be active) into a Swift error if one is
 // active.
 private func throwPythonErrorIfPresent() throws {
