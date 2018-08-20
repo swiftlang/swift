@@ -15,7 +15,7 @@ import Builtin
 // -- completion function
 // CHECK-SAME:   i32 0,
 // -- pattern flags
-// CHECK-SAME:   i32 2097153,
+// CHECK-SAME:   <i32 0x4000_0001>,
 // -- vwtable pointer
 // CHECK-SAME:   @"$S15generic_structs18FixedLayoutGenericVWV"
 // -- extra data pattern

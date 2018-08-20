@@ -47,6 +47,21 @@ struct InProcess;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
 
+/// Non-type metadata kinds have this bit set.
+const unsigned MetadataKindIsNonType = 0x400;
+
+/// Non-heap metadata kinds have this bit set.
+const unsigned MetadataKindIsNonHeap = 0x200;
+
+// The above two flags are negative because the "class" kind has to be zero,
+// and class metadata is both type and heap metadata.
+
+/// Runtime-private metadata has this bit set. The compiler must not statically
+/// generate metadata objects with these kinds, and external tools should not
+/// rely on the stability of these values or the precise binary layout of
+/// their associated data structures.
+const unsigned MetadataKindIsRuntimePrivate = 0x100;
+
 /// Kinds of Swift metadata records.  Some of these are types, some
 /// aren't.
 enum class MetadataKind : uint32_t {
@@ -63,11 +78,21 @@ enum class MetadataKind : uint32_t {
   /// runtime must tolerate metadata with unknown kinds.
   /// This specific value is not mapped to a valid metadata kind at this time,
   /// however.
-  LastEnumerated = 2047,
+  LastEnumerated = 0x7FF,
 };
 
 const unsigned LastEnumeratedMetadataKind =
   (unsigned)MetadataKind::LastEnumerated;
+
+inline bool isHeapMetadataKind(MetadataKind k) {
+  return !((uint32_t)k & MetadataKindIsNonHeap);
+}
+inline bool isTypeMetadataKind(MetadataKind k) {
+  return !((uint32_t)k & MetadataKindIsNonType);
+}
+inline bool isRuntimePrivateMetadataKind(MetadataKind k) {
+  return (uint32_t)k & MetadataKindIsRuntimePrivate;
+}
 
 /// Try to translate the 'isa' value of a type/heap metadata into a value
 /// of the MetadataKind enum.
