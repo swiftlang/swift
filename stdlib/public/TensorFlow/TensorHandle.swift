@@ -90,8 +90,8 @@ internal extension TensorHandle where Scalar : AccelerableByTensorFlow {
   }
 }
 
-extension TensorHandle : TensorSendableReceivable where
-  Scalar : AccelerableByTensorFlow {
+extension TensorHandle : TensorSendableReceivable
+  where Scalar : AccelerableByTensorFlow {
   @inlinable
   static func receiveFromAccelerator(_ computation: _TensorComputation,
                                      _ tensorId: Int
