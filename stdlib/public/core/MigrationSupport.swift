@@ -73,31 +73,31 @@ public typealias LazyPrefixWhileBidirectionalCollection<T> = LazyPrefixWhileColl
 public typealias ReversedRandomAccessCollection<T: RandomAccessCollection> = ReversedCollection<T>
 @available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ReversedCollection.Index")
 public typealias ReversedIndex<T: BidirectionalCollection> = ReversedCollection<T>
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias BidirectionalSlice<T> = Slice<T> where T : BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias RandomAccessSlice<T> = Slice<T> where T : RandomAccessCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias RangeReplaceableSlice<T> = Slice<T> where T : RangeReplaceableCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias RangeReplaceableBidirectionalSlice<T> = Slice<T> where T : RangeReplaceableCollection & BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias RangeReplaceableRandomAccessSlice<T> = Slice<T> where T : RangeReplaceableCollection & RandomAccessCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias MutableSlice<T> = Slice<T> where T : MutableCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias MutableBidirectionalSlice<T> = Slice<T> where T : MutableCollection & BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias MutableRandomAccessSlice<T> = Slice<T> where T : MutableCollection & RandomAccessCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias MutableRangeReplaceableSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias MutableRangeReplaceableBidirectionalSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection & BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Slice")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias MutableRangeReplaceableRandomAccessSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection & RandomAccessCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "DefaultIndices")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "DefaultIndices")
 public typealias DefaultBidirectionalIndices<T> = DefaultIndices<T> where T : BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "DefaultIndices")
+@available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "DefaultIndices")
 public typealias DefaultRandomAccessIndices<T> = DefaultIndices<T> where T : RandomAccessCollection
 
 // Deprecated by SE-0115.
