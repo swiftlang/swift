@@ -273,10 +273,6 @@ public:
   }
   virtual SyntaxTreeTransferMode syntaxTreeTransferMode() = 0;
 
-  virtual bool syntaxReuseInfoEnabled() = 0;
-  virtual void
-  handleSyntaxReuseRegions(std::vector<SourceFileRange> ReuseRegions) = 0;
-
   virtual void finished() {}
 };
 
