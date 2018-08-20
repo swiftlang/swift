@@ -2693,9 +2693,17 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   SmallVector<TupleTypeElt, 4> inputs;
 
   // Merge inputs and generic parameters from the uncurry levels.
+  assert (uncurryLevel <= fnType.getParams().size());
   for (;;) {
     auto canInput = fnType->getInput()->getCanonicalType();
     auto inputFlags = ParameterTypeFlags().withInOut(isa<InOutType>(canInput));
+    if (!fnType.getParams().empty()) {
+      auto oldFlags = fnType.getParams()[0].getParameterFlags();
+      // TODO: Assess whether to merge other metadata info from `oldFlags` to
+      // `inputFlags`. Merging the `Variadic` bit causes compiler crash when
+      // building stdlib.
+      inputFlags = inputFlags.withOwned(oldFlags.isOwned());
+    }
     inputs.push_back(TupleTypeElt(canInput->getInOutObjectType(), Identifier(),
                                   inputFlags));
 
