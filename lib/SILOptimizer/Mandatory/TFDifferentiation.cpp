@@ -3055,14 +3055,16 @@ public:
     SILFunctionConventions origConv(origTy, getModule());
     for (auto param : ai->getArgumentsWithoutIndirectResults())
       args.push_back(remapValue(param));
-
-    // Add original values and nested primal values.
-    auto origResultAggr = extractPrimalValueIfAny(ai, /*nested*/ false);
-    SmallVector<SILValue, 8> origResults, nestedPrimVals;
+    // Add nested primal values.
+    if (auto nestedPrimValAggr = extractPrimalValueIfAny(ai, /*nested*/ true)) {
+      SmallVector<SILValue, 8> nestedPrimVals;
+      extractAllElements(nestedPrimValAggr, builder, nestedPrimVals);
+      args.append(nestedPrimVals.begin(), nestedPrimVals.end());
+    }
+    // Add original results.
+    auto origResultAggr = remapValue(ai);
+    SmallVector<SILValue, 8> origResults;
     extractAllElements(origResultAggr, builder, origResults);
-    auto nestedPrimValAggr = extractPrimalValueIfAny(ai, /*nested*/ true);
-    extractAllElements(nestedPrimValAggr, builder, nestedPrimVals);
-    args.append(nestedPrimVals.begin(), nestedPrimVals.end());
     args.append(origResults.begin(), origResults.end());
 
     // Add seed.
