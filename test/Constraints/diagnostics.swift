@@ -1207,3 +1207,6 @@ func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
   // expected-error@-1 {{ambiguous reference to member '=='}}
 }
+
+func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
+rdar43525641(1, c: 2, 3) // Ok

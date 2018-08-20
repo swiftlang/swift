@@ -161,6 +161,10 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   // requiring further checking at the end.
   bool potentiallyOutOfOrder = false;
 
+  auto hasDefault = [&defaultMap, &numParams](unsigned idx) -> bool {
+    return idx < numParams ? defaultMap.test(idx) : false;
+  };
+
   // Local function that claims the argument at \c argNumber, returning the
   // index of the claimed argument. This is primarily a helper for
   // \c claimNextNamed.
@@ -206,7 +210,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   // Local function that retrieves the next unclaimed argument with the given
   // name (which may be empty). This routine claims the argument.
   auto claimNextNamed
-    = [&](Identifier name, bool ignoreNameMismatch,
+    = [&](Identifier paramLabel, bool ignoreNameMismatch,
           bool forVariadic = false) -> Optional<unsigned> {
     // Skip over any claimed arguments.
     skipClaimedArgs();
@@ -218,8 +222,9 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
     // Go hunting for an unclaimed argument whose name does match.
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
-      // Skip arguments where the name doesn't match.
-      if (args[i].getLabel() != name) {
+      auto argLabel = args[i].getLabel();
+
+      if (argLabel != paramLabel) {
         // If this is an attempt to claim additional unlabeled arguments
         // for variadic parameter, we have to stop at first labeled argument.
         if (forVariadic)
@@ -240,11 +245,23 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
       // We found a match.  If the match wasn't the next one, we have
       // potentially out of order arguments.
-      if (i != nextArgIdx)
+      if (i != nextArgIdx) {
+        // Avoid claiming un-labeled defaulted parameters
+        // by out-of-order un-labeled arguments or parts
+        // of variadic argument sequence, because that might
+        // be incorrect:
+        // ```swift
+        // func foo(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
+        // foo(1, c: 2, 3) // -> `3` will be claimed as '_ b:'.
+        // ```
+        if (argLabel.empty() && (hasDefault(i) || !forVariadic))
+          continue;
+
         potentiallyOutOfOrder = true;
+      }
 
       // Claim it.
-      return claim(name, i);
+      return claim(paramLabel, i);
     }
 
     // If we're not supposed to attempt any fixes, we're done.
@@ -268,8 +285,8 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       // Claim this argument if we are asked to ignore labeling failure,
       // only if argument doesn't have a label when parameter expected
       // it to, or vice versa.
-      if (name.empty() || argLabel.empty())
-        return claim(name, nextArgIdx);
+      if (paramLabel.empty() || argLabel.empty())
+        return claim(paramLabel, nextArgIdx);
     }
 
     // Redundant keyword arguments.
@@ -478,7 +495,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         continue;
 
       // Parameters with defaults can be unfulfilled.
-      if (defaultMap.test(paramIdx))
+      if (hasDefault(paramIdx))
         continue;
 
       listener.missingArgument(paramIdx);
