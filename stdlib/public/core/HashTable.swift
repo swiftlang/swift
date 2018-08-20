@@ -440,3 +440,42 @@ extension _HashTable {
     map[hole] = .unoccupied
   }
 }
+
+extension _HashTable {
+  internal func _invariantCheck(with delegate: _HashTableDelegate) {
+#if INTERNAL_CHECKS_ENABLED
+    _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1,
+      "Invalid hash table scale")
+    _sanityCheck(count >= 0 && count < bucketCount,
+      "Invalid hash table count")
+    _sanityCheck(capacity == _HashTable.capacity(forScale: scale),
+      "Invalid hash table capacity")
+    _sanityCheck(capacity >= 0 && capacity < bucketCount,
+      "Invalid hash table capacity formula")
+    _sanityCheck(count <= capacity,
+      "Hash table count exceeds its capacity")
+    _sanityCheck(_isValidAddress(UInt(bitPattern: self.map)),
+      "Invalid hash table map pointer")
+    _sanityCheck(_isValidAddress(UInt(bitPattern: self.map + bucketCount)),
+      "Invalid hash table map pointer")
+
+    var occupiedCount = 0
+    for bucket in 0 ..< bucketCount where map[bucket].isOccupied {
+      occupiedCount += 1
+      let hashValue = delegate.hashValue(at: Index(bucket: bucket))
+      _sanityCheck(map[bucket] == MapEntry.forHashValue(hashValue),
+        "Some hash table elements are stored with mismatching hash bits")
+      var b = _idealBucket(forHashValue: hashValue)
+      // There must be no holes between the ideal and actual buckets for this
+      // hash value.
+      while b != bucket {
+        _sanityCheck(map[b].isOccupied,
+          "Some hash table elements aren't stored on their collision chain")
+        b = _succ(b)
+      }
+    }
+    _sanityCheck(occupiedCount == count,
+      "Hash table count doesn't match the number of occupied buckets")
+#endif
+  }
+}

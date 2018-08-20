@@ -3501,3 +3501,28 @@ extension Set {
     }
   }
 }
+
+extension Set {
+  @usableFromInline // @testable
+  internal func _invariantCheck() {
+#if INTERNAL_CHECKS_ENABLED
+    guard case .native(let native) = self._variant else {
+      return
+    }
+    native._invariantCheck()
+#endif
+  }
+}
+
+extension _NativeSet {
+  @usableFromInline // @testable
+  internal func _invariantCheck() {
+#if INTERNAL_CHECKS_ENABLED
+    _sanityCheck(
+      _storage === _SwiftRawSetStorage.empty ||
+      _isValidAddress(UInt(bitPattern: _storage.rawElements)),
+    "Invalid rawElements pointer")
+    _storage.hashTable._invariantCheck(with: self)
+#endif
+  }
+}
