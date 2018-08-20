@@ -1353,15 +1353,11 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   }
 
   // Handle code completion after the #.
-  if (Tok.is(tok::pound) && peekToken().is(tok::code_complete)) {
-    consumeToken(); // '#' token.
-    auto CodeCompletionPos = consumeToken();
-    auto Expr = new (Context) CodeCompletionExpr(CodeCompletionPos);
-    if (CodeCompletion)
-      CodeCompletion->completeAfterPound(Expr, ParentKind);
-    result.push_back(Expr);
-    Status.setHasCodeCompletion();
-    return Status;
+  if (Tok.is(tok::pound) && peekToken().is(tok::code_complete) &&
+      Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
+    auto Expr = parseExprPoundCodeCompletion(ParentKind);
+    Status |= Expr;
+    result.push_back(Expr.get());
   }
 
   // Parse the basic expression case.  If we have a leading let/var/case

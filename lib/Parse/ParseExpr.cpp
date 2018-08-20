@@ -1724,6 +1724,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
       return parseExprPoundUnknown(SourceLoc());
     }
+    if (peekToken().is(tok::code_complete) &&
+        Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
+      return parseExprPoundCodeCompletion(/*ParentKind*/None);
+    }
     goto UnknownCharacter;
 
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
@@ -3102,6 +3106,25 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
         {RPoundLoc, RSquareLoc.isValid() ? RSquareLoc : RPoundLoc});
 
   return makeParserError();
+}
+
+/// \brief Handle code completion after pound in expression position.
+///
+/// In case it's in a stmt condition position, specify \p ParentKind to
+/// decide the position accepts #available(...) condtion.
+///
+/// expr-pound-codecompletion:
+///   '#' code-completion-token
+ParserResult<Expr>
+Parser::parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind) {
+  assert(Tok.is(tok::pound) && peekToken().is(tok::code_complete) &&
+         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc());
+  consumeToken(); // '#' token.
+  auto CodeCompletionPos = consumeToken();
+  auto Expr = new (Context) CodeCompletionExpr(CodeCompletionPos);
+  if (CodeCompletion)
+    CodeCompletion->completeAfterPound(Expr, ParentKind);
+  return makeParserCodeCompletionResult(Expr);
 }
 
 /// \brief Parse an expression call suffix.

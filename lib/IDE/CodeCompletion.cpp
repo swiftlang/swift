@@ -1308,11 +1308,11 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
   Optional<DeclKind> AttTargetDK;
+  Optional<StmtKind> ParentStmtKind;
 
   SmallVector<StringRef, 3> ParsedKeywords;
 
   std::vector<std::pair<std::string, bool>> SubModuleNameVisibilityPairs;
-  StmtKind ParentStmtKind;
 
   void addSuperKeyword(CodeCompletionResultSink &Sink) {
     auto *DC = CurDeclContext->getInnermostTypeContext();
@@ -1466,7 +1466,7 @@ public:
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          Optional<unsigned> yieldIndex) override;
-  void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) override;
+  void completeAfterPound(CodeCompletionExpr *E, Optional<StmtKind> ParentKind) override;
   void completeGenericParams(TypeLoc TL) override;
   void completeAfterIfStmt(bool hasElse) override;
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
@@ -2278,7 +2278,7 @@ public:
       Builder.addAnnotatedThrows();
   }
 
-  void addPoundAvailable(StmtKind ParentKind) {
+  void addPoundAvailable(Optional<StmtKind> ParentKind) {
     if (ParentKind != StmtKind::If && ParentKind != StmtKind::Guard)
       return;
     CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::ResultKind::Keyword,
@@ -2295,11 +2295,15 @@ public:
     // #selector is only available when the Objective-C runtime is.
     if (!Ctx.LangOpts.EnableObjCInterop) return;
 
+    // After #, this is a very likely result. When just in a String context,
+    // it's not.
+    auto semanticContext = needPound ? SemanticContextKind::None
+    : SemanticContextKind::ExpressionSpecific;
+
     CodeCompletionResultBuilder Builder(
                                   Sink,
                                   CodeCompletionResult::ResultKind::Keyword,
-                                  SemanticContextKind::ExpressionSpecific,
-                                  ExpectedTypes);
+                                  semanticContext, ExpectedTypes);
     if (needPound)
       Builder.addTextChunk("#selector");
     else
@@ -4605,7 +4609,7 @@ void CodeCompletionCallbacksImpl::completeYieldStmt(CodeCompletionExpr *E,
 }
 
 void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E,
-                                                     StmtKind ParentKind) {
+                                                     Optional<StmtKind> ParentKind) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   Kind = CompletionKind::AfterPound;
