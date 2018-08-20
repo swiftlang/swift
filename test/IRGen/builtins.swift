@@ -756,7 +756,6 @@ func is_same_metatype_test(_ t1: Any.Type, _ t2: Any.Type) {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_unsafeGuaranteed_test
 // CHECK:  call {{.*}}* @{{.*}}swift_{{.*}}etain({{.*}}* returned %0)
-// CHECK:  call void @{{.*}}swift_{{.*}}elease({{.*}}* %0)
 // CHECK:  ret {{.*}}* %0
 func generic_unsafeGuaranteed_test<T: AnyObject>(_ t : T) -> T {
   let (g, _) = Builtin.unsafeGuaranteed(t)
@@ -767,7 +766,7 @@ func generic_unsafeGuaranteed_test<T: AnyObject>(_ t : T) -> T {
 // CHECK:  [[LOCAL:%.*]] = alloca %swift.refcounted*
 // CHECK:  call %swift.refcounted* @swift_retain(%swift.refcounted* returned %0)
 // CHECK:  store %swift.refcounted* %0, %swift.refcounted** [[LOCAL]]
-// CHECK:  call void @swift_release(%swift.refcounted* %0)
+// CHECK-NOT:  call void @swift_release(%swift.refcounted* %0)
 // CHECK:  ret %swift.refcounted* %0
 func unsafeGuaranteed_test(_ x: Builtin.NativeObject) -> Builtin.NativeObject {
   var (g,t) = Builtin.unsafeGuaranteed(x)

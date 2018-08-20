@@ -50,7 +50,7 @@ func tuple_bind(x x: (Int, String)!) -> String? {
   return x?.1
   // CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt.1: [[NONNULL:bb[0-9]+]], case #Optional.none!enumelt: [[NULL:bb[0-9]+]]
   // CHECK: [[NONNULL]](
-  // CHECK:   [[STRING:%.*]] = tuple_extract {{%.*}} : $(Int, String), 1
+  // CHECK:   [[STRING:%.*]] = destructure_tuple {{%.*}} : $(Int, String)
   // CHECK-NOT: destroy_value [[STRING]]
 }
 
