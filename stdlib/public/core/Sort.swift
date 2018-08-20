@@ -402,17 +402,16 @@ extension MutableCollection where Self: RandomAccessCollection {
     let half = distance(from: lo, to: hi) / 2
     let mid = index(lo, offsetBy: half)
     try _sort3(lo, mid, hi, by: areInIncreasingOrder)
-    let pivot = self[mid]
 
     // Loop invariants:
     // * lo < hi
-    // * self[i] < pivot, for i in range.lowerBound..<lo
-    // * pivot <= self[i] for i in hi..<range.upperBound
+    // * self[i] < self[mid], for i in range.lowerBound..<lo
+    // * self[mid] <= self[i] for i in hi..<range.upperBound
     Loop: while true {
       FindLo: do {
         formIndex(after: &lo)
         while lo != hi {
-          if try !areInIncreasingOrder(self[lo], pivot) { break FindLo }
+          if try !areInIncreasingOrder(self[lo], self[mid]) { break FindLo }
           formIndex(after: &lo)
         }
         break Loop
@@ -421,7 +420,7 @@ extension MutableCollection where Self: RandomAccessCollection {
       FindHi: do {
         formIndex(before: &hi)
         while hi != lo {
-          if try areInIncreasingOrder(self[hi], pivot) { break FindHi }
+          if try areInIncreasingOrder(self[hi], self[mid]) { break FindHi }
           formIndex(before: &hi)
         }
         break Loop
