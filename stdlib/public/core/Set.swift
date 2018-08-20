@@ -2036,10 +2036,19 @@ extension _NativeSet {
   }
 
   @inlinable
-  internal mutating func update(with element: Element, isUnique: Bool) -> Element? {
-    _ = ensureUnique(isUnique: isUnique, capacity: count + 1)
-    let hashValue = self.hashValue(for: element)
-    let (index, found) = find(element, hashValue: hashValue)
+  internal mutating func update(
+    with element: Element,
+    isUnique: Bool
+  ) -> Element? {
+    var hashValue = self.hashValue(for: element)
+    var (index, found) = find(element, hashValue: hashValue)
+    let (_, rehashed) = ensureUnique(
+      isUnique: isUnique,
+      capacity: count + (found ? 0 : 1))
+    if rehashed {
+      hashValue = self.hashValue(for: element)
+      (index, found) = find(element, hashValue: hashValue)
+    }
     if found {
       let old = (elements + index.bucket).move()
       uncheckedInitializeElement(at: index, to: element)
