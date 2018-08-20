@@ -4342,9 +4342,13 @@ namespace {
         }
       }
 
-      if (found)
+      if (found) {
+        if (auto *typeResolver = Impl.getTypeResolver())
+          typeResolver->resolveDeclSignature(found);
+
         Impl.ImportedDecls[{decl->getCanonicalDecl(),
                             getActiveSwiftVersion()}] = found;
+      }
 
       return found;
     }
