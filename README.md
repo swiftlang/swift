@@ -208,6 +208,49 @@ common debug flow would involve:
 Another option is to change the scheme to "Wait for executable to be launched",
 then run the build product in Terminal.
 
+### Swift Toolchains
+
+#### Building
+
+Swift toolchains are created using the script
+[build-toolchain](https://github.com/apple/swift/blob/master/utils/build-toolchain). This
+script is used by swift.org's CI to produce snapshots and can allow for one to
+locally reproduce such builds for development or distribution purposes. E.x.:
+
+```
+  $ ./utils/build-toolchain $TOOLCHAIN_PREFIX
+```
+
+where ``$TOOLCHAIN_PREFIX`` is a string that will be prepended to the swift
+package name in the produced tar ball. For instance, if ``$TOOLCHAIN_PREFIX``
+was ``macOS``, the produced archive will have the name
+``swift-macOS.tar.gz``.
+
+Beyond building the toolchain, ``build-toolchain`` also supports the following
+(non-exhaustive) set of useful options::
+
+- ``--dry-run``: Perform a dry run build. This is off by default.
+- ``--test``: Test the toolchain after it has been compiled. This is off by default.
+- ``--distcc``: Use distcc to speed up the build by distributing the c++ part of
+  the swift build. This is off by default.
+
+More options may be added over time. Please pass ``--help`` to
+``build-toolchain`` to see the full set of options.
+
+#### Installing into Xcode
+
+On macOS if one wants to install such a toolchain into Xcode:
+
+1. Untar and copy the toolchain to one of `/Library/Developer/Toolchains/` or
+   `~/Library/Developer/Toolchains/`. E.x.:
+
+```
+  $ tar -xzf swift-macOS.tar.gz -C /
+  $ tar -xzf swift-macOS.tar.gz -C ~/
+```
+
+2. Specify the local toolchain for Xcode's use via `Xcode->Toolchains`.
+
 ### Build Failures
 
 Make sure you are using the [correct release](#macos) of Xcode.
