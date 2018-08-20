@@ -2241,43 +2241,54 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       });
     }
   } else {
-    // If there was no type declaration, synthesize one.
-    auto aliasDecl = new (TC.Context) TypeAliasDecl(SourceLoc(),
-                                                    SourceLoc(),
-                                                    assocType->getName(),
-                                                    SourceLoc(),
-                                                    /*genericparams*/nullptr, 
-                                                    DC);
-    aliasDecl->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
-    aliasDecl->setUnderlyingType(type);
-
-    aliasDecl->setImplicit();
-    if (type->hasError())
-      aliasDecl->setInvalid();
-
-    // Inject the typealias into the nominal decl that conforms to the protocol.
-    if (auto nominal = DC->getSelfNominalTypeDecl()) {
-      // FIXME: Ideally this would use the protocol's access too---that is,
-      // a typealias added for an internal protocol shouldn't need to be
-      // public---but that can be problematic if the same type conforms to two
-      // protocols with different access levels.
-      aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/true);
-
-      if (nominal == DC) {
-        nominal->addMember(aliasDecl);
-      } else {
-        auto ext = cast<ExtensionDecl>(DC);
-        ext->addMember(aliasDecl);
+    auto nominal = DC->getSelfNominalTypeDecl();
+    if (nominal && nominal->getGenericParams() && Conformance->getConditionalRequirements().size() == 0) {
+      for (auto *genericParam : *nominal->getGenericParams()) {
+        if (genericParam->getName() == assocType->getName()) {
+          typeDecl = genericParam;
+          break;
+        }
       }
-    } else {
-      // If the declcontext is a Module, then we're in a special error recovery
-      // situation.  Mark the typealias as an error and don't inject it into any
-      // DeclContext.
-      assert(isa<ModuleDecl>(DC) && "Not an UnresolvedType conformance?");
-      aliasDecl->setInvalid();
     }
 
-    typeDecl = aliasDecl;
+    if (!typeDecl) {
+      // If there was no type declaration, synthesize one.
+      auto aliasDecl = new (TC.Context) TypeAliasDecl(SourceLoc(),
+                                                      SourceLoc(),
+                                                      assocType->getName(),
+                                                      SourceLoc(),
+                                                      /*genericparams*/nullptr,
+                                                      DC);
+      aliasDecl->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
+      aliasDecl->setUnderlyingType(type);
+
+      aliasDecl->setImplicit();
+      if (type->hasError())
+        aliasDecl->setInvalid();
+
+      // Inject the typealias into the nominal decl that conforms to the protocol.
+      if (nominal) {
+        // FIXME: Ideally this would use the protocol's access too---that is,
+        // a typealias added for an internal protocol shouldn't need to be
+        // public---but that can be problematic if the same type conforms to two
+        // protocols with different access levels.
+        aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/true);
+
+        if (nominal == DC) {
+          nominal->addMember(aliasDecl);
+        } else {
+          auto ext = cast<ExtensionDecl>(DC);
+          ext->addMember(aliasDecl);
+        }
+      } else {
+        // If the declcontext is a Module, then we're in a special error recovery
+        // situation.  Mark the typealias as an error and don't inject it into any
+        // DeclContext.
+        assert(isa<ModuleDecl>(DC) && "Not an UnresolvedType conformance?");
+        aliasDecl->setInvalid();
+      }
+      typeDecl = aliasDecl;
+    }
   }
 
   // Record the type witness.
