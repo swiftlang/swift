@@ -360,7 +360,7 @@ bb0(%0 : $Base):
  return %5 : $()
 }
 
-sil public_external @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
+sil public_external @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout_aliasable ()) -> ()
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @empty_box()
 sil @empty_box : $@convention(thin) () -> () {
@@ -370,8 +370,8 @@ entry:
   // CHECK: store %swift.opaque* undef
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <()>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <()>, 0
-  %f = function_ref @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
-  %g = partial_apply %f(%b, %ba) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
+  %f = function_ref @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout_aliasable ()) -> ()
+  %g = partial_apply %f(%b, %ba) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout_aliasable ()) -> ()
   return undef : $()
 }
 
