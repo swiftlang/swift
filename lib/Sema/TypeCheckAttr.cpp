@@ -16,6 +16,7 @@
 
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckType.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -1778,8 +1779,10 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   // Go over the set of requirements and resolve their types.
   for (auto &req : trailingWhereClause->getRequirements()) {
     if (req.getKind() == RequirementReprKind::SameType) {
-      auto firstType = TC.resolveType(req.getFirstTypeRepr(), FD, None);
-      auto secondType = TC.resolveType(req.getSecondTypeRepr(), FD, None);
+      auto firstType = TC.resolveType(req.getFirstTypeRepr(),
+                                      TypeResolution::forContextual(FD), None);
+      auto secondType = TC.resolveType(req.getSecondTypeRepr(),
+                                       TypeResolution::forContextual(FD), None);
       Type interfaceFirstType;
       Type interfaceSecondType;
 
@@ -1829,7 +1832,9 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     }
 
     if (req.getKind() == RequirementReprKind::LayoutConstraint) {
-      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, None);
+      auto subjectType = TC.resolveType(req.getSubjectRepr(),
+                                        TypeResolution::forContextual(FD),
+                                        None);
       Type interfaceSubjectType;
 
       // Map types to their interface types.
@@ -1865,9 +1870,12 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     }
 
     if (req.getKind() == RequirementReprKind::TypeConstraint) {
-      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, None);
-      auto constraint = TC.resolveType(
-          req.getConstraintLoc().getTypeRepr(), FD, None);
+      auto subjectType = TC.resolveType(req.getSubjectRepr(),
+                                        TypeResolution::forContextual(FD),
+                                        None);
+      auto constraint = TC.resolveType(req.getConstraintLoc().getTypeRepr(),
+                                       TypeResolution::forContextual(FD),
+                                       None);
 
       Type interfaceSubjectType;
 
@@ -2035,7 +2043,8 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   options |= TypeResolutionFlags::AllowUnboundGenerics;
 
   DeclContext *DC = D->getDeclContext();
-  Type T = TC.resolveType(ProtoTypeLoc.getTypeRepr(), DC, options);
+  Type T = TC.resolveType(ProtoTypeLoc.getTypeRepr(),
+                          TypeResolution::forContextual(DC), options);
   ProtoTypeLoc.setType(T);
 
   // Definite error-types were already diagnosed in resolveType.

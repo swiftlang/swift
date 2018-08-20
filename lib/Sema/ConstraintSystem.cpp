@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
+#include "TypeCheckType.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SetVector.h"
@@ -476,8 +477,7 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   // call to BoundGenericType::get().
   return TC.applyUnboundGenericArguments(
       unbound, unboundDecl,
-      SourceLoc(), DC, arguments,
-      /*resolver*/nullptr);
+      SourceLoc(), TypeResolution::forContextual(DC), arguments);
 }
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
@@ -980,7 +980,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
-    auto type = TC.resolveTypeInContext(typeDecl, nullptr, useDC,
+    auto type = TC.resolveTypeInContext(typeDecl, nullptr,
+                                        TypeResolution::forContextual(useDC),
                                         TypeResolverContext::InExpression,
                                         /*isSpecialized=*/false);
 

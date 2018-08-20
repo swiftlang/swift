@@ -16,8 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
-#include "GenericTypeResolver.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckType.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -450,8 +450,6 @@ public:
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    GenericTypeToArchetypeResolver resolver(DC);
-
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ude->getBase()))
       return nullptr;
@@ -463,7 +461,8 @@ public:
     auto *repr = IdentTypeRepr::create(TC.Context, components);
       
     // See if the repr resolves to a type.
-    Type ty = TC.resolveIdentifierType(DC, repr, options, &resolver);
+    Type ty = TC.resolveIdentifierType(TypeResolution::forContextual(DC), repr,
+                                       options);
     
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
@@ -540,8 +539,6 @@ public:
   //   then required to have keywords for every argument that name properties
   //   of the type.
   Pattern *visitCallExpr(CallExpr *ce) {
-    GenericTypeToArchetypeResolver resolver(DC);
-
     if (!TC.Context.isSwiftVersion3()) {
       // swift(>=4) mode.
       // Specialized call are not allowed anyway.
@@ -584,8 +581,8 @@ public:
       auto *prefixRepr = IdentTypeRepr::create(TC.Context, components);
 
       // See first if the entire repr resolves to a type.
-      Type enumTy = TC.resolveIdentifierType(DC, prefixRepr, options,
-                                             &resolver);
+      Type enumTy = TC.resolveIdentifierType(TypeResolution::forContextual(DC),
+                                             prefixRepr, options);
       if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
         return nullptr;
 
@@ -695,15 +692,15 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   return P;
 }
 
-static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
+static bool validateTypedPattern(TypeChecker &TC,
+                                 TypeResolution resolution,
                                  TypedPattern *TP,
-                                 TypeResolutionOptions options,
-                                 GenericTypeResolver *resolver) {
+                                 TypeResolutionOptions options) {
   if (TP->hasType())
     return TP->getType()->hasError();
 
   TypeLoc &TL = TP->getTypeLoc();
-  bool hadError = TC.validateType(TL, DC, options, resolver);
+  bool hadError = TC.validateType(TL, resolution, options);
 
   if (hadError) {
     TP->setType(ErrorType::get(TC.Context));
@@ -724,7 +721,7 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
       subPattern = parenPattern->getSubPattern();
 
     if (auto *namedPattern = dyn_cast<NamedPattern>(subPattern)) {
-      auto &C = DC->getASTContext();
+      auto &C = resolution.getDeclContext()->getASTContext();
       namedPattern->getDecl()->getAttrs().add(
           new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
     } else {
@@ -736,9 +733,8 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
   return hadError;
 }
 
-static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
+static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
                                   TypeResolutionOptions options,
-                                  GenericTypeResolver &resolver,
                                   TypeChecker &TC) {
   if (auto ty = decl->getTypeLoc().getType())
     return ty->hasError();
@@ -760,7 +756,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   // We might have a null typeLoc if this is a closure parameter list,
   // where parameters are allowed to elide their types.
   if (!TL.isNull()) {
-    hadError |= TC.validateType(TL, DC, options, &resolver);
+    hadError |= TC.validateType(TL, resolution, options);
   }
 
   auto *TR = TL.getTypeRepr();
@@ -772,7 +768,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   // check, then add an attribute to the decl.
   if (!decl->isVariadic() && TR &&
       TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-    auto &C = DC->getASTContext();
+    auto &C = resolution.getDeclContext()->getASTContext();
     decl->getAttrs().add(
           new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
   }
@@ -811,9 +807,9 @@ void TypeChecker::requestRequiredNominalTypeLayoutForParameters(
 }
 
 /// Type check a parameter list.
-bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
-                                         TypeResolutionOptions options,
-                                         GenericTypeResolver &resolver) {
+bool TypeChecker::typeCheckParameterList(ParameterList *PL,
+                                         TypeResolution resolution,
+                                         TypeResolutionOptions options) {
   bool hadError = false;
   
   for (auto param : *PL) {
@@ -826,7 +822,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
       continue;
     }
 
-    hadError |= validateParameterType(param, DC, options, resolver, *this);
+    hadError |= validateParameterType(param, resolution, options, *this);
     
     auto type = param->getTypeLoc().getType();
 
@@ -875,8 +871,6 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
 
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    TypeResolutionOptions options) {
-  GenericTypeToArchetypeResolver resolver(dc);
-
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
@@ -903,8 +897,9 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
   case PatternKind::Typed: {
+    auto resolution = TypeResolution::forContextual(dc);
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(*this, dc, TP, options, &resolver);
+    bool hadError = validateTypedPattern(*this, resolution, TP, options);
 
     // If we have unbound generic types, don't apply them below; instead,
     // the caller will call typeCheckBinding() later.
@@ -912,9 +907,9 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       return hadError;
 
     Pattern *subPattern = TP->getSubPattern();
-    if (coercePatternToType(subPattern, dc, P->getType(),
+    if (coercePatternToType(subPattern, resolution, P->getType(),
                             options|TypeResolutionFlags::FromNonInferredPattern,
-                            &resolver, TP->getTypeLoc()))
+                            TP->getTypeLoc()))
       hadError = true;
     else {
       TP->setSubPattern(subPattern);
@@ -997,15 +992,16 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 }
 
 /// Perform top-down type coercion on the given pattern.
-bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
+bool TypeChecker::coercePatternToType(Pattern *&P, TypeResolution resolution,
+                                      Type type,
                                       TypeResolutionOptions options,
-                                      GenericTypeResolver *resolver,
                                       TypeLoc tyLoc) {
 recur:
   if (tyLoc.isNull()) {
     tyLoc = TypeLoc::withoutLoc(type);
   }
 
+  auto dc = resolution.getDeclContext();
   auto subOptions = options;
   subOptions.setContext(None);
   switch (P->getKind()) {
@@ -1023,7 +1019,7 @@ recur:
         if (tupleType->getNumElements() == 1 &&
             !tupleType->getElement(0).isVararg()) {
           auto elementTy = tupleType->getElementType(0);
-          if (coercePatternToType(sub, dc, elementTy, subOptions, resolver))
+          if (coercePatternToType(sub, resolution, elementTy, subOptions))
             return true;
           TuplePatternElt elt(sub);
           P = TuplePattern::create(Context, PP->getLParenLoc(), elt,
@@ -1036,7 +1032,7 @@ recur:
       }
     }
   
-    if (coercePatternToType(sub, dc, type, subOptions, resolver))
+    if (coercePatternToType(sub, resolution, type, subOptions))
       return true;
     PP->setSubPattern(sub);
     PP->setType(sub->getType());
@@ -1046,7 +1042,7 @@ recur:
     auto VP = cast<VarPattern>(P);
     
     Pattern *sub = VP->getSubPattern();
-    if (coercePatternToType(sub, dc, type, subOptions, resolver))
+    if (coercePatternToType(sub, resolution, type, subOptions))
       return true;
     VP->setSubPattern(sub);
     if (sub->hasType())
@@ -1058,7 +1054,7 @@ recur:
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
+    bool hadError = validateTypedPattern(*this, resolution, TP, options);
     if (!hadError) {
       if (!type->isEqual(TP->getType()) && !type->hasError()) {
         if (options & TypeResolutionFlags::OverrideType) {
@@ -1071,9 +1067,8 @@ recur:
     }
 
     Pattern *sub = TP->getSubPattern();
-    hadError |= coercePatternToType(sub, dc, TP->getType(),
-                       subOptions | TypeResolutionFlags::FromNonInferredPattern,
-                                    resolver);
+    hadError |= coercePatternToType(sub, resolution, TP->getType(),
+                    subOptions | TypeResolutionFlags::FromNonInferredPattern);
     if (!hadError) {
       TP->setSubPattern(sub);
       TP->setType(sub->getType());
@@ -1150,7 +1145,7 @@ recur:
     auto decayToParen = [&]() -> bool {
       assert(canDecayToParen);
       Pattern *sub = TP->getElement(0).getPattern();
-      if (this->coercePatternToType(sub, dc, type, subOptions, resolver))
+      if (this->coercePatternToType(sub, resolution, type, subOptions))
         return true;
       
       if (TP->getLParenLoc().isValid()) {
@@ -1205,8 +1200,8 @@ recur:
         hadError = true;
       }
       
-      hadError |= coercePatternToType(pattern, dc, CoercionType,
-                                      options, resolver);
+      hadError |= coercePatternToType(pattern, resolution, CoercionType,
+                                      options);
       if (!hadError)
         elt.setPattern(pattern);
     }
@@ -1240,7 +1235,7 @@ recur:
                                              NLE->getLoc(), NLE->getLoc(),
                                              NoneEnumElement->getName(),
                                              NoneEnumElement, nullptr, false);
-        return coercePatternToType(P, dc, type, options, resolver);
+        return coercePatternToType(P, resolution, type, options);
       }
     }
     return typeCheckExprPattern(cast<ExprPattern>(P), dc, type);
@@ -1252,7 +1247,7 @@ recur:
 
     // Type-check the type parameter.
     TypeResolutionOptions paramOptions(TypeResolverContext::InExpression); 
-    if (validateType(IP->getCastTypeLoc(), dc, paramOptions))
+    if (validateType(IP->getCastTypeLoc(), resolution, paramOptions))
       return true;
 
     auto castType = IP->getCastTypeLoc().getType();
@@ -1282,7 +1277,7 @@ recur:
       }
 
       P = sub;
-      return coercePatternToType(P, dc, type, options);
+      return coercePatternToType(P, resolution, type, options);
     }
 
 
@@ -1330,7 +1325,7 @@ recur:
     
     // Coerce the subpattern to the destination type.
     if (Pattern *sub = IP->getSubPattern()) {
-      if (coercePatternToType(sub, dc, IP->getCastTypeLoc().getType(),
+      if (coercePatternToType(sub, resolution, IP->getCastTypeLoc().getType(),
                         subOptions|TypeResolutionFlags::FromNonInferredPattern))
         return true;
       IP->setSubPattern(sub);
@@ -1466,7 +1461,7 @@ recur:
       auto newSubOptions = subOptions;
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
-      if (coercePatternToType(sub, dc, elementType, newSubOptions, resolver))
+      if (coercePatternToType(sub, resolution, elementType, newSubOptions))
         return true;
       EEP->setSubPattern(sub);
     } else if (auto argType = elt->getArgumentInterfaceType()) {
@@ -1497,7 +1492,7 @@ recur:
       auto newSubOptions = subOptions;
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
-      if (coercePatternToType(sub, dc, elementType, newSubOptions, resolver))
+      if (coercePatternToType(sub, resolution, elementType, newSubOptions))
         return true;
       EEP->setSubPattern(sub);
     }
@@ -1550,7 +1545,7 @@ recur:
     auto newSubOptions = subOptions;
     newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
     newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
-    if (coercePatternToType(sub, dc, elementType, newSubOptions, resolver))
+    if (coercePatternToType(sub, resolution, elementType, newSubOptions))
       return true;
     OP->setSubPattern(sub);
     OP->setType(type);
@@ -1603,15 +1598,15 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     return true;
   };
 
-  GenericTypeToArchetypeResolver resolver(CE);
-
   // Sometimes a scalar type gets applied to a single-argument parameter list.
   auto handleParameter = [&](ParamDecl *param, Type ty, bool forceMutable) -> bool {
     bool hadError = false;
     
     // Check that the type, if explicitly spelled, is ok.
     if (param->getTypeLoc().getTypeRepr()) {
-      hadError |= validateParameterType(param, CE, None, resolver, *this);
+      hadError |= validateParameterType(param,
+                                        TypeResolution::forContextual(CE),
+                                        None, *this);
       
       // Now that we've type checked the explicit argument type, see if it
       // agrees with the contextual type.

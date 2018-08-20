@@ -40,12 +40,6 @@ class TypeResolution {
     } complete;
   };
 
-  /// Lazily constructed generic type resolver.
-  ///
-  /// FIXME: This is a compatibility shim used to stage in the TypeResolution
-  /// type.
-  mutable std::shared_ptr<GenericTypeResolver> resolver;
-
   TypeResolution(DeclContext *dc, TypeResolutionStage stage)
     : dc(dc), stage(stage) { }
 
@@ -67,15 +61,15 @@ public:
   /// context.
   static TypeResolution forContextual(DeclContext *dc);
 
+  /// Form a type resolution for a contextual type, which is a complete
+  /// description of the type using the archetypes of the given generic
+  /// environment.
+  static TypeResolution forContextual(DeclContext *dc,
+                                      GenericEnvironment *genericEnv);
+
   /// Retrieve the declaration context in which type resolution will be
   /// performed.
   DeclContext *getDeclContext() const { return dc; }
-
-  /// Retrieve a generic type resolver.
-  ///
-  /// FIXME: Don't use this unless you are calling a GenericTypeResolver-based
-  /// function.
-  GenericTypeResolver *getResolver() const;
 
   /// Retrieves the generic signature for the context, or NULL if there is
   /// no generic signature to resolve types.
