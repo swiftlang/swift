@@ -2254,7 +2254,6 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   auto &solutionCS = solution.getConstraintSystem();
   expr->setType(solution.simplifyType(solutionCS.getType(expr)));
   auto completionType = solution.simplifyType(solutionCS.getType(CCE));
-  assert(!completionType->hasUnresolvedType());
   CCE->setType(completionType);
   return false;
 }
