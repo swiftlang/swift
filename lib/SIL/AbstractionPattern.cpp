@@ -793,6 +793,33 @@ AbstractionPattern AbstractionPattern::getFunctionInputType() const {
   llvm_unreachable("bad kind");
 }
 
+AbstractionPattern
+AbstractionPattern::getFunctionParamType(unsigned index) const {
+  switch (getKind()) {
+  case Kind::Type: {
+    if (isTypeParameter())
+      return AbstractionPattern::getOpaque();
+    auto fnType = cast<AnyFunctionType>(getType());
+    auto param = fnType.getParams()[index];
+    auto paramType = param.getType();
+    // FIXME: Extract this into a utility method
+    if (param.isVariadic()) {
+      auto &ctx = paramType->getASTContext();
+      paramType = CanType(BoundGenericType::get(ctx.getArrayDecl(),
+                                                Type(), {paramType}));
+    }
+    return AbstractionPattern(getGenericSignatureForFunctionComponent(),
+                              paramType);
+  }
+  default:
+    // FIXME: Re-implement this
+    auto input = getFunctionInputType();
+    if (input.isTuple() && input.getNumTupleElements() != 0)
+      return input.getTupleElementType(index);
+    return input;
+  }
+}
+
 static CanType getOptionalObjectType(CanType type) {
   auto objectType = type.getOptionalObjectType();
   assert(objectType && "type was not optional");
@@ -1000,9 +1027,18 @@ bool AbstractionPattern::hasSameBasicTypeStructure(CanType l, CanType r) {
   auto lFunction = dyn_cast<AnyFunctionType>(l);
   auto rFunction = dyn_cast<AnyFunctionType>(r);
   if (lFunction && rFunction) {
-    return hasSameBasicTypeStructure(lFunction.getInput(),
-                                     rFunction.getInput())
-        && hasSameBasicTypeStructure(lFunction.getResult(),
+    auto lParam = lFunction.getParams();
+    auto rParam = rFunction.getParams();
+    if (lParam.size() != rParam.size())
+      return false;
+
+    for (unsigned i : indices(lParam)) {
+      if (!hasSameBasicTypeStructure(lParam[i].getPlainType(),
+                                     rParam[i].getPlainType()))
+        return false;
+    }
+
+    return hasSameBasicTypeStructure(lFunction.getResult(),
                                      rFunction.getResult());
   } else if (lFunction || rFunction) {
     return false;

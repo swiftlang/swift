@@ -129,7 +129,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   // We might have to re-abstract the 'self' value if it is an
   // Optional.
   AbstractionPattern origSelfType(witness->getInterfaceType());
-  origSelfType = origSelfType.getFunctionInputType();
+  origSelfType = origSelfType.getFunctionParamType(0);
 
   swiftValue = SGF.emitSubstToOrigValue(loc, swiftValue,
                                         origSelfType,
