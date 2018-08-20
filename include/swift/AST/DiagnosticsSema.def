@@ -1529,6 +1529,12 @@ ERROR(type_does_not_conform_in_decl_ref,none,
 ERROR(type_does_not_conform_decl_owner,none,
       "%0 %1 requires that %2 conform to %3",
       (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(types_not_equal_decl,none,
+      "%0 %1 requires the types %2 and %3 be equivalent",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(types_not_equal_in_decl_ref,none,
+      "referencing %0 %1 on %2 requires the types %3 and %4 be equivalent",
+      (DescriptiveDeclKind, DeclName, Type, Type, Type))
 NOTE(where_requirement_failure_one_subst,none,
      "where %0 = %1", (Type, Type))
 NOTE(where_requirement_failure_both_subst,none,

@@ -163,3 +163,15 @@ MissingConformance *MissingConformance::create(ConstraintSystem &cs, Type type,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) MissingConformance(type, protocol, locator);
 }
+
+bool SkipSameTypeRequirement::diagnose(Expr *root,
+                                       const Solution &solution) const {
+  SameTypeRequirementFailure failure(root, solution, LHS, RHS, getLocator());
+  return failure.diagnose();
+}
+
+SkipSameTypeRequirement *
+SkipSameTypeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SkipSameTypeRequirement(lhs, rhs, locator);
+}
