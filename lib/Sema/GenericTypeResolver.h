@@ -111,12 +111,11 @@ public:
 /// to check the signature of a generic declaration and resolve (for example)
 /// all dependent member refers to archetype members.
 class CompleteGenericTypeResolver : public GenericTypeResolver {
-  TypeChecker &tc;
   GenericSignature *genericSig;
   GenericSignatureBuilder *builder;
 
 public:
-  CompleteGenericTypeResolver(TypeChecker &tc, GenericSignature *genericSig);
+  CompleteGenericTypeResolver(GenericSignature *genericSig);
 
   virtual bool usesArchetypes() { return false; }
 

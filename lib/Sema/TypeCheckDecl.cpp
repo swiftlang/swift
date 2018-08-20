@@ -4380,7 +4380,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     DeclValidationRAII IBV(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      CompleteGenericTypeResolver resolver(*this, ED->getGenericSignature());
+      CompleteGenericTypeResolver resolver(ED->getGenericSignature());
 
       typeCheckParameterList(PL, EED->getParentEnum(),
                              TypeResolverContext::EnumElementDecl, resolver);

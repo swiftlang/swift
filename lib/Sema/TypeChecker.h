@@ -1227,8 +1227,8 @@ public:
   /// member.
   /// \param useArchetypes Whether to use context archetypes for outer generic
   /// parameters if the class is nested inside a generic function.
-  Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member, Type baseTy,
-                              bool useArchetypes = true);
+  static Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member,
+                                      Type baseTy, bool useArchetypes = true);
 
   /// \brief Retrieve the superclass type of the given type, or a null type if
   /// the type has no supertype.
@@ -1365,6 +1365,10 @@ public:
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDeclForNameLookup(VD);
+  }
+
+  virtual void resolveProtocolEnvironment(ProtocolDecl *proto) override {
+    validateDecl(proto);
   }
 
   virtual void bindExtension(ExtensionDecl *ext) override;

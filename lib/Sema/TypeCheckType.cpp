@@ -2864,10 +2864,13 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     // protocol's generic environment yet, do so now, to ensure the
     // typealias's underlying type has fully resolved dependent
     // member types.
-    if (auto *protoDecl = dyn_cast<ProtocolDecl>(aliasDecl->getDeclContext()))
-      if (protoDecl->getGenericEnvironment() == nullptr)
-        validateDecl(protoDecl);
-
+    if (auto *protoDecl = dyn_cast<ProtocolDecl>(aliasDecl->getDeclContext())) {
+      if (protoDecl->getGenericEnvironment() == nullptr) {
+        ASTContext &ctx = protoDecl->getASTContext();
+        ctx.getLazyResolver()->resolveProtocolEnvironment(protoDecl);
+      }
+    }
+    
     if (aliasDecl->getGenericParams()) {
       return UnboundGenericType::get(
           aliasDecl, baseTy,
@@ -2901,8 +2904,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   // If we're referring to a typealias within a generic context, build
   // a sugared alias type.
   if (aliasDecl && (!sugaredBaseTy || !sugaredBaseTy->isAnyExistentialType())) {
-    resultType = NameAliasType::get(aliasDecl, sugaredBaseTy, subs,
-                                         resultType);
+    resultType = NameAliasType::get(aliasDecl, sugaredBaseTy, subs, resultType);
   }
 
   return resultType;
