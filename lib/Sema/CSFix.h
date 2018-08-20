@@ -66,11 +66,15 @@ enum class FixKind : uint8_t {
   /// labels attached to the, fix it by suggesting proper labels.
   RelabelArguments,
 
+  /// Treat rvalue as lvalue
+  TreatRValueAsLValue,
+
   /// Add a new conformance to the type to satisfy a requirement.
   AddConformance,
 
-  /// Treat rvalue as lvalue
-  TreatRValueAsLValue,
+  /// Skip same-type generic requirement constraint,
+  /// and assume that types are equal.
+  SkipSameTypeRequirement,
 };
 
 class ConstraintFix {
@@ -275,6 +279,26 @@ public:
   static MissingConformance *create(ConstraintSystem &cs, Type type,
                                     ProtocolDecl *protocol,
                                     ConstraintLocator *locator);
+};
+
+/// Skip same-type generic requirement constraint,
+/// and assume that types are equal.
+class SkipSameTypeRequirement final : public ConstraintFix {
+  Type LHS, RHS;
+
+  SkipSameTypeRequirement(Type lhs, Type rhs, ConstraintLocator *locator)
+      : ConstraintFix(FixKind::SkipSameTypeRequirement, locator), LHS(lhs),
+        RHS(rhs) {}
+
+public:
+  std::string getName() const override {
+    return "skip same-type generic requirement";
+  }
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
+
+  static SkipSameTypeRequirement *create(ConstraintSystem &cs, Type lhs,
+                                         Type rhs, ConstraintLocator *locator);
 };
 
 } // end namespace constraints
