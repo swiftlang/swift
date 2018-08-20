@@ -1520,11 +1520,11 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     attr->setInvalid();
   }
 
-  if (!D->hasInterfaceType()) {
+  if (!isa<TypeDecl>(D) && !D->hasInterfaceType()) {
     ctx.getLazyResolver()->resolveDeclSignature(D);
   }
 
-  if (!isa<AccessorDecl>(D)) {
+  if (!isa<AccessorDecl>(D) && !isa<TypeDecl>(D)) {
     useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
                                         D->getInterfaceType());
   }
