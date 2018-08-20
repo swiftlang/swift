@@ -46,10 +46,10 @@ struct _SwiftUnsafeBitMap {
 };
 
 struct _SwiftHashTable {
-  __swift_intptr_t scale;
   __swift_intptr_t capacity;
   __swift_intptr_t count;
-  void *rawMap;
+  __swift_intptr_t scale;
+  void *map;
 };
 
 struct _SwiftDictionaryBodyStorage {

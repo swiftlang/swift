@@ -32,7 +32,7 @@ ClassMetadata CLASS_METADATA_SYM(s18_EmptyArrayStorage);
 SWIFT_RUNTIME_STDLIB_API
 ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);
 
-// _direct type metadata for Swift._RawNativeSetStorage
+// _direct type metadata for Swift._SwiftEmptySetStorage
 SWIFT_RUNTIME_STDLIB_API
 ClassMetadata CLASS_METADATA_SYM(s21_SwiftEmptySetStorage);
 } // namespace swift
@@ -90,13 +90,13 @@ swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
   {
     // _SwiftHashTable hashTable;
     {
-      // We set the capacity to 1 so that there's an empty hole to search.
-      // Any insertion will lead to a real storage being allocated, because 
-      // Dictionary guarantees there's always another empty hole after insertion.
-      0, // int scale;
-      1, // int capacity;                                    
+      // Setting the scale to 0 makes for a bucketCount of 1 -- so that the
+      // storage consists of a single unoccupied bucket. The capacity is set to
+      // 0 so that any insertion will lead to real storage being allocated.
+      0, // int capacity;
       0, // int count;
-      &swift::_swiftEmptySetStorage.entries, // void *rawMap
+      0, // int scale;
+      &swift::_swiftEmptySetStorage.entries, // void *map
     },
     0, // uint64 seed0;
     0, // uint64 seed1;
