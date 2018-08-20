@@ -2003,10 +2003,9 @@ PointerToThinFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                                   TypeDependentOperands, Ty);
 }
 
-ConvertFunctionInst *
-ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
-                            SILType Ty, SILFunction &F,
-                            SILOpenedArchetypesState &OpenedArchetypes) {
+ConvertFunctionInst *ConvertFunctionInst::create(
+    SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILFunction &F,
+    SILOpenedArchetypesState &OpenedArchetypes, bool WithoutActuallyEscaping) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -2014,8 +2013,8 @@ ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ConvertFunctionInst));
-  auto *CFI = ::new (Buffer)
-      ConvertFunctionInst(DebugLoc, Operand, TypeDependentOperands, Ty);
+  auto *CFI = ::new (Buffer) ConvertFunctionInst(
+      DebugLoc, Operand, TypeDependentOperands, Ty, WithoutActuallyEscaping);
   // If we do not have lowered SIL, make sure that are not performing
   // ABI-incompatible conversions.
   //

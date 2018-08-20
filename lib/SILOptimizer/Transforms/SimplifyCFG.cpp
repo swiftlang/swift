@@ -91,9 +91,9 @@ namespace {
     bool ShouldVerify;
     bool EnableJumpThread;
   public:
-    SimplifyCFG(SILFunction &Fn, SILPassManager *PM, bool Verify,
+    SimplifyCFG(SILFunction &Fn, SILTransform &T, bool Verify,
                 bool EnableJumpThread)
-        : FuncBuilder(*PM), Fn(Fn), PM(PM),
+        : FuncBuilder(T), Fn(Fn), PM(T.getPassManager()),
           ConstFolder(FuncBuilder, PM->getOptions().AssertConfig,
                       /* EnableDiagnostics */false,
                       [&](SILInstruction *I) { constFoldingCallback(I); }),
@@ -2530,7 +2530,9 @@ static void removeArgument(SILBasicBlock *BB, unsigned i) {
   // Determine the set of predecessors in case any predecessor has
   // two edges to this block (e.g. a conditional branch where both
   // sides reach this block).
-  llvm::SmallPtrSet<SILBasicBlock *, 4> PredBBs;
+  llvm::SetVector<SILBasicBlock *,SmallVector<SILBasicBlock *, 8>,
+                  SmallPtrSet<SILBasicBlock *, 8>> PredBBs;
+
   for (auto *Pred : BB->getPredecessorBlocks())
     PredBBs.insert(Pred);
 
@@ -3575,7 +3577,7 @@ namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
-    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll,
+    if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
                     /*EnableJumpThread=*/false)
             .run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
@@ -3592,7 +3594,7 @@ namespace {
 class JumpThreadSimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
-    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll,
+    if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
                     /*EnableJumpThread=*/true)
             .run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
@@ -3639,7 +3641,7 @@ public:
   
   /// The entry point to the transformation.
   void run() override {
-    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll, false)
+    if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll, false)
         .simplifyBlockArgs()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }

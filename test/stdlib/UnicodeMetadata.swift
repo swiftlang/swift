@@ -1,4 +1,5 @@
 // RUN: %target-build-swift -module-name="日本語01" %s -o %t.out
+// RUN: %target-codesign %t.out
 // RUN: %target-run %t.out | %FileCheck %s
 // REQUIRES: executable_test
 

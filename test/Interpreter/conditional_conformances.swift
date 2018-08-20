@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // The file that's `main` needs to be called that.
 // RUN: cp %s %t/main.swift
-// RUN: %target-build-swift -D basic %t/main.swift %S/../Inputs/conditional_conformance_basic_conformances.swift -o %t/basic && %target-run %t/basic
-// RUN: %target-build-swift -D with_assoc %t/main.swift %S/../Inputs/conditional_conformance_with_assoc.swift -o %t/with_assoc && %target-run %t/with_assoc
-// RUN: %target-build-swift -D subclass %t/main.swift %S/../Inputs/conditional_conformance_subclass.swift -o %t/subclass && %target-run %t/subclass
+// RUN: %target-build-swift -D basic %t/main.swift %S/../Inputs/conditional_conformance_basic_conformances.swift -o %t/basic && %target-codesign %t/basic && %target-run %t/basic
+// RUN: %target-build-swift -D with_assoc %t/main.swift %S/../Inputs/conditional_conformance_with_assoc.swift -o %t/with_assoc && %target-codesign %t/with_assoc && %target-run %t/with_assoc
+// RUN: %target-build-swift -D subclass %t/main.swift %S/../Inputs/conditional_conformance_subclass.swift -o %t/subclass && %target-codesign %t/subclass && %target-run %t/subclass
 
 // REQUIRES: executable_test
 

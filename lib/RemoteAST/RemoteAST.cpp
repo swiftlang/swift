@@ -449,8 +449,7 @@ public:
 
 private:
   bool validateNominalParent(NominalTypeDecl *decl, Type parent) {
-    auto parentDecl =
-      decl->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto parentDecl = decl->getDeclContext()->getSelfNominalTypeDecl();
 
     // If we don't have a parent type, fast-path.
     if (!parent) {
@@ -1216,6 +1215,26 @@ public:
                                                std::move(valueAddress));
   }
 
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressExistentialMetatype(RemoteAddress object) {
+    // The value of the address is just the input address.
+    // The type is obtained through the following sequence of steps:
+    // 1) Loading a pointer from the input address
+    // 2) Reading it as metadata and resolving the type
+    // 3) Wrapping the resolved type in an existential metatype.
+    auto pointed = Reader.readPointedValue(object.getAddressData());
+    if (!pointed)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto typeResult = Reader.readTypeFromMetadata(*pointed);
+    if (!typeResult)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto wrappedType = ExistentialMetatypeType::get(typeResult);
+    if (!wrappedType)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    return std::make_pair<Type, RemoteAddress>(std::move(wrappedType),
+                                               std::move(object));
+  }
+
   /// Resolve the dynamic type and the value address of an existential,
   /// given its address and its static type. For class and error existentials,
   /// this API takes a pointer to the instance reference rather than the
@@ -1227,9 +1246,9 @@ public:
     if (!staticType->isAnyExistentialType())
       return getFailure<std::pair<Type, RemoteAddress>>();
 
-    // TODO: implement support for ExistentialMetaTypes.
+    // Handle the case where this is an ExistentialMetatype.
     if (!staticType->isExistentialType())
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getDynamicTypeAndAddressExistentialMetatype(object);
 
     // This should be an existential type at this point.
     auto layout = staticType->getExistentialLayout();

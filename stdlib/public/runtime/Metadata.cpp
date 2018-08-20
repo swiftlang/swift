@@ -46,6 +46,7 @@
 #endif
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
+#include "CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "swift/Runtime/Debug.h"
@@ -4196,6 +4197,16 @@ bool Metadata::satisfiesClassConstraint() const {
 }
 
 #if !NDEBUG
+static bool referencesAnonymousContext(Demangle::Node *node) {
+  if (node->getKind() == Demangle::Node::Kind::AnonymousContext)
+    return true;
+  for (unsigned i = 0, e = node->getNumChildren(); i < e; ++i)
+    if (referencesAnonymousContext(node->getChild(i)))
+      return true;
+
+  return false;
+}
+
 void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   // Enable verification when a special environment variable is set.
   // Some metatypes crash when going through the mangler or demangler. A
@@ -4211,12 +4222,17 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   
   Demangle::Demangler Dem;
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
+  // If the mangled node involves types in an AnonymousContext, then by design,
+  // it cannot be looked up by name.
+  if (referencesAnonymousContext(node))
+    return;
+  
   auto mangledName = Demangle::mangleNode(node);
   auto result = _getTypeByMangledName(mangledName,
                                       [](unsigned, unsigned){ return nullptr; });
   if (metadata != result)
     swift::warning(RuntimeErrorFlagNone,
-                   "Metadata mangled name failed to roundtrip: %p -> %s -> %p",
+                   "Metadata mangled name failed to roundtrip: %p -> %s -> %p\n",
                    metadata, mangledName.c_str(), (const Metadata *)result);
 }
 #endif
@@ -4224,3 +4240,14 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
 const TypeContextDescriptor *swift::swift_getTypeContextDescriptor(const Metadata *type) {
     return type->getTypeContextDescriptor();
 }
+
+// Emit compatibility override shims for keypath runtime functionality. The
+// implementation of these functions is in the standard library in
+// KeyPath.swift.
+
+SWIFT_RUNTIME_STDLIB_SPI
+const HeapObject *swift_getKeyPathImpl(const void *pattern,
+                                       const void *arguments);
+
+#define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"

@@ -2,6 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -force-single-frontend-invocation -Xfrontend -enable-key-path-resilience -Xfrontend -enable-resilience -module-name KeyPathMultiModule_b -c -o %t/KeyPathMultiModule_b.o -emit-module-path %t/KeyPathMultiModule_b.swiftmodule -parse-as-library %S/Inputs/KeyPathMultiModule_b.swift
 // RUN: %target-build-swift -g -Xfrontend -enable-key-path-resilience %t/KeyPathMultiModule_b.o -I %t %s -o %t/a.out.resilient
+// RUN: %target-codesign %t/a.out.resilient
 // RUN: %target-run %t/a.out.resilient
 
 // -- Test again with resilience disabled, which changes the circumstances under
@@ -9,6 +10,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -force-single-frontend-invocation -Xfrontend -enable-key-path-resilience -module-name KeyPathMultiModule_b -c -o %t/KeyPathMultiModule_b.o -emit-module-path %t/KeyPathMultiModule_b.swiftmodule -parse-as-library %S/Inputs/KeyPathMultiModule_b.swift
 // RUN: %target-build-swift -Xfrontend -enable-key-path-resilience %t/KeyPathMultiModule_b.o -I %t %s -o %t/a.out.fragile
+// RUN: %target-codesign %t/a.out.fragile
 // RUN: %target-run %t/a.out.fragile
 
 import KeyPathMultiModule_b
@@ -50,6 +52,7 @@ keyPathMultiModule.test("identity across multiple modules") {
     expectEqualWithHashes(A_x_keypath(), \A.x)
     expectEqualWithHashes(A_y_keypath(), \A.y)
     expectEqualWithHashes(A_z_keypath(), \A.z)
+    expectEqualWithHashes(A_immutable_keypath(), \A.immutable)
     expectEqualWithHashes(A_subscript_withGeneric_keypath(index: 0), \A.[withGeneric: 0])
     expectEqualWithHashes(A_subscript_withGeneric_keypath(index: "butt"),
                 \A.[withGeneric: "butt"])
@@ -154,6 +157,8 @@ keyPathMultiModule.test("identity across multiple modules") {
                           \ResilientRoot.storedA)
     expectEqualWithHashes(ResilientRoot_storedB_keypath(),
                           \ResilientRoot.storedB)
+    expectEqualWithHashes(ResilientRoot_storedLet_keypath(),
+                          \ResilientRoot.storedLet)
     expectEqualWithHashes(ResilientRoot_virtual_keypath(),
                           \ResilientRoot.virtual)
     expectEqualWithHashes(ResilientRoot_virtualRO_keypath(),

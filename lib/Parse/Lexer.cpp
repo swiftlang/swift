@@ -171,11 +171,12 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
 Lexer::Lexer(const PrincipalTag &, const LangOptions &LangOpts,
              const SourceManager &SourceMgr, unsigned BufferID,
              DiagnosticEngine *Diags, bool InSILMode,
-             CommentRetentionMode RetainComments,
+             HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
              TriviaRetentionMode TriviaRetention)
     : LangOpts(LangOpts), SourceMgr(SourceMgr), BufferID(BufferID),
-      Diags(Diags), InSILMode(InSILMode), RetainComments(RetainComments),
-      TriviaRetention(TriviaRetention) {}
+      Diags(Diags), InSILMode(InSILMode),
+      IsHashbangAllowed(HashbangAllowed == HashbangMode::Allowed),
+      RetainComments(RetainComments), TriviaRetention(TriviaRetention) {}
 
 void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   assert(Offset <= EndOffset);
@@ -215,28 +216,31 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
 
 Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
              unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
-             CommentRetentionMode RetainComments,
+             HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
              TriviaRetentionMode TriviaRetention)
     : Lexer(PrincipalTag(), Options, SourceMgr, BufferID, Diags, InSILMode,
-            RetainComments, TriviaRetention) {
+            HashbangAllowed, RetainComments, TriviaRetention) {
   unsigned EndOffset = SourceMgr.getRangeForBuffer(BufferID).getByteLength();
   initialize(/*Offset=*/0, EndOffset);
 }
 
 Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
              unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
-             CommentRetentionMode RetainComments,
+             HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
              TriviaRetentionMode TriviaRetention, unsigned Offset,
              unsigned EndOffset)
     : Lexer(PrincipalTag(), Options, SourceMgr, BufferID, Diags, InSILMode,
-            RetainComments, TriviaRetention) {
+            HashbangAllowed, RetainComments, TriviaRetention) {
   initialize(Offset, EndOffset);
 }
 
 Lexer::Lexer(Lexer &Parent, State BeginState, State EndState)
     : Lexer(PrincipalTag(), Parent.LangOpts, Parent.SourceMgr, Parent.BufferID,
-            Parent.Diags, Parent.InSILMode, Parent.RetainComments,
-            Parent.TriviaRetention) {
+            Parent.Diags, Parent.InSILMode,
+            Parent.IsHashbangAllowed
+                ? HashbangMode::Allowed
+                : HashbangMode::Disallowed,
+            Parent.RetainComments, Parent.TriviaRetention) {
   assert(BufferID == SourceMgr.findBufferContainingLoc(BeginState.Loc) &&
          "state for the wrong buffer");
   assert(BufferID == SourceMgr.findBufferContainingLoc(EndState.Loc) &&
@@ -260,7 +264,8 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
          "location from the wrong buffer");
 
   Lexer L(LangOpts, SourceMgr, BufferID, Diags, InSILMode,
-          CommentRetentionMode::None, TriviaRetentionMode::WithoutTrivia);
+          HashbangMode::Allowed, CommentRetentionMode::None,
+          TriviaRetentionMode::WithoutTrivia);
   L.restoreState(State(Loc));
   Token Result;
   L.lex(Result);
@@ -2177,7 +2182,8 @@ void Lexer::lexImpl() {
       size_t BOMLen = ContentStart - BufferStart;
       assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
       // Add UTF-8 BOM to LeadingTrivia.
-      LeadingTrivia.push_back(TriviaPiece::garbageText({CurPtr, BOMLen}));
+      auto Text = OwnedString::makeRefCounted(StringRef(CurPtr, BOMLen));
+      LeadingTrivia.push_back(TriviaPiece::garbageText(Text));
       CurPtr += BOMLen;
     }
     NextToken.setAtStartOfLine(true);
@@ -2353,7 +2359,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // (making this option irrelevant), or the caller lexed comments and
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
-          CommentRetentionMode::ReturnAsTokens);
+          HashbangMode::Allowed, CommentRetentionMode::ReturnAsTokens);
   L.restoreState(State(Loc));
   return L.peekNextToken();
 }
@@ -2402,18 +2408,18 @@ Restart:
       bool isDocComment = CurPtr[1] == '/';
       skipSlashSlashComment(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(isDocComment
-                           ? TriviaPiece::docLineComment({TriviaStart, Length})
-                           : TriviaPiece::lineComment({TriviaStart, Length}));
+      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+      Pieces.push_back(isDocComment ? TriviaPiece::docLineComment(Text)
+                                    : TriviaPiece::lineComment(Text));
       goto Restart;
     } else if (*CurPtr == '*') {
       // '/* ... */' comment.
       bool isDocComment = CurPtr[1] == '*';
       skipSlashStarComment();
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(isDocComment
-                           ? TriviaPiece::docBlockComment({TriviaStart, Length})
-                           : TriviaPiece::blockComment({TriviaStart, Length}));
+      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+      Pieces.push_back(isDocComment ? TriviaPiece::docBlockComment(Text)
+                                    : TriviaPiece::blockComment(Text));
       goto Restart;
     }
     break;
@@ -2421,11 +2427,12 @@ Restart:
     if (TriviaStart == ContentStart && *CurPtr == '!') {
       // Hashbang '#!/path/to/swift'.
       --CurPtr;
-      if (BufferID != SourceMgr.getHashbangBufferID())
+      if (!IsHashbangAllowed)
         diagnose(TriviaStart, diag::lex_hashbang_not_allowed);
       skipHashbang(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+      Pieces.push_back(TriviaPiece::garbageText(Text));
       goto Restart;
     }
     break;
@@ -2434,7 +2441,8 @@ Restart:
     if (tryLexConflictMarker(/*EatNewline=*/false)) {
       // Conflict marker.
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+      Pieces.push_back(TriviaPiece::garbageText(Text));
       goto Restart;
     }
     break;
@@ -2443,7 +2451,8 @@ Restart:
     case NulCharacterKind::Embedded: {
       diagnoseEmbeddedNul(Diags, CurPtr - 1);
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+      Pieces.push_back(TriviaPiece::garbageText(Text));
       goto Restart;
     }
     case NulCharacterKind::CodeCompletion:
@@ -2489,7 +2498,8 @@ Restart:
     }
 
     size_t Length = CurPtr - TriviaStart;
-    Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+    auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+    Pieces.push_back(TriviaPiece::garbageText(Text));
     goto Restart;
   }
   // Reset the cursor.
@@ -2511,8 +2521,8 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
   LangOptions FakeLangOptions;
 
   Lexer L(FakeLangOptions, SM, BufferID, nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::None, TriviaRetentionMode::WithoutTrivia,
-          BufferStart, BufferEnd);
+          HashbangMode::Allowed, CommentRetentionMode::None,
+          TriviaRetentionMode::WithoutTrivia, BufferStart, BufferEnd);
 
   // Lex tokens until we find the token that contains the source location.
   Token Tok;
@@ -2640,7 +2650,7 @@ SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
   // (making this option irrelevant), or the caller lexed comments and
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
-          CommentRetentionMode::ReturnAsTokens);
+          HashbangMode::Allowed, CommentRetentionMode::ReturnAsTokens);
   L.restoreState(State(Loc));
   L.skipToEndOfLine(/*EatNewline=*/true);
   return getSourceLoc(L.CurPtr);

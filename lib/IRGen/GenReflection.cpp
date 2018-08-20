@@ -341,7 +341,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
     if (auto CD = dyn_cast<ClassDecl>(NTD)) {
       auto type = CD->getDeclaredType()->getCanonicalType();
-      auto RC = getReferenceCountingForType(IGM, type);
+      auto RC = type->getReferenceCounting();
       if (RC == ReferenceCounting::ObjC)
         kind = FieldDescriptorKind::ObjCClass;
       else
@@ -897,7 +897,7 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     // extra inhabitants as these. But maybe it's best not to codify
     // that in the ABI anyway.
     CanType thinFunction = CanFunctionType::get(
-      AnyFunctionType::CanParamArrayRef(), Context.TheEmptyTupleType,
+      {}, Context.TheEmptyTupleType,
       AnyFunctionType::ExtInfo().withRepresentation(
           FunctionTypeRepresentation::Thin));
     BuiltinTypes.insert(thinFunction);

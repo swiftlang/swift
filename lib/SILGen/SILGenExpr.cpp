@@ -1096,7 +1096,7 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     (void)baseMeta;
     assert(!baseMeta->is<BoundGenericType>() &&
            "generic static stored properties not implemented");
-    if (field->getDeclContext()->getAsClassOrClassExtensionContext() &&
+    if (field->getDeclContext()->getSelfClassDecl() &&
         field->hasStorage())
       // FIXME: don't need to check hasStorage, already done above
       assert(field->isFinal() && "non-final class stored properties not implemented");
@@ -1711,9 +1711,8 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
     assert(result.getType() == loweredResultTy);
 
     if (loweredResultTy != loweredDestTy) {
-      result = ManagedValue::forUnmanaged(
-          SGF.B.createConvertFunction(e, result.getUnmanagedValue(),
-                                      loweredDestTy));
+      assert(!result.hasCleanup());
+      result = SGF.B.createConvertFunction(e, result, loweredDestTy);
     }
 
     break;
@@ -1975,9 +1974,9 @@ RValue RValueEmitter::visitCovariantFunctionConversionExpr(
   CanAnyFunctionType destTy
     = cast<AnyFunctionType>(e->getType()->getCanonicalType());
   SILType resultType = SGF.getLoweredType(destTy);
-  SILValue result = SGF.B.createConvertFunction(e, 
-                                                original.forward(SGF),
-                                                resultType);
+  SILValue result =
+      SGF.B.createConvertFunction(e, original.forward(SGF), resultType,
+                                  /*Withoutactuallyescaping=*/false);
   return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
 }
 
@@ -2960,7 +2959,7 @@ RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
   for (auto member : selectorDecl->getMembers()) {
     if (auto var = dyn_cast<VarDecl>(member)) {
       if (!var->isStatic() && var->hasStorage()) {
-        selectorMemberTy = var->getInterfaceType()->getRValueType();
+        selectorMemberTy = var->getInterfaceType();
         break;
       }
     }
@@ -3012,7 +3011,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
     // Use the opened archetype from the AST for a protocol member, or make a
     // new one (which we'll upcast immediately below) for a class member.
     ArchetypeType *opened;
-    if (storage->getDeclContext()->getAsClassOrClassExtensionContext()) {
+    if (storage->getDeclContext()->getSelfClassDecl()) {
       opened = ArchetypeType::getOpened(baseType);
     } else {
       opened = subs.getReplacementTypes()[0]->castTo<ArchetypeType>();
@@ -3033,8 +3032,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   }
   
   // Upcast a class instance to the property's declared type if necessary.
-  if (auto propertyClass = storage->getDeclContext()
-                                  ->getAsClassOrClassExtensionContext()) {
+  if (auto propertyClass = storage->getDeclContext()->getSelfClassDecl()) {
     if (baseType->getClassOrBoundGenericClass() != propertyClass) {
       baseType = baseType->getSuperclassForDecl(propertyClass)
         ->getCanonicalType();
@@ -5427,7 +5425,8 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   if (silFnTy->getExtInfo().getRepresentation() !=
       SILFunctionTypeRepresentation::Thick) {
     auto escapingClosure =
-        SGF.B.createConvertFunction(E, functionValue, escapingFnTy);
+        SGF.B.createConvertFunction(E, functionValue, escapingFnTy,
+                                    /*WithoutActuallyEscaping=*/true);
     return visitSubExpr(escapingClosure, true /*isClosureConsumable*/);
   }
 

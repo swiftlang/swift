@@ -192,7 +192,10 @@ public:
   bool isInputIncomplete() const { return IsInputIncomplete; }
 
   void checkForInputIncomplete() {
-    IsInputIncomplete = IsInputIncomplete || Tok.is(tok::eof);
+    IsInputIncomplete = IsInputIncomplete ||
+      // Check whether parser reached EOF but the real EOF, not the end of a
+      // string interpolation segment.
+      (Tok.is(tok::eof) && Tok.getText() != ")");
   }
 
   /// \brief This is the current token being considered by the parser.
@@ -536,6 +539,18 @@ public:
   /// \brief Skip until the next '#else', '#endif' or until eof.
   void skipUntilConditionalBlockClose();
 
+  /// \brief Skip until either finding \c T1 or reaching the end of the line.
+  ///
+  /// This uses \c skipSingle and so matches parens etc. After calling, one or
+  /// more of the following will be true: Tok.is(T1), Tok.isStartOfLine(),
+  /// Tok.is(tok::eof). The "or more" case is the first two: if the next line
+  /// starts with T1.
+  ///
+  /// \returns true if there is an instance of \c T1 on the current line (this
+  /// avoids the foot-gun of not considering T1 starting the next line for a
+  /// plain Tok.is(T1) check).
+  bool skipUntilTokenOrEndOfLine(tok T1);
+
   /// If the parser is generating only a syntax tree, try loading the current
   /// node from a previously generated syntax tree.
   /// Returns \c true if the node has been loaded and inserted into the current
@@ -850,7 +865,7 @@ public:
 
   /// Parse a version tuple of the form x[.y[.z]]. Returns true if there was
   /// an error parsing.
-  bool parseVersionTuple(clang::VersionTuple &Version, SourceRange &Range,
+  bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
 
   bool parseTypeAttributeList(VarDecl::Specifier &Specifier,
@@ -1372,7 +1387,8 @@ public:
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID,
                                   StmtKind ParentKind);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
-  ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo);
+  ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo,
+                                 bool IfWasImplicitlyInserted = false);
   ParserResult<Stmt> parseStmtGuard();
   ParserResult<Stmt> parseStmtWhile(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);

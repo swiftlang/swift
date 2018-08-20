@@ -5,7 +5,7 @@ struct Mystruct1 {
   func s1f1() -> Int { return 0 }
 // CHECK: decl: func s1f1() -> Int
   var intField = 3
-// CHECK: decl: var intField: Int
+// CHECK: decl: @_hasInitialValue var intField: Int
 // CHECK: decl: init(intField: Int)
 // CHECK: decl: init()
 }
@@ -22,14 +22,14 @@ struct MyStruct2 {
 class Myclass1 {
 // CHECK: decl: class Myclass1
   var intField = 4
-// CHECK: decl: var intField: Int
+// CHECK: decl: @_hasInitialValue var intField: Int
 // CHECK: decl: init()
 }
 
 func f1() {
 // CHECK: decl: func f1()
   var s1ins = Mystruct1() // Implicit ctor
-// CHECK: decl: var s1ins: Mystruct1
+// CHECK: decl: @_hasInitialValue var s1ins: Mystruct1
   _ = Mystruct1(intField: 1) // Implicit ctor
 
   s1ins.intField = 34
@@ -37,7 +37,7 @@ func f1() {
 // CHECK: type: Int
 
   var c1ins = Myclass1()
-// CHECK: decl: var c1ins: Myclass1
+// CHECK: decl: @_hasInitialValue var c1ins: Myclass1
 // CHECK: type: Myclass1
 
   c1ins.intField = 3
@@ -59,7 +59,7 @@ class Myclass2 {
 // CHECK: decl: func f1()
 
     var arr1 = [1, 2]
-// CHECK: decl: var arr1: [Int]
+// CHECK: decl: @_hasInitialValue var arr1: [Int]
 // CHECK: type: Array<Int>
 
     arr1.append(1)
@@ -151,7 +151,7 @@ struct MyGenStruct1<T, U: ExpressibleByStringLiteral, V: Sequence> {
 }
 
 let genstruct1 = MyGenStruct1<Int, String, [Float]>(x: 1, y: "", z: [1.0])
-// CHECK: decl: let genstruct1: MyGenStruct1<Int, String, [Float]>
+// CHECK: decl: @_hasInitialValue let genstruct1: MyGenStruct1<Int, String, [Float]>
 
 func test001() {
 // CHECK: decl: func test001()

@@ -3278,7 +3278,8 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
 
   SWIFT_DEFER { TF_DeleteStatus(status); };
 
-  DevicePartitioner partitioner(*fn, deviceInfo, nextTensorTransferId);
+  DevicePartitioner partitioner(parentTransform, *fn, deviceInfo,
+                                nextTensorTransferId);
   auto entryFnBaseName = graphFnNameForCaller;
   unsigned helperFuncId = 0;
   SmallVector<std::pair<StringRef, SILLocation>, 1> pendingGraphFnNames;
@@ -3361,9 +3362,11 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
 }
 
 TFGraphLowering::TFGraphLowering(
+    SILTransform &parentTransform,
     llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
         &graphFunctions)
-    : graphFunctions(graphFunctions), graph(TF_NewGraph(), &TF_DeleteGraph) {}
+    : parentTransform(parentTransform),
+      graphFunctions(graphFunctions), graph(TF_NewGraph(), &TF_DeleteGraph) {}
 
 bool TFGraphLowering::lowerTFFunction(
     StringRef hostFnName, SILFunction *fn,
@@ -3399,7 +3402,7 @@ struct TFLowerGraphTestPass : public SILFunctionTransform {
         GraphFunctionDeviceInfo::getForFunction(*fn, /*removeConfigInst*/ true);
     llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
         graphFunctions;
-    TFGraphLowering graphLowering(graphFunctions);
+    TFGraphLowering graphLowering(*this, graphFunctions);
     if (graphLowering.lowerTFGraph(fn->getName(), fn, deviceInfo)) {
       llvm::errs() << "Failed to generate TFGraph for " << fn->getName()
                    << "\n";

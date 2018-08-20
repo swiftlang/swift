@@ -28,8 +28,7 @@ DerivedConformance::DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
                                        ProtocolDecl *protocol)
     : TC(tc), ConformanceDecl(conformanceDecl), Nominal(nominal),
       Protocol(protocol) {
-  assert(getConformanceContext()
-             ->getAsNominalTypeOrNominalTypeExtensionContext() == nominal);
+  assert(getConformanceContext()->getSelfNominalTypeDecl() == nominal);
 }
 
 DeclContext *DerivedConformance::getConformanceContext() const {
@@ -341,9 +340,8 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   getterDecl->setStatic(isStatic);
 
   // If this is supposed to be a final method, mark it as such.
-  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
-  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
-      !getterDecl->isFinal())
+  assert(isFinal || !parentDC->getSelfClassDecl());
+  if (isFinal && parentDC->getSelfClassDecl() && !getterDecl->isFinal())
     getterDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   // Compute the interface type of the getter.
@@ -376,7 +374,7 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
   auto propertyParam = new (C)
     ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
               Identifier(), property->getLoc(), C.getIdentifier("newValue"),
-              property->getType(), parentDC);
+              parentDC);
   propertyParam->setInterfaceType(propertyInterfaceType);
 
   ParameterList *params = ParameterList::create(C, propertyParam);
@@ -393,25 +391,11 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
 
   // If this is supposed to be a final method, mark it as such.
-  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
-  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
+  assert(isFinal || !parentDC->getSelfClassDecl());
+  if (isFinal && parentDC->getSelfClassDecl() &&
       !setterDecl->isFinal())
     setterDecl->getAttrs().add(new (C) FinalAttr(/*Implicit*/ true));
-
-  // Compute the interface type of the setter.
-  Type interfaceType =
-  FunctionType::get(propertyInterfaceType, TupleType::getEmpty(C));
-  auto selfParam = computeSelfParam(setterDecl);
-  if (auto sig = parentDC->getGenericSignatureOfContext()) {
-    setterDecl->setGenericEnvironment(
-        parentDC->getGenericEnvironmentOfContext());
-    interfaceType = GenericFunctionType::get(sig, {selfParam}, interfaceType,
-                                             FunctionType::ExtInfo());
-  } else {
-    interfaceType =
-      FunctionType::get({selfParam}, interfaceType, FunctionType::ExtInfo());
-  }
-  setterDecl->setInterfaceType(interfaceType);
+  setterDecl->computeType();
   setterDecl->copyFormalAccessFrom(property);
   setterDecl->setValidationToChecked();
 
@@ -429,16 +413,15 @@ DerivedConformance::declareDerivedProperty(Identifier name,
 
   VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var,
                                       /*IsCaptureList*/false, SourceLoc(), name,
-                                      propertyContextType, parentDC);
+                                      parentDC);
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
   propDecl->setValidationToChecked();
 
   // If this is supposed to be a final property, mark it as such.
-  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
-  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
-      !propDecl->isFinal())
+  assert(isFinal || !parentDC->getSelfClassDecl());
+  if (isFinal && parentDC->getSelfClassDecl() && !propDecl->isFinal())
     propDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);

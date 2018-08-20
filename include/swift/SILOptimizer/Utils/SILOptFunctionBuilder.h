@@ -15,28 +15,55 @@
 
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 
 namespace swift {
 
 class SILOptFunctionBuilder {
+  SILTransform &transform;
   SILFunctionBuilder builder;
 
 public:
-  SILOptFunctionBuilder(SILPassManager &passManager)
-      : builder(*passManager.getModule()) {}
+  SILOptFunctionBuilder(SILTransform &transform)
+      : transform(transform),
+        builder(*transform.getPassManager()->getModule()) {}
 
   template <class... ArgTys>
   SILFunction *getOrCreateSharedFunction(ArgTys &&... args) {
-    return builder.getOrCreateSharedFunction(std::forward<ArgTys>(args)...);
+    SILFunction *f =
+      builder.getOrCreateSharedFunction(std::forward<ArgTys>(args)...);
+    notifyAddFunction(f);
+    return f;
   }
 
   template <class... ArgTys>
   SILFunction *getOrCreateFunction(ArgTys &&... args) {
-    return builder.getOrCreateFunction(std::forward<ArgTys>(args)...);
+    SILFunction *f = builder.getOrCreateFunction(std::forward<ArgTys>(args)...);
+    notifyAddFunction(f);
+    return f;
   }
 
   template <class... ArgTys> SILFunction *createFunction(ArgTys &&... args) {
-    return builder.createFunction(std::forward<ArgTys>(args)...);
+    SILFunction *f = builder.createFunction(std::forward<ArgTys>(args)...);
+    notifyAddFunction(f);
+    return f;
+  }
+
+  void eraseFunction(SILFunction *f) {
+    auto &pm = getPassManager();
+    pm.notifyWillDeleteFunction(f);
+    pm.getModule()->eraseFunction(f);
+  }
+
+private:
+  SILPassManager &getPassManager() const {
+    return *transform.getPassManager();
+  }
+
+  void notifyAddFunction(SILFunction *f) {
+    auto &pm = getPassManager();
+    pm.notifyOfNewFunction(f, &transform);
+    pm.notifyAnalysisOfFunction(f);
   }
 };
 

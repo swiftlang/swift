@@ -1,0 +1,36 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name without_actually_escaping
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name without_actually_escaping
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name without_actually_escaping | %FileCheck %s
+
+// thunk for @escaping @callee_guaranteed () -> ()
+// Check that the [without_actually_escaping] thunk attribute is parsed and printed.
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] @f1_testWithoutActuallyEscapingThunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] @f1_testWithoutActuallyEscapingThunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
+  %1 = apply %0() : $@callee_guaranteed () -> ()
+  return %1 : $()
+}
+
+// Check that the convert_function [without_actually_escaping] attribute is parsed and printed.
+// CHECK-LABEL: sil hidden @f2_testWithoutActuallyEscapingBlock : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> () {
+// CHECK: convert_function %0 : $@convention(block) @noescape () -> () to [without_actually_escaping] $@convention(block) () -> ()
+sil hidden @f2_testWithoutActuallyEscapingBlock : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @guaranteed $@convention(block) @noescape () -> ()):
+  %cvt = convert_function %0 : $@convention(block) @noescape () -> () to [without_actually_escaping] $@convention(block) () -> ()
+  %f = function_ref @closure1 : $@convention(thin) (@guaranteed @convention(block) () -> ()) -> ()
+  %call = apply %f(%cvt) : $@convention(thin) (@guaranteed @convention(block) () -> ()) -> ()
+  destroy_value %cvt : $@convention(block) () -> ()
+  %v = tuple ()
+  return %v : $()
+}
+
+// closure #1 in testBlock(block:)
+sil private @closure1 : $@convention(thin) (@guaranteed @convention(block) () -> ()) -> () {
+bb0(%0 : @guaranteed $@convention(block) () -> ()):
+  %call = apply %0() : $@convention(block) () -> ()
+  %v = tuple ()
+  return %v : $()
+}
+

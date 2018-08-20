@@ -276,29 +276,33 @@ func rdar19831698() {
 // <rdar://problem/19836341> Incorrect fixit for NSString? to String? conversions
 func rdar19836341(_ ns: NSString?, vns: NSString?) {
   var vns = vns
-  let _: String? = ns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}
-  var _: String? = ns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}
-  // FIXME: there should be a fixit appending "as String?" to the line; for now
-  // it's sufficient that it doesn't suggest appending "as String"
+  let _: String? = ns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{22-22= as String?}}
+  var _: String? = ns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{22-22= as String?}}
 
   // Important part about below diagnostic is that from-type is described as
   // 'NSString?' and not '@lvalue NSString?':
-  let _: String? = vns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}
-  var _: String? = vns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}
-  
+  let _: String? = vns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{23-23= as String?}}
+  var _: String? = vns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{23-23= as String?}}
+
   vns = ns
 }
 
 // <rdar://problem/20029786> Swift compiler sometimes suggests changing "as!" to "as?!"
 func rdar20029786(_ ns: NSString?) {
-  var s: String = ns ?? "str" as String as String // expected-error{{cannot convert value of type 'NSString?' to expected argument type 'String?'}}
-  var s2 = ns ?? "str" as String as String // expected-error {{cannot convert value of type 'String' to expected argument type 'NSString'}}
+  var s: String = ns ?? "str" as String as String // expected-error{{cannot convert value of type 'NSString?' to expected argument type 'String?'}}{{21-21= as String?}}
+  var s2 = ns ?? "str" as String as String // expected-error {{cannot convert value of type 'String' to expected argument type 'NSString'}}{{43-43= as NSString}}
 
-  let s3: NSString? = "str" as String? // expected-error {{cannot convert value of type 'String?' to specified type 'NSString?'}}
+  let s3: NSString? = "str" as String? // expected-error {{cannot convert value of type 'String?' to specified type 'NSString?'}}{{39-39= as NSString?}}
 
-  var s4: String = ns ?? "str" // expected-error{{cannot convert value of type 'NSString' to specified type 'String'}}
+  var s4: String = ns ?? "str" // expected-error{{cannot convert value of type 'NSString' to specified type 'String'}}{{31-31= as String}}
   var s5: String = (ns ?? "str") as String // fixed version
 }
+
+// Make sure more complicated cast has correct parenthesization
+func castMoreComplicated(anInt: Int?) {
+  let _: (NSObject & NSCopying)? = anInt // expected-error{{cannot convert value of type 'Int?' to specified type '(NSObject & NSCopying)?'}}{{41-41= as (NSObject & NSCopying)?}}
+}
+
 
 // <rdar://problem/19813772> QoI: Using as! instead of as in this case produces really bad diagnostic
 func rdar19813772(_ nsma: NSMutableArray) {

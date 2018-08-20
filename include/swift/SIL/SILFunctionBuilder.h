@@ -18,6 +18,11 @@
 namespace swift {
 
 class SILParserFunctionBuilder;
+class SILSerializationFunctionBuilder;
+class SILOptFunctionBuilder;
+namespace Lowering {
+class SILGenFunctionBuilder;
+} // namespace Lowering
 
 /// A class for creating SILFunctions in a specific SILModule.
 ///
@@ -39,8 +44,10 @@ class SILFunctionBuilder {
   SILModule &mod;
 
   friend class SILParserFunctionBuilder;
+  friend class SILSerializationFunctionBuilder;
+  friend class SILOptFunctionBuilder;
+  friend class Lowering::SILGenFunctionBuilder;
 
-public:
   SILFunctionBuilder(SILModule &mod) : mod(mod) {}
 
   /// Return the declaration of a utility function that can, but needn't, be

@@ -277,7 +277,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
 
   ProtocolDecl *proto = nullptr;
   if (auto *typeDC = DC->getInnermostTypeContext())
-    proto = typeDC->getAsProtocolOrProtocolExtensionContext();
+    proto = typeDC->getSelfProtocolDecl();
 
   for (auto &Req : GenericSig->getRequirements()) {
     // Skip protocol Self requirement.
@@ -776,7 +776,7 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
                           CompilerInvocation Invocation) {
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
-  Invocation.setInputKind(InputFileKind::IFK_Swift);
+  Invocation.setInputKind(InputFileKind::Swift);
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
@@ -1361,7 +1361,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     Error = "Compiler invocation init failed";
     return nullptr;
   }
-  Invocation.setInputKind(InputFileKind::IFK_Swift);
+  Invocation.setInputKind(InputFileKind::Swift);
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
 

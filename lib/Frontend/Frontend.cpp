@@ -286,6 +286,20 @@ Optional<unsigned> CompilerInstance::setUpCodeCompletionBuffer() {
   return codeCompletionBufferID;
 }
 
+static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
+  switch (inputKind) {
+  case InputFileKind::Swift:
+  case InputFileKind::SwiftModuleInterface:
+  case InputFileKind::SIL:
+    return true;
+  case InputFileKind::SwiftLibrary:
+  case InputFileKind::SwiftREPL:
+  case InputFileKind::LLVM:
+  case InputFileKind::None:
+    return false;
+  }
+}
+
 bool CompilerInstance::setUpInputs() {
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
   // per-input setup.
@@ -303,9 +317,11 @@ bool CompilerInstance::setUpInputs() {
     recordPrimaryInputBuffer(*codeCompletionBufferID);
   }
 
-  if (isInputSwift() && MainBufferID == NO_SUCH_BUFFER &&
-      InputSourceCodeBufferIDs.size() == 1)
+  if (MainBufferID == NO_SUCH_BUFFER &&
+      InputSourceCodeBufferIDs.size() == 1 &&
+      shouldTreatSingleInputAsMain(Invocation.getInputKind())) {
     MainBufferID = InputSourceCodeBufferIDs.front();
+  }
 
   return false;
 }
@@ -318,9 +334,8 @@ bool CompilerInstance::setUpForInput(const InputFile &input) {
   if (!bufferID)
     return false;
 
-  if (isInSILMode() ||
-      (isInputSwift() &&
-       llvm::sys::path::filename(input.file()) == "main.swift")) {
+  if (isInputSwift() &&
+      llvm::sys::path::filename(input.file()) == "main.swift") {
     assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
     MainBufferID = *bufferID;
   }
@@ -498,7 +513,7 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   FrontendStatsTracer tracer(Context->Stats, "perform-sema");
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
-  if (Invocation.getInputKind() == InputFileKind::IFK_SIL) {
+  if (Invocation.getInputKind() == InputFileKind::SIL) {
     assert(!InputSourceCodeBufferIDs.empty());
     assert(InputSourceCodeBufferIDs.size() == 1);
     assert(MainBufferID != NO_SUCH_BUFFER);
@@ -517,7 +532,7 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
 
   const ImplicitImports implicitImports(*this);
 
-  if (Invocation.getInputKind() == InputFileKind::IFK_Swift_REPL) {
+  if (Invocation.getInputKind() == InputFileKind::SwiftREPL) {
     createREPLFile(implicitImports);
     return;
   }
@@ -633,12 +648,6 @@ CompilerInstance::computeDelayedParsingCallback(bool isPrimary) {
 
 void CompilerInstance::addMainFileToModule(
     const ImplicitImports &implicitImports) {
-  const InputFileKind Kind = Invocation.getInputKind();
-  assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_SIL);
-
-  if (Kind == InputFileKind::IFK_Swift)
-    SourceMgr.setHashbangBufferID(MainBufferID);
-
   auto *MainFile = createSourceFileForMainModule(
       Invocation.getSourceFileKind(), implicitImports.kind, MainBufferID);
   addAdditionalInitialImportsTo(MainFile, implicitImports);
@@ -920,16 +929,17 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   ModuleDecl *const MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
 
-  assert((Kind == InputFileKind::IFK_Swift ||
-          Kind == InputFileKind::IFK_Swift_Library) &&
+  assert((Kind == InputFileKind::Swift ||
+          Kind == InputFileKind::SwiftLibrary ||
+          Kind == InputFileKind::SwiftModuleInterface) &&
          "only supports parsing .swift files");
   (void)Kind;
 
   // Make sure the main file is the first file in the module but parse it last,
   // to match the parsing logic used when performing Sema.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    assert(Kind == InputFileKind::IFK_Swift);
-    SourceMgr.setHashbangBufferID(MainBufferID);
+    assert(Kind == InputFileKind::Swift ||
+           Kind == InputFileKind::SwiftModuleInterface);
     createSourceFileForMainModule(Invocation.getSourceFileKind(),
                                   SourceFile::ImplicitModuleImportKind::None,
                                   MainBufferID);

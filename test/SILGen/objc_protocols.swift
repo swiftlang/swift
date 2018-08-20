@@ -87,8 +87,9 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK: } // end sil function '[[THUNK2]]'
 
 // CHECK: sil shared [serializable] [thunk] @[[THUNK2_THUNK]] :
-// CHECK:      [[FN:%.*]] = objc_method %0 : $@thick Self.Type, #NSRuncing.mince!1.foreign
-// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>(%0)
+// CHECK:      [[METATYPE:%.*]] = thick_to_objc_metatype %0
+// CHECK:      [[FN:%.*]] = objc_method [[METATYPE]] : $@objc_metatype Self.Type, #NSRuncing.mince!1.foreign
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>([[METATYPE]])
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function '[[THUNK2_THUNK]]'
 

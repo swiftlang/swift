@@ -273,23 +273,23 @@ Version::preprocessorDefinition(StringRef macroName,
   return define;
 }
 
-Version::operator clang::VersionTuple() const
+Version::operator llvm::VersionTuple() const
 {
   switch (Components.size()) {
  case 0:
-   return clang::VersionTuple();
+   return llvm::VersionTuple();
  case 1:
-   return clang::VersionTuple((unsigned)Components[0]);
+   return llvm::VersionTuple((unsigned)Components[0]);
  case 2:
-   return clang::VersionTuple((unsigned)Components[0],
+   return llvm::VersionTuple((unsigned)Components[0],
                               (unsigned)Components[1]);
  case 3:
-   return clang::VersionTuple((unsigned)Components[0],
+   return llvm::VersionTuple((unsigned)Components[0],
                               (unsigned)Components[1],
                               (unsigned)Components[2]);
  case 4:
  case 5:
-   return clang::VersionTuple((unsigned)Components[0],
+   return llvm::VersionTuple((unsigned)Components[0],
                               (unsigned)Components[1],
                               (unsigned)Components[2],
                               (unsigned)Components[3]);

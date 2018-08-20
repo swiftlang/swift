@@ -20,49 +20,27 @@
 
 using namespace swift;
 
-Type InheritedTypeRequest::evaluate(
-                        Evaluator &evaluator,
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        unsigned index) const {
+llvm::Expected<Type>
+InheritedTypeRequest::evaluate(
+  Evaluator &evaluator, llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+  unsigned index) const {
   // Figure out how to resolve types.
-  TypeResolutionOptions options;
+  TypeResolutionOptions options = None;
   DeclContext *dc;
   if (auto typeDecl = decl.dyn_cast<TypeDecl *>()) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = nominal;
-      options |= TypeResolutionFlags::GenericSignature;
-      options |= TypeResolutionFlags::InheritanceClause;
       options |= TypeResolutionFlags::AllowUnavailableProtocol;
     } else {
       dc = typeDecl->getDeclContext();
-
-      if (isa<GenericTypeParamDecl>(typeDecl)) {
-        // For generic parameters, we want name lookup to look at just the
-        // signature of the enclosing entity.
-        if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-          dc = nominal;
-          options |= TypeResolutionFlags::GenericSignature;
-        } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-          dc = ext;
-          options |= TypeResolutionFlags::GenericSignature;
-        } else if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-          dc = func;
-          options |= TypeResolutionFlags::GenericSignature;
-        } else if (!dc->isModuleScopeContext()) {
-          // Skip the generic parameter's context entirely.
-          dc = dc->getParent();
-        }
-      }
     }
   } else {
     auto ext = decl.get<ExtensionDecl *>();
     dc = ext;
-    options |= TypeResolutionFlags::GenericSignature;
-    options |= TypeResolutionFlags::InheritanceClause;
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
-  ProtocolRequirementTypeResolver protoResolver;
+  DependentGenericTypeResolver protoResolver;
   GenericTypeToArchetypeResolver archetypeResolver(dc);
   GenericTypeResolver *resolver;
   if (isa<ProtocolDecl>(dc)) {
@@ -84,12 +62,24 @@ Type InheritedTypeRequest::evaluate(
   return inheritedType ? inheritedType : ErrorType::get(tc.Context);
 }
 
-Type SuperclassTypeRequest::evaluate(Evaluator &evaluator,
-                                     NominalTypeDecl *nominalDecl) const {
+llvm::Expected<Type>
+SuperclassTypeRequest::evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *nominalDecl) const {
   assert(isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl));
 
   for (unsigned int idx : indices(nominalDecl->getInherited())) {
-    Type inheritedType = evaluator(InheritedTypeRequest{nominalDecl, idx});
+    auto result = evaluator(InheritedTypeRequest{nominalDecl, idx});
+
+    if (auto err = result.takeError()) {
+      // FIXME: Should this just return once a cycle is detected?
+      llvm::handleAllErrors(std::move(err),
+        [](const CyclicalRequestError<InheritedTypeRequest> &E) {
+          /* cycle detected */
+        });
+      continue;
+    }
+
+    Type inheritedType = *result;
     if (!inheritedType) continue;
 
     // If we found a class, return it.
@@ -118,10 +108,20 @@ Type SuperclassTypeRequest::evaluate(Evaluator &evaluator,
   return Type();
 }
 
-Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
-                                  EnumDecl *enumDecl) const {
+llvm::Expected<Type>
+EnumRawTypeRequest::evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const {
   for (unsigned int idx : indices(enumDecl->getInherited())) {
-    Type inheritedType = evaluator(InheritedTypeRequest{enumDecl, idx});
+    auto inheritedTypeResult = evaluator(InheritedTypeRequest{enumDecl, idx});
+    
+    if (auto err = inheritedTypeResult.takeError()) {
+      llvm::handleAllErrors(std::move(err),
+        [](const CyclicalRequestError<InheritedTypeRequest> &E) {
+          // cycle detected
+        });
+      continue;
+    }
+
+    auto &inheritedType = *inheritedTypeResult;
     if (!inheritedType) continue;
 
     // Skip existential types.

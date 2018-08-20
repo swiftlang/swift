@@ -365,8 +365,8 @@ bb0(%0 : $*Int64):
 // CHECK-LABEL: sil @testInoutReadEscapeRead : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box ${ var Int64 }, var, name "x"
 // CHECK: [[BOXADR:%.*]] = project_box [[BOX]] : ${ var Int64 }, 0
-// CHECK: begin_access [read] [static] [no_nested_conflict] [[BOXADR]] : $*Int64
-// CHECK: begin_access [read] [static] [no_nested_conflict] [[BOXADR]] : $*Int64
+// CHECK: begin_access [read] [static] [[BOXADR]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testInoutReadEscapeRead'
 sil @testInoutReadEscapeRead : $@convention(thin) () -> () {
 bb0:
@@ -427,9 +427,11 @@ bb0(%0 : ${ var Int64 }):
 // CHECK-LABEL: sil @testInoutReadEscapeWrite : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box ${ var Int64 }, var, name "x"
 // CHECK: [[BOXADR:%.*]] = project_box [[BOX]] : ${ var Int64 }, 0
-// CHECK: begin_access [read] [dynamic] [[BOXADR]] : $*Int64
+// CHECK: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[BOXADR]] : $*Int64
 // CHECK: apply
-// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[BOXADR]] : $*Int64
+// CHECK-NOT: begin_access
+// CHECK: end_access [[BEGIN]]
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testInoutReadEscapeWrite'
 sil @testInoutReadEscapeWrite : $@convention(thin) () -> () {
 bb0:
@@ -490,9 +492,11 @@ bb0(%0 : ${ var Int64 }):
 // CHECK-LABEL: sil @$S17enforce_with_opts24testInoutWriteEscapeReadyyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box ${ var Int64 }, var, name "x"
 // CHECK: [[BOXADR:%.*]] = project_box [[BOX]] : ${ var Int64 }, 0
-// CHECK: begin_access [modify] [dynamic] [[BOXADR]] : $*Int64
+// CHECK: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[BOXADR]] : $*Int64
 // CHECK: apply
-// CHECK: begin_access [read] [dynamic] [no_nested_conflict] %1 : $*Int64
+// CHECK-NOT: begin_access
+// CHECK: end_access [[BEGIN]]
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function '$S17enforce_with_opts24testInoutWriteEscapeReadyyF'
 sil @$S17enforce_with_opts24testInoutWriteEscapeReadyyF : $@convention(thin) () -> () {
 bb0:
@@ -561,9 +565,11 @@ bb0(%0 : ${ var Int64 }):
 // CHECK-LABEL: sil @$S17enforce_with_opts020testInoutWriteEscapeF0yyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box ${ var Int64 }, var, name "x"
 // CHECK: [[BOXADR:%.*]] = project_box [[BOX]] : ${ var Int64 }, 0
-// CHECK: begin_access [modify] [dynamic] [[BOXADR]] : $*Int64
+// CHECK: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[BOXADR]] : $*Int64
 // CHECK: apply
-// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[BOXADR]] : $*Int64
+// CHECK-NOT: begin_access
+// CHECK: end_access [[BEGIN]]
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function '$S17enforce_with_opts020testInoutWriteEscapeF0yyF'
 sil @$S17enforce_with_opts020testInoutWriteEscapeF0yyF : $@convention(thin) () -> () {
 bb0:
@@ -911,4 +917,431 @@ bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
   end_access %4 : $*Int64
   %10 = tuple ()
   return %10 : $()
+}
+
+// public func testOldToNewMapRead() {
+// Checks merging of 3 scopes resulting in a larger read scope
+//
+// CHECK-LABEL: sil @testOldToNewMapRead : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testOldToNewMapRead'
+sil @testOldToNewMapRead : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %7 = begin_access [read] [dynamic] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// public func testOldToNewMapWrite) {
+// Checks merging of 3 scopes resulting in a larger modify scope
+//
+// CHECK-LABEL: sil @testOldToNewMapWrite : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK: store {{.*}} to [[BEGIN]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testOldToNewMapWrite'
+sil @testOldToNewMapWrite : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %4 = metatype $@thin X.Type
+  // function_ref X.init()
+  %5 = function_ref @Xinit : $@convention(method) (@thin X.Type) -> X
+  %6 = apply %5(%4) : $@convention(method) (@thin X.Type) -> X
+  %7 = begin_access [modify] [dynamic] %0 : $*X
+  store %6 to %7 : $*X
+  end_access %7 : $*X
+  %10 = begin_access [read] [dynamic] %0 : $*X
+  %11 = load %10 : $*X
+  end_access %10 : $*X
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// public func testDataFlowAcrossBBs() {
+// Checks merging of scopes across basic blocks - propagating that information
+//
+// CHECK-LABEL: sil @testDataFlowAcrossBBs : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: br bb1
+// CHECK: br bb2
+// CHECK: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testDataFlowAcrossBBs'
+sil @testDataFlowAcrossBBs : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  br bb1
+  
+bb1:
+  br bb2
+
+bb2:
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// public func testDataFlowAcrossInnerLoop() {
+// Checks merging of scopes across an inner loop
+//
+// CHECK-LABEL: sil @testDataFlowAcrossInnerLoop : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: br bb1
+// CHECK: cond_br {{.*}}, bb1, bb2
+// CHECK: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testDataFlowAcrossInnerLoop'
+sil @testDataFlowAcrossInnerLoop : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  br bb1
+  
+bb1:
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb1, bb2
+
+bb2:
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// public func testConflictInInnerLoop() {
+// Checks summary propagation and conflict detection in sub-regions
+//
+// CHECK-LABEL: sil @testConflictInInnerLoop : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: br bb1
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK: cond_br {{.*}}, bb1, bb2
+// CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN3]] : $*X
+// CHECK-NEXT: end_access [[BEGIN3]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testConflictInInnerLoop'
+sil @testConflictInInnerLoop : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  br bb1
+  
+bb1:
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb1, bb2
+
+bb2:
+  %7 = begin_access [read] [dynamic] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil hidden_external [global_init] @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+
+// public func testUnidentifiedAccessInLoop() {
+// Tests Unidentified Accesses detection + propagation
+//
+// CHECK-LABEL: sil @testUnidentifiedAccessInLoop : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: br bb1
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] {{.*}} : $*Int64
+// CHECK-NEXT: load [[BEGIN2]] : $*Int64
+// CHECK-NEXT: end_access [[BEGIN2]] : $*Int64
+// CHECK: cond_br {{.*}}, bb1, bb2
+// CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN3]] : $*X
+// CHECK-NEXT: end_access [[BEGIN3]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testUnidentifiedAccessInLoop'
+sil @testUnidentifiedAccessInLoop : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  br bb1
+  
+bb1:
+  %u0 = function_ref @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+  %u1 = apply %u0() : $@convention(thin) () -> Builtin.RawPointer
+  %u2 = pointer_to_address %u1 : $Builtin.RawPointer to [strict] $*Int64
+  %u3 = begin_access [read] [dynamic] %u2 : $*Int64
+  %u4 = load %u3 : $*Int64
+  end_access %u3 : $*Int64
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb1, bb2
+
+bb2:
+  %7 = begin_access [read] [dynamic] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// public func testIrreducibleGraph() {
+// Checks detection of irreducible control flow / bail
+// See mergePredAccesses in the algorithm
+//
+// CHECK-LABEL: sil @testIrreducibleGraph : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: br bb1
+// CHECK: [[BEGIN2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK: cond_br {{.*}}, bb2, bb3
+// CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN3]] : $*X
+// CHECK-NEXT: end_access [[BEGIN3]] : $*X
+// CHECK: cond_br {{.*}}, bb3, bb4
+// CHECK: [[BEGIN4:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN4]] : $*X
+// CHECK-NEXT: end_access [[BEGIN4]] : $*X
+// CHECK: cond_br {{.*}}, bb2, bb1
+// CHECK: [[BEGIN5:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN5]] : $*X
+// CHECK-NEXT: end_access [[BEGIN5]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testIrreducibleGraph'
+sil @testIrreducibleGraph : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  br bb1
+
+bb1:
+  %4 = begin_access [modify] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %cond1 = integer_literal $Builtin.Int1, 1
+  cond_br %cond1, bb2, bb3
+  
+bb2:
+  %6 = begin_access [read] [dynamic] %0 : $*X
+  %7 = load %6 : $*X
+  end_access %6 : $*X
+  %cond2 = integer_literal $Builtin.Int1, 1
+  cond_br %cond2, bb3, bb4
+
+bb3:
+  %8 = begin_access [read] [dynamic] %0 : $*X
+  %9 = load %8 : $*X
+  end_access %8 : $*X
+  %cond3 = integer_literal $Builtin.Int1, 1
+  cond_br %cond3, bb2, bb1
+  
+bb4:
+  %10 = begin_access [read] [dynamic] %0 : $*X
+  %11 = load %10 : $*X
+  end_access %10 : $*X
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// public func testIrreducibleGraph2() {
+// Checks detection of irreducible control flow / bail + parts that we *can* merge
+// See disableCrossBlock in the algorithm: this detects this corner case
+//
+// CHECK-LABEL: sil @testIrreducibleGraph2 : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: br bb1
+// CHECK: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK: cond_br {{.*}}, bb2, bb3
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK-NEXT: br bb3
+// CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN3]] : $*X
+// CHECK-NEXT: end_access [[BEGIN3]] : $*X
+// CHECK: br bb4
+// CHECK: [[BEGIN4:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN4]] : $*X
+// CHECK-NEXT: end_access [[BEGIN4]] : $*X
+// CHECK: cond_br {{.*}}, bb2, bb5
+// CHECK: [[BEGIN5:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN5]] : $*X
+// CHECK-NEXT: end_access [[BEGIN5]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testIrreducibleGraph2'
+sil @testIrreducibleGraph2 : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  br bb1
+
+bb1:
+  %4 = begin_access [modify] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %cond1 = integer_literal $Builtin.Int1, 1
+  cond_br %cond1, bb2, bb3
+  
+bb2:
+  %6 = begin_access [read] [dynamic] %0 : $*X
+  %7 = load %6 : $*X
+  end_access %6 : $*X
+  br bb3
+
+bb3:
+  %8 = begin_access [read] [dynamic] %0 : $*X
+  %9 = load %8 : $*X
+  end_access %8 : $*X
+  br bb4
+  
+bb4:
+  %10 = begin_access [read] [dynamic] %0 : $*X
+  %11 = load %10 : $*X
+  end_access %10 : $*X
+  %cond2 = integer_literal $Builtin.Int1, 1
+  cond_br %cond2, bb2, bb5
+  
+bb5:
+  %13 = begin_access [read] [dynamic] %0 : $*X
+  %14 = load %13 : $*X
+  end_access %13 : $*X
+  %16 = tuple ()
+  return %16 : $()
+}
+
+
+// public func testStronglyConnectedComponent() {
+// During the merge optimization,
+// Check that we don't merge cross strongly component boundaries for now
+//
+// CHECK-LABEL: sil @testStronglyConnectedComponent : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: br bb1
+// CHECK: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK: cond_br {{.*}}, bb2, bb3
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK-NEXT: br bb3
+// CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN3]] : $*X
+// CHECK: br bb4
+// CHECK: load [[BEGIN3]] : $*X
+// CHECK-NEXT: end_access [[BEGIN3]] : $*X
+// CHECK: cond_br {{.*}}, bb5, bb6
+// CHECK: [[BEGIN4:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN4]] : $*X
+// CHECK-NEXT: end_access [[BEGIN4]] : $*X
+// CHECK: br bb2
+// CHECK: [[BEGIN5:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN5]] : $*X
+// CHECK-NEXT: end_access [[BEGIN5]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testStronglyConnectedComponent'
+sil @testStronglyConnectedComponent : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  br bb1
+
+bb1:
+  %4 = begin_access [modify] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %cond1 = integer_literal $Builtin.Int1, 1
+  cond_br %cond1, bb2, bb3
+
+bb2:
+  %6 = begin_access [read] [dynamic] %0 : $*X
+  %7 = load %6 : $*X
+  end_access %6 : $*X
+  br bb3
+
+bb3:
+  %8 = begin_access [read] [dynamic] %0 : $*X
+  %9 = load %8 : $*X
+  end_access %8 : $*X
+  br bb4
+
+bb4:
+  %10 = begin_access [read] [dynamic] %0 : $*X
+  %11 = load %10 : $*X
+  end_access %10 : $*X
+  %cond2 = integer_literal $Builtin.Int1, 1
+  cond_br %cond2, bb5, bb6
+
+bb5:
+  %13 = begin_access [read] [dynamic] %0 : $*X
+  %14 = load %13 : $*X
+  end_access %13 : $*X
+  br bb2
+
+bb6:
+  %16 = begin_access [read] [dynamic] %0 : $*X
+  %17 = load %16 : $*X
+  end_access %16 : $*X
+  %19 = tuple ()
+  return %19 : $()
 }

@@ -1257,7 +1257,7 @@ static void diagnoseOutputModeArg(DiagnosticEngine &diags, const Arg *arg,
   }
 }
 
-static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
+static bool isSDKTooOld(StringRef sdkPath, llvm::VersionTuple minVersion,
                         StringRef firstPrefix, StringRef secondPrefix = {}) {
   // FIXME: This is a hack.
   // We should be looking at the SDKSettings.plist.
@@ -1280,7 +1280,7 @@ static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
   if (versionEnd == StringRef::npos)
     return false;
 
-  clang::VersionTuple version;
+  llvm::VersionTuple version;
   if (version.tryParse(sdkDirName.slice(versionStart, versionEnd)))
     return false;
   return version < minVersion;
@@ -1290,14 +1290,14 @@ static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
 /// the given target.
 static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
   if (target.isMacOSX()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 14), "OSX");
+    return isSDKTooOld(sdkPath, llvm::VersionTuple(10, 14), "OSX");
 
   } else if (target.isiOS()) {
     // Includes both iOS and TVOS.
-    return isSDKTooOld(sdkPath, clang::VersionTuple(12, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, llvm::VersionTuple(12, 0), "Simulator", "OS");
 
   } else if (target.isWatchOS()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(5, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, llvm::VersionTuple(5, 0), "Simulator", "OS");
 
   } else {
     return false;

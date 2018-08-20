@@ -31,6 +31,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
@@ -112,7 +113,8 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key.str());
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.str(), 0);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -120,7 +122,7 @@ namespace {
                                                     data_type_ref data) {
       uint32_t keyLength = key.str().size();
       uint32_t dataLength = sizeof(uint32_t);
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       // No need to write the data length; it's constant.
       return { keyLength, dataLength };
@@ -132,7 +134,7 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      endian::Writer<little>(out).write<uint32_t>(data);
+      endian::write<uint32_t>(out, data, little);
     }
   };
 
@@ -240,7 +242,7 @@ namespace {
     void writeIndexTables();
 
     void writeConversionLikeInstruction(const SingleValueInstruction *I,
-                                        bool guaranteed, bool escaped);
+                                        unsigned attrs);
     void writeOneTypeLayout(SILInstructionKind valueKind, SILType type);
     void writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
                                       unsigned attrs,
@@ -397,9 +399,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
-      (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
-      (unsigned)F.getInlineStrategy(), (unsigned)F.getOptimizationMode(),
-      (unsigned)F.getEffectsKind(),
+      (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
+      (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
+      (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasQualifiedOwnership(),
       F.isWeakLinked(), FnID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
@@ -589,11 +591,10 @@ void SILSerializer::writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
 /// Write an instruction that looks exactly like a conversion: all
 /// important information is encoded in the operand and the result type.
 void SILSerializer::writeConversionLikeInstruction(
-    const SingleValueInstruction *I, bool guaranteed, bool escaped) {
+    const SingleValueInstruction *I, unsigned attrs) {
   assert(I->getNumOperands() - I->getTypeDependentOperands().size() == 1);
-  writeOneTypeOneOperandLayout(I->getKind(),
-                               (guaranteed ? 1 : 0) | (escaped ? 2 : 0),
-                               I->getType(), I->getOperand(0));
+  writeOneTypeOneOperandLayout(I->getKind(), attrs, I->getType(),
+                               I->getOperand(0));
 }
 
 void
@@ -1473,14 +1474,18 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::ObjCMetatypeToObjectInst:
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
   case SILInstructionKind::ProjectBlockStorageInst: {
-    bool guaranteed = false;
-    bool escaped = false;
+    unsigned attrs = 0;
     if (SI.getKind() == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
-      escaped = cast<ConvertEscapeToNoEscapeInst>(SI).isEscapedByUser();
-      guaranteed = cast<ConvertEscapeToNoEscapeInst>(SI).isLifetimeGuaranteed();
+      if (cast<ConvertEscapeToNoEscapeInst>(SI).isLifetimeGuaranteed())
+        attrs |= 0x01;
+      if (cast<ConvertEscapeToNoEscapeInst>(SI).isEscapedByUser())
+        attrs |= 0x02;
     }
-    writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI),
-                                   guaranteed, escaped);
+    if (SI.getKind() == SILInstructionKind::ConvertFunctionInst) {
+      if (cast<ConvertFunctionInst>(SI).withoutActuallyEscaping())
+        attrs |= 0x01;
+    }
+    writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI), attrs);
     break;
   }
   case SILInstructionKind::PointerToAddressInst: {
@@ -2127,7 +2132,7 @@ static void writeIndexTable(const sil_index_block::ListLayout &List,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0.
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
   SmallVector<uint64_t, 8> scratch;

@@ -92,6 +92,7 @@ namespace {
   /// specific SIL function, which has been designated as a potential top-level
   /// host for tensor code.
   class TFDeabstraction {
+    SILTransform &transform;
     SILFunction &fn;
     TensorFunctionClassifier &tfc;
     ConstExprEvaluator &constantEvaluator;
@@ -114,9 +115,11 @@ namespace {
     /// instructions using TensorHandle values.
     SmallVector<SILInstruction*, 32> tensorOps;
   public:
-    TFDeabstraction(SILFunction &fn, TensorFunctionClassifier &tfc,
+    TFDeabstraction(SILTransform &transform, SILFunction &fn,
+                    TensorFunctionClassifier &tfc,
                     ConstExprEvaluator &constantEvaluator, SILPassManager *PM)
-      : fn(fn), tfc(tfc), constantEvaluator(constantEvaluator), passManager(PM){
+      : transform(transform), fn(fn), tfc(tfc),
+        constantEvaluator(constantEvaluator), passManager(PM) {
     }
 
     /// Deabstract the specified top level function as a deabstraction context.
@@ -261,7 +264,8 @@ void TFDeabstraction::inlineCalls() {
 
   // Use the mandatory inlining algorithm to expose call sites that contain
   // TensorFlow values as their argument or result lists.
-  inlineForTFDeabstraction(fn,
+  SILOptFunctionBuilder funcBuilder(transform);
+  inlineForTFDeabstraction(funcBuilder, fn,
      [&](FullApplySite site, SILFunction &callee) -> bool {
        if (callee.empty() &&
            !site.getModule().linkFunction(&callee,
@@ -2453,7 +2457,7 @@ void TFDeabstractionPass::run() {
     llvm::PrettyStackTraceFormat X("TFDeabstraction on function %s",
                                    fn.getName().str().c_str());
 
-    TFDeabstraction(fn, tfc, constantEvaluator, PM).doIt();
+    TFDeabstraction(*this, fn, tfc, constantEvaluator, PM).doIt();
 
     // TODO(clattner): This should eventually be the driver that kicks off
     // the partitioning pass as part of it, and the partitioning and later

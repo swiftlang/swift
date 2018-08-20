@@ -20,7 +20,7 @@ using namespace swift;
 using namespace swift::index;
 
 static NominalTypeDecl *getNominalParent(const ValueDecl *D) {
-  return D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  return D->getDeclContext()->getSelfNominalTypeDecl();
 }
 
 /// \returns true if \c D is a subclass of 'XCTestCase'.

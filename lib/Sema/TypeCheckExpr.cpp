@@ -730,7 +730,7 @@ TypeChecker::lookupFuncDecl(
     NameLookupOptions lookupOptions,
     const Optional<std::function<bool(FuncDecl *)>> &hasValidTypeCtx,
     const Optional<std::function<void()>> &invalidTypeCtxDiagnostic) {
-
+  assert(lookupContext);
   FuncDecl *resolvedFuncDecl = nullptr;
 
   // Perform lookup.

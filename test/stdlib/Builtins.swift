@@ -12,6 +12,7 @@
 // RUN: %empty-directory(%t)
 //   note: building with -Onone to test debug-mode-only safety checks
 // RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t/Builtins
+// RUN: %target-codesign %t/Builtins
 // RUN: %target-run %t/Builtins
 // REQUIRES: executable_test
 

@@ -147,7 +147,7 @@ void constraints::simplifyLocator(Expr *&anchor,
 
   while (!path.empty()) {
     switch (path[0].getKind()) {
-    case ConstraintLocator::ApplyArgument:
+    case ConstraintLocator::ApplyArgument: {
       // Extract application argument.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
         // The target anchor is the function being called.
@@ -168,6 +168,7 @@ void constraints::simplifyLocator(Expr *&anchor,
         continue;
       }
 
+      // SWIFT_ENABLE_TENSORFLOW
       if (auto *poundAssertExpr = dyn_cast<PoundAssertExpr>(anchor)) {
         targetAnchor = nullptr;
         targetPath.clear();
@@ -176,7 +177,20 @@ void constraints::simplifyLocator(Expr *&anchor,
         path = path.slice(1);
         continue;
       }
+
+      if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+        // The target anchor is the method being called,
+        // no additional information could be retrieved
+        // about this call.
+        targetAnchor = nullptr;
+        targetPath.clear();
+
+        anchor = UME->getArgument();
+        path = path.slice(1);
+        continue;
+      }
       break;
+    }
 
     case ConstraintLocator::ApplyFunction:
       // Extract application function.
@@ -208,7 +222,6 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::LValueConversion:
     case ConstraintLocator::RValueAdjustment:
-    case ConstraintLocator::ScalarToTuple:
     case ConstraintLocator::UnresolvedMember:
       // Arguments in autoclosure positions, lvalue and rvalue adjustments, and
       // scalar-to-tuple conversions, and unresolved members are
@@ -327,7 +340,7 @@ void constraints::simplifyLocator(Expr *&anchor,
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
-        
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -1359,7 +1372,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
     if (auto parent = CS.DC->getInnermostTypeContext()) {
       // If we are in a protocol extension of 'Proto' and we see
       // 'Proto.static', suggest 'Self.static'
-      if (auto extensionContext = parent->getAsProtocolExtensionContext()) {
+      if (auto extensionContext = parent->getExtendedProtocolDecl()) {
         if (extensionContext->getDeclaredType()->isEqual(instanceTy)) {
           Diag->fixItReplace(baseRange, "Self");
         }
@@ -1431,9 +1444,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
   }
 
   // Fall back to a fix-it with a full type qualifier
-  auto nominal =
-      member->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = member->getDeclContext()->getSelfNominalTypeDecl();
   SmallString<32> typeName;
   llvm::raw_svector_ostream typeNameStream(typeName);
   typeNameStream << nominal->getSelfInterfaceType() << ".";
@@ -1621,8 +1632,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         }
         assert(TypeDC->isTypeContext() && "Expected type decl context!");
 
-        if (TypeDC->getAsNominalTypeOrNominalTypeExtensionContext() ==
-            instanceTy->getAnyNominal()) {
+        if (TypeDC->getSelfNominalTypeDecl() == instanceTy->getAnyNominal()) {
           if (propertyInitializer)
             CS.TC.diagnose(nameLoc, diag::instance_member_in_initializer,
                            memberName);
@@ -1952,8 +1962,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       anchor = locator->getAnchor();    
   }
 
-  Type fromType =
-      CS.simplifyType(constraint->getFirstType())->getWithoutImmediateLabel();
+  Type fromType = CS.simplifyType(constraint->getFirstType());
 
   if (fromType->hasTypeVariable() && resolvedAnchorToExpr) {
     TCCOptions options;
@@ -1975,8 +1984,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     return false;
 
   fromType = fromType->getRValueType();
-  auto toType =
-      CS.simplifyType(constraint->getSecondType())->getWithoutImmediateLabel();
+  auto toType = CS.simplifyType(constraint->getSecondType());
 
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"
@@ -2874,6 +2882,10 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
                                Type fromType, Type toType, Expr *expr) {
   // Look through optional types; casts can add them, but can't remove extra
   // ones.
+  bool bothOptional =
+      fromType->getOptionalObjectType() && toType->getOptionalObjectType();
+  if (bothOptional)
+    fromType = fromType->getOptionalObjectType();
   toType = toType->lookThroughAllOptionalTypes();
 
   CheckedCastKind Kind = CS.getTypeChecker().typeCheckCheckedCast(
@@ -2882,9 +2894,11 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
   if (Kind != CheckedCastKind::Unresolved) {
     SmallString<32> buffer;
     llvm::raw_svector_ostream OS(buffer);
-    toType->print(OS);
     bool canUseAs = Kind == CheckedCastKind::Coercion ||
       Kind == CheckedCastKind::BridgingCoercion;
+    if (bothOptional && canUseAs)
+      toType = OptionalType::get(toType);
+    toType->print(OS);
     diag.fixItInsert(
         Lexer::getLocForEndOfToken(CS.DC->getASTContext().SourceMgr,
                                    expr->getEndLoc()),
@@ -3487,9 +3501,24 @@ static Optional<unsigned> getElementForScalarInitOfArg(
   
   auto getElementForScalarInitSimple =
       [](const TupleType *tupleTy) -> Optional<unsigned> {
-    int index = tupleTy->getElementForScalarInit();
-    if (index < 0) return None;
-    return index;    
+    Optional<unsigned> result = None;
+    for (unsigned i = 0, e = tupleTy->getNumElements(); i != e; ++i) {
+      // If we already saw a non-vararg field, then we have more than
+      // one candidate field.
+      if (result.hasValue()) {
+        // Vararg fields are okay; they'll just end up being empty.
+        if (tupleTy->getElement(i).isVararg())
+          continue;
+
+        // Give up.
+        return None;
+      }
+
+      // Otherwise, remember this field number.
+      result = i;
+    }
+
+    return result;
   };
 
   // If there aren't any candidates, we're done.
@@ -3752,7 +3781,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 }
 
 static DeclName getBaseName(DeclContext *context) {
-  if (auto generic = context->getAsNominalTypeOrNominalTypeExtensionContext()) {
+  if (auto generic = context->getSelfNominalTypeDecl()) {
     return generic->getName();
   } else if (context->isModuleScopeContext())
     return context->getParentModule()->getName();
@@ -3780,14 +3809,13 @@ void ConstraintSystem::diagnoseDeprecatedConditionalConformanceOuterAccess(
   auto exampleInner = result.front();
   auto innerChoice = exampleInner.getValueDecl();
   auto innerDC = exampleInner.getDeclContext()->getInnermostTypeContext();
-  auto innerParentDecl =
-      innerDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto innerParentDecl = innerDC->getSelfNominalTypeDecl();
   auto innerBaseName = getBaseName(innerDC);
 
   auto choiceKind = choice->getDescriptiveKind();
   auto choiceDC = choice->getDeclContext();
   auto choiceBaseName = getBaseName(choiceDC);
-  auto choiceParentDecl = choiceDC->getAsDeclOrDeclExtensionContext();
+  auto choiceParentDecl = choiceDC->getAsDecl();
   auto choiceParentKind = choiceParentDecl
                               ? choiceParentDecl->getDescriptiveKind()
                               : DescriptiveDeclKind::Module;
@@ -4089,8 +4117,7 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
         }
         assert(TypeDC->isTypeContext() && "Expected type decl context!");
 
-        if (TypeDC->getAsNominalTypeOrNominalTypeExtensionContext() ==
-            instanceType->getAnyNominal()) {
+        if (TypeDC->getSelfNominalTypeDecl() == instanceType->getAnyNominal()) {
           if (propertyInitializer)
             TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
                         UDE->getName());
@@ -4336,7 +4363,7 @@ public:
     // Explode inout type.
     if (param.isInOut()) {
       insertText << "&";
-      Ty = param.getType()->getInOutObjectType();
+      Ty = param.getPlainType();
     }
     // @autoclosure; the type should be the result type.
     if (auto FT = param.getType()->getAs<AnyFunctionType>())
@@ -5082,7 +5109,7 @@ namespace {
       // this allows things that are throws and not throws, and allows escape
       // and noescape functions.
       auto extInfo = FunctionType::ExtInfo().withThrows();
-      auto fTy = FunctionType::get(tv, contextualType, extInfo);
+      auto fTy = FunctionType::getOld(tv, contextualType, extInfo);
 
       auto locator = cs.getConstraintLocator(expr);
 
@@ -5280,7 +5307,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
   // requirements e.g. <A, B where A.Element == B.Element>.
   for (unsigned i = 0, e = bindings.size(); i != e; ++i) {
     auto param = params[i];
-    auto paramType = param.getType()->getInOutObjectType();
+    auto paramType = param.getPlainType();
 
     auto archetype = paramType->getAs<ArchetypeType>();
     if (!archetype)
@@ -5291,8 +5318,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     for (auto argNo : bindings[i]) {
       auto argType = args[argNo]
                          .getType()
-                         ->getWithoutSpecifierType()
-                         ->getRValueObjectType();
+                         ->getWithoutSpecifierType();
 
       if (argType->is<ArchetypeType>()) {
         diagnoseUnboundArchetype(archetype, fnExpr);
@@ -5530,8 +5556,9 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
                                         TVO_PrefersSubtypeBinding);
 
         auto extInfo = FunctionType::ExtInfo().withThrows();
-        auto fTy = FunctionType::get(ParenType::get(cs.getASTContext(), tv),
-                                     expectedResultType, extInfo);
+
+        FunctionType::Param tvParam(tv);
+        auto fTy = FunctionType::get({tvParam}, expectedResultType, extInfo);
 
         // Add a conversion constraint between the types.
         cs.addConstraint(ConstraintKind::Conversion, typeVar, fTy, locator,
@@ -5619,7 +5646,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
           if (!InputType || !ResultType)
             return false;
 
-          auto expectedType = FunctionType::get(InputType, ResultType);
+          auto expectedType = FunctionType::getOld(InputType, ResultType);
           cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                            expectedType, cs.getConstraintLocator(expr),
                            /*isFavored*/ true);
@@ -7001,7 +7028,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     if (VD->hasType() && (VD->getType()->hasTypeVariable() ||
                           VD->getType()->hasError())) {
       VD->setType(CS.getASTContext().TheUnresolvedType);
-      VD->setInterfaceType(VD->getType()->getInOutObjectType());
+      VD->setInterfaceType(VD->getType());
     }
   }
 
@@ -7413,8 +7440,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
       auto resolved =
           KeyPathExpr::Component::forProperty(varRef, Type(), componentNameLoc);
       resolvedComponents.push_back(resolved);
-      updateState(/*isProperty=*/true,
-                  var->getInterfaceType()->getRValueObjectType());
+      updateState(/*isProperty=*/true, var->getInterfaceType());
 
       continue;
     }
@@ -8329,7 +8355,16 @@ bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
   }
   
   if (!variadicArgs.empty()) {
-    auto varargsTy = contextualTT->getVarArgsBaseType();
+    Type varargsTy;
+    for (auto &elt : contextualTT->getElements()) {
+      if (elt.isVararg()) {
+        varargsTy = elt.getVarargBaseTy();
+        break;
+      }
+    }
+
+    assert(varargsTy);
+
     for (unsigned i = 0, e = variadicArgs.size(); i != e; ++i) {
       unsigned inArgNo = variadicArgs[i];
 
@@ -9132,60 +9167,6 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   return true;
 }
 
-bool swift::diagnoseUnwrap(TypeChecker &TC, DeclContext *DC,
-                           Expr *expr, Type type) {
-  Type unwrappedType = type->getOptionalObjectType();
-  if (!unwrappedType)
-    return false;
-
-  TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
-              unwrappedType);
-
-  // Suggest a default value via ?? <default value>
-  {
-    auto diag =
-      TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
-
-    // Figure out what we need to parenthesize.
-    bool needsParensInside =
-      exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
-    bool needsParensOutside =
-      exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, expr);
-
-    llvm::SmallString<2> insertBefore;
-    llvm::SmallString<32> insertAfter;
-    if (needsParensOutside) {
-      insertBefore += "(";
-    }
-    if (needsParensInside) {
-      insertBefore += "(";
-      insertAfter += ")";
-    }
-    insertAfter += " ?? <" "#default value#" ">";
-    if (needsParensOutside)
-      insertAfter += ")";
-
-    if (!insertBefore.empty()) {
-      diag.fixItInsert(expr->getStartLoc(), insertBefore);
-    }
-    diag.fixItInsertAfter(expr->getEndLoc(), insertAfter);
-  }
-
-  // Suggest a force-unwrap.
-  {
-    auto diag =
-      TC.diagnose(expr->getLoc(), diag::unwrap_with_force_value);
-    if (expr->canAppendPostfixExpression(true)) {
-      diag.fixItInsertAfter(expr->getEndLoc(), "!");
-    } else {
-      diag.fixItInsert(expr->getStartLoc(), "(")
-          .fixItInsertAfter(expr->getEndLoc(), ")!");
-    }
-  }
-
-  return true;
-}
-
 bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
                                               DeclName memberName,
                                               bool resultOptional,
@@ -9202,7 +9183,8 @@ bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
   // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
   // for non-optional results where that would be appropriate. For the moment
   // always offering "?" means that if the user chooses chaining, we'll end up
-  // in diagnoseUnwrap() to offer a default value during the next compile.
+  // in MissingOptionalUnwrapFailure:diagnose() to offer a default value during
+  // the next compile.
   diags.diagnose(baseExpr->getLoc(), diag::optional_base_chain, memberName)
     .fixItInsertAfter(baseExpr->getEndLoc(), "?");
 

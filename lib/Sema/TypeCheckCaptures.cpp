@@ -792,7 +792,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   // Extensions of generic ObjC functions can't use generic parameters from
   // their context.
   if (AFD && GenericParamCaptureLoc.isValid()) {
-    if (auto Clas = AFD->getParent()->getAsClassOrClassExtensionContext()) {
+    if (auto Clas = AFD->getParent()->getSelfClassDecl()) {
       if (Clas->usesObjCGenericsModel()) {
         diagnose(AFD->getLoc(),
                  diag::objc_generic_extension_using_type_parameter);

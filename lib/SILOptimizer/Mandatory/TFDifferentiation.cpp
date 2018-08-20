@@ -35,13 +35,13 @@
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseSet.h"
@@ -509,7 +509,7 @@ private:
     auto id = ctx.getIdentifier(name);
     auto *varDecl = new (ctx) VarDecl(
         /*IsStatic*/ false, VarDecl::Specifier::Var,
-        /*IsCaptureList*/ false, SourceLoc(), id, type, primalValueStruct);
+        /*IsCaptureList*/ false, SourceLoc(), id, primalValueStruct);
     varDecl->setInterfaceType(type);
     primalValueStruct->addMember(varDecl);
     return varDecl;
@@ -801,6 +801,9 @@ using GradientLookupKey = std::pair<SILFunction *, SILReverseAutoDiffConfig>;
 
 class ADContext {
 private:
+  /// Reference to the main transform.
+  SILModuleTransform &transform;
+
   /// The module where Differentiation is performed on.
   SILModule &module;
 
@@ -843,8 +846,9 @@ private:
 
 public:
   /// Construct an ADContext for the given module.
-  explicit ADContext(SILModule &module, SILPassManager &passManager);
+  explicit ADContext(SILModuleTransform &transform);
 
+  SILModuleTransform &getTransform() const { return transform; }
   SILModule &getModule() const { return module; }
   ASTContext &getASTContext() const { return module.getASTContext(); }
   SILPassManager &getPassManager() const { return passManager; }
@@ -863,8 +867,7 @@ public:
     auto *conf = confRef.getConcrete();
     if (auto existingTable = module.lookUpWitnessTable(confRef))
       return existingTable;
-    auto *decl =
-        conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto *decl = conf->getDeclContext()->getSelfNominalTypeDecl();
     auto linkage = getSILLinkage(getDeclLinkage(decl), NotForDefinition);
     auto *newTable = module.createWitnessTableDeclaration(conf, linkage);
     newTable = silLoader->lookupWitnessTable(newTable);
@@ -1055,8 +1058,9 @@ public:
 };
 } // end anonymous namespace
 
-ADContext::ADContext(SILModule &module, SILPassManager &passManager)
-    : module(module), passManager(passManager) {}
+ADContext::ADContext(SILModuleTransform &transform)
+    : transform(transform), module(*transform.getModule()),
+      passManager(*transform.getPassManager()) {}
 
 void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
                                               const DifferentiationTask *task,
@@ -1235,7 +1239,7 @@ public:
     return k & InvalidationKind::Everything;
   }
 
-  virtual DifferentiableActivityInfo *
+  virtual std::unique_ptr<DifferentiableActivityInfo>
   newFunctionAnalysis(SILFunction *f) override;
 
   virtual void initialize(SILPassManager *pm) override;
@@ -1281,10 +1285,10 @@ public:
 };
 } // end anonymous namespace
 
-DifferentiableActivityInfo *
+std::unique_ptr<DifferentiableActivityInfo>
 DifferentiableActivityAnalysis::newFunctionAnalysis(SILFunction *f) {
   assert(dominanceAnalysis && "Expect a valid dominance anaysis");
-  return new DifferentiableActivityInfo(*f);
+  return llvm::make_unique<DifferentiableActivityInfo>(*f);
 }
 
 void DifferentiableActivityAnalysis::initialize(SILPassManager *pm) {
@@ -2365,8 +2369,8 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
       originalTy->getCoroutineKind(), originalTy->getCalleeConvention(),
       originalTy->getParameters(), originalTy->getYields(), results,
       originalTy->getOptionalErrorResult(), context.getASTContext());
-  SILFunctionBuilder FB(module);
-  auto *primal = FB.getOrCreateFunction(
+  SILOptFunctionBuilder fb(context.getTransform());
+  auto *primal = fb.getOrCreateFunction(
       original->getLocation(), primalName, original->getLinkage(), primalTy,
       original->isBare(), original->isTransparent(), original->isSerialized());
   primal->setUnqualifiedOwnership();
@@ -2480,8 +2484,8 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
       origTy->getGenericSignature(), origTy->getExtInfo(),
       origTy->getCoroutineKind(), origTy->getCalleeConvention(), adjParams, {},
       adjResults, None, original->getASTContext());
-  SILFunctionBuilder FB(module);
-  auto *adjoint = FB.createFunction(
+  SILOptFunctionBuilder fb(context.getTransform());
+  auto *adjoint = fb.createFunction(
       original->getLinkage(), adjName, adjType,
       original->getGenericEnvironment(), original->getLocation(),
       original->isBare(), original->isTransparent(), original->isSerialized());
@@ -3608,7 +3612,7 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
     std::string gradName =
         original->getName().str() + "__" + mangleADConfig(config);
     auto gradNameId = astCtx.getIdentifier(gradName);
-    SILFunctionBuilder FB(module);
+    SILOptFunctionBuilder FB(context.getTransform());
     auto *gradFn =
         FB.createFunction(original->getLinkage(), gradNameId.str(), gradType,
                           original->getGenericEnvironment(),
@@ -3929,7 +3933,7 @@ void Differentiation::run() {
   }
 
   // A global differentiation context.
-  ADContext context(module, *PM);
+  ADContext context(*this);
 
   // Lower each gradient instruction to a function reference and replaces its
   // uses with a function reference to its gradient.
@@ -3984,4 +3988,6 @@ void Differentiation::run() {
 // Pass creation
 //===----------------------------------------------------------------------===//
 
-SILTransform *swift::createDifferentiation() { return new Differentiation; }
+SILTransform *swift::createDifferentiation() {
+  return new Differentiation;
+}

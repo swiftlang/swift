@@ -252,3 +252,10 @@ const long long $Ss12_ClassMirrorVs01_B0sWP[1] = {0};
 // type metadata accessor for Swift._ClassMirror
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const long long $Ss12_ClassMirrorVMa[1] = {0};
+
+// KeyPath
+
+SWIFT_RUNTIME_STDLIB_SPI
+const HeapObject *swift_getKeyPathImpl(const void *p, const void *a) {
+  abort();
+}

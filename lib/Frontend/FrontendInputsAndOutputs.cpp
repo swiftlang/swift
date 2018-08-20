@@ -168,6 +168,15 @@ bool FrontendInputsAndOutputs::shouldTreatAsLLVM() const {
   return false;
 }
 
+bool FrontendInputsAndOutputs::shouldTreatAsModuleInterface() const {
+  if (!hasSingleInput())
+    return false;
+
+  StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
+  file_types::ID InputType = file_types::lookupTypeForExtension(InputExt);
+  return InputType == file_types::TY_SwiftModuleInterfaceFile;
+}
+
 bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {
   if (hasSingleInput()) {
     // If we have exactly one input filename, and its extension is "sil",

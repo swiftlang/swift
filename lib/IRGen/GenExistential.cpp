@@ -121,8 +121,8 @@ namespace {
   /// store an existential value of some sort.
   template <class Derived, class Base>
   class ExistentialTypeInfoBase : public Base,
-      private llvm::TrailingObjects<Derived, ProtocolEntry> {
-    friend class llvm::TrailingObjects<Derived, ProtocolEntry>;
+      private llvm::TrailingObjects<Derived, const ProtocolDecl *> {
+    friend class llvm::TrailingObjects<Derived, const ProtocolDecl *>;
 
     /// The number of non-trivial protocols for this existential.
     unsigned NumStoredProtocols;
@@ -136,21 +136,22 @@ namespace {
     }
 
     template <class... As>
-    ExistentialTypeInfoBase(ArrayRef<ProtocolEntry> protocols,
+    ExistentialTypeInfoBase(ArrayRef<const ProtocolDecl *> protocols,
                             As &&...args)
         : Base(std::forward<As>(args)...),
           NumStoredProtocols(protocols.size()) {
       std::uninitialized_copy(protocols.begin(), protocols.end(),
-                              this->template getTrailingObjects<ProtocolEntry>());
+          this->template getTrailingObjects<const ProtocolDecl *>());
     }
 
   public:
     template <class... As>
     static const Derived *
-    create(ArrayRef<ProtocolEntry> protocols, As &&...args)
+    create(ArrayRef<const ProtocolDecl *> protocols, As &&...args)
     {
-      void *buffer =
-          operator new(ExistentialTypeInfoBase::template totalSizeToAlloc<ProtocolEntry>(protocols.size()));
+      void *buffer = operator new(
+          ExistentialTypeInfoBase::template totalSizeToAlloc<
+            const ProtocolDecl *>(protocols.size()));
       return new (buffer) Derived(protocols, std::forward<As>(args)...);
     }
 
@@ -162,47 +163,9 @@ namespace {
     /// implement.  This can be empty, meaning that values of this
     /// type are not know to implement any protocols, although we do
     /// still know how to manipulate them.
-    ArrayRef<ProtocolEntry> getStoredProtocols() const {
-      return {this->template getTrailingObjects<ProtocolEntry>(),
+    ArrayRef<const ProtocolDecl *> getStoredProtocols() const {
+      return {this->template getTrailingObjects<const ProtocolDecl *>(),
               NumStoredProtocols};
-    }
-
-    /// Given an existential object, find the witness table
-    /// corresponding to the given protocol.
-    llvm::Value *findWitnessTable(IRGenFunction &IGF,
-                                  Explosion &container,
-                                  ProtocolDecl *protocol) const {
-      assert(NumStoredProtocols != 0 &&
-             "finding a witness table in a trivial existential");
-
-      return emitImpliedWitnessTableRef(IGF, getStoredProtocols(), protocol,
-        [&](unsigned originIndex) {
-          return asDerived().extractWitnessTable(IGF, container, originIndex);
-        });
-    }
-
-    /// Given the address of an existential object, find the witness
-    /// table corresponding to the given protocol.
-    llvm::Value *findWitnessTable(IRGenFunction &IGF, Address obj,
-                                  ProtocolDecl *protocol) const {
-      assert(NumStoredProtocols != 0 &&
-             "finding a witness table in a trivial existential");
-
-      return emitImpliedWitnessTableRef(IGF, getStoredProtocols(), protocol,
-        [&](unsigned originIndex) {
-          return asDerived().loadWitnessTable(IGF, obj, originIndex);
-        });
-    }
-
-    /// Given the witness table vector from an existential object, find the
-    /// witness table corresponding to the given protocol.
-    llvm::Value *findWitnessTable(IRGenFunction &IGF,
-                                  ArrayRef<llvm::Value *> witnesses,
-                                  ProtocolDecl *protocol) const {
-      return emitImpliedWitnessTableRef(IGF, getStoredProtocols(), protocol,
-        [&](unsigned originIndex) {
-          return witnesses[originIndex];
-        });
     }
 
     /// Given the address of an existential object, find the witness
@@ -253,9 +216,10 @@ namespace {
     const ReferenceCounting Refcounting;
 
     template <class... As>
-    AddressOnlyClassExistentialTypeInfoBase(ArrayRef<ProtocolEntry> protocols,
-                                            ReferenceCounting refcounting,
-                                            As &&...args)
+    AddressOnlyClassExistentialTypeInfoBase(
+        ArrayRef<const ProtocolDecl *> protocols,
+        ReferenceCounting refcounting,
+        As &&...args)
       : super(protocols, std::forward<As>(args)...),
         Refcounting(refcounting) {
     }
@@ -690,12 +654,12 @@ namespace {
     bool IsOptional; \
   public: \
     AddressOnly##Name##ClassExistentialTypeInfo( \
-                                            ArrayRef<ProtocolEntry> protocols, \
-                                            llvm::Type *ty, \
-                                            SpareBitVector &&spareBits, \
-                                            Size size, Alignment align, \
-                                            ReferenceCounting refcounting, \
-                                            bool isOptional) \
+        ArrayRef<const ProtocolDecl *> protocols, \
+        llvm::Type *ty, \
+        SpareBitVector &&spareBits, \
+        Size size, Alignment align, \
+        ReferenceCounting refcounting, \
+        bool isOptional) \
       : AddressOnlyClassExistentialTypeInfoBase(protocols, refcounting, \
                                                 ty, size, std::move(spareBits), \
                                                 align, IsNotPOD, \
@@ -734,13 +698,12 @@ namespace {
     bool IsOptional; \
   public: \
     Loadable##Name##ClassExistentialTypeInfo( \
-                                    ArrayRef<ProtocolEntry> storedProtocols, \
-                                    llvm::Type *valueTy, \
-                                    llvm::Type *ty, \
-                                    const SpareBitVector &spareBits, \
-                                    Size size, Alignment align, \
-                                    ReferenceCounting refcounting, \
-                                    bool isOptional) \
+        ArrayRef<const ProtocolDecl *> storedProtocols, \
+        llvm::Type *valueTy, llvm::Type *ty, \
+        const SpareBitVector &spareBits, \
+        Size size, Alignment align, \
+        ReferenceCounting refcounting, \
+        bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
                                       spareBits, align, IsNotPOD, IsFixedSize), \
         Refcounting(refcounting), ValueType(valueTy), IsOptional(isOptional) { \
@@ -782,11 +745,12 @@ namespace {
     : public ScalarExistentialTypeInfoBase<Name##ClassExistentialTypeInfo, \
                                            LoadableTypeInfo> { \
   public: \
-    Name##ClassExistentialTypeInfo(ArrayRef<ProtocolEntry> storedProtocols, \
-                                   llvm::Type *ty, \
-                                   const SpareBitVector &spareBits, \
-                                   Size size, Alignment align, \
-                                   bool isOptional) \
+    Name##ClassExistentialTypeInfo( \
+        ArrayRef<const ProtocolDecl *> storedProtocols, \
+        llvm::Type *ty, \
+        const SpareBitVector &spareBits, \
+        Size size, Alignment align, \
+        bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
                                       spareBits, align, IsPOD, IsFixedSize) {} \
     const LoadableTypeInfo & \
@@ -845,7 +809,7 @@ class OpaqueExistentialTypeInfo final :
 
   // FIXME: We could get spare bits out of the metadata and/or witness
   // pointers.
-  OpaqueExistentialTypeInfo(ArrayRef<ProtocolEntry> protocols,
+  OpaqueExistentialTypeInfo(ArrayRef<const ProtocolDecl *> protocols,
                             llvm::Type *ty, Size size, Alignment align)
     : super(protocols, ty, size,
             SpareBitVector::getConstant(size.getValueInBits(), false), align,
@@ -949,7 +913,7 @@ class ClassExistentialTypeInfo final
   ReferenceCounting Refcounting;
  
   friend ExistentialTypeInfoBase;
-  ClassExistentialTypeInfo(ArrayRef<ProtocolEntry> protocols,
+  ClassExistentialTypeInfo(ArrayRef<const ProtocolDecl *> protocols,
                            llvm::Type *ty,
                            Size size,
                            SpareBitVector &&spareBits,
@@ -1256,7 +1220,7 @@ class ExistentialMetatypeTypeInfo final
   const LoadableTypeInfo &MetatypeTI;
 
   friend ExistentialTypeInfoBase;
-  ExistentialMetatypeTypeInfo(ArrayRef<ProtocolEntry> storedProtocols,
+  ExistentialMetatypeTypeInfo(ArrayRef<const ProtocolDecl *> storedProtocols,
                               llvm::Type *ty, Size size,
                               SpareBitVector &&spareBits,
                               Alignment align,
@@ -1291,17 +1255,16 @@ public:
 /// existential.
 class ErrorExistentialTypeInfo : public HeapTypeInfo<ErrorExistentialTypeInfo>
 {
-  ProtocolEntry ErrorEntry;
+  const ProtocolDecl *ErrorProto;
   ReferenceCounting Refcounting;
 
 public:
   ErrorExistentialTypeInfo(llvm::PointerType *storage,
                            Size size, SpareBitVector spareBits,
                            Alignment align,
-                           const ProtocolEntry &errorProtocolEntry,
+                           const ProtocolDecl *errorProto,
                            ReferenceCounting refcounting)
-    : HeapTypeInfo(storage, size, spareBits, align),
-      ErrorEntry(errorProtocolEntry),
+    : HeapTypeInfo(storage, size, spareBits, align), ErrorProto(errorProto),
       Refcounting(refcounting) {}
 
   ReferenceCounting getReferenceCounting() const {
@@ -1309,8 +1272,8 @@ public:
     return Refcounting;
   }
   
-  ArrayRef<ProtocolEntry> getStoredProtocols() const {
-    return ErrorEntry;
+  ArrayRef<const ProtocolDecl *> getStoredProtocols() const {
+    return ErrorProto;
   }
 };
   
@@ -1323,7 +1286,6 @@ createErrorExistentialTypeInfo(IRGenModule &IGM,
   // space only for witnesses to the Error protocol.
   assert(layout.isErrorExistential());
   auto *protocol = layout.getProtocols()[0]->getDecl();
-  auto &impl = IGM.getProtocolInfo(protocol);
 
   auto refcounting = (!IGM.ObjCInterop
                       ? ReferenceCounting::Native
@@ -1333,7 +1295,7 @@ createErrorExistentialTypeInfo(IRGenModule &IGM,
                                       IGM.getPointerSize(),
                                       IGM.getHeapObjectSpareBits(),
                                       IGM.getPointerAlignment(),
-                                      ProtocolEntry(protocol, impl),
+                                      protocol,
                                       refcounting);
 }
 
@@ -1341,7 +1303,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   auto layout = T.getExistentialLayout();
 
   SmallVector<llvm::Type*, 5> fields;
-  SmallVector<ProtocolEntry, 4> entries;
+  SmallVector<const ProtocolDecl *, 4> protosWithWitnessTables;
 
   // Check for special existentials.
   if (layout.isErrorExistential()) {
@@ -1381,11 +1343,8 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protoDecl))
       continue;
 
-    // Find the protocol layout.
-    const ProtocolInfo &impl = IGM.getProtocolInfo(protoDecl);
-    entries.push_back(ProtocolEntry(protoDecl, impl));
-
     // Each protocol gets a witness table.
+    protosWithWitnessTables.push_back(protoDecl);
     fields.push_back(IGM.WitnessTablePtrTy);
   }
 
@@ -1394,7 +1353,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   if (layout.requiresClass()) {
     // If we're not using the Objective-C runtime, we can use the
     // native reference counting entry points.
-    ReferenceCounting refcounting = getReferenceCountingForType(IGM, T);
+    ReferenceCounting refcounting = T->getReferenceCounting();
 
     llvm::PointerType *reprTy = nullptr;
     if (auto superclass = layout.getSuperclass()) {
@@ -1432,7 +1391,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
       spareBits.append(IGM.getWitnessTablePtrSpareBits());
     }
 
-    return ClassExistentialTypeInfo::create(entries, type,
+    return ClassExistentialTypeInfo::create(protosWithWitnessTables, type,
                                             size, std::move(spareBits), align,
                                             refcounting);
   }
@@ -1442,10 +1401,11 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   fields[1] = IGM.TypeMetadataPtrTy;
   type->setBody(fields);
 
-  OpaqueExistentialLayout opaque(entries.size());
+  OpaqueExistentialLayout opaque(protosWithWitnessTables.size());
   Alignment align = opaque.getAlignment(IGM);
   Size size = opaque.getSize(IGM);
-  return OpaqueExistentialTypeInfo::create(entries, type, size, align);
+  return OpaqueExistentialTypeInfo::create(protosWithWitnessTables, type, size,
+                                           align);
 }
 
 const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
@@ -1468,7 +1428,7 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
 
   auto layout = instanceT.getExistentialLayout();
 
-  SmallVector<ProtocolEntry, 4> entries;
+  SmallVector<const ProtocolDecl *, 4> protosWithWitnessTables;
   SmallVector<llvm::Type*, 4> fields;
 
   SpareBitVector spareBits;
@@ -1485,11 +1445,8 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
     if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protoDecl))
       continue;
 
-    // Find the protocol layout.
-    const ProtocolInfo &impl = IGM.getProtocolInfo(protoDecl);
-    entries.push_back(ProtocolEntry(protoDecl, impl));
-
     // Each protocol gets a witness table.
+    protosWithWitnessTables.push_back(protoDecl);
     fields.push_back(IGM.WitnessTablePtrTy);
     spareBits.append(IGM.getWitnessTablePtrSpareBits());
   }
@@ -1499,16 +1456,16 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
   Size size = IGM.getPointerSize() * fields.size();
   Alignment align = IGM.getPointerAlignment();
 
-  return ExistentialMetatypeTypeInfo::create(entries, type, size,
-                                             std::move(spareBits),
-                                             align, baseTI);
+  return ExistentialMetatypeTypeInfo::create(protosWithWitnessTables, type,
+                                             size, std::move(spareBits), align,
+                                             baseTI);
 }
 
 /// Emit protocol witness table pointers for the given protocol conformances,
 /// passing each emitted witness table index into the given function body.
 static void forEachProtocolWitnessTable(
     IRGenFunction &IGF, CanType srcType, llvm::Value **srcMetadataCache,
-    CanType destType, ArrayRef<ProtocolEntry> protocols,
+    CanType destType, ArrayRef<const ProtocolDecl *> protocols,
     ArrayRef<ProtocolConformanceRef> conformances,
     llvm::function_ref<void(unsigned, llvm::Value *)> body) {
   // Collect the conformances that need witness tables.
@@ -1528,8 +1485,7 @@ static void forEachProtocolWitnessTable(
          "mismatched protocol conformances");
 
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
-    assert(protocols[i].getProtocol()
-             == witnessConformances[i].getRequirement());
+    assert(protocols[i] == witnessConformances[i].getRequirement());
     auto table = emitWitnessTableRef(IGF, srcType, srcMetadataCache,
                                      witnessConformances[i]);
     body(i, table);
@@ -1603,9 +1559,9 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   auto srcMetadata = IGF.emitTypeMetadataRef(formalSrcType);
   // Should only be one conformance, for the Error protocol.
   assert(conformances.size() == 1 && destTI.getStoredProtocols().size() == 1);
-  const ProtocolEntry &entry = destTI.getStoredProtocols()[0];
-  (void) entry;
-  assert(entry.getProtocol() == conformances[0].getRequirement());
+  const ProtocolDecl *proto = destTI.getStoredProtocols()[0];
+  (void) proto;
+  assert(proto == conformances[0].getRequirement());
   auto witness = emitWitnessTableRef(IGF, formalSrcType, &srcMetadata,
                                      conformances[0]);
   

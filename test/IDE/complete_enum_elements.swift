@@ -28,7 +28,7 @@
 // RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_1 > %t.enum.txt
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS_INVALID < %t.enum.txt
 // RUN: %FileCheck %s -check-prefix=ENUM_SW_IN_PATTERN_1 < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_2 > %t.enum.txt
@@ -279,6 +279,10 @@ func freeFunc() {}
 // WITH_GLOBAL_RESULTS: Begin completions
 // WITH_GLOBAL_RESULTS: Decl[FreeFunction]/CurrModule: freeFunc()[#Void#]{{; name=.+$}}
 // WITH_GLOBAL_RESULTS: End completions
+
+// WITH_GLOBAL_RESULTS_INVALID: Begin completions
+// WITH_GLOBAL_RESULTS_INVALID: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: freeFunc()[#Void#]{{; name=.+$}}
+// WITH_GLOBAL_RESULTS_INVALID: End completions
 
 //===--- Complete enum elements in 'switch'.
 

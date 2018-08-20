@@ -126,8 +126,7 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
 }
 
 static void derivedBody_allParametersGetter(AbstractFunctionDecl *getterDecl) {
-  auto *nominal = getterDecl->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominal = getterDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
   auto *parametersDecl = getParametersStructDecl(nominal).first;
@@ -200,8 +199,7 @@ static void derivedBody_allParametersGetter(AbstractFunctionDecl *getterDecl) {
 }
 
 static void derivedBody_allParametersSetter(AbstractFunctionDecl *setterDecl) {
-  auto *nominal = setterDecl->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominal = setterDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
   auto *selfDecl = setterDecl->getImplicitSelfDecl();
@@ -354,7 +352,7 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
     auto newParameter =
         new (C) VarDecl(parameter->isStatic(), parameter->getSpecifier(),
                         parameter->isCaptureList(), /*NameLoc*/ SourceLoc(),
-                        parameter->getName(), newParameterType, parametersDecl);
+                        parameter->getName(), parametersDecl);
     // NOTE: `newParameter` is not marked as implicit here, because that affects
     // memberwise initializer synthesis.
     newParameter->setInterfaceType(newParameterType);

@@ -905,7 +905,6 @@ public struct UnsafeMutableRawPointer: _Pointer {
       // FIXME: to be replaced by _memcpy when conversions are implemented.
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
         (self + offset)._rawValue, rawSrc, UInt64(MemoryLayout<T>.size)._value,
-        /*alignment:*/ Int32()._value,
         /*volatile:*/ false._value)
     }
   }

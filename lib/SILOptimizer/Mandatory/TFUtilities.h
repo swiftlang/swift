@@ -22,6 +22,7 @@
 #include "swift/AST/TensorFlow.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "tensorflow/c/c_api.h"
 #endif
@@ -330,6 +331,7 @@ struct LoweredGraphFunction {
 
 /// Each object lowers a set of accelerator functions into a single TF graph.
 class TFGraphLowering {
+  SILTransform &parentTransform;
   llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
       &graphFunctions;
   std::unique_ptr<TF_Graph, decltype(&TF_DeleteGraph)> graph;
@@ -341,6 +343,7 @@ class TFGraphLowering {
 
 public:
   TFGraphLowering(
+      SILTransform &parentTransform,
       llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
           &graphFunctions);
 

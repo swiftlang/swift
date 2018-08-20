@@ -210,11 +210,11 @@ func callMin(_ x: Int, y: Int, a: Float, b: Float) {
   min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
 }
 
-func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {}
+func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {} // expected-note {{'R.Element' = 'Double'}}
 
 func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.makeIterator())
-  rangeOfIsBefore(da.makeIterator()) // expected-error{{'(IndexingIterator<[Double]>) -> ()' requires that 'Double' conform to 'IsBefore'}}
+  rangeOfIsBefore(da.makeIterator()) // expected-error{{global function 'rangeOfIsBefore' requires that 'Double' conform to 'IsBefore'}}
 }
 
 func testEqualIterElementTypes<A: IteratorProtocol, B: IteratorProtocol>(_ a: A, _ b: B) where A.Element == B.Element {}

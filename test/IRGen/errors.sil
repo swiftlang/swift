@@ -74,7 +74,7 @@ entry(%0 : $AnyObject):
     normal bb1, error bb2
 
 // CHECK-objc:        [[T0:%.*]] = phi %objc_object* [ [[RESULT]],
-// CHECK-objc-NEXT:   call void @swift_unknownRelease(%objc_object* [[T0]])
+// CHECK-objc-NEXT:   call void @swift_unknownObjectRelease(%objc_object* [[T0]])
 // CHECK-native:      [[T0:%.*]] = phi %swift.refcounted* [ [[RESULT]],
 // CHECK-native-NEXT: call void @swift_release(%swift.refcounted* [[T0]])
 // CHECK-NEXT:        br label [[CONT:%[0-9]+]]

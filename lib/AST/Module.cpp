@@ -291,8 +291,7 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
         continue;
 
       for (ValueDecl *vd : member.second) {
-        auto *nominal = vd->getDeclContext()
-           ->getAsNominalTypeOrNominalTypeExtensionContext();
+        auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
         if (nominal && nominal->getName() == accessPath.front().first)
           consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
       }
@@ -326,8 +325,7 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
   
   if (!accessPath.empty()) {
     for (ValueDecl *vd : iter->second) {
-      auto *nominal = vd->getDeclContext()
-         ->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
       if (nominal && nominal->getName() == accessPath.front().first)
         results.push_back(vd);
     }
@@ -411,7 +409,7 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   size_t oldSize = results.size();
   bool alreadyInPrivateContext = false;
 
-  auto containerDecl = container->getAsDeclOrDeclExtensionContext();
+  auto containerDecl = container->getAsDecl();
   // If FileUnit, then use FileUnit::lookupValue instead.
   assert(containerDecl != nullptr && "This context does not support lookup.");
 
@@ -592,10 +590,6 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType()) {
-    // FIXME: Recursion break.
-    if (!protocol->hasValidSignature())
-      return None;
-
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
     if (!protocol->existentialConformsToSelf())
@@ -1389,6 +1383,7 @@ bool SourceFile::shouldCollectToken() const {
   switch (Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::Interface:
     return (bool)AllCorrectedTokens;
   case SourceFileKind::REPL:
   case SourceFileKind::SIL:
@@ -1400,6 +1395,7 @@ bool SourceFile::shouldBuildSyntaxTree() const {
   switch (Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::Interface:
     return SyntaxInfo.Enable;
   case SourceFileKind::REPL:
   case SourceFileKind::SIL:

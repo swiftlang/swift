@@ -22,9 +22,9 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILConstants.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -556,6 +556,7 @@ namespace tf {
 
 class DevicePartitionerImpl
     : public SILInstructionVisitor<DevicePartitionerImpl> {
+  SILTransform &parentTransform;
   SILFunction &srcFn;
   const GraphFunctionDeviceInfo &deviceInfo;
 
@@ -590,10 +591,11 @@ public:
   /// there is a single device, we choose to exercise them for test
   /// coverage. This can be optimized for compiler performance later if it turns
   /// out to matter.
-  DevicePartitionerImpl(SILFunction &srcFn,
+  DevicePartitionerImpl(SILTransform &parentTransform,
+                        SILFunction &srcFn,
                         const GraphFunctionDeviceInfo &deviceInfo,
                         int &nextTensorTransferId)
-      : srcFn(srcFn), deviceInfo(deviceInfo),
+      : parentTransform(parentTransform), srcFn(srcFn), deviceInfo(deviceInfo),
         nextTensorTransferId(nextTensorTransferId) {
     static_assert(
         NUM_DEVICE_TYPES <= 8,
@@ -624,7 +626,7 @@ public:
     std::string resultFnName = srcFn.getName().str() + "_" +
                                getDeviceShortName(deviceType) +
                                ".device_partition";
-    SILFunctionBuilder FB(srcFn.getModule());
+    SILOptFunctionBuilder FB(parentTransform);
     auto resultFn = FB.getOrCreateFunction(
         srcFn.getLocation(), resultFnName, SILLinkage::Private, newFnType,
         /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
@@ -941,10 +943,12 @@ public:
   }
 };
 
-DevicePartitioner::DevicePartitioner(SILFunction &srcFn,
+DevicePartitioner::DevicePartitioner(SILTransform &parentTransform,
+                                     SILFunction &srcFn,
                                      const GraphFunctionDeviceInfo &deviceInfo,
                                      int &nextTensorTransferId)
-    : impl(new DevicePartitionerImpl(srcFn, deviceInfo, nextTensorTransferId)) {
+    : impl(new DevicePartitionerImpl(parentTransform, srcFn, deviceInfo,
+                                     nextTensorTransferId)) {
 }
 
 DevicePartitioner::~DevicePartitioner() { delete impl; }

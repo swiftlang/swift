@@ -351,6 +351,29 @@ void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPath,
                     ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
 
 } // end namespace namelookup
+
+/// Retrieve the set of nominal type declarations that are directly
+/// "inherited" by the given declaration at a particular position in the
+/// list of "inherited" types.
+///
+/// Add anything we find to the \c result vector. If we come across the
+/// AnyObject type, set \c anyObject true.
+void getDirectlyInheritedNominalTypeDecls(
+    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+    unsigned i,
+    llvm::SmallVectorImpl<std::pair<SourceLoc, NominalTypeDecl *>> &result,
+    bool &anyObject);
+
+/// Retrieve the set of nominal type declarations that are directly
+/// "inherited" by the given declaration, looking through typealiases
+/// and splitting out the components of compositions.
+///
+/// If we come across the AnyObject type, set \c anyObject true.
+SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4>
+getDirectlyInheritedNominalTypeDecls(
+                      llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                      bool &anyObject);
+
 } // end namespace swift
 
 #endif

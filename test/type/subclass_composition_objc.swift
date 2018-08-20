@@ -26,7 +26,7 @@ class SomeMethods {
 
 func takesObjCClass<T : ObjCClass>(_: T) {}
 func takesObjCProtocol<T : ObjCProtocol>(_: T) {}
-func takesObjCClassAndProtocol<T : ObjCClass & ObjCProtocol>(_: T) {}
+func takesObjCClassAndProtocol<T : ObjCClass & ObjCProtocol>(_: T) {} // expected-note {{where 'T' = 'ObjCClass'}}
 
 func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProtocol) {
   takesObjCClass(c)
@@ -39,7 +39,7 @@ func testSelfConformance(c: ObjCClass, p: ObjCProtocol, cp: ObjCClass & ObjCProt
 
   // FIXME: Bad diagnostics
   takesObjCClassAndProtocol(c) // expected-error {{argument type 'ObjCClass' does not conform to expected type 'ObjCProtocol'}}
-  takesObjCClassAndProtocol(p) // expected-error {{'(ObjCClass) -> ()' requires that 'ObjCClass' conform to 'ObjCProtocol'}}
+  takesObjCClassAndProtocol(p) // expected-error {{global function 'takesObjCClassAndProtocol' requires that 'ObjCClass' conform to 'ObjCProtocol'}}
   takesObjCClassAndProtocol(cp)
 }
 

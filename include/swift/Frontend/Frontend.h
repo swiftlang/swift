@@ -38,6 +38,7 @@
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
+#include "swift/TBDGen/TBDGen.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
@@ -70,6 +71,7 @@ class CompilerInvocation {
   MigratorOptions MigratorOpts;
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
+  TBDGenOptions TBDGenOpts;
   /// The \c SyntaxParsingCache to use when parsing the main file of this
   /// invocation
   SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
@@ -197,6 +199,9 @@ public:
   FrontendOptions &getFrontendOptions() { return FrontendOpts; }
   const FrontendOptions &getFrontendOptions() const { return FrontendOpts; }
 
+  TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
+  const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }
+
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
     return ClangImporterOpts;
@@ -293,7 +298,7 @@ public:
   std::string getPCHHash() const;
 
   SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() {
-    if (getInputKind() == InputFileKind::IFK_SIL) {
+    if (getInputKind() == InputFileKind::SIL) {
       return SourceFile::ImplicitModuleImportKind::None;
     }
     if (getParseStdlib()) {
@@ -310,7 +315,7 @@ public:
                        bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
-    return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
+    return FrontendOpts.InputKind == InputFileKind::SwiftLibrary;
   }
 
   const PrimarySpecificPaths &
@@ -507,10 +512,10 @@ private:
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
   bool isInputSwift() {
-    return Invocation.getInputKind() == InputFileKind::IFK_Swift;
+    return Invocation.getInputKind() == InputFileKind::Swift;
   }
   bool isInSILMode() {
-    return Invocation.getInputKind() == InputFileKind::IFK_SIL;
+    return Invocation.getInputKind() == InputFileKind::SIL;
   }
 
   bool setUpInputs();

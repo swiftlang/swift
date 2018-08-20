@@ -9,8 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-/// \file The SIL linker walks the call graph beginning at a starting function,
+///
+/// \file
+///
+/// The SIL linker walks the call graph beginning at a starting function,
 /// deserializing functions, vtables and witness tables.
 ///
 /// The behavior of the linker is controlled by a LinkMode value. The LinkMode
@@ -48,6 +50,8 @@
 /// even those with public linkage. This is not strictly necessary, since the
 /// devirtualizer deserializes vtables and witness tables as needed. However,
 /// doing so early creates more opportunities for optimization.
+///
+//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-linker"
 #include "Linker.h"
@@ -284,30 +288,16 @@ void SILLinkerVisitor::visitProtocolConformance(
 }
 
 void SILLinkerVisitor::visitApplySubstitutions(SubstitutionMap subs) {
-  for (auto &reqt : subs.getGenericSignature()->getRequirements()) {
-    switch (reqt.getKind()) {
-    case RequirementKind::Conformance: {
-      auto conformance = subs.lookupConformance(
-          reqt.getFirstType()->getCanonicalType(),
-          cast<ProtocolDecl>(reqt.getSecondType()->getAnyNominal()))
-        .getValue();
-      
-      // Formally all conformances referenced in a function application are
-      // used. However, eagerly visiting them all at this point leads to a
-      // large blowup in the amount of SIL we read in, and we aren't very
-      // systematic about laziness. For optimization purposes we can defer
-      // reading in most conformances until we need them for devirtualization.
-      // However, we *must* pull in shared clang-importer-derived conformances
-      // we potentially use, since we may not otherwise have a local definition.
-      if (mustDeserializeProtocolConformance(Mod, conformance)) {
-        visitProtocolConformance(conformance, None);
-      }
-      break;
-    }
-    case RequirementKind::Layout:
-    case RequirementKind::SameType:
-    case RequirementKind::Superclass:
-      break;
+  for (auto conformance : subs.getConformances()) {
+    // Formally all conformances referenced in a function application are
+    // used. However, eagerly visiting them all at this point leads to a
+    // large blowup in the amount of SIL we read in, and we aren't very
+    // systematic about laziness. For optimization purposes we can defer
+    // reading in most conformances until we need them for devirtualization.
+    // However, we *must* pull in shared clang-importer-derived conformances
+    // we potentially use, since we may not otherwise have a local definition.
+    if (mustDeserializeProtocolConformance(Mod, conformance)) {
+      visitProtocolConformance(conformance, None);
     }
   }
 }

@@ -314,6 +314,12 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
     prepareGenericParamList(genericParams);
     ext->setGenericParams(genericParams);
   } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
+    // Make sure the generic parameters are set up.
+    if (auto nominalGenericParams = nominal->getGenericParams()) {
+      nominalGenericParams->setOuterParameters(
+        nominal->getDeclContext()->getGenericParamsOfContext());
+    }
+
     // Clone the generic parameter list of a generic type.
     prepareGenericParamList(genericParams);
     ext->setGenericParams(
@@ -360,9 +366,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   // Validate the representation.
   // FIXME: Perform some kind of "shallow" validation here?
-  TypeResolutionOptions options;
+  TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
-  options |= TypeResolutionFlags::ExtensionBinding;
   if (TC.validateType(ED->getExtendedTypeLoc(), dc, options)) {
     ED->setInvalid();
     ED->getExtendedTypeLoc().setInvalidType(TC.Context);
@@ -474,34 +479,6 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
 
 void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
-}
-
-void TypeChecker::resolveExtensionForConformanceConstruction(
-    ExtensionDecl *ext,
-    SmallVectorImpl<ConformanceConstructionInfo> &protocols) {
-  // and the protocols which it inherits from:
-  DependentGenericTypeResolver resolver;
-  TypeResolutionOptions options = TypeResolutionFlags::GenericSignature;
-  options |= TypeResolutionFlags::InheritanceClause;
-  options |= TypeResolutionFlags::AllowUnavailableProtocol;
-  options |= TypeResolutionFlags::ResolveStructure;
-  for (auto &inherited : ext->getInherited()) {
-    // We don't want to have know about any generic params/archetypes, because
-    // that requires knowing a full generic environment for the extension (which
-    // can recur with conformance construction). Furthermore, we only *need* to
-    // resolve the protocol references, which won't involve any archetypes: an
-    // invalid inheritance like `struct Foo<T> {} extension Foo: SomeClass<T>
-    // {}` isn't relevant for conformance construction and is caught elsewhere.
-    auto type = inherited.getType();
-    if (!type)
-      type = resolveType(inherited.getTypeRepr(), ext, options, &resolver);
-
-    if (type && type->isExistentialType()) {
-      auto layout = type->getExistentialLayout();
-      for (auto proto : layout.getProtocols())
-        protocols.push_back({inherited.getLoc(), proto->getDecl()});
-    }
-  }
 }
 
 static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
@@ -855,13 +832,12 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    GenericEnvironment *GenericEnv,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
-  TypeResolutionOptions options;
+  TypeResolutionOptions options = None;
 
   // Fine to have unbound generic types.
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   if (isSILMode) {
     options |= TypeResolutionFlags::SILMode;
-    options |= TypeResolutionFlags::AllowIUO;
   }
   if (isSILType)
     options |= TypeResolutionFlags::SILType;

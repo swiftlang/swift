@@ -47,6 +47,7 @@
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -99,7 +100,8 @@ namespace {
       switch (key.getKind()) {
         case DeclBaseName::Kind::Normal:
           assert(!key.empty());
-          return llvm::HashString(key.getIdentifier().str());
+          // FIXME: DJB seed=0, audit whether the default seed could be used.
+          return llvm::djbHash(key.getIdentifier().str(), 0);
         case DeclBaseName::Kind::Subscript:
           return static_cast<uint8_t>(DeclNameKind::Subscript);
         case DeclBaseName::Kind::Constructor:
@@ -121,14 +123,14 @@ namespace {
       uint32_t dataLength = (sizeof(uint32_t) + 1) * data.size();
       assert(dataLength == static_cast<uint16_t>(dataLength));
 
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       switch (key.getKind()) {
       case DeclBaseName::Kind::Normal:
         writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Normal));
@@ -149,7 +151,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       for (auto entry : data) {
         writer.write<uint8_t>(entry.first);
         writer.write<uint32_t>(entry.second);
@@ -174,7 +176,8 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key.str());
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.str(), 0);
     }
 
     int32_t getNameDataForBase(const NominalTypeDecl *nominal,
@@ -204,7 +207,7 @@ namespace {
           dataLength += nameData;
       }
       assert(dataLength == static_cast<uint16_t>(dataLength));
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
@@ -217,7 +220,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       for (auto entry : data) {
         StringRef dataToWrite;
         writer.write<uint32_t>(entry.second);
@@ -238,7 +241,8 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key, 0);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -247,7 +251,7 @@ namespace {
       uint32_t keyLength = key.size();
       assert(keyLength == static_cast<uint16_t>(keyLength));
       uint32_t dataLength = sizeof(uint32_t);
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       // No need to write the data length; it's constant.
       return { keyLength, dataLength };
@@ -260,7 +264,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint32_t>(data);
     }
   };
@@ -279,7 +283,8 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key.str());
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.str(), 0);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -289,7 +294,7 @@ namespace {
       assert(keyLength == static_cast<uint16_t>(keyLength));
       uint32_t dataLength = (sizeof(uint32_t) * 2) * data.size();
       assert(dataLength == static_cast<uint16_t>(dataLength));
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
@@ -303,7 +308,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       for (auto entry : data) {
         writer.write<uint32_t>(entry.first);
         writer.write<uint32_t>(entry.second);
@@ -324,7 +329,8 @@ namespace {
       switch (key.getKind()) {
       case DeclBaseName::Kind::Normal:
         assert(!key.empty());
-        return llvm::HashString(key.getIdentifier().str());
+        // FIXME: DJB seed=0, audit whether the default seed could be used.
+        return llvm::djbHash(key.getIdentifier().str(), 0);
       case DeclBaseName::Kind::Subscript:
         return static_cast<uint8_t>(DeclNameKind::Subscript);
       case DeclBaseName::Kind::Constructor:
@@ -343,14 +349,14 @@ namespace {
       }
       assert(keyLength == static_cast<uint16_t>(keyLength));
       uint32_t dataLength = sizeof(uint32_t);
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       // No need to write dataLength, it's constant.
       return { keyLength, dataLength };
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       switch (key.getKind()) {
       case DeclBaseName::Kind::Normal:
         writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Normal));
@@ -371,7 +377,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(bitOffsetFitsIn32Bits(), "BitOffset too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint32_t>(static_cast<uint32_t>(data));
     }
   };
@@ -396,7 +402,7 @@ namespace {
       // with the same DeclBaseName. Seems highly unlikely.
       assert((data.size() < (1 << 14)) && "Too many members");
       uint32_t dataLength = sizeof(uint32_t) * data.size(); // value DeclIDs
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       // No need to write the key length; it's constant.
       writer.write<uint16_t>(dataLength);
       return { sizeof(uint32_t), dataLength };
@@ -405,14 +411,14 @@ namespace {
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
       assert(len == sizeof(uint32_t));
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint32_t>(key);
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       for (auto entry : data) {
         writer.write<uint32_t>(entry);
       }
@@ -1212,21 +1218,12 @@ static uint8_t getRawStableResilienceExpansion(swift::ResilienceExpansion e) {
 void Serializer::writeParameterList(const ParameterList *PL) {
   using namespace decls_block;
 
-  unsigned abbrCode = DeclTypeAbbrCodes[ParameterListLayout::Code];
-  ParameterListLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                  PL->size());
+  SmallVector<DeclID, 8> paramIDs;
+  for (const ParamDecl *param : *PL)
+    paramIDs.push_back(addDeclRef(param));
 
-  abbrCode = DeclTypeAbbrCodes[ParameterListEltLayout::Code];
-  for (auto &param : *PL) {
-    // FIXME: Default argument expressions?
-    
-    auto defaultArg =
-      getRawStableDefaultArgumentKind(param->getDefaultArgumentKind());
-    ParameterListEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                       addDeclRef(param),
-                                       param->isVariadic(),
-                                       defaultArg);
-  }
+  unsigned abbrCode = DeclTypeAbbrCodes[ParameterListLayout::Code];
+  ParameterListLayout::emitRecord(Out, ScratchRecord, abbrCode, paramIDs);
 }
 
 
@@ -1940,7 +1937,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     Type ty = SD->getInterfaceType()->getCanonicalType();
 
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
-    bool isProtocolExt = SD->getDeclContext()->getAsProtocolExtensionContext();
+    bool isProtocolExt = SD->getDeclContext()->getExtendedProtocolDecl();
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty), SUBSCRIPT_ID,
                                          isProtocolExt, SD->hasClangNode(),
@@ -1955,7 +1952,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
       Type ty = storage->getInterfaceType()->getCanonicalType();
       IdentifierID nameID = addDeclBaseNameRef(storage->getBaseName());
-      bool isProtocolExt = fn->getDeclContext()->getAsProtocolExtensionContext();
+      bool isProtocolExt = fn->getDeclContext()->getExtendedProtocolDecl();
       abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
       XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            addTypeRef(ty), nameID,
@@ -1984,14 +1981,14 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       abbrCode = DeclTypeAbbrCodes[XRefInitializerPathPieceLayout::Code];
       XRefInitializerPathPieceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addTypeRef(ty),
-        (bool)ctor->getDeclContext()->getAsProtocolExtensionContext(),
+        (bool)ctor->getDeclContext()->getExtendedProtocolDecl(),
         ctor->hasClangNode(),
         getStableCtorInitializerKind(ctor->getInitKind()));
       break;
     }
 
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
-    bool isProtocolExt = fn->getDeclContext()->getAsProtocolExtensionContext();
+    bool isProtocolExt = fn->getDeclContext()->getExtendedProtocolDecl();
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty),
                                          addDeclBaseNameRef(fn->getBaseName()),
@@ -2061,7 +2058,7 @@ void Serializer::writeCrossReference(const Decl *D) {
     return;
   }
 
-  bool isProtocolExt = D->getDeclContext()->getAsProtocolExtensionContext();
+  bool isProtocolExt = D->getDeclContext()->getExtendedProtocolDecl();
   if (auto type = dyn_cast<TypeDecl>(D)) {
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
 
@@ -2958,12 +2955,9 @@ void Serializer::writeDecl(const Decl *D) {
     auto genericParam = cast<GenericTypeParamDecl>(D);
     verifyAttrSerializable(genericParam);
 
-    auto contextID = addDeclContextRef(genericParam->getDeclContext());
-
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamDeclLayout::Code];
     GenericTypeParamDeclLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addDeclBaseNameRef(genericParam->getName()),
-                                contextID,
                                 genericParam->isImplicit(),
                                 genericParam->getDepth(),
                                 genericParam->getIndex());
@@ -3208,13 +3202,22 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(param->getDeclContext());
     Type interfaceType = param->getInterfaceType();
 
+    // Only save the text for normal default arguments, not any of the special
+    // ones.
+    StringRef defaultArgumentText;
+    if (param->getDefaultArgumentKind() == swift::DefaultArgumentKind::Normal)
+      defaultArgumentText = param->getDefaultValueStringRepresentation();
+
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                            addDeclBaseNameRef(param->getArgumentName()),
-                            addDeclBaseNameRef(param->getName()),
-                            contextID,
-                            getRawStableVarDeclSpecifier(param->getSpecifier()),
-                            addTypeRef(interfaceType));
+        addDeclBaseNameRef(param->getArgumentName()),
+        addDeclBaseNameRef(param->getName()),
+        contextID,
+        getRawStableVarDeclSpecifier(param->getSpecifier()),
+        addTypeRef(interfaceType),
+        param->isVariadic(),
+        getRawStableDefaultArgumentKind(param->getDefaultArgumentKind()),
+        defaultArgumentText);
 
     if (interfaceType->hasError()) {
       param->getDeclContext()->dumpContext();
@@ -3241,8 +3244,8 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawDefaultArgumentResilienceExpansion =
       getRawStableResilienceExpansion(
           fn->getDefaultArgumentResilienceExpansion());
-    Type ty = fn->getInterfaceType();
 
+    Type ty = fn->getInterfaceType();
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(addTypeRef(dependency));
 
@@ -3260,7 +3263,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->hasThrows(),
                            addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
-                           addTypeRef(ty),
+                           addTypeRef(fn->getResultInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
                            fn->getFullName().getArgumentNames().size() +
@@ -3297,8 +3300,8 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawDefaultArgumentResilienceExpansion =
       getRawStableResilienceExpansion(
           fn->getDefaultArgumentResilienceExpansion());
-    Type ty = fn->getInterfaceType();
 
+    Type ty = fn->getInterfaceType();
     SmallVector<IdentifierID, 4> dependencies;
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       dependencies.push_back(addTypeRef(dependency));
@@ -3317,7 +3320,7 @@ void Serializer::writeDecl(const Decl *D) {
                                fn->hasThrows(),
                                addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
-                               addTypeRef(ty),
+                               addTypeRef(fn->getResultInterfaceType()),
                                addDeclRef(fn->getOverriddenDecl()),
                                addDeclRef(fn->getStorage()),
                                rawAccessorKind,
@@ -3370,7 +3373,6 @@ void Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
     EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   contextID,
-                                  addTypeRef(elem->getInterfaceType()),
                                   elem->isImplicit(),
                                   elem->hasAssociatedValues(),
                                   (unsigned)RawValueKind,
@@ -3423,7 +3425,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 accessors.Decls.size(),
                                 addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),
-                                addTypeRef(ty),
+                                addTypeRef(subscript->getElementInterfaceType()),
                                 addDeclRef(subscript->getOverriddenDecl()),
                                 rawAccessLevel,
                                 rawSetterAccessLevel,
@@ -3474,7 +3476,6 @@ void Serializer::writeDecl(const Decl *D) {
                                     ctor->getInitKind()),
                                   addGenericEnvironmentRef(
                                                  ctor->getGenericEnvironment()),
-                                  addTypeRef(ty),
                                   addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
@@ -3503,8 +3504,7 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
                                  addGenericEnvironmentRef(
-                                                dtor->getGenericEnvironment()),
-                                 addTypeRef(dtor->getInterfaceType()));
+                                                dtor->getGenericEnvironment()));
     break;
   }
 
@@ -3648,7 +3648,7 @@ void Serializer::writeType(Type ty) {
 
   TypeOffsets.push_back(Out.GetCurrentBitNo());
 
-  switch (ty.getPointer()->getKind()) {
+  switch (ty->getKind()) {
   case TypeKind::Error:
   case TypeKind::Unresolved:
     llvm_unreachable("should not serialize an invalid type");
@@ -3688,15 +3688,11 @@ void Serializer::writeType(Type ty) {
 
   case TypeKind::Paren: {
     auto parenTy = cast<ParenType>(ty.getPointer());
-    auto paramFlags = parenTy->getParameterFlags();
-    auto rawOwnership =
-        getRawStableValueOwnership(paramFlags.getValueOwnership());
+    assert(parenTy->getParameterFlags().isNone());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
     ParenTypeLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()),
-        paramFlags.isVariadic(), paramFlags.isAutoClosure(),
-        paramFlags.isEscaping(), rawOwnership);
+        Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()));
     break;
   }
 
@@ -3708,13 +3704,11 @@ void Serializer::writeType(Type ty) {
 
     abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
-      auto paramFlags = elt.getParameterFlags();
-      auto rawOwnership =
-          getRawStableValueOwnership(paramFlags.getValueOwnership());
+      assert(elt.getParameterFlags().isNone());
       TupleTypeEltLayout::emitRecord(
-          Out, ScratchRecord, abbrCode, addDeclBaseNameRef(elt.getName()),
-          addTypeRef(elt.getType()), paramFlags.isVariadic(),
-          paramFlags.isAutoClosure(), paramFlags.isEscaping(), rawOwnership);
+          Out, ScratchRecord, abbrCode,
+          addDeclBaseNameRef(elt.getName()),
+          addTypeRef(elt.getType()));
     }
 
     break;
@@ -3824,29 +3818,42 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::Function: {
-    auto fnTy = cast<FunctionType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[FunctionTypeLayout::Code];
-    FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-           addTypeRef(fnTy->getInput()),
-           addTypeRef(fnTy->getResult()),
-           getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-           fnTy->isAutoClosure(),
-           fnTy->isNoEscape(),
-           fnTy->throws());
-    break;
-  }
-
+  case TypeKind::Function:
   case TypeKind::GenericFunction: {
-    auto fnTy = cast<GenericFunctionType>(ty.getPointer());
-    unsigned abbrCode = DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
-    GenericFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-            addTypeRef(fnTy->getInput()),
-            addTypeRef(fnTy->getResult()),
-            getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-            fnTy->throws(),
-            addGenericSignatureRef(fnTy->getGenericSignature()));
+    auto *fnTy = cast<AnyFunctionType>(ty.getPointer());
+
+    if (isa<FunctionType>(fnTy)) {
+      unsigned abbrCode = DeclTypeAbbrCodes[FunctionTypeLayout::Code];
+      FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+             addTypeRef(fnTy->getResult()),
+             getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
+             fnTy->isAutoClosure(),
+             fnTy->isNoEscape(),
+             fnTy->throws());
+    } else {
+      assert(!fnTy->isAutoClosure());
+      assert(!fnTy->isNoEscape());
+
+      auto *genericSig = cast<GenericFunctionType>(fnTy)->getGenericSignature();
+      unsigned abbrCode = DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
+      GenericFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+              addTypeRef(fnTy->getResult()),
+              getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
+              fnTy->throws(),
+              addGenericSignatureRef(genericSig));
+    }
+
+    unsigned abbrCode = DeclTypeAbbrCodes[FunctionParamLayout::Code];
+    for (auto &param : fnTy->getParams()) {
+      auto paramFlags = param.getParameterFlags();
+      auto rawOwnership =
+          getRawStableValueOwnership(paramFlags.getValueOwnership());
+      FunctionParamLayout::emitRecord(
+          Out, ScratchRecord, abbrCode, addDeclBaseNameRef(param.getLabel()),
+          addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
+          paramFlags.isAutoClosure(), paramFlags.isEscaping(), rawOwnership);
+    }
+
     break;
   }
       
@@ -3969,15 +3976,6 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::InOut: {
-    auto iotTy = cast<InOutType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[InOutTypeLayout::Code];
-    InOutTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                addTypeRef(iotTy->getObjectType()));
-    break;
-  }
-
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -4021,6 +4019,8 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
+  case TypeKind::InOut:
+    llvm_unreachable("inout types are only used in function type parameters");
   case TypeKind::LValue:
     llvm_unreachable("lvalue types are only used in function bodies");
   case TypeKind::TypeVariable:
@@ -4040,9 +4040,9 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TupleTypeLayout>();
   registerDeclTypeAbbr<TupleTypeEltLayout>();
   registerDeclTypeAbbr<FunctionTypeLayout>();
+  registerDeclTypeAbbr<FunctionParamLayout>();
   registerDeclTypeAbbr<MetatypeTypeLayout>();
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
-  registerDeclTypeAbbr<InOutTypeLayout>();
   registerDeclTypeAbbr<ArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
@@ -4082,7 +4082,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<DestructorLayout>();
 
   registerDeclTypeAbbr<ParameterListLayout>();
-  registerDeclTypeAbbr<ParameterListEltLayout>();
 
   registerDeclTypeAbbr<ParenPatternLayout>();
   registerDeclTypeAbbr<TuplePatternLayout>();
@@ -4237,7 +4236,7 @@ static void writeDeclTable(const index_block::DeclListLayout &DeclList,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -4263,7 +4262,7 @@ writeExtensionTable(const index_block::ExtensionTableLayout &ExtensionTable,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream, info);
   }
 
@@ -4279,7 +4278,7 @@ static void writeLocalDeclTable(const index_block::DeclListLayout &DeclList,
   {
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -4299,7 +4298,7 @@ writeNestedTypeDeclsTable(const index_block::NestedTypeDeclsLayout &declList,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -4324,7 +4323,7 @@ writeDeclMemberNamesTable(const index_block::DeclMemberNamesLayout &declNames,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -4344,7 +4343,7 @@ writeDeclMembersTable(const decl_member_tables_block::DeclMembersLayout &mems,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -4371,7 +4370,8 @@ public:
 
   hash_value_type ComputeHash(key_type_ref key) {
     assert(!key.empty());
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   std::pair<unsigned, unsigned>
@@ -4393,7 +4393,7 @@ public:
 
     // Source order.
     dataLength += numLen;
-    endian::Writer<little> writer(out);
+    endian::Writer writer(out, little);
     writer.write<uint32_t>(keyLength);
     writer.write<uint32_t>(dataLength);
     return { keyLength, dataLength };
@@ -4405,7 +4405,7 @@ public:
 
   void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                 unsigned len) {
-    endian::Writer<little> writer(out);
+    endian::Writer writer(out, little);
     writer.write<uint32_t>(data.Brief.size());
     out << data.Brief;
     writer.write<uint32_t>(data.Raw.Comments.size());
@@ -4601,7 +4601,7 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
                             ArrayRef<StringRef> Names) {
   llvm::SmallString<32> Blob;
   llvm::raw_svector_ostream BlobStream(Blob);
-  endian::Writer<little> Writer(BlobStream);
+  endian::Writer Writer(BlobStream, little);
   Writer.write<uint32_t>(Names.size());
   for (auto N : Names) {
     Writer.write<uint32_t>(N.size());
@@ -4664,9 +4664,9 @@ static void writeDeclCommentTable(
         return true;
 
       RawComment Raw = VD->getRawComment();
-      // When building the stdlib we intend to
-      // serialize unusual comments.  This situation is represented by
-      // GroupContext.isEnable().  In that case, we perform fewer serialization checks.
+      // When building the stdlib we intend to serialize unusual comments.
+      // This situation is represented by GroupContext.isEnable().  In that
+      // case, we perform fewer serialization checks.
       if (!GroupContext.isEnable()) {
         // Skip the decl if it cannot have a comment.
         if (!VD->canHaveComment()) {
@@ -4677,11 +4677,11 @@ static void writeDeclCommentTable(
         if (Raw.Comments.empty())
           return true;
 
-        // Skip the decl if it's not visible to clients.
-        // The use of getEffectiveAccess is unusual here;
-        // we want to take the testability state into account
-        // and emit documentation if and only if they are visible to clients
-        // (which means public ordinarily, but public+internal when testing enabled).
+        // Skip the decl if it's not visible to clients. The use of
+        // getEffectiveAccess is unusual here; we want to take the testability
+        // state into account and emit documentation if and only if they are
+        // visible to clients (which means public ordinarily, but
+        // public+internal when testing enabled).
         if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
           return true;
       }
@@ -4700,6 +4700,18 @@ static void writeDeclCommentTable(
                          SourceOrder++ });
       return true;
     }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      return { false, E };
+    }
+
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    bool walkToParameterListPre(ParameterList *PL) override { return false; }
   };
 
   DeclCommentTableWriter Writer(GroupContext);
@@ -4722,7 +4734,7 @@ static void writeDeclCommentTable(
   {
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = Writer.generator.Emit(blobStream);
   }
 
@@ -4742,7 +4754,8 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       llvm::SmallString<32> scratch;
-      return llvm::HashString(key.getString(scratch));
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.getString(scratch), 0);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -4758,7 +4771,7 @@ namespace {
         dataLength += std::get<0>(entry).size();
       }
 
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
       writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
@@ -4775,7 +4788,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
-      endian::Writer<little> writer(out);
+      endian::Writer writer(out, little);
       for (const auto &entry : data) {
         writer.write<uint32_t>(std::get<0>(entry).size());
         writer.write<uint8_t>(std::get<1>(entry));
@@ -4808,7 +4821,7 @@ static void writeObjCMethodTable(const index_block::ObjCMethodTableLayout &out,
     }
 
     // Make sure that no bucket is at offset 0
-    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    endian::write<uint32_t>(blobStream, 0, little);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -4836,8 +4849,7 @@ static void collectInterestingNestedDeclarations(
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
         if (func->isObjC()) {
-          if (auto owningClass =
-                func->getDeclContext()->getAsClassOrClassExtensionContext()) {
+          if (auto owningClass = func->getDeclContext()->getSelfClassDecl()) {
             Mangle::ASTMangler mangler;
             std::string ownerName = mangler.mangleNominalType(owningClass);
             assert(!ownerName.empty() && "Mangled type came back empty!");
@@ -4872,7 +4884,7 @@ static void collectInterestingNestedDeclarations(
       if (nestedType->getEffectiveAccess() > swift::AccessLevel::FilePrivate) {
         if (!nominalParent) {
           const DeclContext *DC = member->getDeclContext();
-          nominalParent = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+          nominalParent = DC->getSelfNominalTypeDecl();
           assert(nominalParent && "parent context is not a type or extension");
         }
         nestedTypeDecls[nestedType->getName()].push_back({

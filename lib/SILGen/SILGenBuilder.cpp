@@ -207,12 +207,13 @@ ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
   return getSILGenFunction().emitManagedRValueWithCleanup(result);
 }
 
-ManagedValue SILGenBuilder::createConvertFunction(SILLocation loc,
-                                                  ManagedValue fn,
-                                                  SILType resultTy) {
+ManagedValue
+SILGenBuilder::createConvertFunction(SILLocation loc, ManagedValue fn,
+                                     SILType resultTy,
+                                     bool withoutActuallyEscaping) {
   CleanupCloner cloner(*this, fn);
-  SILValue result =
-      createConvertFunction(loc, fn.forward(getSILGenFunction()), resultTy);
+  SILValue result = SILBuilder::createConvertFunction(
+      loc, fn.forward(getSILGenFunction()), resultTy, withoutActuallyEscaping);
   return cloner.clone(result);
 }
 

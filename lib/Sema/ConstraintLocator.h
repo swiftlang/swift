@@ -110,8 +110,6 @@ public:
     SequenceIteratorProtocol,
     /// \brief The element type of a generator.
     GeneratorElementType,
-    /// \brief The scalar type of a tuple type.
-    ScalarToTuple,
     /// \brief An argument passed in an autoclosure parameter
     /// position, which must match the autoclosure return type.
     AutoclosureResult,
@@ -162,7 +160,6 @@ public:
     case InstanceType:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ScalarToTuple:
     case AutoclosureResult:
     case Requirement:
     case Witness:
@@ -177,9 +174,9 @@ public:
     case TupleElement:
     case KeyPathComponent:
     case ConditionalRequirement:
-    case TypeParameterRequirement:
       return 1;
 
+    case TypeParameterRequirement:
     case ApplyArgToParam:
       return 2;
     }
@@ -217,7 +214,6 @@ public:
     case ParentType:
     case LValueConversion:
     case RValueAdjustment:
-    case ScalarToTuple:
     case SubscriptIndex:
     case SubscriptMember:
     case SubscriptResult:
@@ -369,8 +365,10 @@ public:
       return PathElement(ConditionalRequirement, index);
     }
 
-    static PathElement getTypeRequirementComponent(unsigned index) {
-      return PathElement(TypeParameterRequirement, index);
+    static PathElement getTypeRequirementComponent(unsigned index,
+                                                   RequirementKind kind) {
+      return PathElement(TypeParameterRequirement, index,
+                         static_cast<unsigned>(kind));
     }
 
     /// \brief Retrieve the kind of path element.

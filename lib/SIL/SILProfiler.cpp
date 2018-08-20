@@ -260,6 +260,16 @@ struct MapRegionCounters : public ASTWalker {
     } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(E)) {
       return visitClosureExpr(*this, ACE, [&] { mapRegion(ACE); });
     }
+
+    // rdar://42792053
+    // TODO: There's an outstanding issue here with LazyInitializerExpr. A LIE
+    // is copied into the body of a property getter after type-checking (before
+    // coverage). ASTWalker only visits this expression once via the property's
+    // VarDecl, and does not visit it again within the getter. This results in
+    // missing coverage. SILGen treats the init expr as part of the getter, but
+    // its SILProfiler has no information about the init because the LIE isn't
+    // visited here.
+
     return {true, E};
   }
 };

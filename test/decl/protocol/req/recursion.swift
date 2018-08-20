@@ -25,13 +25,12 @@ protocol CircularAssocTypeDefault {
   associatedtype Z3 = Z2
   // expected-note@-1{{protocol requires nested type 'Z3'; do you want to add it?}}
 
-  associatedtype Z4 = Self.Z4 // expected-error{{associated type 'Z4' references itself}}
-  // expected-note@-1{{type declared here}}
-  // expected-note@-2{{protocol requires nested type 'Z4'; do you want to add it?}}
+  associatedtype Z4 = Self.Z4 // expected-error{{associated type 'Z4' is not a member type of 'Self'}}
+  // expected-note@-1{{protocol requires nested type 'Z4'; do you want to add it?}}
 
   associatedtype Z5 = Self.Z6
   // expected-note@-1{{protocol requires nested type 'Z5'; do you want to add it?}}
-  associatedtype Z6 = Self.Z5
+  associatedtype Z6 = Self.Z5 // expected-error{{associated type 'Z5' is not a member type of 'Self'}}
   // expected-note@-1{{protocol requires nested type 'Z6'; do you want to add it?}}
 }
 

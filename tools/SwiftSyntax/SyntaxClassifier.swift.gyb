@@ -28,7 +28,7 @@ public enum SyntaxClassification {
 % end
 }
 
-class _SyntaxClassifier: SyntaxVisitor {
+fileprivate class _SyntaxClassifier: SyntaxVisitor {
 
   /// Don't classify nodes with these IDs or any of their children
   var skipNodeIds: Set<SyntaxNodeId> = []
@@ -71,6 +71,9 @@ class _SyntaxClassifier: SyntaxVisitor {
   }
 
   override func visit(_ token: TokenSyntax) {
+    // FIXME: We need to come up with some way in which the SyntaxClassifier can
+    // classify trivia (i.e. comments). In particular we need to be able to
+    // look into the comments to find things like URLs or keywords like MARK.
     var classification = contextStack.last!.classification
     if !contextStack.last!.force {
       if let contextFreeClassification = 
@@ -84,7 +87,8 @@ class _SyntaxClassifier: SyntaxVisitor {
         classification = .editorPlaceholder
       }
     }
-    assert(classifications[token] == nil)
+    assert(classifications[token] == nil,
+           "\(token) has already been classified")
     classifications[token] = classification
   }
 

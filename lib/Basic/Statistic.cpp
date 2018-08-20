@@ -27,12 +27,16 @@
 #include "llvm/Support/raw_ostream.h"
 #include <chrono>
 #include <limits>
+#include <unistd.h>
 
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
+#endif
+#ifdef HAVE_PROC_PID_RUSAGE
+#include <libproc.h>
 #endif
 
 namespace swift {
@@ -391,7 +395,7 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
     auto &C = getFrontendCounters();
 #define FRONTEND_STATISTIC(TY, NAME)                            \
     do {                                                        \
-      static Statistic Stat = {#TY, #NAME, #NAME, {0}, false};  \
+      static Statistic Stat = {#TY, #NAME, #NAME, {0}, {false}};  \
       Stat += (C).NAME;                                         \
     } while (0);
 #include "swift/Basic/Statistics.def"
@@ -401,7 +405,7 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
     auto &C = getDriverCounters();
 #define DRIVER_STATISTIC(NAME)                                       \
     do {                                                             \
-      static Statistic Stat = {"Driver", #NAME, #NAME, {0}, false};  \
+      static Statistic Stat = {"Driver", #NAME, #NAME, {0}, {false}};  \
       Stat += (C).NAME;                                              \
     } while (0);
 #include "swift/Basic/Statistics.def"
@@ -481,6 +485,18 @@ FrontendStatsTracer::~FrontendStatsTracer()
     Reporter->saveAnyFrontendStatsEvents(*this, false);
 }
 
+// Copy any interesting process-wide resource accounting stats to
+// associated fields in the provided AlwaysOnFrontendCounters.
+void updateProcessWideFrontendCounters(
+    UnifiedStatsReporter::AlwaysOnFrontendCounters &C) {
+#if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
+  struct rusage_info_v4 ru;
+  if (0 == proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru)) {
+    C.NumInstructionsExecuted = ru.ri_instructions;
+  }
+#endif
+}
+
 static inline void
 saveEvent(StringRef StatName,
           int64_t Curr, int64_t Last,
@@ -516,6 +532,7 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
   auto Now = llvm::TimeRecord::getCurrentTime();
   auto &Curr = getFrontendCounters();
   auto &Last = *LastTracedFrontendCounters;
+  updateProcessWideFrontendCounters(Curr);
   if (EventProfilers) {
     auto TimeDelta = Now;
     TimeDelta -= EventProfilers->LastUpdated;
@@ -591,6 +608,8 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
       C.NumProcessFailures++;
     }
   }
+
+  updateProcessWideFrontendCounters(getFrontendCounters());
 
   // NB: Timer needs to be Optional<> because it needs to be destructed early;
   // LLVM will complain about double-stopping a timer if you tear down a

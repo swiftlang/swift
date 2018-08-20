@@ -683,6 +683,7 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
     case DAK_DowngradeExhaustivityCheck:
+    case DAK_HasInitialValue:
       return None;
     default:
       break;

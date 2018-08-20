@@ -79,7 +79,7 @@ extension FinalTests {
     set { }
   }
 
-  // CHECK: @objc static var x
+  // CHECK: @objc @_hasInitialValue static var x
   @objc static var x: Int = 0
 
   // CHECK: @objc static func bar

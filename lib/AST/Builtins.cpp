@@ -155,7 +155,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
   for (Type argType : argTypes) {
     auto PD = new (Context)
         ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                  Identifier(), SourceLoc(), Identifier(), argType, DC);
+                  Identifier(), SourceLoc(), Identifier(), DC);
     PD->setInterfaceType(argType);
     PD->setValidationToChecked();
     PD->setImplicit();
@@ -184,7 +184,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
 /// Build a builtin function declaration.
 static FuncDecl *
 getBuiltinGenericFunction(Identifier Id,
-                          ArrayRef<TupleTypeElt> ArgParamTypes,
+                          ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
                           GenericEnvironment *Env) {
@@ -196,15 +196,14 @@ getBuiltinGenericFunction(Identifier Id,
 
   SmallVector<ParamDecl*, 4> params;
   for (unsigned i = 0, e = ArgParamTypes.size(); i < e; i++) {
-    auto paramIfaceType = ArgParamTypes[i].getRawType();
+    auto paramIfaceType = ArgParamTypes[i].getPlainType();
     auto specifier = (ArgParamTypes[i].getParameterFlags().isInOut())
                          ? VarDecl::Specifier::InOut
                          : VarDecl::Specifier::Default;
     auto PD = new (Context) ParamDecl(specifier,
                                       SourceLoc(), SourceLoc(),
                                       Identifier(), SourceLoc(),
-                                      Identifier(),
-                                      Type(), DC);
+                                      Identifier(), DC);
     PD->setInterfaceType(paramIfaceType);
     PD->setValidationToChecked();
     PD->setImplicit();
@@ -212,7 +211,7 @@ getBuiltinGenericFunction(Identifier Id,
   }
 
   auto *paramList = ParameterList::create(Context, params);
-  
+
   DeclName Name(Context, Id, paramList);
   auto func = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
                                StaticSpellingKind::None,
@@ -223,7 +222,7 @@ getBuiltinGenericFunction(Identifier Id,
                                /*SelfDecl=*/nullptr,
                                paramList,
                                TypeLoc::withoutLoc(ResType), DC);
-    
+
   func->setGenericEnvironment(Env);
   func->computeType();
   func->setValidationToChecked();
@@ -457,7 +456,7 @@ namespace {
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
     GenericEnvironment *GenericEnv = nullptr;
-    SmallVector<TupleTypeElt, 4> InterfaceParams;
+    SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
 
   public:
@@ -479,16 +478,15 @@ namespace {
     template <class G>
     void addParameter(const G &generator) {
       Type gTyIface = generator.build(*this);
-      InterfaceParams.push_back({gTyIface->getInOutObjectType(),
-                                 Identifier(), ParameterTypeFlags()});
+      auto flags = ParameterTypeFlags();
+      InterfaceParams.emplace_back(gTyIface, Identifier(), flags);
     }
 
     template <class G>
     void addInOutParameter(const G &generator) {
       Type gTyIface = generator.build(*this);
-      auto iFaceflags = ParameterTypeFlags().withInOut(true);
-      InterfaceParams.push_back(TupleTypeElt(gTyIface->getInOutObjectType(),
-                                             Identifier(), iFaceflags));
+      auto flags = ParameterTypeFlags().withInOut(true);
+      InterfaceParams.emplace_back(gTyIface, Identifier(), flags);
     }
     
     template <class G>
@@ -522,17 +520,6 @@ namespace {
       std::function<Type(BuiltinGenericSignatureBuilder &)> TheFunction;
       Type build(BuiltinGenericSignatureBuilder &builder) const {
         return TheFunction(builder);
-      }
-    };
-    template <class T, class U>
-    struct FunctionGenerator {
-      T Arg;
-      U Result;
-      FunctionType::ExtInfo ExtInfo;
-      Type build(BuiltinGenericSignatureBuilder &builder) const {
-        return FunctionType::get(Arg.build(builder),
-                                 Result.build(builder),
-                                 ExtInfo);
       }
     };
     template <class T>
@@ -583,13 +570,6 @@ makeTuple(const Gs & ...elementGenerators) {
       return TupleType::get(elts, builder.Context);
     }
   };
-}
-
-template <class T, class U>
-static BuiltinGenericSignatureBuilder::FunctionGenerator<T,U>
-makeFunction(const T &arg, const U &result,
-             FunctionType::ExtInfo extInfo = FunctionType::ExtInfo()) {
-  return { arg, result, extInfo };
 }
 
 template <class T>
@@ -1211,11 +1191,11 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
                                     /*throws*/ false);
   if (withContext) {
     auto ContextTy = Context.TheRawPointerType;
-    auto ContextArg = ParenType::get(Context, ContextTy);
-    auto BlockTy = FunctionType::get(ContextArg, VoidTy, Thin);
+    auto ContextArg = FunctionType::Param(ContextTy);
+    auto BlockTy = FunctionType::get({ContextArg}, VoidTy, Thin);
     return getBuiltinFunction(Id, {HandleTy, BlockTy, ContextTy}, VoidTy);
   } else {
-    auto BlockTy = FunctionType::get(VoidTy, VoidTy, Thin);
+    auto BlockTy = FunctionType::get({}, VoidTy, Thin);
     return getBuiltinFunction(Id, {HandleTy, BlockTy}, VoidTy);
   }
 }
@@ -1297,12 +1277,12 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
 static const char *const IntrinsicNameTable[] = {
     "not_intrinsic",
 #define GET_INTRINSIC_NAME_TABLE
-#include "llvm/IR/Intrinsics.gen"
+#include "llvm/IR/IntrinsicImpl.inc"
 #undef GET_INTRINSIC_NAME_TABLE
 };
 
 #define GET_INTRINSIC_TARGET_DATA
-#include "llvm/IR/Intrinsics.gen"
+#include "llvm/IR/IntrinsicImpl.inc"
 #undef GET_INTRINSIC_TARGET_DATA
 
 /// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types

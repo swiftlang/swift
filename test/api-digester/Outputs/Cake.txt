@@ -1,4 +1,7 @@
 
+/* Generic Signature Changes */
+cake1: Func P1.P1Constraint() has generic signature change from <Self where Self : P1, Self : P2> to <Self where Self : P1>
+
 /* RawRepresentable Changes */
 
 /* Removed Decls */
@@ -19,5 +22,5 @@ cake1: Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
 cake1: Var C1.CIIns1 changes from weak to strong
 cake1: Var C1.CIIns2 changes from strong to weak
 cake1: Func C1.foo1() is now not static
-cake1: Func S1.foo3() is now static
 cake1: Func S1.foo1() is now mutating
+cake1: Func S1.foo3() is now static

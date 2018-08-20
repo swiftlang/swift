@@ -71,7 +71,46 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.PrintIfConfig = false;
   result.FullyQualifiedTypes = true;
   result.SkipImports = true;
-  result.AccessFilter = AccessLevel::Public;
+
+  class ShouldPrintForTextualInterface : public ShouldPrintChecker {
+    bool shouldPrint(const Decl *D, const PrintOptions &options) override {
+      // Skip anything that isn't 'public' or '@usableFromInline'.
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        AccessScope accessScope =
+            VD->getFormalAccessScope(/*useDC*/nullptr,
+                                     /*treatUsableFromInlineAsPublic*/true);
+        if (!accessScope.isPublic())
+          return false;
+      }
+
+      // Skip typealiases that just redeclare generic parameters.
+      if (auto *alias = dyn_cast<TypeAliasDecl>(D)) {
+        if (alias->isImplicit()) {
+          const Decl *parent =
+              D->getDeclContext()->getAsDecl();
+          if (auto *genericCtx = parent->getAsGenericContext()) {
+            bool matchesGenericParam =
+                llvm::any_of(genericCtx->getInnermostGenericParamTypes(),
+                             [alias](const GenericTypeParamType *param) {
+              return param->getName() == alias->getName();
+            });
+            if (matchesGenericParam)
+              return false;
+          }
+        }
+      }
+
+      return ShouldPrintChecker::shouldPrint(D, options);
+    }
+  };
+  result.CurrentPrintabilityChecker =
+      std::make_shared<ShouldPrintForTextualInterface>();
+
+  // FIXME: We don't really need 'public' on everything; we could just change
+  // the default to 'public' and mark the 'internal' things.
+  result.PrintAccess = true;
+
+  result.ExcludeAttrList.push_back(DAK_AccessControl);
 
   // FIXME: We'll need the actual default parameter expression.
   result.PrintDefaultParameterPlaceholder = false;
@@ -477,7 +516,10 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printAccess(const ValueDecl *D) {
     if (!Options.PrintAccess || !D->hasAccess() ||
-        D->getAttrs().hasAttribute<AccessControlAttr>())
+        isa<ProtocolDecl>(D->getDeclContext()))
+      return;
+    if (D->getAttrs().hasAttribute<AccessControlAttr>() &&
+        !llvm::is_contained(Options.ExcludeAttrList, DAK_AccessControl))
       return;
 
     printAccess(D->getFormalAccess());
@@ -749,7 +791,7 @@ void PrintAST::printAttributes(const Decl *D) {
   // Don't print a redundant 'final' if we are printing a 'static' decl.
   unsigned originalExcludeAttrCount = Options.ExcludeAttrList.size();
   if (Options.PrintImplicitAttrs &&
-      D->getDeclContext()->getAsClassOrClassExtensionContext() &&
+      D->getDeclContext()->getSelfClassDecl() &&
       getCorrectStaticSpelling(D) == StaticSpellingKind::KeywordStatic) {
     Options.ExcludeAttrList.push_back(DAK_Final);
   }
@@ -1286,7 +1328,8 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
-bool ShouldPrintChecker::shouldPrint(const Pattern *P, PrintOptions &Options) {
+bool ShouldPrintChecker::shouldPrint(const Pattern *P,
+                                     const PrintOptions &Options) {
   bool ShouldPrint = false;
   P->forEachVariable([&](const VarDecl *VD) {
     ShouldPrint |= shouldPrint(VD, Options);
@@ -1294,7 +1337,8 @@ bool ShouldPrintChecker::shouldPrint(const Pattern *P, PrintOptions &Options) {
   return ShouldPrint;
 }
 
-bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
+bool ShouldPrintChecker::shouldPrint(const Decl *D,
+                                     const PrintOptions &Options) {
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
@@ -1367,7 +1411,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
         // If the Clang declaration is from a protocol but was mirrored into
         // class or extension thereof, treat it as an override.
         if (isa<clang::ObjCProtocolDecl>(clangDecl->getDeclContext()) &&
-            VD->getDeclContext()->getAsClassOrClassExtensionContext())
+            VD->getDeclContext()->getSelfClassDecl())
           return false;
 
         // Check whether Clang considers it an override.
@@ -1830,7 +1874,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       if (auto *genericSig = decl->getGenericSignature()) {
         // For protocol extensions, don't print the 'Self : ...' requirement.
         unsigned flags = PrintRequirements | InnermostOnly;
-        if (decl->getAsProtocolExtensionContext())
+        if (decl->getExtendedProtocolDecl())
           flags |= SkipSelfRequirement;
         printGenericSignature(genericSig, flags);
       }
@@ -2139,7 +2183,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 }
 
 static bool isStructOrClassContext(DeclContext *dc) {
-  auto *nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominal = dc->getSelfNominalTypeDecl();
   if (nominal == nullptr)
     return false;
   return isa<ClassDecl>(nominal) || isa<StructDecl>(nominal);
@@ -2286,7 +2330,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   // through the paren types so that we don't print excessive @escapings.
   unsigned numParens = 0;
   if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
-    auto type = TheTypeLoc.getType()->getInOutObjectType();
+    auto type = TheTypeLoc.getType();
 
     printParameterFlags(Printer, Options, paramFlags);
     while (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
@@ -2310,8 +2354,8 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << "...";
 
   if (param->isDefaultArgument()) {
-    auto defaultArgStr
-      = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
+    StringRef defaultArgStr = param->getDefaultValueStringRepresentation();
+
     if (defaultArgStr.empty()) {
       if (Options.PrintDefaultParameterPlaceholder)
         Printer << " = " << tok::kw_default;
@@ -2324,6 +2368,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       case DefaultArgumentKind::Column:
       case DefaultArgumentKind::Function:
       case DefaultArgumentKind::DSOHandle:
+      case DefaultArgumentKind::NilLiteral:
         Printer.printKeyword(defaultArgStr);
         break;
       default:
@@ -2662,10 +2707,25 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   if ((decl->getInitKind() == CtorInitializerKind::Convenience ||
        decl->getInitKind() == CtorInitializerKind::ConvenienceFactory) &&
       !decl->getAttrs().hasAttribute<ConvenienceAttr>()) {
-    Printer.printKeyword("convenience");
-    Printer << " ";
+    // Protocol extension initializers are modeled as convenience initializers,
+    // but they're not written that way in source. Check if we're actually
+    // printing onto a class.
+    bool isClassContext;
+    if (CurrentType) {
+      isClassContext = CurrentType->getClassOrBoundGenericClass() != nullptr;
+    } else {
+      const DeclContext *dc = decl->getDeclContext();
+      isClassContext = dc->getSelfClassDecl() != nullptr;
+    }
+    if (isClassContext) {
+      Printer.printKeyword("convenience");
+      Printer << " ";
+    } else {
+      assert(decl->getDeclContext()->getExtendedProtocolDecl() &&
+             "unexpected convenience initializer");
+    }
   } else if (decl->getInitKind() == CtorInitializerKind::Factory) {
-      Printer << "/*not inherited*/ ";
+    Printer << "/*not inherited*/ ";
   }
 
   printContextIfNeeded(decl);
@@ -3284,7 +3344,7 @@ public:
       if (i)
         Printer << ", ";
       const TupleTypeElt &TD = Fields[i];
-      Type EltType = TD.getType()->getInOutObjectType();
+      Type EltType = TD.getRawType();
 
       Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
       SWIFT_DEFER {
@@ -3865,7 +3925,7 @@ public:
       Printer << "<anonymous>";
     else {
       if (T->getDecl() &&
-          T->getDecl()->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+          T->getDecl()->getDeclContext()->getSelfProtocolDecl()) {
         Printer.printTypeRef(T, T->getDecl(), Name);
         return;
       }

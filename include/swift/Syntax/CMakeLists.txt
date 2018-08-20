@@ -10,6 +10,7 @@ set(generated_include_sources
     SyntaxBuilders.h.gyb
     SyntaxFactory.h.gyb
     SyntaxVisitor.h.gyb
+    TokenKinds.def.gyb
     Trivia.h.gyb)
 
 add_gyb_target(swift-syntax-generated-headers

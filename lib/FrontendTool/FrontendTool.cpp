@@ -208,7 +208,8 @@ static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
     StringRef realPath;
     int FD;
     // FIXME: appropriate error handling
-    if (llvm::sys::fs::openFileForRead(dep, FD, &buffer)) {
+    if (llvm::sys::fs::openFileForRead(dep, FD, llvm::sys::fs::OF_None,
+                                       &buffer)) {
       // Couldn't open the file now, so let's just assume the old path was
       // canonical (enough).
       realPath = dep;
@@ -282,6 +283,7 @@ static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
   auto bufferID = SF->getBufferID();
   assert(bufferID && "frontend should have a buffer ID "
          "for the main source file");
+  (void)bufferID;
 
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;
@@ -781,6 +783,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
   const auto &frontendOpts = Invocation.getFrontendOptions();
+  const auto &tbdOpts = Invocation.getTBDGenOptions();
   if (!frontendOpts.InputsAndOutputs.hasTBDPath())
     return false;
 
@@ -792,16 +795,7 @@ static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
 
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
 
-  auto installName = frontendOpts.TBDInstallName.empty()
-                         ? "lib" + Invocation.getModuleName().str() + ".dylib"
-                         : frontendOpts.TBDInstallName;
-
-  TBDGenOptions opts;
-  opts.InstallName = installName;
-  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
-  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
-
-  return writeTBD(Instance.getMainModule(), TBDPath, opts);
+  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
 }
 
 static std::deque<PostSILGenInputs>
@@ -911,7 +905,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::EmitPCH)
     return precompileBridgingHeader(Invocation, Instance);
 
-  if (Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR)
+  if (Invocation.getInputKind() == InputFileKind::LLVM)
     return compileLLVMIR(Invocation, Instance, Stats);
 
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
@@ -986,6 +980,9 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }
 
+  if (writeTBDIfNeeded(Invocation, Instance))
+    return true;
+
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.
   bool moduleIsPublic =
@@ -1007,9 +1004,6 @@ static bool performCompile(CompilerInstance &Instance,
 
     return hadPrintAsObjCError || hadEmitIndexDataError || Context.hadError();
   }
-
-  if (writeTBDIfNeeded(Invocation, Instance))
-    return true;
 
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&
          "All actions not requiring SILGen must have been handled!");
@@ -1210,14 +1204,13 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   case FrontendOptions::TBDValidationMode::MissingFromTBD:
     break;
   }
-  TBDGenOptions opts;
-  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
-  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
 
   const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
   return MSF.is<SourceFile *>()
-             ? validateTBD(MSF.get<SourceFile *>(), IRModule, opts, allSymbols)
-             : validateTBD(MSF.get<ModuleDecl *>(), IRModule, opts, allSymbols);
+             ? validateTBD(MSF.get<SourceFile *>(), IRModule,
+                           Invocation.getTBDGenOptions(), allSymbols)
+             : validateTBD(MSF.get<ModuleDecl *>(), IRModule,
+                           Invocation.getTBDGenOptions(), allSymbols);
 }
 
 static bool generateCode(CompilerInvocation &Invocation,
@@ -1514,7 +1507,7 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
     }
 
     std::error_code EC;
-    llvm::raw_fd_ostream OS(OutPath, EC, fs::OpenFlags::F_RW);
+    llvm::raw_fd_ostream OS(OutPath, EC, fs::FA_Read | fs::FA_Write);
     if (EC) {
       llvm::errs() << "error opening file '" << OutPath << "': "
                    << EC.message() << '\n';
@@ -1595,7 +1588,7 @@ static std::unique_ptr<DiagnosticConsumer>
 createDispatchingDiagnosticConsumerIfNeeded(
     const FrontendInputsAndOutputs &inputsAndOutputs,
     llvm::function_ref<std::unique_ptr<DiagnosticConsumer>(const InputFile &)>
-      maybeCreateSingleConsumer) {
+        maybeCreateConsumerForDiagnosticsFrom) {
 
   // The "4" here is somewhat arbitrary. In practice we're going to have one
   // sub-consumer for each diagnostic file we're trying to output, which (again
@@ -1605,14 +1598,14 @@ createDispatchingDiagnosticConsumerIfNeeded(
   // So a value of "4" here means that there would be no heap allocation on a
   // clean build of a module with up to 32 files on an 8-core machine, if the
   // user doesn't customize anything.
-  SmallVector<FileSpecificDiagnosticConsumer::ConsumerPair, 4> subConsumers;
+  SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 4> subconsumers;
 
   inputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
-    if (auto subConsumer = maybeCreateSingleConsumer(input))
-      subConsumers.emplace_back(input.file(), std::move(subConsumer));
-    return false;
-  });
+        if (auto consumer = maybeCreateConsumerForDiagnosticsFrom(input))
+          subconsumers.emplace_back(input.file(), std::move(consumer));
+        return false;
+      });
   // For batch mode, the compiler must swallow diagnostics pertaining to
   // non-primary files in order to avoid Xcode showing the same diagnostic
   // multiple times. So, create a diagnostic "eater" for those non-primary
@@ -1622,16 +1615,12 @@ createDispatchingDiagnosticConsumerIfNeeded(
   if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
     inputsAndOutputs.forEachNonPrimaryInput(
         [&](const InputFile &input) -> bool {
-          subConsumers.emplace_back(input.file(), nullptr);
+          subconsumers.emplace_back(input.file(), nullptr);
           return false;
         });
   }
 
-  if (subConsumers.empty())
-    return nullptr;
-  if (subConsumers.size() == 1)
-    return std::move(subConsumers.front()).second;
-  return llvm::make_unique<FileSpecificDiagnosticConsumer>(subConsumers);
+  return FileSpecificDiagnosticConsumer::consolidateSubconsumers(subconsumers);
 }
 
 /// Creates a diagnostic consumer that handles serializing diagnostics, based on

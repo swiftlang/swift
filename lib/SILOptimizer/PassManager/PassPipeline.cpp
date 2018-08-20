@@ -203,6 +203,10 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addHighLevelLICM();
   // Simplify CFG after LICM that creates new exit blocks
   P.addSimplifyCFG();
+  // LICM might have added new merging potential by hoisting
+  // we don't want to restart the pipeline - ignore the
+  // potential of merging out of two loops
+  P.addAccessEnforcementOpts();
   // Start of loop unrolling passes.
   P.addArrayCountPropagation();
   // To simplify induction variable.
@@ -461,6 +465,10 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.addLICM();
   // Simplify CFG after LICM that creates new exit blocks
   P.addSimplifyCFG();
+  // LICM might have added new merging potential by hoisting
+  // we don't want to restart the pipeline - ignore the
+  // potential of merging out of two loops
+  P.addAccessEnforcementOpts();
 
   // Optimize overflow checks.
   P.addRedundantOverflowCheckRemoval();

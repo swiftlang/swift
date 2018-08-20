@@ -99,7 +99,7 @@ public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned My
 // CHECK: bitcast
 // CHECK: [[COPY:%.*]] = bitcast %T17struct_resilience6MySizeV* %4 to i8*
 // CHECK: [[ARG:%.*]] = bitcast %T17struct_resilience6MySizeV* %1 to i8*
-// CHECK: call void @llvm.memcpy{{.*}}(i8* [[COPY]], i8* [[ARG]], {{i32 8|i64 16}}, i32 {{.*}}, i1 false)
+// CHECK: call void @llvm.memcpy{{.*}}(i8* align {{4|8}} [[COPY]], i8* align {{4|8}} [[ARG]], {{i32 8|i64 16}}, i1 false)
 // CHECK: [[FN:%.*]] = bitcast i8* %2
 // CHECK: call swiftcc void [[FN]](%T17struct_resilience6MySizeV* {{.*}} %0, {{.*}} [[TEMP]], %swift.refcounted* swiftself %{{.*}})
 // CHECK: ret void
