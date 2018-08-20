@@ -12,3 +12,5 @@
 // CHECK-4: -e:2:1: error: use of unresolved identifier 'foo'
 // CHECK-4-NOT: Hello, world!
 
+// RUN: %swift_driver_plain -MFoundation -e 'NSLog("Hello, world!")' 2>&1 | %FileCheck -check-prefix CHECK-5 %s
+// CHECK-5: swift[{{.*}}] Hello, world!
