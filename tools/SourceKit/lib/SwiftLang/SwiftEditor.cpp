@@ -2265,44 +2265,23 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     EditorDoc->readSyntaxInfo(Consumer);
 
     // Log reuse information
-    if (SyntaxCache.hasValue()) {
-      // Avoid computing the reused ranges if the consumer doesn't care about
-      // them
-      if (Consumer.syntaxReuseInfoEnabled()) {
-        auto &SyntaxTree = EditorDoc->getSyntaxTree();
-        auto ReuseRegions = SyntaxCache->getReusedRegions(*SyntaxTree);
+    if (SyntaxCache.hasValue() && LogReuseRegions) {
+      auto &SyntaxTree = EditorDoc->getSyntaxTree();
+      auto ReuseRegions = SyntaxCache->getReusedRegions(*SyntaxTree);
+      LOG_SECTION("SyntaxCache", InfoHighPrio) {
+        Log->getOS() << "Reused ";
 
-        // Abstract away from SyntaxReuseRegions to std::pair<unsigned, unsigned>
-        // so that SourceKit doesn't have to import swiftParse
-        std::vector<SourceFileRange> ReuseRegionOffsets;
-        ReuseRegionOffsets.reserve(ReuseRegions.size());
+        bool FirstIteration = true;
         for (auto ReuseRegion : ReuseRegions) {
-          auto Start = ReuseRegion.Start.getOffset();
-          auto End = ReuseRegion.End.getOffset();
-          ReuseRegionOffsets.push_back({Start, End});
-        }
-        Consumer.handleSyntaxReuseRegions(ReuseRegionOffsets);
-      }
-      if (LogReuseRegions) {
-        auto &SyntaxTree = EditorDoc->getSyntaxTree();
-        auto ReuseRegions = SyntaxCache->getReusedRegions(*SyntaxTree);
-        LOG_SECTION("SyntaxCache", InfoHighPrio) {
-          Log->getOS() << "Reused ";
-
-          bool FirstIteration = true;
-          for (auto ReuseRegion : ReuseRegions) {
-            if (!FirstIteration) {
-              Log->getOS() << ", ";
-            } else {
-              FirstIteration = false;
-            }
-
-            Log->getOS() << ReuseRegion.Start << " - " << ReuseRegion.End;
+          if (!FirstIteration) {
+            Log->getOS() << ", ";
+          } else {
+            FirstIteration = false;
           }
+
+          Log->getOS() << ReuseRegion.Start << " - " << ReuseRegion.End;
         }
       }
-    } else {
-      Consumer.handleSyntaxReuseRegions({});
     }
 
     if (Consumer.syntaxTreeEnabled()) {
