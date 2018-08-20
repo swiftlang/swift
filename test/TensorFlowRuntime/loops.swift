@@ -32,6 +32,8 @@ LoopsTests.testAllBackends("simpleCounterLoop_a") {
   expectNearlyEqual(1024.0, a.scalar!)
 }
 
+// FIXME: This test is failing on macOS for reasons that are not likely related
+// to graph program extraction. See SR-8541.
 #if !os(macOS)
 LoopsTests.testAllBackends("simpleCounterLoop_ab") {
   let maxCount = 100
