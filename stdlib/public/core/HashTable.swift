@@ -29,7 +29,7 @@ internal struct _HashTable {
   internal init(scale: Int, count: Int, map: UnsafeMutablePointer<MapEntry>) {
     _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
     _sanityCheck(count >= 0 && count < (1 << scale) - 1)
-    let capacity = Int(Double(1 &<< scale) / _HashTable.maxLoadFactorInverse)
+    let capacity = _HashTable.capacity(forScale: scale)
     _sanityCheck(count <= capacity)
     self.capacity = capacity
     self.count = count
@@ -45,6 +45,10 @@ extension _HashTable {
   @_transparent
   private static var maxLoadFactorInverse: Double {
     return 4 / 3
+  }
+
+  internal static func capacity(forScale scale: Int) -> Int {
+    return Int(Double(1 &<< scale) / maxLoadFactorInverse)
   }
 
   internal static func scale(
@@ -113,6 +117,11 @@ extension _HashTable {
       // never overflow and get us a nice mask.
       return bucketCount &- 1
     }
+  }
+
+  @inline(__always)
+  internal func _idealBucket(forHashValue hashValue: Int) -> Int {
+    return hashValue & bucketMask
   }
 
   @inline(__always)
@@ -294,7 +303,7 @@ extension _HashTable {
   @usableFromInline
   @_effects(readonly)
   internal func lookupFirst(hashValue: Int) -> (index: Index, found: Bool) {
-    let index = Index(bucket: hashValue & bucketMask)
+    let index = Index(bucket: _idealBucket(forHashValue: hashValue))
     let entry = MapEntry.forHashValue(hashValue)
     return _lookupChain(startingAt: index, lookingFor: entry)
   }
@@ -347,7 +356,7 @@ extension _HashTable {
   @_effects(releasenone)
   internal mutating func insertNew(hashValue: Int) -> Index {
     _sanityCheck(count < capacity)
-    let bucket = _nextHole(atOrAfter: hashValue & bucketMask)
+    let bucket = _nextHole(atOrAfter: _idealBucket(forHashValue: hashValue))
     map[bucket] = MapEntry.forHashValue(hashValue)
     count += 1
     return Index(bucket: bucket)
@@ -381,7 +390,7 @@ extension _HashTable {
     // Remove the element.
     self.count -= 1
 
-    let idealBucket = hashValue & bucketMask
+    let idealBucket = _idealBucket(forHashValue: hashValue)
 
     // If we've put a hole in a chain of contiguous elements, some element after
     // the hole may belong where the new hole is.
@@ -401,7 +410,7 @@ extension _HashTable {
       while candidate != hole {
         let candidateHash = delegate.hashValue(at: Index(bucket: candidate))
         _sanityCheck(map[candidate] == MapEntry.forHashValue(candidateHash))
-        let ideal = candidateHash & bucketMask
+        let ideal = _idealBucket(forHashValue: candidateHash)
 
         // Does this element belong between start and hole?  We need two
         // separate tests depending on whether [start, hole] wraps around the
