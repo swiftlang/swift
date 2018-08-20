@@ -15,7 +15,7 @@ import Builtin
 // -- completion function
 // CHECK-SAME:   i32 0,
 // -- pattern flags
-// CHECK-SAME:   i32 2097153,
+// CHECK-SAME:   <i32 0x4000_0001>,
 // -- vwtable pointer
 // CHECK-SAME:   @"$S15generic_structs18FixedLayoutGenericVWV"
 // -- extra data pattern
@@ -38,8 +38,8 @@ import Builtin
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [14 x i8] c"SingleDynamic\00"
 // CHECK: @"$S15generic_structs13SingleDynamicVMn" = hidden constant 
-// --       flags: struct, unique, generic, reflectable
-// CHECK-SAME:   <i32 0x0001_00D1>
+// --       flags: struct, unique, generic
+// CHECK-SAME:   <i32 0x0000_00D1>
 // --       name
 // CHECK-SAME:   [14 x i8]* [[SINGLEDYNAMIC_NAME]]
 // --       field count
@@ -64,8 +64,8 @@ import Builtin
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [24 x i8] c"DynamicWithRequirements\00"
 // CHECK: @"$S15generic_structs23DynamicWithRequirementsVMn" = hidden constant <{ {{.*}} i32 }> <{
-// --       flags: struct, unique, generic, reflectable
-// CHECK-SAME:   <i32 0x0001_00D1>
+// --       flags: struct, unique, generic
+// CHECK-SAME:   <i32 0x0000_00D1>
 // --       name
 // CHECK-SAME: [24 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]]
 // --       field count

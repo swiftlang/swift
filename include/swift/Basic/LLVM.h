@@ -48,6 +48,7 @@ namespace llvm {
   class raw_ostream;
   class APInt;
   class APFloat;
+  template <typename Fn> class function_ref;
 } // end namespace llvm
 
 
@@ -77,10 +78,11 @@ namespace swift {
   using llvm::SmallSetVector;
 
   // Other common classes.
-  using llvm::raw_ostream;
-  using llvm::APInt;
   using llvm::APFloat;
+  using llvm::APInt;
+  using llvm::function_ref;
   using llvm::NoneType;
+  using llvm::raw_ostream;
 } // end namespace swift
 
 #endif // SWIFT_BASIC_LLVM_H

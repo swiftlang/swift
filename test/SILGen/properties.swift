@@ -50,8 +50,7 @@ func tuple_assignment_2(_ a: inout Int, b: inout Int, xy: (Int, Int)) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : @trivial $*Int, [[B_ADDR:%[0-9]+]] : @trivial $*Int, [[X:%[0-9]+]] : @trivial $Int, [[Y:%[0-9]+]] : @trivial $Int):
   (a, b) = xy
   // CHECK: [[XY2:%[0-9]+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
-  // CHECK: [[X:%[0-9]+]] = tuple_extract [[XY2]] : {{.*}}, 0
-  // CHECK: [[Y:%[0-9]+]] = tuple_extract [[XY2]] : {{.*}}, 1
+  // CHECK: ([[X:%[0-9]+]], [[Y:%[0-9]+]]) = destructure_tuple [[XY2]]
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[A_ADDR]]
   // CHECK: assign [[X]] to [[WRITE]]
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[B_ADDR]]

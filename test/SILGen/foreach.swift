@@ -563,59 +563,29 @@ func genericCollectionContinueBreak<T : Collection>(_ xx: T) {
 // CHECK-LABEL: sil hidden @$S7foreach13tupleElementsyySayAA1CC_ADtGF
 func tupleElements(_ xx: [(C, C)]) {
   // CHECK: bb3([[PAYLOAD:%.*]] : @owned $(C, C)):
-  // CHECK: [[BORROWED_PAYLOAD:%.*]] = begin_borrow [[PAYLOAD]]
-  // CHECK: [[A:%.*]] = tuple_extract [[BORROWED_PAYLOAD]] : $(C, C), 0
-  // CHECK: [[COPY_A:%.*]] = copy_value [[A]]
-  // CHECK: [[B:%.*]] = tuple_extract [[BORROWED_PAYLOAD]] : $(C, C), 1
-  // CHECK: [[COPY_B:%.*]] = copy_value [[B]]
-  // CHECK: end_borrow [[BORROWED_PAYLOAD]] from [[PAYLOAD]]
-  // CHECK: destroy_value [[COPY_B]]
-  // CHECK: destroy_value [[COPY_A]]
-  // CHECK: destroy_value [[PAYLOAD]]
+  // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
+  // CHECK: destroy_value [[B]]
+  // CHECK: destroy_value [[A]]
   for (a, b) in xx {}
   // CHECK: bb7([[PAYLOAD:%.*]] : @owned $(C, C)):
-  // CHECK: [[BORROWED_PAYLOAD:%.*]] = begin_borrow [[PAYLOAD]]
-  // CHECK: [[A:%.*]] = tuple_extract [[BORROWED_PAYLOAD]] : $(C, C), 0
-  // CHECK: [[COPY_A:%.*]] = copy_value [[A]]
-  // CHECK: [[B:%.*]] = tuple_extract [[BORROWED_PAYLOAD]] : $(C, C), 1
-  // CHECK: [[COPY_B:%.*]] = copy_value [[B]]
-  // CHECK: destroy_value [[COPY_B]]
-  // CHECK: end_borrow [[BORROWED_PAYLOAD]] from [[PAYLOAD]]
-  // CHECK: destroy_value [[COPY_A]]
-  // CHECK: destroy_value [[PAYLOAD]]
+  // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
+  // CHECK: destroy_value [[B]]
+  // CHECK: destroy_value [[A]]
   for (a, _) in xx {}
   // CHECK: bb11([[PAYLOAD:%.*]] : @owned $(C, C)):
-  // CHECK: [[BORROWED_PAYLOAD:%.*]] = begin_borrow [[PAYLOAD]]
-  // CHECK: [[A:%.*]] = tuple_extract [[BORROWED_PAYLOAD]] : $(C, C), 0
-  // CHECK: [[COPY_A:%.*]] = copy_value [[A]]
-  // CHECK: [[B:%.*]] = tuple_extract [[BORROWED_PAYLOAD]] : $(C, C), 1
-  // CHECK: [[COPY_B:%.*]] = copy_value [[B]]
-  // CHECK: destroy_value [[COPY_A]]
-  // CHECK: end_borrow [[BORROWED_PAYLOAD]] from [[PAYLOAD]]
-  // CHECK: destroy_value [[COPY_B]]
-  // CHECK: destroy_value [[PAYLOAD]]
+  // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
+  // CHECK: destroy_value [[A]]
+  // CHECK: destroy_value [[B]]
   for (_, b) in xx {}
   // CHECK: bb15([[PAYLOAD:%.*]] : @owned $(C, C)):
-  // CHECK: [[BORROWED_PAYLOAD:%.*]] = begin_borrow [[PAYLOAD]]
-  // CHECK: [[A:%.*]] = tuple_extract [[BORROWED_PAYLOAD]] : $(C, C), 0
-  // CHECK: [[COPY_A:%.*]] = copy_value [[A]]
-  // CHECK: [[B:%.*]] = tuple_extract [[BORROWED_PAYLOAD]] : $(C, C), 1
-  // CHECK: [[COPY_B:%.*]] = copy_value [[B]]
-  // CHECK: destroy_value [[COPY_B]]
-  // CHECK: destroy_value [[COPY_A]]
-  // CHECK: end_borrow [[BORROWED_PAYLOAD]] from [[PAYLOAD]]
-  // CHECK: destroy_value [[PAYLOAD]]
+  // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
+  // CHECK: destroy_value [[B]]
+  // CHECK: destroy_value [[A]]
   for (_, _) in xx {}
   // CHECK: bb19([[PAYLOAD:%.*]] : @owned $(C, C)):
-  // CHECK: [[BORROWED_PAYLOAD:%.*]] = begin_borrow [[PAYLOAD]]
-  // CHECK: [[A:%.*]] = tuple_extract [[BORROWED_PAYLOAD]] : $(C, C), 0
-  // CHECK: [[COPY_A:%.*]] = copy_value [[A]]
-  // CHECK: [[B:%.*]] = tuple_extract [[BORROWED_PAYLOAD]] : $(C, C), 1
-  // CHECK: [[COPY_B:%.*]] = copy_value [[B]]
-  // CHECK: destroy_value [[COPY_B]]
-  // CHECK: destroy_value [[COPY_A]]
-  // CHECK: end_borrow [[BORROWED_PAYLOAD]] from [[PAYLOAD]]
-  // CHECK: destroy_value [[PAYLOAD]]
+  // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
+  // CHECK: destroy_value [[B]]
+  // CHECK: destroy_value [[A]]
   for  _     in xx {}
 }
 

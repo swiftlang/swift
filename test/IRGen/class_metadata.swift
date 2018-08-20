@@ -1,11 +1,13 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize
+// RUN: %empty-directory(%t)
+// RUN: %{python} %utils/chex.py < %s > %t/class_metadata.swift
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/class_metadata.swift -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize
 
 class A {}
 
 // CHECK:      [[A_NAME:@.*]] = private constant [2 x i8] c"A\00"
 // CHECK-LABEL: @"$S14class_metadata1ACMn" =
-//   Flags. -2147418032 == 0x8001_0050 == HasVTable | Reflectable | Unique | Class
-// CHECK-SAME: i32 -2147418032,
+//   Flags. 0x8000_0050 == HasVTable | Unique | Class
+// CHECK-SAME: <i32 0x8000_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -33,8 +35,8 @@ class B : A {}
 
 // CHECK:      [[B_NAME:@.*]] = private constant [2 x i8] c"B\00"
 // CHECK-LABEL: @"$S14class_metadata1BCMn" =
-//   Flags. 65616 == 0x0001_0050 == Reflectable | Unique | Class
-// CHECK-SAME: i32 65616,
+//   Flags. 0x0000_0050 == Unique | Class
+// CHECK-SAME: <i32 0x0000_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -53,8 +55,8 @@ class C<T> : B {}
 
 // CHECK:      [[C_NAME:@.*]] = private constant [2 x i8] c"C\00"
 // CHECK-LABEL: @"$S14class_metadata1CCMn" =
-//   Flags. 65744 == 0x0001_00d0 == Reflectable | Generic | Unique | Class
-// CHECK-SAME: i32 65744,
+//   Flags. 0x0000_00d0 == Generic | Unique | Class
+// CHECK-SAME: <i32 0x0000_00d0>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -104,8 +106,8 @@ class D : E {}
 
 // CHECK:      [[D_NAME:@.*]] = private constant [2 x i8] c"D\00"
 // CHECK-LABEL: @"$S14class_metadata1DCMn" =
-//   Flags. 67174480 == 0x0401_0050 == Reflectable | IndirectSuperclass | Unique | Class
-// CHECK-SAME: i32 67174480,
+//   Flags. 0x0400_0050 == IndirectSuperclass | Unique | Class
+// CHECK-SAME: <i32 0x0400_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
