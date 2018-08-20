@@ -21,7 +21,7 @@ import CTensorFlow
 /// on to determine the datatypes of parameters when they are extracted
 /// into a tensor program.
 @_fixed_layout // required because the compiler accesses cTensorHandle directly.
-public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
+public final class TensorHandle<Scalar : _TensorFlowDataTypeCompatible> {
   /// The underlying `TF_TensorHandle *`.
   ///
   /// - Note: The compiler knows that `TensorHandle` has a single stored
@@ -44,6 +44,14 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
     self.cTensorHandle = cTensorHandle
   }
 
+  deinit {
+    debugLog("De-initializing TensorHandle.")
+    TFE_DeleteTensorHandle(cTensorHandle)
+    debugLog("Returning from deinit of TensorHandle.")
+  }
+}
+
+internal extension TensorHandle where Scalar : AccelerableByTensorFlow {
   /// Create a `TensorHandle` with a closure that initializes the underlying
   /// buffer.
   ///
@@ -72,14 +80,6 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
     TF_DeleteTensor(cTensor)
   }
 
-  deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(cTensorHandle)
-    debugLog("Returning from deinit of TensorHandle.")
-  }
-}
-
-internal extension TensorHandle {
   /// Create a `ShapedArray` with contents of the underlying `TensorHandle`. If
   /// the `TensorHandle` is on the accelerator, it will be copied to the host.
   /// - Returns: A `ShapedArray`.
@@ -90,7 +90,8 @@ internal extension TensorHandle {
   }
 }
 
-extension TensorHandle : TensorSendableReceivable {
+extension TensorHandle : TensorSendableReceivable
+  where Scalar : AccelerableByTensorFlow {
   @inlinable
   static func receiveFromAccelerator(_ computation: _TensorComputation,
                                      _ tensorId: Int

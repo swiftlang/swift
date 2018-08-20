@@ -73,14 +73,18 @@ func _TFReceive<Scalar>(_ handle: TensorHandle<Scalar>)
 /// where it is known that the op always returns a 0-d tensor. It is not for use
 /// in general code.
 @inlinable @inline(__always)
-func _TFGetScalarOrDie<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar {
+func _TFGetScalarOrDie<Scalar : AccelerableByTensorFlow>(
+  _ handle: TensorHandle<Scalar>
+) -> Scalar {
   return Scalar._getScalarOrDie(handle)
 }
 
 /// This function converts a `TensorHandle` into a scalar if it is 0-d, or
 /// returns nil otherwise.
 @inlinable @inline(__always)
-func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
+func _TFGetScalar<Scalar : AccelerableByTensorFlow>(
+  _ handle: TensorHandle<Scalar>
+) -> Scalar? {
   return Scalar._getScalar(handle)
 }
 
@@ -89,7 +93,7 @@ func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
 /// designed to align with the requirements of the `Const` TensorFlow operation.
 @usableFromInline @inline(never)
 @_silgen_name("__tf_tensor_from_scalars")
-func _TFTensorFromScalars<Scalar>(
+func _TFTensorFromScalars<Scalar : AccelerableByTensorFlow>(
   _ scalars: [Scalar], shape: [Int32]
 ) -> TensorHandle<Scalar> {
   let contiguousSize = shape.map(Int.init).reduce(1, *)
@@ -106,13 +110,15 @@ func _TFTensorFromScalars<Scalar>(
 }
 
 @inlinable @inline(__always)
-func _TFMakeScalarTensor<Scalar>(_ scalar: Scalar) -> TensorHandle<Scalar> {
+func _TFMakeScalarTensor<Scalar : AccelerableByTensorFlow>(
+  _ scalar: Scalar
+) -> TensorHandle<Scalar> {
   return Scalar._makeScalarTensor(scalar)
 }
 
 @usableFromInline @inline(never)
 @_silgen_name("__tf_tensor_from_scalars_1d")
-func _TFTensorFromScalars1D<Scalar>(_ scalars: [Scalar])
+func _TFTensorFromScalars1D<Scalar : AccelerableByTensorFlow>(_ scalars: [Scalar])
   -> TensorHandle<Scalar> {
   return _TFTensorFromScalars(scalars, shape: [Int32(scalars.count)])
 }
