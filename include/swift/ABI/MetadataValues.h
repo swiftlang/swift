@@ -1208,17 +1208,11 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     // Generic flags build upwards from 0.
     // Type-specific flags build downwards from 15.
 
-    /// Set if the type supports reflection.  C and Objective-C enums
-    /// currently don't.
-    ///
-    /// Meaningful for all type-descriptor kinds.
-    IsReflectable = 0,
-
     /// Whether there's something unusual about how the metadata is
     /// initialized.
     ///
     /// Meaningful for all type-descriptor kinds.
-    MetadataInitialization = 1,
+    MetadataInitialization = 0,
     MetadataInitialization_width = 2,
 
     /// Set if the type has extended import information.
@@ -1229,8 +1223,7 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// these strings and the order in which they appear.
     ///
     /// Meaningful for all type-descriptor kinds.
-    HasImportInfo = 3,
-
+    HasImportInfo = 2,
 
     // Type-specific flags:
 
@@ -1260,8 +1253,6 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
 public:
   explicit TypeContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
   constexpr TypeContextDescriptorFlags() {}
-
-  FLAGSET_DEFINE_FLAG_ACCESSORS(IsReflectable, isReflectable, setIsReflectable)
 
   enum MetadataInitializationKind {
     /// There are either no special rules for initializing the metadata

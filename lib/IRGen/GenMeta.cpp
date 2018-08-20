@@ -748,7 +748,7 @@ namespace {
       super::layout();
       asImpl().addName();
       asImpl().addAccessFunction();
-      // ABI TODO: layout info should be superseded by remote mirror metadata
+      asImpl().addReflectionFieldDescriptor();
       asImpl().addLayoutInfo();
       asImpl().addGenericSignature();
       asImpl().maybeAddMetadataInitialization();
@@ -1004,7 +1004,8 @@ namespace {
 
     // Subclasses should provide:
     // ContextDescriptorKind getContextKind();
-    // void addLayoutInfo(); // ABI TODO: should be superseded
+    // void addLayoutInfo();
+    // void addReflectionFieldDescriptor();
   };
 
   /// Build a doubly-null-terminated list of field names.
@@ -1028,20 +1029,8 @@ namespace {
     return numFields;
   }
   
-  /// Build the field type vector accessor for a nominal type. This is a
-  /// function that lazily instantiates the type metadata for all of the
-  /// types of the stored properties of an instance of a nominal type.
-  ///
-  /// ABI TODO: This should be unnecessary when the fields that use it are
-  /// superseded.
-  static void addFieldTypes(IRGenModule &IGM, ArrayRef<CanType> fieldTypes) {
-    IGM.addFieldTypes(fieldTypes);
-  }
-  
-  /// Build a field type accessor for stored properties.
-  ///
-  /// ABI TODO: This should be unnecessary when the fields that use it are
-  /// superseded.
+  /// Track the field types of a struct or class for reflection metadata
+  /// emission.
   static void
   addFieldTypes(IRGenModule &IGM, NominalTypeDecl *type,
                 NominalTypeDecl::StoredPropertyRange storedProperties) {
@@ -1052,13 +1041,11 @@ namespace {
       types.push_back(propertyType);
     }
 
-    addFieldTypes(IGM, types);
+    IGM.addFieldTypes(types);
   }
   
-  /// Build a case type accessor for enum payloads.
-  ///
-  /// ABI TODO: This should be unnecessary when the fields that use it are
-  /// superseded.
+  /// Track the payload types of an enum for reflection metadata
+  /// emission.
   static void addFieldTypes(IRGenModule &IGM,
                             ArrayRef<EnumImplStrategy::Element> enumElements) {
     SmallVector<CanType, 4> types;
@@ -1070,9 +1057,8 @@ namespace {
       types.push_back(caseType);
     }
 
-    addFieldTypes(IGM, types);
+    IGM.addFieldTypes(types);
   }
-
 
   class StructContextDescriptorBuilder
     : public TypeContextDescriptorBuilderBase<StructContextDescriptorBuilder,
@@ -1114,13 +1100,21 @@ namespace {
     uint16_t getKindSpecificFlags() {
       TypeContextDescriptorFlags flags;
 
-      // Structs are reflectable unless we emit them with opaque reflection
-      // metadata.
-      flags.setIsReflectable(
-                            !IGM.shouldEmitOpaqueTypeMetadataRecord(getType()));
-
       setCommonFlags(flags);
       return flags.getOpaqueValue();
+    }
+    
+    void addReflectionFieldDescriptor() {
+      // Structs are reflectable unless we emit them with opaque reflection
+      // metadata.
+      if (!IGM.IRGen.Opts.EnableReflectionMetadata
+          || IGM.shouldEmitOpaqueTypeMetadataRecord(getType())) {
+        B.addInt32(0);
+        return;
+      }
+    
+      B.addRelativeAddress(IGM.getAddrOfReflectionFieldDescriptor(
+        getType()->getDeclaredType()->getCanonicalType()));
     }
   };
   
@@ -1176,10 +1170,22 @@ namespace {
     uint16_t getKindSpecificFlags() {
       TypeContextDescriptorFlags flags;
 
-      flags.setIsReflectable(Strategy.isReflectable());
-
       setCommonFlags(flags);
       return flags.getOpaqueValue();
+    }
+
+    void addReflectionFieldDescriptor() {
+      // Some enum layout strategies (viz. C compatible layout) aren't
+      // supported by reflection.
+      if (!IGM.IRGen.Opts.EnableReflectionMetadata
+          || IGM.shouldEmitOpaqueTypeMetadataRecord(getType())
+          || !Strategy.isReflectable()) {
+        B.addInt32(0);
+        return;
+      }
+    
+      B.addRelativeAddress(IGM.getAddrOfReflectionFieldDescriptor(
+        getType()->getDeclaredType()->getCanonicalType()));
     }
   };
   
@@ -1233,9 +1239,6 @@ namespace {
     uint16_t getKindSpecificFlags() {
       TypeContextDescriptorFlags flags;
 
-      // Classes are always reflectable.
-      flags.setIsReflectable(true);
-
       setCommonFlags(flags);
 
       if (!getType()->isForeign()) {
@@ -1255,7 +1258,21 @@ namespace {
       
       return flags.getOpaqueValue();
     }
+
+    void addReflectionFieldDescriptor() {
+      // Classes are always reflectable, unless reflection is disabled or this
+      // is a foreign class.
+      if (!IGM.IRGen.Opts.EnableReflectionMetadata
+          || IGM.shouldEmitOpaqueTypeMetadataRecord(getType())
+          || getType()->isForeign()) {
+        B.addInt32(0);
+        return;
+      }
     
+      B.addRelativeAddress(IGM.getAddrOfReflectionFieldDescriptor(
+        getType()->getDeclaredType()->getCanonicalType()));
+    }
+
     Size getFieldVectorOffset() {
       if (!MetadataLayout) return Size(0);
       return (MetadataLayout->hasResilientSuperclass()
