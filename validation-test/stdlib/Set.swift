@@ -1795,12 +1795,14 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove")
 SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var s = getBridgedVerbatimSet([])
-    let identity1 = s._rawIdentifier()
     expectTrue(isCocoaSet(s))
     expectEqual(0, s.count)
 
+    let emptySet = Set<Int>()
+    expectNotEqual(emptySet._rawIdentifier(), s._rawIdentifier())
+
     s.removeAll()
-    expectEqual(identity1, s._rawIdentifier())
+    expectEqual(emptySet._rawIdentifier(), s._rawIdentifier())
     expectEqual(0, s.count)
   }
 
@@ -1857,12 +1859,14 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var s = getBridgedNonverbatimSet([])
-    let identity1 = s._rawIdentifier()
     expectTrue(isNativeSet(s))
     expectEqual(0, s.count)
 
+    let emptySet = Set<Int>()
+    expectNotEqual(emptySet._rawIdentifier(), s._rawIdentifier())
+
     s.removeAll()
-    expectEqual(identity1, s._rawIdentifier())
+    expectEqual(emptySet._rawIdentifier(), s._rawIdentifier())
     expectEqual(0, s.count)
   }
 
