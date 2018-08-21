@@ -1019,8 +1019,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func intersection<S: Sequence>(_ other: S) -> Set<Element>
     where S.Element == Element {
-    let otherSet = Set(other)
-    return intersection(otherSet)
+    return Set(_native: _variant.intersection(other))
   }
 
   /// Removes the elements of the set that aren't also in the given sequence.
@@ -1039,20 +1038,7 @@ extension Set: SetAlgebra {
   @inlinable
   public mutating func formIntersection<S: Sequence>(_ other: S)
     where S.Element == Element {
-    // Because `intersect` needs to both modify and iterate over
-    // the left-hand side, the index may become invalidated during
-    // traversal so an intermediate set must be created.
-    //
-    // FIXME(performance): perform this operation at a lower level
-    // to avoid invalidating the index and avoiding a copy.
-    let result = self.intersection(other)
-
-    // The result can only have fewer or the same number of elements.
-    // If no elements were removed, don't perform a reassignment
-    // as this may cause an unnecessary uniquing COW.
-    if result.count != count {
-      self = result
-    }
+    self = self.intersection(other)
   }
 
   /// Returns a new set with the elements that are either in this set or in the
@@ -1383,13 +1369,7 @@ extension Set {
   /// - Returns: A new set.
   @inlinable
   public func intersection(_ other: Set<Element>) -> Set<Element> {
-    var newSet = Set<Element>()
-    for member in self {
-      if other.contains(member) {
-        newSet.insert(member)
-      }
-    }
-    return newSet
+    return Set(_native: _variant.intersection(other))
   }
 
   /// Removes the elements of the set that are also in the given sequence and
@@ -2073,6 +2053,32 @@ extension _NativeSet {
       }
     }
     return true
+  }
+
+  @inlinable
+  internal func intersection<S: Sequence>(_ other: S) -> _NativeSet<Element>
+    where S.Element == Element {
+    // Rather than directly creating a new set, mark common elements in a
+    // bitmap, to prevent repeated rehashing during reallocations.
+    var dupes = _storage.hashTable.createBitmap()
+    var dupeCount = 0
+    for element in other {
+      let (index, found) = find(element)
+      if found, dupes._uncheckedInsert(index.bucket) {
+        dupeCount += 1
+      }
+    }
+    if dupeCount == 0 { return _NativeSet() }
+    if dupeCount == self.count { return self }
+    if let other = other as? _NativeSet<Element>, dupeCount == other.count {
+      return other
+    }
+    var result = _NativeSet(capacity: dupeCount)
+    for bucket in dupes {
+      result.insertNew(self.uncheckedElement(at: Index(bucket: bucket)))
+    }
+    _sanityCheck(result.count == dupeCount)
+    return result
   }
 }
 
@@ -2967,6 +2973,45 @@ extension Set._Variant {
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
       self = .native(_NativeSet(capacity: cocoaSet.count))
+#endif
+    }
+  }
+}
+
+extension Set._Variant {
+  @inlinable
+  internal func intersection<S: Sequence>(_ other: S) -> _NativeSet<Element>
+    where S.Element == Element {
+    if let other = other as? Set<Element> {
+      return self.intersection(other)
+    }
+    switch self {
+    case .native(let native):
+      return native.intersection(other)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      return _NativeSet(cocoa).intersection(other)
+#endif
+    }
+  }
+
+  @inlinable
+  internal func intersection(_ other: Set<Element>) -> _NativeSet<Element> {
+    switch (self, other._variant) {
+    case (.native(let this), .native(let that)):
+      // Prefer to iterate over the smaller set.
+      if this.count < that.count {
+        return that.intersection(this)
+      } else {
+        return this.intersection(that)
+      }
+#if _runtime(_ObjC)
+    case (.cocoa(let this), .native(let that)):
+      return that.intersection(Set<Element>(_cocoa: this))
+    case (.native(let this), .cocoa(_)):
+      return this.intersection(other)
+    case (.cocoa(let this), .cocoa(_)):
+      return _NativeSet<Element>(this).intersection(other)
 #endif
     }
   }
