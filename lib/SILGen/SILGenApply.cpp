@@ -5605,7 +5605,6 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     break;
   case AddressorKind::Owning:
   case AddressorKind::NativeOwning:
-  case AddressorKind::NativePinning:
     assert(results.size() == 2);
     pointer = results[0].getUnmanagedValue();
     owner = results[1];
@@ -5636,7 +5635,6 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     break;
   case AddressorKind::Owning:
   case AddressorKind::NativeOwning:
-  case AddressorKind::NativePinning:
     address = B.createMarkDependence(loc, address, owner.getValue());
     break;
   }

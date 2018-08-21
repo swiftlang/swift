@@ -3707,20 +3707,6 @@ Type buildAddressorResultType(TypeChecker &TC,
     };
     return TupleType::get(elts, TC.Context);
   }
-
-  // For native pinning addressors, the return type is actually
-  //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
-  case AddressorKind::NativePinning: {
-    Type pinTokenType =
-      TC.getOptionalType(addressor->getLoc(), TC.Context.TheNativeObjectType);
-    if (!pinTokenType) return Type();
-
-    TupleTypeElt elts[] = {
-      pointerType,
-      pinTokenType
-    };
-    return TupleType::get(elts, TC.Context);
-  }
   }
   llvm_unreachable("bad addressor kind");
 }
