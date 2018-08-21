@@ -2356,21 +2356,15 @@ ResultPlanner::planScalarFromIndirectResult(AbstractionPattern innerOrigType,
 
 void ResultPlanner::executeInnerTuple(
     SILValue innerElement, SmallVector<SILValue, 4> &innerDirectResults) {
+  // NOTE: We know that our value is at +1 here.
   auto innerTupleType = innerElement->getType().getAs<TupleType>();
   assert(innerTupleType && "Only supports tuple inner types");
-  ManagedValue ownedInnerResult =
-      SGF.emitManagedRValueWithCleanup(innerElement);
-  // Then borrow the managed direct result.
-  ManagedValue borrowedInnerResult = ownedInnerResult.borrow(SGF, Loc);
-  for (unsigned i : indices(innerTupleType.getElementTypes())) {
-    ManagedValue elt = SGF.B.createTupleExtract(Loc, borrowedInnerResult, i);
-    auto eltType = elt.getType();
-    if (eltType.is<TupleType>()) {
-      executeInnerTuple(elt.getValue(), innerDirectResults);
-      continue;
-    }
-    innerDirectResults.push_back(elt.copyUnmanaged(SGF, Loc).forward(SGF));
-  }
+  SGF.B.emitDestructureValueOperation(
+      Loc, innerElement, [&](unsigned index, SILValue elt) {
+        if (elt->getType().is<TupleType>())
+          return executeInnerTuple(elt, innerDirectResults);
+        innerDirectResults.push_back(elt);
+      });
 }
 
 SILValue ResultPlanner::execute(SILValue innerResult) {

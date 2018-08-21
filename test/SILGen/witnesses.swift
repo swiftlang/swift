@@ -465,8 +465,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: [[CAST_ARG2_LOADED:%[0-9][0-9]*]] = upcast [[ARG2_LOADED]] : $PropertyRequirementWitnessFromBase to $PropertyRequirementBase
   // CHECK-NEXT: [[METH:%.*]] = class_method [[CAST_ARG2_LOADED]] : $PropertyRequirementBase, #PropertyRequirementBase.width!materializeForSet.1
   // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]({{.*}}, {{.*}}, [[CAST_ARG2_LOADED]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed PropertyRequirementBase) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-  // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
-  // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
+  // CHECK-NEXT: ([[CAR:%.*]], [[CADR:%.*]]) = destructure_tuple [[RES]]
   // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CADR]] : {{.*}})
   // CHECK-NEXT: end_borrow [[ARG2_LOADED]] from [[ARG2]]
   // CHECK-NEXT: return [[TUPLE]]
@@ -475,8 +474,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK: [[OBJ:%.*]] = upcast %2 : $@thick PropertyRequirementWitnessFromBase.Type to $@thick PropertyRequirementBase.Type
   // CHECK: [[METH:%.*]] = function_ref @$S9witnesses23PropertyRequirementBaseC6heightSivmZ
   // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
-  // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
-  // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
+  // CHECK-NEXT: ([[CAR:%.*]], [[CADR:%.*]]) = destructure_tuple [[RES]]
   // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CADR]] : {{.*}})
   // CHECK-NEXT: return [[TUPLE]]
 
@@ -485,8 +483,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK: [[ARG2_LOADED:%[0-9][0-9]*]] = load_borrow [[ARG2]]
   // CHECK: [[METH:%.*]] = class_method [[ARG2_LOADED]] : $PropertyRequirementWitnessFromBase, #PropertyRequirementWitnessFromBase.depth!materializeForSet.1
   // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]({{.*}}, {{.*}}, [[ARG2_LOADED]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed PropertyRequirementWitnessFromBase) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-  // CHECK-NEXT: tuple_extract
-  // CHECK-NEXT: tuple_extract
+  // CHECK-NEXT: destructure_tuple
   // CHECK-NEXT: [[RES:%.*]] = tuple
   // CHECK-NEXT: end_borrow [[ARG2_LOADED]] from [[ARG2]]
   // CHECK-NEXT: return [[RES]]
