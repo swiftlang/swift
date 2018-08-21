@@ -7026,9 +7026,23 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // Coercion from one function type to another, this produces a
     // FunctionConversionExpr in its full generality.
     if (fromFunc) {
+      // SWIFT_ENABLE_TENSORFLOW
+      // If we have a ClosureExpr, then we can safely propagate tensorflow
+      // convention to the closure expression.
+      auto fromEI = fromFunc->getExtInfo();
+      if (toEI.getRepresentation() ==
+              AnyFunctionType::Representation::TensorFlow &&
+          fromEI.getRepresentation() !=
+              AnyFunctionType::Representation::TensorFlow) {
+        auto newFromFuncType = fromFunc->withExtInfo(fromEI.withRepresentation(
+            AnyFunctionType::Representation::TensorFlow));
+        if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+          fromFunc = newFromFuncType->castTo<FunctionType>();
+        }
+      }
       // If we have a ClosureExpr, then we can safely propagate the 'no escape'
       // bit to the closure without invalidating prior analysis.
-      auto fromEI = fromFunc->getExtInfo();
+      fromEI = fromFunc->getExtInfo();
       if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
         auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
         if (!isInDefaultArgumentContext &&

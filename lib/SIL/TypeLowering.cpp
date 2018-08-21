@@ -1749,8 +1749,12 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   CanGenericSignature genericSig = getEffectiveGenericSignature(theClosure,
                                                                 captureInfo);
 
-  auto innerExtInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                               funcType->throws());
+  // SWIFT_ENABLE_TENSORFLOW
+  auto repType =
+      funcType->getRepresentation() == FunctionType::Representation::TensorFlow
+          ? FunctionType::Representation::TensorFlow
+          : FunctionType::Representation::Thin;
+  auto innerExtInfo = AnyFunctionType::ExtInfo(repType, funcType->throws());
 
   return CanAnyFunctionType::get(genericSig, funcType.getParams(),
                                  funcType.getResult(), innerExtInfo);
@@ -2352,6 +2356,10 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
     if (rep1 == SILFunctionTypeRepresentation::Thin &&
         rep2 == SILFunctionTypeRepresentation::Thick)
       return ABIDifference::ThinToThick;
+    // SWIFT_ENABLE_TENSORFLOW
+    if (rep1 == SILFunctionTypeRepresentation::Thin &&
+        rep2 == SILFunctionTypeRepresentation::TensorFlow)
+      return ABIDifference::Trivial;
 
     return ABIDifference::NeedsThunk;
   }

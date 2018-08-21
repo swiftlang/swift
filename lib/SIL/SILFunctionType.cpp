@@ -2192,6 +2192,14 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     return SILFunctionTypeRepresentation::CFunctionPointer;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (c.hasClosureExpr()) {
+    if (auto *closureType =
+        c.getClosureExpr()->getType()->castTo<AnyFunctionType>()) {
+      return closureType->getExtInfo().getSILRepresentation();
+    }
+  }
+
   // Anonymous functions currently always have Freestanding CC.
   if (!c.hasDecl())
     return SILFunctionTypeRepresentation::Thin;
