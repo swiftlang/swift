@@ -749,9 +749,19 @@ extension Set: SetAlgebra {
   @inlinable
   public func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
     where S.Element == Element {
-    // FIXME(performance): isEmpty fast path, here and elsewhere.
-    let other = Set(possibleSuperset)
-    return isSubset(of: other)
+    if self.isEmpty { return true }
+    if self.count == 1 { return possibleSuperset.contains(self.first!) }
+    if let s = possibleSuperset as? Set<Element> {
+      return isSubset(of: s)
+    }
+    switch self._variant {
+    case .native(let native):
+      return native.isSubset(of: possibleSuperset)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      return _NativeSet<Element>(cocoa).isSubset(of: possibleSuperset)
+#endif
+    }
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict subset
@@ -777,9 +787,18 @@ extension Set: SetAlgebra {
   @inlinable
   public func isStrictSubset<S: Sequence>(of possibleStrictSuperset: S) -> Bool
     where S.Element == Element {
-    // FIXME: code duplication.
-    let other = Set(possibleStrictSuperset)
-    return isStrictSubset(of: other)
+    if let s = possibleStrictSuperset as? Set<Element> {
+      return isStrictSubset(of: s)
+    }
+    switch self._variant {
+    case .native(let native):
+      return native.isStrictSubset(of: possibleStrictSuperset)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      return _NativeSet<Element>(cocoa)
+        .isStrictSubset(of: possibleStrictSuperset)
+#endif
+    }
   }
 
   /// Returns a Boolean value that indicates whether the set is a superset of
@@ -800,10 +819,16 @@ extension Set: SetAlgebra {
   @inlinable
   public func isSuperset<S: Sequence>(of possibleSubset: S) -> Bool
     where S.Element == Element {
-    // FIXME(performance): Don't build a set; just ask if every element is in
-    // `self`.
-    let other = Set(possibleSubset)
-    return other.isSubset(of: self)
+    if possibleSubset.underestimatedCount > self.count {
+      return false
+    }
+    if let s = possibleSubset as? Set<Element> {
+      return isSuperset(of: s)
+    }
+    for element in possibleSubset {
+      guard self.contains(element) else { return false }
+    }
+    return true
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict
@@ -827,8 +852,16 @@ extension Set: SetAlgebra {
   @inlinable
   public func isStrictSuperset<S: Sequence>(of possibleStrictSubset: S) -> Bool
     where S.Element == Element {
-    let other = Set(possibleStrictSubset)
-    return other.isStrictSubset(of: self)
+    if possibleStrictSubset.underestimatedCount >= self.count {
+      return false
+    }
+    if let s = possibleStrictSubset as? Set<Element> {
+      return isStrictSuperset(of: s)
+    }
+    guard case .native(let native) = self._variant else {
+      return isStrictSuperset(of: Set(possibleStrictSubset))
+    }
+    return native.isStrictSuperset(of: possibleStrictSubset)
   }
 
   /// Returns a Boolean value that indicates whether the set has no members in
@@ -1212,6 +1245,7 @@ extension Set {
   /// - Returns: `true` if the set is a subset of `other`; otherwise, `false`.
   @inlinable
   public func isSubset(of other: Set<Element>) -> Bool {
+    guard self.count > 0 else { return true }
     guard self.count <= other.count else { return false }
     for member in self {
       if !other.contains(member) {
@@ -1302,7 +1336,7 @@ extension Set {
   ///   `other`; otherwise, `false`.
   @inlinable
   public func isStrictSuperset(of other: Set<Element>) -> Bool {
-    return self.isSuperset(of: other) && self != other
+    return self.count > other.count && self.isSuperset(of: other)
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict subset
@@ -1965,6 +1999,78 @@ extension _NativeSet {
         _storage.hashTable.lookupNext(hashValue: hashValue, after: index)
     }
     return (index, false)
+  }
+}
+
+extension _NativeSet {
+  @inlinable
+  internal func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
+    where S.Element == Element {
+    // Allocate a temporary bitmap to mark elements in self that we've seen in
+    // possibleSuperset.
+    var bitmap = _storage.hashTable.createBitmap()
+    var seen = 0
+    for element in possibleSuperset {
+      // Found a new element of self in possibleSuperset.
+      let (index, found) = find(element)
+      guard found else { continue }
+      if bitmap._uncheckedInsert(index.bucket) {
+        seen += 1
+        if seen == self.count {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  @inlinable
+  internal func isStrictSubset<S: Sequence>(of possibleSuperset: S) -> Bool
+    where S.Element == Element {
+    // Allocate a temporary bitmap to mark elements in self that we've seen in
+    // possibleSuperset.
+    var bitmap = _storage.hashTable.createBitmap()
+    var seen = 0
+    var isStrict = false
+    for element in possibleSuperset {
+      let (index, found) = find(element)
+      guard found else {
+        if !isStrict {
+          isStrict = true
+          if seen == self.count { return true }
+        }
+        continue
+      }
+      if bitmap._uncheckedInsert(index.bucket) {
+        // Found a new element of self in possibleSuperset.
+        seen += 1
+        if seen == self.count && isStrict {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  @inlinable
+  internal func isStrictSuperset<S: Sequence>(of possibleSubset: S) -> Bool
+    where S.Element == Element {
+    // Allocate a temporary bitmap to mark elements in self that we've seen in
+    // possibleStrictSubset.
+    var bitmap = _storage.hashTable.createBitmap()
+    var seen = 0
+    for element in possibleSubset {
+      let (index, found) = find(element)
+      guard found else { return false }
+      if bitmap._uncheckedInsert(index.bucket) {
+        // Found a new element of possibleSubset in self.
+        seen += 1
+        if seen == self.count {
+          return false
+        }
+      }
+    }
+    return true
   }
 }
 

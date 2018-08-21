@@ -442,6 +442,15 @@ extension _HashTable {
 }
 
 extension _HashTable {
+  // Create a bitmap of the same size as this hash table's bucket count.
+  @usableFromInline
+  @_effects(releasenone)
+  internal func createBitmap() -> _Bitmap {
+    return _Bitmap(bitCount: self.bucketCount)
+  }
+}
+
+extension _HashTable {
   internal func _invariantCheck(with delegate: _HashTableDelegate) {
 #if INTERNAL_CHECKS_ENABLED
     _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1,
