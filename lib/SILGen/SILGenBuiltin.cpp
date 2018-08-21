@@ -101,57 +101,6 @@ static ManagedValue emitBuiltinAutorelease(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));    
 }
 
-static bool requireIsOptionalNativeObject(SILGenFunction &SGF,
-                                          SILLocation loc,
-                                          Type type) {
-  if (auto valueType = type->getOptionalObjectType())
-    if (valueType->is<BuiltinNativeObjectType>())
-      return true;
-
-  SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
-              "type of pin handle must be Optional<Builtin.NativeObject>");
-  return false;
-}
-
-static ManagedValue emitBuiltinTryPin(SILGenFunction &SGF,
-                                      SILLocation loc,
-                                      SubstitutionMap subs,
-                                      ArrayRef<ManagedValue> args,
-                                      SGFContext C) {
-  assert(args.size() == 1);
-
-  auto argTy = subs.getReplacementTypes()[0];
-  if (!requireIsOptionalNativeObject(SGF, loc, argTy)) {
-    return SGF.emitUndef(loc, argTy);
-  }
-
-  // The value was produced at +1, but pinning is only a conditional
-  // retain, so we have to leave the cleanup in place.  TODO: try to
-  // emit the argument at +0.
-  SILValue result =
-      SGF.B.createStrongPin(loc, args[0].getValue(), SGF.B.getDefaultAtomicity());
-
-  // The handle, if non-null, is effectively +1.
-  return SGF.emitManagedRValueWithCleanup(result);
-}
-
-static ManagedValue emitBuiltinUnpin(SILGenFunction &SGF,
-                                     SILLocation loc,
-                                     SubstitutionMap subs,
-                                     ArrayRef<ManagedValue> args,
-                                     SGFContext C) {
-  assert(args.size() == 1);
-
-  auto argTy = subs.getReplacementTypes()[0];
-  if (requireIsOptionalNativeObject(SGF, loc, argTy)) {
-    // Unpinning takes responsibility for the +1 handle.
-    SGF.B.createStrongUnpin(loc, args[0].ensurePlusOne(SGF, loc).forward(SGF),
-                            SGF.B.getDefaultAtomicity());
-  }
-
-  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
-}
-
 /// Specialized emitter for Builtin.load and Builtin.take.
 static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &SGF,
                                           SILLocation loc,
@@ -929,22 +878,6 @@ static ManagedValue emitBuiltinIsUnique(SILGenFunction &SGF,
     SGF.B.createIsUnique(loc, args[0].getValue()));
 }
 
-static ManagedValue
-emitBuiltinIsUniqueOrPinned(SILGenFunction &SGF,
-                               SILLocation loc,
-                               SubstitutionMap subs,
-                               ArrayRef<ManagedValue> args,
-                               SGFContext C) {
-  assert(subs.getReplacementTypes().size() == 1 &&
-         "isUnique should have a single substitution");
-  assert(args.size() == 1 && "isUnique should have a single argument");
-  assert((args[0].getType().isAddress() && !args[0].hasCleanup()) &&
-         "Builtin.isUnique takes an address.");
-
-  return ManagedValue::forUnmanaged(
-    SGF.B.createIsUniqueOrPinned(loc, args[0].getValue()));
-}
-
 // This force-casts the incoming address to NativeObject assuming the caller has
 // performed all necessary checks. For example, this may directly cast a
 // single-payload enum to a NativeObject reference.
@@ -963,24 +896,6 @@ emitBuiltinIsUnique_native(SILGenFunction &SGF,
     SILType::getNativeObjectType(SGF.getASTContext()).getAddressType();
   auto toAddr = SGF.B.createUncheckedAddrCast(loc, args[0].getValue(), ToType);
   SILValue result = SGF.B.createIsUnique(loc, toAddr);
-  return ManagedValue::forUnmanaged(result);
-}
-
-static ManagedValue
-emitBuiltinIsUniqueOrPinned_native(SILGenFunction &SGF,
-                                   SILLocation loc,
-                                   SubstitutionMap subs,
-                                   ArrayRef<ManagedValue> args,
-                                   SGFContext C) {
-
-  assert(subs.getReplacementTypes().size() == 1 &&
-         "isUniqueOrPinned_native should have one sub.");
-  assert(args.size() == 1 && "isUniqueOrPinned_native should have one arg.");
-
-  auto ToType =
-    SILType::getNativeObjectType(SGF.getASTContext()).getAddressType();
-  auto toAddr = SGF.B.createUncheckedAddrCast(loc, args[0].getValue(), ToType);
-  SILValue result = SGF.B.createIsUniqueOrPinned(loc, toAddr);
   return ManagedValue::forUnmanaged(result);
 }
 

@@ -615,27 +615,6 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
-// native pinned
-// CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins16isUniqueOrPinnedyBi1_BoSgzF"({{%.*}}* nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK-NEXT: entry:
-// CHECK-NEXT: bitcast [[BUILTIN_NATIVE_OBJECT_TY]]* %0 to %swift.refcounted**
-// CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_native(%swift.refcounted* %2)
-// CHECK-NEXT: ret i1 %3
-func isUniqueOrPinned(_ ref: inout Builtin.NativeObject?) -> Bool {
-  return Builtin.isUniqueOrPinned(&ref)
-}
-
-// native pinned nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins16isUniqueOrPinnedyBi1_BozF"(%swift.refcounted** nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK-NEXT: entry:
-// CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %0
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %1)
-// CHECK-NEXT: ret i1 %2
-func isUniqueOrPinned(_ ref: inout Builtin.NativeObject) -> Bool {
-  return Builtin.isUniqueOrPinned(&ref)
-}
-
 // CHECK: define hidden {{.*}}void @"$S8builtins27acceptsBuiltinUnknownObjectyyBOSgzF"([[BUILTIN_UNKNOWN_OBJECT_TY:%.*]]* nocapture dereferenceable({{.*}})) {{.*}} {
 func acceptsBuiltinUnknownObject(_ ref: inout Builtin.UnknownObject?) {}
 
@@ -663,18 +642,6 @@ func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
-// ObjC pinned nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins16isUniqueOrPinnedyBi1_BOzF"
-// CHECK-SAME:    ([[UNKNOWN_OBJECT]]** nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK-NEXT: entry:
-// CHECK-NEXT: load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** %0
-// CHECK-native-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native([[UNKNOWN_OBJECT]]* %1)
-// CHECK-objc-NEXT: call i1 @swift_isUniquelyReferencedOrPinnedNonObjC_nonNull([[UNKNOWN_OBJECT]]* %1)
-// CHECK-NEXT: ret i1 %2
-func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
-  return Builtin.isUniqueOrPinned(&ref)
-}
-
 // BridgeObject nonNull
 // CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins8isUniqueyBi1_BbzF"(%swift.bridge** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
@@ -683,16 +650,6 @@ func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
 // CHECK-NEXT: ret i1 %2
 func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
   return Builtin.isUnique(&ref)
-}
-
-// Bridge pinned nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins16isUniqueOrPinnedyBi1_BbzF"(%swift.bridge** nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK-NEXT: entry:
-// CHECK-NEXT: load %swift.bridge*, %swift.bridge** %0
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(%swift.bridge* %1)
-// CHECK-NEXT: ret i1 %2
-func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
-  return Builtin.isUniqueOrPinned(&ref)
 }
 
 // BridgeObject nonNull
@@ -704,17 +661,6 @@ func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
 // CHECK-NEXT: ret i1 %3
 func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
   return Builtin.isUnique_native(&ref)
-}
-
-// Bridge pinned nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins23isUniqueOrPinned_nativeyBi1_BbzF"(%swift.bridge** nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK-NEXT: entry:
-// CHECK-NEXT: bitcast %swift.bridge** %0 to %swift.refcounted**
-// CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %2)
-// CHECK-NEXT: ret i1 %3
-func isUniqueOrPinned_native(_ ref: inout Builtin.BridgeObject) -> Bool {
-  return Builtin.isUniqueOrPinned_native(&ref)
 }
 
 // ImplicitlyUnwrappedOptional argument to isUnique.
