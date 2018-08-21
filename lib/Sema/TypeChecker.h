@@ -1047,9 +1047,9 @@ public:
     return Diags.diagnose(std::forward<ArgTypes>(Args)...);
   }
 
-  Type getArraySliceType(SourceLoc loc, Type elementType);
-  Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
-  Type getOptionalType(SourceLoc loc, Type elementType);
+  static Type getArraySliceType(SourceLoc loc, Type elementType);
+  static Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
+  static Type getOptionalType(SourceLoc loc, Type elementType);
   Type getUnsafePointerType(SourceLoc loc, Type pointeeType);
   Type getUnsafeMutablePointerType(SourceLoc loc, Type pointeeType);
   Type getStringType(DeclContext *dc);

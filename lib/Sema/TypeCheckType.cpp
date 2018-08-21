@@ -291,8 +291,9 @@ bool TypeResolution::areSameType(Type type1, Type type2) const {
 }
 
 Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
-  if (!Context.getArrayDecl()) {
-    diagnose(loc, diag::sugar_type_not_found, 0);
+  ASTContext &ctx = elementType->getASTContext();
+  if (!ctx.getArrayDecl()) {
+    ctx.Diags.diagnose(loc, diag::sugar_type_not_found, 0);
     return Type();
   }
 
@@ -301,17 +302,19 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
 
 Type TypeChecker::getDictionaryType(SourceLoc loc, Type keyType, 
                                     Type valueType) {
-  if (!Context.getDictionaryDecl()) {
-    diagnose(loc, diag::sugar_type_not_found, 3);
+  ASTContext &ctx = keyType->getASTContext();
+  if (!ctx.getDictionaryDecl()) {
+    ctx.Diags.diagnose(loc, diag::sugar_type_not_found, 3);
     return Type();
   }
 
-    return DictionaryType::get(keyType, valueType);
+  return DictionaryType::get(keyType, valueType);
 }
 
 Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
-  if (!Context.getOptionalDecl()) {
-    diagnose(loc, diag::sugar_type_not_found, 1);
+  ASTContext &ctx = elementType->getASTContext();
+  if (!ctx.getOptionalDecl()) {
+    ctx.Diags.diagnose(loc, diag::sugar_type_not_found, 1);
     return Type();
   }
 
@@ -2731,7 +2734,8 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   Type baseTy = resolveType(repr->getBase(), options.withoutContext());
   if (!baseTy || baseTy->hasError()) return baseTy;
 
-  auto sliceTy = TC.getArraySliceType(repr->getBrackets().Start, baseTy);
+  auto sliceTy =
+    TypeChecker::getArraySliceType(repr->getBrackets().Start, baseTy);
   if (!sliceTy)
     return ErrorType::get(Context);
 
@@ -2753,8 +2757,8 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
 
   auto dictDecl = Context.getDictionaryDecl();
 
-  if (auto dictTy = TC.getDictionaryType(repr->getBrackets().Start, keyTy, 
-                                         valueTy)) {
+  if (auto dictTy = TypeChecker::getDictionaryType(repr->getBrackets().Start,
+                                                   keyTy, valueTy)) {
     // Check the requirements on the generic arguments.
     TC.validateDecl(dictDecl);
     auto unboundTy = dictDecl->getDeclaredType()->castTo<UnboundGenericType>();
@@ -2787,7 +2791,8 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
   Type baseTy = resolveType(repr->getBase(), elementOptions);
   if (!baseTy || baseTy->hasError()) return baseTy;
 
-  auto optionalTy = TC.getOptionalType(repr->getQuestionLoc(), baseTy);
+  auto optionalTy = TypeChecker::getOptionalType(repr->getQuestionLoc(),
+                                                 baseTy);
   if (!optionalTy) return ErrorType::get(Context);
 
   return optionalTy;
@@ -2857,7 +2862,8 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   if (!baseTy || baseTy->hasError()) return baseTy;
 
   Type uncheckedOptionalTy;
-  uncheckedOptionalTy = TC.getOptionalType(repr->getExclamationLoc(), baseTy);
+  uncheckedOptionalTy = TypeChecker::getOptionalType(repr->getExclamationLoc(),
+                                                     baseTy);
 
   if (!uncheckedOptionalTy)
     return ErrorType::get(Context);
