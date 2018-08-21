@@ -1156,11 +1156,11 @@ public:
   /// \param resolution The resolution to perform.
   ///
   /// \returns the resolved type.
-  Type resolveTypeInContext(TypeDecl *typeDecl,
-                            DeclContext *foundDC,
-                            TypeResolution resolution,
-                            TypeResolutionOptions options,
-                            bool isSpecialized);
+  static Type resolveTypeInContext(TypeDecl *typeDecl,
+                                   DeclContext *foundDC,
+                                   TypeResolution resolution,
+                                   TypeResolutionOptions options,
+                                   bool isSpecialized);
 
   /// Apply generic arguments to the given type.
   ///
@@ -1498,7 +1498,7 @@ public:
   /// requirement.
   /// \param listener The generic check listener used to pick requirements and
   /// notify callers about diagnosed errors.
-  RequirementCheckResult checkGenericArguments(
+  static RequirementCheckResult checkGenericArguments(
       DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
       TypeArrayView<GenericTypeParamType> genericParams,
       ArrayRef<Requirement> requirements,
@@ -1985,10 +1985,10 @@ public:
   ///
   /// \returns the conformance, if \c T conforms to the protocol \c Proto, or
   /// an empty optional.
-  Optional<ProtocolConformanceRef> containsProtocol(
-                                     Type T, ProtocolDecl *Proto,
-                                     DeclContext *DC,
-                                     ConformanceCheckOptions options);
+  static Optional<ProtocolConformanceRef> containsProtocol(
+                                             Type T, ProtocolDecl *Proto,
+                                             DeclContext *DC,
+                                             ConformanceCheckOptions options);
 
   /// \brief Determine whether the given type conforms to the given protocol.
   ///
@@ -2007,12 +2007,12 @@ public:
   ///
   /// \returns The protocol conformance, if \c T conforms to the
   /// protocol \c Proto, or \c None.
-  Optional<ProtocolConformanceRef> conformsToProtocol(
-                                     Type T,
-                                     ProtocolDecl *Proto,
-                                     DeclContext *DC,
-                                     ConformanceCheckOptions options,
-                                     SourceLoc ComplainLoc = SourceLoc());
+  static Optional<ProtocolConformanceRef> conformsToProtocol(
+                                           Type T,
+                                           ProtocolDecl *Proto,
+                                           DeclContext *DC,
+                                           ConformanceCheckOptions options,
+                                           SourceLoc ComplainLoc = SourceLoc());
 
   /// Mark the given protocol conformance as "used" from the given declaration
   /// context.
@@ -2023,12 +2023,10 @@ public:
   /// conformance through a particular declaration context using the given
   /// type checker.
   class LookUpConformance {
-    TypeChecker &tc;
     DeclContext *dc;
 
   public:
-    explicit LookUpConformance(TypeChecker &tc, DeclContext *dc)
-      : tc(tc), dc(dc) { }
+    explicit LookUpConformance(DeclContext *dc) : dc(dc) { }
 
     Optional<ProtocolConformanceRef>
     operator()(CanType dependentType,
@@ -2124,8 +2122,7 @@ public:
 
   /// \brief Check whether the given declaration can be written as a
   /// member of the given base type.
-  bool isUnsupportedMemberTypeAccess(Type type,
-                                     TypeDecl *typeDecl);
+  static bool isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
 
   /// \brief Look up a member type within the given type.
   ///
@@ -2138,10 +2135,10 @@ public:
   /// \param options Options that control name lookup.
   ///
   /// \returns The result of name lookup.
-  LookupTypeResult lookupMemberType(DeclContext *dc, Type type,
-                                    Identifier name,
-                                    NameLookupOptions options
-                                      = defaultMemberTypeLookupOptions);
+  static LookupTypeResult lookupMemberType(DeclContext *dc, Type type,
+                                           Identifier name,
+                                           NameLookupOptions options
+                                             = defaultMemberTypeLookupOptions);
 
   /// \brief Look up the constructors of the given type.
   ///
@@ -2411,7 +2408,7 @@ public:
   ///
   /// Returns true if the arguments list could be constructed, false if for
   /// some reason it could not.
-  bool getDefaultGenericArgumentsString(
+  static bool getDefaultGenericArgumentsString(
       SmallVectorImpl<char> &buf,
       const GenericTypeDecl *typeDecl,
       llvm::function_ref<Type(const GenericTypeParamDecl *)> getPreferredType =

@@ -980,10 +980,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
-    auto type = TC.resolveTypeInContext(typeDecl, nullptr,
-                                        TypeResolution::forContextual(useDC),
-                                        TypeResolverContext::InExpression,
-                                        /*isSpecialized=*/false);
+    auto type = TypeChecker::resolveTypeInContext(
+                                      typeDecl, nullptr,
+                                      TypeResolution::forContextual(useDC),
+                                      TypeResolverContext::InExpression,
+                                      /*isSpecialized=*/false);
 
     // Open the type.
     type = openUnboundGenericType(type, locator);

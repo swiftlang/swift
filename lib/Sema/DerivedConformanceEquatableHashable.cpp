@@ -37,13 +37,13 @@ using namespace swift;
 /// \p theEnum The enum whose elements and associated values should be checked.
 /// \p protocol The protocol being requested.
 /// \return True if all associated values of all elements of the enum conform.
-static bool allAssociatedValuesConformToProtocol(TypeChecker &tc,
-                                                 DeclContext *DC,
+static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
                                                  EnumDecl *theEnum,
                                                  ProtocolDecl *protocol) {
+  auto lazyResolver = DC->getASTContext().getLazyResolver();
   for (auto elt : theEnum->getAllElements()) {
     if (!elt->hasInterfaceType())
-      tc.validateDecl(elt);
+      lazyResolver->resolveDeclSignature(elt);
 
     auto PL = elt->getParameterList();
     if (!PL)
@@ -51,8 +51,9 @@ static bool allAssociatedValuesConformToProtocol(TypeChecker &tc,
 
     for (auto param : *PL) {
       auto type = param->getType()->mapTypeOutOfContext();
-      if (!tc.conformsToProtocol(DC->mapTypeIntoContext(type), protocol, DC,
-                                 ConformanceCheckFlags::Used)) {
+      if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
+                                           protocol, DC,
+                                           ConformanceCheckFlags::Used)) {
         return false;
       }
     }
@@ -65,21 +66,22 @@ static bool allAssociatedValuesConformToProtocol(TypeChecker &tc,
 /// \p theStruct The struct whose stored properties should be checked.
 /// \p protocol The protocol being requested.
 /// \return True if all stored properties of the struct conform.
-static bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
-                                                 DeclContext *DC,
+static bool allStoredPropertiesConformToProtocol(DeclContext *DC,
                                                  StructDecl *theStruct,
                                                  ProtocolDecl *protocol) {
+  auto lazyResolver = DC->getASTContext().getLazyResolver();
   auto storedProperties =
     theStruct->getStoredProperties(/*skipInaccessible=*/true);
   for (auto propertyDecl : storedProperties) {
     if (!propertyDecl->hasType())
-      tc.validateDecl(propertyDecl);
+      lazyResolver->resolveDeclSignature(propertyDecl);
     if (!propertyDecl->hasType())
       return false;
 
     auto type = propertyDecl->getType()->mapTypeOutOfContext();
-    if (!tc.conformsToProtocol(DC->mapTypeIntoContext(type), protocol, DC,
-                               ConformanceCheckFlags::Used)) {
+    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
+                                         protocol, DC,
+                                         ConformanceCheckFlags::Used)) {
       return false;
     }
   }
@@ -87,19 +89,19 @@ static bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
 }
 
 /// Common preconditions for Equatable and Hashable.
-static bool canDeriveConformance(TypeChecker &tc, DeclContext *DC,
+static bool canDeriveConformance(DeclContext *DC,
                                  NominalTypeDecl *target,
                                  ProtocolDecl *protocol) {
   // The type must be an enum or a struct.
   if (auto enumDecl = dyn_cast<EnumDecl>(target)) {
     // The cases must not have associated values, or all associated values must
     // conform to the protocol.
-    return allAssociatedValuesConformToProtocol(tc, DC, enumDecl, protocol);
+    return allAssociatedValuesConformToProtocol(DC, enumDecl, protocol);
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(target)) {
     // All stored properties of the struct must conform to the protocol.
-    return allStoredPropertiesConformToProtocol(tc, DC, structDecl, protocol);
+    return allStoredPropertiesConformToProtocol(DC, structDecl, protocol);
   }
 
   return false;
@@ -675,12 +677,12 @@ deriveEquatable_eq(DerivedConformance &derived,
   return eqDecl;
 }
 
-bool DerivedConformance::canDeriveEquatable(TypeChecker &tc, DeclContext *DC,
+bool DerivedConformance::canDeriveEquatable(DeclContext *DC,
                                             NominalTypeDecl *type) {
   ASTContext &ctx = DC->getASTContext();
   auto equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
   if (!equatableProto) return false;
-  return canDeriveConformance(tc, DC, type, equatableProto);
+  return canDeriveConformance(DC, type, equatableProto);
 }
 
 ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
@@ -1187,7 +1189,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
       // Refuse to synthesize Hashable if type isn't a struct or enum, or if it
       // has non-Hashable stored properties/associated values.
       auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-      if (!canDeriveConformance(TC, getConformanceContext(), Nominal,
+      if (!canDeriveConformance(getConformanceContext(), Nominal,
                                 hashableProto)) {
         TC.diagnose(ConformanceDecl->getLoc(), diag::type_does_not_conform,
                     Nominal->getDeclaredType(),
