@@ -1292,7 +1292,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
             SyntaxFactory::makeBlankFunctionCallArgumentList(
-                &SyntaxContext->getArena()));
+                SyntaxContext->getArena()));
       }
 
       ParserResult<Expr> closure =
@@ -1585,9 +1585,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       auto pattern = createBindingFromPattern(loc, name, specifier);
       if (SyntaxContext->isEnabled()) {
         PatternSyntax PatternNode = SyntaxFactory::makeIdentifierPattern(
-            SyntaxContext->popToken(), &SyntaxContext->getArena());
+            SyntaxContext->popToken(), SyntaxContext->getArena());
         ExprSyntax ExprNode = SyntaxFactory::makeUnresolvedPatternExpr(
-            PatternNode, &SyntaxContext->getArena());
+            PatternNode, SyntaxContext->getArena());
         SyntaxContext->addSyntax(ExprNode);
       }
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
@@ -1723,7 +1723,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
             SyntaxFactory::makeBlankFunctionCallArgumentList(
-                &SyntaxContext->getArena()));
+                SyntaxContext->getArena()));
       }
 
       ParserResult<Expr> closure =
@@ -2090,7 +2090,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     consumeToken(tok::l_paren);
     if (SyntaxContext->isEnabled())
       SyntaxContext->addSyntax(SyntaxFactory::makeBlankDeclNameArgumentList(
-          &SyntaxContext->getArena()));
+          SyntaxContext->getArena()));
     consumeToken(tok::r_paren);
     loc = DeclNameLoc(baseNameLoc);
     SmallVector<Identifier, 2> argumentLabels;
@@ -3277,7 +3277,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
   if (Tok.is(tok::r_square)) {
     if (SyntaxContext->isEnabled())
       SyntaxContext->addSyntax(
-          SyntaxFactory::makeBlankArrayElementList(&Context.getSyntaxArena()));
+          SyntaxFactory::makeBlankArrayElementList(Context.getSyntaxArena()));
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::ArrayExpr);
     return makeParserResult(
