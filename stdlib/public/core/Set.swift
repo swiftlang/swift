@@ -2616,15 +2616,15 @@ extension Set._Variant: _SetBuffer {
   @inlinable
   internal var startIndex: Index {
     if _fastPath(guaranteedNative) {
-      return ._native(asNative.startIndex)
+      return Index(_native: asNative.startIndex)
     }
 
     switch self {
     case .native:
-      return ._native(asNative.startIndex)
+      return Index(_native: asNative.startIndex)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
-      return ._cocoa(cocoaSet.startIndex)
+      return Index(_cocoa: cocoaSet.startIndex)
 #endif
     }
   }
@@ -2632,15 +2632,15 @@ extension Set._Variant: _SetBuffer {
   @inlinable
   internal var endIndex: Index {
     if _fastPath(guaranteedNative) {
-      return ._native(asNative.endIndex)
+      return Index(_native: asNative.endIndex)
     }
 
     switch self {
     case .native:
-      return ._native(asNative.endIndex)
+      return Index(_native: asNative.endIndex)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
-      return ._cocoa(cocoaSet.endIndex)
+      return Index(_cocoa: cocoaSet.endIndex)
 #endif
     }
   }
@@ -2648,15 +2648,15 @@ extension Set._Variant: _SetBuffer {
   @inlinable
   internal func index(after i: Index) -> Index {
     if _fastPath(guaranteedNative) {
-      return ._native(asNative.index(after: i._asNative))
+      return Index(_native: asNative.index(after: i._asNative))
     }
 
     switch self {
     case .native:
-      return ._native(asNative.index(after: i._asNative))
+      return Index(_native: asNative.index(after: i._asNative))
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
-      return ._cocoa(cocoaSet.index(after: i._asCocoa))
+      return Index(_cocoa: cocoaSet.index(after: i._asCocoa))
 #endif
     }
   }
@@ -2671,7 +2671,7 @@ extension Set._Variant: _SetBuffer {
   internal func index(for element: Element) -> Index? {
     if _fastPath(guaranteedNative) {
       if let index = asNative.index(for: element) {
-        return ._native(index)
+        return Index(_native: index)
       }
       return nil
     }
@@ -2679,14 +2679,14 @@ extension Set._Variant: _SetBuffer {
     switch self {
     case .native:
       if let index = asNative.index(for: element) {
-        return ._native(index)
+        return Index(_native: index)
       }
       return nil
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       let cocoaElement = _bridgeAnythingToObjectiveC(element)
       if let index = cocoa.index(for: cocoaElement) {
-        return ._cocoa(index)
+        return Index(_cocoa: index)
       }
       return nil
 #endif
@@ -2975,10 +2975,10 @@ extension Set {
 #endif
     }
 
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline
     internal var _variant: _Variant
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     internal init(_variant: _Variant) {
       self._variant = _variant
     }
@@ -2987,16 +2987,14 @@ extension Set {
 
 extension Set.Index {
   @inlinable
-  internal static func _native(
-    _ index: _NativeSet<Element>.Index
-  ) -> Set.Index {
-    return Set.Index(_variant: .native(index))
+  internal init(_native index: _NativeSet<Element>.Index) {
+    self.init(_variant: .native(index))
   }
 
 #if _runtime(_ObjC)
   @inlinable
-  internal static func _cocoa(_ index: _CocoaSet.Index) -> Set.Index {
-    return Set.Index(_variant: .cocoa(index))
+  internal init(_cocoa index: _CocoaSet.Index) {
+    self.init(_variant: .cocoa(index))
   }
 #endif
 
