@@ -234,7 +234,7 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
 
 void TypeChecker::checkInheritanceClause(Decl *decl) {
   auto dc = decl->getInnermostDeclContext();
-  checkInheritanceClause(decl, TypeResolution::forContextual(dc));
+  checkInheritanceClause(decl, TypeResolution::forInterface(dc));
 }
 
 /// check the inheritance clause of a type declaration or extension thereof.
@@ -244,6 +244,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl) {
 /// to which this type declaration conforms.
 void TypeChecker::checkInheritanceClause(Decl *decl,
                                          TypeResolution resolution) {
+  assert(resolution.getStage() != TypeResolutionStage::Contextual);
+
   TypeResolutionOptions options = None;
   DeclContext *DC;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {

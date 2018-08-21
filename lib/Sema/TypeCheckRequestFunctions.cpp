@@ -43,14 +43,12 @@ InheritedTypeRequest::evaluate(
   // FIXME: This should be part of the request!
   TypeResolution resolution =
     isa<ProtocolDecl>(dc) ? TypeResolution::forStructural(dc)
-                          : TypeResolution::forContextual(dc);
+                          : TypeResolution::forInterface(dc);
 
   TypeLoc &typeLoc = getTypeLoc(decl, index);
 
   Type inheritedType =
     resolution.resolveType(typeLoc.getTypeRepr(), options);
-  if (inheritedType && !isa<ProtocolDecl>(dc))
-    inheritedType = inheritedType->mapTypeOutOfContext();
   return inheritedType ? inheritedType : ErrorType::get(dc->getASTContext());
 }
 
@@ -76,9 +74,6 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
 
     // If we found a class, return it.
     if (inheritedType->getClassOrBoundGenericClass()) {
-      if (inheritedType->hasArchetype())
-        return inheritedType->mapTypeOutOfContext();
-
       return inheritedType;
     }
 
@@ -87,9 +82,6 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
       if (auto superclassType =
             inheritedType->getExistentialLayout().explicitSuperclass) {
         if (superclassType->getClassOrBoundGenericClass()) {
-          if (superclassType->hasArchetype())
-            return superclassType->mapTypeOutOfContext();
-
           return superclassType;
         }
       }
@@ -120,9 +112,6 @@ EnumRawTypeRequest::evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const {
     if (inheritedType->isExistentialType()) continue;
 
     // We found a raw type; return it.
-    if (inheritedType->hasArchetype())
-      return inheritedType->mapTypeOutOfContext();
-
     return inheritedType;
   }
 
