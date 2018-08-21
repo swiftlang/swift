@@ -67,6 +67,9 @@ public:
   static TypeResolution forContextual(DeclContext *dc,
                                       GenericEnvironment *genericEnv);
 
+  /// Retrieve the ASTContext in which this resolution occurs.
+  ASTContext &getASTContext() const { return dc->getASTContext(); }
+
   /// Retrieve the declaration context in which type resolution will be
   /// performed.
   DeclContext *getDeclContext() const { return dc; }

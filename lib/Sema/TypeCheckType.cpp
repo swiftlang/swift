@@ -1137,7 +1137,9 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options) {
   // Short-circuiting.
-  if (comp->isInvalid()) return ErrorType::get(TC.Context);
+  ASTContext &ctx = resolution.getASTContext();
+  auto &diags = ctx.Diags;
+  if (comp->isInvalid()) return ErrorType::get(ctx);
 
   // If the component has already been bound to a declaration, handle
   // that now.
@@ -1155,7 +1157,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC,
 
   // Dynamic 'Self' in the result type of a function body.
   if (options.getBaseContext() == TypeResolverContext::DynamicSelfResult &&
-      comp->getIdentifier() == TC.Context.Id_Self) {
+      comp->getIdentifier() == ctx.Id_Self) {
     auto func = cast<FuncDecl>(DC);
     assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
 
@@ -1165,7 +1167,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC,
 
     auto selfType = resolution.mapTypeIntoContext(
       func->getDeclContext()->getSelfInterfaceType());
-    return DynamicSelfType::get(selfType, TC.Context);
+    return DynamicSelfType::get(selfType, ctx);
   }
 
   auto id = comp->getIdentifier();
@@ -1173,10 +1175,10 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC,
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::KnownNonCascadingDependency))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto globals = TC.lookupUnqualifiedType(lookupDC,
-                                          id,
-                                          comp->getIdLoc(),
-                                          lookupOptions);
+  auto globals = TypeChecker::lookupUnqualifiedType(lookupDC,
+                                                    id,
+                                                    comp->getIdLoc(),
+                                                    lookupOptions);
 
   // Process the names we found.
   Type current;
@@ -1219,16 +1221,16 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC,
   // FIXME: We could recover by looking at later components.
   if (isAmbiguous) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      TC.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
-                  comp->getIdentifier())
+      diags.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
+                     comp->getIdentifier())
         .highlight(comp->getIdLoc());
       for (auto entry : globals) {
-        TC.diagnose(entry.getValueDecl(), diag::found_candidate);
+        entry.getValueDecl()->diagnose(diag::found_candidate);
       }
     }
 
     comp->setInvalid();
-    return ErrorType::get(TC.Context);
+    return ErrorType::get(ctx);
   }
 
   // If we found nothing, complain and give ourselves a chance to recover.
@@ -1236,7 +1238,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC,
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
     if (options.contains(TypeResolutionFlags::SilenceErrors))
-      return ErrorType::get(TC.Context);
+      return ErrorType::get(ctx);
 
     return diagnoseUnknownType(TC, resolution, nullptr, SourceRange(), comp,
                                options, lookupOptions);
