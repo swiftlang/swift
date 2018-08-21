@@ -110,9 +110,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
-  result.ExcludeAttrList.push_back(DAK_AccessControl);
-
-  // FIXME: We'll need the actual default parameter expression.
+  result.ExcludeAttrList = {DAK_ImplicitlyUnwrappedOptional, DAK_AccessControl};
   result.PrintDefaultParameterPlaceholder = false;
 
   return result;
