@@ -178,6 +178,13 @@ extension Set {
     _variant = .native(_native)
   }
 
+#if _runtime(_ObjC)
+  @inlinable
+  internal init(_cocoa: _CocoaSet) {
+    _variant = .cocoa(_cocoa)
+  }
+#endif
+
   //
   // All APIs below should dispatch to `_variant`, without doing any
   // additional processing.
@@ -195,8 +202,8 @@ extension Set {
   public // SPI(Foundation)
   init(_immutableCocoaSet: _NSSet) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
-      "Set can be backed by NSSet _variant only when the member type can be bridged verbatim to Objective-C")
-    _variant = _Variant.cocoa(_CocoaSet(_immutableCocoaSet))
+      "Set can be backed by NSSet only when the member type can be bridged verbatim to Objective-C")
+    self.init(_cocoa: _CocoaSet(_immutableCocoaSet))
   }
 #endif
 }
@@ -1129,9 +1136,9 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   && _isClassOrObjCExistential(DerivedValue.self) {
     switch source._variant {
     case .native(let nativeSet):
-      return Set(_immutableCocoaSet: nativeSet.bridged())
+      return Set(_cocoa: _CocoaSet(nativeSet.bridged()))
     case .cocoa(let cocoaSet):
-      return Set(_immutableCocoaSet: cocoaSet.object)
+      return Set(_cocoa: cocoaSet)
     }
   }
 #endif
