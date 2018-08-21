@@ -1068,14 +1068,17 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         }
         break;
 
-      case RequirementKind::Superclass:
+      case RequirementKind::Superclass: {
         // Superclass requirements.
-        if (!isSubclassOf(firstType, secondType, dc)) {
+        // FIXME: Don't use the type checker instance here?
+        TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
+        if (!tc.isSubclassOf(firstType, secondType, dc)) {
           diagnostic = diag::type_does_not_inherit;
           diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
           requirementFailure = true;
         }
         break;
+      }
 
       case RequirementKind::SameType:
         if (!firstType->isEqual(secondType)) {

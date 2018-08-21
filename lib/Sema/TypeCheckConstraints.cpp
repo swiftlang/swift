@@ -1036,7 +1036,7 @@ namespace {
       if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
         if (!PlaceholderE->getTypeLoc().isNull()) {
           if (!TC.validateType(PlaceholderE->getTypeLoc(),
-                               TypeResolution::forContextual(DC)))
+                               TypeResolution::forContextual(DC), None))
             expr->setType(PlaceholderE->getTypeLoc().getType());
         }
         return finish(true, expr);
@@ -1347,7 +1347,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     options |= TypeResolutionFlags::AllowUnavailable;
     auto resolution = TypeResolution::forContextual(DC);
-    auto BaseTy = TC.resolveType(InnerTypeRepr, resolution, options);
+    auto BaseTy = resolution.resolveType(InnerTypeRepr, options);
 
     if (BaseTy && BaseTy->mayHaveMembers()) {
       auto lookupOptions = defaultMemberLookupOptions;
@@ -1864,7 +1864,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     auto resolution = TypeResolution::forContextual(DC);
-    type = TC.resolveType(rep, resolution, options);
+    type = resolution.resolveType(rep, options);
     typeExpr->getTypeLoc().setType(type);
   }
 
