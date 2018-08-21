@@ -175,3 +175,15 @@ SkipSameTypeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                 ConstraintLocator *locator) {
   return new (cs.getAllocator()) SkipSameTypeRequirement(lhs, rhs, locator);
 }
+
+bool SkipSuperclassRequirement::diagnose(Expr *root,
+                                         const Solution &solution) const {
+  SuperclassRequirementFailure failure(root, solution, LHS, RHS, getLocator());
+  return failure.diagnose();
+}
+
+SkipSuperclassRequirement *
+SkipSuperclassRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SkipSuperclassRequirement(lhs, rhs, locator);
+}
