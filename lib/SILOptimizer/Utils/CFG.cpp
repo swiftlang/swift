@@ -425,13 +425,16 @@ SILBasicBlock *getNthEdgeBlock(SwitchInstTy *S, unsigned EdgeIdx) {
 
 static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
                         SmallVectorImpl<SILValue> &Args) {
-  if (auto Br = dyn_cast<BranchInst>(T)) {
+  switch (T->getKind()) {
+  case SILInstructionKind::BranchInst: {
+    auto Br = cast<BranchInst>(T);
     for (auto V : Br->getArgs())
       Args.push_back(V);
     return;
   }
 
-  if (auto CondBr = dyn_cast<CondBranchInst>(T)) {
+  case SILInstructionKind::CondBranchInst: {
+    auto CondBr = cast<CondBranchInst>(T);
     assert(EdgeIdx < 2);
     auto OpdArgs = EdgeIdx ? CondBr->getFalseArgs() : CondBr->getTrueArgs();
     for (auto V: OpdArgs)
@@ -439,7 +442,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     return;
   }
 
-  if (auto SEI = dyn_cast<SwitchValueInst>(T)) {
+  case SILInstructionKind::SwitchValueInst: {
+    auto SEI = cast<SwitchValueInst>(T);
     auto *SuccBB = getNthEdgeBlock(SEI, EdgeIdx);
     assert(SuccBB->getNumArguments() == 0 && "Can't take an argument");
     (void) SuccBB;
@@ -448,7 +452,9 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
 
   // A switch_enum can implicitly pass the enum payload. We need to look at the
   // destination block to figure this out.
-  if (auto SEI = dyn_cast<SwitchEnumInstBase>(T)) {
+  case SILInstructionKind::SwitchEnumInst:
+  case SILInstructionKind::SwitchEnumAddrInst: {
+    auto SEI = cast<SwitchEnumInstBase>(T);
     auto *SuccBB = getNthEdgeBlock(SEI, EdgeIdx);
     assert(SuccBB->getNumArguments() < 2 && "Can take at most one argument");
     if (!SuccBB->getNumArguments())
@@ -459,7 +465,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
   }
 
   // A dynamic_method_br passes the function to the first basic block.
-  if (auto DMBI = dyn_cast<DynamicMethodBranchInst>(T)) {
+  case SILInstructionKind::DynamicMethodBranchInst: {
+    auto DMBI = cast<DynamicMethodBranchInst>(T);
     auto *SuccBB =
         (EdgeIdx == 0) ? DMBI->getHasMethodBB() : DMBI->getNoMethodBB();
     if (!SuccBB->getNumArguments())
@@ -470,7 +477,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
   }
 
   /// A checked_cast_br passes the result of the cast to the first basic block.
-  if (auto CBI = dyn_cast<CheckedCastBranchInst>(T)) {
+  case SILInstructionKind::CheckedCastBranchInst: {
+    auto CBI = cast<CheckedCastBranchInst>(T);
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
@@ -478,7 +486,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
-  if (auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
+  case SILInstructionKind::CheckedCastAddrBranchInst: {
+    auto CBI = cast<CheckedCastAddrBranchInst>(T);
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
@@ -486,7 +495,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
-  if (auto CBI = dyn_cast<CheckedCastValueBranchInst>(T)) {
+  case SILInstructionKind::CheckedCastValueBranchInst: {
+    auto CBI = cast<CheckedCastValueBranchInst>(T);
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
@@ -495,7 +505,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     return;
   }
 
-  if (auto *TAI = dyn_cast<TryApplyInst>(T)) {
+  case SILInstructionKind::TryApplyInst: {
+    auto *TAI = cast<TryApplyInst>(T);
     auto *SuccBB = EdgeIdx == 0 ? TAI->getNormalBB() : TAI->getErrorBB();
     if (!SuccBB->getNumArguments())
       return;
@@ -504,9 +515,23 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     return;
   }
 
-  // For now this utility is only used to split critical edges involving
-  // cond_br.
-  llvm_unreachable("Not yet implemented");
+  case SILInstructionKind::YieldInst:
+    // The edges from 'yield' never have branch arguments.
+    return;
+
+  case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ThrowInst:
+  case SILInstructionKind::UnwindInst:
+  case SILInstructionKind::UnreachableInst:
+    llvm_unreachable("terminator never has successors");
+
+#define TERMINATOR(ID, ...)
+#define INST(ID, BASE) \
+  case SILInstructionKind::ID:
+#include "swift/SIL/SILNodes.def"
+    llvm_unreachable("not a terminator");
+  }
+  llvm_unreachable("bad instruction kind");
 }
 
 /// Splits the basic block at the iterator with an unconditional branch and
