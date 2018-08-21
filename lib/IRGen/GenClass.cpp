@@ -253,6 +253,9 @@ namespace {
       return Elements;
     }
 
+    /// Does the class metadata have a completely known, static layout that
+    /// does not require initialization at runtime beyond registeration of
+    /// the class with the Objective-C runtime?
     bool isFixedSize() const {
       return !(ClassHasMissingMembers ||
                ClassHasResilientMembers ||
@@ -261,11 +264,20 @@ namespace {
                ClassHasObjCAncestry);
     }
 
-    bool doesMetadataRequireDynamicInitialization() const {
+    /// Note that unlike the top-level doesClassMetadataRequireInitialization(),
+    /// this returns false if the class is generic but otherwise fixed size
+    /// and without resilient or generic ancestry.
+    bool doesMetadataRequireInitialization() const {
       return (ClassHasMissingMembers ||
               ClassHasResilientMembers ||
               ClassHasResilientAncestry ||
               ClassHasGenericAncestry);
+    }
+
+    /// Note that unlike the top-level doesClassMetadataRequireRelocation(),
+    /// this returns false if the class is generic and not resilient.
+    bool doesMetadataRequireRelocation() const {
+      return ClassHasResilientAncestry;
     }
 
     ClassLayout getClassLayout(llvm::Type *classTy) const {
@@ -277,7 +289,8 @@ namespace {
 
       return ClassLayout(*this,
                          isFixedSize(),
-                         doesMetadataRequireDynamicInitialization(),
+                         doesMetadataRequireInitialization(),
+                         doesMetadataRequireRelocation(),
                          classTy,
                          allStoredProps,
                          allFieldAccesses,
@@ -2261,25 +2274,44 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
                                      IGM.Context.Id_SwiftObject);
 }
 
-bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
-                                                          ClassDecl *theClass) {
-  // Classes imported from Objective-C never requires dynamic initialization.
+bool irgen::doesClassMetadataRequireRelocation(IRGenModule &IGM,
+                                               ClassDecl *theClass) {
+  // Classes imported from Objective-C never require dynamic initialization.
   if (theClass->hasClangNode())
     return false;
+
+  // Generic classes always require relocation.
+  if (theClass->isGenericContext())
+    return true;
 
   SILType selfType = getSelfType(theClass);
   auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
 
-  // FIXME: The correct thing is to do in-place initialization of
-  // metadata with resiliently-sized fields, even if we emitted
-  // a fragile layout statically. We can then verify or update
-  // the layout at runtime.
-  //
-  // First, the 'does class metadata require initialization'
-  // condition has to be made more fine grained.
+  // A completely fragile layout does not change whether the metadata
+  // requires *relocation*, since that only depends on resilient class
+  // ancestry, or the class itself being generic.
+  auto &layout = selfTI.getClassLayout(IGM, selfType,
+                                       /*completelyFragileLayout=*/false);
+  return layout.doesMetadataRequireRelocation();
+}
+
+bool irgen::doesClassMetadataRequireInitialization(IRGenModule &IGM,
+                                                   ClassDecl *theClass) {
+  // Classes imported from Objective-C never require dynamic initialization.
+  if (theClass->hasClangNode())
+    return false;
+
+  // Generic classes always require initialization.
+  if (theClass->isGenericContext())
+    return true;
+
+  SILType selfType = getSelfType(theClass);
+  auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+
+  // FIXME: Remove the completelyFragileLayout parameter here.
   auto &layout = selfTI.getClassLayout(IGM, selfType,
                                        /*CompletelyFragileLayout=*/true);
-  return layout.doesMetadataRequireDynamicInitialization();
+  return layout.doesMetadataRequireInitialization();
 }
 
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {

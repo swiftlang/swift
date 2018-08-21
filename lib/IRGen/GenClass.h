@@ -150,11 +150,14 @@ namespace irgen {
 
   ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *theClass);
 
-  /// Does the class metadata for the given class require dynamic
-  /// initialization beyond what can be achieved automatically by
-  /// the runtime?
-  bool doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
-                                                     ClassDecl *theClass);
+  /// Does the given class have resilient ancestry, or is the class itself
+  /// generic?
+  bool doesClassMetadataRequireRelocation(IRGenModule &IGM,
+                                          ClassDecl *theClass);
+
+  /// Does the class have a non-fixed layout, or generic ancestry?
+  bool doesClassMetadataRequireInitialization(IRGenModule &IGM,
+                                              ClassDecl *theClass);
 
   /// Load the instance size and alignment mask from a reference to
   /// class type metadata of the given type.

@@ -1556,12 +1556,10 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     // category onto.
     if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
       if (auto classDecl = ext->getSelfClassDecl()) {
-        if (auto genericClassDecl = classDecl->getGenericAncestor()) {
-          if (!genericClassDecl->usesObjCGenericsModel()) {
-            auto isSubclass = genericClassDecl != classDecl;
-            auto genericTIsGeneric = (bool)genericClassDecl->getGenericParams();
+        if (classDecl->isGenericContext()) {
+          if (!classDecl->usesObjCGenericsModel()) {
             TC.diagnose(ComplainLoc, diag::objc_protocol_in_generic_extension,
-                        T, ProtoType, isSubclass, genericTIsGeneric);
+                        classDecl->isGeneric(), T, ProtoType);
             conformance->setInvalid();
             return conformance;
           }
@@ -4532,7 +4530,7 @@ static bool hasExplicitObjCName(ClassDecl *classDecl) {
 static bool hasGenericAncestry(ClassDecl *classDecl) {
   SmallPtrSet<ClassDecl *, 4> visited;
   while (classDecl && visited.insert(classDecl).second) {
-    if (classDecl->isGeneric() || classDecl->getGenericSignatureOfContext())
+    if (classDecl->isGenericContext())
       return true;
 
     classDecl = classDecl->getSuperclassDecl();
