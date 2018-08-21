@@ -308,7 +308,7 @@ class LogParser(object):
 
     # Parse lines like this
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
-    results_re = re.compile(r'(\d+[, \t]*\w+[, \t]*' +
+    results_re = re.compile(r'([ ]*\d+[, \t]*\w+[, \t]*' +
                             r'[, \t]*'.join([r'[\d.]+'] * 6) +
                             r'[, \t]*[\d.]*)')  # optional MAX_RSS(B)
 

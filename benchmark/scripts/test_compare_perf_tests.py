@@ -345,9 +345,9 @@ Totals,269
     def test_parse_results_formatted_text(self):
         """Parse format that Benchmark_Driver prints to console"""
         log = ("""
-# TEST      SAMPLES MIN(μs) MAX(μs) MEAN(μs) SD(μs) MEDIAN(μs) MAX_RSS(B)
-3 Array2D        20    2060    2188     2099      0       2099   20915200
-Totals        281""")
+  # TEST      SAMPLES MIN(μs) MAX(μs) MEAN(μs) SD(μs) MEDIAN(μs) MAX_RSS(B)
+  3 Array2D        20    2060    2188     2099      0       2099   20915200
+    Totals        281""")
         parser = LogParser()
         results = parser.parse_results(log.splitlines()[1:])  # without 1st \n
         self.assertTrue(isinstance(results[0], PerformanceTestResult))
