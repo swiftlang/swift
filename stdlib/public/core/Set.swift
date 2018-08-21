@@ -1387,10 +1387,8 @@ extension Set {
   }
 }
 
-//===--- APIs templated for Dictionary and Set ----------------------------===//
-
 /// This protocol is only used for compile-time checks that
-/// every buffer type implements all required operations.
+/// every Set type implements all required operations.
 internal protocol _SetBuffer {
   associatedtype Element
   associatedtype Index
@@ -1406,16 +1404,14 @@ internal protocol _SetBuffer {
   func element(at i: Index) -> Element
 }
 
-/// An instance of this class has all `Set` data tail-allocated.
-/// Enough bytes are allocated to hold the bitmap for marking valid entries,
-/// keys, and values. The data layout starts with the bitmap, followed by the
-/// keys, followed by the values.
-//
-// See the docs at the top of the file for more details on this type
-//
-// NOTE: The precise layout of this type is relied on in the runtime
-// to provide a statically allocated empty singleton.
-// See stdlib/public/stubs/GlobalObjects.cpp for details.
+/// An instance of this class has all `Set` data tail-allocated.  Enough bytes
+/// are allocated to hold the _HashTable's metadata entries as well of all
+/// buckets.  The data layout starts with the metadata entries, followed by the
+/// element-sized buckets.
+///
+/// **Note:** The precise layout of this type is relied on in the runtime
+/// to provide a statically allocated empty singleton.
+/// See stdlib/public/stubs/GlobalObjects.cpp for details.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
@@ -3432,8 +3428,8 @@ extension Set {
     }
   }
 
-  /// Returns the native Dictionary hidden inside this NSDictionary;
-  /// returns nil otherwise.
+  /// Returns the native `Set` hidden inside the given `NSSet` instance; returns
+  /// `nil` otherwise.
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ s: AnyObject
   ) -> Set<Element>? {
@@ -3447,7 +3443,7 @@ extension Set {
     if s === _SwiftRawSetStorage.empty {
       return Set()
     }
-    // FIXME: what if `s` is native storage, but for different key/value type?
+    // FIXME: what if `s` is native storage, but for different element type?
     return nil
   }
 }
