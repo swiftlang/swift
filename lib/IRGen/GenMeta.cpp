@@ -3129,11 +3129,11 @@ namespace {
     }
 
     void addGenericArgument() {
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
+      llvm_unreachable("Concrete type metadata cannot have generic parameters");
     }
 
     void addGenericWitnessTable() {
-      B.addNullPointer(IGM.WitnessTablePtrTy);
+      llvm_unreachable("Concrete type metadata cannot have generic requirements");
     }
 
     void emitInitializeMetadata(IRGenFunction &IGF,
@@ -3380,11 +3380,11 @@ namespace {
     }
 
     void addGenericArgument() {
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
+      llvm_unreachable("Concrete type metadata cannot have generic parameters");
     }
 
     void addGenericWitnessTable() {
-      B.addNullPointer(IGM.WitnessTablePtrTy);
+      llvm_unreachable("Concrete type metadata cannot have generic requirements");
     }
 
     Optional<Size> getConstantPayloadSize() {
