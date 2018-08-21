@@ -686,9 +686,8 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
   return x
 
   // CHECK: [[SOME_BB]]([[PAYLOAD:%.*]] : @trivial $(Int, Int)):
-  // CHECK-NEXT:   [[PAYLOAD_1:%.*]] = tuple_extract [[PAYLOAD]] : $(Int, Int), 0
+  // CHECK-NEXT:   ([[PAYLOAD_1:%.*]], [[PAYLOAD_2:%.*]]) = destructure_tuple [[PAYLOAD]]
   // CHECK-NEXT:   debug_value [[PAYLOAD_1]] : $Int, let, name "x"
-  // CHECK-NEXT:   [[PAYLOAD_2:%.*]] = tuple_extract [[PAYLOAD]] : $(Int, Int), 1
   // CHECK-NEXT:   debug_value [[PAYLOAD_2]] : $Int, let, name "y"
   // CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
   // CHECK: [[CONT_BB]]:
