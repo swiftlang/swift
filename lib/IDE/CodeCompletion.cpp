@@ -1390,8 +1390,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
 
     // Figure out the kind of type-check we'll be performing.
     auto CheckKind = CompletionTypeCheckKind::Normal;
-    if (Kind == CompletionKind::KeyPathExpr ||
-        Kind == CompletionKind::KeyPathExprDot)
+    if (Kind == CompletionKind::KeyPathExprObjC)
       CheckKind = CompletionTypeCheckKind::KeyPath;
 
     // If we've already successfully type-checked the expression for some
@@ -1444,7 +1443,7 @@ public:
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
-  void completeExprKeyPath(KeyPathExpr *KPE, bool HasDot) override;
+  void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
 
   void completeTypeSimpleBeginning() override;
   void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
@@ -4474,9 +4473,10 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
 }
 
 void CodeCompletionCallbacksImpl::completeExprKeyPath(KeyPathExpr *KPE,
-                                                      bool HasDot) {
-  Kind = HasDot ? CompletionKind::KeyPathExprDot : CompletionKind::KeyPathExpr;
+                                                      SourceLoc DotLoc) {
+  Kind = CompletionKind::KeyPathExprObjC;
   ParsedExpr = KPE;
+  this->DotLoc = DotLoc;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -4737,8 +4737,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::CallArg:
   case CompletionKind::AfterPound:
   case CompletionKind::GenericParams:
-  case CompletionKind::KeyPathExpr:
-  case CompletionKind::KeyPathExprDot:
+  case CompletionKind::KeyPathExprObjC:
   case CompletionKind::SwiftKeyPath:
     break;
 
@@ -5135,8 +5134,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     if (!ExprType && Kind != CompletionKind::PostfixExprParen &&
         Kind != CompletionKind::CallArg &&
-        Kind != CompletionKind::KeyPathExpr &&
-        Kind != CompletionKind::KeyPathExprDot)
+        Kind != CompletionKind::KeyPathExprObjC)
       return;
   }
 
@@ -5276,11 +5274,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::KeyPathExprDot:
-    Lookup.setHaveDot(SourceLoc());
-    LLVM_FALLTHROUGH;
-
-  case CompletionKind::KeyPathExpr: {
+  case CompletionKind::KeyPathExprObjC: {
+    if (DotLoc.isValid())
+      Lookup.setHaveDot(DotLoc);
     Lookup.setIsKeyPathExpr();
     Lookup.includeInstanceMembers();
 

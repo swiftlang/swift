@@ -639,7 +639,7 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
 
   SmallVector<KeyPathExpr::Component, 4> components;
   /// Handler for code completion.
-  auto handleCodeCompletion = [&](bool hasDot) -> ParserResult<Expr> {
+  auto handleCodeCompletion = [&](SourceLoc DotLoc) -> ParserResult<Expr> {
     KeyPathExpr *expr = nullptr;
     if (!components.empty()) {
       expr = new (Context)
@@ -647,7 +647,7 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
     }
 
     if (CodeCompletion)
-      CodeCompletion->completeExprKeyPath(expr, hasDot);
+      CodeCompletion->completeExprKeyPath(expr, DotLoc);
 
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
@@ -656,11 +656,12 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
 
   // Parse the sequence of unqualified-names.
   ParserStatus status;
+  SourceLoc LastDotLoc;
   while (true) {
     SyntaxParsingContext NamePieceCtx(SyntaxContext, SyntaxKind::ObjcNamePiece);
     // Handle code completion.
     if (Tok.is(tok::code_complete))
-      return handleCodeCompletion(!components.empty());
+      return handleCodeCompletion(LastDotLoc);
 
     // Parse the next name.
     DeclNameLoc nameLoc;
@@ -680,10 +681,10 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
 
     // Handle code completion.
     if (Tok.is(tok::code_complete))
-      return handleCodeCompletion(false);
+      return handleCodeCompletion(SourceLoc());
 
     // Parse the next period to continue the path.
-    if (consumeIf(tok::period))
+    if (consumeIf(tok::period, LastDotLoc))
       continue;
 
     break;
