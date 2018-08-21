@@ -29,27 +29,38 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
 }
 
 /// Represents the identity of a stored class property as a combination
-/// of a base and a single projection. Eventually the goal is to make this
-/// more precise and consider, casts, etc.
+/// of a base, projection and projection path.
+/// We can lazily compute all of them from the originating RefElementAddr
 class ObjectProjection {
   SILValue object;
-  Projection proj;
+  const RefElementAddrInst *REA;
 
 public:
-  ObjectProjection(SILValue object, const Projection &proj)
-      : object(object), proj(proj) {
-    assert(object->getType().isObject());
-  }
+  ObjectProjection(const RefElementAddrInst *REA)
+      : object(stripBorrow(REA->getOperand())), REA(REA) {}
+  ObjectProjection(SILValue object, const RefElementAddrInst *REA)
+      : object(object), REA(REA) {}
+
+  const RefElementAddrInst *getInstr() const { return REA; }
 
   SILValue getObject() const { return object; }
-  const Projection &getProjection() const { return proj; }
+
+  const Projection getProjection() const { return Projection(REA); }
+
+  const ProjectionPath getProjectionPath() const {
+    return ProjectionPath::getProjectionPath(stripBorrow(REA->getOperand()),
+                                             REA)
+        .getValue();
+  }
 
   bool operator==(const ObjectProjection &other) const {
-    return object == other.object && proj == other.proj;
+    return getObject() == other.getObject() &&
+           getProjection() == other.getProjection();
   }
 
   bool operator!=(const ObjectProjection &other) const {
-    return object != other.object || proj != other.proj;
+    return getObject() != other.getObject() ||
+           getProjection() != other.getProjection();
   }
 };
 
@@ -168,8 +179,8 @@ public:
 
   AccessedStorage(SILValue base, Kind kind);
 
-  AccessedStorage(SILValue object, Projection projection)
-      : objProj(object, projection) {
+  AccessedStorage(SILValue object, const RefElementAddrInst *REA)
+      : objProj(object, REA) {
     initKind(Class);
   }
 
@@ -255,8 +266,18 @@ public:
   }
 
   bool isDistinctFrom(const AccessedStorage &other) const {
-    return isUniquelyIdentified() && other.isUniquelyIdentified()
-           && !hasIdenticalBase(other);
+    if (isUniquelyIdentified() && other.isUniquelyIdentified()) {
+      return !hasIdenticalBase(other);
+    }
+    if (getKind() != Class) {
+      return false;
+    }
+    if (other.getKind() != Class) {
+      return false;
+    }
+    auto projPath = getObjectProjection().getProjectionPath();
+    auto otherProjPath = other.getObjectProjection().getProjectionPath();
+    return projPath.hasNonEmptySymmetricDifference(otherProjPath);
   }
 
   /// Returns the ValueDecl for the underlying storage, if it can be
