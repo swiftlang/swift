@@ -42,7 +42,7 @@ TokenSyntax SyntaxFactory::makeToken(tok Kind, OwnedString Text,
                                      const Trivia &LeadingTrivia,
                                      const Trivia &TrailingTrivia,
                                      SourcePresence Presence,
-                                     SyntaxArena *Arena) {
+                                     RC<SyntaxArena> Arena) {
   return make<TokenSyntax>(RawSyntax::make(Kind, Text, LeadingTrivia.Pieces,
                                            TrailingTrivia.Pieces, Presence,
                                            Arena));
@@ -50,7 +50,7 @@ TokenSyntax SyntaxFactory::makeToken(tok Kind, OwnedString Text,
 
 UnknownSyntax
 SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens,
-                                 SyntaxArena *Arena) {
+                                 RC<SyntaxArena> Arena) {
   std::vector<RC<RawSyntax>> Layout;
   Layout.reserve(Tokens.size());
   for (auto &Token : Tokens) {
@@ -118,7 +118,7 @@ canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
 
 RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
                                        llvm::ArrayRef<RC<RawSyntax>> Elements,
-                                       SyntaxArena *Arena) {
+                                       RC<SyntaxArena> Arena) {
   switch (Kind) {
 % for node in SYNTAX_NODES:
   case SyntaxKind::${node.syntax_kind}: {
@@ -161,7 +161,7 @@ RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
 
 Optional<Syntax> SyntaxFactory::createSyntax(SyntaxKind Kind,
                                              llvm::ArrayRef<Syntax> Elements,
-                                             SyntaxArena *Arena) {
+                                             RC<SyntaxArena> Arena) {
   std::vector<RC<RawSyntax>> Layout;
   Layout.reserve(Elements.size());
   for (auto &E : Elements)
@@ -184,7 +184,7 @@ Optional<Syntax> SyntaxFactory::createSyntax(SyntaxKind Kind,
 %     child_params = ', '.join(child_params)
 ${node.name}
 SyntaxFactory::make${node.syntax_kind}(${child_params},
-                                       SyntaxArena *Arena) {
+                                       RC<SyntaxArena> Arena) {
   auto Raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
 %     for child in node.children:
 %       if child.is_optional:
@@ -200,7 +200,7 @@ SyntaxFactory::make${node.syntax_kind}(${child_params},
 ${node.name}
 SyntaxFactory::make${node.syntax_kind}(
     const std::vector<${node.collection_element_type}> &elements,
-    SyntaxArena *Arena) {
+    RC<SyntaxArena> Arena) {
   std::vector<RC<RawSyntax>> layout;
   layout.reserve(elements.size());
   for (auto &element : elements) {
@@ -213,7 +213,7 @@ SyntaxFactory::make${node.syntax_kind}(
 %   end
 
 ${node.name}
-SyntaxFactory::makeBlank${node.syntax_kind}(SyntaxArena *Arena) {
+SyntaxFactory::makeBlank${node.syntax_kind}(RC<SyntaxArena> Arena) {
   auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
 %   for child in node.children:
 %       if child.is_optional:
@@ -232,7 +232,7 @@ SyntaxFactory::makeBlank${node.syntax_kind}(SyntaxArena *Arena) {
   TokenSyntax
   SyntaxFactory::make${token.name}Keyword(const Trivia &LeadingTrivia,
                                           const Trivia &TrailingTrivia,
-                                          SyntaxArena *Arena) {
+                                          RC<SyntaxArena> Arena) {
     return makeToken(tok::${token.kind},
                      OwnedString::makeUnowned("${token.text}"),
                      LeadingTrivia, TrailingTrivia,
@@ -242,7 +242,7 @@ SyntaxFactory::makeBlank${node.syntax_kind}(SyntaxArena *Arena) {
   TokenSyntax
   SyntaxFactory::make${token.name}Token(const Trivia &LeadingTrivia,
                                         const Trivia &TrailingTrivia,
-                                        SyntaxArena *Arena) {
+                                        RC<SyntaxArena> Arena) {
     return makeToken(tok::${token.kind},
                      OwnedString::makeUnowned("${token.text}"),
                      LeadingTrivia, TrailingTrivia,
@@ -253,7 +253,7 @@ SyntaxFactory::makeBlank${node.syntax_kind}(SyntaxArena *Arena) {
   SyntaxFactory::make${token.name}(OwnedString Text,
                                    const Trivia &LeadingTrivia,
                                    const Trivia &TrailingTrivia,
-                                   SyntaxArena *Arena) {
+                                   RC<SyntaxArena> Arena) {
     return makeToken(tok::${token.kind}, Text,
                      LeadingTrivia, TrailingTrivia,
                      SourcePresence::Present, Arena);
@@ -261,7 +261,7 @@ SyntaxFactory::makeBlank${node.syntax_kind}(SyntaxArena *Arena) {
 %   end
 % end
 
-TupleTypeSyntax SyntaxFactory::makeVoidTupleType(SyntaxArena *Arena) {
+TupleTypeSyntax SyntaxFactory::makeVoidTupleType(RC<SyntaxArena> Arena) {
   return makeTupleType(makeLeftParenToken({}, {}, Arena),
                        makeBlankTupleTypeElementList(Arena),
                        makeRightParenToken({}, {}, Arena),
@@ -273,7 +273,7 @@ SyntaxFactory::makeTupleTypeElement(llvm::Optional<TokenSyntax> Label,
                                     llvm::Optional<TokenSyntax> Colon,
                                     TypeSyntax Type,
                                     llvm::Optional<TokenSyntax> TrailingComma,
-                                    SyntaxArena *Arena) {
+                                    RC<SyntaxArena> Arena) {
   return makeTupleTypeElement(None, Label, None, Colon, Type, None, None,
                               TrailingComma, Arena);
 }
@@ -281,7 +281,7 @@ SyntaxFactory::makeTupleTypeElement(llvm::Optional<TokenSyntax> Label,
 TupleTypeElementSyntax
 SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
                                     llvm::Optional<TokenSyntax> TrailingComma,
-                                    SyntaxArena *Arena) {
+                                    RC<SyntaxArena> Arena) {
   return makeTupleTypeElement(None, None, None, None, Type, None, None,
                               TrailingComma, Arena);
 }
@@ -289,14 +289,14 @@ SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
 GenericParameterSyntax
 SyntaxFactory::makeGenericParameter(TokenSyntax Name,
                                     llvm::Optional<TokenSyntax> TrailingComma,
-                                    SyntaxArena *Arena) {
+                                    RC<SyntaxArena> Arena) {
   return makeGenericParameter(None, Name, None, None, TrailingComma, Arena);
 }
 
 TypeSyntax SyntaxFactory::makeTypeIdentifier(OwnedString TypeName,
                                              const Trivia &LeadingTrivia,
                                              const Trivia &TrailingTrivia,
-                                             SyntaxArena *Arena) {
+                                             RC<SyntaxArena> Arena) {
   auto identifier =
       makeIdentifier(TypeName, LeadingTrivia, TrailingTrivia, Arena);
   return makeSimpleTypeIdentifier(identifier, None, Arena);
@@ -304,35 +304,35 @@ TypeSyntax SyntaxFactory::makeTypeIdentifier(OwnedString TypeName,
 
 TypeSyntax SyntaxFactory::makeAnyTypeIdentifier(const Trivia &LeadingTrivia,
                                                 const Trivia &TrailingTrivia,
-                                                SyntaxArena *Arena) {
+                                                RC<SyntaxArena> Arena) {
   return makeTypeIdentifier(OwnedString::makeUnowned("Any"), LeadingTrivia,
                             TrailingTrivia, Arena);
 }
 
 TypeSyntax SyntaxFactory::makeSelfTypeIdentifier(const Trivia &LeadingTrivia,
                                                  const Trivia &TrailingTrivia,
-                                                 SyntaxArena *Arena) {
+                                                 RC<SyntaxArena> Arena) {
   return makeTypeIdentifier(OwnedString::makeUnowned("Self"),
                             LeadingTrivia, TrailingTrivia, Arena);
 }
 
 TokenSyntax SyntaxFactory::makeTypeToken(const Trivia &LeadingTrivia,
                                          const Trivia &TrailingTrivia,
-                                         SyntaxArena *Arena) {
+                                         RC<SyntaxArena> Arena) {
   return makeIdentifier(OwnedString::makeUnowned("Type"),
                         LeadingTrivia, TrailingTrivia, Arena);
 }
 
 TokenSyntax SyntaxFactory::makeProtocolToken(const Trivia &LeadingTrivia,
                                              const Trivia &TrailingTrivia,
-                                             SyntaxArena *Arena) {
+                                             RC<SyntaxArena> Arena) {
   return makeIdentifier(OwnedString::makeUnowned("Protocol"),
                         LeadingTrivia, TrailingTrivia, Arena);
 }
 
 TokenSyntax SyntaxFactory::makeEqualityOperator(const Trivia &LeadingTrivia,
                                                 const Trivia &TrailingTrivia,
-                                                SyntaxArena *Arena) {
+                                                RC<SyntaxArena> Arena) {
   return makeToken(tok::oper_binary_spaced, OwnedString::makeUnowned("=="),
                    LeadingTrivia, TrailingTrivia, SourcePresence::Present,
                    Arena);
