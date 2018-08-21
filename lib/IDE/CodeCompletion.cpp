@@ -1618,6 +1618,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool IsSelfRefExpr = false;
   bool IsKeyPathExpr = false;
   bool IsSwiftKeyPathExpr = false;
+  bool IsAfterSwiftKeyPathRoot = false;
   bool IsDynamicLookup = false;
   bool PreferFunctionReferencesToCalls = false;
   bool HaveLeadingSpace = false;
@@ -1776,8 +1777,9 @@ public:
     IsKeyPathExpr = true;
   }
 
-  void setIsSwiftKeyPathExpr() {
+  void setIsSwiftKeyPathExpr(bool onRoot) {
     IsSwiftKeyPathExpr = true;
+    IsAfterSwiftKeyPathRoot = onRoot;
   }
 
   void setIsDynamicLookup() {
@@ -2624,14 +2626,16 @@ public:
     }
   }
 
-  bool shouldAddSubscriptCall() {
-    if (IsSwiftKeyPathExpr)
-      return true;
-    return !HaveDot;
-  }
-
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
-    assert(shouldAddSubscriptCall() && "cannot add a subscript after a dot");
+    // Don't add subscript call to meta types.
+    if (!ExprType || ExprType->is<AnyMetatypeType>())
+      return;
+
+    // Subscript after '.' is valid only after type part of Swift keypath
+    // expression. (e.g. '\TyName.SubTy.[0])
+    if (HaveDot && !IsAfterSwiftKeyPathRoot)
+      return;
+
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2639,6 +2643,16 @@ public:
         getSemanticContext(SD, Reason), ExpectedTypes);
     Builder.setAssociatedDecl(SD);
     setClangDeclKeywords(SD, Pairs, Builder);
+
+    // '\TyName#^TOKEN^#' requires leading dot.
+    if (!HaveDot && IsAfterSwiftKeyPathRoot)
+      Builder.addLeadingDot();
+
+    if (NeedOptionalUnwrap) {
+      Builder.setNumBytesToErase(NumBytesToEraseForOptionalUnwrap);
+      Builder.addQuestionMark();
+    }
+
     Builder.addLeftBracket();
     addParameters(Builder, SD->getIndices());
     Builder.addRightBracket();
@@ -2972,12 +2986,9 @@ public:
       }
 
       // Swift key path allows .[0]
-      if (shouldAddSubscriptCall()) {
-        if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
-          if (ExprType && !ExprType->is<AnyMetatypeType>())
-            addSubscriptCall(SD, Reason);
-          return;
-        }
+      if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
+        addSubscriptCall(SD, Reason);
+        return;
       }
       return;
 
@@ -4351,8 +4362,6 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
     return;
 
   Kind = CompletionKind::DotExpr;
-  if (E->getKind() == ExprKind::KeyPath)
-    Kind = CompletionKind::SwiftKeyPath;
   if (ParseExprSelectorContext != ObjCSelectorContext::None) {
     PreferFunctionReferencesToCalls = true;
     CompleteExprSelectorContext = ParseExprSelectorContext;
@@ -4474,7 +4483,8 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
 
 void CodeCompletionCallbacksImpl::completeExprKeyPath(KeyPathExpr *KPE,
                                                       SourceLoc DotLoc) {
-  Kind = CompletionKind::KeyPathExprObjC;
+  Kind = (!KPE || KPE->isObjC()) ? CompletionKind::KeyPathExprObjC
+                                 : CompletionKind::SwiftKeyPath;
   ParsedExpr = KPE;
   this->DotLoc = DotLoc;
   CurDeclContext = P.CurDeclContext;
@@ -5189,16 +5199,31 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::SwiftKeyPath: {
-    Lookup.setHaveDot(DotLoc);
-    Lookup.setIsSwiftKeyPathExpr();
-    if (auto BGT = (*ExprType)->getAs<BoundGenericType>()) {
-      auto AllArgs = BGT->getGenericArgs();
-      if (AllArgs.size() == 2) {
-        // The second generic type argument of KeyPath<Root, Value> should be
-        // the value we pull code completion results from.
-        Lookup.getValueExprCompletions(AllArgs[1]);
-      }
+    auto KPE = dyn_cast<KeyPathExpr>(ParsedExpr);
+    auto BGT = (*ExprType)->getAs<BoundGenericType>();
+    if (!KPE || !BGT || BGT->getGenericArgs().size() != 2)
+      break;
+    assert(!KPE->isObjC());
+
+    if (DotLoc.isValid())
+      Lookup.setHaveDot(DotLoc);
+
+    bool OnRoot = !KPE->getComponents().front().isValid();
+    Lookup.setIsSwiftKeyPathExpr(OnRoot);
+
+    auto ParsedType = BGT->getGenericArgs()[1];
+    auto Components = KPE->getComponents();
+    if (Components.back().getKind() ==
+        KeyPathExpr::Component::Kind::OptionalWrap) {
+      // KeyPath expr with '?' (e.g. '\Ty.[0].prop?.another').
+      // Althogh expected type is optional, we should unwrap it because it's
+      // unwrapped.
+      ParsedType = ParsedType->getOptionalObjectType();
     }
+
+    // The second generic type argument of KeyPath<Root, Value> should be
+    // the value we pull code completion results from.
+    Lookup.getValueExprCompletions(ParsedType);
     break;
   }
 

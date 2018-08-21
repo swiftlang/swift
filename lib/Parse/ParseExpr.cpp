@@ -575,31 +575,29 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   SyntaxParsingContext KeyPathCtx(SyntaxContext, SyntaxKind::KeyPathExpr);
   // Consume '\'.
   SourceLoc backslashLoc = consumeToken(tok::backslash);
-  llvm::SaveAndRestore<SourceLoc> slashLoc(SwiftKeyPathSlashLoc, backslashLoc);
+  llvm::SaveAndRestore<bool> S(InSwiftKeyPath, true);
 
   // FIXME: diagnostics
   ParserResult<Expr> rootResult, pathResult;
   if (!startsWithSymbol(Tok, '.')) {
-    llvm::SaveAndRestore<bool> S(InSwiftKeyPath, true);
     rootResult = parseExprPostfix(diag::expr_keypath_expected_expr,
                                   /*isBasic=*/true);
 
-    if (rootResult.isParseError() || rootResult.hasCodeCompletion())
+    if (rootResult.isParseError())
       return rootResult;
   }
 
   if (startsWithSymbol(Tok, '.')) {
-    llvm::SaveAndRestore<Expr*> S(SwiftKeyPathRoot, rootResult.getPtrOrNull());
-
     SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
 
     auto dotLoc = Tok.getLoc();
     // For uniformity, \.foo is parsed as if it were MAGIC.foo, so we need to
     // make sure the . is there, but parsing the ? in \.? as .? doesn't make
     // sense. This is all made more complicated by .?. being considered an
-    // operator token, and a single one at that (which means
-    // peekToken().is(tok::identifier) is incorrect: it is true for .?.foo).
-    if (Tok.getLength() != 1 || !peekToken().is(tok::identifier)) {
+    // operator token. Since keypath allows '.!' '.?' and '.[', consume '.'
+    // the token is a operator starts with '.', or the following token is '['.
+    if ((Tok.isAnyOperator() && Tok.getLength() != 1) ||
+        peekToken().is(tok::l_square)) {
       SyntaxParsingContext KeyPathBaseContext(SyntaxContext,
                                               SyntaxKind::KeyPathBaseExpr);
       consumeStartingCharacterOfCurrentToken(tok::period);
@@ -613,12 +611,24 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     pathResult = parseExprPostfixSuffix(inner, /*isExprBasic=*/true,
                                         /*periodHasKeyPathBehavior=*/false,
                                         unusedHasBindOptional);
-    if (pathResult.isParseError() || pathResult.hasCodeCompletion())
+    if (pathResult.isParseError())
       return pathResult;
   }
 
   auto keypath = new (Context) KeyPathExpr(
       backslashLoc, rootResult.getPtrOrNull(), pathResult.getPtrOrNull());
+
+  // Handle code completion.
+  if ((Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()) ||
+      (Tok.is(tok::period) && peekToken().isAny(tok::code_complete))) {
+    SourceLoc DotLoc;
+    consumeIf(tok::period, DotLoc);
+    if (CodeCompletion)
+      CodeCompletion->completeExprKeyPath(keypath, DotLoc);
+    consumeToken(tok::code_complete);
+    return makeParserCodeCompletionResult(keypath);
+  }
+
   return makeParserResult(keypath);
 }
 
@@ -1110,6 +1120,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (periodHasKeyPathBehavior && peekToken().is(tok::l_square)) {
         break;
       }
+      // Completion for keyPath expression is handled in parseExprKeyPath.
+      if (InSwiftKeyPath && peekToken().is(tok::code_complete))
+        break;
 
       Tok.setKind(tok::period);
       consumeToken();
@@ -1168,16 +1181,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
       // Handle "x.<tab>" for code completion.
       if (Tok.is(tok::code_complete)) {
-        if (CodeCompletion && Result.isNonNull()) {
-          if (InSwiftKeyPath) {
-            Result = makeParserResult(
-              new (Context) KeyPathExpr(SwiftKeyPathSlashLoc, Result.get(),
-                                        nullptr));
-          } else if (SwiftKeyPathRoot) {
-            Result = makeParserResult(
-              new (Context) KeyPathExpr(SwiftKeyPathSlashLoc, SwiftKeyPathRoot,
-                                        Result.get()));
-          }
+        assert(!InSwiftKeyPath);
+        if (CodeCompletion) {
           CodeCompletion->completeDotExpr(Result.get(), /*DotLoc=*/TokLoc);
         }
         // Eat the code completion token because we handled it.
@@ -1318,6 +1323,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     }
 
     if (Tok.is(tok::code_complete)) {
+      if (InSwiftKeyPath)
+        return Result;
+
       if (Tok.isAtStartOfLine()) {
         // Postfix expression is located on a different line than the code
         // completion token, and thus they are not related.
