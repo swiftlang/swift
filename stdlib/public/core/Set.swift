@@ -311,13 +311,13 @@ extension Set {
   public func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> Set {
-    var result = Set()
+    var result = _NativeSet<Element>()
     for element in self {
       if try isIncluded(element) {
-        result.insert(element)
+        result.insertNew(element)
       }
     }
-    return result
+    return Set(_native: result)
   }
 }
 
@@ -437,9 +437,7 @@ extension Set: Equatable {
       }
 
       for member in lhsNative {
-        let (_, found) =
-          rhsNative.find(member)
-        if !found {
+        guard rhsNative.find(member).found else {
           return false
         }
       }
@@ -719,17 +717,18 @@ extension Set: SetAlgebra {
   @inlinable
   public init<Source: Sequence>(_ sequence: Source)
     where Source.Element == Element {
-    self.init(minimumCapacity: sequence.underestimatedCount)
     if let s = sequence as? Set<Element> {
       // If this sequence is actually a native `Set`, then we can quickly
       // adopt its native buffer and let COW handle uniquing only
       // if necessary.
       self._variant = s._variant
-    } else {
-      for item in sequence {
-        insert(item)
-      }
+      return
     }
+    var native = _NativeSet<Element>(capacity: sequence.underestimatedCount)
+    for element in sequence {
+      native._insert(element, isUnique: true)
+    }
+    self._variant = .native(native)
   }
 
   /// Returns a Boolean value that indicates whether the set is a subset of the
@@ -1169,15 +1168,14 @@ internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
 public func _setDownCastConditional<BaseValue, DerivedValue>(
   _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {
-  var result = Set<DerivedValue>(minimumCapacity: source.count)
+  var result = _NativeSet<DerivedValue>(capacity: source.count)
   for member in source {
-    if let derivedMember = member as? DerivedValue {
-      result.insert(derivedMember)
-      continue
+    guard let derivedMember = member as? DerivedValue else {
+      return nil
     }
-    return nil
+    result.insertNew(derivedMember)
   }
-  return result
+  return Set(_native: result)
 }
 
 extension Set {
@@ -1793,13 +1791,13 @@ extension _NativeSet {
     capacity: Int
   ) -> (reallocated: Bool, rehashed: Bool) {
     let scale = _HashTable.scale(forCapacity: capacity)
-    let result = _NativeSet(
+    var result = _NativeSet(
       _SwiftNativeSetStorage<Element>.allocate(scale: scale))
     let rehash = (scale != _storage.hashTable.scale)
     switch (isUnique, rehash) {
     case (true, true): // Move & rehash elements
       for index in self.indices {
-        result.moveNew(from: self, at: index)
+        result._unsafeMoveNew(from: self, at: index)
       }
       _storage.invalidate()
     case (true, false): // Move elements to same buckets in new storage
@@ -1985,7 +1983,7 @@ internal func ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(
 
 extension _NativeSet {
   @inlinable
-  internal func moveNew(from source: _NativeSet, at sourceIndex: Index) {
+  internal func _unsafeMoveNew(from source: _NativeSet, at sourceIndex: Index) {
     _sanityCheck(source._storage.hashTable.isOccupied(sourceIndex))
     _sanityCheck(count + 1 <= capacity)
     let sourcePtr = source.elements + sourceIndex.bucket
@@ -2007,12 +2005,12 @@ extension _NativeSet {
     }
   }
 
-  /// Storage should be uniquely referenced with enough capacity.
-  /// The `element` should not be present in the Set.
-  /// This function does *not* update `count`.
+  /// Insert a new element into uniquely held storage.
+  /// Storage must be uniquely referenced.
+  /// The `element` must not be already present in the Set.
   @inlinable
-  internal func insertNew(_ element: Element) {
-    _sanityCheck(count + 1 <= capacity)
+  internal mutating func insertNew(_ element: Element) {
+    _ = ensureUnique(isUnique: true, capacity: count + 1)
     let hashValue = self.hashValue(for: element)
     if _isDebugAssertConfiguration() {
       // In debug builds, perform a full lookup and trap if we detect duplicate
