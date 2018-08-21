@@ -1199,9 +1199,9 @@ void ConstraintSystem::shrink(Expr *expr) {
             // instead of cloning representative.
             auto coercionRepr = typeRepr->clone(CS.getASTContext());
             // Let's try to resolve coercion type from cloned representative.
+            auto resolution = TypeResolution::forContextual(CS.DC);
             auto coercionType =
-              CS.TC.resolveType(coercionRepr,
-                                TypeResolution::forContextual(CS.DC), None);
+              resolution.resolveType(coercionRepr, None);
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
             if (coercionType->hasError())

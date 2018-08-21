@@ -3818,8 +3818,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
     if (!defaultDefinition.isNull()) {
       if (validateType(
-                defaultDefinition,
-                TypeResolution::forContextual(assocType->getDeclContext()))) {
+            defaultDefinition,
+            TypeResolution::forContextual(
+              assocType->getDeclContext()),
+            None)) {
         defaultDefinition.setInvalidType(Context);
       } else {
         // associatedtype X = X is invalid

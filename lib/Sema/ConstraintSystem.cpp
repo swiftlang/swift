@@ -475,7 +475,7 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   // pointing at a generic TypeAliasDecl here. If we find a way to
   // handle generic TypeAliases elsewhere, this can just become a
   // call to BoundGenericType::get().
-  return TC.applyUnboundGenericArguments(
+  return TypeChecker::applyUnboundGenericArguments(
       unbound, unboundDecl,
       SourceLoc(), TypeResolution::forContextual(DC), arguments);
 }
@@ -980,10 +980,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
-    auto type = TC.resolveTypeInContext(typeDecl, nullptr,
-                                        TypeResolution::forContextual(useDC),
-                                        TypeResolverContext::InExpression,
-                                        /*isSpecialized=*/false);
+    auto type = TypeChecker::resolveTypeInContext(
+                                      typeDecl, nullptr,
+                                      TypeResolution::forContextual(useDC),
+                                      TypeResolverContext::InExpression,
+                                      /*isSpecialized=*/false);
 
     // Open the type.
     type = openUnboundGenericType(type, locator);

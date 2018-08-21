@@ -1848,8 +1848,8 @@ static void maybeAddAccessorsToBehaviorStorage(TypeChecker &TC, VarDecl *var) {
   };
 
   // Try to resolve the behavior to a protocol.
-  auto behaviorType = TC.resolveType(behavior->ProtocolName,
-                                     TypeResolution::forContextual(dc), None);
+  auto resolution = TypeResolution::forContextual(dc);
+  auto behaviorType = resolution.resolveType(behavior->ProtocolName, None);
   if (!behaviorType) {
     return makeBehaviorAccessors();
   }

@@ -3042,7 +3042,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
   auto *nominal = Adoptee->getAnyNominal();
-  if (DerivedConformance::derivesProtocolConformance(TC, DC, nominal, Proto))
+  if (DerivedConformance::derivesProtocolConformance(DC, nominal, Proto))
     derivingTypeDecl = nominal;
 
   if (!derivingTypeDecl) {
@@ -3386,7 +3386,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
       { Type(proto->getProtocolSelfType()) },
       proto->getRequirementSignature(),
       QuerySubstitutionMap{substitutions},
-      TypeChecker::LookUpConformance(TC, DC),
+      TypeChecker::LookUpConformance(DC),
       ConformanceCheckFlags::Used, &listener);
 
   switch (result) {
@@ -3692,7 +3692,7 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   }
 }
 
-static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
+static void diagnoseConformanceFailure(Type T,
                                        ProtocolDecl *Proto,
                                        DeclContext *DC,
                                        SourceLoc ComplainLoc) {
@@ -3705,7 +3705,7 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
   // If we're checking conformance of an existential type to a protocol,
   // do a little bit of extra work to produce a better diagnostic.
   if (T->isExistentialType() &&
-      TC.containsProtocol(T, Proto, DC, None)) {
+      TypeChecker::containsProtocol(T, Proto, DC, None)) {
 
     if (!T->isObjCExistentialType()) {
       diags.diagnose(ComplainLoc, diag::protocol_does_not_conform_objc,
@@ -3729,7 +3729,7 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
   // conformance to RawRepresentable was inferred.
   if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
-        DerivedConformance::derivesProtocolConformance(TC, DC, enumDecl,
+        DerivedConformance::derivesProtocolConformance(DC, enumDecl,
                                                        Proto) &&
         enumDecl->hasRawType() &&
         !enumDecl->getRawType()->is<ErrorType>()) {
@@ -3746,7 +3746,8 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
       if (!equatableProto)
         return;
 
-      if (!TC.conformsToProtocol(rawType, equatableProto, enumDecl, None)) {
+      if (!TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl,
+                                           None)) {
         SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
         diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
         return;
@@ -3780,7 +3781,7 @@ void ConformanceChecker::diagnoseOrDefer(
 
   // Complain that the type does not conform, once.
   if (isError && !AlreadyComplained) {
-    diagnoseConformanceFailure(TC, Adoptee, Proto, DC, Loc);
+    diagnoseConformanceFailure(Adoptee, Proto, DC, Loc);
     AlreadyComplained = true;
   }
 
@@ -3865,7 +3866,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
   auto lookupResult = M->lookupConformance(T, Proto);
   if (!lookupResult) {
     if (ComplainLoc.isValid())
-      diagnoseConformanceFailure(*this, T, Proto, DC, ComplainLoc);
+      diagnoseConformanceFailure(T, Proto, DC, ComplainLoc);
     else
       recordDependency();
 
@@ -3881,7 +3882,8 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
   // If we're using this conformance, note that.
   if (options.contains(ConformanceCheckFlags::Used)) {
-    markConformanceUsed(*lookupResult, DC);
+    if (auto lazyResolver = DC->getASTContext().getLazyResolver())
+      lazyResolver->markConformanceUsed(*lookupResult, DC);
   }
 
   auto condReqs = lookupResult->getConditionalRequirementsIfAvailable();
@@ -3909,7 +3911,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
         {Type(lookupResult->getRequirement()->getProtocolSelfType())},
         *condReqs,
         [](SubstitutableType *dependentType) { return Type(dependentType); },
-        LookUpConformance(*this, DC), options);
+        LookUpConformance(DC), options);
     switch (conditionalCheckResult) {
     case RequirementCheckResult::Success:
       break;
@@ -3922,7 +3924,8 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
   // When requested, print the conformance access path used to find this
   // conformance.
-  if (Context.LangOpts.DebugGenericSignatures &&
+  ASTContext &ctx = Proto->getASTContext();
+  if (ctx.LangOpts.DebugGenericSignatures &&
       InExpression && T->is<ArchetypeType>() && lookupResult->isAbstract() &&
       !T->castTo<ArchetypeType>()->isOpenedExistential() &&
       !T->castTo<ArchetypeType>()->requiresClass() &&
@@ -3972,7 +3975,7 @@ TypeChecker::LookUpConformance::operator()(
   if (conformingReplacementType->isTypeParameter())
     return ProtocolConformanceRef(conformedProtocol);
 
-  return tc.conformsToProtocol(
+  return TypeChecker::conformsToProtocol(
                          conformingReplacementType,
                          conformedProtocol,
                          dc,
@@ -4780,7 +4783,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     if (auto enumDecl = dyn_cast<EnumDecl>(existingDecl)) {
       if (diag.Protocol->isSpecificProtocol(
               KnownProtocolKind::RawRepresentable) &&
-          DerivedConformance::derivesProtocolConformance(*this, dc, enumDecl,
+          DerivedConformance::derivesProtocolConformance(dc, enumDecl,
                                                          diag.Protocol) &&
           enumDecl->hasRawType() &&
           enumDecl->getInherited()[0].getSourceRange().isValid()) {

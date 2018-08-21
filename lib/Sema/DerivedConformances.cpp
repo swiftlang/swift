@@ -47,8 +47,7 @@ Type DerivedConformance::getProtocolType() const {
   return Protocol->getDeclaredType();
 }
 
-bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
-                                                    DeclContext *DC,
+bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
                                                     NominalTypeDecl *Nominal,
                                                     ProtocolDecl *Protocol) {
   // Only known protocols can be derived.
@@ -73,7 +72,7 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
         // Enums without associated values can implicitly derive Equatable
         // conformance.
       case KnownProtocolKind::Equatable:
-        return canDeriveEquatable(TC, DC, Nominal);
+        return canDeriveEquatable(DC, Nominal);
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
@@ -129,7 +128,7 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
     if (auto structDecl = dyn_cast<StructDecl>(Nominal)) {
       switch (*knownProtocol) {
         case KnownProtocolKind::Equatable:
-          return canDeriveEquatable(TC, DC, Nominal);
+          return canDeriveEquatable(DC, Nominal);
         default:
           return false;
       }
@@ -158,8 +157,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
             ConformanceCheckFlags::SkipConditionalRequirements)) {
       auto DC = conformance->getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
-      if (!DerivedConformance::derivesProtocolConformance(tc, DC, nominal,
-                                                          proto))
+      if (!DerivedConformance::derivesProtocolConformance(DC, nominal, proto))
         return nullptr;
     }
 
