@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
+#include "TypeCheckType.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
@@ -1419,7 +1420,8 @@ namespace {
     Type resolveTypeReferenceInExpression(TypeRepr *rep) {
       TypeResolutionOptions options(TypeResolverContext::InExpression);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      return CS.TC.resolveType(rep, CS.DC, options);
+      return CS.TC.resolveType(rep, TypeResolution::forContextual(CS.DC),
+                               options);
     }
 
     Type visitTypeExpr(TypeExpr *E) {
@@ -1636,7 +1638,9 @@ namespace {
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
             TypeResolutionOptions options(TypeResolverContext::InExpression);
             options |= TypeResolutionFlags::AllowUnboundGenerics;
-            if (tc.validateType(specializations[i], CS.DC, options))
+            if (tc.validateType(specializations[i],
+                                TypeResolution::forContextual(CS.DC),
+                                options))
               return Type();
 
             CS.addConstraint(ConstraintKind::Equal,
@@ -2259,7 +2263,8 @@ namespace {
           // of is-patterns applied to an irrefutable pattern.
           pattern = pattern->getSemanticsProvidingPattern();
           while (auto isp = dyn_cast<IsPattern>(pattern)) {
-            if (CS.TC.validateType(isp->getCastTypeLoc(), CS.DC,
+            if (CS.TC.validateType(isp->getCastTypeLoc(),
+                                   TypeResolution::forContextual(CS.DC),
                                    TypeResolverContext::InExpression)) {
               return false;
             }
@@ -2281,7 +2286,9 @@ namespace {
           Type exnType = CS.TC.getExceptionType(CS.DC, clause->getCatchLoc());
           if (!exnType)
             return false;
-          if (CS.TC.coercePatternToType(pattern, CS.DC, exnType,
+          if (CS.TC.coercePatternToType(pattern,
+                                        TypeResolution::forContextual(CS.DC),
+                                        exnType,
                                         TypeResolverContext::InExpression)) {
             return false;
           }
@@ -2597,7 +2604,8 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
+      if (tc.validateType(expr->getCastTypeLoc(),
+                          TypeResolution::forContextual(CS.DC), options))
         return nullptr;
 
       // Open the type we're casting to.
@@ -2626,7 +2634,9 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
+      if (tc.validateType(expr->getCastTypeLoc(),
+                          TypeResolution::forContextual(CS.DC),
+                          options))
         return nullptr;
 
       // Open the type we're casting to.
@@ -2660,7 +2670,8 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
+      if (tc.validateType(expr->getCastTypeLoc(),
+                          TypeResolution::forContextual(CS.DC), options))
         return nullptr;
 
       // Open the type we're casting to.
@@ -2688,7 +2699,8 @@ namespace {
       auto &tc = CS.getTypeChecker();
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
+      if (tc.validateType(expr->getCastTypeLoc(),
+                          TypeResolution::forContextual(CS.DC), options))
         return nullptr;
 
       // Open up the type we're checking.

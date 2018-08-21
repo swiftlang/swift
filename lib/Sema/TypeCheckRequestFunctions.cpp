@@ -9,8 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-#include "GenericTypeResolver.h"
 #include "TypeChecker.h"
+#include "TypeCheckType.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -40,14 +40,10 @@ InheritedTypeRequest::evaluate(
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
-  DependentGenericTypeResolver protoResolver;
-  GenericTypeToArchetypeResolver archetypeResolver(dc);
-  GenericTypeResolver *resolver;
-  if (isa<ProtocolDecl>(dc)) {
-    resolver = &protoResolver;
-  } else {
-    resolver = &archetypeResolver;
-  }
+  // FIXME: This should be part of the request!
+  TypeResolution resolution =
+    isa<ProtocolDecl>(dc) ? TypeResolution::forStructural(dc)
+                          : TypeResolution::forContextual(dc);
 
   auto lazyResolver = dc->getASTContext().getLazyResolver();
   assert(lazyResolver && "Cannot resolve inherited type at this point");
@@ -56,7 +52,7 @@ InheritedTypeRequest::evaluate(
   TypeLoc &typeLoc = getTypeLoc(decl, index);
 
   Type inheritedType =
-    tc.resolveType(typeLoc.getTypeRepr(), dc, options, resolver);
+    tc.resolveType(typeLoc.getTypeRepr(), resolution, options);
   if (inheritedType && !isa<ProtocolDecl>(dc))
     inheritedType = inheritedType->mapTypeOutOfContext();
   return inheritedType ? inheritedType : ErrorType::get(tc.Context);

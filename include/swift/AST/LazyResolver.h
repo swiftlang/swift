@@ -60,6 +60,9 @@ public:
   /// consistency and provides the value a type.
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
 
+  /// Resolve the generic environment of the given protocol.
+  virtual void resolveProtocolEnvironment(ProtocolDecl *proto) = 0;
+
   /// Resolve the trailing where clause of the given protocol in-place.
   virtual void resolveTrailingWhereClause(ProtocolDecl *proto) = 0;
 
