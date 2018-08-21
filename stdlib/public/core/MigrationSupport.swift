@@ -27,9 +27,9 @@ public typealias RandomAccessIndexable = RandomAccessCollection
 public typealias RangeReplaceableIndexable = RangeReplaceableCollection
 @available(*, deprecated: 4.2, renamed: "EnumeratedSequence.Iterator")
 public typealias EnumeratedIterator<T: Sequence> = EnumeratedSequence<T>.Iterator
-@available(*,deprecated: 4.2/*, obsoleted: 5.0*/, renamed: "CollectionOfOne.Iterator")
+@available(*,deprecated: 4.2, obsoleted: 5.0, renamed: "CollectionOfOne.Iterator")
 public typealias IteratorOverOne<T> = CollectionOfOne<T>.Iterator
-@available(*, deprecated: 4.2/*, obsoleted: 5.0*/, renamed: "EmptyCollection.Iterator")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "EmptyCollection.Iterator")
 public typealias EmptyIterator<T> = EmptyCollection<T>.Iterator
 @available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyFilterSequence.Iterator")
 public typealias LazyFilterIterator<T: Sequence> = LazyFilterSequence<T>.Iterator

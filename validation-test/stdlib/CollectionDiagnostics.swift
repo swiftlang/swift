@@ -48,7 +48,7 @@ func sortResultIgnored<
   array.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted(by:)' is unused}}
 }
 
-// expected-warning@+2 {{'Indexable' is deprecated: it will be removed in Swift 5.0.  Please use 'Collection' instead}}
+// expected-warning@+2 {{'Indexable' is deprecated: renamed to 'Collection'}}
 // expected-note@+1 {{use 'Collection' instead}}
 struct GoodIndexable : Indexable { 
   func index(after i: Int) -> Int { return i + 1 }
@@ -60,7 +60,7 @@ struct GoodIndexable : Indexable {
 }
 
 
-// expected-warning@+2 {{'Indexable' is deprecated: it will be removed in Swift 5.0.  Please use 'Collection' instead}}
+// expected-warning@+2 {{'Indexable' is deprecated: renamed to 'Collection'}}
 // expected-note@+1 {{use 'Collection' instead}}
 struct AnotherGoodIndexable1 : Indexable {
   func index(after i: Int) -> Int { return i + 1 }
@@ -70,7 +70,7 @@ struct AnotherGoodIndexable1 : Indexable {
   subscript(pos: Int) -> Int { return 0 }
 }
 
-// expected-warning@+3 {{'Indexable' is deprecated: it will be removed in Swift 5.0.  Please use 'Collection' instead}}
+// expected-warning@+3 {{'Indexable' is deprecated: renamed to 'Collection'}}
 // expected-error@+2 {{type 'BadIndexable2' does not conform to protocol 'Collection'}}
 // expected-note@+1 {{use 'Collection' instead}}
 struct BadIndexable2 : Indexable {

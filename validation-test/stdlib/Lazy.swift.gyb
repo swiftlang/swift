@@ -75,6 +75,8 @@ LazyTestSuite.test("Repeated")
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Element'.
+// FIXME: this should be extension CollectionOfOne.Iterator, but this needs
+// a fix to the compiler.
 extension IteratorOverOne where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
@@ -84,12 +86,12 @@ extension IteratorOverOne where Element : TestProtocol1 {
 LazyTestSuite.test("IteratorOverOne") {
   checkIterator(
     [] as Array<OpaqueValue<Int>>,
-    IteratorOverOne(_elements: nil as Optional<OpaqueValue<Int>>))
+    CollectionOfOne.Iterator(_elements: nil as Optional<OpaqueValue<Int>>))
   { $0.value == $1.value }
 
   checkIterator(
     [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    IteratorOverOne(_elements: OpaqueValue(42)))
+    CollectionOfOne.Iterator(_elements: OpaqueValue(42)))
   { $0.value == $1.value }
 }
 
@@ -241,7 +243,7 @@ LazyTestSuite.test("EmptyCollection/AssociatedTypes") {
   typealias Subject = EmptyCollection<OpaqueValue<Int>>
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: EmptyIterator<OpaqueValue<Int>>.self,
+    iteratorType: EmptyCollection<OpaqueValue<Int>>.Iterator.self,
     subSequenceType: Subject.self,
     indexType: Int.self,
     indicesType: Range<Int>.self)
@@ -376,7 +378,7 @@ extension EmptyIterator where Element : TestProtocol1 {
 LazyTestSuite.test("EmptyIterator") {
   checkIterator(
     [] as Array<OpaqueValue<Int>>,
-    EmptyIterator<OpaqueValue<Int>>())
+    EmptyCollection<OpaqueValue<Int>>.Iterator())
     { $0.value == $1.value }
 }
 
@@ -1291,7 +1293,7 @@ do {
 }
 
 struct TryFlattenIndex<C: Collection> where C.Element: Collection {
-  typealias FlattenedIndex = FlattenCollectionIndex<C>
+  typealias FlattenedIndex = FlattenCollection<C>.Index
 }
 
 
