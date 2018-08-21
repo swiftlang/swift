@@ -45,17 +45,13 @@ InheritedTypeRequest::evaluate(
     isa<ProtocolDecl>(dc) ? TypeResolution::forStructural(dc)
                           : TypeResolution::forContextual(dc);
 
-  auto lazyResolver = dc->getASTContext().getLazyResolver();
-  assert(lazyResolver && "Cannot resolve inherited type at this point");
-
-  TypeChecker &tc = *static_cast<TypeChecker *>(lazyResolver);
   TypeLoc &typeLoc = getTypeLoc(decl, index);
 
   Type inheritedType =
-    tc.resolveType(typeLoc.getTypeRepr(), resolution, options);
+    resolution.resolveType(typeLoc.getTypeRepr(), options);
   if (inheritedType && !isa<ProtocolDecl>(dc))
     inheritedType = inheritedType->mapTypeOutOfContext();
-  return inheritedType ? inheritedType : ErrorType::get(tc.Context);
+  return inheritedType ? inheritedType : ErrorType::get(dc->getASTContext());
 }
 
 llvm::Expected<Type>

@@ -1420,8 +1420,8 @@ namespace {
     Type resolveTypeReferenceInExpression(TypeRepr *rep) {
       TypeResolutionOptions options(TypeResolverContext::InExpression);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      return CS.TC.resolveType(rep, TypeResolution::forContextual(CS.DC),
-                               options);
+      return TypeResolution::forContextual(CS.DC).resolveType(rep,
+                                                              options);
     }
 
     Type visitTypeExpr(TypeExpr *E) {

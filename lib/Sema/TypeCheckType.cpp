@@ -641,7 +641,7 @@ Type TypeChecker::applyGenericArguments(Type type,
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       if (nominal->isOptionalDecl()) {
         // Validate the generic argument.
-        Type objectType = resolveType(genericArgs[0], resolution, options);
+        Type objectType = resolution.resolveType(genericArgs[0], options);
         if (!objectType || objectType->hasError())
           return nullptr;
 
@@ -674,7 +674,7 @@ Type TypeChecker::applyGenericArguments(Type type,
   SmallVector<Type, 2> args;
   for (auto tyR : genericArgs) {
     // Propagate failure.
-    Type substTy = resolveType(tyR, resolution, options);
+    Type substTy = resolution.resolveType(tyR, options);
     if (!substTy || substTy->hasError())
       return ErrorType::get(ctx);
 
@@ -1576,7 +1576,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution,
 
   Type type = Loc.getType();
   if (type.isNull()) {
-    type = resolveType(Loc.getTypeRepr(), resolution, options);
+    type = resolution.resolveType(Loc.getTypeRepr(), options);
     if (!type) {
       type = ErrorType::get(Context);
 
@@ -1685,12 +1685,11 @@ namespace {
   };
 } // end anonymous namespace
 
-Type TypeChecker::resolveType(TypeRepr *TyR, TypeResolution resolution,
+Type TypeResolution::resolveType(TypeRepr *TyR,
                               TypeResolutionOptions options) {
-  PrettyStackTraceTypeRepr stackTrace(resolution.getASTContext(),
-                                      "resolving", TyR);
+  PrettyStackTraceTypeRepr stackTrace(getASTContext(), "resolving", TyR);
 
-  TypeResolver typeResolver(resolution);
+  TypeResolver typeResolver(*this);
   auto result = typeResolver.resolveType(TyR, options);
   
   // If we resolved down to an error, make sure to mark the typeRepr as invalid
