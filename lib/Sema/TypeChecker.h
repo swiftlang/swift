@@ -1064,9 +1064,9 @@ public:
   
   /// \brief Try to resolve an IdentTypeRepr, returning either the referenced
   /// Type or an ErrorType in case of error.
-  Type resolveIdentifierType(TypeResolution resolution,
-                             IdentTypeRepr *IdType,
-                             TypeResolutionOptions options);
+  static Type resolveIdentifierType(TypeResolution resolution,
+                                    IdentTypeRepr *IdType,
+                                    TypeResolutionOptions options);
 
   /// Bind an UnresolvedDeclRefExpr by performing name lookup and
   /// returning the resultant expression.  Context is the DeclContext used
@@ -1112,8 +1112,8 @@ public:
   /// \param options Options that alter type resolution.
   ///
   /// \returns a well-formed type or an ErrorType in case of an error.
-  Type resolveType(TypeRepr *TyR, TypeResolution resolution,
-                   TypeResolutionOptions options);
+  static Type resolveType(TypeRepr *TyR, TypeResolution resolution,
+                          TypeResolutionOptions options);
 
   void validateDecl(ValueDecl *D);
   void validateDecl(OperatorDecl *decl);
@@ -1179,10 +1179,10 @@ public:
   /// error.
   ///
   /// \see applyUnboundGenericArguments
-  Type applyGenericArguments(Type type, SourceLoc loc,
-                             TypeResolution resolution,
-                             GenericIdentTypeRepr *generic,
-                             TypeResolutionOptions options);
+  static Type applyGenericArguments(Type type, SourceLoc loc,
+                                    TypeResolution resolution,
+                                    GenericIdentTypeRepr *generic,
+                                    TypeResolutionOptions options);
 
   /// Apply generic arguments to the given type.
   ///
@@ -1200,11 +1200,11 @@ public:
   /// error.
   ///
   /// \see applyGenericArguments
-  Type applyUnboundGenericArguments(UnboundGenericType *unboundType,
-                                    GenericTypeDecl *decl,
-                                    SourceLoc loc,
-                                    TypeResolution resolution,
-                                    ArrayRef<Type> genericArgs);
+  static Type applyUnboundGenericArguments(UnboundGenericType *unboundType,
+                                           GenericTypeDecl *decl,
+                                           SourceLoc loc,
+                                           TypeResolution resolution,
+                                           ArrayRef<Type> genericArgs);
 
   /// \brief Substitute the given base type into the type of the given nested type,
   /// producing the effective type that the nested type will have.
@@ -2161,11 +2161,6 @@ public:
 
   /// \brief Look up the Bool type in the standard library.
   Type lookupBoolType(const DeclContext *dc);
-
-  /// Diagnose an ambiguous member type lookup result.
-  void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
-                                   Identifier name, SourceLoc nameLoc,
-                                   LookupTypeResult &lookup);
 
   /// @}
 

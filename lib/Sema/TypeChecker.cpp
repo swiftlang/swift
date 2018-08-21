@@ -988,24 +988,6 @@ OwnedResolver swift::createLazyResolver(ASTContext &Ctx) {
                        &deleteTypeCheckerAndDiags);
 }
 
-void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
-                                              SourceRange baseRange,
-                                              Identifier name,
-                                              SourceLoc nameLoc,
-                                              LookupTypeResult &lookup) {
-  if (auto moduleTy = baseTy->getAs<ModuleType>()) {
-    diagnose(nameLoc, diag::ambiguous_module_type, name,
-             moduleTy->getModule()->getName())
-      .highlight(baseRange);
-  } else {
-    diagnose(nameLoc, diag::ambiguous_member_type, name, baseTy)
-      .highlight(baseRange);
-  }
-  for (const auto &member : lookup) {
-    diagnose(member.Member, diag::found_candidate_type, member.MemberType);
-  }
-}
-
 // checkForForbiddenPrefix is for testing purposes.
 
 void TypeChecker::checkForForbiddenPrefix(const Decl *D) {

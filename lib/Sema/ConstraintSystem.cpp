@@ -475,7 +475,7 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   // pointing at a generic TypeAliasDecl here. If we find a way to
   // handle generic TypeAliases elsewhere, this can just become a
   // call to BoundGenericType::get().
-  return TC.applyUnboundGenericArguments(
+  return TypeChecker::applyUnboundGenericArguments(
       unbound, unboundDecl,
       SourceLoc(), TypeResolution::forContextual(DC), arguments);
 }
