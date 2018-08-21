@@ -448,6 +448,14 @@ entry(%0 : @trivial $*A, %1 : @trivial $*B, %2 : @trivial $*A, %3 : @trivial $*B
   return undef : $()
 }
 
+sil @identity : $@convention(thin) <T> () -> () {
+entry:
+  %v = keypath $WritableKeyPath<T, T>, <A> (root $A; objc "self") <T>
+  %w = keypath $WritableKeyPath<Int, Int>, (root $Int; objc "self")
+
+  return undef : $()
+}
+
 sil @s_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, UnsafeRawPointer) -> @out B
 sil @s_set : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed B, @in_guaranteed A, UnsafeRawPointer) -> ()
 sil @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool

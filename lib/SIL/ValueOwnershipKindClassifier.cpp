@@ -397,8 +397,6 @@ struct ValueOwnershipKindBuiltinVisitor
     }                                                                          \
     return ValueOwnershipKind::OWNERSHIP;                                      \
   }
-CONSTANT_OWNERSHIP_BUILTIN(Owned, Take)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, TryPin)
 // This returns a value at +1 that is destroyed strictly /after/ the
 // UnsafeGuaranteedEnd. This provides the guarantee that we want.
 CONSTANT_OWNERSHIP_BUILTIN(Owned, UnsafeGuaranteed)
@@ -443,9 +441,6 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_ULE)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, ICMP_ULT)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IntToPtr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, LShr)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, Load)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, LoadRaw)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, LoadInvariant)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Mul)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Or)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, PtrToInt)
@@ -472,32 +467,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, ZExt)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, ZExtOrBitCast)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_ORD)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, FCMP_UNO)
-CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastToNativeObject)
-CONSTANT_OWNERSHIP_BUILTIN(Unowned, UnsafeCastToNativeObject)
-CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastFromNativeObject)
-CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastToBridgeObject)
-CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastReferenceFromBridgeObject)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, CastBitPatternFromBridgeObject)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, ClassifyBridgeObject)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, BridgeToRawPointer)
-CONSTANT_OWNERSHIP_BUILTIN(Unowned, BridgeFromRawPointer)
-CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastReference)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, AddressOf)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, AddressOfBorrow)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, GepRaw)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, Gep)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, GetTailAddr)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, PerformInstantaneousReadAccess)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, BeginUnpairedModifyAccess)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, EndUnpairedAccess)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, OnFastPath)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUnique)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUniqueOrPinned)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUnique_native)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUniqueOrPinned_native)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, BindMemory)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, AllocWithTailElems)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, ProjectTailElems)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsOptionalType)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Sizeof)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Strideof)
@@ -543,21 +513,11 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, UnexpectedError)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, ErrorInMain)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, DeallocRaw)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Fence)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, Retain)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, Release)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, CondFail)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, FixLifetime)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, Autorelease)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, Unpin)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, Destroy)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, Assign)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, Init)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AtomicStore)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Once)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, OnceWithContext)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, TSanInoutAccess)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Swift3ImplicitObjCEntrypoint)
-CONSTANT_OWNERSHIP_BUILTIN(Unowned, ValueToBridgeObject)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
@@ -570,13 +530,21 @@ CONSTANT_OWNERSHIP_BUILTIN(Unowned, ValueToBridgeObject)
     }                                                                          \
     return ValueOwnershipKind::Unowned;                                        \
   }
-UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ReinterpretCast)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(CmpXChg)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(AtomicLoad)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ExtractElement)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(InsertElement)
 UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ZeroInitializer)
 #undef UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT
+
+#define BUILTIN(X,Y,Z)
+#define BUILTIN_SIL_OPERATION(ID, NAME, CATEGORY) \
+  ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID( \
+      BuiltinInst *BI, StringRef Attr) { \
+    llvm_unreachable("builtin should have been lowered in SILGen"); \
+  }
+
+#include "swift/AST/Builtins.def"
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {
