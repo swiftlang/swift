@@ -207,7 +207,7 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
   case SILStage::Canonical:
   case SILStage::Raw:
     break;
-    
+
   case SILStage::Lowered:
     return wtable;
   }
