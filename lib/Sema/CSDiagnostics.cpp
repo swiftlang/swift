@@ -540,34 +540,55 @@ bool RValueTreatedAsLValueFailure::diagnose() {
   Expr *diagExpr = getLocator()->getAnchor();
   SourceLoc loc;
 
-  auto callExpr = dyn_cast<ApplyExpr>(diagExpr);
-  if (!callExpr)
-    return false; // currently only creating these for args, so should be
-                  // unreachable
+  if (auto callExpr = dyn_cast<ApplyExpr>(diagExpr)) {
+    Expr *argExpr = callExpr->getArg();
+    loc = callExpr->getFn()->getLoc();
 
-  Expr *argExpr = callExpr->getArg();
-  loc = callExpr->getFn()->getLoc();
+    if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
+      subElementDiagID = diag::cannot_apply_lvalue_unop_to_subelement;
+      rvalueDiagID = diag::cannot_apply_lvalue_unop_to_rvalue;
+      diagExpr = argExpr;
+    } else if (isa<BinaryExpr>(callExpr)) {
+      subElementDiagID = diag::cannot_apply_lvalue_binop_to_subelement;
+      rvalueDiagID = diag::cannot_apply_lvalue_binop_to_rvalue;
+      auto argTuple = dyn_cast<TupleExpr>(argExpr);
+      diagExpr = argTuple->getElement(0);
+    } else {
+      auto lastPathElement = getLocator()->getPath().back();
+      assert(lastPathElement.getKind() ==
+             ConstraintLocator::PathElementKind::ApplyArgToParam);
 
-  if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
-    subElementDiagID = diag::cannot_apply_lvalue_unop_to_subelement;
-    rvalueDiagID = diag::cannot_apply_lvalue_unop_to_rvalue;
-    diagExpr = argExpr;
-  } else if (isa<BinaryExpr>(callExpr)) {
-    subElementDiagID = diag::cannot_apply_lvalue_binop_to_subelement;
-    rvalueDiagID = diag::cannot_apply_lvalue_binop_to_rvalue;
-    auto argTuple = dyn_cast<TupleExpr>(argExpr);
-    diagExpr = argTuple->getElement(0);
-  } else {
-    auto lastPathElement = getLocator()->getPath().back();
-    assert(lastPathElement.getKind() ==
-           ConstraintLocator::PathElementKind::ApplyArgToParam);
+      subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
+      rvalueDiagID = diag::cannot_pass_rvalue_inout;
+      if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
+        diagExpr = argTuple->getElement(lastPathElement.getValue());
+      else if (auto parens = dyn_cast<ParenExpr>(argExpr))
+        diagExpr = parens->getSubExpr();
+    }
+  } else if (auto inoutExpr = dyn_cast<InOutExpr>(diagExpr)) {
+    Type type = getConstraintSystem().getType(inoutExpr);
+    if (auto restriction = restrictionForType(type)) {
+      PointerTypeKind pointerKind;
+      if (restriction->second == ConversionRestrictionKind::ArrayToPointer &&
+          restriction->first->getAnyPointerElementType(pointerKind) &&
+          (pointerKind == PTK_UnsafePointer ||
+           pointerKind == PTK_UnsafeRawPointer)) {
+        // If we're converting to an UnsafePointer, then the programmer
+        // specified an & unnecessarily. Produce a fixit hint to remove it.
+        emitDiagnostic(inoutExpr->getLoc(),
+                       diag::extra_address_of_unsafepointer, restriction->first)
+            .highlight(inoutExpr->getSourceRange())
+            .fixItRemove(inoutExpr->getStartLoc());
+        return true;
+      }
+    }
 
     subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
     rvalueDiagID = diag::cannot_pass_rvalue_inout;
-    if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
-      diagExpr = argTuple->getElement(lastPathElement.getValue());
-    else if (auto parens = dyn_cast<ParenExpr>(argExpr))
-      diagExpr = parens->getSubExpr();
+    loc = diagExpr->getLoc();
+    diagExpr = inoutExpr->getSubExpr();
+  } else {
+    return false;
   }
 
   diagnoseSubElementFailure(diagExpr, loc, getConstraintSystem(),
