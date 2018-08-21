@@ -171,7 +171,8 @@
     "Hasher.swift",
     "SipHash.swift",
     "AnyHashable.swift",
-    "Hashing.swift"
+    "Hashing.swift",
+    "Bitmap.swift"  
   ],
   "Misc": [
     "Interval.swift",
