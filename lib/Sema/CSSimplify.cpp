@@ -1662,8 +1662,11 @@ static void attemptToFixRequirementFailure(
     return;
   }
 
-  case RequirementKind::Superclass:
-    break; // Not yet supported
+  case RequirementKind::Superclass: {
+    auto *fix = SkipSuperclassRequirement::create(cs, type1, type2, reqLoc);
+    conversionsOrFixes.push_back(fix);
+    return;
+  }
 
   case RequirementKind::Conformance:
   case RequirementKind::Layout:

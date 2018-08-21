@@ -1535,6 +1535,12 @@ ERROR(types_not_equal_decl,none,
 ERROR(types_not_equal_in_decl_ref,none,
       "referencing %0 %1 on %2 requires the types %3 and %4 be equivalent",
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
+ERROR(types_not_inherited_decl,none,
+      "%0 %1 requires that %2 inherit from %3",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(types_not_inherited_in_decl_ref,none,
+      "referencing %0 %1 on %2 requires that %3 inherit from %4",
+      (DescriptiveDeclKind, DeclName, Type, Type, Type))
 NOTE(where_requirement_failure_one_subst,none,
      "where %0 = %1", (Type, Type))
 NOTE(where_requirement_failure_both_subst,none,
