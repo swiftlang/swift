@@ -26,8 +26,9 @@
 // can be reflected as source-breaking changes for API users. If they are,
 // the output of api-digester will include such changes.
 
+#include "swift/AST/DiagnosticsModuleDiffer.h"
 #include <functional>
-#include <ModuleAnalyzerNodes.h>
+#include "ModuleAnalyzerNodes.h"
 
 using namespace swift;
 using namespace ide;
@@ -1667,10 +1668,11 @@ class DiagnosisEmitter : public SDKNodeVisitor {
   UpdatedNodesMap &UpdateMap;
   NodeMap &TypeAliasUpdateMap;
   TypeMemberDiffVector &MemberChanges;
+  DiagnosticEngine &Diags;
   DiagnosisEmitter(SDKContext &Ctx):
     UpdateMap(Ctx.getNodeUpdateMap()),
     TypeAliasUpdateMap(Ctx.getTypeAliasUpdateMap()),
-    MemberChanges(Ctx.getTypeMemberDiffs()){}
+    MemberChanges(Ctx.getTypeMemberDiffs()), Diags(Ctx.Diags) {}
 
 public:
   static void diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
@@ -1822,8 +1824,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     }
     if (FoundInSuperclass)
       return;
-    RemovedDecls.Diags.emplace_back(ScreenInfo,
-                                    Node->isDeprecated());
+    Diags.diagnose(SourceLoc(), diag::removed_decl, "", Node->isDeprecated());
     return;
   }
   case NodeAnnotation::Rename: {

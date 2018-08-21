@@ -1,0 +1,30 @@
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#endif
+
+#ifndef ERROR
+#  define ERROR(ID,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Options,Text,Signature)
+#endif
+
+#ifndef WARNING
+#  define WARNING(ID,Options,Text,Signature) \
+  DIAG(WARNING,ID,Options,Text,Signature)
+#endif
+
+#ifndef NOTE
+#  define NOTE(ID,Options,Text,Signature) \
+  DIAG(NOTE,ID,Options,Text,Signature)
+#endif
+
+ERROR(removed_decl,none,"'%0'%select{|(deprecated))}1 has been removed.", (StringRef, bool))
+
+
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
+#  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
+#endif
