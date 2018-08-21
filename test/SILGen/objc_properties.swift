@@ -198,7 +198,7 @@ class NonObjCClassWithObjCProperty {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonObjCClassWithObjCProperty):
   // CHECK: [[MATERIALIZE_FOR_SET:%.*]] = class_method [[ARG]] : $NonObjCClassWithObjCProperty, #NonObjCClassWithObjCProperty.property!materializeForSet.1
   // CHECK: [[TUPLE:%.*]] = apply [[MATERIALIZE_FOR_SET]]({{.*}}, {{.*}}, [[ARG]])
-  // CHECK: [[RAW_POINTER:%.*]] = tuple_extract [[TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
+  // CHECK: ([[RAW_POINTER:%.*]], {{%.*}}) = destructure_tuple [[TUPLE]]
   // CHECK: [[OBJECT:%.*]] = pointer_to_address [[RAW_POINTER]] : $Builtin.RawPointer to [strict] $*NSObject
   // CHECK: [[OBJECT_DEP:%.*]] = mark_dependence [[OBJECT]] : $*NSObject on [[ARG]]
   // CHECK: [[OBJECT_ACCESS:%.*]] = begin_access [modify] [unsafe] [[OBJECT_DEP]] : $*NSObject

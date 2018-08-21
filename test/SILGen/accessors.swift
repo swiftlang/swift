@@ -54,8 +54,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER]]
 // CHECK-NEXT: [[T1:%.*]] = class_method [[ARG]] : $A, #A.array!materializeForSet.1
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]], [[ARG]])
-// CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
-// CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
+// CHECK-NEXT: ([[T3:%.*]], [[OPT_CALLBACK:%.*]]) = destructure_tuple [[T2]]
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*OrdinarySub on [[ARG]] : $A
 // CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*OrdinarySub
@@ -112,8 +111,7 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER]]
 // CHECK-NEXT: [[T1:%.*]] = class_method [[ARG]] : $B, #B.array!materializeForSet.1
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]], [[ARG]])
-// CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
-// CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
+// CHECK-NEXT: ([[T3:%.*]], [[OPT_CALLBACK:%.*]]) = destructure_tuple [[T2]]
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on [[ARG]] : $B
 // CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*MutatingSub
@@ -140,8 +138,7 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER2]]
 // CHECK-NEXT: [[T1:%.*]] = class_method [[ARG]] : $B, #B.array!materializeForSet.1
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE2]], [[ARG]])
-// CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
-// CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
+// CHECK-NEXT: ([[T3:%.*]], [[OPT_CALLBACK:%.*]]) = destructure_tuple [[T2]]
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on [[ARG]] : $B
 // CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*MutatingSub

@@ -416,12 +416,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:         [[N:%.*]] = integer_literal $Builtin.Word, 4
 // CHECK:         [[T0:%.*]] = function_ref @$Ss27_allocateUninitializedArray{{.*}}F
 // CHECK:         [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
-// CHECK:         [[BORROWED_T1:%.*]] = begin_borrow [[T1]]
-// CHECK:         [[BORROWED_ARRAY:%.*]] = tuple_extract [[BORROWED_T1]] :  $(Array<Cat>, Builtin.RawPointer), 0
-// CHECK:         [[ARRAY:%.*]] = copy_value [[BORROWED_ARRAY]]
-// CHECK:         [[T2:%.*]] = tuple_extract [[BORROWED_T1]] :  $(Array<Cat>, Builtin.RawPointer), 1
-// CHECK:         end_borrow [[BORROWED_T1]] from [[T1]]
-// CHECK:         destroy_value [[T1]]
+// CHECK:         ([[ARRAY:%.*]], [[T2:%.*]]) = destructure_tuple [[T1]]
 // CHECK:         [[ELT0:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Cat
 //   Element 0.
 // CHECK:         [[T0:%.*]] = function_ref @$S6errors10make_a_catAA3CatCyKF : $@convention(thin) () -> (@owned Cat, @error Error)
@@ -537,8 +532,7 @@ func supportFirstStructure<B: Buildable>(_ b: inout B) throws {
 // CHECK: [[BUFFER_CAST:%.*]] = address_to_pointer [[BUFFER]] : $*B.Structure to $Builtin.RawPointer
 // CHECK: [[MAT:%.*]] = witness_method $B, #Buildable.firstStructure!materializeForSet.1 :
 // CHECK: [[T1:%.*]] = apply [[MAT]]<B>([[BUFFER_CAST]], [[MATBUFFER]], [[BASE:%[0-9]*]])
-// CHECK: [[T2:%.*]] = tuple_extract [[T1]] : {{.*}}, 0
-// CHECK: [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
+// CHECK: ([[T2:%.*]], [[CALLBACK:%.*]]) = destructure_tuple [[T1]]
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*B.Structure
 // CHECK: [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
 // CHECK: [[T5:%.*]] = begin_access [modify] [unsafe] [[T4]] : $*B.Structure
@@ -574,8 +568,7 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
 // CHECK:   [[MAT:%.*]] = witness_method $B, #Buildable.subscript!materializeForSet.1 :
 // CHECK:   [[T1:%.*]] = apply [[MAT]]<B>([[BUFFER_CAST]], [[MATBUFFER]], [[BORROWED_INDEX_COPY]], [[BASE:%[0-9]*]])
 // CHECK:   end_borrow [[BORROWED_INDEX_COPY]] from [[INDEX_COPY]]
-// CHECK:   [[T2:%.*]] = tuple_extract [[T1]] : {{.*}}, 0
-// CHECK:   [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
+// CHECK:   ([[T2:%.*]], [[CALLBACK:%.*]]) = destructure_tuple [[T1]]
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*B.Structure
 // CHECK:   [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
 // CHECK:   [[T5:%.*]] = begin_access [modify] [unsafe] [[T4]] : $*B.Structure
@@ -684,12 +677,7 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @$S6errors11OwnedBridgeVyAA5PylonVSSciaO :
 // CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[BORROWED_ARG2_COPY]], [[WRITE]])
 // CHECK-NEXT: end_borrow [[BORROWED_ARG2_COPY]]
-// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
-// CHECK-NEXT: [[T1:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 0
-// CHECK-NEXT: [[BORROWED_OWNER:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 1
-// CHECK-NEXT: [[OWNER:%.*]] = copy_value [[BORROWED_OWNER]]
-// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
-// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: ([[T1:%.*]], [[OWNER:%.*]]) = destructure_tuple [[T0]]
 // CHECK-NEXT: [[T3:%.*]] = struct_extract [[T1]]
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
@@ -730,12 +718,7 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK-NEXT:   [[ADDRESSOR:%.*]] = function_ref @$S6errors12PinnedBridgeVyAA5PylonVSSciaP :
 // CHECK-NEXT:   [[T0:%.*]] = apply [[ADDRESSOR]]([[BORROWED_ARG2_COPY]], [[WRITE]])
 // CHECK-NEXT:   end_borrow [[BORROWED_ARG2_COPY]]
-// CHECK-NEXT:   [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
-// CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 0
-// CHECK-NEXT:   [[BORROWED_OWNER:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 1
-// CHECK-NEXT:   [[OWNER:%.*]] = copy_value [[BORROWED_OWNER]]
-// CHECK-NEXT:   end_borrow [[BORROWED_T0]] from [[T0]]
-// CHECK-NEXT:   destroy_value [[T0]]
+// CHECK-NEXT:   ([[T1:%.*]], [[OWNER:%.*]]) = destructure_tuple [[T0]]
 // CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T1]]
 // CHECK-NEXT:   [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT:   [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
