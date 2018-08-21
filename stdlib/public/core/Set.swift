@@ -881,9 +881,16 @@ extension Set: SetAlgebra {
   @inlinable
   public func isDisjoint<S: Sequence>(with other: S) -> Bool
     where S.Element == Element {
-    // FIXME(performance): Don't need to build a set.
-    let otherSet = Set(other)
-    return isDisjoint(with: otherSet)
+    return _isDisjoint(with: other)
+  }
+
+  @inlinable
+  internal func _isDisjoint<S: Sequence>(with other: S) -> Bool
+    where S.Element == Element {
+    for element in other {
+      if self.contains(element) { return false }
+    }
+    return true
   }
 
   /// Returns a new set with the elements of both this set and the given
@@ -1290,12 +1297,7 @@ extension Set {
   ///   otherwise, `false`.
   @inlinable
   public func isDisjoint(with other: Set<Element>) -> Bool {
-    for member in self {
-      if other.contains(member) {
-        return false
-      }
-    }
-    return true
+    return _isDisjoint(with: other)
   }
 
   /// Returns a new set containing the elements of this set that do not occur
