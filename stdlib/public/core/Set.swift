@@ -940,9 +940,7 @@ extension Set: SetAlgebra {
   @inlinable
   public mutating func formUnion<S: Sequence>(_ other: S)
     where S.Element == Element {
-    for item in other {
-      insert(item)
-    }
+    _variant.formUnion(other)
   }
 
   /// Returns a new set containing the elements of this set that do not occur
@@ -2050,6 +2048,24 @@ extension _NativeSet {
   }
 
   @inlinable
+  internal mutating func formUnion<S: Sequence>(_ other: S, isUnique: Bool)
+    where S.Element == Element {
+    var isUnique = isUnique
+    if other is Set<Element> {
+      // When `other` is also a set, then max(count, other.count) is a lower
+      // bound on the result's element count.
+      let c = other.underestimatedCount
+      if c > count {
+        isUnique = ensureUnique(isUnique: isUnique, capacity: c).reallocated
+      }
+    }
+    for element in other {
+      let (inserted, _) = _insert(element, isUnique: isUnique)
+      isUnique = isUnique || inserted
+    }
+  }
+
+  @inlinable
   internal func intersection<S: Sequence>(_ other: S) -> _NativeSet<Element>
     where S.Element == Element {
     // Rather than directly creating a new set, mark common elements in a
@@ -3034,6 +3050,29 @@ extension Set._Variant {
 }
 
 extension Set._Variant {
+  @inlinable
+  internal mutating func formUnion<S: Sequence>(_ other: S)
+    where S.Element == Element {
+    switch self {
+    case .native:
+      let isUnique = isUniquelyReferenced()
+      asNative.formUnion(other, isUnique: isUnique)
+#if _runtime(_ObjC)
+    case .cocoa(let this):
+      if let other = other as? Set<Element>,
+        case .native(var that) = other._variant {
+        // When given a choice, form the union on the native set.
+        that.formUnion(Set(_cocoa: this), isUnique: false)
+        self = .native(that)
+        return
+      }
+      var native = _NativeSet<Element>(this)
+      native.formUnion(other, isUnique: true)
+      self = .native(native)
+#endif
+    }
+  }
+
   @inlinable
   internal func intersection<S: Sequence>(_ other: S) -> _NativeSet<Element>
     where S.Element == Element {
