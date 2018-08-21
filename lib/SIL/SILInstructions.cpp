@@ -830,17 +830,6 @@ MarkFunctionEscapeInst::create(SILDebugLocation Loc,
   return ::new(Buf) MarkFunctionEscapeInst(Loc, Elements);
 }
 
-static SILType getPinResultType(SILType operandType) {
-  return SILType::getPrimitiveObjectType(
-    OptionalType::get(operandType.getASTType())->getCanonicalType());
-}
-
-StrongPinInst::StrongPinInst(SILDebugLocation Loc, SILValue operand,
-                             Atomicity atomicity)
-    : UnaryInstructionBase(Loc, operand, getPinResultType(operand->getType())) {
-  setAtomicity(atomicity);
-}
-
 CopyAddrInst::CopyAddrInst(SILDebugLocation Loc, SILValue SrcLValue,
                            SILValue DestLValue, IsTake_t isTakeOfSrc,
                            IsInitialization_t isInitializationOfDest)

@@ -1784,15 +1784,7 @@ public:
       *this << "[nonatomic] ";
     *this << getIDAndType(I->getOperand(0));
   }
-  void visitStrongPinInst(StrongPinInst *I) {
-    if (I->isNonAtomic())
-      *this << "[nonatomic] ";
-    *this << getIDAndType(I->getOperand());
-  }
   void visitIsUniqueInst(IsUniqueInst *CUI) {
-    *this << getIDAndType(CUI->getOperand());
-  }
-  void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
   }
   void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
