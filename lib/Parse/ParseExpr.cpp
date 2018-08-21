@@ -1154,17 +1154,6 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         // fallthrough to an UnresolvedDotExpr.
       }
 
-      // If we have '.<keyword><code_complete>', try to recover by creating
-      // an identifier with the same spelling as the keyword.
-      if (Tok.isKeyword() && peekToken().is(tok::code_complete)) {
-        Identifier Name = Context.getIdentifier(Tok.getText());
-        Result = makeParserResult(new (Context) UnresolvedDotExpr(
-            Result.get(), TokLoc, Name, DeclNameLoc(Tok.getLoc()),
-            /*Implicit=*/false));
-        consumeToken();
-        // Fall into the next code completion handler.
-      }
-
       // Handle "x.<tab>" for code completion.
       if (Tok.is(tok::code_complete)) {
         if (CodeCompletion && Result.isNonNull()) {
