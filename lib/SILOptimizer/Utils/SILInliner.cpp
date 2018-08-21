@@ -59,15 +59,15 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
   return true;
 }
 
-bool SILInliner::canInlineBeginApply(FullApplySite AI) {
+bool SILInliner::canInline(FullApplySite AI) {
   if (auto BA = dyn_cast<BeginApplyInst>(AI)) {
-    return ::canInlineBeginApply(BA);
+    return canInlineBeginApply(BA);
   }
   return true;
 }
 
 bool SILInliner::canInlineFunction(FullApplySite AI) {
-  if (!canInlineBeginApply(AI))
+  if (!canInline(AI))
     return false;
   return AI.getFunction() != &Original;
 }
