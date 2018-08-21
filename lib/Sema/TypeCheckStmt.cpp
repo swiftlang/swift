@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTPrinter.h"
@@ -926,8 +927,9 @@ public:
           pattern = newPattern;
           // Coerce the pattern to the subject's type.
           TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-          if (!subjectType || TC.coercePatternToType(pattern, DC, subjectType,
-                                     patternOptions)) {
+          if (!subjectType ||
+              TC.coercePatternToType(pattern, TypeResolution::forContextual(DC),
+                                     subjectType, patternOptions)) {
             limitExhaustivityChecks = true;
 
             // If that failed, mark any variables binding pieces of the pattern
@@ -1133,7 +1135,9 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
 
     // Coerce the pattern to the exception type.
     TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-    if (!exnType || coercePatternToType(pattern, DC, exnType, patternOptions)) {
+    if (!exnType ||
+        coercePatternToType(pattern, TypeResolution::forContextual(DC), exnType,
+                            patternOptions)) {
       // If that failed, be sure to give the variables error types
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)

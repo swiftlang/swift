@@ -19,7 +19,7 @@
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
-#include "GenericTypeResolver.h"
+#include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTPrinter.h"
@@ -208,19 +208,18 @@ public:
 static void validateAttributes(TypeChecker &TC, Decl *D);
 
 void TypeChecker::resolveTrailingWhereClause(ProtocolDecl *proto) {
-  DependentGenericTypeResolver resolver;
-  validateWhereClauses(proto, &resolver);
+  validateWhereClauses(proto, TypeResolution::forStructural(proto));
 }
 
 void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
-                                       GenericTypeResolver *resolver) {
+                                       TypeResolution resolution) {
   TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
 
   if (auto whereClause = protocol->getTrailingWhereClause()) {
     revertGenericRequirements(whereClause->getRequirements());
     validateRequirements(whereClause->getWhereLoc(),
-                         whereClause->getRequirements(), protocol,
-                         options, resolver);
+                         whereClause->getRequirements(), resolution,
+                         options);
   }
 
   for (auto assocType : protocol->getAssociatedTypeMembers()) {
@@ -228,9 +227,14 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
       revertGenericRequirements(whereClause->getRequirements());
       validateRequirements(whereClause->getWhereLoc(),
                            whereClause->getRequirements(),
-                           protocol, options, resolver);
+                           resolution, options);
     }
   }
+}
+
+void TypeChecker::checkInheritanceClause(Decl *decl) {
+  auto dc = decl->getInnermostDeclContext();
+  checkInheritanceClause(decl, TypeResolution::forContextual(dc));
 }
 
 /// check the inheritance clause of a type declaration or extension thereof.
@@ -239,7 +243,7 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
 /// recording the superclass (if any and if allowed) as well as the protocols
 /// to which this type declaration conforms.
 void TypeChecker::checkInheritanceClause(Decl *decl,
-                                         GenericTypeResolver *resolver) {
+                                         TypeResolution resolution) {
   TypeResolutionOptions options = None;
   DeclContext *DC;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
@@ -251,11 +255,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   } else {
     DC = decl->getDeclContext();
   }
-
-  // Establish a default generic type resolver.
-  GenericTypeToArchetypeResolver defaultResolver(decl->getInnermostDeclContext());
-  if (!resolver)
-    resolver = &defaultResolver;
 
   MutableArrayRef<TypeLoc> inheritedClause;
 
@@ -338,7 +337,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     auto &inherited = inheritedClause[i];
 
     // Validate the type.
-    if (validateType(inherited, DC, options, resolver)) {
+    if (validateType(inherited, resolution, options)) {
       inherited.setInvalidType(Context);
       continue;
     }
@@ -677,12 +676,6 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
                                         /*allowConcreteGenericParams=*/true,
                                         /*ext=*/nullptr);
     parentSig = parentEnv->getGenericSignature();
-
-    // Compute the final set of archetypes.
-    revertGenericParamList(genericParams);
-    GenericTypeToArchetypeResolver archetypeResolver(parentEnv);
-    checkGenericParamList(nullptr, genericParams, parentSig,
-                          &archetypeResolver);
   }
 
   return parentEnv;
@@ -3025,8 +3018,7 @@ public:
 
     TC.checkInheritanceClause(PD);
 
-    GenericTypeToArchetypeResolver resolver(PD);
-    TC.validateWhereClauses(PD, &resolver);
+    TC.validateWhereClauses(PD, TypeResolution::forContextual(PD));
 
     TC.checkDeclCircularity(PD);
     if (PD->isResilient())
@@ -3446,7 +3438,7 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   }
 
   if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                      typeAlias, options)) {
+                      TypeResolution::forContextual(typeAlias), options)) {
     typeAlias->setInvalid();
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
@@ -3825,7 +3817,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
     if (!defaultDefinition.isNull()) {
-      if (validateType(defaultDefinition, assocType->getDeclContext())) {
+      if (validateType(
+                defaultDefinition,
+                TypeResolution::forContextual(assocType->getDeclContext()))) {
         defaultDefinition.setInvalidType(Context);
       } else {
         // associatedtype X = X is invalid
@@ -4380,10 +4374,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     DeclValidationRAII IBV(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      CompleteGenericTypeResolver resolver(*this, ED->getGenericSignature());
-
-      typeCheckParameterList(PL, EED->getParentEnum(),
-                             TypeResolverContext::EnumElementDecl, resolver);
+      typeCheckParameterList(PL,
+                             TypeResolution::forInterface(
+                                                    EED->getParentEnum(),
+                                                    ED->getGenericSignature()),
+                             TypeResolverContext::EnumElementDecl);
       checkDefaultArguments(PL, EED);
     }
 
@@ -4488,10 +4483,9 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         auto helper = [&] {
           (void) typealias->getFormalAccess();
 
-          DependentGenericTypeResolver resolver;
           TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
           if (validateType(typealias->getUnderlyingTypeLoc(),
-                           typealias, options, &resolver)) {
+                           TypeResolution::forStructural(typealias), options)) {
             typealias->setInvalid();
             typealias->getUnderlyingTypeLoc().setInvalidType(Context);
           }
@@ -4865,16 +4859,6 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                          /*allowConcreteGenericParams=*/true,
                                          ext, inferExtendedTypeReqs,
                                          mustInferRequirements);
-
-  // Validate the generic parameters for the last time, to splat down
-  // actual archetypes.
-  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    tc.revertGenericParamList(gpList);
-  });
-  GenericTypeToArchetypeResolver archetypeResolver(env);
-  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    tc.checkGenericParamList(nullptr, gpList, nullptr, &archetypeResolver);
-  });
 
   Type extContextType =
     env->mapTypeIntoContext(extInterfaceType);

@@ -17,10 +17,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
-#include "GenericTypeResolver.h"
-#include "TypeChecker.h"
-#include "TypoCorrection.h"
 #include "MiscDiagnostics.h"
+#include "TypeChecker.h"
+#include "TypeCheckType.h"
+#include "TypoCorrection.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
@@ -1035,7 +1035,8 @@ namespace {
 
       if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
         if (!PlaceholderE->getTypeLoc().isNull()) {
-          if (!TC.validateType(PlaceholderE->getTypeLoc(), DC))
+          if (!TC.validateType(PlaceholderE->getTypeLoc(),
+                               TypeResolution::forContextual(DC)))
             expr->setType(PlaceholderE->getTypeLoc().getType());
         }
         return finish(true, expr);
@@ -1248,9 +1249,8 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   bool hadParameterError = false;
 
-  GenericTypeToArchetypeResolver resolver(closure);
-
-  if (TC.typeCheckParameterList(PL, DC, options, resolver)) {
+  auto resolution = TypeResolution::forContextual(closure);
+  if (TC.typeCheckParameterList(PL, resolution, options)) {
     // If we encounter an error validating the parameter list, don't bail.
     // Instead, go on to validate any potential result type, and bail
     // afterwards.  This allows for better diagnostics, and keeps the
@@ -1260,8 +1260,8 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
-      TC.validateType(closure->getExplicitResultTypeLoc(), DC,
-                      TypeResolverContext::InExpression, &resolver)) {
+      TC.validateType(closure->getExplicitResultTypeLoc(), resolution,
+                      TypeResolverContext::InExpression)) {
     return false;
   }
 
@@ -1346,7 +1346,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     options |= TypeResolutionFlags::AllowUnavailable;
-    auto BaseTy = TC.resolveType(InnerTypeRepr, DC, options);
+    auto resolution = TypeResolution::forContextual(DC);
+    auto BaseTy = TC.resolveType(InnerTypeRepr, resolution, options);
 
     if (BaseTy && BaseTy->mayHaveMembers()) {
       auto lookupOptions = defaultMemberLookupOptions;
@@ -1862,7 +1863,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   } else if (auto *rep = typeExpr->getTypeRepr()) {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-    type = TC.resolveType(rep, DC, options);
+    auto resolution = TypeResolution::forContextual(DC);
+    type = TC.resolveType(rep, resolution, options);
     typeExpr->getTypeLoc().setType(type);
   }
 
@@ -2426,8 +2428,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       return true;
 
     // Apply the solution to the pattern as well.
-    if (coercePatternToType(pattern, DC, initTy, options,
-                            nullptr, TypeLoc())) {
+    if (coercePatternToType(pattern, TypeResolution::forContextual(DC), initTy,
+                            options, TypeLoc())) {
       return true;
     }
   }
@@ -2644,7 +2646,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       Pattern *pattern = Stmt->getPattern();
       TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
       options |= TypeResolutionFlags::OverrideType;
-      if (tc.coercePatternToType(pattern, cs.DC, InitType, options)) {
+      if (tc.coercePatternToType(pattern, TypeResolution::forContextual(cs.DC),
+                                 InitType, options)) {
         return nullptr;
       }
 

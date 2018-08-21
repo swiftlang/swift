@@ -19,6 +19,7 @@
 #include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
+#include "TypeCheckType.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
@@ -1847,7 +1848,8 @@ static void maybeAddAccessorsToBehaviorStorage(TypeChecker &TC, VarDecl *var) {
   };
 
   // Try to resolve the behavior to a protocol.
-  auto behaviorType = TC.resolveType(behavior->ProtocolName, dc, None);
+  auto behaviorType = TC.resolveType(behavior->ProtocolName,
+                                     TypeResolution::forContextual(dc), None);
   if (!behaviorType) {
     return makeBehaviorAccessors();
   }
