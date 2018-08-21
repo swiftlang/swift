@@ -117,7 +117,6 @@ public:
 
   void visitAddressTupleType(CanTupleType tupleFormalType, ManagedValue tuple) {
     bool isPlusOne = tuple.isPlusOne(SGF);
-    bool isAddressOnly = tuple.getType().isAddressOnly(SGF.SGM.M);
 
     for (unsigned i : indices(tupleFormalType->getElements())) {
       CanType eltFormalType = tupleFormalType.getElementType(i);

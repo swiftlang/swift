@@ -363,7 +363,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
 }
 
 /// Check whether the given declaration occurs within a constrained
-/// extension, or an extension of a class with generic ancestry, or an
+/// extension, or an extension of a generic class, or an
 /// extension of an Objective-C runtime visible class, and
 /// therefore is not representable in Objective-C.
 static bool checkObjCInExtensionContext(const ValueDecl *value,
@@ -378,15 +378,12 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
       return true;
     }
 
-    // Check if any Swift classes in the inheritance hierarchy have generic
-    // parameters.
-    // FIXME: This is a current limitation, not inherent. We don't have
-    // a concrete class to attach Objective-C category metadata to.
     if (auto classDecl = ED->getSelfClassDecl()) {
-      if (auto generic = classDecl->getGenericAncestor()) {
-        if (!generic->usesObjCGenericsModel()) {
+      if (classDecl->isGenericContext()) {
+        if (!classDecl->usesObjCGenericsModel()) {
           if (diagnose) {
-            value->diagnose(diag::objc_in_generic_extension);
+            value->diagnose(diag::objc_in_generic_extension,
+                            classDecl->isGeneric());
           }
           return true;
         }

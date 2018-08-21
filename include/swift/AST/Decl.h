@@ -3625,23 +3625,6 @@ public:
   /// might have implicitly @objc members, but will never itself be @objc.
   ObjCClassKind checkObjCAncestry() const;
 
-  /// \brief Whether this class or its superclasses has some form of generic
-  /// context.
-  ///
-  /// For example, given
-  ///
-  /// class A<X> {}
-  /// class B : A<Int> {}
-  /// struct C<T> {
-  ///   struct Inner {}
-  /// }
-  /// class D {}
-  /// class E: D {}
-  ///
-  /// Calling hasGenericAncestry() on `B` returns `A<Int>`, on `C<T>.Inner`
-  /// returns `C<T>.Inner`, but on `E` it returns null.
-  ClassDecl *getGenericAncestor() const;
-
   /// The type of metaclass to use for a class.
   enum class MetaclassKind : uint8_t {
     ObjC,
