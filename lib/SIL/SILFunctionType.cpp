@@ -2194,9 +2194,15 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
 
   // SWIFT_ENABLE_TENSORFLOW
   if (c.hasClosureExpr()) {
+    // If closure was initialized with a TensorFlow convention, Sema would have
+    // propagated that to the closure expr. Return the tensorflow representation
+    // in that case. Note that this is analogous to the Func case below.
     if (auto *closureType =
-        c.getClosureExpr()->getType()->castTo<AnyFunctionType>()) {
-      return closureType->getExtInfo().getSILRepresentation();
+            c.getClosureExpr()->getType()->castTo<AnyFunctionType>()) {
+      if (closureType->getExtInfo().getSILRepresentation() ==
+          SILFunctionTypeRepresentation::TensorFlow) {
+        return SILFunctionTypeRepresentation::TensorFlow;
+      }
     }
   }
 

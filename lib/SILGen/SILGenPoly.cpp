@@ -3097,15 +3097,6 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
     fn = SGF.B.createConvertFunction(Loc, fn, resTy);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  if (newFnType != expectedFnType &&
-      (fnType->getRepresentation() == SILFunctionTypeRepresentation::Thin &&
-       expectedFnType->getRepresentation() ==
-           SILFunctionTypeRepresentation::TensorFlow)) {
-    SILType resTy = SILType::getPrimitiveObjectType(expectedFnType);
-    fn = SGF.B.createConvertFunction(Loc, fn, resTy);
-  }
-
   // Now do thin-to-thick if necessary.
   if (newFnType != expectedFnType &&
       fnType->getRepresentation() == SILFunctionTypeRepresentation::Thin) {
