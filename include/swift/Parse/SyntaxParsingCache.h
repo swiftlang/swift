@@ -90,10 +90,10 @@ public:
   getReusedRegions(const SourceFileSyntax &SyntaxTree) const;
 
 private:
-  llvm::Optional<Syntax> lookUpFrom(const Syntax &Node, size_t Position,
-                                    SyntaxKind Kind);
+  llvm::Optional<Syntax> lookUpFrom(const Syntax &Node, size_t NodeStart,
+                                    size_t Position, SyntaxKind Kind);
 
-  bool nodeCanBeReused(const Syntax &Node, size_t Position,
+  bool nodeCanBeReused(const Syntax &Node, size_t Position, size_t NodeStart,
                        SyntaxKind Kind) const;
 };
 

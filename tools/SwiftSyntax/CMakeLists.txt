@@ -4,6 +4,7 @@ add_swift_library(swiftSwiftSyntax SHARED
   SwiftSyntax.swift
   AbsolutePosition.swift
   AtomicCache.swift
+  ByteTreeDeserialization.swift
   Diagnostic.swift
   DiagnosticConsumer.swift
   DiagnosticEngine.swift
@@ -11,11 +12,13 @@ add_swift_library(swiftSwiftSyntax SHARED
   PrintingDiagnosticConsumer.swift
   RawSyntax.swift
   SourcePresence.swift
+  SourceLength.swift
   SwiftcInvocation.swift
   Syntax.swift
   SyntaxData.swift
   SyntaxChildren.swift
   SyntaxCollections.swift.gyb
+  SyntaxClassifier.swift.gyb
   SyntaxBuilders.swift.gyb
   SyntaxFactory.swift.gyb
   SyntaxKind.swift.gyb
@@ -28,8 +31,3 @@ add_swift_library(swiftSwiftSyntax SHARED
   INSTALL_IN_COMPONENT swift-syntax
   TARGET_SDKS OSX
   IS_STDLIB)
-
-add_custom_target(swiftSwiftSyntax
-    DEPENDS swiftSwiftSyntax-macosx
-      swiftSwiftSyntax-macosx-x86_64
-      swiftSwiftSyntax-swiftmodule-macosx-x86_64)

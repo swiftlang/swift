@@ -2022,7 +2022,7 @@ function(_add_swift_executable_single name)
   cmake_parse_arguments(SWIFTEXE_SINGLE
     "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
     "SDK;ARCHITECTURE"
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;LINK_FAT_LIBRARIES"
+    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;LINK_FAT_LIBRARIES;COMPILE_FLAGS"
     ${ARGN})
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
@@ -2096,6 +2096,7 @@ function(_add_swift_executable_single name)
       MODULE_NAME ${name}
       SDK ${SWIFTEXE_SINGLE_SDK}
       ARCHITECTURE ${SWIFTEXE_SINGLE_ARCHITECTURE}
+      COMPILE_FLAGS ${SWIFTEXE_SINGLE_COMPILE_FLAGS}
       IS_MAIN)
   add_swift_source_group("${SWIFTEXE_SINGLE_EXTERNAL_SOURCES}")
 
@@ -2260,7 +2261,7 @@ function(add_swift_executable name)
   cmake_parse_arguments(SWIFTEXE
     "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
     ""
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES"
+    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;COMPILE_FLAGS"
     ${ARGN})
 
   translate_flag(${SWIFTEXE_EXCLUDE_FROM_ALL}
@@ -2283,6 +2284,7 @@ function(add_swift_executable name)
       LINK_LIBRARIES ${SWIFTEXE_LINK_LIBRARIES}
       SDK ${SWIFT_HOST_VARIANT_SDK}
       ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
+      COMPILE_FLAGS ${SWIFTEXE_COMPILE_FLAGS}
       ${SWIFTEXE_EXCLUDE_FROM_ALL_FLAG}
       ${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
       ${SWIFTEXE_DISABLE_ASLR_FLAG})
@@ -2301,11 +2303,16 @@ function(add_swift_host_tool executable)
       ADDSWIFTHOSTTOOL # prefix
       "" # options
       "" # single-value args
-      "SWIFT_COMPONENT" # multi-value args
+      "SWIFT_COMPONENT;COMPILE_FLAGS;DEPENDS" # multi-value args
       ${ARGN})
 
   # Create the executable rule.
-  add_swift_executable(${executable} ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS})
+  add_swift_executable(
+    ${executable} 
+    ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS}
+    DEPENDS ${ADDSWIFTHOSTTOOL_DEPENDS}
+    COMPILE_FLAGS ${ADDSWIFTHOSTTOOL_COMPILE_FLAGS}
+  )
 
   # And then create the install rule if we are asked to.
   if (ADDSWIFTHOSTTOOL_SWIFT_COMPONENT)

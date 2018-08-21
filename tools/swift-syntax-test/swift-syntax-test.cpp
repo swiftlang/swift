@@ -148,6 +148,12 @@ OmitNodeIds("omit-node-ids",
             llvm::cl::desc("If specified, the serialized syntax tree will not "
                            "include the IDs of the serialized nodes."));
 
+static llvm::cl::opt<bool>
+IncrementalSerialization("incremental-serialization",
+                         llvm::cl::desc("If specified, the serialized syntax "
+                                        "tree will omit nodes that have not "
+                                        "changed since the last parse."));
+
 static llvm::cl::opt<std::string>
 OutputFilename("output-filename",
                llvm::cl::desc("Path to the output file"));
@@ -531,8 +537,10 @@ bool verifyReusedRegions(ByteBasedSourceRangeSet ExpectedReparseRegions,
 
 /// Parse the given input file (incrementally if an old syntax tree was
 /// provided) and call the action specific callback with the new syntax tree
-int parseFile(const char *MainExecutablePath, const StringRef InputFileName,
-              llvm::function_ref<int(SourceFile *)> ActionSpecificCallback) {
+int parseFile(
+    const char *MainExecutablePath, const StringRef InputFileName,
+    llvm::function_ref<int(SourceFile *, SyntaxParsingCache *SyntaxCache)>
+        ActionSpecificCallback) {
   // The cache needs to be a heap allocated pointer since we construct it inside
   // an if block but need to keep it alive until the end of the function.
   SyntaxParsingCache *SyntaxCache = nullptr;
@@ -626,7 +634,7 @@ int parseFile(const char *MainExecutablePath, const StringRef InputFileName,
     }
   }
 
-  int ActionSpecificExitCode = ActionSpecificCallback(SF);
+  int ActionSpecificExitCode = ActionSpecificCallback(SF, SyntaxCache);
   if (ActionSpecificExitCode != EXIT_SUCCESS) {
     return ActionSpecificExitCode;
   } else {
@@ -680,7 +688,8 @@ int doDumpRawTokenSyntax(const StringRef InputFile) {
 
 int doFullParseRoundTrip(const char *MainExecutablePath,
                          const StringRef InputFile) {
-  return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) -> int {
+  return parseFile(MainExecutablePath, InputFile,
+    [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) -> int {
     SF->getSyntaxRoot().print(llvm::outs(), {});
     return EXIT_SUCCESS;
   });
@@ -688,9 +697,17 @@ int doFullParseRoundTrip(const char *MainExecutablePath,
 
 int doSerializeRawTree(const char *MainExecutablePath,
                        const StringRef InputFile) {
-  return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) -> int {
-    auto SerializeTree = [](llvm::raw_ostream &os, RC<RawSyntax> Root) {
+  return parseFile(MainExecutablePath, InputFile,
+    [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) -> int {
+    auto SerializeTree = [](llvm::raw_ostream &os, RC<RawSyntax> Root,
+                            SyntaxParsingCache *SyntaxCache) {
+      std::unordered_set<unsigned> ReusedNodeIds = {};
+      if (options::IncrementalSerialization && SyntaxCache) {
+        ReusedNodeIds = SyntaxCache->getReusedNodeIds();
+      }
+
       swift::json::Output::UserInfoMap JsonUserInfo;
+      JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
       if (options::OmitNodeIds) {
         JsonUserInfo[swift::json::DontSerializeNodeIdsUserInfoKey] =
             (void *)true;
@@ -708,9 +725,9 @@ int doSerializeRawTree(const char *MainExecutablePath,
                               llvm::sys::fs::F_None);
       assert(!errorCode && "Couldn't open output file");
 
-      SerializeTree(os, Root);
+      SerializeTree(os, Root, SyntaxCache);
     } else {
-      SerializeTree(llvm::outs(), Root);
+      SerializeTree(llvm::outs(), Root, SyntaxCache);
     }
     return EXIT_SUCCESS;
   });
@@ -731,13 +748,15 @@ int doDeserializeRawTree(const char *MainExecutablePath,
 }
 
 int doParseOnly(const char *MainExecutablePath, const StringRef InputFile) {
-  return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) {
+  return parseFile(MainExecutablePath, InputFile,
+    [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) {
     return SF ? EXIT_SUCCESS : EXIT_FAILURE;
   });
 }
 
 int dumpParserGen(const char *MainExecutablePath, const StringRef InputFile) {
-  return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) {
+  return parseFile(MainExecutablePath, InputFile,
+    [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) {
     SyntaxPrintOptions Opts;
     Opts.PrintSyntaxKind = options::PrintNodeKind;
     Opts.Visual = options::Visual;
@@ -749,7 +768,8 @@ int dumpParserGen(const char *MainExecutablePath, const StringRef InputFile) {
 
 int dumpEOFSourceLoc(const char *MainExecutablePath,
                      const StringRef InputFile) {
-  return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) -> int {
+  return parseFile(MainExecutablePath, InputFile,
+    [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) -> int {
     auto BufferId = *SF->getBufferID();
     auto Root = SF->getSyntaxRoot();
     auto AbPos = Root.getEOFToken().getAbsolutePosition();
@@ -815,7 +835,7 @@ int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Syntax Test\n");
 
   int ExitCode = EXIT_SUCCESS;
-
+  
   if (options::InputSourceFilename.empty() &&
       options::InputSourceDirectory.empty()) {
     llvm::errs() << "input source file is required\n";

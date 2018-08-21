@@ -18,6 +18,15 @@ import Foundation
 /// exposed to clients.
 typealias NodeIdentifier = [Int]
 
+/// Box a value type into a reference type
+fileprivate class Box<T> {
+  let value: T
+
+  init(_ value: T) {
+    self.value = value
+  }
+}
+
 /// SyntaxData is the underlying storage for each Syntax node.
 /// It's modelled as an array that stores and caches a SyntaxData for each raw
 /// syntax node in its layout. It is up to the specific Syntax nodes to maintain
@@ -38,13 +47,12 @@ final class SyntaxData: Equatable {
 
   let childCaches: [AtomicCache<SyntaxData>]
 
-  let positionCache: AtomicCache<AbsolutePosition>
+  private let positionCache: AtomicCache<Box<AbsolutePosition>>
 
-  fileprivate func calculatePosition(_ initPos: AbsolutePosition) ->
-      AbsolutePosition {
+  fileprivate func calculatePosition() -> AbsolutePosition {
     guard let parent = parent else {
       // If this node is SourceFileSyntax, its location is the start of the file.
-      return initPos
+      return AbsolutePosition.startOfFile
     }
 
     // If the node is the first child of its parent, the location is same with
@@ -55,44 +63,30 @@ final class SyntaxData: Equatable {
     // adding the stride of the sibling.
     for idx in (0..<indexInParent).reversed() {
       if let sibling = parent.cachedChild(at: idx) {
-        let pos = sibling.position.copy()
-        sibling.raw.accumulateAbsolutePosition(pos)
-        return pos
+        return sibling.position + sibling.raw.totalLength
       }
     }
     return parent.position
   }
 
+  /// The position of the start of this node's leading trivia
   var position: AbsolutePosition {
-    return positionCache.value { return calculatePosition(AbsolutePosition()) }
+    return positionCache.value({ return Box(calculatePosition()) }).value
   }
 
+  /// The position of the start of this node's content, skipping its trivia
   var positionAfterSkippingLeadingTrivia: AbsolutePosition {
-    let result = position.copy()
-    _ = raw.accumulateLeadingTrivia(result)
-    return result
+    return position + raw.leadingTriviaLength
   }
 
-  fileprivate func getNextSiblingPos() -> AbsolutePosition {
-    // If this node is root, the position of the next sibling is the end of
-    // this node.
-    guard let parent = parent else {
-      let result = self.position.copy()
-      raw.accumulateAbsolutePosition(result)
-      return result
-    }
-
-    // Find the first valid sibling and return its position.
-    for i in indexInParent+1..<parent.raw.layout.count {
-      guard let sibling = parent.cachedChild(at: i) else { continue }
-      return sibling.position
-    }
-    // Otherwise, use the parent's sibling instead.
-    return parent.getNextSiblingPos()
+  /// The end position of this node's content, excluding its trivia
+  var endPosition: AbsolutePosition {
+    return positionAfterSkippingLeadingTrivia + raw.contentLength
   }
 
-  var byteSize: Int {
-    return getNextSiblingPos().utf8Offset - self.position.utf8Offset
+  /// The end position of this node's trivia
+  var endPositionAfterTrailingTrivia: AbsolutePosition {
+    return endPosition + raw.trailingTriviaLength
   }
 
   /// Creates a SyntaxData with the provided raw syntax, pointing to the
@@ -108,7 +102,7 @@ final class SyntaxData: Equatable {
     self.indexInParent = indexInParent
     self.parent = parent
     self.childCaches = raw.layout.map { _ in AtomicCache<SyntaxData>() }
-    self.positionCache = AtomicCache<AbsolutePosition>()
+    self.positionCache = AtomicCache<Box<AbsolutePosition>>()
   }
 
   /// The index path from this node to the root. This can be used to uniquely
