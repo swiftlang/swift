@@ -403,8 +403,7 @@ func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
 // CHECK:      [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*T
 // CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!materializeForSet.1
 // CHECK:      [[RESULT:%.*]] = apply [[WITNESS_FN]]<T>
-// CHECK:      [[TEMPORARY:%.*]] = tuple_extract [[RESULT]]
-// CHECK:      [[CALLBACK:%.*]] = tuple_extract [[RESULT]]
+// CHECK:      ([[TEMPORARY:%.*]], [[CALLBACK:%.*]]) = destructure_tuple [[RESULT]]
 // CHECK:      [[TEMPORARY_ADDR_TMP:%.*]] = pointer_to_address [[TEMPORARY]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:      [[TEMPORARY_ADDR:%.*]] = mark_dependence [[TEMPORARY_ADDR_TMP]] : $*Int on [[WRITE]] : $*T
 // CHECK:      [[TEMPORARY_ACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMPORARY_ADDR]] : $*Int
