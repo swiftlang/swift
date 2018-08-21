@@ -1259,7 +1259,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (SyntaxContext->isEnabled()) {
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
-            SyntaxFactory::makeBlankFunctionCallArgumentList());
+            SyntaxFactory::makeBlankFunctionCallArgumentList(
+                &SyntaxContext->getArena()));
       }
 
       ParserResult<Expr> closure =
@@ -1547,10 +1548,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                      : VarDecl::Specifier::Var;
       auto pattern = createBindingFromPattern(loc, name, specifier);
       if (SyntaxContext->isEnabled()) {
-        PatternSyntax PatternNode =
-            SyntaxFactory::makeIdentifierPattern(SyntaxContext->popToken());
-        ExprSyntax ExprNode =
-            SyntaxFactory::makeUnresolvedPatternExpr(PatternNode);
+        PatternSyntax PatternNode = SyntaxFactory::makeIdentifierPattern(
+            SyntaxContext->popToken(), &SyntaxContext->getArena());
+        ExprSyntax ExprNode = SyntaxFactory::makeUnresolvedPatternExpr(
+            PatternNode, &SyntaxContext->getArena());
         SyntaxContext->addSyntax(ExprNode);
       }
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
@@ -1658,7 +1659,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       if (SyntaxContext->isEnabled()) {
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
-            SyntaxFactory::makeBlankFunctionCallArgumentList());
+            SyntaxFactory::makeBlankFunctionCallArgumentList(
+                &SyntaxContext->getArena()));
       }
 
       ParserResult<Expr> closure =
@@ -2028,7 +2030,8 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     SyntaxParsingContext ArgsCtxt(SyntaxContext, SyntaxKind::DeclNameArguments);
     consumeToken(tok::l_paren);
     if (SyntaxContext->isEnabled())
-      SyntaxContext->addSyntax(SyntaxFactory::makeBlankDeclNameArgumentList());
+      SyntaxContext->addSyntax(SyntaxFactory::makeBlankDeclNameArgumentList(
+          &SyntaxContext->getArena()));
     consumeToken(tok::r_paren);
     loc = DeclNameLoc(baseNameLoc);
     SmallVector<Identifier, 2> argumentLabels;
