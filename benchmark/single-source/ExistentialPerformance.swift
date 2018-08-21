@@ -13,6 +13,7 @@
 import TestsUtils
 
 public let ExistentialPerformance = [
+  BenchmarkInfo(name: "DistinctClassFieldAccesses", runFunction: run_DistinctClassFieldAccesses, tags: [.unstable, .api, .Array]),
   BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer1", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
   BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer2", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
   BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer3", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
@@ -113,6 +114,43 @@ public let ExistentialPerformance = [
   BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer3", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer3, tags: [.unstable]),
   BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer4", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer4, tags: [.unstable]),
 ]
+
+class ClassWithArrs {
+    var N: Int = 0
+    var A: [Int]
+    var B: [Int]
+
+    init(N: Int) {
+        self.N = N
+
+        A = [Int](repeating: 0, count: N)
+        B = [Int](repeating: 0, count: N)
+    }
+
+    func readArr() {
+        for i in 0..<self.N {
+            for j in 0..<i {
+				let _ = A[j]
+				let _ = B[j]
+			}
+        }
+    }
+
+    func writeArr() {
+		for i in 0..<self.N {
+			A[i] = i
+			B[i] = i
+		}
+    }
+}
+
+public func run_DistinctClassFieldAccesses(_ N: Int) {
+    let workload = ClassWithArrs(N: 100)
+    for _ in 1...N {
+        workload.writeArr()
+        workload.readArr()
+    }
+}
 
 protocol Existential {
   init()
