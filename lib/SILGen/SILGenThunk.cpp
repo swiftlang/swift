@@ -110,8 +110,9 @@ static ManagedValue getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc,
   if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
     if (getMethodDispatch(func) == MethodDispatch::Class) {
       // Use the dynamic thunk if dynamic.
-      if (vd->isDynamic())
+      if (vd->isObjCDynamic()) {
         return SGF.emitDynamicMethodRef(loc, next, constantInfo.SILFnType);
+      }
 
       auto methodTy = SGF.SGM.Types.getConstantOverrideType(next);
       SILValue result =

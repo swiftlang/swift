@@ -3076,9 +3076,28 @@ public:
           Out << "Property and accessor do not match for 'final'\n";
           abort();
         }
-        if (FD->isDynamic() != storageDecl->isDynamic()) {
+        if (FD->isDynamic() != storageDecl->isDynamic() &&
+            // We allow a non dynamic setter if there is a dynamic modify,
+            // observer, or mutable addressor.
+            !(FD->isSetter() &&
+              (storageDecl->getWriteImpl() == WriteImplKind::Modify ||
+               storageDecl->getWriteImpl() ==
+                   WriteImplKind::StoredWithObservers ||
+               storageDecl->getWriteImpl() == WriteImplKind::MutableAddress) &&
+              storageDecl->isDynamic() && !storageDecl->isObjC()) &&
+            // We allow a non dynamic getter if there is a dynamic read.
+            !(FD->isGetter() &&
+              (storageDecl->getReadImpl() == ReadImplKind::Read ||
+               storageDecl->getReadImpl() == ReadImplKind::Address) &&
+              storageDecl->isDynamic() && !storageDecl->isObjC())) {
           Out << "Property and accessor do not match for 'dynamic'\n";
           abort();
+        }
+        if (FD->isDynamic()) {
+          if (FD->isObjC() != storageDecl->isObjC()) {
+            Out << "Property and accessor do not match for '@objc'\n";
+            abort();
+          }
         }
       }
 

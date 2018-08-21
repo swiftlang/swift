@@ -3586,7 +3586,7 @@ static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness) {
     return WitnessDispatchKind::Static;
 
   // If the witness is dynamic, go through dynamic dispatch.
-  if (decl->isDynamic()) {
+  if (decl->isObjCDynamic()) {
     // For initializers we still emit a static allocating thunk around
     // the dynamic initializing entry point.
     if (witness.kind == SILDeclRef::Kind::Allocator)

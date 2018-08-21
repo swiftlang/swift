@@ -1419,6 +1419,7 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
   if (storage->isDynamic())
     return true;
 
+
   // Imported declarations behave like they are dynamic, even if they're
   // not marked as such explicitly.
   if (storage->isObjC() && storage->hasClangNode())
@@ -1535,14 +1536,25 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
 }
 
 static AccessStrategy
+getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch);
+static AccessStrategy
+getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch);
+
+static AccessStrategy
 getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
   switch (storage->getReadWriteImpl()) {
   case ReadWriteImplKind::Immutable:
     assert(isa<VarDecl>(storage) && cast<VarDecl>(storage)->isLet() &&
            "mutation of a immutable variable that isn't a let");
     return AccessStrategy::getStorage();
-  case ReadWriteImplKind::Stored:
+  case ReadWriteImplKind::Stored: {
+    // If the storage isDynamic (and not @objc) use the accessors.
+    if (storage->isDynamic() && !storage->isObjC())
+      return AccessStrategy::getMaterializeToTemporary(
+          getOpaqueReadAccessStrategy(storage, false),
+          getOpaqueWriteAccessStrategy(storage, false));
     return AccessStrategy::getStorage();
+  }
   case ReadWriteImplKind::MutableAddress:
     return AccessStrategy::getAccessor(AccessorKind::MutableAddress,
                                        /*dispatch*/ false);
@@ -1698,7 +1710,7 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   // Dynamic storage suppresses the modify coroutine.
   // If we add a Swift-native concept of `dynamic`, this should be restricted
   // to the ObjC-supported concept.
-  if (isDynamic())
+  if (isObjCDynamic())
     return false;
 
   // Requirements of ObjC protocols don't support the modify coroutine.
@@ -5293,7 +5305,7 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
 
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isDynamic() || decl->hasClangNode())
+  if (decl->isFinal() || decl->isObjCDynamic() || decl->hasClangNode())
     return false;
   
   // Initializers are not normally inherited, but required initializers can
@@ -5316,7 +5328,8 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   }
 
   auto base = decl->getOverriddenDecl();
-  if (!base || base->hasClangNode() || base->isDynamic())
+
+  if (!base || base->hasClangNode() || base->isObjCDynamic())
     return true;
   
   // As above, convenience initializers are not formally overridable in Swift

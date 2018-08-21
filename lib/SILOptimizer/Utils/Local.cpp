@@ -1561,8 +1561,9 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   if (!AFD->isChildContextOf(AssocDC))
     return false;
 
-  if (AFD->isDynamic())
+  if (AFD->isDynamic()) {
     return false;
+  }
 
   if (!AFD->hasAccess())
     return false;

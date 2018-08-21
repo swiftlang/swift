@@ -359,6 +359,11 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Members cannot be both dynamic and @nonobjc.
   if (D->getAttrs().hasAttribute<NonObjCAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_nonobjc);
+
+  // Members cannot be both dynamic and @_transparent.
+  if (D->getASTContext().LangOpts.isSwiftVersionAtLeast(5) &&
+      D->getAttrs().hasAttribute<TransparentAttr>())
+    diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
 }
 
 

@@ -354,6 +354,10 @@ def disable_swift3_objc_inference :
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 4 behavior)">;
 
+def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Add 'dynamic' to all declarations">;
+
 def enable_nskeyedarchiver_diagnostics :
   Flag<["-"], "enable-nskeyedarchiver-diagnostics">,
   HelpText<"Diagnose classes with unstable mangled names adopting NSCoding">;

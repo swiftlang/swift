@@ -1557,7 +1557,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   if (auto *baseDecl = dyn_cast<ClassDecl>(base->getDeclContext())) {
     if (!isAccessor &&
         baseDecl->hasKnownSwiftImplementation() &&
-        !base->isDynamic() &&
+        !base->isObjCDynamic() &&
         override->getDeclContext()->isExtensionContext()) {
       // For compatibility, only generate a warning in Swift 3
       diags.diagnose(override, diag::override_class_declaration_in_extension);

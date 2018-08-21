@@ -312,7 +312,7 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
 // to 'get' and 'set', rather than the normal dynamically dispatched
 // opaque accessors that peer dispatch to 'get' and 'set'.
 static bool needsDynamicCoroutineAccessors(AbstractStorageDecl *storage) {
-  return storage->isDynamic() || storage->hasClangNode();
+  return storage->isObjCDynamic() || storage->hasClangNode();
 }
 
 /// Mark the accessor as transparent if we can.
