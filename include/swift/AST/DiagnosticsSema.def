@@ -499,8 +499,6 @@ ERROR(expr_swift_keypath_invalid_component,none,
       "invalid component of Swift key path", ())
 ERROR(expr_swift_keypath_not_starting_with_type,none,
       "a Swift key path must begin with a type", ())
-ERROR(expr_swift_keypath_unimplemented_component,none,
-      "key path support for %0 components is not implemented", (StringRef))
 ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
       "key path value type %0 cannot be converted to contextual type %1",
       (Type, Type))
