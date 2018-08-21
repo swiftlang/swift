@@ -9,6 +9,7 @@ silopt_register_sources(
   CSE.cpp
   ConditionForwarding.cpp
   CopyForwarding.cpp
+  CopyPropagation.cpp
   DeadCodeElimination.cpp
   DeadObjectElimination.cpp
   DeadStoreElimination.cpp
