@@ -1,19 +1,50 @@
-
-/* Generic Signature Changes */
-
-/* RawRepresentable Changes */
-
-/* Removed Decls */
 TypeAlias AbsoluteValuable has been removed
+TypeAlias AnyBidirectionalCollection.Element has been removed
+TypeAlias AnyCollection.Element has been removed
+TypeAlias AnyIterator.Element has been removed
+TypeAlias AnyRandomAccessCollection.Element has been removed
+TypeAlias AnySequence.Element has been removed
+TypeAlias Array.Element has been removed
+TypeAlias ArraySlice.Element has been removed
+TypeAlias AutoreleasingUnsafeMutablePointer.Pointee has been removed
 TypeAlias BitwiseOperations has been removed (deprecated)
+TypeAlias ClosedRange.Bound has been removed
+TypeAlias CollectionOfOne.Element has been removed
+TypeAlias ContiguousArray.Element has been removed
+TypeAlias Dictionary.Key has been removed
+TypeAlias Dictionary.Value has been removed
+TypeAlias DictionaryLiteral.Key has been removed
+TypeAlias DictionaryLiteral.Value has been removed
+TypeAlias EmptyCollection.Element has been removed
 TypeAlias IntMax has been removed
 TypeAlias Integer has been removed
 TypeAlias IntegerArithmetic has been removed
+TypeAlias LazyMapCollection.Element has been removed
+TypeAlias LazyMapSequence.Element has been removed
+TypeAlias LazySequence.Base has been removed
+TypeAlias PartialRangeFrom.Bound has been removed
+TypeAlias PartialRangeThrough.Bound has been removed
+TypeAlias PartialRangeUpTo.Bound has been removed
+TypeAlias Range.Bound has been removed
+TypeAlias Repeated.Element has been removed
+TypeAlias Set.Element has been removed
 TypeAlias SignedNumber has been removed
+TypeAlias StrideThrough.Element has been removed
+TypeAlias StrideThroughIterator.Element has been removed
+TypeAlias StrideTo.Element has been removed
+TypeAlias StrideToIterator.Element has been removed
 TypeAlias StringProtocol.UTF16Index has been removed (deprecated)
 TypeAlias StringProtocol.UTF8Index has been removed (deprecated)
 TypeAlias StringProtocol.UnicodeScalarIndex has been removed (deprecated)
 TypeAlias UIntMax has been removed
+TypeAlias UnfoldSequence.Element has been removed
+TypeAlias UnsafeBufferPointer.Element has been removed
+TypeAlias UnsafeMutableBufferPointer.Element has been removed
+TypeAlias UnsafeMutablePointer.Pointee has been removed
+TypeAlias UnsafePointer.Pointee has been removed
+Var BidirectionalCollection.endIndex has been removed
+Var BidirectionalCollection.indices has been removed
+Var BidirectionalCollection.startIndex has been removed
 Var FixedWidthInteger.allZeros has been removed (deprecated)
 Constructor Int.init(truncatingBitPattern:) has been removed
 Constructor Int16.init(truncatingBitPattern:) has been removed
@@ -64,20 +95,12 @@ Func UInt32.toIntMax() has been removed
 Func UInt64.toIntMax() has been removed
 Func UInt8.toIntMax() has been removed
 Func UnsignedInteger.toUIntMax() has been removed
-
-/* Moved Decls */
-
-/* Renamed Decls */
 Func Dictionary.filter(_:obsoletedInSwift4:) has been renamed to Func Dictionary.filter(_:)
 Func Set.filter(_:obsoletedInSwift4:) has been renamed to Func Set.filter(_:)
-
-/* Type Changes */
 Var Dictionary.keys has declared type change from LazyMapCollection<[Key : Value], Key> to Dictionary<Key, Value>.Keys
 Var Dictionary.values has declared type change from LazyMapCollection<[Key : Value], Value> to Dictionary<Key, Value>.Values
 Constructor String.init(_:) has return type change from String? to String
-Func Dictionary.filter(_:obsoletedInSwift4:) has return type change from [Dictionary<Key, Value>.Element] to [Dictionary<Key, Value>.Key : Dictionary<Key, Value>.Value]
+Func Dictionary.filter(_:obsoletedInSwift4:) has return type change from [Dictionary<Key, Value>.Element] to [Key : Value]
 Func Dictionary.makeIterator() has return type change from DictionaryIterator<Dictionary<Key, Value>.Key, Dictionary<Key, Value>.Value> to Dictionary<Key, Value>.Iterator
 Func Set.filter(_:obsoletedInSwift4:) has return type change from [Set<Element>.Element] to Set<Element>
 Func Set.makeIterator() has return type change from SetIterator<Element> to Set<Element>.Iterator
-
-/* Decl Attribute changes */

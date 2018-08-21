@@ -830,6 +830,23 @@
         },
         {
           "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:Sa7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
           "name": "SubSequence",
           "printedName": "SubSequence",
           "declKind": "TypeAlias",
@@ -882,13 +899,20 @@
             {
               "kind": "TypeNominal",
               "name": "Array",
-              "printedName": "[Element]",
+              "printedName": "[Array<Element>.Element]",
               "usr": "s:Sa",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Array<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -1001,9 +1025,16 @@
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "Array<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -1138,9 +1169,16 @@
               "printedName": "()"
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "Array<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -1187,9 +1225,16 @@
           ],
           "children": [
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "Array<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -1219,9 +1264,16 @@
               "printedName": "()"
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "Array<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -1387,7 +1439,7 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(UnsafeBufferPointer<Element>) throws -> R",
+              "printedName": "(UnsafeBufferPointer<Array<Element>.Element>) throws -> R",
               "typeAttributes": [
                 "noescape"
               ],
@@ -1400,19 +1452,26 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(UnsafeBufferPointer<Element>)",
+                  "printedName": "(UnsafeBufferPointer<Array<Element>.Element>)",
                   "usr": "s:SR",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "UnsafeBufferPointer",
-                      "printedName": "UnsafeBufferPointer<Element>",
+                      "printedName": "UnsafeBufferPointer<Array<Element>.Element>",
                       "usr": "s:SR",
                       "children": [
                         {
-                          "kind": "TypeNominal",
-                          "name": "GenericTypeParam",
-                          "printedName": "Element"
+                          "kind": "TypeNameAlias",
+                          "name": "Element",
+                          "printedName": "Array<Element>.Element",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "GenericTypeParam",
+                              "printedName": "τ_0_0"
+                            }
+                          ]
                         }
                       ]
                     }
@@ -1447,7 +1506,7 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(inout UnsafeMutableBufferPointer<Element>) throws -> R",
+              "printedName": "(inout UnsafeMutableBufferPointer<Array<Element>.Element>) throws -> R",
               "typeAttributes": [
                 "noescape"
               ],
@@ -1460,12 +1519,12 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(inout UnsafeMutableBufferPointer<Element>)",
+                  "printedName": "(inout UnsafeMutableBufferPointer<Array<Element>.Element>)",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "InOut",
-                      "printedName": "inout UnsafeMutableBufferPointer<Element>"
+                      "printedName": "inout UnsafeMutableBufferPointer<Array<Element>.Element>"
                     }
                   ]
                 }
@@ -2145,6 +2204,23 @@
         },
         {
           "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s10ArraySliceV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
           "name": "SubSequence",
           "printedName": "SubSequence",
           "declKind": "TypeAlias",
@@ -2197,13 +2273,20 @@
             {
               "kind": "TypeNominal",
               "name": "Array",
-              "printedName": "[Element]",
+              "printedName": "[ArraySlice<Element>.Element]",
               "usr": "s:Sa",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "ArraySlice<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -2316,9 +2399,16 @@
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "ArraySlice<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -2453,9 +2543,16 @@
               "printedName": "()"
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "ArraySlice<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -2502,9 +2599,16 @@
           ],
           "children": [
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "ArraySlice<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -2534,9 +2638,16 @@
               "printedName": "()"
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "ArraySlice<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -2702,7 +2813,7 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(UnsafeBufferPointer<Element>) throws -> R",
+              "printedName": "(UnsafeBufferPointer<ArraySlice<Element>.Element>) throws -> R",
               "typeAttributes": [
                 "noescape"
               ],
@@ -2715,19 +2826,26 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(UnsafeBufferPointer<Element>)",
+                  "printedName": "(UnsafeBufferPointer<ArraySlice<Element>.Element>)",
                   "usr": "s:SR",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "UnsafeBufferPointer",
-                      "printedName": "UnsafeBufferPointer<Element>",
+                      "printedName": "UnsafeBufferPointer<ArraySlice<Element>.Element>",
                       "usr": "s:SR",
                       "children": [
                         {
-                          "kind": "TypeNominal",
-                          "name": "GenericTypeParam",
-                          "printedName": "Element"
+                          "kind": "TypeNameAlias",
+                          "name": "Element",
+                          "printedName": "ArraySlice<Element>.Element",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "GenericTypeParam",
+                              "printedName": "τ_0_0"
+                            }
+                          ]
                         }
                       ]
                     }
@@ -2762,7 +2880,7 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(inout UnsafeMutableBufferPointer<Element>) throws -> R",
+              "printedName": "(inout UnsafeMutableBufferPointer<ArraySlice<Element>.Element>) throws -> R",
               "typeAttributes": [
                 "noescape"
               ],
@@ -2775,12 +2893,12 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(inout UnsafeMutableBufferPointer<Element>)",
+                  "printedName": "(inout UnsafeMutableBufferPointer<ArraySlice<Element>.Element>)",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "InOut",
-                      "printedName": "inout UnsafeMutableBufferPointer<Element>"
+                      "printedName": "inout UnsafeMutableBufferPointer<ArraySlice<Element>.Element>"
                     }
                   ]
                 }
@@ -4193,8 +4311,8 @@
         "Equatable",
         "Hashable",
         "LosslessStringConvertible",
-        "Encodable",
         "Decodable",
+        "Encodable",
         "CustomReflectable",
         "_CustomPlaygroundQuickLookable",
         "CVarArg"
@@ -4835,6 +4953,23 @@
                   ]
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Pointee",
+          "printedName": "Pointee",
+          "declKind": "TypeAlias",
+          "usr": "s:SA7Pointeea",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Pointee>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Pointee"
             }
           ]
         },
@@ -23448,6 +23583,23 @@
         },
         {
           "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s15ContiguousArrayV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
           "name": "SubSequence",
           "printedName": "SubSequence",
           "declKind": "TypeAlias",
@@ -23500,13 +23652,20 @@
             {
               "kind": "TypeNominal",
               "name": "Array",
-              "printedName": "[Element]",
+              "printedName": "[ContiguousArray<Element>.Element]",
               "usr": "s:Sa",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "ContiguousArray<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -23619,9 +23778,16 @@
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "ContiguousArray<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -23756,9 +23922,16 @@
               "printedName": "()"
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "ContiguousArray<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -23805,9 +23978,16 @@
           ],
           "children": [
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "ContiguousArray<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -23837,9 +24017,16 @@
               "printedName": "()"
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "ContiguousArray<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -24005,7 +24192,7 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(UnsafeBufferPointer<Element>) throws -> R",
+              "printedName": "(UnsafeBufferPointer<ContiguousArray<Element>.Element>) throws -> R",
               "typeAttributes": [
                 "noescape"
               ],
@@ -24018,19 +24205,26 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(UnsafeBufferPointer<Element>)",
+                  "printedName": "(UnsafeBufferPointer<ContiguousArray<Element>.Element>)",
                   "usr": "s:SR",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "UnsafeBufferPointer",
-                      "printedName": "UnsafeBufferPointer<Element>",
+                      "printedName": "UnsafeBufferPointer<ContiguousArray<Element>.Element>",
                       "usr": "s:SR",
                       "children": [
                         {
-                          "kind": "TypeNominal",
-                          "name": "GenericTypeParam",
-                          "printedName": "Element"
+                          "kind": "TypeNameAlias",
+                          "name": "Element",
+                          "printedName": "ContiguousArray<Element>.Element",
+                          "children": [
+                            {
+                              "kind": "TypeNominal",
+                              "name": "GenericTypeParam",
+                              "printedName": "τ_0_0"
+                            }
+                          ]
                         }
                       ]
                     }
@@ -24065,7 +24259,7 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(inout UnsafeMutableBufferPointer<Element>) throws -> R",
+              "printedName": "(inout UnsafeMutableBufferPointer<ContiguousArray<Element>.Element>) throws -> R",
               "typeAttributes": [
                 "noescape"
               ],
@@ -24078,12 +24272,12 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(inout UnsafeMutableBufferPointer<Element>)",
+                  "printedName": "(inout UnsafeMutableBufferPointer<ContiguousArray<Element>.Element>)",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "InOut",
-                      "printedName": "inout UnsafeMutableBufferPointer<Element>"
+                      "printedName": "inout UnsafeMutableBufferPointer<ContiguousArray<Element>.Element>"
                     }
                   ]
                 }
@@ -24424,17 +24618,31 @@
             {
               "kind": "TypeNominal",
               "name": "Tuple",
-              "printedName": "(lower: Bound, upper: Bound)",
+              "printedName": "(lower: ClosedRange<Bound>.Bound, upper: ClosedRange<Bound>.Bound)",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "ClosedRange<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 },
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "ClosedRange<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -24530,6 +24738,23 @@
               "printedName": "Bool",
               "usr": "s:Sb"
             },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Bound"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Bound",
+          "printedName": "Bound",
+          "declKind": "TypeAlias",
+          "usr": "s:SN5Bounda",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Bound where Bound : Comparable>",
+          "children": [
             {
               "kind": "TypeNominal",
               "name": "GenericTypeParam",
@@ -25274,13 +25499,20 @@
             {
               "kind": "TypeNominal",
               "name": "Range",
-              "printedName": "Range<Bound>",
+              "printedName": "Range<ClosedRange<Bound>.Bound>",
               "usr": "s:Sn",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "ClosedRange<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -25308,13 +25540,20 @@
             {
               "kind": "TypeNominal",
               "name": "ClosedRange",
-              "printedName": "ClosedRange<Bound>",
+              "printedName": "ClosedRange<ClosedRange<Bound>.Bound>",
               "usr": "s:SN",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "ClosedRange<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -25342,13 +25581,20 @@
             {
               "kind": "TypeNominal",
               "name": "Range",
-              "printedName": "Range<Bound>",
+              "printedName": "Range<ClosedRange<Bound>.Bound>",
               "usr": "s:Sn",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "ClosedRange<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -25383,13 +25629,20 @@
             {
               "kind": "TypeNominal",
               "name": "ClosedRange",
-              "printedName": "ClosedRange<Bound>",
+              "printedName": "ClosedRange<ClosedRange<Bound>.Bound>",
               "usr": "s:SN",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "ClosedRange<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -26503,30 +26756,51 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Value, Value) throws -> Value",
+              "printedName": "(Dictionary<Key, Value>.Value, Dictionary<Key, Value>.Value) throws -> Dictionary<Key, Value>.Value",
               "typeAttributes": [
                 "noescape"
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "Tuple",
-                  "printedName": "(Value, Value)",
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "printedName": "τ_0_1"
+                    }
+                  ]
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Tuple",
+                  "printedName": "(Dictionary<Key, Value>.Value, Dictionary<Key, Value>.Value)",
+                  "children": [
+                    {
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -26575,15 +26849,22 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(S.Element) throws -> Key",
+              "printedName": "(S.Element) throws -> Dictionary<Key, Value>.Key",
               "typeAttributes": [
                 "noescape"
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Key"
+                  "kind": "TypeNameAlias",
+                  "name": "Key",
+                  "printedName": "Dictionary<Key, Value>.Key",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -26685,18 +26966,32 @@
             {
               "kind": "TypeNominal",
               "name": "DictionaryIterator",
-              "printedName": "DictionaryIterator<Key, Value>",
+              "printedName": "DictionaryIterator<Dictionary<Key, Value>.Key, Dictionary<Key, Value>.Value>",
               "usr": "s:s18DictionaryIteratorV",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Key"
+                  "kind": "TypeNameAlias",
+                  "name": "Key",
+                  "printedName": "Dictionary<Key, Value>.Key",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 },
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_1"
+                    }
+                  ]
                 }
               ]
             }
@@ -26834,9 +27129,16 @@
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Key"
+              "kind": "TypeNameAlias",
+              "name": "Key",
+              "printedName": "Dictionary<Key, Value>.Key",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -27082,6 +27384,40 @@
           ]
         },
         {
+          "kind": "TypeAlias",
+          "name": "Key",
+          "printedName": "Key",
+          "declKind": "TypeAlias",
+          "usr": "s:SD3Keya",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Key, Value where Key : Hashable>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Key"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Value",
+          "printedName": "Value",
+          "declKind": "TypeAlias",
+          "usr": "s:SD5Valuea",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Key, Value where Key : Hashable>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Value"
+            }
+          ]
+        },
+        {
           "kind": "Function",
           "name": "mapValues",
           "printedName": "mapValues(_:)",
@@ -27099,13 +27435,20 @@
             {
               "kind": "TypeNominal",
               "name": "Dictionary",
-              "printedName": "Dictionary<Key, T>",
+              "printedName": "Dictionary<Dictionary<Key, Value>.Key, T>",
               "usr": "s:SD",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Key"
+                  "kind": "TypeNameAlias",
+                  "name": "Key",
+                  "printedName": "Dictionary<Key, Value>.Key",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -27117,7 +27460,7 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Value) throws -> T",
+              "printedName": "(Dictionary<Key, Value>.Value) throws -> T",
               "typeAttributes": [
                 "noescape"
               ],
@@ -27130,12 +27473,19 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(Value)",
+                  "printedName": "(Dictionary<Key, Value>.Value)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -27161,13 +27511,20 @@
             {
               "kind": "TypeNominal",
               "name": "Dictionary",
-              "printedName": "Dictionary<Key, T>",
+              "printedName": "Dictionary<Dictionary<Key, Value>.Key, T>",
               "usr": "s:SD",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Key"
+                  "kind": "TypeNameAlias",
+                  "name": "Key",
+                  "printedName": "Dictionary<Key, Value>.Key",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 },
                 {
                   "kind": "TypeNominal",
@@ -27179,7 +27536,7 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Value) throws -> T?",
+              "printedName": "(Dictionary<Key, Value>.Value) throws -> T?",
               "typeAttributes": [
                 "noescape"
               ],
@@ -27200,12 +27557,19 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(Value)",
+                  "printedName": "(Dictionary<Key, Value>.Value)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -27231,25 +27595,46 @@
             {
               "kind": "TypeNominal",
               "name": "Optional",
-              "printedName": "Value?",
+              "printedName": "Dictionary<Key, Value>.Value?",
               "usr": "s:Sq",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_1"
+                    }
+                  ]
                 }
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Value"
+              "kind": "TypeNameAlias",
+              "name": "Value",
+              "printedName": "Dictionary<Key, Value>.Value",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_1"
+                }
+              ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Key"
+              "kind": "TypeNameAlias",
+              "name": "Key",
+              "printedName": "Dictionary<Key, Value>.Key",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -27282,30 +27667,51 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Value, Value) throws -> Value",
+              "printedName": "(Dictionary<Key, Value>.Value, Dictionary<Key, Value>.Value) throws -> Dictionary<Key, Value>.Value",
               "typeAttributes": [
                 "noescape"
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "Tuple",
-                  "printedName": "(Value, Value)",
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "printedName": "τ_0_1"
+                    }
+                  ]
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Tuple",
+                  "printedName": "(Dictionary<Key, Value>.Value, Dictionary<Key, Value>.Value)",
+                  "children": [
+                    {
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -27337,48 +27743,83 @@
             {
               "kind": "TypeNominal",
               "name": "Dictionary",
-              "printedName": "[Key : Value]",
+              "printedName": "[Dictionary<Key, Value>.Key : Dictionary<Key, Value>.Value]",
               "usr": "s:SD",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Key"
+                  "kind": "TypeNameAlias",
+                  "name": "Key",
+                  "printedName": "Dictionary<Key, Value>.Key",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 },
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_1"
+                    }
+                  ]
                 }
               ]
             },
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Value, Value) throws -> Value",
+              "printedName": "(Dictionary<Key, Value>.Value, Dictionary<Key, Value>.Value) throws -> Dictionary<Key, Value>.Value",
               "typeAttributes": [
                 "noescape"
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "Tuple",
-                  "printedName": "(Value, Value)",
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "printedName": "τ_0_1"
+                    }
+                  ]
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Tuple",
+                  "printedName": "(Dictionary<Key, Value>.Value, Dictionary<Key, Value>.Value)",
+                  "children": [
+                    {
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -27404,18 +27845,32 @@
             {
               "kind": "TypeNominal",
               "name": "Dictionary",
-              "printedName": "[Key : Value]",
+              "printedName": "[Dictionary<Key, Value>.Key : Dictionary<Key, Value>.Value]",
               "usr": "s:SD",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Key"
+                  "kind": "TypeNameAlias",
+                  "name": "Key",
+                  "printedName": "Dictionary<Key, Value>.Key",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 },
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_1"
+                    }
+                  ]
                 }
               ]
             },
@@ -27427,30 +27882,51 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Value, Value) throws -> Value",
+              "printedName": "(Dictionary<Key, Value>.Value, Dictionary<Key, Value>.Value) throws -> Dictionary<Key, Value>.Value",
               "typeAttributes": [
                 "noescape"
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "Tuple",
-                  "printedName": "(Value, Value)",
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "printedName": "τ_0_1"
+                    }
+                  ]
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Tuple",
+                  "printedName": "(Dictionary<Key, Value>.Value, Dictionary<Key, Value>.Value)",
+                  "children": [
+                    {
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -27476,66 +27952,115 @@
             {
               "kind": "TypeNominal",
               "name": "Dictionary",
-              "printedName": "[Key : Value]",
+              "printedName": "[Dictionary<Key, Value>.Key : Dictionary<Key, Value>.Value]",
               "usr": "s:SD",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Key"
+                  "kind": "TypeNameAlias",
+                  "name": "Key",
+                  "printedName": "Dictionary<Key, Value>.Key",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 },
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_1"
+                    }
+                  ]
                 }
               ]
             },
             {
               "kind": "TypeNominal",
               "name": "Dictionary",
-              "printedName": "[Key : Value]",
+              "printedName": "[Dictionary<Key, Value>.Key : Dictionary<Key, Value>.Value]",
               "usr": "s:SD",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Key"
+                  "kind": "TypeNameAlias",
+                  "name": "Key",
+                  "printedName": "Dictionary<Key, Value>.Key",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 },
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_1"
+                    }
+                  ]
                 }
               ]
             },
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Value, Value) throws -> Value",
+              "printedName": "(Dictionary<Key, Value>.Value, Dictionary<Key, Value>.Value) throws -> Dictionary<Key, Value>.Value",
               "typeAttributes": [
                 "noescape"
               ],
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "Tuple",
-                  "printedName": "(Value, Value)",
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "printedName": "τ_0_1"
+                    }
+                  ]
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Tuple",
+                  "printedName": "(Dictionary<Key, Value>.Value, Dictionary<Key, Value>.Value)",
+                  "children": [
+                    {
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     },
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Value"
+                      "kind": "TypeNameAlias",
+                      "name": "Value",
+                      "printedName": "Dictionary<Key, Value>.Value",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_1"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -27608,20 +28133,34 @@
             {
               "kind": "TypeNominal",
               "name": "Optional",
-              "printedName": "Value?",
+              "printedName": "Dictionary<Key, Value>.Value?",
               "usr": "s:Sq",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Value"
+                  "kind": "TypeNameAlias",
+                  "name": "Value",
+                  "printedName": "Dictionary<Key, Value>.Value",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_1"
+                    }
+                  ]
                 }
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Key"
+              "kind": "TypeNameAlias",
+              "name": "Key",
+              "printedName": "Dictionary<Key, Value>.Key",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -30599,6 +31138,23 @@
                   "usr": "s:Si"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s15EmptyCollectionV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
             }
           ]
         }
@@ -36622,8 +37178,8 @@
       "location": "",
       "moduleName": "Swift",
       "conformingProtocols": [
-        "Encodable",
         "Decodable",
+        "Encodable",
         "LosslessStringConvertible",
         "CustomStringConvertible",
         "CustomDebugStringConvertible",
@@ -39453,8 +40009,8 @@
       "location": "",
       "moduleName": "Swift",
       "conformingProtocols": [
-        "Encodable",
         "Decodable",
+        "Encodable",
         "LosslessStringConvertible",
         "CustomStringConvertible",
         "CustomDebugStringConvertible",
@@ -48534,8 +49090,8 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
-        "Encodable",
         "Decodable",
+        "Encodable",
         "Hashable",
         "Equatable",
         "_HasCustomAnyHashableRepresentation",
@@ -50212,8 +50768,8 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
-        "Encodable",
         "Decodable",
+        "Encodable",
         "Hashable",
         "Equatable",
         "_HasCustomAnyHashableRepresentation",
@@ -51899,8 +52455,8 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
-        "Encodable",
         "Decodable",
+        "Encodable",
         "Hashable",
         "Equatable",
         "_HasCustomAnyHashableRepresentation",
@@ -53495,8 +54051,8 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
-        "Encodable",
         "Decodable",
+        "Encodable",
         "Hashable",
         "Equatable",
         "_HasCustomAnyHashableRepresentation",
@@ -55126,8 +55682,8 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
-        "Encodable",
         "Decodable",
+        "Encodable",
         "Hashable",
         "Equatable",
         "_HasCustomAnyHashableRepresentation",
@@ -56691,8 +57247,8 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
-        "Encodable",
         "Decodable",
+        "Encodable",
         "Hashable",
         "Equatable",
         "_HasCustomAnyHashableRepresentation",
@@ -58266,8 +58822,8 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
-        "Encodable",
         "Decodable",
+        "Encodable",
         "Hashable",
         "Equatable",
         "_HasCustomAnyHashableRepresentation",
@@ -59720,8 +60276,8 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
-        "Encodable",
         "Decodable",
+        "Encodable",
         "Hashable",
         "Equatable",
         "_HasCustomAnyHashableRepresentation",
@@ -61184,8 +61740,8 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
-        "Encodable",
         "Decodable",
+        "Encodable",
         "Hashable",
         "Equatable",
         "_HasCustomAnyHashableRepresentation",
@@ -62761,8 +63317,8 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
-        "Encodable",
         "Decodable",
+        "Encodable",
         "Hashable",
         "Equatable",
         "_HasCustomAnyHashableRepresentation",
@@ -67636,6 +68192,23 @@
       "children": [
         {
           "kind": "TypeAlias",
+          "name": "Base",
+          "printedName": "Base",
+          "declKind": "TypeAlias",
+          "usr": "s:s12LazySequenceV4Basea",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Base where Base : Sequence>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Base"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
           "name": "Iterator",
           "printedName": "Iterator",
           "declKind": "TypeAlias",
@@ -69470,6 +70043,23 @@
         },
         {
           "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s15LazyMapSequenceV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Base, Element where Base : Sequence>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
           "name": "SubSequence",
           "printedName": "SubSequence",
           "declKind": "TypeAlias",
@@ -70157,6 +70747,23 @@
           ]
         },
         {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s17LazyMapCollectionV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Base, Element where Base : Collection>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
+            }
+          ]
+        },
+        {
           "kind": "Function",
           "name": "index",
           "printedName": "index(before:)",
@@ -70276,23 +70883,6 @@
                   ]
                 }
               ]
-            }
-          ]
-        },
-        {
-          "kind": "TypeAlias",
-          "name": "Element",
-          "printedName": "Element",
-          "declKind": "TypeAlias",
-          "usr": "s:s17LazyMapCollectionVsSKRzrlE7Elementa",
-          "location": "",
-          "moduleName": "Swift",
-          "genericSig": "<Base, Element where Base : BidirectionalCollection>",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
             }
           ]
         }
@@ -74244,17 +74834,31 @@
             {
               "kind": "TypeNominal",
               "name": "Tuple",
-              "printedName": "(lower: Bound, upper: Bound)",
+              "printedName": "(lower: Range<Bound>.Bound, upper: Range<Bound>.Bound)",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "Range<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 },
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "Range<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -74759,13 +75363,20 @@
             {
               "kind": "TypeNominal",
               "name": "ClosedRange",
-              "printedName": "ClosedRange<Bound>",
+              "printedName": "ClosedRange<Range<Bound>.Bound>",
               "usr": "s:SN",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "Range<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -74801,6 +75412,23 @@
               "kind": "TypeNominal",
               "name": "GenericTypeParam",
               "printedName": "C"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Bound",
+          "printedName": "Bound",
+          "declKind": "TypeAlias",
+          "usr": "s:Sn5Bounda",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Bound where Bound : Comparable>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Bound"
             }
           ]
         },
@@ -75037,13 +75665,20 @@
             {
               "kind": "TypeNominal",
               "name": "Range",
-              "printedName": "Range<Bound>",
+              "printedName": "Range<Range<Bound>.Bound>",
               "usr": "s:Sn",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "Range<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -75071,13 +75706,20 @@
             {
               "kind": "TypeNominal",
               "name": "ClosedRange",
-              "printedName": "ClosedRange<Bound>",
+              "printedName": "ClosedRange<Range<Bound>.Bound>",
               "usr": "s:SN",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "Range<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -75112,13 +75754,20 @@
             {
               "kind": "TypeNominal",
               "name": "Range",
-              "printedName": "Range<Bound>",
+              "printedName": "Range<Range<Bound>.Bound>",
               "usr": "s:Sn",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Bound"
+                  "kind": "TypeNameAlias",
+                  "name": "Bound",
+                  "printedName": "Range<Bound>.Bound",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -75205,9 +75854,16 @@
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Bound"
+              "kind": "TypeNameAlias",
+              "name": "Bound",
+              "printedName": "PartialRangeUpTo<Bound>.Bound",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -75263,6 +75919,23 @@
               "printedName": "Bool",
               "usr": "s:Sb"
             },
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Bound"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Bound",
+          "printedName": "Bound",
+          "declKind": "TypeAlias",
+          "usr": "s:s16PartialRangeUpToV5Bounda",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Bound where Bound : Comparable>",
+          "children": [
             {
               "kind": "TypeNominal",
               "name": "GenericTypeParam",
@@ -75415,6 +76088,23 @@
               "printedName": "Bound"
             }
           ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Bound",
+          "printedName": "Bound",
+          "declKind": "TypeAlias",
+          "usr": "s:s19PartialRangeThroughV5Bounda",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Bound where Bound : Comparable>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Bound"
+            }
+          ]
         }
       ]
     },
@@ -75498,9 +76188,16 @@
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Bound"
+              "kind": "TypeNameAlias",
+              "name": "Bound",
+              "printedName": "PartialRangeFrom<Bound>.Bound",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -75565,6 +76262,23 @@
         },
         {
           "kind": "TypeAlias",
+          "name": "Bound",
+          "printedName": "Bound",
+          "declKind": "TypeAlias",
+          "usr": "s:s16PartialRangeFromV5Bounda",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Bound where Bound : Comparable>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Bound"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
           "name": "Element",
           "printedName": "Element",
           "declKind": "TypeAlias",
@@ -75613,13 +76327,20 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Optional",
-                  "printedName": "Bound?",
+                  "printedName": "PartialRangeFrom<Bound>.Bound?",
                   "usr": "s:Sq",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Bound"
+                      "kind": "TypeNameAlias",
+                      "name": "Bound",
+                      "printedName": "PartialRangeFrom<Bound>.Bound",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -77185,6 +77906,23 @@
                   ]
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s8RepeatedV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
             }
           ]
         },
@@ -81403,13 +82141,20 @@
             {
               "kind": "TypeNominal",
               "name": "Array",
-              "printedName": "[Element]",
+              "printedName": "[Set<Element>.Element]",
               "usr": "s:Sa",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -81481,9 +82226,16 @@
               "usr": "s:Sb"
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "Set<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -81618,9 +82370,16 @@
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "Set<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -81749,6 +82508,23 @@
                   ]
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:Sh7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element where Element : Hashable>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
             }
           ]
         },
@@ -81922,7 +82698,7 @@
             {
               "kind": "TypeNominal",
               "name": "Tuple",
-              "printedName": "(inserted: Bool, memberAfterInsert: Element)",
+              "printedName": "(inserted: Bool, memberAfterInsert: Set<Element>.Element)",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -81931,16 +82707,30 @@
                   "usr": "s:Sb"
                 },
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "Set<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -81962,20 +82752,34 @@
             {
               "kind": "TypeNominal",
               "name": "Optional",
-              "printedName": "Element?",
+              "printedName": "Set<Element>.Element?",
               "usr": "s:Sq",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "Set<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -81997,20 +82801,34 @@
             {
               "kind": "TypeNominal",
               "name": "Optional",
-              "printedName": "Element?",
+              "printedName": "Set<Element>.Element?",
               "usr": "s:Sq",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "Set<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -82030,9 +82848,16 @@
           ],
           "children": [
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "Set<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -82086,9 +82911,16 @@
           ],
           "children": [
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "Set<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -82299,13 +83131,20 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
@@ -82358,13 +83197,20 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
@@ -82417,13 +83263,20 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
@@ -82476,13 +83329,20 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
@@ -82614,13 +83474,20 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -82648,13 +83515,20 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -82682,13 +83556,20 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -82716,13 +83597,20 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -82744,26 +83632,40 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -82791,13 +83693,20 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -82825,13 +83734,20 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -82853,26 +83769,40 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -82900,13 +83830,20 @@
             {
               "kind": "TypeNominal",
               "name": "Set",
-              "printedName": "Set<Element>",
+              "printedName": "Set<Set<Element>.Element>",
               "usr": "s:Sh",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -83045,13 +83982,20 @@
             {
               "kind": "TypeNominal",
               "name": "Optional",
-              "printedName": "Element?",
+              "printedName": "Set<Element>.Element?",
               "usr": "s:Sq",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -83140,20 +84084,27 @@
             {
               "kind": "TypeNominal",
               "name": "Array",
-              "printedName": "[Element]",
+              "printedName": "[Set<Element>.Element]",
               "usr": "s:Sa",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "Set<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Element) throws -> Bool",
+              "printedName": "(Set<Element>.Element) throws -> Bool",
               "typeAttributes": [
                 "noescape"
               ],
@@ -83167,12 +84118,19 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(Element)",
+                  "printedName": "(Set<Element>.Element)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Element"
+                      "kind": "TypeNameAlias",
+                      "name": "Element",
+                      "printedName": "Set<Element>.Element",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -83250,6 +84208,23 @@
                   "printedName": "Element"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s11SetIteratorV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element where Element : Hashable>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
             }
           ]
         },
@@ -85851,6 +86826,23 @@
               ]
             }
           ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s16StrideToIteratorV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element where Element : Strideable>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
+            }
+          ]
         }
       ]
     },
@@ -85934,6 +86926,23 @@
                   "usr": "s:Si"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s8StrideToV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element where Element : Strideable>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
             }
           ]
         },
@@ -86111,6 +87120,23 @@
               ]
             }
           ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s21StrideThroughIteratorV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element where Element : Strideable>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
+            }
+          ]
         }
       ]
     },
@@ -86194,6 +87220,23 @@
                   "usr": "s:Si"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s13StrideThroughV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element where Element : Strideable>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
             }
           ]
         },
@@ -86336,8 +87379,8 @@
       "location": "",
       "moduleName": "Swift",
       "conformingProtocols": [
-        "Encodable",
         "Decodable",
+        "Encodable",
         "CustomReflectable",
         "_CustomPlaygroundQuickLookable",
         "TextOutputStream",
@@ -97984,6 +99027,23 @@
         },
         {
           "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:Sr7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
           "name": "SubSequence",
           "printedName": "SubSequence",
           "declKind": "TypeAlias",
@@ -98197,13 +99257,20 @@
             {
               "kind": "TypeNominal",
               "name": "UnsafeMutableBufferPointer",
-              "printedName": "UnsafeMutableBufferPointer<Element>",
+              "printedName": "UnsafeMutableBufferPointer<UnsafeMutableBufferPointer<Element>.Element>",
               "usr": "s:Sr",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "UnsafeMutableBufferPointer<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
@@ -98234,9 +99301,16 @@
               "printedName": "()"
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "UnsafeMutableBufferPointer<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -98259,9 +99333,16 @@
               "printedName": "()"
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Element"
+              "kind": "TypeNameAlias",
+              "name": "Element",
+              "printedName": "UnsafeMutableBufferPointer<Element>.Element",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -99033,6 +100114,23 @@
                   ]
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:SR7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
             }
           ]
         },
@@ -101678,6 +102776,23 @@
         },
         {
           "kind": "TypeAlias",
+          "name": "Pointee",
+          "printedName": "Pointee",
+          "declKind": "TypeAlias",
+          "usr": "s:SP7Pointeea",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Pointee>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Pointee"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
           "name": "Stride",
           "printedName": "Stride",
           "declKind": "TypeAlias",
@@ -101855,13 +102970,20 @@
             {
               "kind": "TypeNominal",
               "name": "UnsafePointer",
-              "printedName": "UnsafePointer<Pointee>",
+              "printedName": "UnsafePointer<UnsafeMutablePointer<Pointee>.Pointee>",
               "usr": "s:SP",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Pointee"
+                  "kind": "TypeNameAlias",
+                  "name": "Pointee",
+                  "printedName": "UnsafeMutablePointer<Pointee>.Pointee",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -101904,19 +103026,26 @@
             {
               "kind": "TypeNominal",
               "name": "Optional",
-              "printedName": "UnsafePointer<Pointee>?",
+              "printedName": "UnsafePointer<UnsafeMutablePointer<Pointee>.Pointee>?",
               "usr": "s:Sq",
               "children": [
                 {
                   "kind": "TypeNominal",
                   "name": "UnsafePointer",
-                  "printedName": "UnsafePointer<Pointee>",
+                  "printedName": "UnsafePointer<UnsafeMutablePointer<Pointee>.Pointee>",
                   "usr": "s:SP",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Pointee"
+                      "kind": "TypeNameAlias",
+                      "name": "Pointee",
+                      "printedName": "UnsafeMutablePointer<Pointee>.Pointee",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -101941,13 +103070,20 @@
             {
               "kind": "TypeNominal",
               "name": "UnsafeMutablePointer",
-              "printedName": "UnsafeMutablePointer<Pointee>",
+              "printedName": "UnsafeMutablePointer<UnsafeMutablePointer<Pointee>.Pointee>",
               "usr": "s:Sp",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Pointee"
+                  "kind": "TypeNameAlias",
+                  "name": "Pointee",
+                  "printedName": "UnsafeMutablePointer<Pointee>.Pointee",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
@@ -102113,9 +103249,16 @@
           ],
           "children": [
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Pointee"
+              "kind": "TypeNameAlias",
+              "name": "Pointee",
+              "printedName": "UnsafeMutablePointer<Pointee>.Pointee",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             }
           ]
         },
@@ -102138,9 +103281,16 @@
               "printedName": "()"
             },
             {
-              "kind": "TypeNominal",
-              "name": "GenericTypeParam",
-              "printedName": "Pointee"
+              "kind": "TypeNameAlias",
+              "name": "Pointee",
+              "printedName": "UnsafeMutablePointer<Pointee>.Pointee",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "τ_0_0"
+                }
+              ]
             },
             {
               "kind": "TypeNominal",
@@ -102171,13 +103321,20 @@
             {
               "kind": "TypeNominal",
               "name": "UnsafePointer",
-              "printedName": "UnsafePointer<Pointee>",
+              "printedName": "UnsafePointer<UnsafeMutablePointer<Pointee>.Pointee>",
               "usr": "s:SP",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Pointee"
+                  "kind": "TypeNameAlias",
+                  "name": "Pointee",
+                  "printedName": "UnsafeMutablePointer<Pointee>.Pointee",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
@@ -102425,6 +103582,23 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Pointee",
+          "printedName": "Pointee",
+          "declKind": "TypeAlias",
+          "usr": "s:Sp7Pointeea",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Pointee>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Pointee"
             }
           ]
         },
@@ -114785,6 +115959,23 @@
           ]
         },
         {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s15CollectionOfOneV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
+            }
+          ]
+        },
+        {
           "kind": "Var",
           "name": "debugDescription",
           "printedName": "debugDescription",
@@ -114935,18 +116126,25 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "() -> Element?",
+              "printedName": "() -> AnyIterator<Element>.Element?",
               "children": [
                 {
                   "kind": "TypeNominal",
                   "name": "Optional",
-                  "printedName": "Element?",
+                  "printedName": "AnyIterator<Element>.Element?",
                   "usr": "s:Sq",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Element"
+                      "kind": "TypeNameAlias",
+                      "name": "Element",
+                      "printedName": "AnyIterator<Element>.Element",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -114984,6 +116182,23 @@
                   "printedName": "Element"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s11AnyIteratorV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
             }
           ]
         },
@@ -115155,6 +116370,23 @@
               "kind": "TypeNominal",
               "name": "GenericTypeParam",
               "printedName": "S"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s11AnySequenceV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
             }
           ]
         },
@@ -115929,7 +117161,7 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Element) throws -> T",
+              "printedName": "(AnyCollection<Element>.Element) throws -> T",
               "typeAttributes": [
                 "noescape"
               ],
@@ -115942,12 +117174,19 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(Element)",
+                  "printedName": "(AnyCollection<Element>.Element)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Element"
+                      "kind": "TypeNameAlias",
+                      "name": "Element",
+                      "printedName": "AnyCollection<Element>.Element",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -115973,20 +117212,27 @@
             {
               "kind": "TypeNominal",
               "name": "Array",
-              "printedName": "[Element]",
+              "printedName": "[AnyCollection<Element>.Element]",
               "usr": "s:Sa",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "AnyCollection<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Element) throws -> Bool",
+              "printedName": "(AnyCollection<Element>.Element) throws -> Bool",
               "typeAttributes": [
                 "noescape"
               ],
@@ -116000,12 +117246,19 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(Element)",
+                  "printedName": "(AnyCollection<Element>.Element)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Element"
+                      "kind": "TypeNameAlias",
+                      "name": "Element",
+                      "printedName": "AnyCollection<Element>.Element",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -116036,7 +117289,7 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Element) throws -> Void",
+              "printedName": "(AnyCollection<Element>.Element) throws -> Void",
               "typeAttributes": [
                 "noescape"
               ],
@@ -116056,12 +117309,19 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(Element)",
+                  "printedName": "(AnyCollection<Element>.Element)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Element"
+                      "kind": "TypeNameAlias",
+                      "name": "Element",
+                      "printedName": "AnyCollection<Element>.Element",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -116087,20 +117347,27 @@
             {
               "kind": "TypeNominal",
               "name": "AnyCollection",
-              "printedName": "AnyCollection<Element>",
+              "printedName": "AnyCollection<AnyCollection<Element>.Element>",
               "usr": "s:s13AnyCollectionV",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "AnyCollection<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Element) throws -> Bool",
+              "printedName": "(AnyCollection<Element>.Element) throws -> Bool",
               "typeAttributes": [
                 "noescape"
               ],
@@ -116114,12 +117381,19 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(Element)",
+                  "printedName": "(AnyCollection<Element>.Element)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Element"
+                      "kind": "TypeNameAlias",
+                      "name": "Element",
+                      "printedName": "AnyCollection<Element>.Element",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -116143,13 +117417,20 @@
             {
               "kind": "TypeNominal",
               "name": "AnyCollection",
-              "printedName": "AnyCollection<Element>",
+              "printedName": "AnyCollection<AnyCollection<Element>.Element>",
               "usr": "s:s13AnyCollectionV",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "AnyCollection<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
@@ -116177,13 +117458,20 @@
             {
               "kind": "TypeNominal",
               "name": "AnyCollection",
-              "printedName": "AnyCollection<Element>",
+              "printedName": "AnyCollection<AnyCollection<Element>.Element>",
               "usr": "s:s13AnyCollectionV",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "AnyCollection<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
@@ -116213,20 +117501,27 @@
             {
               "kind": "TypeNominal",
               "name": "AnyCollection",
-              "printedName": "AnyCollection<Element>",
+              "printedName": "AnyCollection<AnyCollection<Element>.Element>",
               "usr": "s:s13AnyCollectionV",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "AnyCollection<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Element) throws -> Bool",
+              "printedName": "(AnyCollection<Element>.Element) throws -> Bool",
               "typeAttributes": [
                 "noescape"
               ],
@@ -116240,12 +117535,19 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(Element)",
+                  "printedName": "(AnyCollection<Element>.Element)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Element"
+                      "kind": "TypeNameAlias",
+                      "name": "Element",
+                      "printedName": "AnyCollection<Element>.Element",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -116269,13 +117571,20 @@
             {
               "kind": "TypeNominal",
               "name": "AnyCollection",
-              "printedName": "AnyCollection<Element>",
+              "printedName": "AnyCollection<AnyCollection<Element>.Element>",
               "usr": "s:s13AnyCollectionV",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "AnyCollection<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
@@ -116303,13 +117612,20 @@
             {
               "kind": "TypeNominal",
               "name": "AnyCollection",
-              "printedName": "AnyCollection<Element>",
+              "printedName": "AnyCollection<AnyCollection<Element>.Element>",
               "usr": "s:s13AnyCollectionV",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "AnyCollection<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             },
@@ -116339,19 +117655,26 @@
             {
               "kind": "TypeNominal",
               "name": "Array",
-              "printedName": "[AnyCollection<Element>]",
+              "printedName": "[AnyCollection<AnyCollection<Element>.Element>]",
               "usr": "s:Sa",
               "children": [
                 {
                   "kind": "TypeNominal",
                   "name": "AnyCollection",
-                  "printedName": "AnyCollection<Element>",
+                  "printedName": "AnyCollection<AnyCollection<Element>.Element>",
                   "usr": "s:s13AnyCollectionV",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Element"
+                      "kind": "TypeNameAlias",
+                      "name": "Element",
+                      "printedName": "AnyCollection<Element>.Element",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -116374,7 +117697,7 @@
             {
               "kind": "TypeFunc",
               "name": "Function",
-              "printedName": "(Element) throws -> Bool",
+              "printedName": "(AnyCollection<Element>.Element) throws -> Bool",
               "typeAttributes": [
                 "noescape"
               ],
@@ -116388,12 +117711,19 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Paren",
-                  "printedName": "(Element)",
+                  "printedName": "(AnyCollection<Element>.Element)",
                   "children": [
                     {
-                      "kind": "TypeNominal",
-                      "name": "GenericTypeParam",
-                      "printedName": "Element"
+                      "kind": "TypeNameAlias",
+                      "name": "Element",
+                      "printedName": "AnyCollection<Element>.Element",
+                      "children": [
+                        {
+                          "kind": "TypeNominal",
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -116564,13 +117894,20 @@
             {
               "kind": "TypeNominal",
               "name": "AnyCollection",
-              "printedName": "AnyCollection<Element>",
+              "printedName": "AnyCollection<AnyCollection<Element>.Element>",
               "usr": "s:s13AnyCollectionV",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "AnyCollection<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -116638,13 +117975,20 @@
             {
               "kind": "TypeNominal",
               "name": "AnyBidirectionalCollection",
-              "printedName": "AnyBidirectionalCollection<Element>",
+              "printedName": "AnyBidirectionalCollection<AnyCollection<Element>.Element>",
               "usr": "s:s26AnyBidirectionalCollectionV",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "AnyCollection<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -116712,13 +118056,20 @@
             {
               "kind": "TypeNominal",
               "name": "AnyRandomAccessCollection",
-              "printedName": "AnyRandomAccessCollection<Element>",
+              "printedName": "AnyRandomAccessCollection<AnyCollection<Element>.Element>",
               "usr": "s:s25AnyRandomAccessCollectionV",
               "children": [
                 {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "Element"
+                  "kind": "TypeNameAlias",
+                  "name": "Element",
+                  "printedName": "AnyCollection<Element>.Element",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
+                    }
+                  ]
                 }
               ]
             }
@@ -117243,6 +118594,23 @@
                   ]
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s13AnyCollectionV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
             }
           ]
         }
@@ -118789,6 +120157,23 @@
               ]
             }
           ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s26AnyBidirectionalCollectionV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
+            }
+          ]
         }
       ]
     },
@@ -120309,6 +121694,23 @@
               ]
             }
           ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s25AnyRandomAccessCollectionV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
+            }
+          ]
         }
       ]
     },
@@ -121758,6 +123160,40 @@
         },
         {
           "kind": "TypeAlias",
+          "name": "Key",
+          "printedName": "Key",
+          "declKind": "TypeAlias",
+          "usr": "s:s17DictionaryLiteralV3Keya",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Key, Value>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Key"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Value",
+          "printedName": "Value",
+          "declKind": "TypeAlias",
+          "usr": "s:s17DictionaryLiteralV5Valuea",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Key, Value>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Value"
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
           "name": "Indices",
           "printedName": "Indices",
           "declKind": "TypeAlias",
@@ -122515,6 +123951,23 @@
                   "printedName": "Element"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "Element",
+          "printedName": "Element",
+          "declKind": "TypeAlias",
+          "usr": "s:s14UnfoldSequenceV7Elementa",
+          "location": "",
+          "moduleName": "Swift",
+          "genericSig": "<Element, State>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "GenericTypeParam",
+              "printedName": "Element"
             }
           ]
         },
