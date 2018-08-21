@@ -13,17 +13,17 @@
 // This file contains only support for types deprecated from previous versions
 // of Swift
 
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "BidirectionalCollection", message: "it will be removed in Swift 5.0.  Please use 'BidirectionalCollection' instead")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "BidirectionalCollection")
 public typealias BidirectionalIndexable = BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Collection", message: "it will be removed in Swift 5.0.  Please use 'Collection' instead")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "Collection")
 public typealias IndexableBase = Collection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Collection", message: "it will be removed in Swift 5.0.  Please use 'Collection' instead")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "Collection")
 public typealias Indexable = Collection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "MutableCollection", message: "it will be removed in Swift 5.0.  Please use 'MutableCollection' instead")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "MutableCollection")
 public typealias MutableIndexable = MutableCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "RandomAccessCollection", message: "it will be removed in Swift 5.0.  Please use 'RandomAccessCollection' instead")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "RandomAccessCollection")
 public typealias RandomAccessIndexable = RandomAccessCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "RangeReplaceableIndexable", message: "it will be removed in Swift 5.0.  Please use 'RangeReplaceableCollection' instead")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "RangeReplaceableIndexable")
 public typealias RangeReplaceableIndexable = RangeReplaceableCollection
 @available(*, deprecated: 4.2, renamed: "EnumeratedSequence.Iterator")
 public typealias EnumeratedIterator<T: Sequence> = EnumeratedSequence<T>.Iterator

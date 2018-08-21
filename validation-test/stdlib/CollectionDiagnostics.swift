@@ -82,7 +82,7 @@ struct BadIndexable2 : Indexable {
   // Missing index(after:) -> Int
 }
 
-// expected-warning@+2 {{'BidirectionalIndexable' is deprecated: it will be removed in Swift 5.0.  Please use 'BidirectionalCollection' instead}}
+// expected-warning@+2 {{'BidirectionalIndexable' is deprecated: renamed to 'BidirectionalCollection'}}
 // expected-note@+1 {{use 'BidirectionalCollection' instead}}
 struct GoodBidirectionalIndexable1 : BidirectionalIndexable {
   var startIndex: Int { return 0 }
@@ -96,7 +96,7 @@ struct GoodBidirectionalIndexable1 : BidirectionalIndexable {
 
 // We'd like to see: {{type 'BadBidirectionalIndexable' does not conform to protocol 'BidirectionalIndexable'}}
 // But the compiler doesn't generate that error.
-// expected-warning@+2 {{'BidirectionalIndexable' is deprecated: it will be removed in Swift 5.0.  Please use 'BidirectionalCollection' instead}}
+// expected-warning@+2 {{'BidirectionalIndexable' is deprecated: renamed to 'BidirectionalCollection'}}
 // expected-note@+1 {{use 'BidirectionalCollection' instead}}
 struct BadBidirectionalIndexable : BidirectionalIndexable {
   var startIndex: Int { return 0 }
