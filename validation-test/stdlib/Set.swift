@@ -3078,6 +3078,7 @@ SetTestSuite.test("formSymmetricDifference")
   .code {
   // Overlap with 4040, 5050, 6060
   var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
+  let s1_copy = s1
   let s2 = Set([1010])
   let result = Set([2020, 3030, 4040, 5050, 6060])
 
@@ -3085,10 +3086,11 @@ SetTestSuite.test("formSymmetricDifference")
   let identity1 = s1._rawIdentifier()
   s1.formSymmetricDifference(s2)
 
-  // Removing just one element shouldn't cause an identity change
-  expectEqual(identity1, s1._rawIdentifier())
+  // COW should trigger a copy
+  expectNotEqual(identity1, s1._rawIdentifier())
 
   expectEqual(s1, result)
+  expectEqual(s1_copy, Set([1010, 2020, 3030, 4040, 5050, 6060]))
 
   // A ⨁ A == {}
   s1.formSymmetricDifference(s1)

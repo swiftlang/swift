@@ -1060,9 +1060,10 @@ extension Set: SetAlgebra {
   @inlinable
   public func symmetricDifference<S: Sequence>(_ other: S) -> Set<Element>
     where S.Element == Element {
-    var newSet = self
-    newSet.formSymmetricDifference(other)
-    return newSet
+    if let other = other as? Set<Element> {
+      return Set(_native: _variant.symmetricDifference(other))
+    }
+    return Set(_native: _variant.symmetricDifference(other))
   }
 
   /// Replace this set with the elements contained in this set or the given
@@ -1084,8 +1085,7 @@ extension Set: SetAlgebra {
   @inlinable
   public mutating func formSymmetricDifference<S: Sequence>(_ other: S)
     where S.Element == Element {
-    let otherSet = Set(other)
-    formSymmetricDifference(otherSet)
+    self = self.symmetricDifference(other)
   }
 }
 
@@ -1391,13 +1391,7 @@ extension Set {
   /// - Parameter other: Another set.
   @inlinable
   public mutating func formSymmetricDifference(_ other: Set<Element>) {
-    for member in other {
-      if contains(member) {
-        remove(member)
-      } else {
-        insert(member)
-      }
-    }
+    self = self.symmetricDifference(other)
   }
 }
 
@@ -2078,6 +2072,67 @@ extension _NativeSet {
       result.insertNew(self.uncheckedElement(at: Index(bucket: bucket)))
     }
     _sanityCheck(result.count == dupeCount)
+    return result
+  }
+
+  @inlinable
+  internal func symmetricDifference<S: Sequence>(_ other: S) -> _NativeSet
+    where S.Element == Element {
+    // Rather than directly creating a new set, mark common elements from `self`
+    // in a bitmap, and collect distinct elements from `other` in an array.
+    var dupes = _storage.hashTable.createBitmap()
+    var dupeCount = 0
+    var distinctsInOther: [Element] = []
+    for element in other {
+      let (index, found) = find(element)
+      if found {
+        if dupes._uncheckedInsert(index.bucket) {
+          dupeCount += 1
+        }
+      } else {
+        distinctsInOther.append(element)
+      }
+    }
+    var result = _NativeSet<Element>(
+      capacity: count - dupeCount + distinctsInOther.count)
+    for index in self.indices where !dupes._uncheckedContains(index.bucket) {
+      result.insertNew(self.uncheckedElement(at: index))
+    }
+    for element in distinctsInOther {
+      result.insertNew(element)
+    }
+    return result
+  }
+
+  @inlinable
+  internal func symmetricDifference(_ other: _NativeSet) -> _NativeSet {
+    if self.count < other.count {
+      // Prefer to iterate over the smaller set.
+      return other.symmetricDifference(self)
+    }
+    // Rather than directly creating a new set, mark common elements from `self`
+    // and `other` in two bitmaps.
+    var selfDupes = _storage.hashTable.createBitmap()
+    var otherDupes = other._storage.hashTable.createBitmap()
+    var dupeCount = 0
+    for otherIndex in other.indices {
+      let (selfIndex, found) = self.find(other.uncheckedElement(at: otherIndex))
+      if found {
+        if !selfDupes._uncheckedInsert(selfIndex.bucket) ||
+          !otherDupes._uncheckedInsert(otherIndex.bucket) {
+          ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
+        }
+        dupeCount += 1
+      }
+    }
+    var result = _NativeSet<Element>(
+      capacity: self.count + other.count - 2 * dupeCount)
+    for i in self.indices where !selfDupes._uncheckedContains(i.bucket) {
+      result.insertNew(self.uncheckedElement(at: i))
+    }
+    for i in other.indices where !otherDupes._uncheckedContains(i.bucket) {
+      result.insertNew(other.uncheckedElement(at: i))
+    }
     return result
   }
 }
@@ -3012,6 +3067,38 @@ extension Set._Variant {
       return this.intersection(other)
     case (.cocoa(let this), .cocoa(_)):
       return _NativeSet<Element>(this).intersection(other)
+#endif
+    }
+  }
+
+  @inlinable
+  internal func symmetricDifference<S: Sequence>(
+    _ other: S
+  ) -> _NativeSet<Element> where S.Element == Element {
+    switch self {
+    case .native(let native):
+      return native.symmetricDifference(other)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      return _NativeSet<Element>(cocoa).symmetricDifference(other)
+#endif
+    }
+  }
+
+  @inlinable
+  internal func symmetricDifference(
+    _ other: Set<Element>
+  ) -> _NativeSet<Element> {
+    switch (self, other._variant) {
+    case (.native(let this), .native(let that)):
+      return this.symmetricDifference(that)
+#if _runtime(_ObjC)
+    case (.native(let this), .cocoa(_)):
+      return this.symmetricDifference(other)
+    case (.cocoa(let this), .native(let that)):
+      return that.symmetricDifference(Set<Element>(_cocoa: this))
+    case (.cocoa(let this), .cocoa(_)):
+      return _NativeSet<Element>(this).symmetricDifference(other)
 #endif
     }
   }
