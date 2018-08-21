@@ -52,8 +52,7 @@ func inoutGlobalStructStoredProperty() {
 // CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[VALUE_BUFFER]] : $*Builtin.UnsafeValueBuffer) : $()
 // CHECK:  [[MATERIALIZE_FOR_SET:%.*]] = class_method [[BORROWED_CLASS]] : $MyClass, #MyClass.storedProperty!materializeForSet.1 : (MyClass) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?), $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed MyClass) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK:  [[MATERIALIZE_FOR_SET_TUPLE:%.*]] = apply [[MATERIALIZE_FOR_SET]]([[TEMPORARY_RAW]], [[VALUE_BUFFER]], [[BORROWED_CLASS]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed MyClass) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-// CHECK:  [[TEMPORARY_BUFFER:%.*]] = tuple_extract [[MATERIALIZE_FOR_SET_TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
-// CHECK:  [[OPTIONAL_CALLBACK:%.*]] = tuple_extract [[MATERIALIZE_FOR_SET_TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 1
+// CHECK:  ([[TEMPORARY_BUFFER:%.*]], [[OPTIONAL_CALLBACK:%.*]]) = destructure_tuple [[MATERIALIZE_FOR_SET_TUPLE]]
 // CHECK:  [[BUFFER_ADDRESS:%.*]] = pointer_to_address [[TEMPORARY_BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:  [[BUFFER_ADDRESS_DEPENDENCE:%.*]] = mark_dependence [[BUFFER_ADDRESS]] : $*Int on [[LOADED_CLASS]] : $MyClass
 // CHECK:  end_borrow [[BORROWED_CLASS]] from [[LOADED_CLASS]] : $MyClass, $MyClass

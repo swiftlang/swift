@@ -448,11 +448,11 @@ func tuple_element(_ x: (Int, Float)) {
   // CHECK: apply
 
   int(tuple().0)
-  // CHECK: [[ZERO:%.*]] = tuple_extract {{%.*}} : {{.*}}, 0
+  // CHECK: ([[ZERO:%.*]], {{%.*}}) = destructure_tuple
   // CHECK: apply {{.*}}([[ZERO]])
 
   float(tuple().1)
-  // CHECK: [[ONE:%.*]] = tuple_extract {{%.*}} : {{.*}}, 1
+  // CHECK: ({{%.*}}, [[ONE:%.*]]) = destructure_tuple
   // CHECK: apply {{.*}}([[ONE]])
 }
 

@@ -4492,40 +4492,17 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   } else if (substFnConv.getNumDirectSILResults() == 1) {
     addManagedDirectResult(rawDirectResult, *directSILResults.begin());
   } else {
-    llvm::SmallVector<std::pair<SILValue, const SILResultInfo &>, 8>
-        copiedResults;
-    {
-      Scope S(Cleanups, CleanupLocation::get(loc));
-
-      // First create an rvalue cleanup for our direct result.
-      ManagedValue managedDirectResult =
-          emitManagedRValueWithCleanup(rawDirectResult);
-      // Then borrow the managed direct result.
-      ManagedValue borrowedDirectResult =
-          managedDirectResult.borrow(*this, loc);
-      // Then create unmanaged copies of the direct result and forward the
-      // result as expected by addManageDirectResult.
-      unsigned Index = 0;
-      for (const SILResultInfo &directResult : directSILResults) {
-        ManagedValue elt =
-            B.createTupleExtract(loc, borrowedDirectResult, Index,
-                                 substFnConv.getSILType(directResult));
-        SILValue v = elt.copyUnmanaged(*this, loc).forward(*this);
-        // We assume that unowned inner pointers, autoreleased values, and
-        // indirect values are never returned in tuples.
-        // FIXME: can this assertion be removed without lowered addresses?
-        assert(directResult.getConvention() == ResultConvention::Owned ||
-               directResult.getConvention() == ResultConvention::Unowned ||
-               !substFnConv.useLoweredAddresses());
-        copiedResults.push_back({v, directResult});
-        ++Index;
-      }
-      // Then allow the cleanups to be emitted in the proper reverse order.
-    }
+    auto directSILResultsIter = directSILResults.begin();
     // Finally add our managed direct results.
-    for (auto p : copiedResults) {
-      addManagedDirectResult(p.first, p.second);
-    }
+    B.emitDestructureValueOperation(
+        loc, rawDirectResult, [&](unsigned index, SILValue v) {
+          auto directResult = *directSILResultsIter;
+          ++directSILResultsIter;
+          assert(directResult.getConvention() == ResultConvention::Owned ||
+                 directResult.getConvention() == ResultConvention::Unowned ||
+                 !substFnConv.useLoweredAddresses());
+          addManagedDirectResult(v, directResult);
+        });
   }
 
   // If there was a foreign error convention, consider it.
