@@ -174,7 +174,8 @@ public extension SingleValueDataset {
       _handle: #tfop(
         "BatchDataset", _handle, Tensor<Int64>(batchSize),
         output_types: [ScalarOfElement.self], output_shapes: [elementShape]
-      )
+      ),
+      elementShape: elementShape
     )
   }
 }
@@ -348,7 +349,8 @@ public extension DoubleValueDataset {
         "ShuffleDataset", _handle, Tensor<Int64>(sampleCount), seed1, seed2,
         output_types: [ScalarOfFirstElement.self, ScalarOfSecondElement.self],
         output_shapes: [elementShapes.0, elementShapes.1]
-      )
+      ),
+      elementShapes: elementShapes
     )
   }
 
@@ -359,7 +361,8 @@ public extension DoubleValueDataset {
         "BatchDataset", _handle, Tensor<Int64>(batchSize),
         output_types: [ScalarOfFirstElement.self, ScalarOfSecondElement.self],
         output_shapes: [elementShapes.0, elementShapes.1]
-      )
+      ),
+      elementShapes: elementShapes
     )
   }
 }
