@@ -562,22 +562,19 @@ bool RValueTreatedAsLValueFailure::diagnose() {
     }
   } else if (auto inoutExpr = dyn_cast<InOutExpr>(diagExpr)) {
     Type type = getConstraintSystem().getType(inoutExpr);
-    for (auto &restriction : getSolution().ConstraintRestrictions) {
-      if (restriction.second == ConversionRestrictionKind::ArrayToPointer &&
-          restriction.first.first->isEqual(type)) {
-        PointerTypeKind pointerKind;
-        if (restriction.first.second->getAnyPointerElementType(pointerKind) &&
-            (pointerKind == PTK_UnsafePointer ||
-             pointerKind == PTK_UnsafeRawPointer)) {
-          // If we're converting to an UnsafePointer, then the programmer
-          // specified an & unnecessarily. Produce a fixit hint to remove it.
-          emitDiagnostic(inoutExpr->getLoc(),
-                         diag::extra_address_of_unsafepointer,
-                         restriction.first.second)
-              .highlight(inoutExpr->getSourceRange())
-              .fixItRemove(inoutExpr->getStartLoc());
-          return true;
-        }
+    if (auto restriction = restrictionForType(type)) {
+      PointerTypeKind pointerKind;
+      if (restriction->second == ConversionRestrictionKind::ArrayToPointer &&
+          restriction->first->getAnyPointerElementType(pointerKind) &&
+          (pointerKind == PTK_UnsafePointer ||
+           pointerKind == PTK_UnsafeRawPointer)) {
+        // If we're converting to an UnsafePointer, then the programmer
+        // specified an & unnecessarily. Produce a fixit hint to remove it.
+        emitDiagnostic(inoutExpr->getLoc(),
+                       diag::extra_address_of_unsafepointer, restriction->first)
+            .highlight(inoutExpr->getSourceRange())
+            .fixItRemove(inoutExpr->getStartLoc());
+        return true;
       }
     }
 

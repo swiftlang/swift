@@ -83,6 +83,16 @@ protected:
 
   const Solution &getSolution() const { return solution; }
 
+  Optional<std::pair<Type, ConversionRestrictionKind>>
+  restrictionForType(Type type) const {
+    for (auto &restriction : solution.ConstraintRestrictions) {
+      if (restriction.first.first->isEqual(type))
+        return std::pair<Type, ConversionRestrictionKind>(
+            restriction.first.second, restriction.second);
+    }
+    return None;
+  }
+
   Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     return solution.getOverloadChoiceIfAvailable(locator);
