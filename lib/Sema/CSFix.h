@@ -301,6 +301,26 @@ public:
                                          Type rhs, ConstraintLocator *locator);
 };
 
+/// Skip 'superclass' generic requirement constraint,
+/// and assume that types are equal.
+class SkipSuperclassRequirement final : public ConstraintFix {
+  Type LHS, RHS;
+
+  SkipSuperclassRequirement(Type lhs, Type rhs, ConstraintLocator *locator)
+      : ConstraintFix(FixKind::SkipSameTypeRequirement, locator), LHS(lhs),
+        RHS(rhs) {}
+
+public:
+  std::string getName() const override {
+    return "skip superclass generic requirement";
+  }
+
+  bool diagnose(Expr *root, const Solution &solution) const override;
+
+  static SkipSuperclassRequirement *
+  create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
+};
+
 } // end namespace constraints
 } // end namespace swift
 

@@ -274,6 +274,40 @@ protected:
   }
 };
 
+/// Diagnose failures related to superclass generic requirements, e.g.
+/// ```swift
+/// class A {
+/// }
+///
+/// class B {
+/// }
+///
+/// func foo<T>(_ t: [T]) where T: A {}
+/// foo([B()])
+/// ```
+///
+/// `A` is not the superclass of `B`, which is required by `foo<T>`.
+class SuperclassRequirementFailure final : public RequirementFailure {
+  Type LHS, RHS;
+
+public:
+  SuperclassRequirementFailure(Expr *expr, const Solution &solution, Type lhs,
+                               Type rhs, ConstraintLocator *locator)
+      : RequirementFailure(expr, solution, locator), LHS(lhs), RHS(rhs) {}
+
+  Type getLHS() const override { return LHS; }
+  Type getRHS() const override { return RHS; }
+
+protected:
+  DiagOnDecl getDiagnosticOnDecl() const override {
+    return diag::types_not_inherited_decl;
+  }
+
+  DiagInReference getDiagnosticInRereference() const override {
+    return diag::types_not_inherited_in_decl_ref;
+  }
+};
+
 /// Diagnose errors associated with missing, extraneous
 /// or incorrect labels supplied by arguments, e.g.
 /// ```swift
