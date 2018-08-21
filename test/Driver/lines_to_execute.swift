@@ -12,15 +12,15 @@
 // CHECK-4: -e:2:1: error: use of unresolved identifier 'foo'
 // CHECK-4-NOT: Hello, world!
 
-// RUN: %swift_driver_plain -MFoundation -e 'NSLog("Hello, world!")' 2>&1 | %FileCheck -check-prefix CHECK-5 %s
-// CHECK-5: swift[{{.*}}] Hello, world!
+// RUN: %swift_driver_plain -MSwiftShims -e '_stdlib_write(1, "Hello, world!", 13)' 2>&1 | %FileCheck -check-prefix CHECK-5 %s
+// CHECK-5: Hello, world!
 
 // RUN: not %swift_driver_plain -MFnord -e 'fnord' 2>&1 | %FileCheck -check-prefix CHECK-6 %s
 // CHECK-6: -M:1:8: error: no such module 'Fnord'
 // CHECK-6-NOT: -e:1:1: error: use of unresolved identifier 'fnord'
 
-// RUN: not %swift_driver_plain -MFoundation -e 'fnord' 2>&1 | %FileCheck -check-prefix CHECK-7 %s
+// RUN: not %swift_driver_plain -MSwiftShims -e 'fnord' 2>&1 | %FileCheck -check-prefix CHECK-7 %s
 // CHECK-7: -e:1:1: error: use of unresolved identifier 'fnord'
 
-// RUN: not %swift_driver_plain -MFoundation 2>&1 | %FileCheck -check-prefix CHECK-8 %s
+// RUN: not %swift_driver_plain -MSwiftShims 2>&1 | %FileCheck -check-prefix CHECK-8 %s
 // CHECK-8: error: cannot use -M arguments to import modules without -e arguments to use them
