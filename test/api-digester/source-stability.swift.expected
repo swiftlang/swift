@@ -1,3 +1,4 @@
+TypeAlias LazyMapCollection.Element has generic signature change from <Base, Element where Base : Collection> to <Base, Element where Base : BidirectionalCollection>
 TypeAlias AbsoluteValuable has been removed
 TypeAlias AnyBidirectionalCollection.Element has been removed
 TypeAlias AnyCollection.Element has been removed
@@ -19,7 +20,6 @@ TypeAlias EmptyCollection.Element has been removed
 TypeAlias IntMax has been removed
 TypeAlias Integer has been removed
 TypeAlias IntegerArithmetic has been removed
-TypeAlias LazyMapCollection.Element has been removed
 TypeAlias LazyMapSequence.Element has been removed
 TypeAlias LazySequence.Base has been removed
 TypeAlias PartialRangeFrom.Bound has been removed
@@ -42,9 +42,6 @@ TypeAlias UnsafeBufferPointer.Element has been removed
 TypeAlias UnsafeMutableBufferPointer.Element has been removed
 TypeAlias UnsafeMutablePointer.Pointee has been removed
 TypeAlias UnsafePointer.Pointee has been removed
-Var BidirectionalCollection.endIndex has been removed
-Var BidirectionalCollection.indices has been removed
-Var BidirectionalCollection.startIndex has been removed
 Var FixedWidthInteger.allZeros has been removed (deprecated)
 Constructor Int.init(truncatingBitPattern:) has been removed
 Constructor Int16.init(truncatingBitPattern:) has been removed
