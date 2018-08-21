@@ -237,7 +237,7 @@ public struct DoubleValueDataset<ScalarOfFirstElement, ScalarOfSecondElement>
 }
 
 public extension DoubleValueDataset {
-  init(randomSeed: Int64, elementShape: TensorShape) {
+  init(randomSeed: Int64, elementShapes: (TensorShape, TensorShape)) {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
     enableCPU()
     self.init(
