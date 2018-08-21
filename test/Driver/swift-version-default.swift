@@ -31,6 +31,18 @@ htn
 #endif
 
 #if swift(>=5)
+aoeu // expected-error {{use of unresolved identifier}}
+#else
+htn
+#endif
+
+#if swift(>=5.1)
+aoeu
+#else
+htn // expected-error {{use of unresolved identifier}}
+#endif
+
+#if swift(>=6)
 aoeu
 #else
 htn // expected-error {{use of unresolved identifier}}
