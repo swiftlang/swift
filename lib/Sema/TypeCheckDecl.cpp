@@ -3123,12 +3123,12 @@ public:
       }
     }
 
-    if (FD->hasBody()) {
-      // Record the body.
-      TC.definedFunctions.push_back(FD);
-    } else if (requiresDefinition(FD)) {
+    if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
       TC.diagnose(FD->getLoc(), diag::func_decl_without_brace);
+    } else {
+      // Record the body.
+      TC.definedFunctions.push_back(FD);
     }
   }
 
@@ -3354,20 +3354,18 @@ public:
     AccessControlChecker::checkAccessControl(TC, CD);
     UsableFromInlineChecker::checkUsableFromInline(TC, CD);
 
-    if (CD->hasBody() && !CD->isMemberwiseInitializer()) {
-      TC.definedFunctions.push_back(CD);
-    } else if (requiresDefinition(CD)) {
+    if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
       TC.diagnose(CD->getLoc(), diag::missing_initializer_def);
+    } else {
+      TC.definedFunctions.push_back(CD);
     }
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
     TC.validateDecl(DD);
     TC.checkDeclAttributes(DD);
-
-    if (DD->hasBody())
-      TC.definedFunctions.push_back(DD);
+    TC.definedFunctions.push_back(DD);
   }
 };
 } // end anonymous namespace
