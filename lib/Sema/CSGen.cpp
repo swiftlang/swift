@@ -2416,7 +2416,7 @@ namespace {
       auto result = InOutType::get(lvalue);
       CS.addConstraint(ConstraintKind::Conversion,
                        CS.getType(expr->getSubExpr()), bound,
-                       CS.getConstraintLocator(expr->getSubExpr()));
+                       CS.getConstraintLocator(expr));
       return result;
     }
 
