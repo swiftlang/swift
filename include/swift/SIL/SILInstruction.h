@@ -7828,6 +7828,21 @@ public:
     }
   }
 
+  /// Return whether the given apply is of a formally-throwing function
+  /// which is statically known not to throw.
+  bool isNonThrowing() const {
+    switch (getInstruction()->getKind()) {
+    case SILInstructionKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->isNonThrowing();
+    case SILInstructionKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->isNonThrowing();
+    case SILInstructionKind::TryApplyInst:
+      return false;
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
   static ApplySite getFromOpaqueValue(void *p) {
     return ApplySite(p);
   }

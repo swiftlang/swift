@@ -103,6 +103,10 @@ static bool canSpecializeFunction(SILFunction *F,
   if (F->getConventions().hasIndirectSILResults())
     return false;
 
+  // For now ignore coroutines.
+  if (F->getLoweredFunctionType()->isCoroutine())
+    return false;
+
   // Do not specialize the signature of always inline functions. We
   // will just inline them and specialize each one of the individual
   // functions that these sorts of functions are inlined into.
