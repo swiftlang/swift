@@ -912,7 +912,7 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
 
   // Try to determine a good source location to report.
   auto loc = getUserSourceLocation(value);
-  
+
   // Opaque handles can never be sent or passed as tensor program arguments.
   // Type checking must have rejected host functions that are either a)
   // public with private ABI or b) marked @inline(never).
@@ -1019,7 +1019,7 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
     // here.  It won't be very useful.
     if (isUserIgnoredByPartitioning(user))
       continue;
-    
+
     // If the value is a non-copyable opaque handle, emit an error.
     if (isOpaqueHandle(value->getType())) {
       diagnoseOpaqueHandleCopy(value, user);
@@ -3654,12 +3654,6 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
       continue;
     }
 
-    // FIXME: properly handle BranchInst.
-    if (isa<BranchInst>(user)) {
-      retainReleaseBalance += 5;
-      continue;
-    }
-
     user->dump();
     oldResult->dump();
     llvm_unreachable(
@@ -4134,7 +4128,7 @@ bool TFFunctionPartition::partition(bool isTest) {
                  argInfo->second.first == Marking::Delete))
               continue;
           }
-          
+
           // If it's an opaque handle such as VariantHandle or ResourceHandle,
           // it cannot be a result except when it's being returned in an
           // accelerator-only function.
