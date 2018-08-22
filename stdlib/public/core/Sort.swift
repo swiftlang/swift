@@ -443,7 +443,7 @@ extension MutableCollection where Self: RandomAccessCollection {
         break Loop
       }
       
-      // we can swap mid, so we should keep pivot valid
+      // we must update mid to keep pivot reference valid
       if lo == mid {
         mid = hi
       } else if hi == mid {
