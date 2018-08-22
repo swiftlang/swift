@@ -68,7 +68,6 @@ public extension SingleValueDataset {
   @inlinable @inline(__always)
   init(randomSeed: Int64, elementShape: TensorShape) {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
-    enableCPU()
     self.init(
       _handle: #tfop("RandomDataset", seed1, seed2,
                      output_types: [ScalarOfElement.self],
@@ -83,7 +82,6 @@ public extension SingleValueDataset {
   @inlinable @inline(__always)
   public init(elements: Tensor<ScalarOfElement>, elementShape: TensorShape) {
     // A dataset creation op only runs on TF CPU.
-    enableCPU()
     self.init(
       _handle: #tfop(
         "TensorSliceDataset", [elements],
@@ -237,7 +235,6 @@ public extension DoubleValueDataset {
   @inlinable @inline(__always)
   init(randomSeed: Int64, elementShapes: (TensorShape, TensorShape)) {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
-    enableCPU()
     self.init(
       _handle: #tfop("RandomDataset", seed1, seed2,
                      output_types: [ScalarOfFirstElement.self,
@@ -255,7 +252,6 @@ public extension DoubleValueDataset {
                          Tensor<ScalarOfSecondElement>),
               elementShapes: (TensorShape, TensorShape)) {
     // A dataset creation op only runs on TF CPU.
-    enableCPU()
     self.init(
       _handle: #tfop(
         "TensorSliceDataset", [elements.0.handle, elements.1.handle],
