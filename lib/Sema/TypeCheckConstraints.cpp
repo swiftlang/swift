@@ -3349,7 +3349,7 @@ void Solution::dump(raw_ostream &out) const {
     out << "\nFixes:\n";
     for (auto *fix : Fixes) {
       out.indent(2);
-      fix->print(out, &ctx.SourceMgr);
+      fix->print(out);
       out << "\n";
     }
   }
@@ -3544,7 +3544,7 @@ void ConstraintSystem::print(raw_ostream &out) {
     out << "\nFixes:\n";
     for (auto *fix : Fixes) {
       out.indent(2);
-      fix->print(out, &getTypeChecker().Context.SourceMgr);
+      fix->print(out);
       out << "\n";
     }
   }
