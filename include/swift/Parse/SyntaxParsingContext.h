@@ -40,7 +40,7 @@ public:
   RC<RawSyntax> get() { return Obj; }
 
   // Only allow allocation of Node using the allocator in SyntaxArena.
-  void *operator new(size_t Bytes, RC<SyntaxArena> Arena,
+  void *operator new(size_t Bytes, RC<SyntaxArena> &Arena,
                      unsigned Alignment = alignof(RawSyntaxCacheNode)) {
     return Arena->Allocate(Bytes, Alignment);
   }
@@ -54,7 +54,7 @@ class RawSyntaxTokenCache {
   std::vector<RawSyntaxCacheNode *> CacheNodes;
 
 public:
-  RC<RawSyntax> getToken(RC<SyntaxArena> Arena, tok TokKind, OwnedString Text,
+  RC<RawSyntax> getToken(RC<SyntaxArena> &Arena, tok TokKind, OwnedString Text,
                          llvm::ArrayRef<TriviaPiece> LeadingTrivia,
                          llvm::ArrayRef<TriviaPiece> TrailingTrivia);
 
@@ -155,7 +155,8 @@ public:
 
     RootContextData(SourceFile &SF, DiagnosticEngine &Diags,
                     SourceManager &SourceMgr, unsigned BufferID,
-                    RC<SyntaxArena> Arena, SyntaxParsingCache *SyntaxCache)
+                    const RC<SyntaxArena> &Arena,
+                    SyntaxParsingCache *SyntaxCache)
         : SF(SF), Diags(Diags), SourceMgr(SourceMgr), BufferID(BufferID),
           Arena(Arena), SyntaxCache(SyntaxCache) {}
   };
@@ -291,7 +292,7 @@ public:
 
   RawSyntaxTokenCache &getTokenCache() { return getRootData()->TokenCache; }
 
-  RC<SyntaxArena> getArena() const { return getRootData()->Arena; }
+  const RC<SyntaxArena> &getArena() const { return getRootData()->Arena; }
 
   const SyntaxParsingContext *getRoot() const;
 
