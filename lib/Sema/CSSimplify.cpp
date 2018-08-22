@@ -589,12 +589,10 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   if (!callExpr) 
     return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
 
-  // Our remaining path can only be 'ApplyArgument' or 'SubscriptIndex'.
+  // Our remaining path can only be 'ApplyArgument'.
   if (!path.empty() &&
-      !(path.size() == 1 &&
-        (path.back().getKind() == ConstraintLocator::ApplyArgument ||
-         path.back().getKind() == ConstraintLocator::SubscriptIndex ||
-         path.back().getKind() == ConstraintLocator::KeyPathComponent)))
+      !(path.size() <= 2 &&
+        path.back().getKind() == ConstraintLocator::ApplyArgument))
     return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
 
   // Dig out the callee.
@@ -616,11 +614,12 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     argLabels = dynSubscript->getArgumentLabels();
     hasTrailingClosure = dynSubscript->hasTrailingClosure();
   } else if (auto keyPath = dyn_cast<KeyPathExpr>(callExpr)) {
-    if (path.empty()
-        || path.back().getKind() != ConstraintLocator::KeyPathComponent)
+    if (path.size() != 2 ||
+        path[0].getKind() != ConstraintLocator::KeyPathComponent ||
+        path[1].getKind() != ConstraintLocator::ApplyArgument)
       return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
     
-    auto componentIndex = path.back().getValue();
+    auto componentIndex = path[0].getValue();
     if (componentIndex >= keyPath->getComponents().size())
       return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
 
@@ -628,7 +627,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     switch (component.getKind()) {
     case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
-      targetLocator = cs.getConstraintLocator(keyPath, path.back());
+      targetLocator = cs.getConstraintLocator(callExpr, path[0]);
       argLabels = component.getSubscriptLabels();
       hasTrailingClosure = false; // key paths don't support trailing closures
       break;
@@ -4193,7 +4192,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
        resolvedItem = resolvedItem->Previous) {
     auto locator = resolvedItem->Locator;
     if (locator->getAnchor() == keyPath
-        && locator->getPath().size() == 1
+        && locator->getPath().size() <= 2
         && locator->getPath()[0].getKind() == ConstraintLocator::KeyPathComponent) {
       choices[locator->getPath()[0].getValue()] = resolvedItem->Choice;
     }
@@ -4583,7 +4582,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     if (matchTypes(func1->getResult(), func2->getResult(),
                    ConstraintKind::Bind,
                    subflags,
-                   locator.withPathElement(ConstraintLocator::FunctionResult)).isFailure())
+                   locator.withPathElement(
+                     ConstraintLocator::FunctionResult)).isFailure())
       return SolutionKind::Error;
 
     // Record any fixes we attempted to get to the correct solution.
@@ -5267,7 +5267,8 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
   if (!subscript)
     return;
   
-  assert(path.size() == 1 && path[0].getKind() == ConstraintLocator::SubscriptMember);
+  assert(path.size() == 1 &&
+         path[0].getKind() == ConstraintLocator::SubscriptMember);
   auto indexTuple = dyn_cast<TupleExpr>(subscript->getIndex());
   if (!indexTuple || indexTuple->getNumElements() != 1)
     return;

@@ -1553,7 +1553,7 @@ namespace {
         index = coerceCallArguments(index, subscriptFnTy, nullptr,
                                     argLabels, hasTrailingClosure,
                                     locator.withPathElement(
-                                      ConstraintLocator::SubscriptIndex));
+                                      ConstraintLocator::ApplyArgument));
         if (!index)
           return nullptr;
 
@@ -4330,8 +4330,14 @@ namespace {
         auto kind = origComponent.getKind();
         Optional<SelectedOverload> foundDecl;
 
-        auto locator = cs.getConstraintLocator(E,
-                       ConstraintLocator::PathElement::getKeyPathComponent(i));
+        auto locator =
+          cs.getConstraintLocator(E,
+                        ConstraintLocator::PathElement::getKeyPathComponent(i));
+        if (kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
+          locator =
+            cs.getConstraintLocator(locator,
+                                    ConstraintLocator::SubscriptMember);
+        }
 
         // If this is an unresolved link, make sure we resolved it.
         if (kind == KeyPathExpr::Component::Kind::UnresolvedProperty ||
@@ -4896,22 +4902,14 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
     return nullptr;
 
   // If the locator points to a function application, find the function itself.
-  bool isSubscript =
-    locator->getPath().back().getKind() == ConstraintLocator::SubscriptIndex;
-  if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument ||
-      isSubscript) {
+  if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument) {
     assert(locator->getPath().back().getNewSummaryFlags() == 0 &&
-           "ApplyArgument/SubscriptIndex adds no flags");
+           "ApplyArgument adds no flags");
     SmallVector<LocatorPathElt, 4> newPath;
     newPath.append(locator->getPath().begin(), locator->getPath().end()-1);
 
     unsigned newFlags = locator->getSummaryFlags();
-
-    if (isSubscript) {
-      newPath.push_back(ConstraintLocator::SubscriptMember);
-    } else {
-      newPath.push_back(ConstraintLocator::ApplyFunction);
-    }
+    newPath.push_back(ConstraintLocator::ApplyFunction);
 
     assert(newPath.back().getNewSummaryFlags() == 0 &&
            "added element that changes the flags?");

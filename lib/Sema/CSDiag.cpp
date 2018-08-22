@@ -296,16 +296,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
-    case ConstraintLocator::SubscriptIndex:
-      if (auto subscript = dyn_cast<SubscriptExpr>(anchor)) {
-        targetAnchor = subscript->getBase();
-        targetPath.clear();
-
-        anchor = subscript->getIndex();
-        path = path.slice(1);
-        continue;
-      }
-      break;
     case ConstraintLocator::SubscriptMember:
       if (isa<SubscriptExpr>(anchor)) {
         targetAnchor = nullptr;
