@@ -736,7 +736,8 @@ int doSerializeRawTree(const char *MainExecutablePath,
       if (options::AddByteTreeFields) {
         UserInfo[swift::byteTree::UserInfoKeyAddInvalidFields] = (void *)true;
       }
-      swift::byteTree::ByteTreeWriter::write(Stream, /*ProtocolVersion=*/1,
+      swift::byteTree::ByteTreeWriter::write(Stream,
+                                             byteTree::SYNTAX_TREE_VERSION,
                                              *Root, UserInfo);
       auto OutputBufferOrError = llvm::FileOutputBuffer::create(
           options::OutputFilename, Stream.data().size());
