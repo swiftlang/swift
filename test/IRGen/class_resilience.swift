@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-resilience -enable-class-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -enable-class-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -enable-class-resilience -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -enable-class-resilience %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -enable-class-resilience %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
 // RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -enable-class-resilience -O %t/class_resilience.swift
 
 // CHECK: @"$S16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = hidden global [[INT]] 0
@@ -33,13 +33,49 @@
 // CHECK: @"$S16class_resilience14ResilientChildCMn" = {{(protected )?}}{{(dllexport )?}}constant <{{.*}}> <{
 // --       flags: class, unique, has vtable, in-place initialization, has resilient superclass
 // CHECK-SAME:   <i32 0xC401_0050>
+// --       parent:
+// CHECK-SAME:   @"$S16class_resilienceMXM"
 // --       name:
 // CHECK-SAME:   [15 x i8]* [[RESILIENTCHILD_NAME]]
-// --       num fields
+// --       metadata accessor function:
+// CHECK-SAME:   @"$S16class_resilience14ResilientChildCMa"
+// --       field descriptor:
+// CHECK-SAME:   @"$S16class_resilience14ResilientChildCMF"
+// -- superclass:
+// CHECK-SAME:   @"got.$S15resilient_class22ResilientOutsideParentCMn"
+// -- metadata bounds:
+// CHECK-SAME:   @"$S16class_resilience14ResilientChildCMo"
+// --       metadata positive size in words (not used):
+// CHECK-SAME:   i32 0,
+// --       num immediate members:
+// CHECK-SAME:   i32 4,
+// --       num fields:
 // CHECK-SAME:   i32 1,
-// --       field offset vector offset
+// --       field offset vector offset:
 // CHECK-SAME:   i32 3,
+// --       singleton metadata initialization cache:
+// CHECK-SAME:   @"$S16class_resilience14ResilientChildCMl"
+// --       resilient pattern:
+// CHECK-SAME:   @"$S16class_resilience14ResilientChildCMP"
+// --       completion function:
+// CHECK-SAME:   @"$S16class_resilience14ResilientChildCMr"
 // CHECK-SAME: }>
+
+// CHECK: @"$S16class_resilience14ResilientChildCMP" = internal constant <{{.*}}> <{
+// --       instantiation function:
+// CHECK-SAME:   @"$S16class_resilience14ResilientChildCMi"
+// --       destructor:
+// CHECK-SAME:   @"$S16class_resilience14ResilientChildCfD"
+// --       ivar destroyer:
+// CHECK-SAME:   i32 0,
+// --       flags:
+// CHECK-SAME:   i32 3,
+// --       RO data:
+// CHECK-objc-SAME: @_DATA__TtC16class_resilience14ResilientChild
+// CHECK-native-SAME: i32 0,
+// --       metaclass:
+// CHECK-objc-SAME: @"$S16class_resilience14ResilientChildCMm"
+// CHECK-native-SAME: i32 0
 
 // CHECK: @"$S16class_resilience16FixedLayoutChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS]] zeroinitializer
 
@@ -361,10 +397,10 @@ extension ResilientGenericOutsideParent {
 // CHECK:      void @swift_initClassMetadata(%swift.type* %0, %swift.type* null, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
-// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvWvd"
+// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd"
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
-// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience26ClassWithResilientPropertyC5colors5Int32VvWvd"
+// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience26ClassWithResilientPropertyC5colors5Int32VvpWvd"
 
 // CHECK: br label %metadata-dependencies.cont
 
@@ -400,10 +436,10 @@ extension ResilientGenericOutsideParent {
 // CHECK:      call void @swift_initClassMetadata(%swift.type* %0, %swift.type* null, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
-// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvWvd"
+// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvpWvd"
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
-// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvWvd"
+// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvpWvd"
 
 // CHECK: br label %metadata-dependencies.cont
 
@@ -414,14 +450,6 @@ extension ResilientGenericOutsideParent {
 // CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
 // CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
-
-
-// ResilientChild metadata relocation function
-
-// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience14ResilientChildCMi"(%swift.type_descriptor*)
-// CHECK-NEXT: entry:
-// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type_descriptor* %0, %swift.type* bitcast ({{.*}} @"$S16class_resilience14ResilientChildCMf", {{.*}}), [[INT]] {{60|96}})
-// CHECK-NEXT: ret %swift.type* [[METADATA]]
 
 
 // ResilientChild metadata initialization function
@@ -467,6 +495,14 @@ extension ResilientGenericOutsideParent {
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
 
+// ResilientChild metadata relocation function
+
+// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience14ResilientChildCMi"(%swift.type_descriptor*, i8*)
+// CHECK-NEXT: entry:
+// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type_descriptor* %0, i8* %1)
+// CHECK-NEXT: ret %swift.type* [[METADATA]]
+
+
 // ResilientChild.field setter dispatch thunk
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S16class_resilience14ResilientChildC5fields5Int32VvsTj"(i32, %T16class_resilience14ResilientChildC* swiftself)
@@ -480,14 +516,6 @@ extension ResilientGenericOutsideParent {
 // CHECK-NEXT: [[METHOD:%.*]] = load void (i32, %T16class_resilience14ResilientChildC*)*, void (i32, %T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]]
 // CHECK-NEXT: call swiftcc void [[METHOD]](i32 %0, %T16class_resilience14ResilientChildC* swiftself %1)
 // CHECK-NEXT: ret void
-
-
-// FixedLayoutChild metadata relocation function
-
-// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience16FixedLayoutChildCMi"(%swift.type_descriptor*)
-// CHECK-NEXT: entry:
-// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type_descriptor* %0, %swift.type* bitcast ({{.*}} @"$S16class_resilience16FixedLayoutChildCMf", {{.*}}), [[INT]] {{60|96}})
-// CHECK-NEXT: ret %swift.type* [[METADATA]]
 
 
 // FixedLayoutChild metadata initialization function
@@ -514,6 +542,14 @@ extension ResilientGenericOutsideParent {
 // CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
 // CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
+
+
+// FixedLayoutChild metadata relocation function
+
+// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience16FixedLayoutChildCMi"(%swift.type_descriptor*, i8*)
+// CHECK-NEXT: entry:
+// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type_descriptor* %0, i8* %1)
+// CHECK-NEXT: ret %swift.type* [[METADATA]]
 
 
 // ResilientGenericChild metadata initialization function

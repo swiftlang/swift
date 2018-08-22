@@ -1245,10 +1245,8 @@ namespace {
         return;
       }
 
-      llvm::Function *relocationFunction =
-        IGM.getAddrOfTypeMetadataInstantiationFunction(getType(),
-                                                       NotForDefinition);
-      B.addRelativeAddress(relocationFunction);
+      auto *pattern = IGM.getAddrOfTypeMetadataPattern(Type);
+      B.addRelativeAddress(pattern);
     }
 
     ContextDescriptorKind getContextKind() {
@@ -2273,26 +2271,6 @@ namespace {
     }
   };
 
-  /// Utility class for building member metadata for classes with resilient
-  /// ancestry. The total size of the class metadata is not known at compile
-  /// time, and requires relocation.
-  class ResilientClassMemberBuilder {
-  public:
-    ResilientClassMemberBuilder(IRGenModule &IGM,
-                                ConstantStructBuilder &builder,
-                                SILVTable *vtable) {}
-
-    void addFieldOffset(VarDecl *var) {}
-
-    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {}
-
-    void addMethod(SILDeclRef fn) {}
-
-    void addGenericArgument(ClassDecl *forClass) {}
-
-    void addGenericWitnessTable(ClassDecl *forClass) {}
-  };
-
   /// Base class for layout of non-generic class metadata.
   template<class Impl, class MemberBuilder>
   class ClassMetadataBuilderBase : public ClassMetadataVisitor<Impl> {
@@ -2540,54 +2518,16 @@ namespace {
       emitClassMetadataBaseOffset(IGM, Target);
       createNonGenericMetadataAccessFunction(IGM, Target);
 
-      if (doesClassMetadataRequireInitialization(IGM, Target)) {
-        emitMetadataCompletionFunction(
-            IGM, Target,
-            [&](IRGenFunction &IGF, llvm::Value *metadata,
-                MetadataDependencyCollector *collector) {
-          emitInitializeClassMetadata(IGF, Target, FieldLayout, metadata,
-                                      collector);
-        });
-      }
+      if (!doesClassMetadataRequireInitialization(IGM, Target))
+        return;
 
-      // If the class has resilient ancestry we also need a relocation
-      // function.
-      if (doesClassMetadataRequireRelocation(IGM, Target))
-        emitRelocationFunction();
-    }
-
-  private:
-    /// Emit the create function for a class with resilient ancestry.
-    void emitRelocationFunction() {
-      // using MetadataRelocator =
-      //   Metadata *(TypeContextDescriptor *type,
-      //              Metadata *metadata);
-      llvm::Function *f =
-        IGM.getAddrOfTypeMetadataInstantiationFunction(Target, ForDefinition);
-      f->setAttributes(IGM.constructInitialAttributes());
-
-      IRGenFunction IGF(IGM, f);
-
-      // Skip instrumentation when building for TSan to avoid false positives.
-      // The synchronization for this happens in the Runtime and we do not see it.
-      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
-        f->removeFnAttr(llvm::Attribute::SanitizeThread);
-
-      if (IGM.DebugInfo)
-        IGM.DebugInfo->emitArtificialFunction(IGF, f);
-
-      Explosion params = IGF.collectParameters();
-      llvm::Value *descriptor = params.claimNext();
-
-      llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(
-        Target->getDeclaredType()->getCanonicalType());
-
-      // Relocate the metadata.
-      auto patternSize = IGM.getSize(Size(B.getNextOffsetFromGlobal()));
-      metadata = IGF.Builder.CreateCall(IGF.IGM.getRelocateClassMetadataFn(),
-                                        {descriptor, metadata, patternSize});
-
-      IGF.Builder.CreateRet(metadata);
+      emitMetadataCompletionFunction(
+          IGM, Target,
+          [&](IRGenFunction &IGF, llvm::Value *metadata,
+              MetadataDependencyCollector *collector) {
+        emitInitializeClassMetadata(IGF, Target, FieldLayout, metadata,
+                                    collector);
+      });
     }
   };
 
@@ -2621,18 +2561,120 @@ namespace {
       : super(IGM, theClass, builder, fieldLayout) {}
   };
 
-  /// A builder for non-generic class metadata with resilient ancestry.
-  class ResilientClassMetadataBuilder :
-      public ClassMetadataBuilderBase<ResilientClassMetadataBuilder,
-                                      ResilientClassMemberBuilder> {
-    using super = ClassMetadataBuilderBase<ResilientClassMetadataBuilder,
-                                           ResilientClassMemberBuilder>;
+  /// A builder for metadata patterns for non-generic class with
+  /// resilient ancestry.
+  class ResilientClassMetadataBuilder {
+    IRGenModule &IGM;
+    ClassDecl *Target;
+    ConstantStructBuilder &B;
+    const ClassLayout &FieldLayout;
 
   public:
     ResilientClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                   ConstantStructBuilder &builder,
                                   const ClassLayout &fieldLayout)
-      : super(IGM, theClass, builder, fieldLayout) {}
+      : IGM(IGM), Target(theClass), B(builder), FieldLayout(fieldLayout) {}
+
+    llvm::Constant *emitNominalTypeDescriptor() {
+      return ClassContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
+    }
+
+    void layout() {
+      emitNominalTypeDescriptor();
+
+      addRelocationFunction();
+      addDestructorFunction();
+      addIVarDestroyer();
+      addClassFlags();
+      addClassDataPointer();
+      addMetaclass();
+    }
+
+    void addRelocationFunction() {
+      auto function = IGM.getAddrOfTypeMetadataInstantiationFunction(
+        Target, NotForDefinition);
+      B.addRelativeAddress(function);
+    }
+
+    void addDestructorFunction() {
+      auto function = getAddrOfDestructorFunction(IGM, Target);
+      B.addRelativeAddressOrNull(function ? *function : nullptr);
+    }
+
+    void addIVarDestroyer() {
+      auto function = IGM.getAddrOfIVarInitDestroy(Target,
+                                                   /*isDestroyer=*/ true,
+                                                   /*isForeign=*/ false,
+                                                   NotForDefinition);
+      B.addRelativeAddressOrNull(function ? *function : nullptr);
+    }
+
+    void addClassFlags() {
+      B.addInt32((uint32_t) getClassFlags(Target));
+    }
+
+    void addClassDataPointer() {
+      auto data = (IGM.ObjCInterop
+                   ? emitClassPrivateData(IGM, Target)
+                   : nullptr);
+      B.addRelativeAddressOrNull(data);
+    }
+
+    void addMetaclass() {
+      auto metaclass = (IGM.ObjCInterop
+                        ? IGM.getAddrOfMetaclassObject(Target, NotForDefinition)
+                        : nullptr);
+      B.addRelativeAddressOrNull(metaclass);
+    }
+
+    void createMetadataAccessFunction() {
+      assert(doesClassMetadataRequireRelocation(IGM, Target));
+
+      assert(!Target->isGenericContext());
+      emitClassMetadataBaseOffset(IGM, Target);
+      createNonGenericMetadataAccessFunction(IGM, Target);
+
+      emitMetadataCompletionFunction(
+          IGM, Target,
+          [&](IRGenFunction &IGF, llvm::Value *metadata,
+              MetadataDependencyCollector *collector) {
+        emitInitializeClassMetadata(IGF, Target, FieldLayout, metadata,
+                                    collector);
+      });
+
+      emitRelocationFunction();
+    }
+
+  private:
+    /// Emit the create function for a class with resilient ancestry.
+    void emitRelocationFunction() {
+      // using MetadataRelocator =
+      //   Metadata *(TypeContextDescriptor *type, void *pattern);
+      llvm::Function *f =
+        IGM.getAddrOfTypeMetadataInstantiationFunction(Target, ForDefinition);
+      f->setAttributes(IGM.constructInitialAttributes());
+
+      IRGenFunction IGF(IGM, f);
+
+      // Skip instrumentation when building for TSan to avoid false positives.
+      // The synchronization for this happens in the Runtime and we do not see it.
+      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
+        f->removeFnAttr(llvm::Attribute::SanitizeThread);
+
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, f);
+
+      Explosion params = IGF.collectParameters();
+      llvm::Value *descriptor = params.claimNext();
+      llvm::Value *pattern = params.claimNext();
+
+      // Allocate class metadata using the pattern we emitted.
+      llvm::Value *metadata =
+        IGF.Builder.CreateCall(IGF.IGM.getRelocateClassMetadataFn(),
+                               {descriptor, pattern});
+
+      IGF.Builder.CreateRet(metadata);
+    }
   };
 
   /// A builder for GenericClassMetadataPattern objects.
@@ -2848,7 +2890,10 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   auto init = builder.beginStruct();
   init.setPacked(true);
 
-  bool isGeneric = classDecl->isGenericContext();
+  // If the class is generic or has resilient ancestry, we emit a pattern,
+  // not type metadata.
+  bool isPattern = doesClassMetadataRequireRelocation(IGM, classDecl);
+
   bool canBeConstant;
   if (classDecl->isGenericContext()) {
     GenericClassMetadataBuilder builder(IGM, classDecl, init,
@@ -2861,7 +2906,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     ResilientClassMetadataBuilder builder(IGM, classDecl, init,
                                           fieldLayout);
     builder.layout();
-    canBeConstant = builder.canBeConstant();
+    canBeConstant = true;
 
     builder.createMetadataAccessFunction();
   } else if (doesClassMetadataRequireInitialization(IGM, classDecl)) {
@@ -2887,14 +2932,14 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
       IGM.TargetInfo.OutputObjectFormat == llvm::Triple::MachO)
     section = "__DATA,__objc_data, regular";
 
-  auto var = IGM.defineTypeMetadata(declaredType, isGeneric, canBeConstant,
+  auto var = IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
                                     init.finishAndCreateFuture(), section);
 
   // Add classes that don't require dynamic initialization to the
   // ObjC class list.
   //
   // FIXME: This is where we check the completely fragile layout.
-  if (IGM.ObjCInterop && !isGeneric &&
+  if (IGM.ObjCInterop && !isPattern &&
       !doesClassMetadataRequireInitialization(IGM, classDecl)) {
     // Emit the ObjC class symbol to make the class visible to ObjC.
     if (classDecl->isObjC()) {

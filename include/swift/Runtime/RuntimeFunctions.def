@@ -809,12 +809,11 @@ FUNCTION(GetExistentialMetadata,
          ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_relocateClassMetadata(TypeContextDescriptor *descriptor,
-//                                       Metadata *pattern,
-//                                       size_t patternSize);
+//                                       const void *pattern);
 FUNCTION(RelocateClassMetadata,
          swift_relocateClassMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeContextDescriptorPtrTy, TypeMetadataPtrTy, SizeTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };

@@ -3577,6 +3577,8 @@ IRGenModule::getAddrOfTypeMetadataInstantiationFunction(NominalTypeDecl *D,
     llvm::Type *argTys[] = {
       /// Type descriptor.
       TypeContextDescriptorPtrTy,
+      /// Resilient metadata pattern.
+      Int8PtrTy
     };
 
     fnType = llvm::FunctionType::get(TypeMetadataPtrTy, argTys,
