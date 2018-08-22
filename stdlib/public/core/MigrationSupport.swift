@@ -31,47 +31,47 @@ public typealias EnumeratedIterator<T: Sequence> = EnumeratedSequence<T>.Iterato
 public typealias IteratorOverOne<T> = CollectionOfOne<T>.Iterator
 @available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "EmptyCollection.Iterator")
 public typealias EmptyIterator<T> = EmptyCollection<T>.Iterator
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyFilterSequence.Iterator")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyFilterSequence.Iterator")
 public typealias LazyFilterIterator<T: Sequence> = LazyFilterSequence<T>.Iterator
-@available(swift, deprecated: 3.1/*, obsoleted: 5.0*/, message: "Use Base.Index")
+@available(swift, deprecated: 3.1, obsoleted: 5.0, message: "Use Base.Index")
 public typealias LazyFilterIndex<Base: Collection> = Base.Index
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyDropWhileSequence.Iterator")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileSequence.Iterator")
 public typealias LazyDropWhileIterator<T> = LazyDropWhileSequence<T>.Iterator where T: Sequence
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyDropWhileCollection.Index")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileCollection.Index")
 public typealias LazyDropWhileIndex<T> = LazyDropWhileCollection<T>.Index where T: Collection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyDropWhileCollection")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileCollection")
 public typealias LazyDropWhileBidirectionalCollection<T> = LazyDropWhileCollection<T> where T: BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyFilterCollection")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyFilterCollection")
 public typealias LazyFilterBidirectionalCollection<T> = LazyFilterCollection<T> where T : BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyMapSequence.Iterator")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyMapSequence.Iterator")
 public typealias LazyMapIterator<T, E> = LazyMapSequence<T, E>.Iterator where T: Sequence
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyMapCollection")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyMapCollection")
 public typealias LazyMapBidirectionalCollection<T, E> = LazyMapCollection<T, E> where T : BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyMapCollection")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyMapCollection")
 public typealias LazyMapRandomAccessCollection<T, E> = LazyMapCollection<T, E> where T : RandomAccessCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyCollection")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyCollection")
 public typealias LazyBidirectionalCollection<T> = LazyCollection<T> where T : BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyCollection")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyCollection")
 public typealias LazyRandomAccessCollection<T> = LazyCollection<T> where T : RandomAccessCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "FlattenCollection.Index")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "FlattenCollection.Index")
 public typealias FlattenCollectionIndex<T> = FlattenCollection<T>.Index where T : Collection, T.Element : Collection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "FlattenCollection.Index")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "FlattenCollection.Index")
 public typealias FlattenBidirectionalCollectionIndex<T> = FlattenCollection<T>.Index where T : BidirectionalCollection, T.Element : BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "FlattenCollection")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "FlattenCollection")
 public typealias FlattenBidirectionalCollection<T> = FlattenCollection<T> where T : BidirectionalCollection, T.Element : BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "JoinedSequence.Iterator")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "JoinedSequence.Iterator")
 public typealias JoinedIterator<T: Sequence> = JoinedSequence<T>.Iterator where T.Element: Sequence
-@available(*, deprecated: 4.2/*, obsoleted: 5.0*/, renamed: "Zip2Sequence.Iterator")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "Zip2Sequence.Iterator")
 public typealias Zip2Iterator<T, U> = Zip2Sequence<T, U>.Iterator where T: Sequence, U: Sequence
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyDropWhileSequence.Iterator")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileSequence.Iterator")
 public typealias LazyPrefixWhileIterator<T> = LazyPrefixWhileSequence<T>.Iterator where T: Sequence
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyDropWhileCollection.Index")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileCollection.Index")
 public typealias LazyPrefixWhileIndex<T> = LazyPrefixWhileCollection<T>.Index where T: Collection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "LazyPrefixWhileCollection")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyPrefixWhileCollection")
 public typealias LazyPrefixWhileBidirectionalCollection<T> = LazyPrefixWhileCollection<T> where T: BidirectionalCollection
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ReversedCollection")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "ReversedCollection")
 public typealias ReversedRandomAccessCollection<T: RandomAccessCollection> = ReversedCollection<T>
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ReversedCollection.Index")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "ReversedCollection.Index")
 public typealias ReversedIndex<T: BidirectionalCollection> = ReversedCollection<T>
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias BidirectionalSlice<T> = Slice<T> where T : BidirectionalCollection
