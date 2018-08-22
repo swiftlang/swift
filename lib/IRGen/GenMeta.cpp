@@ -1724,20 +1724,12 @@ static MetadataKind getMetadataKind(NominalTypeDecl *nominalDecl) {
 namespace {
   /// An adapter class which turns a metadata layout class into a
   /// generic metadata layout class.
-  template <class Impl, class Base>
-  class GenericMetadataBuilderBase : public Base {
-    using super = Base;
-
-    struct FillOp {
-      CanType Type;
-      Optional<ProtocolConformanceRef> Conformance;
-    };
-
+  template <class Impl, class DeclType>
+  class GenericMetadataBuilderBase {
   protected:
-    using super::IGM;
-    using super::asImpl;
-    using super::Target;
-    using super::B;
+    IRGenModule &IGM;
+    DeclType *Target;
+    ConstantStructBuilder &B;
 
     /// Set to true if the metadata record for the generic type has fields
     /// outside of the generic parameter vector.
@@ -1747,9 +1739,9 @@ namespace {
     /// on its generic parameters. Implies HasDependentMetadata.
     bool HasDependentVWT = false;
     
-    template <class... T>
-    GenericMetadataBuilderBase(IRGenModule &IGM, T &&...args)
-      : super(IGM, std::forward<T>(args)...) {}
+    GenericMetadataBuilderBase(IRGenModule &IGM, DeclType *Target,
+                               ConstantStructBuilder &B)
+      : IGM(IGM), Target(Target), B(B) {}
 
     /// Emit the instantiation cache variable for the template.
     void emitInstantiationCache() {
@@ -1759,6 +1751,8 @@ namespace {
         llvm::ConstantAggregateZero::get(cache->getValueType());
       cache->setInitializer(init);
     }
+
+    Impl &asImpl() { return *static_cast<Impl*>(this); }
 
     /// Emit the create function for the template.
     void emitInstantiationFunction() {
@@ -1810,19 +1804,17 @@ namespace {
         // Bind the generic arguments.
         // FIXME: this will be problematic if we ever try to bind superclass
         // types from type metadata!
-        if (Target->isGenericContext()) {
-          auto type = Target->getDeclaredTypeInContext()->getCanonicalType();
-          IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, metadata,
-                                                MetadataState::Abstract);
-        }
+        assert(Target->isGenericContext());
+        auto type = Target->getDeclaredTypeInContext()->getCanonicalType();
+        IGF.bindLocalTypeDataFromTypeMetadata(type, IsExact, metadata,
+                                              MetadataState::Abstract);
 
         // A dependent VWT means that we have dependent metadata.
         if (HasDependentVWT)
           HasDependentMetadata = true;
 
-        if (HasDependentMetadata) {
+        if (HasDependentMetadata)
           asImpl().emitInitializeMetadata(IGF, metadata, false, collector);
-        }
       });
     }
 
@@ -1952,10 +1944,10 @@ namespace {
     }
   };
 
-  template <class Impl, class Base>
+template <class Impl, class DeclType>
   class GenericValueMetadataBuilderBase
-         : public GenericMetadataBuilderBase<Impl, Base> {
-    using super = GenericMetadataBuilderBase<Impl, Base>;
+         : public GenericMetadataBuilderBase<Impl, DeclType> {
+    using super = GenericMetadataBuilderBase<Impl, DeclType>;
   protected:
     using super::IGM;
     using super::asImpl;
@@ -1963,8 +1955,13 @@ namespace {
     using super::B;
 
     template <class... T>
-    GenericValueMetadataBuilderBase(IRGenModule &IGM, T &&...args)
-      : super(IGM, std::forward<T>(args)...) {}
+    GenericValueMetadataBuilderBase(IRGenModule &IGM, DeclType *Target,
+                                    ConstantStructBuilder &B)
+      : super(IGM, Target, B) {}
+
+    SILType getLoweredType() {
+      return IGM.getLoweredType(Target->getDeclaredTypeInContext());
+    }
 
   public:
     /// Emit the fields of a GenericValueMetadataPattern.
@@ -2668,10 +2665,11 @@ namespace {
   /// A builder for GenericClassMetadataPattern objects.
   class GenericClassMetadataBuilder :
     public GenericMetadataBuilderBase<GenericClassMetadataBuilder,
-                      ClassMetadataBuilderBase<GenericClassMetadataBuilder,
-                                               ResilientClassMemberBuilder>>
+                                      ClassDecl>
   {
     using super = GenericMetadataBuilderBase;
+
+    const ClassLayout &FieldLayout;
 
     Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
       ClassRODataOffset, MetaclassObjectOffset, MetaclassRODataOffset;
@@ -2679,7 +2677,7 @@ namespace {
     GenericClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                 ConstantStructBuilder &B,
                                 const ClassLayout &fieldLayout)
-      : super(IGM, theClass, B, fieldLayout)
+      : super(IGM, theClass, B), FieldLayout(fieldLayout)
     {
       // We need special initialization of metadata objects to trick the ObjC
       // runtime into initializing them.
@@ -2718,6 +2716,10 @@ namespace {
 
       // uint16_t Reserved;
       B.addInt16(0);
+    }
+
+    llvm::Constant *emitNominalTypeDescriptor() {
+      return ClassContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
     }
 
     GenericMetadataPatternFlags getPatternFlags() {
@@ -3039,6 +3041,10 @@ namespace {
     using Base::Base;
 
   public:
+    SILType getLoweredType() {
+      return IGM.getLoweredType(Target->getDeclaredTypeInContext());
+    }
+
     /// Create the runtime data structures and functions necessary to
     /// support in-place metadata initialization on this type.
     void maybeCreateInPlaceMetadataInitialization() {
@@ -3089,6 +3095,7 @@ namespace {
     using super::IGM;
     using super::Target;
     using super::asImpl;
+    using super::getLoweredType;
 
     StructMetadataBuilderBase(IRGenModule &IGM, StructDecl *theStruct,
                               ConstantStructBuilder &B)
@@ -3097,10 +3104,6 @@ namespace {
 
   public:
     void noteStartOfTypeSpecificMembers() {}
-
-    SILType getLoweredType() {
-      return IGM.getLoweredType(Target->getDeclaredTypeInContext());
-    }
 
     void addMetadataFlags() {
       B.addInt(IGM.MetadataKindTy, unsigned(getMetadataKind(Target)));
@@ -3195,8 +3198,7 @@ namespace {
   /// A builder for metadata templates.
   class GenericStructMetadataBuilder :
     public GenericValueMetadataBuilderBase<GenericStructMetadataBuilder,
-                      StructMetadataBuilderBase<GenericStructMetadataBuilder>> {
-
+                                           StructDecl> {
     using super = GenericValueMetadataBuilderBase;
 
   public:
@@ -3221,7 +3223,11 @@ namespace {
     void flagUnfilledFieldOffset() {
       // We just assume this might happen.
     }
-    
+
+    llvm::Constant *emitNominalTypeDescriptor() {
+      return StructContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
+    }
+
     llvm::Constant *emitValueWitnessTable() {
       return getValueWitnessTableForGenericValueType(IGM, Target,
                                                      HasDependentVWT);
@@ -3363,10 +3369,6 @@ namespace {
       : super(IGM, theEnum), B(B) {
     }
 
-    SILType getLoweredType() {
-      return IGM.getLoweredType(Target->getDeclaredTypeInContext());
-    }
-
   public:
     void noteStartOfTypeSpecificMembers() {}
 
@@ -3434,11 +3436,10 @@ namespace {
 
   class GenericEnumMetadataBuilder
     : public GenericValueMetadataBuilderBase<GenericEnumMetadataBuilder,
-                          EnumMetadataBuilderBase<GenericEnumMetadataBuilder>>
-  {
-  public:
+                                             EnumDecl> {
     using super = GenericValueMetadataBuilderBase;
 
+  public:
     GenericEnumMetadataBuilder(IRGenModule &IGM, EnumDecl *theEnum,
                                ConstantStructBuilder &B)
       : super(IGM, theEnum, B) {}
@@ -3470,6 +3471,10 @@ namespace {
       }
 
       return metadata;
+    }
+
+    llvm::Constant *emitNominalTypeDescriptor() {
+      return EnumContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
     }
 
     llvm::Constant *emitValueWitnessTable() {
