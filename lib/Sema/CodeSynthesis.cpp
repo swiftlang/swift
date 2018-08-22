@@ -433,13 +433,11 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
   SmallVector<Expr *, 4> args;
   
   for (auto param : params) {
-    // We cannot express how to forward variadic parameters yet.
-    if (param->isVariadic())
-      return nullptr;
-    
     Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
     if (param->isInOut())
       ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*isImplicit=*/true);
+    else if (param->isVariadic())
+      ref = new (ctx) VarargExpansionExpr(ref, /*implicit*/ true);
     args.push_back(ref);
     
     labels.push_back(param->getArgumentName());
@@ -477,7 +475,7 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx,
   
   // Okay, everything else should be forwarded, build the expression.
   auto result = buildArgumentForwardingExpr(params, ctx);
-  assert(result && "FIXME: Cannot forward varargs");
+  assert(result && "FIXME: Cannot forward expression");
   return result;
 }
 
@@ -2509,18 +2507,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                                /*Implicit=*/true);
 
   auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);
-
-  // If buildArgumentForwardingExpr failed, then it was because we tried to
-  // forward varargs, which cannot be done yet.
-  // TODO: We should be able to forward varargs!
-  if (!ctorArgs) {
-    tc.diagnose(classDecl->getLoc(),
-                diag::unsupported_synthesize_init_variadic,
-                classDecl->getDeclaredType());
-    tc.diagnose(superclassCtor, diag::variadic_superclass_init_here);
-    createStubBody(tc, ctor);
-    return ctor;
-  }
 
   Expr *superCall =
     CallExpr::create(ctx, ctorRef, ctorArgs,

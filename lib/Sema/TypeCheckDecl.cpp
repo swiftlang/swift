@@ -2218,7 +2218,7 @@ static bool computeIsSetterMutating(TypeChecker &TC,
     if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify) {
       auto modifyAccessor = storage->getModifyCoroutine();
       auto modifyResult = validateAccessorIsMutating(TC, modifyAccessor);
-      if (result != modifyResult) {
+      if ((result || storage->isGetterMutating()) != modifyResult) {
         TC.diagnose(modifyAccessor,
                     diag::modify_mutatingness_differs_from_setter,
                     modifyResult);
