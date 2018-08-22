@@ -34,15 +34,15 @@ ConstraintFix::~ConstraintFix() {}
 
 Expr *ConstraintFix::getAnchor() const { return getLocator()->getAnchor(); }
 
-void ConstraintFix::print(llvm::raw_ostream &Out, SourceManager *sm) const {
+void ConstraintFix::print(llvm::raw_ostream &Out) const {
   Out << "[fix: ";
   Out << getName();
   Out << ']';
   Out << " @ ";
-  getLocator()->dump(sm, Out);
+  getLocator()->dump(&CS.getASTContext().SourceMgr, Out);
 }
 
-void ConstraintFix::dump(SourceManager *sm) const { print(llvm::errs(), sm); }
+void ConstraintFix::dump() const {print(llvm::errs()); }
 
 std::string ForceDowncast::getName() const {
   llvm::SmallString<16> name;

@@ -96,10 +96,10 @@ public:
   /// root expression and information from constraint system.
   virtual bool diagnose(Expr *root) const = 0;
 
-  void print(llvm::raw_ostream &Out, SourceManager *sm) const;
+  void print(llvm::raw_ostream &Out) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump(SourceManager *sm)
-                                const LLVM_ATTRIBUTE_USED,
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const
+                              LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 
   /// Retrieve anchor expression associated with this fix.
