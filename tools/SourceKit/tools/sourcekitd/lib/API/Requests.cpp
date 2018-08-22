@@ -2037,6 +2037,7 @@ class SKEditorConsumer : public EditorConsumer {
   ResponseReceiver RespReceiver;
   ResponseBuilder RespBuilder;
 
+public:
   ResponseBuilder::Dictionary Dict;
   DocStructureArrayBuilder DocStructure;
   TokenAnnotationsArrayBuilder SyntaxMap;
@@ -2443,8 +2444,10 @@ void serializeSyntaxTreeAsByteTree(
   // Serialize the syntax tree as a ByteTree
   llvm::AppendingBinaryByteStream Stream(llvm::support::endianness::little);
   llvm::BinaryStreamWriter Writer(Stream);
+  std::map<void *, void *> UserInfo;
+  UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
   swift::byteTree::ByteTreeWriter::write(/*ProtocolVersion=*/1, Writer,
-                                         *SyntaxTree.getRaw());
+                                         *SyntaxTree.getRaw(), UserInfo);
 
   std::unique_ptr<llvm::WritableMemoryBuffer> Buf =
       llvm::WritableMemoryBuffer::getNewUninitMemBuffer(Stream.data().size());

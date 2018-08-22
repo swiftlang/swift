@@ -394,9 +394,13 @@ struct WrapperTypeTraits<syntax::TriviaKind> {
 
 template <>
 struct ObjectTraits<syntax::TriviaPiece> {
-  static unsigned numFields(const syntax::TriviaPiece &Trivia) { return 2; }
+  static unsigned numFields(const syntax::TriviaPiece &Trivia,
+                            UserInfoMap &UserInfo) {
+    return 2;
+  }
 
-  static void write(ByteTreeWriter &Writer, const syntax::TriviaPiece &Trivia) {
+  static void write(ByteTreeWriter &Writer, const syntax::TriviaPiece &Trivia,
+                    UserInfoMap &UserInfo) {
     Writer.write(Trivia.getKind(), /*Index=*/0);
     // Write the trivia's text or count depending on its kind
     switch (Trivia.getKind()) {

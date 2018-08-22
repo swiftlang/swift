@@ -18,7 +18,8 @@ func getInput(_ file: String) -> URL {
 
 func getSyntaxTree(_ url: URL) throws -> SourceFileSyntax {
   let content = try SwiftLang.parse(path: url.path).data(using: .utf8)!
-  return try SyntaxTreeDeserializer().deserialize(content)
+  return try SyntaxTreeDeserializer().deserialize(content,
+                                                  serializationFormat: .json)
 }
 
 var VisitorTests = TestSuite("SyntaxVisitor")

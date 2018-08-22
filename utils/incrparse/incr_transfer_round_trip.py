@@ -48,6 +48,11 @@ def main():
     parser.add_argument(
         '--swift-swiftsyntax-test', required=True,
         help='The path to swift-swiftsyntax-test')
+    parser.add_argument(
+        '--serialization-format', choices=['json', 'byteTree'], 
+        default='json', help='''
+    The format that shall be used to transfer the syntax tree
+    ''')
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -57,14 +62,17 @@ def main():
     temp_dir = args.temp_dir
     swift_syntax_test = args.swift_syntax_test
     swift_swiftsyntax_test = args.swift_swiftsyntax_test
+    serialization_format = args.serialization_format
 
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
 
+    treeFileExtension = serialization_format
+
     pre_edit_tree_file = temp_dir + '/' + test_file_name + '.' \
-        + test_case + '.pre.json'
+        + test_case + '.pre.' + treeFileExtension
     incremental_tree_file = temp_dir + '/' + test_file_name + '.' \
-        + test_case + '.incr.json'
+        + test_case + '.incr.' + treeFileExtension
     post_edit_source_file = temp_dir + '/' + test_file_name + '.' \
         + test_case + '.post.swift'
     after_roundtrip_source_file = temp_dir + '/' + test_file_name + '.' \
@@ -76,6 +84,7 @@ def main():
                                      test_case=test_case, 
                                      mode='pre-edit', 
                                      serialization_mode='full',
+                                     serialization_format=serialization_format,
                                      omit_node_ids=False,
                                      output_file=pre_edit_tree_file, 
                                      temp_dir=temp_dir, 
@@ -86,6 +95,7 @@ def main():
                                      test_case=test_case, 
                                      mode='incremental', 
                                      serialization_mode='incremental',
+                                     serialization_format=serialization_format,
                                      omit_node_ids=False,
                                      output_file=incremental_tree_file, 
                                      temp_dir=temp_dir, 
@@ -99,6 +109,7 @@ def main():
 
     try:
         run_command([swift_swiftsyntax_test, '-deserialize-incremental'] +
+                    ['-serialization-format', serialization_format] +
                     ['-pre-edit-tree', pre_edit_tree_file] +
                     ['-incr-tree', incremental_tree_file] +
                     ['-out', after_roundtrip_source_file])
