@@ -99,11 +99,11 @@ extension SyntaxKind: ByteTreeScalarDecodable {
 % for name, nodes in grouped_nodes.items():
 %   for node in nodes:
     case ${SYNTAX_NODE_SERIALIZATION_CODES[node.syntax_kind]}: 
-      return .${node.swift_syntax_kind};
+      return .${node.swift_syntax_kind}
 %   end
 % end
     default:
-      fatalError("Unknown SyntaxKind \(rawValue)")
+      return .unknown
     }
   }
 }
