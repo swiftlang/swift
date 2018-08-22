@@ -86,6 +86,12 @@ struct S: PPP {
   }
 }
 
+struct SS: PPP {
+  func returnsOptionalIndirect() -> SS? {
+    return self
+  }
+}
+
 // The first apply has been devirtualized and inlined. The second remains unspecialized.
 // CHECK-LABEL: sil @$S32sil_combine_concrete_existential37testWitnessReturnOptionalIndirectSelfyyF : $@convention(thin) () -> () {
 // CHECK: switch_enum_addr %{{.*}} : $*Optional<@opened("{{.*}}") PPP>, case #Optional.some!enumelt.1: bb{{.*}}, case #Optional.none!enumelt: bb{{.*}}
