@@ -246,6 +246,8 @@ ERROR(tf_lowering_unknown_op, none,
       "op named '%0' is not registered in TensorFlow", (StringRef))
 ERROR(tf_convention_tf_host_code_not_allowed, none,
       "host code is not allowed in a TensorFlow function", ())
+ERROR(tf_no_captures_in_tf_functions, none,
+      "TensorFlow functions cannot capture values", ())
 
 WARNING(tf_value_implicitly_copied_to_accel, none,
         "%0 implicitly copied to the accelerator, use .toAccelerator() to make "

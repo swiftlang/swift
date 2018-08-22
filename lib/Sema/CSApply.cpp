@@ -7029,6 +7029,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // SWIFT_ENABLE_TENSORFLOW
       // If we have a ClosureExpr, then we can safely propagate tensorflow
       // convention to the closure expression.
+      // NOTE: we also need to check if the closure captures any values.
+      // However, capture information is not available at this point. Therefore,
+      // the check currently happens in the SILGen phase.
       auto fromEI = fromFunc->getExtInfo();
       if (toEI.getRepresentation() ==
               AnyFunctionType::Representation::TensorFlow &&

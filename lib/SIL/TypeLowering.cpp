@@ -1748,6 +1748,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   // Capture generic parameters from the enclosing context if necessary.
   CanGenericSignature genericSig = getEffectiveGenericSignature(theClosure,
                                                                 captureInfo);
+
   auto innerExtInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
                                                funcType->throws());
 
