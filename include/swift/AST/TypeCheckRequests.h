@@ -19,6 +19,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -39,7 +40,8 @@ class InheritedTypeRequest :
                          CacheKind::SeparatelyCached,
                          Type,
                          llvm::PointerUnion<TypeDecl *, ExtensionDecl *>,
-                         unsigned>
+                         unsigned,
+                         TypeResolutionStage>
 {
   /// Retrieve the TypeLoc for this inherited type.
   TypeLoc &getTypeLoc(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
@@ -55,7 +57,8 @@ private:
   llvm::Expected<Type>
   evaluate(Evaluator &evaluator,
            llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-           unsigned index) const;
+           unsigned index,
+           TypeResolutionStage stage) const;
 
 public:
   // Cycle handling
@@ -63,7 +66,7 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Caching
-  bool isCached() const { return true; }
+  bool isCached() const;
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
@@ -73,7 +76,8 @@ class SuperclassTypeRequest :
     public SimpleRequest<SuperclassTypeRequest,
                          CacheKind::SeparatelyCached,
                          Type,
-                         NominalTypeDecl *> {
+                         NominalTypeDecl *,
+                         TypeResolutionStage> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -82,7 +86,8 @@ private:
 
   // Evaluation.
   llvm::Expected<Type>
-  evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl) const;
+  evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl,
+           TypeResolutionStage stage) const;
 
 public:
   // Cycle handling
@@ -90,7 +95,7 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Separate caching.
-  bool isCached() const { return true; }
+  bool isCached() const;
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
@@ -100,7 +105,8 @@ class EnumRawTypeRequest :
     public SimpleRequest<EnumRawTypeRequest,
                          CacheKind::SeparatelyCached,
                          Type,
-                         EnumDecl *> {
+                         EnumDecl *,
+                         TypeResolutionStage> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -109,7 +115,8 @@ private:
 
   // Evaluation.
   llvm::Expected<Type>
-  evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const;
+  evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
+           TypeResolutionStage stage) const;
 
 public:
   // Cycle handling
@@ -117,7 +124,7 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Separate caching.
-  bool isCached() const { return true; }
+  bool isCached() const;
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };

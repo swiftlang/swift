@@ -22,14 +22,16 @@ using namespace swift;
 
 llvm::Expected<Type>
 InheritedTypeRequest::evaluate(
-  Evaluator &evaluator, llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-  unsigned index) const {
+    Evaluator &evaluator, llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+    unsigned index,
+    TypeResolutionStage stage) const {
   // Figure out how to resolve types.
   TypeResolutionOptions options = None;
   DeclContext *dc;
   if (auto typeDecl = decl.dyn_cast<TypeDecl *>()) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = nominal;
+
       options |= TypeResolutionFlags::AllowUnavailableProtocol;
     } else {
       dc = typeDecl->getDeclContext();
@@ -40,25 +42,47 @@ InheritedTypeRequest::evaluate(
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
-  // FIXME: This should be part of the request!
-  TypeResolution resolution =
-    isa<ProtocolDecl>(dc) ? TypeResolution::forStructural(dc)
-                          : TypeResolution::forInterface(dc);
+  Optional<TypeResolution> resolution;
+  switch (stage) {
+  case TypeResolutionStage::Structural:
+    resolution = TypeResolution::forStructural(dc);
+    break;
+
+  case TypeResolutionStage::Interface:
+    resolution = TypeResolution::forInterface(dc);
+    break;
+
+  case TypeResolutionStage::Contextual: {
+    // Compute the contextual type by mapping the interface type into context.
+    auto result =
+      evaluator(InheritedTypeRequest{decl, index,
+                                     TypeResolutionStage::Interface});
+    if (!result)
+      return result;
+
+    return dc->mapTypeIntoContext(*result);
+  }
+  }
 
   TypeLoc &typeLoc = getTypeLoc(decl, index);
 
-  Type inheritedType =
-    resolution.resolveType(typeLoc.getTypeRepr(), options);
+  Type inheritedType;
+  if (typeLoc.getTypeRepr())
+    inheritedType = resolution->resolveType(typeLoc.getTypeRepr(), options);
+  else
+    inheritedType = typeLoc.getType();
+
   return inheritedType ? inheritedType : ErrorType::get(dc->getASTContext());
 }
 
 llvm::Expected<Type>
 SuperclassTypeRequest::evaluate(Evaluator &evaluator,
-                                NominalTypeDecl *nominalDecl) const {
+                                NominalTypeDecl *nominalDecl,
+                                TypeResolutionStage stage) const {
   assert(isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl));
 
   for (unsigned int idx : indices(nominalDecl->getInherited())) {
-    auto result = evaluator(InheritedTypeRequest{nominalDecl, idx});
+    auto result = evaluator(InheritedTypeRequest{nominalDecl, idx, stage});
 
     if (auto err = result.takeError()) {
       // FIXME: Should this just return once a cycle is detected?
@@ -93,9 +117,11 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
 }
 
 llvm::Expected<Type>
-EnumRawTypeRequest::evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const {
+EnumRawTypeRequest::evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
+                             TypeResolutionStage stage) const {
   for (unsigned int idx : indices(enumDecl->getInherited())) {
-    auto inheritedTypeResult = evaluator(InheritedTypeRequest{enumDecl, idx});
+    auto inheritedTypeResult =
+      evaluator(InheritedTypeRequest{enumDecl, idx, stage});
     
     if (auto err = inheritedTypeResult.takeError()) {
       llvm::handleAllErrors(std::move(err),

@@ -988,12 +988,6 @@ NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
     ExtendedNominalRequest{const_cast<ExtensionDecl *>(this)}, nullptr);
 }
 
-Type ExtensionDecl::getInheritedType(unsigned index) const {
-  ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    InheritedTypeRequest{const_cast<ExtensionDecl *>(this), index}, Type());
-}
-
 bool ExtensionDecl::isConstrainedExtension() const {
   // Non-generic extension.
   if (!getGenericSignature())
@@ -2667,12 +2661,6 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
   }
 }
 
-Type TypeDecl::getInheritedType(unsigned index) const {
-  ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    InheritedTypeRequest{const_cast<TypeDecl *>(this), index}, Type());
-}
-
 Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
@@ -3174,7 +3162,8 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
 Type EnumDecl::getRawType() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
-    EnumRawTypeRequest{const_cast<EnumDecl *>(this)}, Type());
+    EnumRawTypeRequest{const_cast<EnumDecl *>(this),
+                       TypeResolutionStage::Interface}, Type());
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -3611,7 +3600,9 @@ ProtocolDecl::getAssociatedTypeMembers() const {
 Type ProtocolDecl::getSuperclass() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
-    SuperclassTypeRequest{const_cast<ProtocolDecl *>(this)}, Type());
+    SuperclassTypeRequest{const_cast<ProtocolDecl *>(this),
+                          TypeResolutionStage::Interface},
+    Type());
 }
 
 ClassDecl *ProtocolDecl::getSuperclassDecl() const {
@@ -6066,7 +6057,9 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 Type ClassDecl::getSuperclass() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
-    SuperclassTypeRequest{const_cast<ClassDecl *>(this)}, Type());
+    SuperclassTypeRequest{const_cast<ClassDecl *>(this),
+                          TypeResolutionStage::Interface},
+    Type());
 }
 
 ClassDecl *ClassDecl::getSuperclassDecl() const {

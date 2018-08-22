@@ -535,6 +535,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       continue;
     }
 
+    // The GenericSignatureBuilder diagnoses problems with generic type
+    // parameters.
+    if (isa<GenericTypeParamDecl>(decl))
+      continue;
+
     // We can't inherit from a non-class, non-protocol type.
     diagnose(decl->getLoc(),
              (isa<StructDecl>(decl) || isa<ExtensionDecl>(decl))
@@ -542,7 +547,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
                : diag::inheritance_from_non_protocol_or_class,
              inheritedTy);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
-    inherited.setInvalidType(Context);
   }
 }
 
