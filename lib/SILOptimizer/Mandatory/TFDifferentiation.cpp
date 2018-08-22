@@ -42,6 +42,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
+#include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
@@ -1525,23 +1526,29 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
 /// float type.
 static SILValue createBuiltinFPScalar(APFloat scalar, CanType type,
                                       SILLocation loc, SILBuilder &builder) {
+  DEBUG({
+    auto &s = getADDebugStream() << "Converting ";
+    scalar.print(s);
+    s << " to a " << type << '\n';
+  });
   auto *fpType = type->castTo<BuiltinFloatType>();
   // If the scalar is a floating point where the FP semantics are different from
-  // the specified FP type, perform a rounding conversion.
-  if (!scalar.isInteger() &&
-      &scalar.getSemantics() != &fpType->getAPFloatSemantics()) {
-    bool losesInfo = false;
-    scalar.convert(fpType->getAPFloatSemantics(),
-                   APFloat::rmNearestTiesToAway, &losesInfo);
-  }
-  // If the scalar is effectively an integer, just coerce it to the right FP
-  // semantics.
-  if (scalar.isInteger()) {
-    bool isExact = false;
-    llvm::APSInt integer;
-    scalar.convertToInteger(integer, APFloat::rmTowardZero, &isExact);
-    integer = integer.extOrTrunc(32);
-    scalar = APFloat(fpType->getAPFloatSemantics(), integer);
+  // the specified FP type, perform a conversion.
+  if (&scalar.getSemantics() != &fpType->getAPFloatSemantics()) {
+    // If the scalar is effectively an integer, just coerce it to the right FP
+    // semantics.
+    if (scalar.isInteger()) {
+      bool isExact = false;
+      llvm::APSInt integer;
+      scalar.convertToInteger(integer, APFloat::rmTowardZero, &isExact);
+      integer = integer.extOrTrunc(fpType->getBitWidth());
+      scalar = APFloat(fpType->getAPFloatSemantics(), integer);
+    }
+    else {
+      bool losesInfo = false;
+      scalar.convert(fpType->getAPFloatSemantics(),
+                     APFloat::rmNearestTiesToAway, &losesInfo);
+    }
   }
   return builder.createFloatLiteral(
       loc, SILType::getPrimitiveObjectType(type), scalar);
@@ -1582,7 +1589,7 @@ static void convertFloatToIndirectExpressible(APFloat scalar,
   auto floatLitMetatypeTy = SILType::getPrimitiveObjectType(
       CanMetatypeType::get(floatLitTy, MetatypeRepresentation::Thick));
   auto *floatLitMetatype = builder.createMetatype(loc, floatLitMetatypeTy);
-  // ExpressibleByBuiltinIntegerLiteral
+  // ExpressibleByBuiltinFloatLiteral
   auto *ebflProto =
       astCtx.getProtocol(KnownProtocolKind::ExpressibleByBuiltinFloatLiteral);
   // `init(_builtinFloatLiteral:)`
@@ -1599,8 +1606,6 @@ static void convertFloatToIndirectExpressible(APFloat scalar,
                                          floatLitTypeDecl,
                                          ProtocolConformanceState::Complete);
   ProtocolConformanceRef ebflConfRef(ebflConf);
-  // Link witness table.
-  context.lookupOrLinkWitnessTable(ebflConfRef);
   // %3 = witness_method ...
   auto initBFLFn = builder.createWitnessMethod(loc, floatLitTy, ebflConfRef,
                                                initBFLDeclRef, initBFLType);
@@ -1616,20 +1621,20 @@ static void convertFloatToIndirectExpressible(APFloat scalar,
     builder.createDeallocStack(loc, floatLitBuf);
   };
   // %4 = apply %3 <...>(%floatLitBuf, %1, %2)
-  builder.createApply(loc, initBFLFn, floatLitSubMap,
-                      {floatLitBuf, builtinFloat, floatLitMetatype},
-                      /*isNonThrowing*/ false);
-
+  auto *ai = builder.createApply(loc, initBFLFn, floatLitSubMap,
+                                 {floatLitBuf, builtinFloat, floatLitMetatype},
+                                 /*isNonThrowing*/ false);
+  tryDevirtualizeWitnessMethod(ai, /*ORE*/ nullptr);
   // Step 2. Initialize a value of type `<target type>` by calling
   // %5 = metatype $@thin <target type>.FloatLiteralType.Type
   auto targetMetatypeTy = SILType::getPrimitiveObjectType(
       CanMetatypeType::get(targetTy, MetatypeRepresentation::Thick));
   auto *targetMetatype = builder.createMetatype(loc, targetMetatypeTy);
-  // `ExpressibleByIntegerLiteral.init(floatLiteral: %4)`.
+  // `ExpressibleByFloatLiteral.init(floatLiteral: %4)`.
   auto *eflProto =
       astCtx.getProtocol(KnownProtocolKind::ExpressibleByFloatLiteral);
   DeclName floatLitInitName(astCtx, DeclBaseName::createConstructor(),
-                          {astCtx.Id_integerLiteral});
+                          {astCtx.Id_floatLiteral});
   auto *initFLDecl =
       cast<ConstructorDecl>(eflProto->lookupDirect(floatLitInitName)[0]);
   SILDeclRef initFLDeclRef(initFLDecl);
@@ -1638,7 +1643,7 @@ static void convertFloatToIndirectExpressible(APFloat scalar,
   auto *parentModule = targetTypeDecl->getModuleContext();
   auto eflConf = *parentModule->lookupConformance(targetTy, eflProto);
   ProtocolConformanceRef eflConfRef(eflConf);
-  context.lookupOrLinkWitnessTable(eflConfRef);
+  // context.lookupOrLinkWitnessTable(eflConfRef);
   // %6 = witness_method ...
   auto initFLFn = builder.createWitnessMethod(loc, targetTy, eflConfRef,
                                               initFLDeclRef, initFLType);
@@ -3452,9 +3457,9 @@ void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
   switch (val.getKind()) {
   /// Given a `%buf : *T, emit instructions that produce a zero or an aggregate
   /// of zeros of the expected type. When `T` conforms to
-  /// `ExpressibleByIntegerLiteral`, we use literal conversion directly.
+  /// `ExpressibleByFloatLiteral`, we use literal conversion directly.
   /// Otherwise, we assert that `T` must be an aggregate where each element is
-  /// `ExpressibleByIntegerLiteral`. We expect to emit a zero for each element
+  /// `ExpressibleByFloatLiteral`. We expect to emit a zero for each element
   /// and use the appropriate aggregate constructor instruction (in this case,
   /// `tuple`) to produce a tuple. But currently, since we need indirect
   /// passing for aggregate instruction, we just use `tuple_element_addr` to get
@@ -3633,8 +3638,6 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
   auto fnTy = combinerFuncDecl->getInterfaceType();
   auto silFnTy = SILType::getPrimitiveObjectType(fnTy->getCanonicalType());
   SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
-  // Link witness table.
-  getContext().lookupOrLinkWitnessTable(confRef);
   // %0 = witness_method @+
   auto witnessMethod = getBuilder().createWitnessMethod(loc, adjointTy, confRef,
                                                         declRef, silFnTy);
@@ -3645,9 +3648,10 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
   auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
   auto metatype = getBuilder().createMetatype(loc, metatypeSILType);
   // %2 = apply $0(%result, %new, %old, %1)
-  getBuilder().createApply(loc, witnessMethod, subMap,
-                           {resultBuffer, rhs, lhs, metatype},
-                           /*isNonThrowing*/ false);
+  auto *apply = getBuilder().createApply(loc, witnessMethod, subMap,
+                                         {resultBuffer, rhs, lhs, metatype},
+                                         /*isNonThrowing*/ false);
+  tryDevirtualizeWitnessMethod(apply, /*ORE*/ nullptr);
 }
 
 bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
