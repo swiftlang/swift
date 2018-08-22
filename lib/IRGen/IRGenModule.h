@@ -1156,11 +1156,10 @@ public:
                                                      bool isForeign,
                                                      ForDefinition_t forDefinition);
   llvm::GlobalValue *defineTypeMetadata(CanType concreteType,
-                                  bool isIndirect,
-                                  bool isPattern,
-                                  bool isConstant,
-                                  ConstantInitFuture init,
-                                  llvm::StringRef section = {});
+                                        bool isPattern,
+                                        bool isConstant,
+                                        ConstantInitFuture init,
+                                        llvm::StringRef section = {});
 
   TypeEntityReference getTypeEntityReference(NominalTypeDecl *D);
 
