@@ -232,72 +232,65 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
   }
 }
 
-void TypeChecker::checkInheritanceClause(Decl *decl) {
-  auto dc = decl->getInnermostDeclContext();
-  checkInheritanceClause(decl, TypeResolution::forInterface(dc));
-}
-
-/// check the inheritance clause of a type declaration or extension thereof.
+/// Check the inheritance clause of a type declaration or extension thereof.
 ///
-/// This routine validates all of the types in the parsed inheritance clause,
-/// recording the superclass (if any and if allowed) as well as the protocols
-/// to which this type declaration conforms.
-void TypeChecker::checkInheritanceClause(Decl *decl,
-                                         TypeResolution resolution) {
-  assert(resolution.getStage() != TypeResolutionStage::Contextual);
-
+/// This routine performs detailed checking of the inheritance clause of the
+/// given type or extension. It need only be called within the primary source
+/// file.
+static void checkInheritanceClause(
+                    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> declUnion) {
   TypeResolutionOptions options = None;
   DeclContext *DC;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    DC = nominal;
-    options |= TypeResolutionFlags::AllowUnavailableProtocol;
-  } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+  MutableArrayRef<TypeLoc> inheritedClause;
+  ExtensionDecl *ext = nullptr;
+  TypeDecl *typeDecl = nullptr;
+  Decl *decl;
+  if ((ext = declUnion.dyn_cast<ExtensionDecl *>())) {
+    decl = ext;
     DC = ext;
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
-  } else {
-    DC = decl->getDeclContext();
-  }
-
-  MutableArrayRef<TypeLoc> inheritedClause;
-
-  if (auto type = dyn_cast<TypeDecl>(decl)) {
-    inheritedClause = type->getInherited();
-  } else {
-    auto ext = cast<ExtensionDecl>(decl);
-    if (!ext->getExtendedType())
-      return;
 
     inheritedClause = ext->getInherited();
 
     // Protocol extensions cannot have inheritance clauses.
-    if (ext->getExtendedType()->is<ProtocolType>()) {
+    if (auto proto = ext->getExtendedProtocolDecl()) {
       if (!inheritedClause.empty()) {
-        diagnose(ext->getLoc(), diag::extension_protocol_inheritance,
-                 ext->getExtendedType())
+        ext->diagnose(diag::extension_protocol_inheritance,
+                 proto->getName())
           .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
                                  inheritedClause.back().getSourceRange().End));
-        ext->setInherited({ });
         return;
       }
     }
+  } else {
+    typeDecl = declUnion.get<TypeDecl *>();
+    decl = typeDecl;
+    if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
+      DC = nominal;
+      options |= TypeResolutionFlags::AllowUnavailableProtocol;
+    } else {
+      DC = typeDecl->getDeclContext();
+    }
+
+    inheritedClause = typeDecl->getInherited();
   }
+
+  ASTContext &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
 
   // Retrieve the location of the start of the inheritance clause.
   auto getStartLocOfInheritanceClause = [&] {
-    if (auto genericTypeDecl = dyn_cast<GenericTypeDecl>(decl)) {
+    if (ext)
+      return ext->getSourceRange().End;
+
+    if (auto genericTypeDecl = dyn_cast<GenericTypeDecl>(typeDecl)) {
       if (auto genericParams = genericTypeDecl->getGenericParams())
         return genericParams->getSourceRange().End;
 
       return genericTypeDecl->getNameLoc();
     }
 
-    if (auto typeDecl = dyn_cast<TypeDecl>(decl))
-      return typeDecl->getNameLoc();
-
-    if (auto ext = dyn_cast<ExtensionDecl>(decl))
-      return ext->getSourceRange().End;
-
-    return SourceLoc();
+    return typeDecl->getNameLoc();
   };
 
   // Compute the source range to be used when removing something from an
@@ -307,8 +300,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedClause.size() == 1) {
       SourceLoc start = getStartLocOfInheritanceClause();
       SourceLoc end = inheritedClause[i].getSourceRange().End;
-      return SourceRange(Lexer::getLocForEndOfToken(Context.SourceMgr, start),
-                         Lexer::getLocForEndOfToken(Context.SourceMgr, end));
+      return SourceRange(Lexer::getLocForEndOfToken(ctx.SourceMgr, start),
+                         Lexer::getLocForEndOfToken(ctx.SourceMgr, end));
     }
 
     // If we're at the first entry, remove from the start of this entry to the
@@ -321,11 +314,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     // Otherwise, remove from the end of the previous entry to the end of this
     // entry.
     SourceLoc afterPriorLoc =
-      Lexer::getLocForEndOfToken(Context.SourceMgr,
+      Lexer::getLocForEndOfToken(ctx.SourceMgr,
                                  inheritedClause[i-1].getSourceRange().End);
 
     SourceLoc afterMyEndLoc =
-      Lexer::getLocForEndOfToken(Context.SourceMgr,
+      Lexer::getLocForEndOfToken(ctx.SourceMgr,
                                  inheritedClause[i].getSourceRange().End);
 
     return SourceRange(afterPriorLoc, afterMyEndLoc);
@@ -339,15 +332,12 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     auto &inherited = inheritedClause[i];
 
     // Validate the type.
-    if (validateType(inherited, resolution, options)) {
-      inherited.setInvalidType(Context);
-      continue;
-    }
+    InheritedTypeRequest request{declUnion, i, TypeResolutionStage::Interface};
+    Type inheritedTy = evaluateOrDefault(ctx.evaluator, request, Type());
 
-    auto inheritedTy = inherited.getType();
-
-    // If this is an error type, ignore it.
-    if (inheritedTy->hasError())
+    // If we couldn't resolve an the inherited type, or it contains an error,
+    // ignore it.
+    if (!inheritedTy || inheritedTy->hasError())
       continue;
 
     // Check whether we inherited from 'AnyObject' twice.
@@ -357,21 +347,21 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedTy->isAnyObject()) {
       if (inheritedAnyObject) {
         // If the first occurrence was written as 'class', downgrade the error
-        // to a warning in such cases
-        // for backward compatibility with Swift <= 4.
+        // to a warning in such case for backward compatibility with
+        // Swift <= 4.
         auto knownIndex = inheritedAnyObject->first;
         auto knownRange = inheritedAnyObject->second;
         SourceRange removeRange = getRemovalRange(knownIndex);
-        if (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
+        if (!ctx.LangOpts.isSwiftVersionAtLeast(5) &&
             (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
-            Lexer::getTokenAtLocation(Context.SourceMgr, knownRange.Start)
+            Lexer::getTokenAtLocation(ctx.SourceMgr, knownRange.Start)
               .is(tok::kw_class)) {
           SourceLoc classLoc = knownRange.Start;
 
-          diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
+          diags.diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
             .fixItRemoveChars(removeRange.Start, removeRange.End);
         } else {
-          diagnose(inherited.getSourceRange().Start,
+          diags.diagnose(inherited.getSourceRange().Start,
                  diag::duplicate_inheritance, inheritedTy)
             .fixItRemoveChars(removeRange.Start, removeRange.End);
         }
@@ -389,9 +379,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       if (layout.explicitSuperclass) {
         if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
           if (protoDecl->isObjC()) {
-            diagnose(protoDecl,
-                    diag::objc_protocol_with_superclass,
-                    protoDecl->getName());
+            protoDecl->diagnose(diag::objc_protocol_with_superclass,
+                                protoDecl->getName());
             continue;
           }
         }
@@ -421,13 +410,13 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       }
 
       // Swift 3 compatibility -- a class inheriting from AnyObject is a no-op.
-      if (Context.LangOpts.isSwiftVersion3() && isa<ClassDecl>(decl) &&
+      if (ctx.LangOpts.isSwiftVersion3() && isa<ClassDecl>(decl) &&
           inheritedTy->isAnyObject()) {
         auto classDecl = cast<ClassDecl>(decl);
         auto removeRange = getRemovalRange(i);
-        diagnose(inherited.getSourceRange().Start,
-                 diag::class_inherits_anyobject,
-                 classDecl->getDeclaredInterfaceType())
+        diags.diagnose(inherited.getSourceRange().Start,
+                       diag::class_inherits_anyobject,
+                       classDecl->getDeclaredInterfaceType())
           .fixItRemoveChars(removeRange.Start, removeRange.End);
         continue;
       }
@@ -439,12 +428,13 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       if (superclassTy) {
         if (superclassTy->isEqual(inheritedTy)) {
           auto removeRange = getRemovalRange(i);
-          diagnose(inherited.getSourceRange().Start,
-                   diag::duplicate_inheritance, inheritedTy)
+          diags.diagnose(inherited.getSourceRange().Start,
+                         diag::duplicate_inheritance, inheritedTy)
             .fixItRemoveChars(removeRange.Start, removeRange.End);
         } else {
-          diagnose(inherited.getSourceRange().Start,
-                   diag::multiple_enum_raw_types, superclassTy, inheritedTy)
+          diags.diagnose(inherited.getSourceRange().Start,
+                         diag::multiple_enum_raw_types, superclassTy,
+                         inheritedTy)
             .highlight(superclassRange);
         }
         continue;
@@ -454,8 +444,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       if (i > 0) {
         auto removeRange = getRemovalRange(i);
 
-        diagnose(inherited.getSourceRange().Start,
-                 diag::raw_type_not_first, inheritedTy)
+        diags.diagnose(inherited.getSourceRange().Start,
+                       diag::raw_type_not_first, inheritedTy)
           .fixItRemoveChars(removeRange.Start, removeRange.End)
           .fixItInsert(inheritedClause[0].getSourceRange().Start,
                        inheritedTy.getString() + ", ");
@@ -478,14 +468,14 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
         if (superclassTy->isEqual(inheritedTy)) {
           // Duplicate superclass.
           auto removeRange = getRemovalRange(i);
-          diagnose(inherited.getSourceRange().Start,
-                   diag::duplicate_inheritance, inheritedTy)
+          diags.diagnose(inherited.getSourceRange().Start,
+                         diag::duplicate_inheritance, inheritedTy)
             .fixItRemoveChars(removeRange.Start, removeRange.End);
         } else {
           // Complain about multiple inheritance.
           // Don't emit a Fix-It here. The user has to think harder about this.
-          diagnose(inherited.getSourceRange().Start,
-                   diag::multiple_inheritance, superclassTy, inheritedTy)
+          diags.diagnose(inherited.getSourceRange().Start,
+                         diag::multiple_inheritance, superclassTy, inheritedTy)
             .highlight(superclassRange);
         }
         continue;
@@ -494,9 +484,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // @objc protocols cannot have superclass constraints.
       if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
         if (protoDecl->isObjC()) {
-          diagnose(protoDecl,
-                   diag::objc_protocol_with_superclass,
-                   protoDecl->getName());
+          protoDecl->diagnose(diag::objc_protocol_with_superclass,
+                              protoDecl->getName());
           continue;
         }
       }
@@ -504,24 +493,22 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // If the declaration we're looking at doesn't allow a superclass,
       // complain.
       if (isa<StructDecl>(decl) || isa<ExtensionDecl>(decl)) {
-        diagnose(decl->getLoc(),
-                 isa<ExtensionDecl>(decl)
-                   ? diag::extension_class_inheritance
-                   : diag::non_class_inheritance,
-                 isa<ExtensionDecl>(decl)
-                   ? cast<ExtensionDecl>(decl)->getDeclaredInterfaceType()
-                   : cast<TypeDecl>(decl)->getDeclaredInterfaceType(),
-                 inheritedTy)
+        decl->diagnose(isa<ExtensionDecl>(decl)
+                         ? diag::extension_class_inheritance
+                         : diag::non_class_inheritance,
+                       isa<ExtensionDecl>(decl)
+                         ? cast<ExtensionDecl>(decl)->getDeclaredInterfaceType()
+                         : cast<TypeDecl>(decl)->getDeclaredInterfaceType(),
+                       inheritedTy)
           .highlight(inherited.getSourceRange());
-        inherited.setInvalidType(Context);
         continue;
       }
 
       // If this is not the first entry in the inheritance clause, complain.
       if (isa<ClassDecl>(decl) && i > 0) {
         auto removeRange = getRemovalRange(i);
-        diagnose(inherited.getSourceRange().Start,
-                 diag::superclass_not_first, inheritedTy)
+        diags.diagnose(inherited.getSourceRange().Start,
+                       diag::superclass_not_first, inheritedTy)
           .fixItRemoveChars(removeRange.Start, removeRange.End)
           .fixItInsert(inheritedClause[0].getSourceRange().Start,
                        inheritedTy.getString() + ", ");
@@ -541,13 +528,22 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       continue;
 
     // We can't inherit from a non-class, non-protocol type.
-    diagnose(decl->getLoc(),
-             (isa<StructDecl>(decl) || isa<ExtensionDecl>(decl))
-               ? diag::inheritance_from_non_protocol
-               : diag::inheritance_from_non_protocol_or_class,
-             inheritedTy);
+    decl->diagnose((isa<StructDecl>(decl) || isa<ExtensionDecl>(decl))
+                     ? diag::inheritance_from_non_protocol
+                     : diag::inheritance_from_non_protocol_or_class,
+                   inheritedTy);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
   }
+}
+
+/// Check the inheritance clauses generic parameters
+static void checkInheritanceClausesOfGenericParams(
+                                            GenericParamList *genericParams) {
+  if (!genericParams)
+    return;
+
+  for (auto gp : *genericParams)
+    checkInheritanceClause(gp);
 }
 
 /// Retrieve the set of protocols the given protocol inherits.
@@ -2595,6 +2591,7 @@ public:
 
     if (!SD->isInvalid()) {
       TC.checkReferencedGenericParams(SD);
+      checkInheritanceClausesOfGenericParams(SD->getGenericParams());
       TC.checkProtocolSelfRequirements(SD);
     }
 
@@ -2634,7 +2631,7 @@ public:
     TC.validateDecl(AT);
     TC.checkDeclAttributes(AT);
 
-    TC.checkInheritanceClause(AT);
+    checkInheritanceClause(AT);
 
     auto *proto = AT->getProtocol();
     if (proto->isObjC()) {
@@ -2701,6 +2698,7 @@ public:
 
     checkUnsupportedNestedType(ED);
     TC.validateDecl(ED);
+    checkInheritanceClausesOfGenericParams(ED->getGenericParams());
 
     {
       // Check for circular inheritance of the raw type.
@@ -2715,7 +2713,7 @@ public:
 
     TC.checkDeclAttributes(ED);
 
-    TC.checkInheritanceClause(ED);
+    checkInheritanceClause(ED);
 
     AccessControlChecker::checkAccessControl(TC, ED);
     UsableFromInlineChecker::checkUsableFromInline(TC, ED);
@@ -2738,6 +2736,7 @@ public:
     checkUnsupportedNestedType(SD);
 
     TC.validateDecl(SD);
+    checkInheritanceClausesOfGenericParams(SD->getGenericParams());
 
     TC.addImplicitConstructors(SD);
 
@@ -2746,7 +2745,7 @@ public:
 
     TC.checkDeclAttributes(SD);
 
-    TC.checkInheritanceClause(SD);
+    checkInheritanceClause(SD);
 
     AccessControlChecker::checkAccessControl(TC, SD);
     UsableFromInlineChecker::checkUsableFromInline(TC, SD);
@@ -2866,6 +2865,7 @@ public:
 
     TC.validateDecl(CD);
     TC.requestSuperclassLayout(CD);
+    checkInheritanceClausesOfGenericParams(CD->getGenericParams());
 
     {
       // Check for circular inheritance.
@@ -2978,7 +2978,7 @@ public:
 
     TC.checkDeclAttributes(CD);
 
-    TC.checkInheritanceClause(CD);
+    checkInheritanceClause(CD);
 
     AccessControlChecker::checkAccessControl(TC, CD);
     UsableFromInlineChecker::checkUsableFromInline(TC, CD);
@@ -3022,7 +3022,7 @@ public:
     AccessControlChecker::checkAccessControl(TC, PD);
     UsableFromInlineChecker::checkUsableFromInline(TC, PD);
 
-    TC.checkInheritanceClause(PD);
+    checkInheritanceClause(PD);
 
     TC.validateWhereClauses(PD, TypeResolution::forContextual(PD));
 
@@ -3109,6 +3109,7 @@ public:
     if (!FD->isInvalid()) {
       if (!isa<AccessorDecl>(FD) ||
           !cast<AccessorDecl>(FD)->isMaterializeForSet()) {
+        checkInheritanceClausesOfGenericParams(FD->getGenericParams());
         TC.checkReferencedGenericParams(FD);
         TC.checkProtocolSelfRequirements(FD);
       }
@@ -3172,7 +3173,7 @@ public:
       }
     }
 
-    TC.checkInheritanceClause(ED);
+    checkInheritanceClause(ED);
     if (auto nominal = ED->getExtendedNominal()) {
       TC.validateDecl(nominal);
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
@@ -3257,6 +3258,7 @@ public:
     TC.validateDecl(CD);
 
     if (!CD->isInvalid()) {
+      checkInheritanceClausesOfGenericParams(CD->getGenericParams());
       TC.checkReferencedGenericParams(CD);
       TC.checkProtocolSelfRequirements(CD);
     }
