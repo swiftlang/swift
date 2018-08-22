@@ -2880,24 +2880,19 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
 
   CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
 
-  // For now, all type metadata is directly stored.
-  bool isIndirect = false;
-
   StringRef section{};
   if (classDecl->isObjC() &&
       IGM.TargetInfo.OutputObjectFormat == llvm::Triple::MachO)
     section = "__DATA,__objc_data, regular";
 
-  auto var = IGM.defineTypeMetadata(declaredType, isIndirect, isGeneric,
-                                    canBeConstant,
-                                    init.finishAndCreateFuture(),
-                                    section);
+  auto var = IGM.defineTypeMetadata(declaredType, isGeneric, canBeConstant,
+                                    init.finishAndCreateFuture(), section);
 
   // Add classes that don't require dynamic initialization to the
   // ObjC class list.
   //
   // FIXME: This is where we check the completely fragile layout.
-  if (IGM.ObjCInterop && !isGeneric && !isIndirect &&
+  if (IGM.ObjCInterop && !isGeneric &&
       !doesClassMetadataRequireInitialization(IGM, classDecl)) {
     // Emit the ObjC class symbol to make the class visible to ObjC.
     if (classDecl->isObjC()) {
@@ -3289,11 +3284,8 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 
   CanType declaredType = structDecl->getDeclaredType()->getCanonicalType();
 
-  // For now, all type metadata is directly stored.
-  bool isIndirect = false;
-
-  IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
-                         canBeConstant, init.finishAndCreateFuture());
+  IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
+                         init.finishAndCreateFuture());
 
   IGM.IRGen.noteUseOfAnyParentTypeMetadata(structDecl);
 }
@@ -3487,11 +3479,8 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
 
   CanType declaredType = theEnum->getDeclaredType()->getCanonicalType();
 
-  // For now, all type metadata is directly stored.
-  bool isIndirect = false;
-  
-  IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
-                         canBeConstant, init.finishAndCreateFuture());
+  IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
+                         init.finishAndCreateFuture());
 
   IGM.IRGen.noteUseOfAnyParentTypeMetadata(theEnum);
 }

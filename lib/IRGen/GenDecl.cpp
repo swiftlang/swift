@@ -3275,13 +3275,11 @@ IRGenModule::getAddrOfTypeMetadataInPlaceInitializationCache(
 /// existing external declaration to the address point as an alias into the
 /// full metadata object.
 llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
-                                 bool isIndirect,
-                                 bool isPattern,
-                                 bool isConstant,
-                                 ConstantInitFuture init,
-                                 llvm::StringRef section) {
+                                                   bool isPattern,
+                                                   bool isConstant,
+                                                   ConstantInitFuture init,
+                                                   llvm::StringRef section) {
   assert(init);
-  assert(!isIndirect && "indirect type metadata not used yet");
 
   if (isPattern) {
     auto addr = getAddrOfTypeMetadataPattern(concreteType->getAnyNominal(),
