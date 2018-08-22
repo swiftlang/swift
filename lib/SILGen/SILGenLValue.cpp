@@ -47,6 +47,8 @@ struct LValueWritebackCleanup : Cleanup {
 
   void emit(SILGenFunction &SGF, CleanupLocation loc,
             ForUnwind_t forUnwind) override {
+    FullExpr scope(SGF.Cleanups, loc);
+
     // TODO: honor forUnwind!
     auto &evaluation = *SGF.FormalEvalContext.find(Depth);
     assert(evaluation.getKind() == FormalAccess::Exclusive);
