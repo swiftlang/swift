@@ -59,10 +59,8 @@ DatasetAPITests.testAllBackends("SingleValueHOFs") {
 DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
   let scalars1 = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
   let scalars2 = Tensor<Float>(rangeFrom: 5, to: 10, stride: 1)
-  let datasetLeft = SingleValueDataset(elements: scalars1,
-                                   elementShape: [])
-  let datasetRight = SingleValueDataset(elements: scalars2,
-                                   elementShape: [])
+  let datasetLeft = SingleValueDataset(elements: scalars1, elementShape: [])
+  let datasetRight = SingleValueDataset(elements: scalars2, elementShape: [])
   var i: Int32 = 0
   for (item1, item2) in zip(datasetLeft, datasetRight) {
     expectEqual(scalars1[i].array, item1.array)
