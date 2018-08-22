@@ -1594,7 +1594,7 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
     innerFailure = &specializedFailure;
   
   // Perform a conditional cast branch.
-  SGF.emitCheckedCastBranchOld(
+  SGF.emitCheckedCastBranch(
       loc, castOperand, sourceType, targetType, SGFContext(),
       // Success block: recurse.
       [&](ManagedValue castValue) {
@@ -1603,7 +1603,7 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
         assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
       },
       // Failure block: branch out to the continuation block.
-      [&] { (*innerFailure)(loc); }, rows[0].Count);
+      [&](Optional<ManagedValue> mv) { (*innerFailure)(loc); }, rows[0].Count);
 }
 
 namespace {
