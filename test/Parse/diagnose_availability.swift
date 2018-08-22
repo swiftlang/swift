@@ -26,3 +26,35 @@ func availableOnMultiplePlatforms() {}
 // expected-error@-1 {{'deprecated' can't be combined with shorthand specification 'OSX 10.0'}}
 // expected-error@-2 {{expected declaration}}
 func twoShorthandsFollowedByDeprecated() {}
+
+
+// SR-8598: Missing/wrong warning message for '*' or 'swift' platform.
+
+@available(*, deprecated: 4.2)
+// expected-warning@-1 {{unexpected version number for non-specific platform '*' in 'available' attribute}}
+func allPlatformsDeprecatedVersion() {}
+
+@available(*, deprecated, obsoleted: 4.2)
+// expected-warning@-1 {{unexpected version number for non-specific platform '*' in 'available' attribute}}
+func allPlatformsDeprecatedAndObsoleted() {}
+
+@available(swift, unavailable)
+// expected-warning@-1 {{argument 'unavailable' is infeasible for swift platform in 'available' attribute}}
+func swiftUnavailable() {}
+
+@available(swift, unavailable, introduced: 4.2)
+// expected-warning@-1 {{argument 'unavailable' is infeasible for swift platform in 'available' attribute}}
+func swiftUnavailableIntroduced() {}
+
+@available(swift, deprecated)
+// expected-warning@-1 {{'deprecated' must have a version number for swift platform in 'available' attribute}}
+func swiftDeprecated() {}
+
+@available(swift, deprecated, obsoleted: 4.2)
+// expected-warning@-1 {{'deprecated' must have a version number for swift platform in 'available' attribute}}
+func swiftDeprecatedObsoleted() {}
+
+@available(swift, message: "missing valid option")
+// expected-warning@-1 {{expected 'available' option with a version number for swift platform, such as 'introduced', 'deprecated', or 'obsoleted'}}
+func swiftMessage() {}
+

@@ -511,10 +511,29 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   bool SomeVersion = (!Introduced.empty() ||
                       !Deprecated.empty() ||
                       !Obsoleted.empty());
-  if (!PlatformKind.hasValue() &&
-      Platform == "swift" &&
-      SomeVersion &&
-      PlatformAgnostic == PlatformAgnosticAvailabilityKind::None) {
+  if (!PlatformKind.hasValue() && Platform == "swift") {
+    if (PlatformAgnostic == PlatformAgnosticAvailabilityKind::Deprecated) {
+      diagnose(AttrLoc,
+               diag::attr_availability_swift_platform_deprecated,
+               AttrName);
+      return nullptr;
+    }
+    if (PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
+      diagnose(AttrLoc,
+               diag::attr_availability_swift_platform_infeasible,
+               "unavailable",
+               AttrName);
+      return nullptr;
+    }
+    assert(PlatformAgnostic == PlatformAgnosticAvailabilityKind::None);
+
+    if (!SomeVersion) {
+      diagnose(AttrLoc,
+               diag::attr_availability_swift_platform_expected_option,
+               AttrName);
+      return nullptr;
+    }
+
     PlatformKind = PlatformKind::none;
     PlatformAgnostic = PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
   }
@@ -525,6 +544,14 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   if (!PlatformKind.hasValue()) {
     diagnose(AttrLoc, diag::attr_availability_unknown_platform,
            Platform, AttrName);
+    return nullptr;
+  }
+
+  // Warn if any version is specified for non-specific '*' platforms.
+  if (Platform == "*" && SomeVersion) {
+    diagnose(AttrLoc,
+             diag::attr_availability_nonspecific_platform_unexpected_version,
+             AttrName);
     return nullptr;
   }
 
