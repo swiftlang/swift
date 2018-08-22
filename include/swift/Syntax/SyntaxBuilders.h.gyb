@@ -42,7 +42,7 @@ class ${node.name}Builder {
 
 public:
   ${node.name}Builder() = default;
-  ${node.name}Builder(RC<SyntaxArena> Arena) : Arena(Arena) {}
+  ${node.name}Builder(const RC<SyntaxArena> &Arena) : Arena(Arena) {}
 
 %     for child in node.children:
   ${node.name}Builder &use${child.name}(${child.type_name} ${child.name});

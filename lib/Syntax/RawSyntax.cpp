@@ -70,7 +70,7 @@ static void dumpTokenKind(llvm::raw_ostream &OS, tok Kind) {
 unsigned RawSyntax::NextFreeNodeId = 1;
 
 RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                     SourcePresence Presence, RC<SyntaxArena> Arena,
+                     SourcePresence Presence, const RC<SyntaxArena> &Arena,
                      llvm::Optional<unsigned> NodeId) {
   assert(Kind != SyntaxKind::Token &&
          "'token' syntax node must be constructed with dedicated constructor");
@@ -98,7 +98,7 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
 RawSyntax::RawSyntax(tok TokKind, OwnedString Text,
                      ArrayRef<TriviaPiece> LeadingTrivia,
                      ArrayRef<TriviaPiece> TrailingTrivia,
-                     SourcePresence Presence, RC<SyntaxArena> Arena,
+                     SourcePresence Presence, const RC<SyntaxArena> &Arena,
                      llvm::Optional<unsigned> NodeId) {
   RefCount = 0;
 
@@ -142,7 +142,8 @@ RawSyntax::~RawSyntax() {
 }
 
 RC<RawSyntax> RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                              SourcePresence Presence, RC<SyntaxArena> Arena,
+                              SourcePresence Presence,
+                              const RC<SyntaxArena> &Arena,
                               llvm::Optional<unsigned> NodeId) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       Layout.size(), 0, 0);
@@ -155,7 +156,8 @@ RC<RawSyntax> RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
 RC<RawSyntax> RawSyntax::make(tok TokKind, OwnedString Text,
                               ArrayRef<TriviaPiece> LeadingTrivia,
                               ArrayRef<TriviaPiece> TrailingTrivia,
-                              SourcePresence Presence, RC<SyntaxArena> Arena,
+                              SourcePresence Presence,
+                              const RC<SyntaxArena> &Arena,
                               llvm::Optional<unsigned> NodeId) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       0, 1, LeadingTrivia.size() + TrailingTrivia.size());

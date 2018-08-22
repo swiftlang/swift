@@ -68,7 +68,7 @@ RC<RawSyntax>
 SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
                                         ArrayRef<RC<RawSyntax>> Parts) {
   assert(isUnknownKind(Kind));
-  RC<SyntaxArena> Arena = getArena();
+  const RC<SyntaxArena> &Arena = getArena();
   return RawSyntax::make(Kind, Parts, SourcePresence::Present, Arena);
 }
 
@@ -76,7 +76,7 @@ RC<RawSyntax>
 SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
                                      ArrayRef<RC<RawSyntax>> Parts) {
   // Try to create the node of the given syntax.
-  RC<SyntaxArena> Arena = getArena();
+  const RC<SyntaxArena> &Arena = getArena();
   if (auto Node = SyntaxFactory::createRaw(Kind, Parts, Arena))
     return Node;
 
@@ -287,7 +287,7 @@ namespace {
 void finalizeSourceFile(RootContextData &RootData,
                         ArrayRef<RC<RawSyntax>> Parts) {
   SourceFile &SF = RootData.SF;
-  RC<SyntaxArena> Arena = RootData.Arena;
+  RC<SyntaxArena> &Arena = RootData.Arena;
   std::vector<RC<RawSyntax>> AllTopLevel;
   RC<RawSyntax> EOFToken;
 
@@ -465,7 +465,7 @@ bool shouldCacheNode(tok TokKind, OwnedString &Text,
 }
 
 RC<RawSyntax>
-RawSyntaxTokenCache::getToken(RC<SyntaxArena> Arena, tok TokKind,
+RawSyntaxTokenCache::getToken(RC<SyntaxArena> &Arena, tok TokKind,
                               OwnedString Text,
                               llvm::ArrayRef<TriviaPiece> LeadingTrivia,
                               llvm::ArrayRef<TriviaPiece> TrailingTrivia) {
