@@ -129,10 +129,15 @@ struct ByteTreeObjectReader {
   }
 }
 
+struct ByteTreeProtocolVersion {
+  let major: Int
+  let minor: Int
+}
+
 /// Reader for reading the ByteTree format into Swift objects
 struct ByteTreeReader {
   enum DeserializationError: Error, CustomStringConvertible {
-    case versionValidationFailed(ByteTreeReader.ProtocolVersion)
+    case versionValidationFailed(ByteTreeProtocolVersion)
 
     public var description: String {
       switch self {
@@ -142,9 +147,6 @@ struct ByteTreeReader {
       }
     }
   }
-
-  /// The type as which the protocol version is encoded in ByteTree
-  typealias ProtocolVersion = UInt32
 
   /// A pointer pointing to the next byte of serialized data to be read
   private var pointer: UnsafeRawPointer
@@ -173,7 +175,7 @@ struct ByteTreeReader {
   static func read<T: ByteTreeObjectDecodable>(
     _ rootObjectType: T.Type, from pointer: UnsafeRawPointer,
     userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>,
-    protocolVersionValidation: (ProtocolVersion) -> Bool
+    protocolVersionValidation: (ByteTreeProtocolVersion) -> Bool
   ) throws -> T {
     var reader = ByteTreeReader(pointer: pointer, userInfo: userInfo)
     try reader.readAndValidateProtocolVersion(protocolVersionValidation)
@@ -193,7 +195,7 @@ struct ByteTreeReader {
   static func read<T: ByteTreeObjectDecodable>(
     _ rootObjectType: T.Type, from data: Data,
     userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>,
-    protocolVersionValidation versionValidate: (ProtocolVersion) -> Bool
+    protocolVersionValidation versionValidate: (ByteTreeProtocolVersion) -> Bool
   ) throws -> T {
     return try data.withUnsafeBytes { (pointer: UnsafePointer<UInt8>) in
       let rawPointer = UnsafeRawPointer(pointer)
@@ -249,10 +251,17 @@ struct ByteTreeReader {
   /// - Parameter validationCallback: A callback that determines if the given
   ///             protocol version can be read
   private mutating func readAndValidateProtocolVersion(
-    _ validationCallback: (ProtocolVersion) -> Bool
+    _ validationCallback: (ByteTreeProtocolVersion) -> Bool
   ) throws {
-    let protocolVersion = ProtocolVersion(littleEndian: 
-      readRaw(ProtocolVersion.self))
+    // The first three bytes of the four byte version number make up the major 
+    // version
+    let version = UInt32(littleEndian: readRaw(UInt32.self))
+    // The most significant three bytes make up the major version
+    let majorVersion = Int(version >> 8)
+    // The least significant byte constitutes the minor version
+    let minorVersion = Int(version & 0xff)
+    let protocolVersion = ByteTreeProtocolVersion(major: majorVersion, 
+                                                  minor: minorVersion)
     let result = validationCallback(protocolVersion)
     if !result {
       throw DeserializationError.versionValidationFailed(protocolVersion)
