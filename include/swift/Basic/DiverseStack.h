@@ -366,10 +366,14 @@ public:
   void pop(stable_iterator stable_iter) {
     iterator iter = find(stable_iter);
     checkIterator(iter);
+#ifndef NDEBUG
     while (Begin != iter.Ptr) {
       pop();
       checkIterator(iter);
     }
+#else
+    Begin = iter.Ptr;
+#endif
   }
 };
 
