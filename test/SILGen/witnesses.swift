@@ -522,3 +522,37 @@ protocol EscapingReq {
 struct EscapingCovariance: EscapingReq {
   func f(_: (Int) -> Int) { }
 }
+
+protocol InoutFunctionReq {
+  associatedtype T
+  func updateFunction(x: inout () -> T)
+}
+
+// CHECK-LABEL: sil private [transparent] [thunk] @$S9witnesses13InoutFunctionVAA0bC3ReqA2aDP06updateC01xy1TQzycz_tFTW
+// CHECK:      bb0(%0 : @trivial $*@callee_guaranteed () -> @out (), %1 : @trivial $*InoutFunction):
+// CHECK-NEXT:   [[TEMP:%.*]] = alloc_stack $@callee_guaranteed () -> ()
+//   Reabstract the contents of the inout argument into the temporary.
+// CHECK-NEXT:   [[OLD_FN:%.*]] = load [take] %0
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[THUNK:%.*]] = function_ref @$SytIegr_Ieg_TR
+// CHECK-NEXT:   [[THUNKED_OLD_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[OLD_FN]])
+// CHECK-NEXT:   store [[THUNKED_OLD_FN]] to [init] [[TEMP]] :
+//   Call the function.
+// CHECK-NEXT:   [[SELF:%.*]] = load [trivial] %1 : $*InoutFunction
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[T0:%.*]] = function_ref @$S9witnesses13InoutFunctionV06updateC01xyyycz_tF :
+// CHECK-NEXT:   apply [[T0]]([[TEMP]], [[SELF]])
+// CHECK-NEXT:   [[TUPLE:%.*]] = tuple ()
+//   Reabstract the contents of the temporary back into the inout argument.
+// CHECK-NEXT:   [[NEW_FN:%.*]] = load [take] [[TEMP]]
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[THUNK:%.*]] = function_ref @$SIeg_ytIegr_TR
+// CHECK-NEXT:   [[THUNKED_NEW_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NEW_FN]])
+// CHECK-NEXT:   store [[THUNKED_NEW_FN]] to [init] %0 :
+// CHECK-NEXT:   dealloc_stack [[TEMP]]
+// CHECK-NEXT:   return [[TUPLE]]
+// CHECK-LABEL:  } // end sil function '$S9witnesses13InoutFunctionVAA0bC3ReqA2aDP06updateC01xy1TQzycz_tFTW'
+
+struct InoutFunction : InoutFunctionReq {
+  func updateFunction(x: inout () -> ()) {}
+}
