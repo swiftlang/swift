@@ -2198,7 +2198,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     // propagated that to the closure expr. Return the tensorflow representation
     // in that case. Note that this is analogous to the Func case below.
     if (auto *closureType =
-            c.getClosureExpr()->getType()->castTo<AnyFunctionType>()) {
+            c.getClosureExpr()->getType()->getAs<AnyFunctionType>()) {
       if (closureType->getExtInfo().getSILRepresentation() ==
           SILFunctionTypeRepresentation::TensorFlow) {
         return SILFunctionTypeRepresentation::TensorFlow;
