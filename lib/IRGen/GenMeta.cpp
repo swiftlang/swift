@@ -2020,6 +2020,23 @@ createInPlaceInitializationMetadataAccessFunction(IRGenModule &IGM,
   });
 }
 
+/// Create an access function for the given non-generic type.
+static void createNonGenericMetadataAccessFunction(IRGenModule &IGM,
+                                                   NominalTypeDecl *typeDecl) {
+  assert(!typeDecl->isGenericContext());
+  auto type = typeDecl->getDeclaredType()->getCanonicalType();
+
+  // If the type requires the in-place initialization pattern, use it.
+  if (needsInPlaceMetadataInitialization(IGM, typeDecl)) {
+    createInPlaceInitializationMetadataAccessFunction(IGM, typeDecl, type);
+    return;
+  }
+
+  // Otherwise, use the lazy pattern, which should be emitted using a
+  // direct reference to the metadata.
+  createDirectTypeMetadataAccessFunction(IGM, type, /*allow existing*/ false);
+}
+
 // Classes
 
 /// Emit the base-offset variable for the class.
@@ -2170,13 +2187,7 @@ namespace {
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      for (unsigned i = 0,
-                    e = placeholder->getNumberOfFieldOffsetVectorEntries();
-           i < e; ++i) {
-        // Emit placeholder values for some number of stored properties we
-        // know exist but aren't able to reference directly.
-        B.addInt(IGM.SizeTy, 0);
-      }
+      llvm_unreachable("Fixed class metadata cannot have missing members");
     }
 
     void addMethod(SILDeclRef fn) {
@@ -2320,11 +2331,7 @@ namespace {
 
     void noteResilientSuperclass() {}
 
-    void noteStartOfImmediateMembers(ClassDecl *theClass) {
-      if (theClass == Target) {
-        emitClassMetadataBaseOffset(IGM, theClass);
-      }
-    }
+    void noteStartOfImmediateMembers(ClassDecl *theClass) {}
 
     /// The 'metadata flags' field in a class is actually a pointer to
     /// the metaclass object for the class.
@@ -2530,25 +2537,18 @@ namespace {
 
     void createMetadataAccessFunction() {
       assert(!Target->isGenericContext());
-      auto type =cast<ClassType>(Target->getDeclaredType()->getCanonicalType());
+      emitClassMetadataBaseOffset(IGM, Target);
+      createNonGenericMetadataAccessFunction(IGM, Target);
 
-      // Fixed case.
-      if (!doesClassMetadataRequireInitialization(IGM, Target)) {
-        (void) createDirectTypeMetadataAccessFunction(IGM, type,
-                                                      /*allowExisting*/ false);
-        return;
+      if (doesClassMetadataRequireInitialization(IGM, Target)) {
+        emitMetadataCompletionFunction(
+            IGM, Target,
+            [&](IRGenFunction &IGF, llvm::Value *metadata,
+                MetadataDependencyCollector *collector) {
+          emitInitializeClassMetadata(IGF, Target, FieldLayout, metadata,
+                                      collector);
+        });
       }
-
-      // Otherwise, we have to initialize metadata at runtime.
-      createInPlaceInitializationMetadataAccessFunction(IGM, Target, type);
-
-      emitMetadataCompletionFunction(
-          IGM, Target,
-          [&](IRGenFunction &IGF, llvm::Value *metadata,
-              MetadataDependencyCollector *collector) {
-        emitInitializeClassMetadata(IGF, Target, FieldLayout, metadata,
-                                    collector);
-      });
 
       // If the class has resilient ancestry we also need a relocation
       // function.
@@ -3028,23 +3028,6 @@ namespace {
       });
     }
   };
-}
-
-/// Create an access function for the given non-generic type.
-static void createNonGenericMetadataAccessFunction(IRGenModule &IGM,
-                                                   NominalTypeDecl *typeDecl) {
-  assert(!typeDecl->isGenericContext());
-  auto type = typeDecl->getDeclaredType()->getCanonicalType();
-
-  // If the type requires the in-place initialization pattern, use it.
-  if (needsInPlaceMetadataInitialization(IGM, typeDecl)) {
-    createInPlaceInitializationMetadataAccessFunction(IGM, typeDecl, type);
-    return;
-  }
-
-  // Otherwise, use the lazy pattern, which should be emitted using a
-  // direct reference to the metadata.
-  createDirectTypeMetadataAccessFunction(IGM, type, /*allow existing*/ false);
 }
 
 
