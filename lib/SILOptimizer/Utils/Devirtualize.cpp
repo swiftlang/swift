@@ -121,7 +121,7 @@ static bool isEffectivelyFinalMethod(FullApplySite AI,
   if (!CHA)
     return false;
 
-  // This is a private or a module internal class.
+  // This is a private, a module internal or a public class.
   //
   // We can analyze the class hierarchy rooted at it and
   // eventually devirtualize a method call more efficiently.
