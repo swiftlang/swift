@@ -160,6 +160,7 @@ struct TestConfig {
             LogMemory: \(logMemory)
             SampleTime: \(sampleTime)
             FixedIters: \(fixedNumIters)
+            Delimiter: \(String(reflecting: delim))
             Tests Filter: \(c.tests ?? [])
             Tests to run: \(testList)
 
