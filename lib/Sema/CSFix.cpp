@@ -53,8 +53,8 @@ std::string ForceDowncast::getName() const {
 }
 
 bool ForceDowncast::diagnose(Expr *expr, const Solution &solution) const {
-  MissingExplicitConversionFailure failure(expr, solution, getLocator(),
-                                           DowncastTo);
+  MissingExplicitConversionFailure failure(expr, solution.getConstraintSystem(),
+                                           getLocator(), DowncastTo);
   return failure.diagnose();
 }
 
@@ -64,7 +64,8 @@ ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type toType,
 }
 
 bool ForceOptional::diagnose(Expr *root, const Solution &solution) const {
-  MissingOptionalUnwrapFailure failure(root, solution, getLocator());
+  MissingOptionalUnwrapFailure failure(root, solution.getConstraintSystem(),
+                                       getLocator());
   return failure.diagnose();
 }
 
@@ -76,8 +77,9 @@ ForceOptional *ForceOptional::create(ConstraintSystem &cs,
 bool UnwrapOptionalBase::diagnose(Expr *root, const Solution &solution) const {
   bool resultIsOptional =
       getKind() == FixKind::UnwrapOptionalBaseWithOptionalResult;
-  MemberAccessOnOptionalBaseFailure failure(root, solution, getLocator(),
-                                            MemberName, resultIsOptional);
+  MemberAccessOnOptionalBaseFailure failure(
+      root, solution.getConstraintSystem(), getLocator(), MemberName,
+      resultIsOptional);
   return failure.diagnose();
 }
 
@@ -95,7 +97,8 @@ UnwrapOptionalBase *UnwrapOptionalBase::createWithOptionalResult(
 }
 
 bool AddAddressOf::diagnose(Expr *root, const Solution &solution) const {
-  MissingAddressOfFailure failure(root, solution, getLocator());
+  MissingAddressOfFailure failure(root, solution.getConstraintSystem(),
+                                  getLocator());
   return failure.diagnose();
 }
 
@@ -105,7 +108,8 @@ AddAddressOf *AddAddressOf::create(ConstraintSystem &cs,
 }
 
 bool TreatRValueAsLValue::diagnose(Expr *root, const Solution &solution) const {
-  RValueTreatedAsLValueFailure failure(solution, getLocator());
+  RValueTreatedAsLValueFailure failure(solution.getConstraintSystem(),
+                                       getLocator());
   return failure.diagnose();
 }
 
@@ -116,7 +120,8 @@ TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
 
 
 bool CoerceToCheckedCast::diagnose(Expr *root, const Solution &solution) const {
-  MissingForcedDowncastFailure failure(root, solution, getLocator());
+  MissingForcedDowncastFailure failure(root, solution.getConstraintSystem(),
+                                       getLocator());
   return failure.diagnose();
 }
 
@@ -127,8 +132,8 @@ CoerceToCheckedCast *CoerceToCheckedCast::create(ConstraintSystem &cs,
 
 bool MarkExplicitlyEscaping::diagnose(Expr *root,
                                       const Solution &solution) const {
-  NoEscapeFuncToTypeConversionFailure failure(root, solution, getLocator(),
-                                              ConvertTo);
+  NoEscapeFuncToTypeConversionFailure failure(
+      root, solution.getConstraintSystem(), getLocator(), ConvertTo);
   return failure.diagnose();
 }
 
@@ -139,7 +144,8 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, ConstraintLocator *locator,
 }
 
 bool RelabelArguments::diagnose(Expr *root, const Solution &solution) const {
-  LabelingFailure failure(solution, getLocator(), getLabels());
+  LabelingFailure failure(solution.getConstraintSystem(), getLocator(),
+                          getLabels());
   return failure.diagnose();
 }
 
@@ -153,7 +159,8 @@ RelabelArguments::create(ConstraintSystem &cs,
 }
 
 bool MissingConformance::diagnose(Expr *root, const Solution &solution) const {
-  MissingConformanceFailure failure(root, solution, getLocator(),
+  MissingConformanceFailure failure(root, solution.getConstraintSystem(),
+                                    getLocator(),
                                     {NonConformingType, Protocol});
   return failure.diagnose();
 }
@@ -166,7 +173,8 @@ MissingConformance *MissingConformance::create(ConstraintSystem &cs, Type type,
 
 bool SkipSameTypeRequirement::diagnose(Expr *root,
                                        const Solution &solution) const {
-  SameTypeRequirementFailure failure(root, solution, LHS, RHS, getLocator());
+  SameTypeRequirementFailure failure(root, solution.getConstraintSystem(), LHS,
+                                     RHS, getLocator());
   return failure.diagnose();
 }
 
@@ -178,7 +186,8 @@ SkipSameTypeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
 
 bool SkipSuperclassRequirement::diagnose(Expr *root,
                                          const Solution &solution) const {
-  SuperclassRequirementFailure failure(root, solution, LHS, RHS, getLocator());
+  SuperclassRequirementFailure failure(root, solution.getConstraintSystem(),
+                                       LHS, RHS, getLocator());
   return failure.diagnose();
 }
 
