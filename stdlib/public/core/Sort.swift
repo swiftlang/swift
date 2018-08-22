@@ -266,14 +266,14 @@ extension Collection where Self: BidirectionalCollection {
     forKey key: Element,
     within range: Range<Index>,
     by areInIncreasingOreder: (Element, Element) throws -> Bool
-    ) rethrows -> Index {
+  ) rethrows -> Index {
     
     var start = range.lowerBound
     var end   = range.upperBound
     
     while start < end {
-      let mid = index(start,
-                      offsetBy: distance(from: start, to: end) &>> 1)
+      let half = distance(from: start, to: end) &>> 1
+      let mid  = index(start, offsetBy: half)
       // the following if statement equals to self[mid] <= key
       // <= is necessary for picking the first element that is greater
       // than key
@@ -314,17 +314,14 @@ extension MutableCollection where Self: BidirectionalCollection {
         within: start..<sortedEnd,
         by: areInIncreasingOrder)
 
-      // Move elements forward until insertion point is reached.
+      // swap elements forward until insertion point is reached.
       var i = sortedEnd
-      let tmp = self[i]
 
       while i != insertionPoint {
         let j = index(before: i)
-        self[i] = self[j]
+        swapAt(i,j)
         i = j
       }
-      
-      self[insertionPoint] = tmp
 
       formIndex(after: &sortedEnd)
     }
@@ -420,7 +417,7 @@ extension MutableCollection where Self: RandomAccessCollection {
     // Sort the first, middle, and last elements, then use the middle value
     // as the pivot for the partition.
     let half = distance(from: lo, to: hi) / 2
-    let mid = index(lo, offsetBy: half)
+    var mid = index(lo, offsetBy: half)
     try _sort3(lo, mid, hi, by: areInIncreasingOrder)
 
     // Loop invariants:
@@ -445,7 +442,13 @@ extension MutableCollection where Self: RandomAccessCollection {
         }
         break Loop
       }
-
+      
+      // we can swap mid, so we should keep pivot valid
+      if lo == mid {
+        mid = hi
+      } else if hi == mid {
+        mid = lo
+      }
       swapAt(lo, hi)
     }
 
