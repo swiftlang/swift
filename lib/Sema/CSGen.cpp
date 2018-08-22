@@ -2420,6 +2420,27 @@ namespace {
       return result;
     }
 
+    Type visitVarargExpansionExpr(VarargExpansionExpr *expr) {
+      // Create a fresh type variable.
+      auto element = CS.createTypeVariable(CS.getConstraintLocator(expr));
+
+      // Try to build the appropriate type for a variadic argument list of
+      // the fresh element type.  If that failed, just bail out.
+      auto array = CS.TC.getArraySliceType(expr->getLoc(), element);
+      if (!array) return element;
+
+      // Require the operand to be convertible to the array type.
+      CS.addConstraint(ConstraintKind::Conversion,
+                       CS.getType(expr->getSubExpr()), array,
+                       CS.getConstraintLocator(expr));
+
+      // The apparent type of the expression is the element type, as far as
+      // the type-checker is concerned.  When this becomes a real feature,
+      // we should syntactically restrict these expressions to only appear
+      // in specific positions.
+      return element;
+    }
+
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr));
       CS.addConstraint(ConstraintKind::DynamicTypeOf, tv,

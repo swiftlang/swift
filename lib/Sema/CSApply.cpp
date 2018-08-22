@@ -3127,6 +3127,19 @@ namespace {
       return expr;
     }
 
+    Expr *visitVarargExpansionExpr(VarargExpansionExpr *expr) {
+      simplifyExprType(expr);
+
+      auto elementTy = cs.getType(expr);
+      auto arrayTy =
+        cs.getTypeChecker().getArraySliceType(expr->getLoc(), elementTy);
+      if (!arrayTy) return expr;
+
+      expr->setSubExpr(coerceToType(expr->getSubExpr(), arrayTy,
+                                    cs.getConstraintLocator(expr)));
+      return expr;
+    }
+
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       Expr *base = expr->getBase();
       base = cs.coerceToRValue(base);
