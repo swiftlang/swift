@@ -827,6 +827,53 @@ static CanType getSingleTupleElement(CanType type) {
 }
 
 namespace {
+  class TranslateIndirect : public Cleanup {
+    AbstractionPattern InputOrigType, OutputOrigType;
+    CanType InputSubstType, OutputSubstType;
+    SILValue Input, Output;
+
+  public:
+    TranslateIndirect(AbstractionPattern inputOrigType, CanType inputSubstType,
+                      AbstractionPattern outputOrigType, CanType outputSubstType,
+                      SILValue input, SILValue output)
+      : InputOrigType(inputOrigType), OutputOrigType(outputOrigType),
+        InputSubstType(inputSubstType), OutputSubstType(outputSubstType),
+        Input(input), Output(output) {
+      assert(input->getType().isAddress());
+      assert(output->getType().isAddress());
+    }
+
+    void emit(SILGenFunction &SGF, CleanupLocation loc,
+              ForUnwind_t forUnwind) override {
+      FullExpr scope(SGF.Cleanups, loc);
+
+      // Re-assert ownership of the input value.
+      auto inputMV = SGF.emitManagedBufferWithCleanup(Input);
+
+      // Set up an initialization of the output buffer.
+      auto &outputTL = SGF.getTypeLowering(Output->getType());
+      auto outputInit = SGF.useBufferAsTemporary(Output, outputTL);
+
+      // Transform into the output buffer.
+      auto mv = SGF.emitTransformedValue(loc, inputMV,
+                                         InputOrigType, InputSubstType,
+                                         OutputOrigType, OutputSubstType,
+                                         SGFContext(outputInit.get()));
+      emitForceInto(SGF, loc, mv, *outputInit);
+
+      // Disable the cleanup; we've kept our promise to leave the inout
+      // initialized.
+      outputInit->getManagedAddress().forward(SGF);
+    }
+
+    void dump(SILGenFunction &SGF) const override {
+      llvm::errs() << "TranslateIndirect("
+        << InputOrigType << ", " << InputSubstType << ", "
+        << OutputOrigType << ", " << OutputSubstType << ", "
+        << Output << ", " << Input << ")\n";
+    }
+  };
+
   class TranslateArguments {
     SILGenFunction &SGF;
     SILLocation Loc;
@@ -1356,13 +1403,49 @@ namespace {
                                 outputSubstType, input);
         return;
       case ParameterConvention::Indirect_Inout: {
-        // If it's inout, we need writeback.
-        llvm::errs() << "inout writeback in abstraction difference thunk "
-                        "not yet implemented\n";
-        llvm::errs() << "input value ";
-        input.getValue()->dump();
-        llvm::errs() << "output type " << SGF.getSILType(result) << "\n";
-        abort();
+        inputOrigType = inputOrigType.getWithoutSpecifierType();
+        inputSubstType = inputSubstType.getWithoutSpecifierType();
+        outputOrigType = outputOrigType.getWithoutSpecifierType();
+        outputSubstType = outputSubstType.getWithoutSpecifierType();
+
+        // Create a temporary of the right type.
+        auto &temporaryTL = SGF.getTypeLowering(result.getType());
+        auto temporary = SGF.emitTemporary(Loc, temporaryTL);
+
+        // Take ownership of the input value.  This leaves the input l-value
+        // effectively uninitialized, but we'll push a cleanup that will put
+        // a value back into it.
+        FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
+        auto ownedInput =
+          SGF.emitManagedBufferWithCleanup(input.getLValueAddress());
+
+        // Translate the input value into the temporary.
+        translateSingleInto(inputOrigType, inputSubstType,
+                            outputOrigType, outputSubstType,
+                            ownedInput, *temporary);
+
+        // Forward the cleanup on the temporary.  We're about to push a new
+        // cleanup that will re-assert ownership of this value.
+        auto temporaryAddr = temporary->getManagedAddress().forward(SGF);
+
+        // Leave the scope in which we did the forward translation.  This
+        // ensures that the value in the input buffer is destroyed
+        // immediately rather than (potentially) arbitrarily later
+        // at a point where we want to put new values in the input buffer.
+        scope.pop();
+
+        // Push the cleanup to perform the reverse translation.  This cleanup
+        // asserts ownership of the value of the temporary.
+        SGF.Cleanups.pushCleanup<TranslateIndirect>(outputOrigType,
+                                                    outputSubstType,
+                                                    inputOrigType,
+                                                    inputSubstType,
+                                                    temporaryAddr,
+                                                    input.getLValueAddress());
+
+        // Add the temporary as an l-value argument.
+        Outputs.push_back(ManagedValue::forLValue(temporaryAddr));
+        return;
       }
       case ParameterConvention::Indirect_In: {
         if (SGF.silConv.useLoweredAddresses()) {
