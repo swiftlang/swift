@@ -69,6 +69,7 @@ def main():
                                      test_case=test_case, 
                                      mode='incremental', 
                                      serialization_mode='incremental',
+                                     serialization_format='json',
                                      omit_node_ids=False,
                                      output_file=incremental_serialized_file, 
                                      temp_dir=temp_dir + '/temp', 
