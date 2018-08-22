@@ -7776,7 +7776,7 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
 
     bool diagnosed = false;
     for (const auto *fix : fixes->second)
-      diagnosed |= fix->diagnose(E, solution);
+      diagnosed |= fix->diagnose(E);
     return diagnosed;
   };
 
