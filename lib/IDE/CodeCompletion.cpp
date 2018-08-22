@@ -4484,7 +4484,7 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
 void CodeCompletionCallbacksImpl::completeExprKeyPath(KeyPathExpr *KPE,
                                                       SourceLoc DotLoc) {
   Kind = (!KPE || KPE->isObjC()) ? CompletionKind::KeyPathExprObjC
-                                 : CompletionKind::SwiftKeyPath;
+                                 : CompletionKind::KeyPathExprSwift;
   ParsedExpr = KPE;
   this->DotLoc = DotLoc;
   CurDeclContext = P.CurDeclContext;
@@ -4748,7 +4748,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::AfterPound:
   case CompletionKind::GenericParams:
   case CompletionKind::KeyPathExprObjC:
-  case CompletionKind::SwiftKeyPath:
+  case CompletionKind::KeyPathExprSwift:
     break;
 
   case CompletionKind::StmtOrExpr:
@@ -5198,7 +5198,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::SwiftKeyPath: {
+  case CompletionKind::KeyPathExprSwift: {
     auto KPE = dyn_cast<KeyPathExpr>(ParsedExpr);
     auto BGT = (*ExprType)->getAs<BoundGenericType>();
     if (!KPE || !BGT || BGT->getGenericArgs().size() != 2)

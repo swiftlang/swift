@@ -488,6 +488,7 @@ enum class CompletionKind {
   SuperExpr,
   SuperExprDot,
   KeyPathExprObjC,
+  KeyPathExprSwift,
   TypeSimpleBeginning,
   TypeIdentifierWithDot,
   TypeIdentifierWithoutDot,
@@ -505,7 +506,6 @@ enum class CompletionKind {
   AfterPound,
   AfterIfStmtElse,
   GenericParams,
-  SwiftKeyPath,
 };
 
 /// \brief A single code completion result.
