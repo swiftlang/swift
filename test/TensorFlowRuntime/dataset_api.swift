@@ -47,16 +47,10 @@ DatasetAPITests.testAllBackends("SingleValueTransformations") {
   expectEqual([0, 4, 1, 3, 2], shuffled.map { $0.scalar! })
 }
 
-// FIXME: Only public @TensorFlowGraph functions are being partitioned.
-@TensorFlowGraph
-public func addOne(_ x: Tensor<Float>) -> Tensor<Float> {
-  return x + 1
-}
-
 DatasetAPITests.testAllBackends("SingleValueHOFs") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
   let dataset = SingleValueDataset(elements: scalars, elementShape: [])
-  let result: SingleValueDataset = dataset.map(addOne)
+  let result: SingleValueDataset = dataset.map { $0 + 1 }
   expectEqual(result.flatMap { $0.scalars }, [1, 2, 3, 4, 5])
 }
 
