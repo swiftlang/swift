@@ -2281,31 +2281,38 @@ namespace {
     void addGenericWitnessTable(ClassDecl *forClass) {}
   };
 
-  /// Base class for laying out class metadata.
-  template <class Impl, class MemberBuilder>
+  /// Base class for layout of non-generic class metadata.
+  template<class Impl, class MemberBuilder>
   class ClassMetadataBuilderBase : public ClassMetadataVisitor<Impl> {
     using super = ClassMetadataVisitor<Impl>;
 
-  protected:
     using super::IGM;
     using super::Target;
-    using super::asImpl;
 
     ConstantStructBuilder &B;
+
     const ClassLayout &FieldLayout;
-    ClassMetadataLayout &MetadataLayout;
+    const ClassMetadataLayout &MetadataLayout;
 
     MemberBuilder Members;
+    Size AddressPoint;
 
+  public:
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              ConstantStructBuilder &builder,
                              const ClassLayout &fieldLayout)
-      : super(IGM, theClass), B(builder), FieldLayout(fieldLayout),
+      : super(IGM, theClass), B(builder),
+        FieldLayout(fieldLayout),
         MetadataLayout(IGM.getClassMetadataLayout(theClass)),
         Members(IGM, builder,
                 IGM.getSILModule().lookUpVTable(theClass)) {}
 
   public:
+    void noteAddressPoint() {
+      ClassMetadataVisitor<Impl>::noteAddressPoint();
+      AddressPoint = B.getNextOffsetFromGlobal();
+    }
+
     void addClassFlags() {
       B.addInt32((uint32_t) getClassFlags(Target));
     }
@@ -2342,6 +2349,38 @@ namespace {
         // rdar://problem/18801263
         B.addInt(IGM.MetadataKindTy, unsigned(MetadataKind::Class));
       }
+    }
+
+    void addSuperclass() {
+      if (doesClassMetadataRequireInitialization(IGM, Target)) {
+        // Leave a null pointer placeholder to be filled at runtime
+        B.addNullPointer(IGM.TypeMetadataPtrTy);
+        return;
+      }
+
+      // If this is a root class, use SwiftObject as our formal parent.
+      if (!Target->hasSuperclass()) {
+        // This is only required for ObjC interoperation.
+        if (!IGM.ObjCInterop) {
+          B.addNullPointer(IGM.TypeMetadataPtrTy);
+          return;
+        }
+
+        // We have to do getAddrOfObjCClass ourselves here because
+        // the ObjC runtime base needs to be ObjC-mangled but isn't
+        // actually imported from a clang module.
+        B.add(IGM.getAddrOfObjCClass(
+                               IGM.getObjCRuntimeBaseForSwiftRootClass(Target),
+                               NotForDefinition));
+        return;
+      }
+
+      Type type = Target->mapTypeIntoContext(Target->getSuperclass());
+      auto *metadata = tryEmitConstantHeapMetadataRef(
+          IGM, type->getCanonicalType(),
+          /*allowUninit*/ false);
+      assert(metadata != nullptr);
+      B.add(metadata);
     }
 
     /// The runtime provides a value witness table for Builtin.NativeObject.
@@ -2488,73 +2527,6 @@ namespace {
       Members.addGenericWitnessTable(forClass);
     }
 
-  };
-
-  /// Base class for layout of non-generic class metadata.
-  template<class Impl, class MemberBuilder>
-  class ConcreteClassMetadataBuilderBase :
-      public ClassMetadataBuilderBase<Impl, MemberBuilder> {
-
-    using super = ClassMetadataBuilderBase<Impl, MemberBuilder>;
-
-    using super::IGM;
-    using super::Target;
-    using super::FieldLayout;
-    using super::B;
-
-    Size AddressPoint;
-
-  public:
-    ConcreteClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
-                                     ConstantStructBuilder &builder,
-                                     const ClassLayout &fieldLayout)
-      : super(IGM, theClass, builder, fieldLayout) {}
-
-    void noteAddressPoint() {
-      super::noteAddressPoint();
-      AddressPoint = B.getNextOffsetFromGlobal();
-    }
-
-    void addSuperclass() {
-      if (doesClassMetadataRequireInitialization(IGM, Target)) {
-        // Leave a null pointer placeholder to be filled at runtime
-        B.addNullPointer(IGM.TypeMetadataPtrTy);
-        return;
-      }
-
-      // If this is a root class, use SwiftObject as our formal parent.
-      if (!Target->hasSuperclass()) {
-        // This is only required for ObjC interoperation.
-        if (!IGM.ObjCInterop) {
-          B.addNullPointer(IGM.TypeMetadataPtrTy);
-          return;
-        }
-
-        // We have to do getAddrOfObjCClass ourselves here because
-        // the ObjC runtime base needs to be ObjC-mangled but isn't
-        // actually imported from a clang module.
-        B.add(IGM.getAddrOfObjCClass(
-                               IGM.getObjCRuntimeBaseForSwiftRootClass(Target),
-                               NotForDefinition));
-        return;
-      }
-
-      Type type = Target->mapTypeIntoContext(Target->getSuperclass());
-      auto *metadata = tryEmitConstantHeapMetadataRef(
-          IGM, type->getCanonicalType(),
-          /*allowUninit*/ false);
-      assert(metadata != nullptr);
-      B.add(metadata);
-    }
-
-    bool canBeConstant() {
-      // TODO: the metadata global can actually be constant in a very
-      // special case: it's not a pattern, ObjC interoperation isn't
-      // required, there are no class fields, and there is nothing that
-      // needs to be runtime-adjusted.
-      return false;
-    }
-
     void createMetadataAccessFunction() {
       assert(!Target->isGenericContext());
       auto type =cast<ClassType>(Target->getDeclaredType()->getCanonicalType());
@@ -2621,10 +2593,10 @@ namespace {
   /// A builder for non-generic class metadata which does not require any
   /// runtime initialization.
   class FixedClassMetadataBuilder :
-      public ConcreteClassMetadataBuilderBase<FixedClassMetadataBuilder,
-                                              FixedClassMemberBuilder> {
-    using super = ConcreteClassMetadataBuilderBase<FixedClassMetadataBuilder,
-                                                   FixedClassMemberBuilder>;
+      public ClassMetadataBuilderBase<FixedClassMetadataBuilder,
+                                      FixedClassMemberBuilder> {
+    using super = ClassMetadataBuilderBase<FixedClassMetadataBuilder,
+                                           FixedClassMemberBuilder>;
 
   public:
     FixedClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
@@ -2636,10 +2608,10 @@ namespace {
   /// A builder for non-generic class metadata with resiliently-sized
   /// fields or generic ancestry.
   class InPlaceClassMetadataBuilder :
-      public ConcreteClassMetadataBuilderBase<InPlaceClassMetadataBuilder,
-                                              InPlaceClassMemberBuilder> {
-    using super = ConcreteClassMetadataBuilderBase<InPlaceClassMetadataBuilder,
-                                                   InPlaceClassMemberBuilder>;
+      public ClassMetadataBuilderBase<InPlaceClassMetadataBuilder,
+                                      InPlaceClassMemberBuilder> {
+    using super = ClassMetadataBuilderBase<InPlaceClassMetadataBuilder,
+                                           InPlaceClassMemberBuilder>;
 
   public:
     InPlaceClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
@@ -2650,10 +2622,10 @@ namespace {
 
   /// A builder for non-generic class metadata with resilient ancestry.
   class ResilientClassMetadataBuilder :
-      public ConcreteClassMetadataBuilderBase<ResilientClassMetadataBuilder,
-                                              ResilientClassMemberBuilder> {
-    using super = ConcreteClassMetadataBuilderBase<ResilientClassMetadataBuilder,
-                                                   ResilientClassMemberBuilder>;
+      public ClassMetadataBuilderBase<ResilientClassMetadataBuilder,
+                                      ResilientClassMemberBuilder> {
+    using super = ClassMetadataBuilderBase<ResilientClassMetadataBuilder,
+                                           ResilientClassMemberBuilder>;
 
   public:
     ResilientClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
