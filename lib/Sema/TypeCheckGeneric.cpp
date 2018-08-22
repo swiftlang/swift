@@ -263,12 +263,6 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 /// Revert the dependent types within the given generic parameter list.
 static void revertGenericParamList(TypeChecker &tc,
                                    GenericParamList *genericParams) {
-  // Revert the inherited clause of the generic parameter list.
-  for (auto param : *genericParams) {
-    for (auto &inherited : param->getInherited())
-      revertDependentTypeLoc(inherited);
-  }
-
   // Revert the requirements of the generic parameter list.
   tc.revertGenericRequirements(genericParams->getRequirements());
 }
