@@ -39,7 +39,7 @@
 // TODO: There's no support for TF's "global seed" yet, so we always use the
 // default graph seed as the first seed. Need to investigate the best way to
 // model TF's "global seed".
-@usableFromInline
+@usableFromInline @inline(__always)
 func _tensorSeeds(_ seed: Tensor<Int64>) -> (Tensor<Int64>, Tensor<Int64>) {
   return (Tensor(_defaultGraphSeed), seed)
 }
@@ -65,6 +65,7 @@ public struct SingleValueDataset<ScalarOfElement : AccelerableByTensorFlow> {
 }
 
 public extension SingleValueDataset {
+  @inlinable @inline(__always)
   init(randomSeed: Int64, elementShape: TensorShape) {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
     enableCPU()
@@ -79,10 +80,6 @@ public extension SingleValueDataset {
 
 public extension SingleValueDataset {
   /// Creates a dataset from a batch of elements as a tensor.
-  ///
-  /// - Parameter
-  ///   - elements: The batch of elements.
-  ///   - elementShape: The shape that the 
   @inlinable @inline(__always)
   public init(elements: Tensor<ScalarOfElement>, elementShape: TensorShape) {
     // A dataset creation op only runs on TF CPU.
@@ -153,10 +150,9 @@ public extension SingleValueDataset {
     )
   }
 
-  // TODO: Make default seeds consistent with TensorFlow Python API.
   @inlinable @inline(__always)
   func shuffled(
-    sampleCount: Int64, randomSeed: Int64 = 42
+    sampleCount: Int64, randomSeed: Int64
   ) -> SingleValueDataset {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
     return SingleValueDataset(
@@ -221,10 +217,11 @@ extension SingleValueDatasetIterator : IteratorProtocol {
 ///
 /// A `DoubleValueDataset` can be used to represent an input pipeline as a
 /// collection of element tensor tuples.
+// FIXME: SR-8599 blocks heterogeneous scalar types.
 @_fixed_layout
-public struct DoubleValueDataset<ScalarOfFirstElement, ScalarOfSecondElement>
-  where ScalarOfFirstElement : AccelerableByTensorFlow,
-        ScalarOfSecondElement : AccelerableByTensorFlow {
+public struct DoubleValueDataset<ScalarOfFirstElement>
+  where ScalarOfFirstElement : AccelerableByTensorFlow {
+  public typealias ScalarOfSecondElement = ScalarOfFirstElement
   @usableFromInline let _handle: VariantHandle
   public let elementShapes: (TensorShape, TensorShape)
 
@@ -237,6 +234,7 @@ public struct DoubleValueDataset<ScalarOfFirstElement, ScalarOfSecondElement>
 }
 
 public extension DoubleValueDataset {
+  @inlinable @inline(__always)
   init(randomSeed: Int64, elementShapes: (TensorShape, TensorShape)) {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
     enableCPU()
@@ -252,10 +250,6 @@ public extension DoubleValueDataset {
 
 public extension DoubleValueDataset {
   /// Creates a dataset from a batch of elements as a tensor.
-  ///
-  /// - Parameter
-  ///   - elements: The batch of elements.
-  ///   - elementShape: The shape that the 
   @inlinable @inline(__always)
   public init(elements: (Tensor<ScalarOfFirstElement>,
                          Tensor<ScalarOfSecondElement>),
@@ -264,7 +258,7 @@ public extension DoubleValueDataset {
     enableCPU()
     self.init(
       _handle: #tfop(
-        "TensorSliceDataset", [elements.0, elements.1],
+        "TensorSliceDataset", [elements.0.handle, elements.1.handle],
         Toutput_types: [ScalarOfFirstElement.self, ScalarOfSecondElement.self],
         output_shapes: [elementShapes.0, elementShapes.1]
       ),
@@ -278,12 +272,12 @@ extension DoubleValueDataset : Sequence {
                               Tensor<ScalarOfSecondElement>)
 
   public typealias Iterator =
-    DoubleValueDatasetIterator<ScalarOfFirstElement, ScalarOfSecondElement>
+    DoubleValueDatasetIterator<ScalarOfFirstElement>
 
   /// Returns an iterator over the elements of this dataset.
   @inlinable @inline(__always)
   public func makeIterator()
-    -> DoubleValueDatasetIterator<ScalarOfFirstElement, ScalarOfSecondElement> {
+    -> DoubleValueDatasetIterator<ScalarOfFirstElement> {
     let resource: ResourceHandle =
       #tfop("AnonymousIterator",
             output_types: [ScalarOfFirstElement.self,
@@ -297,20 +291,21 @@ extension DoubleValueDataset : Sequence {
 
 public extension DoubleValueDataset {
   @inlinable @inline(__always)
-  func map<T : AccelerableByTensorFlow, U : AccelerableByTensorFlow>(
+  func map<T : AccelerableByTensorFlow>(
     _ transform:
       @convention(tensorflow) (Tensor<ScalarOfFirstElement>,
-                               Tensor<ScalarOfSecondElement>) -> Tensor<T>
-  ) -> DoubleValueDataset<T, U> {
+                               Tensor<ScalarOfSecondElement>)
+        -> (Tensor<T>, Tensor<T>)
+  ) -> DoubleValueDataset<T> {
     // FIXME(SR-8570): If we pass an empty Array<TensorHandle<T>> as
     // other_arguments and an empty Array<Any.Type> as Targuments, partitioning
     // won't recognize the attribute:
     //    error: unknown array attribute
-    return DoubleValueDataset<T, U>(
+    return DoubleValueDataset<T>(
       _handle: #tfop(
         "MapDataset", _handle, [Tensor<Int32>(0)], f: transform,
         Targuments: [Int32.self],
-        output_types: [T.self, U.self],
+        output_types: [T.self, T.self],
         output_shapes: [elementShapes.0, elementShapes.1]
       ),
       elementShapes: elementShapes
@@ -338,10 +333,9 @@ public extension DoubleValueDataset {
     )
   }
 
-  // TODO: Make default seeds consistent with TensorFlow Python API.
   @inlinable @inline(__always)
   func shuffled(
-    sampleCount: Int64, randomSeed: Int64 = 42
+    sampleCount: Int64, randomSeed: Int64
   ) -> DoubleValueDataset {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
     return DoubleValueDataset(
@@ -368,11 +362,11 @@ public extension DoubleValueDataset {
 }
 
 /// Represents the state of iterating through a `DoubleValueDataset`.
+// FIXME: SR-8599 blocks heterogeneous scalar types.
 @_fixed_layout
-public struct DoubleValueDatasetIterator<ScalarOfFirstElement,
-                                         ScalarOfSecondElement>
-    where ScalarOfFirstElement : AccelerableByTensorFlow,
-          ScalarOfSecondElement : AccelerableByTensorFlow {
+public struct DoubleValueDatasetIterator<ScalarOfFirstElement>
+  where ScalarOfFirstElement : AccelerableByTensorFlow {
+  public typealias ScalarOfSecondElement = ScalarOfFirstElement
   @usableFromInline let handle: ResourceHandle
   public let elementShapes: (TensorShape, TensorShape)
 
@@ -411,14 +405,16 @@ extension DoubleValueDatasetIterator : IteratorProtocol {
 }
 
 @inlinable @inline(__always)
-public func zip<T, U>(
+// FIXME: SR-8599 blocks heterogeneous scalar types.
+public func zip<T>(
   _ first: SingleValueDataset<T>,
-  _ second: SingleValueDataset<U>
-) -> DoubleValueDataset<T, U> {
+  _ second: SingleValueDataset<T>
+) -> DoubleValueDataset<T> {
   return DoubleValueDataset(
-    _handle: #tfop("ZipDataset", [first, second],
-                   output_types: [T.self, U.self],
-                   output_shapes: [first.elementShape, second.elementShape]),
+    _handle: #tfop("ZipDataset", [first._handle, second._handle],
+                   output_types: [T.self, T.self],
+                   output_shapes: [first.elementShape, second.elementShape],
+                   N: 2),
     elementShapes: (first.elementShape, second.elementShape)
   )
 }

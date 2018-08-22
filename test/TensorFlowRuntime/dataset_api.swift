@@ -42,8 +42,9 @@ DatasetAPITests.testAllBackends("SingleValueDatasetIteration") {
 
 DatasetAPITests.testAllBackends("SingleValueTransformations") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
-  let shuffled = scalars.shuffled(seed: 42)
-  expcetEqual(ShapedArray(shape: [5], scalars: [4, 2, 3, 0, 1]), scalars.array)
+  let dataset = SingleValueDataset(elements: scalars, elementShape: [])
+  let shuffled = dataset.shuffled(sampleCount: 5, randomSeed: 42)
+  expectEqual([0, 4, 1, 3, 2], shuffled.map { $0.scalar! })
 }
 
 // FIXME: Only public @TensorFlowGraph functions are being partitioned.
@@ -61,11 +62,11 @@ DatasetAPITests.testAllBackends("SingleValueHOFs") {
 
 DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
   let scalars1 = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
-  let dataset1 = SingleValueDataset(elements: scalars1, elementShape: [1])
   let scalars2 = Tensor<Float>(rangeFrom: 5, to: 10, stride: 1)
-  let dataset2 = SingleValueDataset(elements: scalars2, elementShape: [1])
+  let dataset = DoubleValueDataset(elements: (scalars1, scalars2),
+                                   elementShapes: ([], []))
   var i: Int32 = 0
-  for (item1, item2) in zip(scalars1, scalars2) {
+  for (item1, item2) in dataset {
     expectEqual(scalars1[i].array, item1.array)
     expectEqual(scalars2[i].array, item2.array)
     i += 1
