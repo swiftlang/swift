@@ -1617,11 +1617,11 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
                   IGF.IGM.getPointerSize() * storedProperties.size());
 }
 
-static void emitInitializeMetadata(IRGenFunction &IGF,
-                                   NominalTypeDecl *nominalDecl,
-                                   llvm::Value *metadata,
-                                   bool isVWTMutable,
-                                   MetadataDependencyCollector *collector) {
+static void emitInitializeValueMetadata(IRGenFunction &IGF,
+                                        NominalTypeDecl *nominalDecl,
+                                        llvm::Value *metadata,
+                                        bool isVWTMutable,
+                                        MetadataDependencyCollector *collector) {
   auto loweredTy =
     IGF.IGM.getLoweredType(nominalDecl->getDeclaredTypeInContext());
 
@@ -1992,7 +1992,8 @@ template <class Impl, class DeclType>
                                 llvm::Value *metadata,
                                 bool isVWTMutable,
                                 MetadataDependencyCollector *collector) {
-      ::emitInitializeMetadata(IGF, Target, metadata, isVWTMutable, collector);
+      emitInitializeValueMetadata(IGF, Target, metadata,
+                                  isVWTMutable, collector);
     }
   };
 } // end anonymous namespace
@@ -2803,7 +2804,8 @@ namespace {
                                 bool isVWTMutable,
                                 MetadataDependencyCollector *collector) {
       assert(!HasDependentVWT && "class should never have dependent VWT");
-      emitInitializeClassMetadata(IGF, Target, FieldLayout, metadata, collector);
+      emitInitializeClassMetadata(IGF, Target, FieldLayout,
+                                  metadata, collector);
     }
   };
 } // end anonymous namespace
@@ -3021,8 +3023,8 @@ namespace {
       emitMetadataCompletionFunction(IGM, Target,
         [&](IRGenFunction &IGF, llvm::Value *metadata,
             MetadataDependencyCollector *collector) {
-        emitInitializeMetadata(IGF, Target, metadata, /*vwt mutable*/true,
-                               collector);
+        emitInitializeValueMetadata(IGF, Target, metadata,
+                                    /*vwt mutable*/true, collector);
       });
     }
   };
