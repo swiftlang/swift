@@ -531,3 +531,7 @@ public func graphFuncReturningOpaqueHandles() -> (ResourceHandle, ResourceHandle
 // CHECK:  [[C:%.*]] = tuple ([[A]] : $ResourceHandle, [[B]] : $ResourceHandle)
 // CHECK:  return [[C]] : $(ResourceHandle, ResourceHandle)   
 
+// Allow Any.Type as a type list member for empty type lists.
+public func testSR8570() {
+  () = #tfop("FooOp", Targuments: [] as [Any.Type]) // expected-error {{op named 'FooOp' is not registered in TensorFlow}}
+}
