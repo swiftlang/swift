@@ -1252,12 +1252,6 @@ ERROR(missing_unimplemented_init_runtime,none,
       "standard library error: missing _unimplementedInitializer", ())
 ERROR(missing_undefined_runtime,none,
       "standard library error: missing _undefined", ())
-WARNING(unsupported_synthesize_init_variadic,none,
-        "synthesizing a variadic inherited initializer for subclass %0 is "
-        "unsupported",
-        (Type))
-NOTE(variadic_superclass_init_here,none,
-     "variadic superclass initializer defined here", ())
 
 WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
         "reference to %0 %1 of %2 depends on '@objc' inference "

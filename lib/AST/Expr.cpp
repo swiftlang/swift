@@ -297,6 +297,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   PASS_THROUGH_REFERENCE(AutoClosure, getSingleExpressionBody);
   PASS_THROUGH_REFERENCE(InOut, getSubExpr);
 
+  NO_REFERENCE(VarargExpansion);
   NO_REFERENCE(DynamicType);
 
   PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
@@ -601,6 +602,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
 
   case ExprKind::OpenExistential:
   case ExprKind::MakeTemporarilyEscapable:
+  case ExprKind::VarargExpansion:
     return false;
 
   case ExprKind::Call:
