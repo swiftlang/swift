@@ -55,8 +55,7 @@ std::pair<Expr *, bool> FailureDiagnostic::computeAnchor() const {
 }
 
 Type FailureDiagnostic::getType(Expr *expr) const {
-  auto &cs = getConstraintSystem();
-  return solution.simplifyType(cs.getType(expr));
+  return resolveType(CS.getType(expr));
 }
 
 template <typename... ArgTypes>
