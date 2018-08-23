@@ -1576,7 +1576,8 @@ namespace {
         baseTy = MetatypeType::get(baseTy, CS.getASTContext());
 
         auto methodTy = CS.createTypeVariable(
-            CS.getConstraintLocator(expr));
+          CS.getConstraintLocator(expr),
+          TVO_PrefersArgumentSubtypeBinding);
 
         CS.addValueMemberConstraint(
             baseTy, expr->getName(), methodTy, CurDC,
