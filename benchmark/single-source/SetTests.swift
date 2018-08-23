@@ -13,106 +13,69 @@
 import TestsUtils
 
 public let SetTests = [
-  BenchmarkInfo(name: "SetExclusiveOr", runFunction: run_SetExclusiveOr, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetExclusiveOr_OfObjects", runFunction: run_SetExclusiveOr_OfObjects, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetIntersect", runFunction: run_SetIntersect, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetIntersect_OfObjects", runFunction: run_SetIntersect_OfObjects, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetIsSubsetOf", runFunction: run_SetIsSubsetOf, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetIsSubsetOf_OfObjects", runFunction: run_SetIsSubsetOf_OfObjects, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetUnion", runFunction: run_SetUnion, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetUnion_OfObjects", runFunction: run_SetUnion_OfObjects, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetExclusiveOr2", runFunction: run_SetExclusiveOr2, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetExclusiveOr2_OfObjects", runFunction: run_SetExclusiveOr2_OfObjects, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetIntersect2", runFunction: run_SetIntersect2, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetIntersect2_OfObjects", runFunction: run_SetIntersect2_OfObjects, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetIsSubsetOf2", runFunction: run_SetIsSubsetOf2, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetIsSubsetOf2_OfObjects", runFunction: run_SetIsSubsetOf2_OfObjects, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetUnion2", runFunction: run_SetUnion2, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(name: "SetUnion2_OfObjects", runFunction: run_SetUnion2_OfObjects, tags: [.validation, .api, .Set]),
 ]
 
 @inline(never)
-public func run_SetIsSubsetOf(_ N: Int) {
-  let size = 200
+public func run_SetIsSubsetOf2(_ N: Int) {
+  let size = 400
 
-  SRand()
+  let set = Set<Int>(size / 2 ..< size)
+  let otherSet = Set<Int>(0 ..< size)
 
-  var set = Set<Int>(minimumCapacity: size)
-  var otherSet = Set<Int>(minimumCapacity: size)
-
-  for _ in 0 ..< size {
-    set.insert(Int(truncatingIfNeeded: Random()))
-    otherSet.insert(Int(truncatingIfNeeded: Random()))
-  }
-
-  var isSubset = false
   for _ in 0 ..< N * 5000 {
-    isSubset = set.isSubset(of: otherSet)
-    if isSubset {
-      break
-    }
+    let isSubset = set.isSubset(of: identity(otherSet))
+    CheckResults(isSubset)
   }
-
-  CheckResults(!isSubset)
 }
 
 @inline(never)
-func sink(_ s: inout Set<Int>) {
-}
-
-@inline(never)
-public func run_SetExclusiveOr(_ N: Int) {
+public func run_SetExclusiveOr2(_ N: Int) {
   let size = 400
+  let overlap = 100
 
-  SRand()
+  let set = Set<Int>(0 ..< size)
+  let otherSet = Set<Int>(size - overlap ..< 2 * size - overlap)
 
-  var set = Set<Int>(minimumCapacity: size)
-  var otherSet = Set<Int>(minimumCapacity: size)
-
-  for _ in 0 ..< size {
-    set.insert(Int(truncatingIfNeeded: Random()))
-    otherSet.insert(Int(truncatingIfNeeded: Random()))
-  }
-
-  var xor = Set<Int>()
   for _ in 0 ..< N * 100 {
-    xor = set.symmetricDifference(otherSet)
+    let diff = set.symmetricDifference(identity(otherSet))
+    CheckResults(diff.count == 2 * (size - overlap))
   }
-  sink(&xor)
 }
 
 @inline(never)
-public func run_SetUnion(_ N: Int) {
+public func run_SetUnion2(_ N: Int) {
   let size = 400
+  let overlap = 100
 
-  SRand()
+  let set = Set<Int>(0 ..< size)
+  let otherSet = Set<Int>(size - overlap ..< 2 * size - overlap)
 
-  var set = Set<Int>(minimumCapacity: size)
-  var otherSet = Set<Int>(minimumCapacity: size)
-
-  for _ in 0 ..< size {
-    set.insert(Int(truncatingIfNeeded: Random()))
-    otherSet.insert(Int(truncatingIfNeeded: Random()))
-  }
-
-  var or = Set<Int>()
   for _ in 0 ..< N * 100 {
-    or = set.union(otherSet)
+    let or = set.union(identity(otherSet))
+    CheckResults(or.count == 2 * size)
   }
-  sink(&or)
 }
 
 @inline(never)
-public func run_SetIntersect(_ N: Int) {
+public func run_SetIntersect2(_ N: Int) {
   let size = 400
+  let overlap = 100
 
-  SRand()
+  let set = Set<Int>(0 ..< size)
+  let otherSet = Set<Int>(size - overlap ..< 2 * size - overlap)
 
-  var set = Set<Int>(minimumCapacity: size)
-  var otherSet = Set<Int>(minimumCapacity: size)
-
-  for _ in 0 ..< size {
-    set.insert(Int(truncatingIfNeeded: Random()))
-    otherSet.insert(Int(truncatingIfNeeded: Random()))
-  }
-
-  var and = Set<Int>()
   for _ in 0 ..< N * 100 {
-    and = set.intersection(otherSet)
+    let and = set.intersection(identity(otherSet))
+    CheckResults(and.count == overlap)
   }
-  sink(&and)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -133,92 +96,58 @@ class Box<T : Hashable> : Hashable {
 
 @inline(never)
 public func run_SetIsSubsetOf_OfObjects(_ N: Int) {
-  let size = 200
+  let size = 400
 
-  SRand()
+  let set = Set<Box<Int>>((size / 2 ..< size).map(Box.init))
+  let otherSet = Set<Box<Int>>((0 ..< size).map(Box.init))
 
-  var set = Set<Box<Int>>(minimumCapacity: size)
-  var otherSet = Set<Box<Int>>(minimumCapacity: size)
-
-  for _ in 0 ..< size {
-    set.insert(Box(Int(truncatingIfNeeded: Random())))
-    otherSet.insert(Box(Int(truncatingIfNeeded: Random())))
-  }
-
-  var isSubset = false
   for _ in 0 ..< N * 5000 {
-    isSubset = set.isSubset(of: otherSet)
-    if isSubset {
-      break
-    }
+    let isSubset = set.isSubset(of: identity(otherSet))
+    CheckResults(isSubset)
   }
-
-  CheckResults(!isSubset)
-}
-
-@inline(never)
-func sink(_ s: inout Set<Box<Int>>) {
 }
 
 @inline(never)
 public func run_SetExclusiveOr_OfObjects(_ N: Int) {
   let size = 400
+  let overlap = 100
 
-  SRand()
+  let set = Set<Box<Int>>((0 ..< size).map(Box.init))
+  let otherSet = Set<Box<Int>>(
+    (size - overlap ..< 2 * size - overlap).map(Box.init))
 
-  var set = Set<Box<Int>>(minimumCapacity: size)
-  var otherSet = Set<Box<Int>>(minimumCapacity: size)
-
-  for _ in 0 ..< size {
-    set.insert(Box(Int(truncatingIfNeeded: Random())))
-    otherSet.insert(Box(Int(truncatingIfNeeded: Random())))
-  }
-
-  var xor = Set<Box<Int>>()
   for _ in 0 ..< N * 100 {
-    xor = set.symmetricDifference(otherSet)
+    let diff = set.symmetricDifference(identity(otherSet))
+    CheckResults(diff.count == 2 * (size - overlap))
   }
-  sink(&xor)
 }
 
 @inline(never)
 public func run_SetUnion_OfObjects(_ N: Int) {
   let size = 400
+  let overlap = 100
 
-  SRand()
+  let set = Set<Box<Int>>((0 ..< size).map(Box.init))
+  let otherSet = Set<Box<Int>>(
+    (size - overlap ..< 2 * size - overlap).map(Box.init))
 
-  var set = Set<Box<Int>>(minimumCapacity: size)
-  var otherSet = Set<Box<Int>>(minimumCapacity: size)
-
-  for _ in 0 ..< size {
-    set.insert(Box(Int(truncatingIfNeeded: Random())))
-    otherSet.insert(Box(Int(truncatingIfNeeded: Random())))
-  }
-
-  var or = Set<Box<Int>>()
   for _ in 0 ..< N * 100 {
-    or = set.union(otherSet)
+    let or = set.union(identity(otherSet))
+    CheckResults(or.count == 2 * size)
   }
-  sink(&or)
 }
 
 @inline(never)
-public func run_SetIntersect_OfObjects(_ N: Int) {
+public func run_SetIntersect2_OfObjects(_ N: Int) {
   let size = 400
+  let overlap = 100
 
-  SRand()
+  let set = Set<Box<Int>>((0 ..< size).map(Box.init))
+  let otherSet = Set<Box<Int>>(
+    (size - overlap ..< 2 * size - overlap).map(Box.init))
 
-  var set = Set<Box<Int>>(minimumCapacity: size)
-  var otherSet = Set<Box<Int>>(minimumCapacity: size)
-
-  for _ in 0 ..< size {
-    set.insert(Box(Int(truncatingIfNeeded: Random())))
-    otherSet.insert(Box(Int(truncatingIfNeeded: Random())))
-  }
-
-  var and = Set<Box<Int>>()
   for _ in 0 ..< N * 100 {
-    and = set.intersection(otherSet)
+    let and = set.intersection(otherSet)
+    CheckResults(and.count == overlap)
   }
-  sink(&and)
 }
