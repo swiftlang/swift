@@ -27,6 +27,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeWalker.h"
@@ -4165,11 +4166,17 @@ static ConstraintResult visitInherited(
   // Visit all of the inherited types.
   auto typeDecl = decl.dyn_cast<TypeDecl *>();
   auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+  ASTContext &ctx = typeDecl ? typeDecl->getASTContext()
+                             : extDecl->getASTContext();
+  auto &evaluator = ctx.evaluator;
   ArrayRef<TypeLoc> inheritedTypes = typeDecl ? typeDecl->getInherited()
                                               : extDecl->getInherited();
   for (unsigned index : indices(inheritedTypes)) {
-    Type inheritedType = typeDecl ? typeDecl->getInheritedType(index)
-                                  : extDecl->getInheritedType(index);
+    Type inheritedType
+      = evaluateOrDefault(evaluator,
+                          InheritedTypeRequest{decl, index,
+                            TypeResolutionStage::Structural},
+                          Type());
     if (!inheritedType) continue;
 
     const auto &inherited = inheritedTypes[index];
