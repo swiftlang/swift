@@ -353,7 +353,7 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///     // Prints "[30, 40, 50]"
   ///
   /// If the array is empty, `endIndex` is equal to `startIndex`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var endIndex: Int {
     @inlinable
     get {
