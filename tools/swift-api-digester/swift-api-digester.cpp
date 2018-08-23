@@ -29,6 +29,7 @@
 #include "swift/AST/DiagnosticsModuleDiffer.h"
 #include <functional>
 #include "ModuleAnalyzerNodes.h"
+#include "ModuleDiagsConsumer.h"
 
 using namespace swift;
 using namespace ide;
@@ -2044,7 +2045,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
     llvm::errs() << RightPath << " does not exist\n";
     return 1;
   }
-  PrintingDiagnosticConsumer PDC;
+  ModuleDifferDiagsConsumer PDC;
   SDKContext Ctx(Opts);
   Ctx.getDiags().addConsumer(PDC);
 
@@ -2062,6 +2063,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   RefinementPass.pass(LeftModule, RightModule);
   // Find member hoist changes to help refine diagnostics.
   findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
+
   DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
   return 0;
 }
@@ -2100,7 +2102,7 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
 
-  PrintingDiagnosticConsumer PDC;
+  ModuleDifferDiagsConsumer PDC;
   SDKContext Ctx(Opts);
   Ctx.getDiags().addConsumer(PDC);
 
