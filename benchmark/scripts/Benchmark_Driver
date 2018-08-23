@@ -442,24 +442,17 @@ def run_benchmarks(driver):
         else:
             print(','.join(test_output))
         output.append(test_output)
-    if not output:
-        return
-    formatted_output = '\n'.join([','.join(l) for l in output])
-    totals = ['Totals', str(len(driver.tests))]
-    totals_output = '\n\n' + ','.join(totals)
-    if log:
-        print(line_format.format(*([''] + totals + ([''] * 6))))
-    else:
-        print(totals_output[1:])
-    formatted_output += totals_output
-    return formatted_output
+
+    print('\nTotal performance tests executed: {0}'.format(len(driver.tests)))
+    csv_log = '\n'.join([','.join(l) for l in output]) + '\n'
+    return csv_log
 
 
 def run(args):
     driver = BenchmarkDriver(args)
-    output = run_benchmarks(driver)
-    if args.output_dir:
-        driver.log_results(output)
+    csv_log = run_benchmarks(driver)
+    if args.output_dir and csv_log:
+        driver.log_results(csv_log)
     return 0
 
 

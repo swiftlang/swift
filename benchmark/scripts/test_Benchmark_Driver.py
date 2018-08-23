@@ -295,28 +295,31 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         driver.run_independent_samples = mock_run
 
         with captured_output() as (out, _):
-            formatted_output = run_benchmarks(driver)
+            log = run_benchmarks(driver)
 
+        csv_log = '3,b1,1,123,123,123,0,123,888\n'
+        self.assertEquals(log, csv_log)
         self.assertEquals(
             out.getvalue(),
             '#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),' +
             'MAX_RSS(B)\n' +
-            '3,b1,1,123,123,123,0,123,888\n\nTotals,1\n')
-        self.assertEquals(formatted_output,
-                          '3,b1,1,123,123,123,0,123,888\n' +
-                          '\nTotals,1')
+            csv_log +
+            '\n' +
+            'Total performance tests executed: 1\n')
 
         driver.args.output_dir = 'logs/'
         with captured_output() as (out, _):
-            run_benchmarks(driver)
+            log = run_benchmarks(driver)
+
+        self.assertEquals(log, csv_log)
         self.assertEquals(
             out.getvalue(),
             '  # TEST                      SAMPLES MIN(μs) MAX(μs)' +
             ' MEAN(μs) SD(μs) MEDIAN(μs) MAX_RSS(B)\n' +
             '  3 b1                              1     123     123' +
             '      123      0        123        888\n' +
-            '    Totals                          1                ' +
-            '                                      \n')
+            '\n' +
+            'Total performance tests executed: 1\n')
 
     def test_log_results(self):
         """Create log directory if it doesn't exist and write the log file."""

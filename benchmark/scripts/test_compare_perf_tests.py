@@ -328,7 +328,7 @@ class TestLogParser(unittest.TestCase):
         log = """#,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
 34,BitCount,20,3,4,4,0,4
 
-Totals,269
+Total performance tests executed: 1
 """
         parser = LogParser()
         results = parser.parse_results(log.splitlines())
@@ -347,7 +347,9 @@ Totals,269
         log = ("""
   # TEST      SAMPLES MIN(μs) MAX(μs) MEAN(μs) SD(μs) MEDIAN(μs) MAX_RSS(B)
   3 Array2D        20    2060    2188     2099      0       2099   20915200
-    Totals        281""")
+
+Total performance tests executed: 1
+""")
         parser = LogParser()
         results = parser.parse_results(log.splitlines()[1:])  # without 1st \n
         self.assertTrue(isinstance(results[0], PerformanceTestResult))
