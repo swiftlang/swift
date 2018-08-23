@@ -4564,6 +4564,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
         if (auto *unresolvedDotExpr = dyn_cast<UnresolvedDotExpr>(applyExpr->getFn())) {
           if (TC.getSelfForInitDelegationInConstructor(DC, unresolvedDotExpr)) {
+            getConstraintLocator(locator)->dump(this);
             increaseScore(SK_FunctionConversion);
           }
         }
