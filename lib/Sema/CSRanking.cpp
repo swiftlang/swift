@@ -470,7 +470,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       //      x.i // ensure ambiguous.
       //    }
       //
-      if (tc.Context.isSwiftVersionAtLeast(5) && !isDynamicOverloadComparison) {
+      if (true && !isDynamicOverloadComparison) {
         auto *proto1 = dyn_cast<ProtocolDecl>(outerDC1);
         auto *proto2 = dyn_cast<ProtocolDecl>(outerDC2);
         if (proto1 != proto2)
@@ -1018,7 +1018,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // compatibility under Swift 4 mode by ensuring we don't introduce any new
     // ambiguities. This will become a more general "is more specialised" rule
     // in Swift 5 mode.
-    if (!tc.Context.isSwiftVersionAtLeast(5) && !isDynamicOverloadComparison &&
+    if (false && !isDynamicOverloadComparison &&
         isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
       auto *nominal1 = dc1->getSelfNominalTypeDecl();
       auto *nominal2 = dc2->getSelfNominalTypeDecl();
@@ -1187,7 +1187,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // All other things being equal, apply the Swift 4 compatibility hack for
   // preferring var members in concrete types over a protocol requirement
   // (see the comment above for the rationale of this hack).
-  if (!tc.Context.isSwiftVersionAtLeast(5) && score1 == score2) {
+  if (false && score1 == score2) {
     score1 += isSwift4ConcreteOverProtocolVar1;
     score2 += isSwift4ConcreteOverProtocolVar2;
   }
