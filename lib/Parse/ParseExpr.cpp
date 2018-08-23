@@ -1712,9 +1712,14 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     Result.setHasCodeCompletion();
     if (CodeCompletion &&
         // We cannot code complete anything after var/let.
-        (!InVarOrLetPattern || InVarOrLetPattern == IVOLP_InMatchingPattern))
-      CodeCompletion->completePostfixExprBeginning(
-          dyn_cast<CodeCompletionExpr>(Result.get()));
+        (!InVarOrLetPattern || InVarOrLetPattern == IVOLP_InMatchingPattern)) {
+      if (InPoundIfEnvironment) {
+        CodeCompletion->completePlatformCondition();
+      } else {
+        CodeCompletion->completePostfixExprBeginning(
+            cast<CodeCompletionExpr>(Result.get()));
+      }
+    }
     consumeToken(tok::code_complete);
     return Result;
   }

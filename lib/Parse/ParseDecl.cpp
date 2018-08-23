@@ -2452,6 +2452,10 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
 ParserResult<Decl>
 Parser::parseDecl(ParseDeclOptions Flags,
                   llvm::function_ref<void(Decl*)> Handler) {
+  ParserPosition BeginParserPosition;
+  if (isCodeCompletionFirstPass())
+    BeginParserPosition = getParserPosition();
+
   if (Tok.is(tok::pound_if)) {
     auto IfConfigResult = parseIfConfig(
       [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {
@@ -2478,6 +2482,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
                                   [&](Decl *D) {Decls.emplace_back(D);});
         }
       });
+    if (IfConfigResult.hasCodeCompletion() && isCodeCompletionFirstPass()) {
+      consumeDecl(BeginParserPosition, Flags,
+                  CurDeclContext->isModuleScopeContext());
+      return makeParserError();
+    }
 
     if (auto ICD = IfConfigResult.getPtrOrNull()) {
       // The IfConfigDecl is ahead of its members in source order.
@@ -2502,10 +2511,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
   SyntaxParsingContext DeclParsingContext(SyntaxContext,
                                           SyntaxContextKind::Decl);
-
-  ParserPosition BeginParserPosition;
-  if (isCodeCompletionFirstPass())
-    BeginParserPosition = getParserPosition();
 
   // Note that we're parsing a declaration.
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),

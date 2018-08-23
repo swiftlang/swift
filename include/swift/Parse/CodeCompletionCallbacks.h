@@ -213,6 +213,8 @@ public:
 
   virtual void completeAfterPoundDirective() = 0;
 
+  virtual void completePlatformCondition() = 0;
+
   virtual void completeAfterIfStmt(bool hasElse) = 0;
 
   virtual void completeGenericParams(TypeLoc TL) = 0;

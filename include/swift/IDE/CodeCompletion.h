@@ -505,6 +505,7 @@ enum class CompletionKind {
   ForEachSequence,
   AfterPoundExpr,
   AfterPoundDirective,
+  PlatformConditon,
   AfterIfStmtElse,
   GenericParams,
   SwiftKeyPath,

@@ -361,6 +361,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                             ? BraceItemListKind::ActiveConditionalBlock
                             : BraceItemListKind::InactiveConditionalBlock);
         });
+      if (IfConfigResult.hasCodeCompletion() && isCodeCompletionFirstPass()) {
+        consumeDecl(BeginParserPosition, None, IsTopLevel);
+        return IfConfigResult;
+      }
+      BraceItemsStatus |= IfConfigResult;
       if (auto ICD = IfConfigResult.getPtrOrNull()) {
         Result = ICD;
         // Add the #if block itself

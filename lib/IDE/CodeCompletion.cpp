@@ -1469,12 +1469,14 @@ public:
   void completeAfterPoundExpr(CodeCompletionExpr *E,
                               Optional<StmtKind> ParentKind) override;
   void completeAfterPoundDirective() override;
+  void completePlatformCondition() override;
   void completeGenericParams(TypeLoc TL) override;
   void completeAfterIfStmt(bool hasElse) override;
-  void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
 
   void doneParsing() override;
 
+private:
+  void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
   void deliverCompletionResults();
 };
 } // end anonymous namespace
@@ -4623,6 +4625,11 @@ void CodeCompletionCallbacksImpl::completeAfterPoundDirective() {
   Kind = CompletionKind::AfterPoundDirective;
 }
 
+void CodeCompletionCallbacksImpl::completePlatformCondition() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::PlatformConditon;
+}
+
 void CodeCompletionCallbacksImpl::completeAfterIfStmt(bool hasElse) {
   CurDeclContext = P.CurDeclContext;
   if (hasElse) {
@@ -4748,6 +4755,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::CallArg:
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AfterPoundDirective:
+  case CompletionKind::PlatformConditon:
   case CompletionKind::GenericParams:
   case CompletionKind::KeyPathExpr:
   case CompletionKind::KeyPathExprDot:
@@ -4871,6 +4879,65 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
   });
   addWithName("else", CodeCompletionKeywordKind::pound_else);
   addWithName("endif", CodeCompletionKeywordKind::pound_endif);
+}
+
+/// Add platform conditions used in '#if' and '#elseif' directives.
+static void addPlatformConditions(CodeCompletionResultSink &Sink) {
+  auto addWithName =
+      [&](StringRef Name,
+          llvm::function_ref<void(CodeCompletionResultBuilder & Builder)>
+              consumer) {
+        CodeCompletionResultBuilder Builder(
+            Sink, CodeCompletionResult::ResultKind::Pattern,
+            SemanticContextKind::ExpressionSpecific, {});
+        Builder.addTextChunk(Name);
+        Builder.addLeftParen();
+        consumer(Builder);
+        Builder.addRightParen();
+      };
+  addWithName("os", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("name");
+  });
+  addWithName("arch", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("name");
+  });
+  addWithName("canImport", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("module");
+  });
+  addWithName("targetEnvironment", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk("simulator");
+  });
+  addWithName("swift", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk(">=");
+    Builder.addSimpleNamedParameter("version");
+  });
+  addWithName("swift", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk("<");
+    Builder.addSimpleNamedParameter("version");
+  });
+  addWithName("compiler", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk(">=");
+    Builder.addSimpleNamedParameter("version");
+  });
+  addWithName("compiler", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk("<");
+    Builder.addSimpleNamedParameter("version");
+  });
+
+  addKeyword(Sink, "true", CodeCompletionKeywordKind::kw_true, "Bool");
+  addKeyword(Sink, "false", CodeCompletionKeywordKind::kw_false, "Bool");
+}
+
+/// Add flags specified by '-D' to completion results.
+static void addConditionalCompilationFlags(ASTContext &Ctx,
+                                           CodeCompletionResultSink &Sink) {
+  for (auto Flag : Ctx.LangOpts.getCustomConditionalCompilationFlags()) {
+    // TODO: Should we filter out some flags?
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::ExpressionSpecific, {});
+    Builder.addTextChunk(Flag);
+  }
 }
 
 namespace  {
@@ -5478,6 +5545,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     addPoundDirectives(CompletionContext.getResultSink());
     // FIXME: Add pound expressions (e.g. '#selector()') if it's at statements
     // position.
+    break;
+  }
+
+  case CompletionKind::PlatformConditon: {
+    addPlatformConditions(CompletionContext.getResultSink());
+    addConditionalCompilationFlags(CurDeclContext->getASTContext(),
+                                   CompletionContext.getResultSink());
     break;
   }
 
