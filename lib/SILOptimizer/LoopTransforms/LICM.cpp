@@ -332,20 +332,23 @@ hoistSpecialInstruction(std::unique_ptr<LoopNestSummary> &LoopSummary,
   bool Changed = false;
 
   for (auto *Inst : Special) {
-    auto *BI = dyn_cast<BeginAccessInst>(Inst);
-    assert(BI && "Only BeginAccessInst are supported");
-    SmallVector<EndAccessInst *, 2> Ends;
-    getEndAccesses(BI, Ends);
-    if (!hoistInstruction(DT, BI, Loop, Preheader)) {
+    if (!hoistInstruction(DT, Inst, Loop, Preheader)) {
       continue;
     }
-    LLVM_DEBUG(llvm::dbgs() << "Hoisted " << *BI);
-    for (auto *instSink : Ends) {
-      if (!sinkInstruction(DT, LoopSummary, instSink, LI)) {
-        llvm_unreachable("LICM: Could not perform must-sink instruction");
+    if (auto *BI = dyn_cast<BeginAccessInst>(Inst)) {
+      SmallVector<EndAccessInst *, 2> Ends;
+      getEndAccesses(BI, Ends);
+      LLVM_DEBUG(llvm::dbgs() << "Hoisted BeginAccess " << *BI);
+      for (auto *instSink : Ends) {
+        if (!sinkInstruction(DT, LoopSummary, instSink, LI)) {
+          llvm_unreachable("LICM: Could not perform must-sink instruction");
+        }
       }
+      LLVM_DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
+    } else {
+      auto *REA = static_cast<RefElementAddrInst *>(Inst);
+      LLVM_DEBUG(llvm::dbgs() << "Hoisted RefElementAddr " << *REA);
     }
-    LLVM_DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
     Changed = true;
   }
 
@@ -613,6 +616,11 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         assert(BI && "Expected a Begin Access");
         BeginAccesses.push_back(BI);
         checkSideEffects(Inst, MayWrites);
+        break;
+      }
+      case SILInstructionKind::RefElementAddrInst: {
+        auto *REA = static_cast<RefElementAddrInst *>(&Inst);
+        SpecialHoist.insert(REA);
         break;
       }
       case swift::SILInstructionKind::CondFailInst: {
