@@ -117,12 +117,19 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
 }
 
 bool RequirementFailure::diagnose(bool asNote) {
-  if (!canDiagnoseFailure() || asNote)
+  if (!canDiagnoseFailure())
     return false;
 
   auto *anchor = getAnchor();
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = AffectedDecl->getAsGenericContext();
+
+  if (asNote) {
+    const auto &req = getRequirement();
+    emitDiagnostic(reqDC->getAsDecl(), getDiagnosticAsNote(), getLHS(),
+                   getRHS(), req.getFirstType(), req.getSecondType(), "");
+    return true;
+  }
 
   if (reqDC != genericCtx) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
@@ -160,8 +167,11 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor) const {
 }
 
 bool MissingConformanceFailure::diagnose(bool asNote) {
-  if (!canDiagnoseFailure() || asNote)
+  if (!canDiagnoseFailure())
     return false;
+
+  if (asNote)
+    return RequirementFailure::diagnose(asNote);
 
   auto *anchor = getAnchor();
   auto ownerType = getOwnerType();

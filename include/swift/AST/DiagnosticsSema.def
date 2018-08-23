@@ -1539,6 +1539,10 @@ NOTE(where_requirement_failure_both_subst,none,
      "where %0 = %1, %2 = %3", (Type, Type, Type, Type))
 NOTE(requirement_implied_by_conditional_conformance,none,
      "requirement from conditional conformance of %0 to %1", (Type, Type))
+NOTE(candidate_types_conformance_requirement,none,
+     "candidate requires that %0 conform to %1 "
+     "(requirement specified as %2 == %3%4)",
+     (Type, Type, Type, Type, StringRef))
 NOTE(candidate_types_equal_requirement,none,
      "candidate requires that the types %0 and %1 be equivalent "
      "(requirement specified as %2 == %3%4)",

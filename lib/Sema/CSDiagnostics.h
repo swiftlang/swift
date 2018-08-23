@@ -133,6 +133,7 @@ protected:
   using PathEltKind = ConstraintLocator::PathElementKind;
   using DiagOnDecl = Diag<DescriptiveDeclKind, DeclName, Type, Type>;
   using DiagInReference = Diag<DescriptiveDeclKind, DeclName, Type, Type, Type>;
+  using DiagAsNote = Diag<Type, Type, Type, Type, StringRef>;
 
   const ValueDecl *AffectedDecl;
   /// If possible, find application expression associated
@@ -182,6 +183,7 @@ protected:
 
   virtual DiagOnDecl getDiagnosticOnDecl() const = 0;
   virtual DiagInReference getDiagnosticInRereference() const = 0;
+  virtual DiagAsNote getDiagnosticAsNote() const = 0;
 
   /// Determine whether it would be possible to diagnose
   /// current requirement failure.
@@ -242,6 +244,10 @@ protected:
   DiagInReference getDiagnosticInRereference() const override {
     return diag::type_does_not_conform_in_decl_ref;
   }
+
+  DiagAsNote getDiagnosticAsNote() const override {
+    return diag::candidate_types_conformance_requirement;
+  }
 };
 
 /// Diagnose failures related to same-type generic requirements, e.g.
@@ -278,6 +284,10 @@ protected:
   DiagInReference getDiagnosticInRereference() const override {
     return diag::types_not_equal_in_decl_ref;
   }
+
+  DiagAsNote getDiagnosticAsNote() const override {
+    return diag::candidate_types_equal_requirement;
+  }
 };
 
 /// Diagnose failures related to superclass generic requirements, e.g.
@@ -311,6 +321,10 @@ protected:
 
   DiagInReference getDiagnosticInRereference() const override {
     return diag::types_not_inherited_in_decl_ref;
+  }
+
+  DiagAsNote getDiagnosticAsNote() const override {
+    return diag::candidate_types_inheritance_requirement;
   }
 };
 
