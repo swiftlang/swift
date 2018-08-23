@@ -20,6 +20,9 @@ Example:
 
 Use `Benchmark_Driver -h` for help on available commands and options.
 
+class `BenchmarkDriver` runs performance tests and impements the `run` COMMAND.
+class `BenchmarkDoctor` analyzes performance tests, implements `check` COMMAND.
+
 """
 
 import argparse
