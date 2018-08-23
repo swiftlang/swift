@@ -2186,6 +2186,12 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   if (DA->isNotSerialized())
     return;
 
+  // Ignore attributes that have been marked invalid. (This usually means
+  // type-checking removed them, but only provided a warning rather than an
+  // error.)
+  if (DA->isInvalid())
+    return;
+
   switch (DA->getKind()) {
   case DAK_RawDocComment:
   case DAK_ReferenceOwnership: // Serialized as part of the type.
