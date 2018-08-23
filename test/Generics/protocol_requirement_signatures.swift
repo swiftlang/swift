@@ -87,3 +87,14 @@ protocol P4 {
 protocol P5 {
 	associatedtype AType : P4 where AType.BType == Self
 }
+
+// SR-8119
+protocol P6 {
+  associatedtype A1: P7
+}
+
+// CHECK-DAG: .P7@
+// CHECK-NEXT: <Self where Self == Self.A2.A1, Self.A2 : P6>
+protocol P7 {
+  associatedtype A2: P6 where A2.A1 == Self
+}

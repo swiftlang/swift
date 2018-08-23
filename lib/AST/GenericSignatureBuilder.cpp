@@ -1978,15 +1978,6 @@ bool EquivalenceClass::recordConformanceConstraint(
 }
 
 template<typename T>
-Type Constraint<T>::getSubjectDependentType(
-                      TypeArrayView<GenericTypeParamType> genericParams) const {
-  if (auto type = subject.dyn_cast<Type>())
-    return type;
-
-  return subject.get<PotentialArchetype *>()->getDependentType(genericParams);
-}
-
-template<typename T>
 bool Constraint<T>::isSubjectEqualTo(Type type) const {
   return getSubjectDependentType({ })->isEqual(type);
 }
@@ -7547,5 +7538,3 @@ void GenericSignatureBuilder::verifyGenericSignaturesInModule(
     verifyGenericSignature(context, canGenericSig);
   }
 }
-
-

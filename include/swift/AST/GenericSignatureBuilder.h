@@ -1737,6 +1737,15 @@ inline bool isErrorResult(GenericSignatureBuilder::ConstraintResult result) {
 /// Canonical ordering for dependent types.
 int compareDependentTypes(Type type1, Type type2);
 
+template<typename T>
+Type GenericSignatureBuilder::Constraint<T>::getSubjectDependentType(
+                      TypeArrayView<GenericTypeParamType> genericParams) const {
+  if (auto type = subject.dyn_cast<Type>())
+    return type;
+
+  return subject.get<PotentialArchetype *>()->getDependentType(genericParams);
+}
+
 } // end namespace swift
 
 #endif
