@@ -54,10 +54,9 @@ public:
 
   const Projection &getProjection() const { return proj; }
 
-  const ProjectionPath getProjectionPath() const {
+  const Optional<ProjectionPath> getProjectionPath() const {
     return ProjectionPath::getProjectionPath(stripBorrow(REA->getOperand()),
-                                             REA)
-        .getValue();
+                                             REA);
   }
 
   bool operator==(const ObjectProjection &other) const {
@@ -284,7 +283,11 @@ public:
     }
     auto projPath = getObjectProjection().getProjectionPath();
     auto otherProjPath = other.getObjectProjection().getProjectionPath();
-    return projPath.hasNonEmptySymmetricDifference(otherProjPath);
+    if (!projPath.hasValue() || !otherProjPath.hasValue()) {
+      return false;
+    }
+    return projPath.getValue().hasNonEmptySymmetricDifference(
+        otherProjPath.getValue());
   }
 
   /// Returns the ValueDecl for the underlying storage, if it can be
