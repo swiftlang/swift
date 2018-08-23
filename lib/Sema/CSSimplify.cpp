@@ -2121,7 +2121,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           }
         }
 
-        increaseScore(ScoreKind::SK_EmptyExistentialConversion);
+        if (kind != ConstraintKind::ArgumentConversion ||
+            type1->is<FunctionType>())
+          increaseScore(ScoreKind::SK_EmptyExistentialConversion);
       }
 
       conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
