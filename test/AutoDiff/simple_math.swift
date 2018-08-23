@@ -10,7 +10,7 @@ SimpleMathTests.test("Arithmetics") {
     return -x * y
   }
   let dfoo = #gradient(foo)
-  expectEqual(dfoo(3, 4), (-4, -3))
+  expectEqual((-4, -3), dfoo(4, 3))
 }
 
 SimpleMathTests.test("FunctionCall") {
@@ -21,7 +21,7 @@ SimpleMathTests.test("FunctionCall") {
     return 3 * x
   }
   let dfoo = #gradient(foo)
-  expectEqual(dfoo(3, 4), (3, 9))
+  expectEqual((3, 9), dfoo(3, 4))
 }
 
 runAllTests()

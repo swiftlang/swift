@@ -1501,138 +1501,115 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
 
 /// Create a builtin floating point value. The specified type must be a builtin
 /// float type.
-static SILValue createBuiltinFPScalar(APFloat scalar, CanType type,
+static SILValue createBuiltinFPScalar(APInt scalar, CanType type,
                                       SILLocation loc, SILBuilder &builder) {
-  DEBUG({
-    auto &s = getADDebugStream() << "Converting ";
-    scalar.print(s);
-    s << " to a " << type << '\n';
-  });
   auto *fpType = type->castTo<BuiltinFloatType>();
-  // If the scalar is a floating point where the FP semantics are different from
-  // the specified FP type, perform a conversion.
-  if (&scalar.getSemantics() != &fpType->getAPFloatSemantics()) {
-    // If the scalar is effectively an integer, just coerce it to the right FP
-    // semantics.
-    if (scalar.isInteger()) {
-      bool isExact = false;
-      llvm::APSInt integer;
-      scalar.convertToInteger(integer, APFloat::rmTowardZero, &isExact);
-      integer = integer.extOrTrunc(fpType->getBitWidth());
-      scalar = APFloat(fpType->getAPFloatSemantics(), integer);
-    }
-    else {
-      bool losesInfo = false;
-      scalar.convert(fpType->getAPFloatSemantics(),
-                     APFloat::rmNearestTiesToAway, &losesInfo);
-    }
-  }
   return builder.createFloatLiteral(
-      loc, SILType::getPrimitiveObjectType(type), scalar);
+      loc, SILType::getPrimitiveObjectType(type),
+      APFloat(fpType->getAPFloatSemantics(), scalar));
 }
 
 /// Convert an integer literal to a type that is expressible by integer literal.
-static void convertFloatToIndirectExpressible(APFloat scalar,
-                                              NominalTypeDecl *targetTypeDecl,
-                                              SILValue resultBuf,
-                                              SILLocation loc,
-                                              SILBuilder &builder,
-                                              ADContext &context) {
+static void convertIntToIndirectExpressible(APInt scalar,
+                                            NominalTypeDecl *targetTypeDecl,
+                                            SILValue resultBuf,
+                                            SILLocation loc,
+                                            SILBuilder &builder,
+                                            ADContext &context) {
   auto &module = builder.getModule();
   auto &astCtx = module.getASTContext();
   auto targetTy =
       targetTypeDecl->getDeclaredInterfaceType()->getCanonicalType();
-  // Step 1. Initialize a value of type `<target type>.FloatLiteralType` from
+  // Step 1. Initialize a value of type `<target type>.IntegerLiteralType` from
   // the given value.
-  DeclName floatLitTypeName(astCtx.Id_FloatLiteralType);
-  SmallVector<ValueDecl *, 1> floatLitTypeLookupResults;
-  targetTypeDecl->lookupQualified(targetTy, floatLitTypeName, NL_OnlyTypes,
+  DeclName intLitTypeName(astCtx.Id_IntegerLiteralType);
+  SmallVector<ValueDecl *, 1> intLitTypeLookupResults;
+  targetTypeDecl->lookupQualified(targetTy, intLitTypeName, NL_OnlyTypes,
                                   /*typeResolver*/ nullptr,
-                                  floatLitTypeLookupResults);
-  assert(floatLitTypeLookupResults.size() == 1);
-  auto floatLitTypeAliasDecl =
-      cast<TypeAliasDecl>(floatLitTypeLookupResults[0]);
-  // Now we have the FloatLiteralType type.
-  auto floatLitTy = floatLitTypeAliasDecl
+                                  intLitTypeLookupResults);
+  assert(intLitTypeLookupResults.size() == 1);
+  auto intLitTypeAliasDecl =
+      cast<TypeAliasDecl>(intLitTypeLookupResults[0]);
+  // Now we have the IntegerLiteralType type.
+  auto intLitTy = intLitTypeAliasDecl
       ->getUnderlyingTypeLoc().getType()->getCanonicalType();
-  auto *floatLitTypeDecl = floatLitTy->getAnyNominal();
-  assert(floatLitTypeDecl);
+  auto *intLitTypeDecl = intLitTy->getAnyNominal();
+  assert(intLitTypeDecl);
   // %1 = float_literal $Builtin.FPIEEE80, <value>
-  auto builtinFloatTy =
-      SILType::getBuiltinFloatType(BuiltinFloatType::FPKind::IEEE80, astCtx);
-  auto builtinFloat =
-      createBuiltinFPScalar(scalar, builtinFloatTy.getASTType(), loc, builder);
-  // %2 = metatype $@thin <target type>.FloatLiteralType.Type
-  auto floatLitMetatypeTy = SILType::getPrimitiveObjectType(
-      CanMetatypeType::get(floatLitTy, MetatypeRepresentation::Thick));
-  auto *floatLitMetatype = builder.createMetatype(loc, floatLitMetatypeTy);
-  // ExpressibleByBuiltinFloatLiteral
-  auto *ebflProto =
-      astCtx.getProtocol(KnownProtocolKind::ExpressibleByBuiltinFloatLiteral);
-  // `init(_builtinFloatLiteral:)`
+  auto builtinIntegerTy = SILType::getBuiltinIntegerType(2048, astCtx);
+  auto builtinInteger = builder.createIntegerLiteral(
+      loc, builtinIntegerTy,scalar.sextOrTrunc(2048));
+  // %2 = metatype $@thin <target type>.IntegerLiteralType.Type
+  auto intLitMetatypeTy = SILType::getPrimitiveObjectType(
+      CanMetatypeType::get(intLitTy, MetatypeRepresentation::Thick));
+  auto *intLitMetatype = builder.createMetatype(loc, intLitMetatypeTy);
+  // ExpressibleByBuiltinIntegerLiteral
+  auto *ebilProto =
+      astCtx.getProtocol(KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral);
+  // `init(_builtinIntegerLiteral:)`
   DeclName builtinLitInitName(astCtx, DeclBaseName::createConstructor(),
-                              {astCtx.Id_builtinFloatLiteral});
-  auto *initBFLDecl =
-      cast<ConstructorDecl>(ebflProto->lookupDirect(builtinLitInitName)[0]);
-  SILDeclRef initBFLDeclRef(initBFLDecl);
-  auto initBFLType = context.getTypeConverter().getConstantType(initBFLDeclRef);
-  // Look up `FloatLiteralType : _ExpressibleByBuiltinFloatLiteral`. This is
+                              {astCtx.Id_builtinIntegerLiteral});
+  auto *initBILDecl =
+      cast<ConstructorDecl>(ebilProto->lookupDirect(builtinLitInitName)[0]);
+  SILDeclRef initBILDeclRef(initBILDecl);
+  auto initBILType = context.getTypeConverter().getConstantType(initBILDeclRef);
+  // Look up `IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral`. This is
   // guaranteed to be a normal conformance.
-  auto *ebflConf = astCtx.getConformance(floatLitTy, ebflProto,
-                                         floatLitTypeDecl->getLoc(),
-                                         floatLitTypeDecl,
+  auto *ebilConf = astCtx.getConformance(intLitTy, ebilProto,
+                                         intLitTypeDecl->getLoc(),
+                                         intLitTypeDecl,
                                          ProtocolConformanceState::Complete);
-  ProtocolConformanceRef ebflConfRef(ebflConf);
+  ProtocolConformanceRef ebilConfRef(ebilConf);
   // %3 = witness_method ...
-  auto initBFLFn = builder.createWitnessMethod(loc, floatLitTy, ebflConfRef,
-                                               initBFLDeclRef, initBFLType);
+  auto initBILFn = builder.createWitnessMethod(loc, intLitTy, ebilConfRef,
+                                               initBILDeclRef, initBILType);
   // Ensure the witness method is linked.
-  module.lookUpFunctionInWitnessTable(ebflConfRef, initBFLDeclRef);
+  module.lookUpFunctionInWitnessTable(ebilConfRef, initBILDeclRef);
   // Get substitutions.
-  auto floatLitSubMap = SubstitutionMap::getProtocolSubstitutions(
-      ebflProto, floatLitTy, ebflConfRef);
+  auto intLitSubMap = SubstitutionMap::getProtocolSubstitutions(
+      ebilProto, intLitTy, ebilConfRef);
   // Allocate result buffer.
-  // %floatLitBuf = alloc_stack $FloatLiteralType
-  auto *floatLitBuf = builder.createAllocStack(
-      loc, SILType::getPrimitiveObjectType(floatLitTy));
+  // %intLitBuf = alloc_stack $IntegerLiteralType
+  auto *intLitBuf = builder.createAllocStack(
+      loc, SILType::getPrimitiveObjectType(intLitTy));
   SWIFT_DEFER {
-    // dealloc_stack %floatLitBuf : $*FloatLiteralType
-    builder.createDeallocStack(loc, floatLitBuf);
+    // dealloc_stack %intLitBuf : $*IntegerLiteralType
+    builder.createDeallocStack(loc, intLitBuf);
   };
-  // %4 = apply %3 <...>(%floatLitBuf, %1, %2)
-  builder.createApply(loc, initBFLFn, floatLitSubMap,
-                      {floatLitBuf, builtinFloat, floatLitMetatype},
+  // %4 = apply %3 <...>(%intLitBuf, %1, %2)
+  builder.createApply(loc, initBILFn, intLitSubMap,
+                      {intLitBuf, builtinInteger, intLitMetatype},
                       /*isNonThrowing*/ false);
   // Step 2. Initialize a value of type `<target type>` by calling
-  // %5 = metatype $@thin <target type>.FloatLiteralType.Type
+  // `ExpressibleByIntegerLiteral.init(integerLiteral: %4)`.
+  // %5 = metatype $@thin <target type>.IntegerLiteralType.Type
   auto targetMetatypeTy = SILType::getPrimitiveObjectType(
       CanMetatypeType::get(targetTy, MetatypeRepresentation::Thick));
   auto *targetMetatype = builder.createMetatype(loc, targetMetatypeTy);
-  // `ExpressibleByFloatLiteral.init(floatLiteral: %4)`.
-  auto *eflProto =
-      astCtx.getProtocol(KnownProtocolKind::ExpressibleByFloatLiteral);
-  DeclName floatLitInitName(astCtx, DeclBaseName::createConstructor(),
-                          {astCtx.Id_floatLiteral});
-  auto *initFLDecl =
-      cast<ConstructorDecl>(eflProto->lookupDirect(floatLitInitName)[0]);
-  SILDeclRef initFLDeclRef(initFLDecl);
-  auto initFLType = context.getTypeConverter().getConstantType(initFLDeclRef);
-  // Lookup `<target type> : ExpressibleByFloatLiteral`.
+  auto *eilProto =
+      astCtx.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
+  DeclName intLitInitName(astCtx, DeclBaseName::createConstructor(),
+                          {astCtx.Id_integerLiteral});
+  auto *initILDecl =
+      cast<ConstructorDecl>(eilProto->lookupDirect(intLitInitName)[0]);
+  SILDeclRef initILDeclRef(initILDecl);
+  auto initILType = context.getTypeConverter().getConstantType(initILDeclRef);
+  // Lookup `<target type> : ExpressibleByIntegerLiteral`.
   auto *parentModule = targetTypeDecl->getModuleContext();
-  auto eflConf = *parentModule->lookupConformance(targetTy, eflProto);
-  ProtocolConformanceRef eflConfRef(eflConf);
-  // context.lookupOrLinkWitnessTable(eflConfRef);
+  auto eilConf = *parentModule->lookupConformance(targetTy, eilProto);
+  ProtocolConformanceRef eilConfRef(eilConf);
+  // context.lookupOrLinkWitnessTable(eilConfRef);
   // %6 = witness_method ...
-  auto initFLFn = builder.createWitnessMethod(loc, targetTy, eflConfRef,
-                                              initFLDeclRef, initFLType);
+  auto initILFn = builder.createWitnessMethod(loc, targetTy, eilConfRef,
+                                              initILDeclRef, initILType);
   // Ensure the witness method is linked.
-  module.lookUpFunctionInWitnessTable(eflConfRef, initFLDeclRef);
+  module.lookUpFunctionInWitnessTable(eilConfRef, initILDeclRef);
   // Get substitutions.
   auto targetSubMap =
-      SubstitutionMap::getProtocolSubstitutions(eflProto, targetTy, eflConfRef);
-  // %7 = apply %6 <...>(%resultBuf, %floatLitBuf, %5)
-  builder.createApply(loc, initFLFn, targetSubMap,
-                      {resultBuf, floatLitBuf, targetMetatype},
+      SubstitutionMap::getProtocolSubstitutions(eilProto, targetTy, eilConfRef);
+  // %7 = apply %6 <...>(%resultBuf, %intLitBuf, %5)
+  builder.createApply(loc, initILFn, targetSubMap,
+                      {resultBuf, intLitBuf, targetMetatype},
                       /*isNonThrowing*/ false);
 }
 
@@ -1645,8 +1622,8 @@ static void convertFloatToIndirectExpressible(APFloat scalar,
 ///   to `FloatingPoint`.
 ///
 /// The root address derivation of `seedBufAccess` must be the result of
-/// `begin_access`.
-static void createScalarValueIndirect(APFloat scalar, CanType type,
+/// a `begin_access`.
+static void createScalarValueIndirect(APInt scalar, CanType type,
                                       SILValue seedBufAccess, SILLocation loc,
                                       SILBuilder &builder, ADContext &context) {
   // See if the type is a builtin float. If so, we don't do protocol
@@ -1667,8 +1644,8 @@ static void createScalarValueIndirect(APFloat scalar, CanType type,
   // If it's scalar differentiation, just convert the literal to the requested
   // type.
   if (context.supportsScalarDifferentiation(type)) {
-    convertFloatToIndirectExpressible(scalar, targetTypeDecl, seedBufAccess,
-                                      loc, builder, context);
+    convertIntToIndirectExpressible(scalar, targetTypeDecl, seedBufAccess,
+                                    loc, builder, context);
     return;
   }
   // Otherwise it must be vector differentiation, call
@@ -1688,8 +1665,8 @@ static void createScalarValueIndirect(APFloat scalar, CanType type,
   // %0 = ... : $<scalar type>
   auto scalarBuf =
       builder.createAllocStack(loc, SILType::getPrimitiveObjectType(scalarTy));
-  convertFloatToIndirectExpressible(scalar, scalarTyDecl, scalarBuf, loc,
-                                    builder, context);
+  convertIntToIndirectExpressible(scalar, scalarTyDecl, scalarBuf, loc,
+                                  builder, context);
   auto scalarLOQ = getBufferLOQ(scalarTy, builder.getFunction());
   auto loadAccess = builder.createBeginAccess(
       loc, scalarBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
@@ -1751,7 +1728,7 @@ static void createScalarValueIndirect(APFloat scalar, CanType type,
 ///   to `FloatingPoint`.
 ///
 /// The specified type must be a loadable type.
-static SILValue createScalarValueDirect(APFloat scalar, CanType type,
+static SILValue createScalarValueDirect(APInt scalar, CanType type,
                                         SILLocation loc,
                                         SILBuilder &builder,
                                         ADContext &context) {
@@ -3406,16 +3383,14 @@ SILValue AdjointEmitter::materializeAdjointDirect(AdjointValue val,
   switch (val.getKind()) {
   case AdjointValue::Kind::Zero: {
     if (auto tupleTy = val.getType().getAs<TupleType>()) {
-      auto elts = map<SmallVector<SILValue, 8>>(tupleTy->getElementTypes(),
-          [&](Type eltTy) {
-            return createScalarValueDirect(APFloat(0.0),
-                                           eltTy->getCanonicalType(),
-                                           loc, builder, ctx);
+      auto elts = map<SmallVector<SILValue, 8>>(val.getTupleElements(),
+          [&](AdjointValue eltVal) {
+            return materializeAdjointDirect(eltVal, loc);
           });
       return builder.createTuple(loc, elts);
     }
     return createScalarValueDirect(
-        APFloat(0.0), val.getType().getASTType(), loc, builder, ctx);
+        APInt(2048, 0), val.getType().getASTType(), loc, builder, ctx);
   }
   case AdjointValue::Kind::Tuple: {
     auto elts = map<SmallVector<SILValue, 8>>(
@@ -3430,16 +3405,21 @@ SILValue AdjointEmitter::materializeAdjointDirect(AdjointValue val,
   }
 }
 
-void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
-                                                SILValue destBuffer) {
-  auto loc = destBuffer.getLoc();
-  auto soq = getBufferSOQ(val.getType().getASTType(), getAdjoint());
+/// Materialize the given adjoint value indirectly to the specified buffer.
+/// The root address derivation of `seedBufAccess` must be the result of
+/// a `begin_access`.
+static void materializeAdjointIndirectHelper(AdjointValue val,
+                                             SILValue destBufferAccess,
+                                             SILBuilder &builder,
+                                             ADContext &context) {
+  auto loc = destBufferAccess.getLoc();
+  auto soq = getBufferSOQ(val.getType().getASTType(), builder.getFunction());
   switch (val.getKind()) {
   /// Given a `%buf : *T, emit instructions that produce a zero or an aggregate
   /// of zeros of the expected type. When `T` conforms to
-  /// `ExpressibleByFloatLiteral`, we use literal conversion directly.
+  /// `ExpressibleByIntegerLiteral`, we use literal conversion directly.
   /// Otherwise, we assert that `T` must be an aggregate where each element is
-  /// `ExpressibleByFloatLiteral`. We expect to emit a zero for each element
+  /// `ExpressibleByIntegerLiteral`. We expect to emit a zero for each element
   /// and use the appropriate aggregate constructor instruction (in this case,
   /// `tuple`) to produce a tuple. But currently, since we need indirect
   /// passing for aggregate instruction, we just use `tuple_element_addr` to get
@@ -3448,26 +3428,13 @@ void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
     if (auto tupleTy = val.getType().getAs<TupleType>()) {
       SmallVector<SILValue, 8> eltVals;
       for (unsigned i : range(tupleTy->getNumElements())) {
-        auto eltAddr = getBuilder().createTupleElementAddr(loc, destBuffer, i);
-        auto elt = tupleTy->getElement(i);
-        convertFloatToIndirectExpressible(APFloat(0.0),
-                                          elt.getType()->getAnyNominal(),
-                                          eltAddr, loc, getBuilder(),
-                                          getContext());
+        auto eltAddr = builder.createTupleElementAddr(loc, destBufferAccess, i);
+        materializeAdjointIndirectHelper(
+            val.getTupleElements()[i], eltAddr, builder, context);
       }
-    } else if (auto builtinFP = val.getType().getAs<BuiltinFloatType>()) {
-      auto *access = getBuilder().createBeginAccess(
-          loc, destBuffer, SILAccessKind::Init, SILAccessEnforcement::Static,
-          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      auto zero = createBuiltinFPScalar(APFloat(0.0), builtinFP, loc, builder);
-      getBuilder().createStore(loc, zero, access,
-                               getBufferSOQ(builtinFP, getAdjoint()));
-      getBuilder().createEndAccess(loc, access, /*aborted*/ false);
     } else {
-      auto *nomTy = val.getSwiftType()->getAnyNominal();
-      assert(nomTy);
-      convertFloatToIndirectExpressible(APFloat(0.0), nomTy, destBuffer, loc,
-                                        getBuilder(), getContext());
+      createScalarValueIndirect(APInt(2048, 0), val.getSwiftType(),
+                                destBufferAccess, loc, builder, context);
     }
     break;
   /// Given a `%buf : *(T0, T1, T2, ...)`, recursively emit instructions to
@@ -3479,20 +3446,31 @@ void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
       auto *tupTy = val.getSwiftType()->castTo<TupleType>();
       auto eltTy = SILType::getPrimitiveObjectType(tupTy->getCanonicalType());
       auto *eltBuf =
-          getBuilder().createTupleElementAddr(loc, destBuffer, idx, eltTy);
-      materializeAdjointIndirect(eltAndIdx.value(), eltBuf);
+          builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy);
+      materializeAdjointIndirectHelper(
+          eltAndIdx.value(), eltBuf, builder, context);
     }
     break;
   }
   /// Value is already materialized!
   case AdjointValue::Kind::Materialized:
-    auto *access = getBuilder().createBeginAccess(
-        loc, destBuffer, SILAccessKind::Init, SILAccessEnforcement::Static,
+    auto *access = builder.createBeginAccess(
+        loc, destBufferAccess, SILAccessKind::Init, SILAccessEnforcement::Static,
         /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    getBuilder().createStore(loc, val.getMaterializedValue(), access, soq);
-    getBuilder().createEndAccess(loc, access, /*aborted*/ false);
+    builder.createStore(loc, val.getMaterializedValue(), access, soq);
+    builder.createEndAccess(loc, access, /*aborted*/ false);
     break;
   }
+}
+
+void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
+                                                SILValue destBuffer) {
+  auto *access = getBuilder().createBeginAccess(
+      destBuffer.getLoc(), destBuffer, SILAccessKind::Init,
+      SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+      /*fromBuiltin*/ false);
+  materializeAdjointIndirectHelper(val, access, builder, getContext());
+  getBuilder().createEndAccess(destBuffer.getLoc(), access, /*aborted*/ false);
 }
 
 AdjointValue AdjointEmitter::accumulateAdjoints(AdjointValue lhs,
@@ -3742,7 +3720,7 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
       // seed to feed into the canonical gradient.
       auto *seedBuf = builder.createAllocStack(loc, seedSILTy);
       createScalarValueIndirect(
-          APFloat(1.0), seedTy, seedBuf, loc, builder, context);
+          APInt(2048, 1), seedTy, seedBuf, loc, builder, context);
       // If seed is address only, we'll clean up the buffer after calling the
       // canonical gradient Otherwise, we just load the seed and deallocate the
       // buffer.
