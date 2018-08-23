@@ -904,7 +904,7 @@ static SILValue getBehaviorInitStorageFn(SILGenFunction &SGF,
     SILGenFunctionBuilder builder(SGF);
     thunkFn = builder.getOrCreateFunction(
         SILLocation(behaviorVar), behaviorInitName, SILLinkage::PrivateExternal,
-        initConstantTy, IsBare, IsTransparent, IsSerialized);
+        initConstantTy, IsBare, IsTransparent, IsSerialized, IsNotDynamic);
   }
   return SGF.B.createFunctionRef(behaviorVar, thunkFn);
 }

@@ -435,9 +435,9 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   auto *Fn = FunctionBuilder.createFunction(
       Orig->getLinkage(), ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
-      Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
-      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
-      Orig->getDebugScope());
+      IsNotDynamic, Orig->getEntryCount(), Orig->isThunk(),
+      Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
+      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs())
     Fn->addSemanticsAttr(Attr);
   if (!Orig->hasQualifiedOwnership()) {

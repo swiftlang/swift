@@ -467,13 +467,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked;
+      isWeakLinked, isDynamic;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, funcTyID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      isWeakLinked, isDynamic, funcTyID, genericEnvID, clangNodeOwnerID,
+      SemanticsIDs);
 
   if (funcTyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -550,6 +551,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         linkage == SILLinkage::PublicNonABI) {
       fn->setLinkage(SILLinkage::SharedExternal);
     }
+    if (fn->isDynamicallyReplaceable() != isDynamic) {
+      LLVM_DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
+      MF->error();
+      return nullptr;
+    }
   } else {
     // Otherwise, create a new function.
     SILSerializationFunctionBuilder builder(SILMod);
@@ -564,6 +570,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setWeakLinked(isWeakLinked);
+    fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
     if (clangNodeOwner)
       fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {
@@ -2479,13 +2486,13 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked;
+      isWeakLinked, isDynamic;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, funcTyID, genericEnvID, clangOwnerID, SemanticsIDs);
+      isWeakLinked, isDynamic, funcTyID, genericEnvID, clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage

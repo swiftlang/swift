@@ -2269,6 +2269,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     break;
   case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
   }
+  if (isDynamicallyReplaceable()) {
+    OS << "[dynamically_replacable] ";
+  }
   if (isWithoutActuallyEscapingThunk())
     OS << "[without_actually_escaping] ";
 

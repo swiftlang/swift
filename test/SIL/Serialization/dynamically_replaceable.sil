@@ -1,0 +1,11 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -emit-module -o %t/tmp.swiftmodule
+// RUN: %target-sil-opt %t/tmp.swiftmodule -disable-sil-linking | %FileCheck %s
+
+
+// CHECK-LABEL: sil [serialized] [dynamically_replacable] [canonical] @test_dynamically_replaceable
+sil [serialized] [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}

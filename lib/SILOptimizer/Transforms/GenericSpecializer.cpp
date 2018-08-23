@@ -100,6 +100,9 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       if (!Callee->shouldOptimize())
         continue;
 
+      if (Callee->isDynamicallyReplaceable())
+        continue;
+
       // We have a call that can potentially be specialized, so
       // attempt to do so.
       llvm::SmallVector<SILFunction *, 2> NewFunctions;

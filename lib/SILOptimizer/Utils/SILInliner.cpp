@@ -109,6 +109,11 @@ bool SILInliner::canInlineApplySite(FullApplySite apply) {
   if (auto BA = dyn_cast<BeginApplyInst>(apply))
     return canInlineBeginApply(BA);
 
+  if (auto *FunRef = apply.getReferencedFunction()) {
+    if (FunRef->isDynamicallyReplaceable())
+      return false;
+  }
+
   return true;
 }
 

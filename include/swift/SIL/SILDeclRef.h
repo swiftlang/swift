@@ -384,6 +384,8 @@ struct SILDeclRef {
   /// subclassed.
   SubclassScope getSubclassScope() const;
 
+  bool isDynamicallyReplaceable() const;
+
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
   /// Produces a SILDeclRef from an opaque value.

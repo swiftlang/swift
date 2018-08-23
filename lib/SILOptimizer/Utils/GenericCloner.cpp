@@ -44,9 +44,9 @@ SILFunction *GenericCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), ReInfo.getSpecializedGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(), Serialized,
-      Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
-      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
-      Orig->getDebugScope());
+      IsNotDynamic, Orig->getEntryCount(), Orig->isThunk(),
+      Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
+      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }

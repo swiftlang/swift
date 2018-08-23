@@ -1679,6 +1679,13 @@ bb0(%0 : $A):
   return %20 : $()
 }
 
+// CHECK-LABEL: sil [dynamically_replacable] @test_dynamically_replaceable
+sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+} 
+
 struct EmptyStruct {}
 
 sil @test_empty_destructure : $@convention(thin) () -> () {

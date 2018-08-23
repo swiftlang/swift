@@ -47,6 +47,10 @@ enum IsThunk_t {
   IsReabstractionThunk,
   IsSignatureOptimizedThunk
 };
+enum IsDynamicallyReplaceable_t {
+  IsNotDynamic,
+  IsDynamic
+};
 
 class SILSpecializeAttr final {
   friend SILFunction;
@@ -182,6 +186,9 @@ private:
   /// Whether cross-module references to this function should use weak linking.
   unsigned IsWeakLinked : 1;
 
+  // Whether the implementation can be dynamically replaced.
+  unsigned IsDynamicReplaceable : 1;
+
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   OptimizationMode OptMode;
@@ -273,14 +280,16 @@ private:
               ProfileCounter entryCount, IsThunk_t isThunk,
               SubclassScope classSubclassScope, Inline_t inlineStrategy,
               EffectsKind E, SILFunction *insertBefore,
-              const SILDebugScope *debugScope);
+              const SILDebugScope *debugScope,
+              IsDynamicallyReplaceable_t isDynamic);
 
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
          CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
          Optional<SILLocation> loc, IsBare_t isBareSILFunction,
          IsTransparent_t isTrans, IsSerialized_t isSerialized,
-         ProfileCounter entryCount, IsThunk_t isThunk = IsNotThunk,
+         ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
+         IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
          Inline_t inlineStrategy = InlineDefault,
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
@@ -517,6 +526,16 @@ public:
     IsWeakLinked = value;
   }
 
+  /// Returs whether this function implementation can be dynamically replaced.
+  IsDynamicallyReplaceable_t isDynamicallyReplaceable() const {
+    return IsDynamicallyReplaceable_t(IsDynamicReplaceable);
+  }
+  void setIsDynamic(IsDynamicallyReplaceable_t value = IsDynamic) {
+    assert(IsDynamicReplaceable == IsNotDynamic && "already set");
+    IsDynamicReplaceable = value;
+    assert(!Transparent || !IsDynamicReplaceable);
+  }
+
   /// Get the DeclContext of this function. (Debug info only).
   DeclContext *getDeclContext() const {
     return getLocation().getAsDeclContext();
@@ -619,7 +638,10 @@ public:
 
   /// Get this function's transparent attribute.
   IsTransparent_t isTransparent() const { return IsTransparent_t(Transparent); }
-  void setTransparent(IsTransparent_t isT) { Transparent = isT; }
+  void setTransparent(IsTransparent_t isT) {
+    Transparent = isT;
+    assert(!Transparent || !IsDynamicReplaceable);
+  }
 
   /// Get this function's serialized attribute.
   IsSerialized_t isSerialized() const { return IsSerialized_t(Serialized); }

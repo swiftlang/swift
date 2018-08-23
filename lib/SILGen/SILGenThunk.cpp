@@ -54,7 +54,7 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateFunction(
       constant.getDecl(), name, SILLinkage::Shared, constantTy, IsBare,
-      IsTransparent, IsSerializable, ProfileCounter(), IsThunk);
+      IsTransparent, IsSerializable, IsNotDynamic, ProfileCounter(), IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
@@ -295,5 +295,5 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   SILGenFunctionBuilder builder(*this);
   return builder.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, IsSerializable,
-      ProfileCounter(), IsReabstractionThunk);
+      ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
 }

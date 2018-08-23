@@ -936,3 +936,14 @@ unsigned SILDeclRef::getParameterListCount() const {
     llvm_unreachable("Unhandled ValueDecl for SILDeclRef");
   }
 }
+
+bool SILDeclRef::isDynamicallyReplaceable() const {
+  if (isStoredPropertyInitializer())
+    return false;
+
+  if (!hasDecl())
+    return false;
+
+  auto decl = getDecl();
+  return decl->isDynamic() && !decl->isObjC();
+}

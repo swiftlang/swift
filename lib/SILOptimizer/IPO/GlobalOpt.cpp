@@ -274,9 +274,9 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
                          /*params*/ {}, /*yields*/ {}, Results, None,
                          M.getASTContext());
   auto getterName = M.allocateCopy(getterNameTmp);
-  return FunctionBuilder.getOrCreateFunction(loc, getterName, Linkage,
-                                             LoweredType, IsBare,
-                                             IsNotTransparent, Serialized);
+  return FunctionBuilder.getOrCreateFunction(
+      loc, getterName, Linkage, LoweredType, IsBare, IsNotTransparent,
+      Serialized, IsNotDynamic);
 }
 
 /// Generate getter from the initialization code whose result is stored by a

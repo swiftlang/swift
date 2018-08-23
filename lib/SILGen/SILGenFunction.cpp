@@ -495,7 +495,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   ctx);
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
-        NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized);
+        NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized,
+        IsNotDynamic);
     auto NSStringFromClass = B.createFunctionRef(mainClass, NSStringFromClassFn);
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
@@ -584,7 +585,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     SILGenFunctionBuilder builder(SGM);
     auto NSApplicationMainFn = builder.getOrCreateFunction(
         mainClass, "NSApplicationMain", SILLinkage::PublicExternal,
-        NSApplicationMainType, IsBare, IsTransparent, IsNotSerialized);
+        NSApplicationMainType, IsBare, IsTransparent, IsNotSerialized,
+        IsNotDynamic);
 
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };
