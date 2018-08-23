@@ -60,9 +60,14 @@ endif()
 # When Python exists, NumpyConversion.swift imports it, so it must be
 # available at link time.
 set(TENSORFLOW_DEPENDS_PYTHON)
-if (SWIFT_PYTHON_EXISTS)
-  list(APPEND TENSORFLOW_DEPENDS_PYTHON SWIFT_MODULE_DEPENDS Python)
-endif()
+foreach(python_version ${PYTHON_INTEROP_VERSIONS})
+  string(SUBSTRING "${python_version}" 0 1 python_version_short)
+  if (TARGET swiftPython2)
+    list(APPEND TENSORFLOW_DEPENDS_PYTHON SWIFT_MODULE_DEPENDS Python2)
+  elseif (TARGET swiftPython3)
+    list(APPEND TENSORFLOW_DEPENDS_PYTHON SWIFT_MODULE_DEPENDS Python3)
+  endif()
+endforeach()
 
 add_swift_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"

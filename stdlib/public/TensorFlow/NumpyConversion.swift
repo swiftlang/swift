@@ -15,8 +15,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if canImport(Python)
-import Python
+#if canImport(Python2)
+import Python2
+#elseif canImport(Python3)
+import Python3
+#else
+#error("Toolchain does not support Python2 or Python3.")
+#endif
 
 /// The `numpy` Python module.
 /// Note: Global variables are lazy, so the following declaration won't produce
@@ -98,4 +103,5 @@ extension Tensor : ConvertibleFromNumpyArray
     self.init(shape: shape, scalars: buffPtr)
   }
 }
-#endif
+
+#endif // canImport(Python2) or canImport(Python3)

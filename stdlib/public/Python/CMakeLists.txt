@@ -16,8 +16,6 @@
 
 include("../../../cmake/modules/FindPythonLibraries.cmake")
 
-set(SWIFT_PYTHON_EXISTS TRUE PARENT_SCOPE)
-
 set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY)
   list(APPEND SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES SHARED)
@@ -30,11 +28,11 @@ foreach(python_version ${PYTHON_INTEROP_VERSIONS})
   string(SUBSTRING "${python_version}" 0 1 python_version_short)
   reset_python_variables()
   if(python_version EQUAL 2.7)
-    find_package(PythonLibs "${python_version}" EXACT REQUIRED)
+    find_package(PythonLibs "${python_version}" EXACT)
     set(PYTHON2_LIBRARIES ${PYTHON_LIBRARIES})
   else()
-    set(Python_ADDITIONAL_VERSIONS 3.4 3.5 3.6)
-    find_package(PythonLibs "${python_version}" REQUIRED)
+    set(Python_ADDITIONAL_VERSIONS 3.4 3.5 3.6 3.7)
+    find_package(PythonLibs "${python_version}")
     set(PYTHON3_LIBRARIES ${PYTHON_LIBRARIES})
   endif()
   message(STATUS "Building Python (version ${python_version}).")
