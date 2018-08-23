@@ -924,7 +924,7 @@ def assignmentOperatorComment(operator, fixedWidth):
 # by the related operator:
 #     +   addingReportingOverflow(_:)
 #     -   subtractingReportingOverflow(_:)
-#     *   multiplyingReportingOverflow(_:)
+#     *   multipliedReportingOverflow(by:)
 #     /   dividedReportingOverflow(by:)
 #     %   remainderReportingOverflow(dividingBy:)
 def overflowOperationComment(operator):
@@ -1000,94 +1000,6 @@ def overflowOperationComment(operator):
 """,
     }
     return comments[operator]
-
-# documentation for "unsafe" arithmetic methods, indexed by the related
-# operator:
-#     +   unsafeAdding(_:)
-#     -   unsafeSubtracting(_:)
-#     *   unsafeMultiplied(by:)
-#     /   unsafeDivided(by:)
-def unsafeOperationComment(operator):
-    comments = {
-        '+': """\
-  /// Returns the sum of this value and the given value without checking for
-  /// arithmetic overflow.
-  ///
-  /// Use this function only to avoid the cost of overflow checking when you
-  /// are certain that the operation won't overflow. In optimized builds (`-O`)
-  /// the compiler is free to assume that overflow won't occur. Failure to
-  /// satisfy that assumption is a serious programming error and could lead to
-  /// statements being unexpectedly executed or skipped.
-  ///
-  /// In debug builds (`-Onone`) a runtime error is still triggered if the
-  /// operation overflows.
-  ///
-  /// This method is not a synonym for the masking addition operator (`&+`).
-  /// Use that operator instead of this method when you want to discard any
-  /// overflow that results from an addition operation.
-  ///
-  /// - Parameter rhs: The value to add to this value.
-  /// - Returns: The sum of this value and `rhs`.
-""",
-        '-': """\
-  /// Returns the difference obtained by subtracting the given value from this
-  /// value without checking for arithmetic overflow.
-  ///
-  /// Use this function only to avoid the cost of overflow checking when you
-  /// are certain that the operation won't overflow. In optimized builds (`-O`)
-  /// the compiler is free to assume that overflow won't occur. Failure to
-  /// satisfy that assumption is a serious programming error and could lead to
-  /// statements being unexpectedly executed or skipped.
-  ///
-  /// In debug builds (`-Onone`) a runtime error is still triggered if the
-  /// operation overflows.
-  ///
-  /// This method is not a synonym for the masking subtraction operator (`&-`).
-  /// Use that operator instead of this method when you want to discard any
-  /// overflow that results from a subtraction operation.
-  ///
-  /// - Parameter rhs: The value to subtract from this value.
-  /// - Returns: The result of subtracting `rhs` from this value.
-""",
-        '*': """\
-  /// Returns the product of this value and the given value without checking
-  /// for arithmetic overflow.
-  ///
-  /// Use this function only to avoid the cost of overflow checking when you
-  /// are certain that the operation won't overflow. In optimized builds (`-O`)
-  /// the compiler is free to assume that overflow won't occur. Failure to
-  /// satisfy that assumption is a serious programming error and could lead to
-  /// statements being unexpectedly executed or skipped.
-  ///
-  /// In debug builds (`-Onone`) a runtime error is still triggered if the
-  /// operation overflows.
-  ///
-  /// This method is not a synonym for the masking multiplication operator
-  /// (`&*`). Use that operator instead of this method when you want to discard
-  /// any overflow that results from an addition operation.
-  ///
-  /// - Parameter rhs: The value to multiply by this value.
-  /// - Returns: The product of this value and `rhs`.
-""",
-        '/': """\
-  /// Returns the quotient obtained by dividing this value by the given value
-  /// without checking for arithmetic overflow.
-  ///
-  /// Use this function only to avoid the cost of overflow checking when you
-  /// are certain that the operation won't overflow. In optimized builds (`-O`)
-  /// the compiler is free to assume that overflow won't occur. Failure to
-  /// satisfy that assumption is a serious programming error and could lead to
-  /// statements being unexpectedly executed or skipped.
-  ///
-  /// In debug builds (`-Onone`) a runtime error is still triggered if the
-  /// operation overflows.
-  ///
-  /// - Parameter rhs: The value to divide this value by.
-  /// - Returns: The result of dividing this value by `rhs`.
-""",
-    }
-    return comments[operator]
-
 }%
 
 //===----------------------------------------------------------------------===//
@@ -2901,21 +2813,6 @@ ${assignmentOperatorComment(x.operator, True)}
 #endif
 // end of FIXME(integers)
 
-${unsafeOperationComment(x.operator)}
-  @_transparent
-  public func unsafe${capitalize(x.name)}(${x.firstArg} other: Self) -> Self {
-    let (result, overflow) = self.${x.name}ReportingOverflow(${callLabel}other)
-
-    if overflow {
-      if (_isDebugAssertConfiguration()) {
-        _preconditionFailure("Overflow in unsafe${capitalize(x.name)}")
-      }
-      else {
-        Builtin.conditionallyUnreachable()
-      }
-    }
-    return result
-  }
 % end
 
   /// Creates a new instance from the bit pattern of the given instance by
@@ -4004,7 +3901,6 @@ public func numericCast<T : BinaryInteger, U : BinaryInteger>(_ x: T) -> U {
   return U(x)
 }
 
-// FIXME(integers): switch to using `FixedWidthInteger.unsafeAdding`
 @inlinable // FIXME(sil-serialize-all)
 internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
@@ -4014,7 +3910,6 @@ internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 #endif
 }
 
-// FIXME(integers): switch to using `FixedWidthInteger.unsafeSubtracting`
 @inlinable // FIXME(sil-serialize-all)
 internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
