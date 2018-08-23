@@ -107,7 +107,7 @@ extension Set : _ObjectiveCBridgeable {
       return result != nil
     }
 
-    result = Swift._setBridgeFromObjectiveCConditional(anySet)
+    result = anySet as? Set
     return result != nil
   }
 
