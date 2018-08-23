@@ -94,7 +94,7 @@ public:
 
   /// Diagnose a failure associated with this fix given
   /// root expression and information from constraint system.
-  virtual bool diagnose(Expr *root) const = 0;
+  virtual bool diagnose(Expr *root, bool asNote = false) const = 0;
 
   void print(llvm::raw_ostream &Out) const;
 
@@ -122,7 +122,7 @@ class ForceDowncast final : public ConstraintFix {
 
 public:
   std::string getName() const override;
-  bool diagnose(Expr *root) const override;
+  bool diagnose(Expr *root, bool asNote = false) const override;
 
   static ForceDowncast *create(ConstraintSystem &cs, Type toType,
                                ConstraintLocator *locator);
@@ -136,7 +136,7 @@ class ForceOptional final : public ConstraintFix {
 public:
   std::string getName() const override { return "force optional"; }
 
-  bool diagnose(Expr *root) const override;
+  bool diagnose(Expr *root, bool asNote = false) const override;
 
   static ForceOptional *create(ConstraintSystem &cs,
                                ConstraintLocator *locator);
@@ -158,7 +158,7 @@ public:
     return "unwrap optional base of member lookup";
   }
 
-  bool diagnose(Expr *root) const override;
+  bool diagnose(Expr *root, bool asNote = false) const override;
 
   static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclName member,
                                     ConstraintLocator *locator);
@@ -176,7 +176,7 @@ class AddAddressOf final : public ConstraintFix {
 public:
   std::string getName() const override { return "add address-of"; }
 
-  bool diagnose(Expr *root) const override;
+  bool diagnose(Expr *root, bool asNote = false) const override;
 
   static AddAddressOf *create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
@@ -189,7 +189,7 @@ class TreatRValueAsLValue final : public ConstraintFix {
 public:
   std::string getName() const override { return "treat rvalue as lvalue"; }
 
-  bool diagnose(Expr *root) const override;
+  bool diagnose(Expr *root, bool asNote = false) const override;
 
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
@@ -204,7 +204,7 @@ class CoerceToCheckedCast final : public ConstraintFix {
 public:
   std::string getName() const override { return "as to as!"; }
 
-  bool diagnose(Expr *root) const override;
+  bool diagnose(Expr *root, bool asNote = false) const override;
 
   static CoerceToCheckedCast *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
@@ -224,7 +224,7 @@ class MarkExplicitlyEscaping final : public ConstraintFix {
 public:
   std::string getName() const override { return "add @escaping"; }
 
-  bool diagnose(Expr *root) const override;
+  bool diagnose(Expr *root, bool asNote = false) const override;
 
   static MarkExplicitlyEscaping *create(ConstraintSystem &cs,
                                         ConstraintLocator *locator,
@@ -256,7 +256,7 @@ public:
     return {getTrailingObjects<Identifier>(), NumLabels};
   }
 
-  bool diagnose(Expr *root) const override;
+  bool diagnose(Expr *root, bool asNote = false) const override;
 
   static RelabelArguments *create(ConstraintSystem &cs,
                                   llvm::ArrayRef<Identifier> correctLabels,
@@ -283,7 +283,7 @@ public:
     return "add missing protocol conformance";
   }
 
-  bool diagnose(Expr *root) const override;
+  bool diagnose(Expr *root, bool asNote = false) const override;
 
   static MissingConformance *create(ConstraintSystem &cs, Type type,
                                     ProtocolDecl *protocol,
@@ -305,7 +305,7 @@ public:
     return "skip same-type generic requirement";
   }
 
-  bool diagnose(Expr *root) const override;
+  bool diagnose(Expr *root, bool asNote = false) const override;
 
   static SkipSameTypeRequirement *create(ConstraintSystem &cs, Type lhs,
                                          Type rhs, ConstraintLocator *locator);
@@ -326,7 +326,7 @@ public:
     return "skip superclass generic requirement";
   }
 
-  bool diagnose(Expr *root) const override;
+  bool diagnose(Expr *root, bool asNote = false) const override;
 
   static SkipSuperclassRequirement *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
