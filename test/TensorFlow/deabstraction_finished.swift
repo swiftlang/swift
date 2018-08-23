@@ -230,3 +230,20 @@ public func bar() {
 
 // CHECK-LABEL: --- INPUT FUNCTION {{.*}}bar
 // CHECK: graph_op "Const"
+
+// Check that tensorflow convention is propagated to closures from declarations.
+public func testTensorFlowClosures(_ a: Float) -> Tensor<Int32>{
+  let closure: @convention(tensorflow) (Tensor<Float>) -> Tensor<Int32> = {
+    return Tensor<Int32>($0)
+  }
+  let f = Tensor<Float>(a);
+  return closure(f);
+}
+
+// CHECK-LABEL --- TFPartition Accelerator Result: [[NAME:*.*]]
+// sil private @[[NAME]] : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Int32> {
+// bb0(%0 : @unowned $TensorHandle<Builtin.FPIEEE32>):
+//   [[A:%.*]] = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
+//   [[B:%.*]] = graph_op "Cast,i"([[A]] : $TensorHandle<Float>) {SrcT: $Float, DstT: $Int32, __device: "/device:CPU:0"} : $TensorHandle<Int32>
+//   return [[B]] : $TensorHandle<Int32>
+// } // end sil function '[[NAME]]'

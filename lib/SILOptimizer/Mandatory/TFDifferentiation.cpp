@@ -42,8 +42,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
-#include "swift/SILOptimizer/Utils/Devirtualize.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseSet.h"
@@ -857,27 +855,6 @@ public:
     return differentiationTasks;
   }
 
-  /// Finds a witness table for the specified conformance in the current module.
-  /// If it doesn't exist, then tries to find it in all imported modules and
-  /// links it to the current module. Returns null if no witness table can be
-  /// found.
-  SILWitnessTable *lookupOrLinkWitnessTable(ProtocolConformanceRef confRef) {
-    auto *conf = confRef.getConcrete();
-    if (auto existingTable = module.lookUpWitnessTable(confRef))
-      return existingTable;
-    auto *decl =
-        conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
-    auto linkage = getSILLinkage(getDeclLinkage(decl), NotForDefinition);
-    auto *newTable = module.createWitnessTableDeclaration(conf, linkage);
-    newTable = silLoader->lookupWitnessTable(newTable);
-    // Update linkage for witness methods.
-    // FIXME: Figure out why witnesses have shared linkage by default.
-    for (auto &entry : newTable->getEntries())
-      if (entry.getKind() == SILWitnessTable::WitnessKind::Method)
-        entry.getMethodWitness().Witness->setLinkage(linkage);
-    return newTable;
-  }
-
   ProtocolDecl *getVectorNumericProtocol() const {
     return vectorNumericProtocol;
   }
@@ -1609,6 +1586,8 @@ static void convertFloatToIndirectExpressible(APFloat scalar,
   // %3 = witness_method ...
   auto initBFLFn = builder.createWitnessMethod(loc, floatLitTy, ebflConfRef,
                                                initBFLDeclRef, initBFLType);
+  // Ensure the witness method is linked.
+  module.lookUpFunctionInWitnessTable(ebflConfRef, initBFLDeclRef);
   // Get substitutions.
   auto floatLitSubMap = SubstitutionMap::getProtocolSubstitutions(
       ebflProto, floatLitTy, ebflConfRef);
@@ -1621,10 +1600,9 @@ static void convertFloatToIndirectExpressible(APFloat scalar,
     builder.createDeallocStack(loc, floatLitBuf);
   };
   // %4 = apply %3 <...>(%floatLitBuf, %1, %2)
-  auto *ai = builder.createApply(loc, initBFLFn, floatLitSubMap,
-                                 {floatLitBuf, builtinFloat, floatLitMetatype},
-                                 /*isNonThrowing*/ false);
-  tryDevirtualizeWitnessMethod(ai, /*ORE*/ nullptr);
+  builder.createApply(loc, initBFLFn, floatLitSubMap,
+                      {floatLitBuf, builtinFloat, floatLitMetatype},
+                      /*isNonThrowing*/ false);
   // Step 2. Initialize a value of type `<target type>` by calling
   // %5 = metatype $@thin <target type>.FloatLiteralType.Type
   auto targetMetatypeTy = SILType::getPrimitiveObjectType(
@@ -1647,6 +1625,8 @@ static void convertFloatToIndirectExpressible(APFloat scalar,
   // %6 = witness_method ...
   auto initFLFn = builder.createWitnessMethod(loc, targetTy, eflConfRef,
                                               initFLDeclRef, initFLType);
+  // Ensure the witness method is linked.
+  module.lookUpFunctionInWitnessTable(eflConfRef, initFLDeclRef);
   // Get substitutions.
   auto targetSubMap =
       SubstitutionMap::getProtocolSubstitutions(eflProto, targetTy, eflConfRef);
@@ -3641,6 +3621,8 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
   // %0 = witness_method @+
   auto witnessMethod = getBuilder().createWitnessMethod(loc, adjointTy, confRef,
                                                         declRef, silFnTy);
+  // Ensure the witness method is linked.
+  getModule().lookUpFunctionInWitnessTable(confRef, declRef);
   auto subMap =
       SubstitutionMap::getProtocolSubstitutions(proto, adjointTy, confRef);
   // %1 = metatype $T.Type
@@ -3648,10 +3630,9 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
   auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
   auto metatype = getBuilder().createMetatype(loc, metatypeSILType);
   // %2 = apply $0(%result, %new, %old, %1)
-  auto *apply = getBuilder().createApply(loc, witnessMethod, subMap,
-                                         {resultBuffer, rhs, lhs, metatype},
-                                         /*isNonThrowing*/ false);
-  tryDevirtualizeWitnessMethod(apply, /*ORE*/ nullptr);
+  getBuilder().createApply(loc, witnessMethod, subMap,
+                           {resultBuffer, rhs, lhs, metatype},
+                           /*isNonThrowing*/ false);
 }
 
 bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {

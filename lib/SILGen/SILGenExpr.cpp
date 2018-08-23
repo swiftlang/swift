@@ -2792,6 +2792,17 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   // Emit the closure body.
   SGF.SGM.emitClosure(e);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Make sure that no values are captured if this a tensorflow function.
+  auto *closureType = e->getType()->castTo<AnyFunctionType>();
+  const auto &captureInfo = e->getCaptureInfo();
+  if (closureType->getExtInfo().getRepresentation() ==
+          FunctionTypeRepresentation::TensorFlow &&
+      (captureInfo.hasLocalCaptures() || captureInfo.hasDynamicSelfCapture())) {
+    SGF.SGM.diagnose(e, diag::tf_no_captures_in_tf_functions);
+    return RValue(SGF, e, SGF.emitUndef(e, e->getType()));
+  }
+
   SubstitutionMap subs;
   if (e->getCaptureInfo().hasGenericParamCaptures())
     subs = SGF.getForwardingSubstitutionMap();

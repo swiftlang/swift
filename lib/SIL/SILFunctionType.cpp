@@ -2192,6 +2192,20 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     return SILFunctionTypeRepresentation::CFunctionPointer;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (c.hasClosureExpr()) {
+    // If closure was initialized with a TensorFlow convention, Sema would have
+    // propagated that to the closure expr. Return the tensorflow representation
+    // in that case. Note that this is analogous to the Func case below.
+    if (auto *closureType =
+            c.getClosureExpr()->getType()->getAs<AnyFunctionType>()) {
+      if (closureType->getExtInfo().getSILRepresentation() ==
+          SILFunctionTypeRepresentation::TensorFlow) {
+        return SILFunctionTypeRepresentation::TensorFlow;
+      }
+    }
+  }
+
   // Anonymous functions currently always have Freestanding CC.
   if (!c.hasDecl())
     return SILFunctionTypeRepresentation::Thin;

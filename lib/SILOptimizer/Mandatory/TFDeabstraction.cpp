@@ -1902,10 +1902,13 @@ static Type conformsToTensorProtocol(Type ty, ModuleDecl *module) {
 
 /// Given something that conforms to the TensorProtocol protocol, extract the
 /// 'handle' out of it.
+// TODO: This should not be specific to TensorProtocol because TensorProtocol
+// requires a TensorHandle whereas members can be other opaque handles. This
+// will go away when TensorHandle unifies all handle types in the future.
 static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
                                               SILBuilder &B) {
-  // If we already have a TensorHandle, just use it.
-  if (isTensorHandle(v->getType()))
+  // If we already have a TensorFlow value, just use it.
+  if (classifyTensorFlowValue(v->getType()) != TFValueKind::Nope)
     return v;
 
   auto module = B.getFunction().getModule().getSwiftModule();
