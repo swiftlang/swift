@@ -883,6 +883,10 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
                                                                paramIdx));
       auto argTy = args[argIdx].getType();
 
+      // FIXME: This should be revisited. If one of argTy or paramTy
+      // is a type variable, matchTypes() will add a constraint, and
+      // when the constraint is later solved, we will have lost the
+      // value of 'subflags'.
       if (!haveOneNonUserConversion) {
         subflags |= ConstraintSystem::TMF_ApplyingOperatorParameter;
       }
