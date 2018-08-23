@@ -319,11 +319,6 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
         ResultType = V->getType();
         continue;
       }
-      // Look through strong_pin instructions.
-      if (auto pin = dyn_cast<StrongPinInst>(V)) {
-        WorkList.push_back(pin->getOperand());
-        continue;
-      }
     }
 
     auto Arg = dyn_cast<SILArgument>(V);

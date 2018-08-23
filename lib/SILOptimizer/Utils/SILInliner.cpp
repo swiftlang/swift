@@ -681,11 +681,9 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::RefTailAddrInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreBorrowInst:
-  case SILInstructionKind::StrongPinInst:
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::SetDeallocatingInst:
   case SILInstructionKind::StrongRetainInst:
-  case SILInstructionKind::StrongUnpinInst:
   case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst:
   case SILInstructionKind::SwitchEnumAddrInst:
@@ -698,7 +696,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::InitBlockStorageHeaderInst:
   case SILInstructionKind::SelectEnumAddrInst:
   case SILInstructionKind::SelectEnumInst:

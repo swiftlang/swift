@@ -638,7 +638,7 @@ func _getSuperclass(_ t: Any.Type) -> AnyClass? {
 //    value... thus bumping the reference count and disturbing the
 //    result we are trying to observe, Dr. Heisenberg!
 //
-// _isUnique and _isUniquePinned cannot be made public or the compiler
+// _isUnique cannot be made public or the compiler
 // will attempt to generate generic code for the transparent function
 // and type checking will fail.
 
@@ -646,12 +646,6 @@ func _getSuperclass(_ t: Any.Type) -> AnyClass? {
 @usableFromInline @_transparent
 internal func _isUnique<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
-}
-
-/// Returns `true` if `object` is uniquely referenced or pinned.
-@usableFromInline @_transparent
-internal func _isUniqueOrPinned<T>(_ object: inout T) -> Bool {
-  return Bool(Builtin.isUniqueOrPinned(&object))
 }
 
 /// Returns `true` if `object` is uniquely referenced.
@@ -668,21 +662,6 @@ func _isUnique_native<T>(_ object: inout T) -> Bool {
   _sanityCheck(_usesNativeSwiftReferenceCounting(
       type(of: Builtin.reinterpretCast(object) as AnyObject)))
   return Bool(Builtin.isUnique_native(&object))
-}
-
-/// Returns `true` if `object` is uniquely referenced or pinned.
-/// This provides sanity checks on top of the Builtin.
-@_transparent
-public // @testable
-func _isUniqueOrPinned_native<T>(_ object: inout T) -> Bool {
-  // This could be a bridge object, single payload enum, or plain old
-  // reference. Any case it's non pointer bits must be zero.
-  _sanityCheck(
-    (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
-    == 0)
-  _sanityCheck(_usesNativeSwiftReferenceCounting(
-      type(of: Builtin.reinterpretCast(object) as AnyObject)))
-  return Bool(Builtin.isUniqueOrPinned_native(&object))
 }
 
 /// Returns `true` if type is a POD type. A POD type is a type that does not
