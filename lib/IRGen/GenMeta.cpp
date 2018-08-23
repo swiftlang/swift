@@ -2854,7 +2854,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     GenericClassMetadataBuilder builder(IGM, classDecl, init,
                                         fieldLayout);
     builder.layout();
-    canBeConstant = false;
+    canBeConstant = true;
 
     builder.createMetadataAccessFunction();
   } else if (doesClassMetadataRequireRelocation(IGM, classDecl)) {
@@ -3255,7 +3255,7 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
     GenericStructMetadataBuilder builder(IGM, structDecl, init);
     builder.layout();
     isPattern = true;
-    canBeConstant = false;
+    canBeConstant = true;
 
     builder.createMetadataAccessFunction();
   } else {
@@ -3450,7 +3450,7 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
     GenericEnumMetadataBuilder builder(IGM, theEnum, init);
     builder.layout();
     isPattern = true;
-    canBeConstant = false;
+    canBeConstant = true;
 
     builder.createMetadataAccessFunction();
   } else {

@@ -518,8 +518,8 @@ extension ResilientGenericOutsideParent {
 
 // ResilientGenericChild metadata initialization function
 
-// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience21ResilientGenericChildCMi"(%swift.type_descriptor*, i8**, i8**)
-// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
+// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience21ResilientGenericChildCMi"(%swift.type_descriptor*, i8**, i8*)
+// CHECK:              [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
 // CHECK:              ret %swift.type* [[METADATA]]
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S16class_resilience21ResilientGenericChildCMr"

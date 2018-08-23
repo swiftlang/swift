@@ -11,7 +11,7 @@ import Builtin
 // CHECK:       [[PATTERN:@.*]] = internal constant [4 x i32] [i32 0, i32 1, i32 8, i32 0]
 // CHECK-LABEL: @"$S15generic_structs18FixedLayoutGenericVMP" = internal constant <{ {{.*}} }> <{
 // -- instantiation function
-// CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**, i8**)* @"$S15generic_structs18FixedLayoutGenericVMi"
+// CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**, i8*)* @"$S15generic_structs18FixedLayoutGenericVMi"
 // -- completion function
 // CHECK-SAME:   i32 0,
 // -- pattern flags
@@ -56,7 +56,7 @@ import Builtin
 // CHECK-SAME: }>
 // CHECK: @"$S15generic_structs13SingleDynamicVMP" = internal constant <{ {{.*}} }> <{
 // -- instantiation function
-// CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**, i8**)* @"$S15generic_structs13SingleDynamicVMi"
+// CHECK-SAME:   %swift.type* (%swift.type_descriptor*, i8**, i8*)* @"$S15generic_structs13SingleDynamicVMi"
 // -- vwtable pointer
 // CHECK-SAME:   @"$S15generic_structs13SingleDynamicVWV"
 
@@ -195,10 +195,10 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   return %v : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_structs13SingleDynamicVMi"(%swift.type_descriptor*, i8**, i8**)
+// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S15generic_structs13SingleDynamicVMi"(%swift.type_descriptor*, i8**, i8*)
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]], align 8
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2, i64 16)
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2, i64 16)
 // CHECK-NEXT:   ret %swift.type* [[METADATA]]
 // CHECK: }
 
