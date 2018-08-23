@@ -163,6 +163,19 @@ class BenchmarkDriver(object):
                       [self.run(test, measure_memory=True)
                        for _ in range(self.args.iterations)])
 
+    def log_results(self, output, log_file=None):
+        """Log output to `log_file`.
+
+        Creates `args.output_dir` if it doesn't exist yet.
+        """
+        log_file = log_file or self.log_file
+        dir = os.path.dirname(log_file)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        print('Logging results to: %s' % log_file)
+        with open(log_file, 'w') as f:
+            f.write(output)
+
 
 class LoggingReportFormatter(logging.Formatter):
     """Format logs as plain text or with colors on the terminal.
@@ -399,15 +412,6 @@ class BenchmarkDoctor(object):
         return 0
 
 
-def log_results(log_file, formatted_output):
-    dir = os.path.dirname(log_file)
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    print('Logging results to: %s' % log_file)
-    with open(log_file, 'w') as f:
-        f.write(formatted_output)
-
-
 def run_benchmarks(driver):
     """Run perf tests individually and return results in a format that's
     compatible with `LogParser`.
@@ -455,7 +459,7 @@ def run(args):
     driver = BenchmarkDriver(args)
     output = run_benchmarks(driver)
     if args.output_dir:
-        log_results(driver.log_file, output)
+        driver.log_results(output)
     return 0
 
 

@@ -331,19 +331,19 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
             import tempfile  # setUp
             temp_dir = tempfile.mkdtemp()
             log_dir = os.path.join(temp_dir, 'sub-dir/')
-            log_results = Benchmark_Driver.log_results
+            driver = BenchmarkDriver(Stub(), tests=[''])
 
             self.assertFalse(os.path.exists(log_dir))
             content = "formatted output"
             log_file = os.path.join(log_dir, '1.log')
             with captured_output() as (out, _):
-                log_results(log_file, content)
+                driver.log_results(content, log_file=log_file)
             assert_log_written(out, log_file, content)
 
             self.assertTrue(os.path.exists(log_dir))
             log_file = os.path.join(log_dir, '2.log')
             with captured_output() as (out, _):
-                log_results(log_file, content)
+                driver.log_results(content, log_file=log_file)
             assert_log_written(out, log_file, content)
 
         finally:
