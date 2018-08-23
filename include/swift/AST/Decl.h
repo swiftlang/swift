@@ -1214,6 +1214,22 @@ public:
                        SecondType.getSourceRange().End);
   }
 
+  /// Retrieve the first or subject type representation from the \c repr,
+  /// or \c nullptr if \c repr is null.
+  static TypeRepr *getFirstTypeRepr(const RequirementRepr *repr) {
+    if (!repr) return nullptr;
+    return repr->FirstType.getTypeRepr();
+  }
+
+  /// Retrieve the second or constraint type representation from the \c repr,
+  /// or \c nullptr if \c repr is null.
+  static TypeRepr *getSecondTypeRepr(const RequirementRepr *repr) {
+    if (!repr) return nullptr;
+    assert(repr->getKind() == RequirementReprKind::TypeConstraint ||
+           repr->getKind() == RequirementReprKind::SameType);
+    return repr->SecondType.getTypeRepr();
+  }
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");

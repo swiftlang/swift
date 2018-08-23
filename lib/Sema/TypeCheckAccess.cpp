@@ -96,12 +96,12 @@ public:
 /// part of the type that caused the problem could not be found. The DeclContext
 /// is never null.
 void AccessControlCheckerBase::checkTypeAccessImpl(
-    TypeLoc TL, AccessScope contextAccessScope,
+    Type type, TypeRepr *typeRepr, AccessScope contextAccessScope,
     const DeclContext *useDC,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   if (!TC.getLangOpts().EnableAccessControl)
     return;
-  if (!TL.getType())
+  if (!type)
     return;
   // Don't spend time checking local declarations; this is always valid by the
   // time we get to this point.
@@ -113,11 +113,11 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   // without a TypeRepr, for example for 'var' declarations with an inferred
   // type.
   auto typeAccessScope =
-    (TL.getTypeRepr()
-     ? TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(),
+    (typeRepr
+     ? TypeReprAccessScopeChecker::getAccessScope(typeRepr,
                                                   useDC,
                                                   checkUsableFromInline)
-     : TypeAccessScopeChecker::getAccessScope(TL.getType(),
+     : TypeAccessScopeChecker::getAccessScope(type,
                                               useDC,
                                               checkUsableFromInline));
 
@@ -151,7 +151,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     if (TC.getLangOpts().isSwiftVersion3()) {
       auto typeOnlyAccessScope =
         TypeAccessScopeChecker::getAccessScope(
-            TL.getType(), useDC,
+            type, useDC,
             /*treatUsableFromInlineAsPublic*/false,
             /*canonicalizeParents*/true);
       if (typeOnlyAccessScope.hasValue()) {
@@ -176,7 +176,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
 
   const TypeRepr *complainRepr =
         TypeAccessScopeDiagnoser::findTypeWithScope(
-            TL.getTypeRepr(),
+            typeRepr,
             *typeAccessScope,
             useDC, checkUsableFromInline);
   diagnose(*typeAccessScope, complainRepr, downgradeToWarning);
@@ -189,15 +189,14 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
 /// The TypeRepr passed to \p diagnose may be null, in which case a particular
 /// part of the type that caused the problem could not be found.
 void AccessControlCheckerBase::checkTypeAccess(
-    TypeLoc TL, const ValueDecl *context,
+    Type type, TypeRepr *typeRepr, const ValueDecl *context,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   assert(!isa<ParamDecl>(context));
   const DeclContext *DC = context->getDeclContext();
   AccessScope contextAccessScope =
     context->getFormalAccessScope(
       nullptr, checkUsableFromInline);
-  checkTypeAccessImpl(TL, contextAccessScope,
-                      DC, diagnose);
+  checkTypeAccessImpl(type, typeRepr, contextAccessScope, DC, diagnose);
 }
 
 /// Highlights the given TypeRepr, and adds a note pointing to the type's
@@ -225,34 +224,29 @@ void AccessControlCheckerBase::checkRequirementAccess(
     AccessScope accessScope,
     const DeclContext *useDC,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
-  // Prepopulate the requirements.
-  // FIXME: This is a hack; it would be better to eliminate the
-  // TypeLoc usage with checkTypeAccessImpl.
-  RequirementRequest::visitRequirements(source, TypeResolutionStage::Interface,
-                                        [](Requirement, RequirementRepr*) {
-                                          return false;
-                                        });
+  RequirementRequest::visitRequirements(
+      source, TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr* reqRepr) {
+        switch (req.getKind()) {
+        case RequirementKind::Conformance:
+        case RequirementKind::SameType:
+        case RequirementKind::Superclass:
+          checkTypeAccessImpl(req.getFirstType(),
+                              RequirementRepr::getFirstTypeRepr(reqRepr),
+                              accessScope, useDC, diagnose);
+          checkTypeAccessImpl(req.getSecondType(),
+                              RequirementRepr::getSecondTypeRepr(reqRepr),
+                              accessScope, useDC, diagnose);
+          break;
 
-  for (auto &requirement : RequirementRequest::getRequirements(source)) {
-    switch (requirement.getKind()) {
-    case RequirementReprKind::TypeConstraint:
-      checkTypeAccessImpl(requirement.getSubjectLoc(),
-                          accessScope, useDC, diagnose);
-      checkTypeAccessImpl(requirement.getConstraintLoc(),
-                          accessScope, useDC, diagnose);
-      break;
-    case RequirementReprKind::LayoutConstraint:
-      checkTypeAccessImpl(requirement.getSubjectLoc(),
-                          accessScope, useDC, diagnose);
-      break;
-    case RequirementReprKind::SameType:
-      checkTypeAccessImpl(requirement.getFirstTypeLoc(),
-                          accessScope, useDC, diagnose);
-      checkTypeAccessImpl(requirement.getSecondTypeLoc(),
-                          accessScope, useDC, diagnose);
-      break;
-    }
-  }
+        case RequirementKind::Layout:
+          checkTypeAccessImpl(req.getFirstType(),
+                              RequirementRepr::getFirstTypeRepr(reqRepr),
+                              accessScope, useDC, diagnose);
+          break;
+        }
+        return false;
+      });
 }
 
 void AccessControlCheckerBase::checkGenericParamAccess(
@@ -304,7 +298,9 @@ void AccessControlCheckerBase::checkGenericParamAccess(
     if (param->getInherited().empty())
       continue;
     assert(param->getInherited().size() == 1);
-    checkTypeAccessImpl(param->getInherited().front(), accessScope,
+    checkTypeAccessImpl(param->getInherited().front().getType(),
+                        param->getInherited().front().getTypeRepr(),
+                        accessScope,
                         DC, callback);
   }
   callbackACEK = ACEK::Requirement;
@@ -403,7 +399,7 @@ void AccessControlChecker::check(Decl *D) {
         if (seenVars.count(theVar) || theVar->isInvalid())
           return;
 
-        checkTypeAccess(TypeLoc::withoutLoc(theVar->getType()),
+        checkTypeAccess(theVar->getType(), nullptr,
                         theVar,
                         [&](AccessScope typeAccessScope,
                             const TypeRepr *complainRepr,
@@ -445,7 +441,9 @@ void AccessControlChecker::check(Decl *D) {
       if (!anyVar)
         return;
 
-      checkTypeAccess(TP->getTypeLoc(), anyVar,
+      checkTypeAccess(TP->getTypeLoc().getType(),
+                      TP->getTypeLoc().getTypeRepr(),
+                      anyVar,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -475,7 +473,9 @@ void AccessControlChecker::check(Decl *D) {
   case DeclKind::TypeAlias: {
     auto TAD = cast<TypeAliasDecl>(D);
 
-    checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD,
+    checkTypeAccess(TAD->getUnderlyingTypeLoc().getType(),
+                    TAD->getUnderlyingTypeLoc().getTypeRepr(),
+                    TAD,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -527,7 +527,9 @@ void AccessControlChecker::check(Decl *D) {
         }
       });
     });
-    checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
+    checkTypeAccess(assocType->getDefaultDefinitionLoc().getType(),
+                    assocType->getDefaultDefinitionLoc().getTypeRepr(),
+                    assocType,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -591,7 +593,7 @@ void AccessControlChecker::check(Decl *D) {
       });
       if (rawTypeLocIter == ED->getInherited().end())
         return;
-      checkTypeAccess(*rawTypeLocIter, ED,
+      checkTypeAccess(rawType, rawTypeLocIter->getTypeRepr(), ED,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -652,7 +654,7 @@ void AccessControlChecker::check(Decl *D) {
         outerDowngradeToWarning = DowngradeToWarning::Yes;
       }
 
-      checkTypeAccess(*superclassLocIter, CD,
+      checkTypeAccess(CD->getSuperclass(), superclassLocIter->getTypeRepr(), CD,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -981,8 +983,7 @@ void UsableFromInlineChecker::check(Decl *D) {
         if (seenVars.count(theVar) || theVar->isInvalid())
           return;
 
-        checkTypeAccess(TypeLoc::withoutLoc(theVar->getType()),
-                        theVar,
+        checkTypeAccess(theVar->getType(), nullptr, theVar,
                         [&](AccessScope typeAccessScope,
                             const TypeRepr *complainRepr,
                             DowngradeToWarning downgradeToWarning) {
@@ -1121,7 +1122,7 @@ void UsableFromInlineChecker::check(Decl *D) {
       });
       if (rawTypeLocIter == ED->getInherited().end())
         return;
-      checkTypeAccess(*rawTypeLocIter, ED,
+      checkTypeAccess(rawType, rawTypeLocIter->getTypeRepr(), ED,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -1168,7 +1169,7 @@ void UsableFromInlineChecker::check(Decl *D) {
       if (superclassLocIter == CD->getInherited().end())
         return;
 
-      checkTypeAccess(*superclassLocIter, CD,
+      checkTypeAccess(CD->getSuperclass(), superclassLocIter->getTypeRepr(), CD,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {

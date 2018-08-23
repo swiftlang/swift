@@ -5311,13 +5311,13 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
 
     if (inferForModule) {
       inferRequirements(*inferForModule, firstType,
-                        reqRepr ? reqRepr->getSubjectRepr() : nullptr,
+                        RequirementRepr::getFirstTypeRepr(reqRepr),
                         source.asInferred(
-                          reqRepr ? reqRepr->getSubjectRepr() : nullptr));
+                          RequirementRepr::getFirstTypeRepr(reqRepr)));
       inferRequirements(*inferForModule, secondType,
-                        reqRepr ? reqRepr->getConstraintRepr() : nullptr,
+                        RequirementRepr::getSecondTypeRepr(reqRepr),
                         source.asInferred(
-                          reqRepr ? reqRepr->getConstraintRepr() : nullptr));
+                          RequirementRepr::getSecondTypeRepr(reqRepr)));
     }
 
     return addTypeRequirement(firstType, secondType, source,
@@ -5328,9 +5328,9 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
   case RequirementKind::Layout: {
     if (inferForModule) {
       inferRequirements(*inferForModule, firstType,
-                        reqRepr ? reqRepr->getSubjectRepr() : nullptr,
+                        RequirementRepr::getFirstTypeRepr(reqRepr),
                         source.asInferred(
-                          reqRepr ? reqRepr->getSubjectRepr() : nullptr));
+                          RequirementRepr::getFirstTypeRepr(reqRepr)));
     }
 
     return addLayoutRequirement(firstType, req.getLayoutConstraint(), source,
@@ -5355,13 +5355,13 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
 
     if (inferForModule) {
       inferRequirements(*inferForModule, firstType,
-                        reqRepr ? reqRepr->getFirstTypeRepr() : nullptr,
+                        RequirementRepr::getFirstTypeRepr(reqRepr),
                         source.asInferred(
-                          reqRepr ? reqRepr->getFirstTypeRepr() : nullptr));
+                          RequirementRepr::getFirstTypeRepr(reqRepr)));
       inferRequirements(*inferForModule, secondType,
-                        reqRepr ? reqRepr->getSecondTypeRepr() : nullptr,
+                        RequirementRepr::getSecondTypeRepr(reqRepr),
                         source.asInferred(
-                          reqRepr ? reqRepr->getSecondTypeRepr() : nullptr));
+                          RequirementRepr::getSecondTypeRepr(reqRepr)));
     }
 
     return addSameTypeRequirement(

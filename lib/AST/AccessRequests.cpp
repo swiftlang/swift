@@ -244,38 +244,21 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
           switch (req.getKind()) {
           case RequirementKind::Conformance:
           case RequirementKind::Superclass:
-            maxAccess = std::min(getTypeAccess(req.getFirstType(),
-                                               reqRepr
-                                                 ? reqRepr->getSubjectRepr()
-                                                 : nullptr),
-                                 maxAccess);
-            maxAccess = std::min(getTypeAccess(req.getSecondType(),
-                                               reqRepr
-                                                 ? reqRepr->getConstraintRepr()
-                                                 : nullptr),
-                                 maxAccess);
-            break;
-          case RequirementKind::Layout:
-            maxAccess = std::min(getTypeAccess(req.getFirstType(),
-                                               reqRepr
-                                                 ? reqRepr->getSubjectRepr()
-                                                 : nullptr),
-                                 maxAccess);
-            break;
           case RequirementKind::SameType:
-            maxAccess = std::min(getTypeAccess(req.getFirstType(),
-                                               reqRepr
-                                                 ? reqRepr->getFirstTypeRepr()
-                                                 : nullptr),
+            maxAccess = std::min(getTypeAccess(
+                                   req.getSecondType(),
+                                   RequirementRepr::getSecondTypeRepr(reqRepr)),
                                  maxAccess);
-            maxAccess = std::min(getTypeAccess(req.getSecondType(),
-                                               reqRepr
-                                                 ? reqRepr->getSecondTypeRepr()
-                                                 : nullptr),
+            LLVM_FALLTHROUGH;
+
+          case RequirementKind::Layout:
+            maxAccess = std::min(getTypeAccess(
+                                   req.getFirstType(),
+                                   RequirementRepr::getFirstTypeRepr(reqRepr)),
                                  maxAccess);
             break;
           }
-          
+
           return false;
         });
   }

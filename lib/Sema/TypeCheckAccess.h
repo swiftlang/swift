@@ -50,13 +50,19 @@ protected:
   bool checkUsableFromInline;
 
   void checkTypeAccessImpl(
-      TypeLoc TL, AccessScope contextAccessScope,
+      Type type, TypeRepr *typeRepr, AccessScope contextAccessScope,
       const DeclContext *useDC,
       llvm::function_ref<CheckTypeAccessCallback> diagnose);
 
   void checkTypeAccess(
-      TypeLoc TL, const ValueDecl *context,
+      Type type, TypeRepr *typeRepr, const ValueDecl *context,
       llvm::function_ref<CheckTypeAccessCallback> diagnose);
+
+  void checkTypeAccess(
+      const TypeLoc &TL, const ValueDecl *context,
+      llvm::function_ref<CheckTypeAccessCallback> diagnose) {
+    return checkTypeAccess(TL.getType(), TL.getTypeRepr(), context, diagnose);
+  }
 
   void checkRequirementAccess(
       WhereClauseOwner source,
