@@ -1246,18 +1246,6 @@ public:
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
-  /// Validate a protocol's where clause, along with the where clauses of
-  /// its associated types.
-  void validateWhereClauses(ProtocolDecl *protocol, TypeResolution resolution);
-
-  void resolveTrailingWhereClause(ProtocolDecl *proto) override;
-
-  /// Check the inheritance clause of the given declaration.
-  void checkInheritanceClause(Decl *decl, TypeResolution resolution);
-
-  /// Check the inheritance clause of the given declaration.
-  void checkInheritanceClause(Decl *decl);
-
   /// Diagnose if the class has no designated initializers.
   void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
 
