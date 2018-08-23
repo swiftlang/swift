@@ -12,6 +12,15 @@
 #  See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ===---------------------------------------------------------------------===//
+"""
+Benchmark_Driver is a tool for running and analysing Swift Benchmarking Suite.
+
+Example:
+    $ Benchmark_Driver run
+
+Use `Benchmark_Driver -h` for help on available commands and options.
+
+"""
 
 import argparse
 import glob
@@ -29,12 +38,16 @@ DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 class BenchmarkDriver(object):
-    """Executes tests from Swift Benchmark Suite."""
+    """Executes tests from Swift Benchmark Suite.
+
+    It's a higher level wrapper for the Benchmark_X family of binaries
+    (X = [O, Onone, Osize]).
+    """
 
     def __init__(self, args, tests=None, _subprocess=None, parser=None):
-        """Initialized with command line arguments.
+        """Initialize with command line arguments.
 
-        Optional parameters for injecting dependencies; used for testing.
+        Optional parameters are for injecting dependencies -- used for testing.
         """
         self.args = args
         self._subprocess = _subprocess or subprocess
@@ -356,6 +369,7 @@ class BenchmarkDoctor(object):
 
     @staticmethod
     def run_check(args):
+        """Validate benchmarks conform to health rules, report violations."""
         doctor = BenchmarkDoctor(args)
         doctor.check()
         # TODO non-zero error code when errors are logged
@@ -462,12 +476,12 @@ def run(args):
 
 
 def format_name(log_path):
-    """Return the filename and directory for a log file"""
+    """Return the filename and directory for a log file."""
     return '/'.join(log_path.split('/')[-2:])
 
 
 def compare_logs(compare_script, new_log, old_log, log_dir, opt):
-    """Return diff of log files at paths `new_log` and `old_log`"""
+    """Return diff of log files at paths `new_log` and `old_log`."""
     print('Comparing %s %s ...' % (format_name(old_log), format_name(new_log)))
     subprocess.call([compare_script, '--old-file', old_log,
                     '--new-file', new_log, '--format', 'markdown',
@@ -557,6 +571,7 @@ def compare(args):
 
 
 def positive_int(value):
+    """Verify the value is a positive integer."""
     ivalue = int(value)
     if not (ivalue > 0):
         raise ValueError
@@ -641,6 +656,7 @@ def parse_args(args):
 
 
 def main():
+    """Parse command line arguments and execute the specified COMMAND."""
     args = parse_args(sys.argv[1:])
     return args.func(args)
 
