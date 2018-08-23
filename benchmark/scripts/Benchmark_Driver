@@ -418,33 +418,32 @@ def run_benchmarks(driver):
     """
     # Set a constant hash seed. Some tests are currently sensitive to
     # fluctuations in the number of hash collisions.
-    #
-    # FIXME: This should only be set in the environment of the child process
-    # that runs the tests.
     os.environ["SWIFT_DETERMINISTIC_HASHING"] = "1"
 
-    log = driver.args.output_dir
-    output = []
-    headings = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)', 'MEAN(μs)',
-                'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)']
     line_format = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
-    if log:
-        print(line_format.format(*headings))
-    else:
-        print(','.join(headings))
+    format = (
+        (lambda values: ','.join(values))  # CSV
+        if (driver.args.output_dir is None) else
+        (lambda values: line_format.format(*values)))  # justified columns
+
+    def console_log(values):
+        print(format(values))
+
+    console_log(['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)',  # header
+                'MEAN(μs)', 'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)'])
+
+    def result_values(r):
+        return map(str, [r.test_num, r.name, r.num_samples, r.min, r.max,
+                         int(r.mean), int(r.sd), r.median, r.max_rss])
+
+    results = []
     for test in driver.tests:
-        r = driver.run_independent_samples(test)
-        test_output = map(str, [
-            r.test_num, r.name, r.num_samples, r.min, r.max, int(r.mean),
-            int(r.sd), r.median, r.max_rss])
-        if log:
-            print(line_format.format(*test_output))
-        else:
-            print(','.join(test_output))
-        output.append(test_output)
+        result = result_values(driver.run_independent_samples(test))
+        console_log(result)
+        results.append(result)
 
     print('\nTotal performance tests executed: {0}'.format(len(driver.tests)))
-    csv_log = '\n'.join([','.join(l) for l in output]) + '\n'
+    csv_log = '\n'.join([','.join(r) for r in results]) + '\n'
     return csv_log
 
 
