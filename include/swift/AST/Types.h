@@ -328,11 +328,11 @@ protected:
     ID : 32 - NumTypeBaseBits,
 
     /// Type variable options.
-    Options : 3,
+    Options : 4,
 
     ///  Index into the list of type variables, as used by the
     ///  constraint graph.
-    GraphIndex : 29
+    GraphIndex : 28
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,

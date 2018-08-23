@@ -69,7 +69,7 @@ namespace constraints {
 /// can be restored.
 class SavedTypeVariableBinding {
   /// \brief The type variable and type variable options.
-  llvm::PointerIntPair<TypeVariableType *, 3> TypeVarAndOptions;
+  llvm::PointerIntPair<TypeVariableType *, 4> TypeVarAndOptions;
   
   /// \brief The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
