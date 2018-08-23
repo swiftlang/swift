@@ -2444,7 +2444,8 @@ void serializeSyntaxTreeAsByteTree(
   auto StartClock = clock();
   // Serialize the syntax tree as a ByteTree
   swift::ExponentialGrowthAppendingBinaryByteStream Stream(
-      /*InitialSize=*/32 * 1024, llvm::support::endianness::little);
+      llvm::support::endianness::little);
+  Stream.reserve(32 * 1024);
   llvm::BinaryStreamWriter Writer(Stream);
   std::map<void *, void *> UserInfo;
   UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;

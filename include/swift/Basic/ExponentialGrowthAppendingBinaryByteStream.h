@@ -31,42 +31,17 @@ namespace swift {
 class ExponentialGrowthAppendingBinaryByteStream
     : public llvm::WritableBinaryStream {
   /// The buffer holding the data.
-  uint8_t *Data;
-
-  /// The size of the buffer that has been reserved. The buffer needs to get
-  /// resized if more data shall be written.
-  size_t ReservedBufferSize;
-
-  /// The size of the buffer that has been initialized by the user using
-  /// \c writeBytes. Since will always be less than or equal to
-  /// \c ReservedBufferSize, but will most likely be strictly less becuase the
-  /// internal buffer grows exponentially.
-  size_t Size = 0;
+  SmallVector<uint8_t, 0> Data;
 
   llvm::support::endianness Endian;
-
-  void reserve(size_t Size);
-
 public:
   ExponentialGrowthAppendingBinaryByteStream()
       : ExponentialGrowthAppendingBinaryByteStream(
             llvm::support::endianness::little) {}
   ExponentialGrowthAppendingBinaryByteStream(llvm::support::endianness Endian)
-      : ExponentialGrowthAppendingBinaryByteStream(/*InitialSize=*/32, Endian) {
-  }
-  ExponentialGrowthAppendingBinaryByteStream(size_t InitialSize,
-                                             llvm::support::endianness Endian)
-      : Endian(Endian) {
-    if (InitialSize == 0) {
-      // The initial buffer needs to be at least one byte large so that doubling
-      // its size has an effect.
-      InitialSize = 1;
-    }
-    Data = (uint8_t *)malloc(InitialSize);
-    ReservedBufferSize = InitialSize;
-  }
+      : Endian(Endian) {}
 
-  ~ExponentialGrowthAppendingBinaryByteStream() { free(Data); }
+  void reserve(size_t Size);
 
   llvm::support::endianness getEndian() const override { return Endian; }
 
@@ -76,9 +51,9 @@ public:
   llvm::Error readLongestContiguousChunk(uint32_t Offset,
                                          ArrayRef<uint8_t> &Buffer) override;
 
-  MutableArrayRef<uint8_t> data() { return {Data, Size}; }
+  MutableArrayRef<uint8_t> data() { return Data; }
 
-  uint32_t getLength() override { return Size; }
+  uint32_t getLength() override { return Data.size(); }
 
   llvm::Error writeBytes(uint32_t Offset, ArrayRef<uint8_t> Buffer) override;
 
