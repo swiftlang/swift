@@ -409,8 +409,9 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   auto *outerDC1 = decl1->getDeclContext();
   auto *outerDC2 = decl2->getDeclContext();
 
-  if (!tc.specializedOverloadComparisonCache.count(
-          {decl1, decl2, isDynamicOverloadComparison})) {
+  auto overloadComparisonKey =
+      std::make_tuple(decl1, decl2, isDynamicOverloadComparison);
+  if (!tc.specializedOverloadComparisonCache.count(overloadComparisonKey)) {
 
     auto compareSpecializations = [&] () -> bool {
       // If the kinds are different, there's nothing we can do.
@@ -727,25 +728,21 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       return false;
     };
 
-    tc.specializedOverloadComparisonCache[{
-        decl1, decl2, isDynamicOverloadComparison}] = compareSpecializations();
+    tc.specializedOverloadComparisonCache[overloadComparisonKey] =
+        compareSpecializations();
   } else if (tc.getLangOpts().DebugConstraintSolver) {
     auto &log = tc.Context.TypeCheckerDebug->getStream();
     log << "Found cached comparison: "
-        << tc.specializedOverloadComparisonCache[{decl1, decl2,
-                                                  isDynamicOverloadComparison}]
-        << "\n";
+        << tc.specializedOverloadComparisonCache[overloadComparisonKey] << "\n";
   }
 
   if (tc.getLangOpts().DebugConstraintSolver) {
     auto &log = tc.Context.TypeCheckerDebug->getStream();
-    auto result = tc.specializedOverloadComparisonCache[{
-        decl1, decl2, isDynamicOverloadComparison}];
+    auto result = tc.specializedOverloadComparisonCache[overloadComparisonKey];
     log << "comparison result: " << (result ? "better" : "not better") << "\n";
   }
 
-  return tc.specializedOverloadComparisonCache[{decl1, decl2,
-                                                isDynamicOverloadComparison}];
+  return tc.specializedOverloadComparisonCache[overloadComparisonKey];
 }
 
 Comparison TypeChecker::compareDeclarations(DeclContext *dc,
@@ -1021,9 +1018,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // compatibility under Swift 4 mode by ensuring we don't introduce any new
     // ambiguities. This will become a more general "is more specialised" rule
     // in Swift 5 mode.
-    if (!tc.Context.isSwiftVersionAtLeast(5) &&
-        choice1.getKind() != OverloadChoiceKind::DeclViaDynamic &&
-        choice2.getKind() != OverloadChoiceKind::DeclViaDynamic &&
+    if (!tc.Context.isSwiftVersionAtLeast(5) && !isDynamicOverloadComparison &&
         isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
       auto *nominal1 = dc1->getSelfNominalTypeDecl();
       auto *nominal2 = dc2->getSelfNominalTypeDecl();
