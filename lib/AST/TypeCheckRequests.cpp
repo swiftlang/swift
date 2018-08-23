@@ -43,6 +43,23 @@ void swift::simple_display(
     ext->getSelfNominalTypeDecl()->dumpRef(out);
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           const TypeResolutionStage &value) {
+  switch (value) {
+  case TypeResolutionStage::Structural:
+    out << "structural";
+    break;
+
+  case TypeResolutionStage::Interface:
+    out << "interface";
+    break;
+
+  case TypeResolutionStage::Contextual:
+    out << "contextual";
+    break;
+  }
+}
+
 //----------------------------------------------------------------------------//
 // Inherited type computation.
 //----------------------------------------------------------------------------//
@@ -66,6 +83,10 @@ void InheritedTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   const auto &storage = getStorage();
   auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
   diags.diagnose(typeLoc.getLoc(), diag::circular_reference_through);
+}
+
+bool InheritedTypeRequest::isCached() const {
+  return std::get<2>(getStorage()) == TypeResolutionStage::Interface;
 }
 
 Optional<Type> InheritedTypeRequest::getCachedResult() const {
@@ -97,6 +118,10 @@ void SuperclassTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto nominalDecl = std::get<0>(getStorage());
   // FIXME: Customize this further.
   diags.diagnose(nominalDecl, diag::circular_reference_through);
+}
+
+bool SuperclassTypeRequest::isCached() const {
+  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
 }
 
 Optional<Type> SuperclassTypeRequest::getCachedResult() const {
@@ -136,6 +161,10 @@ void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto enumDecl = std::get<0>(getStorage());
   // FIXME: Customize this further.
   diags.diagnose(enumDecl, diag::circular_reference_through);
+}
+
+bool EnumRawTypeRequest::isCached() const {
+  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
 }
 
 Optional<Type> EnumRawTypeRequest::getCachedResult() const {

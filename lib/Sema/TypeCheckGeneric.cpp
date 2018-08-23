@@ -62,13 +62,13 @@ void checkGenericParamList(TypeChecker &tc,
       builder->addGenericParameter(param);
   }
 
+  // Add the requirements for each of the generic parameters to the builder.
   // Now, check the inheritance clauses of each parameter.
-  for (auto param : *genericParams) {
-    tc.checkInheritanceClause(param, resolution);
-
-    if (builder)
+  if (builder) {
+    for (auto param : *genericParams)
       builder->addGenericParameterRequirements(param);
   }
+
 
   // Add the requirements clause to the builder, validating the types in
   // the requirements clause along the way.
@@ -263,12 +263,6 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 /// Revert the dependent types within the given generic parameter list.
 static void revertGenericParamList(TypeChecker &tc,
                                    GenericParamList *genericParams) {
-  // Revert the inherited clause of the generic parameter list.
-  for (auto param : *genericParams) {
-    for (auto &inherited : param->getInherited())
-      revertDependentTypeLoc(inherited);
-  }
-
   // Revert the requirements of the generic parameter list.
   tc.revertGenericRequirements(genericParams->getRequirements());
 }

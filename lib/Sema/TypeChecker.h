@@ -1263,12 +1263,6 @@ public:
 
   void resolveTrailingWhereClause(ProtocolDecl *proto) override;
 
-  /// Check the inheritance clause of the given declaration.
-  void checkInheritanceClause(Decl *decl, TypeResolution resolution);
-
-  /// Check the inheritance clause of the given declaration.
-  void checkInheritanceClause(Decl *decl);
-
   /// Diagnose if the class has no designated initializers.
   void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
 

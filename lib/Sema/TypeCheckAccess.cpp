@@ -21,6 +21,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 
 using namespace swift;
 
@@ -680,6 +681,15 @@ void AccessControlChecker::check(Decl *D) {
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
+
+    // FIXME: Hack to ensure that we've computed the types involved here.
+    ASTContext &ctx = proto->getASTContext();
+    for (unsigned i : indices(proto->getInherited())) {
+      (void)evaluateOrDefault(ctx.evaluator,
+                              InheritedTypeRequest{
+                                proto, i, TypeResolutionStage::Interface},
+                              Type());
+    }
 
     std::for_each(proto->getInherited().begin(),
                   proto->getInherited().end(),
