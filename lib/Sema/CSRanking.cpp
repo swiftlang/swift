@@ -941,6 +941,26 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       }
     }
 
+    // If both are properties and one is in a protocol, prefer the one not in
+    // a protocol.
+    //
+    // This is a Swift 4.1 compatibility hack. Changes elsewhere in the compiler
+    // made this case ambiguous. Perhaps it was never meant to be unambiguous in
+    // the first place, because it only seemed to work for properties, and not
+    // methods, so I'm going to keep this intentionally narrow.
+    if (isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
+      auto *nominal1 = dc1->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *nominal2 = dc2->getAsNominalTypeOrNominalTypeExtensionContext();
+
+      if (nominal1 && nominal2 && nominal1 != nominal2) {
+        if (isa<ProtocolDecl>(nominal1))
+          score2 += weight;
+
+        if (isa<ProtocolDecl>(nominal2))
+          score1 += weight;
+      }
+    }
+
     // If we haven't found a refinement, record whether one overload is in
     // any way more constrained than another. We'll only utilize this
     // information in the case of a potential ambiguity.
