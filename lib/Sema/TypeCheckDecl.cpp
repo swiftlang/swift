@@ -513,7 +513,8 @@ static void checkInheritanceClause(
 
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
-static void checkGenericParams(GenericParamList *genericParams) {
+static void checkGenericParams(GenericParamList *genericParams,
+                               DeclContext *owningDC) {
   if (!genericParams)
     return;
 
@@ -522,10 +523,9 @@ static void checkGenericParams(GenericParamList *genericParams) {
   }
 
   // Force visitation of each of the requirements here.
-  auto owner =
-    genericParams->getParams().front()->getDeclContext()->getAsDecl();
-  assert(owner && "Generic parameter list without a decl owning it?");
-  RequirementRequest::visitRequirements(owner, TypeResolutionStage::Interface,
+  RequirementRequest::visitRequirements(WhereClauseOwner(owningDC,
+                                                         genericParams),
+                                        TypeResolutionStage::Interface,
                                         [](Requirement, RequirementRepr *) {
                                           return false;
                                         });
@@ -2601,7 +2601,7 @@ public:
 
     if (!SD->isInvalid()) {
       TC.checkReferencedGenericParams(SD);
-      checkGenericParams(SD->getGenericParams());
+      checkGenericParams(SD->getGenericParams(), SD);
       TC.checkProtocolSelfRequirements(SD);
     }
 
@@ -2710,7 +2710,7 @@ public:
 
     checkUnsupportedNestedType(ED);
     TC.validateDecl(ED);
-    checkGenericParams(ED->getGenericParams());
+    checkGenericParams(ED->getGenericParams(), ED);
 
     {
       // Check for circular inheritance of the raw type.
@@ -2748,7 +2748,7 @@ public:
     checkUnsupportedNestedType(SD);
 
     TC.validateDecl(SD);
-    checkGenericParams(SD->getGenericParams());
+    checkGenericParams(SD->getGenericParams(), SD);
 
     TC.addImplicitConstructors(SD);
 
@@ -2877,7 +2877,7 @@ public:
 
     TC.validateDecl(CD);
     TC.requestSuperclassLayout(CD);
-    checkGenericParams(CD->getGenericParams());
+    checkGenericParams(CD->getGenericParams(), CD);
 
     {
       // Check for circular inheritance.
@@ -3120,7 +3120,7 @@ public:
     if (!FD->isInvalid()) {
       if (!isa<AccessorDecl>(FD) ||
           !cast<AccessorDecl>(FD)->isMaterializeForSet()) {
-        checkGenericParams(FD->getGenericParams());
+        checkGenericParams(FD->getGenericParams(), FD);
         TC.checkReferencedGenericParams(FD);
         TC.checkProtocolSelfRequirements(FD);
       }
@@ -3185,6 +3185,7 @@ public:
     }
 
     checkInheritanceClause(ED);
+
     if (auto nominal = ED->getExtendedNominal()) {
       TC.validateDecl(nominal);
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
@@ -3197,6 +3198,9 @@ public:
           checkEnumRawValues(TC, enumDecl);
       }
     }
+
+    if (auto genericParams = ED->getGenericParams())
+      checkGenericParams(genericParams, ED);
 
     validateAttributes(TC, ED);
 
@@ -3269,7 +3273,7 @@ public:
     TC.validateDecl(CD);
 
     if (!CD->isInvalid()) {
-      checkGenericParams(CD->getGenericParams());
+      checkGenericParams(CD->getGenericParams(), CD);
       TC.checkReferencedGenericParams(CD);
       TC.checkProtocolSelfRequirements(CD);
     }

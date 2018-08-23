@@ -310,7 +310,8 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   callbackACEK = ACEK::Requirement;
 
   checkRequirementAccess(WhereClauseOwner(
-                           DC, const_cast<GenericParamList *>(params)),
+                           owner->getInnermostDeclContext(),
+                           const_cast<GenericParamList *>(params)),
                          accessScope, DC, callback);
 
   if (minAccessScope.isPublic())
