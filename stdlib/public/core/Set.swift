@@ -1442,6 +1442,7 @@ internal class _SwiftRawSetStorage: _SwiftNativeNSSet {
     _sanityCheckFailure("This class cannot be directly initialized")
   }
 
+  @usableFromInline
   internal func invalidate() {}
 }
 
@@ -1543,16 +1544,19 @@ internal final class _SwiftNativeSetStorage<
     _fixLifetime(self)
   }
 
+  @usableFromInline
   internal override func invalidate() {
     hashTable.count = -1
   }
 
-  @usableFromInline
+  @inlinable
   static internal func allocate(capacity: Int) -> _SwiftNativeSetStorage {
     let scale = _HashTable.scale(forCapacity: Swift.max(1 ,capacity))
     return allocate(scale: scale)
   }
 
+  @usableFromInline
+  @_effects(releasenone)
   static internal func allocate(scale: Int) -> _SwiftNativeSetStorage {
     _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
     let bucketCount = 1 &<< scale
@@ -1729,13 +1733,20 @@ internal struct _NativeSet<Element: Hashable> {
 }
 
 extension _NativeSet {
+  @inlinable
   internal var bucketCount: Int {
-    return _assumeNonNegative(_storage.hashTable.bucketCount)
+    @inline(__always)
+    get {
+      return _assumeNonNegative(_storage.hashTable.bucketCount)
+    }
   }
 
   @inlinable
   internal var capacity: Int {
-    return _assumeNonNegative(_storage.hashTable.capacity)
+    @inline(__always)
+    get {
+      return _assumeNonNegative(_storage.hashTable.capacity)
+    }
   }
 
   @inlinable
@@ -1792,12 +1803,11 @@ extension _NativeSet {
 }
 
 extension _NativeSet {
-  @usableFromInline
-  @_effects(releasenone)
+  @inlinable
   internal mutating func reallocate(
     isUnique: Bool,
     capacity: Int
-  ) -> (reallocated: Bool, rehashed: Bool) {
+  ) -> Bool {
     let scale = _HashTable.scale(forCapacity: capacity)
     var result = _NativeSet(
       _SwiftNativeSetStorage<Element>.allocate(scale: scale))
@@ -1826,7 +1836,7 @@ extension _NativeSet {
       }
     }
     _storage = result._storage
-    return (true, rehash)
+    return rehash
   }
 
   @inlinable
@@ -1838,7 +1848,7 @@ extension _NativeSet {
     if isUnique && capacity <= self.capacity {
       return (false, false)
     }
-    return reallocate(isUnique: isUnique, capacity: capacity)
+    return (true, reallocate(isUnique: isUnique, capacity: capacity))
   }
 }
 
@@ -1982,7 +1992,7 @@ extension _NativeSet {
     where S.Element == Element {
     // Allocate a temporary bitmap to mark elements in self that we've seen in
     // possibleSuperset.
-    var bitmap = _storage.hashTable.createBitmap()
+    var bitmap = _Bitmap(bitCount: self.bucketCount)
     var seen = 0
     for element in possibleSuperset {
       // Found a new element of self in possibleSuperset.
@@ -2003,7 +2013,7 @@ extension _NativeSet {
     where S.Element == Element {
     // Allocate a temporary bitmap to mark elements in self that we've seen in
     // possibleSuperset.
-    var bitmap = _storage.hashTable.createBitmap()
+    var bitmap = _Bitmap(bitCount: self.bucketCount)
     var seen = 0
     var isStrict = false
     for element in possibleSuperset {
@@ -2031,7 +2041,7 @@ extension _NativeSet {
     where S.Element == Element {
     // Allocate a temporary bitmap to mark elements in self that we've seen in
     // possibleStrictSubset.
-    var bitmap = _storage.hashTable.createBitmap()
+    var bitmap = _Bitmap(bitCount: self.bucketCount)
     var seen = 0
     for element in possibleSubset {
       let (index, found) = find(element)
@@ -2070,7 +2080,7 @@ extension _NativeSet {
     where S.Element == Element {
     // Rather than directly creating a new set, mark common elements in a
     // bitmap, to prevent repeated rehashing during reallocations.
-    var dupes = _storage.hashTable.createBitmap()
+    var dupes = _Bitmap(bitCount: self.bucketCount)
     var dupeCount = 0
     for element in other {
       let (index, found) = find(element)
@@ -2096,7 +2106,7 @@ extension _NativeSet {
     where S.Element == Element {
     // Rather than directly creating a new set, mark common elements from `self`
     // in a bitmap, and collect distinct elements from `other` in an array.
-    var dupes = _storage.hashTable.createBitmap()
+    var dupes = _Bitmap(bitCount: self.bucketCount)
     var dupeCount = 0
     var distinctsInOther: [Element] = []
     for element in other {
@@ -2128,8 +2138,8 @@ extension _NativeSet {
     }
     // Rather than directly creating a new set, mark common elements from `self`
     // and `other` in two bitmaps.
-    var selfDupes = _storage.hashTable.createBitmap()
-    var otherDupes = other._storage.hashTable.createBitmap()
+    var selfDupes = _Bitmap(bitCount: self.bucketCount)
+    var otherDupes = _Bitmap(bitCount: other.bucketCount)
     var dupeCount = 0
     for otherIndex in other.indices {
       let (selfIndex, found) = self.find(other.uncheckedElement(at: otherIndex))

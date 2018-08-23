@@ -23,7 +23,12 @@ internal struct _HashTable {
   @usableFromInline
   internal var count: Int
 
-  internal let scale: Int
+  // Bits 0..<6 hold the size scale.
+  // Bits 6... are reserved for future use. (E.g., remembering reserveCapacity
+  // so that we can resize storage after removals.)
+  @usableFromInline
+  internal let limits: Int
+
   internal let map: UnsafeMutablePointer<MapEntry>
 
   internal init(scale: Int, count: Int, map: UnsafeMutablePointer<MapEntry>) {
@@ -33,7 +38,7 @@ internal struct _HashTable {
     _sanityCheck(count <= capacity)
     self.capacity = capacity
     self.count = count
-    self.scale = scale
+    self.limits = scale
     self.map = map
 
     map.assign(repeating: .unoccupied, count: bucketCount)
@@ -51,6 +56,7 @@ extension _HashTable {
     return Int(Double(1 &<< scale) / maxLoadFactorInverse)
   }
 
+  @usableFromInline
   internal static func scale(
     forCapacity capacity: Int
   ) -> Int {
@@ -105,6 +111,14 @@ extension _HashTable {
 }
 
 extension _HashTable {
+  @inlinable
+  internal var scale: Int {
+    @inline(__always) get {
+      return limits & 0x3F
+    }
+  }
+
+  @inlinable
   internal var bucketCount: Int {
     @inline(__always) get {
       return 1 &<< scale
@@ -124,6 +138,7 @@ extension _HashTable {
     return hashValue & bucketMask
   }
 
+  @inlinable
   @inline(__always)
   internal func _isValid(_ bucket: Int) -> Bool {
     return bucket >= 0 && bucket < bucketCount
@@ -438,15 +453,6 @@ extension _HashTable {
     }
     // Mark new hole as empty.
     map[hole] = .unoccupied
-  }
-}
-
-extension _HashTable {
-  // Create a bitmap of the same size as this hash table's bucket count.
-  @usableFromInline
-  @_effects(releasenone)
-  internal func createBitmap() -> _Bitmap {
-    return _Bitmap(bitCount: self.bucketCount)
   }
 }
 
