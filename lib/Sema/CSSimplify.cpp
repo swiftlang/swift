@@ -1370,7 +1370,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
   // Conformance to 'Any' always holds.
   if (type2->isAny()) {
-    auto *fnTy = type1->getAs<AnyFunctionType>();
+    auto *fnTy = type1->getAs<FunctionType>();
     if (!fnTy || !fnTy->isNoEscape())
       return getTypeMatchSuccess();
 
@@ -1569,7 +1569,7 @@ ConstraintSystem::matchTypesBindTypeVar(
   // Disallow bindings of noescape functions to type variables that
   // represent an opened archetype. If we allowed this it would allow
   // the noescape function to potentially escape.
-  if (auto *fnTy = type->getAs<AnyFunctionType>()) {
+  if (auto *fnTy = type->getAs<FunctionType>()) {
     if (fnTy->isNoEscape() && typeVar->getImpl().getArchetype()) {
       if (shouldAttemptFixes()) {
         auto *fix = MarkExplicitlyEscaping::create(
@@ -2103,7 +2103,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Penalize conversions to Any, and disallow conversions of
       // noescape functions to Any.
       if (kind >= ConstraintKind::Conversion && type2->isAny()) {
-        if (auto *fnTy = type1->getAs<AnyFunctionType>()) {
+        if (auto *fnTy = type1->getAs<FunctionType>()) {
           if (fnTy->isNoEscape()) {
             if (shouldAttemptFixes()) {
               auto &ctx = getASTContext();
