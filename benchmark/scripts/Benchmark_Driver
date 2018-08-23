@@ -55,6 +55,9 @@ class BenchmarkDriver(object):
         self.tests = tests or self._get_tests()
         self.parser = parser or LogParser()
         self.results = {}
+        # Set a constant hash seed. Some tests are currently sensitive to
+        # fluctuations in the number of hash collisions.
+        os.environ['SWIFT_DETERMINISTIC_HASHING'] = '1'
 
     def _invoke(self, cmd):
         return self._subprocess.check_output(
@@ -175,6 +178,52 @@ class BenchmarkDriver(object):
         print('Logging results to: %s' % log_file)
         with open(log_file, 'w') as f:
             f.write(output)
+
+    RESULT = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
+
+    def run_and_log(self, csv_console=True):
+        """Run benchmarks and continuously log results to the console.
+
+        There are two console log formats: CSV and justified columns. Both are
+        compatible with `LogParser`. Depending on the `csv_console` parameter,
+        the CSV log format is either printed to console or returned as a string
+        from this method. When `csv_console` is False, the console output
+        format is justified columns.
+        """
+
+        format = (
+            (lambda values: ','.join(values)) if csv_console else
+            (lambda values: self.RESULT.format(*values)))  # justified columns
+
+        def console_log(values):
+            print(format(values))
+
+        console_log(['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)',  # header
+                    'MEAN(μs)', 'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)'])
+
+        def result_values(r):
+            return map(str, [r.test_num, r.name, r.num_samples, r.min, r.max,
+                             int(r.mean), int(r.sd), r.median, r.max_rss])
+
+        results = []
+        for test in self.tests:
+            result = result_values(self.run_independent_samples(test))
+            console_log(result)
+            results.append(result)
+
+        print(
+            '\nTotal performance tests executed: {0}'.format(len(self.tests)))
+        return (None if csv_console else
+                ('\n'.join([','.join(r) for r in results]) + '\n'))  # csv_log
+
+    @staticmethod
+    def run_benchmarks(args):
+        """Run benchmarks and log results."""
+        driver = BenchmarkDriver(args)
+        csv_log = driver.run_and_log(csv_console=(args.output_dir is None))
+        if csv_log:
+            driver.log_results(csv_log)
+        return 0
 
 
 class LoggingReportFormatter(logging.Formatter):
@@ -412,49 +461,6 @@ class BenchmarkDoctor(object):
         return 0
 
 
-def run_benchmarks(driver):
-    """Run perf tests individually and return results in a format that's
-    compatible with `LogParser`.
-    """
-    # Set a constant hash seed. Some tests are currently sensitive to
-    # fluctuations in the number of hash collisions.
-    os.environ["SWIFT_DETERMINISTIC_HASHING"] = "1"
-
-    line_format = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
-    format = (
-        (lambda values: ','.join(values))  # CSV
-        if (driver.args.output_dir is None) else
-        (lambda values: line_format.format(*values)))  # justified columns
-
-    def console_log(values):
-        print(format(values))
-
-    console_log(['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)',  # header
-                'MEAN(μs)', 'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)'])
-
-    def result_values(r):
-        return map(str, [r.test_num, r.name, r.num_samples, r.min, r.max,
-                         int(r.mean), int(r.sd), r.median, r.max_rss])
-
-    results = []
-    for test in driver.tests:
-        result = result_values(driver.run_independent_samples(test))
-        console_log(result)
-        results.append(result)
-
-    print('\nTotal performance tests executed: {0}'.format(len(driver.tests)))
-    csv_log = '\n'.join([','.join(r) for r in results]) + '\n'
-    return csv_log
-
-
-def run(args):
-    driver = BenchmarkDriver(args)
-    csv_log = run_benchmarks(driver)
-    if args.output_dir and csv_log:
-        driver.log_results(csv_log)
-    return 0
-
-
 def format_name(log_path):
     """Return the filename and directory for a log file."""
     return '/'.join(log_path.split('/')[-2:])
@@ -603,7 +609,7 @@ def parse_args(args):
     run_parser.add_argument(
         '--swift-repo',
         help='absolute path to the Swift source repository')
-    run_parser.set_defaults(func=run)
+    run_parser.set_defaults(func=BenchmarkDriver.run_benchmarks)
 
     check_parser = subparsers.add_parser(
         'check',

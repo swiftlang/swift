@@ -285,20 +285,19 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
             ('/benchmarks/Benchmark_O', 'b1', '--memory')), 3)
         self.assertEquals(r.num_samples, 3)  # results are merged
 
-    def test_run_bechmarks(self):
+    def test_run_and_log(self):
         def mock_run(test):
             self.assertEquals(test, 'b1')
             return PerformanceTestResult(
                 '3,b1,1,123,123,123,0,123,888'.split(','))
-        run_benchmarks = Benchmark_Driver.run_benchmarks
-        driver = Stub(tests=['b1'], args=Stub(output_dir=None))
-        driver.run_independent_samples = mock_run
+        driver = BenchmarkDriver(tests=['b1'], args=Stub(output_dir=None))
+        driver.run_independent_samples = mock_run  # patching
 
         with captured_output() as (out, _):
-            log = run_benchmarks(driver)
+            log = driver.run_and_log()
 
         csv_log = '3,b1,1,123,123,123,0,123,888\n'
-        self.assertEquals(log, csv_log)
+        self.assertEquals(log, None)
         self.assertEquals(
             out.getvalue(),
             '#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),' +
@@ -307,9 +306,8 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
             '\n' +
             'Total performance tests executed: 1\n')
 
-        driver.args.output_dir = 'logs/'
         with captured_output() as (out, _):
-            log = run_benchmarks(driver)
+            log = driver.run_and_log(csv_console=False)
 
         self.assertEquals(log, csv_log)
         self.assertEquals(
@@ -352,6 +350,11 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         finally:
             import shutil  # tearDown
             shutil.rmtree(temp_dir)
+
+    def test_deterministing_hashing(self):
+        cmd = ['printenv', 'SWIFT_DETERMINISTIC_HASHING']
+        driver = BenchmarkDriver(['no args'], tests=['ignored'])
+        self.assertEquals(driver._invoke(cmd).strip(), '1')
 
 
 class BenchmarkDriverMock(Mock):
