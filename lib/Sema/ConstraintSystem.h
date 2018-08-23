@@ -707,6 +707,16 @@ public:
     return None;
   }
 
+  /// Retrieve overload choices associated with given expression.
+  void getOverloadChoices(Expr *anchor,
+                          SmallVectorImpl<SelectedOverload> &overloads) const {
+    for (auto &e : overloadChoices) {
+      auto *locator = e.first;
+      if (locator->getAnchor() == anchor)
+        overloads.push_back(e.second);
+    }
+  }
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -1777,6 +1787,9 @@ public:
   /// Assuming that this constraint system is actually erroneous, this *always*
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
+
+  bool diagnoseAmbiguity(Expr *expr, ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguityWithFixes(Expr *expr, ArrayRef<Solution> solutions);
 
   /// \brief Give the deprecation warning for referring to a global function
   /// when there's a method from a conditional conformance in a smaller/closer

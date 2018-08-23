@@ -234,6 +234,9 @@ bool MissingConformanceFailure::diagnose(bool asNote) {
 }
 
 bool LabelingFailure::diagnose(bool asNote) {
+  if (asNote)
+    return false;
+
   auto &cs = getConstraintSystem();
   auto *call = cast<CallExpr>(getAnchor());
   return diagnoseArgumentLabelError(cs.getASTContext(), call->getArg(),

@@ -14,19 +14,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ConstraintSystem.h"
 #include "CSDiag.h"
 #include "CalleeCandidateInfo.h"
+#include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypoCorrection.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/DenseSet.h"
@@ -455,9 +456,91 @@ tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc,
   return true;
 }
 
-static bool diagnoseAmbiguity(ConstraintSystem &cs,
-                              ArrayRef<Solution> solutions,
-                              Expr *expr) {
+bool ConstraintSystem::diagnoseAmbiguityWithFixes(
+    Expr *expr, ArrayRef<Solution> solutions) {
+  if (solutions.empty())
+    return false;
+
+  auto getOverloadDecl = [&](SelectedOverload &overload) -> ValueDecl * {
+    auto &choice = overload.choice;
+    return choice.isDecl() ? choice.getDecl() : nullptr;
+  };
+
+  // Problems related to fixes forming ambiguous solution set
+  // could only be diagnosed (at the moment), if all of the fixes
+  // are attached to the same anchor, which means they fix
+  // different overloads of the same declaration.
+  Expr *commonAnchor = nullptr;
+  SmallPtrSet<ValueDecl *, 4> distinctChoices;
+  SmallVector<std::pair<const Solution *, const ConstraintFix *>, 4>
+      viableSolutions;
+
+  bool diagnosable = llvm::all_of(solutions, [&](const Solution &solution) {
+    ArrayRef<ConstraintFix *> fixes = solution.Fixes;
+
+    // Currently only support a single fix in a solution,
+    // but ultimately should be able to deal with multiple.
+    if (fixes.size() != 1)
+      return false;
+
+    const auto *fix = fixes.front();
+    if (commonAnchor && commonAnchor != fix->getAnchor())
+      return false;
+
+    commonAnchor = fix->getAnchor();
+
+    SmallVector<SelectedOverload, 2> overloads;
+    solution.getOverloadChoices(commonAnchor, overloads);
+    // There is unfortunately no way, at the moment, to figure out
+    // what declaration the fix is attached to, so we have to make
+    // sure that there is only one declaration associated with common
+    // anchor to be sure that the right problem is being diagnosed.
+    if (overloads.size() != 1)
+      return false;
+
+    auto *decl = getOverloadDecl(overloads.front());
+    if (!decl)
+      return false;
+
+    // If this declaration is distinct, let's record this solution
+    // as viable, otherwise we'd produce the same diagnostic multiple
+    // times, which means that actual problem is elsewhere.
+    if (distinctChoices.insert(decl).second)
+      viableSolutions.push_back({&solution, fix});
+    return true;
+  });
+
+  if (!diagnosable || viableSolutions.size() < 2)
+    return false;
+
+  auto *decl = *distinctChoices.begin();
+  assert(solverState);
+
+  bool diagnosed = true;
+  {
+    DiagnosticTransaction transaction(TC.Diags);
+
+    TC.diagnose(commonAnchor->getLoc(), diag::ambiguous_reference_to_decl,
+                decl->getDescriptiveKind(), decl->getFullName());
+
+    for (const auto &viable : viableSolutions) {
+      // Create scope so each applied solution is rolled back.
+      ConstraintSystem::SolverScope scope(*this);
+      applySolution(*viable.first);
+      // All of the solutions supposed to produce a "candidate" note.
+      diagnosed &= viable.second->diagnose(expr, /*asNote*/ true);
+    }
+
+    // If not all of the fixes produced a note, we can't diagnose this.
+    if (!diagnosed)
+      transaction.abort();
+  }
+
+  return diagnosed;
+}
+
+bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
+                                         ArrayRef<Solution> solutions) {
   // Produce a diff of the solutions.
   SolutionDiff diff(solutions);
 
@@ -484,7 +567,7 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
 
     // If we can't resolve the locator to an anchor expression with no path,
     // we can't diagnose this well.
-    auto *anchor = simplifyLocatorToAnchor(cs, overload.locator);
+    auto *anchor = simplifyLocatorToAnchor(*this, overload.locator);
     if (!anchor)
       continue;
     auto it = indexMap.find(anchor);
@@ -524,10 +607,10 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
   if (bestOverload) {
     auto &overload = diff.overloads[*bestOverload];
     auto name = getOverloadChoiceName(overload.choices);
-    auto anchor = simplifyLocatorToAnchor(cs, overload.locator);
+    auto anchor = simplifyLocatorToAnchor(*this, overload.locator);
 
     // Emit the ambiguity diagnostic.
-    auto &tc = cs.getTypeChecker();
+    auto &tc = getTypeChecker();
     tc.diagnose(anchor->getLoc(),
                 name.isOperator() ? diag::ambiguous_operator_ref
                                   : diag::ambiguous_decl_ref,
@@ -9021,6 +9104,11 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     // FIXME: If we were able to actually fix things along the way,
     // we may have to hunt for the best solution. For now, we don't care.
 
+    // Before removing any "fixed" solutions, let's check
+    // if ambiguity is caused by fixes and diagnose if possible.
+    if (diagnoseAmbiguityWithFixes(expr, viable))
+      return true;
+
     // Remove solutions that require fixes; the fixes in those systems should
     // be diagnosed rather than any ambiguity.
     auto hasFixes = [](const Solution &sol) { return !sol.Fixes.empty(); };
@@ -9039,9 +9127,9 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
           solution.dump(log);
           log << "\n";
         }
-      }        
+      }
 
-      if (diagnoseAmbiguity(*this, viable, expr)) {
+      if (diagnoseAmbiguity(expr, viable)) {
         return true;
       }
     }
