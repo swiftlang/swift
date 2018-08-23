@@ -67,6 +67,28 @@ class BenchmarkDriver(object):
                   else 'O')
         return os.path.join(self.args.tests, "Benchmark_" + suffix)
 
+    def _git(self, cmd):
+        """Execute the Git command in the `swift-repo`."""
+        return self._invoke(
+            ('git -C {0} '.format(self.args.swift_repo) + cmd).split()).strip()
+
+    @property
+    def log_file(self):
+        """Full path to log file.
+
+        If `swift-repo` is set, log file is tied to Git branch and revision.
+        """
+        if not self.args.output_dir:
+            return None
+        log_dir = self.args.output_dir
+        harness_name = os.path.basename(self.test_harness)
+        suffix = '-' + time.strftime('%Y%m%d%H%M%S', time.localtime())
+        if self.args.swift_repo:
+            log_dir = os.path.join(
+                log_dir, self._git('rev-parse --abbrev-ref HEAD'))  # branch
+            suffix += '-' + self._git('rev-parse --short HEAD')  # revision
+        return os.path.join(log_dir, harness_name + suffix + '.log')
+
     @property
     def _cmd_list_benchmarks(self):
         # Use tab delimiter for easier parsing to override the default comma.
@@ -377,52 +399,17 @@ class BenchmarkDoctor(object):
         return 0
 
 
-def get_current_git_branch(git_repo_path):
-    """Return the selected branch for the repo `git_repo_path`"""
-    return subprocess.check_output(
-        ['git', '-C', git_repo_path, 'rev-parse',
-         '--abbrev-ref', 'HEAD'], stderr=subprocess.STDOUT).strip()
-
-
-def get_git_head_ID(git_repo_path):
-    """Return the short identifier for the HEAD commit of the repo
-        `git_repo_path`"""
-    return subprocess.check_output(
-        ['git', '-C', git_repo_path, 'rev-parse',
-         '--short', 'HEAD'], stderr=subprocess.STDOUT).strip()
-
-
-def log_results(log_directory, driver, formatted_output, swift_repo=None):
-    """Log `formatted_output` to a branch specific directory in
-    `log_directory`
-    """
+def log_results(log_file, formatted_output):
     try:
-        branch = get_current_git_branch(swift_repo)
-    except (OSError, subprocess.CalledProcessError):
-        branch = None
-    try:
-        head_ID = '-' + get_git_head_ID(swift_repo)
-    except (OSError, subprocess.CalledProcessError):
-        head_ID = ''
-    timestamp = time.strftime("%Y%m%d%H%M%S", time.localtime())
-    if branch:
-        output_directory = os.path.join(log_directory, branch)
-    else:
-        output_directory = log_directory
-    driver_name = os.path.basename(driver)
-    try:
-        os.makedirs(output_directory)
+        os.makedirs(os.path.dirname(log_file))
     except OSError:
         pass
-    log_file = os.path.join(output_directory,
-                            driver_name + '-' + timestamp + head_ID + '.log')
     print('Logging results to: %s' % log_file)
     with open(log_file, 'w') as f:
         f.write(formatted_output)
 
 
-def run_benchmarks(driver,
-                   log_directory=None, swift_repo=None):
+def run_benchmarks(driver):
     """Run perf tests individually and return results in a format that's
     compatible with `LogParser`.
     """
@@ -433,11 +420,12 @@ def run_benchmarks(driver,
     # that runs the tests.
     os.environ["SWIFT_DETERMINISTIC_HASHING"] = "1"
 
+    log = driver.log_file
     output = []
     headings = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)', 'MEAN(μs)',
                 'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)']
     line_format = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
-    if log_directory:
+    if log:
         print(line_format.format(*headings))
     else:
         print(','.join(headings))
@@ -446,7 +434,7 @@ def run_benchmarks(driver,
         test_output = map(str, [
             r.test_num, r.name, r.num_samples, r.min, r.max, int(r.mean),
             int(r.sd), r.median, r.max_rss])
-        if log_directory:
+        if log:
             print(line_format.format(*test_output))
         else:
             print(','.join(test_output))
@@ -456,22 +444,18 @@ def run_benchmarks(driver,
     formatted_output = '\n'.join([','.join(l) for l in output])
     totals = ['Totals', str(len(driver.tests))]
     totals_output = '\n\n' + ','.join(totals)
-    if log_directory:
+    if log:
         print(line_format.format(*([''] + totals + ([''] * 6))))
     else:
         print(totals_output[1:])
     formatted_output += totals_output
-    if log_directory:
-        log_results(log_directory, driver.test_harness, formatted_output,
-                    swift_repo)
+    if log:
+        log_results(log, formatted_output)
     return formatted_output
 
 
 def run(args):
-    run_benchmarks(
-        BenchmarkDriver(args),
-        log_directory=args.output_dir,
-        swift_repo=args.swift_repo)
+    run_benchmarks(BenchmarkDriver(args))
     return 0
 
 
@@ -491,10 +475,10 @@ def compare_logs(compare_script, new_log, old_log, log_dir, opt):
 
 def compare(args):
     log_dir = args.log_dir
-    swift_repo = args.swift_repo
     compare_script = args.compare_script
     baseline_branch = args.baseline_branch
-    current_branch = get_current_git_branch(swift_repo)
+    current_branch = \
+        BenchmarkDriver(args, tests=[''])._git('rev-parse --abbrev-ref HEAD')
     current_branch_dir = os.path.join(log_dir, current_branch)
     baseline_branch_dir = os.path.join(log_dir, baseline_branch)
 
