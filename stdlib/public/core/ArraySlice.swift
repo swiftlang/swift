@@ -393,10 +393,10 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
         index, wasNativeTypeChecked: wasNativeTypeChecked,
         matchingSubscriptCheck: token)
     }
-    mutableAddressWithPinnedNativeOwner {
-      _makeMutableAndUniqueOrPinned() // makes the array native, too
+    mutableAddressWithNativeOwner {
+      _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_native(index)
-      return (_getElementAddress(index), Builtin.tryPin(_getOwner_native()))
+      return (_getElementAddress(index), _getOwner_native())
     }
   }
 
@@ -501,15 +501,6 @@ extension ArraySlice {
       _buffer = _Buffer(copying: _buffer)
     }
   }
-
-  @inlinable
-  @_semantics("array.make_mutable")
-  internal mutating func _makeMutableAndUniqueOrPinned() {
-    if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
-      _buffer = _Buffer(copying: _buffer)
-    }
-  }
-
 
   /// Check that the given `index` is valid for subscripting, i.e.
   /// `0 ≤ index < count`.

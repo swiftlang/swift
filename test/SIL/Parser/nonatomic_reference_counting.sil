@@ -45,20 +45,6 @@ bb0:
   return %1 : $C
 }
 
-// CHECK-LABEL: sil @test_nonatomic_pin_unpin
-// CHECK: strong_pin [nonatomic]
-// CHECK: strong_unpin [nonatomic]
-// CHECK: return
-sil @test_nonatomic_pin_unpin: $@convention(thin) () -> () {
-bb0:
-  %0 = alloc_ref $C
-  %1 = unchecked_ref_cast %0 : $C to  $Builtin.NativeObject
-  %2 = strong_pin [nonatomic] %1 : $Builtin.NativeObject
-  strong_unpin [nonatomic] %2 : $Optional<Builtin.NativeObject>
-  %3 = tuple ()
-  return %3 : $()
-}
-
 // CHECK-LABEL: sil @test_unowned_nonatomic_rr
 // CHECK: unowned_retain [nonatomic]
 // CHECK: unowned_release [nonatomic]

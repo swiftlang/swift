@@ -187,7 +187,6 @@ ACCESSOR(Address)
 IMMUTABLE_ADDRESSOR(Unsafe, unsafeAddress)
 IMMUTABLE_ADDRESSOR(Owning, addressWithOwner)
 IMMUTABLE_ADDRESSOR(NativeOwning, addressWithNativeOwner)
-IMMUTABLE_ADDRESSOR(NativePinning, addressWithPinnedNativeOwner)
 
 /// This is a mutableAddress-family accessor: a function that is
 /// called when the storage is assigned to (like a setter) or
@@ -203,7 +202,6 @@ ACCESSOR(MutableAddress)
 MUTABLE_ADDRESSOR(Unsafe, unsafeMutableAddress)
 MUTABLE_ADDRESSOR(Owning, mutableAddressWithOwner)
 MUTABLE_ADDRESSOR(NativeOwning, mutableAddressWithNativeOwner)
-MUTABLE_ADDRESSOR(NativePinning, mutableAddressWithPinnedNativeOwner)
 
 #ifdef LAST_ACCESSOR
 LAST_ACCESSOR(MutableAddress)

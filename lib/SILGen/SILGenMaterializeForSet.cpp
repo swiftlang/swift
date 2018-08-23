@@ -881,10 +881,6 @@ MaterializeForSetEmitter::createAddressorCallback(SILFunction &F,
     case AddressorKind::NativeOwning:
       SGF.B.createDestroyValue(loc, owner);
       break;
-
-    case AddressorKind::NativePinning:
-      SGF.B.createStrongUnpin(loc, owner, SGF.B.getDefaultAtomicity());
-      break;
     }
 
     SGF.B.createDeallocValueBuffer(loc, ownerType, callbackStorage);

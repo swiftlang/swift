@@ -196,7 +196,7 @@ internal struct _SliceBuffer<Element>
   internal mutating func isMutableAndUniquelyReferenced() -> Bool {
     // This is a performance optimization that ensures that the copy of self
     // that occurs at -Onone is destroyed before we call
-    // isUniquelyReferencedOrPinned. This code used to be:
+    // isUniquelyReferenced. This code used to be:
     //
     //   return _hasNativeBuffer && isUniquelyReferenced()
     //
@@ -205,21 +205,6 @@ internal struct _SliceBuffer<Element>
       return false
     }
     return isUniquelyReferenced()
-  }
-
-  @inlinable
-  internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
-    // This is a performance optimization that ensures that the copy of self
-    // that occurs at -Onone is destroyed before we call
-    // isUniquelyReferencedOrPinned. This code used to be:
-    //
-    //   return _hasNativeBuffer && isUniquelyReferencedOrPinned()
-    //
-    // SR-6437
-    if !_hasNativeBuffer {
-      return false
-    }
-    return isUniquelyReferencedOrPinned()
   }
 
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
@@ -295,11 +280,6 @@ internal struct _SliceBuffer<Element>
   @inlinable // FIXME(sil-serialize-all)
   internal mutating func isUniquelyReferenced() -> Bool {
     return isKnownUniquelyReferenced(&owner)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func isUniquelyReferencedOrPinned() -> Bool {
-    return _isKnownUniquelyReferencedOrPinned(&owner)
   }
 
   @inlinable // FIXME(sil-serialize-all)

@@ -1073,12 +1073,9 @@ public:
   void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *i) {
     llvm_unreachable("not valid in canonical SIL");
   }
-  void visitStrongPinInst(StrongPinInst *i);
-  void visitStrongUnpinInst(StrongUnpinInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);
   void visitStrongReleaseInst(StrongReleaseInst *i);
   void visitIsUniqueInst(IsUniqueInst *i);
-  void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *i);
   void visitIsEscapingClosureInst(IsEscapingClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocBoxInst(DeallocBoxInst *i);
@@ -3792,25 +3789,6 @@ void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
   setLoweredExplosion(i, result);
 }
 
-void IRGenSILFunction::visitStrongPinInst(swift::StrongPinInst *i) {
-  Explosion lowered = getLoweredExplosion(i->getOperand());
-  llvm::Value *object = lowered.claimNext();
-  llvm::Value *pinHandle =
-      emitNativeTryPin(object, i->isAtomic() ? irgen::Atomicity::Atomic
-                                             : irgen::Atomicity::NonAtomic);
-
-  Explosion result;
-  result.add(pinHandle);
-  setLoweredExplosion(i, result);
-}
-
-void IRGenSILFunction::visitStrongUnpinInst(swift::StrongUnpinInst *i) {
-  Explosion lowered = getLoweredExplosion(i->getOperand());
-  llvm::Value *pinHandle = lowered.claimNext();
-  emitNativeUnpin(pinHandle, i->isAtomic() ? irgen::Atomicity::Atomic
-                                           : irgen::Atomicity::NonAtomic);
-}
-
 void IRGenSILFunction::visitStrongRetainInst(swift::StrongRetainInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getOperand()->getType()));
@@ -3944,15 +3922,6 @@ static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
 void IRGenSILFunction::visitIsUniqueInst(swift::IsUniqueInst *i) {
   llvm::Value *result = emitIsUnique(*this, i->getOperand(),
                                      i->getLoc().getSourceLoc(), false);
-  Explosion out;
-  out.add(result);
-  setLoweredExplosion(i, out);
-}
-
-void IRGenSILFunction::
-visitIsUniqueOrPinnedInst(swift::IsUniqueOrPinnedInst *i) {
-  llvm::Value *result = emitIsUnique(*this, i->getOperand(),
-                                     i->getLoc().getSourceLoc(), true);
   Explosion out;
   out.add(result);
   setLoweredExplosion(i, out);

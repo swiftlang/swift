@@ -699,49 +699,6 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: throw [[ERROR]]
 // CHECK: } // end sil function '$S6errors16supportStructure_4nameyAA11OwnedBridgeVz_SStKF'
 
-struct PinnedBridge {
-  var owner : Builtin.NativeObject
-  subscript(name: String) -> Pylon {
-    addressWithPinnedNativeOwner { return (someValidPointer(), owner) }
-    mutableAddressWithPinnedNativeOwner { return (someValidPointer(), owner) }
-  }
-}
-func supportStructure(_ b: inout PinnedBridge, name: String) throws {
-  try b[name].support()
-}
-// CHECK:      sil hidden @$S6errors16supportStructure_4nameyAA12PinnedBridgeVz_SStKF :
-// CHECK:      bb0([[ARG1:%.*]] : @trivial $*PinnedBridge, [[ARG2:%.*]] : @guaranteed $String):
-// CHECK:        [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $String
-// CHECK-NEXT:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG1]] : $*PinnedBridge
-// CHECK-NEXT:   [[BORROWED_ARG2_COPY:%.*]] = begin_borrow [[ARG2_COPY]]
-// CHECK-NEXT:   // function_ref
-// CHECK-NEXT:   [[ADDRESSOR:%.*]] = function_ref @$S6errors12PinnedBridgeVyAA5PylonVSSciaP :
-// CHECK-NEXT:   [[T0:%.*]] = apply [[ADDRESSOR]]([[BORROWED_ARG2_COPY]], [[WRITE]])
-// CHECK-NEXT:   end_borrow [[BORROWED_ARG2_COPY]]
-// CHECK-NEXT:   ([[T1:%.*]], [[OWNER:%.*]]) = destructure_tuple [[T0]]
-// CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T1]]
-// CHECK-NEXT:   [[T4:%.*]] = pointer_to_address [[T3]]
-// CHECK-NEXT:   [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
-// CHECK-NEXT:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[T5]] : $*Pylon
-// CHECK:        [[SUPPORT:%.*]] = function_ref @$S6errors5PylonV7supportyyKF
-// CHECK-NEXT:   try_apply [[SUPPORT]]([[ACCESS]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
-// CHECK:      [[BB_NORMAL]]
-// CHECK-NEXT:   end_access [[ACCESS]] : $*Pylon
-// CHECK-NEXT:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
-// CHECK-NEXT:   end_access [[WRITE]]
-// CHECK-NEXT:   destroy_value [[ARG2_COPY]] : $String
-// CHECK-NEXT:   tuple ()
-// CHECK-NEXT:   return
-// CHECK:      [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
-// CHECK-NEXT:   end_access [[ACCESS]] : $*Pylon
-// CHECK-NEXT:   [[OWNER_COPY:%.*]] = copy_value [[OWNER]]
-// CHECK-NEXT:   strong_unpin [[OWNER_COPY]] : $Optional<Builtin.NativeObject>
-// CHECK-NEXT:   destroy_value [[OWNER]]
-// CHECK-NEXT:   end_access [[WRITE]]
-// CHECK-NEXT:   destroy_value [[ARG2_COPY]] : $String
-// CHECK-NEXT:   throw [[ERROR]]
-// CHECK: } // end sil function '$S6errors16supportStructure_4nameyAA12PinnedBridgeVz_SStKF'
-
 // ! peepholes its argument with getSemanticsProvidingExpr().
 // Test that that doesn't look through try!.
 // rdar://21515402

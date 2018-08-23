@@ -71,8 +71,6 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
       return "lO";
     case AddressorKind::NativeOwning:
       return "lo";
-    case AddressorKind::NativePinning:
-      return "lp";
     }
     llvm_unreachable("bad addressor kind");
   case AccessorKind::MutableAddress:
@@ -85,8 +83,6 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
       return "aO";
     case AddressorKind::NativeOwning:
       return "ao";
-    case AddressorKind::NativePinning:
-      return "aP";
     }
     llvm_unreachable("bad addressor kind");
   case AccessorKind::MaterializeForSet:

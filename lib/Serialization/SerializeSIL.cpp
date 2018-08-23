@@ -1237,12 +1237,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::CopyBlockInst:
-  case SILInstructionKind::StrongPinInst:
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::StrongRetainInst:
-  case SILInstructionKind::StrongUnpinInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::ReturnInst:
@@ -1259,8 +1256,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     else if (auto *DRI = dyn_cast<DeallocRefInst>(&SI))
       Attr = (unsigned)DRI->canAllocOnStack();
     else if (auto *RCI = dyn_cast<RefCountingInst>(&SI))
-      Attr = RCI->isNonAtomic();
-    else if (auto *RCI = dyn_cast<StrongPinInst>(&SI))
       Attr = RCI->isNonAtomic();
     else if (auto *UOCI = dyn_cast<UncheckedOwnershipConversionInst>(&SI)) {
       Attr = unsigned(SILValue(UOCI).getOwnershipKind());

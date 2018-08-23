@@ -1037,11 +1037,6 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
     // Emit the release immediately.
     SGF.B.emitDestroyValueOperation(loc, addressorResult.second.forward(SGF));
     break;
-  case AddressorKind::NativePinning:
-    // Emit the unpin immediately.
-    SGF.B.createStrongUnpin(loc, addressorResult.second.forward(SGF),
-                            SGF.B.getDefaultAtomicity());
-    break;
   }
   
   return result;

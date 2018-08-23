@@ -86,17 +86,6 @@ tests.test("_isUnique_native/SpareBitTrap")
   _ = _isUnique_native(&b)
 }
 
-tests.test("_isUniqueOrPinned_native/SpareBitTrap")
-  .skip(.custom(
-    { !_isStdlibInternalChecksEnabled() },
-    reason: "sanity checks are disabled in this build of stdlib"))
-  .code {
-  // Fake an ObjC pointer.
-  var b = _makeObjCBridgeObject(X())
-  expectCrashLater()
-  _ = _isUniqueOrPinned_native(&b)
-}
-
 tests.test("_isUnique_native/NonNativeTrap")
   .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
@@ -105,16 +94,6 @@ tests.test("_isUnique_native/NonNativeTrap")
   var x = XObjC()
   expectCrashLater()
   _ = _isUnique_native(&x)
-}
-
-tests.test("_isUniqueOrPinned_native/NonNativeTrap")
-  .skip(.custom(
-    { !_isStdlibInternalChecksEnabled() },
-    reason: "sanity checks are disabled in this build of stdlib"))
-  .code {
-  var x = XObjC()
-  expectCrashLater()
-  _ = _isUniqueOrPinned_native(&x)
 }
 #endif // _ObjC
 
