@@ -42,7 +42,6 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseSet.h"
 
@@ -855,27 +854,6 @@ public:
     return differentiationTasks;
   }
 
-  /// Finds a witness table for the specified conformance in the current module.
-  /// If it doesn't exist, then tries to find it in all imported modules and
-  /// links it to the current module. Returns null if no witness table can be
-  /// found.
-  SILWitnessTable *lookupOrLinkWitnessTable(ProtocolConformanceRef confRef) {
-    auto *conf = confRef.getConcrete();
-    if (auto existingTable = module.lookUpWitnessTable(confRef))
-      return existingTable;
-    auto *decl =
-        conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
-    auto linkage = getSILLinkage(getDeclLinkage(decl), NotForDefinition);
-    auto *newTable = module.createWitnessTableDeclaration(conf, linkage);
-    newTable = silLoader->lookupWitnessTable(newTable);
-    // Update linkage for witness methods.
-    // FIXME: Figure out why witnesses have shared linkage by default.
-    for (auto &entry : newTable->getEntries())
-      if (entry.getKind() == SILWitnessTable::WitnessKind::Method)
-        entry.getMethodWitness().Witness->setLinkage(linkage);
-    return newTable;
-  }
-
   ProtocolDecl *getVectorNumericProtocol() const {
     return vectorNumericProtocol;
   }
@@ -1567,11 +1545,11 @@ static void convertIntToIndirectExpressible(intmax_t value,
       astCtx.getConformance(intLitTy, ebilProto, intLitTypeDecl->getLoc(),
                             intLitTypeDecl, ProtocolConformanceState::Complete);
   ProtocolConformanceRef ebilConfRef(ebilConf);
-  // Link witness table.
-  context.lookupOrLinkWitnessTable(ebilConfRef);
   // %3 = witness_method ...
   auto initBILFn = builder.createWitnessMethod(loc, intLitTy, ebilConfRef,
                                                initBILDeclRef, initBILType);
+  // Ensure the witness method is linked.
+  module.lookUpFunctionInWitnessTable(ebilConfRef, initBILDeclRef);
   // Get substitutions.
   auto intLitSubMap = SubstitutionMap::getProtocolSubstitutions(
       ebilProto, intLitTy, ebilConfRef);
@@ -1607,10 +1585,11 @@ static void convertIntToIndirectExpressible(intmax_t value,
   auto *parentModule = targetTypeDecl->getModuleContext();
   auto eilConf = *parentModule->lookupConformance(targetTy, eilProto);
   ProtocolConformanceRef eilConfRef(eilConf);
-  context.lookupOrLinkWitnessTable(eilConfRef);
   // %6 = witness_method ...
   auto initILFn = builder.createWitnessMethod(loc, targetTy, eilConfRef,
                                               initILDeclRef, initILType);
+  // Ensure the witness method is linked.
+  module.lookUpFunctionInWitnessTable(eilConfRef, initILDeclRef);
   // Get substitutions.
   auto targetSubMap =
       SubstitutionMap::getProtocolSubstitutions(eilProto, targetTy, eilConfRef);
@@ -3055,14 +3034,16 @@ public:
     SILFunctionConventions origConv(origTy, getModule());
     for (auto param : ai->getArgumentsWithoutIndirectResults())
       args.push_back(remapValue(param));
-
-    // Add original values and nested primal values.
-    auto origResultAggr = extractPrimalValueIfAny(ai, /*nested*/ false);
-    SmallVector<SILValue, 8> origResults, nestedPrimVals;
+    // Add nested primal values.
+    if (auto nestedPrimValAggr = extractPrimalValueIfAny(ai, /*nested*/ true)) {
+      SmallVector<SILValue, 8> nestedPrimVals;
+      extractAllElements(nestedPrimValAggr, builder, nestedPrimVals);
+      args.append(nestedPrimVals.begin(), nestedPrimVals.end());
+    }
+    // Add original results.
+    auto origResultAggr = remapValue(ai);
+    SmallVector<SILValue, 8> origResults;
     extractAllElements(origResultAggr, builder, origResults);
-    auto nestedPrimValAggr = extractPrimalValueIfAny(ai, /*nested*/ true);
-    extractAllElements(nestedPrimValAggr, builder, nestedPrimVals);
-    args.append(nestedPrimVals.begin(), nestedPrimVals.end());
     args.append(origResults.begin(), origResults.end());
 
     // Add seed.
@@ -3549,11 +3530,11 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
   auto fnTy = combinerFuncDecl->getInterfaceType();
   auto silFnTy = SILType::getPrimitiveObjectType(fnTy->getCanonicalType());
   SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
-  // Link witness table.
-  getContext().lookupOrLinkWitnessTable(confRef);
   // %0 = witness_method @+
   auto witnessMethod = getBuilder().createWitnessMethod(loc, adjointTy, confRef,
                                                         declRef, silFnTy);
+  // Ensure the witness method is linked.
+  getModule().lookUpFunctionInWitnessTable(confRef, declRef);
   auto subMap =
       SubstitutionMap::getProtocolSubstitutions(proto, adjointTy, confRef);
   // %1 = metatype $T.Type

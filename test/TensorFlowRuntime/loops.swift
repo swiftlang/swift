@@ -29,9 +29,12 @@ LoopsTests.testAllBackends("simpleCounterLoop_a") {
     count += 1
   }
   a += a
-  expectNearlyEqual(1024.0, a.array.scalars[0])
+  expectNearlyEqual(1024.0, a.scalar!)
 }
 
+// FIXME: This test is failing on macOS for reasons that are not likely related
+// to graph program extraction. See SR-8541.
+#if !os(macOS)
 LoopsTests.testAllBackends("simpleCounterLoop_ab") {
   let maxCount = 100
   var a = Tensor<Float>(0)
@@ -44,8 +47,9 @@ LoopsTests.testAllBackends("simpleCounterLoop_ab") {
     count += 1
   }
   a -= b
-  expectEqual(98, a.scalar)
+  expectEqual(98, a.scalar!)
 }
+#endif
 
 // TODO: fix the disabled GPU tests below.
 #if !CUDA

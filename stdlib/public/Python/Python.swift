@@ -223,9 +223,9 @@ public enum PythonError : Error, Equatable {
 extension PythonError : CustomStringConvertible {
   public var description: String {
     switch self {
-    case .exception(let p): return "exception: \(p)"
-    case .invalidCall(let p): return "invalidCall: \(p)"
-    case .invalidModule(let m): return "invalidModule: \(m)"
+    case .exception(let p): return "Python exception: \(p)"
+    case .invalidCall(let p): return "Invalid Python call: \(p)"
+    case .invalidModule(let m): return "Invalid Python module: \(m)"
     }
   }
 }

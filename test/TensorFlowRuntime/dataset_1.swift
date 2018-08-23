@@ -109,7 +109,7 @@ DatasetTests.testAllBackends("MultiValue") {
     Toutput_types: outputTypes,
     output_shapes: outputShapes
   )
-  let iterator: VariantHandle = #tfop(
+  let iterator: ResourceHandle = #tfop(
     "IteratorV2", shared_name: "blah", container: "earth",
     output_types: outputTypes, output_shapes: outputShapes
   )
@@ -118,24 +118,18 @@ DatasetTests.testAllBackends("MultiValue") {
     "IteratorGetNext", iterator,
     output_types: outputTypes, output_shapes: outputShapes
   )
-  _hostOp(next.0)
-  _hostOp(next.1)
   expectEqual(0, Tensor(handle: next.0).scalarized())
   expectEqual(10, Tensor(handle: next.1).scalarized())
   next = #tfop(
     "IteratorGetNext", iterator,
     output_types: outputTypes, output_shapes: outputShapes
   )
-  _hostOp(next.0)
-  _hostOp(next.1)
   expectEqual(1, Tensor(handle: next.0).scalarized())
   expectEqual(11, Tensor(handle: next.1).scalarized())
   next = #tfop(
     "IteratorGetNext", iterator,
     output_types: outputTypes, output_shapes: outputShapes
   )
-  _hostOp(next.0)
-  _hostOp(next.1)
   expectEqual(2, Tensor(handle: next.0).scalarized())
   expectEqual(12, Tensor(handle: next.1).scalarized())
 }

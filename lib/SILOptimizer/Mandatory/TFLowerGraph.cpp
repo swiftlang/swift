@@ -2026,7 +2026,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         for (auto elt : rawElements)
           elements.push_back(elt.lookThroughSingleElementAggregates());
 
-        if (elementType->is<MetatypeType>()) {
+        if (elementType->is<AnyMetatypeType>()) {
           SmallVector<TF_DataType, 4> types;
           for (auto elt : elements) {
             auto dtype = convertSwiftTypeToTF(elt.getMetatypeValue());

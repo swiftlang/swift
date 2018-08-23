@@ -44,14 +44,13 @@ func takesTFFunc(fn : @convention(tensorflow) (Tensor<Float>) -> Tensor<Float>) 
 func testTFFunc() {
   let one = Tensor<Float>(1)
 
-  // FIXME: This should work.
-  takesTFFunc { $0 + 1 }  // expected-error {{TensorFlow functions cannot be converted to other function types}}
+  // It is fine to pass a closure as a tensorflow function. The parititioner will
+  // validate it and throw an error if it cannot be partitioned.
+  takesTFFunc { $0 + 1 }
 
-  // FIXME: This should generate an error saying that you cannot capture "one"
-  // because TensorFlow functions cannot capture values.
-  takesTFFunc { $0 + one }  // expected-error {{TensorFlow functions cannot be converted to other function types}}
-
-
+  // This type checks even though it captures a value. The SILGen pass will
+  // check if the closures that are tensorflow functions do not have captures.
+  takesTFFunc { $0 + one }
   // FIXME: Should eventually be supported.
   @convention(tensorflow) // expected-error {{attribute can only be applied to types, not declarations}}
   func inner1(a : Tensor<Float>) -> Tensor<Float> {
