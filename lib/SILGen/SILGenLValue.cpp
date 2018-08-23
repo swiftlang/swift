@@ -1123,7 +1123,7 @@ namespace {
 
     /// The subscript index expression.  Useless
     Expr *IndexExprForDiagnostics;
-    RValue Indices;
+    PreparedArguments Indices;
 
     /// AST type of the base expression, in case the accessor call
     /// requires re-abstraction.
@@ -1131,7 +1131,7 @@ namespace {
 
     struct AccessorArgs {
       ArgumentSource base;
-      RValue Indices;
+      PreparedArguments Indices;
     };
 
     /// Returns a tuple of RValues holding the accessor value, base (retained if
@@ -1156,13 +1156,12 @@ namespace {
                     CanType baseFormalType,
                     LValueTypeData typeData,
                     Expr *indexExprForDiagnostics,
-                    RValue *optSubscripts)
+                    PreparedArguments &&indices)
       : Base(typeData, kind), Storage(storage),
         IndexExprForDiagnostics(indexExprForDiagnostics),
+        Indices(std::move(indices)),
         BaseFormalType(baseFormalType)
     {
-      if (optSubscripts)
-        Indices = std::move(*optSubscripts);
     }
 
     AccessComponent(const AccessComponent &copied,
@@ -1211,9 +1210,9 @@ namespace {
                            CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *indexExprForDiagnostics,
-                           RValue *optIndices)
+                           PreparedArguments &&indices)
       : super(kind, decl, baseFormalType, typeData,
-              indexExprForDiagnostics, optIndices),
+              indexExprForDiagnostics, std::move(indices)),
         Accessor(accessor), IsSuper(isSuper),
         IsDirectAccessorUse(isDirectAccessorUse),
         Substitutions(substitutions) {}
@@ -1250,12 +1249,12 @@ namespace {
                            SubstitutionMap substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
-                           Expr *subscriptIndexExpr = nullptr,
-                           RValue *subscriptIndex = nullptr)
+                           Expr *subscriptIndexExpr,
+                           PreparedArguments &&indices)
       : AccessorBasedComponent(GetterSetterKind, decl, accessor, isSuper,
                                isDirectAccessorUse, substitutions,
                                baseFormalType, typeData, subscriptIndexExpr,
-                               subscriptIndex)
+                               std::move(indices))
     {
       assert(getAccessorDecl()->isGetterOrSetter() ||
              getAccessorDecl()->isMaterializeForSet());
@@ -1278,7 +1277,7 @@ namespace {
       auto subs = this->Substitutions;
       bool isSuper = this->IsSuper;
       bool isDirectAccessorUse = this->IsDirectAccessorUse;
-      RValue indices = std::move(this->Indices);
+      auto indices = std::move(this->Indices);
       auto baseFormalType = this->BaseFormalType;
 
       // Drop this component from the l-value.
@@ -1294,7 +1293,8 @@ namespace {
                                      bool isSuper, SILDeclRef setter,
                                      bool isDirectAccessorUse,
                                      SubstitutionMap subs,
-                                     RValue &&indices, ArgumentSource &&value) {
+                                     PreparedArguments &&indices,
+                                     ArgumentSource &&value) {
       ArgumentSource self = [&] {
         if (!baseLV.isValid()) {
           return ArgumentSource();
@@ -1599,9 +1599,9 @@ namespace {
                                     CanType baseFormalType,
                                     LValueTypeData typeData,
                                     Expr *indexExprForDiagnostics,
-                                    RValue *optIndices)
+                                    PreparedArguments &&indices)
       : AccessComponent(MaterializeToTemporaryKind, storage, baseFormalType,
-                        typeData, indexExprForDiagnostics, optIndices),
+                        typeData, indexExprForDiagnostics, std::move(indices)),
         Substitutions(subs),
         ReadStrategy(readStrategy), WriteStrategy(writeStrategy),
         Options(options), IsSuper(isSuper) {}
@@ -1616,12 +1616,7 @@ namespace {
 
     std::unique_ptr<LogicalPathComponent>
     clone(SILGenFunction &SGF, SILLocation loc) const override {
-      RValue clonedIndicesBuffer;
-      RValue *clonedIndices = nullptr;
-      if (!Indices.isNull()) {
-        clonedIndicesBuffer = Indices.copy(SGF, loc);
-        clonedIndices = &clonedIndicesBuffer;
-      }
+      PreparedArguments clonedIndices = Indices.copy(SGF, loc);
 
       LogicalPathComponent *clone =
         new MaterializeToTemporaryComponent(Storage, IsSuper, Substitutions,
@@ -1629,7 +1624,7 @@ namespace {
                                             ReadStrategy, WriteStrategy,
                                             BaseFormalType, getTypeData(),
                                             IndexExprForDiagnostics,
-                                            clonedIndices);
+                                            std::move(clonedIndices));
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
 
@@ -1691,12 +1686,12 @@ namespace {
                         SubstitutionMap substitutions,
                         CanType baseFormalType, LValueTypeData typeData,
                         SILType substFieldType,
-                        Expr *subscriptIndexExpr = nullptr,
-                        RValue *subscriptIndex = nullptr)
+                        Expr *indexExprForDiagnostics,
+                        PreparedArguments &&indices)
       : AccessorBasedComponent(AddressorKind, decl, accessor, isSuper,
                                isDirectAccessorUse, substitutions,
-                               baseFormalType, typeData, subscriptIndexExpr,
-                               subscriptIndex),
+                               baseFormalType, typeData,
+                               indexExprForDiagnostics, std::move(indices)),
         SubstFieldType(substFieldType)
     {
       assert(getAccessorDecl()->isAnyAddressor());
@@ -1779,12 +1774,12 @@ namespace {
                                SubstitutionMap substitutions,
                                CanType baseFormalType,
                                LValueTypeData typeData,
-                               Expr *indexExprForDiagnostics = nullptr,
-                               RValue *optIndices = nullptr)
+                               Expr *indexExprForDiagnostics,
+                               PreparedArguments &&indices)
       : AccessorBasedComponent(CoroutineAccessorKind,
                                decl, accessor, isSuper, isDirectAccessorUse,
                                substitutions, baseFormalType, typeData,
-                               indexExprForDiagnostics, optIndices) {
+                               indexExprForDiagnostics, std::move(indices)) {
     }
 
     using AccessorBasedComponent::AccessorBasedComponent;
@@ -2251,7 +2246,7 @@ void LValue::addMemberComponent(SILGenFunction &SGF, SILLocation loc,
                                 bool isSuper,
                                 AccessStrategy accessStrategy,
                                 CanType formalRValueType,
-                                RValue &&indices,
+                                PreparedArguments &&indices,
                                 Expr *indexExprForDiagnostics) {
   if (auto var = dyn_cast<VarDecl>(storage)) {
     assert(indices.isNull());
@@ -2601,21 +2596,24 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
         SGF.SGM.Types.getLoweredType(Storage->getType()).getAddressType();
       LV.add<AddressorComponent>(Storage, addressor,
                                  /*isSuper=*/false, isDirect, getSubs(),
-                                 CanType(), typeData, storageType);
+                                 CanType(), typeData, storageType,
+                                 nullptr, PreparedArguments());
     }
 
     void emitUsingCoroutineAccessor(SILDeclRef accessor, bool isDirect,
                                     LValueTypeData typeData) {
       LV.add<CoroutineAccessorComponent>(Storage, accessor,
                                          /*isSuper*/ false, isDirect, getSubs(),
-                                         CanType(), typeData);
+                                         CanType(), typeData,
+                                         nullptr, PreparedArguments());
     }
 
     void emitUsingGetterSetter(SILDeclRef accessor, bool isDirect,
                                LValueTypeData typeData) {
       LV.add<GetterSetterComponent>(Storage, accessor,
                                     /*isSuper=*/false, isDirect, getSubs(),
-                                    CanType(), typeData);
+                                    CanType(), typeData,
+                                    nullptr, PreparedArguments());
     }
 
     void emitUsingMaterialization(AccessStrategy readStrategy,
@@ -2625,7 +2623,7 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                               getSubs(), Options,
                                               readStrategy, writeStrategy,
                                               /*base type*/CanType(), typeData,
-                                              nullptr, nullptr);
+                                              nullptr, PreparedArguments());
     }
 
     void emitUsingStorage(LValueTypeData typeData) {
@@ -2965,7 +2963,7 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
   CanType BaseFormalType;
   SubstitutionMap Subs;
   Expr *IndexExprForDiagnostics;
-  RValue *Indices;
+  PreparedArguments Indices;
 
   MemberStorageAccessEmitter(SILGenFunction &SGF, SILLocation loc,
                              StorageType *storage,
@@ -2975,11 +2973,12 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
                              LValueOptions options,
                              LValue &lv,
                              Expr *indexExprForDiagnostics,
-                             RValue *indices)
+                             PreparedArguments &&indices)
     : super(SGF, storage, formalRValueType),
       LV(lv), Options(options), Loc(loc), IsSuper(isSuper),
       BaseFormalType(lv.getSubstFormalType()), Subs(subs),
-      IndexExprForDiagnostics(indexExprForDiagnostics), Indices(indices) {}
+      IndexExprForDiagnostics(indexExprForDiagnostics),
+      Indices(std::move(indices)) {}
 
   void emitUsingAddressor(SILDeclRef addressor, bool isDirect,
                           LValueTypeData typeData) {
@@ -2988,21 +2987,22 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
 
     LV.add<AddressorComponent>(Storage, addressor, IsSuper, isDirect, Subs,
                                BaseFormalType, typeData, varStorageType,
-                               IndexExprForDiagnostics, Indices);
+                               IndexExprForDiagnostics, std::move(Indices));
   }
 
   void emitUsingCoroutineAccessor(SILDeclRef accessor, bool isDirect,
                                   LValueTypeData typeData) {
     LV.add<CoroutineAccessorComponent>(Storage, accessor, IsSuper, isDirect,
                                        Subs, BaseFormalType, typeData,
-                                       IndexExprForDiagnostics, Indices);
+                                       IndexExprForDiagnostics,
+                                       std::move(Indices));
   }
 
   void emitUsingGetterSetter(SILDeclRef accessor, bool isDirect,
                              LValueTypeData typeData) {
     LV.add<GetterSetterComponent>(Storage, accessor, IsSuper, isDirect,
                                   Subs, BaseFormalType, typeData,
-                                  IndexExprForDiagnostics, Indices);
+                                  IndexExprForDiagnostics, std::move(Indices));
   }
 
   void emitUsingMaterialization(AccessStrategy readStrategy,
@@ -3011,7 +3011,8 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
     LV.add<MaterializeToTemporaryComponent>(Storage, IsSuper, Subs, Options,
                                             readStrategy, writeStrategy,
                                             BaseFormalType, typeData,
-                                            IndexExprForDiagnostics, Indices);
+                                            IndexExprForDiagnostics,
+                                            std::move(Indices));
   }
 };
 } // end anonymous namespace
@@ -3071,7 +3072,7 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       LV.add<ValueComponent>(addr, None, typeData);
     }
   } emitter(SGF, loc, var, subs, isSuper, formalRValueType, options, *this,
-            /*indices for diags*/ nullptr, /*indices*/ nullptr);
+            /*indices for diags*/ nullptr, /*indices*/ PreparedArguments());
 
   emitter.emitUsingStrategy(strategy);
 }
@@ -3080,6 +3081,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
                                         AccessKind accessKind,
                                         LValueOptions options) {
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
+  auto subs = e->getDecl().getSubstitutions();
 
   auto accessSemantics = e->getAccessSemantics();
   auto strategy =
@@ -3091,15 +3093,12 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   assert(lv.isValid());
 
   Expr *indexExpr = e->getIndex();
-  // FIXME: This admits varargs tuples, which should only be handled as part of
-  // argument emission.
-  RValue index = SGF.emitRValue(indexExpr);
+  auto indices = SGF.prepareSubscriptIndices(decl, subs, strategy, indexExpr);
 
   CanType formalRValueType = getSubstFormalRValueType(e);
-  lv.addMemberSubscriptComponent(SGF, e, decl,
-                                 e->getDecl().getSubstitutions(),
+  lv.addMemberSubscriptComponent(SGF, e, decl, subs,
                                  options, e->isSuper(), strategy,
-                                 formalRValueType, std::move(index),
+                                 formalRValueType, std::move(indices),
                                  indexExpr);
   return lv;
 }
@@ -3154,7 +3153,7 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                          bool isSuper,
                                          AccessStrategy strategy,
                                          CanType formalRValueType,
-                                         RValue &&indices,
+                                         PreparedArguments &&indices,
                                          Expr *indexExprForDiagnostics) {
   struct MemberSubscriptAccessEmitter
       : MemberStorageAccessEmitter<MemberSubscriptAccessEmitter,
@@ -3169,7 +3168,7 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
       llvm_unreachable("subscripts never have behaviors");
     }
   } emitter(SGF, loc, decl, subs, isSuper, formalRValueType, options, *this,
-            indexExprForDiagnostics, &indices);
+            indexExprForDiagnostics, std::move(indices));
 
   emitter.emitUsingStrategy(strategy);
 }

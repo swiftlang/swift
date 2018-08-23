@@ -1285,7 +1285,9 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   
   if (!decl->exportsPropertyDescriptor())
     return;
-  
+
+  PrettyStackTraceDecl stackTrace("emitting property descriptor for", decl);
+
   Type baseTy;
   if (decl->getDeclContext()->isTypeContext()) {
     // TODO: Static properties should eventually be referenceable as

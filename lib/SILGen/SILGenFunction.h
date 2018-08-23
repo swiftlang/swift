@@ -38,6 +38,7 @@ class ConsumableManagedValue;
 class LogicalPathComponent;
 class LValue;
 class ManagedValue;
+class PreparedArguments;
 class RValue;
 class CalleeTypeInfo;
 class ResultPlan;
@@ -1103,7 +1104,7 @@ public:
                                   ManagedValue base,
                                   CanType baseFormalType,
                                   bool isSuper, AbstractStorageDecl *storage,
-                                  RValue indexes,
+                                  PreparedArguments &&indices,
                                   SubstitutionMap substitutions,
                                   AccessSemantics semantics, Type propTy,
                                   SGFContext C,
@@ -1121,7 +1122,12 @@ public:
                                 SILDeclRef function,
                                 CanType expectedType,
                                 SubstitutionMap subs);
-  
+
+  PreparedArguments prepareSubscriptIndices(SubscriptDecl *subscript,
+                                            SubstitutionMap subs,
+                                            AccessStrategy strategy,
+                                            Expr *indices);
+
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
@@ -1130,13 +1136,13 @@ public:
                          SubstitutionMap substitutions,
                          ArgumentSource &&optionalSelfValue,
                          bool isSuper, bool isDirectAccessorUse,
-                         RValue &&optionalSubscripts, SGFContext C);
+                         PreparedArguments &&optionalSubscripts, SGFContext C);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionMap substitutions,
                        ArgumentSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
-                       RValue &&optionalSubscripts,
+                       PreparedArguments &&optionalSubscripts,
                        ArgumentSource &&value);
 
   MaterializedLValue
@@ -1160,7 +1166,7 @@ public:
                         SubstitutionMap substitutions,
                         ArgumentSource &&optionalSelfValue,
                         bool isSuper, bool isDirectAccessorUse,
-                        RValue &&optionalSubscripts,
+                        PreparedArguments &&optionalSubscripts,
                         SILType addressType);
 
   CleanupHandle
@@ -1168,7 +1174,7 @@ public:
                         SubstitutionMap substitutions,
                         ArgumentSource &&optionalSelfValue,
                         bool isSuper, bool isDirectAccessorUse,
-                        RValue &&optionalSubscripts,
+                        PreparedArguments &&optionalSubscripts,
                         SmallVectorImpl<ManagedValue> &yields);
 
   RValue emitApplyConversionFunction(SILLocation loc,
