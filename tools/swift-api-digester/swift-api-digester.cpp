@@ -1673,7 +1673,7 @@ class DiagnosisEmitter : public SDKNodeVisitor {
   DiagnosisEmitter(SDKContext &Ctx):
     UpdateMap(Ctx.getNodeUpdateMap()),
     TypeAliasUpdateMap(Ctx.getTypeAliasUpdateMap()),
-    MemberChanges(Ctx.getTypeMemberDiffs()), Diags(Ctx.Diags) {}
+    MemberChanges(Ctx.getTypeMemberDiffs()), Diags(Ctx.getDiags()) {}
 
 public:
   static void diagnosis(NodePtr LeftRoot, NodePtr RightRoot,

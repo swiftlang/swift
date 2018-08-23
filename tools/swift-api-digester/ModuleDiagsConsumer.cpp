@@ -20,9 +20,10 @@
 
 void swift::ide::api::
 ModuleDifferDiagsConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        					DiagnosticKind Kind,
+                        DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) {
-  base::handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
+  PrintingDiagnosticConsumer::handleDiagnostic(SM, Loc, Kind, FormatString,
+    FormatArgs, Info);
 }

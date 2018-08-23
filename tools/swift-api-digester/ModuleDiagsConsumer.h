@@ -20,6 +20,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -30,7 +31,7 @@ namespace api {
 /// \brief Diagnostic consumer that displays diagnostics to standard output.
 class ModuleDifferDiagsConsumer: public PrintingDiagnosticConsumer {
 public:
-  ModuleDifferDiagsConsumer(llvm::raw_ostream &OS):
+  ModuleDifferDiagsConsumer(llvm::raw_ostream &OS=llvm::errs()):
     PrintingDiagnosticConsumer(OS) {}
 
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
