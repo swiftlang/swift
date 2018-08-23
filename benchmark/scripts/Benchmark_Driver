@@ -400,10 +400,9 @@ class BenchmarkDoctor(object):
 
 
 def log_results(log_file, formatted_output):
-    try:
-        os.makedirs(os.path.dirname(log_file))
-    except OSError:
-        pass
+    dir = os.path.dirname(log_file)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
     print('Logging results to: %s' % log_file)
     with open(log_file, 'w') as f:
         f.write(formatted_output)
@@ -420,7 +419,7 @@ def run_benchmarks(driver):
     # that runs the tests.
     os.environ["SWIFT_DETERMINISTIC_HASHING"] = "1"
 
-    log = driver.log_file
+    log = driver.args.output_dir
     output = []
     headings = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)', 'MEAN(μs)',
                 'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)']
@@ -449,13 +448,14 @@ def run_benchmarks(driver):
     else:
         print(totals_output[1:])
     formatted_output += totals_output
-    if log:
-        log_results(log, formatted_output)
     return formatted_output
 
 
 def run(args):
-    run_benchmarks(BenchmarkDriver(args))
+    driver = BenchmarkDriver(args)
+    output = run_benchmarks(driver)
+    if args.output_dir:
+        log_results(driver.log_file, output)
     return 0
 
 

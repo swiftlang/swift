@@ -290,19 +290,65 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
             self.assertEquals(test, 'b1')
             return PerformanceTestResult(
                 '3,b1,1,123,123,123,0,123,888'.split(','))
-        driver = Stub(tests=['b1'], log_file=None)
-        driver.run_independent_samples = mock_run
         run_benchmarks = Benchmark_Driver.run_benchmarks
+        driver = Stub(tests=['b1'], args=Stub(output_dir=None))
+        driver.run_independent_samples = mock_run
 
         with captured_output() as (out, _):
+            formatted_output = run_benchmarks(driver)
+
+        self.assertEquals(
+            out.getvalue(),
+            '#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),' +
+            'MAX_RSS(B)\n' +
+            '3,b1,1,123,123,123,0,123,888\n\nTotals,1\n')
+        self.assertEquals(formatted_output,
+                          '3,b1,1,123,123,123,0,123,888\n' +
+                          '\nTotals,1')
+
+        driver.args.output_dir = 'logs/'
+        with captured_output() as (out, _):
             run_benchmarks(driver)
-        self.assertEquals('\n'.join("""
-#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
-3,b1,1,123,123,123,0,123,888
+        self.assertEquals(
+            out.getvalue(),
+            '  # TEST                      SAMPLES MIN(μs) MAX(μs)' +
+            ' MEAN(μs) SD(μs) MEDIAN(μs) MAX_RSS(B)\n' +
+            '  3 b1                              1     123     123' +
+            '      123      0        123        888\n' +
+            '    Totals                          1                ' +
+            '                                      \n')
 
-Totals,1
+    def test_log_results(self):
+        """Create log directory if it doesn't exist and write the log file."""
+        def assert_log_written(out, log_file, content):
+            self.assertEquals(out.getvalue(),
+                              'Logging results to: ' + log_file + '\n')
+            with open(log_file, 'rU') as f:
+                text = f.read()
+            self.assertEquals(text, "formatted output")
 
-""".splitlines()[1:]), out.getvalue())  # removes 1st \n from multiline string
+        try:
+            import tempfile  # setUp
+            temp_dir = tempfile.mkdtemp()
+            log_dir = os.path.join(temp_dir, 'sub-dir/')
+            log_results = Benchmark_Driver.log_results
+
+            self.assertFalse(os.path.exists(log_dir))
+            content = "formatted output"
+            log_file = os.path.join(log_dir, '1.log')
+            with captured_output() as (out, _):
+                log_results(log_file, content)
+            assert_log_written(out, log_file, content)
+
+            self.assertTrue(os.path.exists(log_dir))
+            log_file = os.path.join(log_dir, '2.log')
+            with captured_output() as (out, _):
+                log_results(log_file, content)
+            assert_log_written(out, log_file, content)
+
+        finally:
+            import shutil  # tearDown
+            shutil.rmtree(temp_dir)
 
 
 class BenchmarkDriverMock(Mock):
