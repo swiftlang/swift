@@ -1732,6 +1732,13 @@ ${assignmentOperatorComment(x.nonMaskingOperator, False)}
     _ lhs: inout Self, _ rhs: RHS)
 % end
 
+  /// Returns `-1` if this value is negative and `1` if it's positive;
+  /// otherwise, `0`.
+  ///
+  /// - Returns: The sign of this number, expressed as an integer of the same
+  ///   type.
+  func signum() -> Self
+
   /// Divides this value by `divisor`, rounding the result according to `rule`
   /// to produce a `quotient` and `remainder`.
   ///
@@ -1775,88 +1782,23 @@ ${assignmentOperatorComment(x.nonMaskingOperator, False)}
   ///
   /// - Returns: the quotient and remainder.
   ///
-  /// See also `divided(by:,rounding:)`,
-  /// `remainder(dividingBy:, roundingQuotient:)`, `mod(_:)`, and `isDivisible(by:)`.
-  func quotientAndRemainder(
-    dividingBy rhs: Self,
-    roundingQuotient rule: RoundingRule
-  ) -> (quotient: Self, remainder: Self)
-
-  /// This value divided by `divisor`, rounded to an integer value.
-  ///
-  /// Division is unique among the basic arithmetic operations on integers in
-  /// that the result if we interpret the arguments as real numbers is
-  /// generally not an integer. For example, as real numbers, 3/2 is 1.5.
-  /// Thus, we need to choose a rounding rule that describes how to round
-  /// the quotient when it is not an exact integer. This function provides
-  /// the ability to control the rounding.
-  ///
-  /// A few of the available rounding rules are worth calling out in particular:
-  ///
-  /// - `.towardZero` matches the behavior of the `/` operator.
-  ///
-  /// - `.down` is frequently called "floored" or "flooring" division.
-  ///
-  /// - `.up` and `.awayFromZero` are useful when working with sizes and counts.
-  ///   If you want to put `n` objects into buckets, each of which can hold `k`
-  ///   objects, you will use `n.divided(by: k, rounding: .up)` buckets.
-  ///
-  /// - `.toNearestOrEven` and `.toNearestOrAwayFromZero` are useful if you
-  ///   need to emulate or implement floating-point rounding with integer
-  ///   arithmetic.
-  ///
-  /// - Parameters:
-  ///   - divisor: the number to divide by.
-  ///   - rule: the rounding rule to use.
-  ///
-  /// See also `remainder(dividingBy:, roundingQuotient:)` and
-  /// `quotientAndRemainder(dividingBy:, roundingQuotient:)`.
-  func divided(by divisor: Self, rounding rule: RoundingRule) -> Self
-
-  /// The remainder of dividing this value by `divisor`, using the specified
-  /// rounding `rule`.
-  ///
-  /// Equivalent to
-  /// ~~~~
-  /// let quotient = self.divided(by: divisor, rounding: rule)
-  /// return self - q*quotient
-  /// ~~~~
-  ///
-  /// A few of the available rounding rules are worth calling out in particular:
-  ///
-  /// - `.towardZero` matches the behavior of the `%` operator.
-  ///
-  /// - `.down` has the property the sign of the result always matches the
-  ///   sign of the divisor, and so when the divisor is positive, the result
-  ///   is always in `0 ..< divisor`.
-  ///
-  /// - `.toNearestOrEven` and `.toNearestOrAwayFromZero` are sometimes used
-  ///   because they produce the smallest magnitude remainder.
-  ///
-  /// - Parameters:
-  ///   - divisor: the number to divide by to get the remainder.
-  ///   - rule: the rounding rule to apply to the quotient.
-  ///
-  /// See also `mod(_:)`, `divided(by:,rounding:)`,
-  /// `quotientAndRemainder(dividingBy:, roundingQuotient:)`, and `isDivisible(by:)`.
-  func remainder(
-    dividingBy divisor: Self,
-    roundingQuotient rule: RoundingRule
-  ) -> Self
+  /// See also `mod(_:)`.
+  func divided(by rhs: Self, rounding rule: RoundingRule)
+    -> (quotient: Self, remainder: Self)
 
   /// The mathematical modulo operation.
   ///
-  /// This operation is similar to the `%` operator or `.remainder`, but
-  /// differs importantly in how it handles negative numbers. The `modulus`
-  /// must be positive, and the result is always non-negative, even if `self`
-  /// is negative.
+  /// This operation is similar to the `%` operator and the `remainder` result
+  /// of the `.divided(by:, rounding:)` function, but differs importantly in
+  /// how it handles negative numbers. The `modulus` must be positive, and the
+  /// result is always non-negative, even if `self` is negative.
   ///
   /// - Parameters:
   ///   - modulus: must be positive.
   /// - Returns: the unique integer in `0 ..< modulus` that satisfies
   ///   `self = n*modulus + result` for some integer `n`.
   ///
-  /// See also `remainder(dividingBy:, roundingQuotient:)` and `isDivisible(by:)`.
+  /// See also `divided(by:, rounding:)`.
   func mod(_ modulus: Self) -> Self
 
   /// Shifts this value right by n, rounding according to the specified
@@ -1865,19 +1807,14 @@ ${assignmentOperatorComment(x.nonMaskingOperator, False)}
   /// - Parameters:
   ///   - n: The number of bits to shift by. Must be non-negative.
   ///   - rule: The direction in which to round the result if it is not exact.
-  /// - Returns: the pair `(rounded: Self, exact: Bool)`, where `rounded`
-  ///   is `self*2**(-n)` rounded to the nearest integer, and `exact` is
+  /// - Returns: the pair `(rounded: Self, isExact: Bool)`, where `rounded`
+  ///   is `self*2**(-n)` rounded to the nearest integer, and `isExact` is
   ///   true if and only if the result of the shift was an integer before
   ///   rounding.
+  ///
+  /// See also `divided(by:, rounding:)`.
   func shiftedRight<Count>(by n: Count, rounding rule: RoundingRule)
     -> (result: Self, isExact: Bool) where Count : BinaryInteger
-
-  /// Returns `-1` if this value is negative and `1` if it's positive;
-  /// otherwise, `0`.
-  ///
-  /// - Returns: The sign of this number, expressed as an integer of the same
-  ///   type.
-  func signum() -> Self
 }
 
 public extension BinaryInteger {
@@ -1906,9 +1843,7 @@ public extension BinaryInteger {
   @inlinable // FIXME(sil-serialize-all)
   func _binaryLogarithm() -> Int {
     _precondition(self > (0 as Self))
-    var (quotient, remainder) =
-      (bitWidth &- 1).quotientAndRemainder(dividingBy: UInt.bitWidth)
-    remainder = remainder &+ 1
+    var (quotient, remainder) = bitWidth.divided(by: UInt.bitWidth, rounding: .up)
     var word = UInt(truncatingIfNeeded: self >> (bitWidth &- remainder))
     // If, internally, a variable-width binary integer uses digits of greater
     // bit width than that of Magnitude.Words.Element (i.e., UInt), then it is
@@ -1954,16 +1889,13 @@ ${operatorComment(x.nonMaskingOperator, False)}
 % end
 
   @_transparent
-  func quotientAndRemainder(
-    dividingBy divisor: Self
-  ) -> (quotient: Self, remainder: Self) {
-    return quotientAndRemainder(dividingBy: divisor, roundingQuotient: .down)
+  func divided(by divisor: Self) -> (quotient: Self, remainder: Self) {
+    return divided(by: divisor, rounding: .down)
   }
 
-  func quotientAndRemainder(
-    dividingBy divisor: Self,
-    roundingQuotient rule: RoundingRule
-  ) -> (quotient: Self, remainder: Self) {
+  @inlinable
+  func divided(by divisor: Self, rounding rule: RoundingRule)
+  -> (quotient: Self, remainder: Self) {
     //  Figure out the sign of the real-number ratio self/divisor; this informs
     //  how we actually implement the rounding.
     let negativeQuotient = Self.isSigned && (self < 0) != (divisor < 0)
@@ -2005,39 +1937,22 @@ ${operatorComment(x.nonMaskingOperator, False)}
       }
       //  Otherwise, round away from zero.
       roundAway()
+    @unknown default:
+      return self.dividedNoInline(by: divisor, rounding: rule)
     }
     return (quotient, remainder)
   }
 
-  @_transparent
-  func divided(by divisor: Self) -> Self {
-    return self.divided(by: divisor, rounding: .down)
+  @usableFromInline
+  internal func dividedNoInline(by divisor: Self, rounding rule: RoundingRule)
+  -> (quotient: Self, remainder: Self) {
+    return self.divided(by: divisor, rounding: rule)
   }
 
-  @_transparent
-  func divided(by divisor: Self, rounding rule: RoundingRule) -> Self {
-    let (result, _) = quotientAndRemainder(dividingBy: divisor, roundingQuotient: rule)
-    return result
-  }
-
-  @_transparent
-  func remainder(dividingBy divisor: Self) -> Self {
-    return self.remainder(dividingBy: divisor, roundingQuotient: .down)
-  }
-
-  @_transparent
-  func remainder(
-    dividingBy divisor: Self,
-    roundingQuotient rule: RoundingRule
-  ) -> Self {
-    let (_, result) = quotientAndRemainder(dividingBy: divisor, roundingQuotient: rule)
-    return result
-  }
-
-  @_transparent
+  @inlinable
   func mod(_ modulus: Self) -> Self {
     _precondition(modulus > 0, "mod(_:) requires a positive modulus.")
-    return remainder(dividingBy: modulus, roundingQuotient: .down)
+    return divided(by: modulus, rounding: .down).remainder
   }
 
   @_transparent
@@ -2046,6 +1961,7 @@ ${operatorComment(x.nonMaskingOperator, False)}
     return shiftedRight(by: n, rounding: .down)
   }
 
+  @inlinable
   func shiftedRight<Count>(
     by n: Count,
     rounding rule: RoundingRule
@@ -2080,6 +1996,8 @@ ${operatorComment(x.nonMaskingOperator, False)}
       case .toNearestOrEven:
         if fraction > halfway { rounded += 1 }
         else if fraction == halfway { rounded += rounded & 1 }
+      @unknown default:
+        return self.shiftedRightNoInline(by: n, rounding: rule)
       }
     } else {
       switch rule {
@@ -2098,46 +2016,20 @@ ${operatorComment(x.nonMaskingOperator, False)}
       case .toNearestOrEven:
         if fraction > halfway { rounded += 1 }
         else if fraction == halfway { rounded += rounded & 1 }
+      @unknown default:
+        return self.shiftedRightNoInline(by: n, rounding: rule)
       }
     }
     return (rounded, !sticky)
   }
 
-  /// Test if this value is exactly divisible by `testDivisor`.
-  ///
-  /// For example:
-  ///
-  /// ~~~~
-  /// 5.isDivisible(by: 2)  // false, because 5 is not twice any integer.
-  /// 21.isDivisible(by: 7) // true, because 21 = 3*7.
-  /// ~~~~
-  ///
-  /// Two edge cases warrant special attention:
-  /// - `x.isDivisible(by: 0)` is `false` for all `x`, even `x == 0`. This is
-  ///   because zero times anything is zero, so there is no *unique* `k`
-  ///   satisfying `0 = k*0`.
-  /// - For signed fixed-width integer types `T`, `T.min.isDivisible(by: -1)`
-  ///   is `true`, even though `T.min / -1` overflows, because the integer
-  ///   `k` exists and is unique; it simply isn't representable as a `T`.
-  ///
-  /// - Parameter testDivisor: the number by which to test for divisibility.
-  /// - Returns: true if a unique integer `k` exists such that `self == k * testDivisor`.
-  ///
-  /// - See also: isEven, isOdd.
-  @_transparent
-  func isDivisible(by testDivisor: Self) -> Bool {
-    return testDivisor != 0 && self % testDivisor == 0
+  @usableFromInline
+  internal func shiftedRightNoInline<Count>(
+    by n: Count,
+    rounding rule: RoundingRule
+  ) -> (result: Self, isExact: Bool) where Count : BinaryInteger {
+    return self.shiftedRight(by: n, rounding: rule)
   }
-
-  /// True if this value is evenly divisible by two, false otherwise.
-  /// - See also: isDivisible(by:), isOdd
-  @_transparent
-  var isEven: Bool { return _lowWord % 2 == 0 }
-
-  /// True if this value is not evenly divisible by two, false otherwise.
-  /// - See also: isDivisible(by:), isEven
-  @_transparent
-  var isOdd: Bool { return !isEven }
 }
 
 //===----------------------------------------------------------------------===//
@@ -2164,10 +2056,10 @@ extension BinaryInteger {
     // (although not necessarily the case for builtin types).
     let isRadixPowerOfTwo = radix.nonzeroBitCount == 1
     let radix_ = Magnitude(radix)
-    func _quotientAndRemainder(_ value: Magnitude) -> (Magnitude, Magnitude) {
+    func _divided(_ value: Magnitude) -> (Magnitude, Magnitude) {
       return isRadixPowerOfTwo
         ? (value >> radix.trailingZeroBitCount, value & (radix_ - 1))
-        : value.quotientAndRemainder(dividingBy: radix_)
+        : value.divided(by: radix_)
     }
 
     let hasLetters = radix > 10
@@ -2191,7 +2083,7 @@ extension BinaryInteger {
 
     var result: [UInt8] = []
     while value != 0 {
-      let (quotient, remainder) = _quotientAndRemainder(value)
+      let (quotient, remainder) = _divided(value)
       result.append(_ascii(UInt8(truncatingIfNeeded: remainder)))
       value = quotient
     }
@@ -2694,12 +2586,17 @@ ${overflowOperationComment(x.operator)}
   ///     // quotient == 186319822866995413
   ///     // remainder == 0
   ///
-  /// - Parameter dividend: A tuple containing the high and low parts of a
-  ///   double-width integer.
+  /// - Parameters
+  ///   - dividend: A tuple containing the high and low parts of a double-width
+  ///     integer.
+  ///   - rule: The rule to use to round the quotient if the division is not
+  ///     exact.
   /// - Returns: A tuple containing the quotient and remainder obtained by
   ///   dividing `dividend` by this value.
-  func dividingFullWidth(_ dividend: (high: Self, low: Self.Magnitude))
-    -> (quotient: Self, remainder: Self)
+  func dividingFullWidth(
+    _ dividend: (high: Self, low: Self.Magnitude),
+    rounding rule: RoundingRule
+  ) -> (quotient: Self, remainder: Self)
 
   init(_truncatingBits bits: UInt)
 
@@ -3297,11 +3194,9 @@ extension FixedWidthInteger {
       return Self(truncatingIfNeeded: generator.next() as UInt64)
     }
 
-    let (quotient, remainder) = bitWidth.quotientAndRemainder(
-      dividingBy: UInt64.bitWidth
-    )
+    let quotient = bitWidth.divided(by: UInt64.bitWidth, rounding: .up).quotient
     var tmp: Self = 0
-    for i in 0 ..< quotient + remainder.signum() {
+    for i in 0 ..< quotient {
       let next: UInt64 = generator.next()
       tmp += Self(truncatingIfNeeded: next) &<< (UInt64.bitWidth * i)
     }
@@ -4006,6 +3901,13 @@ ${assignmentOperatorComment(x.operator, True)}
 %   end
   }
 
+  @_transparent
+  public func dividingFullWidth(
+    _ dividend: (high: ${Self}, low: ${Self}.Magnitude)
+  ) -> (quotient: ${Self}, remainder: ${Self}) {
+    return self.dividingFullWidth(dividend, rounding: .down)
+  }
+
   /// Returns a tuple containing the quotient and remainder of dividing the
   /// given value by this value.
   ///
@@ -4018,9 +3920,9 @@ ${assignmentOperatorComment(x.operator, True)}
   ///   sign, if the type is signed.
   /// - Returns: A tuple containing the quotient and remainder of `dividend`
   ///   divided by this value.
-  @inlinable // FIXME(sil-serialize-all)
   public func dividingFullWidth(
-    _ dividend: (high: ${Self}, low: ${Self}.Magnitude)
+    _ dividend: (high: ${Self}, low: ${Self}.Magnitude),
+    rounding rule: RoundingRule
   ) -> (quotient: ${Self}, remainder: ${Self}) {
     // FIXME(integers): tests
 %   # 128-bit types are not provided by the 32-bit LLVM
