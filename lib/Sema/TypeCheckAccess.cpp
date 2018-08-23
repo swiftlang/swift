@@ -221,11 +221,19 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
 }
 
 void AccessControlCheckerBase::checkRequirementAccess(
-    ArrayRef<RequirementRepr> requirements,
+    WhereClauseOwner source,
     AccessScope accessScope,
     const DeclContext *useDC,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
-  for (auto &requirement : requirements) {
+  // Prepopulate the requirements.
+  // FIXME: This is a hack; it would be better to eliminate the
+  // TypeLoc usage with checkTypeAccessImpl.
+  RequirementRequest::visitRequirements(source, TypeResolutionStage::Interface,
+                                        [](Requirement, RequirementRepr*) {
+                                          return false;
+                                        });
+
+  for (auto &requirement : RequirementRequest::getRequirements(source)) {
     switch (requirement.getKind()) {
     case RequirementReprKind::TypeConstraint:
       checkTypeAccessImpl(requirement.getSubjectLoc(),
@@ -301,7 +309,8 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   }
   callbackACEK = ACEK::Requirement;
 
-  checkRequirementAccess(params->getRequirements(),
+  checkRequirementAccess(WhereClauseOwner(
+                           DC, const_cast<GenericParamList *>(params)),
                          accessScope, DC, callback);
 
   if (minAccessScope.isPublic())
@@ -531,28 +540,26 @@ void AccessControlChecker::check(Decl *D) {
       }
     });
 
-    if (auto *trailingWhereClause = assocType->getTrailingWhereClause()) {
-      checkRequirementAccess(trailingWhereClause->getRequirements(),
-                             assocType->getFormalAccessScope(),
-                             assocType->getDeclContext(),
-                             [&](AccessScope typeAccessScope,
-                                 const TypeRepr *thisComplainRepr,
-                                 DowngradeToWarning downgradeDiag) {
-        if (typeAccessScope.isChildOf(minAccessScope) ||
-            (!complainRepr &&
-             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-          minAccessScope = typeAccessScope;
-          complainRepr = thisComplainRepr;
-          accessControlErrorKind = ACEK_Requirement;
-          downgradeToWarning = downgradeDiag;
+    checkRequirementAccess(assocType,
+                           assocType->getFormalAccessScope(),
+                           assocType->getDeclContext(),
+                           [&](AccessScope typeAccessScope,
+                               const TypeRepr *thisComplainRepr,
+                               DowngradeToWarning downgradeDiag) {
+      if (typeAccessScope.isChildOf(minAccessScope) ||
+          (!complainRepr &&
+           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+        minAccessScope = typeAccessScope;
+        complainRepr = thisComplainRepr;
+        accessControlErrorKind = ACEK_Requirement;
+        downgradeToWarning = downgradeDiag;
 
-          // Swift versions before 5.0 did not check requirements on the
-          // protocol's where clause, so emit a warning.
-          if (!TC.Context.isSwiftVersionAtLeast(5))
-            downgradeToWarning = DowngradeToWarning::Yes;
-        }
-      });
-    }
+        // Swift versions before 5.0 did not check requirements on the
+        // protocol's where clause, so emit a warning.
+        if (!TC.Context.isSwiftVersionAtLeast(5))
+          downgradeToWarning = DowngradeToWarning::Yes;
+      }
+    });
 
     if (!minAccessScope.isPublic()) {
       auto minAccess = minAccessScope.accessLevelForDiagnostics();
@@ -709,28 +716,26 @@ void AccessControlChecker::check(Decl *D) {
       });
     });
 
-    if (auto *trailingWhereClause = proto->getTrailingWhereClause()) {
-      checkRequirementAccess(trailingWhereClause->getRequirements(),
-                             proto->getFormalAccessScope(),
-                             proto->getDeclContext(),
-                             [&](AccessScope typeAccessScope,
-                                 const TypeRepr *thisComplainRepr,
-                                 DowngradeToWarning downgradeDiag) {
-        if (typeAccessScope.isChildOf(minAccessScope) ||
-            (!complainRepr &&
-             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-          minAccessScope = typeAccessScope;
-          complainRepr = thisComplainRepr;
-          protocolControlErrorKind = PCEK_Requirement;
-          downgradeToWarning = downgradeDiag;
+    checkRequirementAccess(proto,
+                           proto->getFormalAccessScope(),
+                           proto->getDeclContext(),
+                           [&](AccessScope typeAccessScope,
+                               const TypeRepr *thisComplainRepr,
+                               DowngradeToWarning downgradeDiag) {
+      if (typeAccessScope.isChildOf(minAccessScope) ||
+          (!complainRepr &&
+           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+        minAccessScope = typeAccessScope;
+        complainRepr = thisComplainRepr;
+        protocolControlErrorKind = PCEK_Requirement;
+        downgradeToWarning = downgradeDiag;
 
-          // Swift versions before 5.0 did not check requirements on the
-          // protocol's where clause, so emit a warning.
-          if (!TC.Context.isSwiftVersionAtLeast(5))
-            downgradeToWarning = DowngradeToWarning::Yes;
-        }
-      });
-    }
+        // Swift versions before 5.0 did not check requirements on the
+        // protocol's where clause, so emit a warning.
+        if (!TC.Context.isSwiftVersionAtLeast(5))
+          downgradeToWarning = DowngradeToWarning::Yes;
+      }
+    });
 
     if (!minAccessScope.isPublic()) {
       auto minAccess = minAccessScope.accessLevelForDiagnostics();
@@ -1079,10 +1084,10 @@ void UsableFromInlineChecker::check(Decl *D) {
       highlightOffendingType(TC, diag, complainRepr);
     });
 
-    if (auto *trailingWhereClause = assocType->getTrailingWhereClause()) {
+    if (assocType->getTrailingWhereClause()) {
       auto accessScope =
         assocType->getFormalAccessScope(nullptr);
-      checkRequirementAccess(trailingWhereClause->getRequirements(),
+      checkRequirementAccess(assocType,
                              accessScope,
                              assocType->getDeclContext(),
                              [&](AccessScope typeAccessScope,
@@ -1202,10 +1207,10 @@ void UsableFromInlineChecker::check(Decl *D) {
       });
     });
 
-    if (auto *trailingWhereClause = proto->getTrailingWhereClause()) {
+    if (proto->getTrailingWhereClause()) {
       auto accessScope = proto->getFormalAccessScope(nullptr,
                                                      /*checkUsableFromInline*/true);
-      checkRequirementAccess(trailingWhereClause->getRequirements(),
+      checkRequirementAccess(proto,
                              accessScope,
                              proto->getDeclContext(),
                              [&](AccessScope typeAccessScope,

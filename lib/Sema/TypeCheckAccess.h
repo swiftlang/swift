@@ -26,9 +26,10 @@ namespace swift {
 class Decl;
 class DeclContext;
 class GenericParamList;
+class RequirementRepr;
 class TypeChecker;
 class ValueDecl;
-class RequirementRepr;
+struct WhereClauseOwner;
 
 /// A uniquely-typed boolean to reduce the chances of accidentally inverting
 /// a check.
@@ -58,7 +59,7 @@ protected:
       llvm::function_ref<CheckTypeAccessCallback> diagnose);
 
   void checkRequirementAccess(
-      ArrayRef<RequirementRepr> requirements,
+      WhereClauseOwner source,
       AccessScope accessScope,
       const DeclContext *useDC,
       llvm::function_ref<CheckTypeAccessCallback> diagnose);

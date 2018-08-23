@@ -1203,17 +1203,6 @@ public:
   /// \param nominal The generic type.
   void validateGenericTypeSignature(GenericTypeDecl *nominal);
 
-  bool validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
-                           TypeResolution resolution,
-                           TypeResolutionOptions options);
-
-  /// Validate the given requirements.
-  void validateRequirements(SourceLoc whereLoc,
-                            MutableArrayRef<RequirementRepr> requirements,
-                            TypeResolution resolution,
-                            TypeResolutionOptions options,
-                            GenericSignatureBuilder *builder = nullptr);
-
   /// Create a text string that describes the bindings of generic parameters
   /// that are relevant to the given set of types, e.g.,
   /// "[with T = Bar, U = Wibble]".
@@ -1262,6 +1251,12 @@ public:
   void validateWhereClauses(ProtocolDecl *protocol, TypeResolution resolution);
 
   void resolveTrailingWhereClause(ProtocolDecl *proto) override;
+
+  /// Check the inheritance clause of the given declaration.
+  void checkInheritanceClause(Decl *decl, TypeResolution resolution);
+
+  /// Check the inheritance clause of the given declaration.
+  void checkInheritanceClause(Decl *decl);
 
   /// Diagnose if the class has no designated initializers.
   void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);

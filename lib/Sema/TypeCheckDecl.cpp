@@ -208,28 +208,7 @@ public:
 static void validateAttributes(TypeChecker &TC, Decl *D);
 
 void TypeChecker::resolveTrailingWhereClause(ProtocolDecl *proto) {
-  validateWhereClauses(proto, TypeResolution::forStructural(proto));
-}
-
-void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
-                                       TypeResolution resolution) {
-  TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
-
-  if (auto whereClause = protocol->getTrailingWhereClause()) {
-    revertGenericRequirements(whereClause->getRequirements());
-    validateRequirements(whereClause->getWhereLoc(),
-                         whereClause->getRequirements(), resolution,
-                         options);
-  }
-
-  for (auto assocType : protocol->getAssociatedTypeMembers()) {
-    if (auto whereClause = assocType->getTrailingWhereClause()) {
-      revertGenericRequirements(whereClause->getRequirements());
-      validateRequirements(whereClause->getWhereLoc(),
-                           whereClause->getRequirements(),
-                           resolution, options);
-    }
-  }
+  // FIXME: DELETE
 }
 
 /// Check the inheritance clause of a type declaration or extension thereof.
@@ -536,14 +515,24 @@ static void checkInheritanceClause(
   }
 }
 
-/// Check the inheritance clauses generic parameters
-static void checkInheritanceClausesOfGenericParams(
-                                            GenericParamList *genericParams) {
+/// Check the inheritance clauses generic parameters along with any
+/// requirements stored within the generic parameter list.
+static void checkGenericParams(GenericParamList *genericParams) {
   if (!genericParams)
     return;
 
-  for (auto gp : *genericParams)
+  for (auto gp : *genericParams) {
     checkInheritanceClause(gp);
+  }
+
+  // Force visitation of each of the requirements here.
+  auto owner =
+    genericParams->getParams().front()->getDeclContext()->getAsDecl();
+  assert(owner && "Generic parameter list without a decl owning it?");
+  RequirementRequest::visitRequirements(owner, TypeResolutionStage::Interface,
+                                        [](Requirement, RequirementRepr *) {
+                                          return false;
+                                        });
 }
 
 /// Retrieve the set of protocols the given protocol inherits.
@@ -2266,6 +2255,31 @@ static void finalizeAbstractStorageDecl(TypeChecker &TC,
   }
 }
 
+/// Check the requirements in the where clause of the given \c source
+/// to ensure that they don't introduce additional 'Self' requirements.
+static void checkProtocolSelfRequirements(ProtocolDecl *proto,
+                                          TypeDecl *source) {
+  RequirementRequest::visitRequirements(source, TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
+        switch (req.getKind()) {
+        case RequirementKind::Conformance:
+        case RequirementKind::Layout:
+        case RequirementKind::Superclass:
+          if (reqRepr &&
+              req.getFirstType()->isEqual(proto->getProtocolSelfType())) {
+            auto &diags = proto->getASTContext().Diags;
+            diags.diagnose(reqRepr->getSubjectLoc().getLoc(),
+                           diag::protocol_where_clause_self_requirement);
+          }
+
+          return false;
+
+        case RequirementKind::SameType:
+          return false;
+        }
+      });
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2591,7 +2605,7 @@ public:
 
     if (!SD->isInvalid()) {
       TC.checkReferencedGenericParams(SD);
-      checkInheritanceClausesOfGenericParams(SD->getGenericParams());
+      checkGenericParams(SD->getGenericParams());
       TC.checkProtocolSelfRequirements(SD);
     }
 
@@ -2632,8 +2646,10 @@ public:
     TC.checkDeclAttributes(AT);
 
     checkInheritanceClause(AT);
-
     auto *proto = AT->getProtocol();
+
+    checkProtocolSelfRequirements(proto, AT);
+
     if (proto->isObjC()) {
       TC.diagnose(AT->getLoc(),
                   diag::associated_type_objc,
@@ -2698,7 +2714,7 @@ public:
 
     checkUnsupportedNestedType(ED);
     TC.validateDecl(ED);
-    checkInheritanceClausesOfGenericParams(ED->getGenericParams());
+    checkGenericParams(ED->getGenericParams());
 
     {
       // Check for circular inheritance of the raw type.
@@ -2736,7 +2752,7 @@ public:
     checkUnsupportedNestedType(SD);
 
     TC.validateDecl(SD);
-    checkInheritanceClausesOfGenericParams(SD->getGenericParams());
+    checkGenericParams(SD->getGenericParams());
 
     TC.addImplicitConstructors(SD);
 
@@ -2865,7 +2881,7 @@ public:
 
     TC.validateDecl(CD);
     TC.requestSuperclassLayout(CD);
-    checkInheritanceClausesOfGenericParams(CD->getGenericParams());
+    checkGenericParams(CD->getGenericParams());
 
     {
       // Check for circular inheritance.
@@ -3023,8 +3039,7 @@ public:
     UsableFromInlineChecker::checkUsableFromInline(TC, PD);
 
     checkInheritanceClause(PD);
-
-    TC.validateWhereClauses(PD, TypeResolution::forContextual(PD));
+    checkProtocolSelfRequirements(PD, PD);
 
     TC.checkDeclCircularity(PD);
     if (PD->isResilient())
@@ -3109,7 +3124,7 @@ public:
     if (!FD->isInvalid()) {
       if (!isa<AccessorDecl>(FD) ||
           !cast<AccessorDecl>(FD)->isMaterializeForSet()) {
-        checkInheritanceClausesOfGenericParams(FD->getGenericParams());
+        checkGenericParams(FD->getGenericParams());
         TC.checkReferencedGenericParams(FD);
         TC.checkProtocolSelfRequirements(FD);
       }
@@ -3258,7 +3273,7 @@ public:
     TC.validateDecl(CD);
 
     if (!CD->isInvalid()) {
-      checkInheritanceClausesOfGenericParams(CD->getGenericParams());
+      checkGenericParams(CD->getGenericParams());
       TC.checkReferencedGenericParams(CD);
       TC.checkProtocolSelfRequirements(CD);
     }
@@ -3944,8 +3959,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    resolveTrailingWhereClause(proto);
-
     validateAttributes(*this, D);
 
     // FIXME: IRGen likes to emit @objc protocol descriptors even if the
@@ -4451,8 +4464,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
 
     (void) proto->getFormalAccess();
 
-    resolveTrailingWhereClause(proto);
-
     for (auto ATD : proto->getAssociatedTypeMembers()) {
       validateDeclForNameLookup(ATD);
     }
@@ -4857,7 +4868,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
       GenericSignatureBuilder::FloatingRequirementSource::forInferred(nullptr);
 
     builder.inferRequirements(*ext->getModuleContext(),
-                              TypeLoc::withoutLoc(extInterfaceType),
+                              extInterfaceType,
+                              nullptr,
                               source);
   };
 

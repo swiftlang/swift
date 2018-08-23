@@ -22,10 +22,13 @@
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
 
+class GenericParamList;
+class RequirementRepr;
 struct TypeLoc;
 
 /// Display a nominal type or extension thereof.
@@ -207,6 +210,85 @@ public:
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
+};
+
+/// Describes the owner of a where clause, from which we can extract
+/// requirements.
+struct WhereClauseOwner {
+  /// The declaration context in which the where clause will be evaluated.
+  DeclContext *dc;
+
+  /// The source of the where clause, which can be a generic parameter list
+  /// or a declaration that can have a where clause.
+  llvm::PointerUnion<GenericParamList *, Decl *> source;
+
+  WhereClauseOwner(Decl *decl);
+
+  WhereClauseOwner(DeclContext *dc, GenericParamList *genericParams)
+    : dc(dc), source(genericParams) { }
+
+  SourceLoc getLoc() const;
+
+  friend hash_code hash_value(const WhereClauseOwner &owner) {
+    return hash_combine(hash_value(owner.dc), hash_value(owner.source));
+  }
+
+  friend bool operator==(const WhereClauseOwner &lhs,
+                         const WhereClauseOwner &rhs) {
+    return lhs.dc == rhs.dc && lhs.source == rhs.source;
+  }
+
+  friend bool operator!=(const WhereClauseOwner &lhs,
+                         const WhereClauseOwner &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const WhereClauseOwner &owner);
+
+/// Retrieve a requirement from the where clause of the given declaration.
+class RequirementRequest :
+    public SimpleRequest<RequirementRequest,
+                         CacheKind::SeparatelyCached,
+                         Requirement,
+                         WhereClauseOwner,
+                         unsigned,
+                         TypeResolutionStage> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  /// Retrieve the array of requirements from the given owner.
+  static MutableArrayRef<RequirementRepr> getRequirements(WhereClauseOwner);
+
+  /// Visit each of the requirements in the given owner,
+  ///
+  /// \returns true after short-circuiting if the callback returned \c true
+  /// for any of the requirements.
+  static bool visitRequirements(
+      WhereClauseOwner, TypeResolutionStage stage,
+      llvm::function_ref<bool(Requirement, RequirementRepr*)> callback);
+
+private:
+  friend class SimpleRequest;
+
+  /// Retrieve the requirement this request operates on.
+  RequirementRepr &getRequirement() const;
+
+  // Evaluation.
+  llvm::Expected<Requirement> evaluate(Evaluator &evaluator,
+                                       WhereClauseOwner,
+                                       unsigned index,
+                                       TypeResolutionStage stage) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const;
+  Optional<Requirement> getCachedResult() const;
+  void cacheResult(Requirement value) const;
 };
 
 /// The zone number for the type checker.

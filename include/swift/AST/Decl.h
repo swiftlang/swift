@@ -6636,6 +6636,9 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
 std::pair<DefaultArgumentKind, Type>
 getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
 
+/// Display Decl subclasses.
+void simple_display(llvm::raw_ostream &out, const Decl *decl);
+
 /// Display ValueDecl subclasses.
 void simple_display(llvm::raw_ostream &out, const ValueDecl *decl);
 
