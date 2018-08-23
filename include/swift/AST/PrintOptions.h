@@ -363,6 +363,9 @@ struct PrintOptions {
 
   BracketOptions BracketOptions;
 
+  // This is explicit to guarantee that it can be called from LLDB.
+  PrintOptions() {}
+
   bool excludeAttrKind(AnyAttrKind K) const {
     if (std::any_of(ExcludeAttrList.begin(), ExcludeAttrList.end(),
                     [K](AnyAttrKind other) { return other == K; }))
