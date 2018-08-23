@@ -5263,6 +5263,14 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   if (decl->isInvalid())
     return;
 
+  // Don't add implicit constructors in textual interfaces.
+  if (auto *SF = decl->getParentSourceFile()) {
+    if (SF->Kind == SourceFileKind::Interface) {
+      decl->setAddedImplicitInitializers();
+      return;
+    }
+  }
+
   // Bail out if we're validating one of our constructors already; we'll
   // revisit the issue later.
   if (isa<ClassDecl>(decl)) {

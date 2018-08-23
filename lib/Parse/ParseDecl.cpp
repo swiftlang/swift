@@ -5481,8 +5481,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
                                         { }, nullptr, CurDeclContext);
   setLocalDiscriminator(ED);
   ED->getAttrs() = Attributes;
-  if (SF.Kind == SourceFileKind::Interface)
-    ED->setAddedImplicitInitializers();
 
   ContextChange CC(*this, ED);
 
@@ -5755,8 +5753,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
                                             CurDeclContext);
   setLocalDiscriminator(SD);
   SD->getAttrs() = Attributes;
-  if (SF.Kind == SourceFileKind::Interface)
-    SD->setAddedImplicitInitializers();
 
   ContextChange CC(*this, SD);
 
@@ -5845,8 +5841,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
                                           { }, nullptr, CurDeclContext);
   setLocalDiscriminator(CD);
   CD->getAttrs() = Attributes;
-  if (SF.Kind == SourceFileKind::Interface)
-    CD->setAddedImplicitInitializers();
 
   ContextChange CC(*this, CD);
 
