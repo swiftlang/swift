@@ -1575,12 +1575,9 @@ namespace {
         //   self.super = Super.init()
         baseTy = MetatypeType::get(baseTy, CS.getASTContext());
 
-        auto argsTy = CS.createTypeVariable(
-                        CS.getConstraintLocator(expr),
-                          TVO_CanBindToLValue |
-                          TVO_PrefersSubtypeBinding);
-        auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr));
-        auto methodTy = FunctionType::getOld(argsTy, resultTy);
+        auto methodTy = CS.createTypeVariable(
+            CS.getConstraintLocator(expr));
+
         CS.addValueMemberConstraint(
             baseTy, expr->getName(), methodTy, CurDC,
             expr->getFunctionRefKind(),
