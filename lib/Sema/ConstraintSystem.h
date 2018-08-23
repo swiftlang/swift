@@ -165,7 +165,9 @@ enum TypeVariableOptions {
 
   /// Whether a more specific deduction for this type variable implies a
   /// better solution to the constraint system.
-  TVO_PrefersSubtypeBinding = 0x04
+  TVO_PrefersSubtypeBinding = 0x04,
+
+  TVO_PrefersArgumentSubtypeBinding = 0x08
 };
 
 /// \brief The implementation object for a type variable used within the
@@ -229,6 +231,10 @@ public:
   /// binding.
   bool prefersSubtypeBinding() const {
     return getRawOptions() & TVO_PrefersSubtypeBinding;
+  }
+
+  bool prefersArgumentSubtypeBinding() const {
+    return getRawOptions() & TVO_PrefersArgumentSubtypeBinding;
   }
 
   bool mustBeMaterializable() const {

@@ -4556,20 +4556,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (locator.isFunctionConversion()) {
       increaseScore(SK_FunctionConversion);
     }
-
-    SmallVector<ConstraintLocator::PathElement, 8> path;
-    auto *anchor = locator.getLocatorParts(path);
-
-    if (anchor) {
-      if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        if (auto *unresolvedDotExpr = dyn_cast<UnresolvedDotExpr>(applyExpr->getFn())) {
-          if (TC.getSelfForInitDelegationInConstructor(DC, unresolvedDotExpr)) {
-            getConstraintLocator(locator)->dump(this);
-            increaseScore(SK_FunctionConversion);
-          }
-        }
-      }
-    }
   };
 
   // Local function to form an unsolved result.
