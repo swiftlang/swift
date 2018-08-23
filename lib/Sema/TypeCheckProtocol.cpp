@@ -1060,6 +1060,23 @@ bool WitnessChecker::findBestWitness(
   }
 
   if (numViable == 0) {
+    // Assume any missing value witnesses for a conformance in a textual
+    // interface can be treated as opaque.
+    // FIXME: ...but we should do something better about types.
+    if (conformance && !conformance->isInvalid()) {
+      if (auto *SF = DC->getParentSourceFile()) {
+        if (SF->Kind == SourceFileKind::Interface) {
+          auto match = matchWitness(TC, ReqEnvironmentCache, Proto,
+                                    conformance, DC, requirement, requirement);
+          assert(match.isViable());
+          numViable = 1;
+          bestIdx = matches.size();
+          matches.push_back(std::move(match));
+          return true;
+        }
+      }
+    }
+
     if (anyFromUnconstrainedExtension &&
         conformance != nullptr &&
         conformance->isInvalid()) {
@@ -4598,8 +4615,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     currentDecl = cast<NominalTypeDecl>(dc);
   }
 
+  SourceFile *SF = dc->getParentSourceFile();
   ReferencedNameTracker *tracker = nullptr;
-  if (SourceFile *SF = dc->getParentSourceFile())
+  if (SF)
     tracker = SF->getReferencedNameTracker();
 
   // Check each of the conformances associated with this context.
@@ -4804,85 +4822,88 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // If there were any unsatisfied requirements, check whether there
   // are any near-matches we should diagnose.
   if (!unsatisfiedReqs.empty() && !anyInvalid) {
-    // Find all of the members that aren't used to satisfy
-    // requirements, and check whether they are close to an
-    // unsatisfied or defaulted requirement.
-    for (auto member : idc->getMembers()) {
-      // Filter out anything that couldn't satisfy one of the
-      // requirements or was used to satisfy a different requirement.
-      auto value = dyn_cast<ValueDecl>(member);
-      if (!value) continue;
-      if (isa<TypeDecl>(value)) continue;
-      if (!value->getFullName()) continue;
+    if (SF && SF->Kind != SourceFileKind::Interface) {
+      // Find all of the members that aren't used to satisfy
+      // requirements, and check whether they are close to an
+      // unsatisfied or defaulted requirement.
+      for (auto member : idc->getMembers()) {
+        // Filter out anything that couldn't satisfy one of the
+        // requirements or was used to satisfy a different requirement.
+        auto value = dyn_cast<ValueDecl>(member);
+        if (!value) continue;
+        if (isa<TypeDecl>(value)) continue;
+        if (!value->getFullName()) continue;
 
-      // If this declaration overrides another declaration, the signature is
-      // fixed; don't complain about near misses.
-      if (value->getOverriddenDecl()) continue;
+        // If this declaration overrides another declaration, the signature is
+        // fixed; don't complain about near misses.
+        if (value->getOverriddenDecl()) continue;
 
-      // If this member is a witness to any @objc requirement, ignore it.
-      if (!findWitnessedObjCRequirements(value, /*anySingleRequirement=*/true)
-            .empty())
-        continue;
+        // If this member is a witness to any @objc requirement, ignore it.
+        if (!findWitnessedObjCRequirements(value, /*anySingleRequirement=*/true)
+              .empty())
+          continue;
 
-      // Find the unsatisfied requirements with the nearest-matching
-      // names.
-      SmallVector<ValueDecl *, 4> bestOptionalReqs;
-      unsigned bestScore = UINT_MAX;
-      for (auto req : unsatisfiedReqs) {
-        // Skip unavailable requirements.
-        if (req->getAttrs().isUnavailable(Context)) continue;
+        // Find the unsatisfied requirements with the nearest-matching
+        // names.
+        SmallVector<ValueDecl *, 4> bestOptionalReqs;
+        unsigned bestScore = UINT_MAX;
+        for (auto req : unsatisfiedReqs) {
+          // Skip unavailable requirements.
+          if (req->getAttrs().isUnavailable(Context)) continue;
 
-        // Score this particular optional requirement.
-        auto score = scorePotentiallyMatching(*this, req, value, bestScore);
-        if (!score) continue;
+          // Score this particular optional requirement.
+          auto score = scorePotentiallyMatching(*this, req, value, bestScore);
+          if (!score) continue;
 
-        // If the score is better than the best we've seen, update the best
-        // and clear out the list.
-        if (*score < bestScore) {
-          bestOptionalReqs.clear();
-          bestScore = *score;
-        }
-
-        // If this score matches the (possible new) best score, record it.
-        if (*score == bestScore)
-          bestOptionalReqs.push_back(req);
-      }
-
-      // If we found some requirements with nearly-matching names, diagnose
-      // the first one.
-      if (bestScore < UINT_MAX) {
-        bestOptionalReqs.erase(
-          std::remove_if(
-            bestOptionalReqs.begin(),
-            bestOptionalReqs.end(),
-            [&](ValueDecl *req) {
-              return !shouldWarnAboutPotentialWitness(groupChecker, req, value,
-                                                      defaultAccess, bestScore);
-            }),
-          bestOptionalReqs.end());
-      }
-
-      // If we have something to complain about, do so.
-      if (!bestOptionalReqs.empty()) {
-        auto req = bestOptionalReqs[0];
-        bool diagnosed = false;
-        for (auto conformance : conformances) {
-          if (conformance->getProtocol() == req->getDeclContext()) {
-            diagnosePotentialWitness(*this,
-                                     conformance->getRootNormalConformance(),
-                                     req, value, defaultAccess);
-            diagnosed = true;
-            break;
+          // If the score is better than the best we've seen, update the best
+          // and clear out the list.
+          if (*score < bestScore) {
+            bestOptionalReqs.clear();
+            bestScore = *score;
           }
-        }
-        assert(diagnosed && "Failed to find conformance to diagnose?");
-        (void)diagnosed;
 
-        // Remove this requirement from the list. We don't want to
-        // complain about it twice.
-        unsatisfiedReqs.erase(std::find(unsatisfiedReqs.begin(),
-                                        unsatisfiedReqs.end(),
-                                        req));
+          // If this score matches the (possible new) best score, record it.
+          if (*score == bestScore)
+            bestOptionalReqs.push_back(req);
+        }
+
+        // If we found some requirements with nearly-matching names, diagnose
+        // the first one.
+        if (bestScore < UINT_MAX) {
+          bestOptionalReqs.erase(
+            std::remove_if(
+              bestOptionalReqs.begin(),
+              bestOptionalReqs.end(),
+              [&](ValueDecl *req) {
+                return !shouldWarnAboutPotentialWitness(groupChecker, req,
+                                                        value, defaultAccess,
+                                                        bestScore);
+              }),
+            bestOptionalReqs.end());
+        }
+
+        // If we have something to complain about, do so.
+        if (!bestOptionalReqs.empty()) {
+          auto req = bestOptionalReqs[0];
+          bool diagnosed = false;
+          for (auto conformance : conformances) {
+            if (conformance->getProtocol() == req->getDeclContext()) {
+              diagnosePotentialWitness(*this,
+                                       conformance->getRootNormalConformance(),
+                                       req, value, defaultAccess);
+              diagnosed = true;
+              break;
+            }
+          }
+          assert(diagnosed && "Failed to find conformance to diagnose?");
+          (void)diagnosed;
+
+          // Remove this requirement from the list. We don't want to
+          // complain about it twice.
+          unsatisfiedReqs.erase(std::find(unsatisfiedReqs.begin(),
+                                          unsatisfiedReqs.end(),
+                                          req));
+        }
       }
     }
 

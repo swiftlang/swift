@@ -2699,6 +2699,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return nullptr;
     }
 
+    theStruct->setAddedImplicitInitializers();
     if (isImplicit)
       theStruct->setImplicit();
     theStruct->setIsObjC(isObjC);
@@ -3606,6 +3607,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return nullptr;
     }
 
+    theEnum->setAddedImplicitInitializers();
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setIsObjC(isObjC);
