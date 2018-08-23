@@ -31,30 +31,34 @@ func twoShorthandsFollowedByDeprecated() {}
 // SR-8598: Missing/wrong warning message for '*' or 'swift' platform.
 
 @available(*, deprecated: 4.2)
-// expected-warning@-1 {{unexpected version number for non-specific platform '*' in 'available' attribute}}
+// expected-warning@-1 {{unexpected version number in 'available' attribute for non-specific platform '*'}} {{25-30=}}
 func allPlatformsDeprecatedVersion() {}
 
 @available(*, deprecated, obsoleted: 4.2)
-// expected-warning@-1 {{unexpected version number for non-specific platform '*' in 'available' attribute}}
+// expected-warning@-1 {{unexpected version number in 'available' attribute for non-specific platform '*'}} {{36-41=}}
 func allPlatformsDeprecatedAndObsoleted() {}
 
+@available(*, introduced: 4.0, deprecated: 4.1, obsoleted: 4.2)
+// expected-warning@-1 {{unexpected version number in 'available' attribute for non-specific platform '*'}} {{25-30=}} {{42-47=}} {{58-63=}}
+func allPlatformsDeprecatedAndObsoleted2() {}
+
 @available(swift, unavailable)
-// expected-warning@-1 {{argument 'unavailable' is infeasible for swift platform in 'available' attribute}}
+// expected-warning@-1 {{'unavailable' cannot be used in 'available' attribute for platform 'swift'}}
 func swiftUnavailable() {}
 
 @available(swift, unavailable, introduced: 4.2)
-// expected-warning@-1 {{argument 'unavailable' is infeasible for swift platform in 'available' attribute}}
+// expected-warning@-1 {{'unavailable' cannot be used in 'available' attribute for platform 'swift'}}
 func swiftUnavailableIntroduced() {}
 
 @available(swift, deprecated)
-// expected-warning@-1 {{'deprecated' must have a version number for swift platform in 'available' attribute}}
+// expected-warning@-1 {{expected version number with 'deprecated' in 'available' attribute for platform 'swift'}}
 func swiftDeprecated() {}
 
 @available(swift, deprecated, obsoleted: 4.2)
-// expected-warning@-1 {{'deprecated' must have a version number for swift platform in 'available' attribute}}
+// expected-warning@-1 {{expected version number with 'deprecated' in 'available' attribute for platform 'swift'}}
 func swiftDeprecatedObsoleted() {}
 
 @available(swift, message: "missing valid option")
-// expected-warning@-1 {{expected 'available' option with a version number for swift platform, such as 'introduced', 'deprecated', or 'obsoleted'}}
+// expected-warning@-1 {{expected 'introduced', 'deprecated', or 'obsoleted' in 'available' attribute for platform 'swift'}}
 func swiftMessage() {}
 
