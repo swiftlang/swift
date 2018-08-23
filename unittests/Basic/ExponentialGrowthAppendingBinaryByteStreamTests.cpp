@@ -76,8 +76,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, ReadAndWrite) {
 }
 
 TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteAtInvalidOffset) {
-  ExponentialGrowthAppendingBinaryByteStream Stream(/*InitialSize=*/16,
-                                                    llvm::support::little);
+  ExponentialGrowthAppendingBinaryByteStream Stream(llvm::support::little);
   EXPECT_EQ(0U, Stream.getLength());
 
   std::vector<uint8_t> InputData = {'T', 'e', 's', 't', 'T', 'e', 's', 't'};
@@ -98,8 +97,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteAtInvalidOffset) {
 TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, InitialSizeZero) {
   // Test that the stream also works with an initial size of 0, which doesn't
   // grow when doubled.
-  ExponentialGrowthAppendingBinaryByteStream Stream(/*InitialSize=*/0,
-                                                    llvm::support::little);
+  ExponentialGrowthAppendingBinaryByteStream Stream(llvm::support::little);
 
   std::vector<uint8_t> InputData = {'T', 'e', 's', 't'};
   auto Test = makeArrayRef(InputData).take_front(4);
@@ -108,12 +106,41 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, InitialSizeZero) {
 }
 
 TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, GrowMultipleSteps) {
-  ExponentialGrowthAppendingBinaryByteStream Stream(/*InitialSize=*/1,
-                                                    llvm::support::little);
+  ExponentialGrowthAppendingBinaryByteStream Stream(llvm::support::little);
 
   // Test that the buffer can grow multiple steps at once, e.g. 1 -> 2 -> 4
   std::vector<uint8_t> InputData = {'T', 'e', 's', 't'};
   auto Test = makeArrayRef(InputData).take_front(4);
   EXPECT_THAT_ERROR(Stream.writeBytes(0, Test), Succeeded());
   EXPECT_EQ(Test, Stream.data());
+}
+
+TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteIntoMiddle) {
+  // Test that the stream resizes correctly if we write into its middle
+
+  ExponentialGrowthAppendingBinaryByteStream Stream(llvm::support::little);
+
+  // Test that the buffer can grow multiple steps at once, e.g. 1 -> 2 -> 4
+  std::vector<uint8_t> InitialData = {'T', 'e', 's', 't'};
+  auto InitialDataRef = makeArrayRef(InitialData);
+  EXPECT_THAT_ERROR(Stream.writeBytes(0, InitialDataRef), Succeeded());
+  EXPECT_EQ(InitialDataRef, Stream.data());
+
+  std::vector<uint8_t> UpdateData = {'u'};
+  auto UpdateDataRef = makeArrayRef(UpdateData);
+  EXPECT_THAT_ERROR(Stream.writeBytes(1, UpdateDataRef), Succeeded());
+
+  std::vector<uint8_t> DataAfterUpdate = {'T', 'u', 's', 't'};
+  auto DataAfterUpdateRef = makeArrayRef(DataAfterUpdate);
+  EXPECT_EQ(DataAfterUpdateRef, Stream.data());
+  EXPECT_EQ(4u, Stream.getLength());
+
+  std::vector<uint8_t> InsertData = {'e', 'r'};
+  auto InsertDataRef = makeArrayRef(InsertData);
+  EXPECT_THAT_ERROR(Stream.writeBytes(4, InsertDataRef), Succeeded());
+
+  std::vector<uint8_t> DataAfterInsert = {'T', 'u', 's', 't', 'e', 'r'};
+  auto DataAfterInsertRef = makeArrayRef(DataAfterInsert);
+  EXPECT_EQ(DataAfterInsertRef, Stream.data());
+  EXPECT_EQ(6u, Stream.getLength());
 }

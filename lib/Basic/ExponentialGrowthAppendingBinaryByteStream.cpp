@@ -17,32 +17,27 @@ using namespace swift;
 
 Error ExponentialGrowthAppendingBinaryByteStream::readBytes(
     uint32_t Offset, uint32_t Size, ArrayRef<uint8_t> &Buffer) {
-  if (Offset > this->Size)
+  if (Offset > getLength())
     return make_error<BinaryStreamError>(stream_error_code::invalid_offset);
 
-  if (Offset + Size > this->Size)
+  if (Offset + Size > getLength())
     return make_error<BinaryStreamError>(stream_error_code::stream_too_short);
 
-  Buffer = ArrayRef<uint8_t>(Data + Offset, Size);
+  Buffer = ArrayRef<uint8_t>(Data.data() + Offset, Size);
   return Error::success();
 }
 
 Error ExponentialGrowthAppendingBinaryByteStream::readLongestContiguousChunk(
     uint32_t Offset, ArrayRef<uint8_t> &Buffer) {
-  if (Offset > this->Size)
+  if (Offset > getLength())
     return make_error<BinaryStreamError>(stream_error_code::invalid_offset);
 
-  Buffer = ArrayRef<uint8_t>(Data + Offset, Size - Offset);
+  Buffer = ArrayRef<uint8_t>(Data.data() + Offset, Data.size() - Offset);
   return Error::success();
 }
 
 void ExponentialGrowthAppendingBinaryByteStream::reserve(size_t Size) {
-  if (Size <= ReservedBufferSize) {
-    // The buffer is already large enough. Nothing to do.
-    return;
-  }
-  Data = (uint8_t *)realloc(Data, Size);
-  ReservedBufferSize = Size;
+  Data.reserve(Size);
 }
 
 Error ExponentialGrowthAppendingBinaryByteStream::writeBytes(
@@ -50,20 +45,16 @@ Error ExponentialGrowthAppendingBinaryByteStream::writeBytes(
   if (Buffer.empty())
     return Error::success();
 
-  if (Offset > Size)
+  if (Offset > getLength())
     return make_error<BinaryStreamError>(stream_error_code::invalid_offset);
 
   // Resize the internal buffer if needed.
   uint32_t RequiredSize = Offset + Buffer.size();
-  uint32_t NewBufferSize = ReservedBufferSize;
-  // Double the buffer size until its size is sufficient to hold the new data.
-  while (RequiredSize > NewBufferSize) {
-    NewBufferSize *= 2;
+  if (RequiredSize > Data.size()) {
+    Data.resize(RequiredSize);
   }
-  reserve(NewBufferSize);
 
-  Size += Buffer.size();
-  ::memcpy(Data + Offset, Buffer.data(), Buffer.size());
+  ::memcpy(Data.data() + Offset, Buffer.data(), Buffer.size());
 
   return Error::success();
 }
