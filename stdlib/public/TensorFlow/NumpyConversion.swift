@@ -26,8 +26,12 @@ private let np = Python.import("numpy")
 extension ShapedArray : ConvertibleFromNumpyArray
   where Scalar : NumpyScalarCompatible {
   public init?(numpyArray: PythonObject) {
-    guard let array = ContiguousNumpyArray<Scalar, Int>(numpyArray: numpyArray)
+    guard let array = ContiguousNumpyArray<Scalar>(numpyArray: numpyArray)
       else { return nil }
+
+    guard let shape = Array<Int>(array.shape) else {
+      return nil
+    }
 
     // This code avoids calling `init<S : Sequence>(shape: [Int], scalars: S)`,
     // which inefficiently copies scalars one by one. Instead,
@@ -35,27 +39,28 @@ extension ShapedArray : ConvertibleFromNumpyArray
     // does a `memcpy` of the entire `scalars` array.
     // Unecessary copying is minimized.
     let dummyPointer = UnsafeMutablePointer<Scalar>.allocate(capacity: 1)
-    let scalarCount = array.shape.reduce(1, *)
+    let scalarCount = shape.reduce(1, *)
     var scalars: [Scalar] = Array(repeating: dummyPointer.move(),
                                   count: scalarCount)
     dummyPointer.deallocate()
     scalars.withUnsafeMutableBufferPointer { buffPtr in
-      buffPtr.baseAddress!.assign(from: array.ptr, count: scalarCount)
+      buffPtr.baseAddress!.assign(from: array.baseAddress, count: scalarCount)
     }
-    self.init(shape: array.shape, scalars: scalars)
+    self.init(shape: shape, scalars: scalars)
   }
 }
 
 extension Tensor : ConvertibleFromNumpyArray
   where Scalar : NumpyScalarCompatible {
   public init?(numpyArray: PythonObject) {
-    guard let array = ContiguousNumpyArray<Scalar, Int32>(
-        numpyArray: numpyArray) else {
+    guard let array = ContiguousNumpyArray<Scalar>(numpyArray: numpyArray)
+      else { return nil }
+
+    guard let shape = Array<Int32>(array.shape) else {
       return nil
     }
-
-    let tensorShape = TensorShape(array.shape)
-    let buffPtr = UnsafeBufferPointer(start: array.ptr,
+    let tensorShape = TensorShape(shape)
+    let buffPtr = UnsafeBufferPointer(start: array.baseAddress,
                                       count: Int(tensorShape.contiguousSize))
     self.init(shape: tensorShape, scalars: buffPtr)
   }
