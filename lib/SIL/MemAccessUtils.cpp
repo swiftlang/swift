@@ -104,8 +104,7 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     // actually refer the same address) because these will be dynamically
     // checked.
     auto *REA = cast<RefElementAddrInst>(base);
-    SILValue Object = stripBorrow(REA->getOperand());
-    objProj = ObjectProjection(Object, Projection(REA));
+    objProj = ObjectProjection(REA);
   }
   }
 }
