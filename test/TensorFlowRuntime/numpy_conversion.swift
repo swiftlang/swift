@@ -49,6 +49,16 @@ NumpyConversionTests.test("shaped-array-conversion") {
     expectEqual(ShapedArray(shape: [1, 2, 3], scalars: [1, 2, 3, 4, 5, 6]),
                 array)
   }
+
+  let numpyArrayStrided = np.array([[1, 2], [1, 2]], dtype: np.int32)[
+      Python.slice(Python.None), 1]
+  // Assert that the array has a stride, so that we're certainly testing a
+  // strided array.
+  expectNotEqual(numpyArrayStrided.__array_interface__["strides"], Python.None)
+  if let array = expectNotNil(
+      ShapedArray<Int32>(numpyArray: numpyArrayStrided)) {
+    expectEqual(ShapedArray(shape: [2], scalars: [2, 2]), array)
+  }
 }
 
 NumpyConversionTests.test("tensor-conversion") {
@@ -81,6 +91,15 @@ NumpyConversionTests.test("tensor-conversion") {
   if let tensor = expectNotNil(Tensor<Int32>(numpyArray: numpyArrayInt32)) {
     expectEqual(ShapedArray(shape: [1, 2, 3], scalars: [1, 2, 3, 4, 5, 6]),
                 tensor.array)
+  }
+
+  let numpyArrayStrided = np.array([[1, 2], [1, 2]], dtype: np.int32)[
+      Python.slice(Python.None), 1]
+  // Assert that the array has a stride, so that we're certainly testing a
+  // strided array.
+  expectNotEqual(numpyArrayStrided.__array_interface__["strides"], Python.None)
+  if let tensor = expectNotNil(Tensor<Int32>(numpyArray: numpyArrayStrided)) {
+    expectEqual(ShapedArray(shape: [2], scalars: [2, 2]), tensor.array)
   }
 }
 #endif

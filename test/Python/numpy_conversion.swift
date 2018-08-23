@@ -52,6 +52,15 @@ NumpyConversionTests.test("array-conversion") {
 
   let numpyArray2D = np.ones([2, 3])
   expectNil(Array<Float>(numpyArray: numpyArray2D))
+
+  let numpyArrayStrided = np.array([[1, 2], [1, 2]], dtype: np.int32)[
+      Python.slice(Python.None), 1]
+  // Assert that the array has a stride, so that we're certainly testing a
+  // strided array.
+  expectNotEqual(numpyArrayStrided.__array_interface__["strides"], Python.None)
+  if let array = expectNotNil(Array<Int32>(numpyArray: numpyArrayStrided)) {
+    expectEqual([2, 2], array)
+  }
 }
 
 runAllTests()

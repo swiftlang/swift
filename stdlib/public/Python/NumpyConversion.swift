@@ -152,32 +152,68 @@ extension Double : NumpyScalarCompatible {
   }
 }
 
-extension Array : ConvertibleFromNumpyArray
-  where Element : NumpyScalarCompatible {
+/// A helper struct with all the data that ConvertibleFromNumpyArray
+/// implementations need to copy memory from a NumpyArray.
+public struct ContiguousNumpyArray<Scalar> {
+  /// The shape of the array.
+  public let shape: PythonObject
+
+  /// A pointer to the memory, which is guaranteed to hold the array data in
+  /// C_CONTIGUOUS format.
+  public let baseAddress: UnsafePointer<Scalar>
+
+  /// The array itself. We hold it in this struct so that `baseAddress` points
+  /// to valid memory as long as this struct is around.
+  private let contiguousNumpyArray: PythonObject
+}
+
+extension ContiguousNumpyArray : ConvertibleFromNumpyArray
+  where Scalar : NumpyScalarCompatible {
   public init?(numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
     guard Python.isinstance(numpyArray, np.ndarray) == true else {
       return nil
     }
-    // Check if the dtype of the `ndarray` is compatible with the `Element`
+    // Check if the dtype of the `ndarray` is compatible with the `Scalar`
     // type.
-    guard Element.isCompatible(withNumpyScalarType: numpyArray.dtype) else {
+    guard Scalar.isCompatible(withNumpyScalarType: numpyArray.dtype) else {
+      return nil
+    }
+
+    // Make sure that the array is contiguous in memory. This does a copy if
+    // the array is not already contiguous in memory.
+    let contiguousNumpyArray = np.ascontiguousarray(numpyArray)
+
+    guard let baseAddressVal =
+      UInt(contiguousNumpyArray.__array_interface__["data"].tuple2.0) else {
+      return nil
+    }
+    // Note: `baseAddress` is not nil even if the `ndarray` is empty (i.e. has
+    // a shape of `(0,)`).
+    guard let baseAddress = UnsafePointer<Scalar>(bitPattern: baseAddressVal)
+      else { fatalError("numpy.ndarray data pointer was nil") }
+
+    self.shape = numpyArray.__array_interface__["shape"]
+    self.baseAddress = baseAddress
+    self.contiguousNumpyArray = contiguousNumpyArray
+  }
+}
+
+extension Array : ConvertibleFromNumpyArray
+  where Element : NumpyScalarCompatible {
+  public init?(numpyArray: PythonObject) {
+    guard let array = ContiguousNumpyArray<Element>(numpyArray: numpyArray)
+      else { return nil }
+
+    guard let shape = Array<Int>(array.shape) else {
       return nil
     }
 
     // Only 1-D `ndarray` instances can be converted to `Array`.
-    let pyShape = numpyArray.__array_interface__["shape"]
-    guard let shape = Array<Int>(pyShape) else { return nil }
     guard shape.count == 1 else {
       return nil
     }
-    guard let ptrVal =
-      UInt(numpyArray.__array_interface__["data"].tuple2.0) else {
-      return nil
-    }
-    guard let ptr = UnsafePointer<Element>(bitPattern: ptrVal) else {
-      fatalError("numpy.ndarray data pointer was nil")
-    }
+
     // This code avoids constructing and initialize from `UnsafeBufferPointer`
     // because that uses the `init<S : Sequence>(_ elements: S)` initializer,
     // which performs unnecessary copying.
@@ -186,7 +222,7 @@ extension Array : ConvertibleFromNumpyArray
     self.init(repeating: dummyPointer.move(), count: scalarCount)
     dummyPointer.deallocate()
     withUnsafeMutableBufferPointer { buffPtr in
-      buffPtr.baseAddress!.assign(from: ptr, count: scalarCount)
+      buffPtr.baseAddress!.assign(from: array.baseAddress, count: scalarCount)
     }
   }
 }
