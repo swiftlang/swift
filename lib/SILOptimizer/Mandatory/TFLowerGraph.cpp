@@ -1112,6 +1112,8 @@ static int decodeShapeAttr(const ASTContext &ctx,
     attr = attr.getEnumPayloadValue();
   }
 
+  attr = attr.lookThroughSingleElementAggregates();
+
   CanType eltType;
   auto arrayValue = attr.getArrayValue(eltType);
   for (auto elt : arrayValue) {
