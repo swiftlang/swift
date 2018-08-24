@@ -3304,7 +3304,7 @@ struct TargetForeignMetadataInitialization {
 /// The cache structure for non-trivial initialization of singleton value
 /// metadata.
 template <typename Runtime>
-struct TargetInPlaceValueMetadataCache {
+struct TargetSingletonMetadataCache {
   /// The metadata pointer.  Clients can do dependency-ordered loads
   /// from this, and if they see a non-zero value, it's a Complete
   /// metadata.
@@ -3313,24 +3313,32 @@ struct TargetInPlaceValueMetadataCache {
   /// The private cache data.
   std::atomic<TargetPointer<Runtime, void>> Private;
 };
-using InPlaceValueMetadataCache =
-  TargetInPlaceValueMetadataCache<InProcess>;
+using SingletonMetadataCache =
+  TargetSingletonMetadataCache<InProcess>;
 
 template <typename Runtime>
 struct TargetResilientClassMetadataPattern;
 
-/// An instantiation pattern for non-generic resilient class metadata.
-/// Used in conjunction with InPlaceValueMetadataInitialization.
+/// A function for allocating metadata for a resilient class, calculating
+/// the correct metadata size at runtime.
 using MetadataRelocator =
   Metadata *(const TargetTypeContextDescriptor<InProcess> *type,
              const TargetResilientClassMetadataPattern<InProcess> *pattern);
 
 /// An instantiation pattern for non-generic resilient class metadata.
+///
+/// Used for classes with resilient ancestry, that is, where at least one
+/// ancestor is defined in a different resilience domain.
+///
+/// The hasResilientSuperclass() flag in the class context descriptor is
+/// set in this case, and hasSingletonMetadataInitialization() must be
+/// set as well.
+///
+/// The pattern is referenced from the SingletonMetadataInitialization
+/// record in the class context descriptor.
 template <typename Runtime>
 struct TargetResilientClassMetadataPattern {
-  /// If the class descriptor's hasResilientSuperclass() flag is set,
-  /// this field instead points at a function that allocates metadata
-  /// with the correct size at runtime.
+  /// A function that allocates metadata with the correct size at runtime.
   TargetRelativeDirectPointer<Runtime, MetadataRelocator> RelocationFunction;
 
   /// The heap-destructor function.
@@ -3358,10 +3366,10 @@ using ResilientClassMetadataPattern =
 /// singleton value metadata, which is required when e.g. a non-generic
 /// value type has a resilient component type.
 template <typename Runtime>
-struct TargetInPlaceValueMetadataInitialization {
+struct TargetSingletonMetadataInitialization {
   /// The initialization cache.  Out-of-line because mutable.
   TargetRelativeDirectPointer<Runtime,
-                              TargetInPlaceValueMetadataCache<Runtime>>
+                              TargetSingletonMetadataCache<Runtime>>
     InitializationCache;
 
   union {
@@ -3371,17 +3379,19 @@ struct TargetInPlaceValueMetadataInitialization {
       IncompleteMetadata;
 
     /// If the class descriptor's hasResilientSuperclass() flag is set,
-    /// this field instead points at a function that allocates metadata
-    /// with the correct size at runtime.
+    /// this field instead points at a pattern used to allocate and
+    /// initialize metadata for this class, since it's size and contents
+    /// is not known at compile time.
     TargetRelativeDirectPointer<Runtime, TargetResilientClassMetadataPattern<Runtime>>
       ResilientPattern;
   };
 
-  /// The completion function.  The pattern will always be null.
+  /// The completion function.  The pattern will always be null, even
+  /// for a resilient class.
   TargetRelativeDirectPointer<Runtime, MetadataCompleter>
     CompletionFunction;
 
-  bool hasRelocationFunction(
+  bool hasResilientClassPattern(
       const TargetTypeContextDescriptor<Runtime> *description) const {
     auto *classDescription =
       dyn_cast<TargetClassDescriptor<Runtime>>(description);
@@ -3391,7 +3401,7 @@ struct TargetInPlaceValueMetadataInitialization {
 
   TargetMetadata<Runtime> *allocate(
       const TargetTypeContextDescriptor<Runtime> *description) const {
-    if (hasRelocationFunction(description)) {
+    if (hasResilientClassPattern(description)) {
       return ResilientPattern->RelocationFunction(description,
                                                   ResilientPattern.get());
     }
@@ -3435,12 +3445,12 @@ public:
     return getTypeContextDescriptorFlags().getMetadataInitialization();
   }
 
-  /// Does this type have non-trivial "in place" metadata initialization?
+  /// Does this type have non-trivial "singleton" metadata initialization?
   ///
   /// The type of the initialization-control structure differs by subclass,
   /// so it doesn't appear here.
-  bool hasInPlaceMetadataInitialization() const {
-    return getTypeContextDescriptorFlags().hasInPlaceMetadataInitialization();
+  bool hasSingletonMetadataInitialization() const {
+    return getTypeContextDescriptorFlags().hasSingletonMetadataInitialization();
   }
 
   /// Does this type have "foreign" metadata initialiation?
@@ -3453,8 +3463,8 @@ public:
   const TargetForeignMetadataInitialization<Runtime> &
   getForeignMetadataInitialization() const;
 
-  const TargetInPlaceValueMetadataInitialization<Runtime> &
-  getInPlaceMetadataInitialization() const;
+  const TargetSingletonMetadataInitialization<Runtime> &
+  getSingletonMetadataInitialization() const;
 
   const TargetTypeGenericContextDescriptorHeader<Runtime> &
   getFullGenericContextHeader() const;
@@ -3580,7 +3590,7 @@ class TargetClassDescriptor final
                               TargetTypeGenericContextDescriptorHeader,
                               /*additional trailing objects:*/
                               TargetForeignMetadataInitialization<Runtime>,
-                              TargetInPlaceValueMetadataInitialization<Runtime>,
+                              TargetSingletonMetadataInitialization<Runtime>,
                               TargetVTableDescriptorHeader<Runtime>,
                               TargetMethodDescriptor<Runtime>> {
 private:
@@ -3588,7 +3598,7 @@ private:
     TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
                                   TargetTypeGenericContextDescriptorHeader,
                                   TargetForeignMetadataInitialization<Runtime>,
-                                  TargetInPlaceValueMetadataInitialization<Runtime>,
+                                  TargetSingletonMetadataInitialization<Runtime>,
                                   TargetVTableDescriptorHeader<Runtime>,
                                   TargetMethodDescriptor<Runtime>>;
 
@@ -3601,8 +3611,8 @@ public:
   using VTableDescriptorHeader = TargetVTableDescriptorHeader<Runtime>;
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
-  using InPlaceMetadataInitialization =
-    TargetInPlaceValueMetadataInitialization<Runtime>;
+  using SingletonMetadataInitialization =
+    TargetSingletonMetadataInitialization<Runtime>;
 
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
@@ -3694,8 +3704,8 @@ private:
     return this->hasForeignMetadataInitialization() ? 1 : 0;
   }
 
-  size_t numTrailingObjects(OverloadToken<InPlaceMetadataInitialization>) const{
-    return this->hasInPlaceMetadataInitialization() ? 1 : 0;
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataInitialization>) const{
+    return this->hasSingletonMetadataInitialization() ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<VTableDescriptorHeader>) const {
@@ -3715,9 +3725,9 @@ public:
     return *this->template getTrailingObjects<ForeignMetadataInitialization>();
   }
 
-  const InPlaceMetadataInitialization &getInPlaceMetadataInitialization() const{
-    assert(this->hasInPlaceMetadataInitialization());
-    return *this->template getTrailingObjects<InPlaceMetadataInitialization>();
+  const SingletonMetadataInitialization &getSingletonMetadataInitialization() const{
+    assert(this->hasSingletonMetadataInitialization());
+    return *this->template getTrailingObjects<SingletonMetadataInitialization>();
   }
 
   /// True if metadata records for this type have a field offset vector for
@@ -3830,19 +3840,19 @@ class TargetStructDescriptor final
                             TargetTypeGenericContextDescriptorHeader,
                             /*additional trailing objects*/
                             TargetForeignMetadataInitialization<Runtime>,
-                            TargetInPlaceValueMetadataInitialization<Runtime>> {
+                            TargetSingletonMetadataInitialization<Runtime>> {
 public:
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
-  using InPlaceMetadataInitialization =
-    TargetInPlaceValueMetadataInitialization<Runtime>;
+  using SingletonMetadataInitialization =
+    TargetSingletonMetadataInitialization<Runtime>;
 
 private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
                                   TargetTypeGenericContextDescriptorHeader,
                                   ForeignMetadataInitialization,
-                                  InPlaceMetadataInitialization>;
+                                  SingletonMetadataInitialization>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -3856,8 +3866,8 @@ private:
     return this->hasForeignMetadataInitialization() ? 1 : 0;
   }
 
-  size_t numTrailingObjects(OverloadToken<InPlaceMetadataInitialization>) const{
-    return this->hasInPlaceMetadataInitialization() ? 1 : 0;
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataInitialization>) const{
+    return this->hasSingletonMetadataInitialization() ? 1 : 0;
   }
 
 public:
@@ -3883,9 +3893,9 @@ public:
     return *this->template getTrailingObjects<ForeignMetadataInitialization>();
   }
 
-  const InPlaceMetadataInitialization &getInPlaceMetadataInitialization() const{
-    assert(this->hasInPlaceMetadataInitialization());
-    return *this->template getTrailingObjects<InPlaceMetadataInitialization>();
+  const SingletonMetadataInitialization &getSingletonMetadataInitialization() const{
+    assert(this->hasSingletonMetadataInitialization());
+    return *this->template getTrailingObjects<SingletonMetadataInitialization>();
   }
 
   static constexpr int32_t getGenericArgumentOffset() {
@@ -3906,10 +3916,10 @@ class TargetEnumDescriptor final
                             TargetTypeGenericContextDescriptorHeader,
                             /*additional trailing objects*/
                             TargetForeignMetadataInitialization<Runtime>,
-                            TargetInPlaceValueMetadataInitialization<Runtime>> {
+                            TargetSingletonMetadataInitialization<Runtime>> {
 public:
-  using InPlaceMetadataInitialization =
-    TargetInPlaceValueMetadataInitialization<Runtime>;
+  using SingletonMetadataInitialization =
+    TargetSingletonMetadataInitialization<Runtime>;
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
 
@@ -3918,7 +3928,7 @@ private:
     TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
                                   TargetTypeGenericContextDescriptorHeader,
                                   ForeignMetadataInitialization,
-                                  InPlaceMetadataInitialization>;
+                                  SingletonMetadataInitialization>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -3932,8 +3942,8 @@ private:
     return this->hasForeignMetadataInitialization() ? 1 : 0;
   }
 
-  size_t numTrailingObjects(OverloadToken<InPlaceMetadataInitialization>) const{
-    return this->hasInPlaceMetadataInitialization() ? 1 : 0;
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataInitialization>) const{
+    return this->hasSingletonMetadataInitialization() ? 1 : 0;
   }
 
 public:
@@ -3977,9 +3987,9 @@ public:
     return *this->template getTrailingObjects<ForeignMetadataInitialization>();
   }
 
-  const InPlaceMetadataInitialization &getInPlaceMetadataInitialization() const{
-    assert(this->hasInPlaceMetadataInitialization());
-    return *this->template getTrailingObjects<InPlaceMetadataInitialization>();
+  const SingletonMetadataInitialization &getSingletonMetadataInitialization() const{
+    assert(this->hasSingletonMetadataInitialization());
+    return *this->template getTrailingObjects<SingletonMetadataInitialization>();
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -4089,18 +4099,18 @@ TargetTypeContextDescriptor<Runtime>::getForeignMetadataInitialization() const {
 }
 
 template<typename Runtime>
-inline const TargetInPlaceValueMetadataInitialization<Runtime> &
-TargetTypeContextDescriptor<Runtime>::getInPlaceMetadataInitialization() const {
+inline const TargetSingletonMetadataInitialization<Runtime> &
+TargetTypeContextDescriptor<Runtime>::getSingletonMetadataInitialization() const {
   switch (this->getKind()) {
   case ContextDescriptorKind::Enum:
     return llvm::cast<TargetEnumDescriptor<Runtime>>(this)
-        ->getInPlaceMetadataInitialization();
+        ->getSingletonMetadataInitialization();
   case ContextDescriptorKind::Struct:
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)
-        ->getInPlaceMetadataInitialization();
+        ->getSingletonMetadataInitialization();
   case ContextDescriptorKind::Class:
     return llvm::cast<TargetClassDescriptor<Runtime>>(this)
-        ->getInPlaceMetadataInitialization();
+        ->getSingletonMetadataInitialization();
   default:
     swift_runtime_unreachable("Not a enum, struct or class type descriptor.");
   }

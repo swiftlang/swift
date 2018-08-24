@@ -1204,9 +1204,9 @@ private:
       switch (typeFlags.getMetadataInitialization()) {
       case TypeContextDescriptorFlags::NoMetadataInitialization:
         return 0;
-      case TypeContextDescriptorFlags::InPlaceMetadataInitialization:
+      case TypeContextDescriptorFlags::SingletonMetadataInitialization:
         // FIXME: classes
-        return sizeof(TargetInPlaceValueMetadataInitialization<Runtime>);
+        return sizeof(TargetSingletonMetadataInitialization<Runtime>);
       case TypeContextDescriptorFlags::ForeignMetadataInitialization:
         return sizeof(TargetForeignMetadataInitialization<Runtime>);
       }

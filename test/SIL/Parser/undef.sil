@@ -21,7 +21,7 @@ struct S {
 
 enum E {
   case Case
-  case DataCase(())
+  case DataCase(Void)
 }
 
 sil @general_test : $() -> () {

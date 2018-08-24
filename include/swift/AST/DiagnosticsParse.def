@@ -866,6 +866,18 @@ ERROR(initializer_as_typed_pattern,none,
 ERROR(unlabeled_parameter_following_variadic_parameter,none,
       "a parameter following a variadic parameter requires a label", ())
 
+ERROR(enum_element_empty_arglist,none,
+      "enum element with associated values must have at least one "
+      "associated value", ())
+WARNING(enum_element_empty_arglist_swift4,none,
+        "enum element with associated values must have at least one "
+        "associated value; this will be an error in the future "
+        "version of Swift", ())
+NOTE(enum_element_empty_arglist_delete,none,
+     "did you mean to remove the empty associated value list?", ())
+NOTE(enum_element_empty_arglist_add_void,none,
+     "did you mean to explicitly add a 'Void' associated value?", ())
+
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
 //------------------------------------------------------------------------------

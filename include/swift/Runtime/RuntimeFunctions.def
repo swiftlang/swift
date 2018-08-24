@@ -653,9 +653,9 @@ FUNCTION(GetForeignWitnessTable, swift_getForeignWitnessTable, C_CC,
               ProtocolDescriptorPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// MetadataResponse swift_getInPlaceMetadata(MetadataRequest request,
-//                                           TypeContextDescriptor *type);
-FUNCTION(GetInPlaceMetadata, swift_getInPlaceMetadata, SwiftCC,
+// MetadataResponse swift_getSingletonMetadata(MetadataRequest request,
+//                                             TypeContextDescriptor *type);
+FUNCTION(GetSingletonMetadata, swift_getSingletonMetadata, SwiftCC,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy, TypeContextDescriptorPtrTy),
          ATTRS(NoUnwind, ReadNone))
