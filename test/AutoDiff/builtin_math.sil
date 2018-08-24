@@ -11,6 +11,12 @@ bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   return %2 : $Builtin.FPIEEE32
 }
 
+sil @simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
+bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
+  %2 = builtin "fdiv_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  return %2 : $Builtin.FPIEEE32
+}
+
 sil @chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
 bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   %2 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
@@ -26,6 +32,7 @@ bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   %5 = builtin "fsub_FPIEEE32"(%4 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
   return %5 : $Builtin.FPIEEE32
 }
+
 sil @fanout : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32 {
 bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
   // f(x, y) =
@@ -44,6 +51,11 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
   %simple_mul = function_ref @simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
   %simple_mul_grad = gradient [source 0] [wrt 0, 1] %simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
+  // FIXME(SR-8584): Uncomment this test when the crasher gets fixed.
+  //
+  // %simple_div = function_ref @simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+  // %simple_div_grad = gradient [source 0] [wrt 0, 1] %simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+
   %chain_rule = function_ref @chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
   %chain_rule_grad = gradient [source 0] [wrt 0, 1] %chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
@@ -60,6 +72,10 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK-LABEL: struct simple_mul__Type {
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
 // CHECK: }
+
+// HECK-LABEL: struct simple_div__Type {
+// HECK:   @sil_stored var v_0: Builtin.FPIEEE32
+// HECK: }
 
 // CHECK-LABEL: struct chain_rule__Type {
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
