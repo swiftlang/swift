@@ -245,18 +245,18 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
       capacity: capacity,
       elementTypeIsBridgedVerbatim: verbatim)
   }
-	
-	@inlinable
-	internal var assertsOnCopy: Bool {
-		get {
-			return _storage.countAndCapacity.assertsOnCopy
-		}
-	}
-	
-	@inlinable
-	internal func setAssertsOnCopy(_ newValue: Bool) {
-		_storage.countAndCapacity.assertsOnCopy = newValue
-	}
+  
+  @inlinable
+  internal var assertsOnCopy: Bool {
+    get {
+      return _storage.countAndCapacity.assertsOnCopy
+    }
+  }
+  
+  @inlinable
+  internal func setAssertsOnCopy(_ newValue: Bool) {
+    _storage.countAndCapacity.assertsOnCopy = newValue
+  }
 
   /// True, if the array is native and does not need a deferred type check.
   @inlinable

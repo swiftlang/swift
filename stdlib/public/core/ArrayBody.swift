@@ -80,17 +80,17 @@ internal struct _ArrayBody {
         = newValue ? _capacityAndFlags | 1 : _capacityAndFlags & ~1
     }
   }
-	
-	@inlinable
-	internal var assertsOnCopy: Bool {
-		get {
-			return (_capacityAndFlags & 0x2) != 0
-		}
-		set {
-			_capacityAndFlags
-				= newValue ? (_capacityAndFlags | 2) : (_capacityAndFlags & ~2)
-		}
-	}
+
+  @inlinable
+  internal var assertsOnCopy: Bool {
+    get {
+      return (_capacityAndFlags & 0x2) != 0
+    }
+    set {
+      _capacityAndFlags
+        = newValue ? (_capacityAndFlags | 2) : (_capacityAndFlags & ~2)
+    }
+  }
 
   /// Storage optimization: compresses capacity and
   /// elementTypeIsBridgedVerbatim together.

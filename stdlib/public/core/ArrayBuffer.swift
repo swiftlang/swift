@@ -144,7 +144,7 @@ extension _ArrayBuffer {
         return b
       }
     }
-		assert(assertsOnCopy == false)
+    assert(assertsOnCopy == false)
     return nil
   }
 
@@ -366,20 +366,20 @@ extension _ArrayBuffer {
   internal var capacity: Int {
     return _fastPath(_isNative) ? _native.capacity : _nonNative.count
   }
-	
-	@inlinable
-	internal var assertsOnCopy: Bool {
-		get {
-			return _fastPath(_isNative) ? _native.assertsOnCopy : false
-		}
-		nonmutating set {
-			if _fastPath(_isNative) {
-				_native.setAssertsOnCopy(newValue)
-			// } else {
-			// 	_nonNative.assertsOnCopy = newValue
-			}
-		}
-	}
+  
+  @inlinable
+  internal var assertsOnCopy: Bool {
+    get {
+      return _fastPath(_isNative) ? _native.assertsOnCopy : false
+    }
+    nonmutating set {
+      if _fastPath(_isNative) {
+        _native.setAssertsOnCopy(newValue)
+      // } else {
+      //   _nonNative.assertsOnCopy = newValue
+      }
+    }
+  }
 
   @inlinable
   @inline(__always)

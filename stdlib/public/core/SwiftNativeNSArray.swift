@@ -99,7 +99,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
         byteCount: range.length * MemoryLayout<AnyObject>.stride)
     }
   }
-	
+
   @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
