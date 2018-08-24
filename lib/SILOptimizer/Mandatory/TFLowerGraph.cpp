@@ -1094,31 +1094,47 @@ static void decodeShapeArrayLegacy(const SILTensorOpInfo &tfopInfo,
   }
 }
 
-// This helper function decodes a shape attribute into its values.
-static void decodeShapeAttr(SymbolicValue attr,
-                            SmallVectorImpl<int64_t> &result) {
-  attr = attr.lookThroughSingleElementAggregates();
-  CanType eltType;
-  for (auto elt : attr.getArrayValue(eltType)) {
-    elt = elt.lookThroughSingleElementAggregates();
-    result.push_back(elt.getIntegerValue().getLimitedValue());
+/// This helper function decodes a shape attribute of type TensorShape or
+/// Optional<TensorShape>. It stores the dimensions to `result`, and returns
+/// the rank. Note that "nil as Optional<TensorShape>" represents "unknown
+/// rank", and that we return -1 in that case.
+static int decodeShapeAttr(const ASTContext &ctx,
+                           SymbolicValue attr,
+                           SmallVectorImpl<int64_t> &result) {
+  // Handle "nil as Optional<TensorShape>" unknown rank case.
+  if (attr.getKind() == SymbolicValue::Kind::Enum &&
+      attr.getEnumValue() == ctx.getOptionalNoneDecl()) {
+    return -1;
   }
+
+  // Extract value from Optional<TensorShape>.
+  if (attr.getKind() == SymbolicValue::Kind::EnumWithPayload) {
+    attr = attr.getEnumPayloadValue();
+  }
+
+  CanType eltType;
+  auto arrayValue = attr.getArrayValue(eltType);
+  for (auto elt : arrayValue) {
+    elt = elt.lookThroughSingleElementAggregates();
+    result.push_back(elt.getIntegerValue().sextOrTrunc(64).getLimitedValue());
+  }
+  return arrayValue.size();
 }
 
 /// Decode the shape array in `attrValue` into `dims`, `numDims` and `dimPtrs`.
-static void decodeShapeArray(SymbolicValue attrValue,
+static void decodeShapeArray(const ASTContext &ctx,
+                             SymbolicValue attrValue,
                              SmallVectorImpl<int64_t> &dims,
                              SmallVectorImpl<int> &numDims,
                              SmallVectorImpl<int64_t *> &dimPtrs) {
   CanType eltType;
   auto shapeArray = attrValue.getArrayValue(eltType);
-  assert(eltType->getString() == "TensorShape");
+  assert(eltType->getString() == "TensorShape" ||
+         eltType->getString() == "Optional<TensorShape>");
   auto numShapes = shapeArray.size();
   for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
-    auto prevNumDims = dims.size();
     auto shape = shapeArray[shapeIdx];
-    decodeShapeAttr(shape, dims);
-    numDims.push_back(int(dims.size() - prevNumDims));
+    numDims.push_back(decodeShapeAttr(ctx, shape, dims));
   }
 
   // Now that we've build the array of dimensions, convert it to the array
@@ -1133,7 +1149,8 @@ static void decodeShapeArray(SymbolicValue attrValue,
 
 /// Decode the shape array attribute at attr `attrIdx` in the graph_op
 /// instruction, into `dims`, `numDims` and `dimPtrs`.
-static void decodeShapeArrayAtAttr(const GraphOperationInfo &graphOpInfo,
+static void decodeShapeArrayAtAttr(const ASTContext &ctx,
+                                   const GraphOperationInfo &graphOpInfo,
                                    StringRef attrName, unsigned attrIdx,
                                    SmallVectorImpl<int64_t> &dims,
                                    SmallVectorImpl<int> &numDims,
@@ -1144,7 +1161,7 @@ static void decodeShapeArrayAtAttr(const GraphOperationInfo &graphOpInfo,
   assert(attrInfo.second == SILTensorOpInfo::OperandClass::Normal ||
          attrInfo.second == SILTensorOpInfo::OperandClass::ShapeArray);
   assert(attrInfo.first == attrName);
-  decodeShapeArray(attr.value, dims, numDims, dimPtrs);
+  decodeShapeArray(ctx, attr.value, dims, numDims, dimPtrs);
 }
 
 GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
@@ -1475,8 +1492,9 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorRecvInst(
   SmallVector<int64_t *, 8> dimPtrs;
   if (inst->getNumAttributes() == 4) {
     // 3 is the attr idx for the optional shape array attr.
-    decodeShapeArrayAtAttr(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
-                           numDims, dimPtrs);
+    decodeShapeArrayAtAttr(SILFn.getASTContext(), graphOpInfo,
+                           SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims, numDims,
+                           dimPtrs);
   }
   if (thisDeviceType == DeviceType::TPU) {
     return addTPUDequeueOp(inst, /* isInfeed */ true, transferId, dims, numDims,
@@ -1602,8 +1620,9 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorSendInst(
   SmallVector<int64_t *, 8> dimPtrs;
   if (inst->getNumAttributes() == 4)
     // 3 is the attr idx for the optional shape array attr.
-    decodeShapeArrayAtAttr(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
-                           numDims, dimPtrs);
+    decodeShapeArrayAtAttr(SILFn.getASTContext(), graphOpInfo,
+                           SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims, numDims,
+                           dimPtrs);
   if (thisDeviceType == DeviceType::TPU) {
     return addTPUEnqueueOp(inst, /* isInfeed */ false, transferId, dims,
                            numDims, dimPtrs);
@@ -1640,7 +1659,7 @@ GLStatus TFGraphFunctionLowering::createDatasetCreationContext(
   SmallVector<int64_t, 8> dims;
   SmallVector<int, 3> numDims;
   SmallVector<int64_t *, 8> dimPtrs;
-  decodeShapeArray(attr.value, dims, numDims, dimPtrs);
+  decodeShapeArray(SILFn.getASTContext(), attr.value, dims, numDims, dimPtrs);
 
   // Even when this built-in returns multiple tensors, they are always presented
   // by a single tuple.
@@ -2011,11 +2030,12 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         auto rawElements = attrValue.getArrayValue(elementType);
         auto elementTypeString = elementType->getString();
 
-        if (elementTypeString == "TensorShape") {
+        if (elementTypeString == "TensorShape" ||
+            elementTypeString == "Optional<TensorShape>") {
           SmallVector<int64_t, 8> dims;
           SmallVector<int, 3> numDims;
           SmallVector<int64_t *, 8> dimPtrs;
-          decodeShapeArray(attrValue, dims, numDims, dimPtrs);
+          decodeShapeArray(SILFn.getASTContext(), attrValue, dims, numDims, dimPtrs);
           TF_SetAttrShapeList(op, name.c_str(), dimPtrs.data(), numDims.data(),
                               numDims.size());
           break;
@@ -2136,7 +2156,9 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
         // Decode the shape attribute which must come next.
         auto shapeAttr = inst->getAttribute(nextAttributeNumber++).value;
-        decodeShapeAttr(shapeAttr, shape);
+        auto rank = decodeShapeAttr(SILFn.getASTContext(), shapeAttr, shape);
+        (void)rank;
+        assert(rank != -1 && "we generated a shape with unknown rank");
       }
       // Set the tensor as the attribute on the graph node.
       auto tensor = convertValuesToTensor(elements, shape, dtype);
@@ -2148,8 +2170,8 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     }
     case SILTensorOpInfo::OperandClass::Shape: {
       SmallVector<int64_t, 4> shape;
-      decodeShapeAttr(attrValue, shape);
-      TF_SetAttrShape(op, name.c_str(), shape.data(), shape.size());
+      auto rank = decodeShapeAttr(SILFn.getASTContext(), attrValue, shape);
+      TF_SetAttrShape(op, name.c_str(), shape.data(), rank);
       break;
     }
 

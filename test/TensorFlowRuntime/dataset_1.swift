@@ -40,7 +40,7 @@ public func createMockDataSet() -> VariantHandle {
   let dataset : VariantHandle = #tfop("TensorSliceDataset",
                                       [values],
                                       Toutput_types: [Float.self],
-                                      output_shapes: [TensorShape()])
+                                      output_shapes: [nil as TensorShape?])
   return dataset
 }
 
@@ -53,7 +53,7 @@ func getNextScalarFloatTensor(_ iterator: ResourceHandle) -> Tensor<Float> {
   let ret: TensorHandle<Float> = #tfop("IteratorGetNext",
                                        iterator,
                                        output_types: [Float.self],
-                                       output_shapes: [TensorShape()])
+                                       output_shapes: [nil as TensorShape?])
   return Tensor(handle: ret)
 }
 
@@ -69,7 +69,7 @@ public func model() {
     "OneShotIterator",
     dataset_factory : createMockDataSet,
     output_types: [Float.self],
-    output_shapes: [TensorShape()]
+    output_shapes: [nil as TensorShape?]
   )
 
   let one = getNextScalarFloatTensor(iterator)
@@ -91,7 +91,7 @@ public func model() {
   // let _: TensorHandle<Float> = #tfop("IteratorGetNext",
   //                                    iterator,
   //                                    output_types: [Float.self],
-  //                                    output_shapes: [TensorShape()])
+  //                                    output_shapes: [nil as TensorShape?])
 }
 
 DatasetTests.testAllBackends("Basic") {
@@ -103,7 +103,7 @@ DatasetTests.testAllBackends("MultiValue") {
   let elements1: Tensor<Int32> = [0, 1, 2]
   let elements2: Tensor<Int32> = [10, 11, 12]
   let outputTypes = [Int32.self, Int32.self]
-  let outputShapes: [TensorShape] = [[], []]
+  let outputShapes: [TensorShape?] = [nil, nil]
   let dataset: VariantHandle = #tfop(
     "TensorSliceDataset", [elements1, elements2],
     Toutput_types: outputTypes,
