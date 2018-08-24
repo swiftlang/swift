@@ -4309,16 +4309,22 @@ public:
   void verifyEpilogBlocks(SILFunction *F) {
     bool FoundReturnBlock = false;
     bool FoundThrowBlock = false;
+    bool FoundUnwindBlock = false;
     for (auto &BB : *F) {
       if (isa<ReturnInst>(BB.getTerminator())) {
         require(!FoundReturnBlock,
                 "more than one return block in function");
         FoundReturnBlock = true;
-      }
-      if (isa<ThrowInst>(BB.getTerminator())) {
+      } else if (isa<ThrowInst>(BB.getTerminator())) {
         require(!FoundThrowBlock,
                 "more than one throw block in function");
         FoundThrowBlock = true;
+      } else if (isa<UnwindInst>(BB.getTerminator())) {
+        require(!FoundUnwindBlock,
+                "more than one unwind block in function");
+        FoundUnwindBlock = true;
+      } else {
+        assert(!BB.getTerminator()->isFunctionExiting());
       }
     }
   }
