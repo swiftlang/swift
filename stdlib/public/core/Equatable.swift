@@ -244,7 +244,7 @@ extension Equatable {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -266,7 +266,7 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }
