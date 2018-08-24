@@ -171,8 +171,13 @@ extension Array : ConvertibleFromNumpyArray
     guard shape.count == 1 else {
       return nil
     }
+
+    // Make sure that the array is contiguous in memory. This does a copy if
+    // the array is not already contiguous in memory.
+    let contiguousNumpyArray = np.ascontiguousarray(numpyArray)
+
     guard let ptrVal =
-      UInt(numpyArray.__array_interface__["data"].tuple2.0) else {
+      UInt(contiguousNumpyArray.__array_interface__["data"].tuple2.0) else {
       return nil
     }
     guard let ptr = UnsafePointer<Element>(bitPattern: ptrVal) else {
