@@ -1600,8 +1600,9 @@ ConstraintSystem::matchTypesBindTypeVar(
 
   // If the left-hand type variable cannot bind to an lvalue,
   // but we still have an lvalue, fail.
-  if (!typeVar->getImpl().canBindToLValue() && type->hasLValueType())
+  if (!typeVar->getImpl().canBindToLValue() && type->hasLValueType()) {
     return getTypeMatchFailure(locator);
+  }
 
   // Disallow bindings of noescape functions to type variables that
   // represent an opened archetype. If we allowed this it would allow
@@ -2520,11 +2521,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
       }
     }
+  }
 
-    if (type2->is<LValueType>() && !isTypeVarOrMember1) {
+  if (attemptFixes && type2->is<LValueType>() && !isTypeVarOrMember1) {
       conversionsOrFixes.push_back(
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
-    }
   }
 
   if (attemptFixes)
@@ -5003,6 +5004,9 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
   increaseScore(SK_Fix);
   if (worseThanBestSolution())
     return true;
+
+  if (!fix->shouldRecordFix())
+    return false;
 
   auto *loc = fix->getLocator();
   auto existingFix = llvm::find_if(Fixes, [&](const ConstraintFix *e) {
