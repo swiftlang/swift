@@ -53,8 +53,8 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 
   // FIXME(SR-8584): Uncomment this test when the crasher gets fixed.
   //
-  // %simple_div = function_ref @simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
-  // %simple_div_grad = gradient [source 0] [wrt 0, 1] %simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+  %simple_div = function_ref @simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+  %simple_div_grad = gradient [source 0] [wrt 0, 1] %simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
   %chain_rule = function_ref @chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
   %chain_rule_grad = gradient [source 0] [wrt 0, 1] %chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
@@ -73,9 +73,9 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
 // CHECK: }
 
-// HECK-LABEL: struct simple_div__Type {
-// HECK:   @sil_stored var v_0: Builtin.FPIEEE32
-// HECK: }
+// CHECK-LABEL: struct simple_div__Type {
+// CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
+// CHECK: }
 
 // CHECK-LABEL: struct chain_rule__Type {
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
@@ -143,6 +143,17 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK:   %6 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %7 = tuple (%5 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32)
 // CHECK:   return %7 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
+// CHECK: }
+
+// CHECK-LABEL: @simple_div__adjoint_src_0_wrt_0_1
+// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $simple_div__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
+// CHECK:   %5 = builtin "fdiv_FPIEEE32"(%4 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %6 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %7 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %8 = builtin "fdiv_FPIEEE32"(%6 : $Builtin.FPIEEE32, %7 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %9 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %8 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %10 = tuple (%5 : $Builtin.FPIEEE32, %9 : $Builtin.FPIEEE32)
+// CHECK:   return %10 : $(Builtin.FPIEEE32, Builtin.FPIEEE32)
 // CHECK: }
 
 // CHECK-LABEL: @chain_rule__adjoint_src_0_wrt_0_1
