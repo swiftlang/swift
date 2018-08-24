@@ -15,20 +15,20 @@ import TestsUtils
 let size = 400
 let overlap = 100
 
-let setAB = Set(0 ..< size)
-let setCD = Set(size ..< 2 * size)
-let setBC = Set(size - overlap ..< 2 * size - overlap)
-let setB = Set(size - overlap ..< size)
+let setAB = Set(0 ..< size)                              //   0 ..< 400
+let setCD = Set(size ..< 2 * size)                       // 400 ..< 800
+let setBC = Set(size - overlap ..< 2 * size - overlap)   // 300 ..< 700
+let setB = Set(size - overlap ..< size)                  // 300 ..< 400
 
 let setOAB = Set(setAB.map(Box.init))
 let setOCD = Set(setCD.map(Box.init))
 let setOBC = Set(setBC.map(Box.init))
 let setOB = Set(setB.map(Box.init))
 
-let countAC = 2 * (size - overlap)
-let countABC = 2 * size - overlap
-let countABCD = 2 * size
-let countB = overlap
+let countAC = 2 * (size - overlap) // 600
+let countABC = 2 * size - overlap  // 700
+let countABCD = 2 * size           // 800
+let countB = overlap               // 100
 
 public let SetTests = [
   BenchmarkInfo(
