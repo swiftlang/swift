@@ -347,15 +347,20 @@ class BenchmarkDoctor(object):
               for correction in [(setup / i) for i in [1, 2]]
               ] for result in i_series])
 
-        if 2500 < runtime:
-            log = (BenchmarkDoctor.log_runtime.warning if runtime < 500000 else
+        threshold = 1000
+        if threshold < runtime:
+            log = (BenchmarkDoctor.log_runtime.warning if runtime < 10000 else
                    BenchmarkDoctor.log_runtime.error)
             caveat = '' if setup == 0 else ' (excluding the setup overhead)'
             log("'%s' execution took at least %d μs%s.", name, runtime, caveat)
-            factor = int(pow(2, math.ceil(math.log(runtime / 2500.0, 2))))
+
+            def factor(base):  # suitable divisior that's integer power of base
+                return int(pow(base, math.ceil(
+                    math.log(runtime / float(threshold), base))))
+
             BenchmarkDoctor.log_runtime.info(
-                "Decrease the workload of '%s' by a factor of %d, "
-                "to be less than 2500 μs.", name, factor)
+                "Decrease the workload of '%s' by a factor of %d (%d), to be "
+                "less than %d μs.", name, factor(2), factor(10), threshold)
 
     @staticmethod
     def _setup_overhead(measurements):

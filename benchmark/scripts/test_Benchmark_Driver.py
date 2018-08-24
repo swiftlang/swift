@@ -548,13 +548,18 @@ class TestBenchmarkDoctor(unittest.TestCase):
             self.logs['info'])
 
     def test_benchmark_runtime_range(self):
-        """Optimized benchmark should run in less then 2500 μs.
+        """Optimized benchmark should run in less then 1000 μs.
 
-        With runtimes less than 2500 μs there is better than 1:4 chance of
-        being interrupted in the middle of measurement due to elapsed 10 ms
-        quantum used by macos scheduler.
+        Even on calm machine, benchmark with runtime of 2500 μs has 1:4 chance
+        of being interrupted in the middle of measurement due to elapsed 10 ms
+        quantum used by macos scheduler. Linux scheduler's quantum is 6ms.
+        Driver yielding the process before the 10ms quantum elapses helped
+        a lot, but benchmarks with runtimes under 1ms usually exhibit a strong
+        mode which is best for accurate performance charaterization.
+        To minimize the number of involuntary context switches that corrupt our
+        measurements, we should strive to stay in the microbenchmark range.
 
-        Warn about longer runtime. Runtimes over half a second are an error.
+        Warn about longer runtime. Runtimes over 10ms are an error.
         """
         def measurements(name, runtime):
             return {'name': name,
@@ -564,7 +569,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
         with captured_output() as (out, _):
             doctor = BenchmarkDoctor(self.args, BenchmarkDriverMock([]))
             doctor.analyze(measurements('Cheetah', 200))
-            doctor.analyze(measurements('Hare', 2501))
+            doctor.analyze(measurements('Hare', 1001))
             doctor.analyze(measurements('Tortoise', 500000))
             doctor.analyze({'name': 'OverheadTurtle',
                             'OverheadTurtle O i1a': _PTR(min=800000),
@@ -573,17 +578,17 @@ class TestBenchmarkDoctor(unittest.TestCase):
 
         self.assertIn('runtime: ', output)
         self.assertNotIn('Cheetah', output)
-        self.assert_contains(["'Hare' execution took at least 2501 μs."],
+        self.assert_contains(["'Hare' execution took at least 1001 μs."],
                              self.logs['warning'])
         self.assert_contains(
-            ["Decrease the workload of 'Hare' by a factor of 2, "
-             "to be less than 2500 μs."], self.logs['info'])
+            ["Decrease the workload of 'Hare' by a factor of 2 (10), "
+             "to be less than 1000 μs."], self.logs['info'])
         self.assert_contains(
             ["'Tortoise' execution took at least 500000 μs."],
             self.logs['error'])
         self.assert_contains(
-            ["Decrease the workload of 'Tortoise' by a factor of 256, "
-             "to be less than 2500 μs."], self.logs['info'])
+            ["Decrease the workload of 'Tortoise' by a factor of 512 (1000), "
+             "to be less than 1000 μs."], self.logs['info'])
         self.assert_contains(
             ["'OverheadTurtle' execution took at least 600000 μs"
              " (excluding the setup overhead)."],
