@@ -303,7 +303,8 @@ StringRef SDKNodeDecl::getScreenInfo() const {
     OS << ModuleName;
   if (!HeaderName.empty())
     OS << "(" << HeaderName << ")";
-  OS << ": ";
+  if (!OS.str().empty())
+    OS << ": ";
   OS << getDeclKind() << " " << getFullyQualifiedName();
   return Ctx.buffer(OS.str());
 }
