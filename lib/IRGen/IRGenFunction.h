@@ -430,7 +430,7 @@ public:
   void emitErrorStrongRelease(llvm::Value *value);
 
   llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
-                                bool isNonNull, bool checkPinned);
+                                bool isNonNull);
 
   llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc,
                                          unsigned verificationType);

@@ -1297,43 +1297,23 @@ llvm::Value *IRGenFunction::emitLoadRefcountedPtr(Address addr,
 }
 
 llvm::Value *IRGenFunction::
-emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull,
-                 bool checkPinned) {
+emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull) {
   llvm::Constant *fn;
   if (value->getType() == IGM.RefCountedPtrTy) {
-    if (checkPinned) {
-      if (isNonNull)
-        fn = IGM.getIsUniquelyReferencedOrPinned_nonNull_nativeFn();
-      else
-        fn = IGM.getIsUniquelyReferencedOrPinned_nativeFn();
-    }
-    else {
-      if (isNonNull)
-        fn = IGM.getIsUniquelyReferenced_nonNull_nativeFn();
-      else
-        fn = IGM.getIsUniquelyReferenced_nativeFn();
-    }
+    if (isNonNull)
+      fn = IGM.getIsUniquelyReferenced_nonNull_nativeFn();
+    else
+      fn = IGM.getIsUniquelyReferenced_nativeFn();
   } else if (value->getType() == IGM.UnknownRefCountedPtrTy) {
-    if (checkPinned) {
-      if (!isNonNull)
-        unimplemented(loc, "optional objc ref");
-
-      fn = IGM.getIsUniquelyReferencedOrPinnedNonObjC_nonNullFn();
-    }
-    else {
-      if (isNonNull)
-        fn = IGM.getIsUniquelyReferencedNonObjC_nonNullFn();
-      else
-        fn = IGM.getIsUniquelyReferencedNonObjCFn();
-    }
+    if (isNonNull)
+      fn = IGM.getIsUniquelyReferencedNonObjC_nonNullFn();
+    else
+      fn = IGM.getIsUniquelyReferencedNonObjCFn();
   } else if (value->getType() == IGM.BridgeObjectPtrTy) {
     if (!isNonNull)
       unimplemented(loc, "optional bridge ref");
 
-    if (checkPinned)
-      fn = IGM.getIsUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObjectFn();
-    else
-      fn = IGM.getIsUniquelyReferencedNonObjC_nonNull_bridgeObjectFn();
+    fn = IGM.getIsUniquelyReferencedNonObjC_nonNull_bridgeObjectFn();
   } else {
     llvm_unreachable("Unexpected LLVM type for a refcounted pointer.");
   }
