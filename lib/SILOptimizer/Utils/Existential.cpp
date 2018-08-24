@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -307,5 +309,78 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(Operand &openedUse) {
           InitExistential->getTypeDependentOperands()[0].get());
     }
   }
+  assert(isValid());
+}
+
+/// Initialize a ConcreteExistentialInfo based on the already computed concrete
+/// type and protocol declaration. It determines the OpenedArchetypeDef
+/// and SubstituionMap for the ArgOperand argument.
+/// We need the OpenedArchetypeDef to be able to cast it to the concrete type.
+/// findInitExistential helps us determine this OpenedArchetypeDef. For cases
+/// where OpenedArchetypeDef can not be found from findInitExistential (because
+/// there was no InitExistential), then we do
+/// extra effort in trying to find an OpenedArchetypeDef for AllocStackInst
+/// using getAddressOfStackInit.
+ConcreteExistentialInfo::ConcreteExistentialInfo(Operand &ArgOperand,
+                                                 CanType ConcreteTy,
+                                                 ProtocolDecl *Protocol)
+    : ConcreteExistentialInfo(ArgOperand) {
+
+  // If we found an InitExistential, assert that ConcreteType we determined is
+  // same as ConcreteTy argument.
+  if (InitExistential) {
+    assert(ConcreteType == ConcreteTy);
+    assert(isValid());
+    return;
+  }
+
+  ConcreteType = ConcreteTy;
+  OpenedArchetypeDef = ArgOperand.get();
+
+  // If findInitExistential call from the other constructor did not update the
+  // OpenedArchetypeDef (because it did not find an InitExistential) and that
+  // the original Arg is an alloc_stack instruction, then we determine the
+  // OpenedArchetypeDef using getAddressOfStackInit. Please keep in mind that an
+  // alloc_stack can be an argument to apply (which could have no associated
+  // InitExistential), thus we need to determine the OpenedArchetypeDef for it.
+  // This is the extra effort.
+  SILInstruction *User = ArgOperand.getUser();
+  SILModule &M = User->getModule();
+  if (auto *ASI = dyn_cast<AllocStackInst>(OpenedArchetypeDef)) {
+    bool copied = false;
+    if (SILValue Src = getAddressOfStackInit(ASI, User, copied)) {
+      OpenedArchetypeDef = Src;
+    }
+    isCopied = copied;
+  }
+
+  // Bail, if we did not find an opened existential.
+  if (!(isa<OpenExistentialRefInst>(OpenedArchetypeDef) ||
+        isa<OpenExistentialAddrInst>(OpenedArchetypeDef)))
+    return;
+
+  // We have the open_existential; we still need the conformance.
+  auto ConformanceRef =
+      M.getSwiftModule()->lookupConformance(ConcreteType, Protocol);
+  if (!ConformanceRef)
+    return;
+
+  // Assert that the conformance is complete.
+  auto *ConcreteConformance = ConformanceRef.getValue().getConcrete();
+  assert(ConcreteConformance->isComplete());
+
+  /// Determine the ExistentialConformances and SubstitutionMap.
+  ExistentialType = Protocol->getDeclaredType()->getCanonicalType();
+  auto ExistentialSig = M.getASTContext().getExistentialSignature(
+      ExistentialType, M.getSwiftModule());
+  ExistentialSubs = SubstitutionMap::get(
+      ExistentialSig, {ConcreteType},
+      llvm::makeArrayRef(ProtocolConformanceRef(ConcreteConformance)));
+
+  /// Determine the OpenedArchetype.
+  OpenedArchetype =
+      OpenedArchetypeDef->getType().castTo<ArchetypeType>();
+
+  /// Check validity.
   assert(isValid());
 }

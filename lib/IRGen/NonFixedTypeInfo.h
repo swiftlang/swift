@@ -110,6 +110,10 @@ public:
     return emitLoadOfIsPOD(IGF, T);
   }
 
+  llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsBitwiseTakable(IGF, T);
+  }
+
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override {
     return emitLoadOfIsInline(IGF, T);

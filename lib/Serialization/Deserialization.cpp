@@ -2021,8 +2021,6 @@ getActualAddressorKind(uint8_t raw) {
     return swift::AddressorKind::Owning;
   case serialization::AddressorKind::NativeOwning:
     return swift::AddressorKind::NativeOwning;
-  case serialization::AddressorKind::NativePinning:
-    return swift::AddressorKind::NativePinning;
   }
 
   return None;
@@ -2699,6 +2697,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return nullptr;
     }
 
+    theStruct->setAddedImplicitInitializers();
     if (isImplicit)
       theStruct->setImplicit();
     theStruct->setIsObjC(isObjC);
@@ -3606,6 +3605,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return nullptr;
     }
 
+    theEnum->setAddedImplicitInitializers();
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setIsObjC(isObjC);

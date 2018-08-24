@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 436; // Last change: without_actually_escaping.
+const uint16_t VERSION_MINOR = 438; // Last change: add isbitwisetakable
 
 using DeclIDField = BCFixed<31>;
 
@@ -286,7 +286,7 @@ using MetatypeRepresentationField = BCFixed<2>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum class AddressorKind : uint8_t {
-  NotAddressor, Unsafe, Owning, NativeOwning, NativePinning
+  NotAddressor, Unsafe, Owning, NativeOwning
 };
 using AddressorKindField = BCFixed<3>;
  

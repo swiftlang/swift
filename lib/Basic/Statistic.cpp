@@ -27,8 +27,12 @@
 #include "llvm/Support/raw_ostream.h"
 #include <chrono>
 #include <limits>
-#include <unistd.h>
 
+#if LLVM_ON_UNIX
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#endif
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif

@@ -188,20 +188,6 @@ struct RedundantAddressors1 {
     addressWithNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has an addressor}}
   }
 }
-struct RedundantAddressors2 {
-  var owner : Builtin.NativeObject
-  subscript(index: Int) -> Int {
-    unsafeAddress { return someValidAddress() } // expected-note {{previous definition of addressor here}}
-    addressWithPinnedNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has an addressor}}
-  }
-}
-struct RedundantAddressors3 {
-  var owner : Builtin.NativeObject
-  subscript(index: Int) -> Int {
-    addressWithNativeOwner { return (someValidAddress(), owner) } // expected-note {{previous definition of addressor here}}
-    addressWithPinnedNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has an addressor}}
-  }
-}
 
 struct RedundantMutableAddressors1 {
   var owner : Builtin.NativeObject

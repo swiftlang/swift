@@ -110,9 +110,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
-  result.ExcludeAttrList.push_back(DAK_AccessControl);
-
-  // FIXME: We'll need the actual default parameter expression.
+  result.ExcludeAttrList = {DAK_ImplicitlyUnwrappedOptional, DAK_AccessControl};
   result.PrintDefaultParameterPlaceholder = false;
 
   return result;
@@ -638,9 +636,8 @@ public:
     PrintParams = 1,
     PrintRequirements = 2,
     InnermostOnly = 4,
-    SkipSelfRequirement = 8,
-    SwapSelfAndDependentMemberType = 16,
-    PrintInherited = 32,
+    SwapSelfAndDependentMemberType = 8,
+    PrintInherited = 16,
   };
 
   void printInheritedFromRequirementSignature(ProtocolDecl *proto,
@@ -1226,13 +1223,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
 
       if (req.getKind() != RequirementKind::Layout)
         second = req.getSecondType();
-
-      if ((flags & SkipSelfRequirement) &&
-          req.getKind() == RequirementKind::Conformance) {
-        auto proto = cast<ProtocolDecl>(second->getAnyNominal());
-        if (first->isEqual(proto->getSelfInterfaceType()))
-          continue;
-      }
 
       if (!subMap.empty()) {
         if (Type subFirst = substParam(first))
@@ -1870,14 +1860,16 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     });
     printInherited(decl);
 
-    if (decl->getGenericParams())
-      if (auto *genericSig = decl->getGenericSignature()) {
-        // For protocol extensions, don't print the 'Self : ...' requirement.
-        unsigned flags = PrintRequirements | InnermostOnly;
-        if (decl->getExtendedProtocolDecl())
-          flags |= SkipSelfRequirement;
-        printGenericSignature(genericSig, flags);
-      }
+    if (auto *genericSig = decl->getGenericSignature()) {
+      auto *baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
+      assert(baseGenericSig &&
+             "an extension can't be generic if the base type isn't");
+      printGenericSignature(genericSig, PrintRequirements | InnermostOnly,
+                            [baseGenericSig](const Requirement &req) -> bool {
+        // Only include constraints that are not satisfied by the base type.
+        return !baseGenericSig->isRequirementSatisfied(req);
+      });
+    }
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false,

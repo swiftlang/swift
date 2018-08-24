@@ -350,7 +350,7 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
   // Initialize the header:
 
   // Heap destructor.
-  fullMetadata->destroy = pattern->Destroy;
+  fullMetadata->destroy = pattern->Destroy.get();
 
   // Value witness table.
 #if SWIFT_OBJC_INTEROP
@@ -379,13 +379,6 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
 
   // Superclass.
   metadata->Superclass = nullptr;
-#if SWIFT_OBJC_INTEROP
-  // If the class doesn't have a formal superclass, automatically set
-  // it to SwiftObject.
-  if (!description->hasSuperclass()) {
-    metadata->Superclass = getRootSuperclass();
-  }
-#endif
 
 #if SWIFT_OBJC_INTEROP
   // Cache data.  Install the same initializer that the compiler is
@@ -568,11 +561,11 @@ namespace {
     InPlaceMetadataCacheEntry() {}
 
     AllocationResult allocate(const TypeContextDescriptor *description) {
-      auto valueTypeDescriptor = cast<ValueTypeDescriptor>(description);
-      auto &initialization =
-        valueTypeDescriptor->getInPlaceMetadataInitialization();
+      auto &initialization = description->getInPlaceMetadataInitialization();
 
-      auto metadata = initialization.IncompleteMetadata.get();
+      // Classes with resilient superclasses might require their metadata to
+      // be relocated.
+      auto metadata = initialization.allocate(description);
 
       auto state = inferStateForMetadata(metadata);
       return { metadata, state };
@@ -587,8 +580,8 @@ namespace {
       if (state < PrivateMetadataState::NonTransitiveComplete) {
         // Find a pattern.  Currently we always use the default pattern.
         auto &initialization =
-          cast<ValueMetadata>(metadata)->getDescription()
-                                       ->getInPlaceMetadataInitialization();
+            metadata->getTypeContextDescriptor()
+                    ->getInPlaceMetadataInitialization();
 
         // Complete the metadata's instantiation.
         auto dependency =
@@ -613,8 +606,8 @@ namespace {
     }
 
     void publishCompleteMetadata(Metadata *metadata) {
-      auto &init = cast<ValueMetadata>(metadata)->getDescription()
-                                           ->getInPlaceMetadataInitialization();
+      auto &init = metadata->getTypeContextDescriptor()
+                           ->getInPlaceMetadataInitialization();
       auto &cache = *init.InitializationCache.get();
       cache.Metadata.store(metadata, std::memory_order_release);
     }
@@ -636,8 +629,7 @@ namespace {
     template <class... ArgTys>
     std::pair<EntryType*, bool>
     getOrInsert(KeyType key, ArgTys &&...args) {
-      auto &init =
-        cast<ValueTypeDescriptor>(key)->getInPlaceMetadataInitialization();
+      auto &init = key->getInPlaceMetadataInitialization();
       auto &cache = *init.InitializationCache.get();
 
       // Check for an existing entry.
@@ -665,8 +657,7 @@ namespace {
     }
 
     EntryType *find(KeyType key) {
-      auto &init =
-        cast<ValueTypeDescriptor>(key)->getInPlaceMetadataInitialization();
+      auto &init = key->getInPlaceMetadataInitialization();
 
       return static_cast<InPlaceMetadataCacheEntry*>(
         init.InitializationCache->Private.load(std::memory_order_acquire));
@@ -2065,30 +2056,9 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
 
 /// Initialize the invariant superclass components of a class metadata,
 /// such as the generic type arguments, field offsets, and so on.
-static void _swift_initializeSuperclass(ClassMetadata *theClass) {
-#if SWIFT_OBJC_INTEROP
-  // If the class is generic, we need to give it a name for Objective-C.
-  if (theClass->getDescription()->isGeneric())
-    _swift_initGenericClassObjCName(theClass);
-#endif
-
+static void _swift_initializeSuperclass(ClassMetadata *theClass,
+                                       ClassLayoutFlags layoutFlags) {
   const ClassMetadata *theSuperclass = theClass->Superclass;
-
-  // Copy the class's immediate methods from the nominal type descriptor
-  // to the class metadata.
-  {
-    const auto *description = theClass->getDescription();
-    auto *classWords = reinterpret_cast<void **>(theClass);
-
-    if (description->hasVTable()) {
-      auto *vtable = description->getVTableDescriptor();
-      for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
-        classWords[vtable->getVTableOffset(theClass) + i]
-          = description->getMethod(i);
-      }
-    }
-  }
-
   if (theSuperclass == nullptr)
     return;
 
@@ -2113,7 +2083,7 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass) {
     }
 
     // Copy the vtable entries.
-    if (description->hasVTable()) {
+    if (description->hasVTable() && !hasStaticVTable(layoutFlags)) {
       auto *vtable = description->getVTableDescriptor();
       memcpy(classWords + vtable->getVTableOffset(ancestor),
              superWords + vtable->getVTableOffset(ancestor),
@@ -2150,64 +2120,130 @@ static MetadataAllocator &getResilientMetadataAllocator() {
 #endif
 
 ClassMetadata *
-swift::swift_relocateClassMetadata(ClassMetadata *self,
-                                   size_t templateSize,
-                                   size_t numImmediateMembers) {
-  // Force the initialization of the metadata layout.
-  (void) self->getDescription()->getMetadataBounds();
+swift::swift_relocateClassMetadata(ClassDescriptor *description,
+                                   ResilientClassMetadataPattern *pattern) {
+  auto bounds = description->getMetadataBounds();
 
-  const ClassMetadata *superclass = self->Superclass;
+  auto metadata = reinterpret_cast<ClassMetadata *>(
+      (char*) malloc(bounds.getTotalSizeInBytes()) +
+      bounds.getAddressPointInBytes());
+  auto fullMetadata = asFullMetadata(metadata);
+  char *rawMetadata = reinterpret_cast<char*>(metadata);
 
-  size_t metadataSize;
-  if (superclass && superclass->isTypeMetadata()) {
-    metadataSize = (superclass->getClassSize() -
-                    superclass->getClassAddressPoint() +
-                    self->getClassAddressPoint() +
-                    numImmediateMembers * sizeof(void *));
-  } else {
-    metadataSize = (templateSize +
-                    numImmediateMembers * sizeof(void *));
-  }
+  // Zero out the entire immediate-members section.
+  void **immediateMembers =
+    reinterpret_cast<void**>(rawMetadata + bounds.ImmediateMembersOffset);
+  memset(immediateMembers, 0, description->getImmediateMembersSize());
 
-  if (templateSize < metadataSize) {
-    auto rawNewClass = (char*) malloc(metadataSize);
-    auto rawOldClass = (const char*) self;
-    rawOldClass -= self->getClassAddressPoint();
+  // Initialize the header:
 
-    memcpy(rawNewClass, rawOldClass, templateSize);
-    memset(rawNewClass + templateSize, 0,
-           metadataSize - templateSize);
+  // Heap destructor.
+  fullMetadata->destroy = pattern->Destroy.get();
 
-    rawNewClass += self->getClassAddressPoint();
-    auto *newClass = (ClassMetadata *) rawNewClass;
-    newClass->setClassSize(metadataSize);
+  // Value witness table.
+#if SWIFT_OBJC_INTEROP
+  fullMetadata->ValueWitnesses =
+    (pattern->Flags & ClassFlags::UsesSwiftRefcounting)
+       ? &VALUE_WITNESS_SYM(Bo)
+       : &VALUE_WITNESS_SYM(BO);
+#else
+  fullMetadata->ValueWitnesses = &VALUE_WITNESS_SYM(Bo);
+#endif
 
-    assert(newClass->isTypeMetadata());
+  // MetadataKind / isa.
+#if SWIFT_OBJC_INTEROP
+  metadata->setClassISA(pattern->Metaclass.get());
+#else
+  metadata->setKind(MetadataKind::Class);
+#endif
 
-    return newClass;
-  }
+  // Superclass.
+  metadata->Superclass = nullptr;
 
-  return self;
+#if SWIFT_OBJC_INTEROP
+  // Cache data.  Install the same initializer that the compiler is
+  // required to use.  We don't need to do this in non-ObjC-interop modes.
+  metadata->CacheData[0] = &_objc_empty_cache;
+  metadata->CacheData[1] = nullptr;
+#endif
+
+  // RO-data pointer.
+#if SWIFT_OBJC_INTEROP
+  auto classRO = pattern->Data.get();
+  metadata->Data =
+    reinterpret_cast<uintptr_t>(classRO) | SWIFT_CLASS_IS_SWIFT_MASK;
+#else
+  metadata->Data = SWIFT_CLASS_IS_SWIFT_MASK;
+#endif
+
+  // Class flags.
+  metadata->Flags = pattern->Flags;
+
+  // Instance layout.
+  metadata->InstanceAddressPoint = 0;
+  metadata->InstanceSize = 0;
+  metadata->InstanceAlignMask = 0;
+
+  // Reserved.
+  metadata->Reserved = 0;
+
+  // Class metadata layout.
+  metadata->ClassSize = bounds.getTotalSizeInBytes();
+  metadata->ClassAddressPoint = bounds.getAddressPointInBytes();
+
+  // Class descriptor.
+  metadata->setDescription(description);
+
+  // I-var destroyer.
+  metadata->IVarDestroyer = pattern->IVarDestroyer;
+
+  return metadata;
 }
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void
 swift::swift_initClassMetadata(ClassMetadata *self,
+                               ClassMetadata *super,
                                ClassLayoutFlags layoutFlags,
                                size_t numFields,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets) {
+  self->Superclass = super;
+
 #if SWIFT_OBJC_INTEROP
+  // Set the superclass to SwiftObject if this is a root class.
+  if (!super)
+    self->Superclass = getRootSuperclass();
+
   // Register our custom implementation of class_getImageName.
   static swift_once_t onceToken;
   swift_once(&onceToken, [](void *unused) {
     (void)unused;
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
+
+  // If the class is generic, we need to give it a name for Objective-C.
+  if (self->getDescription()->isGeneric())
+    _swift_initGenericClassObjCName(self);
 #endif
 
-  _swift_initializeSuperclass(self);
+  // Copy the class's immediate methods from the nominal type descriptor
+  // to the class metadata.
+  if (!hasStaticVTable(layoutFlags)) {
+    const auto *description = self->getDescription();
+    auto *classWords = reinterpret_cast<void **>(self);
+
+    if (description->hasVTable()) {
+      auto *vtable = description->getVTableDescriptor();
+      for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
+        classWords[vtable->getVTableOffset(self) + i]
+          = description->getMethod(i);
+      }
+    }
+  }
+
+  _swift_initializeSuperclass(self, layoutFlags);
 
   // Start layout by appending to a standard heap object header.
   size_t size, alignMask;
@@ -2218,8 +2254,6 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 
   // If we have a superclass, start from its size and alignment instead.
   if (classHasSuperclass(self)) {
-    const ClassMetadata *super = self->Superclass;
-
     // This is straightforward if the superclass is Swift.
 #if SWIFT_OBJC_INTEROP
     if (super->isTypeMetadata()) {

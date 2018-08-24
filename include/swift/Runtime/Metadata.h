@@ -574,20 +574,19 @@ void swift_initStructMetadata(StructMetadata *self,
                               const TypeLayout * const *fieldTypes,
                               uint32_t *fieldOffsets);
 
-/// Relocate the metadata for a class and copy fields from the given template.
-/// The final size of the metadata is calculated at runtime from the size of
-/// the superclass metadata together with the given number of immediate
-/// members.
+/// Allocate the metadata for a class and copy fields from the given pattern.
+/// The final size of the metadata is calculated at runtime from the metadata
+/// bounds in the class descriptor.
 SWIFT_RUNTIME_EXPORT
 ClassMetadata *
-swift_relocateClassMetadata(ClassMetadata *self,
-                            size_t templateSize,
-                            size_t numImmediateMembers);
+swift_relocateClassMetadata(ClassDescriptor *descriptor,
+                            ResilientClassMetadataPattern *pattern);
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 SWIFT_RUNTIME_EXPORT
 void swift_initClassMetadata(ClassMetadata *self,
+                             ClassMetadata *super,
                              ClassLayoutFlags flags,
                              size_t numFields,
                              const TypeLayout * const *fieldTypes,

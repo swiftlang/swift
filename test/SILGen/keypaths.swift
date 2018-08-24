@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen -module-name keypaths %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -module-name keypaths %s | %FileCheck %s
+
+import Swift
 
 struct S<T> {
   var x: T
@@ -383,3 +385,14 @@ func subclass_generics<T: C<Int>, U: C<V>, V/*: PoC*/>(_: T, _: U, _: V) {
   _ = \PoC.extension
  */
 }
+
+// CHECK-LABEL: sil hidden @{{.*}}identity
+func identity<T>(_: T) {
+  // CHECK: keypath $WritableKeyPath<T, T>, <τ_0_0> ({{.*}}root $τ_0_0) <T>
+  let _: WritableKeyPath<T, T> = Builtin.identityKeyPath()
+  // CHECK: keypath $WritableKeyPath<Array<T>, Array<T>>, <τ_0_0> ({{.*}}root $τ_0_0) <Array<T>>
+  let _: WritableKeyPath<[T], [T]> = Builtin.identityKeyPath()
+  // CHECK: keypath $WritableKeyPath<String, String>, ({{.*}}root $String)
+  let _: WritableKeyPath<String, String> = Builtin.identityKeyPath()
+}
+

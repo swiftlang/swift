@@ -1198,8 +1198,7 @@ func platypus<T>(a: [T]) {
 func badTypes() {
   let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
   let array = [Int](sequence)
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
-  // FIXME: terrible diagnostic
+  // expected-error@-1 {{initializer 'init' requires the types 'Int' and '[Int]' be equivalent}}
 }
 
 // rdar://34357545
@@ -1207,3 +1206,6 @@ func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
   // expected-error@-1 {{ambiguous reference to member '=='}}
 }
+
+func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
+rdar43525641(1, c: 2, 3) // Ok

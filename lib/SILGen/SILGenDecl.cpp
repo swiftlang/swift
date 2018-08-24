@@ -90,21 +90,20 @@ static void copyOrInitValueIntoHelper(
 void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
                                               SILLocation loc,
                                               ManagedValue value, bool isInit) {
-  // In the object case, we perform a borrow + extract + copy sequence. This is
-  // because we do not have a destructure operation.
+  // In the object case, emit a destructure operation and return.
   if (value.getType().isObject()) {
-    value = value.borrow(SGF, loc);
-    return copyOrInitValueIntoHelper(
-        SGF, loc, value, isInit, SubInitializations,
-        [&](ManagedValue aggregate, unsigned i,
-            SILType fieldType) -> ManagedValue {
-          auto elt = SGF.B.createTupleExtract(loc, aggregate, i, fieldType);
-          return SGF.B.createCopyValue(loc, elt);
+    return SGF.B.emitDestructureValueOperation(
+        loc, value, [&](unsigned i, ManagedValue subValue) {
+          auto &subInit = SubInitializations[i];
+          subInit->copyOrInitValueInto(SGF, loc, subValue, isInit);
+          subInit->finishInitialization(SGF);
         });
   }
 
-  // In the address case, we can support takes directly, so forward the cleanup
-  // of the aggregate and create takes of the underlying addresses.
+  // In the address case, we forward the underlying value and store it
+  // into memory and then create a +1 cleanup. since we assume here
+  // that we have a +1 value since we are forwarding into memory.
+  assert(value.isPlusOne(SGF) && "Can not store a +0 value into memory?!");
   value = ManagedValue::forUnmanaged(value.forward(SGF));
   return copyOrInitValueIntoHelper(
       SGF, loc, value, isInit, SubInitializations,

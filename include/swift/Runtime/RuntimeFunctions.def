@@ -670,19 +670,19 @@ FUNCTION(GetGenericMetadata, swift_getGenericMetadata, SwiftCC,
 
 // Metadata *swift_allocateGenericClassMetadata(ClassDescriptor *type,
 //                                              const void * const *arguments,
-//                                              const void * const *template);
+//                                              const void *template);
 FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 // Metadata *swift_allocateGenericValueMetadata(ValueTypeDescriptor *type,
 //                                              const void * const *arguments,
-//                                              const void * const *template,
+//                                              const void *template,
 //                                              size_t extraSize);
 FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy, SizeTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy, SizeTy),
          ATTRS(NoUnwind))
 
 // MetadataResponse swift_checkMetadataState(MetadataRequest request,
@@ -808,17 +808,17 @@ FUNCTION(GetExistentialMetadata,
               ProtocolDescriptorRefTy->getPointerTo()),
          ATTRS(NoUnwind, ReadOnly))
 
-// Metadata *swift_relocateClassMetadata(Metadata *self,
-//                                       size_t templateSize,
-//                                       size_t numImmediateMembers);
+// Metadata *swift_relocateClassMetadata(TypeContextDescriptor *descriptor,
+//                                       const void *pattern);
 FUNCTION(RelocateClassMetadata,
          swift_relocateClassMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };
 // void swift_initClassMetadata(Metadata *self,
+//                              Metadata *super,
 //                              ClassLayoutFlags flags,
 //                              size_t numFields,
 //                              TypeLayout * const *fieldTypes,
@@ -826,7 +826,7 @@ FUNCTION(RelocateClassMetadata,
 FUNCTION(InitClassMetadata,
          swift_initClassMetadata, C_CC,
          RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, SizeTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))

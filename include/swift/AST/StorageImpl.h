@@ -54,9 +54,6 @@ enum class AddressorKind : uint8_t {
   /// \brief This is an owning addressor; it returns a Builtin.NativeObject
   /// which should be released when the caller is done with the object.
   NativeOwning,
-  /// \brief This is a pinning addressor; it returns a Builtin.NativeObject?
-  /// which should be unpinned when the caller is done with the object.
-  NativePinning,
 };
 
 /// Whether an access to storage is for reading, writing, or both.

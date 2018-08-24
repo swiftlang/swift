@@ -786,7 +786,8 @@ static bool hasNonCanonicalSelfProtocolRequirement(
 
 /// Retrieve the best requirement source from the list
 static const RequirementSource *
-getBestRequirementSource(ArrayRef<GSBConstraint<ProtocolDecl *>> constraints) {
+getBestRequirementSource(GenericSignatureBuilder &builder,
+                         ArrayRef<GSBConstraint<ProtocolDecl *>> constraints) {
   const RequirementSource *bestSource = nullptr;
   bool bestIsNonCanonical = false;
 
@@ -801,6 +802,16 @@ getBestRequirementSource(ArrayRef<GSBConstraint<ProtocolDecl *>> constraints) {
 
   for (const auto &constraint : constraints) {
     auto source = constraint.source;
+
+    // Skip self-recursive sources.
+    bool derivedViaConcrete = false;
+    if (source->getMinimalConformanceSource(
+                                        builder,
+                                        constraint.getSubjectDependentType({ }),
+                                        constraint.value,
+                                        derivedViaConcrete)
+          != source)
+      continue;
 
     // If there is a non-canonical protocol requirement next to the root,
     // skip this requirement source.
@@ -907,7 +918,8 @@ void GenericSignature::buildConformanceAccessPath(
     assert(conforms != equivClass->conformsTo.end());
 
     // Compute the root type, canonicalizing it w.r.t. the protocol context.
-    auto conformsSource = getBestRequirementSource(conforms->second);
+    auto conformsSource = getBestRequirementSource(inProtoSigBuilder,
+                                                   conforms->second);
     assert(conformsSource != source || !requirementSignatureProto);
     Type localRootType = conformsSource->getRootType();
     localRootType = inProtoSig->getCanonicalTypeInContext(localRootType);
@@ -977,7 +989,7 @@ GenericSignature::getConformanceAccessPath(Type type, ProtocolDecl *protocol) {
   assert(conforms != equivClass->conformsTo.end());
 
   // Canonicalize the root type.
-  auto source = getBestRequirementSource(conforms->second);
+  auto source = getBestRequirementSource(builder, conforms->second);
   Type rootType = source->getRootType()->getCanonicalType(this);
 
   // Build the path.

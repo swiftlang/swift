@@ -120,8 +120,6 @@ RValue Scope::popPreservingValue(RValue &&rv) {
 }
 
 void Scope::popImpl() {
-  SmallVector<SILValue, 16> cleanupsToPropagateToOuterScope;
-
   cleanups.stack.checkIterator(depth);
   cleanups.stack.checkIterator(cleanups.innermostScope);
   assert(cleanups.innermostScope == depth && "popping scopes out of order");

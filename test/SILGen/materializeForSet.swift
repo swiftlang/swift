@@ -407,8 +407,7 @@ struct Bill : Totalled {
 // CHECK:        bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : @trivial $*Bill):
 // CHECK:          [[T0:%.*]] = function_ref @$S17materializeForSet4BillV5totalSivm
 // CHECK-NEXT:     [[T1:%.*]] = apply [[T0]]([[BUFFER]], [[STORAGE]], [[SELF]])
-// CHECK-NEXT:     [[LEFT:%.*]] = tuple_extract [[T1]]
-// CHECK-NEXT:     [[RIGHT:%.*]] = tuple_extract [[T1]]
+// CHECK-NEXT:     ([[LEFT:%.*]], [[RIGHT:%.*]]) = destructure_tuple [[T1]]
 // CHECK-NEXT:     [[T1:%.*]] = tuple ([[LEFT]] : $Builtin.RawPointer, [[RIGHT]] : $Optional<Builtin.RawPointer>)
 // CHECK-NEXT:     return [[T1]] :
 

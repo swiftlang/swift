@@ -161,6 +161,10 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   // requiring further checking at the end.
   bool potentiallyOutOfOrder = false;
 
+  auto hasDefault = [&defaultMap, &numParams](unsigned idx) -> bool {
+    return idx < numParams ? defaultMap.test(idx) : false;
+  };
+
   // Local function that claims the argument at \c argNumber, returning the
   // index of the claimed argument. This is primarily a helper for
   // \c claimNextNamed.
@@ -206,7 +210,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   // Local function that retrieves the next unclaimed argument with the given
   // name (which may be empty). This routine claims the argument.
   auto claimNextNamed
-    = [&](Identifier name, bool ignoreNameMismatch,
+    = [&](Identifier paramLabel, bool ignoreNameMismatch,
           bool forVariadic = false) -> Optional<unsigned> {
     // Skip over any claimed arguments.
     skipClaimedArgs();
@@ -218,8 +222,9 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
     // Go hunting for an unclaimed argument whose name does match.
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
-      // Skip arguments where the name doesn't match.
-      if (args[i].getLabel() != name) {
+      auto argLabel = args[i].getLabel();
+
+      if (argLabel != paramLabel) {
         // If this is an attempt to claim additional unlabeled arguments
         // for variadic parameter, we have to stop at first labeled argument.
         if (forVariadic)
@@ -240,11 +245,23 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
       // We found a match.  If the match wasn't the next one, we have
       // potentially out of order arguments.
-      if (i != nextArgIdx)
+      if (i != nextArgIdx) {
+        // Avoid claiming un-labeled defaulted parameters
+        // by out-of-order un-labeled arguments or parts
+        // of variadic argument sequence, because that might
+        // be incorrect:
+        // ```swift
+        // func foo(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
+        // foo(1, c: 2, 3) // -> `3` will be claimed as '_ b:'.
+        // ```
+        if (argLabel.empty() && (hasDefault(i) || !forVariadic))
+          continue;
+
         potentiallyOutOfOrder = true;
+      }
 
       // Claim it.
-      return claim(name, i);
+      return claim(paramLabel, i);
     }
 
     // If we're not supposed to attempt any fixes, we're done.
@@ -268,8 +285,8 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       // Claim this argument if we are asked to ignore labeling failure,
       // only if argument doesn't have a label when parameter expected
       // it to, or vice versa.
-      if (name.empty() || argLabel.empty())
-        return claim(name, nextArgIdx);
+      if (paramLabel.empty() || argLabel.empty())
+        return claim(paramLabel, nextArgIdx);
     }
 
     // Redundant keyword arguments.
@@ -478,7 +495,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         continue;
 
       // Parameters with defaults can be unfulfilled.
-      if (defaultMap.test(paramIdx))
+      if (hasDefault(paramIdx))
         continue;
 
       listener.missingArgument(paramIdx);
@@ -1625,6 +1642,55 @@ ConstraintSystem::matchTypesBindTypeVar(
   return getTypeMatchSuccess();
 }
 
+static void attemptToFixRequirementFailure(
+    ConstraintSystem &cs, Type type1, Type type2,
+    SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
+    ConstraintLocatorBuilder locator) {
+  using LocatorPathEltKind = ConstraintLocator::PathElementKind;
+
+  // Can't fix not yet properly resolved types.
+  if (type1->hasTypeVariable() || type2->hasTypeVariable())
+    return;
+
+  // If dependent members are present here it's because
+  // base doesn't conform to associated type's protocol.
+  if (type1->hasDependentMember() || type2->hasDependentMember())
+    return;
+
+  SmallVector<LocatorPathElt, 4> path;
+  auto *anchor = locator.getLocatorParts(path);
+
+  if (path.empty())
+    return;
+
+  auto &elt = path.back();
+  if (elt.getKind() != LocatorPathEltKind::TypeParameterRequirement)
+    return;
+
+  // Build simplified locator which only contains anchor and requirement info.
+  ConstraintLocatorBuilder requirement(cs.getConstraintLocator(anchor));
+  auto *reqLoc = cs.getConstraintLocator(requirement.withPathElement(elt));
+
+  auto reqKind = static_cast<RequirementKind>(elt.getValue2());
+  switch (reqKind) {
+  case RequirementKind::SameType: {
+    auto *fix = SkipSameTypeRequirement::create(cs, type1, type2, reqLoc);
+    conversionsOrFixes.push_back(fix);
+    return;
+  }
+
+  case RequirementKind::Superclass: {
+    auto *fix = SkipSuperclassRequirement::create(cs, type1, type2, reqLoc);
+    conversionsOrFixes.push_back(fix);
+    return;
+  }
+
+  case RequirementKind::Conformance:
+  case RequirementKind::Layout:
+    llvm_unreachable("conformance requirements are handled elsewhere");
+  }
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
@@ -2450,7 +2516,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
       }
     }
+
+    if (type2->is<LValueType>() && !isTypeVarOrMember1) {
+      conversionsOrFixes.push_back(
+          TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+    }
   }
+
+  if (attemptFixes)
+    attemptToFixRequirementFailure(*this, type1, type2, conversionsOrFixes,
+                                   locator);
 
   if (conversionsOrFixes.empty()) {
     // If one of the types is a type variable or member thereof, we leave this
@@ -4658,11 +4733,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     addContextualScore();
     // Unwrap an inout type.
     auto obj1 = type1->getInOutObjectType();
-    
+
     obj1 = getFixedTypeRecursive(obj1, false, false);
     
     auto t2 = type2->getDesugaredType();
-    
+
     auto baseType1 = getFixedTypeRecursive(*isArrayType(obj1), false, false);
     auto baseType2 = getBaseTypeForPointer(*this, t2);
 
@@ -4913,7 +4988,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
     auto &log = ctx.TypeCheckerDebug->getStream();
     log.indent(solverState ? solverState->depth * 2 + 2 : 0)
       << "(attempting fix ";
-    fix->print(log, &ctx.SourceMgr);
+    fix->print(log);
     log << ")\n";
   }
 
@@ -4994,6 +5069,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
         return SolutionKind::Error;
 
     return result;
+  }
+
+  case FixKind::SkipSameTypeRequirement: {
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
   case FixKind::ExplicitlyEscaping:

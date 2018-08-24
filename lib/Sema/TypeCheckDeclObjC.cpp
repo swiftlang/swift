@@ -49,6 +49,7 @@ bool swift::shouldDiagnoseObjCReason(ObjCReason reason, ASTContext &ctx) {
 
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::ElementOfObjCEnum:
   case ObjCReason::Accessor:
     return false;
   }
@@ -73,6 +74,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
 
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::ElementOfObjCEnum:
   case ObjCReason::Accessor:
     llvm_unreachable("should not diagnose this @objc reason");
   }
@@ -363,7 +365,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
 }
 
 /// Check whether the given declaration occurs within a constrained
-/// extension, or an extension of a class with generic ancestry, or an
+/// extension, or an extension of a generic class, or an
 /// extension of an Objective-C runtime visible class, and
 /// therefore is not representable in Objective-C.
 static bool checkObjCInExtensionContext(const ValueDecl *value,
@@ -378,15 +380,12 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
       return true;
     }
 
-    // Check if any Swift classes in the inheritance hierarchy have generic
-    // parameters.
-    // FIXME: This is a current limitation, not inherent. We don't have
-    // a concrete class to attach Objective-C category metadata to.
     if (auto classDecl = ED->getSelfClassDecl()) {
-      if (auto generic = classDecl->getGenericAncestor()) {
-        if (!generic->usesObjCGenericsModel()) {
+      if (classDecl->isGenericContext()) {
+        if (!classDecl->usesObjCGenericsModel()) {
           if (diagnose) {
-            value->diagnose(diag::objc_in_generic_extension);
+            value->diagnose(diag::objc_in_generic_extension,
+                            classDecl->isGeneric());
           }
           return true;
         }
@@ -1276,6 +1275,14 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // as an arithmetic type in C.
     if (isEnumObjC(enumDecl))
       isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
+  } else if (auto enumElement = dyn_cast<EnumElementDecl>(VD)) {
+    // Enum elements can be @objc so long as the containing enum is @objc.
+    if (enumElement->getParentEnum()->isObjC()) {
+      if (enumElement->getAttrs().hasAttribute<ObjCAttr>())
+        isObjC = ObjCReason::ExplicitlyObjC;
+      else
+        isObjC = ObjCReason::ElementOfObjCEnum;
+    }
   } else if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
     if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
       isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
@@ -1524,7 +1531,7 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     ctx.getLazyResolver()->resolveDeclSignature(D);
   }
 
-  if (!isa<AccessorDecl>(D) && !isa<TypeDecl>(D)) {
+  if (!isa<TypeDecl>(D) && !isa<AccessorDecl>(D) && !isa<EnumElementDecl>(D)) {
     useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
                                         D->getInterfaceType());
   }

@@ -2316,25 +2316,27 @@ namespace {
 /// arguments are going into a varargs array.
 struct ArgSpecialDest {
   VarargsInfo *SharedInfo;
-  unsigned Index;
+  unsigned Index : 31;
+  unsigned IsExpansion : 1;
   CleanupHandle Cleanup;
 
   ArgSpecialDest() : SharedInfo(nullptr) {}
-  explicit ArgSpecialDest(VarargsInfo &info, unsigned index)
-    : SharedInfo(&info), Index(index) {}
+  explicit ArgSpecialDest(VarargsInfo &info, unsigned index, bool isExpansion)
+    : SharedInfo(&info), Index(index), IsExpansion(isExpansion) {}
 
   // Reference semantics: need to preserve the cleanup handle.
   ArgSpecialDest(const ArgSpecialDest &) = delete;
   ArgSpecialDest &operator=(const ArgSpecialDest &) = delete;
   ArgSpecialDest(ArgSpecialDest &&other)
     : SharedInfo(other.SharedInfo), Index(other.Index),
-      Cleanup(other.Cleanup) {
+      IsExpansion(other.IsExpansion), Cleanup(other.Cleanup) {
     other.SharedInfo = nullptr;
   }
   ArgSpecialDest &operator=(ArgSpecialDest &&other) {
     assert(!isValid() && "overwriting valid special destination!");
     SharedInfo = other.SharedInfo;
     Index = other.Index;
+    IsExpansion = other.IsExpansion;
     Cleanup = other.Cleanup;
     other.SharedInfo = nullptr;
     return *this;
@@ -2345,10 +2347,6 @@ struct ArgSpecialDest {
   }
 
   /// Is this a valid special destination?
-  ///
-  /// Most of the time, most arguments don't have special
-  /// destinations, and making an array of Optional<Special special
-  /// destinations has t
   bool isValid() const { return SharedInfo != nullptr; }
 
   /// Fill this special destination with a value.
@@ -2356,6 +2354,14 @@ struct ArgSpecialDest {
             AbstractionPattern _unused_origType,
             SILType loweredSubstParamType) {
     assert(isValid() && "filling an invalid destination");
+
+    if (IsExpansion) {
+      auto expr = std::move(arg).asKnownExpr()->getSemanticsProvidingExpr();
+      auto array = cast<VarargExpansionExpr>(expr)->getSubExpr();
+      SharedInfo->setExpansion(Index, SGF.emitRValueAsSingleValue(array));
+      Cleanup = CleanupHandle::invalid();
+      return;
+    }
 
     SILLocation loc = arg.getLocation();
     auto destAddr = SharedInfo->getBaseAddress();
@@ -2998,8 +3004,9 @@ struct ElementExtent {
   ClaimedParamsRef Params;
   /// The destination index, if any.
   /// This is set in the first pass.
-  unsigned DestIndex : 30;
+  unsigned DestIndex : 29;
   unsigned HasDestIndex : 1;
+  unsigned IsVarargExpansion : 1;
 #ifndef NDEBUG
   unsigned Used : 1;
 #endif
@@ -3044,6 +3051,7 @@ class TupleShuffleArgEmitter {
   /// Extents of the inner elements.
   SmallVector<ElementExtent, 8> innerExtents;
   Optional<VarargsInfo> varargsInfo;
+  SmallVector<unsigned, 4> varargExpansions;
   SILParameterInfo variadicParamInfo; // innerExtents will point at this
   Optional<SmallVector<ArgSpecialDest, 8>> innerSpecialDests;
 
@@ -3102,6 +3110,18 @@ private:
       return origParamType.getTupleElementType(index);
     }
   }
+
+  VarargExpansionExpr *getVarargExpansion(unsigned innerIndex) {
+    Expr *expr = inner->getSemanticsProvidingExpr();
+    if (cast<TupleShuffleExpr>(outer)->isSourceScalar()) {
+      assert(innerIndex == 0);
+    } else {
+      auto tuple = dyn_cast<TupleExpr>(expr);
+      if (!tuple) return nullptr;
+      expr = tuple->getElement(innerIndex)->getSemanticsProvidingExpr();
+    }
+    return dyn_cast<VarargExpansionExpr>(expr);
+  }
 };
 
 } // end anonymous namespace
@@ -3150,9 +3170,22 @@ void TupleShuffleArgEmitter::constructInnerTupleTypeInfo(ArgEmitter &parent) {
       unsigned numVarargs = variadicArgs.size();
       assert(canVarargsArrayType == substEltType);
 
-      // Create the array value.
+      // Check for vararg expansions, since their presence changes our
+      // emission strategy.
+      {
+        for (auto i : indices(variadicArgs)) {
+          unsigned innerIndex = variadicArgs[i];
+          if (getVarargExpansion(innerIndex)) {
+            varargExpansions.push_back(i);
+          }
+        }
+      }
+
+      // If we don't have any vararg expansions, eagerly emit into
+      // the array value.
       varargsInfo.emplace(emitBeginVarargs(parent.SGF, outer, varargsEltType,
-                                           canVarargsArrayType, numVarargs));
+                                           canVarargsArrayType, numVarargs,
+                                           varargExpansions));
 
       // If we have any varargs, we'll need to actually initialize
       // the array buffer.
@@ -3181,9 +3214,12 @@ void TupleShuffleArgEmitter::constructInnerTupleTypeInfo(ArgEmitter &parent) {
           innerExtents[innerIndex].Used = true;
 #endif
 
+          auto expansion = getVarargExpansion(innerIndex);
+
           // Set the destination index.
           innerExtents[innerIndex].HasDestIndex = true;
           innerExtents[innerIndex].DestIndex = i++;
+          innerExtents[innerIndex].IsVarargExpansion = (expansion != nullptr);
 
           // Use the singleton param info we prepared before.
           innerExtents[innerIndex].Params =
@@ -3213,7 +3249,8 @@ void TupleShuffleArgEmitter::flattenPatternFromInnerExtendIntoInnerParams(
       if (extent.HasDestIndex) {
         assert(extent.Params.size() == 1);
         innerSpecialDests->push_back(
-            ArgSpecialDest(*varargsInfo, extent.DestIndex));
+            ArgSpecialDest(*varargsInfo, extent.DestIndex,
+                           extent.IsVarargExpansion));
 
         // Otherwise, fill in with the appropriate number of invalid
         // special dests.
@@ -4492,40 +4529,17 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   } else if (substFnConv.getNumDirectSILResults() == 1) {
     addManagedDirectResult(rawDirectResult, *directSILResults.begin());
   } else {
-    llvm::SmallVector<std::pair<SILValue, const SILResultInfo &>, 8>
-        copiedResults;
-    {
-      Scope S(Cleanups, CleanupLocation::get(loc));
-
-      // First create an rvalue cleanup for our direct result.
-      ManagedValue managedDirectResult =
-          emitManagedRValueWithCleanup(rawDirectResult);
-      // Then borrow the managed direct result.
-      ManagedValue borrowedDirectResult =
-          managedDirectResult.borrow(*this, loc);
-      // Then create unmanaged copies of the direct result and forward the
-      // result as expected by addManageDirectResult.
-      unsigned Index = 0;
-      for (const SILResultInfo &directResult : directSILResults) {
-        ManagedValue elt =
-            B.createTupleExtract(loc, borrowedDirectResult, Index,
-                                 substFnConv.getSILType(directResult));
-        SILValue v = elt.copyUnmanaged(*this, loc).forward(*this);
-        // We assume that unowned inner pointers, autoreleased values, and
-        // indirect values are never returned in tuples.
-        // FIXME: can this assertion be removed without lowered addresses?
-        assert(directResult.getConvention() == ResultConvention::Owned ||
-               directResult.getConvention() == ResultConvention::Unowned ||
-               !substFnConv.useLoweredAddresses());
-        copiedResults.push_back({v, directResult});
-        ++Index;
-      }
-      // Then allow the cleanups to be emitted in the proper reverse order.
-    }
+    auto directSILResultsIter = directSILResults.begin();
     // Finally add our managed direct results.
-    for (auto p : copiedResults) {
-      addManagedDirectResult(p.first, p.second);
-    }
+    B.emitDestructureValueOperation(
+        loc, rawDirectResult, [&](unsigned index, SILValue v) {
+          auto directResult = *directSILResultsIter;
+          ++directSILResultsIter;
+          assert(directResult.getConvention() == ResultConvention::Owned ||
+                 directResult.getConvention() == ResultConvention::Unowned ||
+                 !substFnConv.useLoweredAddresses());
+          addManagedDirectResult(v, directResult);
+        });
   }
 
   // If there was a foreign error convention, consider it.
@@ -5591,7 +5605,6 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     break;
   case AddressorKind::Owning:
   case AddressorKind::NativeOwning:
-  case AddressorKind::NativePinning:
     assert(results.size() == 2);
     pointer = results[0].getUnmanagedValue();
     owner = results[1];
@@ -5622,7 +5635,6 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     break;
   case AddressorKind::Owning:
   case AddressorKind::NativeOwning:
-  case AddressorKind::NativePinning:
     address = B.createMarkDependence(loc, address, owner.getValue());
     break;
   }

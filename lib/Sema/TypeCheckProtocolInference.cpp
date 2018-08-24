@@ -886,7 +886,7 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
 
   // Can we derive conformances for this protocol and adoptee?
   NominalTypeDecl *derivingTypeDecl = adoptee->getAnyNominal();
-  if (!DerivedConformance::derivesProtocolConformance(tc, dc, derivingTypeDecl,
+  if (!DerivedConformance::derivesProtocolConformance(dc, derivingTypeDecl,
                                                       proto))
     return Type();
 
@@ -1117,7 +1117,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                              { Type(proto->getProtocolSelfType()) },
                              sanitizedRequirements,
                              QuerySubstitutionMap{substitutions},
-                             TypeChecker::LookUpConformance(tc, dc),
+                             TypeChecker::LookUpConformance(dc),
                              None, nullptr, options);
   switch (result) {
   case RequirementCheckResult::Failure:

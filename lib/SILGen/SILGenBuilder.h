@@ -411,6 +411,7 @@ public:
   using SILBuilder::createReturn;
   ReturnInst *createReturn(SILLocation Loc, ManagedValue ReturnValue);
 
+  using SILBuilder::emitDestructureValueOperation;
   /// Perform either a tuple or struct destructure and then pass its components
   /// as managed value one by one with an index to the closure.
   void emitDestructureValueOperation(

@@ -573,28 +573,6 @@ func castBitPatternFromBridgeObject(_ bo: Builtin.BridgeObject) -> Builtin.Word 
   return Builtin.castBitPatternFromBridgeObject(bo)
 }
 
-// CHECK-LABEL: sil hidden @$S8builtins8pinUnpin{{[_0-9a-zA-Z]*}}F
-// CHECK:       bb0([[ARG:%.*]] : @guaranteed $Builtin.NativeObject):
-// CHECK-NEXT:    debug_value
-func pinUnpin(_ object : Builtin.NativeObject) {
-// String pin acts as a pin and a +1. The destroy is paired with the strong_pin,
-// but the unpin operation is later.  
-// CHECK-NEXT:    [[HANDLE:%.*]] = strong_pin [[ARG]] : $Builtin.NativeObject
-// CHECK-NEXT:    debug_value
-  let handle : Builtin.NativeObject? = Builtin.tryPin(object)
-
-// CHECK-NEXT:    [[BORROWED_HANDLE:%.*]] = begin_borrow [[HANDLE]]
-// CHECK-NEXT:    [[HANDLE_COPY:%.*]] = copy_value [[BORROWED_HANDLE]] : $Optional<Builtin.NativeObject>
-// CHECK-NEXT:    strong_unpin [[HANDLE_COPY]] : $Optional<Builtin.NativeObject>
-  Builtin.unpin(handle)
-
-// CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    end_borrow [[BORROWED_HANDLE]] from [[HANDLE]]
-// CHECK-NEXT:    destroy_value [[HANDLE]] : $Optional<Builtin.NativeObject>
-// CHECK-NEXT:    [[T0:%.*]] = tuple ()
-// CHECK-NEXT:    return [[T0]] : $()
-}
-
 // ----------------------------------------------------------------------------
 // isUnique variants
 // ----------------------------------------------------------------------------
@@ -619,26 +597,6 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
 
-// NativeObject pinned
-// CHECK-LABEL: sil hidden @$S8builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Optional<Builtin.NativeObject>):
-// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[WRITE]] : $*Optional<Builtin.NativeObject>
-// CHECK: return
-func isUniqueOrPinned(_ ref: inout Builtin.NativeObject?) -> Bool {
-  return _getBool(Builtin.isUniqueOrPinned(&ref))
-}
-
-// NativeObject pinned nonNull
-// CHECK-LABEL: sil hidden @$S8builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Builtin.NativeObject):
-// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[WRITE]] : $*Builtin.NativeObject
-// CHECK: return
-func isUniqueOrPinned(_ ref: inout Builtin.NativeObject) -> Bool {
-  return _getBool(Builtin.isUniqueOrPinned(&ref))
-}
-
 // UnknownObject (ObjC)
 // CHECK-LABEL: sil hidden @$S8builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : @trivial $*Optional<Builtin.UnknownObject>):
@@ -659,16 +617,6 @@ func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
 
-// UnknownObject (ObjC) pinned nonNull
-// CHECK-LABEL: sil hidden @$S8builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Builtin.UnknownObject):
-// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[WRITE]] : $*Builtin.UnknownObject
-// CHECK: return
-func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
-  return _getBool(Builtin.isUniqueOrPinned(&ref))
-}
-
 // BridgeObject nonNull
 // CHECK-LABEL: sil hidden @$S8builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : @trivial $*Builtin.BridgeObject):
@@ -679,16 +627,6 @@ func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUnique(&ref))
 }
 
-// BridgeObject pinned nonNull
-// CHECK-LABEL: sil hidden @$S8builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Builtin.BridgeObject):
-// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[WRITE]] : $*Builtin.BridgeObject
-// CHECK: return
-func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
-  return _getBool(Builtin.isUniqueOrPinned(&ref))
-}
-
 // BridgeObject nonNull native
 // CHECK-LABEL: sil hidden @$S8builtins15isUnique_native{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : @trivial $*Builtin.BridgeObject):
@@ -697,17 +635,6 @@ func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
 // CHECK: return
 func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUnique_native(&ref))
-}
-
-// BridgeObject pinned nonNull native
-// CHECK-LABEL: sil hidden @$S8builtins23isUniqueOrPinned_native{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Builtin.BridgeObject):
-// CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
-// CHECK: [[CAST:%.*]] = unchecked_addr_cast [[WRITE]] : $*Builtin.BridgeObject to $*Builtin.NativeObject
-// CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[CAST]] : $*Builtin.NativeObject
-// CHECK: return
-func isUniqueOrPinned_native(_ ref: inout Builtin.BridgeObject) -> Bool {
-  return _getBool(Builtin.isUniqueOrPinned_native(&ref))
 }
 
 // ----------------------------------------------------------------------------

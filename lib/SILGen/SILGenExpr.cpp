@@ -1037,11 +1037,6 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
     // Emit the release immediately.
     SGF.B.emitDestroyValueOperation(loc, addressorResult.second.forward(SGF));
     break;
-  case AddressorKind::NativePinning:
-    // Emit the unpin immediately.
-    SGF.B.createStrongUnpin(loc, addressorResult.second.forward(SGF),
-                            SGF.B.getDefaultAtomicity());
-    break;
   }
   
   return result;
@@ -2157,9 +2152,19 @@ RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
 
 VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
                                        CanType baseTy, CanType arrayTy,
-                                       unsigned numElements) {
+                                       unsigned numElements,
+                                       ArrayRef<unsigned> expansionIndices) {
   // Reabstract the base type against the array element type.
   auto baseAbstraction = AbstractionPattern::getOpaque();
+  auto &baseTL = SGF.getTypeLowering(baseAbstraction, baseTy);
+
+  if (!expansionIndices.empty()) {
+    // An assertion is okay here for now because this is only in generated code.
+    assert(numElements == 1 &&
+           "expansion that is not the only variadic argument is unsupported");
+    return VarargsInfo(ManagedValue(), CleanupHandle::invalid(), SILValue(),
+                       baseTL, baseAbstraction, /*expansion peephole*/ true);
+  }
 
   // Allocate the array.
   SILValue numEltsVal = SGF.B.createIntegerLiteral(loc,
@@ -2180,19 +2185,24 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
   auto abortCleanup =
     SGF.enterDeallocateUninitializedArrayCleanup(array.getValue());
 
-  auto &baseTL = SGF.getTypeLowering(baseAbstraction, baseTy);
-
   // Turn the pointer into an address.
   basePtr = SGF.B.createPointerToAddress(
     loc, basePtr, baseTL.getLoweredType().getAddressType(),
     /*isStrict*/ true,
     /*isInvariant*/ false);
 
-  return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction);
+  return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction,
+                     /*expansion peephole*/ false);
 }
 
 ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
                                       VarargsInfo &&varargs) {
+  if (varargs.isExpansionPeephole()) {
+    auto result = varargs.getArray();
+    assert(result);
+    return result;
+  }
+
   // Kill the abort cleanup.
   SGF.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
 
@@ -2211,7 +2221,8 @@ static ManagedValue emitVarargs(SILGenFunction &SGF,
   auto baseTy = _baseTy->getCanonicalType();
   auto arrayTy = _arrayTy->getCanonicalType();
 
-  auto varargs = emitBeginVarargs(SGF, loc, baseTy, arrayTy, elements.size());
+  auto varargs = emitBeginVarargs(SGF, loc, baseTy, arrayTy, elements.size(),
+                                  /*expansions*/ {});
   AbstractionPattern baseAbstraction = varargs.getBaseAbstractionPattern();
   SILValue basePtr = varargs.getBaseAddress();
   

@@ -55,9 +55,7 @@ func tuple_patterns() {
   // CHECK: [[HADDR:%[0-9]+]] = alloc_box ${ var Double }
   // CHECK: [[PBH:%.*]] = project_box [[HADDR]]
   // CHECK: [[EFGH:%[0-9]+]] = apply
-  // CHECK: [[E:%[0-9]+]] = tuple_extract {{.*}}, 0
-  // CHECK: [[F:%[0-9]+]] = tuple_extract {{.*}}, 1
-  // CHECK: [[H:%[0-9]+]] = tuple_extract {{.*}}, 2
+  // CHECK: ([[E:%[0-9]+]], [[F:%[0-9]+]], [[H:%[0-9]+]]) = destructure_tuple
   // CHECK: store [[E]] to [trivial] [[PBE]]
   // CHECK: store [[F]] to [trivial] [[PBF]]
   // CHECK: store [[H]] to [trivial] [[PBH]]
@@ -79,8 +77,7 @@ func tuple_patterns() {
   // CHECK: [[KADDR:%[0-9]+]] = alloc_box ${ var () }
   // CHECK-NOT: alloc_box ${ var Double }
   // CHECK: [[J_K_:%[0-9]+]] = apply
-  // CHECK: [[J:%[0-9]+]] = tuple_extract {{.*}}, 0
-  // CHECK: [[K:%[0-9]+]] = tuple_extract {{.*}}, 2
+  // CHECK: ([[J:%[0-9]+]], [[K:%[0-9]+]], {{%[0-9]+}}) = destructure_tuple
   // CHECK: store [[J]] to [trivial] [[PBJ]]
   var (j,_,k,_) : (Int, Float, (), Double) = MRV()
 }

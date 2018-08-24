@@ -850,28 +850,30 @@ void swift::diagnoseSubElementFailure(Expr *destExpr,
     return;
   }
 
-  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(immInfo.first))
-    if (auto *LE = dyn_cast<LoadExpr>(ICE->getSubExpr())) {
-      Type actualType = CS.getType(LE);
-      Type neededType = CS.getType(ICE);
-      
+  if (auto contextualType = CS.getContextualType(immInfo.first)) {
+    Type neededType = contextualType->getInOutObjectType();
+    Type actualType = CS.getType(immInfo.first)->getInOutObjectType();
+    if (!neededType->isEqual(actualType)) {
       if (diagID.ID == diag::cannot_pass_rvalue_inout_subelement.ID) {
         // We have a special diagnostic with tailored wording for this
         // common case.
-        TC.diagnose(loc, diag::cannot_pass_rvalue_inout_converted,
-                    actualType, neededType)
-          .highlight(ICE->getSourceRange());
-        
-        fixItChangeInoutArgType(LE->getSubExpr(), actualType, neededType, CS);
-      }
-      else
+        TC.diagnose(loc, diag::cannot_pass_rvalue_inout_converted, actualType,
+                    neededType)
+            .highlight(immInfo.first->getSourceRange());
+
+        if (auto inoutExpr = dyn_cast<InOutExpr>(immInfo.first))
+          fixItChangeInoutArgType(inoutExpr->getSubExpr(), actualType,
+                                  neededType, CS);
+      } else {
         TC.diagnose(loc, diagID,
-                    "implicit conversion from '" +
-                    actualType->getString() + "' to '" +
-                    neededType->getString() + "' requires a temporary")
-          .highlight(ICE->getSourceRange());
+                    "implicit conversion from '" + actualType->getString() +
+                        "' to '" + neededType->getString() +
+                        "' requires a temporary")
+            .highlight(immInfo.first->getSourceRange());
+      }
       return;
     }
+  }
 
   if (auto IE = dyn_cast<IfExpr>(immInfo.first)) {
     if (isLoadedLValue(IE)) {
@@ -6523,9 +6525,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
     if (auto unwrapped = contextualType->getOptionalObjectType())
       unwrappedType = unwrapped;
 
-    PointerTypeKind pointerKind;
-    if (auto pointerEltType =
-          unwrappedType->getAnyPointerElementType(pointerKind)) {
+    if (auto pointerEltType = unwrappedType->getAnyPointerElementType()) {
 
       // If the element type is Void, then we allow any input type, since
       // everything is convertible to UnsafeRawPointer
@@ -6537,20 +6537,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
       // Furthermore, if the subexpr type is already known to be an array type,
       // then we must have an attempt at an array to pointer conversion.
       if (isKnownToBeArrayType(CS.getType(IOE->getSubExpr()))) {
-        // If we're converting to an UnsafeMutablePointer, then the pointer to
-        // the first element is being passed in.  The array is ok, so long as
-        // it is mutable.
-        if (pointerKind == PTK_UnsafeMutablePointer) {
-          contextualType = ArraySliceType::get(contextualType);
-        } else if (pointerKind == PTK_UnsafePointer || pointerKind == PTK_UnsafeRawPointer) {
-          // If we're converting to an UnsafePointer, then the programmer
-          // specified an & unnecessarily.  Produce a fixit hint to remove it.
-          diagnose(IOE->getLoc(), diag::extra_address_of_unsafepointer,
-                   unwrappedType)
-            .highlight(IOE->getSourceRange())
-            .fixItRemove(IOE->getStartLoc());
-          return true;
-        }
+        contextualType = ArraySliceType::get(contextualType);
       }
     } else if (contextualType->is<InOutType>()) {
       contextualType = contextualType->getInOutObjectType();
@@ -6564,21 +6551,11 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
     }
   }
 
-  auto subExpr = typeCheckChildIndependently(IOE->getSubExpr(), contextualType,
-                                             CS.getContextualTypePurpose(),
-                                             TCC_AllowLValue);
-  if (!subExpr) return true;
-
-  auto subExprType = CS.getType(subExpr);
-
-  // The common cause is that the operand is not an lvalue.
-  if (!subExprType->hasLValueType()) {
-    diagnoseSubElementFailure(subExpr, IOE->getLoc(), CS,
-                              diag::cannot_pass_rvalue_inout_subelement,
-                              diag::cannot_pass_rvalue_inout);
+  if (!typeCheckChildIndependently(IOE->getSubExpr(), contextualType,
+                                   CS.getContextualTypePurpose(),
+                                   TCC_AllowLValue)) {
     return true;
   }
-  
   return false;
 }
 

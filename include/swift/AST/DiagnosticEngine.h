@@ -619,10 +619,7 @@ namespace swift {
     /// be attached.
     InFlightDiagnostic diagnose(SourceLoc Loc, DiagID ID, 
                                 ArrayRef<DiagnosticArgument> Args) {
-      assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnostic = Diagnostic(ID, Args);
-      ActiveDiagnostic->setLoc(Loc);
-      return InFlightDiagnostic(*this);
+      return diagnose(Loc, Diagnostic(ID, Args));
     }
 
     /// \brief Emit a diagnostic using a preformatted array of diagnostic
@@ -640,7 +637,7 @@ namespace swift {
     /// be attached.
     InFlightDiagnostic diagnose(DeclNameLoc Loc, DiagID ID, 
                                 ArrayRef<DiagnosticArgument> Args) {
-      return diagnose(Loc.getBaseNameLoc(), ID, Args);
+      return diagnose(Loc.getBaseNameLoc(), Diagnostic(ID, Args));
     }
 
     /// \brief Emit an already-constructed diagnostic at the given location.
@@ -672,10 +669,7 @@ namespace swift {
     InFlightDiagnostic 
     diagnose(SourceLoc Loc, Diag<ArgTypes...> ID,
              typename detail::PassArgument<ArgTypes>::type... Args) {
-      assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnostic = Diagnostic(ID, std::move(Args)...);
-      ActiveDiagnostic->setLoc(Loc);
-      return InFlightDiagnostic(*this);
+      return diagnose(Loc, Diagnostic(ID, std::move(Args)...));
     }
 
     /// \brief Emit a diagnostic with the given set of diagnostic arguments.
@@ -704,10 +698,7 @@ namespace swift {
     InFlightDiagnostic 
     diagnose(DeclNameLoc Loc, Diag<ArgTypes...> ID,
              typename detail::PassArgument<ArgTypes>::type... Args) {
-      assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnostic = Diagnostic(ID, std::move(Args)...);
-      ActiveDiagnostic->setLoc(Loc.getBaseNameLoc());
-      return InFlightDiagnostic(*this);
+      return diagnose(Loc.getBaseNameLoc(), Diagnostic(ID, std::move(Args)...));
     }
 
     /// \brief Emit a diagnostic using a preformatted array of diagnostic
@@ -725,10 +716,7 @@ namespace swift {
     /// be attached.
     InFlightDiagnostic diagnose(const Decl *decl, DiagID id,
                                 ArrayRef<DiagnosticArgument> args) {
-      assert(!ActiveDiagnostic && "Already have an active diagnostic");
-      ActiveDiagnostic = Diagnostic(id, args);
-      ActiveDiagnostic->setDecl(decl);
-      return InFlightDiagnostic(*this);
+      return diagnose(decl, Diagnostic(id, args));
     }
 
     /// \brief Emit an already-constructed diagnostic referencing the given
@@ -761,9 +749,7 @@ namespace swift {
     InFlightDiagnostic
     diagnose(const Decl *decl, Diag<ArgTypes...> id,
              typename detail::PassArgument<ArgTypes>::type... args) {
-      ActiveDiagnostic = Diagnostic(id, std::move(args)...);
-      ActiveDiagnostic->setDecl(decl);
-      return InFlightDiagnostic(*this);
+      return diagnose(decl, Diagnostic(id, std::move(args)...));
     }
 
     /// \returns true if diagnostic is marked with PointsToFirstBadToken

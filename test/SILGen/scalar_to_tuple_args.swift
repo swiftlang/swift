@@ -54,12 +54,7 @@ scalarWithCallerSideDefaults(x)
 tupleWithDefaults(x: (x,x))
 
 // CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
-// CHECK: [[BORROWED_ALLOC_ARRAY:%.*]] = begin_borrow [[ALLOC_ARRAY]]
-// CHECK: [[BORROWED_ARRAY:%.*]] = tuple_extract [[BORROWED_ALLOC_ARRAY]] {{.*}}, 0
-// CHECK: [[ARRAY:%.*]] = copy_value [[BORROWED_ARRAY]]
-// CHECK: [[MEMORY:%.*]] = tuple_extract [[BORROWED_ALLOC_ARRAY]] {{.*}}, 1
-// CHECK: end_borrow [[BORROWED_ALLOC_ARRAY]] from [[ALLOC_ARRAY]]
-// CHECK: destroy_value [[ALLOC_ARRAY]]
+// CHECK: ([[ARRAY:%.*]], [[MEMORY:%.*]]) = destructure_tuple [[ALLOC_ARRAY]]
 // CHECK: [[ADDR:%.*]] = pointer_to_address [[MEMORY]]
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
 // CHECK: [[X:%.*]] = load [trivial] [[READ]]
@@ -70,10 +65,7 @@ tupleWithDefaults(x: (x,x))
 variadicFirst(x)
 
 // CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
-// CHECK: [[BORROWED_ALLOC_ARRAY:%.*]] = begin_borrow [[ALLOC_ARRAY]]
-// CHECK: [[BORROWED_ARRAY:%.*]] = tuple_extract [[BORROWED_ALLOC_ARRAY]] {{.*}}, 0
-// CHECK: [[ARRAY:%.*]] = copy_value [[BORROWED_ARRAY]]
-// CHECK: end_borrow [[BORROWED_ALLOC_ARRAY]] from [[ALLOC_ARRAY]]
+// CHECK: ([[ARRAY:%.*]], [[MEMORY:%.*]]) = destructure_tuple [[ALLOC_ARRAY]]
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
 // CHECK: [[X:%.*]] = load [trivial] [[READ]]
 // CHECK: [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]

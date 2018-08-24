@@ -465,8 +465,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: [[CAST_ARG2_LOADED:%[0-9][0-9]*]] = upcast [[ARG2_LOADED]] : $PropertyRequirementWitnessFromBase to $PropertyRequirementBase
   // CHECK-NEXT: [[METH:%.*]] = class_method [[CAST_ARG2_LOADED]] : $PropertyRequirementBase, #PropertyRequirementBase.width!materializeForSet.1
   // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]({{.*}}, {{.*}}, [[CAST_ARG2_LOADED]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed PropertyRequirementBase) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-  // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
-  // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
+  // CHECK-NEXT: ([[CAR:%.*]], [[CADR:%.*]]) = destructure_tuple [[RES]]
   // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CADR]] : {{.*}})
   // CHECK-NEXT: end_borrow [[ARG2_LOADED]] from [[ARG2]]
   // CHECK-NEXT: return [[TUPLE]]
@@ -475,8 +474,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK: [[OBJ:%.*]] = upcast %2 : $@thick PropertyRequirementWitnessFromBase.Type to $@thick PropertyRequirementBase.Type
   // CHECK: [[METH:%.*]] = function_ref @$S9witnesses23PropertyRequirementBaseC6heightSivmZ
   // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
-  // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
-  // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
+  // CHECK-NEXT: ([[CAR:%.*]], [[CADR:%.*]]) = destructure_tuple [[RES]]
   // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CADR]] : {{.*}})
   // CHECK-NEXT: return [[TUPLE]]
 
@@ -485,8 +483,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK: [[ARG2_LOADED:%[0-9][0-9]*]] = load_borrow [[ARG2]]
   // CHECK: [[METH:%.*]] = class_method [[ARG2_LOADED]] : $PropertyRequirementWitnessFromBase, #PropertyRequirementWitnessFromBase.depth!materializeForSet.1
   // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]({{.*}}, {{.*}}, [[ARG2_LOADED]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed PropertyRequirementWitnessFromBase) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-  // CHECK-NEXT: tuple_extract
-  // CHECK-NEXT: tuple_extract
+  // CHECK-NEXT: destructure_tuple
   // CHECK-NEXT: [[RES:%.*]] = tuple
   // CHECK-NEXT: end_borrow [[ARG2_LOADED]] from [[ARG2]]
   // CHECK-NEXT: return [[RES]]
@@ -524,4 +521,38 @@ protocol EscapingReq {
 // CHECK: return
 struct EscapingCovariance: EscapingReq {
   func f(_: (Int) -> Int) { }
+}
+
+protocol InoutFunctionReq {
+  associatedtype T
+  func updateFunction(x: inout () -> T)
+}
+
+// CHECK-LABEL: sil private [transparent] [thunk] @$S9witnesses13InoutFunctionVAA0bC3ReqA2aDP06updateC01xy1TQzycz_tFTW
+// CHECK:      bb0(%0 : @trivial $*@callee_guaranteed () -> @out (), %1 : @trivial $*InoutFunction):
+// CHECK-NEXT:   [[TEMP:%.*]] = alloc_stack $@callee_guaranteed () -> ()
+//   Reabstract the contents of the inout argument into the temporary.
+// CHECK-NEXT:   [[OLD_FN:%.*]] = load [take] %0
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[THUNK:%.*]] = function_ref @$SytIegr_Ieg_TR
+// CHECK-NEXT:   [[THUNKED_OLD_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[OLD_FN]])
+// CHECK-NEXT:   store [[THUNKED_OLD_FN]] to [init] [[TEMP]] :
+//   Call the function.
+// CHECK-NEXT:   [[SELF:%.*]] = load [trivial] %1 : $*InoutFunction
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[T0:%.*]] = function_ref @$S9witnesses13InoutFunctionV06updateC01xyyycz_tF :
+// CHECK-NEXT:   apply [[T0]]([[TEMP]], [[SELF]])
+// CHECK-NEXT:   [[TUPLE:%.*]] = tuple ()
+//   Reabstract the contents of the temporary back into the inout argument.
+// CHECK-NEXT:   [[NEW_FN:%.*]] = load [take] [[TEMP]]
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[THUNK:%.*]] = function_ref @$SIeg_ytIegr_TR
+// CHECK-NEXT:   [[THUNKED_NEW_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NEW_FN]])
+// CHECK-NEXT:   store [[THUNKED_NEW_FN]] to [init] %0 :
+// CHECK-NEXT:   dealloc_stack [[TEMP]]
+// CHECK-NEXT:   return [[TUPLE]]
+// CHECK-LABEL:  } // end sil function '$S9witnesses13InoutFunctionVAA0bC3ReqA2aDP06updateC01xy1TQzycz_tFTW'
+
+struct InoutFunction : InoutFunctionReq {
+  func updateFunction(x: inout () -> ()) {}
 }

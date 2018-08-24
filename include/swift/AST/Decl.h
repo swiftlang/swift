@@ -1214,6 +1214,22 @@ public:
                        SecondType.getSourceRange().End);
   }
 
+  /// Retrieve the first or subject type representation from the \c repr,
+  /// or \c nullptr if \c repr is null.
+  static TypeRepr *getFirstTypeRepr(const RequirementRepr *repr) {
+    if (!repr) return nullptr;
+    return repr->FirstType.getTypeRepr();
+  }
+
+  /// Retrieve the second or constraint type representation from the \c repr,
+  /// or \c nullptr if \c repr is null.
+  static TypeRepr *getSecondTypeRepr(const RequirementRepr *repr) {
+    if (!repr) return nullptr;
+    assert(repr->getKind() == RequirementReprKind::TypeConstraint ||
+           repr->getKind() == RequirementReprKind::SameType);
+    return repr->SecondType.getTypeRepr();
+  }
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -1724,9 +1740,6 @@ public:
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
-
-  /// Retrieve one of the types listed in the "inherited" clause.
-  Type getInheritedType(unsigned index) const;
 
   /// Whether we have fully checked the extension signature.
   bool hasValidSignature() const {
@@ -2607,9 +2620,6 @@ public:
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
-
-  /// Retrieve one of the types listed in the "inherited" clause.
-  Type getInheritedType(unsigned index) const;
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
@@ -3625,23 +3635,6 @@ public:
   /// might have implicitly @objc members, but will never itself be @objc.
   ObjCClassKind checkObjCAncestry() const;
 
-  /// \brief Whether this class or its superclasses has some form of generic
-  /// context.
-  ///
-  /// For example, given
-  ///
-  /// class A<X> {}
-  /// class B : A<Int> {}
-  /// struct C<T> {
-  ///   struct Inner {}
-  /// }
-  /// class D {}
-  /// class E: D {}
-  ///
-  /// Calling hasGenericAncestry() on `B` returns `A<Int>`, on `C<T>.Inner`
-  /// returns `C<T>.Inner`, but on `E` it returns null.
-  ClassDecl *getGenericAncestor() const;
-
   /// The type of metaclass to use for a class.
   enum class MetaclassKind : uint8_t {
     ObjC,
@@ -4544,6 +4537,9 @@ public:
   void setParentPatternStmt(Stmt *S) {
     ParentPattern = S;
   }
+
+  /// True if the global stored property requires lazy initialization.
+  bool isLazilyInitializedGlobal() const;
 
   /// Return the initializer involved in this VarDecl.  Recall that the
   /// initializer may be involved in initializing more than just this one
@@ -6655,6 +6651,9 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
 /// the type of the corresponding parameter.
 std::pair<DefaultArgumentKind, Type>
 getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
+
+/// Display Decl subclasses.
+void simple_display(llvm::raw_ostream &out, const Decl *decl);
 
 /// Display ValueDecl subclasses.
 void simple_display(llvm::raw_ostream &out, const ValueDecl *decl);

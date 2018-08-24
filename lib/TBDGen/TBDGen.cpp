@@ -208,9 +208,7 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
       addSymbol(mangler.mangleEntity(VD, false));
     }
 
-    // Top-level variables (*not* statics) in the main file don't get accessors,
-    // despite otherwise looking like globals.
-    if (!FileHasEntryPoint || VD->isStatic())
+    if (VD->isLazilyInitializedGlobal())
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
   }
 
@@ -423,6 +421,10 @@ convertToPacked(const version::Version &version) {
   return tapi::internal::PackedVersion(major, minor, subminor);
 }
 
+static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
+  return LangOpts.EnableAppExtensionRestrictions;
+}
+
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet *symbols,
                                            llvm::raw_ostream *os,
@@ -433,6 +435,8 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
 
   tapi::internal::InterfaceFile file;
   file.setFileType(tapi::internal::FileType::TBD_V3);
+  file.setApplicationExtensionSafe(
+    isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);
   file.setCurrentVersion(convertToPacked(opts.CurrentVersion));
   file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
@@ -453,7 +457,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
     SmallVector<Decl *, 16> decls;
     file->getTopLevelDecls(decls);
 
-    visitor.setFileHasEntryPoint(file->hasEntryPoint());
+    visitor.addMainIfNecessary(file);
 
     for (auto d : decls)
       visitor.visit(d);

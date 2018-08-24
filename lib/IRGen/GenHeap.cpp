@@ -1289,30 +1289,6 @@ void IRGenFunction::emitErrorStrongRelease(llvm::Value *value) {
   emitUnaryRefCountCall(*this, IGM.getErrorStrongReleaseFn(), value);
 }
 
-llvm::Value *IRGenFunction::emitNativeTryPin(llvm::Value *value,
-                                             Atomicity atomicity) {
-  llvm::CallInst *call =
-      (atomicity == Atomicity::Atomic)
-          ? Builder.CreateCall(IGM.getNativeTryPinFn(), value)
-          : Builder.CreateCall(IGM.getNonAtomicNativeTryPinFn(), value);
-  call->setDoesNotThrow();
-
-  // Builtin.NativeObject? has representation i32/i64.
-  llvm::Value *handle = Builder.CreatePtrToInt(call, IGM.IntPtrTy);
-  return handle;
-}
-
-void IRGenFunction::emitNativeUnpin(llvm::Value *value, Atomicity atomicity) {
-  // Builtin.NativeObject? has representation i32/i64.
-  value = Builder.CreateIntToPtr(value, IGM.RefCountedPtrTy);
-
-  llvm::CallInst *call =
-      (atomicity == Atomicity::Atomic)
-          ? Builder.CreateCall(IGM.getNativeUnpinFn(), value)
-          : Builder.CreateCall(IGM.getNonAtomicNativeUnpinFn(), value);
-  call->setDoesNotThrow();
-}
-
 llvm::Value *IRGenFunction::emitLoadRefcountedPtr(Address addr,
                                                   ReferenceCounting style) {
   Address src =

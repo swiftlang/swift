@@ -23,6 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
+#include <tuple>
 
 namespace swift {
 namespace constraints {
@@ -32,7 +33,7 @@ namespace constraints {
 /// the problem, parent expression and some utility methods.
 class FailureDiagnostic {
   Expr *E;
-  const Solution &solution;
+  ConstraintSystem &CS;
   ConstraintLocator *Locator;
 
   Expr *Anchor;
@@ -41,9 +42,9 @@ class FailureDiagnostic {
   bool HasComplexLocator;
 
 public:
-  FailureDiagnostic(Expr *expr, const Solution &solution,
+  FailureDiagnostic(Expr *expr, ConstraintSystem &cs,
                     ConstraintLocator *locator)
-      : E(expr), solution(solution), Locator(locator) {
+      : E(expr), CS(cs), Locator(locator) {
     std::tie(Anchor, HasComplexLocator) = computeAnchor();
   }
 
@@ -58,7 +59,7 @@ public:
   virtual bool diagnose() = 0;
 
   ConstraintSystem &getConstraintSystem() const {
-    return solution.getConstraintSystem();
+    return CS;
   }
 
   Expr *getParentExpr() const { return E; }
@@ -71,26 +72,40 @@ public:
 
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType) const {
-    return solution.simplifyType(rawType);
+    return CS.simplifyType(rawType);
   }
 
   template <typename... ArgTypes>
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
 
 protected:
-  TypeChecker &getTypeChecker() const { return getConstraintSystem().TC; }
+  TypeChecker &getTypeChecker() const { return CS.TC; }
 
-  DeclContext *getDC() const { return getConstraintSystem().DC; }
+  DeclContext *getDC() const { return CS.DC; }
+
+  Optional<std::pair<Type, ConversionRestrictionKind>>
+  restrictionForType(Type type) const {
+    for (auto &restriction : CS.ConstraintRestrictions) {
+      if (std::get<0>(restriction)->isEqual(type))
+        return std::pair<Type, ConversionRestrictionKind>(
+            std::get<1>(restriction), std::get<2>(restriction));
+    }
+    return None;
+  }
 
   Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
-    return solution.getOverloadChoiceIfAvailable(locator);
+    if (auto *overload = getResolvedOverload(locator))
+      return Optional<SelectedOverload>(
+           {overload->Choice, overload->OpenedFullType, overload->ImpliedType});
+    return None;
   }
 
   /// Retrieve overload choice resolved for given locator
   /// by the constraint solver.
-  ResolvedOverloadSetListItem *getResolvedOverload(ConstraintLocator *locator) {
-    auto resolvedOverload = getConstraintSystem().getResolvedOverloadSets();
+  ResolvedOverloadSetListItem *
+  getResolvedOverload(ConstraintLocator *locator) const {
+    auto resolvedOverload = CS.getResolvedOverloadSets();
     while (resolvedOverload) {
       if (resolvedOverload->Locator == locator)
         return resolvedOverload;
@@ -123,9 +138,9 @@ protected:
   const ApplyExpr *Apply = nullptr;
 
 public:
-  RequirementFailure(Expr *expr, const Solution &solution,
+  RequirementFailure(Expr *expr, ConstraintSystem &cs,
                      ConstraintLocator *locator)
-      : FailureDiagnostic(expr, solution, locator), AffectedDecl(getDeclRef()) {
+      : FailureDiagnostic(expr, cs, locator), AffectedDecl(getDeclRef()) {
     auto *anchor = getAnchor();
     expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
       auto *AE = dyn_cast<ApplyExpr>(subExpr);
@@ -200,10 +215,10 @@ class MissingConformanceFailure final : public RequirementFailure {
   ProtocolDecl *Protocol;
 
 public:
-  MissingConformanceFailure(Expr *expr, const Solution &solution,
+  MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
                             std::pair<Type, ProtocolDecl *> conformance)
-      : RequirementFailure(expr, solution, locator),
+      : RequirementFailure(expr, cs, locator),
         NonConformingType(conformance.first), Protocol(conformance.second) {}
 
   bool diagnose() override;
@@ -226,6 +241,76 @@ protected:
   }
 };
 
+/// Diagnose failures related to same-type generic requirements, e.g.
+/// ```swift
+/// protocol P {
+///   associatedtype T
+/// }
+///
+/// struct S : P {
+///   typealias T = String
+/// }
+///
+/// func foo<U: P>(_ t: [U]) where U.T == Int {}
+/// foo([S()])
+/// ```
+///
+/// `S.T` is not the same type as `Int`, which is required by `foo`.
+class SameTypeRequirementFailure final : public RequirementFailure {
+  Type LHS, RHS;
+
+public:
+  SameTypeRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
+                             Type rhs, ConstraintLocator *locator)
+      : RequirementFailure(expr, cs, locator), LHS(lhs), RHS(rhs) {}
+
+  Type getLHS() const override { return LHS; }
+  Type getRHS() const override { return RHS; }
+
+protected:
+  DiagOnDecl getDiagnosticOnDecl() const override {
+    return diag::types_not_equal_decl;
+  }
+
+  DiagInReference getDiagnosticInRereference() const override {
+    return diag::types_not_equal_in_decl_ref;
+  }
+};
+
+/// Diagnose failures related to superclass generic requirements, e.g.
+/// ```swift
+/// class A {
+/// }
+///
+/// class B {
+/// }
+///
+/// func foo<T>(_ t: [T]) where T: A {}
+/// foo([B()])
+/// ```
+///
+/// `A` is not the superclass of `B`, which is required by `foo<T>`.
+class SuperclassRequirementFailure final : public RequirementFailure {
+  Type LHS, RHS;
+
+public:
+  SuperclassRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
+                               Type rhs, ConstraintLocator *locator)
+      : RequirementFailure(expr, cs, locator), LHS(lhs), RHS(rhs) {}
+
+  Type getLHS() const override { return LHS; }
+  Type getRHS() const override { return RHS; }
+
+protected:
+  DiagOnDecl getDiagnosticOnDecl() const override {
+    return diag::types_not_inherited_decl;
+  }
+
+  DiagInReference getDiagnosticInRereference() const override {
+    return diag::types_not_inherited_in_decl_ref;
+  }
+};
+
 /// Diagnose errors associated with missing, extraneous
 /// or incorrect labels supplied by arguments, e.g.
 /// ```swift
@@ -238,9 +323,9 @@ class LabelingFailure final : public FailureDiagnostic {
   ArrayRef<Identifier> CorrectLabels;
 
 public:
-  LabelingFailure(const Solution &solution, ConstraintLocator *locator,
+  LabelingFailure(ConstraintSystem &cs, ConstraintLocator *locator,
                   ArrayRef<Identifier> labels)
-      : FailureDiagnostic(nullptr, solution, locator), CorrectLabels(labels) {}
+      : FailureDiagnostic(nullptr, cs, locator), CorrectLabels(labels) {}
 
   bool diagnose() override;
 };
@@ -251,19 +336,19 @@ class NoEscapeFuncToTypeConversionFailure final : public FailureDiagnostic {
   Type ConvertTo;
 
 public:
-  NoEscapeFuncToTypeConversionFailure(Expr *expr, const Solution &solution,
+  NoEscapeFuncToTypeConversionFailure(Expr *expr, ConstraintSystem &cs,
                                       ConstraintLocator *locator,
                                       Type toType = Type())
-      : FailureDiagnostic(expr, solution, locator), ConvertTo(toType) {}
+      : FailureDiagnostic(expr, cs, locator), ConvertTo(toType) {}
 
   bool diagnose() override;
 };
 
 class MissingForcedDowncastFailure final : public FailureDiagnostic {
 public:
-  MissingForcedDowncastFailure(Expr *expr, const Solution &solution,
+  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs,
                                ConstraintLocator *locator)
-      : FailureDiagnostic(expr, solution, locator) {}
+      : FailureDiagnostic(expr, cs, locator) {}
 
   bool diagnose() override;
 };
@@ -272,9 +357,9 @@ public:
 /// to `inout` parameter, without explicitly specifying `&`.
 class MissingAddressOfFailure final : public FailureDiagnostic {
 public:
-  MissingAddressOfFailure(Expr *expr, const Solution &solution,
+  MissingAddressOfFailure(Expr *expr, ConstraintSystem &cs,
                           ConstraintLocator *locator)
-      : FailureDiagnostic(expr, solution, locator) {}
+      : FailureDiagnostic(expr, cs, locator) {}
 
   bool diagnose() override;
 };
@@ -286,9 +371,9 @@ class MissingExplicitConversionFailure final : public FailureDiagnostic {
   Type ConvertingTo;
 
 public:
-  MissingExplicitConversionFailure(Expr *expr, const Solution &solution,
+  MissingExplicitConversionFailure(Expr *expr, ConstraintSystem &cs,
                                    ConstraintLocator *locator, Type toType)
-      : FailureDiagnostic(expr, solution, locator), ConvertingTo(toType) {}
+      : FailureDiagnostic(expr, cs, locator), ConvertingTo(toType) {}
 
   bool diagnose() override;
 
@@ -325,10 +410,10 @@ class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
   bool ResultTypeIsOptional;
 
 public:
-  MemberAccessOnOptionalBaseFailure(Expr *expr, const Solution &solution,
+  MemberAccessOnOptionalBaseFailure(Expr *expr, ConstraintSystem &cs,
                                     ConstraintLocator *locator,
                                     DeclName memberName, bool resultOptional)
-      : FailureDiagnostic(expr, solution, locator), Member(memberName),
+      : FailureDiagnostic(expr, cs, locator), Member(memberName),
         ResultTypeIsOptional(resultOptional) {}
 
   bool diagnose() override;
@@ -338,9 +423,9 @@ public:
 /// which require some type of force-unwrap e.g. "!" or "try!".
 class MissingOptionalUnwrapFailure final : public FailureDiagnostic {
 public:
-  MissingOptionalUnwrapFailure(Expr *expr, const Solution &solution,
+  MissingOptionalUnwrapFailure(Expr *expr, ConstraintSystem &cs,
                                ConstraintLocator *locator)
-      : FailureDiagnostic(expr, solution, locator) {}
+      : FailureDiagnostic(expr, cs, locator) {}
 
   bool diagnose() override;
 };
@@ -350,8 +435,8 @@ public:
 class RValueTreatedAsLValueFailure final : public FailureDiagnostic {
 
 public:
-  RValueTreatedAsLValueFailure(const Solution &solution, ConstraintLocator *locator)
-    : FailureDiagnostic(nullptr, solution, locator) {}
+  RValueTreatedAsLValueFailure(ConstraintSystem &cs, ConstraintLocator *locator)
+      : FailureDiagnostic(nullptr, cs, locator) {}
 
   bool diagnose() override;
 };

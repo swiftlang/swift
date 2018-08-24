@@ -27,7 +27,7 @@ func physical_tuple_rvalue() -> Int {
   return tuple_rvalue().1
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @$S10properties12tuple_rvalue{{[_0-9a-zA-Z]*}}F
   // CHECK: [[TUPLE:%[0-9]+]] = apply [[FUNC]]()
-  // CHECK: [[RET:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 1
+  // CHECK: ({{%.*}}, [[RET:%[0-9]+]]) = destructure_tuple [[TUPLE]]
   // CHECK: return [[RET]]
 }
 
@@ -205,8 +205,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[T0:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_TEMP]] : $*Val to $Builtin.RawPointer
   // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : (Ref) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?)
   // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[STORAGE]], [[VAL_REF_BORROWED]])
-  // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
-  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 1  
+  // CHECK: ([[T0:%.*]], [[OPT_CALLBACK:%.*]]) = destructure_tuple [[MAT_RESULT]]
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Val
   // CHECK: [[T2:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: end_borrow [[VAL_REF_BORROWED]] from [[VAL_REF]]
@@ -218,8 +217,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[A1:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
   // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV7z_tupleSi_Sitvg
   // CHECK: [[V_R_VP_Z_TUPLE:%[0-9]+]] = apply [[GET_Z_TUPLE_METHOD]]([[LD]])
-  // CHECK: [[T0:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 0
-  // CHECK: [[T1:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 1
+  // CHECK: ([[T0:%.*]], [[T1:%.*]]) = destructure_tuple [[V_R_VP_Z_TUPLE]]
   // CHECK: store [[T0]] to [trivial] [[A0]]
   // CHECK: store [[T1]] to [trivial] [[A1]]
   // CHECK: end_borrow [[LD]] from [[VAL_REF_VAL_PROP_MAT]]
@@ -265,8 +263,7 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: [[A1:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV7z_tupleSi_Sitvg
   // CHECK: [[Z_TUPLE:%[0-9]+]] = apply [[Z_GET_METHOD]]([[VAL1]])
-  // CHECK: [[T0:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 0
-  // CHECK: [[T1:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 1
+  // CHECK: ([[T0:%.*]], [[T1:%.*]]) = destructure_tuple [[Z_TUPLE]]
   // CHECK: store [[T0]] to [trivial] [[A0]]
   // CHECK: store [[T1]] to [trivial] [[A1]]
   // CHECK: end_borrow [[VAL1]] from [[WRITE]]
