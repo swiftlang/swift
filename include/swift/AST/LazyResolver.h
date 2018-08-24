@@ -63,9 +63,6 @@ public:
   /// Resolve the generic environment of the given protocol.
   virtual void resolveProtocolEnvironment(ProtocolDecl *proto) = 0;
 
-  /// Resolve the trailing where clause of the given protocol in-place.
-  virtual void resolveTrailingWhereClause(ProtocolDecl *proto) = 0;
-
   /// Bind an extension to its extended type.
   virtual void bindExtension(ExtensionDecl *ext) = 0;
 

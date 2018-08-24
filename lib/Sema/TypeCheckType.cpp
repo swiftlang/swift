@@ -97,7 +97,10 @@ GenericSignature *TypeResolution::getGenericSignature() const {
     return dc->getGenericSignatureOfContext();
 
   case TypeResolutionStage::Interface:
-    return complete.genericSig;
+    if (complete.genericSig)
+      return complete.genericSig;
+
+    return dc->getGenericSignatureOfContext();
 
   case TypeResolutionStage::Structural:
     return nullptr;
