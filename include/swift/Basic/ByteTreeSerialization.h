@@ -167,8 +167,15 @@ private:
            "NumFields may not be reset since it has already been written to "
            "the byte stream");
     assert((this->NumFields == UINT_MAX) && "NumFields has already been set");
+    // Num fields cannot exceed (1 << 31) since it would otherwise interfere
+    // with the bitflag that indicates if the next construct in the tree is an
+    // object or a scalar.
+    assert((NumFields & ((uint32_t)1 << 31)) == 0 && "Field size too large");
 
-    auto Error = StreamWriter.writeInteger(NumFields);
+    // Set the most significant bit to indicate that the next construct is an
+    // object and not a scalar.
+    uint32_t ToWrite = NumFields | (1 << 31);
+    auto Error = StreamWriter.writeInteger(ToWrite);
     (void)Error;
     assert(!Error);
 
@@ -229,6 +236,10 @@ public:
     validateAndIncreaseFieldIndex(Index);
 
     uint32_t ValueSize = ScalarTraits<T>::size(Value);
+    // Size cannot exceed (1 << 31) since it would otherwise interfere with the
+    // bitflag that indicates if the next construct in the tree is an object
+    // or a scalar.
+    assert((ValueSize & ((uint32_t)1 << 31)) == 0 && "Value size too large");
     auto SizeError = StreamWriter.writeInteger(ValueSize);
     (void)SizeError;
     assert(!SizeError);
@@ -301,13 +312,16 @@ struct ScalarTraits<llvm::StringRef> {
 };
 
 template <>
-struct ScalarTraits<llvm::NoneType> {
-  // Serialize llvm::None as a value with 0 length
-  static unsigned size(const llvm::NoneType &None) { return 0; }
-  static llvm::Error write(llvm::BinaryStreamWriter &Writer,
-                           const llvm::NoneType &None) {
+struct ObjectTraits<llvm::NoneType> {
+  // Serialize llvm::None as an object without any elements
+  static unsigned numFields(const llvm::NoneType &Object,
+                            UserInfoMap &UserInfo) {
+    return 0;
+  }
+
+  static void write(ByteTreeWriter &Writer, const llvm::NoneType &Object,
+                    UserInfoMap &UserInfo) {
     // Nothing to write
-    return llvm::ErrorSuccess();
   }
 };
 
