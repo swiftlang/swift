@@ -265,7 +265,7 @@ extension Collection where Self: BidirectionalCollection {
   internal func _findUpperBound(
     forKey key: Element,
     within range: Range<Index>,
-    by areInIncreasingOreder: (Element, Element) throws -> Bool
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows -> Index {
     
     var start = range.lowerBound
@@ -274,14 +274,14 @@ extension Collection where Self: BidirectionalCollection {
     while start < end {
       let half = distance(from: start, to: end) &>> 1
       let mid  = index(start, offsetBy: half)
-      // the following if statement equals to self[mid] <= key
+      // The following if statement equals to self[mid] <= key.
       // <= is necessary for picking the first element that is greater
-      // than key
-      if try !areInIncreasingOreder(key, self[mid]) {
-        // move left bound closer to right
+      // than key.
+      if try !areInIncreasingOrder(key, self[mid]) {
+        // Move left bound closer to the right.
         start = index(after: mid)
       } else {
-        // move right bound closer to left
+        // Move right bound closer to the left.
         end = mid
       }
     }
@@ -307,14 +307,14 @@ extension MutableCollection where Self: BidirectionalCollection {
 
     while sortedEnd != range.upperBound {
 
-      // Find the position where should we put the left most element
+      // Find the position where should we put the leftmost element
       // of unsorted part of our range.
       let insertionPoint = try _findUpperBound(
         forKey: self[sortedEnd],
         within: start..<sortedEnd,
         by: areInIncreasingOrder)
 
-      // swap elements forward until insertion point is reached.
+      // Swap elements forward until insertion point is reached.
       var i = sortedEnd
 
       while i != insertionPoint {
@@ -442,8 +442,8 @@ extension MutableCollection where Self: RandomAccessCollection {
         }
         break Loop
       }
-      
-      // we must update mid to keep pivot reference valid
+
+      // We must update mid to keep reference to pivot element valid.
       if lo == mid {
         mid = hi
       } else if hi == mid {
