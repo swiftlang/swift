@@ -295,7 +295,6 @@ internal struct _BufferingHasher<RawCore: _HasherCore> {
 ///   different values on every new execution of your program. The hash
 ///   algorithm implemented by `Hasher` may itself change between any two
 ///   versions of the standard library.
-@_fixed_layout // FIXME: Should be resilient (rdar://problem/38549901)
 public struct Hasher {
   // FIXME: Remove @usableFromInline once Hasher is resilient.
   // rdar://problem/38549901
