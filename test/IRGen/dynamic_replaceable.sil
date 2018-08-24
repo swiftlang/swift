@@ -1,0 +1,25 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -disable-objc-interop | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+// CHECK: @test_dynamically_replaceableTX = global %swift.dyn_repl_link_entry { i8* bitcast (void ()* @test_dynamically_replaceableTI to i8*), %swift.dyn_repl_link_entry* null }
+// CHECK: @llvm.used = appending global {{.*}} @test_dynamically_replaceable {{.*}} @test_dynamically_replaceableTX
+
+// CHECK-LABEL: define swiftcc void @test_dynamically_replaceable()
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   [[FUN_PTR:%.*]] = load i8*, i8** getelementptr inbounds (%swift.dyn_repl_link_entry, %swift.dyn_repl_link_entry* @test_dynamically_replaceableTX, i32 0, i32 0)
+// CHECK-NEXT:   [[TYPED_PTR:%.*]] = bitcast i8* [[FUN_PTR]] to void ()*
+// CHECK-NEXT:   call swiftcc void [[TYPED_PTR]]()
+// CHECK-NEXT:   ret void
+// CHECK-NEXT: }
+
+// CHECK-LABEL: define swiftcc void @test_dynamically_replaceableTI()
+// CHECK: entry:
+// CHECK:   ret void
+// CHECK: }
+
+sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}

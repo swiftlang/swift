@@ -1207,12 +1207,13 @@ llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF,
   llvm_unreachable("bad kind");
 }
 
-IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
-                                   SILFunction *f)
-  : IRGenFunction(IGM, IGM.getAddrOfSILFunction(f, ForDefinition),
-                  f->getOptimizationMode(),
-                  f->getDebugScope(), f->getLocation()),
-    CurSILFn(f) {
+IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
+    : IRGenFunction(IGM,
+                    IGM.getAddrOfSILFunction(f, ForDefinition,
+                                             f->isDynamicallyReplaceable()),
+                    f->getOptimizationMode(), f->getDebugScope(),
+                    f->getLocation()),
+      CurSILFn(f) {
   // Apply sanitizer attributes to the function.
   // TODO: Check if the function is supposed to be excluded from ASan either by
   // being in the external file or via annotations.

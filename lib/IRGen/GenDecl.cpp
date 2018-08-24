@@ -49,6 +49,7 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
+#include "Callee.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
@@ -1272,6 +1273,44 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
   }
 }
 
+llvm::GlobalVariable *IRGenModule::getGlobalForDynamicallyReplaceableThunk(
+    LinkEntity &entity, llvm::Type *type, ForDefinition_t forDefinition) {
+  return cast<llvm::GlobalVariable>(
+      getAddrOfLLVMVariable(entity, forDefinition, DebugTypeInfo()));
+}
+
+/// Creates a dynamic replacement chain entry for \p SILFn that contains either
+/// the implementation function pointer \p or a nullptr, the next pointer of the
+/// chain entry is set to nullptr.
+///   struct ChainEntry {
+///      void *funPtr;
+///      struct ChainEntry *next;
+///   }
+static llvm::GlobalVariable *getChainEntryForDynamicReplacement(
+    IRGenModule &IGM, SILFunction *SILFn,
+    llvm::Function *implFunction = nullptr,
+    ForDefinition_t forDefinition = ForDefinition) {
+
+  LinkEntity entity =
+      LinkEntity::forDynamicallyReplaceableFunctionVariable(SILFn);
+  auto linkEntry = IGM.getGlobalForDynamicallyReplaceableThunk(
+      entity, IGM.DynamicReplacementLinkEntryTy, forDefinition);
+  if (!forDefinition)
+    return linkEntry;
+
+  auto *funPtr =
+      implFunction ? llvm::ConstantExpr::getBitCast(implFunction, IGM.Int8PtrTy)
+                   : llvm::ConstantExpr::getNullValue(IGM.Int8PtrTy);
+  auto *nextEntry =
+      llvm::ConstantExpr::getNullValue(IGM.DynamicReplacementLinkEntryPtrTy);
+  llvm::Constant *fields[] = {funPtr, nextEntry};
+  auto *entry =
+      llvm::ConstantStruct::get(IGM.DynamicReplacementLinkEntryTy, fields);
+  linkEntry->setInitializer(entry);
+  return linkEntry;
+}
+
+
 void IRGenerator::emitEagerClassInitialization() {
   if (ClassesForEagerInitialization.empty())
     return;
@@ -1893,16 +1932,95 @@ static clang::GlobalDecl getClangGlobalDeclForFunction(const clang::Decl *decl) 
   return clang::GlobalDecl(cast<clang::FunctionDecl>(decl));
 }
 
+static void addLLVMFunctionAttributes(SILFunction *f, Signature &signature) {
+  auto &attrs = signature.getMutableAttributes();
+  switch (f->getInlineStrategy()) {
+  case NoInline:
+    attrs = attrs.addAttribute(signature.getType()->getContext(),
+                               llvm::AttributeList::FunctionIndex,
+                               llvm::Attribute::NoInline);
+    break;
+  case AlwaysInline:
+    // FIXME: We do not currently transfer AlwaysInline since doing so results
+    // in test failures, which must be investigated first.
+  case InlineDefault:
+    break;
+  }
+
+  if (isReadOnlyFunction(f)) {
+    attrs = attrs.addAttribute(signature.getType()->getContext(),
+                               llvm::AttributeList::FunctionIndex,
+                               llvm::Attribute::ReadOnly);
+  }
+}
+
+/// Emit the thunk that dispatches to the dynamically replaceable function.
+static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
+                                            SILFunction *SILFn,
+                                            llvm::Function *dispatchFn,
+                                            llvm::Function *implFn,
+                                            Signature &signature) {
+
+  // Create and initialize the first link entry for the chain of replacements.
+  // The first implementation is initialized with 'implFn'.
+  auto linkEntry = getChainEntryForDynamicReplacement(IGM, SILFn, implFn);
+
+  // We should never inline the implementation function.
+  implFn->addFnAttr(llvm::Attribute::NoInline);
+
+  // Load the function and dispatch to it forwarding our arguments.
+  llvm::BasicBlock *entryBB =
+      llvm::BasicBlock::Create(IGM.getLLVMContext(), "entry", dispatchFn);
+  IRBuilder B(IGM.getLLVMContext(), false);
+  B.SetInsertPoint(entryBB);
+  llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, 0),
+                               llvm::ConstantInt::get(IGM.Int32Ty, 0)};
+  auto *fnPtr = B.CreateLoad(
+      llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices),
+      IGM.getPointerAlignment());
+  auto *typeFnPtr = B.CreateBitOrPointerCast(fnPtr, implFn->getType());
+  SmallVector<llvm::Value *, 16> forwardedArgs;
+  for (auto &arg : dispatchFn->args())
+    forwardedArgs.push_back(&arg);
+  auto *Res =
+      B.CreateCall(FunctionPointer(typeFnPtr, signature), forwardedArgs);
+  if (implFn->getReturnType()->isVoidTy())
+    B.CreateRetVoid();
+  else
+    B.CreateRet(Res);
+
+}
+
 /// Find the entry point for a SIL function.
-llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
-                                                  ForDefinition_t forDefinition) {
-  LinkEntity entity = LinkEntity::forSILFunction(f);
+llvm::Function *
+IRGenModule::getAddrOfSILFunction(SILFunction *f, ForDefinition_t forDefinition,
+                                  bool isDynamicallyReplaceableImplementation) {
+  assert(forDefinition || !isDynamicallyReplaceableImplementation);
+
+  LinkEntity entity =
+      LinkEntity::forSILFunction(f, false);
 
   // Check whether we've created the function already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  llvm::Function *fn = Module.getFunction(f->getName());  
+  llvm::Function *fn = Module.getFunction(entity.mangleAsString());
   if (fn) {
-    if (forDefinition) updateLinkageForDefinition(*this, fn, entity);
+    if (forDefinition) {
+      updateLinkageForDefinition(*this, fn, entity);
+      // Create the dynamically repl
+      LinkEntity implEntity = LinkEntity::forSILFunction(f, true);
+      if (isDynamicallyReplaceableImplementation) {
+        auto existingImpl = Module.getFunction(implEntity.mangleAsString());
+        assert(!existingImpl);
+        (void) existingImpl;
+        Signature signature = getSignature(f->getLoweredFunctionType());
+        addLLVMFunctionAttributes(f, signature);
+        LinkInfo implLink = LinkInfo::get(*this, implEntity, forDefinition);
+        auto implFn = createFunction(*this, implLink, signature, fn,
+                                     f->getOptimizationMode());
+        emitDynamicallyReplaceableThunk(*this, f, fn, implFn, signature);
+        return implFn;
+      }
+    }
     return fn;
   }
 
@@ -1953,28 +2071,10 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   }
 
   Signature signature = getSignature(f->getLoweredFunctionType());
-  auto &attrs = signature.getMutableAttributes();
+  addLLVMFunctionAttributes(f, signature);
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  switch (f->getInlineStrategy()) {
-  case NoInline:
-    attrs = attrs.addAttribute(signature.getType()->getContext(),
-                               llvm::AttributeList::FunctionIndex,
-                               llvm::Attribute::NoInline);
-    break;
-  case AlwaysInline:
-    // FIXME: We do not currently transfer AlwaysInline since doing so results
-    // in test failures, which must be investigated first.
-  case InlineDefault:
-    break;
-  }
-
-  if (isReadOnlyFunction(f)) {
-    attrs = attrs.addAttribute(signature.getType()->getContext(),
-                               llvm::AttributeList::FunctionIndex,
-                               llvm::Attribute::ReadOnly);
-  }
   fn = createFunction(*this, link, signature, insertBefore,
                       f->getOptimizationMode());
 
@@ -1989,6 +2089,16 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   // If we have an order number for this function, set it up as appropriate.
   if (hasOrderNumber) {
     EmittedFunctionsByOrder.insert(orderNumber, fn);
+  }
+
+  if (isDynamicallyReplaceableImplementation && forDefinition) {
+    LinkEntity implEntity = LinkEntity::forSILFunction(f, true);
+    LinkInfo implLink = LinkInfo::get(*this, implEntity, forDefinition);
+    auto implFn = createFunction(*this, implLink, signature, insertBefore,
+                                 f->getOptimizationMode());
+
+    emitDynamicallyReplaceableThunk(*this, f, fn, implFn, signature);
+    return implFn;
   }
   return fn;
 }

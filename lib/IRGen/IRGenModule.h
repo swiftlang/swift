@@ -641,6 +641,10 @@ public:
   llvm::Type *FloatTy;
   llvm::Type *DoubleTy;
 
+  llvm::StructType *DynamicReplacementLinkEntryTy; // %link_entry = { i8*, %link_entry*}
+  llvm::PointerType
+      *DynamicReplacementLinkEntryPtrTy; // %link_entry*
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   /// Used to create unique names for class layout types with tail allocated
@@ -1317,11 +1321,14 @@ public:
   Address getAddrOfObjCClassRef(ClassDecl *D);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D,
                                            ForDefinition_t forDefinition);
+
   llvm::Function *getAddrOfObjCMetadataUpdateFunction(ClassDecl *D,
                                                       ForDefinition_t forDefinition);
 
-  llvm::Function *getAddrOfSILFunction(SILFunction *f,
-                                       ForDefinition_t forDefinition);
+  llvm::Function *
+  getAddrOfSILFunction(SILFunction *f, ForDefinition_t forDefinition,
+                       bool IsDynamicallyReplaceableImplementation = false);
+
   llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      const TypeInfo &ti,
@@ -1383,6 +1390,10 @@ public:
   void emitSharedContextDescriptor(DeclContext *dc);
 
   void ensureRelativeSymbolCollocation(SILWitnessTable &wt);
+
+  llvm::GlobalVariable *
+  getGlobalForDynamicallyReplaceableThunk(LinkEntity &entity, llvm::Type *type,
+                                          ForDefinition_t forDefinition);
 
 private:
   llvm::Constant *

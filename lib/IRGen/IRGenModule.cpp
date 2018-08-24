@@ -458,6 +458,16 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   IsSwiftErrorInRegister =
     clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
       ClangCodeGen->CGM());
+
+  DynamicReplacementLinkEntryTy =
+      llvm::StructType::create(getLLVMContext(), "swift.dyn_repl_link_entry");
+  DynamicReplacementLinkEntryPtrTy =
+      DynamicReplacementLinkEntryTy->getPointerTo(DefaultAS);
+  llvm::Type *linkEntryFields[] = {
+    Int8PtrTy, // function pointer.
+    DynamicReplacementLinkEntryPtrTy // next.
+  };
+  DynamicReplacementLinkEntryTy->setBody(linkEntryFields);
 }
 
 IRGenModule::~IRGenModule() {
