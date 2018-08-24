@@ -15,6 +15,7 @@
 
 import logging
 import os
+import time
 import unittest
 
 from imp import load_source
@@ -106,6 +107,11 @@ class Test_parse_args(unittest.TestCase):
              "argument -i/--iterations: invalid positive_int value: '-3'"],
             err.getvalue())
 
+    def test_output_dir(self):
+        self.assertIsNone(parse_args(['run']).output_dir)
+        self.assertEquals(
+            parse_args(['run', '--output-dir', '/log']).output_dir, '/log')
+
     def test_check_supports_vebose_output(self):
         self.assertFalse(parse_args(['check']).verbose)
         self.assertTrue(parse_args(['check', '-v']).verbose)
@@ -125,7 +131,7 @@ class SubprocessMock(Mock):
     STDOUT = object()
 
     def __init__(self, responses=None):
-        super(SubprocessMock, self).__init__()
+        super(SubprocessMock, self).__init__(responses)
 
         def _check_output(args, stdin=None, stdout=None, stderr=None,
                           shell=False):
@@ -196,6 +202,32 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         self.assertEquals(driver.all_tests,
                           ['Benchmark1', 'Benchmark2', 'Benchmark3'])
 
+    def test_log_file(self):
+        """When swift-repo is set, log is tied to Git branch and revision."""
+        self.assertIsNone(BenchmarkDriver(
+            Stub(output_dir=None, tests='/bin/'), tests=['ignored']).log_file)
+
+        now = time.strftime('%Y%m%d%H%M%S', time.localtime())
+        driver = BenchmarkDriver(
+            Stub(output_dir='/path', tests='/bin/', optimization='Suffix',
+                 swift_repo=None,), tests=['ignored'])
+        self.assertEquals(driver.log_file,
+                          '/path/Benchmark_Suffix-' + now + '.log')
+
+        r = '/repo/'
+        subprocess_mock = SubprocessMock(responses=[
+            ('git -C {0} rev-parse --abbrev-ref HEAD'.format(r).split(' '),
+             'branch\n'),
+            ('git -C {0} rev-parse --short HEAD'.format(r).split(' '),
+             'short_hash\n'),
+        ])
+        driver = BenchmarkDriver(
+            Stub(output_dir='/log/', tests='', optimization='S', swift_repo=r),
+            tests=['ignored'], _subprocess=subprocess_mock)
+        self.assertEquals(driver.log_file,
+                          '/log/branch/Benchmark_S-' + now + '-short_hash.log')
+        subprocess_mock.assert_called_all_expected()
+
 
 class LogParserStub(object):
     results_from_string_called = False
@@ -253,24 +285,76 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
             ('/benchmarks/Benchmark_O', 'b1', '--memory')), 3)
         self.assertEquals(r.num_samples, 3)  # results are merged
 
-    def test_run_bechmarks(self):
+    def test_run_and_log(self):
         def mock_run(test):
             self.assertEquals(test, 'b1')
             return PerformanceTestResult(
                 '3,b1,1,123,123,123,0,123,888'.split(','))
-        driver = Stub(tests=['b1'])
-        driver.run_independent_samples = mock_run
-        run_benchmarks = Benchmark_Driver.run_benchmarks
+        driver = BenchmarkDriver(tests=['b1'], args=Stub(output_dir=None))
+        driver.run_independent_samples = mock_run  # patching
 
         with captured_output() as (out, _):
-            run_benchmarks(driver)
-        self.assertEquals('\n'.join("""
-#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
-3,b1,1,123,123,123,0,123,888
+            log = driver.run_and_log()
 
-Totals,1
+        csv_log = '3,b1,1,123,123,123,0,123,888\n'
+        self.assertEquals(log, None)
+        self.assertEquals(
+            out.getvalue(),
+            '#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),' +
+            'MAX_RSS(B)\n' +
+            csv_log +
+            '\n' +
+            'Total performance tests executed: 1\n')
 
-""".splitlines()[1:]), out.getvalue())  # removes 1st \n from multiline string
+        with captured_output() as (out, _):
+            log = driver.run_and_log(csv_console=False)
+
+        self.assertEquals(log, csv_log)
+        self.assertEquals(
+            out.getvalue(),
+            '  # TEST                      SAMPLES MIN(μs) MAX(μs)' +
+            ' MEAN(μs) SD(μs) MEDIAN(μs) MAX_RSS(B)\n' +
+            '  3 b1                              1     123     123' +
+            '      123      0        123        888\n' +
+            '\n' +
+            'Total performance tests executed: 1\n')
+
+    def test_log_results(self):
+        """Create log directory if it doesn't exist and write the log file."""
+        def assert_log_written(out, log_file, content):
+            self.assertEquals(out.getvalue(),
+                              'Logging results to: ' + log_file + '\n')
+            with open(log_file, 'rU') as f:
+                text = f.read()
+            self.assertEquals(text, "formatted output")
+
+        try:
+            import tempfile  # setUp
+            temp_dir = tempfile.mkdtemp()
+            log_dir = os.path.join(temp_dir, 'sub-dir/')
+            driver = BenchmarkDriver(Stub(), tests=[''])
+
+            self.assertFalse(os.path.exists(log_dir))
+            content = "formatted output"
+            log_file = os.path.join(log_dir, '1.log')
+            with captured_output() as (out, _):
+                driver.log_results(content, log_file=log_file)
+            assert_log_written(out, log_file, content)
+
+            self.assertTrue(os.path.exists(log_dir))
+            log_file = os.path.join(log_dir, '2.log')
+            with captured_output() as (out, _):
+                driver.log_results(content, log_file=log_file)
+            assert_log_written(out, log_file, content)
+
+        finally:
+            import shutil  # tearDown
+            shutil.rmtree(temp_dir)
+
+    def test_deterministing_hashing(self):
+        cmd = ['printenv', 'SWIFT_DETERMINISTIC_HASHING']
+        driver = BenchmarkDriver(['no args'], tests=['ignored'])
+        self.assertEquals(driver._invoke(cmd).strip(), '1')
 
 
 class BenchmarkDriverMock(Mock):

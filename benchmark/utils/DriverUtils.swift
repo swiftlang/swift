@@ -443,8 +443,7 @@ func runBenchmarks(_ c: TestConfig) {
     report(index, test, results:runBench(test, c))
   }
 
-  print("")
-  print("Totals\(c.delim)\(testCount)")
+  print("\nTotal performance tests executed: \(testCount)")
 }
 
 public func main() {
