@@ -3383,9 +3383,10 @@ SILValue AdjointEmitter::materializeAdjointDirect(AdjointValue val,
   switch (val.getKind()) {
   case AdjointValue::Kind::Zero: {
     if (auto tupleTy = val.getType().getAs<TupleType>()) {
-      auto elts = map<SmallVector<SILValue, 8>>(val.getTupleElements(),
-          [&](AdjointValue eltVal) {
-            return materializeAdjointDirect(eltVal, loc);
+      auto elts = map<SmallVector<SILValue, 8>>(tupleTy->getElementTypes(),
+          [&](Type eltTy) {
+            return createScalarValueDirect(0, eltTy->getCanonicalType(),
+                                           loc, builder, ctx);
           });
       return builder.createTuple(loc, elts);
     }
@@ -3429,8 +3430,7 @@ static void materializeAdjointIndirectHelper(AdjointValue val,
       SmallVector<SILValue, 8> eltVals;
       for (unsigned i : range(tupleTy->getNumElements())) {
         auto eltAddr = builder.createTupleElementAddr(loc, destBufferAccess, i);
-        materializeAdjointIndirectHelper(
-            val.getTupleElements()[i], eltAddr, builder, context);
+        createScalarValueIndirect(0, tupleTy, eltAddr, loc, builder, context);
       }
     } else {
       createScalarValueIndirect(0, val.getSwiftType(),
