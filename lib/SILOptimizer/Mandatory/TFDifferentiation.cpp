@@ -1506,7 +1506,7 @@ static SILValue createBuiltinFPScalar(APInt scalar, CanType type,
   auto *fpType = type->castTo<BuiltinFloatType>();
   return builder.createFloatLiteral(
       loc, SILType::getPrimitiveObjectType(type),
-      APFloat(fpType->getAPFloatSemantics(), scalar));
+      APFloat(fpType->getAPFloatSemantics(), scalar.sextOrTrunc(32)));
 }
 
 /// Convert an integer literal to a type that is expressible by integer literal.
