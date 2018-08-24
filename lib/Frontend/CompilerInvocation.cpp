@@ -281,7 +281,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.SolverShrinkUnsolvedThreshold = threshold;
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_solver_disable_shrink))
+  if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {

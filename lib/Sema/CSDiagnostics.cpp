@@ -85,7 +85,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     locator = cs.getConstraintLocator(
         ctor.withPathElement(PathEltKind::ApplyFunction)
             .withPathElement(PathEltKind::ConstructorMember));
-  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+  } else if (isa<UnresolvedDotExpr>(anchor)) {
     ConstraintLocatorBuilder member(locator);
     locator =
         cs.getConstraintLocator(member.withPathElement(PathEltKind::Member));

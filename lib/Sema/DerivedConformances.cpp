@@ -125,7 +125,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     }
 
     // Structs can explicitly derive Equatable conformance.
-    if (auto structDecl = dyn_cast<StructDecl>(Nominal)) {
+    if (isa<StructDecl>(Nominal)) {
       switch (*knownProtocol) {
         case KnownProtocolKind::Equatable:
           return canDeriveEquatable(DC, Nominal);

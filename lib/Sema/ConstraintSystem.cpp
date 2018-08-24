@@ -1460,7 +1460,7 @@ static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
 
     auto funcType = AFD->getInterfaceType();
     auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
-      if (auto objType = type->getOptionalObjectType())
+      if (type->getOptionalObjectType())
         return true;
 
       return type->isAny();

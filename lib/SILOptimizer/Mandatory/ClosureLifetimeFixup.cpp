@@ -203,8 +203,7 @@ static bool tryExtendLifetimeToLastUse(
   // Handle an apply.
   if (auto SingleApplyUser = FullApplySite::isa(SingleUser)) {
     // FIXME: Don't know how-to handle begin_apply/end_apply yet.
-    if (auto *Begin =
-            dyn_cast<BeginApplyInst>(SingleApplyUser.getInstruction())) {
+    if (isa<BeginApplyInst>(SingleApplyUser.getInstruction())) {
       return false;
     }
 
