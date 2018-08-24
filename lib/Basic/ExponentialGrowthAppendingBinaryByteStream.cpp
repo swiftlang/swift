@@ -17,20 +17,19 @@ using namespace swift;
 
 Error ExponentialGrowthAppendingBinaryByteStream::readBytes(
     uint32_t Offset, uint32_t Size, ArrayRef<uint8_t> &Buffer) {
-  if (Offset > getLength())
-    return make_error<BinaryStreamError>(stream_error_code::invalid_offset);
-
-  if (Offset + Size > getLength())
-    return make_error<BinaryStreamError>(stream_error_code::stream_too_short);
-
+  if (auto Error = checkOffsetForRead(Offset, Size)) {
+    return Error;
+  }
+  
   Buffer = ArrayRef<uint8_t>(Data.data() + Offset, Size);
   return Error::success();
 }
 
 Error ExponentialGrowthAppendingBinaryByteStream::readLongestContiguousChunk(
     uint32_t Offset, ArrayRef<uint8_t> &Buffer) {
-  if (Offset > getLength())
-    return make_error<BinaryStreamError>(stream_error_code::invalid_offset);
+  if (auto Error = checkOffsetForRead(Offset, 0)) {
+    return Error;
+  }
 
   Buffer = ArrayRef<uint8_t>(Data.data() + Offset, Data.size() - Offset);
   return Error::success();
@@ -45,9 +44,10 @@ Error ExponentialGrowthAppendingBinaryByteStream::writeBytes(
   if (Buffer.empty())
     return Error::success();
 
-  if (Offset > getLength())
-    return make_error<BinaryStreamError>(stream_error_code::invalid_offset);
-
+  if (auto Error = checkOffsetForWrite(Offset, Buffer.size())) {
+    return Error;
+  }
+  
   // Resize the internal buffer if needed.
   uint32_t RequiredSize = Offset + Buffer.size();
   if (RequiredSize > Data.size()) {
