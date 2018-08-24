@@ -2928,13 +2928,7 @@ public:
       else
         materializeAdjointIndirect(adjVal, adjParam);
     }
-    SILValue retVal;
-    if (retElts.size() == 1)
-      retVal = retElts[0];
-    else
-      retVal = getBuilder().createTuple(adjLoc, retElts);
-    getBuilder().createReturn(adjLoc, retVal);
-
+    getBuilder().createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
     return errorOccurred;
   }
 
@@ -3341,7 +3335,7 @@ public:
       auto div = builder.createBuiltinBinaryFunction(
           opLoc, "fdiv", opType, opType, {minusLHS, squareRHS});
       auto adjRHS = builder.createBuiltinBinaryFunction(opLoc, "fmul", opType,
-                                                        {}, {adjVal, div});
+                                                        opType, {adjVal, div});
       addAdjointValue(bi->getOperand(1), adjRHS);
       break;
     }
