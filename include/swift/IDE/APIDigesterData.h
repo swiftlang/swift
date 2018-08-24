@@ -60,6 +60,11 @@ raw_ostream &operator<<(raw_ostream &Out, const NodeAnnotation Value);
 // Redefine << so that we can output the name of the node kind.
 raw_ostream &operator<<(raw_ostream &Out, const SDKNodeKind Value);
 
+StringRef getDeclKindStr(const DeclKind Value);
+
+// Redefine << so that we can output the name of decl kind.
+raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value);
+
 struct APIDiffItem {
   virtual void streamDef(llvm::raw_ostream &S) const = 0;
   virtual APIDiffItemKind getKind() const = 0;
