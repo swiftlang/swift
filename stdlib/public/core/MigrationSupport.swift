@@ -466,6 +466,17 @@ extension String { // RangeReplaceableCollection
   }
 }
 
+@available(*, unavailable, renamed: "TextOutputStream")
+public typealias OutputStreamType = TextOutputStream
+
+extension TextOutputStreamable {
+  @available(*, unavailable, renamed: "write(to:)")
+  public func writeTo<Target : TextOutputStream>(_ target: inout Target) {
+    Builtin.unreachable()
+  }
+}
+
+
 extension String.UnicodeScalarView : _CustomPlaygroundQuickLookable {
   @available(*, deprecated/*, obsoleted: 5.0*/, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
