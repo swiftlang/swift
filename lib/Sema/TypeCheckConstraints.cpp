@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "CSDiagnostics.h"
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
@@ -2717,7 +2718,8 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   }
 
   // Otherwise, it is a structural problem, diagnose that.
-  diagnoseAssignmentFailure(dest, destTy, equalLoc);
+  AssignmentFailure failure(dest, *this, equalLoc);
+  (void)failure.diagnose();
   return Type();
 }
 

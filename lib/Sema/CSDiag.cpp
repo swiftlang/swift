@@ -16,6 +16,7 @@
 
 #include "ConstraintSystem.h"
 #include "CSDiag.h"
+#include "CSDiagnostics.h"
 #include "CalleeCandidateInfo.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
@@ -571,323 +572,6 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
   // could diagnose ambiguity that way as well.
 
   return false;
-}
-
-/// Given an expression that has a non-lvalue type, dig into it until we find
-/// the part of the expression that prevents the entire subexpression from being
-/// mutable.  For example, in a sequence like "x.v.v = 42" we want to complain
-/// about "x" being a let property if "v.v" are both mutable.
-///
-/// This returns the base subexpression that looks immutable (or that can't be
-/// analyzed any further) along with a decl extracted from it if we could.
-///
-static std::pair<Expr*, ValueDecl*>
-resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
-  expr = expr->getValueProvidingExpr();
-
-  // Provide specific diagnostics for assignment to subscripts whose base expr
-  // is known to be an rvalue.
-  if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
-    // If we found a decl for the subscript, check to see if it is a set-only
-    // subscript decl.
-    SubscriptDecl *member = nullptr;
-    if (SE->hasDecl())
-      member = dyn_cast_or_null<SubscriptDecl>(SE->getDecl().getDecl());
-    
-    if (!member) {
-      auto loc = CS.getConstraintLocator(SE,ConstraintLocator::SubscriptMember);
-      member = dyn_cast_or_null<SubscriptDecl>(CS.findResolvedMemberRef(loc));
-    }
-
-    // If it isn't settable, return it.
-    if (member) {
-      if (!member->isSettable() ||
-          !member->isSetterAccessibleFrom(CS.DC))
-        return { expr, member };
-    }
-
-    // If it is settable, then the base must be the problem, recurse.
-    return resolveImmutableBase(SE->getBase(), CS);
-  }
-
-  // Look through property references.
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-    // If we found a decl for the UDE, check it.
-    auto loc = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
-    
-    // If we can resolve a member, we can determine whether it is settable in
-    // this context.
-    if (auto *member = CS.findResolvedMemberRef(loc)) {
-      auto *memberVD = dyn_cast<VarDecl>(member);
-      
-      // If the member isn't a vardecl (e.g. its a funcdecl), or it isn't
-      // settable, then it is the problem: return it.
-      if (!memberVD ||
-          !member->isSettable(nullptr) ||
-          !memberVD->isSetterAccessibleFrom(CS.DC))
-        return { expr, member };
-    }
-
-    // If we weren't able to resolve a member or if it is mutable, then the
-    // problem must be with the base, recurse.
-    return resolveImmutableBase(UDE->getBase(), CS);
-  }
-
-  if (auto *MRE = dyn_cast<MemberRefExpr>(expr)) {
-    // If the member isn't settable, then it is the problem: return it.
-    if (auto member = dyn_cast<AbstractStorageDecl>(MRE->getMember().getDecl()))
-      if (!member->isSettable(nullptr) ||
-          !member->isSetterAccessibleFrom(CS.DC))
-        return { expr, member };
-
-    // If we weren't able to resolve a member or if it is mutable, then the
-    // problem must be with the base, recurse.
-    return resolveImmutableBase(MRE->getBase(), CS);
-  }
-
-  if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
-    return { expr, DRE->getDecl() };
-
-  // Look through x!
-  if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
-    return resolveImmutableBase(FVE->getSubExpr(), CS);
-  
-  // Look through x?
-  if (auto *BOE = dyn_cast<BindOptionalExpr>(expr))
-    return resolveImmutableBase(BOE->getSubExpr(), CS);
-  
-  // Look through implicit conversions
-  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(expr))
-    if (!isa<LoadExpr>(ICE->getSubExpr()))
-      return resolveImmutableBase(ICE->getSubExpr(), CS);
-
-  return { expr, nullptr };
-}
-
-static bool isLoadedLValue(Expr *expr) {
-  expr = expr->getSemanticsProvidingExpr();
-  if (isa<LoadExpr>(expr))
-    return true;
-  if (auto ifExpr = dyn_cast<IfExpr>(expr))
-    return isLoadedLValue(ifExpr->getThenExpr())
-        && isLoadedLValue(ifExpr->getElseExpr());
-  return false;
-}
-
-static void fixItChangeInoutArgType(const Expr * arg,
-                                    const Type actualType,
-                                    const Type neededType,
-                                    ConstraintSystem &CS) {
-  auto &TC = CS.getTypeChecker();
-  
-  auto *DRE = dyn_cast<DeclRefExpr>(arg);
-  if (!DRE)
-    return;
-  
-  auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl());
-  if (!VD)
-    return;
-  
-  // Don't emit for non-local variables.
-  // (But in script-mode files, we consider module-scoped
-  // variables in the same file to be local variables.)
-  auto VDC = VD->getDeclContext();
-  bool isLocalVar = VDC->isLocalContext();
-  if (!isLocalVar && VDC->isModuleScopeContext()) {
-    auto argFile = CS.DC->getParentSourceFile();
-    auto varFile = VDC->getParentSourceFile();
-    isLocalVar = (argFile == varFile && argFile->isScriptMode());
-  }
-  if (!isLocalVar)
-    return;
-  
-  SmallString<32> scratch;
-  SourceLoc endLoc;       // Filled in if we decide to diagnose this
-  SourceLoc startLoc;     // Left invalid if we're inserting
-  
-  auto isSimpleTypelessPattern = [](Pattern *P) -> bool {
-    if (auto VP = dyn_cast_or_null<VarPattern>(P))
-      P = VP->getSubPattern();
-    return P && isa<NamedPattern>(P);
-  };
-  
-  auto typeRange = VD->getTypeSourceRangeForDiagnostics();
-  if (typeRange.isValid()) {
-    startLoc = typeRange.Start;
-    endLoc = typeRange.End;
-  } else if (isSimpleTypelessPattern(VD->getParentPattern())) {
-    endLoc = VD->getNameLoc();
-    scratch += ": ";
-  }
-  
-  if (endLoc.isInvalid())
-    return;
-  
-  scratch += neededType.getString();
-  
-  // Adjust into the location where we actually want to insert
-  endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, endLoc);
-  
-  // Since we already adjusted endLoc, this will turn an insertion
-  // into a zero-character replacement.
-  if (!startLoc.isValid())
-    startLoc = endLoc;
-  
-  TC.diagnose(VD->getLoc(), diag::inout_change_var_type_if_possible,
-              actualType, neededType)
-    .fixItReplaceChars(startLoc, endLoc, scratch);
-}
-
-void swift::diagnoseSubElementFailure(Expr *destExpr,
-                                      SourceLoc loc,
-                                      ConstraintSystem &CS,
-                                      Diag<StringRef> diagID,
-                                      Diag<Type> unknownDiagID) {
-  auto &TC = CS.getTypeChecker();
-
-  // Walk through the destination expression, resolving what the problem is.  If
-  // we find a node in the lvalue path that is problematic, this returns it.
-  auto immInfo = resolveImmutableBase(destExpr, CS);
-
-  // Otherwise, we cannot resolve this because the available setter candidates
-  // are all mutating and the base must be mutating.  If we dug out a
-  // problematic decl, we can produce a nice tailored diagnostic.
-  if (auto *VD = dyn_cast_or_null<VarDecl>(immInfo.second)) {
-    std::string message = "'";
-    message += VD->getName().str().str();
-    message += "'";
-
-    if (VD->isCaptureList())
-      message += " is an immutable capture";
-    else if (VD->isImplicit())
-      message += " is immutable";
-    else if (VD->isLet())
-      message += " is a 'let' constant";
-    else if (!VD->isSettable(CS.DC))
-      message += " is a get-only property";
-    else if (!VD->isSetterAccessibleFrom(CS.DC))
-      message += " setter is inaccessible";
-    else {
-      message += " is immutable";
-    }
-    TC.diagnose(loc, diagID, message)
-      .highlight(immInfo.first->getSourceRange());
-
-    // If this is a simple variable marked with a 'let', emit a note to fixit
-    // hint it to 'var'.
-    VD->emitLetToVarNoteIfSimple(CS.DC);
-    return;
-  }
-
-  // If the underlying expression was a read-only subscript, diagnose that.
-  if (auto *SD = dyn_cast_or_null<SubscriptDecl>(immInfo.second)) {
-    StringRef message;
-    if (!SD->isSettable())
-      message = "subscript is get-only";
-    else if (!SD->isSetterAccessibleFrom(CS.DC))
-      message = "subscript setter is inaccessible";
-    else
-      message = "subscript is immutable";
-
-    TC.diagnose(loc, diagID, message)
-      .highlight(immInfo.first->getSourceRange());
-    return;
-  }
-
-  // If we're trying to set an unapplied method, say that.
-  if (auto *VD = immInfo.second) {
-    std::string message = "'";
-    message += VD->getBaseName().getIdentifier().str();
-    message += "'";
-
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-      if (AFD->hasImplicitSelfDecl()) {
-        message += " is a method";
-        diagID = diag::assignment_lhs_is_immutable_variable;
-      } else {
-        message += " is a function";
-      }
-    } else
-      message += " is not settable";
-
-    TC.diagnose(loc, diagID, message)
-      .highlight(immInfo.first->getSourceRange());
-    return;
-  }
-
-  // If the expression is the result of a call, it is an rvalue, not a mutable
-  // lvalue.
-  if (auto *AE = dyn_cast<ApplyExpr>(immInfo.first)) {
-    // Handle literals, which are a call to the conversion function.
-    auto argsTuple =
-      dyn_cast<TupleExpr>(AE->getArg()->getSemanticsProvidingExpr());
-    if (isa<CallExpr>(AE) && AE->isImplicit() && argsTuple &&
-        argsTuple->getNumElements() == 1) {
-      if (auto LE = dyn_cast<LiteralExpr>(argsTuple->getElement(0)->
-                                          getSemanticsProvidingExpr())) {
-        TC.diagnose(loc, diagID, "literals are not mutable")
-          .highlight(LE->getSourceRange());
-        return;
-      }
-    }
-
-    std::string name = "call";
-    if (isa<PrefixUnaryExpr>(AE) || isa<PostfixUnaryExpr>(AE))
-      name = "unary operator";
-    else if (isa<BinaryExpr>(AE))
-      name = "binary operator";
-    else if (isa<CallExpr>(AE))
-      name = "function call";
-    else if (isa<DotSyntaxCallExpr>(AE) || isa<DotSyntaxBaseIgnoredExpr>(AE))
-      name = "method call";
-
-    if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn()->getValueProvidingExpr()))
-      name = std::string("'") +
-             DRE->getDecl()->getBaseName().getIdentifier().str().str() + "'";
-
-    TC.diagnose(loc, diagID, name + " returns immutable value")
-      .highlight(AE->getSourceRange());
-    return;
-  }
-
-  if (auto contextualType = CS.getContextualType(immInfo.first)) {
-    Type neededType = contextualType->getInOutObjectType();
-    Type actualType = CS.getType(immInfo.first)->getInOutObjectType();
-    if (!neededType->isEqual(actualType)) {
-      if (diagID.ID == diag::cannot_pass_rvalue_inout_subelement.ID) {
-        // We have a special diagnostic with tailored wording for this
-        // common case.
-        TC.diagnose(loc, diag::cannot_pass_rvalue_inout_converted, actualType,
-                    neededType)
-            .highlight(immInfo.first->getSourceRange());
-
-        if (auto inoutExpr = dyn_cast<InOutExpr>(immInfo.first))
-          fixItChangeInoutArgType(inoutExpr->getSubExpr(), actualType,
-                                  neededType, CS);
-      } else {
-        TC.diagnose(loc, diagID,
-                    "implicit conversion from '" + actualType->getString() +
-                        "' to '" + neededType->getString() +
-                        "' requires a temporary")
-            .highlight(immInfo.first->getSourceRange());
-      }
-      return;
-    }
-  }
-
-  if (auto IE = dyn_cast<IfExpr>(immInfo.first)) {
-    if (isLoadedLValue(IE)) {
-      TC.diagnose(loc, diagID,
-                  "result of conditional operator '? :' is never mutable")
-        .highlight(IE->getQuestionLoc())
-        .highlight(IE->getColonLoc());
-      return;
-    }
-  }
-
-  auto type = destExpr->getType() ?: CS.simplifyType(CS.getType(destExpr));
-  TC.diagnose(loc, unknownDiagID, type)
-      .highlight(immInfo.first->getSourceRange());
 }
 
 /// Flags that can be used to control name lookup.
@@ -1667,7 +1351,8 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         diagIDmember = diag::cannot_pass_rvalue_mutating_getter;
       }
       assert(baseExpr && "Cannot have a mutation failure without a base");
-      diagnoseSubElementFailure(baseExpr, loc, CS, diagIDsubelt, diagIDmember);
+      AssignmentFailure failure(baseExpr, CS, loc, diagIDsubelt, diagIDmember);
+      (void)failure.diagnose();
       return;
     }
         
@@ -2984,10 +2669,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   // If we contextually had an inout type, and got a non-lvalue result, then
   // we fail with a mutability error.
   if (contextualType->is<InOutType>() && !exprType->is<LValueType>()) {
-    diagnoseSubElementFailure(recheckedExpr, recheckedExpr->getLoc(), CS,
+    AssignmentFailure failure(recheckedExpr, CS, recheckedExpr->getLoc(),
                               diag::cannot_pass_rvalue_inout_subelement,
                               diag::cannot_pass_rvalue_inout);
-    return true;
+    return failure.diagnose();
   }
 
   // Try to find the contextual type in a variety of ways.  If the constraint
@@ -3313,67 +2998,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   }
 
   return true;
-}
-
-
-/// When an assignment to an expression is detected and the destination is
-/// invalid, emit a detailed error about the condition.
-void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
-                                                 SourceLoc equalLoc) {
-  auto &TC = getTypeChecker();
-
-  // Diagnose obvious assignments to literals.
-  if (isa<LiteralExpr>(dest->getValueProvidingExpr())) {
-    TC.diagnose(equalLoc, diag::cannot_assign_to_literal);
-    return;
-  }
-
-  // Diagnose assignments to let-properties in delegating initializers.
-  if (auto *member = dyn_cast<UnresolvedDotExpr>(dest)) {
-    if (auto *ctor = dyn_cast<ConstructorDecl>(DC)) {
-      if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
-        if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
-            ctor->getDelegatingOrChainedInitKind(nullptr) ==
-              ConstructorDecl::BodyInitKind::Delegating) {
-          auto resolved = resolveImmutableBase(member, *this);
-          assert(resolved.first == member);
-          TC.diagnose(equalLoc, diag::assignment_let_property_delegating_init,
-                      member->getName());
-          if (resolved.second) {
-            TC.diagnose(resolved.second, diag::decl_declared_here,
-                        member->getName());
-          }
-          return;
-        }
-      }
-    }
-  }
-
-  Diag<StringRef> diagID;
-  if (isa<ApplyExpr>(dest))
-    diagID = diag::assignment_lhs_is_apply_expression;
-  else if (isa<DeclRefExpr>(dest))
-    diagID = diag::assignment_lhs_is_immutable_variable;
-  else if (isa<ForceValueExpr>(dest))
-    diagID = diag::assignment_bang_has_immutable_subcomponent;
-  else if (isa<UnresolvedDotExpr>(dest) || isa<MemberRefExpr>(dest))
-    diagID = diag::assignment_lhs_is_immutable_property;
-  else if (auto sub = dyn_cast<SubscriptExpr>(dest)) {
-    diagID = diag::assignment_subscript_has_immutable_base;
-
-    // If the destination is a subscript with a 'dynamicLookup:' label and if
-    // the tuple is implicit, then this was actually a @dynamicMemberLookup
-    // access. Emit a more specific diagnostic.
-    if (sub->getIndex()->isImplicit() &&
-        sub->getArgumentLabels().size() == 1 &&
-        sub->getArgumentLabels().front() == TC.Context.Id_dynamicMember)
-      diagID = diag::assignment_dynamic_property_has_immutable_base;
-  } else {
-    diagID = diag::assignment_lhs_is_immutable_variable;
-  }
-
-  diagnoseSubElementFailure(dest, equalLoc, *this, diagID,
-                            diag::assignment_lhs_not_lvalue);
 }
 
 //===----------------------------------------------------------------------===//
@@ -6462,8 +6086,9 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
       if (diagnoseSubscriptErrors(subscriptExpr, /* inAssignmentDestination = */ true))
         return true;
     }
-    CS.diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc());
-    return true;
+
+    AssignmentFailure failure(destExpr, CS, assignExpr->getLoc());
+    return failure.diagnose();
   }
 
   auto *srcExpr = assignExpr->getSrc();
