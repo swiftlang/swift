@@ -12,6 +12,18 @@
 #  See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ===---------------------------------------------------------------------===//
+"""
+Benchmark_Driver is a tool for running and analysing Swift Benchmarking Suite.
+
+Example:
+    $ Benchmark_Driver run
+
+Use `Benchmark_Driver -h` for help on available commands and options.
+
+class `BenchmarkDriver` runs performance tests and impements the `run` COMMAND.
+class `BenchmarkDoctor` analyzes performance tests, implements `check` COMMAND.
+
+"""
 
 import argparse
 import glob
@@ -29,12 +41,16 @@ DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 class BenchmarkDriver(object):
-    """Executes tests from Swift Benchmark Suite."""
+    """Executes tests from Swift Benchmark Suite.
+
+    It's a higher level wrapper for the Benchmark_X family of binaries
+    (X = [O, Onone, Osize]).
+    """
 
     def __init__(self, args, tests=None, _subprocess=None, parser=None):
-        """Initialized with command line arguments.
+        """Initialize with command line arguments.
 
-        Optional parameters for injecting dependencies; used for testing.
+        Optional parameters are for injecting dependencies -- used for testing.
         """
         self.args = args
         self._subprocess = _subprocess or subprocess
@@ -42,6 +58,9 @@ class BenchmarkDriver(object):
         self.tests = tests or self._get_tests()
         self.parser = parser or LogParser()
         self.results = {}
+        # Set a constant hash seed. Some tests are currently sensitive to
+        # fluctuations in the number of hash collisions.
+        os.environ['SWIFT_DETERMINISTIC_HASHING'] = '1'
 
     def _invoke(self, cmd):
         return self._subprocess.check_output(
@@ -53,6 +72,28 @@ class BenchmarkDriver(object):
         suffix = (self.args.optimization if hasattr(self.args, 'optimization')
                   else 'O')
         return os.path.join(self.args.tests, "Benchmark_" + suffix)
+
+    def _git(self, cmd):
+        """Execute the Git command in the `swift-repo`."""
+        return self._invoke(
+            ('git -C {0} '.format(self.args.swift_repo) + cmd).split()).strip()
+
+    @property
+    def log_file(self):
+        """Full path to log file.
+
+        If `swift-repo` is set, log file is tied to Git branch and revision.
+        """
+        if not self.args.output_dir:
+            return None
+        log_dir = self.args.output_dir
+        harness_name = os.path.basename(self.test_harness)
+        suffix = '-' + time.strftime('%Y%m%d%H%M%S', time.localtime())
+        if self.args.swift_repo:
+            log_dir = os.path.join(
+                log_dir, self._git('rev-parse --abbrev-ref HEAD'))  # branch
+            suffix += '-' + self._git('rev-parse --short HEAD')  # revision
+        return os.path.join(log_dir, harness_name + suffix + '.log')
 
     @property
     def _cmd_list_benchmarks(self):
@@ -127,6 +168,65 @@ class BenchmarkDriver(object):
         return reduce(merge_results,
                       [self.run(test, measure_memory=True)
                        for _ in range(self.args.iterations)])
+
+    def log_results(self, output, log_file=None):
+        """Log output to `log_file`.
+
+        Creates `args.output_dir` if it doesn't exist yet.
+        """
+        log_file = log_file or self.log_file
+        dir = os.path.dirname(log_file)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        print('Logging results to: %s' % log_file)
+        with open(log_file, 'w') as f:
+            f.write(output)
+
+    RESULT = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
+
+    def run_and_log(self, csv_console=True):
+        """Run benchmarks and continuously log results to the console.
+
+        There are two console log formats: CSV and justified columns. Both are
+        compatible with `LogParser`. Depending on the `csv_console` parameter,
+        the CSV log format is either printed to console or returned as a string
+        from this method. When `csv_console` is False, the console output
+        format is justified columns.
+        """
+
+        format = (
+            (lambda values: ','.join(values)) if csv_console else
+            (lambda values: self.RESULT.format(*values)))  # justified columns
+
+        def console_log(values):
+            print(format(values))
+
+        console_log(['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)',  # header
+                    'MEAN(μs)', 'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)'])
+
+        def result_values(r):
+            return map(str, [r.test_num, r.name, r.num_samples, r.min, r.max,
+                             int(r.mean), int(r.sd), r.median, r.max_rss])
+
+        results = []
+        for test in self.tests:
+            result = result_values(self.run_independent_samples(test))
+            console_log(result)
+            results.append(result)
+
+        print(
+            '\nTotal performance tests executed: {0}'.format(len(self.tests)))
+        return (None if csv_console else
+                ('\n'.join([','.join(r) for r in results]) + '\n'))  # csv_log
+
+    @staticmethod
+    def run_benchmarks(args):
+        """Run benchmarks and log results."""
+        driver = BenchmarkDriver(args)
+        csv_log = driver.run_and_log(csv_console=(args.output_dir is None))
+        if csv_log:
+            driver.log_results(csv_log)
+        return 0
 
 
 class LoggingReportFormatter(logging.Formatter):
@@ -356,6 +456,7 @@ class BenchmarkDoctor(object):
 
     @staticmethod
     def run_check(args):
+        """Validate benchmarks conform to health rules, report violations."""
         doctor = BenchmarkDoctor(args)
         doctor.check()
         # TODO non-zero error code when errors are logged
@@ -363,111 +464,13 @@ class BenchmarkDoctor(object):
         return 0
 
 
-def get_current_git_branch(git_repo_path):
-    """Return the selected branch for the repo `git_repo_path`"""
-    return subprocess.check_output(
-        ['git', '-C', git_repo_path, 'rev-parse',
-         '--abbrev-ref', 'HEAD'], stderr=subprocess.STDOUT).strip()
-
-
-def get_git_head_ID(git_repo_path):
-    """Return the short identifier for the HEAD commit of the repo
-        `git_repo_path`"""
-    return subprocess.check_output(
-        ['git', '-C', git_repo_path, 'rev-parse',
-         '--short', 'HEAD'], stderr=subprocess.STDOUT).strip()
-
-
-def log_results(log_directory, driver, formatted_output, swift_repo=None):
-    """Log `formatted_output` to a branch specific directory in
-    `log_directory`
-    """
-    try:
-        branch = get_current_git_branch(swift_repo)
-    except (OSError, subprocess.CalledProcessError):
-        branch = None
-    try:
-        head_ID = '-' + get_git_head_ID(swift_repo)
-    except (OSError, subprocess.CalledProcessError):
-        head_ID = ''
-    timestamp = time.strftime("%Y%m%d%H%M%S", time.localtime())
-    if branch:
-        output_directory = os.path.join(log_directory, branch)
-    else:
-        output_directory = log_directory
-    driver_name = os.path.basename(driver)
-    try:
-        os.makedirs(output_directory)
-    except OSError:
-        pass
-    log_file = os.path.join(output_directory,
-                            driver_name + '-' + timestamp + head_ID + '.log')
-    print('Logging results to: %s' % log_file)
-    with open(log_file, 'w') as f:
-        f.write(formatted_output)
-
-
-def run_benchmarks(driver,
-                   log_directory=None, swift_repo=None):
-    """Run perf tests individually and return results in a format that's
-    compatible with `LogParser`.
-    """
-    # Set a constant hash seed. Some tests are currently sensitive to
-    # fluctuations in the number of hash collisions.
-    #
-    # FIXME: This should only be set in the environment of the child process
-    # that runs the tests.
-    os.environ["SWIFT_DETERMINISTIC_HASHING"] = "1"
-
-    output = []
-    headings = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)', 'MEAN(μs)',
-                'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)']
-    line_format = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
-    if log_directory:
-        print(line_format.format(*headings))
-    else:
-        print(','.join(headings))
-    for test in driver.tests:
-        r = driver.run_independent_samples(test)
-        test_output = map(str, [
-            r.test_num, r.name, r.num_samples, r.min, r.max, int(r.mean),
-            int(r.sd), r.median, r.max_rss])
-        if log_directory:
-            print(line_format.format(*test_output))
-        else:
-            print(','.join(test_output))
-        output.append(test_output)
-    if not output:
-        return
-    formatted_output = '\n'.join([','.join(l) for l in output])
-    totals = ['Totals', str(len(driver.tests))]
-    totals_output = '\n\n' + ','.join(totals)
-    if log_directory:
-        print(line_format.format(*([''] + totals + ([''] * 6))))
-    else:
-        print(totals_output[1:])
-    formatted_output += totals_output
-    if log_directory:
-        log_results(log_directory, driver.test_harness, formatted_output,
-                    swift_repo)
-    return formatted_output
-
-
-def run(args):
-    run_benchmarks(
-        BenchmarkDriver(args),
-        log_directory=args.output_dir,
-        swift_repo=args.swift_repo)
-    return 0
-
-
 def format_name(log_path):
-    """Return the filename and directory for a log file"""
+    """Return the filename and directory for a log file."""
     return '/'.join(log_path.split('/')[-2:])
 
 
 def compare_logs(compare_script, new_log, old_log, log_dir, opt):
-    """Return diff of log files at paths `new_log` and `old_log`"""
+    """Return diff of log files at paths `new_log` and `old_log`."""
     print('Comparing %s %s ...' % (format_name(old_log), format_name(new_log)))
     subprocess.call([compare_script, '--old-file', old_log,
                     '--new-file', new_log, '--format', 'markdown',
@@ -477,10 +480,10 @@ def compare_logs(compare_script, new_log, old_log, log_dir, opt):
 
 def compare(args):
     log_dir = args.log_dir
-    swift_repo = args.swift_repo
     compare_script = args.compare_script
     baseline_branch = args.baseline_branch
-    current_branch = get_current_git_branch(swift_repo)
+    current_branch = \
+        BenchmarkDriver(args, tests=[''])._git('rev-parse --abbrev-ref HEAD')
     current_branch_dir = os.path.join(log_dir, current_branch)
     baseline_branch_dir = os.path.join(log_dir, baseline_branch)
 
@@ -557,6 +560,7 @@ def compare(args):
 
 
 def positive_int(value):
+    """Verify the value is a positive integer."""
     ivalue = int(value)
     if not (ivalue > 0):
         raise ValueError
@@ -608,7 +612,7 @@ def parse_args(args):
     run_parser.add_argument(
         '--swift-repo',
         help='absolute path to the Swift source repository')
-    run_parser.set_defaults(func=run)
+    run_parser.set_defaults(func=BenchmarkDriver.run_benchmarks)
 
     check_parser = subparsers.add_parser(
         'check',
@@ -641,6 +645,7 @@ def parse_args(args):
 
 
 def main():
+    """Parse command line arguments and execute the specified COMMAND."""
     args = parse_args(sys.argv[1:])
     return args.func(args)
 
