@@ -1733,6 +1733,21 @@ static void checkSpecializeAttrRequirements(
   }
 }
 
+/// Retrieve the canonical version of the given requirement.
+static Requirement getCanonicalRequirement(const Requirement &req) {
+  switch (req.getKind()) {
+  case RequirementKind::Conformance:
+  case RequirementKind::SameType:
+  case RequirementKind::Superclass:
+    return Requirement(req.getKind(), req.getFirstType()->getCanonicalType(),
+                       req.getSecondType()->getCanonicalType());
+
+  case RequirementKind::Layout:
+    return Requirement(req.getKind(), req.getFirstType()->getCanonicalType(),
+                       req.getLayoutConstraint());
+  }
+}
+
 /// Type check that a set of requirements provided by @_specialize.
 /// Store the set of requirements in the attribute.
 void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
@@ -1823,11 +1838,9 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
             TypeLoc(req.getSecondTypeRepr(), genericType)));
       }
 
-      // Convert the requirement into a form which uses canonical interface
-      // types.
+      // Convert the requirement into a semantic form.
       Requirement convertedRequirement(RequirementKind::SameType,
-                                       genericType->getCanonicalType(),
-                                       concreteType->getCanonicalType());
+                                       genericType, concreteType);
       convertedRequirements.push_back(convertedRequirement);
       continue;
     }
@@ -1859,12 +1872,10 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       // Add a resolved requirement.
       resolvedRequirements.push_back(resolvedReq);
 
-      // Convert the requirement into a form which uses canonical interface
-      // types.
-      Requirement convertedRequirement(
-          RequirementKind::Layout,
-          interfaceSubjectType->getCanonicalType(),
-          req.getLayoutConstraint());
+      // Convert the requirement into a semantic form.
+      Requirement convertedRequirement(RequirementKind::Layout,
+                                       interfaceSubjectType,
+                                       req.getLayoutConstraint());
       convertedRequirements.push_back(convertedRequirement);
       continue;
     }
@@ -1887,7 +1898,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
           !constraint || constraint->hasError())
         continue;
 
-
       auto interfaceLayoutConstraint = constraint->mapTypeOutOfContext();
 
       // Re-create a requirement using the resolved interface types.
@@ -1899,12 +1909,11 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       // Add a resolved requirement.
       resolvedRequirements.push_back(resolvedReq);
 
-      // Convert the requirement into a form which uses canonical interface
-      // types.
+      // Convert the requirement into a semantic form.
       Requirement convertedRequirement(
           RequirementKind::Conformance,
-          interfaceSubjectType->getCanonicalType(),
-          interfaceLayoutConstraint->getCanonicalType());
+          interfaceSubjectType,
+          interfaceLayoutConstraint);
       convertedRequirements.push_back(convertedRequirement);
       continue;
     }
@@ -1914,13 +1923,24 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   checkSpecializeAttrRequirements(attr, FD, resolvedRequirements,
                                   constrainedGenericParams, TC);
 
-  // Store converted requirements in the attribute so that they are
-  // serialized later.
-  attr->setRequirements(DC->getASTContext(), convertedRequirements);
-
   // Add the requirements to the builder.
-  for (auto &req : resolvedRequirements)
-    Builder.addRequirement(&req, DC->getParentModule());
+  assert(resolvedRequirements.size() == convertedRequirements.size());
+  using FloatingRequirementSource =
+    GenericSignatureBuilder::FloatingRequirementSource;
+  for (unsigned index : indices(convertedRequirements)) {
+    Builder.addRequirement(convertedRequirements[index],
+                           &resolvedRequirements[index],
+                           FloatingRequirementSource::forExplicit(
+                                                  &resolvedRequirements[index]),
+                           nullptr, DC->getParentModule());
+  }
+
+  // Canonicalize and store converted requirements in the attribute so that
+  // they are serialized later.
+  for (auto &req : convertedRequirements) {
+    req = getCanonicalRequirement(req);
+  }
+  attr->setRequirements(DC->getASTContext(), convertedRequirements);
 
   // Check the result.
   (void)std::move(Builder).computeGenericSignature(

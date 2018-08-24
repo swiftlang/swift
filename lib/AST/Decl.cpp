@@ -6173,6 +6173,25 @@ NominalTypeDecl *TypeOrExtensionDecl::getBaseNominal() const {
 }
 bool TypeOrExtensionDecl::isNull() const { return Decl.isNull(); }
 
+void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
+  if (!decl) {
+    out << "(null)";
+    return;
+  }
+
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    simple_display(out, value);
+  } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    out << "extension of ";
+    if (auto typeRepr = ext->getExtendedTypeLoc().getTypeRepr())
+      typeRepr->print(out);
+    else
+      ext->getSelfNominalTypeDecl()->dumpRef(out);
+  } else {
+    out << "(unknown decl)";
+  }
+}
+
 void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
   if (decl) decl->dumpRef(out);
   else out << "(null)";
