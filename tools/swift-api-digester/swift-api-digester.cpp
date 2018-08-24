@@ -27,6 +27,7 @@
 // the output of api-digester will include such changes.
 
 #include "swift/AST/DiagnosticsModuleDiffer.h"
+#include "swift/IDE/APIDigesterData.h"
 #include <functional>
 #include "ModuleAnalyzerNodes.h"
 #include "ModuleDiagsConsumer.h"
@@ -1480,16 +1481,6 @@ public:
   }
 };
 
-// Redefine << so that we can output the name of decl kind.
-raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value) {
-  switch (Value) {
-#define DECL(X, PARENT) case DeclKind::X: return Out << #X;
-#include "swift/AST/DeclNodes.def"
-  }
-
-  llvm_unreachable("Unhandled DeclKind in switch.");
-}
-
 class DiagnosisEmitter : public SDKNodeVisitor {
   void handle(const SDKNodeDecl *D, NodeAnnotation Anno);
   void visitType(SDKNodeType *T);
@@ -1497,174 +1488,35 @@ class DiagnosisEmitter : public SDKNodeVisitor {
   void visit(NodePtr Node) override;
   SDKNodeDecl *findAddedDecl(const SDKNodeDecl *Node);
   bool findTypeAliasDecl(const SDKNodeDecl *Node);
-  static StringRef printName(StringRef Name);
-  static StringRef printDiagKeyword(StringRef Name);
   static void collectAddedDecls(NodePtr Root, std::set<SDKNodeDecl*> &Results);
 
-  template<typename T>
-  struct DiagBag {
-    std::vector<T> Diags;
-    ~DiagBag() {
-      llvm::outs() << "\n/* ";
-      T::theme(llvm::outs());
-      llvm::outs() << " */\n";
-      removeRedundantAndSort(Diags);
-      std::for_each(Diags.begin(), Diags.end(), [](T &Diag) {
-        if (Diag.isABISpecific() && !options::Abi)
-          return;
-        Diag.outputModule();
-        Diag.output();
-      });
-    }
-  };
-
   struct MetaInfo {
+    SDKContext &Ctx;
     StringRef ModuleName;
     StringRef HeaderName;
     DeclKind Kind;
     StringRef Name;
     bool IsABISpecific;
     MetaInfo(const SDKNodeDecl *Node, bool IsABISpecific):
-      ModuleName(Node->getModuleName()), HeaderName(Node->getHeaderName()),
+      Ctx(Node->getSDKContext()), ModuleName(Node->getModuleName()),
+      HeaderName(Node->getHeaderName()),
       Kind(Node->getDeclKind()), Name(Node->getFullyQualifiedName()),
       IsABISpecific(IsABISpecific) {}
-    int compare(MetaInfo &Other) const {
-      if (ModuleName != Other.ModuleName)
-        return ModuleName.compare(Other.ModuleName);
-      if (HeaderName != Other.HeaderName)
-        return HeaderName.compare(Other.HeaderName);
-      if (Kind != Other.Kind)
-        return (uint8_t)Kind - (uint8_t)Other.Kind;
-      return Name.compare(Other.Name);
-    }
-  };
-
-  class DiagBase {
-  protected:
-    MetaInfo Info;
-    DiagBase(MetaInfo Info): Info(Info) {}
-    virtual ~DiagBase() = default;
-    raw_ostream &outputName() const {
-      return llvm::outs() << Info.Kind << " " << printName(Info.Name);
-    }
-  public:
-    void outputModule() const {
+    StringRef str() {
+      llvm::SmallString<64> SS;
+      llvm::raw_svector_ostream OS(SS);
       if (options::PrintModule) {
-        llvm::outs() << Info.ModuleName;
-        if (!Info.HeaderName.empty())
-          llvm::outs() << "(" << Info.HeaderName << ")";
-        llvm::outs() << ": ";
+        OS << ModuleName;
+        if (!HeaderName.empty())
+          OS << "(" << HeaderName << ")";
+        OS << ": ";
       }
+      OS << Kind << " " << Name;
+      return Ctx.buffer(OS.str());
     }
-    virtual void output() const = 0;
-    bool isABISpecific() const { return Info.IsABISpecific; }
-  };
-
-  struct RemovedDeclDiag: public DiagBase  {
-    DeclKind Kind;
-    StringRef Name;
-    bool IsDeprecated;
-    RemovedDeclDiag(MetaInfo Info, bool IsDeprecated): DiagBase(Info),
-      IsDeprecated(IsDeprecated) {}
-    bool operator<(RemovedDeclDiag Other) const {
-       return Info.compare(Other.Info) < 0;
-    }
-    void output() const override;
-    static void theme(raw_ostream &OS) { OS << "Removed Decls"; };
-  };
-
-  struct MovedDeclDiag: public DiagBase {
-    DeclKind AddedKind;
-    StringRef AddedName;
-    MovedDeclDiag(MetaInfo Info, DeclKind AddedKind, StringRef AddedName):
-      DiagBase(Info), AddedKind(AddedKind), AddedName(AddedName) {}
-    bool operator<(MovedDeclDiag Other) const {
-       return Info.compare(Other.Info) < 0;
-    }
-    void output() const override;
-    static void theme(raw_ostream &OS) { OS << "Moved Decls"; };
-  };
-
-  struct RenamedDeclDiag: public DiagBase  {
-    DeclKind KindAfter;
-    StringRef NameAfter;
-    RenamedDeclDiag(MetaInfo Info, DeclKind KindAfter, StringRef NameAfter):
-                      DiagBase(Info), KindAfter(KindAfter), NameAfter(NameAfter) {}
-    bool operator<(RenamedDeclDiag Other) const {
-      return Info.compare(Other.Info) < 0;
-    };
-    void output() const override;
-    static void theme(raw_ostream &OS) { OS << "Renamed Decls"; };
-  };
-
-  struct DeclAttrDiag: public DiagBase {
-    StringRef AttrBefore;
-    StringRef AttrAfter;
-    DeclAttrDiag(MetaInfo Info, StringRef AttrBefore, StringRef AttrAfter):
-                 DiagBase(Info), AttrBefore(AttrBefore), AttrAfter(AttrAfter) {}
-    DeclAttrDiag(MetaInfo Info, StringRef AttrAfter): DeclAttrDiag(Info,
-                 StringRef(), AttrAfter) {}
-    bool operator<(DeclAttrDiag Other) const;
-    void output() const override;
-    static void theme(raw_ostream &OS) { OS << "Decl Attribute changes"; };
-  };
-
-  struct DeclTypeChangeDiag: public DiagBase {
-    StringRef TypeNameBefore;
-    StringRef TypeNameAfter;
-    StringRef Description;
-    DeclTypeChangeDiag(MetaInfo Info, StringRef TypeNameBefore,
-                       StringRef TypeNameAfter,
-                       StringRef Description): DiagBase(Info),
-      TypeNameBefore(TypeNameBefore), TypeNameAfter(TypeNameAfter),
-      Description(Description) {}
-    bool operator<(DeclTypeChangeDiag Other) const {
-      return Info.compare(Other.Info) < 0;
-    };
-    void output() const override;
-    static void theme(raw_ostream &OS) { OS << "Type Changes"; };
-  };
-
-  struct RawRepresentableChangeDiag: public DiagBase {
-    StringRef UnderlyingType;
-    StringRef RawTypeName;
-    RawRepresentableChangeDiag(MetaInfo Info, StringRef UnderlyingType,
-      StringRef RawTypeName): DiagBase(Info), UnderlyingType(UnderlyingType),
-      RawTypeName(RawTypeName) {}
-    bool operator<(RawRepresentableChangeDiag Other) const {
-      return Info.compare(Other.Info) < 0;
-    }
-    void output() const override {
-      outputName() << "(" << UnderlyingType << ")"
-        << " is now " << RawTypeName << " representable\n";
-    }
-    static void theme(raw_ostream &OS) { OS << "RawRepresentable Changes"; };
-  };
-
-  struct GenericSignatureChangeDiag: public DiagBase {
-    StringRef GSBefore;
-    StringRef GSAfter;
-    GenericSignatureChangeDiag(MetaInfo Info, StringRef GSBefore,
-      StringRef GSAfter): DiagBase(Info),
-      GSBefore(GSBefore), GSAfter(GSAfter) {}
-    bool operator<(GenericSignatureChangeDiag Other) const {
-      return Info.compare(Other.Info) < 0;
-    }
-    void output() const override {
-      outputName() << " has generic signature change from " << GSBefore << " to "
-        << GSAfter << "\n";
-    }
-    static void theme(raw_ostream &OS) { OS << "Generic Signature Changes"; };
   };
 
   std::set<SDKNodeDecl*> AddedDecls;
-  DiagBag<DeclAttrDiag> AttrChangedDecls;
-  DiagBag<DeclTypeChangeDiag> TypeChangedDecls;
-  DiagBag<RenamedDeclDiag> RenamedDecls;
-  DiagBag<MovedDeclDiag> MovedDecls;
-  DiagBag<RemovedDeclDiag> RemovedDecls;
-  DiagBag<RawRepresentableChangeDiag> RawRepresentableDecls;
-  DiagBag<GenericSignatureChangeDiag> GSChangeDecls;
 
   UpdatedNodesMap &UpdateMap;
   NodeMap &TypeAliasUpdateMap;
@@ -1710,58 +1562,6 @@ bool DiagnosisEmitter::findTypeAliasDecl(const SDKNodeDecl *Node) {
   });
 }
 
-StringRef DiagnosisEmitter::printName(StringRef Name) {
-  OSColor Color(llvm::outs(), llvm::raw_ostream::CYAN);
-  Color << Name;
-  return StringRef();
-}
-
-StringRef DiagnosisEmitter::printDiagKeyword(StringRef Name) {
-  OSColor Color(llvm::outs(), llvm::raw_ostream::YELLOW);
-  Color << Name;
-  return StringRef();
-}
-
-void DiagnosisEmitter::RemovedDeclDiag::output() const {
-  outputName() << " has been " << printDiagKeyword("removed");
-  if (IsDeprecated)
-    llvm::outs() << " (deprecated)";
-  llvm::outs() << "\n";
-}
-
-void DiagnosisEmitter::MovedDeclDiag::output() const {
-  outputName() << " has been " << printDiagKeyword("moved") << " to "
-    << AddedKind << " " << printName(AddedName) << "\n";
-}
-
-void DiagnosisEmitter::RenamedDeclDiag::output() const {
-  outputName() << " has been " << printDiagKeyword("renamed") << " to "
-    << KindAfter << " " << printName(NameAfter) << "\n";
-}
-
-void DiagnosisEmitter::DeclTypeChangeDiag::output() const {
-  outputName() << " has "
-               << Description << " type change from "
-               << printName(TypeNameBefore) << " to "
-               << printName(TypeNameAfter) << "\n";
-}
-
-
-bool DiagnosisEmitter::DeclAttrDiag::operator<(DeclAttrDiag Other) const {
-  auto result = Info.compare(Other.Info);
-  if (result)
-    return result < 0;
-  return AttrAfter.compare(Other.AttrAfter) < 0;
-}
-
-void DiagnosisEmitter::DeclAttrDiag::output() const {
-  if (AttrBefore.empty())
-    outputName() << " is now " << printDiagKeyword(AttrAfter)<< "\n";
-  else
-    outputName() << " changes from " << printDiagKeyword(AttrBefore)
-      << " to "<< printDiagKeyword(AttrAfter)<< "\n";
-}
-
 void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
                                  SDKContext &Ctx) {
   DiagnosisEmitter Emitter(Ctx);
@@ -1781,9 +1581,9 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       return;
     if (auto *Added = findAddedDecl(Node)) {
       if (Node->getDeclKind() != DeclKind::Constructor) {
-        MovedDecls.Diags.emplace_back(ScreenInfo,
-                                      Added->getDeclKind(),
-                                      Added->getFullyQualifiedName());
+        Diags.diagnose(SourceLoc(), diag::moved_decl, ScreenInfo.str(),
+          Ctx.buffer((Twine(getDeclKindStr(Added->getDeclKind())) + " " +
+            Added->getFullyQualifiedName()).str()));
         return;
       }
     }
@@ -1793,8 +1593,9 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     auto It = std::find_if(MemberChanges.begin(), MemberChanges.end(),
       [&](TypeMemberDiffItem &Item) { return Item.usr == Node->getUsr(); });
     if (It != MemberChanges.end()) {
-      RenamedDecls.Diags.emplace_back(ScreenInfo, Node->getDeclKind(),
-        Ctx.buffer((Twine(It->newTypeName) + "." + It->newPrintedName).str()));
+      Diags.diagnose(SourceLoc(), diag::renamed_decl, ScreenInfo.str(),
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
+          It->newTypeName + "." + It->newPrintedName).str()));
       return;
     }
 
@@ -1803,7 +1604,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     // refine diagnostics message instead of showing the type alias has been
     // removed.
     if (TypeAliasUpdateMap.find((SDKNode*)Node) != TypeAliasUpdateMap.end()) {
-      RawRepresentableDecls.Diags.emplace_back(ScreenInfo,
+      Diags.diagnose(SourceLoc(), diag::raw_type_change, ScreenInfo.str(),
         Node->getAs<SDKNodeDeclTypeAlias>()->getUnderlyingType()->getPrintedName(),
         TypeAliasUpdateMap[(SDKNode*)Node]->getAs<SDKNodeDeclType>()->
           getRawValueType()->getPrintedName());
@@ -1825,31 +1626,34 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     }
     if (FoundInSuperclass)
       return;
-    Diags.diagnose(SourceLoc(), diag::removed_decl, "", Node->isDeprecated());
+    Diags.diagnose(SourceLoc(), diag::removed_decl, ScreenInfo.str(),
+      Node->isDeprecated());
     return;
   }
   case NodeAnnotation::Rename: {
     MetaInfo ScreenInfo(Node, false);
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    RenamedDecls.Diags.emplace_back(ScreenInfo,
-                                    Count->getDeclKind(),
-                                    Count->getFullyQualifiedName());
+    Diags.diagnose(SourceLoc(), diag::renamed_decl, ScreenInfo.str(),
+        Ctx.buffer((Twine(getDeclKindStr(Count->getDeclKind())) + " " +
+          Count->getFullyQualifiedName()).str()));
     return;
   }
   case NodeAnnotation::NowMutating: {
     MetaInfo ScreenInfo(Node, false);
-    AttrChangedDecls.Diags.emplace_back(ScreenInfo, Ctx.buffer("mutating"));
+    Diags.diagnose(SourceLoc(), diag::decl_new_attr, ScreenInfo.str(),
+      Ctx.buffer("mutating"));
     return;
   }
   case NodeAnnotation::NowThrowing: {
     MetaInfo ScreenInfo(Node, false);
-    AttrChangedDecls.Diags.emplace_back(ScreenInfo, Ctx.buffer("throwing"));
+    Diags.diagnose(SourceLoc(), diag::decl_new_attr, ScreenInfo.str(),
+      Ctx.buffer("throwing"));
     return;
   }
   case NodeAnnotation::StaticChange: {
     MetaInfo ScreenInfo(Node, false);
-    AttrChangedDecls.Diags.emplace_back(ScreenInfo,
-                        Ctx.buffer(Node->isStatic() ? "not static" : "static"));
+    Diags.diagnose(SourceLoc(), diag::decl_new_attr, ScreenInfo.str(),
+      Ctx.buffer(Node->isStatic() ? "not static" : "static"));
     return;
   }
   case NodeAnnotation::OwnershipChange: {
@@ -1860,17 +1664,16 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       return keywordOf(O);
     };
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    AttrChangedDecls.Diags.emplace_back(
-        ScreenInfo,
-        getOwnershipDescription(Node->getReferenceOwnership()),
-        getOwnershipDescription(Count->getReferenceOwnership()));
+    Diags.diagnose(SourceLoc(), diag::decl_attr_change, ScreenInfo.str(),
+      getOwnershipDescription(Node->getReferenceOwnership()),
+      getOwnershipDescription(Count->getReferenceOwnership()));
     return;
   }
   case NodeAnnotation::ChangeGenericSignature: {
     MetaInfo ScreenInfo(Node, false);
-    GSChangeDecls.Diags.emplace_back(ScreenInfo, Node->getGenericSignature(),
-      UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>()->
-                                     getGenericSignature());
+    Diags.diagnose(SourceLoc(), diag::decl_attr_change, ScreenInfo.str(),
+      Node->getGenericSignature(), UpdateMap.findUpdateCounterpart(Node)->
+        getAs<SDKNodeDecl>()->getGenericSignature());
     return;
   }
 
@@ -1885,7 +1688,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     auto Desc = Node->hasDeclAttribute(It->Kind) ?
       Ctx.buffer((llvm::Twine("without ") + It->Content).str()):
       Ctx.buffer((llvm::Twine("with ") + It->Content).str());
-    AttrChangedDecls.Diags.emplace_back(ScreenInfo, Desc);
+    Diags.diagnose(SourceLoc(), diag::decl_new_attr, ScreenInfo.str(), Desc);
     return;
   }
   }
@@ -1916,10 +1719,8 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
         SDKNodeDeclAbstractFunc::getTypeRoleDescription(Ctx, Parent->getChildIndex(Node)) :
         Ctx.buffer("declared");
       if (Node->getPrintedName() != Count->getPrintedName())
-        TypeChangedDecls.Diags.emplace_back(ScreenInfo,
-                                            Node->getPrintedName(),
-                                            Count->getPrintedName(),
-                                            Descriptor);
+        Diags.diagnose(SourceLoc(), diag::decl_type_change, ScreenInfo.str(),
+          Descriptor, Node->getPrintedName(), Count->getPrintedName());
       break;
     default:
       break;
