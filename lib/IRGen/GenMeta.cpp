@@ -2163,119 +2163,12 @@ static ClassFlags getClassFlags(ClassDecl *classDecl) {
 }
 
 namespace {
-  /// Utility class for building member metadata for classes where the
-  /// entire hierarchy is in the current resilience domain, and all stored
-  /// properties have a fixed size.
-  class FixedClassMemberBuilder {
-    IRGenModule &IGM;
-    ConstantStructBuilder &B;
-    SILVTable *VTable;
-
-  public:
-    FixedClassMemberBuilder(IRGenModule &IGM,
-                            ConstantStructBuilder &builder,
-                            SILVTable *vtable)
-      : IGM(IGM), B(builder), VTable(vtable) {}
-
-    void addFieldOffset(VarDecl *var) {
-      SILType baseType = SILType::getPrimitiveObjectType(
-        var->getDeclContext()->getDeclaredTypeInContext()
-          ->getCanonicalType());
-      B.addInt(IGM.SizeTy, getClassFieldOffset(IGM, baseType, var).getValue());
-    }
-
-    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      llvm_unreachable("Fixed class metadata cannot have missing members");
-    }
-
-    void addMethod(SILDeclRef fn) {
-      // Find the vtable entry.
-      assert(VTable && "no vtable?!");
-      auto entry = VTable->getEntry(IGM.getSILModule(), fn);
-
-      // The class is fragile. Emit a direct reference to the vtable entry.
-      if (entry) {
-        B.add(IGM.getAddrOfSILFunction(entry->Implementation, NotForDefinition));
-        return;
-      }
-
-      // The method is removed by dead method elimination.
-      // It should be never called. We add a pointer to an error function.
-      B.addBitCast(IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
-    }
-
-    void addGenericArgument(ClassDecl *forClass) {
-      llvm_unreachable("Fixed class metadata cannot have generic parameters");
-    }
-
-    void addGenericWitnessTable(ClassDecl *forClass) {
-      llvm_unreachable("Fixed class metadata cannot have generic requirements");
-    }
-  };
-
-  /// Utility class for building member metadata for classes where the
-  /// entire hierarchy is in the current resilience domain, but some properties
-  /// have an unknown size, or the class has generic ancestry, which requires us
-  /// to fill in the superclass field and generic requirements at runtime.
-  class InPlaceClassMemberBuilder {
-    IRGenModule &IGM;
-    ConstantStructBuilder &B;
-    SILVTable *VTable;
-
-  public:
-    InPlaceClassMemberBuilder(IRGenModule &IGM,
-                              ConstantStructBuilder &builder,
-                              SILVTable *vtable)
-      : IGM(IGM), B(builder), VTable(vtable) {}
-
-    void addFieldOffset(VarDecl *var) {
-      // Field offsets are either copied from the superclass or calculated
-      // at runtime.
-      B.addInt(IGM.SizeTy, 0);
-    }
-
-    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      for (unsigned i = 0,
-                    e = placeholder->getNumberOfFieldOffsetVectorEntries();
-           i < e; ++i) {
-        // Emit placeholder values for some number of stored properties we
-        // know exist but aren't able to reference directly.
-        B.addInt(IGM.SizeTy, 0);
-      }
-    }
-
-    void addMethod(SILDeclRef fn) {
-      // Find the vtable entry.
-      assert(VTable && "no vtable?!");
-      auto entry = VTable->getEntry(IGM.getSILModule(), fn);
-
-      // The class is fragile. Emit a direct reference to the vtable entry.
-      if (entry) {
-        B.add(IGM.getAddrOfSILFunction(entry->Implementation, NotForDefinition));
-        return;
-      }
-
-      // The method is removed by dead method elimination.
-      // It should be never called. We add a pointer to an error function.
-      B.addBitCast(IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
-    }
-
-    void addGenericArgument(ClassDecl *forClass) {
-      // Filled in at runtime.
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
-    }
-
-    void addGenericWitnessTable(ClassDecl *forClass) {
-      // Filled in at runtime.
-      B.addNullPointer(IGM.WitnessTablePtrTy);
-    }
-  };
-
   /// Base class for layout of non-generic class metadata.
-  template<class Impl, class MemberBuilder>
+  template<class Impl>
   class ClassMetadataBuilderBase : public ClassMetadataVisitor<Impl> {
     using super = ClassMetadataVisitor<Impl>;
 
+  protected:
     using super::IGM;
     using super::Target;
 
@@ -2283,8 +2176,8 @@ namespace {
 
     const ClassLayout &FieldLayout;
     const ClassMetadataLayout &MetadataLayout;
+    const SILVTable *VTable;
 
-    MemberBuilder Members;
     Size AddressPoint;
 
   public:
@@ -2294,8 +2187,7 @@ namespace {
       : super(IGM, theClass), B(builder),
         FieldLayout(fieldLayout),
         MetadataLayout(IGM.getClassMetadataLayout(theClass)),
-        Members(IGM, builder,
-                IGM.getSILModule().lookUpVTable(theClass)) {}
+        VTable(IGM.getSILModule().lookUpVTable(theClass)) {}
 
   public:
     void noteAddressPoint() {
@@ -2486,16 +2378,20 @@ namespace {
       B.add(data);
     }
 
-    void addFieldOffset(VarDecl *var) {
-      Members.addFieldOffset(var);
-    }
-    
-    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      Members.addFieldOffsetPlaceholders(placeholder);
-    }
-
     void addMethod(SILDeclRef fn) {
-      Members.addMethod(fn);
+      // Find the vtable entry.
+      assert(VTable && "no vtable?!");
+      auto entry = VTable->getEntry(IGM.getSILModule(), fn);
+
+      // The class is fragile. Emit a direct reference to the vtable entry.
+      if (entry) {
+        B.add(IGM.getAddrOfSILFunction(entry->Implementation, NotForDefinition));
+        return;
+      }
+
+      // The method is removed by dead method elimination.
+      // It should be never called. We add a pointer to an error function.
+      B.addBitCast(IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
     }
 
     void addPlaceholder(MissingMemberDecl *m) {
@@ -2504,14 +2400,6 @@ namespace {
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
-
-    void addGenericArgument(ClassDecl *forClass) {
-      Members.addGenericArgument(forClass);
-    }
-
-    void addGenericWitnessTable(ClassDecl *forClass) {
-      Members.addGenericWitnessTable(forClass);
-    }
 
     void createMetadataAccessFunction() {
       assert(!Target->isGenericContext());
@@ -2534,31 +2422,76 @@ namespace {
   /// A builder for non-generic class metadata which does not require any
   /// runtime initialization.
   class FixedClassMetadataBuilder :
-      public ClassMetadataBuilderBase<FixedClassMetadataBuilder,
-                                      FixedClassMemberBuilder> {
-    using super = ClassMetadataBuilderBase<FixedClassMetadataBuilder,
-                                           FixedClassMemberBuilder>;
+      public ClassMetadataBuilderBase<FixedClassMetadataBuilder> {
+    using super = ClassMetadataBuilderBase<FixedClassMetadataBuilder>;
+    using super::IGM;
+    using super::B;
 
   public:
     FixedClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                               ConstantStructBuilder &builder,
                               const ClassLayout &fieldLayout)
       : super(IGM, theClass, builder, fieldLayout) {}
+
+    void addFieldOffset(VarDecl *var) {
+      SILType baseType = SILType::getPrimitiveObjectType(
+        var->getDeclContext()->getDeclaredTypeInContext()
+          ->getCanonicalType());
+      B.addInt(IGM.SizeTy, getClassFieldOffset(IGM, baseType, var).getValue());
+    }
+
+    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      llvm_unreachable("Fixed class metadata cannot have missing members");
+    }
+
+    void addGenericArgument(ClassDecl *forClass) {
+      llvm_unreachable("Fixed class metadata cannot have generic parameters");
+    }
+
+    void addGenericWitnessTable(ClassDecl *forClass) {
+      llvm_unreachable("Fixed class metadata cannot have generic requirements");
+    }
   };
 
   /// A builder for non-generic class metadata with resiliently-sized
   /// fields or generic ancestry.
   class InPlaceClassMetadataBuilder :
-      public ClassMetadataBuilderBase<InPlaceClassMetadataBuilder,
-                                      InPlaceClassMemberBuilder> {
-    using super = ClassMetadataBuilderBase<InPlaceClassMetadataBuilder,
-                                           InPlaceClassMemberBuilder>;
+      public ClassMetadataBuilderBase<InPlaceClassMetadataBuilder> {
+    using super = ClassMetadataBuilderBase<InPlaceClassMetadataBuilder>;
+    using super::IGM;
+    using super::B;
 
   public:
     InPlaceClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                                 ConstantStructBuilder &builder,
                                 const ClassLayout &fieldLayout)
       : super(IGM, theClass, builder, fieldLayout) {}
+
+    void addFieldOffset(VarDecl *var) {
+      // Field offsets are either copied from the superclass or calculated
+      // at runtime.
+      B.addInt(IGM.SizeTy, 0);
+    }
+
+    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      for (unsigned i = 0,
+                    e = placeholder->getNumberOfFieldOffsetVectorEntries();
+           i < e; ++i) {
+        // Emit placeholder values for some number of stored properties we
+        // know exist but aren't able to reference directly.
+        B.addInt(IGM.SizeTy, 0);
+      }
+    }
+
+    void addGenericArgument(ClassDecl *forClass) {
+      // Filled in at runtime.
+      B.addNullPointer(IGM.TypeMetadataPtrTy);
+    }
+
+    void addGenericWitnessTable(ClassDecl *forClass) {
+      // Filled in at runtime.
+      B.addNullPointer(IGM.WitnessTablePtrTy);
+    }
   };
 
   /// A builder for metadata patterns for non-generic class with
