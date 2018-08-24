@@ -12,69 +12,115 @@
 
 import TestsUtils
 
+let size = 400
+let overlap = 100
+
+let setAB = Set(0 ..< size)
+let setCD = Set(size ..< 2 * size)
+let setBC = Set(size - overlap ..< 2 * size - overlap)
+let setB = Set(size - overlap ..< size)
+
+let setOAB = Set(setAB.map(Box.init))
+let setOCD = Set(setCD.map(Box.init))
+let setOBC = Set(setBC.map(Box.init))
+let setOB = Set(setB.map(Box.init))
+
+let countAC = 2 * (size - overlap)
+let countABC = 2 * size - overlap
+let countABCD = 2 * size
+let countB = overlap
+
 public let SetTests = [
-  BenchmarkInfo(name: "SetExclusiveOr2", runFunction: run_SetExclusiveOr2, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetExclusiveOr2_OfObjects", runFunction: run_SetExclusiveOr2_OfObjects, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetIntersect2", runFunction: run_SetIntersect2, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetIntersect2_OfObjects", runFunction: run_SetIntersect2_OfObjects, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetIsSubsetOf2", runFunction: run_SetIsSubsetOf2, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetIsSubsetOf2_OfObjects", runFunction: run_SetIsSubsetOf2_OfObjects, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetUnion2", runFunction: run_SetUnion2, tags: [.validation, .api, .Set]),
-  BenchmarkInfo(name: "SetUnion2_OfObjects", runFunction: run_SetUnion2_OfObjects, tags: [.validation, .api, .Set]),
+  BenchmarkInfo(
+    name: "SetExclusiveOr2",
+    runFunction: { n in run_SetExclusiveOr(setAB, setBC, countAC, 10 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setBC]) }),
+  BenchmarkInfo(
+    name: "SetExclusiveOr2_OfObjects",
+    runFunction: { n in run_SetExclusiveOr_OfObjects(setOAB, setOBC, countAC, 10 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOBC]) }),
+
+  BenchmarkInfo(
+    name: "SetIntersect2",
+    runFunction: { n in run_SetIntersect(setAB, setBC, countB, 10 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setBC]) }),
+  BenchmarkInfo(
+    name: "SetIntersect2_OfObjects",
+    runFunction: { n in run_SetIntersect_OfObjects(setOAB, setOBC, countB, 10 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOBC]) }),
+
+  BenchmarkInfo(
+    name: "SetIsSubsetOf2",
+    runFunction: { n in run_SetIsSubsetOf(setB, setAB, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setB, setAB]) }),
+  BenchmarkInfo(
+    name: "SetIsSubsetOf2_OfObjects",
+    runFunction: { n in run_SetIsSubsetOf_OfObjects(setOB, setOAB, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOB, setOAB]) }),
+
+  BenchmarkInfo(
+    name: "SetUnion2",
+    runFunction: { n in run_SetUnion(setAB, setBC, countABC, 10 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setBC]) }),
+  BenchmarkInfo(
+    name: "SetUnion2_OfObjects",
+    runFunction: { n in run_SetUnion_OfObjects(setOAB, setOBC, countABC, 10 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOBC]) }),
 ]
 
 @inline(never)
-public func run_SetIsSubsetOf2(_ N: Int) {
-  let size = 400
-
-  let set = Set<Int>(size / 2 ..< size)
-  let otherSet = Set<Int>(0 ..< size)
-
-  for _ in 0 ..< N * 5000 {
-    let isSubset = set.isSubset(of: identity(otherSet))
-    CheckResults(isSubset)
+public func run_SetIsSubsetOf(
+  _ a: Set<Int>,
+  _ b: Set<Int>,
+  _ r: Bool,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let isSubset = a.isSubset(of: identity(b))
+    CheckResults(isSubset == r)
   }
 }
 
 @inline(never)
-public func run_SetExclusiveOr2(_ N: Int) {
-  let size = 400
-  let overlap = 100
-
-  let set = Set<Int>(0 ..< size)
-  let otherSet = Set<Int>(size - overlap ..< 2 * size - overlap)
-
-  for _ in 0 ..< N * 100 {
-    let diff = set.symmetricDifference(identity(otherSet))
-    CheckResults(diff.count == 2 * (size - overlap))
+public func run_SetExclusiveOr(
+  _ a: Set<Int>,
+  _ b: Set<Int>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let diff = a.symmetricDifference(identity(b))
+    CheckResults(diff.count == r)
   }
 }
 
 @inline(never)
-public func run_SetUnion2(_ N: Int) {
-  let size = 400
-  let overlap = 100
-
-  let set = Set<Int>(0 ..< size)
-  let otherSet = Set<Int>(size - overlap ..< 2 * size - overlap)
-
-  for _ in 0 ..< N * 100 {
-    let or = set.union(identity(otherSet))
-    CheckResults(or.count == 2 * size)
+public func run_SetUnion(
+  _ a: Set<Int>,
+  _ b: Set<Int>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let or = a.union(identity(b))
+    CheckResults(or.count == r)
   }
 }
 
 @inline(never)
-public func run_SetIntersect2(_ N: Int) {
-  let size = 400
-  let overlap = 100
-
-  let set = Set<Int>(0 ..< size)
-  let otherSet = Set<Int>(size - overlap ..< 2 * size - overlap)
-
-  for _ in 0 ..< N * 100 {
-    let and = set.intersection(identity(otherSet))
-    CheckResults(and.count == overlap)
+public func run_SetIntersect(
+  _ a: Set<Int>,
+  _ b: Set<Int>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let and = a.intersection(identity(b))
+    CheckResults(and.count == r)
   }
 }
 
@@ -95,59 +141,49 @@ class Box<T : Hashable> : Hashable {
 }
 
 @inline(never)
-public func run_SetIsSubsetOf_OfObjects(_ N: Int) {
-  let size = 400
-
-  let set = Set<Box<Int>>((size / 2 ..< size).map(Box.init))
-  let otherSet = Set<Box<Int>>((0 ..< size).map(Box.init))
-
-  for _ in 0 ..< N * 5000 {
-    let isSubset = set.isSubset(of: identity(otherSet))
-    CheckResults(isSubset)
+func run_SetIsSubsetOf_OfObjects(
+  _ a: Set<Box<Int>>,
+  _ b: Set<Box<Int>>,
+  _ r: Bool,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let isSubset = a.isSubset(of: identity(b))
+    CheckResults(isSubset == r)
   }
 }
 
 @inline(never)
-public func run_SetExclusiveOr_OfObjects(_ N: Int) {
-  let size = 400
-  let overlap = 100
-
-  let set = Set<Box<Int>>((0 ..< size).map(Box.init))
-  let otherSet = Set<Box<Int>>(
-    (size - overlap ..< 2 * size - overlap).map(Box.init))
-
-  for _ in 0 ..< N * 100 {
-    let diff = set.symmetricDifference(identity(otherSet))
-    CheckResults(diff.count == 2 * (size - overlap))
+func run_SetExclusiveOr_OfObjects(
+  _ a: Set<Box<Int>>,
+  _ b: Set<Box<Int>>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let diff = a.symmetricDifference(identity(b))
+    CheckResults(diff.count == r)
   }
 }
 
 @inline(never)
-public func run_SetUnion_OfObjects(_ N: Int) {
-  let size = 400
-  let overlap = 100
-
-  let set = Set<Box<Int>>((0 ..< size).map(Box.init))
-  let otherSet = Set<Box<Int>>(
-    (size - overlap ..< 2 * size - overlap).map(Box.init))
-
-  for _ in 0 ..< N * 100 {
-    let or = set.union(identity(otherSet))
-    CheckResults(or.count == 2 * size)
+func run_SetUnion_OfObjects(
+  _ a: Set<Box<Int>>,
+  _ b: Set<Box<Int>>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let or = a.union(identity(b))
+    CheckResults(or.count == r)
   }
 }
 
 @inline(never)
-public func run_SetIntersect2_OfObjects(_ N: Int) {
-  let size = 400
-  let overlap = 100
-
-  let set = Set<Box<Int>>((0 ..< size).map(Box.init))
-  let otherSet = Set<Box<Int>>(
-    (size - overlap ..< 2 * size - overlap).map(Box.init))
-
-  for _ in 0 ..< N * 100 {
-    let and = set.intersection(otherSet)
-    CheckResults(and.count == overlap)
+func run_SetIntersect_OfObjects(
+  _ a: Set<Box<Int>>,
+  _ b: Set<Box<Int>>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let and = a.intersection(b)
+    CheckResults(and.count == r)
   }
 }
