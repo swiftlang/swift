@@ -34,9 +34,6 @@ public struct ${node.name}: _SyntaxBase {
   internal init(root: SyntaxData, data: SyntaxData) {
     self._root = root
     self._data = data
-#if DEBUG
-    validate()
-#endif
   }
 
   /// Creates a new `${node.name}` by replacing the underlying layout with
