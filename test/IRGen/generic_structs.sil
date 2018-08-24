@@ -262,7 +262,7 @@ struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
 // CHECK: [[T4:%.*]] = call swiftcc %swift.metadata_response [[T3]](i64 0, %swift.type* %T, i8** [[T1]])
 // CHECK: %T.Assoc = extractvalue %swift.metadata_response [[T4]], 0
 
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 3
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 2
 // CHECK:   [[T1:%.*]] = load i8*, i8** [[T0]],
 // CHECK:   [[T2:%.*]] = bitcast i8* [[T1]] to i8** (%swift.type*, %swift.type*, i8**)*
 // CHECK:   %T.Assoc.HasAssociatedType = call swiftcc i8** [[T2]](%swift.type* %T.Assoc, %swift.type* %T, i8** %T.ParentHasAssociatedType)
