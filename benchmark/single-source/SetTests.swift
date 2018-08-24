@@ -52,33 +52,6 @@ let setQ: Set<Int> = {
 }()
 
 public let SetTests = [
-  // Legacy benchmarks, kept for continuity with previous releases.
-  BenchmarkInfo(
-    name: "SetExclusiveOr", // ~"SetSymmetricDifferenceInt0"
-    runFunction: { n in run_SetSymmetricDifferenceInt(setAB, setCD, countABCD, 100 * n) },
-    tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setAB, setCD]) }),
-  BenchmarkInfo(
-    name: "SetExclusiveOr_OfObjects", // ~"SetSymmetricDifferenceBox0"
-    runFunction: { n in run_SetSymmetricDifferenceBox(setOAB, setOCD, countABCD, 100 * n) },
-    tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setOAB, setOCD]) }),
-  BenchmarkInfo(
-    name: "SetIntersect", // ~"SetIntersectionInt0"
-    runFunction: { n in run_SetIntersectionInt(setAB, setCD, 0, 100 * n) },
-    tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setAB, setCD]) }),
-  BenchmarkInfo(
-    name: "SetUnion", // ~"SetUnionInt0"
-    runFunction: { n in run_SetUnionInt(setAB, setCD, countABCD, 100 * n) },
-    tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setAB, setCD]) }),
-  BenchmarkInfo(
-    name: "SetUnion_OfObjects", // ~"SetUnionBox0"
-    runFunction: { n in run_SetUnionBox(setOAB, setOCD, countABCD, 100 * n) },
-    tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setOAB, setOCD]) }),
-
   // Mnemonic: number after name is percentage of common elements in input sets.
   BenchmarkInfo(
     name: "SetIsSubsetInt0",
@@ -234,6 +207,33 @@ public let SetTests = [
     runFunction: { n in run_SetSubtractingInt(setP, setQ, 0, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, setQ]) }),
+
+  // Legacy benchmarks, kept for continuity with previous releases.
+  BenchmarkInfo(
+    name: "SetExclusiveOr", // ~"SetSymmetricDifferenceInt0"
+    runFunction: { n in run_SetSymmetricDifferenceInt(setAB, setCD, countABCD, 100 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
+    name: "SetExclusiveOr_OfObjects", // ~"SetSymmetricDifferenceBox0"
+    runFunction: { n in run_SetSymmetricDifferenceBox(setOAB, setOCD, countABCD, 100 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
+  BenchmarkInfo(
+    name: "SetIntersect", // ~"SetIntersectionInt0"
+    runFunction: { n in run_SetIntersectionInt(setAB, setCD, 0, 100 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
+    name: "SetUnion", // ~"SetUnionInt0"
+    runFunction: { n in run_SetUnionInt(setAB, setCD, countABCD, 100 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
+    name: "SetUnion_OfObjects", // ~"SetUnionBox0"
+    runFunction: { n in run_SetUnionBox(setOAB, setOCD, countABCD, 100 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
 ]
 
 @inline(never)
