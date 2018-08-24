@@ -29,6 +29,14 @@ using namespace constraints;
 
 FailureDiagnostic::~FailureDiagnostic() {}
 
+bool FailureDiagnostic::diagnose(bool asNote) {
+  return asNote ? diagnoseAsNote() : diagnoseAsError();
+}
+
+bool FailureDiagnostic::diagnoseAsNote() {
+  return false;
+}
+
 std::pair<Expr *, bool> FailureDiagnostic::computeAnchor() const {
   auto &cs = getConstraintSystem();
 
@@ -116,20 +124,13 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
   return AffectedDecl->getAsGenericContext();
 }
 
-bool RequirementFailure::diagnose(bool asNote) {
+bool RequirementFailure::diagnoseAsError() {
   if (!canDiagnoseFailure())
     return false;
 
   auto *anchor = getAnchor();
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = AffectedDecl->getAsGenericContext();
-
-  if (asNote) {
-    const auto &req = getRequirement();
-    emitDiagnostic(reqDC->getAsDecl(), getDiagnosticAsNote(), getLHS(),
-                   getRHS(), req.getFirstType(), req.getSecondType(), "");
-    return true;
-  }
 
   if (reqDC != genericCtx) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
@@ -144,6 +145,15 @@ bool RequirementFailure::diagnose(bool asNote) {
   }
 
   emitRequirementNote(reqDC->getAsDecl());
+  return true;
+}
+
+bool RequirementFailure::diagnoseAsNote() {
+  const auto &req = getRequirement();
+  const auto *reqDC = getRequirementDC();
+
+  emitDiagnostic(reqDC->getAsDecl(), getDiagnosticAsNote(), getLHS(), getRHS(),
+                 req.getFirstType(), req.getSecondType(), "");
   return true;
 }
 
@@ -166,12 +176,9 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor) const {
                  req.getFirstType(), getLHS(), req.getSecondType(), getRHS());
 }
 
-bool MissingConformanceFailure::diagnose(bool asNote) {
+bool MissingConformanceFailure::diagnoseAsError() {
   if (!canDiagnoseFailure())
     return false;
-
-  if (asNote)
-    return RequirementFailure::diagnose(asNote);
 
   auto *anchor = getAnchor();
   auto ownerType = getOwnerType();
@@ -230,13 +237,10 @@ bool MissingConformanceFailure::diagnose(bool asNote) {
 
   // If none of the special cases could be diagnosed,
   // let's fallback to the most general diagnostic.
-  return RequirementFailure::diagnose();
+  return RequirementFailure::diagnoseAsError();
 }
 
-bool LabelingFailure::diagnose(bool asNote) {
-  if (asNote)
-    return false;
-
+bool LabelingFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *call = cast<CallExpr>(getAnchor());
   return diagnoseArgumentLabelError(cs.getASTContext(), call->getArg(),
@@ -244,11 +248,7 @@ bool LabelingFailure::diagnose(bool asNote) {
                                     isa<SubscriptExpr>(call->getFn()));
 }
 
-bool NoEscapeFuncToTypeConversionFailure::diagnose(bool asNote) {
-  // Can't diagnose this problem as a note at the moment.
-  if (asNote)
-    return false;
-
+bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
 
   if (ConvertTo) {
@@ -271,9 +271,8 @@ bool NoEscapeFuncToTypeConversionFailure::diagnose(bool asNote) {
   return true;
 }
 
-bool MissingForcedDowncastFailure::diagnose(bool asNote) {
-  // Can't diagnose this problem as a note at the moment.
-  if (hasComplexLocator() || asNote)
+bool MissingForcedDowncastFailure::diagnoseAsError() {
+  if (hasComplexLocator())
     return false;
 
   auto &TC = getTypeChecker();
@@ -313,9 +312,8 @@ bool MissingForcedDowncastFailure::diagnose(bool asNote) {
   }
 }
 
-bool MissingAddressOfFailure::diagnose(bool asNote) {
-  // Can't diagnose this problem as a note at the moment.
-  if (hasComplexLocator() || asNote)
+bool MissingAddressOfFailure::diagnoseAsError() {
+  if (hasComplexLocator())
     return false;
 
   auto *anchor = getAnchor();
@@ -325,9 +323,8 @@ bool MissingAddressOfFailure::diagnose(bool asNote) {
   return true;
 }
 
-bool MissingExplicitConversionFailure::diagnose(bool asNote) {
-  // Can't diagnose this problem as a note at the moment.
-  if (hasComplexLocator() || asNote)
+bool MissingExplicitConversionFailure::diagnoseAsError() {
+  if (hasComplexLocator())
     return false;
 
   auto *DC = getDC();
@@ -383,9 +380,8 @@ bool MissingExplicitConversionFailure::diagnose(bool asNote) {
   return true;
 }
 
-bool MemberAccessOnOptionalBaseFailure::diagnose(bool asNote) {
-  // Can't diagnose this problem as a note at the moment.
-  if (hasComplexLocator() || asNote)
+bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
+  if (hasComplexLocator())
     return false;
 
   auto *anchor = getAnchor();
@@ -537,9 +533,8 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
   return true;
 }
 
-bool MissingOptionalUnwrapFailure::diagnose(bool asNote) {
-  // Can't diagnose this problem as a note at the moment.
-  if (hasComplexLocator() || asNote)
+bool MissingOptionalUnwrapFailure::diagnoseAsError() {
+  if (hasComplexLocator())
     return false;
 
   auto *anchor = getAnchor();
@@ -555,11 +550,7 @@ bool MissingOptionalUnwrapFailure::diagnose(bool asNote) {
   return true;
 }
 
-bool RValueTreatedAsLValueFailure::diagnose(bool asNote) {
-  // Can't diagnose this problem as a note at the moment.
-  if (asNote)
-    return false;
-
+bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   Diag<StringRef> subElementDiagID;
   Diag<Type> rvalueDiagID;
   Expr *diagExpr = getLocator()->getAnchor();
