@@ -6,6 +6,7 @@
 
 // FIXME: Add a feature for "platforms that support XCTest".
 // REQUIRES: OS=macosx
+// UNSUPPORTED: remote_run
 
 import StdlibUnittest
 
