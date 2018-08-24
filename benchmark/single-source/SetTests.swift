@@ -32,10 +32,20 @@ let countB = overlap
 
 public let SetTests = [
   BenchmarkInfo(
+    name: "SetExclusiveOr",
+    runFunction: { n in run_SetExclusiveOr(setAB, setCD, countABCD, 100 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
     name: "SetExclusiveOr2",
     runFunction: { n in run_SetExclusiveOr(setAB, setBC, countAC, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setBC]) }),
+  BenchmarkInfo(
+    name: "SetExclusiveOr_OfObjects",
+    runFunction: { n in run_SetExclusiveOr_OfObjects(setOAB, setOCD, countABCD, 100 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
   BenchmarkInfo(
     name: "SetExclusiveOr2_OfObjects",
     runFunction: { n in run_SetExclusiveOr_OfObjects(setOAB, setOBC, countAC, 10 * n) },
@@ -43,10 +53,20 @@ public let SetTests = [
     setUpFunction: { blackHole([setOAB, setOBC]) }),
 
   BenchmarkInfo(
+    name: "SetIntersect",
+    runFunction: { n in run_SetIntersect(setAB, setCD, 0, 100 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
     name: "SetIntersect2",
     runFunction: { n in run_SetIntersect(setAB, setBC, countB, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setBC]) }),
+  BenchmarkInfo(
+    name: "SetIntersect_OfObjects",
+    runFunction: { n in run_SetIntersect_OfObjects(setOAB, setOCD, 0, 100 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
   BenchmarkInfo(
     name: "SetIntersect2_OfObjects",
     runFunction: { n in run_SetIntersect_OfObjects(setOAB, setOBC, countB, 10 * n) },
@@ -54,10 +74,20 @@ public let SetTests = [
     setUpFunction: { blackHole([setOAB, setOBC]) }),
 
   BenchmarkInfo(
+    name: "SetIsSubsetOf",
+    runFunction: { n in run_SetIsSubsetOf(setAB, setCD, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
     name: "SetIsSubsetOf2",
     runFunction: { n in run_SetIsSubsetOf(setB, setAB, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setB, setAB]) }),
+  BenchmarkInfo(
+    name: "SetIsSubsetOf_OfObjects",
+    runFunction: { n in run_SetIsSubsetOf_OfObjects(setOAB, setOCD, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
   BenchmarkInfo(
     name: "SetIsSubsetOf2_OfObjects",
     runFunction: { n in run_SetIsSubsetOf_OfObjects(setOB, setOAB, true, 50 * n) },
@@ -65,10 +95,20 @@ public let SetTests = [
     setUpFunction: { blackHole([setOB, setOAB]) }),
 
   BenchmarkInfo(
+    name: "SetUnion",
+    runFunction: { n in run_SetUnion(setAB, setCD, countABCD, 100 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
     name: "SetUnion2",
     runFunction: { n in run_SetUnion(setAB, setBC, countABC, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setBC]) }),
+  BenchmarkInfo(
+    name: "SetUnion_OfObjects",
+    runFunction: { n in run_SetUnion_OfObjects(setOAB, setOCD, countABCD, 100 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
   BenchmarkInfo(
     name: "SetUnion2_OfObjects",
     runFunction: { n in run_SetUnion_OfObjects(setOAB, setOBC, countABC, 10 * n) },
