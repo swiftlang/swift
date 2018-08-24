@@ -1554,7 +1554,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       return;
     if (auto *Added = findAddedDecl(Node)) {
       if (Node->getDeclKind() != DeclKind::Constructor) {
-        Diags.diagnose(diag::moved_decl, Node->getScreenInfo(),
+        Diags.diagnose(SourceLoc(), diag::moved_decl, Node->getScreenInfo(),
           Ctx.buffer((Twine(getDeclKindStr(Added->getDeclKind())) + " " +
             Added->getFullyQualifiedName()).str()));
         return;
@@ -1566,7 +1566,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     auto It = std::find_if(MemberChanges.begin(), MemberChanges.end(),
       [&](TypeMemberDiffItem &Item) { return Item.usr == Node->getUsr(); });
     if (It != MemberChanges.end()) {
-      Diags.diagnose(diag::renamed_decl, Node->getScreenInfo(),
+      Diags.diagnose(SourceLoc(), diag::renamed_decl, Node->getScreenInfo(),
         Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
           It->newTypeName + "." + It->newPrintedName).str()));
       return;
@@ -1577,7 +1577,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     // refine diagnostics message instead of showing the type alias has been
     // removed.
     if (TypeAliasUpdateMap.find((SDKNode*)Node) != TypeAliasUpdateMap.end()) {
-      Diags.diagnose(diag::raw_type_change, Node->getScreenInfo(),
+      Diags.diagnose(SourceLoc(), diag::raw_type_change, Node->getScreenInfo(),
         Node->getAs<SDKNodeDeclTypeAlias>()->getUnderlyingType()->getPrintedName(),
         TypeAliasUpdateMap[(SDKNode*)Node]->getAs<SDKNodeDeclType>()->
           getRawValueType()->getPrintedName());
@@ -1599,28 +1599,29 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     }
     if (FoundInSuperclass)
       return;
-    Diags.diagnose(diag::removed_decl, Node->getScreenInfo(), Node->isDeprecated());
+    Diags.diagnose(SourceLoc(), diag::removed_decl, Node->getScreenInfo(),
+      Node->isDeprecated());
     return;
   }
   case NodeAnnotation::Rename: {
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    Diags.diagnose(diag::renamed_decl, Node->getScreenInfo(),
+    Diags.diagnose(SourceLoc(), diag::renamed_decl, Node->getScreenInfo(),
         Ctx.buffer((Twine(getDeclKindStr(Count->getDeclKind())) + " " +
           Count->getFullyQualifiedName()).str()));
     return;
   }
   case NodeAnnotation::NowMutating: {
-    Diags.diagnose(diag::decl_new_attr, Node->getScreenInfo(),
+    Diags.diagnose(SourceLoc(), diag::decl_new_attr, Node->getScreenInfo(),
       Ctx.buffer("mutating"));
     return;
   }
   case NodeAnnotation::NowThrowing: {
-    Diags.diagnose(diag::decl_new_attr, Node->getScreenInfo(),
+    Diags.diagnose(SourceLoc(), diag::decl_new_attr, Node->getScreenInfo(),
       Ctx.buffer("throwing"));
     return;
   }
   case NodeAnnotation::StaticChange: {
-    Diags.diagnose(diag::decl_new_attr, Node->getScreenInfo(),
+    Diags.diagnose(SourceLoc(), diag::decl_new_attr, Node->getScreenInfo(),
       Ctx.buffer(Node->isStatic() ? "not static" : "static"));
     return;
   }
@@ -1631,13 +1632,13 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       return keywordOf(O);
     };
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    Diags.diagnose(diag::decl_attr_change, Node->getScreenInfo(),
+    Diags.diagnose(SourceLoc(), diag::decl_attr_change, Node->getScreenInfo(),
       getOwnershipDescription(Node->getReferenceOwnership()),
       getOwnershipDescription(Count->getReferenceOwnership()));
     return;
   }
   case NodeAnnotation::ChangeGenericSignature: {
-    Diags.diagnose(diag::generic_sig_change, Node->getScreenInfo(),
+    Diags.diagnose(SourceLoc(), diag::generic_sig_change, Node->getScreenInfo(),
       Node->getGenericSignature(), UpdateMap.findUpdateCounterpart(Node)->
         getAs<SDKNodeDecl>()->getGenericSignature());
     return;
@@ -1654,7 +1655,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       Ctx.buffer((llvm::Twine("without ") + It->Content).str()):
       Ctx.buffer((llvm::Twine("with ") + It->Content).str());
     if (options::Abi)
-      Diags.diagnose(diag::decl_new_attr, Node->getScreenInfo(), Desc);
+      Diags.diagnose(SourceLoc(), diag::decl_new_attr, Node->getScreenInfo(), Desc);
     return;
   }
   }
@@ -1684,7 +1685,7 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
         SDKNodeDeclAbstractFunc::getTypeRoleDescription(Ctx, Parent->getChildIndex(Node)) :
         Ctx.buffer("declared");
       if (Node->getPrintedName() != Count->getPrintedName())
-        Diags.diagnose(diag::decl_type_change, Parent->getScreenInfo(),
+        Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
           Descriptor, Node->getPrintedName(), Count->getPrintedName());
       break;
     default:
