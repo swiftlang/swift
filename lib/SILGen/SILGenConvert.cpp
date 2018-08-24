@@ -601,7 +601,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       ManagedValue nsError =
           emitRValueForStorageLoad(
               loc, nativeError, concreteFormalType,
-              /*super*/ false, nsErrorVar, RValue(),
+              /*super*/ false, nsErrorVar, PreparedArguments(),
               nsErrorVarSubstitutions,
               AccessSemantics::Ordinary, nsErrorType, SGFContext())
               .getAsSingleValue(*this, loc);
