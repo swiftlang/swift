@@ -3085,7 +3085,7 @@ protected:
   }
 };
 
-/// An instantiation pattern for class metadata.
+/// An instantiation pattern for generic class metadata.
 template <typename Runtime>
 struct TargetGenericClassMetadataPattern final :
        TargetGenericMetadataPattern<Runtime>,
@@ -3138,7 +3138,7 @@ private:
 using GenericClassMetadataPattern =
   TargetGenericClassMetadataPattern<InProcess>;
 
-/// An instantiation pattern for value metadata.
+/// An instantiation pattern for generic value metadata.
 template <typename Runtime>
 struct TargetGenericValueMetadataPattern final :
        TargetGenericMetadataPattern<Runtime>,
@@ -3316,10 +3316,43 @@ struct TargetInPlaceValueMetadataCache {
 using InPlaceValueMetadataCache =
   TargetInPlaceValueMetadataCache<InProcess>;
 
+template <typename Runtime>
+struct TargetResilientClassMetadataPattern;
+
 /// An instantiation pattern for non-generic resilient class metadata.
 /// Used in conjunction with InPlaceValueMetadataInitialization.
 using MetadataRelocator =
-  Metadata *(const TargetTypeContextDescriptor<InProcess> *description);
+  Metadata *(const TargetTypeContextDescriptor<InProcess> *type,
+             const TargetResilientClassMetadataPattern<InProcess> *pattern);
+
+/// An instantiation pattern for non-generic resilient class metadata.
+template <typename Runtime>
+struct TargetResilientClassMetadataPattern {
+  /// If the class descriptor's hasResilientSuperclass() flag is set,
+  /// this field instead points at a function that allocates metadata
+  /// with the correct size at runtime.
+  TargetRelativeDirectPointer<Runtime, MetadataRelocator> RelocationFunction;
+
+  /// The heap-destructor function.
+  TargetRelativeDirectPointer<Runtime, HeapObjectDestroyer> Destroy;
+
+  /// The ivar-destructor function.
+  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
+
+  /// The class flags.
+  ClassFlags Flags;
+
+  // The following fields are only present in ObjC interop.
+
+  /// Our ClassROData.
+  TargetRelativeDirectPointer<Runtime, void> Data;
+
+  /// Our metaclass.
+  TargetRelativeDirectPointer<Runtime, TargetAnyClassMetadata<Runtime>> Metaclass;
+};
+
+using ResilientClassMetadataPattern =
+  TargetResilientClassMetadataPattern<InProcess>;
 
 /// The control structure for performing non-trivial initialization of
 /// singleton value metadata, which is required when e.g. a non-generic
@@ -3340,8 +3373,8 @@ struct TargetInPlaceValueMetadataInitialization {
     /// If the class descriptor's hasResilientSuperclass() flag is set,
     /// this field instead points at a function that allocates metadata
     /// with the correct size at runtime.
-    TargetRelativeDirectPointer<Runtime, MetadataRelocator>
-      RelocationFunction;
+    TargetRelativeDirectPointer<Runtime, TargetResilientClassMetadataPattern<Runtime>>
+      ResilientPattern;
   };
 
   /// The completion function.  The pattern will always be null.
@@ -3358,8 +3391,10 @@ struct TargetInPlaceValueMetadataInitialization {
 
   TargetMetadata<Runtime> *allocate(
       const TargetTypeContextDescriptor<Runtime> *description) const {
-    if (hasRelocationFunction(description))
-      return RelocationFunction(description);
+    if (hasRelocationFunction(description)) {
+      return ResilientPattern->RelocationFunction(description,
+                                                  ResilientPattern.get());
+    }
     return IncompleteMetadata.get();
   }
 };

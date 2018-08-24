@@ -670,19 +670,19 @@ FUNCTION(GetGenericMetadata, swift_getGenericMetadata, SwiftCC,
 
 // Metadata *swift_allocateGenericClassMetadata(ClassDescriptor *type,
 //                                              const void * const *arguments,
-//                                              const void * const *template);
+//                                              const void *template);
 FUNCTION(AllocateGenericClassMetadata, swift_allocateGenericClassMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 // Metadata *swift_allocateGenericValueMetadata(ValueTypeDescriptor *type,
 //                                              const void * const *arguments,
-//                                              const void * const *template,
+//                                              const void *template,
 //                                              size_t extraSize);
 FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          C_CC, RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy, SizeTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy, SizeTy),
          ATTRS(NoUnwind))
 
 // MetadataResponse swift_checkMetadataState(MetadataRequest request,
@@ -809,12 +809,11 @@ FUNCTION(GetExistentialMetadata,
          ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_relocateClassMetadata(TypeContextDescriptor *descriptor,
-//                                       Metadata *pattern,
-//                                       size_t patternSize);
+//                                       const void *pattern);
 FUNCTION(RelocateClassMetadata,
          swift_relocateClassMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeContextDescriptorPtrTy, TypeMetadataPtrTy, SizeTy),
+         ARGS(TypeContextDescriptorPtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };

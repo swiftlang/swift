@@ -110,12 +110,12 @@ public class Concrete : Derived<Int> {
 //// Metadata initialization function for 'Derived' copies superclass vtable
 //// and installs overrides for 'm2()' and 'init()'.
 
-// CHECK-LABEL: define internal %swift.type* @"$S14generic_vtable7DerivedCMi"(%swift.type_descriptor*, i8**, i8**)
+// CHECK-LABEL: define internal %swift.type* @"$S14generic_vtable7DerivedCMi"(%swift.type_descriptor*, i8**, i8*)
 
 // - 2 immediate members:
 //   - type metadata for generic parameter T,
 //   - and vtable entry for 'm3()'
-// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
+// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
 // CHECK: ret %swift.type* [[METADATA]]
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S14generic_vtable7DerivedCMr"
