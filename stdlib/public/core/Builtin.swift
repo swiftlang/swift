@@ -672,6 +672,14 @@ func _isPOD<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.ispod(type))
 }
 
+/// Returns `true` if type is a bitwise takable. A bitwise takable type can
+/// just be moved to a different address in memory.
+@_transparent
+public // @testable
+func _isBitwiseTakable<T>(_ type: T.Type) -> Bool {
+  return Bool(Builtin.isbitwisetakable(type))
+}
+
 /// Returns `true` if type is nominally an Optional type.
 @_transparent
 public // @testable

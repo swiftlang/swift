@@ -220,6 +220,10 @@ llvm::Value *FixedTypeInfo::getIsPOD(IRGenFunction &IGF, SILType T) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
                                 isPOD(ResilienceExpansion::Maximal) == IsPOD);
 }
+llvm::Value *FixedTypeInfo::getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const {
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+                                isBitwiseTakable(ResilienceExpansion::Maximal) == IsBitwiseTakable);
+}
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return asSizeConstant(IGM, getFixedStride());
 }
