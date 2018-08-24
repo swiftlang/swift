@@ -831,7 +831,6 @@ public enum NonExhaustivePayload {
   case milliseconds(Int)
   case microseconds(Int)
   case nanoseconds(Int)
-  @_downgrade_exhaustivity_check
   case never
 }
 
@@ -930,20 +929,6 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break
   } // no-warning
 
-  // Test interaction with @_downgrade_exhaustivity_check.
-  switch (value, interval) { // no-warning
-  case (_, .seconds): break
-  case (.a, _): break
-  case (.b, _): break
-  }
-
-  switch (value, interval) { // no-warning
-  case (_, .never): break
-  case (.a, _): break
-  case (.b, _): break
-  }
-
-
   // Test payloaded enums.
   switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}}
   case .a: break
@@ -1008,7 +993,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   }
 }
 
-public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: NonExhaustivePayload, for interval: TemporalProxy, flag: Bool) {
+public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: NonExhaustivePayload, flag: Bool) {
   switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}}
   case .a: break
   }
@@ -1081,19 +1066,6 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   case (_, .a): break
   case (_, .b): break
   @unknown case _: break
-  }
-
-  // Test interaction with @_downgrade_exhaustivity_check.
-  switch (value, interval) { // no-warning
-  case (_, .seconds): break
-  case (.a, _): break
-  case (.b, _): break
-  }
-
-  switch (value, interval) { // no-warning
-  case (_, .never): break
-  case (.a, _): break
-  case (.b, _): break
   }
 
   // Test payloaded enums.

@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 438; // Last change: add isbitwisetakable
+const uint16_t VERSION_MINOR = 439; // Last change: remove @_downgrade_exhaustivity_check attribute
 
 using DeclIDField = BCFixed<31>;
 
