@@ -1159,7 +1159,6 @@ namespace  {
     UNINTERESTING_ATTR(RestatedObjCConformance)
     UNINTERESTING_ATTR(Implements)
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
-    UNINTERESTING_ATTR(DowngradeExhaustivityCheck)
     UNINTERESTING_ATTR(ImplicitlyUnwrappedOptional)
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)
     UNINTERESTING_ATTR(WeakLinked)
