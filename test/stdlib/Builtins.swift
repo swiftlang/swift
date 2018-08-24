@@ -29,6 +29,10 @@ var tests = TestSuite("Builtins")
 
 class X {}
 
+struct W {
+    weak var weakX: X?
+}
+
 tests.test("_isUnique/NativeObject") {
   var a: Builtin.NativeObject = Builtin.castToNativeObject(X())
   expectNotEqual(false, _isUnique_native(&a))
@@ -271,6 +275,13 @@ tests.test("_isPOD") {
   expectTrue(_isPOD(Int.self))
   expectFalse(_isPOD(X.self))
   expectFalse(_isPOD(P.self))
+}
+
+tests.test("_isBitwiseTakable") {
+  expectTrue(_isBitwiseTakable(Int.self))
+  expectTrue(_isBitwiseTakable(X.self))
+  expectTrue(_isBitwiseTakable(P.self))
+  expectFalse(_isBitwiseTakable(W.self))
 }
 
 tests.test("_isOptional") {
