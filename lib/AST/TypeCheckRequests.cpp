@@ -259,6 +259,9 @@ SourceLoc WhereClauseOwner::getLoc() const {
   if (auto decl = source.dyn_cast<Decl *>())
     return decl->getLoc();
 
+  if (auto attr = source.dyn_cast<SpecializeAttr *>())
+    return attr->getLocation();
+
   return source.get<GenericParamList *>()->getWhereLoc();
 }
 
@@ -266,6 +269,8 @@ void swift::simple_display(llvm::raw_ostream &out,
                            const WhereClauseOwner &owner) {
   if (auto decl = owner.source.dyn_cast<Decl *>()) {
     simple_display(out, decl);
+  } else if (owner.source.is<SpecializeAttr *>()) {
+    out << "@_specialize";
   } else {
     out << "(SIL generic parameter list)";
   }
@@ -287,6 +292,13 @@ MutableArrayRef<RequirementRepr>
 RequirementRequest::getRequirements(WhereClauseOwner owner) {
   if (auto genericParams = owner.source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
+  }
+
+  if (auto attr = owner.source.dyn_cast<SpecializeAttr *>()) {
+    if (auto whereClause = attr->getTrailingWhereClause())
+      return whereClause->getRequirements();
+    
+    return { };
   }
 
   auto decl = owner.source.dyn_cast<Decl *>();

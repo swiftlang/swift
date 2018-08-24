@@ -29,6 +29,7 @@ namespace swift {
 
 class GenericParamList;
 class RequirementRepr;
+class SpecializeAttr;
 struct TypeLoc;
 
 /// Display a nominal type or extension thereof.
@@ -220,22 +221,27 @@ struct WhereClauseOwner {
 
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
-  llvm::PointerUnion<GenericParamList *, Decl *> source;
+  llvm::PointerUnion3<GenericParamList *, Decl *, SpecializeAttr *> source;
 
   WhereClauseOwner(Decl *decl);
 
   WhereClauseOwner(DeclContext *dc, GenericParamList *genericParams)
     : dc(dc), source(genericParams) { }
 
+  WhereClauseOwner(DeclContext *dc, SpecializeAttr *attr)
+    : dc(dc), source(attr) { }
+
   SourceLoc getLoc() const;
 
   friend hash_code hash_value(const WhereClauseOwner &owner) {
-    return hash_combine(hash_value(owner.dc), hash_value(owner.source));
+    return hash_combine(hash_value(owner.dc),
+                        hash_value(owner.source.getOpaqueValue()));
   }
 
   friend bool operator==(const WhereClauseOwner &lhs,
                          const WhereClauseOwner &rhs) {
-    return lhs.dc == rhs.dc && lhs.source == rhs.source;
+    return lhs.dc == rhs.dc &&
+           lhs.source.getOpaqueValue() == rhs.source.getOpaqueValue();
   }
 
   friend bool operator!=(const WhereClauseOwner &lhs,
