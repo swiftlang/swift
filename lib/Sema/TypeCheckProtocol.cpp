@@ -2518,7 +2518,7 @@ witnessHasImplementsAttrForRequirement(ValueDecl *witness,
 }
 
 /// Determine the given witness has a same-type constraint constraining the
-/// given 'Self' type, and return the
+/// given 'Self' type, and return the requirement that does.
 ///
 /// \returns None if there is no such constraint; a non-empty optional that
 /// may have the \c RequirementRepr for the actual constraint.
