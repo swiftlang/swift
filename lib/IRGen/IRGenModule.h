@@ -1168,7 +1168,6 @@ public:
                                           SymbolReferenceKind kind);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
-                                               bool isConstant,
                                                ConstantInit init,
                                                StringRef section);
   llvm::Function *getAddrOfTypeMetadataCompletionFunction(NominalTypeDecl *D,

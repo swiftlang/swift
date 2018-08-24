@@ -3282,8 +3282,9 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   assert(init);
 
   if (isPattern) {
+    assert(isConstant && "Type metadata patterns must be constant");
     auto addr = getAddrOfTypeMetadataPattern(concreteType->getAnyNominal(),
-                                             isConstant, init, section);
+                                             init, section);
 
     return cast<llvm::GlobalValue>(addr);
   }
@@ -3488,12 +3489,11 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataPattern(NominalTypeDecl *D) {
-  return getAddrOfTypeMetadataPattern(D, false, ConstantInit(), "");
+  return getAddrOfTypeMetadataPattern(D, ConstantInit(), "");
 }
 
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
-                                          bool isConstant,
                                           ConstantInit init,
                                           StringRef section) {
   if (!init)
@@ -3502,7 +3502,7 @@ IRGenModule::getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
   auto alignment = getPointerAlignment();
   LinkEntity entity = LinkEntity::forTypeMetadataPattern(D);
   auto addr = getAddrOfLLVMVariable(entity, alignment, init,
-                                   Int8PtrTy, DebugTypeInfo());
+                                   Int8Ty, DebugTypeInfo());
 
   if (init) {
     auto var = cast<llvm::GlobalVariable>(addr);
@@ -3565,7 +3565,7 @@ IRGenModule::getAddrOfTypeMetadataInstantiationFunction(NominalTypeDecl *D,
       /// Generic arguments.
       Int8PtrPtrTy,
       /// Generic metadata pattern.
-      Int8PtrPtrTy
+      Int8PtrTy
     };
 
     fnType = llvm::FunctionType::get(TypeMetadataPtrTy, argTys,
@@ -3577,6 +3577,8 @@ IRGenModule::getAddrOfTypeMetadataInstantiationFunction(NominalTypeDecl *D,
     llvm::Type *argTys[] = {
       /// Type descriptor.
       TypeContextDescriptorPtrTy,
+      /// Resilient metadata pattern.
+      Int8PtrTy
     };
 
     fnType = llvm::FunctionType::get(TypeMetadataPtrTy, argTys,
