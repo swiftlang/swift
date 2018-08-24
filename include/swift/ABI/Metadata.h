@@ -3319,18 +3319,26 @@ using SingletonMetadataCache =
 template <typename Runtime>
 struct TargetResilientClassMetadataPattern;
 
-/// An instantiation pattern for non-generic resilient class metadata.
-/// Used in conjunction with SingletonMetadataInitialization.
+/// A function for allocating metadata for a resilient class, calculating
+/// the correct metadata size at runtime.
 using MetadataRelocator =
   Metadata *(const TargetTypeContextDescriptor<InProcess> *type,
              const TargetResilientClassMetadataPattern<InProcess> *pattern);
 
 /// An instantiation pattern for non-generic resilient class metadata.
+///
+/// Used for classes with resilient ancestry, that is, where at least one
+/// ancestor is defined in a different resilience domain.
+///
+/// The hasResilientSuperclass() flag in the class context descriptor is
+/// set in this case, and hasSingletonMetadataInitialization() must be
+/// set as well.
+///
+/// The pattern is referenced from the SingletonMetadataInitialization
+/// record in the class context descriptor.
 template <typename Runtime>
 struct TargetResilientClassMetadataPattern {
-  /// If the class descriptor's hasResilientSuperclass() flag is set,
-  /// this field instead points at a function that allocates metadata
-  /// with the correct size at runtime.
+  /// A function that allocates metadata with the correct size at runtime.
   TargetRelativeDirectPointer<Runtime, MetadataRelocator> RelocationFunction;
 
   /// The heap-destructor function.
@@ -3371,17 +3379,19 @@ struct TargetSingletonMetadataInitialization {
       IncompleteMetadata;
 
     /// If the class descriptor's hasResilientSuperclass() flag is set,
-    /// this field instead points at a function that allocates metadata
-    /// with the correct size at runtime.
+    /// this field instead points at a pattern used to allocate and
+    /// initialize metadata for this class, since it's size and contents
+    /// is not known at compile time.
     TargetRelativeDirectPointer<Runtime, TargetResilientClassMetadataPattern<Runtime>>
       ResilientPattern;
   };
 
-  /// The completion function.  The pattern will always be null.
+  /// The completion function.  The pattern will always be null, even
+  /// for a resilient class.
   TargetRelativeDirectPointer<Runtime, MetadataCompleter>
     CompletionFunction;
 
-  bool hasRelocationFunction(
+  bool hasResilientClassPattern(
       const TargetTypeContextDescriptor<Runtime> *description) const {
     auto *classDescription =
       dyn_cast<TargetClassDescriptor<Runtime>>(description);
@@ -3391,7 +3401,7 @@ struct TargetSingletonMetadataInitialization {
 
   TargetMetadata<Runtime> *allocate(
       const TargetTypeContextDescriptor<Runtime> *description) const {
-    if (hasRelocationFunction(description)) {
+    if (hasResilientClassPattern(description)) {
       return ResilientPattern->RelocationFunction(description,
                                                   ResilientPattern.get());
     }

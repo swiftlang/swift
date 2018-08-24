@@ -577,6 +577,9 @@ void swift_initStructMetadata(StructMetadata *self,
 /// Allocate the metadata for a class and copy fields from the given pattern.
 /// The final size of the metadata is calculated at runtime from the metadata
 /// bounds in the class descriptor.
+///
+/// This function is only intended to be called from the relocation function
+/// of a resilient class pattern.
 SWIFT_RUNTIME_EXPORT
 ClassMetadata *
 swift_relocateClassMetadata(ClassDescriptor *descriptor,
