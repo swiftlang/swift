@@ -539,8 +539,8 @@ swift::swift_getGenericMetadata(MetadataRequest request,
 
 namespace {
   /// A cache entry for "in-place" metadata initializations.
-  class InPlaceMetadataCacheEntry final
-      : public MetadataCacheEntryBase<InPlaceMetadataCacheEntry, int> {
+  class SingletonMetadataCacheEntry final
+      : public MetadataCacheEntryBase<SingletonMetadataCacheEntry, int> {
     ValueType Value = nullptr;
 
     friend MetadataCacheEntryBase;
@@ -556,12 +556,12 @@ namespace {
     // objects or else it gets annoyed.
     static size_t numTrailingObjects(OverloadToken<int>) { return 0; }
 
-    static const char *getName() { return "InPlaceMetadataCache"; }
+    static const char *getName() { return "SingletonMetadataCache"; }
 
-    InPlaceMetadataCacheEntry() {}
+    SingletonMetadataCacheEntry() {}
 
     AllocationResult allocate(const TypeContextDescriptor *description) {
-      auto &initialization = description->getInPlaceMetadataInitialization();
+      auto &initialization = description->getSingletonMetadataInitialization();
 
       // Classes with resilient superclasses might require their metadata to
       // be relocated.
@@ -581,7 +581,7 @@ namespace {
         // Find a pattern.  Currently we always use the default pattern.
         auto &initialization =
             metadata->getTypeContextDescriptor()
-                    ->getInPlaceMetadataInitialization();
+                    ->getSingletonMetadataInitialization();
 
         // Complete the metadata's instantiation.
         auto dependency =
@@ -607,7 +607,7 @@ namespace {
 
     void publishCompleteMetadata(Metadata *metadata) {
       auto &init = metadata->getTypeContextDescriptor()
-                           ->getInPlaceMetadataInitialization();
+                           ->getSingletonMetadataInitialization();
       auto &cache = *init.InitializationCache.get();
       cache.Metadata.store(metadata, std::memory_order_release);
     }
@@ -617,19 +617,19 @@ namespace {
   /// appropriate for the in-place metadata cache.
   ///
   /// TODO: delete the cache entry when initialization is complete.
-  class InPlaceMetadataCacheStorage {
+  class SingletonMetadataCacheStorage {
     ConcurrencyControl Concurrency;
 
   public:
     using KeyType = const TypeContextDescriptor *;
-    using EntryType = InPlaceMetadataCacheEntry;
+    using EntryType = SingletonMetadataCacheEntry;
 
     ConcurrencyControl &getConcurrency() { return Concurrency; }
 
     template <class... ArgTys>
     std::pair<EntryType*, bool>
     getOrInsert(KeyType key, ArgTys &&...args) {
-      auto &init = key->getInPlaceMetadataInitialization();
+      auto &init = key->getSingletonMetadataInitialization();
       auto &cache = *init.InitializationCache.get();
 
       // Check for an existing entry.
@@ -638,7 +638,7 @@ namespace {
       // If there isn't one there, optimistically create an entry and
       // try to swap it in.
       if (!existingEntry) {
-        auto allocatedEntry = new InPlaceMetadataCacheEntry();
+        auto allocatedEntry = new SingletonMetadataCacheEntry();
         if (cache.Private.compare_exchange_strong(existingEntry,
                                                   allocatedEntry,
                                                   std::memory_order_acq_rel,
@@ -653,13 +653,13 @@ namespace {
         delete allocatedEntry;
       }
 
-      return { static_cast<InPlaceMetadataCacheEntry*>(existingEntry), false };
+      return { static_cast<SingletonMetadataCacheEntry*>(existingEntry), false };
     }
 
     EntryType *find(KeyType key) {
-      auto &init = key->getInPlaceMetadataInitialization();
+      auto &init = key->getSingletonMetadataInitialization();
 
-      return static_cast<InPlaceMetadataCacheEntry*>(
+      return static_cast<SingletonMetadataCacheEntry*>(
         init.InitializationCache->Private.load(std::memory_order_acquire));
     }
 
@@ -672,20 +672,20 @@ namespace {
     }
   };
 
-  class InPlaceMetadataCache
-      : public LockingConcurrentMap<InPlaceMetadataCacheEntry,
-                                    InPlaceMetadataCacheStorage> {
+  class SingletonTypeMetadataCache
+      : public LockingConcurrentMap<SingletonMetadataCacheEntry,
+                                    SingletonMetadataCacheStorage> {
   };
 } // end anonymous namespace
 
 /// The cache of all in-place metadata initializations.
-static Lazy<InPlaceMetadataCache> InPlaceMetadata;
+static Lazy<SingletonTypeMetadataCache> SingletonMetadata;
 
 MetadataResponse
-swift::swift_getInPlaceMetadata(MetadataRequest request,
-                                const TypeContextDescriptor *description) {
-  auto result = InPlaceMetadata.get().getOrInsert(description, request,
-                                                  description);
+swift::swift_getSingletonMetadata(MetadataRequest request,
+                                  const TypeContextDescriptor *description) {
+  auto result = SingletonMetadata.get().getOrInsert(description, request,
+                                                    description);
 
   return result.second;
 }
@@ -3699,8 +3699,8 @@ static Result performOnMetadataCache(const Metadata *metadata,
     case TypeContextDescriptorFlags::ForeignMetadataInitialization:
       return std::move(callbacks).forForeignMetadata(metadata, description);
 
-    case TypeContextDescriptorFlags::InPlaceMetadataInitialization:
-      return std::move(callbacks).forInPlaceMetadata(description);
+    case TypeContextDescriptorFlags::SingletonMetadataInitialization:
+      return std::move(callbacks).forSingletonMetadata(description);
     }
     swift_runtime_unreachable("bad metadata initialization kind");
   }
@@ -3735,8 +3735,8 @@ bool swift::addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
       return ForeignMetadata.get().enqueue(description, QueueEntry, Dependency);
     }
 
-    bool forInPlaceMetadata(const TypeContextDescriptor *description) && {
-      return InPlaceMetadata.get().enqueue(description, QueueEntry, Dependency);
+    bool forSingletonMetadata(const TypeContextDescriptor *description) && {
+      return SingletonMetadata.get().enqueue(description, QueueEntry, Dependency);
     }
 
     bool forTupleMetadata(const TupleTypeMetadata *metadata) {
@@ -3767,8 +3767,8 @@ void swift::resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry) {
       ForeignMetadata.get().resumeInitialization(description, QueueEntry);
     }
 
-    void forInPlaceMetadata(const TypeContextDescriptor *description) && {
-      InPlaceMetadata.get().resumeInitialization(description, QueueEntry);
+    void forSingletonMetadata(const TypeContextDescriptor *description) && {
+      SingletonMetadata.get().resumeInitialization(description, QueueEntry);
     }
 
     void forTupleMetadata(const TupleTypeMetadata *metadata) {
@@ -3802,9 +3802,9 @@ MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
       return ForeignMetadata.get().await(description, Request);
     }
 
-    MetadataResponse forInPlaceMetadata(
+    MetadataResponse forSingletonMetadata(
                                   const TypeContextDescriptor *description) && {
-      return InPlaceMetadata.get().await(description, Request);
+      return SingletonMetadata.get().await(description, Request);
     }
 
     MetadataResponse forTupleMetadata(const TupleTypeMetadata *metadata) {
@@ -3909,7 +3909,7 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
         return false;
       }
 
-      bool forInPlaceMetadata(const TypeContextDescriptor *description) && {
+      bool forSingletonMetadata(const TypeContextDescriptor *description) && {
         // TODO: this could be cheap enough.
         return true;
       }
@@ -4076,9 +4076,9 @@ checkMetadataDependency(MetadataDependency dependency) {
       return ForeignMetadata.get().checkDependency(description, Requirement);
     }
 
-    MetadataDependency forInPlaceMetadata(
+    MetadataDependency forSingletonMetadata(
                               const TypeContextDescriptor *description) && {
-      return InPlaceMetadata.get().checkDependency(description, Requirement);
+      return SingletonMetadata.get().checkDependency(description, Requirement);
     }
 
     MetadataDependency forTupleMetadata(const TupleTypeMetadata *metadata) {

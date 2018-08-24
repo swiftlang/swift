@@ -129,9 +129,9 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
 /*****************************************************************************/
 
 /// Does the metadata for the given type, which we are currently emitting,
-/// require in-place metadata initialization structures and functions?
-static bool needsInPlaceMetadataInitialization(IRGenModule &IGM,
-                                               NominalTypeDecl *typeDecl) {
+/// require singleton metadata initialization structures and functions?
+static bool needsSingletonMetadataInitialization(IRGenModule &IGM,
+                                                 NominalTypeDecl *typeDecl) {
   // Generic types never have singleton metadata initialization.
   if (typeDecl->isGenericContext())
     return false;
@@ -930,9 +930,9 @@ namespace {
       if (requiresForeignTypeMetadata(Type))
         return TypeContextDescriptorFlags::ForeignMetadataInitialization;
 
-      // The only other option is in-place initialization.
-      if (needsInPlaceMetadataInitialization(IGM, Type))
-        return TypeContextDescriptorFlags::InPlaceMetadataInitialization;
+      // The only other option is singleton initialization.
+      if (needsSingletonMetadataInitialization(IGM, Type))
+        return TypeContextDescriptorFlags::SingletonMetadataInitialization;
 
       return TypeContextDescriptorFlags::NoMetadataInitialization;
     }
@@ -947,22 +947,14 @@ namespace {
         return;
 
       case TypeContextDescriptorFlags::ForeignMetadataInitialization:
-        asImpl().addForeignMetadataInitialization();
+        addForeignMetadataInitialization();
         return;
 
-      case TypeContextDescriptorFlags::InPlaceMetadataInitialization:
-        asImpl().addInPlaceMetadataInitialization();
+      case TypeContextDescriptorFlags::SingletonMetadataInitialization:
+        addSingletonMetadataInitialization();
         return;
       }
       llvm_unreachable("bad kind");
-    }
-
-    void addInPlaceMetadataInitialization() {
-      if (isa<StructDecl>(Type) || isa<EnumDecl>(Type) || isa<ClassDecl>(Type)) {
-        asImpl().addInPlaceValueMetadataInitialization();
-      } else {
-        llvm_unreachable("unexpected type allowing in-place initialization");
-      }
     }
 
     /// Add a ForeignMetadataInitialization structure to the descriptor.
@@ -979,12 +971,12 @@ namespace {
       return ::needsForeignMetadataCompletionFunction(Type);
     }
 
-    /// Add an InPlaceValueMetadataInitialization structure to the descriptor.
-    void addInPlaceValueMetadataInitialization() {
+    /// Add an SingletonMetadataInitialization structure to the descriptor.
+    void addSingletonMetadataInitialization() {
       // Relative pointer to the initialization cache.
       // Note that we trigger the definition of it when emitting the
       // completion function.
-      auto cache = IGM.getAddrOfTypeMetadataInPlaceInitializationCache(Type,
+      auto cache = IGM.getAddrOfTypeMetadataSingletonInitializationCache(Type,
                                                               NotForDefinition);
       B.addRelativeAddress(cache);
 
@@ -1999,20 +1991,20 @@ template <class Impl, class DeclType>
 /// Create an access function for the given type which triggers the
 /// in-place initialization path.
 static void
-createInPlaceInitializationMetadataAccessFunction(IRGenModule &IGM,
-                                                  NominalTypeDecl *typeDecl,
-                                                  CanType type) {
+createSingletonInitializationMetadataAccessFunction(IRGenModule &IGM,
+                                                    NominalTypeDecl *typeDecl,
+                                                    CanType type) {
   assert(!typeDecl->isGenericContext());
 
   (void) createTypeMetadataAccessFunction(IGM, type,
-                                          CacheStrategy::InPlaceInitialization,
+                                          CacheStrategy::SingletonInitialization,
                                           [&](IRGenFunction &IGF,
                                               DynamicMetadataRequest request,
                                               llvm::Constant *cacheVariable) {
     llvm::Value *descriptor =
       IGF.IGM.getAddrOfTypeContextDescriptor(typeDecl, RequireMetadata);
     auto responsePair =
-      IGF.Builder.CreateCall(IGF.IGM.getGetInPlaceMetadataFn(),
+      IGF.Builder.CreateCall(IGF.IGM.getGetSingletonMetadataFn(),
                              {request.get(IGF), descriptor});
     return MetadataResponse::handle(IGF, request, responsePair);
   });
@@ -2025,8 +2017,8 @@ static void createNonGenericMetadataAccessFunction(IRGenModule &IGM,
   auto type = typeDecl->getDeclaredType()->getCanonicalType();
 
   // If the type requires the in-place initialization pattern, use it.
-  if (needsInPlaceMetadataInitialization(IGM, typeDecl)) {
-    createInPlaceInitializationMetadataAccessFunction(IGM, typeDecl, type);
+  if (needsSingletonMetadataInitialization(IGM, typeDecl)) {
+    createSingletonInitializationMetadataAccessFunction(IGM, typeDecl, type);
     return;
   }
 
@@ -2455,16 +2447,16 @@ namespace {
 
   /// A builder for non-generic class metadata with resiliently-sized
   /// fields or generic ancestry.
-  class InPlaceClassMetadataBuilder :
-      public ClassMetadataBuilderBase<InPlaceClassMetadataBuilder> {
-    using super = ClassMetadataBuilderBase<InPlaceClassMetadataBuilder>;
+  class SingletonClassMetadataBuilder :
+      public ClassMetadataBuilderBase<SingletonClassMetadataBuilder> {
+    using super = ClassMetadataBuilderBase<SingletonClassMetadataBuilder>;
     using super::IGM;
     using super::B;
 
   public:
-    InPlaceClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                                ConstantStructBuilder &builder,
-                                const ClassLayout &fieldLayout)
+    SingletonClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
+                                  ConstantStructBuilder &builder,
+                                  const ClassLayout &fieldLayout)
       : super(IGM, theClass, builder, fieldLayout) {}
 
     void addFieldOffset(VarDecl *var) {
@@ -2843,8 +2835,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
 
     builder.createMetadataAccessFunction();
   } else if (doesClassMetadataRequireInitialization(IGM, classDecl)) {
-    InPlaceClassMetadataBuilder builder(IGM, classDecl, init,
-                                        fieldLayout);
+    SingletonClassMetadataBuilder builder(IGM, classDecl, init,
+                                          fieldLayout);
     builder.layout();
     canBeConstant = builder.canBeConstant();
 
@@ -2994,8 +2986,8 @@ namespace {
 
     /// Create the runtime data structures and functions necessary to
     /// support in-place metadata initialization on this type.
-    void maybeCreateInPlaceMetadataInitialization() {
-      if (!needsInPlaceMetadataInitialization(IGM, Target))
+    void maybeCreateSingletonMetadataInitialization() {
+      if (!needsSingletonMetadataInitialization(IGM, Target))
         return;
 
       emitMetadataCompletionFunction(IGM, Target,
@@ -3107,7 +3099,7 @@ namespace {
 
     void createMetadataAccessFunction() {
       createNonGenericMetadataAccessFunction(IGM, Target);
-      maybeCreateInPlaceMetadataInitialization();
+      maybeCreateSingletonMetadataInitialization();
     }
   };
   
@@ -3357,7 +3349,7 @@ namespace {
 
     void createMetadataAccessFunction() {
       createNonGenericMetadataAccessFunction(IGM, Target);
-      maybeCreateInPlaceMetadataInitialization();
+      maybeCreateSingletonMetadataInitialization();
     }
   };
 

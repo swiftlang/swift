@@ -330,11 +330,11 @@ ClassMetadataBounds getResilientMetadataBounds(
 int32_t getResilientImmediateMembersOffset(const ClassDescriptor *descriptor);
 
 /// \brief Fetch a uniqued metadata object for a nominal type which requires
-/// in-place metadata initialization.
+/// singleton metadata initialization.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
-swift_getInPlaceMetadata(MetadataRequest request,
-                         const TypeContextDescriptor *description);
+swift_getSingletonMetadata(MetadataRequest request,
+                           const TypeContextDescriptor *description);
 
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
