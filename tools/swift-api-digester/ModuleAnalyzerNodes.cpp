@@ -293,6 +293,21 @@ SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
   return Info.createSDKNode(SDKNodeKind::Root);
 }
 
+StringRef SDKNodeDecl::getScreenInfo() const {
+  auto ModuleName = getModuleName();
+  auto HeaderName = getHeaderName();
+  auto &Ctx = getSDKContext();
+  llvm::SmallString<64> SS;
+  llvm::raw_svector_ostream OS(SS);
+  if (Ctx.getOpts().PrintModule)
+    OS << ModuleName;
+  if (!HeaderName.empty())
+    OS << "(" << HeaderName << ")";
+  OS << ": ";
+  OS << getDeclKind() << " " << getFullyQualifiedName();
+  return Ctx.buffer(OS.str());
+}
+
 bool SDKNodeDecl::isSDKPrivate() const {
   if (getName().startswith("__"))
     return true;

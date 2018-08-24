@@ -18,11 +18,13 @@
 #ifndef __SWIFT_MODULE_DIFFER_DIAGS_CONSUMER_H__
 #define __SWIFT_MODULE_DIFFER_DIAGS_CONSUMER_H__
 
+#include "llvm/ADT/MapVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 
 #include "llvm/Support/raw_ostream.h"
+#include <set>
 
 namespace swift {
 namespace ide {
@@ -30,8 +32,9 @@ namespace api {
 
 /// \brief Diagnostic consumer that displays diagnostics to standard output.
 class ModuleDifferDiagsConsumer: public PrintingDiagnosticConsumer {
+  llvm::MapVector<StringRef, std::set<std::string>> AllDiags;
 public:
-  ModuleDifferDiagsConsumer():PrintingDiagnosticConsumer(llvm::errs()) {}
+  ModuleDifferDiagsConsumer();
   ~ModuleDifferDiagsConsumer();
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind,

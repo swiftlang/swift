@@ -51,10 +51,16 @@ static StringRef getCategoryName(uint32_t ID) {
     return StringRef();
   }
 }
-
-static bool isModuleDifferDiag(uint32_t ID) {
-  return !getCategoryName(ID).empty();
 }
+
+swift::ide::api::
+ModuleDifferDiagsConsumer::ModuleDifferDiagsConsumer():
+    PrintingDiagnosticConsumer(llvm::errs()) {
+#define DIAG(KIND, ID, Options, Text, Signature)                              \
+  auto ID = getCategoryName(LocalDiagID::ID);                                 \
+  assert(!ID.empty());                                                        \
+  AllDiags[ID] = std::set<std::string>();
+#include "swift/AST/DiagnosticsModuleDiffer.def"
 }
 
 void swift::ide::api::
@@ -63,7 +69,8 @@ ModuleDifferDiagsConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) {
-  if (!isModuleDifferDiag((uint32_t)Info.ID)) {
+  auto Category = getCategoryName((uint32_t)Info.ID);
+  if (Category.empty()) {
     PrintingDiagnosticConsumer::handleDiagnostic(SM, Loc, Kind, FormatString,
       FormatArgs, Info);
     return;
@@ -73,9 +80,15 @@ ModuleDifferDiagsConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
     llvm::raw_svector_ostream Out(Text);
     DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
   }
-  llvm::outs() << Text << "\n";
+  AllDiags[Category].insert(Text.str().str());
 }
 
 swift::ide::api::ModuleDifferDiagsConsumer::~ModuleDifferDiagsConsumer() {
-
+  for (auto &Pair: AllDiags) {
+    llvm::outs() << "\n";
+    llvm::outs() << Pair.first << "\n";
+    for (auto &Item: Pair.second) {
+      llvm::outs() << Item << "\n";
+    }
+  }
 }
