@@ -73,9 +73,9 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
 // CHECK: }
 
-// CHECK-LABEL: struct simple_div__Type {
-// CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
-// CHECK: }
+// HECK-LABEL: struct simple_div__Type {
+// HECK:   @sil_stored var v_0: Builtin.FPIEEE32
+// HECK: }
 
 // CHECK-LABEL: struct chain_rule__Type {
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32

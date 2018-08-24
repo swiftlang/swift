@@ -1501,16 +1501,16 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
 
 /// Create a builtin floating point value. The specified type must be a builtin
 /// float type.
-static SILValue createBuiltinFPScalar(APInt scalar, CanType type,
+static SILValue createBuiltinFPScalar(intmax_t scalar, CanType type,
                                       SILLocation loc, SILBuilder &builder) {
   auto *fpType = type->castTo<BuiltinFloatType>();
   return builder.createFloatLiteral(
       loc, SILType::getPrimitiveObjectType(type),
-      APFloat(fpType->getAPFloatSemantics(), scalar.sextOrTrunc(32)));
+      APFloat(fpType->getAPFloatSemantics(), scalar));
 }
 
 /// Convert an integer literal to a type that is expressible by integer literal.
-static void convertIntToIndirectExpressible(APInt scalar,
+static void convertIntToIndirectExpressible(intmax_t scalar,
                                             NominalTypeDecl *targetTypeDecl,
                                             SILValue resultBuf,
                                             SILLocation loc,
@@ -1538,7 +1538,7 @@ static void convertIntToIndirectExpressible(APInt scalar,
   // %1 = float_literal $Builtin.FPIEEE80, <value>
   auto builtinIntegerTy = SILType::getBuiltinIntegerType(2048, astCtx);
   auto builtinInteger = builder.createIntegerLiteral(
-      loc, builtinIntegerTy,scalar.sextOrTrunc(2048));
+      loc, builtinIntegerTy, APInt(2048, scalar));
   // %2 = metatype $@thin <target type>.IntegerLiteralType.Type
   auto intLitMetatypeTy = SILType::getPrimitiveObjectType(
       CanMetatypeType::get(intLitTy, MetatypeRepresentation::Thick));
@@ -1623,7 +1623,7 @@ static void convertIntToIndirectExpressible(APInt scalar,
 ///
 /// The root address derivation of `seedBufAccess` must be the result of
 /// a `begin_access`.
-static void createScalarValueIndirect(APInt scalar, CanType type,
+static void createScalarValueIndirect(intmax_t scalar, CanType type,
                                       SILValue seedBufAccess, SILLocation loc,
                                       SILBuilder &builder, ADContext &context) {
   // See if the type is a builtin float. If so, we don't do protocol
@@ -1728,7 +1728,7 @@ static void createScalarValueIndirect(APInt scalar, CanType type,
 ///   to `FloatingPoint`.
 ///
 /// The specified type must be a loadable type.
-static SILValue createScalarValueDirect(APInt scalar, CanType type,
+static SILValue createScalarValueDirect(intmax_t scalar, CanType type,
                                         SILLocation loc,
                                         SILBuilder &builder,
                                         ADContext &context) {
@@ -3390,7 +3390,7 @@ SILValue AdjointEmitter::materializeAdjointDirect(AdjointValue val,
       return builder.createTuple(loc, elts);
     }
     return createScalarValueDirect(
-        APInt(2048, 0), val.getType().getASTType(), loc, builder, ctx);
+        0, val.getType().getASTType(), loc, builder, ctx);
   }
   case AdjointValue::Kind::Tuple: {
     auto elts = map<SmallVector<SILValue, 8>>(
@@ -3433,7 +3433,7 @@ static void materializeAdjointIndirectHelper(AdjointValue val,
             val.getTupleElements()[i], eltAddr, builder, context);
       }
     } else {
-      createScalarValueIndirect(APInt(2048, 0), val.getSwiftType(),
+      createScalarValueIndirect(0, val.getSwiftType(),
                                 destBufferAccess, loc, builder, context);
     }
     break;
@@ -3719,8 +3719,7 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
       // Call `<seed type>.init(1)` to create a default
       // seed to feed into the canonical gradient.
       auto *seedBuf = builder.createAllocStack(loc, seedSILTy);
-      createScalarValueIndirect(
-          APInt(2048, 1), seedTy, seedBuf, loc, builder, context);
+      createScalarValueIndirect(1, seedTy, seedBuf, loc, builder, context);
       // If seed is address only, we'll clean up the buffer after calling the
       // canonical gradient Otherwise, we just load the seed and deallocate the
       // buffer.
