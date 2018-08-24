@@ -247,3 +247,12 @@ public func testTensorFlowClosures(_ a: Float) -> Tensor<Int32>{
 //   [[B:%.*]] = graph_op "Cast,i"([[A]] : $TensorHandle<Float>) {SrcT: $Float, DstT: $Int32, __device: "/device:CPU:0"} : $TensorHandle<Int32>
 //   return [[B]] : $TensorHandle<Int32>
 // } // end sil function '[[NAME]]'
+
+struct Foo {
+  let a: Tensor<Float>
+  let b: Tensor<Int32>
+}
+
+func testExtractTFDataType () {
+  let _: Void = #tfop("Const", dtype$dtype: Foo.self)
+}

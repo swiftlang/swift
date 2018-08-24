@@ -127,6 +127,7 @@ struct SILTensorOpInfo {
 
     Normal, // No modifier.
     DType,  // This integer value is a dtype.
+    DTypes, // This marks an aggregate dtype.
     Tensor, // This array or scalar should be turned into a TF_Tensor.
     Shape,  // This array of integers is a shape specifier.
 

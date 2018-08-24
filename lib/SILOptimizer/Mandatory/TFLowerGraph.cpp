@@ -2105,7 +2105,9 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
           TF_SetAttrBoolList(op, name.c_str(), values.data(), values.size());
           break;
         }
-
+        if (elementTypeString == "AccelerableByTensorFlow") {
+          //TODO FIXME
+        }
         internalError(getUserSourceLocation(inst->getDebugLocation()),
                       "unknown array attribute");
         return GLStatus::Error;
@@ -2117,6 +2119,10 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       auto swiftType = attrValue.getMetatypeValue();
       dtypeAttr = convertSwiftTypeToTF(swiftType);
       TF_SetAttrType(op, name.data(), (TF_DataType)dtypeAttr);
+      break;
+    }
+    case SILTensorOpInfo::OperandClass::DTypes: {
+      llvm_unreachable("Should’ve been desugared by deabstraction!");
       break;
     }
     case SILTensorOpInfo::OperandClass::Tensor: {

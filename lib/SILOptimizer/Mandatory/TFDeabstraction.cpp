@@ -1823,6 +1823,31 @@ static void removeArrayValueIfPossible(ApplyInst *array) {
     decoder.removeInstructionsIfPossible();
 }
 
+// Recursively find the cannonical types of the elements of Tuples and Structs
+static void collectElementScalarTypes(Type type,
+                                      SmallVectorImpl<SymbolicValue> &result) {
+  // Opaque handles are not supported.
+  if (tf::isTensorHandle(type)) {
+    auto eltType = getTensorHandleElementType(type)->getCanonicalType();
+    result.push_back(SymbolicValue::getMetatype(eltType));
+  } else if (auto tupleTy = type->getAs<TupleType>()) {
+    for (auto eltTy : tupleTy->getElementTypes()) {
+      collectElementScalarTypes(eltTy->getCanonicalType(), result);
+    }
+  } else if (auto *decl = cast<StructDecl>(type->getAnyNominal())) {
+    for (auto *member : decl->getStoredProperties()) {
+      auto memberTy = member->getInterfaceType();
+      auto map = memberTy->getMemberSubstitutionMap(member->getModuleContext(),
+                                                    member);
+      memberTy = member->getInterfaceType().subst(map);
+      llvm:: outs() << "memberTy " << memberTy->getString() << '\n';
+      collectElementScalarTypes(memberTy, result);
+    }
+  } else {
+    llvm_unreachable("Not a tensorflow value or aggregate");
+  }
+}
+
 /// Deabstraction can leave around lots of dead instructions from the attributes
 /// that get promoted, including heavy weight types that inline into a lot of
 /// code, like arrays.  Do a quick pass to remove these, improving compile time
@@ -2133,6 +2158,20 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     // Get the constant, ignoring struct wrappers.
     auto constValue = it->second.lookThroughSingleElementAggregates();
 
+    // extract dtype list if suffix is `$dtypes` and constValue is a metatype
+    if (operandClass.second == SILTensorOpInfo::OperandClass::DTypes &&
+        constValue.getKind() == SymbolicValue::Metatype) {
+      SmallVector<SymbolicValue, 8> metatypes;
+      collectElementScalarTypes(constValue.getMetatypeValue(), metatypes);
+      attrName = operandClass.first.str();
+      auto *proto = context.getProtocol(
+                      KnownProtocolKind::AccelerableByTensorFlow);
+      constValue = SymbolicValue::getArray(metatypes,
+                                           proto->getInterfaceType()
+                                                ->getCanonicalType(),
+                                           context.getAllocator());
+    }
+
     // Clone it out of the ConstExpr pool into the global SILModule pool.
     constValue = constValue.cloneInto(allocator);
 
@@ -2219,6 +2258,10 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       // This integer value is a dtype.
       if (constValue.getKind() != SymbolicValue::Integer)
         return diagnoseInvalidAttr("requires a constant integer");
+      break;
+    case SILTensorOpInfo::OperandClass::DTypes:
+      if (constValue.getKind() != SymbolicValue::Array)
+        return diagnoseInvalidAttr("requires an array");
       break;
     case SILTensorOpInfo::OperandClass::Array:
       if (constValue.getKind() != SymbolicValue::Array)
