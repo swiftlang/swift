@@ -1054,6 +1054,12 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
     }
     _sanityCheck(capacity >= minimumCapacity)
   }
+	
+	// TODO: Find a better name, this is terrible
+	@inlinable
+	public func startAssertingOnCopy() {
+		_buffer.assertsOnCopy = true
+	}
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
   /// The count of the new buffer is set to `oldCount`, the capacity of the

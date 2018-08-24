@@ -33,7 +33,7 @@ internal struct _ArrayBody {
     _storage = _SwiftArrayBodyStorage(
       count: count,
       _capacityAndFlags:
-        (UInt(truncatingIfNeeded: capacity) &<< 1) |
+        (UInt(truncatingIfNeeded: capacity) &<< 2) |
         (elementTypeIsBridgedVerbatim ? 1 : 0))
   }
 
@@ -61,7 +61,7 @@ internal struct _ArrayBody {
   /// reallocation.
   @inlinable
   internal var capacity: Int {
-    return Int(_capacityAndFlags &>> 1)
+    return Int(_capacityAndFlags &>> 2)
   }
 
   /// Is the Element type bitwise-compatible with some Objective-C
@@ -80,6 +80,17 @@ internal struct _ArrayBody {
         = newValue ? _capacityAndFlags | 1 : _capacityAndFlags & ~1
     }
   }
+	
+	@inlinable
+	internal var assertsOnCopy: Bool {
+		get {
+			return (_capacityAndFlags & 0x2) != 0
+		}
+		set {
+			_capacityAndFlags
+				= newValue ? (_capacityAndFlags | 2) : (_capacityAndFlags & ~2)
+		}
+	}
 
   /// Storage optimization: compresses capacity and
   /// elementTypeIsBridgedVerbatim together.
