@@ -31,9 +31,8 @@ namespace api {
 /// \brief Diagnostic consumer that displays diagnostics to standard output.
 class ModuleDifferDiagsConsumer: public PrintingDiagnosticConsumer {
 public:
-  ModuleDifferDiagsConsumer(llvm::raw_ostream &OS=llvm::errs()):
-    PrintingDiagnosticConsumer(OS) {}
-
+  ModuleDifferDiagsConsumer():PrintingDiagnosticConsumer(llvm::errs()) {}
+  ~ModuleDifferDiagsConsumer();
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind,
                         StringRef FormatString,

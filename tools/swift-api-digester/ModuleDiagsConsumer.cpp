@@ -15,8 +15,47 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "ModuleDiagsConsumer.h"
+
+using namespace swift;
+
+namespace {
+// Reproduce the DiagIDs, as we want both the size and access to the raw ids
+// themselves.
+enum LocalDiagID : uint32_t {
+#define DIAG(KIND, ID, Options, Text, Signature) ID,
+#include "swift/AST/DiagnosticsAll.def"
+  NumDiags
+};
+
+static StringRef getCategoryName(uint32_t ID) {
+  switch(ID) {
+  case LocalDiagID::removed_decl:
+    return "/* Removed Decls */";
+  case LocalDiagID::moved_decl:
+    return "/* Moved Decls */";
+  case LocalDiagID::renamed_decl:
+    return "/* Renamed Decls */";
+  case LocalDiagID::decl_attr_change:
+  case LocalDiagID::decl_new_attr:
+    return "/* Decl Attribute changes */";
+  case LocalDiagID::decl_type_change:
+    return "/* Type Changes */";
+  case LocalDiagID::raw_type_change:
+    return "/* RawRepresentable Changes */";
+  case LocalDiagID::generic_sig_change:
+    return "/* Generic Signature Changes */";
+  default:
+    return StringRef();
+  }
+}
+
+static bool isModuleDifferDiag(uint32_t ID) {
+  return !getCategoryName(ID).empty();
+}
+}
 
 void swift::ide::api::
 ModuleDifferDiagsConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
@@ -24,6 +63,19 @@ ModuleDifferDiagsConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) {
-  PrintingDiagnosticConsumer::handleDiagnostic(SM, Loc, Kind, FormatString,
-    FormatArgs, Info);
+  if (!isModuleDifferDiag((uint32_t)Info.ID)) {
+    PrintingDiagnosticConsumer::handleDiagnostic(SM, Loc, Kind, FormatString,
+      FormatArgs, Info);
+    return;
+  }
+  llvm::SmallString<256> Text;
+  {
+    llvm::raw_svector_ostream Out(Text);
+    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+  }
+  llvm::outs() << Text << "\n";
+}
+
+swift::ide::api::ModuleDifferDiagsConsumer::~ModuleDifferDiagsConsumer() {
+
 }
