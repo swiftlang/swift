@@ -2618,9 +2618,6 @@ ConstraintSystem::simplifyConstructionConstraint(
   // Desugar the value type.
   auto desugarValueType = valueType->getDesugaredType();
 
-  Type argType = fnType->getInput();
-  Type resultType = fnType->getResult();
-
   switch (desugarValueType->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
@@ -2646,6 +2643,9 @@ ConstraintSystem::simplifyConstructionConstraint(
 
   case TypeKind::Tuple: {
     // Tuple construction is simply tuple conversion.
+    Type argType = fnType->getInput();
+    Type resultType = fnType->getResult();
+
     if (matchTypes(resultType, desugarValueType,
                    ConstraintKind::Bind,
                    flags,
@@ -2686,29 +2686,34 @@ ConstraintSystem::simplifyConstructionConstraint(
     return SolutionKind::Error;
   }
 
-  auto applyLocator = getConstraintLocator(locator,
-                                           ConstraintLocator::ApplyArgument);
   auto fnLocator = getConstraintLocator(locator,
                                         ConstraintLocator::ApplyFunction);
-  auto tv = createTypeVariable(applyLocator,
-                               TVO_CanBindToLValue |
-                               TVO_PrefersSubtypeBinding);
+  auto memberType = createTypeVariable(fnLocator);
 
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
   addValueMemberConstraint(MetatypeType::get(valueType, TC.Context),
                            DeclBaseName::createConstructor(),
-                           FunctionType::getOld(tv, resultType),
+                           memberType,
                            useDC, functionRefKind,
                            /*outerAlternatives=*/{},
                            getConstraintLocator(
                              fnLocator, 
                              ConstraintLocator::ConstructorMember));
 
-  // The first type must be convertible to the constructor's argument type.
-  addConstraint(ConstraintKind::ArgumentTupleConversion, argType, tv,
-                applyLocator);
+  // FIXME: Once TVO_PrefersSubtypeBinding is replaced with something
+  // better, we won't need the second type variable at all.
+  {
+    auto argType = createTypeVariable(
+        getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
+        (TVO_CanBindToLValue |
+         TVO_PrefersSubtypeBinding));
+    addConstraint(ConstraintKind::FunctionInput, memberType, argType, locator);
+  }
+
+  addConstraint(ConstraintKind::ApplicableFunction, fnType, memberType,
+                fnLocator);
 
   return SolutionKind::Solved;
 }

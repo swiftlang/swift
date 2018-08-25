@@ -5885,12 +5885,12 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // makes it a lot easier to determine contextual mismatch.
   if (CS.failedConstraint && !hasTrailingClosure) {
     auto *constraint = CS.failedConstraint;
-    if (constraint->getKind() == ConstraintKind::ArgumentTupleConversion) {
+    if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
       if (auto *locator = constraint->getLocator()) {
         if (locator->getAnchor() == callExpr) {
-          argType = constraint->getSecondType();
-          if (auto *typeVar = argType->getAs<TypeVariableType>())
-            argType = CS.getFixedType(typeVar);
+          auto calleeType = CS.simplifyType(constraint->getSecondType());
+          if (auto *fnType = calleeType->getAs<FunctionType>())
+            argType = fnType->getInput();
         }
       }
     }

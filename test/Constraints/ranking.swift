@@ -168,3 +168,9 @@ struct UnsafePointerStruct {
     self.init(from!)
   }
 }
+
+// CHECK-LABEL: sil hidden @$S7ranking22useUnsafePointerStructyySPyxGlF : $@convention(thin) <U> (UnsafePointer<U>) -> ()
+func useUnsafePointerStruct<U>(_ ptr: UnsafePointer<U>) {
+  // CHECK: function_ref @$S7ranking19UnsafePointerStructVyACSPyxGclufC : $@convention(method) <τ_0_0> (UnsafePointer<τ_0_0>, @thin UnsafePointerStruct.Type) -> UnsafePointerStruct
+  let _: UnsafePointerStruct = UnsafePointerStruct(ptr)
+}
