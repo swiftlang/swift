@@ -2054,7 +2054,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                            isMethod ? 2 : 1)->getCanonicalType();
   }
 
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(this)) {
+  if (isa<AbstractStorageDecl>(this)) {
     // First, get the default overload signature type for the decl. For vars,
     // this is the empty tuple type, as variables cannot be overloaded directly
     // by type. For subscripts, it's their interface type.
@@ -5158,7 +5158,7 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
   } else if (auto func = dyn_cast<FuncDecl>(this)) {
     // Otherwise cast this to be able to access getName()
     baseNameStr = func->getName().str();
-  } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
+  } else if (isa<ConstructorDecl>(this)) {
     baseNameStr = "init";
   } else {
     llvm_unreachable("Unknown subclass of AbstractFunctionDecl");

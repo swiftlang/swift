@@ -3104,7 +3104,7 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
   }
 
   // Load lvalues.
-  if (auto lvalue = exprTy->getAs<LValueType>())
+  if (exprTy->is<LValueType>())
     return addImplicitLoadExpr(expr, getType, setType);
 
   // Walk into parenthesized expressions to update the subexpression.

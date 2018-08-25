@@ -1041,7 +1041,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   }
 
   // Destructors are always @objc, with -dealloc as their entry point.
-  if (auto deinit = dyn_cast<DestructorDecl>(VD))
+  if (isa<DestructorDecl>(VD))
     return ObjCReason(ObjCReason::ImplicitlyObjC);
 
   ProtocolDecl *protocolContext =

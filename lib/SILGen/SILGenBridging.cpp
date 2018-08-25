@@ -947,7 +947,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   CanSILFunctionType substFnTy = thunkTy;
 
-  if (auto genericSig = thunkTy->getGenericSignature()) {
+  if (thunkTy->getGenericSignature()) {
     substFnTy = thunkTy->substGenericArgs(F.getModule(),
                                           interfaceSubs);
   }

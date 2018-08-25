@@ -3431,7 +3431,7 @@ bool RewriteTreeNode::enumerateRulesRec(
     lhs.push_back(assocType);
 
   SWIFT_DEFER {
-    if (auto assocType = getMatch())
+    if (getMatch())
       lhs.pop_back();
   };
 
