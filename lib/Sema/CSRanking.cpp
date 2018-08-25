@@ -1002,11 +1002,23 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   for (auto &binding : diff.typeBindings) {
     // If the type variable isn't one for which we should be looking at the
     // bindings, don't.
-    if (!binding.typeVar->getImpl().prefersSubtypeBinding())
+    auto &impl = binding.typeVar->getImpl();
+    if (!impl.prefersSubtypeBinding() &&
+        !impl.prefersArgumentSubtypeBinding())
       continue;
 
     auto type1 = binding.bindings[idx1];
     auto type2 = binding.bindings[idx2];
+
+    if (impl.prefersArgumentSubtypeBinding()) {
+      if (!type1->is<FunctionType>() ||
+          !type2->is<FunctionType>()) {
+        continue;
+      }
+
+      type1 = type1->castTo<FunctionType>()->getInput();
+      type2 = type2->castTo<FunctionType>()->getInput();
+    }
 
     // If the types are equivalent, there's nothing more to do.
     if (type1->isEqual(type2))
