@@ -644,11 +644,11 @@ static void detectFuncDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
   if (auto LF = dyn_cast<SDKNodeDeclAbstractFunc>(L)) {
     auto RF = R->getAs<SDKNodeDeclAbstractFunc>();
     if (!LF->isThrowing() && RF->isThrowing()) {
-      Diags.diagnose(diag::decl_new_attr, LF->getScreenInfo(),
+      Diags.diagnose(SourceLoc(), diag::decl_new_attr, LF->getScreenInfo(),
         Ctx.buffer("throwing"));
     }
     if (!LF->isMutating() && RF->isMutating()) {
-      Diags.diagnose(diag::decl_new_attr, LF->getScreenInfo(),
+      Diags.diagnose(SourceLoc(), diag::decl_new_attr, LF->getScreenInfo(),
         Ctx.buffer("mutating"));
     }
   }
@@ -682,7 +682,7 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
 
     // Diagnose static attribute change.
     if (LD->isStatic() ^ RD->isStatic()) {
-      Diags.diagnose(diag::decl_new_attr, LD->getScreenInfo(),
+      Diags.diagnose(SourceLoc(), diag::decl_new_attr, LD->getScreenInfo(),
         Ctx.buffer(LD->isStatic() ? "not static" : "static"));
     }
 
@@ -694,7 +694,7 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
           return Ctx.buffer("strong");
         return keywordOf(O);
       };
-      Diags.diagnose(diag::decl_attr_change, LD->getScreenInfo(),
+      Diags.diagnose(SourceLoc(), diag::decl_attr_change, LD->getScreenInfo(),
         getOwnershipDescription(LD->getReferenceOwnership()),
         getOwnershipDescription(RD->getReferenceOwnership()));
     }
@@ -705,14 +705,15 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
           auto Desc = LD->hasDeclAttribute(Info.Kind) ?
             Ctx.buffer((llvm::Twine("without ") + Info.Content).str()):
             Ctx.buffer((llvm::Twine("with ") + Info.Content).str());
-          Diags.diagnose(diag::decl_new_attr, LD->getScreenInfo(), Desc);
+          Diags.diagnose(SourceLoc(), diag::decl_new_attr, LD->getScreenInfo(),
+            Desc);
         }
       }
     }
 
     // Diagnose generic signature change
     if (LD->getGenericSignature() != RD->getGenericSignature()) {
-      Diags.diagnose(diag::generic_sig_change, LD->getScreenInfo(),
+      Diags.diagnose(SourceLoc(), diag::generic_sig_change, LD->getScreenInfo(),
         LD->getGenericSignature(), RD->getGenericSignature());
     }
     detectRename(L, R);
