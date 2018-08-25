@@ -55,24 +55,21 @@ func _tensorSeeds(_ seed: Tensor<Int64>) -> (Tensor<Int64>, Tensor<Int64>) {
 @_fixed_layout
 public struct SingleValueDataset<ScalarOfElement : AccelerableByTensorFlow> {
   @usableFromInline let _handle: VariantHandle
-  public let elementShape: TensorShape
 
   @usableFromInline @inline(__always)
-  internal init(_handle: VariantHandle, elementShape: TensorShape) {
+  internal init(_handle: VariantHandle) {
     self._handle = _handle
-    self.elementShape = elementShape
   }
 }
 
 public extension SingleValueDataset {
   @inlinable @inline(__always)
-  init(randomSeed: Int64, elementShape: TensorShape) {
+  init(randomSeed: Int64) {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
     self.init(
       _handle: #tfop("RandomDataset", seed1, seed2,
                      output_types: [ScalarOfElement.self],
-                     output_shapes: [elementShape]),
-      elementShape: elementShape
+                     output_shapes: [nil] as [TensorShape?])
     )
   }
 }
@@ -80,15 +77,14 @@ public extension SingleValueDataset {
 public extension SingleValueDataset {
   /// Creates a dataset from a batch of elements as a tensor.
   @inlinable @inline(__always)
-  public init(elements: Tensor<ScalarOfElement>, elementShape: TensorShape) {
+  public init(elements: Tensor<ScalarOfElement>) {
     // A dataset creation op only runs on TF CPU.
     self.init(
       _handle: #tfop(
         "TensorSliceDataset", [elements],
         Toutput_types: [ScalarOfElement.self],
-        output_shapes: [elementShape]
-      ),
-      elementShape: elementShape
+        output_shapes: [nil] as [TensorShape?]
+      )
     )
   }
 }
@@ -103,10 +99,9 @@ extension SingleValueDataset : Sequence {
   public func makeIterator() -> SingleValueDatasetIterator<ScalarOfElement> {
     let resource: ResourceHandle = #tfop("AnonymousIterator",
                                          output_types: [ScalarOfElement.self],
-                                         output_shapes: [elementShape])
+                                         output_shapes: [nil] as [TensorShape?])
     #tfop("MakeIterator", _handle, resource) as Void
-    return SingleValueDatasetIterator(_handle: resource,
-                                      elementShape: elementShape)
+    return SingleValueDatasetIterator(_handle: resource)
   }
 }
 
@@ -123,9 +118,8 @@ public extension SingleValueDataset {
       _handle: #tfop(
         "MapDataset", _handle, [Tensor<Int32>(0)], f: transform,
         Targuments: [Int32.self],
-        output_types: [T.self], output_shapes: [elementShape]
-      ),
-      elementShape: elementShape
+        output_types: [T.self], output_shapes: [nil] as [TensorShape?]
+      )
     )
   }
 
@@ -142,9 +136,8 @@ public extension SingleValueDataset {
       _handle: #tfop(
         "FilterDataset", _handle, [Tensor<Int32>(0)],
         predicate: isIncluded, Targuments: [Int32.self],
-        output_types: [ScalarOfElement.self], output_shapes: [elementShape]
-      ),
-      elementShape: elementShape
+        output_types: [ScalarOfElement.self], output_shapes: [nil] as [TensorShape?]
+      )
     )
   }
 
@@ -156,9 +149,8 @@ public extension SingleValueDataset {
     return SingleValueDataset(
       _handle: #tfop(
         "ShuffleDataset", _handle, Tensor<Int64>(sampleCount), seed1, seed2,
-        output_types: [ScalarOfElement.self], output_shapes: [elementShape]
-      ),
-      elementShape: elementShape
+        output_types: [ScalarOfElement.self], output_shapes: [nil] as [TensorShape?]
+      )
     )
   }
 
@@ -167,9 +159,8 @@ public extension SingleValueDataset {
     return SingleValueDataset(
       _handle: #tfop(
         "BatchDataset", _handle, Tensor<Int64>(batchSize),
-        output_types: [ScalarOfElement.self], output_shapes: [elementShape]
-      ),
-      elementShape: elementShape
+        output_types: [ScalarOfElement.self], output_shapes: [nil] as [TensorShape?]
+      )
     )
   }
 }
@@ -179,12 +170,10 @@ public extension SingleValueDataset {
 public struct SingleValueDatasetIterator<ScalarOfElement>
   where ScalarOfElement : AccelerableByTensorFlow {
   @usableFromInline let handle: ResourceHandle
-  public let elementShape: TensorShape
 
   @usableFromInline @inline(__always)
-  internal init(_handle: ResourceHandle, elementShape: TensorShape) {
+  internal init(_handle: ResourceHandle) {
     self.handle = _handle
-    self.elementShape = elementShape
   }
 }
 
@@ -197,13 +186,13 @@ extension SingleValueDatasetIterator : IteratorProtocol {
   public mutating func next() -> Element? {
     let optional: VariantHandle =
       #tfop("IteratorGetNextAsOptional", handle,
-            output_types: [ScalarOfElement.self], output_shapes: [elementShape])
+            output_types: [ScalarOfElement.self], output_shapes: [nil] as [TensorShape?])
     guard _TFGetScalarOrDie(#tfop("OptionalHasValue", optional)) else {
       return nil
     }
     return Tensor(handle: #tfop("OptionalGetValue", optional,
                                 output_types: [ScalarOfElement.self],
-                                output_shapes: [elementShape]))
+                                output_shapes: [nil] as [TensorShape?]))
   }
 }
 
@@ -221,26 +210,22 @@ public struct DoubleValueDataset<ScalarOfFirstElement>
   where ScalarOfFirstElement : AccelerableByTensorFlow {
   public typealias ScalarOfSecondElement = ScalarOfFirstElement
   @usableFromInline let _handle: VariantHandle
-  public let elementShapes: (TensorShape, TensorShape)
 
   @usableFromInline @inline(__always)
-  internal init(_handle: VariantHandle,
-                elementShapes: (TensorShape, TensorShape)) {
+  internal init(_handle: VariantHandle) {
     self._handle = _handle
-    self.elementShapes = elementShapes
   }
 }
 
 public extension DoubleValueDataset {
   @inlinable @inline(__always)
-  init(randomSeed: Int64, elementShapes: (TensorShape, TensorShape)) {
+  init(randomSeed: Int64) {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
     self.init(
       _handle: #tfop("RandomDataset", seed1, seed2,
                      output_types: [ScalarOfFirstElement.self,
                                     ScalarOfSecondElement.self],
-                     output_shapes: [elementShapes.0, elementShapes.1]),
-      elementShapes: elementShapes
+                     output_shapes: [nil, nil] as [TensorShape?])
     )
   }
 }
@@ -249,16 +234,14 @@ public extension DoubleValueDataset {
   /// Creates a dataset from a batch of elements as a tensor.
   @inlinable @inline(__always)
   public init(elements: (Tensor<ScalarOfFirstElement>,
-                         Tensor<ScalarOfSecondElement>),
-              elementShapes: (TensorShape, TensorShape)) {
+                         Tensor<ScalarOfSecondElement>)) {
     // A dataset creation op only runs on TF CPU.
     self.init(
       _handle: #tfop(
         "TensorSliceDataset", [elements.0.handle, elements.1.handle],
         Toutput_types: [ScalarOfFirstElement.self, ScalarOfSecondElement.self],
-        output_shapes: [elementShapes.0, elementShapes.1]
-      ),
-      elementShapes: elementShapes
+        output_shapes: [nil, nil] as [TensorShape?]
+      )
     )
   }
 }
@@ -278,10 +261,9 @@ extension DoubleValueDataset : Sequence {
       #tfop("AnonymousIterator",
             output_types: [ScalarOfFirstElement.self,
                            ScalarOfSecondElement.self],
-            output_shapes: [elementShapes.0, elementShapes.1])
+            output_shapes: [nil, nil] as [TensorShape?])
     #tfop("MakeIterator", _handle, resource) as Void
-    return DoubleValueDatasetIterator(_handle: resource,
-                                      elementShapes: elementShapes)
+    return DoubleValueDatasetIterator(_handle: resource)
   }
 }
 
@@ -302,9 +284,8 @@ public extension DoubleValueDataset {
         "MapDataset", _handle, [Tensor<Int32>(0)], f: transform,
         Targuments: [Int32.self],
         output_types: [T.self, T.self],
-        output_shapes: [elementShapes.0, elementShapes.1]
-      ),
-      elementShapes: elementShapes
+        output_shapes: [nil, nil] as [TensorShape?]
+      )
     )
   }
 
@@ -323,9 +304,8 @@ public extension DoubleValueDataset {
         "FilterDataset", _handle, [Tensor<Int32>(0)],
         predicate: isIncluded, Targuments: [Int32.self],
         output_types: [ScalarOfFirstElement.self, ScalarOfSecondElement.self],
-        output_shapes: [elementShapes.0, elementShapes.1]
-      ),
-      elementShapes: elementShapes
+        output_shapes: [nil, nil] as [TensorShape?]
+      )
     )
   }
 
@@ -338,9 +318,8 @@ public extension DoubleValueDataset {
       _handle: #tfop(
         "ShuffleDataset", _handle, Tensor<Int64>(sampleCount), seed1, seed2,
         output_types: [ScalarOfFirstElement.self, ScalarOfSecondElement.self],
-        output_shapes: [elementShapes.0, elementShapes.1]
-      ),
-      elementShapes: elementShapes
+        output_shapes: [nil, nil] as [TensorShape?]
+      )
     )
   }
 
@@ -350,9 +329,8 @@ public extension DoubleValueDataset {
       _handle: #tfop(
         "BatchDataset", _handle, Tensor<Int64>(batchSize),
         output_types: [ScalarOfFirstElement.self, ScalarOfSecondElement.self],
-        output_shapes: [elementShapes.0, elementShapes.1]
-      ),
-      elementShapes: elementShapes
+        output_shapes: [nil, nil] as [TensorShape?]
+      )
     )
   }
 }
@@ -364,13 +342,10 @@ public struct DoubleValueDatasetIterator<ScalarOfFirstElement>
   where ScalarOfFirstElement : AccelerableByTensorFlow {
   public typealias ScalarOfSecondElement = ScalarOfFirstElement
   @usableFromInline let handle: ResourceHandle
-  public let elementShapes: (TensorShape, TensorShape)
 
   @usableFromInline @inline(__always)
-  internal init(_handle: ResourceHandle,
-                elementShapes: (TensorShape, TensorShape)) {
+  internal init(_handle: ResourceHandle) {
     self.handle = _handle
-    self.elementShapes = elementShapes
   }
 }
 
@@ -386,7 +361,7 @@ extension DoubleValueDatasetIterator : IteratorProtocol {
       #tfop("IteratorGetNextAsOptional", handle,
             output_types: [ScalarOfFirstElement.self,
                            ScalarOfSecondElement.self],
-            output_shapes: [elementShapes.0, elementShapes.1])
+            output_shapes: [nil, nil] as [TensorShape?])
     guard _TFGetScalarOrDie(#tfop("OptionalHasValue", optional)) else {
       return nil
     }
@@ -395,7 +370,7 @@ extension DoubleValueDatasetIterator : IteratorProtocol {
       #tfop("OptionalGetValue", optional,
             output_types: [ScalarOfFirstElement.self,
                            ScalarOfSecondElement.self],
-            output_shapes: [elementShapes.0, elementShapes.1])
+            output_shapes: [nil, nil] as [TensorShape?])
     return (Tensor(handle: firstHandle), Tensor(handle: secondHandle))
   }
 }
@@ -409,8 +384,7 @@ public func zip<T>(
   return DoubleValueDataset(
     _handle: #tfop("ZipDataset", [first._handle, second._handle],
                    output_types: [T.self, T.self],
-                   output_shapes: [first.elementShape, second.elementShape],
-                   N: 2),
-    elementShapes: (first.elementShape, second.elementShape)
+                   output_shapes: [nil, nil] as [TensorShape?],
+                   N: 2)
   )
 }
