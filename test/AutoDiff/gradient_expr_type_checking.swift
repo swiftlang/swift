@@ -53,8 +53,8 @@ let _: (Float) -> (Float, Float) = #valueAndGradient(e)
 let _: (Double) -> (Double, Double) = #valueAndGradient(e)
 
 let _: (Float) -> (Float, Float, Float) = #gradient(e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
-let _: ((Float, Float)) -> (Float, Float) = #gradient(e) // expected-error {{gradient parameter has non-differentiable type '(Float, Float)'}}
-let _: (Int) -> (Int) = #gradient(e) // expected-error {{gradient parameter has non-differentiable type 'Int'}}
+let _: ((Float, Float)) -> (Float, Float) = #gradient(e)
+let _: (Int) -> (Int) = #gradient(e)
 let _: (Float) -> Double = #gradient(e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
 
 // Complex type inference.
