@@ -111,11 +111,6 @@ module CPython3 [system] [extern_c] {
     export *
   }
 
-  explicit module pygetopt {
-    header "include/pygetopt.h"
-    export *
-  }
-
   explicit module pythread {
     header "include/pythread.h"
     export *

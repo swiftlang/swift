@@ -19,9 +19,9 @@
 import Python2
 #elseif canImport(Python3)
 import Python3
-#else
-#error("Toolchain does not support Python2 or Python3.")
 #endif
+
+#if canImport(Python2) || canImport(Python3)
 
 /// The `numpy` Python module.
 /// Note: Global variables are lazy, so the following declaration won't produce
@@ -104,4 +104,4 @@ extension Tensor : ConvertibleFromNumpyArray
   }
 }
 
-#endif // canImport(Python2) or canImport(Python3)
+#endif // canImport(Python2) || canImport(Python3)
