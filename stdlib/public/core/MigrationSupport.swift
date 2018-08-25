@@ -101,45 +101,45 @@ public typealias DefaultBidirectionalIndices<T> = DefaultIndices<T> where T : Bi
 public typealias DefaultRandomAccessIndices<T> = DefaultIndices<T> where T : RandomAccessCollection
 
 // Deprecated by SE-0115.
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByNilLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByNilLiteral")
 public typealias NilLiteralConvertible = ExpressibleByNilLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinIntegerLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinIntegerLiteral")
 public typealias _BuiltinIntegerLiteralConvertible = _ExpressibleByBuiltinIntegerLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByIntegerLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByIntegerLiteral")
 public typealias IntegerLiteralConvertible = ExpressibleByIntegerLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinFloatLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinFloatLiteral")
 public typealias _BuiltinFloatLiteralConvertible = _ExpressibleByBuiltinFloatLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByFloatLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByFloatLiteral")
 public typealias FloatLiteralConvertible = ExpressibleByFloatLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinBooleanLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinBooleanLiteral")
 public typealias _BuiltinBooleanLiteralConvertible = _ExpressibleByBuiltinBooleanLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByBooleanLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByBooleanLiteral")
 public typealias BooleanLiteralConvertible = ExpressibleByBooleanLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinUnicodeScalarLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinUnicodeScalarLiteral")
 public typealias _BuiltinUnicodeScalarLiteralConvertible = _ExpressibleByBuiltinUnicodeScalarLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByUnicodeScalarLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByUnicodeScalarLiteral")
 public typealias UnicodeScalarLiteralConvertible = ExpressibleByUnicodeScalarLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral")
 public typealias _BuiltinExtendedGraphemeClusterLiteralConvertible = _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByExtendedGraphemeClusterLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByExtendedGraphemeClusterLiteral")
 public typealias ExtendedGraphemeClusterLiteralConvertible = ExpressibleByExtendedGraphemeClusterLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinStringLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinStringLiteral")
 public typealias _BuiltinStringLiteralConvertible = _ExpressibleByBuiltinStringLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByBuiltinUTF16StringLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinUTF16StringLiteral")
 public typealias _BuiltinUTF16StringLiteralConvertible = _ExpressibleByBuiltinUTF16StringLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByStringLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByStringLiteral")
 public typealias StringLiteralConvertible = ExpressibleByStringLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByArrayLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByArrayLiteral")
 public typealias ArrayLiteralConvertible = ExpressibleByArrayLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "ExpressibleByDictionaryLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByDictionaryLiteral")
 public typealias DictionaryLiteralConvertible = ExpressibleByDictionaryLiteral
 @available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'StringInterpolationConvertible', consider adding an 'init(_:String)'")
 public typealias StringInterpolationConvertible = ExpressibleByStringInterpolation
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByColorLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByColorLiteral")
 public typealias _ColorLiteralConvertible = _ExpressibleByColorLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByImageLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByImageLiteral")
 public typealias _ImageLiteralConvertible = _ExpressibleByImageLiteral
-@available(*, deprecated/*, obsoleted: 5.0*/, renamed: "_ExpressibleByFileReferenceLiteral")
+@available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByFileReferenceLiteral")
 public typealias _FileReferenceLiteralConvertible = _ExpressibleByFileReferenceLiteral
 
 @available(*, deprecated, obsoleted: 5.0, renamed: "ClosedRange.Index")
