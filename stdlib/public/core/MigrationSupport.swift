@@ -435,7 +435,7 @@ extension String {
   /// Previous versions of Swift provided this view since String
   /// itself was not a collection. String is now a collection of
   /// characters, so this type is now just an alias for String.
-  @available(swift, deprecated: 3.2/*, obsoleted: 5.0*/, message: "Please mutate the String directly")
+  @available(swift, deprecated: 3.2, obsoleted: 5.0, message: "Please mutate the String directly")
   public mutating func withMutableCharacters<R>(
     _ body: (inout String) -> R
   ) -> R {
