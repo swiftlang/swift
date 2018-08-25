@@ -2926,9 +2926,9 @@ public:
         s << "<Struct>(";
         interleave(llvm::zip(decl->getStoredProperties(),
                              getAggregateElements()),
-                   [&s](std::pair<VarDecl *, AdjointValue> elt) {
-                     s << elt.first << ": ";
-                     elt.second.print(s);
+                   [&s](std::tuple<VarDecl *, AdjointValue> elt) {
+                     s << std::get<0>(elt) << ": ";
+                     std::get<1>(elt).print(s);
                    }, [&s] { s << ", "; });
       } else if (auto tupleType = type.getAs<TupleType>()) {
         s << "<Tuple>(";
