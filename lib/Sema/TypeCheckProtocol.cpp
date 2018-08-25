@@ -3366,11 +3366,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
         auto concreteConformance = conformance.getConcrete();
 
         // Map the conformance.
-        auto interfaceType =
-          concreteConformance->getType()->mapTypeOutOfContext();
-
         concreteConformance = concreteConformance->subst(
-            interfaceType,
             [](SubstitutableType *type) -> Type {
               if (auto *archetypeType = type->getAs<ArchetypeType>())
                 return archetypeType->getInterfaceType();
