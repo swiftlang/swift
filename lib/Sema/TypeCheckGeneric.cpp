@@ -174,36 +174,6 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
   tl.setType(Type());
 }
 
-/// Revert the dependent types within the given generic parameter list.
-static void revertGenericParamList(TypeChecker &tc,
-                                   GenericParamList *genericParams) {
-  // Revert the requirements of the generic parameter list.
-  tc.revertGenericRequirements(genericParams->getRequirements());
-}
-
-void TypeChecker::revertGenericRequirements(
-                                MutableArrayRef<RequirementRepr> requirements) {
-  for (auto &req : requirements) {
-    if (req.isInvalid())
-      continue;
-
-    switch (req.getKind()) {
-    case RequirementReprKind::TypeConstraint:
-      revertDependentTypeLoc(req.getConstraintLoc());
-      LLVM_FALLTHROUGH;
-
-    case RequirementReprKind::LayoutConstraint:
-      revertDependentTypeLoc(req.getSubjectLoc());
-      break;
-
-    case RequirementReprKind::SameType:
-      revertDependentTypeLoc(req.getFirstTypeLoc());
-      revertDependentTypeLoc(req.getSecondTypeLoc());
-      break;
-    }
-  }
-}
-
 ///
 /// Generic functions
 ///
@@ -533,7 +503,6 @@ computeGenericFuncSignature(TypeChecker &tc, AbstractFunctionDecl *func) {
   // there might still be errors that have not yet been diagnosed. Revert the
   // generic function signature and type-check it again, completely.
   revertGenericFuncSignature(func);
-  revertGenericParamList(tc, gp);
 
   // Debugging of the generic signature.
   if (tc.Context.LangOpts.DebugGenericSignatures) {
@@ -652,7 +621,6 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     // there might still be errors that have not yet been diagnosed. Revert the
     // generic function signature and type-check it again, completely.
     revertGenericSubscriptSignature(subscript);
-    revertGenericParamList(*this, gp);
 
     // Debugging of generic signature generation.
     if (Context.LangOpts.DebugGenericSignatures) {
@@ -766,18 +734,6 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     sig = std::move(builder).computeGenericSignature(
                                          genericParams->getSourceRange().Start,
                                          allowConcreteGenericParams);
-
-    // The generic signature builder now has all of the requirements, although
-    // there might still be errors that have not yet been diagnosed. Revert the
-    // signature and type-check it again, completely.
-    if (recursivelyVisitGenericParams) {
-      visitOuterToInner(genericParams,
-                        [&](GenericParamList *gpList) {
-        revertGenericParamList(*this, gpList);
-      });
-    } else {
-      revertGenericParamList(*this, genericParams);
-    }
 
     // Debugging of the generic signature builder and generic signature
     // generation.

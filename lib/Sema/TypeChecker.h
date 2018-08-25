@@ -1129,9 +1129,6 @@ public:
   void prepareGenericParamList(GenericParamList *genericParams,
                                DeclContext *dc);
 
-  /// Revert the dependent types within a set of requirements.
-  void revertGenericRequirements(MutableArrayRef<RequirementRepr> requirements);
-
   /// Compute the generic signature, generic environment and interface type
   /// of a generic function.
   void validateGenericFuncSignature(AbstractFunctionDecl *func);
