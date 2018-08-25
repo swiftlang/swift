@@ -659,30 +659,6 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   // FIXME: Ambiguity resolution.
   auto conformance = conformances.front();
 
-  // Rebuild inherited conformances based on the root normal conformance.
-  // FIXME: This is a hack to work around our inability to handle multiple
-  // levels of substitution through inherited conformances elsewhere in the
-  // compiler.
-  if (auto inherited = dyn_cast<InheritedProtocolConformance>(conformance)) {
-    // Dig out the conforming nominal type.
-    auto rootConformance = inherited->getRootNormalConformance();
-    auto conformingClass
-      = rootConformance->getType()->getClassOrBoundGenericClass();
-
-    // Map up to our superclass's type.
-    auto superclassTy = type->getSuperclassForDecl(conformingClass);
-
-    // Compute the conformance for the inherited type.
-    auto inheritedConformance = lookupConformance(superclassTy, protocol);
-    assert(inheritedConformance &&
-           "We already found the inherited conformance");
-
-    // Create the inherited conformance entry.
-    conformance
-      = ctx.getInheritedConformance(type, inheritedConformance->getConcrete());
-    return ProtocolConformanceRef(conformance);
-  }
-
   // If the type is specialized, find the conformance for the generic type.
   if (type->isSpecialized()) {
     // Figure out the type that's explicitly conforming to this protocol.

@@ -65,6 +65,8 @@ STATISTIC(NumRegisteredGenericSignatureBuilders,
           "# of generic signature builders successfully registered");
 STATISTIC(NumRegisteredGenericSignatureBuildersAlready,
           "# of generic signature builders already registered");
+STATISTIC(NumCollapsedInheritedProtocolConformances,
+          "# of inherited protocol conformances collapsed");
 STATISTIC(NumCollapsedSpecializedProtocolConformances,
           "# of specialized protocol conformances collapsed");
 
@@ -1771,46 +1773,29 @@ ASTContext::getConformance(Type conformingType,
   return result;
 }
 
-/// If one of the ancestor conformances already has a matching type, use
-/// that instead.
-static ProtocolConformance *collapseSpecializedConformance(
-                                             Type type,
-                                             ProtocolConformance *conformance,
-                                             SubstitutionMap substitutions) {
-  while (true) {
-    switch (conformance->getKind()) {
-    case ProtocolConformanceKind::Specialized:
-      conformance = cast<SpecializedProtocolConformance>(conformance)
-                      ->getGenericConformance();
-      break;
-
-    case ProtocolConformanceKind::Normal:
-    case ProtocolConformanceKind::Inherited:
-      // If the conformance matches, return it.
-      if (conformance->getType()->isEqual(type)) {
-        for (auto subConformance : substitutions.getConformances())
-          if (!subConformance.isAbstract())
-            return nullptr;
-
-        return conformance;
-      }
-
-      return nullptr;
-    }
-  }
-}
-
 ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
                                       SubstitutionMap substitutions) {
-  // If we are performing a substitution that would get us back to the
-  // a prior conformance (e.g., mapping into and then out of a conformance),
-  // return the existing conformance.
-  if (auto existing = collapseSpecializedConformance(type, generic,
-                                                     substitutions)) {
+  // Collapse multiple levels of specialized conformance -- they have no
+  // semantic effect.
+  while (auto *baseGeneric = dyn_cast<SpecializedProtocolConformance>(generic)) {
     ++NumCollapsedSpecializedProtocolConformances;
-    return existing;
+    generic = baseGeneric->getGenericConformance();
+  }
+
+  // If our substitutions have no effect, return the underlying conformance.
+  if (generic->getType()->isEqual(type)) {
+    bool allAbstract = true;
+    for (auto subConformance : substitutions.getConformances()) {
+      if (!subConformance.isAbstract()) {
+        allAbstract = false;
+        break;
+      }
+    }
+
+    if (allAbstract)
+      return generic;
   }
 
   llvm::FoldingSetNodeID id;
@@ -1838,6 +1823,13 @@ ASTContext::getSpecializedConformance(Type type,
 
 InheritedProtocolConformance *
 ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
+  // Collapse multiple levels of inherited conformance -- they have no
+  // semantic effect.
+  while (auto *baseInherited = dyn_cast<InheritedProtocolConformance>(inherited)) {
+    ++NumCollapsedInheritedProtocolConformances;
+    inherited = baseInherited->getInheritedConformance();
+  }
+
   llvm::FoldingSetNodeID id;
   InheritedProtocolConformance::Profile(id, type, inherited);
 
