@@ -341,6 +341,11 @@ private:
                                       StringRef workingDirectory,
                                       CommandOutput *Output) const;
 
+  void chooseTextualInterfacePath(Compilation &C, const JobAction *JA,
+                                  StringRef workingDirectory,
+                                  llvm::SmallString<128> &buffer,
+                                  CommandOutput *output) const;
+
   void chooseRemappingOutputPath(Compilation &C, const TypeToPathMap *OutputMap,
                                  CommandOutput *Output) const;
 

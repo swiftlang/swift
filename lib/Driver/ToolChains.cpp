@@ -544,6 +544,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-module-doc-path");
 
   addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_SwiftModuleInterfaceFile,
+                   "-emit-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
 
@@ -792,6 +796,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                         Arguments);
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SwiftModuleDocFile, "-emit-module-doc-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_SwiftModuleInterfaceFile,
+                   "-emit-interface-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");

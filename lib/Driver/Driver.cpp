@@ -1481,12 +1481,19 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     // top-level output.
     OI.ShouldGenerateModule = true;
     OI.ShouldTreatModuleAsTopLevelOutput = true;
-  } else if ((OI.DebugInfoLevel > IRGenDebugInfoLevel::LineTables &&
-              OI.shouldLink()) ||
-             Args.hasArg(options::OPT_emit_objc_header,
-                         options::OPT_emit_objc_header_path)) {
+  } else if (OI.DebugInfoLevel > IRGenDebugInfoLevel::LineTables &&
+             OI.shouldLink()) {
     // An option has been passed which requires a module, but the user hasn't
     // requested one. Generate a module, but treat it as an intermediate output.
+    OI.ShouldGenerateModule = true;
+    OI.ShouldTreatModuleAsTopLevelOutput = false;
+  } else if (Args.hasArg(options::OPT_emit_objc_header,
+                         options::OPT_emit_objc_header_path,
+                         options::OPT_experimental_emit_interface) &&
+             OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
+    // An option has been passed which requires whole-module knowledge, but we
+    // don't have that. Generate a module, but treat it as an intermediate
+    // output.
     OI.ShouldGenerateModule = true;
     OI.ShouldTreatModuleAsTopLevelOutput = false;
   } else {
@@ -2461,6 +2468,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory,
                                    Output.get());
 
+  if (C.getArgs().hasArg(options::OPT_experimental_emit_interface))
+    chooseTextualInterfacePath(C, JA, workingDirectory, Buf, Output.get());
+
   if (C.getArgs().hasArg(options::OPT_update_code) && isa<CompileJobAction>(JA))
     chooseRemappingOutputPath(C, OutputMap, Output.get());
 
@@ -2755,6 +2765,33 @@ void Driver::chooseRemappingOutputPath(Compilation &C,
     if (isTempFile)
       C.addTemporaryFile(Path);
   }
+}
+
+void Driver::chooseTextualInterfacePath(Compilation &C, const JobAction *JA,
+                                        StringRef workingDirectory,
+                                        llvm::SmallString<128> &buffer,
+                                        CommandOutput *output) const {
+  switch (C.getOutputInfo().CompilerMode) {
+  case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::BatchModeCompile:
+    if (!isa<MergeModuleJobAction>(JA))
+      return;
+    break;
+  case OutputInfo::Mode::SingleCompile:
+    if (!isa<CompileJobAction>(JA))
+      return;
+    break;
+  case OutputInfo::Mode::Immediate:
+  case OutputInfo::Mode::REPL:
+    llvm_unreachable("these modes aren't usable with 'swiftc'");
+  }
+
+  StringRef outputPath = *getOutputFilenameFromPathArgOrAsTopLevel(
+        C.getOutputInfo(), C.getArgs(), llvm::opt::OptSpecifier(),
+        file_types::TY_SwiftModuleInterfaceFile,
+        /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
+  output->setAdditionalOutputForType(file_types::TY_SwiftModuleInterfaceFile,
+                                     outputPath);
 }
 
 void Driver::chooseSerializedDiagnosticsPath(Compilation &C,
