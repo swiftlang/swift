@@ -34,12 +34,6 @@ namespace swift {
   /// UnresolvedType.
   Type replaceTypeParametersWithUnresolved(Type ty);
   Type replaceTypeVariablesWithUnresolved(Type ty);
-
-  /// Diagnose lvalue expr error.
-  void diagnoseSubElementFailure(Expr *destExpr, SourceLoc loc,
-                                 constraints::ConstraintSystem &CS,
-                                 Diag<StringRef> diagID,
-                                 Diag<Type> unknownDiagID);
 };
 
 #endif /* SWIFT_SEMA_CSDIAG_H */
