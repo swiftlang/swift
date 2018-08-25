@@ -1259,6 +1259,11 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
     else
       CurFn->addFnAttr(llvm::Attribute::SanitizeThread);
   }
+
+  // Disable inlining of coroutine functions until we split.
+  if (f->getLoweredFunctionType()->isCoroutine()) {
+    CurFn->addFnAttr(llvm::Attribute::NoInline);
+  }
 }
 
 IRGenSILFunction::~IRGenSILFunction() {
