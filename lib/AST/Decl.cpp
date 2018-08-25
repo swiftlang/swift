@@ -5417,18 +5417,6 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
 
   // (Self) -> (Args...) -> Result
   if (hasSelf) {
-    // Constructors have an initializer type that takes an instance
-    // instead of a metatype.
-    if (auto *ctor = dyn_cast<ConstructorDecl>(this)) {
-      auto initSelfParam = computeSelfParam(this, /*isInitializingCtor=*/true);
-      Type initFuncTy;
-      if (sig)
-        initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, funcTy);
-      else
-        initFuncTy = FunctionType::get({initSelfParam}, funcTy);
-      ctor->setInitializerInterfaceType(initFuncTy);
-    }
-
     // Substitute in our own 'self' parameter.
     auto selfParam = computeSelfParam(this);
     if (sig)
@@ -5806,11 +5794,24 @@ Type ConstructorDecl::getResultInterfaceType() const {
 }
 
 Type ConstructorDecl::getInitializerInterfaceType() {
-  return InitializerInterfaceType;
-}
+  if (InitializerInterfaceType)
+    return InitializerInterfaceType;
 
-void ConstructorDecl::setInitializerInterfaceType(Type t) {
-  InitializerInterfaceType = t;
+  // Lazily calculate initializer type.
+  auto funcTy = getInterfaceType()->castTo<AnyFunctionType>()->getResult();
+  assert(funcTy->is<FunctionType>());
+
+  // Constructors have an initializer type that takes an instance
+  // instead of a metatype.
+  auto initSelfParam = computeSelfParam(this, /*isInitializingCtor=*/true);
+  Type initFuncTy;
+  if (auto *sig = getGenericSignature())
+    initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, funcTy);
+  else
+    initFuncTy = FunctionType::get({initSelfParam}, funcTy);
+  InitializerInterfaceType = initFuncTy;
+
+  return InitializerInterfaceType;
 }
 
 ConstructorDecl::BodyInitKind

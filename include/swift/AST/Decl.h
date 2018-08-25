@@ -5902,7 +5902,6 @@ public:
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();
-  void setInitializerInterfaceType(Type t);
 
   /// Get the typechecked call to super.init expression, which needs to be
   /// inserted at the end of the initializer by SILGen.
