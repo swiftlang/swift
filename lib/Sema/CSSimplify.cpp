@@ -4989,7 +4989,7 @@ ConstraintSystem::simplifyRestrictedConstraint(
 
 static bool isAugmentingFix(ConstraintFix *fix) {
   switch (fix->getKind()) {
-    case swift::constraints::FixKind::TreatRValueAsLValue:
+    case FixKind::TreatRValueAsLValue:
       return false;
     default:
       return true;
