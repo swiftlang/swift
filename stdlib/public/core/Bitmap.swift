@@ -10,7 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A simple bitmap of a fixed number of bits.
+/// A simple bitmap of a fixed number of bits, implementing a partial SetAlgebra
+/// of small nonnegative Int values.
+///
+/// Because _Bitmap implements a simple flat bit vector, it isn't suitable for
+/// holding arbitrarily large integers. The maximal element a bitmap can store
+/// is fixed at its initialization; it uses this to determine how much space it
+/// needs to allocate for storage. Storage is allocated up front.
+///
+/// FIXME: Conform to the full SetAlgebra protocol. Allow resizing after init.
 @_fixed_layout
 @usableFromInline
 internal struct _Bitmap {
@@ -164,14 +172,14 @@ extension _Bitmap.Word {
   @inline(__always)
   internal func _uncheckedContains(_ bit: Int) -> Bool {
     _sanityCheck(bit >= 0 && bit < UInt.bitWidth)
-    return _value & (1 << bit) != 0
+    return _value & (1 &<< bit) != 0
   }
 
   @inlinable
   @inline(__always)
   internal mutating func _uncheckedInsert(_ bit: Int) -> Bool {
     _sanityCheck(bit >= 0 && bit < UInt.bitWidth)
-    let mask: UInt = 1 << bit
+    let mask: UInt = 1 &<< bit
     let inserted = _value & mask == 0
     _value |= mask
     return inserted
@@ -181,13 +189,17 @@ extension _Bitmap.Word {
   @inline(__always)
   internal mutating func _uncheckedRemove(_ bit: Int) -> Bool {
     _sanityCheck(bit >= 0 && bit < UInt.bitWidth)
-    let mask: UInt = 1 << bit
+    let mask: UInt = 1 &<< bit
     let removed = _value & mask != 0
     _value &= ~mask
     return removed
   }
 }
 
+// Word implements Sequence by using a copy of itself as its Iterator.
+// Iteration with next() destroys the word's value; however, this won't cause
+// problems in normal use, because next() is usually called on a separate
+// iterator, not the original word.
 extension _Bitmap.Word: Sequence, IteratorProtocol {
   @inlinable
   internal var count: Int {
@@ -199,11 +211,13 @@ extension _Bitmap.Word: Sequence, IteratorProtocol {
     return count
   }
 
+  /// Return the index of the lowest set bit in this word,
+  /// and also destructively clear it.
   @inlinable
   internal mutating func next() -> Int? {
     guard _value != 0 else { return nil }
     let bit = _value.trailingZeroBitCount
-    _value &= ~((1 as UInt) << bit)
+    _value &= _value &- 1       // Clear lowest nonzero bit.
     return bit
   }
 }
