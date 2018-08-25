@@ -54,8 +54,9 @@ static StringRef getCategoryName(uint32_t ID) {
 }
 
 swift::ide::api::
-ModuleDifferDiagsConsumer::ModuleDifferDiagsConsumer():
-    PrintingDiagnosticConsumer(llvm::errs()) {
+ModuleDifferDiagsConsumer::ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff):
+    PrintingDiagnosticConsumer(llvm::errs()),
+    DiagnoseModuleDiff(DiagnoseModuleDiff) {
 #define DIAG(KIND, ID, Options, Text, Signature)                              \
   auto ID = getCategoryName(LocalDiagID::ID);                                 \
   assert(!ID.empty());                                                        \
@@ -75,6 +76,8 @@ ModuleDifferDiagsConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
       FormatArgs, Info);
     return;
   }
+  if (!DiagnoseModuleDiff)
+    return;
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
