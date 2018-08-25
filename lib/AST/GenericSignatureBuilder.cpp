@@ -4576,7 +4576,7 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
       Impl->HadAnyError = true;
 
       Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
-                     TypeLoc::withoutLoc(concreteType));
+                     concreteType);
       return ConstraintResult::Concrete;
     }
 
@@ -4709,8 +4709,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
       Impl->HadAnyError = true;
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
-                     TypeLoc::withoutLoc(subjectType),
-                     TypeLoc::withoutLoc(constraintType));
+                     subjectType, constraintType);
     }
 
     return ConstraintResult::Conflicting;
@@ -4758,7 +4757,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       if (source.getLoc().isValid()) {
         Impl->HadAnyError = true;
         Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
-                       TypeLoc::withoutLoc(subjectType));
+                       subjectType);
       }
 
       return ConstraintResult::Concrete;
