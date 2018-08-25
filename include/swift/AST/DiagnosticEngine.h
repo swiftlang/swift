@@ -672,18 +672,11 @@ namespace swift {
       return diagnose(Loc, Diagnostic(ID, std::move(Args)...));
     }
 
-    /// \brief Emit a diagnostic with the given set of diagnostic arguments.
-    ///
-    /// \param ID The diagnostic to be emitted.
-    ///
-    /// \param Args The diagnostic arguments, which will be converted to
-    /// the types expected by the diagnostic \p ID.
+    /// Delete an API that may lead clients to avoid specifying source location.
     template<typename ...ArgTypes>
     InFlightDiagnostic
     diagnose(Diag<ArgTypes...> ID,
-             typename detail::PassArgument<ArgTypes>::type... Args) {
-      return diagnose(SourceLoc(), ID, std::move(Args)...);
-    }
+             typename detail::PassArgument<ArgTypes>::type... Args) = delete;
 
     /// \brief Emit a diagnostic with the given set of diagnostic arguments.
     ///
