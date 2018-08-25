@@ -661,14 +661,14 @@ extension String.UnicodeScalarView {
 }
 
 extension String.UTF16View : _CustomPlaygroundQuickLookable {
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UTF16View.customPlaygroundQuickLook will be removed in Swift 5.0")
+  @available(*, deprecated: 4.2, obsoleted: 5.0, message: "UTF16View.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
 }
 
 extension String.UTF8View : _CustomPlaygroundQuickLookable {
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UTF8View.customPlaygroundQuickLook will be removed in Swift 5.0")
+  @available(*, deprecated: 4.2, obsoleted: 5.0, message: "UTF8View.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
@@ -729,7 +729,7 @@ extension Substring {
 }
 
 extension Substring : _CustomPlaygroundQuickLookable {
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "Substring.customPlaygroundQuickLook will be removed in Swift 5.0")
+  @available(*, deprecated: 4.2, obsoleted: 5.0, message: "Substring.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return String(self).customPlaygroundQuickLook
   }
@@ -862,7 +862,7 @@ extension UnsafeRawPointer : _CustomPlaygroundQuickLookable {
     : "UnsafeRawPointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UnsafeRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(*, deprecated: 4.2, obsoleted: 5.0, message: "UnsafeRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
@@ -877,7 +877,7 @@ extension UnsafeMutableRawPointer : _CustomPlaygroundQuickLookable {
     : "UnsafeMutableRawPointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UnsafeMutableRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(*, deprecated: 4.2, obsoleted: 5.0, message: "UnsafeMutableRawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
@@ -891,7 +891,7 @@ extension UnsafePointer: _CustomPlaygroundQuickLookable {
     : "UnsafePointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "UnsafePointer.customPlaygroundQuickLook will be removed in a future Swift version")
+  @available(*, deprecated: 4.2, obsoleted: 5.0, message: "UnsafePointer.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(summary)
   }
@@ -1229,7 +1229,7 @@ extension _PlaygroundQuickLook {
 ///         // conform to CustomPlaygroundQuickLookable.
 ///         extension MyType: CustomPlaygroundQuickLookable { /*...*/ }
 ///     #endif
-@available(*, deprecated/*, obsoleted: 5.0*/, message: "CustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
+@available(swift, deprecated: 4.2, obsoleted: 5.0, message: "CustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public typealias CustomPlaygroundQuickLookable = _CustomPlaygroundQuickLookable
 
 public protocol _CustomPlaygroundQuickLookable {
@@ -1243,7 +1243,7 @@ public protocol _CustomPlaygroundQuickLookable {
 // Double-underscored real version allows us to keep using this in AppKit while
 // warning for non-SDK use. This is probably overkill but it doesn't cost
 // anything.
-@available(*, deprecated/*, obsoleted: 5.0*/, message: "_DefaultCustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
+@available(*, deprecated: 4.2, obsoleted: 5.0, message: "_DefaultCustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public typealias _DefaultCustomPlaygroundQuickLookable = __DefaultCustomPlaygroundQuickLookable
 
 public protocol __DefaultCustomPlaygroundQuickLookable {
