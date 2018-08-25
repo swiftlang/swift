@@ -2466,20 +2466,20 @@ SetTestSuite.test("SetUpcastBridgedEntryPoint") {
   }
 
   do {
-    let s: Set<NSObject> = _setBridgeToObjectiveC(s)
+    let so = s as Set<NSObject>
 
-    expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
-    expectTrue(s.contains(TestBridgedKeyTy(2020) as NSObject))
-    expectTrue(s.contains(TestBridgedKeyTy(3030) as NSObject))
+    expectTrue(so.contains(TestBridgedKeyTy(1010) as NSObject))
+    expectTrue(so.contains(TestBridgedKeyTy(2020) as NSObject))
+    expectTrue(so.contains(TestBridgedKeyTy(3030) as NSObject))
   }
 
   do {
-    let s: Set<TestObjCKeyTy> = _setBridgeToObjectiveC(s)
+    let st = s as Set<TestObjCKeyTy>
 
-    expectEqual(3, s.count)
-    expectTrue(s.contains(TestBridgedKeyTy(1010) as TestObjCKeyTy))
-    expectTrue(s.contains(TestBridgedKeyTy(2020) as TestObjCKeyTy))
-    expectTrue(s.contains(TestBridgedKeyTy(3030) as TestObjCKeyTy))
+    expectEqual(3, st.count)
+    expectTrue(st.contains(TestBridgedKeyTy(1010) as TestObjCKeyTy))
+    expectTrue(st.contains(TestBridgedKeyTy(2020) as TestObjCKeyTy))
+    expectTrue(st.contains(TestBridgedKeyTy(3030) as TestObjCKeyTy))
   }
 }
 
@@ -2595,7 +2595,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCEntryPoint") {
   }
 
   // Successful downcast.
-  let sCV: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveC(s)
+  let sCV = s as! Set<TestBridgedKeyTy>
   do {
     expectEqual(3, sCV.count)
     expectTrue(sCV.contains(TestBridgedKeyTy(1010)))
@@ -2638,7 +2638,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
   }
 
   // Successful downcast.
-  if let sVC = _setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>? {
+  if let sVC = s as? Set<TestBridgedKeyTy> {
     expectEqual(3, sVC.count)
     expectTrue(sVC.contains(TestBridgedKeyTy(1010)))
     expectTrue(sVC.contains(TestBridgedKeyTy(2020)))
@@ -2649,7 +2649,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
 
   // Unsuccessful downcasts
   s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb" as NSString)
-  expectNil(_setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>?)
+  expectNil(s as? Set<TestBridgedKeyTy>)
 }
 
 SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
