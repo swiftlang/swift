@@ -2,15 +2,42 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+#if os(macOS)
+import Darwin.C
+#else
+import Glibc
+#endif
 
 var SimpleMathTests = TestSuite("SimpleMath")
 
 SimpleMathTests.test("Arithmetics") {
-  func foo(_ x: Float, _ y: Float) -> Float {
+  let dfoo1 = #gradient({ (x: Float, y: Float) -> Float in
+    return x * y
+  })
+  expectEqual((4, 3), dfoo1(3, 4))
+  let dfoo2 = #gradient({ (x: Float, y: Float) -> Float in
     return -x * y
-  }
-  let dfoo = #gradient(foo)
-  expectEqual((-4, -3), dfoo(3, 4))
+  })
+  expectEqual((-4, -3), dfoo2(3, 4))
+  let dfoo3 = #gradient({ (x: Float, y: Float) -> Float in
+    return -x + y
+  })
+  expectEqual((-1, 1), dfoo3(3, 4))
+}
+
+SimpleMathTests.test("Fanout") {
+  let dfoo1 = #gradient({ (x: Float) -> Float in
+     x - x
+  })
+  expectEqual(0, dfoo1(100))
+  let dfoo2 = #gradient({ (x: Float) -> Float in
+     x + x
+  })
+  expectEqual(2, dfoo2(100))
+  let dfoo3 = #gradient({ (x: Float, y: Float) -> Float in
+    x + x + x * y * sin(1.0)
+  })
+  expectEqual((3.682942, 2.5244129), dfoo3(3, 2))
 }
 
 SimpleMathTests.test("FunctionCall") {
