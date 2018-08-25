@@ -708,7 +708,7 @@ extension Substring {
   /// Previous versions of Swift provided this view since String
   /// itself was not a collection. String is now a collection of
   /// characters, so this type is now just an alias for String.
-  @available(swift, deprecated: 3.2/*, obsoleted: 5.0*/, message: "Please mutate the Substring directly")
+  @available(swift, deprecated: 3.2, obsoleted: 5.0, message: "Please mutate the Substring directly")
   public mutating func withMutableCharacters<R>(
     _ body: (inout Substring) -> R
   ) -> R {
@@ -745,23 +745,23 @@ extension Collection {
   @available(swift, deprecated: 3.2, obsoleted: 5.0, renamed: "Element")
   public typealias _Element = Element
 
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
+  @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
   public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T) -> Index {
     return index(i, offsetBy: Int(n))
   }
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
+  @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
   public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T) {
     return formIndex(&i, offsetBy: Int(n))
   }
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
+  @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
   public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T, limitedBy limit: Index) -> Index? {
     return index(i, offsetBy: Int(n), limitedBy: limit)
   }
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
+  @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
   public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T, limitedBy limit: Index) -> Bool {
     return formIndex(&i, offsetBy: Int(n), limitedBy: limit)
   }
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
+  @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
   public func distance<T: BinaryInteger>(from start: Index, to end: Index) -> T {
     return numericCast(distance(from: start, to: end) as Int)
   }
