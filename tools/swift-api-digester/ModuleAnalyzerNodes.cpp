@@ -64,7 +64,7 @@ struct swift::ide::api::SDKNodeInitInfo {
 
 SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {
 #define ADD(NAME) ABIAttrs.push_back({DeclAttrKind::DAK_##NAME, \
-      NodeAnnotation::Change##NAME, getAttrName(DeclAttrKind::DAK_##NAME)});
+      getAttrName(DeclAttrKind::DAK_##NAME)});
   ADD(ObjC)
   ADD(FixedLayout)
   ADD(Frozen)

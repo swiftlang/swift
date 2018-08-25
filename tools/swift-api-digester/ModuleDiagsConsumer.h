@@ -32,9 +32,10 @@ namespace api {
 
 /// \brief Diagnostic consumer that displays diagnostics to standard output.
 class ModuleDifferDiagsConsumer: public PrintingDiagnosticConsumer {
+  bool DiagnoseModuleDiff;
   llvm::MapVector<StringRef, std::set<std::string>> AllDiags;
 public:
-  ModuleDifferDiagsConsumer();
+  ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff);
   ~ModuleDifferDiagsConsumer();
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind,

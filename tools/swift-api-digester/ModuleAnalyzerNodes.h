@@ -130,7 +130,6 @@ public:
 // attributes is considerred ABI-breaking.
 struct ABIAttributeInfo {
   const DeclAttrKind Kind;
-  const NodeAnnotation Annotation;
   const StringRef Content;
 };
 
