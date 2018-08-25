@@ -14,6 +14,7 @@
 import Glibc
 #else
 import Darwin
+import LibProc
 #endif
 
 import TestsUtils
@@ -291,6 +292,27 @@ class SampleRunner {
   init(_ config: TestConfig) {
     self.c = config
   }
+
+#if os(Linux)
+  private static func getExecutedInstructions() -> UInt64 {
+    // FIXME: there is a Linux PMC API you can use to get this, but it's
+    // not quite so straightforward.
+    return 0
+  }
+#else
+  private static func getExecutedInstructions() -> UInt64 {
+    if #available(OSX 10.9, iOS 7.0, *) {
+      var u = rusage_info_v4()
+      let p = UnsafeMutablePointer(&u)
+      p.withMemoryRebound(to: Optional<rusage_info_t>.self, capacity: 1) { up in
+        let _ = proc_pid_rusage(getpid(), RUSAGE_INFO_V4, up)
+      }
+      return u.ri_instructions
+    } else {
+      return 0
+    }
+  }
+#endif
 
   private static func getResourceUtilization() -> rusage {
     var u = rusage(); getrusage(RUSAGE_SELF, &u); return u
