@@ -1051,9 +1051,9 @@ extension Optional where Wrapped == String.Index {
 }
 
 extension Zip2Sequence {
-  @available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Sequence1.Iterator")
+  @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "Sequence1.Iterator")
   public typealias Stream1 = Sequence1.Iterator
-  @available(*, deprecated/*, obsoleted: 5.0*/, renamed: "Sequence2.Iterator")
+  @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "Sequence2.Iterator")
   public typealias Stream2 = Sequence2.Iterator
 }
 
