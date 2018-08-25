@@ -92,12 +92,6 @@ public:
 
   virtual std::string getName() const = 0;
 
-  /// Determine from the current CS (primarily the already existing fixes)
-  /// whether this fix should be recorded for later diagnosis.
-  virtual bool shouldRecordFix() const {
-    return true;
-  }
-
   /// Diagnose a failure associated with this fix given
   /// root expression and information from constraint system.
   virtual bool diagnose(Expr *root, bool asNote = false) const = 0;
@@ -116,8 +110,6 @@ public:
 
 protected:
   ConstraintSystem &getConstraintSystem() const { return CS; }
-
-  bool constraintSystemContainsFixInExpr(Expr *expr) const;
 };
 
 /// Append 'as! T' to force a downcast to the specified type.
@@ -197,7 +189,6 @@ class TreatRValueAsLValue final : public ConstraintFix {
 public:
   std::string getName() const override { return "treat rvalue as lvalue"; }
 
-  bool shouldRecordFix() const override;
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static TreatRValueAsLValue *create(ConstraintSystem &cs,

@@ -4987,6 +4987,15 @@ ConstraintSystem::simplifyRestrictedConstraint(
   llvm_unreachable("Unhandled SolutionKind in switch.");
 }
 
+static bool isAugmentingFix(ConstraintFix *fix) {
+  switch (fix->getKind()) {
+    case swift::constraints::FixKind::TreatRValueAsLValue:
+      return false;
+    default:
+      return true;
+  }
+}
+
 bool ConstraintSystem::recordFix(ConstraintFix *fix) {
   auto &ctx = getASTContext();
   if (ctx.LangOpts.DebugConstraintSolver) {
@@ -5005,20 +5014,30 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
   if (worseThanBestSolution())
     return true;
 
-  if (!fix->shouldRecordFix())
-    return false;
-
-  auto *loc = fix->getLocator();
-  auto existingFix = llvm::find_if(Fixes, [&](const ConstraintFix *e) {
-    // If we already have a fix like this recorded, let's not do it again,
-    // this situation might happen when the same fix kind is applicable to
+  if (isAugmentingFix(fix)) {
+    // Always useful, unless duplicate of exactly the same fix and location.
+    // This situation might happen when the same fix kind is applicable to
     // different overload choices.
-    return e->getKind() == fix->getKind() && e->getLocator() == loc;
-  });
-
-  if (existingFix == Fixes.end())
-    Fixes.push_back(fix);
-
+    auto *loc = fix->getLocator();
+    auto existingFix = llvm::find_if(Fixes, [&](const ConstraintFix *e) {
+      // If we already have a fix like this recorded, let's not do it again,
+      return e->getKind() == fix->getKind() && e->getLocator() == loc;
+    });
+    if (existingFix == Fixes.end())
+      Fixes.push_back(fix);
+  } else {
+    // Only useful to record if no pre-existing fix in the subexpr tree.
+    llvm::SmallDenseSet<Expr *> fixExprs;
+    for (auto fix : Fixes)
+      fixExprs.insert(fix->getAnchor());
+    bool found = false;
+    fix->getAnchor()->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+      found |= fixExprs.count(subExpr) > 0;
+      return subExpr;
+    });
+    if (!found)
+      Fixes.push_back(fix);
+  }
   return false;
 }
 

@@ -44,18 +44,6 @@ void ConstraintFix::print(llvm::raw_ostream &Out) const {
 
 void ConstraintFix::dump() const {print(llvm::errs()); }
 
-bool ConstraintFix::constraintSystemContainsFixInExpr(Expr *expr) const {
-  llvm::SmallDenseSet<Expr *> fixExprs;
-  for (auto fix : CS.Fixes)
-    fixExprs.insert(fix->getAnchor());
-  bool found = false;
-  expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
-    found |= fixExprs.count(subExpr) > 0;
-    return subExpr;
-  });
-  return found;
-}
-
 std::string ForceDowncast::getName() const {
   llvm::SmallString<16> name;
   name += "force downcast (as! ";
@@ -115,10 +103,6 @@ bool AddAddressOf::diagnose(Expr *root, bool asNote) const {
 AddAddressOf *AddAddressOf::create(ConstraintSystem &cs,
                                    ConstraintLocator *locator) {
   return new (cs.getAllocator()) AddAddressOf(cs, locator);
-}
-
-bool TreatRValueAsLValue::shouldRecordFix() const {
-  return !constraintSystemContainsFixInExpr(getAnchor());
 }
 
 bool TreatRValueAsLValue::diagnose(Expr *root, bool asNote) const {
