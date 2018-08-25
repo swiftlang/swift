@@ -1112,8 +1112,7 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
 static ProtocolConformance &mapConformanceIntoContext(IRGenModule &IGM,
                                                       const ProtocolConformance &conf,
                                                       DeclContext *dc) {
-  return *conf.subst(dc->mapTypeIntoContext(conf.getType()),
-                     [&](SubstitutableType *t) -> Type {
+  return *conf.subst([&](SubstitutableType *t) -> Type {
                        return dc->mapTypeIntoContext(t);
                      },
                      LookUpConformanceInModule(IGM.getSwiftModule()));
