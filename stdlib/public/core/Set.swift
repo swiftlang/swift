@@ -960,15 +960,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func subtracting<S: Sequence>(_ other: S) -> Set<Element>
     where S.Element == Element {
-    return self._subtracting(other)
-  }
-
-  @inlinable
-  internal func _subtracting<S: Sequence>(_ other: S) -> Set<Element>
-    where S.Element == Element {
-    var newSet = self
-    newSet.subtract(other)
-    return newSet
+    return Set(_native: _variant.subtracting(other))
   }
 
   /// Removes the elements of the given sequence from the set.
@@ -992,7 +984,11 @@ extension Set: SetAlgebra {
 
   @inlinable
   internal mutating func _subtract<S: Sequence>(_ other: S)
-    where S.Element == Element {
+  where S.Element == Element {
+    guard _variant.isUniquelyReferenced() else {
+      self = Set(_native: _variant.subtracting(other))
+      return
+    }
     for item in other {
       remove(item)
     }
@@ -1300,7 +1296,7 @@ extension Set {
   /// - Returns: A new set.
   @inlinable
   public func subtracting(_ other: Set<Element>) -> Set<Element> {
-    return self._subtracting(other)
+    return Set(_native: _variant.subtracting(other))
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict
@@ -2058,6 +2054,22 @@ extension _NativeSet {
   }
 
   @inlinable
+  internal func bitmap<S: Sequence>(
+    markingElementsIn other: S
+  ) -> (bitmap: _Bitmap, count: Int)
+  where S.Element == Element {
+    var bitmap = _Bitmap(bitCount: self.bucketCount)
+    var count = 0
+    for element in other {
+      let (index, found) = find(element)
+      if found, bitmap._uncheckedInsert(index.bucket) {
+        count += 1
+      }
+    }
+    return (bitmap, count)
+  }
+
+  @inlinable
   internal mutating func formUnion<S: Sequence>(_ other: S, isUnique: Bool)
     where S.Element == Element {
     var isUnique = isUnique
@@ -2076,18 +2088,29 @@ extension _NativeSet {
   }
 
   @inlinable
+  internal func subtracting<S: Sequence>(_ other: S) -> _NativeSet
+    where S.Element == Element {
+    // Rather than directly creating a new set, mark common elements in a bitmap
+    // first. This ensures we hash each element (in both sets) only once, and
+    // that we'll have an exact count for the result set, preventing rehashings
+    // during insertions.
+    let (dupes, dupeCount) = bitmap(markingElementsIn: other)
+    if dupeCount == 0 { return self }
+    if dupeCount == self.count { return _NativeSet() }
+    var result = _NativeSet(capacity: self.count - dupeCount)
+    for index in self.indices where !dupes._uncheckedContains(index.bucket) {
+      result.insertNew(self.uncheckedElement(at: index))
+    }
+    return result
+  }
+
+  @inlinable
   internal func intersection<S: Sequence>(_ other: S) -> _NativeSet<Element>
     where S.Element == Element {
-    // Rather than directly creating a new set, mark common elements in a
-    // bitmap, to prevent repeated rehashing during reallocations.
-    var dupes = _Bitmap(bitCount: self.bucketCount)
-    var dupeCount = 0
-    for element in other {
-      let (index, found) = find(element)
-      if found, dupes._uncheckedInsert(index.bucket) {
-        dupeCount += 1
-      }
-    }
+    // Rather than directly creating a new set, mark common elements in a bitmap
+    // first. This minimizes hashing, and ensures that we'll have an exact count
+    // for the result set, preventing rehashings during insertions.
+    let (dupes, dupeCount) = bitmap(markingElementsIn: other)
     if dupeCount == 0 { return _NativeSet() }
     if dupeCount == self.count { return self }
     if let other = other as? _NativeSet<Element>, dupeCount == other.count {
@@ -2106,6 +2129,8 @@ extension _NativeSet {
     where S.Element == Element {
     // Rather than directly creating a new set, mark common elements from `self`
     // in a bitmap, and collect distinct elements from `other` in an array.
+    // This minimizes hashing, and ensures that we'll have an exact count for
+    // the result set, preventing rehashings during insertions.
     var dupes = _Bitmap(bitCount: self.bucketCount)
     var dupeCount = 0
     var distinctsInOther: [Element] = []
@@ -2137,7 +2162,9 @@ extension _NativeSet {
       return other.symmetricDifference(self)
     }
     // Rather than directly creating a new set, mark common elements from `self`
-    // and `other` in two bitmaps.
+    // and `other` in two bitmaps.  This minimizes hashing, and ensures that
+    // we'll have an exact count for the result set, preventing rehashings
+    // during insertions.
     var selfDupes = _Bitmap(bitCount: self.bucketCount)
     var otherDupes = _Bitmap(bitCount: other.bucketCount)
     var dupeCount = 0
@@ -3079,6 +3106,19 @@ extension Set._Variant {
       var native = _NativeSet<Element>(this)
       native.formUnion(other, isUnique: true)
       self = .native(native)
+#endif
+    }
+  }
+
+  @inlinable
+  internal func subtracting<S: Sequence>(_ other: S) -> _NativeSet<Element>
+  where S.Element == Element {
+    switch self {
+    case .native(let native):
+      return native.subtracting(other)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      return _NativeSet(cocoa).subtracting(other)
 #endif
     }
   }
