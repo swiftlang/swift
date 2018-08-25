@@ -7677,6 +7677,7 @@ static void finishInheritedConformances(
                                                      inherited);
     assert(inheritedConformance && inheritedConformance->isConcrete() &&
            "inherited conformance not found");
+    (void)inheritedConformance;
   }
 }
 

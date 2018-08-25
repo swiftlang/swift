@@ -2440,8 +2440,9 @@ ResultPlanner::planScalarFromIndirectResult(AbstractionPattern innerOrigType,
 void ResultPlanner::executeInnerTuple(
     SILValue innerElement, SmallVector<SILValue, 4> &innerDirectResults) {
   // NOTE: We know that our value is at +1 here.
-  auto innerTupleType = innerElement->getType().getAs<TupleType>();
-  assert(innerTupleType && "Only supports tuple inner types");
+  assert(innerElement->getType().getAs<TupleType>() &&
+         "Only supports tuple inner types");
+
   SGF.B.emitDestructureValueOperation(
       Loc, innerElement, [&](unsigned index, SILValue elt) {
         if (elt->getType().is<TupleType>())
