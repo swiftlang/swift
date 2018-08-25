@@ -140,6 +140,12 @@ enum class ConstraintKind : char {
   // The key path type is chosen based on the selection of overloads for the
   // member references along the path.
   KeyPath,
+  /// \brief The first type is a function type, the second is the function's
+  /// input type.
+  FunctionInput,
+  /// \brief The first type is a function type, the second is the function's
+  /// result type.
+  FunctionResult,
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -487,6 +493,8 @@ public:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::Defaultable:
+    case ConstraintKind::FunctionInput:
+    case ConstraintKind::FunctionResult:
       return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Disjunction:

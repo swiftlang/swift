@@ -859,6 +859,8 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
     llvm_unreachable("Not a call argument constraint");
   }
   
@@ -982,6 +984,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::BridgingConversion:
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
     llvm_unreachable("Not a conversion");
   }
 
@@ -1074,6 +1078,8 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
     return false;
   }
 
@@ -1222,6 +1228,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::BridgingConversion:
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -1893,6 +1901,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
+    case ConstraintKind::FunctionInput:
+    case ConstraintKind::FunctionResult:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -3026,6 +3036,64 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
 
   // Equate it to the other type in the constraint.
   addConstraint(ConstraintKind::Bind, objectTy, second, locator);
+  return SolutionKind::Solved;
+}
+
+/// \brief Attempt to simplify a function input or result constraint.
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyFunctionComponentConstraint(
+                                        ConstraintKind kind,
+                                        Type first, Type second,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator) {
+  auto funcTy = simplifyType(first);
+
+  unsigned unwrapCount = 0;
+  if (shouldAttemptFixes()) {
+    while (auto objectTy = funcTy->getOptionalObjectType()) {
+      funcTy = objectTy;
+
+      // Track how many times we do this so that we can record a fix for each.
+      ++unwrapCount;
+    }
+  }
+
+  if (funcTy->isTypeVariableOrMember()) {
+    if (!flags.contains(TMF_GenerateConstraints))
+      return SolutionKind::Unsolved;
+
+    addUnsolvedConstraint(
+      Constraint::create(*this, kind, funcTy, second,
+                         getConstraintLocator(locator)));
+  } else if (funcTy->is<FunctionType>()) {
+    // Equate it to the other type in the constraint.
+    Type type;
+    ConstraintLocator::PathElementKind locKind;
+
+    if (kind == ConstraintKind::FunctionInput) {
+      type = funcTy->castTo<FunctionType>()->getInput();
+      locKind = ConstraintLocator::FunctionArgument;
+    } else if (kind == ConstraintKind::FunctionResult) {
+      type = funcTy->castTo<FunctionType>()->getResult();
+      locKind = ConstraintLocator::FunctionResult;
+    } else {
+      llvm_unreachable("Bad function component constraint kind");
+    }
+
+    addConstraint(ConstraintKind::Bind, type, second,
+                  locator.withPathElement(locKind));
+  } else {
+    return SolutionKind::Error;
+  }
+
+  if (unwrapCount > 0) {
+    auto *fix = ForceOptional::create(*this, getConstraintLocator(locator));
+    while (unwrapCount-- > 0) {
+      if (recordFix(fix))
+        return SolutionKind::Error;
+    }
+  }
+
   return SolutionKind::Solved;
 }
 
@@ -5166,6 +5234,11 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::Defaultable:
     return simplifyDefaultableConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
+    return simplifyFunctionComponentConstraint(kind, first, second,
+                                               subflags, locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::BindOverload:
@@ -5500,6 +5573,14 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                          constraint.getSecondType(),
                                          TMF_GenerateConstraints,
                                          constraint.getLocator());
+
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
+    return simplifyFunctionComponentConstraint(constraint.getKind(),
+                                               constraint.getFirstType(),
+                                               constraint.getSecondType(),
+                                               TMF_GenerateConstraints,
+                                               constraint.getLocator());
 
   case ConstraintKind::Disjunction:
     // Disjunction constraints are never solved here.

@@ -167,6 +167,8 @@ static bool shouldBindToValueType(Constraint *constraint) {
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
     llvm_unreachable("shouldBindToValueType() may only be called on "
                      "relational constraints");
   }
@@ -426,6 +428,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
+    case ConstraintKind::FunctionInput:
+    case ConstraintKind::FunctionResult:
       // Constraints from which we can't do anything.
       break;
 

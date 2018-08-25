@@ -65,6 +65,8 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
@@ -130,6 +132,8 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::Defaultable:
   case ConstraintKind::BindOverload:
   case ConstraintKind::Disjunction:
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -231,6 +235,8 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::Defaultable:
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
   case ConstraintKind::BindOverload:
@@ -321,6 +327,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       break;
   case ConstraintKind::OptionalObject:
       Out << " optional with object type "; break;
+  case ConstraintKind::FunctionInput:
+    Out << " bind function input of "; break;
+  case ConstraintKind::FunctionResult:
+    Out << " bind function result of "; break;
   case ConstraintKind::BindOverload: {
     Out << " bound to ";
     auto overload = getOverloadChoice();
@@ -509,6 +519,8 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
     constraint->getFirstType()->getTypeVariables(typeVars);
     constraint->getSecondType()->getTypeVariables(typeVars);
     break;
