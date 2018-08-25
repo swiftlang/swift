@@ -15,11 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
-#include "ConstraintSystem.h"
 #include "CSDiag.h"
+#include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -609,5 +611,58 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
 
   diagnoseSubElementFailure(diagExpr, loc, getConstraintSystem(),
                             subElementDiagID, rvalueDiagID);
+  return true;
+}
+
+bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
+  const auto *expr = getParentExpr();
+  auto *callExpr = dyn_cast<CallExpr>(expr);
+  if (!callExpr)
+    return false;
+  if (!callExpr->hasTrailingClosure())
+    return false;
+  if (callExpr->getFn() != getAnchor())
+    return false;
+
+  llvm::SmallMapVector<Identifier, const ValueDecl *, 8> choicesByLabel;
+  for (const auto &choice : Choices) {
+    auto *callee = dyn_cast<AbstractFunctionDecl>(choice.getDecl());
+    if (!callee)
+      return false;
+
+    const ParameterList *paramList = callee->getParameters();
+    const ParamDecl *param = paramList->getArray().back();
+
+    // Sanity-check that the trailing closure corresponds to this parameter.
+    if (!param->hasValidSignature() ||
+        !param->getInterfaceType()->is<AnyFunctionType>())
+      return false;
+
+    Identifier trailingClosureLabel = param->getArgumentName();
+    auto &choiceForLabel = choicesByLabel[trailingClosureLabel];
+
+    // FIXME: Cargo-culted from diagnoseAmbiguity: apparently the same decl can
+    // appear more than once?
+    if (choiceForLabel == callee)
+      continue;
+
+    // If just providing the trailing closure label won't solve the ambiguity,
+    // don't bother offering the fix-it.
+    if (choiceForLabel != nullptr)
+      return false;
+
+    choiceForLabel = callee;
+  }
+
+  // If we got here, then all of the choices have unique labels. Offer them in
+  // order.
+  for (const auto &choicePair : choicesByLabel) {
+    auto diag = emitDiagnostic(
+        expr->getLoc(), diag::ambiguous_because_of_trailing_closure,
+        choicePair.first.empty(), choicePair.second->getFullName());
+    swift::fixItEncloseTrailingClosure(getTypeChecker(), diag, callExpr,
+                                       choicePair.first);
+  }
+
   return true;
 }
