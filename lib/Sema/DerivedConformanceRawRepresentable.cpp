@@ -319,9 +319,6 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   (void)equatableProto;
   (void)rawType;
 
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
-                                         /*static*/false, /*inout*/true);
-
   auto *rawDecl = new (C)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                 C.Id_rawValue, SourceLoc(), C.Id_rawValue, parentDC);
@@ -336,7 +333,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
                             /*Failability=*/ OTK_Optional,
                             /*FailabilityLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                            selfDecl, paramList,
+                            paramList,
                             /*GenericParams=*/nullptr, parentDC);
   
   initDecl->setImplicit();

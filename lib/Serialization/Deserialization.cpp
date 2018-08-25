@@ -2793,7 +2793,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       createDecl<ConstructorDecl>(name, SourceLoc(),
                                   failability, /*FailabilityLoc=*/SourceLoc(),
                                   /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-                                  /*BodyParams=*/nullptr, nullptr,
+                                  /*BodyParams=*/nullptr,
                                   genericParams, parent);
     declOrOffset = ctor;
 
@@ -2806,17 +2806,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return nullptr;
     }
 
-    bool mutating = parent->getDeclaredInterfaceType()->hasReferenceSemantics();
-    auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parent,
-                                           /*static*/ false,
-                                           /*mutating*/ mutating);
-    selfDecl->setImplicit();
-
     auto *bodyParams = readParameterList();
     assert(bodyParams && "missing parameters for constructor");
-    ctor->setParameters(selfDecl, bodyParams);
-
-    ctor->computeType();
+    ctor->setParameters(bodyParams);
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
@@ -2840,6 +2832,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       error();
       return nullptr;
     }
+
+    ctor->computeType();
 
     break;
   }
@@ -3152,21 +3146,20 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    bool hasImplicitSelfDecl = DC->isTypeContext();
     FuncDecl *fn;
     if (!isAccessor) {
       fn = FuncDecl::createDeserialized(
         ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-        genericParams, hasImplicitSelfDecl, DC);
+        genericParams, DC);
     } else {
       fn = AccessorDecl::createDeserialized(
         ctx, /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
         accessorKind, addressorKind, storage,
         /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-        genericParams, hasImplicitSelfDecl, DC);
+        genericParams, DC);
     }
     fn->setEarlyAttrValidation();
     declOrOffset = fn;
@@ -3206,20 +3199,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     fn->getBodyResultTypeLoc().setType(getType(resultInterfaceTypeID));
 
-    ParamDecl *selfDecl = nullptr;
-    if (DC->isTypeContext()) {
-      selfDecl = ParamDecl::createSelf(SourceLoc(), DC,
-                                       fn->isStatic(),
-                                       fn->isMutating());
-      selfDecl->setImplicit();
-    }
-
     ParameterList *paramList = readParameterList();
-
-    fn->setParameters(selfDecl, paramList);
-
-    // Set the interface type.
-    fn->computeType();
+    fn->setParameters(paramList);
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
@@ -3244,6 +3225,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       error();
       return nullptr;
     }
+
+    // Set the interface type.
+    fn->computeType();
 
     break;
   }
@@ -3902,19 +3886,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto dtor = createDecl<DestructorDecl>(SourceLoc(), /*selfpat*/nullptr, DC);
+    auto dtor = createDecl<DestructorDecl>(SourceLoc(), DC);
     declOrOffset = dtor;
 
     configureGenericEnvironment(dtor, genericEnvID);
 
     dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
-    auto *selfDecl = ParamDecl::createSelf(SourceLoc(), DC,
-                                           /*static*/ false,
-                                           /*mutating*/ false);
-    selfDecl->setImplicit();
-    dtor->setParameters(selfDecl, ParameterList::createEmpty(ctx));
-
     dtor->computeType();
 
     if (isImplicit)

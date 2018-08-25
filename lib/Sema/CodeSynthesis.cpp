@@ -131,10 +131,8 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
 
   GenericEnvironment *genericEnvironmentOfLazyAccessor = nullptr;
 
-  // The implicit 'self' argument if in a type context.
   ParamDecl *selfDecl = nullptr;
   if (storage->getDeclContext()->isTypeContext()) {
-    // For lazy properties, steal the 'self' from the initializer context.
     if (storage->getAttrs().hasAttribute<LazyAttr>()) {
       // The getter is considered mutating if it's on a value type.
       if (!storage->getDeclContext()->getSelfClassDecl() &&
@@ -142,6 +140,7 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
         storage->setIsGetterMutating(true);
       }
 
+      // For lazy properties, steal the 'self' from the initializer context.
       auto *varDecl = cast<VarDecl>(storage);
       auto *bindingDecl = varDecl->getParentPatternBinding();
       auto *bindingInit = cast<PatternBindingInitializer>(
@@ -150,13 +149,9 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
       selfDecl = bindingInit->getImplicitSelfDecl();
       genericEnvironmentOfLazyAccessor =
         bindingInit->getGenericEnvironmentOfContext();
-    } else {
-      selfDecl = ParamDecl::createSelf(loc,
-                                       storage->getDeclContext(),
-                                       /*isStatic*/false);
     }
   }
-    
+
   // Add an index-forwarding clause.
   auto *getterParams = buildIndexForwardingParamList(storage, {});
 
@@ -174,10 +169,16 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
       staticLoc, StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr,
-      selfDecl, getterParams,
+      getterParams,
       TypeLoc::withoutLoc(storageInterfaceType),
       storage->getDeclContext());
   getter->setImplicit();
+
+  // If we're stealing the 'self' from a lazy initializer, set it now.
+  if (selfDecl) {
+    *getter->getImplicitSelfDeclStorage() = selfDecl;
+    selfDecl->setDeclContext(getter);
+  }
 
   // We need to install the generic environment here because:
   // 1) validating the getter will change the implicit self decl's DC to it,
@@ -213,15 +214,6 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
 
   bool isStatic = storage->isStatic();
   bool isMutating = storage->isSetterMutating();
-
-  // The implicit 'self' argument if in a type context.
-  ParamDecl *selfDecl = nullptr;
-  if (storage->getDeclContext()->isTypeContext()) {
-    selfDecl = ParamDecl::createSelf(loc,
-                                     storage->getDeclContext(),
-                                     /*isStatic*/isStatic,
-                                     /*isInOut*/isMutating);
-  }
   
   // Add a "(value : T, indices...)" argument list.
   auto storageInterfaceType = storage->getValueInterfaceType();
@@ -236,7 +228,7 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
       AccessorKind::Set, AddressorKind::NotAddressor, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, selfDecl, params,
+      /*GenericParams=*/nullptr, params,
       TypeLoc::withoutLoc(setterRetTy),
       storage->getDeclContext());
   setter->setImplicit();
@@ -328,11 +320,7 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   auto &ctx = storage->getASTContext();
   SourceLoc loc = storage->getLoc();
 
-  //  - The implicit 'self' argument if in a type context.
   auto DC = storage->getDeclContext();
-  ParamDecl *selfDecl = nullptr;
-  if (DC->isTypeContext())
-    selfDecl = ParamDecl::createSelf(loc, DC, /*isStatic*/false);
 
   //  - The buffer parameter, (buffer: Builtin.RawPointer,
   //                           inout storage: Builtin.UnsafeValueBuffer,
@@ -369,7 +357,7 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
       (genericParams
        ? genericParams->clone(DC)
        : nullptr),
-      selfDecl, params, TypeLoc::withoutLoc(retTy), DC);
+      params, TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   
   // Open-code the setMutating() calculation since we might run before
@@ -1480,12 +1468,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   }
   
   // Borrow the parameters from the requirement declaration.
-  ParamDecl *SelfDecl = nullptr;
-  if (DC->isTypeContext()) {
-    SelfDecl = ParamDecl::createSelf(SourceLoc(), DC);
-    SelfDecl->setImplicit();
-  }
-
   SmallVector<ParamDecl *, 4> Params;
   SmallVector<Identifier, 4> NameComponents;
   
@@ -1518,7 +1500,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                      DeclName(Context, ParameterBaseName, NameComponents),
                      /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, SelfDecl, ParamList,
+                     /*GenericParams=*/nullptr, ParamList,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
   Parameter->setInterfaceType(SubstInterfaceTy);
@@ -2170,14 +2152,11 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   
   // Create the constructor.
   DeclName name(context, DeclBaseName::createConstructor(), paramList);
-  auto *selfParam = ParamDecl::createSelf(Loc, decl,
-                                          /*static*/false, /*inout*/true);
   auto *ctor =
     new (context) ConstructorDecl(name, Loc,
                                   OTK_None, /*FailabilityLoc=*/SourceLoc(),
                                   /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                                  selfParam, paramList,
-                                  nullptr, decl);
+                                  paramList, /*GenericParams=*/nullptr, decl);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -2440,9 +2419,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   // Determine the initializer parameters.
 
-  // Create the 'self' declaration and patterns.
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), classDecl);
-
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
   options |= ParameterList::Inherited;
@@ -2469,8 +2445,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                               /*FailabilityLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
-                              selfDecl, bodyParams,
-                              genericParams, classDecl);
+                              bodyParams, genericParams, classDecl);
 
   ctor->setImplicit();
 
@@ -2499,6 +2474,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   assert(kind == DesignatedInitKind::Chaining);
 
   // Reference to super.init.
+  auto *selfDecl = ctor->getImplicitSelfDecl();
   Expr *superRef = new (ctx) SuperRefExpr(selfDecl, SourceLoc(),
                                           /*Implicit=*/true);
   Expr *ctorRef  = new (ctx) UnresolvedDotExpr(superRef, SourceLoc(),
