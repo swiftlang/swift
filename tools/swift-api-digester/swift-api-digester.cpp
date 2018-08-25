@@ -638,15 +638,18 @@ public:
   virtual ~SDKTreeDiffPass() {}
 };
 
-static void detectFuncDeclChange(NodePtr L, NodePtr R) {
+static void detectFuncDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
   assert(L->getKind() == R->getKind());
+  auto &Diags = Ctx.getDiags();
   if (auto LF = dyn_cast<SDKNodeDeclAbstractFunc>(L)) {
     auto RF = R->getAs<SDKNodeDeclAbstractFunc>();
     if (!LF->isThrowing() && RF->isThrowing()) {
-      LF->annotate(NodeAnnotation::NowThrowing);
+      Diags.diagnose(SourceLoc(), diag::decl_new_attr, LF->getScreenInfo(),
+        Ctx.buffer("throwing"));
     }
     if (!LF->isMutating() && RF->isMutating()) {
-      LF->annotate(NodeAnnotation::NowMutating);
+      Diags.diagnose(SourceLoc(), diag::decl_new_attr, LF->getScreenInfo(),
+        Ctx.buffer("mutating"));
     }
   }
 }
@@ -671,24 +674,48 @@ static bool isOwnershipEquivalent(ReferenceOwnership Left,
   return false;
 }
 
-static void detectDeclChange(NodePtr L, NodePtr R) {
+static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
   assert(L->getKind() == R->getKind());
-  auto &Ctx = L->getSDKContext();
+  auto &Diags = Ctx.getDiags();
   if (auto LD = dyn_cast<SDKNodeDecl>(L)) {
     auto *RD = R->getAs<SDKNodeDecl>();
-    if (LD->isStatic() ^ RD->isStatic())
-      L->annotate(NodeAnnotation::StaticChange);
-    if (!isOwnershipEquivalent(LD->getReferenceOwnership(),
-                               RD->getReferenceOwnership()))
-      L->annotate(NodeAnnotation::OwnershipChange);
-    // Check if some attributes with ABI-impact have been added/removed.
-    for (auto &Info: Ctx.getABIAttributeInfo()) {
-      if (LD->hasDeclAttribute(Info.Kind) != RD->hasDeclAttribute(Info.Kind))
-        L->annotate(Info.Annotation);
+
+    // Diagnose static attribute change.
+    if (LD->isStatic() ^ RD->isStatic()) {
+      Diags.diagnose(SourceLoc(), diag::decl_new_attr, LD->getScreenInfo(),
+        Ctx.buffer(LD->isStatic() ? "not static" : "static"));
     }
-    // Mark generic signature change
-    if (LD->getGenericSignature() != RD->getGenericSignature())
-      L->annotate(NodeAnnotation::ChangeGenericSignature);
+
+    // Diagnose ownership change.
+    if (!isOwnershipEquivalent(LD->getReferenceOwnership(),
+                               RD->getReferenceOwnership())) {
+      auto getOwnershipDescription = [&](swift::ReferenceOwnership O) {
+        if (O == ReferenceOwnership::Strong)
+          return Ctx.buffer("strong");
+        return keywordOf(O);
+      };
+      Diags.diagnose(SourceLoc(), diag::decl_attr_change, LD->getScreenInfo(),
+        getOwnershipDescription(LD->getReferenceOwnership()),
+        getOwnershipDescription(RD->getReferenceOwnership()));
+    }
+    if (options::Abi) {
+      // Check if some attributes with ABI-impact have been added/removed.
+      for (auto &Info: Ctx.getABIAttributeInfo()) {
+        if (LD->hasDeclAttribute(Info.Kind) != RD->hasDeclAttribute(Info.Kind)) {
+          auto Desc = LD->hasDeclAttribute(Info.Kind) ?
+            Ctx.buffer((llvm::Twine("without ") + Info.Content).str()):
+            Ctx.buffer((llvm::Twine("with ") + Info.Content).str());
+          Diags.diagnose(SourceLoc(), diag::decl_new_attr, LD->getScreenInfo(),
+            Desc);
+        }
+      }
+    }
+
+    // Diagnose generic signature change
+    if (LD->getGenericSignature() != RD->getGenericSignature()) {
+      Diags.diagnose(SourceLoc(), diag::generic_sig_change, LD->getScreenInfo(),
+        LD->getGenericSignature(), RD->getGenericSignature());
+    }
     detectRename(L, R);
   }
 }
@@ -713,11 +740,11 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
     for (NodePtr R : RightToRemove)
       Right->removeChild(R);
   }
-
+  SDKContext &Ctx;
   UpdatedNodesMap &UpdateMap;
 
 public:
-  PrunePass(UpdatedNodesMap &UpdateMap) : UpdateMap(UpdateMap) {}
+  PrunePass(SDKContext &Ctx): Ctx(Ctx), UpdateMap(Ctx.getNodeUpdateMap()) {}
 
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
     switch (Reason) {
@@ -755,8 +782,8 @@ public:
     SDKNodeKind Kind = Left->getKind();
     assert(Kind == SDKNodeKind::Root || *Left != *Right);
 
-    detectDeclChange(Left, Right);
-    detectFuncDeclChange(Left, Right);
+    detectDeclChange(Left, Right, Ctx);
+    detectFuncDeclChange(Left, Right, Ctx);
 
     switch(Kind) {
     case SDKNodeKind::Root:
@@ -1610,54 +1637,8 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
           Count->getFullyQualifiedName()).str()));
     return;
   }
-  case NodeAnnotation::NowMutating: {
-    Diags.diagnose(SourceLoc(), diag::decl_new_attr, Node->getScreenInfo(),
-      Ctx.buffer("mutating"));
+  default:
     return;
-  }
-  case NodeAnnotation::NowThrowing: {
-    Diags.diagnose(SourceLoc(), diag::decl_new_attr, Node->getScreenInfo(),
-      Ctx.buffer("throwing"));
-    return;
-  }
-  case NodeAnnotation::StaticChange: {
-    Diags.diagnose(SourceLoc(), diag::decl_new_attr, Node->getScreenInfo(),
-      Ctx.buffer(Node->isStatic() ? "not static" : "static"));
-    return;
-  }
-  case NodeAnnotation::OwnershipChange: {
-    auto getOwnershipDescription = [&](swift::ReferenceOwnership O) {
-      if (O == ReferenceOwnership::Strong)
-        return Ctx.buffer("strong");
-      return keywordOf(O);
-    };
-    auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    Diags.diagnose(SourceLoc(), diag::decl_attr_change, Node->getScreenInfo(),
-      getOwnershipDescription(Node->getReferenceOwnership()),
-      getOwnershipDescription(Count->getReferenceOwnership()));
-    return;
-  }
-  case NodeAnnotation::ChangeGenericSignature: {
-    Diags.diagnose(SourceLoc(), diag::generic_sig_change, Node->getScreenInfo(),
-      Node->getGenericSignature(), UpdateMap.findUpdateCounterpart(Node)->
-        getAs<SDKNodeDecl>()->getGenericSignature());
-    return;
-  }
-
-  default: {
-    // Diagnose the addition/removal of attributes with ABI impact.
-    auto Infos = Ctx.getABIAttributeInfo();
-    auto It = std::find_if(Infos.begin(), Infos.end(),
-      [&](const ABIAttributeInfo &I) { return I.Annotation == Anno; });
-    if (It == Infos.end())
-      return;
-    auto Desc = Node->hasDeclAttribute(It->Kind) ?
-      Ctx.buffer((llvm::Twine("without ") + It->Content).str()):
-      Ctx.buffer((llvm::Twine("with ") + It->Content).str());
-    if (options::Abi)
-      Diags.diagnose(SourceLoc(), diag::decl_new_attr, Node->getScreenInfo(), Desc);
-    return;
-  }
   }
 }
 
@@ -1812,7 +1793,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
     llvm::errs() << RightPath << " does not exist\n";
     return 1;
   }
-  ModuleDifferDiagsConsumer PDC;
+  ModuleDifferDiagsConsumer PDC(true);
   SDKContext Ctx(Opts);
   Ctx.getDiags().addConsumer(PDC);
 
@@ -1824,7 +1805,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   auto RightModule = RightCollector.getSDKRoot();
   TypeAliasDiffFinder(LeftModule, RightModule,
                       Ctx.getTypeAliasUpdateMap()).search();
-  PrunePass Prune(Ctx.getNodeUpdateMap());
+  PrunePass Prune(Ctx);
   Prune.pass(LeftModule, RightModule);
   ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
   RefinementPass.pass(LeftModule, RightModule);
@@ -1869,7 +1850,7 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
 
-  ModuleDifferDiagsConsumer PDC;
+  ModuleDifferDiagsConsumer PDC(false);
   SDKContext Ctx(Opts);
   Ctx.getDiags().addConsumer(PDC);
 
@@ -1886,7 +1867,7 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   llvm::errs() << "Detecting type member diffs" << "\n";
   findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
 
-  PrunePass Prune(Ctx.getNodeUpdateMap());
+  PrunePass Prune(Ctx);
   Prune.pass(LeftModule, RightModule);
   llvm::errs() << "Finished pruning" << "\n";
   ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
