@@ -1,3 +1,5 @@
+// SWIFT_ENABLE_TENSORFLOW
+// UNSUPPORTED: macos
 // RUN: %sourcekitd-test -req=sema %s -- %s | %FileCheck %s -check-prefix=NONE
 // RUN: %sourcekitd-test -req=track-compiles == -req=version | %FileCheck %s -check-prefix=NONE
 // RUN: %sourcekitd-test -req=track-compiles -req-opts=value=0 \

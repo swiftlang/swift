@@ -1,3 +1,5 @@
+// SWIFT_ENABLE_TENSORFLOW
+// UNSUPPORTED: macos
 // RUN: not %target-swift-frontend -parse-sil -emit-sil 2>&1 | %FileCheck -check-prefix=SIL_FILES %s
 // SIL_FILES: this mode requires a single input file
 
