@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
-#include "MiscDiagnostics.h"
+#include "CSDiagnostics.h"
 #include "TypeCheckType.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
@@ -2283,61 +2283,6 @@ static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
   return name;
 }
 
-/// Returns true if any diagnostics were emitted.
-static bool
-tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc, const Expr *expr,
-                                    const Expr *anchor,
-                                    ArrayRef<OverloadChoice> choices) {
-  auto *callExpr = dyn_cast<CallExpr>(expr);
-  if (!callExpr)
-    return false;
-  if (!callExpr->hasTrailingClosure())
-    return false;
-  if (callExpr->getFn() != anchor)
-    return false;
-
-  llvm::SmallMapVector<Identifier, const ValueDecl *, 8> choicesByLabel;
-  for (const OverloadChoice &choice : choices) {
-    auto *callee = dyn_cast<AbstractFunctionDecl>(choice.getDecl());
-    if (!callee)
-      return false;
-
-    const ParameterList *paramList = callee->getParameters();
-    const ParamDecl *param = paramList->getArray().back();
-
-    // Sanity-check that the trailing closure corresponds to this parameter.
-    if (!param->hasValidSignature() ||
-        !param->getInterfaceType()->is<AnyFunctionType>())
-      return false;
-
-    Identifier trailingClosureLabel = param->getArgumentName();
-    auto &choiceForLabel = choicesByLabel[trailingClosureLabel];
-
-    // FIXME: Cargo-culted from diagnoseAmbiguity: apparently the same decl can
-    // appear more than once?
-    if (choiceForLabel == callee)
-      continue;
-
-    // If just providing the trailing closure label won't solve the ambiguity,
-    // don't bother offering the fix-it.
-    if (choiceForLabel != nullptr)
-      return false;
-
-    choiceForLabel = callee;
-  }
-
-  // If we got here, then all of the choices have unique labels. Offer them in
-  // order.
-  for (const auto &choicePair : choicesByLabel) {
-    auto diag =
-        tc.diagnose(expr->getLoc(), diag::ambiguous_because_of_trailing_closure,
-                    choicePair.first.empty(), choicePair.second->getFullName());
-    swift::fixItEncloseTrailingClosure(tc, diag, callExpr, choicePair.first);
-  }
-
-  return true;
-}
-
 bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
                                          ArrayRef<Solution> solutions) {
   // Produce a diff of the solutions.
@@ -2415,7 +2360,9 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
                                   : diag::ambiguous_decl_ref,
                 name);
 
-    if (tryDiagnoseTrailingClosureAmbiguity(tc, expr, anchor, overload.choices))
+    TrailingClosureAmbiguityFailure failure(expr, *this, anchor,
+                                            overload.choices);
+    if (failure.diagnoseAsNote())
       return true;
 
     // Emit candidates.  Use a SmallPtrSet to make sure only emit a particular
