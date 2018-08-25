@@ -467,6 +467,21 @@ public:
   bool diagnoseAsError() override;
 };
 
+class TrailingClosureAmbiguityFailure final : public FailureDiagnostic {
+  ArrayRef<OverloadChoice> Choices;
+
+public:
+  TrailingClosureAmbiguityFailure(Expr *root, ConstraintSystem &cs,
+                                  Expr *anchor,
+                                  ArrayRef<OverloadChoice> choices)
+      : FailureDiagnostic(root, cs, cs.getConstraintLocator(anchor)),
+        Choices(choices) {}
+
+  bool diagnoseAsError() override { return false; }
+
+  bool diagnoseAsNote() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
