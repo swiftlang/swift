@@ -54,9 +54,20 @@ public:
   /// failure location, types and declarations deduced by
   /// constraint system, and other auxiliary information.
   ///
+  /// \param asNote In ambiguity cases it's beneficial to
+  /// produce diagnostic as a note instead of an error if possible.
+  ///
   /// \returns true If the problem has been successfully diagnosed
   /// and diagnostic message emitted, false otherwise.
-  virtual bool diagnose() = 0;
+  bool diagnose(bool asNote = false);
+
+  /// Try to produce an error diagnostic for the problem at hand.
+  virtual bool diagnoseAsError() = 0;
+
+  /// Instead of producing an error diagnostic, attempt to
+  /// produce a "note" to complement some other diagnostic
+  /// e.g. ambiguity error.
+  virtual bool diagnoseAsNote();
 
   ConstraintSystem &getConstraintSystem() const {
     return CS;
@@ -130,6 +141,7 @@ protected:
   using PathEltKind = ConstraintLocator::PathElementKind;
   using DiagOnDecl = Diag<DescriptiveDeclKind, DeclName, Type, Type>;
   using DiagInReference = Diag<DescriptiveDeclKind, DeclName, Type, Type, Type>;
+  using DiagAsNote = Diag<Type, Type, Type, Type, StringRef>;
 
   const ValueDecl *AffectedDecl;
   /// If possible, find application expression associated
@@ -170,7 +182,8 @@ public:
   virtual Type getLHS() const = 0;
   virtual Type getRHS() const = 0;
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 
 protected:
   /// Retrieve declaration contextual where current
@@ -179,6 +192,7 @@ protected:
 
   virtual DiagOnDecl getDiagnosticOnDecl() const = 0;
   virtual DiagInReference getDiagnosticInRereference() const = 0;
+  virtual DiagAsNote getDiagnosticAsNote() const = 0;
 
   /// Determine whether it would be possible to diagnose
   /// current requirement failure.
@@ -221,7 +235,7 @@ public:
       : RequirementFailure(expr, cs, locator),
         NonConformingType(conformance.first), Protocol(conformance.second) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 
 private:
   /// The type which was expected, by one of the generic requirements,
@@ -238,6 +252,10 @@ protected:
 
   DiagInReference getDiagnosticInRereference() const override {
     return diag::type_does_not_conform_in_decl_ref;
+  }
+
+  DiagAsNote getDiagnosticAsNote() const override {
+    return diag::candidate_types_conformance_requirement;
   }
 };
 
@@ -275,6 +293,10 @@ protected:
   DiagInReference getDiagnosticInRereference() const override {
     return diag::types_not_equal_in_decl_ref;
   }
+
+  DiagAsNote getDiagnosticAsNote() const override {
+    return diag::candidate_types_equal_requirement;
+  }
 };
 
 /// Diagnose failures related to superclass generic requirements, e.g.
@@ -309,6 +331,10 @@ protected:
   DiagInReference getDiagnosticInRereference() const override {
     return diag::types_not_inherited_in_decl_ref;
   }
+
+  DiagAsNote getDiagnosticAsNote() const override {
+    return diag::candidate_types_inheritance_requirement;
+  }
 };
 
 /// Diagnose errors associated with missing, extraneous
@@ -327,7 +353,7 @@ public:
                   ArrayRef<Identifier> labels)
       : FailureDiagnostic(nullptr, cs, locator), CorrectLabels(labels) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose errors related to converting function type which
@@ -341,7 +367,7 @@ public:
                                       Type toType = Type())
       : FailureDiagnostic(expr, cs, locator), ConvertTo(toType) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 class MissingForcedDowncastFailure final : public FailureDiagnostic {
@@ -350,7 +376,7 @@ public:
                                ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related to passing value of some type
@@ -361,7 +387,7 @@ public:
                           ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related attempt to implicitly convert types which
@@ -375,7 +401,7 @@ public:
                                    ConstraintLocator *locator, Type toType)
       : FailureDiagnostic(expr, cs, locator), ConvertingTo(toType) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 
 private:
   bool exprNeedsParensBeforeAddingAs(Expr *expr) {
@@ -416,7 +442,7 @@ public:
       : FailureDiagnostic(expr, cs, locator), Member(memberName),
         ResultTypeIsOptional(resultOptional) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related to use of the unwrapped optional types,
@@ -427,7 +453,7 @@ public:
                                ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose errors associated with rvalues in positions
@@ -438,7 +464,7 @@ public:
   RValueTreatedAsLValueFailure(ConstraintSystem &cs, ConstraintLocator *locator)
       : FailureDiagnostic(nullptr, cs, locator) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints
