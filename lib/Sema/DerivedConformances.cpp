@@ -284,7 +284,6 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
 
   auto &C = tc.Context;
   auto parentDC = property->getDeclContext();
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC, isStatic);
   ParameterList *params = ParameterList::createEmpty(C);
 
   Type propertyInterfaceType = property->getInterfaceType();
@@ -294,7 +293,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     AccessorKind::Get, AddressorKind::NotAddressor, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-    /*GenericParams=*/nullptr, selfDecl, params,
+    /*GenericParams=*/nullptr, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);

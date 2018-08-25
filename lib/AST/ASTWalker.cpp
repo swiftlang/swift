@@ -313,7 +313,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       visitGenericParamList(AFD->getGenericParams());
     }
 
-    if (auto *PD = AFD->getImplicitSelfDecl())
+    if (auto *PD = AFD->getImplicitSelfDecl(/*createIfNeeded=*/false))
       visit(PD);
     visit(AFD->getParameters());
 
