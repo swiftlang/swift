@@ -760,39 +760,6 @@ static ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
                    Type argType, Type paramType,
                    ConstraintLocatorBuilder locator) {
-
-  if (paramType->isAny()) {
-    if (argType->is<InOutType>())
-      return cs.getTypeMatchFailure(locator);
-
-    // If the param type is Any, the function can only have one argument.
-    // Check if exactly one argument was passed to this function, otherwise
-    // we obviously have a mismatch.
-    if (auto tupleArgType = dyn_cast<TupleType>(argType.getPointer())) {
-      if (tupleArgType->getNumElements() != 1 ||
-          tupleArgType->getElement(0).hasName()) {
-        return cs.getTypeMatchFailure(locator);
-      }
-    }
-
-    // Disallow assignment of noescape function to parameter of type
-    // Any. Allowing this would allow these functions to escape.
-    if (auto *fnTy = argType->getAs<AnyFunctionType>()) {
-      if (fnTy->isNoEscape()) {
-        auto *loc = cs.getConstraintLocator(locator);
-        // Allow assigned of 'no-escape' function with recorded fix.
-        if (cs.shouldAttemptFixes()) {
-          if (!cs.recordFix(MarkExplicitlyEscaping::create(cs, loc)))
-            return cs.getTypeMatchSuccess();
-        }
-
-        return cs.getTypeMatchFailure(locator);
-      }
-    }
-
-    return cs.getTypeMatchSuccess();
-  }
-
   // Extract the parameters.
   ValueDecl *callee;
   unsigned calleeLevel;
@@ -883,6 +850,10 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
                                                                paramIdx));
       auto argTy = args[argIdx].getType();
 
+      // FIXME: This does not make sense at all. If one of argTy or
+      // paramTy is a type variable, matchTypes() will add a constraint,
+      // and when the constraint is later solved, we will have lost
+      // the value of 'subflags'.
       if (!haveOneNonUserConversion) {
         subflags |= ConstraintSystem::TMF_ApplyingOperatorParameter;
       }
@@ -1403,7 +1374,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
   // Conformance to 'Any' always holds.
   if (type2->isAny()) {
-    auto *fnTy = type1->getAs<AnyFunctionType>();
+    auto *fnTy = type1->getAs<FunctionType>();
     if (!fnTy || !fnTy->isNoEscape())
       return getTypeMatchSuccess();
 
@@ -1602,7 +1573,7 @@ ConstraintSystem::matchTypesBindTypeVar(
   // Disallow bindings of noescape functions to type variables that
   // represent an opened archetype. If we allowed this it would allow
   // the noescape function to potentially escape.
-  if (auto *fnTy = type->getAs<AnyFunctionType>()) {
+  if (auto *fnTy = type->getAs<FunctionType>()) {
     if (fnTy->isNoEscape() && typeVar->getImpl().getArchetype()) {
       if (shouldAttemptFixes()) {
         auto *fix = MarkExplicitlyEscaping::create(
@@ -2136,7 +2107,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Penalize conversions to Any, and disallow conversions of
       // noescape functions to Any.
       if (kind >= ConstraintKind::Conversion && type2->isAny()) {
-        if (auto *fnTy = type1->getAs<AnyFunctionType>()) {
+        if (auto *fnTy = type1->getAs<FunctionType>()) {
           if (fnTy->isNoEscape()) {
             if (shouldAttemptFixes()) {
               auto &ctx = getASTContext();
@@ -2154,7 +2125,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           }
         }
 
-        increaseScore(ScoreKind::SK_EmptyExistentialConversion);
+        if (kind != ConstraintKind::ArgumentConversion ||
+            type1->is<FunctionType>())
+          increaseScore(ScoreKind::SK_EmptyExistentialConversion);
       }
 
       conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);

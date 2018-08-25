@@ -5104,45 +5104,17 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   auto *fromTupleExpr = dyn_cast<TupleExpr>(innerExpr);
 
   /// Check each of the tuple elements in the destination.
-  bool hasVariadic = false;
-  unsigned variadicParamIdx = toTuple->getNumElements();
   bool anythingShuffled = false;
-  bool hasInits = false;
   SmallVector<TupleTypeElt, 4> toSugarFields;
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  fromTuple->getElements().size());
-  SmallVector<Expr *, 2> callerDefaultArgs;
-  ConcreteDeclRef callee =
-    findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
+    assert(sources[i] != TupleShuffleExpr::DefaultInitialize &&
+           sources[i] != TupleShuffleExpr::Variadic);
+
     const auto &toElt = toTuple->getElement(i);
     auto toEltType = toElt.getType();
-
-    // If we're default-initializing this member, there's nothing to do.
-    if (sources[i] == TupleShuffleExpr::DefaultInitialize) {
-      anythingShuffled = true;
-      hasInits = true;
-      toSugarFields.push_back(toElt);
-
-      // Create a caller-side default argument, if we need one.
-      if (auto defArg = getCallerDefaultArg(cs, dc, expr->getLoc(),
-                                            callee, i).first) {
-        callerDefaultArgs.push_back(defArg);
-        sources[i] = TupleShuffleExpr::CallerDefaultInitialize;
-      }
-      continue;
-    }
-
-    // If this is the variadic argument, note it.
-    if (sources[i] == TupleShuffleExpr::Variadic) {
-      assert(!hasVariadic && "two variadic parameters?");
-      toSugarFields.push_back(toElt);
-      hasVariadic = true;
-      variadicParamIdx = i;
-      anythingShuffled = true;
-      continue;
-    }
 
     // If the source and destination index are different, we'll be shuffling.
     if ((unsigned)sources[i] != i) {
@@ -5200,51 +5172,6 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       fromElt.getWithType(cs.getType(convertedElt));
   }
 
-  // Convert all of the variadic arguments to the destination type.
-  ArraySliceType *arrayType = nullptr;
-  if (hasVariadic) {
-    Type toEltType = toTuple->getElements()[variadicParamIdx].getVarargBaseTy();
-    for (int fromFieldIdx : variadicArgs) {
-      const auto &fromElt = fromTuple->getElement(fromFieldIdx);
-      Type fromEltType = fromElt.getType();
-
-      // If the source and destination types match, there's nothing to do.
-      if (toEltType->isEqual(fromEltType)) {
-        fromTupleExprFields[fromFieldIdx] = fromElt;
-        continue;
-      }
-
-      // We need to convert the source element to the destination type.
-      if (!fromTupleExpr) {
-        // FIXME: Lame! We can't express this in the AST.
-        tc.diagnose(expr->getLoc(),
-                    diag::tuple_conversion_not_expressible,
-                    fromTuple, toTuple);
-        return nullptr;
-      }
-
-      // Actually convert the source element.
-      auto convertedElt = coerceToType(
-                            fromTupleExpr->getElement(fromFieldIdx),
-                            toEltType,
-                            locator.withPathElement(
-                              LocatorPathElt::getTupleElement(fromFieldIdx)));
-      if (!convertedElt)
-        return nullptr;
-
-      fromTupleExpr->setElement(fromFieldIdx, convertedElt);
-
-      fromTupleExprFields[fromFieldIdx] =
-        fromElt.getWithType(cs.getType(convertedElt));
-    }
-
-    // Find the appropriate injection function.
-    if (tc.requireArrayLiteralIntrinsics(expr->getStartLoc()))
-      return nullptr;
-    arrayType = cast<ArraySliceType>(
-          toTuple->getElements()[variadicParamIdx].getType().getPointer());
-  }
-
   // Compute the updated 'from' tuple type, since we may have
   // performed some conversions in place.
   Type fromTupleType = TupleType::get(fromTupleExprFields, tc.Context);
@@ -5256,8 +5183,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   }
 
   // Compute the re-sugared tuple type.
-  Type toSugarType = hasInits? toTuple
-                             : TupleType::get(toSugarFields, tc.Context);
+  Type toSugarType = TupleType::get(toSugarFields, tc.Context);
 
   // If we don't have to shuffle anything, we're done.
   if (!anythingShuffled && fromTupleExpr) {
@@ -5272,13 +5198,10 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   // Create the tuple shuffle.
   return
     cs.cacheType(TupleShuffleExpr::create(tc.Context,
-                     expr, sources,
-                     TupleShuffleExpr::TupleToTuple,
-                     callee,
-                     variadicArgs,
-                     arrayType,
-                     callerDefaultArgs,
-                     toSugarType));
+                                          expr, sources,
+                                          TupleShuffleExpr::TupleToTuple,
+                                          ConcreteDeclRef(), {}, Type(), {},
+                                          toSugarType));
 }
 
 static Type getMetatypeSuperclass(Type t, TypeChecker &tc) {
