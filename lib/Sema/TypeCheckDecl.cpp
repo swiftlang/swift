@@ -1189,7 +1189,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return false;
 
   // If 'dynamic' was explicitly specified, check it.
-  if (auto dynamicAttr = decl->getAttrs().getAttribute<DynamicAttr>()) {
+  if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
     return makeDynamic(decl);
   }
 

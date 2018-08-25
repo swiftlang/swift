@@ -4440,7 +4440,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   // If there's a foreign error parameter, fill it in.
   ManagedValue errorTemp;
-  if (auto foreignError = calleeTypeInfo.foreignError) {
+  if (calleeTypeInfo.foreignError) {
     unsigned errorParamIndex =
         calleeTypeInfo.foreignError->getErrorParameterIndex();
 

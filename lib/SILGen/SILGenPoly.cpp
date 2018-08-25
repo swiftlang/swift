@@ -2996,7 +2996,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
 
   CanSILFunctionType substFnType = thunkType;
 
-  if (auto genericSig = thunkType->getGenericSignature()) {
+  if (thunkType->getGenericSignature()) {
     substFnType = thunkType->substGenericArgs(SGF.F.getModule(),
                                               interfaceSubs);
   }
@@ -3105,7 +3105,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   // Use the subsitution map in the context of the current function.
   // thunk->getForwardingSubstitutionMap() / thunk might have been created in a
   // different function's generic enviroment.
-  if (auto genericSig = thunkType->getGenericSignature()) {
+  if (thunkType->getGenericSignature()) {
     substFnTy = thunkType->substGenericArgs(F.getModule(), interfaceSubs);
   }
 
@@ -3716,7 +3716,7 @@ SILGenFunction::emitCanonicalFunctionThunk(SILLocation loc, ManagedValue fn,
 
   CanSILFunctionType substFnTy = thunkTy;
 
-  if (auto genericSig = thunkTy->getGenericSignature()) {
+  if (thunkTy->getGenericSignature()) {
     substFnTy = thunkTy->substGenericArgs(F.getModule(), interfaceSubs);
   }
 

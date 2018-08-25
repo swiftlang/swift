@@ -7647,9 +7647,8 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   if (!DLC)
     return visitExpr(E);
 
-  if (auto Conformance
-        = CS.TC.conformsToProtocol(contextualType, DLC, CS.DC,
-                                   ConformanceCheckFlags::InExpression)) {
+  if (CS.TC.conformsToProtocol(contextualType, DLC, CS.DC,
+                               ConformanceCheckFlags::InExpression)) {
     // If the contextual type conforms to ExpressibleByDictionaryLiteral and
     // this is an empty array, then they meant "[:]".
     auto numElements = E->getNumElements();

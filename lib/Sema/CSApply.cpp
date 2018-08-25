@@ -695,7 +695,7 @@ namespace {
     }
 
     unsigned getNaturalArgumentCount(ValueDecl *member) {
-      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (isa<AbstractFunctionDecl>(member)) {
         // For functions, close the existential once the function
         // has been fully applied.
         return 2;
