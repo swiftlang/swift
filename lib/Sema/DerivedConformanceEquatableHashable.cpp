@@ -603,9 +603,6 @@ deriveEquatable_eq(DerivedConformance &derived,
     return param;
   };
 
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
-                                        /*isStatic=*/true);
-
   ParameterList *params = ParameterList::create(C, {
     getParamDecl("a"),
     getParamDecl("b")
@@ -631,7 +628,7 @@ deriveEquatable_eq(DerivedConformance &derived,
                      /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
-                     selfDecl, params,
+                     params,
                      TypeLoc::withoutLoc(boolTy),
                      parentDC);
   eqDecl->setImplicit();
@@ -757,7 +754,6 @@ deriveHashable_hashInto(DerivedConformance &derived,
   Type hasherType = hasherDecl->getDeclaredType();
 
   // Params: self (implicit), hasher
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
   auto *hasherParamDecl = new (C) ParamDecl(VarDecl::Specifier::InOut,
                                             SourceLoc(),
                                             SourceLoc(), C.Id_into, SourceLoc(),
@@ -775,7 +771,7 @@ deriveHashable_hashInto(DerivedConformance &derived,
                                     SourceLoc(), StaticSpellingKind::None,
                                     SourceLoc(), name, SourceLoc(),
                                     /*Throws=*/false, SourceLoc(),
-                                    nullptr, selfDecl, params,
+                                    nullptr, params,
                                     TypeLoc::withoutLoc(returnType),
                                     parentDC);
   hashDecl->setImplicit();
@@ -1077,7 +1073,6 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                     C.Id_hashValue, parentDC);
   hashValueDecl->setType(intType);
 
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
   ParameterList *params = ParameterList::createEmpty(C);
 
   AccessorDecl *getterDecl = AccessorDecl::create(C,
@@ -1085,7 +1080,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       AccessorKind::Get, AddressorKind::NotAddressor, hashValueDecl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, selfDecl, params,
+      /*GenericParams=*/nullptr, params,
       TypeLoc::withoutLoc(intType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);

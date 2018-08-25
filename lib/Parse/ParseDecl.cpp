@@ -3763,11 +3763,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      EndLoc);
   }
 
-  // Create the implicit 'self' if needed.
-  ParamDecl *SelfDecl = nullptr;
-  if (Flags & Parser::PD_HasContainerType)
-    SelfDecl = ParamDecl::createUnboundSelf(DeclLoc, P->CurDeclContext);
-
   // The typechecker will always fill this in.
   TypeLoc ReturnType;
 
@@ -3781,7 +3776,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  (GenericParams
                                   ? GenericParams->clone(P->CurDeclContext)
                                   : nullptr),
-                                 SelfDecl, ValueArg, ReturnType,
+                                 ValueArg, ReturnType,
                                  P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
@@ -5189,10 +5184,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                       ParseDeclOptions Flags, DeclAttributes &Attributes) {
   assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
 
-  bool HasContainerType = Flags.contains(PD_HasContainerType);
-
   if (StaticLoc.isValid()) {
-    if (!HasContainerType) {
+    if (!Flags.contains(PD_HasContainerType)) {
       // Reject static functions at global scope.
       diagnose(Tok, diag::static_func_decl_global_scope, StaticSpelling)
           .fixItRemove(StaticLoc);
@@ -5270,17 +5263,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   if (SignatureHasCodeCompletion && !CodeCompletion)
     return makeParserCodeCompletionStatus();
 
-  // If we're within a container, create a parameter to match the
-  // container type named 'self'.
-  //
-  // This turns an instance function "(int)->int" on FooTy into
-  // "(inout self: FooTy)->(int)->int", and a static function
-  // "(int)->int" on FooTy into "(self: FooTy.Type)->(int)->int".
-  // Note that we can't actually compute the type here until Sema.
-  ParamDecl *SelfDecl = nullptr;
-  if (HasContainerType)
-    SelfDecl = ParamDecl::createUnboundSelf(NameLoc, CurDeclContext);
-
   DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
@@ -5304,7 +5286,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                               FuncLoc, FullName, NameLoc,
                               /*Throws=*/throwsLoc.isValid(), throwsLoc,
                               /*GenericParams=*/nullptr,
-                              SelfDecl, BodyParams, FuncRetTy,
+                              BodyParams, FuncRetTy,
                               CurDeclContext);
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
@@ -6230,13 +6212,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
-  auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
   DeclName FullName(Context, DeclBaseName::createConstructor(), namePieces);
-
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failability, FailabilityLoc,
                                            throwsLoc.isValid(), throwsLoc,
-                                           SelfDecl, Params.get(), nullptr,
+                                           Params.get(), nullptr,
                                            CurDeclContext);
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
@@ -6271,8 +6251,8 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     // Tell the type checker not to touch this constructor.
     CD->setInvalid();
   }
-  
-  addToScope(SelfDecl);
+
+  addToScope(CD->getImplicitSelfDecl());
   addParametersToScope(Params.get());
 
   // '{'
@@ -6355,11 +6335,8 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  auto *SelfDecl = ParamDecl::createUnboundSelf(DestructorLoc, CurDeclContext);
-
   Scope S(this, ScopeKind::DestructorBody);
-  auto *DD = new (Context) DestructorDecl(DestructorLoc, SelfDecl,
-                                          CurDeclContext);
+  auto *DD = new (Context) DestructorDecl(DestructorLoc, CurDeclContext);
 
   // Parse the body.
   if (Tok.is(tok::l_brace)) {
