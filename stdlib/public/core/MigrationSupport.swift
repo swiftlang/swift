@@ -142,7 +142,7 @@ public typealias _ImageLiteralConvertible = _ExpressibleByImageLiteral
 @available(*, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByFileReferenceLiteral")
 public typealias _FileReferenceLiteralConvertible = _ExpressibleByFileReferenceLiteral
 
-@available(*, deprecated, obsoleted: 5.0, renamed: "ClosedRange.Index")
+@available(*, deprecated: 4.2, obsoleted: 5.0, renamed: "ClosedRange.Index")
 public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
 
 /// An optional type that allows implicit member access.
@@ -307,7 +307,7 @@ extension Range where Bound: Strideable, Bound.Stride : SignedInteger {
   /// Now that Range is conditionally a collection when Bound: Strideable,
   /// CountableRange is no longer needed. This is a deprecated initializer
   /// for any remaining uses of Range(countableRange).
-  @available(*, deprecated: 4.2/*, obsoleted: 5.0*/, message: "CountableRange is now a Range. No need to convert any more.")
+  @available(*, deprecated: 4.2, obsoleted: 5.0, message: "CountableRange is now a Range. No need to convert any more.")
   public init(_ other: Range<Bound>) {
     self = other
   }  
@@ -317,7 +317,7 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
   /// Now that Range is conditionally a collection when Bound: Strideable,
   /// CountableRange is no longer needed. This is a deprecated initializer
   /// for any remaining uses of Range(countableRange).
-  @available(*, deprecated: 4.2/*, obsoleted: 5.0*/, message: "CountableClosedRange is now a ClosedRange. No need to convert any more.")
+  @available(*, deprecated: 4.2, obsoleted: 5.0, message: "CountableClosedRange is now a ClosedRange. No need to convert any more.")
   public init(_ other: ClosedRange<Bound>) {
     self = other
   }  
