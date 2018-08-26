@@ -852,9 +852,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func isStrictSuperset<S: Sequence>(of possibleStrictSubset: S) -> Bool
     where S.Element == Element {
-    if possibleStrictSubset.underestimatedCount >= self.count {
-      return false
-    }
+    if isEmpty { return false }
     if let s = possibleStrictSubset as? Set<Element> {
       return isStrictSuperset(of: s)
     }
