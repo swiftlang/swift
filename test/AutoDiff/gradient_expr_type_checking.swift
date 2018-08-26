@@ -74,7 +74,7 @@ func addNumeric<T : Numeric>(_ x: T, _ y: T) -> T {
   return x + y
 }
 func daddNumeric<T : Numeric>(_ x: T, _ y: T) -> (T, T) {
-  return #gradient(addNumeric)(x, y) // expected-error {{gradient parameter has non-differentiable type 'T'}}
+  return #gradient(addNumeric)(x, y)
 }
 // Ok because the constraint on daddNumeric is FloatingPoint, not Numeric.
 func daddFloatingPoint<T : FloatingPoint>(_ x: T, _ y: T) -> (T, T) {
