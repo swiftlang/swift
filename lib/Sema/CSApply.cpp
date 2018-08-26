@@ -7944,11 +7944,12 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   // Add the conversion from the argument to the function parameter type.
   auto openedFuncType = openedType->castTo<FunctionType>();
-  cs.addConstraint(
-      ConstraintKind::ArgumentTupleConversion, cs.getType(call->getArg()),
-      FunctionType::composeInput(cs.getASTContext(),
-                                 openedFuncType->getParams(), false),
-      cs.getConstraintLocator(call, ConstraintLocator::ApplyArgument));
+  ::matchCallArguments(
+      cs, /*isOperator=*/false,
+      cs.getType(call->getArg()),
+      openedFuncType->getInput(),
+      cs.getConstraintLocator(call,
+                              ConstraintLocator::ApplyArgument));
 
   // Solve the system.
   SmallVector<Solution, 1> solutions;

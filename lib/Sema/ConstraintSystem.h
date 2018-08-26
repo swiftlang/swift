@@ -3327,6 +3327,11 @@ bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);
 
+ConstraintSystem::TypeMatchResult
+matchCallArguments(ConstraintSystem &cs,
+                   bool isOperator, Type argType, Type paramType,
+                   ConstraintLocatorBuilder locator);
+
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.
 /// If this cannot be proven, conservatively returns true.

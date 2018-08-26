@@ -755,10 +755,10 @@ public:
 };
 
 // Match the argument of a call to the parameter.
-static ConstraintSystem::TypeMatchResult
-matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
-                   Type argType, Type paramType,
-                   ConstraintLocatorBuilder locator) {
+ConstraintSystem::TypeMatchResult
+constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
+                                Type argType, Type paramType,
+                                ConstraintLocatorBuilder locator) {
 
   if (paramType->isAny()) {
     if (argType->is<InOutType>())
@@ -823,49 +823,9 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   // Check the argument types for each of the parameters.
   ConstraintSystem::TypeMatchOptions subflags =
     ConstraintSystem::TMF_GenerateConstraints;
-  ConstraintKind subKind;
-  switch (kind) {
-  case ConstraintKind::ArgumentTupleConversion:
-    subKind = ConstraintKind::ArgumentConversion;
-    break;
-
-  case ConstraintKind::OperatorArgumentTupleConversion:
-    subKind = ConstraintKind::OperatorArgumentConversion;
-    break;
-
-  case ConstraintKind::Conversion:
-  case ConstraintKind::BridgingConversion:
-  case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::ArgumentConversion:
-  case ConstraintKind::Bind:
-  case ConstraintKind::BindParam:
-  case ConstraintKind::BindToPointerType:
-  case ConstraintKind::Equal:
-  case ConstraintKind::Subtype:
-  case ConstraintKind::ApplicableFunction:
-  case ConstraintKind::BindOverload:
-  case ConstraintKind::CheckedCast:
-  case ConstraintKind::ConformsTo:
-  case ConstraintKind::Defaultable:
-  case ConstraintKind::Disjunction:
-  case ConstraintKind::DynamicTypeOf:
-  case ConstraintKind::EscapableFunctionOf:
-  case ConstraintKind::OpenedExistentialOf:
-  case ConstraintKind::KeyPath:
-  case ConstraintKind::KeyPathApplication:
-  case ConstraintKind::LiteralConformsTo:
-  case ConstraintKind::OptionalObject:
-  case ConstraintKind::SelfObjectOfProtocol:
-  case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::ValueMember:
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
-    llvm_unreachable("Not a call argument constraint");
-  }
-  
-  auto haveOneNonUserConversion =
-          (subKind != ConstraintKind::OperatorArgumentConversion);
-  
+  ConstraintKind subKind = (isOperator
+                            ? ConstraintKind::OperatorArgumentConversion
+                            : ConstraintKind::ArgumentConversion);
   
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
@@ -888,7 +848,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
       // is a type variable, matchTypes() will add a constraint, and
       // when the constraint is later solved, we will have lost the
       // value of 'subflags'.
-      if (!haveOneNonUserConversion) {
+      if (isOperator) {
         subflags |= ConstraintSystem::TMF_ApplyingOperatorParameter;
       }
 
@@ -1834,7 +1794,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (kind == ConstraintKind::ArgumentTupleConversion ||
       kind == ConstraintKind::OperatorArgumentTupleConversion) {
     if (!typeVar2) {
-      return ::matchCallArguments(*this, kind, type1, type2, locator);
+      bool isOperator = (kind == ConstraintKind::OperatorArgumentTupleConversion);
+      return ::matchCallArguments(*this, isOperator, type1, type2, locator);
     }
 
     return formUnsolvedResult();
@@ -4489,16 +4450,15 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     // If this application is part of an operator, then we allow an implicit
     // lvalue to be compatible with inout arguments.  This is used by
     // assignment operators.
-    ConstraintKind ArgConv = ConstraintKind::ArgumentTupleConversion;
-    if (isa<PrefixUnaryExpr>(anchor) || isa<PostfixUnaryExpr>(anchor) ||
-        isa<BinaryExpr>(anchor))
-      ArgConv = ConstraintKind::OperatorArgumentTupleConversion;
+    bool isOperator = (isa<PrefixUnaryExpr>(anchor) ||
+                       isa<PostfixUnaryExpr>(anchor) ||
+                       isa<BinaryExpr>(anchor));
 
     // The argument type must be convertible to the input type.
-    if (matchTypes(func1->getInput(), func2->getInput(),
-                   ArgConv, subflags,
-                   outerLocator.withPathElement(
-                     ConstraintLocator::ApplyArgument)).isFailure())
+    if (::matchCallArguments(*this, isOperator,
+                             func1->getInput(), func2->getInput(),
+                             outerLocator.withPathElement(
+                               ConstraintLocator::ApplyArgument)).isFailure())
       return SolutionKind::Error;
 
     // The result types are equivalent.

@@ -1330,10 +1330,12 @@ namespace {
       }
       auto *constr = cast<ConstructorDecl>(constrs.front());
       auto constrParamType = tc.getObjectLiteralParameterType(expr, constr);
-      CS.addConstraint(
-          ConstraintKind::ArgumentTupleConversion, CS.getType(expr->getArg()),
+      ::matchCallArguments(
+          CS, /*isOperator=*/false,
+          CS.getType(expr->getArg()),
           constrParamType,
-          CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
+          CS.getConstraintLocator(expr,
+                                  ConstraintLocator::ApplyArgument));
 
       Type result = tv;
       if (constr->getFailability() != OTK_None)
