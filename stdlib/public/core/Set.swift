@@ -1423,7 +1423,7 @@ internal class _SwiftRawSetStorage: _SwiftNativeNSSet {
   internal final var hashTable: _HashTable
 
   @usableFromInline
-  internal var seed: (UInt64, UInt64)
+  internal var seed: Hasher._Seed
 
   @usableFromInline
   @nonobjc
