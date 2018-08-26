@@ -279,7 +279,10 @@ bool MissingForcedDowncastFailure::diagnoseAsError() {
 
   auto &TC = getTypeChecker();
 
-  auto *coerceExpr = dyn_cast<CoerceExpr>(getAnchor());
+  auto *expr = getAnchor();
+  if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
+    expr = assignExpr->getSrc();
+  auto *coerceExpr = dyn_cast<CoerceExpr>(expr);
   if (!coerceExpr)
     return false;
 
@@ -333,6 +336,8 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   auto &TC = getTypeChecker();
 
   auto *anchor = getAnchor();
+  if (auto *assign = dyn_cast<AssignExpr>(anchor))
+    anchor = assign->getSrc();
   if (auto *paren = dyn_cast<ParenExpr>(anchor))
     anchor = paren->getSubExpr();
 
@@ -540,6 +545,10 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     return false;
 
   auto *anchor = getAnchor();
+
+  if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
+    anchor = assignExpr->getSrc();
+  
   auto *unwrapped = anchor->getValueProvidingExpr();
   auto type = getType(anchor)->getRValueType();
 
@@ -554,9 +563,13 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
 bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   Diag<StringRef> subElementDiagID;
-  Diag<Type> rvalueDiagID;
+  Diag<Type> rvalueDiagID = diag::assignment_lhs_not_lvalue;
   Expr *diagExpr = getLocator()->getAnchor();
-  SourceLoc loc;
+  SourceLoc loc = diagExpr->getLoc();
+
+  if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
+    diagExpr = assignExpr->getDest();
+  }
 
   if (auto callExpr = dyn_cast<ApplyExpr>(diagExpr)) {
     Expr *argExpr = callExpr->getArg();
@@ -571,7 +584,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       rvalueDiagID = diag::cannot_apply_lvalue_binop_to_rvalue;
       auto argTuple = dyn_cast<TupleExpr>(argExpr);
       diagExpr = argTuple->getElement(0);
-    } else {
+    } else if (getLocator()->getPath().size() > 0) {
       auto lastPathElement = getLocator()->getPath().back();
       assert(lastPathElement.getKind() ==
              ConstraintLocator::PathElementKind::ApplyArgToParam);
@@ -582,10 +595,11 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
         diagExpr = argTuple->getElement(lastPathElement.getValue());
       else if (auto parens = dyn_cast<ParenExpr>(argExpr))
         diagExpr = parens->getSubExpr();
+    } else {
+      subElementDiagID = diag::assignment_lhs_is_apply_expression;
     }
   } else if (auto inoutExpr = dyn_cast<InOutExpr>(diagExpr)) {
-    Type type = getConstraintSystem().getType(inoutExpr);
-    if (auto restriction = restrictionForType(type)) {
+    if (auto restriction = getRestrictionForType(getType(inoutExpr))) {
       PointerTypeKind pointerKind;
       if (restriction->second == ConversionRestrictionKind::ArrayToPointer &&
           restriction->first->getAnyPointerElementType(pointerKind) &&
@@ -603,10 +617,42 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
 
     subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
     rvalueDiagID = diag::cannot_pass_rvalue_inout;
-    loc = diagExpr->getLoc();
     diagExpr = inoutExpr->getSubExpr();
+  } else if (isa<DeclRefExpr>(diagExpr)) {
+    subElementDiagID = diag::assignment_lhs_is_immutable_variable;
+  } else if (isa<ForceValueExpr>(diagExpr)) {
+    subElementDiagID = diag::assignment_bang_has_immutable_subcomponent;
+  } else if (isa<MemberRefExpr>(diagExpr)) {
+    subElementDiagID = diag::assignment_lhs_is_immutable_property;
+  } else if (auto member = dyn_cast<UnresolvedDotExpr>(diagExpr)) {
+    subElementDiagID = diag::assignment_lhs_is_immutable_property;
+
+    if (auto *ctor = dyn_cast<ConstructorDecl>(getDC())) {
+      if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
+        if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
+            ctor->getDelegatingOrChainedInitKind(nullptr) ==
+            ConstructorDecl::BodyInitKind::Delegating) {
+          emitDiagnostic(loc, diag::assignment_let_property_delegating_init,
+                      member->getName());
+          if (auto *ref = getResolvedMemberRef(member)) {
+            emitDiagnostic(ref, diag::decl_declared_here, member->getName());
+          }
+          return true;
+        }
+      }
+    }
+  } else if (auto sub = dyn_cast<SubscriptExpr>(diagExpr)) {
+      subElementDiagID = diag::assignment_subscript_has_immutable_base;
+
+      // If the destination is a subscript with a 'dynamicLookup:' label and if
+      // the tuple is implicit, then this was actually a @dynamicMemberLookup
+      // access. Emit a more specific diagnostic.
+      if (sub->getIndex()->isImplicit() &&
+          sub->getArgumentLabels().size() == 1 &&
+          sub->getArgumentLabels().front() == getTypeChecker().Context.Id_dynamicMember)
+        subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
   } else {
-    return false;
+    subElementDiagID = diag::assignment_lhs_is_immutable_variable;
   }
 
   diagnoseSubElementFailure(diagExpr, loc, getConstraintSystem(),

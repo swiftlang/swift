@@ -375,6 +375,17 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
         return { expr, member };
     }
 
+    if (auto tupleExpr = dyn_cast<TupleExpr>(SE->getIndex())) {
+      if (tupleExpr->getNumElements() == 1 && tupleExpr->getElementName(0).str() == "keyPath") {
+        auto indexType = CS.simplifyType(CS.getType(tupleExpr->getElement(0)));
+        if (auto bgt = indexType->getAs<BoundGenericType>()) {
+          auto decl = bgt->getDecl();
+          if (decl == CS.getASTContext().getKeyPathDecl())
+            return resolveImmutableBase(tupleExpr->getElement(0), CS);
+        }
+      }
+    }
+
     // If it is settable, then the base must be the problem, recurse.
     return resolveImmutableBase(SE->getBase(), CS);
   }
@@ -429,6 +440,9 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
   if (auto *ICE = dyn_cast<ImplicitConversionExpr>(expr))
     if (!isa<LoadExpr>(ICE->getSubExpr()))
       return resolveImmutableBase(ICE->getSubExpr(), CS);
+
+  if (auto *SAE = dyn_cast<SelfApplyExpr>(expr))
+    return resolveImmutableBase(SAE->getFn(), CS);
 
   return { expr, nullptr };
 }
@@ -526,7 +540,11 @@ void swift::diagnoseSubElementFailure(Expr *destExpr,
     message += VD->getName().str().str();
     message += "'";
 
-    if (VD->isCaptureList())
+    auto type = CS.simplifyType(CS.getType(immInfo.first));
+    auto bgt = type ? type->getAs<BoundGenericType>() : nullptr;
+    if (bgt && bgt->getDecl() == CS.getASTContext().getKeyPathDecl())
+      message += " is a read-only key path";
+    else if (VD->isCaptureList())
       message += " is an immutable capture";
     else if (VD->isImplicit())
       message += " is immutable";
@@ -581,6 +599,14 @@ void swift::diagnoseSubElementFailure(Expr *destExpr,
 
     TC.diagnose(loc, diagID, message)
       .highlight(immInfo.first->getSourceRange());
+    return;
+  }
+
+  // If a keypath was the problem but wasn't resolved into a vardecl
+  // it is ambiguous or unable to be used for setting.
+  if (auto *KPE = dyn_cast_or_null<KeyPathExpr>(immInfo.first)) {
+    TC.diagnose(loc, diagID, "immutable key path")
+      .highlight(KPE->getSourceRange());
     return;
   }
 
@@ -3087,44 +3113,30 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
 /// When an assignment to an expression is detected and the destination is
 /// invalid, emit a detailed error about the condition.
-void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
+bool ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                                                  SourceLoc equalLoc) {
   auto &TC = getTypeChecker();
 
-  // Diagnose obvious assignments to literals.
-  if (isa<LiteralExpr>(dest->getValueProvidingExpr())) {
-    TC.diagnose(equalLoc, diag::cannot_assign_to_literal);
-    return;
-  }
-
-  // Diagnose assignments to let-properties in delegating initializers.
-  if (auto *member = dyn_cast<UnresolvedDotExpr>(dest)) {
-    if (auto *ctor = dyn_cast<ConstructorDecl>(DC)) {
-      if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
-        if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
-            ctor->getDelegatingOrChainedInitKind(nullptr) ==
-              ConstructorDecl::BodyInitKind::Delegating) {
-          auto resolved = resolveImmutableBase(member, *this);
-          assert(resolved.first == member);
-          TC.diagnose(equalLoc, diag::assignment_let_property_delegating_init,
-                      member->getName());
-          if (resolved.second) {
-            TC.diagnose(resolved.second, diag::decl_declared_here,
-                        member->getName());
-          }
-          return;
-        }
-      }
+  // Assignments to let-properties in delegating initializers will be caught
+  // elsewhere now, so if we see them here, it isn't an assignment problem.
+  if (auto *ctor = dyn_cast<ConstructorDecl>(DC)) {
+    DeclRefExpr *baseRef = nullptr;
+    if (auto *member = dyn_cast<UnresolvedDotExpr>(dest)) {
+      baseRef = dyn_cast<DeclRefExpr>(member->getBase());
+    } else if (auto *member = dyn_cast<MemberRefExpr>(dest)) {
+      if (auto *load = dyn_cast<LoadExpr>(member->getBase()))
+        baseRef = dyn_cast<DeclRefExpr>(load->getSubExpr());
+    }
+    if (baseRef && baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
+        ctor->getDelegatingOrChainedInitKind(nullptr) ==
+          ConstructorDecl::BodyInitKind::Delegating) {
+      return false;
     }
   }
 
   Diag<StringRef> diagID;
-  if (isa<ApplyExpr>(dest))
+  if (isa<ApplyExpr>(dest) || isa<SelfApplyExpr>(dest))
     diagID = diag::assignment_lhs_is_apply_expression;
-  else if (isa<DeclRefExpr>(dest))
-    diagID = diag::assignment_lhs_is_immutable_variable;
-  else if (isa<ForceValueExpr>(dest))
-    diagID = diag::assignment_bang_has_immutable_subcomponent;
   else if (isa<UnresolvedDotExpr>(dest) || isa<MemberRefExpr>(dest))
     diagID = diag::assignment_lhs_is_immutable_property;
   else if (auto sub = dyn_cast<SubscriptExpr>(dest)) {
@@ -3137,12 +3149,12 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
         sub->getArgumentLabels().size() == 1 &&
         sub->getArgumentLabels().front() == TC.Context.Id_dynamicMember)
       diagID = diag::assignment_dynamic_property_has_immutable_base;
-  } else {
+  } else
     diagID = diag::assignment_lhs_is_immutable_variable;
-  }
 
   diagnoseSubElementFailure(dest, equalLoc, *this, diagID,
                             diag::assignment_lhs_not_lvalue);
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -6231,8 +6243,8 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
       if (diagnoseSubscriptErrors(subscriptExpr, /* inAssignmentDestination = */ true))
         return true;
     }
-    CS.diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc());
-    return true;
+    if (CS.diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc()))
+      return true;
   }
 
   auto *srcExpr = assignExpr->getSrc();
