@@ -27,6 +27,9 @@ namespace swift {
   class Type;
 
 namespace tf {
+  /// Return true if the given type represents a TensorFlow dtype.
+  bool isTensorFlowDType(Type ty);
+
   /// If the specified type is the well-known TensorHandle<T> type, then return
   /// "T".  If not, return a null type.
   Type getTensorHandleElementType(Type ty);

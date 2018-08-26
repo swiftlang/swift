@@ -382,8 +382,6 @@ const char *SILTensorOpInfo::getOperandClassSuffix(OperandClass opClass) {
     return "";
   case OperandClass::DType:
     return "$dtype";
-  case OperandClass::DTypes:
-      return "$dtypes";
   case OperandClass::Tensor:
     return "$tensor";
   case OperandClass::Shape:
@@ -394,6 +392,8 @@ const char *SILTensorOpInfo::getOperandClassSuffix(OperandClass opClass) {
     return "$elt";
   case OperandClass::ShapeArray:
     return "$shapearray";
+  case OperandClass::ExtractingDTypeList:
+    return "$extractingDTypeList";
   }
 }
 
@@ -407,10 +407,10 @@ SILTensorOpInfo::getOperandClass(StringRef suffix) {
       .Case("tensor", OperandClass::Tensor)
       .Case("shape", OperandClass::Shape)
       .Case("dtype", OperandClass::DType)
-      .Case("dtypes", OperandClass::DTypes)
       .Case("array", OperandClass::Array)
       .Case("elt", OperandClass::ArrayElement)
       .Case("shapearray", OperandClass::ShapeArray)
+      .Case("extractingDTypeList", OperandClass::ExtractingDTypeList)
       .Default(None);
 }
 

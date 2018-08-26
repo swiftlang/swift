@@ -127,7 +127,7 @@ struct SILTensorOpInfo {
 
     Normal, // No modifier.
     DType,  // This integer value is a dtype.
-    DTypes, // This marks an aggregate dtype.
+
     Tensor, // This array or scalar should be turned into a TF_Tensor.
     Shape,  // This array of integers is a shape specifier.
 
@@ -136,6 +136,10 @@ struct SILTensorOpInfo {
 
     // This is the start of a shape array.  The value is the # elements.
     ShapeArray,
+
+    // Recursively flatten any lists or aggregates to TensorHandle's or dtypes,
+    // extract dtypes from TensorHandles, and form a list of all dtypes.
+    ExtractingDTypeList,
   };
 
   /// Return the string suffix for the specified attribute modifier.

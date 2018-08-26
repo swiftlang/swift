@@ -248,11 +248,20 @@ public func testTensorFlowClosures(_ a: Float) -> Tensor<Int32>{
 //   return [[B]] : $TensorHandle<Int32>
 // } // end sil function '[[NAME]]'
 
-struct Foo {
-  let a: Tensor<Float>
-  let b: Tensor<Int32>
+func testExtractDTypeList () {
+  struct Foo {
+    let a: Tensor<Float>
+    let b: Tensor<Float>
+  }
+  // expected-error @+1 {{op named 'SomeOp' is not registered in TensorFlow}}
+  let elements = Foo(a: Tensor([1]), b: Tensor([2]))
+  // TODO: Support heterogeneous input lists so that we can replace b's dtype with something else.
+  // TODO: Support unpacking a struct value into an input list so that we can replace
+  // `[elements.a, elements.b]` with `elements`.
+  let _: VariantHandle = #tfop("TensorSliceDataset", [elements.a, elements.b],
+                               Toutput_types$extractingDTypeList: Foo.self,
+                               output_shapes: [TensorShape()])
 }
 
-func testExtractTFDataType () {
-  let _: Void = #tfop("Const", dtype$dtype: Foo.self)
-}
+// CHECK-LABEL --- TFPartition Accelerator Result: {{.*}}testExtractDTypeList
+// CHECK: graph_op "TensorSliceDataset,L,e,e"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {Toutput_types: [$AccelerableByTensorFlow.Protocol: $Float, $Float], output_shapes: [$TensorShape: ([$Int32: ])], __device: "/device:CPU:0"} : $VariantHandle

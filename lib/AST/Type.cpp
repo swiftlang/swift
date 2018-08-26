@@ -3276,7 +3276,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
 
-//  assert(ownerNominal == baseTy->getAnyNominal());
+  assert(ownerNominal == baseTy->getAnyNominal());
 
   // Gather all of the substitutions for all levels of generic arguments.
   auto *genericSig = dc->getGenericSignatureOfContext();
