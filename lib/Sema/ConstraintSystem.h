@@ -1774,7 +1774,7 @@ public:
 
   /// When an assignment to an expression is detected and the destination is
   /// invalid, emit a detailed error about the condition.
-  void diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
+  bool diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
 
   
   /// \brief Mine the active and inactive constraints in the constraint
@@ -2365,10 +2365,6 @@ public:
   private:
     TypeMatchResult(SolutionKind result) : Kind(result) {}
   };
-
-  /// \brief Compute the rvalue type of the given expression, which is the
-  /// destination of an assignment statement.
-  Type computeAssignDestType(Expr *dest, SourceLoc equalLoc);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
   ///

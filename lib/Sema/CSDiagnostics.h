@@ -95,13 +95,18 @@ protected:
   DeclContext *getDC() const { return CS.DC; }
 
   Optional<std::pair<Type, ConversionRestrictionKind>>
-  restrictionForType(Type type) const {
+  getRestrictionForType(Type type) const {
     for (auto &restriction : CS.ConstraintRestrictions) {
       if (std::get<0>(restriction)->isEqual(type))
         return std::pair<Type, ConversionRestrictionKind>(
             std::get<1>(restriction), std::get<2>(restriction));
     }
     return None;
+  }
+
+  ValueDecl *getResolvedMemberRef(UnresolvedDotExpr *member) {
+    auto locator = CS.getConstraintLocator(member, ConstraintLocator::Member);
+    return CS.findResolvedMemberRef(locator);
   }
 
   Optional<SelectedOverload>

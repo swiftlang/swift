@@ -1600,8 +1600,9 @@ ConstraintSystem::matchTypesBindTypeVar(
 
   // If the left-hand type variable cannot bind to an lvalue,
   // but we still have an lvalue, fail.
-  if (!typeVar->getImpl().canBindToLValue() && type->hasLValueType())
+  if (!typeVar->getImpl().canBindToLValue() && type->hasLValueType()) {
     return getTypeMatchFailure(locator);
+  }
 
   // Disallow bindings of noescape functions to type variables that
   // represent an opened archetype. If we allowed this it would allow
@@ -2520,11 +2521,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
       }
     }
+  }
 
-    if (type2->is<LValueType>() && !isTypeVarOrMember1) {
+  if (attemptFixes && type2->is<LValueType>() && !isTypeVarOrMember1) {
       conversionsOrFixes.push_back(
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
-    }
   }
 
   if (attemptFixes)
@@ -4986,6 +4987,15 @@ ConstraintSystem::simplifyRestrictedConstraint(
   llvm_unreachable("Unhandled SolutionKind in switch.");
 }
 
+static bool isAugmentingFix(ConstraintFix *fix) {
+  switch (fix->getKind()) {
+    case FixKind::TreatRValueAsLValue:
+      return false;
+    default:
+      return true;
+  }
+}
+
 bool ConstraintSystem::recordFix(ConstraintFix *fix) {
   auto &ctx = getASTContext();
   if (ctx.LangOpts.DebugConstraintSolver) {
@@ -5004,17 +5014,30 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
   if (worseThanBestSolution())
     return true;
 
-  auto *loc = fix->getLocator();
-  auto existingFix = llvm::find_if(Fixes, [&](const ConstraintFix *e) {
-    // If we already have a fix like this recorded, let's not do it again,
-    // this situation might happen when the same fix kind is applicable to
+  if (isAugmentingFix(fix)) {
+    // Always useful, unless duplicate of exactly the same fix and location.
+    // This situation might happen when the same fix kind is applicable to
     // different overload choices.
-    return e->getKind() == fix->getKind() && e->getLocator() == loc;
-  });
-
-  if (existingFix == Fixes.end())
-    Fixes.push_back(fix);
-
+    auto *loc = fix->getLocator();
+    auto existingFix = llvm::find_if(Fixes, [&](const ConstraintFix *e) {
+      // If we already have a fix like this recorded, let's not do it again,
+      return e->getKind() == fix->getKind() && e->getLocator() == loc;
+    });
+    if (existingFix == Fixes.end())
+      Fixes.push_back(fix);
+  } else {
+    // Only useful to record if no pre-existing fix in the subexpr tree.
+    llvm::SmallDenseSet<Expr *> fixExprs;
+    for (auto fix : Fixes)
+      fixExprs.insert(fix->getAnchor());
+    bool found = false;
+    fix->getAnchor()->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+      found |= fixExprs.count(subExpr) > 0;
+      return subExpr;
+    });
+    if (!found)
+      Fixes.push_back(fix);
+  }
   return false;
 }
 
