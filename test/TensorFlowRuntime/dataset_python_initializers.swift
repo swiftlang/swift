@@ -12,8 +12,9 @@ let csvFilenameIndex = CommandLine.arguments.firstIndex(of: "--csv-file")! + 1
 let csvFilename = CommandLine.arguments[csvFilenameIndex]
 
 DatasetPythonInitializersTest.test("SingleValueDataset") {
-  let dataset = SingleValueDataset<Float>(csvFilename: csvFilename,
-                                          header: false, selectColumns: [0, 1])
+  let dataset = SingleValueDataset<Float>(contentsOfCSVFile: csvFilename,
+                                          hasHeader: false,
+                                          selectingColumns: [0, 1])
   let expected: [[Float]] = [[1, 2], [3, 4]]
   var i = 0
   for element in dataset {
@@ -23,9 +24,9 @@ DatasetPythonInitializersTest.test("SingleValueDataset") {
 }
 
 DatasetPythonInitializersTest.test("DoubleValueDataset") {
-  let dataset = DoubleValueDataset<Float>(csvFilename: csvFilename,
-                                          header: false,
-                                          selectColumns: ([0], [1]))
+  let dataset = DoubleValueDataset<Float>(contentsOfCSVFile: csvFilename,
+                                          hasHeader: false,
+                                          selectingColumns: ([0], [1]))
   let expected1: [[Float]] = [[1], [3]]
   let expected2: [[Float]] = [[2], [4]]
   var i = 0
