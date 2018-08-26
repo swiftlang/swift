@@ -3095,3 +3095,29 @@ bb16:
   br bb8(%65 : $TestEnm)
 }
 
+sil @print : $@convention(thin) (@guaranteed String) -> ()
+sil @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed String
+
+sil @dont_clone_begin_apply : $(Builtin.Int1, @guaranteed String) -> () {
+bb0(%condition : $Builtin.Int1, %arg : $String):
+  %print = function_ref @print : $@convention(thin) (@guaranteed String) -> ()
+  cond_br %condition, bb1, bb2
+bb1:
+  apply %print(%arg) : $@convention(thin) (@guaranteed String) -> ()
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %yield_string = function_ref @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed String
+  (%yield, %token) = begin_apply %yield_string() : $@yield_once @convention(thin) () -> @yields @guaranteed String
+  cond_br %condition, bb4, bb5
+bb4:
+  apply %print(%yield) : $@convention(thin) (@guaranteed String) -> ()
+  br bb6
+bb5:
+  br bb6
+bb6:
+  end_apply %token
+  %rv = tuple ()
+  return %rv : $()
+}
