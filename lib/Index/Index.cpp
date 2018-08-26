@@ -395,7 +395,7 @@ private:
 
   Expr *getContainingExpr(size_t index) const {
     if (ExprStack.size() > index)
-      return ExprStack.end()[-(index + 1)];
+      return ExprStack.end()[-std::ptrdiff_t(index + 1)];
     return nullptr;
   }
 
