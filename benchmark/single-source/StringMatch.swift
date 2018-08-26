@@ -77,12 +77,12 @@ func matchStar(_ c: Character, _ regexp: Substring, _ text: Substring) -> Bool {
 }
 
 let tests: DictionaryLiteral = [
-  "^h..lo*!$":"hellooooo!",
-  "^h..lo*!$":"hella noms",
-  ".ab":"abracadabra!",
-  "s.*":"saaaad!",
-  "...e.$":"\"Ganymede,\" he continued, \"is the largest moon in the Solar System\"",
-  "🤠*":"even 🤠🤠🤠 are supported",
+  "^h..lo*!$":"hellooooo!" + "",
+  "^h..lo*!$":"hella noms" + "",
+  ".ab":"abracadabra!" + "",
+  "s.*":"saaaad!" + "",
+  "...e.$":"\"Ganymede,\" he continued, \"is the largest moon in the Solar System\"" + "",
+  "🤠*":"even 🤠🤠🤠 are supported" + "",
 ]
 
 @inline(never)
