@@ -1178,6 +1178,8 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (isa<BeginApplyInst>(this))
     return false;
 
+  // If you add more cases here, you should also update SILLoop:canDuplicate.
+
   return true;
 }
 
