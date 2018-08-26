@@ -5451,11 +5451,9 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   auto *DC = CS.DC;
 
   auto typeCheckExpr = [](TypeChecker &TC, Expr *expr, DeclContext *DC,
-                          SmallPtrSetImpl<TypeBase *> &types,
-                          Type contextualType = Type()) {
-    CalleeListener listener(contextualType);
+                          SmallPtrSetImpl<TypeBase *> &types) {
     TC.getPossibleTypesOfExpressionWithoutApplying(
-        expr, DC, types, FreeTypeVariableBinding::Disallow, &listener);
+        expr, DC, types, FreeTypeVariableBinding::Disallow);
   };
 
   // First let's type-check expression without contextual type, and
@@ -5470,22 +5468,9 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   if (withoutContextual.empty())
     return false;
 
-  SmallPtrSet<TypeBase *, 4> withContextual;
-  typeCheckExpr(TC, callExpr, DC, withContextual, contextualType);
-  // If type-checking with contextual type didn't produce any results
-  // it means that we have a contextual mismatch.
-  if (withContextual.empty()) {
-    // If there is just a single choice, we can hit contextual diagnostics
-    // about it in case re-typecheck fails.
-    Type exprType = withoutContextual.size() == 1 ? *withoutContextual.begin() : Type();
-    return diagnoseContextualConversionError(callExpr, contextualType, CTP,
-                                             exprType);
-  }
-
-  // If call produces a single type when type-checked with contextual
-  // expression, it means that the problem is elsewhere, any other
-  // outcome is ambiguous.
-  return false;
+  Type exprType = withoutContextual.size() == 1 ? *withoutContextual.begin() : Type();
+  return diagnoseContextualConversionError(callExpr, contextualType, CTP,
+                                           exprType);
 }
 
 bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
