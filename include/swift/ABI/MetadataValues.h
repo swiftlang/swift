@@ -1271,7 +1271,7 @@ public:
 
     /// The type requires non-trivial singleton initialization using the
     /// "in-place" code pattern.
-    InPlaceMetadataInitialization = 1,
+    SingletonMetadataInitialization = 1,
 
     /// The type requires non-trivial singleton initialization using the
     /// "foreign" code pattern.
@@ -1287,8 +1287,8 @@ public:
                                  getMetadataInitialization,
                                  setMetadataInitialization)
 
-  bool hasInPlaceMetadataInitialization() const {
-    return getMetadataInitialization() == InPlaceMetadataInitialization;
+  bool hasSingletonMetadataInitialization() const {
+    return getMetadataInitialization() == SingletonMetadataInitialization;
   }
 
   bool hasForeignMetadataInitialization() const {

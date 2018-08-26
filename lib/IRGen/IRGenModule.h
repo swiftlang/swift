@@ -1176,7 +1176,7 @@ public:
                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataInstantiationCache(NominalTypeDecl *D,
                                              ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfTypeMetadataInPlaceInitializationCache(
+  llvm::Constant *getAddrOfTypeMetadataSingletonInitializationCache(
                                              NominalTypeDecl *D,
                                              ForDefinition_t forDefinition);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,

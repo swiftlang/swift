@@ -129,9 +129,9 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
 /*****************************************************************************/
 
 /// Does the metadata for the given type, which we are currently emitting,
-/// require in-place metadata initialization structures and functions?
-static bool needsInPlaceMetadataInitialization(IRGenModule &IGM,
-                                               NominalTypeDecl *typeDecl) {
+/// require singleton metadata initialization structures and functions?
+static bool needsSingletonMetadataInitialization(IRGenModule &IGM,
+                                                 NominalTypeDecl *typeDecl) {
   // Generic types never have singleton metadata initialization.
   if (typeDecl->isGenericContext())
     return false;
@@ -930,9 +930,9 @@ namespace {
       if (requiresForeignTypeMetadata(Type))
         return TypeContextDescriptorFlags::ForeignMetadataInitialization;
 
-      // The only other option is in-place initialization.
-      if (needsInPlaceMetadataInitialization(IGM, Type))
-        return TypeContextDescriptorFlags::InPlaceMetadataInitialization;
+      // The only other option is singleton initialization.
+      if (needsSingletonMetadataInitialization(IGM, Type))
+        return TypeContextDescriptorFlags::SingletonMetadataInitialization;
 
       return TypeContextDescriptorFlags::NoMetadataInitialization;
     }
@@ -947,22 +947,14 @@ namespace {
         return;
 
       case TypeContextDescriptorFlags::ForeignMetadataInitialization:
-        asImpl().addForeignMetadataInitialization();
+        addForeignMetadataInitialization();
         return;
 
-      case TypeContextDescriptorFlags::InPlaceMetadataInitialization:
-        asImpl().addInPlaceMetadataInitialization();
+      case TypeContextDescriptorFlags::SingletonMetadataInitialization:
+        addSingletonMetadataInitialization();
         return;
       }
       llvm_unreachable("bad kind");
-    }
-
-    void addInPlaceMetadataInitialization() {
-      if (isa<StructDecl>(Type) || isa<EnumDecl>(Type) || isa<ClassDecl>(Type)) {
-        asImpl().addInPlaceValueMetadataInitialization();
-      } else {
-        llvm_unreachable("unexpected type allowing in-place initialization");
-      }
     }
 
     /// Add a ForeignMetadataInitialization structure to the descriptor.
@@ -979,12 +971,12 @@ namespace {
       return ::needsForeignMetadataCompletionFunction(Type);
     }
 
-    /// Add an InPlaceValueMetadataInitialization structure to the descriptor.
-    void addInPlaceValueMetadataInitialization() {
+    /// Add an SingletonMetadataInitialization structure to the descriptor.
+    void addSingletonMetadataInitialization() {
       // Relative pointer to the initialization cache.
       // Note that we trigger the definition of it when emitting the
       // completion function.
-      auto cache = IGM.getAddrOfTypeMetadataInPlaceInitializationCache(Type,
+      auto cache = IGM.getAddrOfTypeMetadataSingletonInitializationCache(Type,
                                                               NotForDefinition);
       B.addRelativeAddress(cache);
 
@@ -1999,20 +1991,20 @@ template <class Impl, class DeclType>
 /// Create an access function for the given type which triggers the
 /// in-place initialization path.
 static void
-createInPlaceInitializationMetadataAccessFunction(IRGenModule &IGM,
-                                                  NominalTypeDecl *typeDecl,
-                                                  CanType type) {
+createSingletonInitializationMetadataAccessFunction(IRGenModule &IGM,
+                                                    NominalTypeDecl *typeDecl,
+                                                    CanType type) {
   assert(!typeDecl->isGenericContext());
 
   (void) createTypeMetadataAccessFunction(IGM, type,
-                                          CacheStrategy::InPlaceInitialization,
+                                          CacheStrategy::SingletonInitialization,
                                           [&](IRGenFunction &IGF,
                                               DynamicMetadataRequest request,
                                               llvm::Constant *cacheVariable) {
     llvm::Value *descriptor =
       IGF.IGM.getAddrOfTypeContextDescriptor(typeDecl, RequireMetadata);
     auto responsePair =
-      IGF.Builder.CreateCall(IGF.IGM.getGetInPlaceMetadataFn(),
+      IGF.Builder.CreateCall(IGF.IGM.getGetSingletonMetadataFn(),
                              {request.get(IGF), descriptor});
     return MetadataResponse::handle(IGF, request, responsePair);
   });
@@ -2025,8 +2017,8 @@ static void createNonGenericMetadataAccessFunction(IRGenModule &IGM,
   auto type = typeDecl->getDeclaredType()->getCanonicalType();
 
   // If the type requires the in-place initialization pattern, use it.
-  if (needsInPlaceMetadataInitialization(IGM, typeDecl)) {
-    createInPlaceInitializationMetadataAccessFunction(IGM, typeDecl, type);
+  if (needsSingletonMetadataInitialization(IGM, typeDecl)) {
+    createSingletonInitializationMetadataAccessFunction(IGM, typeDecl, type);
     return;
   }
 
@@ -2163,119 +2155,12 @@ static ClassFlags getClassFlags(ClassDecl *classDecl) {
 }
 
 namespace {
-  /// Utility class for building member metadata for classes where the
-  /// entire hierarchy is in the current resilience domain, and all stored
-  /// properties have a fixed size.
-  class FixedClassMemberBuilder {
-    IRGenModule &IGM;
-    ConstantStructBuilder &B;
-    SILVTable *VTable;
-
-  public:
-    FixedClassMemberBuilder(IRGenModule &IGM,
-                            ConstantStructBuilder &builder,
-                            SILVTable *vtable)
-      : IGM(IGM), B(builder), VTable(vtable) {}
-
-    void addFieldOffset(VarDecl *var) {
-      SILType baseType = SILType::getPrimitiveObjectType(
-        var->getDeclContext()->getDeclaredTypeInContext()
-          ->getCanonicalType());
-      B.addInt(IGM.SizeTy, getClassFieldOffset(IGM, baseType, var).getValue());
-    }
-
-    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      llvm_unreachable("Fixed class metadata cannot have missing members");
-    }
-
-    void addMethod(SILDeclRef fn) {
-      // Find the vtable entry.
-      assert(VTable && "no vtable?!");
-      auto entry = VTable->getEntry(IGM.getSILModule(), fn);
-
-      // The class is fragile. Emit a direct reference to the vtable entry.
-      if (entry) {
-        B.add(IGM.getAddrOfSILFunction(entry->Implementation, NotForDefinition));
-        return;
-      }
-
-      // The method is removed by dead method elimination.
-      // It should be never called. We add a pointer to an error function.
-      B.addBitCast(IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
-    }
-
-    void addGenericArgument(ClassDecl *forClass) {
-      llvm_unreachable("Fixed class metadata cannot have generic parameters");
-    }
-
-    void addGenericWitnessTable(ClassDecl *forClass) {
-      llvm_unreachable("Fixed class metadata cannot have generic requirements");
-    }
-  };
-
-  /// Utility class for building member metadata for classes where the
-  /// entire hierarchy is in the current resilience domain, but some properties
-  /// have an unknown size, or the class has generic ancestry, which requires us
-  /// to fill in the superclass field and generic requirements at runtime.
-  class InPlaceClassMemberBuilder {
-    IRGenModule &IGM;
-    ConstantStructBuilder &B;
-    SILVTable *VTable;
-
-  public:
-    InPlaceClassMemberBuilder(IRGenModule &IGM,
-                              ConstantStructBuilder &builder,
-                              SILVTable *vtable)
-      : IGM(IGM), B(builder), VTable(vtable) {}
-
-    void addFieldOffset(VarDecl *var) {
-      // Field offsets are either copied from the superclass or calculated
-      // at runtime.
-      B.addInt(IGM.SizeTy, 0);
-    }
-
-    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      for (unsigned i = 0,
-                    e = placeholder->getNumberOfFieldOffsetVectorEntries();
-           i < e; ++i) {
-        // Emit placeholder values for some number of stored properties we
-        // know exist but aren't able to reference directly.
-        B.addInt(IGM.SizeTy, 0);
-      }
-    }
-
-    void addMethod(SILDeclRef fn) {
-      // Find the vtable entry.
-      assert(VTable && "no vtable?!");
-      auto entry = VTable->getEntry(IGM.getSILModule(), fn);
-
-      // The class is fragile. Emit a direct reference to the vtable entry.
-      if (entry) {
-        B.add(IGM.getAddrOfSILFunction(entry->Implementation, NotForDefinition));
-        return;
-      }
-
-      // The method is removed by dead method elimination.
-      // It should be never called. We add a pointer to an error function.
-      B.addBitCast(IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
-    }
-
-    void addGenericArgument(ClassDecl *forClass) {
-      // Filled in at runtime.
-      B.addNullPointer(IGM.TypeMetadataPtrTy);
-    }
-
-    void addGenericWitnessTable(ClassDecl *forClass) {
-      // Filled in at runtime.
-      B.addNullPointer(IGM.WitnessTablePtrTy);
-    }
-  };
-
   /// Base class for layout of non-generic class metadata.
-  template<class Impl, class MemberBuilder>
+  template<class Impl>
   class ClassMetadataBuilderBase : public ClassMetadataVisitor<Impl> {
     using super = ClassMetadataVisitor<Impl>;
 
+  protected:
     using super::IGM;
     using super::Target;
 
@@ -2283,8 +2168,8 @@ namespace {
 
     const ClassLayout &FieldLayout;
     const ClassMetadataLayout &MetadataLayout;
+    const SILVTable *VTable;
 
-    MemberBuilder Members;
     Size AddressPoint;
 
   public:
@@ -2294,8 +2179,7 @@ namespace {
       : super(IGM, theClass), B(builder),
         FieldLayout(fieldLayout),
         MetadataLayout(IGM.getClassMetadataLayout(theClass)),
-        Members(IGM, builder,
-                IGM.getSILModule().lookUpVTable(theClass)) {}
+        VTable(IGM.getSILModule().lookUpVTable(theClass)) {}
 
   public:
     void noteAddressPoint() {
@@ -2486,16 +2370,20 @@ namespace {
       B.add(data);
     }
 
-    void addFieldOffset(VarDecl *var) {
-      Members.addFieldOffset(var);
-    }
-    
-    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      Members.addFieldOffsetPlaceholders(placeholder);
-    }
-
     void addMethod(SILDeclRef fn) {
-      Members.addMethod(fn);
+      // Find the vtable entry.
+      assert(VTable && "no vtable?!");
+      auto entry = VTable->getEntry(IGM.getSILModule(), fn);
+
+      // The class is fragile. Emit a direct reference to the vtable entry.
+      if (entry) {
+        B.add(IGM.getAddrOfSILFunction(entry->Implementation, NotForDefinition));
+        return;
+      }
+
+      // The method is removed by dead method elimination.
+      // It should be never called. We add a pointer to an error function.
+      B.addBitCast(IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
     }
 
     void addPlaceholder(MissingMemberDecl *m) {
@@ -2504,14 +2392,6 @@ namespace {
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
-
-    void addGenericArgument(ClassDecl *forClass) {
-      Members.addGenericArgument(forClass);
-    }
-
-    void addGenericWitnessTable(ClassDecl *forClass) {
-      Members.addGenericWitnessTable(forClass);
-    }
 
     void createMetadataAccessFunction() {
       assert(!Target->isGenericContext());
@@ -2534,31 +2414,76 @@ namespace {
   /// A builder for non-generic class metadata which does not require any
   /// runtime initialization.
   class FixedClassMetadataBuilder :
-      public ClassMetadataBuilderBase<FixedClassMetadataBuilder,
-                                      FixedClassMemberBuilder> {
-    using super = ClassMetadataBuilderBase<FixedClassMetadataBuilder,
-                                           FixedClassMemberBuilder>;
+      public ClassMetadataBuilderBase<FixedClassMetadataBuilder> {
+    using super = ClassMetadataBuilderBase<FixedClassMetadataBuilder>;
+    using super::IGM;
+    using super::B;
 
   public:
     FixedClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                               ConstantStructBuilder &builder,
                               const ClassLayout &fieldLayout)
       : super(IGM, theClass, builder, fieldLayout) {}
+
+    void addFieldOffset(VarDecl *var) {
+      SILType baseType = SILType::getPrimitiveObjectType(
+        var->getDeclContext()->getDeclaredTypeInContext()
+          ->getCanonicalType());
+      B.addInt(IGM.SizeTy, getClassFieldOffset(IGM, baseType, var).getValue());
+    }
+
+    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      llvm_unreachable("Fixed class metadata cannot have missing members");
+    }
+
+    void addGenericArgument(ClassDecl *forClass) {
+      llvm_unreachable("Fixed class metadata cannot have generic parameters");
+    }
+
+    void addGenericWitnessTable(ClassDecl *forClass) {
+      llvm_unreachable("Fixed class metadata cannot have generic requirements");
+    }
   };
 
   /// A builder for non-generic class metadata with resiliently-sized
   /// fields or generic ancestry.
-  class InPlaceClassMetadataBuilder :
-      public ClassMetadataBuilderBase<InPlaceClassMetadataBuilder,
-                                      InPlaceClassMemberBuilder> {
-    using super = ClassMetadataBuilderBase<InPlaceClassMetadataBuilder,
-                                           InPlaceClassMemberBuilder>;
+  class SingletonClassMetadataBuilder :
+      public ClassMetadataBuilderBase<SingletonClassMetadataBuilder> {
+    using super = ClassMetadataBuilderBase<SingletonClassMetadataBuilder>;
+    using super::IGM;
+    using super::B;
 
   public:
-    InPlaceClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                                ConstantStructBuilder &builder,
-                                const ClassLayout &fieldLayout)
+    SingletonClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
+                                  ConstantStructBuilder &builder,
+                                  const ClassLayout &fieldLayout)
       : super(IGM, theClass, builder, fieldLayout) {}
+
+    void addFieldOffset(VarDecl *var) {
+      // Field offsets are either copied from the superclass or calculated
+      // at runtime.
+      B.addInt(IGM.SizeTy, 0);
+    }
+
+    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      for (unsigned i = 0,
+                    e = placeholder->getNumberOfFieldOffsetVectorEntries();
+           i < e; ++i) {
+        // Emit placeholder values for some number of stored properties we
+        // know exist but aren't able to reference directly.
+        B.addInt(IGM.SizeTy, 0);
+      }
+    }
+
+    void addGenericArgument(ClassDecl *forClass) {
+      // Filled in at runtime.
+      B.addNullPointer(IGM.TypeMetadataPtrTy);
+    }
+
+    void addGenericWitnessTable(ClassDecl *forClass) {
+      // Filled in at runtime.
+      B.addNullPointer(IGM.WitnessTablePtrTy);
+    }
   };
 
   /// A builder for metadata patterns for non-generic class with
@@ -2910,8 +2835,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
 
     builder.createMetadataAccessFunction();
   } else if (doesClassMetadataRequireInitialization(IGM, classDecl)) {
-    InPlaceClassMetadataBuilder builder(IGM, classDecl, init,
-                                        fieldLayout);
+    SingletonClassMetadataBuilder builder(IGM, classDecl, init,
+                                          fieldLayout);
     builder.layout();
     canBeConstant = builder.canBeConstant();
 
@@ -3061,8 +2986,8 @@ namespace {
 
     /// Create the runtime data structures and functions necessary to
     /// support in-place metadata initialization on this type.
-    void maybeCreateInPlaceMetadataInitialization() {
-      if (!needsInPlaceMetadataInitialization(IGM, Target))
+    void maybeCreateSingletonMetadataInitialization() {
+      if (!needsSingletonMetadataInitialization(IGM, Target))
         return;
 
       emitMetadataCompletionFunction(IGM, Target,
@@ -3174,7 +3099,7 @@ namespace {
 
     void createMetadataAccessFunction() {
       createNonGenericMetadataAccessFunction(IGM, Target);
-      maybeCreateInPlaceMetadataInitialization();
+      maybeCreateSingletonMetadataInitialization();
     }
   };
   
@@ -3424,7 +3349,7 @@ namespace {
 
     void createMetadataAccessFunction() {
       createNonGenericMetadataAccessFunction(IGM, Target);
-      maybeCreateInPlaceMetadataInitialization();
+      maybeCreateSingletonMetadataInitialization();
     }
   };
 

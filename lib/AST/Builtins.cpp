@@ -171,7 +171,6 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              Name, /*NameLoc=*/SourceLoc(),
                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                              /*GenericParams=*/nullptr,
-                             /*SelfDecl=*/nullptr,
                              paramList,
                              TypeLoc::withoutLoc(ResType), DC);
   FD->computeType(Info);
@@ -219,7 +218,6 @@ getBuiltinGenericFunction(Identifier Id,
                                Name, /*NameLoc=*/SourceLoc(),
                                /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                                GenericParams,
-                               /*SelfDecl=*/nullptr,
                                paramList,
                                TypeLoc::withoutLoc(ResType), DC);
 
@@ -730,6 +728,13 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
 }
 
 static ValueDecl *getIsPODOperation(ASTContext &Context, Identifier Id) {
+  BuiltinGenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(BuiltinIntegerType::get(1,Context)));
+  return builder.build(Id);
+}
+
+static ValueDecl *getIsBitwiseTakable(ASTContext &Context, Identifier Id) {
   BuiltinGenericSignatureBuilder builder(Context);
   builder.addParameter(makeMetatype(makeGenericParam()));
   builder.setResult(makeConcrete(BuiltinIntegerType::get(1,Context)));
@@ -1735,6 +1740,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::IsPOD:
     return getIsPODOperation(Context, Id);
+
+  case BuiltinValueKind::IsBitwiseTakable:
+    return getIsBitwiseTakable(Context, Id);
 
   case BuiltinValueKind::IsOptionalType:
     return getIsOptionalOperation(Context, Id);

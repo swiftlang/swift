@@ -402,11 +402,11 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   
   llvm::FoldingSet<SILLayout> SILLayouts;
 
-  syntax::SyntaxArena TheSyntaxArena;
+  RC<syntax::SyntaxArena> TheSyntaxArena;
 };
 
 ASTContext::Implementation::Implementation()
- : IdentifierTable(Allocator) {}
+    : IdentifierTable(Allocator), TheSyntaxArena(new SyntaxArena()) {}
 ASTContext::Implementation::~Implementation() {
   for (auto &cleanup : Cleanups)
     cleanup();
@@ -539,7 +539,7 @@ void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
   evaluator.setStatsReporter(stats);
 }
 
-syntax::SyntaxArena &ASTContext::getSyntaxArena() const {
+RC<syntax::SyntaxArena> ASTContext::getSyntaxArena() const {
   return getImpl().TheSyntaxArena;
 }
 
@@ -3563,19 +3563,27 @@ void AnyFunctionType::decomposeInput(
   }
 }
 
+Type AnyFunctionType::Param::getParameterType(bool forCanonical,
+                                              ASTContext *ctx) const {
+  Type type = getPlainType();
+  if (isVariadic()) {
+    if (!ctx) ctx = &type->getASTContext();
+    auto arrayDecl = ctx->getArrayDecl();
+    if (!arrayDecl)
+      type = ErrorType::get(*ctx);
+    else if (forCanonical)
+      type = BoundGenericType::get(arrayDecl, Type(), {type});
+    else
+      type = ArraySliceType::get(type);
+  }
+  return type;
+}
+
 Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
                                    bool canonicalVararg) {
   SmallVector<TupleTypeElt, 4> elements;
   for (const auto &param : params) {
-    Type eltType = param.getPlainType();
-    if (param.isVariadic()) {
-      if (!ctx.getArrayDecl())
-        eltType = ErrorType::get(ctx);
-      else if (canonicalVararg)
-        eltType = BoundGenericType::get(ctx.getArrayDecl(), Type(), {eltType});
-      else
-        eltType = ArraySliceType::get(eltType);
-    }
+    Type eltType = param.getParameterType(canonicalVararg, &ctx);
     elements.emplace_back(eltType, param.getLabel(),
                           param.getParameterFlags());
   }

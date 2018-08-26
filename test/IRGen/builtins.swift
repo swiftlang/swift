@@ -692,6 +692,31 @@ func ispod_test() {
   var f = Builtin.ispod(Builtin.NativeObject.self)
 }
 
+// CHECK-LABEL: define {{.*}} @{{.*}}generic_isbitwisetakable_test
+func generic_isbitwisetakable_test<T>(_: T) {
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
+  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
+  // CHECK-NEXT: [[FLAGS:%.*]] = ptrtoint i8* [[T1]] to i64
+  // CHECK-NEXT: [[ISNOTBITWISETAKABLE:%.*]] = and i64 [[FLAGS]], 1048576
+  // CHECK-NEXT: [[ISBITWISETAKABLE:%.*]] = icmp eq i64 [[ISNOTBITWISETAKABLE]], 0
+  // CHECK-NEXT: store i1 [[ISBITWISETAKABLE]], i1* [[S:%.*]]
+  var s = Builtin.isbitwisetakable(T.self)
+}
+
+// CHECK-LABEL: define {{.*}} @{{.*}}isbitwisetakable_test
+func isbitwisetakable_test() {
+  // CHECK: store i1 true, i1*
+  // CHECK: store i1 true, i1*
+  // CHECK: store i1 true, i1*
+  // CHECK: store i1 true, i1*
+  // CHECK: store i1 false, i1*
+  var t1 = Builtin.isbitwisetakable(Int.self)
+  var t2 = Builtin.isbitwisetakable(C.self)
+  var t3 = Builtin.isbitwisetakable(Abc.self)
+  var t4 = Builtin.isbitwisetakable(Empty.self)
+  var f = Builtin.isbitwisetakable(W.self)
+}
+
 // CHECK-LABEL: define {{.*}} @{{.*}}is_same_metatype
 func is_same_metatype_test(_ t1: Any.Type, _ t2: Any.Type) {
   // CHECK: [[MT1_AS_PTR:%.*]] = bitcast %swift.type* %0 to i8*

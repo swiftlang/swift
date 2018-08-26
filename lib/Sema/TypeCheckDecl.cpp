@@ -1127,29 +1127,6 @@ static void inferFinalAndDiagnoseIfNeeded(TypeChecker &TC, ValueDecl *D,
   makeFinal(TC.Context, D);
 }
 
-/// Configure the implicit 'self' parameter of a function, setting its type,
-/// pattern, etc.
-///
-/// \param func The function whose 'self' is being configured.
-static void configureImplicitSelf(TypeChecker &tc,
-                                  AbstractFunctionDecl *func) {
-  auto selfDecl = func->getImplicitSelfDecl();
-
-  // Compute the type of self.
-  auto selfParam = computeSelfParam(func, /*isInitializingCtor*/true,
-                                    /*wantDynamicSelf*/true);
-  assert(selfDecl && selfParam.getPlainType() && "Not a method");
-
-  // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
-  // neither inout.
-  auto specifier = selfParam.getParameterFlags().isInOut()
-                       ? VarDecl::Specifier::InOut
-                       : VarDecl::Specifier::Default;
-  selfDecl->setSpecifier(specifier);
-
-  selfDecl->setInterfaceType(selfParam.getPlainType());
-}
-
 /// Try to make the given declaration 'dynamic', checking any semantic
 /// constraints before doing so.
 ///
@@ -1189,7 +1166,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return false;
 
   // If 'dynamic' was explicitly specified, check it.
-  if (auto dynamicAttr = decl->getAttrs().getAttribute<DynamicAttr>()) {
+  if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
     return makeDynamic(decl);
   }
 
@@ -4171,10 +4148,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    // Before anything else, set up the 'self' argument correctly if present.
-    if (FD->getDeclContext()->isTypeContext())
-      configureImplicitSelf(*this, FD);
-
     // If we have generic parameters, check the generic signature now.
     if (FD->getGenericParams() || !isa<AccessorDecl>(FD)) {
       validateGenericFuncSignature(FD);
@@ -4301,8 +4274,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    configureImplicitSelf(*this, CD);
-
     validateGenericFuncSignature(CD);
 
     // We want the constructor to be available for name lookup as soon
@@ -4329,8 +4300,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     if (auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext()))
       DD->copyFormalAccessFrom(enclosingClass, /*sourceIsParentContext*/true);
-
-    configureImplicitSelf(*this, DD);
 
     validateGenericFuncSignature(DD);
 

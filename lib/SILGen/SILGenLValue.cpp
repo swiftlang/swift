@@ -3966,12 +3966,18 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
                                         ArgumentSource &&src,
                                         LValue &&dest) {
-  FormalEvaluationScope scope(*this);
+  // Enter a FormalEvaluationScope so that formal access to independent LValue
+  // components do not overlap. Furthermore, use an ArgumentScope to force
+  // cleanup of materialized LValues immediately, before evaluating the next
+  // LValue. For example: (x[i], x[j]) = a, b
+  ArgumentScope argScope(*this, loc);
 
   // If the last component is a getter/setter component, use a special
   // generation pattern that allows us to peephole the emission of the RHS.
-  if (trySetterPeephole(*this, loc, std::move(src), std::move(dest)))
+  if (trySetterPeephole(*this, loc, std::move(src), std::move(dest))) {
+    argScope.pop();
     return;
+  }
 
   // Otherwise, force the RHS now to preserve evaluation order.
   auto srcLoc = src.getLocation();
@@ -4008,6 +4014,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
 
   // The writeback scope closing will propagate the value back up through the
   // writeback chain.
+  argScope.pop();
 }
 
 void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,

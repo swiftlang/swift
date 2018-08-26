@@ -780,7 +780,7 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
   // The builtin code pattern to find tagged strings is:
   // builtin "stringObjectOr_Int64" (or to tag the string)
   // value_to_bridge_object (cast the UInt to bridge object)
-  if (auto *VTBOI = dyn_cast<ValueToBridgeObjectInst>(SRI->getOperand())) {
+  if (isa<ValueToBridgeObjectInst>(SRI->getOperand())) {
     return eraseInstFromFunction(*SRI);
   }
 
@@ -1230,7 +1230,7 @@ SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
   // The builtin code pattern to find tagged strings is:
   // builtin "stringObjectOr_Int64" (or to tag the string)
   // value_to_bridge_object (cast the UInt to bridge object)
-  if (auto *VTBOI = dyn_cast<ValueToBridgeObjectInst>(SRI->getOperand())) {
+  if (isa<ValueToBridgeObjectInst>(SRI->getOperand())) {
     return eraseInstFromFunction(*SRI);
   }
 

@@ -25,7 +25,7 @@ class Base<T> {
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:     [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getInPlaceMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$S3foo12SuperDerivedCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:     [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$S3foo12SuperDerivedCMn" to %swift.type_descriptor*))
 // CHECK-NEXT:     [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK-NEXT:     [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
 // CHECK-NEXT:     br label %cont
@@ -46,7 +46,7 @@ class SuperDerived: Derived {
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:     [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getInPlaceMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$S3foo7DerivedCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:     [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$S3foo7DerivedCMn" to %swift.type_descriptor*))
 // CHECK-NEXT:     [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK-NEXT:     [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
 // CHECK-NEXT:     br label %cont

@@ -707,6 +707,16 @@ public:
     return None;
   }
 
+  /// Retrieve overload choices associated with given expression.
+  void getOverloadChoices(Expr *anchor,
+                          SmallVectorImpl<SelectedOverload> &overloads) const {
+    for (auto &e : overloadChoices) {
+      auto *locator = e.first;
+      if (locator->getAnchor() == anchor)
+        overloads.push_back(e.second);
+    }
+  }
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -1764,7 +1774,7 @@ public:
 
   /// When an assignment to an expression is detected and the destination is
   /// invalid, emit a detailed error about the condition.
-  void diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
+  bool diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
 
   
   /// \brief Mine the active and inactive constraints in the constraint
@@ -1777,6 +1787,9 @@ public:
   /// Assuming that this constraint system is actually erroneous, this *always*
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
+
+  bool diagnoseAmbiguity(Expr *expr, ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguityWithFixes(Expr *expr, ArrayRef<Solution> solutions);
 
   /// \brief Give the deprecation warning for referring to a global function
   /// when there's a method from a conditional conformance in a smaller/closer
@@ -2352,10 +2365,6 @@ public:
   private:
     TypeMatchResult(SolutionKind result) : Kind(result) {}
   };
-
-  /// \brief Compute the rvalue type of the given expression, which is the
-  /// destination of an assignment statement.
-  Type computeAssignDestType(Expr *dest, SourceLoc equalLoc);
 
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
@@ -3356,6 +3365,13 @@ void simplifyLocator(Expr *&anchor,
                      Expr *&targetAnchor,
                      SmallVectorImpl<LocatorPathElt> &targetPath,
                      SourceRange &range);
+
+/// Simplify the given locator down to a specific anchor expression,
+/// if possible.
+///
+/// \returns the anchor expression if it fully describes the locator, or
+/// null otherwise.
+Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 
 class DisjunctionChoice {
   ConstraintSystem *CS;

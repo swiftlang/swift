@@ -14,19 +14,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ConstraintSystem.h"
 #include "CSDiag.h"
 #include "CalleeCandidateInfo.h"
+#include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypoCorrection.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/DenseSet.h"
@@ -341,238 +342,6 @@ void constraints::simplifyLocator(Expr *&anchor,
   }
 }
 
-/// Simplify the given locator down to a specific anchor expression,
-/// if possible.
-///
-/// \returns the anchor expression if it fully describes the locator, or
-/// null otherwise.
-static Expr *simplifyLocatorToAnchor(ConstraintSystem &cs,
-                                     ConstraintLocator *locator) {
-  if (!locator || !locator->getAnchor())
-    return nullptr;
-
-  SourceRange range;
-  locator = simplifyLocator(cs, locator, range);
-  if (!locator->getAnchor() || !locator->getPath().empty())
-    return nullptr;
-
-  return locator->getAnchor();
-}
-
-
-
-
-/// \brief Determine the number of distinct overload choices in the
-/// provided set.
-static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
-  llvm::SmallPtrSet<void *, 4> uniqueChoices;
-  unsigned result = 0;
-  for (auto choice : choices) {
-    if (uniqueChoices.insert(choice.getOpaqueChoiceSimple()).second)
-      ++result;
-  }
-  return result;
-}
-
-/// \brief Determine the name of the overload in a set of overload choices.
-static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
-  DeclName name;
-  for (auto choice : choices) {
-    if (!choice.isDecl())
-      continue;
-
-    DeclName nextName = choice.getDecl()->getFullName();
-    if (!name) {
-      name = nextName;
-      continue;
-    }
-
-    if (name != nextName) {
-      // Assume all choices have the same base name and only differ in
-      // argument labels. This may not be a great assumption, but we don't
-      // really have a way to recover for diagnostics otherwise.
-      return name.getBaseName();
-    }
-  }
-
-  return name;
-}
-
-/// Returns true if any diagnostics were emitted.
-static bool
-tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc,
-                                    const Expr *expr,
-                                    const Expr *anchor,
-                                    ArrayRef<OverloadChoice> choices) {
-  auto *callExpr = dyn_cast<CallExpr>(expr);
-  if (!callExpr)
-    return false;
-  if (!callExpr->hasTrailingClosure())
-    return false;
-  if (callExpr->getFn() != anchor)
-    return false;
-
-  llvm::SmallMapVector<Identifier, const ValueDecl *, 8> choicesByLabel;
-  for (const OverloadChoice &choice : choices) {
-    auto *callee = dyn_cast<AbstractFunctionDecl>(choice.getDecl());
-    if (!callee)
-      return false;
-
-    const ParameterList *paramList = callee->getParameters();
-    const ParamDecl *param = paramList->getArray().back();
-
-    // Sanity-check that the trailing closure corresponds to this parameter.
-    if (!param->hasValidSignature() ||
-        !param->getInterfaceType()->is<AnyFunctionType>())
-      return false;
-
-    Identifier trailingClosureLabel = param->getArgumentName();
-    auto &choiceForLabel = choicesByLabel[trailingClosureLabel];
-
-    // FIXME: Cargo-culted from diagnoseAmbiguity: apparently the same decl can
-    // appear more than once?
-    if (choiceForLabel == callee)
-      continue;
-
-    // If just providing the trailing closure label won't solve the ambiguity,
-    // don't bother offering the fix-it.
-    if (choiceForLabel != nullptr)
-      return false;
-
-    choiceForLabel = callee;
-  }
-
-  // If we got here, then all of the choices have unique labels. Offer them in
-  // order.
-  for (const auto &choicePair : choicesByLabel) {
-    auto diag = tc.diagnose(expr->getLoc(),
-                            diag::ambiguous_because_of_trailing_closure,
-                            choicePair.first.empty(),
-                            choicePair.second->getFullName());
-    swift::fixItEncloseTrailingClosure(tc, diag, callExpr, choicePair.first);
-  }
-
-  return true;
-}
-
-static bool diagnoseAmbiguity(ConstraintSystem &cs,
-                              ArrayRef<Solution> solutions,
-                              Expr *expr) {
-  // Produce a diff of the solutions.
-  SolutionDiff diff(solutions);
-
-  // Find the locators which have the largest numbers of distinct overloads.
-  Optional<unsigned> bestOverload;
-  // Overloads are scored by lexicographical comparison of (# of distinct
-  // overloads, depth, *reverse* of the index). N.B. - cannot be used for the
-  // reversing: the score version of index == 0 should be > than that of 1, but
-  // -0 == 0 < UINT_MAX == -1, whereas ~0 == UINT_MAX > UINT_MAX - 1 == ~1.
-  auto score = [](unsigned distinctOverloads, unsigned depth, unsigned index) {
-    return std::make_tuple(distinctOverloads, depth, ~index);
-  };
-  auto bestScore = score(0, 0, std::numeric_limits<unsigned>::max());
-
-  // Get a map of expressions to their depths and post-order traversal indices.
-  // Heuristically, all other things being equal, we should complain about the
-  // ambiguous expression that (1) has the most overloads, (2) is deepest, or
-  // (3) comes earliest in the expression.
-  auto depthMap = expr->getDepthMap();
-  auto indexMap = expr->getPreorderIndexMap();
-
-  for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
-    auto &overload = diff.overloads[i];
-
-    // If we can't resolve the locator to an anchor expression with no path,
-    // we can't diagnose this well.
-    auto *anchor = simplifyLocatorToAnchor(cs, overload.locator);
-    if (!anchor)
-      continue;
-    auto it = indexMap.find(anchor);
-    if (it == indexMap.end())
-      continue;
-    unsigned index = it->second;
-    it = depthMap.find(anchor);
-    if (it == depthMap.end())
-      continue;
-    unsigned depth = it->second;
-
-    // If we don't have a name to hang on to, it'll be hard to diagnose this
-    // overload.
-    if (!getOverloadChoiceName(overload.choices))
-      continue;
-
-    unsigned distinctOverloads = countDistinctOverloads(overload.choices);
-
-    // We need at least two overloads to make this interesting.
-    if (distinctOverloads < 2)
-      continue;
-
-    // If we have more distinct overload choices for this locator than for
-    // prior locators, just keep this locator.
-    auto thisScore = score(distinctOverloads, depth, index);
-    if (thisScore > bestScore) {
-      bestScore = thisScore;
-      bestOverload = i;
-      continue;
-    }
-
-    // We have better results. Ignore this one.
-  }
-
-  // FIXME: Should be able to pick the best locator, e.g., based on some
-  // depth-first numbering of expressions.
-  if (bestOverload) {
-    auto &overload = diff.overloads[*bestOverload];
-    auto name = getOverloadChoiceName(overload.choices);
-    auto anchor = simplifyLocatorToAnchor(cs, overload.locator);
-
-    // Emit the ambiguity diagnostic.
-    auto &tc = cs.getTypeChecker();
-    tc.diagnose(anchor->getLoc(),
-                name.isOperator() ? diag::ambiguous_operator_ref
-                                  : diag::ambiguous_decl_ref,
-                name);
-
-    if (tryDiagnoseTrailingClosureAmbiguity(tc, expr, anchor, overload.choices))
-      return true;
-
-    // Emit candidates.  Use a SmallPtrSet to make sure only emit a particular
-    // candidate once.  FIXME: Why is one candidate getting into the overload
-    // set multiple times? (See also tryDiagnoseTrailingClosureAmbiguity.)
-    SmallPtrSet<Decl*, 8> EmittedDecls;
-    for (auto choice : overload.choices) {
-      switch (choice.getKind()) {
-      case OverloadChoiceKind::Decl:
-      case OverloadChoiceKind::DeclViaDynamic:
-      case OverloadChoiceKind::DeclViaBridge:
-      case OverloadChoiceKind::DeclViaUnwrappedOptional:
-        // FIXME: show deduced types, etc, etc.
-        if (EmittedDecls.insert(choice.getDecl()).second)
-          tc.diagnose(choice.getDecl(), diag::found_candidate);
-        break;
-
-      case OverloadChoiceKind::KeyPathApplication:
-      case OverloadChoiceKind::DynamicMemberLookup:
-        // Skip key path applications and dynamic member lookups, since we don't
-        // want them to noise up unrelated subscript diagnostics.
-        break;
-
-      case OverloadChoiceKind::BaseType:
-      case OverloadChoiceKind::TupleIndex:
-        // FIXME: Actually diagnose something here.
-        break;
-      }
-    }
-
-    return true;
-  }
-
-  // FIXME: If we inferred different types for literals (for example),
-  // could diagnose ambiguity that way as well.
-
-  return false;
-}
-
 /// Given an expression that has a non-lvalue type, dig into it until we find
 /// the part of the expression that prevents the entire subexpression from being
 /// mutable.  For example, in a sequence like "x.v.v = 42" we want to complain
@@ -604,6 +373,17 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
       if (!member->isSettable() ||
           !member->isSetterAccessibleFrom(CS.DC))
         return { expr, member };
+    }
+
+    if (auto tupleExpr = dyn_cast<TupleExpr>(SE->getIndex())) {
+      if (tupleExpr->getNumElements() == 1 && tupleExpr->getElementName(0).str() == "keyPath") {
+        auto indexType = CS.simplifyType(CS.getType(tupleExpr->getElement(0)));
+        if (auto bgt = indexType->getAs<BoundGenericType>()) {
+          auto decl = bgt->getDecl();
+          if (decl == CS.getASTContext().getKeyPathDecl())
+            return resolveImmutableBase(tupleExpr->getElement(0), CS);
+        }
+      }
     }
 
     // If it is settable, then the base must be the problem, recurse.
@@ -660,6 +440,9 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
   if (auto *ICE = dyn_cast<ImplicitConversionExpr>(expr))
     if (!isa<LoadExpr>(ICE->getSubExpr()))
       return resolveImmutableBase(ICE->getSubExpr(), CS);
+
+  if (auto *SAE = dyn_cast<SelfApplyExpr>(expr))
+    return resolveImmutableBase(SAE->getFn(), CS);
 
   return { expr, nullptr };
 }
@@ -757,7 +540,11 @@ void swift::diagnoseSubElementFailure(Expr *destExpr,
     message += VD->getName().str().str();
     message += "'";
 
-    if (VD->isCaptureList())
+    auto type = CS.simplifyType(CS.getType(immInfo.first));
+    auto bgt = type ? type->getAs<BoundGenericType>() : nullptr;
+    if (bgt && bgt->getDecl() == CS.getASTContext().getKeyPathDecl())
+      message += " is a read-only key path";
+    else if (VD->isCaptureList())
       message += " is an immutable capture";
     else if (VD->isImplicit())
       message += " is immutable";
@@ -812,6 +599,14 @@ void swift::diagnoseSubElementFailure(Expr *destExpr,
 
     TC.diagnose(loc, diagID, message)
       .highlight(immInfo.first->getSourceRange());
+    return;
+  }
+
+  // If a keypath was the problem but wasn't resolved into a vardecl
+  // it is ambiguous or unable to be used for setting.
+  if (auto *KPE = dyn_cast_or_null<KeyPathExpr>(immInfo.first)) {
+    TC.diagnose(loc, diagID, "immutable key path")
+      .highlight(KPE->getSourceRange());
     return;
   }
 
@@ -3318,44 +3113,30 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
 /// When an assignment to an expression is detected and the destination is
 /// invalid, emit a detailed error about the condition.
-void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
+bool ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                                                  SourceLoc equalLoc) {
   auto &TC = getTypeChecker();
 
-  // Diagnose obvious assignments to literals.
-  if (isa<LiteralExpr>(dest->getValueProvidingExpr())) {
-    TC.diagnose(equalLoc, diag::cannot_assign_to_literal);
-    return;
-  }
-
-  // Diagnose assignments to let-properties in delegating initializers.
-  if (auto *member = dyn_cast<UnresolvedDotExpr>(dest)) {
-    if (auto *ctor = dyn_cast<ConstructorDecl>(DC)) {
-      if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
-        if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
-            ctor->getDelegatingOrChainedInitKind(nullptr) ==
-              ConstructorDecl::BodyInitKind::Delegating) {
-          auto resolved = resolveImmutableBase(member, *this);
-          assert(resolved.first == member);
-          TC.diagnose(equalLoc, diag::assignment_let_property_delegating_init,
-                      member->getName());
-          if (resolved.second) {
-            TC.diagnose(resolved.second, diag::decl_declared_here,
-                        member->getName());
-          }
-          return;
-        }
-      }
+  // Assignments to let-properties in delegating initializers will be caught
+  // elsewhere now, so if we see them here, it isn't an assignment problem.
+  if (auto *ctor = dyn_cast<ConstructorDecl>(DC)) {
+    DeclRefExpr *baseRef = nullptr;
+    if (auto *member = dyn_cast<UnresolvedDotExpr>(dest)) {
+      baseRef = dyn_cast<DeclRefExpr>(member->getBase());
+    } else if (auto *member = dyn_cast<MemberRefExpr>(dest)) {
+      if (auto *load = dyn_cast<LoadExpr>(member->getBase()))
+        baseRef = dyn_cast<DeclRefExpr>(load->getSubExpr());
+    }
+    if (baseRef && baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
+        ctor->getDelegatingOrChainedInitKind(nullptr) ==
+          ConstructorDecl::BodyInitKind::Delegating) {
+      return false;
     }
   }
 
   Diag<StringRef> diagID;
-  if (isa<ApplyExpr>(dest))
+  if (isa<ApplyExpr>(dest) || isa<SelfApplyExpr>(dest))
     diagID = diag::assignment_lhs_is_apply_expression;
-  else if (isa<DeclRefExpr>(dest))
-    diagID = diag::assignment_lhs_is_immutable_variable;
-  else if (isa<ForceValueExpr>(dest))
-    diagID = diag::assignment_bang_has_immutable_subcomponent;
   else if (isa<UnresolvedDotExpr>(dest) || isa<MemberRefExpr>(dest))
     diagID = diag::assignment_lhs_is_immutable_property;
   else if (auto sub = dyn_cast<SubscriptExpr>(dest)) {
@@ -3368,12 +3149,12 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
         sub->getArgumentLabels().size() == 1 &&
         sub->getArgumentLabels().front() == TC.Context.Id_dynamicMember)
       diagID = diag::assignment_dynamic_property_has_immutable_base;
-  } else {
+  } else
     diagID = diag::assignment_lhs_is_immutable_variable;
-  }
 
   diagnoseSubElementFailure(dest, equalLoc, *this, diagID,
                             diag::assignment_lhs_not_lvalue);
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -6462,8 +6243,8 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
       if (diagnoseSubscriptErrors(subscriptExpr, /* inAssignmentDestination = */ true))
         return true;
     }
-    CS.diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc());
-    return true;
+    if (CS.diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc()))
+      return true;
   }
 
   auto *srcExpr = assignExpr->getSrc();
@@ -7564,9 +7345,8 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   if (!DLC)
     return visitExpr(E);
 
-  if (auto Conformance
-        = CS.TC.conformsToProtocol(contextualType, DLC, CS.DC,
-                                   ConformanceCheckFlags::InExpression)) {
+  if (CS.TC.conformsToProtocol(contextualType, DLC, CS.DC,
+                               ConformanceCheckFlags::InExpression)) {
     // If the contextual type conforms to ExpressibleByDictionaryLiteral and
     // this is an empty array, then they meant "[:]".
     auto numElements = E->getNumElements();
@@ -8984,81 +8764,6 @@ ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
   }
   
   return nullptr;
-}
-
-
-bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
-  if (TC.getLangOpts().DebugConstraintSolver) {
-    auto &log = TC.Context.TypeCheckerDebug->getStream();
-    log << "---Attempting to salvage and emit diagnostics---\n";
-  }
-
-  // Attempt to solve again, capturing all states that come from our attempts to
-  // select overloads or bind type variables.
-  //
-  // FIXME: can this be removed?  We need to arrange for recordFixes to be
-  // eliminated.
-  viable.clear();
-
-  {
-    // Set up solver state.
-    SolverState state(expr, *this);
-    state.recordFixes = true;
-
-    // Solve the system.
-    solveRec(viable, FreeTypeVariableBinding::Disallow);
-
-    // Check whether we have a best solution; this can happen if we found
-    // a series of fixes that worked.
-    if (auto best = findBestSolution(viable, state.ExprWeights,
-                                     /*minimize=*/true)) {
-      if (*best != 0)
-        viable[0] = std::move(viable[*best]);
-      viable.erase(viable.begin() + 1, viable.end());
-      return false;
-    }
-
-    // FIXME: If we were able to actually fix things along the way,
-    // we may have to hunt for the best solution. For now, we don't care.
-
-    // Remove solutions that require fixes; the fixes in those systems should
-    // be diagnosed rather than any ambiguity.
-    auto hasFixes = [](const Solution &sol) { return !sol.Fixes.empty(); };
-    auto newEnd = std::remove_if(viable.begin(), viable.end(), hasFixes);
-    viable.erase(newEnd, viable.end());
-
-    // If there are multiple solutions, try to diagnose an ambiguity.
-    if (viable.size() > 1) {
-      if (getASTContext().LangOpts.DebugConstraintSolver) {
-        auto &log = getASTContext().TypeCheckerDebug->getStream();
-        log << "---Ambiguity error: "
-            << viable.size() << " solutions found---\n";
-        int i = 0;
-        for (auto &solution : viable) {
-          log << "---Ambiguous solution #" << i++ << "---\n";
-          solution.dump(log);
-          log << "\n";
-        }
-      }        
-
-      if (diagnoseAmbiguity(*this, viable, expr)) {
-        return true;
-      }
-    }
-
-    // Fall through to produce diagnostics.
-  }
-
-  if (getExpressionTooComplex(viable)) {
-    TC.diagnose(expr->getLoc(), diag::expression_too_complex).
-    highlight(expr->getSourceRange());
-    return true;
-  }
-
-  // If all else fails, diagnose the failure by looking through the system's
-  // constraints.
-  diagnoseFailureForExpr(expr);
-  return true;
 }
 
 bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,

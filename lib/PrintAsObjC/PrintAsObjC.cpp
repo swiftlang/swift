@@ -1523,12 +1523,8 @@ private:
 
   bool printImportedAlias(const TypeAliasDecl *alias,
                           Optional<OptionalTypeKind> optionalKind) {
-    if (!alias->hasClangNode()) {
-      if (!alias->isObjC()) return false;
-
-      os << alias->getName();
-      return true;
-    }
+    if (!alias->hasClangNode())
+      return false;
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
@@ -1560,7 +1556,7 @@ private:
     if (printImportedAlias(alias, optionalKind))
       return;
 
-    visitPart(alias->getUnderlyingTypeLoc().getType(), optionalKind);
+    visitPart(aliasTy->getSinglyDesugaredType(), optionalKind);
   }
 
   void maybePrintTagKeyword(const TypeDecl *NTD) {
@@ -1993,7 +1989,10 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   }
 
   void visitNameAliasType(NameAliasType *aliasTy) {
-    Callback(*this, aliasTy->getDecl());
+    if (aliasTy->getDecl()->hasClangNode())
+      Callback(*this, aliasTy->getDecl());
+    else
+      visit(aliasTy->getSinglyDesugaredType());
   }
 
   void visitParenType(ParenType *parenTy) {
@@ -2312,9 +2311,8 @@ public:
         } else if (auto PD = dyn_cast<ProtocolDecl>(TD)) {
           forwardDeclare(PD);
         } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
-          (void)addImport(TD);
-          // Just in case, make sure the underlying type is visible too.
-          finder.visit(TAD->getUnderlyingTypeLoc().getType());
+          if (TAD->hasClangNode())
+            (void)addImport(TD);
         } else if (addImport(TD)) {
           return;
         } else if (auto ED = dyn_cast<EnumDecl>(TD)) {

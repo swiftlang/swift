@@ -130,7 +130,6 @@ public:
 // attributes is considerred ABI-breaking.
 struct ABIAttributeInfo {
   const DeclAttrKind Kind;
-  const NodeAnnotation Annotation;
   const StringRef Content;
 };
 
@@ -139,6 +138,7 @@ struct CheckerOptions {
   bool ABI;
   bool Verbose;
   bool AbortOnModuleLoadFailure;
+  bool PrintModule;
   StringRef LocationFilter;
 };
 
@@ -303,6 +303,7 @@ public:
   bool hasDeclAttribute(DeclAttrKind DAKind) const;
   bool isStatic() const { return IsStatic; };
   StringRef getGenericSignature() const { return GenericSig; }
+  StringRef getScreenInfo() const;
 };
 
 class SDKNodeRoot: public SDKNode {

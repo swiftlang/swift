@@ -68,16 +68,16 @@ RC<RawSyntax>
 SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
                                         ArrayRef<RC<RawSyntax>> Parts) {
   assert(isUnknownKind(Kind));
-  SyntaxArena &Arena = getArena();
-  return RawSyntax::make(Kind, Parts, SourcePresence::Present, &Arena);
+  const RC<SyntaxArena> &Arena = getArena();
+  return RawSyntax::make(Kind, Parts, SourcePresence::Present, Arena);
 }
 
 RC<RawSyntax>
 SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
                                      ArrayRef<RC<RawSyntax>> Parts) {
   // Try to create the node of the given syntax.
-  SyntaxArena &Arena = getArena();
-  if (auto Node = SyntaxFactory::createRaw(Kind, Parts, &Arena))
+  const RC<SyntaxArena> &Arena = getArena();
+  if (auto Node = SyntaxFactory::createRaw(Kind, Parts, Arena))
     return Node;
 
   // Fallback to unknown syntax for the category.
@@ -162,9 +162,10 @@ void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
   if (!Enabled)
     return;
 
-  auto &Arena = getArena();
+  auto Arena = getArena();
   auto Text = OwnedString::makeRefCounted(Tok.getText());
-  addRawSyntax(RawSyntax::getToken(
+
+  addRawSyntax(getTokenCache().getToken(
       Arena, Tok.getKind(), Text, LeadingTrivia.Pieces, TrailingTrivia.Pieces));
 }
 
@@ -286,6 +287,7 @@ namespace {
 void finalizeSourceFile(RootContextData &RootData,
                         ArrayRef<RC<RawSyntax>> Parts) {
   SourceFile &SF = RootData.SF;
+  RC<SyntaxArena> &Arena = RootData.Arena;
   std::vector<RC<RawSyntax>> AllTopLevel;
   RC<RawSyntax> EOFToken;
 
@@ -313,14 +315,17 @@ void finalizeSourceFile(RootContextData &RootData,
   }
 
   if (!EOFToken)
-    EOFToken = RawSyntax::missing(tok::eof, OwnedString::makeUnowned(""));
+    EOFToken =
+        RawSyntax::missing(tok::eof, OwnedString::makeUnowned(""), Arena);
 
   auto newRaw = SyntaxFactory::createRaw(
       SyntaxKind::SourceFile,
       {
-          SyntaxFactory::createRaw(SyntaxKind::CodeBlockItemList, AllTopLevel),
+          SyntaxFactory::createRaw(SyntaxKind::CodeBlockItemList, AllTopLevel,
+                                   Arena),
           EOFToken,
-      });
+      },
+      Arena);
   assert(newRaw);
   SF.setSyntaxRoot(make<SourceFileSyntax>(newRaw));
 
@@ -432,5 +437,76 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   case AccumulationMode::NotSet:
     assert(!Enabled && "Cleanup mode must be specified before destruction");
     break;
+  }
+}
+
+bool shouldCacheNode(tok TokKind, OwnedString &Text,
+                     llvm::ArrayRef<TriviaPiece> LeadingTrivia,
+                     llvm::ArrayRef<TriviaPiece> TrailingTrivia) {
+  // Is string_literal with >16 length.
+  if (TokKind == tok::string_literal && Text.size() > 16) {
+    return false;
+  }
+
+  // Has leading comment trivia et al.
+  if (any_of(LeadingTrivia,
+             [](const syntax::TriviaPiece &T) { return T.getText().size(); })) {
+    return false;
+  }
+
+  // Has trailing comment trivia et al.
+  if (any_of(TrailingTrivia,
+             [](const syntax::TriviaPiece &T) { return T.getText().size(); })) {
+    return false;
+  }
+
+  // We can cache the node
+  return true;
+}
+
+RC<RawSyntax>
+RawSyntaxTokenCache::getToken(RC<SyntaxArena> &Arena, tok TokKind,
+                              OwnedString Text,
+                              llvm::ArrayRef<TriviaPiece> LeadingTrivia,
+                              llvm::ArrayRef<TriviaPiece> TrailingTrivia) {
+  // Determine whether this token is worth to cache.
+  if (!shouldCacheNode(TokKind, Text, LeadingTrivia, TrailingTrivia)) {
+    // Do not use cache.
+    return RawSyntax::make(TokKind, Text, LeadingTrivia, TrailingTrivia,
+                           SourcePresence::Present, Arena);
+  }
+
+  // This node is cacheable. Get or create.
+  llvm::FoldingSetNodeID ID;
+  RawSyntax::Profile(ID, TokKind, Text, LeadingTrivia, TrailingTrivia);
+
+  void *insertPos = nullptr;
+  if (auto existing = CachedTokens.FindNodeOrInsertPos(ID, insertPos)) {
+    // Found in the cache. Just return it.
+    return existing->get();
+  }
+
+  // Could not found in the cache. Create it.
+  auto Raw = RawSyntax::make(TokKind, Text, LeadingTrivia, TrailingTrivia,
+                             SourcePresence::Present, Arena);
+  auto IDRef = ID.Intern(Arena->getAllocator());
+  auto CacheNode = new (Arena) RawSyntaxCacheNode(Raw, IDRef);
+  // Keep track of the created RawSyntaxCacheNode so that we can destruct it
+  // later.
+  CacheNodes.push_back(CacheNode);
+  CachedTokens.InsertNode(CacheNode, insertPos);
+  return Raw;
+}
+
+RawSyntaxTokenCache::~RawSyntaxTokenCache() {
+  // The CachedTokens folding set is no longer used. It does not, however, clean
+  // up the RawSyntaxCacheNodes we created for it and would keep a strong
+  // reference to their RawSyntax nodes.
+  // We thus need to manually destruct the RawSyntaxCacheNodes here.
+  // After all RawSyntax nodes in the current arena are disposed of, the
+  // RawSyntaxCacheNode will also be destroyed, as they are allocated in that
+  // arena.
+  for (RawSyntaxCacheNode *Node : CacheNodes) {
+    Node->~RawSyntaxCacheNode();
   }
 }

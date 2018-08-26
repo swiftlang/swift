@@ -138,7 +138,7 @@ public class Concrete : Derived<Int> {
 
 
 // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc %swift.metadata_response @"$S14generic_vtable8ConcreteCMa"
-// CHECK: call swiftcc %swift.metadata_response @swift_getInPlaceMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$S14generic_vtable8ConcreteCMn" to {{.*}}))
+// CHECK: call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$S14generic_vtable8ConcreteCMn" to {{.*}}))
 // CHECK: ret
 
 //// Metadata response function for 'Concrete' sets the superclass.

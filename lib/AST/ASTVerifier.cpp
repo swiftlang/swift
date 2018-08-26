@@ -1439,8 +1439,7 @@ public:
           assert(knownConcreteErasure != ExistentialErasureOnly);
           knownConcreteErasure = ConcreteErasureOnly;
           concreteTy = concreteMeta->getInstanceType();
-        } else if (auto existentialMeta =
-                     concreteTy->getAs<ExistentialMetatypeType>()) {
+        } else if (concreteTy->is<ExistentialMetatypeType>()) {
           // If this is already forced to be a concrete erasure (say we're going
           // from (P & Q).Type.Protocol to P.Type.Type), then this is invalid,
           // because it would require the existential metatype to be
@@ -3013,13 +3012,15 @@ public:
           Out << "mutating function in a class\n";
           abort();
         }
-        const ParamDecl *selfParam = FD->getImplicitSelfDecl();
-        if (!selfParam->isInOut()) {
+        const ParamDecl *selfParam = FD->getImplicitSelfDecl(
+            /*createIfNeeded=*/false);
+        if (selfParam && !selfParam->isInOut()) {
           Out << "mutating function does not have inout 'self'\n";
           abort();
         }
       } else {
-        const ParamDecl *selfParam = FD->getImplicitSelfDecl();
+        const ParamDecl *selfParam = FD->getImplicitSelfDecl(
+            /*createIfNeeded=*/false);
         if (selfParam && selfParam->isInOut()) {
           Out << "non-mutating function has inout 'self'\n";
           abort();

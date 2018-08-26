@@ -2745,26 +2745,30 @@ namespace {
       auto typeVar = CS.createTypeVariable(locator);
       return LValueType::get(typeVar);
     }
-    
+
+    static Type genAssignDestType(Expr *expr, ConstraintSystem &CS) {
+      if (auto *TE = dyn_cast<TupleExpr>(expr)) {
+        SmallVector<TupleTypeElt, 4> destTupleTypes;
+        for (unsigned i = 0; i !=  TE->getNumElements(); ++i) {
+          Type subType = genAssignDestType(TE->getElement(i), CS);
+          destTupleTypes.push_back(TupleTypeElt(subType, TE->getElementName(i)));
+        }
+        return TupleType::get(destTupleTypes, CS.getASTContext());
+      } else {
+        Type destTy = CS.createTypeVariable(CS.getConstraintLocator(expr));
+        CS.addConstraint(ConstraintKind::Bind, CS.getType(expr), LValueType::get(destTy),
+                         CS.getConstraintLocator(expr));
+        return destTy;
+      }
+    }
+
     Type visitAssignExpr(AssignExpr *expr) {
       // Handle invalid code.
       if (!expr->getDest() || !expr->getSrc())
         return Type();
-      
-      // Compute the type to which the source must be converted to allow
-      // assignment to the destination.
-      auto destTy = CS.computeAssignDestType(expr->getDest(), expr->getLoc());
-      if (!destTy)
-        return Type();
-      if (destTy->is<UnresolvedType>()) {
-        return CS.createTypeVariable(CS.getConstraintLocator(expr));
-      }
-      
-      // The source must be convertible to the destination.
-      CS.addConstraint(ConstraintKind::Conversion,
-                       CS.getType(expr->getSrc()), destTy,
-                       CS.getConstraintLocator(expr->getSrc()));
-
+      Type destTy = genAssignDestType(expr->getDest(), CS);
+      CS.addConstraint(ConstraintKind::Conversion, CS.getType(expr->getSrc()), destTy,
+                       CS.getConstraintLocator(expr));
       return TupleType::getEmpty(CS.getASTContext());
     }
     

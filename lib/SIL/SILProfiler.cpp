@@ -99,7 +99,7 @@ static bool canCreateProfilerForAST(ASTNode N) {
   assert(hasASTBeenTypeChecked(N) && "Cannot use this AST for profiling");
 
   if (auto *D = N.dyn_cast<Decl *>()) {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+    if (isa<AbstractFunctionDecl>(D))
       return true;
 
     if (isa<TopLevelCodeDecl>(D))

@@ -444,6 +444,7 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   }
   // Print timers.
   TimerGroup::printAllJSONValues(OS, delim);
+  TimerGroup::clearAll();
   OS << "\n}\n";
   OS.flush();
 }
@@ -664,6 +665,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_STATS)
   publishAlwaysOnStatsToLLVM();
   PrintStatisticsJSON(ostream);
+  TimerGroup::clearAll();
 #else
   printAlwaysOnStatsAndTimers(ostream);
 #endif
