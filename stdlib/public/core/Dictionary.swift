@@ -796,10 +796,11 @@ extension Dictionary {
 
       // Prepare storage.
       // If `key` isn't in the dictionary yet, assume that this access will end
-      // up inserting it. Otherwise this can only be a removal or an in-place
-      // mutation. (If we guess wrong, we might needlessly rehash; that's fine.)
+      // up inserting it. (If we guess wrong, we might needlessly expand
+      // storage; that's fine.) Otherwise this can only be a removal or an
+      // in-place mutation.
       let (_, rehashed) = _variant.ensureUniqueNative(
-        withCapacity: self.capacity + (found ? 0 : 1),
+        withCapacity: self.count + (found ? 0 : 1),
         isUnique: isUnique)
       // FIXME: we should be able to make this a let; however, some of the
       // low-level operations below are (incorrectly) marked as mutating.
