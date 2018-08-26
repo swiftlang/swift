@@ -2407,7 +2407,7 @@ static bool shouldTailDuplicate(SILBasicBlock &Block) {
     if (!Inst.isTriviallyDuplicatable())
       return false;
 
-    if (isa<ApplyInst>(&Inst))
+    if (FullApplySite::isa(&Inst))
       return false;
 
     if (isa<ReleaseValueInst>(&Inst) ||

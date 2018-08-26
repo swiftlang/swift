@@ -1173,6 +1173,11 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (isa<BeginAccessInst>(this))
     return false;
 
+  // begin_apply creates a token that has to be directly used by the
+  // corresponding end_apply and abort_apply.
+  if (isa<BeginApplyInst>(this))
+    return false;
+
   return true;
 }
 
