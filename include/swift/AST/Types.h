@@ -1799,6 +1799,14 @@ public:
     return YieldTypeFlags(isOwned ? value | Owned : value - Owned);
   }
 
+  /// Return these flags interpreted as parameter flags.
+  ParameterTypeFlags asParamFlags() const {
+    return ParameterTypeFlags(/*variadic*/ false,
+                              /*autoclosure*/ false,
+                              /*escaping*/ false,
+                              getValueOwnership());
+  }
+
   bool operator ==(const YieldTypeFlags &other) const {
     return value.toRaw() == other.value.toRaw();
   }
@@ -2653,6 +2661,10 @@ public:
 
     Type getPlainType() const { return Ty; }
 
+    /// The type of the parameter.  Adjusts for varargs, but not inout.
+    Type getParameterType(bool forCanonical = false,
+                          ASTContext *ctx = nullptr) const;
+
     bool hasLabel() const { return !Label.empty(); }
     Identifier getLabel() const { return Label; }
     
@@ -2696,6 +2708,9 @@ public:
 
     CanType getType() const { return CanType(Param::getType()); }
     CanType getPlainType() const { return CanType(Param::getPlainType()); }
+    CanType getParameterType() const {
+      return CanType(Param::getParameterType(/*forCanonical*/ true));
+    }
   };
 
   using CanParamArrayRef =
@@ -2719,6 +2734,13 @@ public:
 
     CanYield getCanonical() const;
 
+    /// There are a number of places where it's convenient to re-use
+    /// the call machinery, processing yields as if they were
+    /// parameters of a call.  Return this reinterpreted as a parameter.
+    Param asParam() const {
+      return Param(getType(), Identifier(), getFlags().asParamFlags());
+    }
+
     Yield subst(SubstitutionMap subs, SubstOptions options = None) const {
       return Yield(getType().subst(subs, options), getFlags());
     }
@@ -2738,6 +2760,7 @@ public:
       : Yield(type, flags) {}
 
     CanType getType() const { return CanType(Yield::getType()); }
+    CanParam asParam() const { return CanParam::getFromParam(Yield::asParam());}
 
     CanYield subst(SubstitutionMap subs, SubstOptions options = None) const {
       return CanYield(getType().subst(subs, options)->getCanonicalType(),
