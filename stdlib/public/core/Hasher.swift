@@ -332,6 +332,13 @@ public struct Hasher {
     }
   }
 
+  /// Generate a new random seed using `SystemRandomNumberGenerator`.
+  @inlinable
+  internal static func _randomSeed() -> _Seed {
+    var random = SystemRandomNumberGenerator()
+    return (random.next(), random.next())
+  }
+
   /// Adds the given value to this hasher, mixing its essential parts into the
   /// hasher state.
   ///

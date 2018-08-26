@@ -1544,14 +1544,20 @@ internal final class _SwiftNativeSetStorage<
   }
 
   @inlinable
-  static internal func allocate(capacity: Int) -> _SwiftNativeSetStorage {
+  static internal func allocate(
+    capacity: Int,
+    seed: Hasher._Seed
+  ) -> _SwiftNativeSetStorage {
     let scale = _HashTable.scale(forCapacity: Swift.max(1 ,capacity))
-    return allocate(scale: scale)
+    return allocate(scale: scale, seed: seed)
   }
 
   @usableFromInline
   @_effects(releasenone)
-  static internal func allocate(scale: Int) -> _SwiftNativeSetStorage {
+  static internal func allocate(
+    scale: Int,
+    seed: Hasher._Seed
+  ) -> _SwiftNativeSetStorage {
     _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
     let bucketCount = 1 &<< scale
     let storage = Builtin.allocWithTailElems_2(
@@ -1570,21 +1576,7 @@ internal final class _SwiftNativeSetStorage<
       count: 0,
       map: UnsafeMutablePointer(mapAddr))
     storage.rawElements = UnsafeMutableRawPointer(elementsAddr)
-
-    // We assign a unique hash seed to each distinct hash table size, so that we
-    // avoid certain copy operations becoming quadratic, without breaking value
-    // semantics. (See https://bugs.swift.org/browse/SR-3268)
-    //
-    // We don't need to generate a brand new seed for each table size: it's
-    // enough to change a single bit in the global seed by XORing the bucket
-    // count to it. (The bucket count is always a power of two.)
-    //
-    // FIXME: Use an approximation of true per-instance seeding. We can't just
-    // use the base address, because COW copies need to share the same seed.
-    let seed = Hasher._seed
-    let perturbation = bucketCount
-    storage.seed = (seed.0 ^ UInt64(truncatingIfNeeded: perturbation), seed.1)
-
+    storage.seed = seed
     return storage
   }
 
@@ -1706,7 +1698,9 @@ internal struct _NativeSet<Element: Hashable> {
 
   @inlinable
   internal init(capacity: Int) {
-    self._storage = _SwiftNativeSetStorage<Element>.allocate(capacity: capacity)
+    self._storage = _SwiftNativeSetStorage<Element>.allocate(
+      capacity: capacity,
+      seed: Hasher._randomSeed())
   }
 
 #if _runtime(_ObjC)
@@ -1803,9 +1797,16 @@ extension _NativeSet {
     capacity: Int
   ) -> Bool {
     let scale = _HashTable.scale(forCapacity: capacity)
-    var result = _NativeSet(
-      _SwiftNativeSetStorage<Element>.allocate(scale: scale))
     let rehash = (scale != _storage.hashTable.scale)
+
+    // We generate a unique hash seed whenever we change the size of the hash
+    // table, so that we avoid certain copy operations becoming quadratic,
+    // without breaking value semantics. (For background details, see
+    // https://bugs.swift.org/browse/SR-3268)
+    let seed = rehash ? Hasher._randomSeed() : _storage.seed
+
+    var result = _NativeSet(
+      _SwiftNativeSetStorage<Element>.allocate(scale: scale, seed: seed))
     switch (isUnique, rehash) {
     case (true, true): // Move & rehash elements
       for index in self.indices {
@@ -2360,7 +2361,8 @@ extension _NativeSet {
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
       _storage = _SwiftNativeSetStorage<Element>.allocate(
-        scale: self._storage.hashTable.scale)
+        scale: self._storage.hashTable.scale,
+        seed: Hasher._randomSeed())
       return
     }
     for index in indices {
