@@ -1,3 +1,5 @@
+// SWIFT_ENABLE_TENSORFLOW
+// UNSUPPORTED: macos
 // RUN: %empty-directory(%t)
 
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %S/Inputs -c main.swift | %FileCheck %s -check-prefix=INPUT

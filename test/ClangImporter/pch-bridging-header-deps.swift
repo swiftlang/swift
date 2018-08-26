@@ -1,3 +1,5 @@
+// SWIFT_ENABLE_TENSORFLOW
+// UNSUPPORTED: macos
 // RUN: rm -f %t.*
 //
 // Generate a bridging PCH, use it in a swift file, and check that the swift file's .swiftdeps
