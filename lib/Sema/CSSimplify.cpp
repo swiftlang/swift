@@ -864,6 +864,9 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
+  // FIXME: Remove varargs logic below once we're no longer comparing
+  // argument lists in CSRanking.
+
   // Equality and subtyping have fairly strict requirements on tuple matching,
   // requiring element names to either match up or be disjoint.
   if (kind < ConstraintKind::Conversion) {
@@ -1109,12 +1112,29 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
+  SmallVector<AnyFunctionType::Param, 8> func1Params;
+  func1Params.append(func1->getParams().begin(), func1->getParams().end());
+
+  SmallVector<AnyFunctionType::Param, 8> func2Params;
+  func2Params.append(func2->getParams().begin(), func2->getParams().end());
+
   // Add a very narrow exception to SE-0110 by allowing functions that
   // take multiple arguments to be passed as an argument in places
   // that expect a function that takes a single tuple (of the same
   // arity).
-  auto func1Input = func1->getInput();
-  auto func2Input = func2->getInput();
+  auto isSingleParam = [&](ArrayRef<AnyFunctionType::Param> params) {
+    return (params.size() == 1 &&
+            params[0].getLabel().empty() &&
+            !params[0].isVariadic());
+  };
+
+  auto implodeParams = [&](SmallVectorImpl<AnyFunctionType::Param> &params) {
+    auto input = AnyFunctionType::composeInput(getASTContext(), params,
+                                               /*canonicalVararg=*/false);
+    params.clear();
+    params.emplace_back(input);
+  };
+
   {
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
@@ -1128,19 +1148,22 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
-        if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer())) {
-          if (!func1Input->hasParenSugar())
-            func2Input = paren2->getUnderlyingType();
+        if (isSingleParam(func2Params)) {
+          if (!isSingleParam(func1Params)) {
+            implodeParams(func1Params);
+          }
         } else if (getASTContext().isSwiftVersionAtLeast(4)
                    && !getASTContext().isSwiftVersionAtLeast(5)
-                   && !func2Input->hasParenSugar()) {
+                   && !isSingleParam(func2Params)) {
           auto *simplified = locator.trySimplifyToExpr();
           // We somehow let tuple unsplatting function conversions
           // through in some cases in Swift 4, so let's let that
           // continue to work, but only for Swift 4.
-          if (simplified && isa<DeclRefExpr>(simplified))
-            if (auto *paren1 = dyn_cast<ParenType>(func1Input.getPointer()))
-              func1Input = paren1->getUnderlyingType();
+          if (simplified && isa<DeclRefExpr>(simplified)) {
+            if (isSingleParam(func1Params)) {
+              implodeParams(func2Params);
+            }
+          }
         }
       }
     }
@@ -1166,14 +1189,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
-        if (auto *paren1 = dyn_cast<ParenType>(func1Input.getPointer())) {
-          auto innerTy = paren1->getUnderlyingType();
-          if (func2Input->isVoid() && innerTy->isVoid()) {
-            func1Input = innerTy;
-            // If the other input is also parenthesized, remove one
-            // layer of parens from it as well.
-            if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer()))
-              func2Input = paren2->getUnderlyingType();
+        if (isSingleParam(func1Params) &&
+            func1Params[0].getType()->isVoid()) {
+          if (func2Params.empty()) {
+            func2Params.emplace_back(getASTContext().TheEmptyTupleType);
           }
         }
       }
@@ -1181,11 +1200,42 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   // Input types can be contravariant (or equal).
-  auto result =
-      matchTypes(func2Input, func1Input, subKind, subflags,
-                 locator.withPathElement(ConstraintLocator::FunctionArgument));
-  if (result.isFailure())
-    return result;
+  auto argumentLocator = locator.withPathElement(
+      ConstraintLocator::FunctionArgument);
+
+  if (func1Params.size() != func2Params.size())
+    return getTypeMatchFailure(argumentLocator);
+
+  for (unsigned i : indices(func1Params)) {
+    auto func1Param = func1Params[i];
+    auto func2Param = func2Params[i];
+
+    // Variadic bit must match.
+    if (func1Param.isVariadic() != func2Param.isVariadic())
+      return getTypeMatchFailure(argumentLocator);
+
+    // Labels must match.
+    //
+    // FIXME: We should not end up with labels here at all, but we do
+    // from invalid code in diagnostics, and as a result of code completion
+    // directly building constraint systems.
+    if (func1Param.getLabel() != func2Param.getLabel())
+      return getTypeMatchFailure(argumentLocator);
+
+    // FIXME: We should check value ownership too, but it's not completely
+    // trivial because of inout-to-pointer conversions.
+
+    // Compare the parameter types.
+    auto result = matchTypes(func2Param.getType(),
+                             func1Param.getType(),
+                             subKind, subflags,
+                             (func1Params.size() == 1
+                              ? argumentLocator
+                              : argumentLocator.withPathElement(
+                                LocatorPathElt::getTupleElement(i))));
+    if (result.isFailure())
+      return result;
+  }
 
   // Result type can be covariant (or equal).
   return matchTypes(func1->getResult(), func2->getResult(), subKind,
@@ -1575,39 +1625,20 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                              TypeMatchOptions flags,
                              ConstraintLocatorBuilder locator) {
-  // If we're matching the input types of two function types, we have to be
-  // careful to preserve ParenType sugar.
-  bool isArgumentTupleMatch = false;
-  if (auto elt = locator.last())
-    if (elt->getKind() == ConstraintLocator::FunctionArgument)
-      isArgumentTupleMatch = true;
-
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
-  type1 = getFixedTypeRecursive(type1, flags, kind == ConstraintKind::Equal,
-                                isArgumentTupleMatch);
-  type2 = getFixedTypeRecursive(type2, flags, kind == ConstraintKind::Equal,
-                                isArgumentTupleMatch);
+  type1 = getFixedTypeRecursive(type1, flags, kind == ConstraintKind::Equal);
+  type2 = getFixedTypeRecursive(type2, flags, kind == ConstraintKind::Equal);
 
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
-  TypeVariableType *typeVar1, *typeVar2;
-  if (isArgumentTupleMatch) {
-    typeVar1 = dyn_cast<TypeVariableType>(type1.getPointer());
-    typeVar2 = dyn_cast<TypeVariableType>(type2.getPointer());
 
-    // If the types are obviously equivalent, we're done.
-    if (type1->hasParenSugar() == type2->hasParenSugar() &&
-        type1->isEqual(type2))
-      return getTypeMatchSuccess();
-  } else {
-    typeVar1 = desugar1->getAs<TypeVariableType>();
-    typeVar2 = desugar2->getAs<TypeVariableType>();
+  auto *typeVar1 = desugar1->getAs<TypeVariableType>();
+  auto *typeVar2 = desugar2->getAs<TypeVariableType>();
 
-    // If the types are obviously equivalent, we're done.
-    if (desugar1->isEqual(desugar2))
-      return getTypeMatchSuccess();
-  }
+  // If the types are obviously equivalent, we're done.
+  if (desugar1->isEqual(desugar2))
+    return getTypeMatchSuccess();
 
   // Local function that should be used to produce the return value whenever
   // this function was unable to resolve the constraint. It should be used
@@ -1761,14 +1792,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
       llvm_unreachable("Not a relational constraint");
-    }
-  }
-
-  if (isArgumentTupleMatch) {
-    if (!typeVar1 && !typeVar2) {
-      if (type1->hasParenSugar() != type2->hasParenSugar()) {
-        return getTypeMatchFailure(locator);
-      }
     }
   }
 
@@ -4661,11 +4684,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // Unwrap an inout type.
     auto obj1 = type1->getInOutObjectType();
 
-    obj1 = getFixedTypeRecursive(obj1, false, false);
+    obj1 = getFixedTypeRecursive(obj1, false);
     
     auto t2 = type2->getDesugaredType();
 
-    auto baseType1 = getFixedTypeRecursive(*isArrayType(obj1), false, false);
+    auto baseType1 = getFixedTypeRecursive(*isArrayType(obj1), false);
     auto baseType2 = getBaseTypeForPointer(*this, t2);
 
     increaseScore(ScoreKind::SK_ValueToPointerConversion);
@@ -4684,7 +4707,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // TODO: Handle different encodings based on pointer element type, such as
     // UTF16 for [U]Int16 or UTF32 for [U]Int32. For now we only interop with
     // Int8 pointers using UTF8 encoding.
-    baseType2 = getFixedTypeRecursive(baseType2, false, false);
+    baseType2 = getFixedTypeRecursive(baseType2, false);
     // If we haven't resolved the element type, generate constraints.
     if (baseType2->isTypeVariableOrMember()) {
       if (flags.contains(TMF_GenerateConstraints)) {
