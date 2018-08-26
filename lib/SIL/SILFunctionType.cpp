@@ -128,7 +128,7 @@ SILFunctionType::getGradientType(
     case ResultConvention::UnownedInnerPointer:
       seedConv = ParameterConvention::Indirect_In_Guaranteed; break;
     }
-    gradParams.push_back({ originalSourceResultTy, seedConv });
+    gradParams.push_back({originalSourceResultTy, seedConv});
   }
   // If no differentiation parameters are specified, differentiation is with
   // respect to all of original's parameters. For simplicity, we add all

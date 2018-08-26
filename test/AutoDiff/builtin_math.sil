@@ -51,8 +51,6 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
   %simple_mul = function_ref @simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
   %simple_mul_grad = gradient [source 0] [wrt 0, 1] %simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
-  // FIXME(SR-8584): Uncomment this test when the crasher gets fixed.
-  //
   %simple_div = function_ref @simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
   %simple_div_grad = gradient [source 0] [wrt 0, 1] %simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 

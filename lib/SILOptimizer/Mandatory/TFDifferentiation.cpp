@@ -172,13 +172,14 @@ static void collectAllActualResultsInTypeOrder(
     ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
     IndResRange &&indirectResults, SmallVectorImpl<SILValue> &results) {
   auto callee = ai->getCallee();
-  SILFunctionConventions calleeConvs(callee->getType().getAs<SILFunctionType>(),
-                                     ai->getModule());
+  SILFunctionConventions calleeConvs(
+      callee->getType().castTo<SILFunctionType>(), ai->getModule());
   unsigned indResIdx = 0, dirResIdx = 0;
-  for (auto &resInfo : calleeConvs.getResults())
+  for (auto &resInfo : calleeConvs.getResults()) {
     results.push_back(resInfo.isFormalDirect()
                           ? extractedDirectResults[dirResIdx++]
                           : indirectResults[indResIdx++]);
+  }
 }
 
 /// Given a range of types, joins these into a single type. If there's exactly
@@ -302,6 +303,11 @@ public:
     // Invoked by a `@differentiable` attribute in the Swift source. This case
     // has an associated `@differentiable` attribute.
     DifferentiableAttribute,
+    
+    // Invoker by a `[reverse_differentiable]` attribute in SIL **without**
+    // being lined to a Swift AST attribute. This case has an associated
+    // `[reverse_differentiable]` attribute.
+    SILReverseDifferentiableAttribute
   };
 
 private:
@@ -327,6 +333,13 @@ private:
     std::pair<DifferentiableAttr *, FuncDecl *> differentiableAttribute;
     Value(DifferentiableAttr *attr, FuncDecl *fd)
         : differentiableAttribute({attr, fd}) {}
+    
+    /// The `[reverse_differentiable]` attribute associated with the
+    /// `SILReverseDifferentiableAttribute` case.
+    std::pair<SILReverseDifferentiableAttr *, SILFunction *>
+        silReverseDifferentiableAttribute;
+    Value(SILReverseDifferentiableAttr *attr, SILFunction *f)
+        : silReverseDifferentiableAttribute({attr, f}) {}
   } value;
 
   /*implicit*/
@@ -341,6 +354,8 @@ public:
       : kind(Kind::DifferentialOperator), value(expr) {}
   DifferentiationInvoker(DifferentiableAttr *attr, FuncDecl *fd)
       : kind(Kind::DifferentiableAttribute), value(attr, fd) {}
+  DifferentiationInvoker(SILReverseDifferentiableAttr *attr, SILFunction *f)
+      : kind(Kind::SILReverseDifferentiableAttribute), value(attr, f) {}
 
   Kind getKind() const { return kind; }
 
@@ -364,6 +379,16 @@ public:
   getDifferentiableAttribute() const {
     assert(kind == Kind::DifferentiableAttribute);
     return value.differentiableAttribute;
+  }
+  
+  std::pair<SILReverseDifferentiableAttr *, SILFunction *>
+  getSILReverseDifferentiableAttribute() const {
+    assert(kind == Kind::SILReverseDifferentiableAttribute);
+    return value.silReverseDifferentiableAttribute;
+  }
+  
+  bool isAnyDifferentialOperator() const {
+    return kind == Kind::DifferentialOperator || kind == Kind::GradientInst;
   }
 
   void print(llvm::raw_ostream &os) const;
@@ -555,7 +580,9 @@ public:
   /// of an `apply` instruction in the original function.
   VarDecl *addNestedStaticPrimalValueDecl(ApplyInst *inst,
                                           CanType primalValueType) {
-    auto *decl = addVarDecl("pv_", primalValueType);
+    auto *decl = addVarDecl(
+        "pv_" + llvm::itostr(nestedStaticPrimalValueMap.size()),
+        primalValueType);
     nestedStaticPrimalValueMap.insert({inst, decl});
     return decl;
   }
@@ -735,13 +762,20 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
   case Kind::DifferentialOperator:
     os << "differential_operator=(";
     getDifferentialOperator()->print(os);
-    os << ")";
+    os << ')';
     break;
   case Kind::DifferentiableAttribute: {
     auto diffAttr = getDifferentiableAttribute();
     os << "differentiable_attribute=(attr=(";
     diffAttr.first->print(os);
     os << ") func_decl=" << diffAttr.second->getFullName();
+    break;
+  }
+  case Kind::SILReverseDifferentiableAttribute: {
+    auto diffAttr = getSILReverseDifferentiableAttribute();
+    os << "sil_reverse_differentiable_attribute=(attr=(";
+    diffAttr.first->print(os);
+    os << ") function=" << diffAttr.second->getName();
     break;
   }
   }
@@ -941,7 +975,7 @@ private:
   mutable FuncDecl *cachedNumericPlusFn = nullptr;
   
   /// Cache of computed cotangent spaces for types.
-  mutable DenseMap<CanType, Optional<CotangentSpace>> cachedTangentSpaces;
+  mutable DenseMap<CanType, Optional<CotangentSpace>> cachedCotangentSpaces;
 
 public:
   /// Construct an ADContext for the given module.
@@ -988,7 +1022,7 @@ public:
   }
 
   /// Determines the cotangent space (or none) of the specified type.
-  Optional<CotangentSpace> getTangentSpace(CanType type) const;
+  Optional<CotangentSpace> getCotangentSpace(CanType type) const;
 
   /// Retrieves the file unit that contains implicit declarations in the
   /// current Swift module. If it does not exist, create one.
@@ -1152,9 +1186,11 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
              << "\n"
              << "while performing differentiation task\n\t" << task << '\n');
   switch (invoker.getKind()) {
-  // For a gradient instruction that is not associated with any source
-  // location, we emit a diagnostic without source location.
+  // For a gradient instruction or a `[reverse_differentiable]` attribute that
+  // is not associated with any source location, we emit a diagnostic at the
+  // instruction source location.
   case DifferentiationInvoker::Kind::GradientInst:
+  case DifferentiationInvoker::Kind::SILReverseDifferentiableAttribute:
     diagnose(opLoc,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
     break;
@@ -1239,16 +1275,16 @@ static NominalTypeDecl *getAnyRealScalarTypeDecl(CanType type,
 }
 
 /// Determines the cotangent space of a type.
-Optional<CotangentSpace> ADContext::getTangentSpace(CanType type) const {
+Optional<CotangentSpace> ADContext::getCotangentSpace(CanType type) const {
   LLVM_DEBUG(getADDebugStream() << "Classifying cotangent space for "
              << type << '\n');
-  auto lookup = cachedTangentSpaces.find(type);
-  if (lookup != cachedTangentSpaces.end())
+  auto lookup = cachedCotangentSpaces.find(type);
+  if (lookup != cachedCotangentSpaces.end())
     return lookup->getSecond();
-  // A helper that is used to cache the computed cotangent space for the specified
-  // type and retuns the same cotangent space.
+  // A helper that is used to cache the computed cotangent space for the
+  // specified type and retuns the same cotangent space.
   auto cache = [&](Optional<CotangentSpace> cotangentSpace) {
-    cachedTangentSpaces.insert({type, cotangentSpace});
+    cachedCotangentSpaces.insert({type, cotangentSpace});
     return cotangentSpace;
   };
   // `Builtin.FP<...>` is a builtin real scalar space.
@@ -1269,29 +1305,31 @@ Optional<CotangentSpace> ADContext::getTangentSpace(CanType type) const {
       if (structDecl->getFormalAccess() >= AccessLevel::Public &&
           !structDecl->getAttrs().hasAttribute<FixedLayoutAttr>())
         return cache(None);
-      auto allMembersHaveTangentSpace =
+      auto allMembersHaveCotangentSpace =
           llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-            return (bool)getTangentSpace(v->getType()->getCanonicalType());
+            return (bool)getCotangentSpace(v->getType()->getCanonicalType());
           });
-      if (allMembersHaveTangentSpace)
+      if (allMembersHaveCotangentSpace)
         return cache(CotangentSpace::getProductStruct(structDecl));
     }
-    // Frozen enum types, all of whose payloads have a cotangent space, are a sum
-    // of the product of payloads in each case.
+    // Frozen enum types, all of whose payloads have a cotangent space, are a
+    // sum of the product of payloads in each case.
     if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
       if (enumDecl->getFormalAccess() >= AccessLevel::Public &&
           !enumDecl->getAttrs().hasAttribute<FrozenAttr>())
-        return None;
-      auto allMembersHaveTangentSpace =
+        return cache(None);
+      if (enumDecl->isIndirect())
+        return cache(None);
+      auto allMembersHaveCotangentSpace =
         llvm::all_of(enumDecl->getAllCases(), [&](EnumCaseDecl *cd) {
           return llvm::all_of(cd->getElements(), [&](EnumElementDecl *eed) {
             return llvm::all_of(*eed->getParameterList(), [&](ParamDecl *pd) {
               return (bool)
-                  getTangentSpace(pd->getType()->getCanonicalType());
+                  getCotangentSpace(pd->getType()->getCanonicalType());
             });
           });
         });
-      if (allMembersHaveTangentSpace)
+      if (allMembersHaveCotangentSpace)
         return cache(CotangentSpace::getSum(enumDecl));
     }
   }
@@ -1299,11 +1337,11 @@ Optional<CotangentSpace> ADContext::getTangentSpace(CanType type) const {
   // those cotangent space.
   if (TupleType *tupleType = type->getAs<TupleType>())
     if (llvm::all_of(tupleType->getElementTypes(), [&](Type t) {
-            return (bool)getTangentSpace(t->getCanonicalType()); }))
+            return (bool)getCotangentSpace(t->getCanonicalType()); }))
       return cache(CotangentSpace::getProductTuple(tupleType));
   // Otherwise, the type does not have a cotangent space. That is, it does not
   // support differentiation.
-  return None;
+  return cache(None);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1368,7 +1406,7 @@ class DifferentiableActivityInfo;
 /// a variable is “varied” if it depends on at least one independent. Conversely
 /// we say that a variable is “useful” if at least one dependent depends on it.
 /// Finally, we say that a variable is “active” if it is at the same time varied
-/// and useful. In the special case of the cotangent mode, it is easy to check
+/// and useful. In the special case of the tangent mode, it is easy to check
 /// that when variable `v` is not varied at some place in the program, then its
 /// derivative `v̇` at this place is certainly null. Conversely when variable `v`
 /// is not useful, then whatever the value of `v̇`, this value does not matter
@@ -1810,7 +1848,7 @@ static void convertIntToIndirectExpressible(intmax_t scalar,
 static void createScalarValueIndirect(intmax_t scalar, CanType type,
                                       SILValue seedBufAccess, SILLocation loc,
                                       SILBuilder &builder, ADContext &context) {
-  auto cotangentSpace = context.getTangentSpace(type);
+  auto cotangentSpace = context.getCotangentSpace(type);
   assert(cotangentSpace && "No cotangent space for this type");
   // See if the type is a builtin float. If so, we don't do protocol
   // conformance-based conversion.
@@ -1875,7 +1913,8 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
         CanMetatypeType::get(type, MetatypeRepresentation::Thick));
     auto *metatype = builder.createMetatype(loc, metatypeTy);
     // Call `init(_:)` through `VectorNumeric` protocol.
-    DeclName initName(astCtx, DeclBaseName::createConstructor(), {Identifier()});
+    DeclName initName(astCtx, DeclBaseName::createConstructor(),
+                      {Identifier()});
     // Allocate buffer for passing the indirect scalar value.
     // %2 = alloc_stack $<scalar type>
     auto scalarValBuf =
@@ -1950,7 +1989,7 @@ static SILValue createScalarValueDirect(intmax_t scalar, CanType type,
                                         ADContext &context) {
   LLVM_DEBUG(getADDebugStream() << "Creating a scalar value " << scalar <<
         " of type " << type << '\n');
-  auto cotangentSpace = context.getTangentSpace(type);
+  auto cotangentSpace = context.getCotangentSpace(type);
   assert(cotangentSpace && "No cotangent space for this type");
   switch (cotangentSpace->getKind()) {
   case CotangentSpace::Kind::BuiltinRealScalar:
@@ -2470,6 +2509,7 @@ public:
       errorOccurred = true;
       return;
     }
+    auto calleeOriginType = calleeOriginFnRef->getFunctionType();
     // Find or register a differentiation task for this function.
     auto *newTask = context.lookUpOrRegisterDifferentiationTask(
         calleeOriginFnRef->getReferencedFunction(), indices,
@@ -2505,18 +2545,32 @@ public:
       llvm_unreachable("FIXME: Some primal values are indirect");
     }
     // Collect substituted arguments.
-    for (auto origArg : ai->getArguments())
+    LLVM_DEBUG(getADDebugStream() << "Retrieving original arguments:\n");
+    for (auto origArg : ai->getArguments()) {
+      LLVM_DEBUG(getADDebugStream() << "Original argument " << origArg);
       newArgs.push_back(getOpValue(origArg));
+    }
     // %2 = apply %1(...)
-    auto primalCall = builder.createApply(ai->getLoc(), convertedPrimal,
-                                          ai->getSubstitutionMap(), newArgs,
-                                          ai->isNonThrowing());
+    auto *primalCall = builder.createApply(ai->getLoc(), convertedPrimal,
+                                           ai->getSubstitutionMap(), newArgs,
+                                           ai->isNonThrowing());
+    LLVM_DEBUG(getADDebugStream()
+               << "Applied primal function\n" << *primalCall);
     // After applying the primal, we need to handle the primal's direct results.
     // These results include direct primal values and direct original results.
     SmallVector<SILValue, 8> primVals, origResults, allDirResults;
     extractAllElements(primalCall, builder, allDirResults);
-    collectPrimalValuesAndOriginalResults(primalFnTy, primalCall, allDirResults,
-                                          primVals, origResults);
+    collectPrimalValuesAndOriginalResults(calleeOriginType, primalCall,
+                                          allDirResults, primVals, origResults);
+    LLVM_DEBUG({
+      auto &s = getADDebugStream();
+      s << "All direct results returned by the primal function: \n";
+      llvm::for_each(allDirResults, [&](SILValue v) { s << v; });
+      s << "Primal values returned by the primal function: \n";
+      llvm::for_each(primVals, [&](SILValue v) { s << v; });
+      s << "Original results returned by the primal function: \n";
+      llvm::for_each(origResults, [&](SILValue v) { s << v; });
+    });
 
     // Get original direct results for cloning.
     SmallVector<SILValue, 8> origDirResults;
@@ -3393,21 +3447,27 @@ public:
     getBuilder().createDeallocStack(loc, seedBuf);
     // If `applyAdj` is a tuple, extract all results.
     SmallVector<SILValue, 8> dirResults;
-    if (auto adjDirResTupTy = applyAdj->getType().getAs<TupleType>())
-      for (auto i : range(adjDirResTupTy->getNumElements()))
-        dirResults.push_back(
-            getBuilder().createTupleExtract(applyAdj->getLoc(), applyAdj, i));
-    else
-      dirResults.push_back(applyAdj);
+    extractAllElements(applyAdj, builder, dirResults);
     // Get all results in type-defined order.
     SmallVector<SILValue, 8> allResults;
     collectAllActualResultsInTypeOrder(
-        ai, dirResults, applyAdj->getIndirectSILResults(), allResults);
+        applyAdj, dirResults, applyAdj->getIndirectSILResults(), allResults);
+    LLVM_DEBUG({
+      auto &s = getADDebugStream();
+      s << "All direct results of the nested adjoint call: \n";
+      interleave(dirResults, [&](SILValue v) { s << v; }, [&]{});
+      s << "All indirect results of the nested adjoint call: \n";
+      interleave(applyAdj->getIndirectSILResults(),
+                 [&](SILValue v) { s << v; }, [&]{});
+      s << "All results of the nested adjoint call: \n";
+      interleave(allResults, [&](SILValue v) { s << v; }, [&]{});
+    });
     // Set adjoints for all original parameters.
-    for (auto i : range(origConvs.getSILArgIndexOfFirstParam(),
-                        origConvs.getNumParameters()))
-      addAdjointValue(applyAdj->getArgument(i),
-                      AdjointValue::getMaterialized(allResults[i]));
+    auto origNumIndRes = origConvs.getNumIndirectSILResults();
+    auto allResultsIt = allResults.begin();
+    for (unsigned i : otherTask->getIndices().parameters.set_bits())
+      addAdjointValue(ai->getArgument(i + origNumIndRes),
+                      AdjointValue::getMaterialized(*allResultsIt++));
   }
 
   /// Handle `gradient` instruction.
@@ -3528,7 +3588,8 @@ public:
         }
       }
       addAdjointValue(tei->getOperand(),
-          AdjointValue::getAggregate(tei->getType(), elements, allocator));
+          AdjointValue::getAggregate(tei->getOperand()->getType(),
+                                     elements, allocator));
       break;
     }
     }
@@ -3634,7 +3695,7 @@ SILValue AdjointEmitter::materializeAdjointDirect(AdjointValue val,
   auto &ctx = getContext();
   LLVM_DEBUG(getADDebugStream() <<
              "Materializing adjoints for " << val << '\n');
-  auto cotangentSpace = ctx.getTangentSpace(val.getType().getASTType());
+  auto cotangentSpace = ctx.getCotangentSpace(val.getType().getASTType());
   assert(cotangentSpace && "No cotangent space for this type");
   switch (val.getKind()) {
   case AdjointValue::Kind::Zero:
@@ -3645,7 +3706,7 @@ SILValue AdjointEmitter::materializeAdjointDirect(AdjointValue val,
     for (auto &eltAdjVal : val.getAggregateElements())
       elements.push_back(materializeAdjointDirect(eltAdjVal, loc));
     if (auto tupleTy = val.getType().getAs<TupleType>()) {
-      return builder.createTuple(loc, elements);
+      return builder.createTuple(loc, val.getType(), elements);
     } else {
       return builder.createStruct(loc, val.getType(), elements);
     }
@@ -3788,7 +3849,7 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
   auto adjointASTTy = adjointTy.getASTType();
   auto loc = lhs.getLoc();
   auto &builder = getBuilder();
-  auto cotangentSpace = getContext().getTangentSpace(adjointASTTy);
+  auto cotangentSpace = getContext().getCotangentSpace(adjointASTTy);
   assert(cotangentSpace && "No cotangent space for this type");
   switch (cotangentSpace->getKind()) {
   case CotangentSpace::Kind::BuiltinRealScalar:
@@ -3865,7 +3926,7 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
   auto adjointTy = lhsBufAccess->getType();
   auto adjointASTTy = adjointTy.getASTType();
   auto &context = getContext();
-  auto cotangentSpace = context.getTangentSpace(adjointASTTy);
+  auto cotangentSpace = context.getCotangentSpace(adjointASTTy);
   assert(cotangentSpace && "No cotangent space for this type");
   switch (cotangentSpace->getKind()) {
   case CotangentSpace::Kind::BuiltinRealScalar: {
@@ -4285,24 +4346,46 @@ bool Differentiation::processGradientInst(GradientInst *gi,
 /// AD pass entry.
 void Differentiation::run() {
   auto &module = *getModule();
+  auto &astCtx = module.getASTContext();
   debugDump(module);
 
   // Collect gradient instructions to process.
+  SmallVector<std::pair<SILFunction *,
+                        SILReverseDifferentiableAttr *>, 8> emptyDiffAttrs;
   SmallVector<GradientInst *, 16> gradInsts;
-  // Handle each `gradient` instruction in the module.
-  for (SILFunction &f : module)
-    for (SILBasicBlock &bb : f)
-      for (SILInstruction &i : bb)
+  // Handle each `gradient` instruction and each `reverse_differentiable`
+  // attribute in the module.
+  for (SILFunction &f : module) {
+    // If `f` has a `[reverse_differentiable]` attribute without specifying a
+    // primal or an adjoint, push it to the work list.
+    for (auto *diffAttr : f.getReverseDifferentiableAttrs()) {
+      if (diffAttr->hasPrimal() && diffAttr->hasAdjoint())
+        continue;
+      if (!diffAttr->hasPrimal() && !diffAttr->hasAdjoint()) {
+        emptyDiffAttrs.push_back({&f, diffAttr});
+        continue;
+      }
+      // If only primal or adjoint is specified, it's an incomplete attribute.
+      astCtx.Diags.diagnose(f.getLocation().getSourceLoc(),
+                            diag::autodiff_incomplete_differentiable_attr);
+    }
+    for (SILBasicBlock &bb : f) {
+      for (SILInstruction &i : bb) {
+        // If `i` is a `gradient` instruction, i.e. the SIL-level differential
+        // operator, push it to the work list.
         if (auto *gi = dyn_cast<GradientInst>(&i))
           gradInsts.push_back(gi);
+      }
+    }
+  }
 
-  // If there's no `gradient` instruction, there's no AD to do.
-  if (gradInsts.empty())
+  // If there's no `gradient` instruction or no empty `[reverse_differentiable]`
+  // attributes to process, there's no AD to do.
+  if (gradInsts.empty() && emptyDiffAttrs.empty())
     return;
 
   // AD relies on stdlib (the Swift module). If it's not imported, it's an
   // internal error.
-  auto &astCtx = module.getSwiftModule()->getASTContext();
   if (!astCtx.getStdlibModule()) {
     astCtx.Diags.diagnose(SourceLoc(),
                           diag::autodiff_internal_swift_not_imported);
@@ -4311,6 +4394,13 @@ void Differentiation::run() {
 
   // A global differentiation context.
   ADContext context(module, *PM);
+  
+  // For every empty `[reverse_differentiable]` attribute, create a
+  // differentiation task.
+  for (auto &fnAndAttr : emptyDiffAttrs)
+    context.registerDifferentiationTask(
+        fnAndAttr.first, fnAndAttr.second->getIndices(),
+        DifferentiationInvoker(fnAndAttr.second, fnAndAttr.first));
 
   // Lower each gradient instruction to a function reference and replaces its
   // uses with a function reference to its gradient.
@@ -4351,6 +4441,10 @@ void Differentiation::run() {
   // Fill the body of each empty canonical gradient function corresponding to
   // each differentiation task.
   for (auto &task : context.getDifferentiationTasks()) {
+    // If the invoker is not a differential operator, there's no need to
+    // synthesize any canonical gradient for it.
+    if (!task->getInvoker().isAnyDifferentialOperator())
+      continue;
     auto *canGradFn = context.lookupCanonicalGradient(task.get());
     assert(canGradFn && "Cannot find the canonical gradient function");
     fillCanonicalGradient(*canGradFn, task.get(), context);
