@@ -1977,6 +1977,7 @@ static void collectInnermostTensorFlowDTypes(
     result.push_back(SymbolicValue::getMetatype(type));
   } else if (tf::isTensorHandle(type)) {
     auto eltType = getTensorHandleElementType(type)->getCanonicalType();
+    assert(tf::isTensorFlowDType(eltType));
     result.push_back(SymbolicValue::getMetatype(eltType));
   } else if (auto tupleTy = type->getAs<TupleType>()) {
     for (auto eltTy : tupleTy->getElementTypes())
