@@ -74,7 +74,7 @@ extension _HashTable {
 }
 
 extension _HashTable {
-  internal struct MapEntry: Equatable {
+  internal struct MapEntry {
     internal static var payloadMask: UInt8 { return 0x7F }
     internal static var unoccupied: MapEntry { return MapEntry(_value: 0) }
 
@@ -110,6 +110,15 @@ extension _HashTable {
   }
 }
 
+extension _HashTable.MapEntry: Equatable {
+  @inline(__always)
+  internal static func ==(
+    lhs: _HashTable.MapEntry,
+    rhs: _HashTable.MapEntry
+  ) -> Bool {
+    return lhs.value == rhs.value
+  }
+}
 extension _HashTable {
   @inlinable
   internal var scale: Int {
