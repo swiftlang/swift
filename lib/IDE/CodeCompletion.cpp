@@ -1598,7 +1598,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   Type ExprType;
 
   /// Whether the expr is of statically inferred metatype.
-  bool IsStaticMetatype;
+  bool IsStaticMetatype = false;
 
   /// User-provided base type for LookupKind::Type completions.
   Type BaseType;
