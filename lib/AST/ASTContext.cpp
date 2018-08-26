@@ -3563,19 +3563,27 @@ void AnyFunctionType::decomposeInput(
   }
 }
 
+Type AnyFunctionType::Param::getParameterType(bool forCanonical,
+                                              ASTContext *ctx) const {
+  Type type = getPlainType();
+  if (isVariadic()) {
+    if (!ctx) ctx = &type->getASTContext();
+    auto arrayDecl = ctx->getArrayDecl();
+    if (!arrayDecl)
+      type = ErrorType::get(*ctx);
+    else if (forCanonical)
+      type = BoundGenericType::get(arrayDecl, Type(), {type});
+    else
+      type = ArraySliceType::get(type);
+  }
+  return type;
+}
+
 Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
                                    bool canonicalVararg) {
   SmallVector<TupleTypeElt, 4> elements;
   for (const auto &param : params) {
-    Type eltType = param.getPlainType();
-    if (param.isVariadic()) {
-      if (!ctx.getArrayDecl())
-        eltType = ErrorType::get(ctx);
-      else if (canonicalVararg)
-        eltType = BoundGenericType::get(ctx.getArrayDecl(), Type(), {eltType});
-      else
-        eltType = ArraySliceType::get(eltType);
-    }
+    Type eltType = param.getParameterType(canonicalVararg, &ctx);
     elements.emplace_back(eltType, param.getLabel(),
                           param.getParameterFlags());
   }
