@@ -873,7 +873,8 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   auto ClangNode = VD->getClangNode();
   if (ClangNode) {
     auto ClangMod = Importer->getClangOwningModule(ClangNode);
-    ModuleName = ClangMod->getFullModuleName();
+    if (ClangMod)
+      ModuleName = ClangMod->getFullModuleName();
   } else if (VD->getLoc().isInvalid() && VD->getModuleContext() != MainModule) {
     ModuleName = VD->getModuleContext()->getName().str();
   }
