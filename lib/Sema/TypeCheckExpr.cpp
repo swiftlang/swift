@@ -683,36 +683,6 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   return Result;
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-/// Determines whether the specified type supports scalar differentiation.
-/// We say that a type supports scalar AD when it conforms to
-/// `FloatingPoint`.
-bool TypeChecker::isCompatibleWithScalarAutoDiff(Type type, DeclContext *DC) {
-  auto *floatingPointProto =
-    DC->getASTContext().getProtocol(KnownProtocolKind::FloatingPoint);
-  auto conf = conformsToProtocol(type, floatingPointProto, DC,
-                                 ConformanceCheckFlags::InExpression);
-  return conf.hasValue();
-}
-
-/// Determines whether the specified type supports vector differentiation.
-/// We say that a type supports vector AD when it conforms to
-/// `VectorNumeric` while its `ScalarElement` supports scalar AD.
-bool TypeChecker::isCompatibleWithVectorAutoDiff(Type type, DeclContext *DC) {
-  auto &ctx = DC->getASTContext();
-  auto *vectorNumericProto = ctx.getProtocol(KnownProtocolKind::VectorNumeric);
-  if (auto conf = conformsToProtocol(type, vectorNumericProto, DC,
-                                     ConformanceCheckFlags::InExpression)) {
-    auto scalarElementName = ctx.getIdentifier("ScalarElement");
-    auto assocTyDecl = cast<AssociatedTypeDecl>(
-      conf->getRequirement()->lookupDirect(scalarElementName).front());
-    auto assocTy = assocTyDecl->getDeclaredInterfaceType();
-    auto scalarTy = conf->getAssociatedType(type, assocTy);
-    return isCompatibleWithScalarAutoDiff(scalarTy, DC);
-  }
-  return false;
-}
-
 // SWIFT_ENABLE_TENSORFLOW
 // Returns the function declaration corresponding to the given function name and
 // lookup context. If the base type of the function is specified, member lookup
