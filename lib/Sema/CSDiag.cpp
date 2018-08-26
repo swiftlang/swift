@@ -5403,18 +5403,19 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
         return false;
 
       class ClosureCalleeListener : public ExprTypeCheckListener {
-        Type InputType;
+        FunctionType *InputType;
         Type ResultType;
 
       public:
-        explicit ClosureCalleeListener(Type inputType, Type resultType)
+        explicit ClosureCalleeListener(FunctionType *inputType, Type resultType)
             : InputType(inputType), ResultType(resultType) {}
 
         bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-          if (!InputType || !ResultType)
+          if (!ResultType)
             return false;
 
-          auto expectedType = FunctionType::getOld(InputType, ResultType);
+          AnyFunctionType::Param Input(InputType);
+          auto expectedType = FunctionType::get({Input}, ResultType);
           cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                            expectedType, cs.getConstraintLocator(expr),
                            /*isFavored*/ true);
