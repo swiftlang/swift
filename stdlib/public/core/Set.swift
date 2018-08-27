@@ -2733,22 +2733,13 @@ extension Set {
 }
 
 extension Set._Variant {
-  @usableFromInline @_transparent
-  internal var guaranteedNative: Bool {
-    return _canBeClass(Element.self) == 0
-  }
-
   @inlinable
   @inline(__always)
   internal mutating func isUniquelyReferenced() -> Bool {
-    // Note that &self drills down through .native(_NativeSet) to the first
-    // property in _NativeSet, which is the reference to the storage.
-    if _fastPath(guaranteedNative) {
-      return _isUnique_native(&self)
-    }
-
     switch self {
     case .native:
+      // Note that `&self` drills down through `.native(_NativeSet)` to the
+      // first property in `_NativeSet`, which is the reference to the storage.
       return _isUnique_native(&self)
 #if _runtime(_ObjC)
     case .cocoa:
@@ -2831,10 +2822,6 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   internal var startIndex: Index {
-    if _fastPath(guaranteedNative) {
-      return Index(_native: asNative.startIndex)
-    }
-
     switch self {
     case .native:
       return Index(_native: asNative.startIndex)
@@ -2847,10 +2834,6 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   internal var endIndex: Index {
-    if _fastPath(guaranteedNative) {
-      return Index(_native: asNative.endIndex)
-    }
-
     switch self {
     case .native:
       return Index(_native: asNative.endIndex)
@@ -2863,10 +2846,6 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   internal func index(after i: Index) -> Index {
-    if _fastPath(guaranteedNative) {
-      return Index(_native: asNative.index(after: i._asNative))
-    }
-
     switch self {
     case .native:
       return Index(_native: asNative.index(after: i._asNative))
@@ -2885,13 +2864,6 @@ extension Set._Variant: _SetBuffer {
   @inlinable
   @inline(__always)
   internal func index(for element: Element) -> Index? {
-    if _fastPath(guaranteedNative) {
-      if let index = asNative.index(for: element) {
-        return Index(_native: index)
-      }
-      return nil
-    }
-
     switch self {
     case .native:
       if let index = asNative.index(for: element) {
@@ -2911,10 +2883,6 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   internal var count: Int {
-    if _fastPath(guaranteedNative) {
-      return asNative.count
-    }
-
     switch self {
     case .native:
       return asNative.count
@@ -2928,9 +2896,6 @@ extension Set._Variant: _SetBuffer {
   @inlinable
   @inline(__always)
   internal func contains(_ member: Element) -> Bool {
-    if _fastPath(guaranteedNative) {
-      return asNative.contains(member)
-    }
     switch self {
     case .native:
       return asNative.contains(member)
@@ -2943,10 +2908,6 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   internal func element(at i: Index) -> Element {
-    if _fastPath(guaranteedNative) {
-      return asNative.element(at: i._asNative)
-    }
-
     switch self {
     case .native:
       return asNative.element(at: i._asNative)
@@ -2962,11 +2923,6 @@ extension Set._Variant: _SetBuffer {
 extension Set._Variant {
   @inlinable
   internal mutating func update(with value: Element) -> Element? {
-    if _fastPath(guaranteedNative) {
-      let isUnique = self.isUniquelyReferenced()
-      return asNative.update(with: value, isUnique: isUnique)
-    }
-
     switch self {
     case .native:
       let isUnique = self.isUniquelyReferenced()
@@ -2986,11 +2942,6 @@ extension Set._Variant {
   internal mutating func insert(
     _ element: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
-    if _fastPath(guaranteedNative) {
-      let isUnique = self.isUniquelyReferenced()
-      return asNative.insert(element, isUnique: isUnique)
-    }
-
     switch self {
     case .native:
       let isUnique = self.isUniquelyReferenced()
@@ -3009,11 +2960,6 @@ extension Set._Variant {
   @inlinable
   @discardableResult
   internal mutating func remove(at index: Index) -> Element {
-    if _fastPath(guaranteedNative) {
-      let isUnique = isUniquelyReferenced()
-      return asNative.remove(at: index._asNative, isUnique: isUnique)
-    }
-
     switch self {
     case .native:
       let isUnique = isUniquelyReferenced()
@@ -3040,11 +2986,6 @@ extension Set._Variant {
   @inlinable
   @discardableResult
   internal mutating func remove(_ member: Element) -> Element? {
-    if _fastPath(guaranteedNative) {
-      let isUnique = isUniquelyReferenced()
-      return asNative.remove(member, isUnique: isUnique)
-    }
-
     switch self {
     case .native:
       let isUnique = isUniquelyReferenced()
@@ -3322,11 +3263,6 @@ extension Set.Index {
 #endif
 
   @usableFromInline @_transparent
-  internal var _guaranteedNative: Bool {
-    return _canBeClass(Element.self) == 0
-  }
-
-  @usableFromInline @_transparent
   internal var _asNative: _NativeSet<Element>.Index {
     switch _variant {
     case .native(let nativeIndex):
@@ -3357,10 +3293,6 @@ extension Set.Index: Equatable {
     lhs: Set<Element>.Index,
     rhs: Set<Element>.Index
   ) -> Bool {
-    if _fastPath(lhs._guaranteedNative) {
-      return lhs._asNative == rhs._asNative
-    }
-
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
       return lhsNative == rhsNative
@@ -3380,10 +3312,6 @@ extension Set.Index: Comparable {
     lhs: Set<Element>.Index,
     rhs: Set<Element>.Index
   ) -> Bool {
-    if _fastPath(lhs._guaranteedNative) {
-      return lhs._asNative < rhs._asNative
-    }
-
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
       return lhsNative < rhsNative
@@ -3406,11 +3334,6 @@ extension Set.Index: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
-    if _fastPath(_guaranteedNative) {
-      hasher.combine(0 as UInt8)
-      hasher.combine(_asNative.bucket)
-      return
-    }
     switch _variant {
     case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
@@ -3598,11 +3521,6 @@ extension Set.Iterator {
 #endif
 
   @usableFromInline @_transparent
-  internal var _guaranteedNative: Bool {
-    return _canBeClass(Element.self) == 0
-  }
-
-  @usableFromInline @_transparent
   internal var _asNative: _NativeSet<Element>.Iterator {
     get {
       switch _variant {
@@ -3628,10 +3546,6 @@ extension Set.Iterator: IteratorProtocol {
   @inlinable
   @inline(__always)
   public mutating func next() -> Element? {
-    if _fastPath(_guaranteedNative) {
-      return _asNative.next()
-    }
-
     switch _variant {
     case .native:
       return _asNative.next()
