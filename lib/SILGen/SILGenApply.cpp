@@ -4409,7 +4409,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   auto directResultsArray = makeArrayRef(directResults);
   RValue result =
-      resultPlan->finish(*this, loc, substResultType, directResultsArray);
+    resultPlan->finish(*this, loc, substResultType, directResultsArray);
   assert(directResultsArray.empty() && "didn't claim all direct results");
 
   return result;

@@ -159,8 +159,10 @@ extension Error {
     // CHECK: [[FAILURE]]:
     // CHECK: [[ERROR_BOX:%[0-9]+]] = alloc_existential_box $Error, $Self
     // CHECK: [[ERROR_PROJECTED:%[0-9]+]] = project_existential_box $Self in [[ERROR_BOX]] : $Error
+    // CHECK: store [[ERROR_BOX]] to [init] [[ERROR_BUF:%.*]] :
     // CHECK: copy_addr [take] [[COPY]] to [initialization] [[ERROR_PROJECTED]] : $*Self
-    // CHECK: br [[CONTINUATION]]([[ERROR_BOX]] : $Error)
+    // CHECK: [[ERROR_BOX2:%.*]] = load [take] [[ERROR_BUF]]
+    // CHECK: br [[CONTINUATION]]([[ERROR_BOX2]] : $Error)
 
     // CHECK: [[CONTINUATION]]([[ERROR_ARG:%[0-9]+]] : @owned $Error):
 		return self as NSError
