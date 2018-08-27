@@ -72,6 +72,7 @@ Func Dictionary.filter(_:obsoletedInSwift4:) has been renamed to Func Dictionary
 Func Set.filter(_:obsoletedInSwift4:) has been renamed to Func Set.filter(_:)
 
 /* Type Changes */
+Constructor Mirror.init(_:children:displayStyle:ancestorRepresentation:) has parameter 1 type change from DictionaryLiteral<String, Any> to KeyValuePairs<String, Any>
 Constructor String.init(_:) has return type change from String? to String
 Func Dictionary.filter(_:obsoletedInSwift4:) has return type change from [Dictionary<Key, Value>.Element] to [Dictionary<Key, Value>.Key : Dictionary<Key, Value>.Value]
 Func Dictionary.makeIterator() has return type change from DictionaryIterator<Dictionary<Key, Value>.Key, Dictionary<Key, Value>.Value> to Dictionary<Key, Value>.Iterator

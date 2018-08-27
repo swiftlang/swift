@@ -325,7 +325,7 @@ import SwiftShims
 /// The order of key-value pairs in a dictionary is stable between mutations
 /// but is otherwise unpredictable. If you need an ordered collection of
 /// key-value pairs and don't need the fast key lookup that `Dictionary`
-/// provides, see the `DictionaryLiteral` type for an alternative.
+/// provides, see the `KeyValuePairs` type for an alternative.
 ///
 /// You can search a dictionary's contents for a particular value using the
 /// `contains(where:)` or `firstIndex(where:)` methods supplied by default
