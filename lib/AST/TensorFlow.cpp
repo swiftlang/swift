@@ -80,16 +80,37 @@ bool tf::isTensorFlowValueOrAggregate(Type ty) {
       [](Type eltTy) {
         return isTensorFlowValueOrAggregate(eltTy);
       });
-  if (auto *structTy = ty->getAs<StructType>())
-    return llvm::all_of(structTy->getDecl()->getStoredProperties(),
+  if (auto *structDecl = ty->getStructOrBoundGenericStruct())
+    return llvm::all_of(structDecl->getStoredProperties(),
       [](VarDecl *member) {
         return isTensorFlowValueOrAggregate(member->getType());
       });
-  if (auto *genericStructTy = ty->getAs<BoundGenericStructType>())
-    return llvm::all_of(genericStructTy->getDecl()->getStoredProperties(),
-      [](VarDecl *member) {
-        return isTensorFlowValueOrAggregate(member->getType());
-      });
+  return false;
+}
+
+bool tf::flattenTensorFlowValueAggregate(Type ty,
+                                         SmallVectorImpl<Type> &result) {
+  if (isTensorFlowValue(ty)) {
+    result.push_back(ty);
+    return true;
+  }
+  if (auto *tupleTy = ty->getAs<TupleType>())
+    return llvm::all_of(tupleTy->getElementTypes(),
+        [&](Type eltTy) {
+          return flattenTensorFlowValueAggregate(eltTy, result);
+        });
+  if (auto *structDecl = ty->getStructOrBoundGenericStruct()) {
+    auto *module = structDecl->getModuleContext();
+    return llvm::all_of(structDecl->getStoredProperties(),
+        [&](VarDecl *member) {
+          auto subMap = ty->getMemberSubstitutionMap(module, member);
+          auto eltTy = member->getType().subst(subMap);
+          return flattenTensorFlowValueAggregate(eltTy, result);
+        });
+  }
+  // Terminal type is not a TensorFlow value or an aggregate of TensorFlow
+  // values, so it fails.
+  result.clear();
   return false;
 }
 
