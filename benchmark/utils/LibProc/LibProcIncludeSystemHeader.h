@@ -1,4 +1,4 @@
-//===--- module.modulemap -------------------------------------------------===//
+//===--- LibProcIncludeSystemHeader.h -------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-module LibProc {
-  header "LibProcIncludeSystemHeader.h"
-  export *
-}
+// This file exists to include the following not-yet-modularized system header:
+
+#include <libproc.h>
