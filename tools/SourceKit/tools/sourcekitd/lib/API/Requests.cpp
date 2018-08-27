@@ -2446,10 +2446,9 @@ void serializeSyntaxTreeAsByteTree(
   swift::ExponentialGrowthAppendingBinaryByteStream Stream(
       llvm::support::endianness::little);
   Stream.reserve(32 * 1024);
-  llvm::BinaryStreamWriter Writer(Stream);
   std::map<void *, void *> UserInfo;
   UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
-  swift::byteTree::ByteTreeWriter::write(/*ProtocolVersion=*/1, Writer,
+  swift::byteTree::ByteTreeWriter::write(Stream, /*ProtocolVersion=*/1,
                                          *SyntaxTree.getRaw(), UserInfo);
 
   std::unique_ptr<llvm::WritableMemoryBuffer> Buf =
