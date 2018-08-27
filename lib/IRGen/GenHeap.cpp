@@ -1488,10 +1488,7 @@ public:
     // Allocate a new object using the layout.
     auto boxedInterfaceType = boxedType;
     if (env) {
-      boxedInterfaceType = SILType::getPrimitiveType(
-        boxedType.getASTType()->mapTypeOutOfContext()
-           ->getCanonicalType(),
-         boxedType.getCategory());
+      boxedInterfaceType = boxedType.mapTypeOutOfContext();
     }
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
