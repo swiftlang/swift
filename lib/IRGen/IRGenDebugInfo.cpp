@@ -1188,7 +1188,7 @@ private:
       auto *Decl = StructTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       if (auto *ClangDecl = Decl->getClangDecl()) {
-        auto ClangSrcLoc = ClangDecl->getLocStart();
+        auto ClangSrcLoc = ClangDecl->getBeginLoc();
         clang::SourceManager &ClangSM =
             CI.getClangASTContext().getSourceManager();
         L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
@@ -1213,7 +1213,7 @@ private:
       auto *Decl = ClassTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
       if (auto *ClangDecl = Decl->getClangDecl()) {
-        auto ClangSrcLoc = ClangDecl->getLocStart();
+        auto ClangSrcLoc = ClangDecl->getBeginLoc();
         clang::SourceManager &ClangSM =
             CI.getClangASTContext().getSourceManager();
         L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
