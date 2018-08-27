@@ -346,8 +346,8 @@ hoistSpecialInstruction(std::unique_ptr<LoopNestSummary> &LoopSummary,
       }
       LLVM_DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
     } else {
-      auto *REA = static_cast<RefElementAddrInst *>(Inst);
-      LLVM_DEBUG(llvm::dbgs() << "Hoisted RefElementAddr " << *REA);
+      LLVM_DEBUG(llvm::dbgs() << "Hoisted RefElementAddr "
+                              << *static_cast<RefElementAddrInst *>(Inst));
     }
     Changed = true;
   }
