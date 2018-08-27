@@ -24,6 +24,11 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* [SE-0214][]:
+
+  Renamed the `DictionaryLiteral` type to `KeyValuePairs`.
+  A typealias preserves the old name for compatibility.
+
 * [SR-2608][]
 
   Default arguments are now printed in SourceKit-generated interfaces for Swift
@@ -7147,6 +7152,20 @@ Swift 1.0
 [SE-0210]: <https://github.com/apple/swift-evolution/blob/master/proposals/0210-key-path-offset.md>
 [SE-0211]: <https://github.com/apple/swift-evolution/blob/master/proposals/0211-unicode-scalar-properties.md>
 [SE-0212]: <https://github.com/apple/swift-evolution/blob/master/proposals/0212-compiler-version-directive.md>
+[SE-0213]: <https://github.com/apple/swift-evolution/blob/master/proposals/0213-literal-init-via-coercion.md>
+[SE-0214]: <https://github.com/apple/swift-evolution/blob/master/proposals/0214-DictionaryLiteral.md>
+[SE-0215]: <https://github.com/apple/swift-evolution/blob/master/proposals/0215-conform-never-to-hashable-and-equatable.md>
+[SE-0216]: <https://github.com/apple/swift-evolution/blob/master/proposals/0216-dynamic-callable.md>
+[SE-0217]: <https://github.com/apple/swift-evolution/blob/master/proposals/0217-bangbang.md>
+[SE-0218]: <https://github.com/apple/swift-evolution/blob/master/proposals/0218-introduce-compact-map-values.md>
+[SE-0219]: <https://github.com/apple/swift-evolution/blob/master/proposals/0219-package-manager-dependency-mirroring.md>
+[SE-0220]: <https://github.com/apple/swift-evolution/blob/master/proposals/0220-count-where.md>
+[SE-0221]: <https://github.com/apple/swift-evolution/blob/master/proposals/0221-character-properties.md>
+[SE-0222]: <https://github.com/apple/swift-evolution/blob/master/proposals/0222-lazy-compactmap-sequence.md>
+[SE-0223]: <https://github.com/apple/swift-evolution/blob/master/proposals/0223-array-uninitialized-initializer.md>
+[SE-0224]: <https://github.com/apple/swift-evolution/blob/master/proposals/0224-ifswift-lessthan-operator.md>
+[SE-0225]: <https://github.com/apple/swift-evolution/blob/master/proposals/0225-binaryinteger-iseven-isodd-ismultiple.md>
+[SE-0226]: <https://github.com/apple/swift-evolution/blob/master/proposals/0226-package-manager-target-based-dep-resolution.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
