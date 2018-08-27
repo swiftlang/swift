@@ -2399,7 +2399,6 @@ namespace {
     // SWIFT_ENABLE_TENSORFLOW
     Expr *handleReverseAutoDiffExpr(ReverseAutoDiffExpr *expr,
                                     bool preservingOriginalResult) {
-      auto &TC = cs.getTypeChecker();
       auto gradType = simplifyType(cs.getType(expr));
       auto gradFnType = gradType->getAs<AnyFunctionType>();
       assert(gradFnType &&
@@ -2421,15 +2420,6 @@ namespace {
       } else {
         for (auto &param : expr->getParameters())
           diffParamTypes.push_back(gradParams[param.index].getType());
-      }
-      for (auto &paramTy : diffParamTypes) {
-        if (!(TC.isCompatibleWithScalarAutoDiff(paramTy, dc) ||
-              TC.isCompatibleWithVectorAutoDiff(paramTy, dc))) {
-          TC.diagnose(expr->getLoc(),
-                      diag::gradient_expr_parameter_not_differentiable,
-                      paramTy);
-          return nullptr;
-        }
       }
       return expr;
     }

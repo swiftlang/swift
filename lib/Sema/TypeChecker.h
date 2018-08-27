@@ -2359,21 +2359,10 @@ public:
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
-  
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// Determines whether the specified type supports scalar differentiation.
-  /// We say that a type supports scalar AD when it conforms to
-  /// `FloatingPoint`.
-  bool isCompatibleWithScalarAutoDiff(Type type, DeclContext *DC);
-
-  /// Determines whether the specified type supports vector differentiation.
-  /// We say that a type supports vector AD when it conforms to
-  /// `VectorNumeric` while its `ScalarElement` supports scalar AD.
-  bool isCompatibleWithVectorAutoDiff(Type type, DeclContext *DC);
 
   /// SWIFT_ENABLE_TENSORFLOW
-  // Returns the function declaration corresponding to the given function name and
-  // lookup context. If the function declaration cannot be resolved, emits a
+  // Returns the function declaration corresponding to the given function name
+  // and lookup context. If the function declaration cannot be resolved, emits a
   // diagnostic and returns nullptr.
   FuncDecl *lookupFuncDecl(
       DeclName funcName, SourceLoc funcNameLoc, Type baseType,
