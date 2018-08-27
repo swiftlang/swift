@@ -2105,6 +2105,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
           TF_SetAttrBoolList(op, name.c_str(), values.data(), values.size());
           break;
         }
+
         internalError(getUserSourceLocation(inst->getDebugLocation()),
                       "unknown array attribute");
         return GLStatus::Error;
