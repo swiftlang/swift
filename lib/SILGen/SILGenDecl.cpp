@@ -1370,8 +1370,9 @@ namespace {
         }
         break;
       case ExistentialRepresentation::Boxed:
-        SGF.B.createDeallocExistentialBox(l, concreteFormalType,
-                                          existentialAddr);
+        auto box = SGF.B.createLoad(l, existentialAddr,
+                                    LoadOwnershipQualifier::Take);
+        SGF.B.createDeallocExistentialBox(l, concreteFormalType, box);
         break;
       }
     }
@@ -1389,12 +1390,13 @@ namespace {
 /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
 /// of the specified value.
 CleanupHandle SILGenFunction::enterDeinitExistentialCleanup(
-                                               SILValue valueOrAddr,
+                                               CleanupState state,
+                                               SILValue addr,
                                                CanType concreteFormalType,
                                                ExistentialRepresentation repr) {
-  Cleanups.pushCleanup<DeinitExistentialCleanup>(valueOrAddr,
-                                                 concreteFormalType,
-                                                 repr);
+  assert(addr->getType().isAddress());
+  Cleanups.pushCleanupInState<DeinitExistentialCleanup>(state, addr,
+                                                      concreteFormalType, repr);
   return Cleanups.getTopCleanup();
 }
 

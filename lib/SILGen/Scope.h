@@ -41,7 +41,7 @@ public:
     cleanups.innermostScope = depth;
   }
 
-  Scope(const Scope &&other) = delete;
+  Scope(const Scope &other) = delete;
   Scope &operator=(const Scope &other) = delete;
 
   Scope(Scope &&other)

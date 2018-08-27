@@ -159,6 +159,10 @@ public:
     assert(!stack.empty());
     return stack.stable_begin();
   }
+  
+  Cleanup &getCleanup(CleanupHandle iter) {
+    return *stack.find(iter);
+  }
 
   /// \brief Emit a branch to the given jump destination,
   /// threading out through any cleanups we need to run. This does not pop the

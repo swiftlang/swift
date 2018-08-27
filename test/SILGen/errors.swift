@@ -35,26 +35,31 @@ func make_a_cat() throws -> Cat {
 }
 
 // CHECK: sil hidden @$S6errors15dont_make_a_cat{{.*}}F : $@convention(thin) () -> (@owned Cat, @error Error) {
-// CHECK:      [[BOX:%.*]] = alloc_existential_box $Error, $HomeworkError
-// CHECK-NEXT: [[ADDR:%.*]] = project_existential_box $HomeworkError in [[BOX]] : $Error
-// CHECK-NEXT: [[T0:%.*]] = metatype $@thin HomeworkError.Type
+// CHECK:      [[T0:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T1:%.*]] = enum $HomeworkError, #HomeworkError.TooHard!enumelt
+// CHECK-NEXT: [[BOX:%.*]] = alloc_existential_box $Error, $HomeworkError
+// CHECK-NEXT: [[ADDR:%.*]] = project_existential_box $HomeworkError in [[BOX]] : $Error
+// CHECK-NEXT: store [[BOX]] to [init] [[BOXBUF:%.*]] :
 // CHECK-NEXT: store [[T1]] to [init] [[ADDR]]
+// CHECK-NEXT: [[BOX2:%.*]] = load [take] [[BOXBUF]]
 // CHECK-NEXT: builtin "willThrow"
-// CHECK-NEXT: throw [[BOX]]
+// CHECK-NEXT: dealloc_stack [[BOXBUF]]
+// CHECK-NEXT: throw [[BOX2]]
 func dont_make_a_cat() throws -> Cat {
   throw HomeworkError.TooHard
 }
 
 // CHECK: sil hidden @$S6errors11dont_return{{.*}}F : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @error Error) {
-// CHECK:      [[BOX:%.*]] = alloc_existential_box $Error, $HomeworkError
-// CHECK-NEXT: [[ADDR:%.*]] = project_existential_box $HomeworkError in [[BOX]] : $Error
-// CHECK-NEXT: [[T0:%.*]] = metatype $@thin HomeworkError.Type
+// CHECK:      [[T0:%.*]] = metatype $@thin HomeworkError.Type
 // CHECK-NEXT: [[T1:%.*]] = enum $HomeworkError, #HomeworkError.TooMuch!enumelt
+// CHECK-NEXT: [[BOX:%.*]] = alloc_existential_box $Error, $HomeworkError
+// CHECK-NEXT: [[ADDR:%.*]] = project_existential_box $HomeworkError in [[BOX]] : $Error
+// CHECK-NEXT: store [[BOX]] to [init] [[BOXBUF:%.*]] :
 // CHECK-NEXT: store [[T1]] to [init] [[ADDR]]
+// CHECK-NEXT: [[BOX2:%.*]] = load [take] [[BOXBUF]]
 // CHECK-NEXT: builtin "willThrow"
-// CHECK-NOT: destroy_addr %1 : $*T
-// CHECK-NEXT: throw [[BOX]]
+// CHECK-NEXT: dealloc_stack [[BOXBUF]]
+// CHECK-NEXT: throw [[BOX2]]
 func dont_return<T>(_ argument: T) throws -> T {
   throw HomeworkError.TooMuch
 }
@@ -224,6 +229,7 @@ enum ColorError : Error {
 
 //CHECK-LABEL: sil hidden @$S6errors6IThrows5Int32VyKF
 //CHECK: builtin "willThrow"
+//CHECK-NEXT: dealloc_stack
 //CHECK-NEXT: throw
 func IThrow() throws -> Int32 {
   throw ColorError.Red
