@@ -1707,6 +1707,7 @@ static void validateMultilineIndents(const Token &Str,
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
 ///   string_literal ::= ["]["]["].*["]["]["] - approximately
+///   string_literal ::= (#+)("")?".*"(\2\1) - "raw" strings
 void Lexer::lexStringLiteral(unsigned DelimiterLength) {
   const char *TokStart = CurPtr-1;
   assert((*TokStart == '"' || *TokStart == '\'') && "Unexpected start");
@@ -1714,7 +1715,7 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
   // diagnostics about changing them to double quotes.
 
   bool wasErroneous = false, MultilineString = false;
-  std::string ExtraTermination;
+  SmallString<8> ExtraTermination;
 
   // Is this the start of a multiline string literal?
   if (*TokStart == '"' && *CurPtr == '"' && *(CurPtr + 1) == '"') {
@@ -1723,9 +1724,9 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
     if (*CurPtr != '\n' && *CurPtr != '\r')
       diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
         .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");
-    ExtraTermination.insert(ExtraTermination.size(), 2, *TokStart);
+    ExtraTermination.append(2, *TokStart);
   }
-  ExtraTermination.insert(ExtraTermination.size(), DelimiterLength, '#');
+  ExtraTermination.append(DelimiterLength, '#');
 
   while (true) {
     const char *TmpPtr = CurPtr + 1;
@@ -1750,6 +1751,7 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
     // String literals cannot have \n or \r in them (unless multiline).
     if (((*CurPtr == '\r' || *CurPtr == '\n') && !MultilineString)
         || CurPtr == BufferEnd) {
+      TokStart -= DelimiterLength;
       diagnose(TokStart, diag::lex_unterminated_string);
       return formToken(tok::unknown, TokStart);
     }
@@ -1798,9 +1800,9 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
       }
 
       // Is this the end of multiline/delimited string literal?
-      if (StringRef(CurPtr, ExtraTermination.length()) == ExtraTermination) {
+      if (StringRef(CurPtr, BufferEnd - CurPtr).startswith(ExtraTermination)) {
         TokStart -= DelimiterLength;
-        CurPtr += ExtraTermination.length();
+        CurPtr += ExtraTermination.size();
         if (wasErroneous)
           return formToken(tok::unknown, TokStart);
 
