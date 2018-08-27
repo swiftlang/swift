@@ -1971,7 +1971,7 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
 
 /// Given a type, recursively collect all innermost element types if it's an
 /// aggregate of TensorHandle's or dtypes.
-static void collectInnermostTensorFlowDTypes(
+static bool collectInnermostTensorFlowDTypes(
     CanType type, SmallVectorImpl<SymbolicValue> &result) {
   if (isTensorFlowDType(type)) {
     result.push_back(SymbolicValue::getMetatype(type));
@@ -1981,17 +1981,20 @@ static void collectInnermostTensorFlowDTypes(
     result.push_back(SymbolicValue::getMetatype(eltType));
   } else if (auto tupleTy = type->getAs<TupleType>()) {
     for (auto eltTy : tupleTy->getElementTypes())
-      collectInnermostTensorFlowDTypes(eltTy->getCanonicalType(), result);
+      if (!collectInnermostTensorFlowDTypes(eltTy->getCanonicalType(), result))
+        return false;
   } else if (auto *decl = type->getStructOrBoundGenericStruct()) {
     for (auto *member : decl->getStoredProperties()) {
       auto subMap =
           type->getMemberSubstitutionMap(member->getModuleContext(), member);
       auto memberTy = member->getType().subst(subMap)->getCanonicalType();
-      collectInnermostTensorFlowDTypes(memberTy, result);
+      if (!collectInnermostTensorFlowDTypes(memberTy, result))
+        return false;
     }
   } else {
-    llvm_unreachable("Not a TensorHandle or an aggregate of TensorHandles");
+    return false;
   }
+  return true;
 }
 
 /// Replace the specified tensor operation with a GraphOperation instruction,
@@ -2274,8 +2277,9 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       if (constValue.getKind() != SymbolicValue::Metatype)
         return diagnoseInvalidAttr("requires a metatype");
       SmallVector<SymbolicValue, 8> metatypes;
-      collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
-                                       metatypes);
+      if (!collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
+                                            metatypes))
+        return diagnoseInvalidAttr("not an aggregate of TensorFlow values");
       // Drop '$extractingDTypeList' from the attribute name.
       currentAttr.name = context.getIdentifier(operandClass.first);
       // Replace the single metatype with a list of metatypes each representing
