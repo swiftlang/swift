@@ -12,6 +12,8 @@ let csvFilenameIndex = CommandLine.arguments.firstIndex(of: "--csv-file")! + 1
 let csvFilename = CommandLine.arguments[csvFilenameIndex]
 
 DatasetPythonInitializersTest.test("SingleValueDataset") {
+  guard let np = try? Python.attemptImport("numpy") else { return }
+
   let dataset = SingleValueDataset<Float>(contentsOfCSVFile: csvFilename,
                                           hasHeader: false,
                                           selectingColumns: [0, 1])
@@ -24,6 +26,8 @@ DatasetPythonInitializersTest.test("SingleValueDataset") {
 }
 
 DatasetPythonInitializersTest.test("DoubleValueDataset") {
+  guard let np = try? Python.attemptImport("numpy") else { return }
+
   let dataset = DoubleValueDataset<Float>(contentsOfCSVFile: csvFilename,
                                           hasHeader: false,
                                           selectingColumns: ([0], [1]))
