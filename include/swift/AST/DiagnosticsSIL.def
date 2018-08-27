@@ -269,6 +269,8 @@ ERROR(tf_op_misuse, none,
       "%0", (StringRef))
 NOTE(tf_op_misuse_note, none,
      "%0", (StringRef))
+ERROR(tf_op_extract_address_only,none,
+      "cannot extract TensorFlow result into an address-only type", ())
 
 // Control flow diagnostics.
 ERROR(missing_return,none,

@@ -1963,6 +1963,8 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     case SILTensorOpInfo::OperandClass::Input:
     case SILTensorOpInfo::OperandClass::InputElt:
       assert(0 && "Input classes cannot exist for attributes");
+    case SILTensorOpInfo::OperandClass::Out:
+      assert(0 && "Attributes cannot be output parameters");
 
     case SILTensorOpInfo::OperandClass::Normal: // No modifier.
       // We add attributes based on what the type of the value is.

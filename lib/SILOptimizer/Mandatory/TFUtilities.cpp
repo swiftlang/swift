@@ -392,6 +392,8 @@ const char *SILTensorOpInfo::getOperandClassSuffix(OperandClass opClass) {
     return "$elt";
   case OperandClass::ShapeArray:
     return "$shapearray";
+  case OperandClass::Out:
+    return "$out";
   }
 }
 
@@ -408,6 +410,7 @@ SILTensorOpInfo::getOperandClass(StringRef suffix) {
       .Case("array", OperandClass::Array)
       .Case("elt", OperandClass::ArrayElement)
       .Case("shapearray", OperandClass::ShapeArray)
+      .Case("out", OperandClass::Out)
       .Default(None);
 }
 

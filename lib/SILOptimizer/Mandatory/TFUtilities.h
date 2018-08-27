@@ -135,10 +135,19 @@ struct SILTensorOpInfo {
 
     // This is the start of a shape array.  The value is the # elements.
     ShapeArray,
+
+    // An operand specifying the address where an indirect output should be
+    // stored.  This occurs when the tfop exists in a context where its output
+    // is address-only.  Deabstraction eliminates Out operands before forming
+    // GraphOps, by rewriting the tfop to return the value directly.  This
+    // rewriting is possible because tfop outputs must always be loadable in
+    // deabstraction scopes.
+    Out,
   };
 
   /// Return the string suffix for the specified attribute modifier.
   static const char *getOperandClassSuffix(OperandClass opClass);
+
 
   /// Return the operand class of the specified string form like "tensor"
   static llvm::Optional<OperandClass> getOperandClass(StringRef suffix);
@@ -150,6 +159,19 @@ struct SILTensorOpInfo {
   bool isInput(unsigned operandNumber) const {
     return operandClasses[operandNumber].second == OperandClass::Input ||
            operandClasses[operandNumber].second == OperandClass::InputElt;
+  }
+
+  /// Returns the full name that this builtin would have if its operands
+  /// changed to the passed-in values.
+  std::string getBuiltinNameWithNewOperands(
+      const SmallVectorImpl<std::pair<StringRef, OperandClass>> &newOperandClasses) const {
+    std::string name = "__tfop_" + opName.str();
+    for (auto newOperandClass : newOperandClasses) {
+      name += ",";
+      name += newOperandClass.first;
+      name += getOperandClassSuffix(newOperandClass.second);
+    }
+    return name;
   }
 
   /// Analyze the specified SIL instruction and return a SILTensorOpInfo

@@ -331,10 +331,18 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
 /// (i.e., an address of a stack location is passed instead of the value itself)
 /// then rewrite the builtin to use a loaded version of that value.
 ///
-/// Similarly, if a primitive integer or floating point value is passed as a
-/// struct value, extract out the underlying integer or float value.
+/// Similarly, if an operand is an indirect output, then rewrite the builtin to
+/// return the value directly, and emit an instruction that stores the direct
+/// value to the indirect output address.
 ///
-static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
+/// Also, if a primitive integer or floating point value is passed as a struct
+/// value, extract out the underlying integer or float value.
+///
+static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
+                                     TFDeabstraction &TFDA) {
+  auto origInst = opInfo.inst;
+  auto &ctx = origInst->getType().getASTContext();
+
   /// Return a VarDecl if this is a struct wrapping a single field which is a
   /// primitive integer or floating point value.  We accept multiple layers of
   /// struct wrappers as well, but return the decl for the top level field
@@ -365,43 +373,69 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
   // Predicate that returns true if the specified type is an address type for
   // a loadable (non-address-only) value.
   auto isLoadableAddressType = [&](SILType type) -> bool {
-    return type.isAddress() && type.isLoadable(inst->getModule());
+    return type.isAddress() && type.isLoadable(origInst->getModule());
   };
 
   // Predicate that returns true if an operand of the specified type should be
   // rewritten - either to load an address argument or expand a struct
   // parameter.
-  auto canSimplifyOperand = [&](SILType type) -> bool {
+  auto canSimplifyOperand = [&](SILType type,
+                                SILTensorOpInfo::OperandClass operandClass)
+      -> bool {
     return isLoadableAddressType(type) ||
-           getPrimitiveStructField(type.getASTType()) != nullptr;
+           getPrimitiveStructField(type.getASTType()) != nullptr ||
+           operandClass == SILTensorOpInfo::OperandClass::Out;
   };
 
   // If we don't have to change any operands, don't rewrite the builtin.
   bool mustChangeBuiltin = false;
-  for (auto &op : inst->getAllOperands()) {
-    if (canSimplifyOperand(op.get()->getType())) {
+  for (auto operandAndClass : zip(origInst->getAllOperands(),
+                                  opInfo.operandClasses)) {
+    auto operand = std::get<0>(operandAndClass).get();
+    auto operandClass = std::get<1>(operandAndClass);
+    if (canSimplifyOperand(operand->getType(), operandClass.second)) {
       mustChangeBuiltin = true;
       break;
     }
   }
 
-  if (!mustChangeBuiltin) return inst;
+  if (!mustChangeBuiltin) return origInst;
 
   // Mark the function as being mutated.
   TFDA.aboutToChangeFunction();
 
   // Okay, we do have to simplify something.  Scan through and rewrite operands.
-  SILBuilder B(inst);
+  SILBuilder B(origInst);
   SmallVector<SILValue, 8> operands;
-  for (auto &op : inst->getAllOperands()) {
-    auto operand = op.get();
+  SmallVector<std::pair<StringRef, SILTensorOpInfo::OperandClass>, 4>
+      operandClasses;
+  llvm::Optional<SILValue> outParameterAddress;
+  for (auto operandAndClass : zip(origInst->getAllOperands(),
+                                  opInfo.operandClasses)) {
+    auto operand = std::get<0>(operandAndClass).get();
+    auto operandClass = std::get<1>(operandAndClass);
+
+    // If this is an out parameter, take note of it (so that we can deal with it
+    // later), and exclude it from the list of rewritten operands.
+    if (operandClass.second == SILTensorOpInfo::OperandClass::Out) {
+      assert(operand->getType().isAddress());
+      if (!operand->getType().isLoadable(origInst->getModule())) {
+        diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
+                 diag::tf_op_extract_address_only);
+        continue;
+      }
+      assert(!outParameterAddress && "there is more than one out parameter");
+      outParameterAddress = operand;
+      continue;
+    }
+
     // If this is an address operand, emit a load of the value.
     if (isLoadableAddressType(operand->getType())) {
-      bool hasOwnership = inst->getFunction()->hasQualifiedOwnership();
+      bool hasOwnership = origInst->getFunction()->hasQualifiedOwnership();
       auto loadOwnership = hasOwnership ? LoadOwnershipQualifier::Trivial
                                         : LoadOwnershipQualifier::Unqualified;
-      auto load = B.createLoad(inst->getLoc(), operand, loadOwnership);
-      load->setDebugLocation(inst->getDebugLocation());
+      auto load = B.createLoad(origInst->getLoc(), operand, loadOwnership);
+      load->setDebugLocation(origInst->getDebugLocation());
       operand = load;
     }
 
@@ -412,27 +446,42 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
     // If this is a struct value, emit struct extraction instruction(s).
     while (auto fieldDecl = getPrimitiveStructField(
                                      operand->getType().getASTType())) {
-      auto extract = B.createStructExtract(inst->getLoc(), operand, fieldDecl);
-      extract->setDebugLocation(inst->getDebugLocation());
+      auto extract = B.createStructExtract(origInst->getLoc(), operand, fieldDecl);
+      extract->setDebugLocation(origInst->getDebugLocation());
       operand = extract;
     }
 
     operands.push_back(operand);
+    operandClasses.push_back(operandClass);
   }
 
   // Now that we've rebuilt the operand list, create a new builtin and replace
   // the old one.
-  auto *newInst =
-    B.createBuiltin(inst->getLoc(), inst->getName(),
-                    inst->getType(), SubstitutionMap(), operands);
-  newInst->setDebugLocation(inst->getDebugLocation());
+  auto newName = opInfo.getBuiltinNameWithNewOperands(operandClasses);
+  auto newType = outParameterAddress ?
+      (*outParameterAddress)->getType().getObjectType() : origInst->getType();
+  auto newInst =
+    B.createBuiltin(origInst->getLoc(), ctx.getIdentifier(newName), newType,
+                    SubstitutionMap(), operands);
+  newInst->setDebugLocation(origInst->getDebugLocation());
+
+  // If the original instruction had an out parameter, store the new
+  // instruction's value to that address.
+  if (outParameterAddress) {
+    auto hasOwnership = newInst->getFunction()->hasQualifiedOwnership();
+    auto storeOwnership = hasOwnership ? StoreOwnershipQualifier::Trivial
+                                       : StoreOwnershipQualifier::Unqualified;
+    B.createStore(origInst->getLoc(), newInst, *outParameterAddress,
+                  storeOwnership);
+  }
 
   // Replace the old with the new and delete the old instruction.
-  inst->replaceAllUsesPairwiseWith(newInst);
+  origInst->replaceAllUsesPairwiseWith(newInst);
 
   // Remove the StructInst and other random values that we leave around in the
   // program, now that we directly refer to the TensorFlow values.
-  deleteInstAndAbandonedUses(inst);
+  deleteInstAndAbandonedUses(origInst);
+
   return newInst;
 }
 
@@ -524,8 +573,12 @@ static bool explodeAggregateInst(SILInstruction *inst,
 /// address and a use of the loaded value.  This allows the stack allocation to
 /// be promoted, allowing us to construct SSA def-use chains.
 ///
-/// Similarly, if we see a struct operand that wraps a primitive value, we
-/// extract out the underlying scalar value until we get to a builtin integer or
+/// Similarly, if we find an indirect output, replace it with a direct output
+/// and a store of the outputted value.  This occurs when the tfop has been
+/// inlined from a context where its output is address-only.
+///
+/// Also, if we see a struct operand that wraps a primitive value, we extract
+/// out the underlying scalar value until we get to a builtin integer or
 /// floating point value.
 ///
 /// Since we're scanning the function, keep track of all of the tensor
@@ -552,10 +605,10 @@ void TFDeabstraction::simplifyTensorOperands() {
         logIfFirstChange();
 
         // Simplify operands if possible.
-        opInfo->inst = simplifyOperands(opInfo->inst, *this);
+        auto newInst = simplifyOperands(*opInfo, *this);
 
         // Remember this for later passes.
-        tensorOps.push_back(opInfo->inst);
+        tensorOps.push_back(newInst);
         containsOpBuiltin = true;
         continue;
       }
@@ -2244,6 +2297,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     case SILTensorOpInfo::OperandClass::Input:
     case SILTensorOpInfo::OperandClass::InputElt:
       llvm_unreachable("Input classes cannot exist for attributes");
+    case SILTensorOpInfo::OperandClass::Out:
+      llvm_unreachable("Attributes cannot be output parameters");
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
       if (verifyNormalAttr(constValue))
         return; // error already emitted.
@@ -2370,6 +2425,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     return diagnoseInvalid("the specified result type is not a TensorFlow "
                            "value type or an aggregate of TensorFlow value "
                            "types");
+
   auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
       return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 
