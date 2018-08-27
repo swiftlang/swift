@@ -63,9 +63,7 @@ LazyTestSuite.test("Repeated")
   expectEqual(42, c.repeatedValue.value)
 
   let expected = (0..<count).map { _ in OpaqueValue(42) }
-  checkRandomAccessCollection(
-    expected, c)
-    { $0.value == $1.value }
+  checkRandomAccessCollection(expected, c) { $0.value == $1.value }
 }
 
 // FIXME: trap tests.
@@ -75,6 +73,8 @@ LazyTestSuite.test("Repeated")
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Element'.
+// FIXME: this should be extension CollectionOfOne.Iterator, but this needs
+// a fix to the compiler.
 extension IteratorOverOne where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
@@ -84,12 +84,12 @@ extension IteratorOverOne where Element : TestProtocol1 {
 LazyTestSuite.test("IteratorOverOne") {
   checkIterator(
     [] as Array<OpaqueValue<Int>>,
-    IteratorOverOne(_elements: nil as Optional<OpaqueValue<Int>>))
+    CollectionOfOne.Iterator(_elements: nil as Optional<OpaqueValue<Int>>))
   { $0.value == $1.value }
 
   checkIterator(
     [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    IteratorOverOne(_elements: OpaqueValue(42)))
+    CollectionOfOne.Iterator(_elements: OpaqueValue(42)))
   { $0.value == $1.value }
 }
 
@@ -124,21 +124,20 @@ LazyTestSuite.test("CollectionOfOne/AssociatedTypes") {
     indicesType: Range<Int>.self)
 }
 
-% for (name, operation, indices) in [
-%   ('index(after:)', '_ = c.index(after: i)', '-2, -1, 1, 2'),
-%   ('index(before:)', '_ = c.index(before: i)', '-1, 0, 2'),
-%   ('subscript(Index)/Get', '_ = c[i]', '-2, -1, 1, 2'),
-%   ('subscript(Index)/Set', 'c[i] = OpaqueValue(42)', '-2, -1, 1, 2'),
-% ]:
-LazyTestSuite.test("CollectionOfOne/${name}")
-  .forEach(in: [${indices}]) {
-  i in
-
-  var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
-  expectCrashLater()
-  ${operation}
+let collectionOfOneIndexTests: [(String,(inout CollectionOfOne<OpaqueValue<Int>>,Int)->Void,[Int])] = [
+  ("index(after:)",        { _ = $0.index(after: $1) },  [-2, -1, 1, 2]),
+  ("index(before:)",       { _ = $0.index(before: $1) }, [-1, 0, 2]),
+  ("subscript(Index)/Get", { _ = $0[$1] },               [-2, -1, 1, 2]),
+  ("subscript(Index)/Set", { $0[$1] = OpaqueValue(42) }, [-2, -1, 1, 2]),
+]
+for (name,operation,indices) in collectionOfOneIndexTests {
+  LazyTestSuite.test("CollectionOfOne/\(name)")
+  .forEach(in: indices) { i in
+    var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+    expectCrashLater()
+    operation(&c,i)
+  }
 }
-% end
 
 LazyTestSuite.test("CollectionOfOne/index(after:), index(before:)") {
   let c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
@@ -153,21 +152,21 @@ LazyTestSuite.test("CollectionOfOne/subscript(Index)/Get/Set/NoTrap") {
   expectEqualSequence([OpaqueValue(4242)], c) { $0.value == $1.value }
 }
 
-% for (name, operation) in [
-%   ('subscript(Range<Index>)/Get', '_ = c[r]'),
-%   ('subscript(Range<Index>)/Set', 'c[r] = slice'),
-% ]:
-LazyTestSuite.test("CollectionOfOne/${name}/Trap")
-  .forEach(in: [
-    -1 ..< -1, -1..<0, -1..<1, 1..<2, 2..<2,
-  ] as [Range<Int>]) {
-  r in
+let collectionOfOneInvalidRanges = [-1 ..< -1, -1..<0, -1..<1, 1..<2, 2..<2]
+LazyTestSuite.test("CollectionOfOne/subscript(Range<Index>)/Get/Trap")
+.forEach(in: collectionOfOneInvalidRanges) { r in
+  let c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
+  expectCrashLater()
+  _ = c[r]
+}
+
+LazyTestSuite.test("CollectionOfOne/subscript(Range<Index>)/Set/Trap")
+.forEach(in: collectionOfOneInvalidRanges) { r in
   var c = CollectionOfOne<OpaqueValue<Int>>(OpaqueValue(42))
   let slice = r.count == 0 ? c[0..<0] : c[0..<1]
   expectCrashLater()
-  ${operation}
+  c[r] = slice
 }
-% end
 
 LazyTestSuite.test("CollectionOfOne/subscript(Range<Index>)/Set/DifferentLength/Trap")
   .forEach(in: [ 0..<0, 0..<1, 1..<1 ] as [Range<Int>]) {
@@ -241,27 +240,26 @@ LazyTestSuite.test("EmptyCollection/AssociatedTypes") {
   typealias Subject = EmptyCollection<OpaqueValue<Int>>
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: EmptyIterator<OpaqueValue<Int>>.self,
+    iteratorType: EmptyCollection<OpaqueValue<Int>>.Iterator.self,
     subSequenceType: Subject.self,
     indexType: Int.self,
     indicesType: Range<Int>.self)
 }
 
-% for (name, operation) in [
-%   ('index(after:)', '_ = c.index(after: i)'),
-%   ('index(before:)', '_ = c.index(before: i)'),
-%   ('subscript(Index)/Get', '_ = c[i]'),
-%   ('subscript(Index)/Set', 'c[i] = OpaqueValue(42)'),
-% ]:
-LazyTestSuite.test("EmptyCollection/${name}")
-  .forEach(in: [-1, 0, 1]) {
-  i in
-
-  var c = EmptyCollection<OpaqueValue<Int>>()
-  expectCrashLater()
-  ${operation}
+let emptyCollectionIndexTests: [(String,(inout EmptyCollection<OpaqueValue<Int>>,Int)->Void)] = [
+  ("index(after:)",        { _ = $0.index(after: $1) }),
+  ("index(before:)",       { _ = $0.index(before: $1) }),
+  ("subscript(Index)/Get", { _ = $0[$1] }),
+  ("subscript(Index)/Set", { $0[$1] = OpaqueValue(42) }),
+]
+for (name,operation) in emptyCollectionIndexTests {
+  LazyTestSuite.test("EmptyCollection/\(name)")
+  .forEach(in: [-1, 0, 1]) { i in
+    var c = EmptyCollection<OpaqueValue<Int>>()
+    expectCrashLater()
+    operation(&c,i)
+  }
 }
-% end
 
 % for (name, operation) in [
 %   ('subscript(Range<Index>)/Get', '_ = c[r]'),
@@ -376,7 +374,7 @@ extension EmptyIterator where Element : TestProtocol1 {
 LazyTestSuite.test("EmptyIterator") {
   checkIterator(
     [] as Array<OpaqueValue<Int>>,
-    EmptyIterator<OpaqueValue<Int>>())
+    EmptyCollection<OpaqueValue<Int>>.Iterator())
     { $0.value == $1.value }
 }
 
@@ -1291,7 +1289,7 @@ do {
 }
 
 struct TryFlattenIndex<C: Collection> where C.Element: Collection {
-  typealias FlattenedIndex = FlattenCollectionIndex<C>
+  typealias FlattenedIndex = FlattenCollection<C>.Index
 }
 
 
