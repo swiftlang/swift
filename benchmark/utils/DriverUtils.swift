@@ -287,9 +287,14 @@ final class SampleRunner {
   let timer = Timer()
   let baseline = SampleRunner.getResourceUtilization()
   let c: TestConfig
+  var start, end, lastYield: Timer.TimeT
+  let schedulerQuantum = UInt64(10_000_000) // nanoseconds (== 10ms, macos)
 
   init(_ config: TestConfig) {
     self.c = config
+    sched_yield()
+    let now = timer.getTime()
+    (start, end, lastYield) = (now, now, now)
   }
 
   private static func getResourceUtilization() -> rusage {
@@ -315,23 +320,46 @@ final class SampleRunner {
     }
     return maxRSS
   }
+
+  private func startMeasurement() {
+    let spent = timer.diffTimeInNanoSeconds(from: lastYield, to: end)
+    let nextSampleEstimate = UInt64(Double(lastSampleTime) * 1.5)
+
+    if (spent + nextSampleEstimate < schedulerQuantum) {
+        start = timer.getTime()
+    } else {
+        if c.verbose {
+          print("    Yielding again after estimated \(spent/1000) us")
+        }
+        sched_yield()
+        let now = timer.getTime()
+        (start, lastYield) = (now, now)
+    }
+  }
+
+  private func stopMeasurement() {
+    end = timer.getTime()
+  }
+
+  /// Time in nanoseconds spent running the last function
+  var lastSampleTime: UInt64 {
+    return timer.diffTimeInNanoSeconds(from: start, to: end)
   }
 
   func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
-    // Start the timer.
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in startTrackingObjects(p) }
 #endif
-    let start_ticks = timer.getTime()
+
+    self.startMeasurement()
     fn(Int(num_iters))
-    // Stop the timer.
-    let end_ticks = timer.getTime()
+    self.stopMeasurement()
+
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in stopTrackingObjects(p) }
 #endif
 
-    // Compute the spent time and the scaling factor.
-    return timer.diffTimeInNanoSeconds(from: start_ticks, to: end_ticks)
+    return lastSampleTime
   }
 }
 
