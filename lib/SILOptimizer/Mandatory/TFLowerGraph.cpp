@@ -2191,8 +2191,6 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     case SILTensorOpInfo::OperandClass::Array: // Handled as 'normal'
     case SILTensorOpInfo::OperandClass::ArrayElement:
       llvm_unreachable("This is a legacy class that shouldn't happen");
-    case SILTensorOpInfo::OperandClass::ExtractingDTypeList:
-      llvm_unreachable("Should’ve been desugared by deabstraction!");
     }
   }
 

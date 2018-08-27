@@ -1975,26 +1975,30 @@ static bool collectInnermostTensorFlowDTypes(
     CanType type, SmallVectorImpl<SymbolicValue> &result) {
   if (isTensorFlowDType(type)) {
     result.push_back(SymbolicValue::getMetatype(type));
-  } else if (tf::isTensorHandle(type)) {
+    return true;
+  }
+  if (tf::isTensorHandle(type)) {
     auto eltType = getTensorHandleElementType(type)->getCanonicalType();
     assert(tf::isTensorFlowDType(eltType));
     result.push_back(SymbolicValue::getMetatype(eltType));
-  } else if (auto tupleTy = type->getAs<TupleType>()) {
-    for (auto eltTy : tupleTy->getElementTypes())
-      if (!collectInnermostTensorFlowDTypes(eltTy->getCanonicalType(), result))
-        return false;
-  } else if (auto *decl = type->getStructOrBoundGenericStruct()) {
-    for (auto *member : decl->getStoredProperties()) {
-      auto subMap =
-          type->getMemberSubstitutionMap(member->getModuleContext(), member);
-      auto memberTy = member->getType().subst(subMap)->getCanonicalType();
-      if (!collectInnermostTensorFlowDTypes(memberTy, result))
-        return false;
-    }
-  } else {
-    return false;
+    return true;
   }
-  return true;
+  if (auto tupleTy = type->getAs<TupleType>())
+    return llvm::all_of(tupleTy->getElementTypes(),
+                        [&](Type eltTy) {
+                          return collectInnermostTensorFlowDTypes(
+                              eltTy->getCanonicalType(), result);
+                        });
+  if (auto *decl = type->getStructOrBoundGenericStruct())
+    return llvm::all_of(decl->getStoredProperties(),
+                        [&](VarDecl *member) {
+                          auto subMap = type->getMemberSubstitutionMap(
+                              member->getModuleContext(), member);
+                          auto eltTy = member->getType().subst(subMap);
+                          return collectInnermostTensorFlowDTypes(
+                              eltTy->getCanonicalType(), result);
+                        });
+  return false;
 }
 
 /// Replace the specified tensor operation with a GraphOperation instruction,
@@ -2249,10 +2253,27 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       if (constValue.getKind() != SymbolicValue::Integer)
         return diagnoseInvalidAttr("requires a constant integer");
       break;
-    case SILTensorOpInfo::OperandClass::Array:
-      if (constValue.getKind() != SymbolicValue::Array)
-        return diagnoseInvalidAttr("requires an array");
-      break;
+    case SILTensorOpInfo::OperandClass::Array: {
+      if (constValue.getKind() == SymbolicValue::Array)
+        break;
+      if (constValue.getKind() == SymbolicValue::Metatype) {
+        SmallVector<SymbolicValue, 8> metatypes;
+        if (!collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
+                                              metatypes))
+          return diagnoseInvalidAttr("not an aggregate of TensorFlow values");
+        // Drop '$array' from the attribute name.
+        currentAttr.name = context.getIdentifier(operandClass.first);
+        // Replace the single metatype with a list of metatypes each representing
+        // a dtype.
+        auto *dtypeProto =
+            context.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
+        currentAttr.value = SymbolicValue::getArray(
+              metatypes, dtypeProto->getInterfaceType()->getCanonicalType(),
+              context.getAllocator());
+        break;
+      }
+      return diagnoseInvalidAttr("requires an array or a metatype");
+    }
     case SILTensorOpInfo::OperandClass::Shape:
       if (verifyShapeAttr(constValue))
         return; // error already emitted.
@@ -2268,27 +2289,6 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         if (verifyShapeAttr(shape))
           return; // error already emitted.
       }
-      break;
-    }
-    case SILTensorOpInfo::OperandClass::ExtractingDTypeList: {
-      // When '$extractingDTypeList' is specified, we are going to recursively
-      // extract all dtypes from the aggregate type and form a list. This
-      // attribute will be canonicalized to a normal attribute.
-      if (constValue.getKind() != SymbolicValue::Metatype)
-        return diagnoseInvalidAttr("requires a metatype");
-      SmallVector<SymbolicValue, 8> metatypes;
-      if (!collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
-                                            metatypes))
-        return diagnoseInvalidAttr("not an aggregate of TensorFlow values");
-      // Drop '$extractingDTypeList' from the attribute name.
-      currentAttr.name = context.getIdentifier(operandClass.first);
-      // Replace the single metatype with a list of metatypes each representing
-      // a dtype.
-      auto *dtypeProto =
-          context.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
-      currentAttr.value = SymbolicValue::getArray(
-          metatypes, dtypeProto->getInterfaceType()->getCanonicalType(),
-          context.getAllocator());
       break;
     }
     case SILTensorOpInfo::OperandClass::ArrayElement:

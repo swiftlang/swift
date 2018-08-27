@@ -29,7 +29,7 @@ bool tf::isTensorFlowDType(Type ty) {
   auto &ctx = ty->getASTContext();
   auto tensorProto =
       ctx.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
-  if (!tensorProto || !nominal)
+  if (!tensorProto)
     return false;
   SmallVector<ProtocolConformance *, 2> conformances;
   nominal->lookupConformance(nullptr, tensorProto, conformances);

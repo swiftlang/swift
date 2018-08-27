@@ -41,6 +41,6 @@ public func testExtractDTypeList () {
   }
   // expected-error @+1 {{not an aggregate of TensorFlow values}}
   let _: VariantHandle = #tfop("TensorSliceDataset", [] as [TensorHandle<Float>],
-                               Toutput_types$extractingDTypeList: Foo.self,
+                               Toutput_types$array: Foo.self,
                                output_shapes: [TensorShape()])
 }
