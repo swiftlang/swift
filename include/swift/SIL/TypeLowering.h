@@ -796,9 +796,12 @@ public:
     return ti.getLoweredType();
   }
 
-  AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage);
-  AbstractionPattern getAbstractionPattern(VarDecl *var);
-  AbstractionPattern getAbstractionPattern(SubscriptDecl *subscript);
+  AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage,
+                                           bool isNonObjC = false);
+  AbstractionPattern getAbstractionPattern(VarDecl *var,
+                                           bool isNonObjC = false);
+  AbstractionPattern getAbstractionPattern(SubscriptDecl *subscript,
+                                           bool isNonObjC = false);
   AbstractionPattern getIndicesAbstractionPattern(SubscriptDecl *subscript);
   AbstractionPattern getAbstractionPattern(EnumElementDecl *element);
 

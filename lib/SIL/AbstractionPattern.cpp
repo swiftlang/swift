@@ -31,15 +31,18 @@
 using namespace swift;
 using namespace swift::Lowering;
 
-AbstractionPattern TypeConverter::getAbstractionPattern(AbstractStorageDecl *decl) {
+AbstractionPattern
+TypeConverter::getAbstractionPattern(AbstractStorageDecl *decl,
+                                     bool isNonObjC) {
   if (auto var = dyn_cast<VarDecl>(decl)) {
-    return getAbstractionPattern(var);
+    return getAbstractionPattern(var, isNonObjC);
   } else {
-    return getAbstractionPattern(cast<SubscriptDecl>(decl));
+    return getAbstractionPattern(cast<SubscriptDecl>(decl), isNonObjC);
   }
 }
 
-AbstractionPattern TypeConverter::getAbstractionPattern(SubscriptDecl *decl) {
+AbstractionPattern
+TypeConverter::getAbstractionPattern(SubscriptDecl *decl, bool isNonObjC) {
   CanGenericSignature genericSig;
   if (auto sig = decl->getGenericSignatureOfContext())
     genericSig = sig->getCanonicalSignature();
@@ -67,13 +70,17 @@ static const clang::Type *getClangType(const clang::Decl *decl) {
   return cast<clang::ObjCPropertyDecl>(decl)->getType().getTypePtr();
 }
 
-AbstractionPattern TypeConverter::getAbstractionPattern(VarDecl *var) {
+AbstractionPattern
+TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
   CanGenericSignature genericSig;
   if (auto sig = var->getDeclContext()->getGenericSignatureOfContext())
     genericSig = sig->getCanonicalSignature();
 
   CanType swiftType = var->getInterfaceType()
                          ->getCanonicalType();
+
+  if (isNonObjC)
+    return AbstractionPattern(genericSig, swiftType);
 
   if (auto clangDecl = var->getClangDecl()) {
     auto clangType = getClangType(clangDecl);
