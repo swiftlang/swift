@@ -644,16 +644,12 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
         }
       }
     }
+
+    if (auto resolvedOverload = getResolvedOverload(getLocator()))
+      if (resolvedOverload->Choice.getKind() == OverloadChoiceKind::DynamicMemberLookup)
+        subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
   } else if (auto sub = dyn_cast<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
-
-      // If the destination is a subscript with a 'dynamicLookup:' label and if
-      // the tuple is implicit, then this was actually a @dynamicMemberLookup
-      // access. Emit a more specific diagnostic.
-      if (sub->getIndex()->isImplicit() &&
-          sub->getArgumentLabels().size() == 1 &&
-          sub->getArgumentLabels().front() == getTypeChecker().Context.Id_dynamicMember)
-        subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
   } else {
     subElementDiagID = diag::assignment_lhs_is_immutable_variable;
   }
@@ -727,23 +723,6 @@ bool AssignmentFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *DC = getDC();
   auto *destExpr = getParentExpr();
-
-  // Assignments to let-properties in delegating initializers will be caught
-  // elsewhere now, so if we see them here, it isn't an assignment problem.
-  if (auto *ctor = dyn_cast<ConstructorDecl>(DC)) {
-    DeclRefExpr *baseRef = nullptr;
-    if (auto *member = dyn_cast<UnresolvedDotExpr>(destExpr)) {
-      baseRef = dyn_cast<DeclRefExpr>(member->getBase());
-    } else if (auto *member = dyn_cast<MemberRefExpr>(destExpr)) {
-      if (auto *load = dyn_cast<LoadExpr>(member->getBase()))
-        baseRef = dyn_cast<DeclRefExpr>(load->getSubExpr());
-    }
-    if (baseRef && baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
-        ctor->getDelegatingOrChainedInitKind(nullptr) ==
-            ConstructorDecl::BodyInitKind::Delegating) {
-      return false;
-    }
-  }
 
   // Walk through the destination expression, resolving what the problem is.  If
   // we find a node in the lvalue path that is problematic, this returns it.
