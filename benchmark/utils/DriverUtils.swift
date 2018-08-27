@@ -247,7 +247,7 @@ func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
 #endif
 
 #if os(Linux)
-class Timer {
+final class Timer {
   typealias TimeT = timespec
   func getTime() -> TimeT {
     var ticks = timespec(tv_sec: 0, tv_nsec: 0)
@@ -267,7 +267,7 @@ class Timer {
   }
 }
 #else
-class Timer {
+final class Timer {
   typealias TimeT = UInt64
   var info = mach_timebase_info_data_t(numer: 0, denom: 0)
   init() {
@@ -283,7 +283,7 @@ class Timer {
 }
 #endif
 
-class SampleRunner {
+final class SampleRunner {
   let timer = Timer()
   let baseline = SampleRunner.getResourceUtilization()
   let c: TestConfig
