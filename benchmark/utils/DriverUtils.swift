@@ -298,22 +298,23 @@ class SampleRunner {
 
   /// Returns maximum resident set size (MAX_RSS) delta in bytes
   func measureMemoryUsage() -> Int {
-      var current = SampleRunner.getResourceUtilization()
-      let maxRSS = current.ru_maxrss - baseline.ru_maxrss
+    let current = SampleRunner.getResourceUtilization()
+    let maxRSS = current.ru_maxrss - baseline.ru_maxrss
 
-      if c.verbose {
-        let pages = maxRSS / sysconf(_SC_PAGESIZE)
-        func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
-          let b = baseline[keyPath: stat], c = current[keyPath: stat]
-          return "\(c) - \(b) = \(c - b)"
-        }
-        print("""
-                  MAX_RSS \(deltaEquation(\rusage.ru_maxrss)) (\(pages) pages)
-                  ICS \(deltaEquation(\rusage.ru_nivcsw))
-                  VCS \(deltaEquation(\rusage.ru_nvcsw))
-              """)
+    if c.verbose {
+      let pages = maxRSS / sysconf(_SC_PAGESIZE)
+      func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
+        let b = baseline[keyPath: stat], c = current[keyPath: stat]
+        return "\(c) - \(b) = \(c - b)"
       }
-      return maxRSS
+      print("""
+                MAX_RSS \(deltaEquation(\rusage.ru_maxrss)) (\(pages) pages)
+                ICS \(deltaEquation(\rusage.ru_nivcsw))
+                VCS \(deltaEquation(\rusage.ru_nvcsw))
+            """)
+    }
+    return maxRSS
+  }
   }
 
   func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
