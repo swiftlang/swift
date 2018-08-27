@@ -1491,9 +1491,11 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 
   assert(!ApplySite::isa(value) && "Unexpected instruction");
 
-  // Find the first non-alloc stack and use its scope when creating
-  // the new SILBuilder. AllocStackInst(s) can be hoisted and mess
-  // up with scopes.
+  // Find the first non-AllocStackInst and use its scope when creating
+  // the new SILBuilder. An AllocStackInst does not directly cause any
+  // code to be generated. The location of an AllocStackInst carries information
+  // about the source variable; it doesn't matter where in the instruction
+  // stream the AllocStackInst is located.
   auto BBIter = pass.F->begin()->begin();
   SILInstruction *FirstNonAllocStack = &*BBIter;
   while (isa<AllocStackInst>(FirstNonAllocStack) &&
