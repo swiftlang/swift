@@ -1303,8 +1303,18 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   unsigned CharValue = 0;
   // Escape processing.  We already ate the "\".
   switch (*CurPtr) {
-  case ' ': case '\t': case '\n': case '\r':
-    if (MultilineString && maybeConsumeNewlineEscape(CurPtr, 0))
+  case ' ': case '\t': case '\n': case '\r': case '#':
+    if (*CurPtr == '#') {
+      if (DelimiterLength) {
+        if (EmitDiagnostics)
+          diagnose(CurPtr, diag::lex_invalid_delimiter_escape)
+          .fixItRemoveChars(Lexer::getSourceLoc(CurPtr),
+                            Lexer::getSourceLoc(CurPtr + 1));
+        CurPtr++;
+        return ~1U;
+      }
+    }
+    else if (MultilineString && maybeConsumeNewlineEscape(CurPtr, 0))
       return '\n';
     LLVM_FALLTHROUGH;
   default:  // Invalid escape.
