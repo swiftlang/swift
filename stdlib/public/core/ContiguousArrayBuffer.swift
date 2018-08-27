@@ -251,6 +251,9 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     get {
       return _storage.countAndCapacity.assertsOnCopy
     }
+    set {
+      _storage.countAndCapacity.assertsOnCopy = newValue
+    }
   }
   
   @inlinable
