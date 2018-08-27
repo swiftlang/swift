@@ -3914,7 +3914,7 @@ static bool hasReferenceSemantics(IRGenSILFunction &IGF,
 }
 
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
-                                 SourceLoc loc, bool checkPinned) {
+                                 SourceLoc loc) {
   if (!hasReferenceSemantics(IGF, operand->getType())) {
     IGF.emitTrap(/*EmitUnreachable=*/false);
     return llvm::UndefValue::get(IGF.IGM.Int1Ty);
@@ -3925,12 +3925,12 @@ static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
     operTI.loadRefcountedPtr(IGF, loc, IGF.getLoweredAddress(operand));
 
   return
-    IGF.emitIsUniqueCall(ref.getValue(), loc, ref.isNonNull(), checkPinned);
+    IGF.emitIsUniqueCall(ref.getValue(), loc, ref.isNonNull());
 }
 
 void IRGenSILFunction::visitIsUniqueInst(swift::IsUniqueInst *i) {
   llvm::Value *result = emitIsUnique(*this, i->getOperand(),
-                                     i->getLoc().getSourceLoc(), false);
+                                     i->getLoc().getSourceLoc());
   Explosion out;
   out.add(result);
   setLoweredExplosion(i, out);

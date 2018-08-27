@@ -502,10 +502,9 @@ DECL_NODES = [
                    text_choices=[
                       'get', 'set', 'didSet', 'willSet', 'unsafeAddress', 
                       'addressWithOwner', 'addressWithNativeOwner', 
-                      'addressWithPinnedNativeOwner', 'unsafeMutableAddress', 
+                      'unsafeMutableAddress', 
                       'mutableAddressWithOwner', 
                       'mutableAddressWithNativeOwner', 
-                      'mutableAddressWithPinnedNativeOwner',
                       '_read', '_modify'
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
