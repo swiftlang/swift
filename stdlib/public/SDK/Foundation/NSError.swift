@@ -162,14 +162,8 @@ public extension CustomNSError {
   }
 }
 
-extension CustomNSError where Self: RawRepresentable, Self.RawValue: SignedInteger {
-  // The error code of Error with integral raw values is the raw value.
-  public var errorCode: Int {
-    return numericCast(self.rawValue)
-  }
-}
-
-extension CustomNSError where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
+extension CustomNSError
+    where Self: RawRepresentable, Self.RawValue: FixedWidthInteger {
   // The error code of Error with integral raw values is the raw value.
   public var errorCode: Int {
     return numericCast(self.rawValue)
@@ -185,13 +179,7 @@ public extension Error where Self : CustomNSError {
 }
 
 public extension Error where Self: CustomNSError, Self: RawRepresentable,
-    Self.RawValue: SignedInteger {
-  /// Default implementation for customized NSErrors.
-  var _code: Int { return self.errorCode }  
-}
-
-public extension Error where Self: CustomNSError, Self: RawRepresentable,
-    Self.RawValue: UnsignedInteger {
+    Self.RawValue: FixedWidthInteger {
   /// Default implementation for customized NSErrors.
   var _code: Int { return self.errorCode }  
 }
@@ -384,7 +372,7 @@ extension _BridgedNSError {
   public var _domain: String { return Self._nsErrorDomain }
 }
 
-extension _BridgedNSError where Self.RawValue: SignedInteger {
+extension _BridgedNSError where Self.RawValue: FixedWidthInteger {
   public var _code: Int { return Int(rawValue) }
 
   public init?(_bridgedNSError: NSError) {
@@ -393,22 +381,6 @@ extension _BridgedNSError where Self.RawValue: SignedInteger {
     }
 
     self.init(rawValue: RawValue(_bridgedNSError.code))
-  }
-
-  public var hashValue: Int { return _code }
-}
-
-extension _BridgedNSError where Self.RawValue: UnsignedInteger {
-  public var _code: Int {
-    return Int(bitPattern: UInt(rawValue))
-  }
-
-  public init?(_bridgedNSError: NSError) {
-    if _bridgedNSError.domain != Self._nsErrorDomain {
-      return nil
-    }
-
-    self.init(rawValue: RawValue(UInt(bitPattern: _bridgedNSError.code)))
   }
 
   public var hashValue: Int { return _code }
