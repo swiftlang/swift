@@ -1057,7 +1057,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
 
   // TODO: Find a better name, this is terrible
   @inlinable
-  public func startAssertingOnCopy() {
+  public mutating func startAssertingOnCopy() {
     _buffer.assertsOnCopy = true
   }
 
