@@ -2388,15 +2388,6 @@ public:
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
   
-  /// \brief Subroutine of \c matchFunctionTypes(), which matches up the
-  /// parameter types of two function types.
-  TypeMatchResult matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1,
-                                          ArrayRef<AnyFunctionType::Param> type2,
-                                          Type argType, Type paramType,
-                                          ConstraintKind kind,
-                                          TypeMatchOptions flags,
-                                          ConstraintLocatorBuilder locator);
-  
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
   TypeMatchResult matchSuperclassTypes(Type type1, Type type2,
@@ -2652,6 +2643,13 @@ private:
 
   /// \brief Attempt to simplify the optional object constraint.
   SolutionKind simplifyOptionalObjectConstraint(
+                                          Type first, Type second,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
+
+  /// \brief Attempt to simplify a function input or result constraint.
+  SolutionKind simplifyFunctionComponentConstraint(
+                                          ConstraintKind kind,
                                           Type first, Type second,
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
@@ -3328,6 +3326,11 @@ bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);
+
+ConstraintSystem::TypeMatchResult
+matchCallArguments(ConstraintSystem &cs,
+                   bool isOperator, Type argType, Type paramType,
+                   ConstraintLocatorBuilder locator);
 
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.

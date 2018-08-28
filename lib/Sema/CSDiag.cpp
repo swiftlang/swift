@@ -296,16 +296,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
-    case ConstraintLocator::SubscriptIndex:
-      if (auto subscript = dyn_cast<SubscriptExpr>(anchor)) {
-        targetAnchor = subscript->getBase();
-        targetPath.clear();
-
-        anchor = subscript->getIndex();
-        path = path.slice(1);
-        continue;
-      }
-      break;
     case ConstraintLocator::SubscriptMember:
       if (isa<SubscriptExpr>(anchor)) {
         targetAnchor = nullptr;
@@ -4854,36 +4844,31 @@ namespace {
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // If we have no contextual type, there is nothing to do.
-      if (!contextualType) return false;
+      if (!contextualType)
+        return false;
 
       // If the expression is obviously something that produces a metatype,
       // then don't put a constraint on it.
       auto semExpr = expr->getValueProvidingExpr();
       if (isa<TypeExpr>(semExpr))
         return false;
-      
-      // We're making the expr have a function type, whose result is the same
-      // as our contextual type.
-      auto inputLocator =
+
+      auto resultLocator =
         cs.getConstraintLocator(expr, ConstraintLocator::FunctionResult);
-
-      auto tv = cs.createTypeVariable(inputLocator,
-                                      TVO_CanBindToLValue |
-                                      TVO_PrefersSubtypeBinding);
-
-      // In order to make this work, we pick the most general function type and
-      // use a conversion constraint.  This gives us:
-      //    "$T0 throws -> contextualType"
-      // this allows things that are throws and not throws, and allows escape
-      // and noescape functions.
-      auto extInfo = FunctionType::ExtInfo().withThrows();
-      auto fTy = FunctionType::getOld(tv, contextualType, extInfo);
+      auto resultType = cs.createTypeVariable(resultLocator,
+                                              TVO_CanBindToLValue);
 
       auto locator = cs.getConstraintLocator(expr);
+      cs.addConstraint(ConstraintKind::FunctionResult,
+                       cs.getType(expr),
+                       resultType,
+                       locator);
 
-      // Add a conversion constraint between the types.
-      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr), fTy,
-                       locator, /*isFavored*/ true);
+      cs.addConstraint(ConstraintKind::Conversion,
+                       resultType,
+                       contextualType,
+                       locator);
+
       return false;
     }
   };
@@ -5885,12 +5870,12 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // makes it a lot easier to determine contextual mismatch.
   if (CS.failedConstraint && !hasTrailingClosure) {
     auto *constraint = CS.failedConstraint;
-    if (constraint->getKind() == ConstraintKind::ArgumentTupleConversion) {
+    if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
       if (auto *locator = constraint->getLocator()) {
         if (locator->getAnchor() == callExpr) {
-          argType = constraint->getSecondType();
-          if (auto *typeVar = argType->getAs<TypeVariableType>())
-            argType = CS.getFixedType(typeVar);
+          auto calleeType = CS.simplifyType(constraint->getSecondType());
+          if (auto *fnType = calleeType->getAs<FunctionType>())
+            argType = fnType->getInput();
         }
       }
     }

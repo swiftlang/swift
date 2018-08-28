@@ -635,9 +635,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
         }
         type = openUnboundGenericType(type, typeVar->getImpl().getLocator());
         type = type->reconstituteSugar(/*recursive=*/false);
-      } else if ((binding.BindingSource == ConstraintKind::ArgumentConversion ||
-                  binding.BindingSource ==
-                      ConstraintKind::ArgumentTupleConversion) &&
+      } else if (binding.BindingSource == ConstraintKind::ArgumentConversion &&
                  !type->hasTypeVariable() && isCollectionType(type)) {
         // If the type binding comes from the argument conversion, let's
         // instead of binding collection types directly let's try to

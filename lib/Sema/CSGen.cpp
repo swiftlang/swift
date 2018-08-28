@@ -1047,22 +1047,22 @@ namespace {
     /// \brief Add constraints for a subscript operation.
     Type addSubscriptConstraints(Expr *anchor, Type baseTy, Expr *index,
                                  ValueDecl *declOrNull,
-                                 ConstraintLocator *memberLocator = nullptr,
-                                 ConstraintLocator *indexLocator = nullptr) {
+                                 ConstraintLocator *locator = nullptr) {
       // Locators used in this expression.
-      if (!indexLocator)
-        indexLocator
-          = CS.getConstraintLocator(anchor, ConstraintLocator::SubscriptIndex);
-      auto resultLocator
-        = CS.getConstraintLocator(anchor, ConstraintLocator::SubscriptResult);
-      
-      Type outputTy;
+      if (locator == nullptr)
+        locator = CS.getConstraintLocator(anchor);
 
-      // The base type must have a subscript declaration with type
-      // I -> inout? O, where I and O are fresh type variables. The index
-      // expression must be convertible to I and the subscript expression
-      // itself has type inout? O, where O may or may not be an lvalue.
-      auto inputTv = CS.createTypeVariable(indexLocator);
+      auto fnLocator =
+        CS.getConstraintLocator(locator,
+                                ConstraintLocator::ApplyFunction);
+      auto memberLocator =
+        CS.getConstraintLocator(locator,
+                                ConstraintLocator::SubscriptMember);
+      auto resultLocator =
+        CS.getConstraintLocator(locator,
+                                ConstraintLocator::FunctionResult);
+
+      Type outputTy;
 
       // For an integer subscript expression on an array slice type, instead of
       // introducing a new type variable we can easily obtain the element type.
@@ -1116,10 +1116,6 @@ namespace {
         CS.setFavoredType(anchor, outputTy.getPointer());
       }
 
-      if (!memberLocator)
-        memberLocator
-          = CS.getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
-
       // FIXME: This can only happen when diagnostics successfully type-checked
       // sub-expression of the subscript and mutated AST, but under normal
       // circumstances subscript should never have InOutExpr as a direct child
@@ -1132,7 +1128,7 @@ namespace {
 
       // Add the member constraint for a subscript declaration.
       // FIXME: weak name!
-      auto fnTy = FunctionType::getOld(inputTv, outputTy);
+      auto memberTy = CS.createTypeVariable(resultLocator);
 
       // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
       // a known subscript here. This might be cleaner if we split off a new
@@ -1140,19 +1136,28 @@ namespace {
       if (auto decl = declOrNull) {
         OverloadChoice choice =
             OverloadChoice(baseTy, decl, FunctionRefKind::DoubleApply);
-        CS.addBindOverloadConstraint(fnTy, choice, memberLocator,
+        CS.addBindOverloadConstraint(memberTy, choice, memberLocator,
                                      CurDC);
       } else {
         CS.addValueMemberConstraint(baseTy, DeclBaseName::createSubscript(),
-                                    fnTy, CurDC, FunctionRefKind::DoubleApply,
+                                    memberTy, CurDC, FunctionRefKind::DoubleApply,
                                     /*outerAlternatives=*/{},
                                     memberLocator);
       }
 
+      // FIXME: Redesign the AST so that an ApplyExpr directly stores a list of
+      // arguments together with their inout-ness, instead of a single
+      // ParenExpr or TupleExpr.
+      SmallVector<AnyFunctionType::Param, 8> params;
+      AnyFunctionType::decomposeInput(CS.getType(index), params);
+
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
-      CS.addConstraint(ConstraintKind::ArgumentTupleConversion,
-                       CS.getType(index), inputTv, indexLocator);
+      CS.addConstraint(ConstraintKind::ApplicableFunction,
+                       FunctionType::get(params, outputTy),
+                       memberTy,
+                       fnLocator);
+
       return outputTy;
     }
 
@@ -1325,10 +1330,12 @@ namespace {
       }
       auto *constr = cast<ConstructorDecl>(constrs.front());
       auto constrParamType = tc.getObjectLiteralParameterType(expr, constr);
-      CS.addConstraint(
-          ConstraintKind::ArgumentTupleConversion, CS.getType(expr->getArg()),
+      ::matchCallArguments(
+          CS, /*isOperator=*/false,
+          CS.getType(expr->getArg()),
           constrParamType,
-          CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
+          CS.getConstraintLocator(expr,
+                                  ConstraintLocator::ApplyArgument));
 
       Type result = tv;
       if (constr->getFailability() != OTK_None)
@@ -1582,12 +1589,23 @@ namespace {
         //   self.super = Super.init()
         baseTy = MetatypeType::get(baseTy, CS.getASTContext());
 
-        auto argsTy = CS.createTypeVariable(
-                        CS.getConstraintLocator(expr),
-                          TVO_CanBindToLValue |
-                          TVO_PrefersSubtypeBinding);
-        auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr));
-        auto methodTy = FunctionType::getOld(argsTy, resultTy);
+        auto methodTy = CS.createTypeVariable(
+            CS.getConstraintLocator(expr,
+                                    ConstraintLocator::ApplyFunction));
+
+        // FIXME: Once TVO_PrefersSubtypeBinding is replaced with something
+        // better, we won't need the second type variable at all.
+        {
+          auto argTy = CS.createTypeVariable(
+              CS.getConstraintLocator(expr,
+                                      ConstraintLocator::ApplyArgument),
+              (TVO_CanBindToLValue |
+               TVO_PrefersSubtypeBinding));
+          CS.addConstraint(
+              ConstraintKind::FunctionInput, methodTy, argTy,
+              CS.getConstraintLocator(expr));
+        }
+
         CS.addValueMemberConstraint(
             baseTy, expr->getName(), methodTy, CurDC,
             expr->getFunctionRefKind(),
@@ -3000,11 +3018,10 @@ namespace {
         // re-type-check the constraints during failure diagnosis.
         case KeyPathExpr::Component::Kind::Subscript: {
 
-          auto memberLocator = CS.getConstraintLocator(E,
+          auto *locator = CS.getConstraintLocator(E,
                         ConstraintLocator::PathElement::getKeyPathComponent(i));
           base = addSubscriptConstraints(E, base, component.getIndexExpr(),
-                                         /*decl*/ nullptr, memberLocator,
-                                         /*index locator*/ memberLocator);
+                                         /*decl*/ nullptr, locator);
           break;
         }
         
