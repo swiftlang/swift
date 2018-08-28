@@ -26,130 +26,55 @@ public protocol ConvertibleFromNumpyArray {
   init?(numpyArray: PythonObject)
 }
 
-/// A type that is compatible with a NumPy scalar `dtype`.
+/// A type that is bitwise compatible with one or more NumPy scalar types.
 public protocol NumpyScalarCompatible {
-  static func isCompatible(withNumpyScalarType dtype: PythonObject) -> Bool
+  /// The NumPy scalar types that this type is bitwise compatible with. Must
+  /// be nonempty.
+  static var numpyScalarTypes: [PythonObject] { get }
 }
 
 extension Bool : NumpyScalarCompatible {
-  public static func isCompatible(
-    withNumpyScalarType dtype: PythonObject
-  ) -> Bool {
-    switch dtype {
-    case np.bool_, Python.bool: return true
-    default: return false
-    }
-  }
+  public static let numpyScalarTypes = [np.bool_, Python.bool]
 }
 
 extension UInt8 : NumpyScalarCompatible {
-  public static func isCompatible(
-    withNumpyScalarType dtype: PythonObject
-  ) -> Bool {
-    switch dtype {
-    case np.uint8: return true
-    default: return false
-    }
-  }
+  public static let numpyScalarTypes = [np.uint8]
 }
 
 extension Int8 : NumpyScalarCompatible {
-  public static func isCompatible(
-    withNumpyScalarType dtype: PythonObject
-  ) -> Bool {
-    switch dtype {
-    case np.int8: return true
-    default: return false
-    }
-  }
+  public static let numpyScalarTypes = [np.int8]
 }
 
 extension UInt16 : NumpyScalarCompatible {
-  public static func isCompatible(
-    withNumpyScalarType dtype: PythonObject
-  ) -> Bool {
-    switch dtype {
-    case np.uint16: return true
-    default: return false
-    }
-  }
+  public static let numpyScalarTypes = [np.uint16]
 }
 
 extension Int16 : NumpyScalarCompatible {
-  public static func isCompatible(
-    withNumpyScalarType dtype: PythonObject
-  ) -> Bool {
-    switch dtype {
-    case np.int16: return true
-    default: return false
-    }
-  }
+  public static let numpyScalarTypes = [np.int16]
 }
 
 extension UInt32 : NumpyScalarCompatible {
-  public static func isCompatible(
-    withNumpyScalarType dtype: PythonObject
-  ) -> Bool {
-    switch dtype {
-    case np.uint32: return true
-    default: return false
-    }
-  }
+  public static let numpyScalarTypes = [np.uint32]
 }
 
 extension Int32 : NumpyScalarCompatible {
-  public static func isCompatible(
-    withNumpyScalarType dtype: PythonObject
-  ) -> Bool {
-    switch dtype {
-    case np.int32: return true
-    default: return false
-    }
-  }
+  public static let numpyScalarTypes = [np.int32]
 }
 
 extension UInt64 : NumpyScalarCompatible {
-  public static func isCompatible(
-    withNumpyScalarType dtype: PythonObject
-  ) -> Bool {
-    switch dtype {
-    case np.uint64: return true
-    default: return false
-    }
-  }
+  public static let numpyScalarTypes = [np.uint64]
 }
 
 extension Int64 : NumpyScalarCompatible {
-  public static func isCompatible(
-    withNumpyScalarType dtype: PythonObject
-  ) -> Bool {
-    switch dtype {
-    case np.int64: return true
-    default: return false
-    }
-  }
+  public static let numpyScalarTypes = [np.int64]
 }
 
 extension Float : NumpyScalarCompatible {
-  public static func isCompatible(
-    withNumpyScalarType dtype: PythonObject
-  ) -> Bool {
-    switch dtype {
-    case np.float32: return true
-    default: return false
-    }
-  }
+  public static let numpyScalarTypes = [np.float32]
 }
 
 extension Double : NumpyScalarCompatible {
-  public static func isCompatible(
-    withNumpyScalarType dtype: PythonObject
-  ) -> Bool {
-    switch dtype {
-    case np.float64: return true
-    default: return false
-    }
-  }
+  public static let numpyScalarTypes = [np.float64]
 }
 
 extension Array : ConvertibleFromNumpyArray
@@ -161,7 +86,7 @@ extension Array : ConvertibleFromNumpyArray
     }
     // Check if the dtype of the `ndarray` is compatible with the `Element`
     // type.
-    guard Element.isCompatible(withNumpyScalarType: numpyArray.dtype) else {
+    guard Element.numpyScalarTypes.contains(numpyArray.dtype) else {
       return nil
     }
 

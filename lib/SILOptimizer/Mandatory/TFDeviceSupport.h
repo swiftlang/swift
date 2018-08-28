@@ -79,7 +79,7 @@ static DeviceType getOpDeviceType(llvm::StringRef device) {
 }
 
 /// The returned string is compatible with TF device name used in TF graphs.
-static std::string getDeviceString(DeviceType deviceType) {
+static inline std::string getDeviceString(DeviceType deviceType) {
   switch (deviceType) {
   case DeviceType::CPU:
     return DEFAULT_CPU_DEVICE;

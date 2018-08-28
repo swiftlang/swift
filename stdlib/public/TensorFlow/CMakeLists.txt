@@ -38,6 +38,7 @@ set(SOURCES
   CompilerRuntime.swift
   CompositeMath.swift
   Dataset.swift
+  DatasetPythonInitializers.swift
   DataTypes.swift
   Gradients.swift
   OpaqueHandles.swift

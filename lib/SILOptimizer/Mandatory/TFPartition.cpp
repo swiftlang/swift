@@ -2435,7 +2435,7 @@ static void createConstTensorAttrsOnAccel(
     SmallVectorImpl<GraphOperationAttribute> &attributes) {
   // Literals take attributes specifying the dtype and value.
   attributes.push_back(
-      {ctx.getIdentifier("dtype$dtype"),
+      {ctx.getIdentifier("dtype"),
        SymbolicValue::getMetatype(valTy.getASTType()->getCanonicalType())});
   attributes.push_back({ctx.getIdentifier("value$tensor"), constVal});
 }
@@ -2545,7 +2545,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     // Conversions get an attribute specifying the result dtype, named "DstT".
     opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
     attributes.push_back(
-        {ctx.getIdentifier("DstT$dtype"),
+        {ctx.getIdentifier("DstT"),
          SymbolicValue::getMetatype(
              inst->getType().getASTType()->getCanonicalType())});
     break;
