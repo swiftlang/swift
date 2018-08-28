@@ -7921,12 +7921,16 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   cs.cacheSubExprTypes(call);
 
+  // Extract the arguments.
+  SmallVector<AnyFunctionType::Param, 8> args;
+  AnyFunctionType::decomposeInput(cs.getType(call->getArg()), args);
+
   // Add the conversion from the argument to the function parameter type.
   auto openedFuncType = openedType->castTo<FunctionType>();
   ::matchCallArguments(
       cs, /*isOperator=*/false,
-      cs.getType(call->getArg()),
-      openedFuncType->getInput(),
+      args,
+      openedFuncType->getParams(),
       cs.getConstraintLocator(call,
                               ConstraintLocator::ApplyArgument));
 

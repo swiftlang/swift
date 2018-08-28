@@ -757,7 +757,8 @@ public:
 // Match the argument of a call to the parameter.
 ConstraintSystem::TypeMatchResult
 constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
-                                Type argType, Type paramType,
+                                ArrayRef<AnyFunctionType::Param> args,
+                                ArrayRef<AnyFunctionType::Param> params,
                                 ConstraintLocatorBuilder locator) {
   // Extract the parameters.
   ValueDecl *callee;
@@ -768,14 +769,13 @@ constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
   std::tie(callee, calleeLevel, argLabels, hasTrailingClosure) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
 
-  SmallVector<AnyFunctionType::Param, 4> params;
-  AnyFunctionType::decomposeInput(paramType, params);
-
   llvm::SmallBitVector defaultMap =
     computeDefaultMap(params, callee, calleeLevel);
 
-  // Extract the arguments.
-  auto args = decomposeArgType(argType, argLabels);
+  // Apply labels to arguments.
+  SmallVector<AnyFunctionType::Param, 8> argsWithLabels;
+  argsWithLabels.append(args.begin(), args.end());
+  AnyFunctionType::relabelParams(argsWithLabels, argLabels);
 
   // FIXME: Remove this. It's functionally identical to the real code
   // path below, except for some behavioral differences in solution ranking
@@ -810,7 +810,7 @@ constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
   // Match up the call arguments to the parameters.
   ArgumentFailureTracker listener(cs, locator);
   SmallVector<ParamBinding, 4> parameterBindings;
-  if (constraints::matchCallArguments(args, params,
+  if (constraints::matchCallArguments(argsWithLabels, params,
                                       defaultMap,
                                       hasTrailingClosure,
                                       cs.shouldAttemptFixes(), listener,
@@ -839,7 +839,7 @@ constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
       auto loc = locator.withPathElement(LocatorPathElt::
                                             getApplyArgToParam(argIdx,
                                                                paramIdx));
-      auto argTy = args[argIdx].getType();
+      auto argTy = argsWithLabels[argIdx].getType();
 
       // FIXME: This should be revisited. If one of argTy or paramTy
       // is a type variable, matchTypes() will add a constraint, and
@@ -4417,13 +4417,15 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     // The argument type must be convertible to the input type.
     if (::matchCallArguments(*this, isOperator,
-                             func1->getInput(), func2->getInput(),
+                             func1->getParams(),
+                             func2->getParams(),
                              outerLocator.withPathElement(
                                ConstraintLocator::ApplyArgument)).isFailure())
       return SolutionKind::Error;
 
     // The result types are equivalent.
-    if (matchTypes(func1->getResult(), func2->getResult(),
+    if (matchTypes(func1->getResult(),
+                   func2->getResult(),
                    ConstraintKind::Bind,
                    subflags,
                    locator.withPathElement(
