@@ -4530,27 +4530,24 @@ public:
       return true;
     };
 
-    SILModule &M = F->getModule();
     for (auto &BB : *F) {
       TermInst *TI = BB.getTerminator();
       CurInstruction = TI;
 
-      // Check for non-cond_br critical edges in canonical SIL.
-      if (!isa<CondBranchInst>(TI) && M.getStage() == SILStage::Canonical) {
+      // Check for non-cond_br critical edges.
+      auto *CBI = dyn_cast<CondBranchInst>(TI);
+      if (!CBI) {
         for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
           require(!isCriticalEdgePred(TI, Idx),
                   "non cond_br critical edges not allowed");
         }
         continue;
       }
-
       // In ownership qualified SIL, ban critical edges from CondBranchInst that
       // have non-trivial arguments.
+      //
+      // FIXME: it would be far simpler to ban all critical edges in general.
       if (!F->hasQualifiedOwnership())
-        continue;
-
-      auto *CBI = dyn_cast<CondBranchInst>(TI);
-      if (!CBI)
         continue;
 
       if (isCriticalEdgePred(CBI, CondBranchInst::TrueIdx)) {
