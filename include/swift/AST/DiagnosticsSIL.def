@@ -269,8 +269,14 @@ ERROR(tf_op_misuse, none,
       "%0", (StringRef))
 NOTE(tf_op_misuse_note, none,
      "%0", (StringRef))
-ERROR(tf_op_extract_address_only,none,
-      "cannot extract TensorFlow result into an address-only type", ())
+
+ERROR(tf_op_result_generic,none,
+      "cannot extract TensorFlow result into type %0, because %0 contains "
+      "unbound generic parameters", (Type))
+ERROR(tf_op_result_not_value_or_aggregate,none,
+      "cannot extract TensorFlow result into type %0, because %0 is not a "
+      "TensorFlow value type or an aggregate of TensorFlow value types",
+      (Type))
 
 // Control flow diagnostics.
 ERROR(missing_return,none,

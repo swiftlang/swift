@@ -135,7 +135,7 @@ namespace {
   private:
     void logCurrentState(const char *name, bool isDetailed);
     void inlineCalls();
-    void simplifyTensorOperands();
+    bool simplifyTensorOperands();
 
     void promoteToSSA(ArrayRef<AllocStackInst *> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
@@ -338,6 +338,8 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
 /// Also, if a primitive integer or floating point value is passed as a struct
 /// value, extract out the underlying integer or float value.
 ///
+/// Returns nullptr on error.
+///
 static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
                                      TFDeabstraction &TFDA) {
   auto origInst = opInfo.inst;
@@ -409,7 +411,7 @@ static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
   SmallVector<SILValue, 8> operands;
   SmallVector<std::pair<StringRef, SILTensorOpInfo::OperandClass>, 4>
       operandClasses;
-  llvm::Optional<SILValue> outParameterAddress;
+  SILValue outParameterAddress;
   for (auto operandAndClass : zip(origInst->getAllOperands(),
                                   opInfo.operandClasses)) {
     auto operand = std::get<0>(operandAndClass).get();
@@ -418,11 +420,18 @@ static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
     // If this is an out parameter, take note of it (so that we can deal with it
     // later), and exclude it from the list of rewritten operands.
     if (operandClass.second == SILTensorOpInfo::OperandClass::Out) {
-      assert(operand->getType().isAddress());
-      if (!operand->getType().isLoadable(origInst->getModule())) {
-        diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
-                 diag::tf_op_extract_address_only);
-        continue;
+      auto operandType = operand->getType();
+      assert(operandType.isAddress());
+      if (!operandType.isLoadable(origInst->getModule())) {
+        auto astType = operandType.getASTType();
+        if (astType->hasArchetype()) {
+          diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
+                   diag::tf_op_result_generic, astType);
+        } else {
+          diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
+                   diag::tf_op_result_not_value_or_aggregate, astType);
+        }
+        return nullptr;
       }
       assert(!outParameterAddress && "there is more than one out parameter");
       outParameterAddress = operand;
@@ -459,7 +468,7 @@ static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
   // the old one.
   auto newName = opInfo.getBuiltinNameWithNewOperands(operandClasses);
   auto newType = outParameterAddress ?
-      (*outParameterAddress)->getType().getObjectType() : origInst->getType();
+      outParameterAddress->getType().getObjectType() : origInst->getType();
   auto newInst =
     B.createBuiltin(origInst->getLoc(), ctx.getIdentifier(newName), newType,
                     SubstitutionMap(), operands);
@@ -471,7 +480,7 @@ static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
     auto hasOwnership = newInst->getFunction()->hasQualifiedOwnership();
     auto storeOwnership = hasOwnership ? StoreOwnershipQualifier::Trivial
                                        : StoreOwnershipQualifier::Unqualified;
-    B.createStore(origInst->getLoc(), newInst, *outParameterAddress,
+    B.createStore(origInst->getLoc(), newInst, outParameterAddress,
                   storeOwnership);
   }
 
@@ -584,9 +593,12 @@ static bool explodeAggregateInst(SILInstruction *inst,
 /// Since we're scanning the function, keep track of all of the tensor
 /// operations to avoid additional linear scans over the function.
 ///
-void TFDeabstraction::simplifyTensorOperands() {
+/// Returns true on error.
+///
+bool TFDeabstraction::simplifyTensorOperands() {
   llvm::PrettyStackTraceFormat X("TFDeabstraction::simplifyTensorOperands");
   bool containsOpBuiltin = false;
+  bool hasError = false;
 
   bool alreadyPrinted = false;
   auto logIfFirstChange = [&]() {
@@ -606,6 +618,11 @@ void TFDeabstraction::simplifyTensorOperands() {
 
         // Simplify operands if possible.
         auto newInst = simplifyOperands(*opInfo, *this);
+
+        if (!newInst) {
+          hasError = true;
+          continue;
+        }
 
         // Remember this for later passes.
         tensorOps.push_back(newInst);
@@ -669,6 +686,8 @@ void TFDeabstraction::simplifyTensorOperands() {
   // working on the host-side tensor operation.
   if (!containsOpBuiltin)
     tensorOps.clear();
+
+  return hasError;
 }
 
 namespace {
@@ -2304,6 +2323,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     // Verify that the type of this attribute is ok for the OperandClass we
     // have.
     switch (operandClass.second) {
+    case SILTensorOpInfo::OperandClass::Out:
+      llvm_unreachable("Attributes cannot be output parameters");
     case SILTensorOpInfo::OperandClass::Input:
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
       if (verifyNormalAttr(constValue))
@@ -2407,8 +2428,6 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                                    " floating point, string, or array thereof");
       }
       break;
-    case SILTensorOpInfo::OperandClass::Out:
-      llvm_unreachable("Attributes cannot be output parameters");
     }
   }
 
@@ -2422,10 +2441,13 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
   // Figure out the result list.
   SmallVector<Type, 4> resultTypes;
   auto userResultTy = inst->getType().getASTType();
-  if (!tf::flattenTensorFlowValueAggregate(userResultTy, resultTypes))
-    return diagnoseInvalid("the specified result type is not a TensorFlow "
-                           "value type or an aggregate of TensorFlow value "
-                           "types");
+  if (!tf::flattenTensorFlowValueAggregate(userResultTy, resultTypes)) {
+    auto loc = getUserSourceLocation(inst);
+    diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
+             diag::tf_op_result_not_value_or_aggregate, userResultTy)
+      .highlight(loc.getSourceRange());
+    return;
+  }
   auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
       return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 
@@ -2485,7 +2507,8 @@ void TFDeabstraction::doIt() {
 
   // Scan for any Tensor operations, removing indirect operands and structs that
   // interfere with SSA construction.
-  simplifyTensorOperands();
+  if (simplifyTensorOperands())
+    return;
 
   // If we didn't find any ops, early exit processing of this function to save
   // compile time.

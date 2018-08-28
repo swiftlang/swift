@@ -155,9 +155,10 @@ struct SILTensorOpInfo {
   /// Returns the full name that this builtin would have if its operands
   /// changed to the passed-in values.
   std::string getBuiltinNameWithNewOperands(
-      const SmallVectorImpl<std::pair<StringRef, OperandClass>> &newOperandClasses) const {
+      const SmallVectorImpl<std::pair<StringRef, OperandClass>>
+        &newOperandClasses) const {
     std::string name = "__tfop_" + opName.str();
-    for (auto newOperandClass : newOperandClasses) {
+    for (const auto &newOperandClass : newOperandClasses) {
       name += ",";
       name += newOperandClass.first;
       name += getOperandClassSuffix(newOperandClass.second);
