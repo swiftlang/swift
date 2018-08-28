@@ -5354,9 +5354,11 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     return;
   }
 
-  // Record the curly braces but nothing inside.
-  SF.recordInterfaceToken("{");
-  SF.recordInterfaceToken("}");
+  if (IsParsingInterfaceTokens) {
+    // Record the curly braces but nothing inside.
+    SF.recordInterfaceToken("{");
+    SF.recordInterfaceToken("}");
+  }
   llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
 
   if (isDelayedParsingEnabled()) {
