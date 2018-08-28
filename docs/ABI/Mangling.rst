@@ -215,7 +215,7 @@ Entities
   entity-spec ::= decl-name label-list? type 'v' ACCESSOR                           // variable
   entity-spec ::= decl-name type 'fp'                                               // generic type parameter
   entity-spec ::= decl-name type 'fo'                                               // enum element (currently not used)
-  entity-spec ::= identifier 'Qa'                                                   // associated type declaration
+  entity-spec ::= identifier 'Qa'                                                   // associated type declaration
 
   ACCESSOR ::= 'm'                           // materializeForSet
   ACCESSOR ::= 's'                           // setter
@@ -332,7 +332,7 @@ Types
   any-generic-type ::= context decl-name 'a'     // typealias type (used in DWARF and USRs)
 
   any-generic-type ::= standard-substitutions
-  
+
   standard-substitutions ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
   standard-substitutions ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
 
@@ -417,12 +417,12 @@ Types
   type ::= type 'Xp'                         // existential metatype without representation
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
   type ::= 'Xe'                              // error or unresolved type
- 
+
   bound-generic-type ::= type 'y' (type* '_')* type* retroactive-conformance* 'G'   // one type-list per nesting level of type
   bound-generic-type ::= substitution
 
   FUNCTION-KIND ::= 'f'                      // @thin function type
-  FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used) 
+  FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used)
   FUNCTION-KIND ::= 'K'                      // @auto_closure function type (noescape)
   FUNCTION-KIND ::= 'B'                      // objc block function type
   FUNCTION-KIND ::= 'C'                      // C function pointer type
@@ -474,7 +474,7 @@ Types
   associated-type ::= substitution
   associated-type ::= protocol 'QP'          // self type of protocol
   associated-type ::= archetype identifier 'Qa' // associated type
-  
+
   assoc-type-name ::= identifier                // associated type name without protocol
   assoc-type-name ::= identifier protocol 'P'   //
 
@@ -582,15 +582,15 @@ Property behaviors are implemented using private protocol conformances.
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1
   GENERIC-PARAM-INDEX ::= 'd' INDEX INDEX    // depth = M+1, idx = N
 
-  LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject 
-  LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject 
-  LAYOUT-CONSTRAINT ::= 'T'  // Trivial 
+  LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject
+  LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject
+  LAYOUT-CONSTRAINT ::= 'T'  // Trivial
   LAYOUT-CONSTRAINT ::= 'C'  // Class
-  LAYOUT-CONSTRAINT ::= 'D'  // NativeClass 
-  LAYOUT-CONSTRAINT ::= 'E' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of exact size 
-  LAYOUT-CONSTRAINT ::= 'e' LAYOUT-SIZE  // Trivial of exact size 
-  LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits 
-  LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits 
+  LAYOUT-CONSTRAINT ::= 'D'  // NativeClass
+  LAYOUT-CONSTRAINT ::= 'E' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of exact size
+  LAYOUT-CONSTRAINT ::= 'e' LAYOUT-SIZE  // Trivial of exact size
+  LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits
+  LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'U'  // Unknown layout
 
   LAYOUT-SIZE ::= INDEX // Size only
