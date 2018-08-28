@@ -170,10 +170,10 @@ open class User {
 // (10 words of normal class metadata on 64-bit platforms, 13 on 32-bit)
 // 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter.1:
 // 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter.1:
-// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!materializeForSet.1:
+// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!modify.1:
 // 13 CHECK-VTABLE-NEXT: #User.wrappedProp!getter.1:
 // 14 CHECK-VTABLE-NEXT: #User.wrappedProp!setter.1:
-// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!materializeForSet.1:
+// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!modify.1:
 // 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod!1:
 // 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod!1:
 // 18 CHECK-VTABLE-NEXT: #User.constrainedUnwrapped!1:

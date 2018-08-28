@@ -227,8 +227,10 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
       return Flags::Kind::Getter;
     case AccessorKind::Set:
       return Flags::Kind::Setter;
-    case AccessorKind::MaterializeForSet:
-      return Flags::Kind::MaterializeForSet;
+    case AccessorKind::Read:
+      return Flags::Kind::ReadCoroutine;
+    case AccessorKind::Modify:
+      return Flags::Kind::ModifyCoroutine;
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:

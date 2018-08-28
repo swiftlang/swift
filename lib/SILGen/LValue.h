@@ -266,7 +266,7 @@ public:
   struct AccessedStorage {
     AbstractStorageDecl *Storage;
     bool IsSuper;
-    const RValue *Indices;
+    const PreparedArguments *Indices;
     Expr *IndexExprForDiagnostics;
   };
 
@@ -444,7 +444,7 @@ public:
                           bool isSuper,
                           AccessStrategy accessStrategy,
                           CanType formalRValueType,
-                          RValue &&indices,
+                          PreparedArguments &&indices,
                           Expr *indexExprForDiagnostics);
 
   void addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
@@ -462,8 +462,8 @@ public:
                                    bool isSuper,
                                    AccessStrategy accessStrategy,
                                    CanType formalRValueType,
-                                   RValue &&indices,
-                                   Expr *indexExprForDiagnostics = nullptr);
+                                   PreparedArguments &&indices,
+                                   Expr *indexExprForDiagnostics);
 
   /// Add a subst-to-orig reabstraction component.  That is, given
   /// that this l-value trafficks in values following the substituted

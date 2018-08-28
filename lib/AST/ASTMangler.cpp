@@ -85,8 +85,6 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
       return "ao";
     }
     llvm_unreachable("bad addressor kind");
-  case AccessorKind::MaterializeForSet:
-    return "m";
   }
   llvm_unreachable("bad accessor kind");
 }

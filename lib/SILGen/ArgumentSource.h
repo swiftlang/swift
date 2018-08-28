@@ -229,7 +229,9 @@ public:
   RValue &&asKnownRValue(SILGenFunction &SGF) && {
     return std::move(Storage.get<RValueStorage>(StoredKind).Value);
   }
-
+  const RValue &asKnownRValue() const & {
+    return Storage.get<RValueStorage>(StoredKind).Value;
+  }
   SILLocation getKnownRValueLocation() const & {
     return Storage.get<RValueStorage>(StoredKind).Loc;
   }
@@ -238,6 +240,9 @@ public:
   /// that value.
   LValue &&asKnownLValue() && {
     return std::move(Storage.get<LValueStorage>(StoredKind).Value);
+  }
+  const LValue &asKnownLValue() const & {
+    return Storage.get<LValueStorage>(StoredKind).Value;
   }
   SILLocation getKnownLValueLocation() const & {
     return Storage.get<LValueStorage>(StoredKind).Loc;
@@ -310,6 +315,8 @@ public:
   /// Whether this argument source requires the callee to evaluate.
   bool requiresCalleeToEvaluate() const;
 
+  bool isObviouslyEqual(const ArgumentSource &other) const;
+
   void dump() const;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
@@ -317,23 +324,108 @@ private:
   /// Private helper constructor for delayed borrowed rvalues.
   ArgumentSource(SILLocation loc, RValue &&rv, Kind kind);
 
-  // Make the non-move accessors private to make it more difficult
+  // Make this non-move accessor private to make it more difficult
   // to accidentally re-emit values.
-  const RValue &asKnownRValue() const & {
-    return Storage.get<RValueStorage>(StoredKind).Value;
-  }
-
-  // Make the non-move accessors private to make it more difficult
-  // to accidentally re-emit values.
-  const LValue &asKnownLValue() const & {
-    return Storage.get<LValueStorage>(StoredKind).Value;
-  }
-
   Expr *asKnownExpr() const & {
     return Storage.get<Expr*>(StoredKind);
   }
 
   RValue getKnownTupleAsRValue(SILGenFunction &SGF, SGFContext C) &&;
+};
+
+class PreparedArguments {
+  // TODO: replace this formal type with an array of parameter types.
+  CanType FormalType;
+  std::vector<ArgumentSource> Arguments;
+  bool IsScalar = false;
+public:
+  PreparedArguments() {}
+  PreparedArguments(CanType formalType, bool isScalar) {
+    emplace(formalType, isScalar);
+  }
+
+  // Move-only.
+  PreparedArguments(const PreparedArguments &) = delete;
+  PreparedArguments &operator=(const PreparedArguments &) = delete;
+
+  PreparedArguments(PreparedArguments &&other)
+    : FormalType(other.FormalType), Arguments(std::move(other.Arguments)),
+      IsScalar(other.IsScalar) {
+    other.FormalType = CanType();
+  }
+  PreparedArguments &operator=(PreparedArguments &&other) {
+    FormalType = other.FormalType;
+    IsScalar = other.IsScalar;
+    Arguments = std::move(other.Arguments);
+    other.FormalType = CanType();
+    return *this;
+  }
+
+  /// Returns true if this is a null argument list.  Note that this always
+  /// indicates the total absence of an argument list rather than the
+  /// possible presence of an empty argument list.
+  bool isNull() const { return !FormalType; }
+
+  /// Returns true if this is a non-null and completed argument list.
+  bool isValid() const {
+    assert(!isNull());
+    if (IsScalar) {
+      return Arguments.size() == 1;
+    } else if (auto tuple = dyn_cast<TupleType>(FormalType)) {
+      return Arguments.size() == tuple->getNumElements();
+    } else {
+      return Arguments.size() == 1;
+    }
+  }
+
+  /// Return the formal type of this argument list.
+  CanType getFormalType() const {
+    assert(!isNull());
+    return FormalType;
+  }
+
+  /// Is this a single-argument list?  Note that the argument might be a tuple.
+  bool isScalar() const {
+    assert(!isNull());
+    return IsScalar;
+  }
+
+  MutableArrayRef<ArgumentSource> getSources() && {
+    assert(isValid());
+    return Arguments;
+  }
+
+  /// Emplace a (probably incomplete) argument list.
+  void emplace(CanType formalType, bool isScalar) {
+    assert(isNull());
+    assert(!formalType->hasTypeParameter() && "should be a contextual type!");
+    assert(isScalar || isa<TupleType>(formalType));
+    FormalType = formalType;
+    IsScalar = isScalar;
+  }
+
+  /// Emplace an empty argument list.
+  void emplaceEmptyArgumentList(SILGenFunction &SGF);
+
+  /// Add an emitted r-value argument to this argument list.
+  void add(SILLocation loc, RValue &&arg) {
+    assert(!isNull());
+    Arguments.emplace_back(loc, std::move(arg));
+  }
+
+  /// Add an arbitrary argument source to these arguments.
+  ///
+  /// An argument list with an arbtrary argument source can't generally
+  /// be copied.
+  void addArbitrary(ArgumentSource &&arg) {
+    assert(!isNull());
+    Arguments.emplace_back(std::move(arg));
+  }
+
+  /// Copy these prepared arguments.  This propagates null.
+  PreparedArguments copy(SILGenFunction &SGF, SILLocation loc) const;
+
+  bool isObviouslyEqual(const PreparedArguments &other) const;
 };
 
 } // end namespace Lowering

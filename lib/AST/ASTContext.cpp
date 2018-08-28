@@ -1357,7 +1357,8 @@ void ASTContext::addExternalDecl(Decl *decl) {
 
 void ASTContext::addSynthesizedDecl(Decl *decl) {
   auto *mod = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
-  if (mod->getKind() == FileUnitKind::ClangModule) {
+  if (mod->getKind() == FileUnitKind::ClangModule ||
+      mod->getKind() == FileUnitKind::SerializedAST) {
     ExternalDefinitions.insert(decl);
     return;
   }

@@ -26,6 +26,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/ExternalUnion.h"
@@ -258,8 +259,6 @@ public:
   };
 
   const Kind kind;
-
-  bool isMaterializeForSet = false;
 
   // Move, don't copy.
   Callee(const Callee &) = delete;
@@ -2433,6 +2432,22 @@ public:
     maybeEmitForeignErrorArgument();
   }
 
+  void emitTopLevel(PreparedArguments &&args,
+                    AbstractionPattern origParamType) {
+    assert(args.isValid());
+    auto argSources = std::move(args).getSources();
+    if (args.isScalar()) {
+      assert(argSources.size() == 1);
+      emitTopLevel(std::move(argSources[0]), origParamType);
+    } else {
+      for (auto i : indices(argSources)) {
+        emitTopLevel(std::move(argSources[i]),
+                     origParamType.getTupleElementType(i));
+      }
+      maybeEmitForeignErrorArgument();
+    }
+  }
+
 private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType) {
     // If it was a tuple in the original type, or the argument
@@ -3582,24 +3597,40 @@ public:
   CanType SubstResultType;
 
 private:
-  ArgumentSource ArgValue;
+  PreparedArguments Args;
   bool Throws;
 
 public:
   CallSite(ApplyExpr *apply)
       : Loc(apply), SubstResultType(apply->getType()->getCanonicalType()),
-        ArgValue(apply->getArg()), Throws(apply->throws()) {}
+        Throws(apply->throws()) {
+    Expr *arg = apply->getArg();
+    Args.emplace(arg->getType()->getCanonicalType(), /*scalar*/true);
+    Args.addArbitrary(arg);
+  }
+
+  CallSite(SILLocation loc, PreparedArguments &&args, CanType resultType,
+           bool throws)
+      : Loc(loc), SubstResultType(resultType), Args(std::move(args)),
+        Throws(throws) {
+    assert(Args.isValid());
+  }
 
   CallSite(SILLocation loc, ArgumentSource &&value, CanType resultType,
            bool throws)
-      : Loc(loc), SubstResultType(resultType), ArgValue(std::move(value)),
-        Throws(throws) {}
+      : Loc(loc), SubstResultType(resultType),
+        Args(value.getSubstType(), /*scalar*/ true), Throws(throws) {
+    Args.addArbitrary(std::move(value));
+  }
 
   CallSite(SILLocation loc, ArgumentSource &&value, CanAnyFunctionType fnType)
       : CallSite(loc, std::move(value), fnType.getResult(), fnType->throws()) {}
 
+  CallSite(SILLocation loc, PreparedArguments &&args, CanAnyFunctionType fnType)
+      : CallSite(loc, std::move(args), fnType.getResult(), fnType->throws()) {}
+
   /// Return the substituted, unlowered AST type of the argument.
-  CanType getSubstArgType() const { return ArgValue.getSubstType(); }
+  CanType getSubstArgType() const { return Args.getFormalType(); }
 
   /// Return the substituted, unlowered AST type of the result of
   /// this application.
@@ -3618,11 +3649,14 @@ public:
 
     ArgEmitter emitter(SGF, lowering.Rep, params, args, delayedArgs,
                        foreignError, foreignSelf);
-    emitter.emitTopLevel(std::move(ArgValue), origParamType);
+    emitter.emitTopLevel(std::move(Args), origParamType);
   }
 
   /// Take the arguments for special processing, in place of the above.
-  ArgumentSource &&forward() && { return std::move(ArgValue); }
+  ArgumentSource &&forward() && {
+    assert(Args.isScalar());
+    return std::move(std::move(Args).getSources()[0]);
+  }
 };
 
 } // end anonymous namespace
@@ -3987,15 +4021,6 @@ CallEmission::applyNormalCall(SGFContext C) {
 
   auto mv = callee.getFnValue(SGF, isCurried, borrowedSelf);
 
-  // Materialize for set could temporarily escape its arguments.
-  if (callee.isMaterializeForSet) {
-    auto indices = ArrayRef<ManagedValue>(uncurriedArgs).slice(2);
-    for (auto index : indices) {
-      auto *toNoEscape = dyn_cast<ConvertEscapeToNoEscapeInst>(index.getValue());
-      if (!toNoEscape) continue;
-      toNoEscape->setEscapedByUser();
-    }
-  }
   // Emit the uncurried call.
   firstLevelResult.value = SGF.emitApply(
       std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
@@ -4613,6 +4638,30 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   return normalBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
 }
 
+SILValue SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
+                                                   SILType substFnType,
+                                                   SubstitutionMap subs,
+                                                   ArrayRef<SILValue> args,
+                                            SmallVectorImpl<SILValue> &yields) {
+  // TODO: adjust this to create try_begin_apply when appropriate.
+  assert(!substFnType.castTo<SILFunctionType>()->hasErrorResult());
+
+  auto beginApply = B.createBeginApply(loc, fn, subs, args);
+
+  auto yieldResults = beginApply->getYieldedValues();
+  yields.append(yieldResults.begin(), yieldResults.end());
+
+  return beginApply->getTokenResult();
+}
+
+void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc, SILValue token) {
+  // TODO: adjust this to handle TryBeginApplyResult.
+  assert(isa<BeginApplyResult>(token));
+  assert(cast<BeginApplyResult>(token)->isTokenResult());
+
+  B.createEndApply(loc, token);
+}
+
 void SILGenFunction::emitYield(SILLocation loc,
                                MutableArrayRef<ArgumentSource> valueSources,
                                ArrayRef<AbstractionPattern> origTypes,
@@ -4646,6 +4695,15 @@ void SILGenFunction::emitYield(SILLocation loc,
   if (!delayedArgs.empty())
     emitDelayedArguments(*this, delayedArgs, yieldArgs);
 
+  emitRawYield(loc, yieldArgs, unwindDest, /*unique*/ false);
+
+  evalScope.pop();
+}
+
+void SILGenFunction::emitRawYield(SILLocation loc,
+                                  ArrayRef<ManagedValue> yieldArgs,
+                                  JumpDest unwindDest,
+                                  bool isUniqueYield) {
   SmallVector<SILValue, 4> yieldValues;
   for (auto arg : yieldArgs)
     yieldValues.push_back(arg.getValue());
@@ -4656,6 +4714,7 @@ void SILGenFunction::emitYield(SILLocation loc,
   // The unwind block.  We can use the dest block we were passed
   // directly if there are no active cleanups between here and it.
   bool requiresSeparateUnwindBB =
+    !isUniqueYield ||
     Cleanups.hasAnyActiveCleanups(unwindDest.getDepth());
   auto unwindBB = requiresSeparateUnwindBB
                     ? createBasicBlock(FunctionSection::Postmatter)
@@ -4673,7 +4732,6 @@ void SILGenFunction::emitYield(SILLocation loc,
 
   // Emit the resumption path.
   B.emitBlock(resumeBB);
-  evalScope.pop();
 }
 
 /// Emits SIL instructions to create an enum value. Attempts to avoid
@@ -5347,6 +5405,81 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
   return Preparer.prepare();
 }
 
+static void collectFakeIndexParameters(SILGenModule &SGM,
+                                       CanType substType,
+                                    SmallVectorImpl<SILParameterInfo> &params) {
+  if (auto tuple = dyn_cast<TupleType>(substType)) {
+    for (auto substEltType : tuple.getElementTypes())
+      collectFakeIndexParameters(SGM, substEltType, params);
+    return;
+  }
+
+  // Use conventions that will produce a +1 value.
+  auto &tl = SGM.Types.getTypeLowering(substType);
+  ParameterConvention convention;
+  if (tl.isFormallyPassedIndirectly()) {
+    convention = ParameterConvention::Indirect_In;
+  } else if (tl.isTrivial()) {
+    convention = ParameterConvention::Direct_Unowned;
+  } else {
+    convention = ParameterConvention::Direct_Owned;
+  }
+
+  params.push_back(SILParameterInfo{tl.getLoweredType().getASTType(),
+                                    convention});
+}
+
+PreparedArguments
+SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
+                                        SubstitutionMap subs,
+                                        AccessStrategy strategy,
+                                        Expr *indexExpr) {
+  // FIXME: we should expect an array of index expressions.
+
+  // TODO: use the real abstraction pattern from the accessor(s) in the
+  // strategy.
+  // Currently we use the substituted type so that we can reconstitute these
+  // as RValues.
+
+  auto substArgType = indexExpr->getType()->getCanonicalType();
+  SmallVector<SILParameterInfo, 4> substParamTys;
+  collectFakeIndexParameters(SGM, substArgType, substParamTys);
+
+  SmallVector<ManagedValue, 4> argValues;
+  SmallVector<DelayedArgument, 2> delayedArgs;
+
+  ArgEmitter emitter(*this, SILFunctionTypeRepresentation::Thin,
+                     ClaimedParamsRef(substParamTys),
+                     argValues, delayedArgs,
+                     /*foreign error*/None,
+                     ImportAsMemberStatus());
+
+  emitter.emitTopLevel(indexExpr, AbstractionPattern(substArgType));
+
+  // TODO: do something to preserve LValues in the delayed arguments?
+  if (!delayedArgs.empty())
+    emitDelayedArguments(*this, delayedArgs, argValues);
+
+  bool isScalar = subscript->getIndices()->size() == 1;
+  PreparedArguments result(substArgType, isScalar);
+  if (isScalar) {
+    result.add(indexExpr, RValue(*this, argValues, substArgType));
+  } else {
+    ArrayRef<ManagedValue> remainingArgs = argValues;
+    auto substArgTupleType = cast<TupleType>(substArgType);
+    for (auto substArgEltType : substArgTupleType.getElementTypes()) {
+      auto count = RValue::getRValueSize(substArgEltType);
+      RValue elt(*this, remainingArgs.slice(0, count), substArgEltType);
+      result.add(indexExpr, std::move(elt));
+      remainingArgs = remainingArgs.slice(count);
+    }
+    assert(remainingArgs.empty());
+  }
+
+  assert(result.isValid());
+  return result;
+}
+
 SILDeclRef SILGenModule::getGetterDeclRef(AbstractStorageDecl *storage) {
   auto *getter = storage->getGetter();
   return SILDeclRef(getter, SILDeclRef::Kind::Func)
@@ -5359,7 +5492,7 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
                 SubstitutionMap substitutions,
                 ArgumentSource &&selfValue,
                 bool isSuper, bool isDirectUse,
-                RValue &&subscripts, SGFContext c) {
+                PreparedArguments &&subscriptIndices, SGFContext c) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
@@ -5376,11 +5509,10 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
-  if (subscripts.isNull())
-    subscripts = emitEmptyTupleRValue(loc, SGFContext());
+  if (subscriptIndices.isNull())
+    subscriptIndices.emplaceEmptyArgumentList(*this);
 
-  emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),
-                       accessType);
+  emission.addCallSite(loc, std::move(subscriptIndices), accessType);
 
   // T
   return emission.apply(c);
@@ -5396,7 +5528,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
                                      SubstitutionMap substitutions,
                                      ArgumentSource &&selfValue,
                                      bool isSuper, bool isDirectUse,
-                                     RValue &&subscripts,
+                                     PreparedArguments &&subscriptIndices,
                                      ArgumentSource &&setValue) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
@@ -5414,131 +5546,27 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
 
-  // (value)  or (value, indices)
-  if (!subscripts.isNull()) {
-    // If we have a value and index list, create a new rvalue to represent the
-    // both of them together.
-    auto inputTupleType = dyn_cast<TupleType>(accessType.getInput());
+  // (value)  or (value, indices...)
+  bool isScalar = subscriptIndices.isNull() ||
+                  std::move(subscriptIndices).getSources().empty();
+  PreparedArguments values(accessType.getInput(), isScalar);
+  values.addArbitrary(std::move(setValue));
+  if (!isScalar) {
+    unsigned paramIndex = 1;
+    for (auto &component : std::move(subscriptIndices).getSources()) {
+      auto param = accessType.getParams()[paramIndex++];
+      auto paramType = param.getParameterType();
 
-    SmallVector<ArgumentSource, 4> eltSources;
-
-    // The value comes first.
-    eltSources.push_back(std::move(setValue));
-
-    // The indices come after.  Whether they are expanded or not depends on
-    // whether they were written as separate parameters, which should be
-    // reflected in the params list.
-    // TODO: we should really take an array of RValues.
-    if (accessType->getNumParams() != 2) {
-      auto subscriptsTupleType = cast<TupleType>(subscripts.getType());
-      assert(accessType.getParams().size()
-              == 1 + subscriptsTupleType->getNumElements());
-      (void)subscriptsTupleType;
-      SmallVector<RValue, 8> eltRVs;
-      std::move(subscripts).extractElements(eltRVs);
-      for (auto &elt : eltRVs)
-        eltSources.emplace_back(loc, std::move(elt));
-    } else {
-      assert(inputTupleType && "Must have an input tuple here");
-      subscripts.rewriteType(inputTupleType.getElementType(1));
-      eltSources.emplace_back(loc, std::move(subscripts));
+      auto argLoc = component.getKnownRValueLocation();
+      RValue &&arg = std::move(component).asKnownRValue(*this);
+      arg.rewriteType(paramType);
+      values.add(argLoc, std::move(arg));
     }
-
-    if (eltSources.size() == 1) {
-      setValue = std::move(eltSources.front());
-    } else {
-      assert(inputTupleType);
-      setValue = ArgumentSource(loc, inputTupleType, eltSources);
-    }
-
-  } else {
-    setValue.rewriteType(accessType.getInput());
   }
-  emission.addCallSite(loc, std::move(setValue), accessType);
+  assert(values.isValid());
+  emission.addCallSite(loc, std::move(values), accessType);
   // ()
   emission.apply();
-}
-
-SILDeclRef
-SILGenModule::getMaterializeForSetDeclRef(AbstractStorageDecl *storage) {
-  return SILDeclRef(storage->getMaterializeForSetFunc(),
-                    SILDeclRef::Kind::Func);
-}
-
-MaterializedLValue SILGenFunction::
-emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
-                              SubstitutionMap substitutions,
-                              ArgumentSource &&selfValue,
-                              bool isSuper, bool isDirectUse,
-                              RValue &&subscripts, SILValue buffer,
-                              SILValue callbackStorage) {
-  // Scope any further writeback just within this operation.
-  FormalEvaluationScope writebackScope(*this);
-
-  Callee callee = emitSpecializedAccessorFunctionRef(*this, loc,
-                                                     materializeForSet,
-                                                     substitutions, selfValue,
-                                                     isSuper, isDirectUse);
-  callee.isMaterializeForSet = true;
-
-  bool hasSelf = (bool)selfValue;
-  auto accessType = callee.getSubstFormalType();
-
-  CallEmission emission(*this, std::move(callee), std::move(writebackScope));
-  // Self ->
-  if (hasSelf) {
-    emission.addCallSite(loc, std::move(selfValue), accessType);
-    accessType = cast<FunctionType>(accessType.getResult());
-  }
-
-  // (buffer, callbackStorage)  or (buffer, callbackStorage, indices) ->
-  // Note that this "RValue" stores a mixed LValue/RValue tuple.
-  RValue args = [&] () -> RValue {
-    SmallVector<ManagedValue, 4> elts;
-
-    auto bufferPtr =
-      B.createAddressToPointer(loc, buffer,
-                               SILType::getRawPointerType(getASTContext()));
-    elts.push_back(ManagedValue::forUnmanaged(bufferPtr));
-
-    elts.push_back(ManagedValue::forLValue(callbackStorage));
-
-    if (!subscripts.isNull()) {
-      std::move(subscripts).getAll(elts);
-    }
-    return RValue(*this, elts, accessType.getInput());
-  }();
-  emission.addCallSite(loc, ArgumentSource(loc, std::move(args)), accessType);
-  // (buffer, optionalCallback)
-  SmallVector<ManagedValue, 2> results;
-  emission.apply().getAll(results);
-
-  // Project out the materialized address. The address directly returned by
-  // materialize for set is strictly typed, whether it is the local buffer or
-  // stored property.
-  SILValue address = results[0].getUnmanagedValue();
-  address = B.createPointerToAddress(loc, address, buffer->getType(),
-                                     /*isStrict*/ true,
-                                     /*isInvariant*/ false);
-
-  // Project out the optional callback.
-  SILValue optionalCallback = results[1].getUnmanagedValue();
-
-  auto origAccessType = SGM.Types.getConstantInfo(materializeForSet).FormalType;
-
-  assert(origAccessType->getParams().size() == 1 &&
-         "more than one self parameter?");
-  auto origSelfType = origAccessType
-      ->getParams()[0].getPlainType()
-      ->getCanonicalType();
-
-  CanGenericSignature genericSig;
-  if (auto genericFnType = dyn_cast<GenericFunctionType>(origAccessType))
-    genericSig = genericFnType.getGenericSignature();
-
-  return MaterializedLValue(ManagedValue::forLValue(address),
-                            origSelfType, genericSig,
-                            optionalCallback, callbackStorage);
 }
 
 SILDeclRef SILGenModule::getAddressorDeclRef(AbstractStorageDecl *storage) {
@@ -5562,7 +5590,8 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                       SubstitutionMap substitutions,
                       ArgumentSource &&selfValue,
                       bool isSuper, bool isDirectUse,
-                      RValue &&subscripts, SILType addressType) {
+                      PreparedArguments &&subscriptIndices,
+                      SILType addressType) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
@@ -5580,11 +5609,10 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
-  if (subscripts.isNull())
-    subscripts = emitEmptyTupleRValue(loc, SGFContext());
+  if (subscriptIndices.isNull())
+    subscriptIndices.emplaceEmptyArgumentList(*this);
 
-  emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),
-                       accessType);
+  emission.addCallSite(loc, std::move(subscriptIndices), accessType);
 
   // Unsafe{Mutable}Pointer<T> or
   // (Unsafe{Mutable}Pointer<T>, Builtin.UnknownPointer) or
@@ -5661,7 +5689,7 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
                                       SubstitutionMap substitutions,
                                       ArgumentSource &&selfValue,
                                       bool isSuper, bool isDirectUse,
-                                      RValue &&subscripts,
+                                      PreparedArguments &&subscriptIndices,
                                       SmallVectorImpl<ManagedValue> &yields) {
   Callee callee =
     emitSpecializedAccessorFunctionRef(*this, loc, accessor,
@@ -5683,11 +5711,10 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
-  if (subscripts.isNull())
-    subscripts = emitEmptyTupleRValue(loc, SGFContext());
+  if (subscriptIndices.isNull())
+    subscriptIndices.emplaceEmptyArgumentList(*this);
 
-  emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),
-                       accessType);
+  emission.addCallSite(loc, std::move(subscriptIndices), accessType);
 
   auto endApplyHandle = emission.applyCoroutine(yields);
 

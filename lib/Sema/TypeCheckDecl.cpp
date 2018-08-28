@@ -3093,14 +3093,10 @@ public:
   void visitFuncDecl(FuncDecl *FD) {
     TC.validateDecl(FD);
 
-    // We get bogus errors here with generic subscript materializeForSet.
     if (!FD->isInvalid()) {
-      if (!isa<AccessorDecl>(FD) ||
-          !cast<AccessorDecl>(FD)->isMaterializeForSet()) {
-        checkGenericParams(FD->getGenericParams(), FD);
-        TC.checkReferencedGenericParams(FD);
-        TC.checkProtocolSelfRequirements(FD);
-      }
+      checkGenericParams(FD->getGenericParams(), FD);
+      TC.checkReferencedGenericParams(FD);
+      TC.checkProtocolSelfRequirements(FD);
     }
 
     AccessControlChecker::checkAccessControl(TC, FD);
@@ -4141,7 +4137,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
       // These don't mention the value type directly.
       // If we add yield types to the function type, we'll need to update this.
-      case AccessorKind::MaterializeForSet:
       case AccessorKind::Read:
       case AccessorKind::Modify:
         break;

@@ -2335,14 +2335,6 @@ public:
           abort();
         }
       }
-      if (auto materializeForSet = ASD->getMaterializeForSetFunc()) {
-        if (materializeForSet->isMutating() !=
-            (ASD->isSetterMutating() || ASD->isGetterMutating())) {
-          Out << "AbstractStorageDecl::is{Getter,Setter}Mutating is out of sync"
-                 " with whether materializeForSet is mutating\n";
-          abort();
-        }
-      }
       if (auto addressor = ASD->getAddressor()) {
         if (addressor->isMutating() != ASD->isGetterMutating()) {
           Out << "AbstractStorageDecl::isGetterMutating is out of sync"
@@ -2365,7 +2357,8 @@ public:
         }
       }
       if (auto modifier = ASD->getModifyCoroutine()) {
-        if (modifier->isMutating() != ASD->isSetterMutating()) {
+        if (modifier->isMutating() !=
+            (ASD->isSetterMutating() || ASD->isGetterMutating())) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
                  " with whether modify addressor is mutating";
           abort();
@@ -3079,7 +3072,6 @@ public:
       case AccessorKind::Set:
       case AccessorKind::WillSet:
       case AccessorKind::DidSet:
-      case AccessorKind::MaterializeForSet:
       case AccessorKind::Read:
       case AccessorKind::Modify:
         if (FD->getAddressorKind() != AddressorKind::NotAddressor) {

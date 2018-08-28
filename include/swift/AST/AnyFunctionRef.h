@@ -190,7 +190,8 @@ private:
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
         if (AD->isCoroutine()) {
-          auto valueTy = AD->getStorage()->getValueInterfaceType();
+          auto valueTy = AD->getStorage()->getValueInterfaceType()
+                                         ->getReferenceStorageReferent();
           if (mapIntoContext)
             valueTy = AD->mapTypeIntoContext(valueTy);
           YieldTypeFlags flags(AD->getAccessorKind() == AccessorKind::Modify

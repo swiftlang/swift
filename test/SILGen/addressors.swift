@@ -212,17 +212,16 @@ struct D : Subscriptable {
 // SILGEN:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*Int32
 // SILGEN:   assign [[VALUE]] to [[ACCESS]] : $*Int32
 
-// materializeForSet.
-// SILGEN-LABEL: sil hidden [transparent] @$S10addressors1DVys5Int32VAEcim
-// SILGEN: bb0([[BUFFER:%.*]] : @trivial $Builtin.RawPointer, [[STORAGE:%.*]] : @trivial $*Builtin.UnsafeValueBuffer, [[I:%.*]] : @trivial $Int32, [[SELF:%.*]] : @trivial $*D):
+// SILGEN-LABEL: sil hidden [transparent] @$S10addressors1DVys5Int32VAEciM
+// SILGEN: bb0([[I:%.*]] : @trivial $Int32, [[SELF:%.*]] : @trivial $*D):
+// SILGEN:   [[SELF_ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF]]
 // SILGEN:   [[T0:%.*]] = function_ref @$S10addressors1DVys5Int32VAEciau
-// SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[SELF]])
+// SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[SELF_ACCESS]])
 // SILGEN:   [[ADDR_TMP:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
 // SILGEN:   [[ADDR:%.*]] = pointer_to_address [[ADDR_TMP]]
-// SILGEN:   [[PTR:%.*]] = address_to_pointer [[ADDR]]
-// SILGEN:   [[OPT:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
-// SILGEN:   [[T2:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[OPT]] : $Optional<Builtin.RawPointer>)
-// SILGEN:   return [[T2]] :
+// SILGEN:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]]
+// SILGEN:   yield [[ACCESS]]
+// SILGEN:   end_access [[ACCESS]]
 
 func make_int() -> Int32 { return 0 }
 func take_int_inout(_ value: inout Int32) {}
@@ -370,37 +369,23 @@ class G {
 // CHECK:   store [[VALUE]] to [[ACCESS]] : $*Int32
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
 
-//   materializeForSet callback for G.value
-// CHECK-LABEL: sil private [transparent] @$S10addressors1GC5values5Int32VvmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed G, @thick G.Type) -> () {
-// CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*G, [[SELFTYPE:%3]] : $@thick G.Type):
-// CHECK:   [[T0:%.*]] = project_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
-// CHECK:   [[OWNER:%.*]] = load [[T0]]
-// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
-// CHECK:   dealloc_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
-
-//   materializeForSet for G.value
-// CHECK-LABEL: sil hidden [transparent] @$S10addressors1GC5values5Int32Vvm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed G) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $G):
+// CHECK-LABEL: sil hidden [transparent] @$S10addressors1GC5values5Int32VvM : $@yield_once @convention(method) (@guaranteed G) -> @yields @inout Int32 {
+// CHECK: bb0([[SELF:%0]] : $G):
 //   Call the addressor.
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @$S10addressors1GC5values5Int32Vvao : $@convention(method) (@guaranteed G) -> (UnsafeMutablePointer<Int32>, @owned Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[T1:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
-// CHECK:   [[T2:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
+// CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
 //   Get the address.
 // CHECK:   [[PTR:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
 // CHECK:   [[ADDR_TMP:%.*]] = pointer_to_address [[PTR]]
-// CHECK:   [[ADDR:%.*]] = mark_dependence [[ADDR_TMP]] : $*Int32 on [[T2]]
-//   Initialize the callback storage with the owner.
-// CHECK:   [[T0:%.*]] = alloc_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
-// CHECK:   store [[T2]] to [[T0]] : $*Builtin.NativeObject
-// CHECK:   [[PTR:%.*]] = address_to_pointer [[ADDR]]
-//   Set up the callback.
-// CHECK:   [[CALLBACK_FN:%.*]] = function_ref @$S10addressors1GC5values5Int32VvmytfU_ :
-// CHECK:   [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK_FN]]
-// CHECK:   [[CALLBACK:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[CALLBACK_ADDR]]
-//   Epilogue.
-// CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
-// CHECK:   return [[RESULT]]
+// CHECK:   [[ADDR:%.*]] = mark_dependence [[ADDR_TMP]] : $*Int32 on [[OWNER]]
+//   Yield.
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*Int32
+// CHECK:   yield [[ACCESS]] : $*Int32, resume bb1, unwind bb2
+// CHECK:   end_access [[ACCESS]]
+//   Clean up.
+// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
 
 class Base {
   var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.allocate(capacity: 100)
@@ -430,10 +415,10 @@ class Sub : Base {
 // CHECK-LABEL: sil_vtable Base {
 // CHECK-NEXT: #Base.data!getter.1: (Base) -> () -> UnsafeMutablePointer<Int32> : @$S10addressors4BaseC4dataSpys5Int32VGvg
 // CHECK-NEXT: #Base.data!setter.1: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @$S10addressors4BaseC4dataSpys5Int32VGvs
-// CHECK-NEXT: #Base.data!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : @$S10addressors4BaseC4dataSpys5Int32VGvm
+// CHECK-NEXT: #Base.data!modify.1: (Base) -> () -> () : @$S10addressors4BaseC4dataSpys5Int32VGvM
 // CHECK-NEXT: #Base.value!getter.1: (Base) -> () -> Int32 : @$S10addressors4BaseC5values5Int32Vvg
 // CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : @$S10addressors4BaseC5values5Int32Vvs
-// CHECK-NEXT: #Base.value!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : @$S10addressors4BaseC5values5Int32Vvm
+// CHECK-NEXT: #Base.value!modify.1: (Base) -> () -> () : @$S10addressors4BaseC5values5Int32VvM
 // CHECK-NEXT: #Base.init!initializer.1: (Base.Type) -> () -> Base : @$S10addressors4BaseCACycfc
 // CHECK-NEXT: #Base.deinit!deallocator.1: @$S10addressors4BaseCfD
 // CHECK-NEXT: }
@@ -441,10 +426,10 @@ class Sub : Base {
 // CHECK-LABEL: sil_vtable Sub {
 // CHECK-NEXT: #Base.data!getter.1: (Base) -> () -> UnsafeMutablePointer<Int32> : @$S10addressors4BaseC4dataSpys5Int32VGvg
 // CHECK-NEXT: #Base.data!setter.1: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @$S10addressors4BaseC4dataSpys5Int32VGvs
-// CHECK-NEXT: #Base.data!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : @$S10addressors4BaseC4dataSpys5Int32VGvm
+// CHECK-NEXT: #Base.data!modify.1: (Base) -> () -> () : @$S10addressors4BaseC4dataSpys5Int32VGvM
 // CHECK-NEXT: #Base.value!getter.1: (Base) -> () -> Int32 : @$S10addressors3SubC5values5Int32Vvg
 // CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : @$S10addressors3SubC5values5Int32Vvs
-// CHECK-NEXT: #Base.value!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : @$S10addressors3SubC5values5Int32Vvm
+// CHECK-NEXT: #Base.value!modify.1: (Base) -> () -> () : @$S10addressors3SubC5values5Int32VvM
 // CHECK-NEXT: #Base.init!initializer.1: (Base.Type) -> () -> Base : @$S10addressors3SubCACycfc
 // CHECK-NEXT: #Sub.deinit!deallocator.1: @$S10addressors3SubCfD
 // CHECK-NEXT: }

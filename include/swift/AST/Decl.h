@@ -147,7 +147,6 @@ enum class DescriptiveDeclKind : uint8_t {
   ClassMethod,
   Getter,
   Setter,
-  MaterializeForSet,
   Addressor,
   MutableAddressor,
   ReadAccessor,
@@ -325,7 +324,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2,
     /// Whether the getter is mutating.
     IsGetterMutating : 1,
 
@@ -336,7 +335,10 @@ protected:
     HasStorage : 1,
 
     /// Whether this storage supports semantic mutation in some way.
-    SupportsMutation : 1
+    SupportsMutation : 1,
+
+    /// Whether an opaque read of this storage produces an owned value.
+    OpaqueReadOwnership : 2
   );
 
   SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1,
@@ -4142,6 +4144,8 @@ protected:
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
     Bits.AbstractStorageDecl.IsGetterMutating = false;
     Bits.AbstractStorageDecl.IsSetterMutating = true;
+    Bits.AbstractStorageDecl.OpaqueReadOwnership =
+      unsigned(OpaqueReadOwnership::Owned);
   }
 
   void setSupportsMutationIfStillStored(StorageIsMutable_t supportsMutation) {
@@ -4211,7 +4215,15 @@ public:
   bool hasAnyAccessors() const {
     return !getAllAccessors().empty();
   }
-  
+
+  /// \brief Return the ownership of values opaquely read from this storage.
+  OpaqueReadOwnership getOpaqueReadOwnership() const {
+    return OpaqueReadOwnership(Bits.AbstractStorageDecl.OpaqueReadOwnership);
+  }
+  void setOpaqueReadOwnership(OpaqueReadOwnership ownership) {
+    Bits.AbstractStorageDecl.OpaqueReadOwnership = unsigned(ownership);
+  }
+
   /// \brief Return true if reading this storage requires the ability to
   /// modify the base value.
   bool isGetterMutating() const {
@@ -4267,11 +4279,30 @@ public:
   /// \brief Add a synthesized setter.
   void setSynthesizedSetter(AccessorDecl *setter);
 
-  /// \brief Add a synthesized materializeForSet accessor.
-  void setSynthesizedMaterializeForSet(AccessorDecl *materializeForSet);
+  /// \brief Add a synthesized read coroutine.
+  void setSynthesizedReadCoroutine(AccessorDecl *read);
 
-  /// Does this storage require a materializeForSet accessor?
-  bool requiresMaterializeForSet() const;
+  /// \brief Add a synthesized modify coroutine.
+  void setSynthesizedModifyCoroutine(AccessorDecl *modify);
+
+  /// Does this storage require an opaque accessor of the given kind?
+  bool requiresOpaqueAccessor(AccessorKind kind) const;
+
+  /// Does this storage require a 'get' accessor in its opaque-accessors set?
+  bool requiresOpaqueGetter() const {
+    return getOpaqueReadOwnership() != OpaqueReadOwnership::Borrowed;
+  }
+
+  /// Does this storage require a 'read' accessor in its opaque-accessors set?
+  bool requiresOpaqueReadCoroutine() const {
+    return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+  }
+
+  /// Does this storage require a 'set' accessor in its opaque-accessors set?
+  bool requiresOpaqueSetter() const { return supportsMutation(); }
+
+  /// Does this storage require a 'modify' accessor in its opaque-accessors set?
+  bool requiresOpaqueModifyCoroutine() const;
 
   SourceRange getBracesRange() const {
     if (auto info = Accessors.getPointer())
@@ -4297,12 +4328,6 @@ public:
   }
 
   void overwriteSetterAccess(AccessLevel accessLevel);
-
-  /// \brief Retrieve the materializeForSet function, if this
-  /// declaration has one.
-  AccessorDecl *getMaterializeForSetFunc() const {
-    return getAccessor(AccessorKind::MaterializeForSet);
-  }
 
   /// \brief Return the decl for the immutable addressor if it exists.
   AccessorDecl *getAddressor() const {
@@ -5571,9 +5596,6 @@ public:
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
   bool isSetter() const { return getAccessorKind() == AccessorKind::Set; }
-  bool isMaterializeForSet() const {
-    return getAccessorKind() == AccessorKind::MaterializeForSet;
-  }
   bool isAnyAddressor() const {
     auto kind = getAccessorKind();
     return kind == AccessorKind::Address
@@ -6471,8 +6493,6 @@ AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
   Accessors.setInt(accessLevel);
   if (auto setter = getSetter())
     setter->overwriteAccess(accessLevel);
-  if (auto materializeForSet = getMaterializeForSetFunc())
-    materializeForSet->overwriteAccess(accessLevel);
   if (auto modify = getModifyCoroutine())
     modify->overwriteAccess(accessLevel);
   if (auto mutableAddressor = getMutableAddressor())

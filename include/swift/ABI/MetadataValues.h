@@ -322,7 +322,8 @@ public:
     Init,
     Getter,
     Setter,
-    MaterializeForSet,
+    ModifyCoroutine,
+    ReadCoroutine,
   };
 
 private:
@@ -542,7 +543,8 @@ public:
     Init,
     Getter,
     Setter,
-    MaterializeForSet,
+    ReadCoroutine,
+    ModifyCoroutine,
     AssociatedTypeAccessFunction,
     AssociatedConformanceAccessFunction,
   };

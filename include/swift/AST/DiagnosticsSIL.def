@@ -89,6 +89,10 @@ ERROR(inout_argument_alias,none,
 NOTE(previous_inout_alias,none,
       "previous aliasing argument", ())
 
+ERROR(unimplemented_generator_witnesses,none,
+      "protocol conformance emission for generator coroutines is unimplemented",
+      ())
+
 WARNING(exclusivity_access_required_warn,none,
         "overlapping accesses to %0, but "
         "%select{initialization|read|modification|deinitialization}1 requires "

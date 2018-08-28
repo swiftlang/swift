@@ -3779,9 +3779,8 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  ValueArg, ReturnType,
                                  P->CurDeclContext);
 
-  // Non-static set/willSet/didSet/materializeForSet/mutableAddress
-  // default to mutating.  get/address default to
-  // non-mutating.
+  // Non-static set/willSet/didSet/mutableAddress default to mutating.
+  // get/address default to non-mutating.
   switch (Kind) {
   case AccessorKind::Address:
   case AccessorKind::Get:
@@ -3796,9 +3795,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
     if (D->isInstanceMember())
       D->setSelfAccessKind(SelfAccessKind::Mutating);
     break;
-
-  case AccessorKind::MaterializeForSet:
-    llvm_unreachable("not parseable accessors");
   }
 
   return D;
@@ -3859,7 +3855,9 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
     SyntaxParsingContext ParamCtx(P.SyntaxContext, SyntaxKind::AccessorParameter);
     StartLoc = P.consumeToken(tok::l_paren);
     if (P.Tok.isNot(tok::identifier)) {
-      P.diagnose(P.Tok, diag::expected_accessor_name, (unsigned)Kind);
+      P.diagnose(P.Tok, diag::expected_accessor_parameter_name,
+                 Kind == AccessorKind::Set ? 0 :
+                 Kind == AccessorKind::WillSet ? 1 : 2);
       P.skipUntil(tok::r_paren, tok::l_brace);
       if (P.Tok.is(tok::r_paren))
         EndLoc = P.consumeToken();
@@ -3965,8 +3963,6 @@ static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
     return "'willSet'";
   case AccessorKind::DidSet:
     return "'didSet'";
-  case AccessorKind::MaterializeForSet:
-    llvm_unreachable("unparseable");
   }
   llvm_unreachable("bad accessor kind");  
 }
@@ -4018,7 +4014,6 @@ static bool isAllowedInLimitedSyntax(AccessorKind kind) {
 
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Read:
@@ -4376,9 +4371,6 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
 
   // Fill in the result type.
   switch (kind) {
-  case AccessorKind::MaterializeForSet:
-    llvm_unreachable("should never be seen here");
-
   // These have non-trivial returns, so fill in error.
   case AccessorKind::Get:
   case AccessorKind::Address:
