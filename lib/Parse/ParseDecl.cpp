@@ -5305,63 +5305,26 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   if (rethrows) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));
   }
-  
-  // Enter the arguments for the function into a new function-body scope.  We
-  // need this even if there is no function body to detect argument name
-  // duplication.
-  {
-    Scope S(this, ScopeKind::FunctionBody);
 
-    diagnoseOperatorFixityAttributes(*this, Attributes, FD);
-    
-    // Add the attributes here so if we need them while parsing the body
-    // they are available.
-    FD->getAttrs() = Attributes;
+  diagnoseOperatorFixityAttributes(*this, Attributes, FD);
+  // Add the attributes here so if we need them while parsing the body
+  // they are available.
+  FD->getAttrs() = Attributes;
 
-    // Pass the function signature to code completion.
-    if (SignatureHasCodeCompletion)
-      CodeCompletion->setParsedDecl(FD);
+  // Pass the function signature to code completion.
+  if (SignatureHasCodeCompletion)
+    CodeCompletion->setParsedDecl(FD);
 
-    DefaultArgs.setFunctionContext(FD, FD->getParameters());
-    if (auto *P = FD->getImplicitSelfDecl())
-      addToScope(P);
-    addParametersToScope(FD->getParameters());
-    setLocalDiscriminator(FD);
-    
-    // Establish the new context.
-    ParseFunctionBody CC(*this, FD);
-    setLocalDiscriminatorToParamList(FD->getParameters());
+  DefaultArgs.setFunctionContext(FD, FD->getParameters());
+  setLocalDiscriminator(FD);
 
-    // Check to see if we have a "{" to start a brace statement.
+  if (Flags.contains(PD_InProtocol)) {
     if (Tok.is(tok::l_brace)) {
-      // Record the curly braces but nothing inside.
-      SF.recordInterfaceToken("{");
-      SF.recordInterfaceToken("}");
-      llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
-
-      if (Flags.contains(PD_InProtocol)) {
-        diagnose(Tok, diag::protocol_method_with_body);
-        skipUntilDeclRBrace();
-      } else if (!isDelayedParsingEnabled()) {
-        if (Context.Stats)
-          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
-
-        ParserResult<BraceStmt> Body =
-            parseBraceItemList(diag::func_decl_without_brace);
-        if (Body.isNull()) {
-          // FIXME: Should do some sort of error recovery here?
-        } else if (SignatureStatus.hasCodeCompletion()) {
-          // Code completion was inside the signature, don't attach the body.
-          FD->setBodySkipped(Body.get()->getSourceRange());
-        } else {
-          FD->setBody(Body.get());
-        }
-      } else {
-        consumeAbstractFunctionBody(FD, Attributes);
-      }
-    } else {
-      checkForInputIncomplete();
+      diagnose(Tok, diag::protocol_method_with_body);
+      skipSingle();
     }
+  } else {
+    parseAbstractFunctionBody(FD);
   }
 
   // Exit the scope introduced for the generic parameters.
@@ -5369,6 +5332,44 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
   addToScope(FD);
   return DCC.fixupParserResult(FD);
+}
+
+/// Parse function body into \p AFD.
+void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
+  Scope S(this, ScopeKind::FunctionBody);
+
+  // Enter the arguments for the function into a new function-body scope.  We
+  // need this even if there is no function body to detect argument name
+  // duplication.
+  if (auto *P = AFD->getImplicitSelfDecl())
+    addToScope(P);
+  addParametersToScope(AFD->getParameters());
+
+   // Establish the new context.
+  ParseFunctionBody CC(*this, AFD);
+  setLocalDiscriminatorToParamList(AFD->getParameters());
+
+  if (!Tok.is(tok::l_brace)) {
+    checkForInputIncomplete();
+    return;
+  }
+
+  // Record the curly braces but nothing inside.
+  SF.recordInterfaceToken("{");
+  SF.recordInterfaceToken("}");
+  llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
+
+  if (isDelayedParsingEnabled()) {
+    consumeAbstractFunctionBody(AFD, AFD->getAttrs());
+    return;
+  }
+
+  if (Context.Stats)
+    Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
+  ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+  if (!Body.isNull())
+    AFD->setBody(Body.get());
 }
 
 bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
@@ -6225,7 +6226,6 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   CD->setGenericParams(GenericParams);
 
-  Scope S2(this, ScopeKind::ConstructorBody);
   CtorInitializerKind initKind = CtorInitializerKind::Designated;
   if (Attributes.hasAttribute<ConvenienceAttr>())
     initKind = CtorInitializerKind::Convenience;
@@ -6244,37 +6244,13 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     CD->setInvalid();
   }
 
-  addToScope(CD->getImplicitSelfDecl());
-  addParametersToScope(Params.get());
-
-  // '{'
-  if (Tok.is(tok::l_brace)) {
-    // Record the curly braces but nothing inside.
-    SF.recordInterfaceToken("{");
-    SF.recordInterfaceToken("}");
-    llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
-
-    if (Flags.contains(PD_InProtocol)) {
+  if (Flags.contains(PD_InProtocol)) {
+    if (Tok.is(tok::l_brace)) {
       diagnose(Tok, diag::protocol_init_with_body);
-      skipUntilDeclRBrace();
-    } else {
-      // Parse the body.
-      ParseFunctionBody CC(*this, CD);
-      setLocalDiscriminatorToParamList(CD->getParameters());
-
-      if (!isDelayedParsingEnabled()) {
-        if (Context.Stats)
-          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
-
-        ParserResult<BraceStmt> Body =
-          parseBraceItemList(diag::invalid_diagnostic);
-
-        if (!Body.isNull())
-          CD->setBody(Body.get());
-      } else {
-        consumeAbstractFunctionBody(CD, Attributes);
-      }
+      skipSingle();
     }
+  } else {
+    parseAbstractFunctionBody(CD);
   }
 
   CD->getAttrs() = Attributes;
@@ -6327,30 +6303,8 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  Scope S(this, ScopeKind::DestructorBody);
   auto *DD = new (Context) DestructorDecl(DestructorLoc, CurDeclContext);
-
-  // Parse the body.
-  if (Tok.is(tok::l_brace)) {
-    // Record the curly braces but nothing inside.
-    SF.recordInterfaceToken("{");
-    SF.recordInterfaceToken("}");
-    llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
-
-    ParseFunctionBody CC(*this, DD);
-    if (!isDelayedParsingEnabled()) {
-      if (Context.Stats)
-          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
-
-      ParserResult<BraceStmt> Body =
-        parseBraceItemList(diag::invalid_diagnostic);
-
-      if (!Body.isNull())
-        DD->setBody(Body.get());
-    } else {
-      consumeAbstractFunctionBody(DD, Attributes);
-    }
-  }
+  parseAbstractFunctionBody(DD);
 
   DD->getAttrs() = Attributes;
 
