@@ -1,3 +1,4 @@
+// XFAIL: linux
 // An end-to-end test to ensure local variables have debug info.  This
 // test only verifies that the variables show up in the debug info at
 // all. There are other tests testing liveness and representation.
