@@ -2950,17 +2950,18 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   }
 
   auto &resultTL = SGF.getTypeLowering(E->getType());
+
   if (resultTL.isLoadable()) {
     auto resultTy = resultTL.getLoweredType();
     auto res = SGF.B.createBuiltin(E, SGF.getASTContext().getIdentifier(name),
                                    resultTy, {}, args);
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(res, resultTL));
   } else {
-    auto resultTy = SGF.getLoweredType(SGF.getASTContext().TheEmptyTupleType);
-    auto address = SGF.getBufferForExprResult(E, resultTy, C);
+    auto address = SGF.getBufferForExprResult(E, resultTL.getLoweredType(), C);
     args.push_back(address);
     name += ",$out";
-    SGF.B.createBuiltin(E, SGF.getASTContext().getIdentifier(name), resultTy,
+    auto voidTy = SGF.getLoweredType(SGF.getASTContext().TheEmptyTupleType);
+    SGF.B.createBuiltin(E, SGF.getASTContext().getIdentifier(name), voidTy,
                         {}, args);
     return RValue(SGF, E, SGF.manageBufferForExprResult(address, resultTL, C));
   }
