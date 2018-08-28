@@ -72,8 +72,12 @@ extension _HashTable {
 
 extension _HashTable {
   internal struct MapEntry {
-    internal static var payloadMask: UInt8 { return 0x7F }
-    internal static var unoccupied: MapEntry { return MapEntry(_value: 0) }
+    internal static var payloadMask: UInt8 {
+      @inline(__always) get { return 0x7F }
+    }
+    internal static var unoccupied: MapEntry {
+      @inline(__always) get { return MapEntry(_value: 0) }
+    }
 
     internal var value: UInt8
 
