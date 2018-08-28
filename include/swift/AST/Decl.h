@@ -4870,9 +4870,6 @@ public:
   const ParameterList *getIndices() const { return Indices; }
   void setIndices(ParameterList *p);
 
-  /// Retrieve the interface type of the indices.
-  Type getIndicesInterfaceType() const;
-
   /// \brief Retrieve the type of the element referenced by a subscript
   /// operation.
   Type getElementInterfaceType() const;
