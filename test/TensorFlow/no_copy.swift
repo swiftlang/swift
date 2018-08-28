@@ -39,7 +39,7 @@ public func testEmptyScalarsArray() {
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyScalarsArray
  CHECK: sil private @{{.*}}testEmptyScalarsArray{{.*}} : $@callee_owned () -> () {
  CHECK: bb0:
- CHECK: graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: ], value$shape: [$Int32: (i32 0), (i32 20), (i32 30)],
+ CHECK: graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: ], shape: [$Int32: (i32 0), (i32 20), (i32 30)],
  CHECK: graph_op "Add,i,i"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
  */
 
@@ -56,15 +56,15 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
 // CHECK-NEXT:  return [[A]] : $TensorHandle<Float>
 // CHECK-NEXT:}
 
-// Testcase for an op that uses the $tensor and $shape modifiers.
+// Testcase for an op that uses the $tensor modifier.
 public func testConstantArray() -> TensorHandle<Float> {
-  return #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: [2])
+  return #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], shape: [2])
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConstantArray
 // CHECK: sil private @{{.*}}testConstantArray{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
-// CHECK:  %0 = graph_op "Const"() {dtype: $Float, value$tensor: [$Double: (f64 0x3FF0000000000000 /* 1 */), (f64 0x4000000000000000 /* 2 */)], value$shape: [$Int: (i64 2)], __device: "/device:CPU:0"} : $TensorHandle<Float>
+// CHECK:  %0 = graph_op "Const"() {dtype: $Float, value$tensor: [$Double: (f64 0x3FF0000000000000 /* 1 */), (f64 0x4000000000000000 /* 2 */)], shape: [$Int: (i64 2)], __device: "/device:CPU:0"} : $TensorHandle<Float>
 // CHECK-NEXT:  return %0 : $TensorHandle<Float>
 
 // Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.

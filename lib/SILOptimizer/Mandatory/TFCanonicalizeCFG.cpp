@@ -271,7 +271,7 @@ static SILValue createTFIntegerConst(GraphFunctionDeviceInfo &deviceInfo,
   // Literals take attributes specifying the dtype, value, and device.
   std::string opName("Const");
   SmallVector<GraphOperationAttribute, 3>  attributes;
-  attributes.push_back({context.getIdentifier("dtype$dtype"),
+  attributes.push_back({context.getIdentifier("dtype"),
                         SymbolicValue::getMetatype(intType.getASTType())});
   attributes.push_back({context.getIdentifier("value$tensor"),
                         SymbolicValue::getInteger(APInt(bitwidth, value),

@@ -252,7 +252,7 @@ public func test_while1(maxCount: Int, arg1: Tensor<Float>, arg2: Tensor<Float>)
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_while1{{.*}}
 // CHECK: sil private @{{.*}}test_while1{{.*}}
 // CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>, %2 : @unowned $TensorHandle<Builtin.Int1>, %3 : @unowned $TensorHandle<Builtin.Int64>):
-// CHECK-NEXT: graph_op "Const"() {dtype$dtype: $Builtin.Int64, value$tensor: i64 0
+// CHECK-NEXT: graph_op "Const"() {dtype: $Builtin.Int64, value$tensor: i64 0
 // CHECK:      graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
 // CHECK-NEXT: graph_op "tf_tensor_to_i1"(
 // CHECK-NEXT: cond_br {{.*}}, bb2, bb1
@@ -418,7 +418,7 @@ public func testStringHandle() {
     "Const", dtype:
     String.self,
     value$tensor: ["foo", "bar"],
-    value$shape: TensorShape(2)
+    shape: TensorShape(2)
   )
 }
 
@@ -427,7 +427,7 @@ public func testStringHandle() {
 // CHECK: [[POS:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
 // CHECK: [[LEN:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
 // CHECK: graph_op "Substr,i,i,i"([[STR]] : $TensorHandle<String>, [[POS]] : $TensorHandle<Int32>, [[LEN]] : $TensorHandle<Int32>) {__device: "/device:CPU:0"} : $TensorHandle<String>
-// CHECK: graph_op "Const"() {dtype: $String, value$tensor: [$String: "foo", "bar"], value$shape: [$Int32: (i32 2)], __device: "/device:CPU:0"} : $TensorHandle<String>
+// CHECK: graph_op "Const"() {dtype: $String, value$tensor: [$String: "foo", "bar"], shape: [$Int32: (i32 2)], __device: "/device:CPU:0"} : $TensorHandle<String>
 
 
 // b/76117368

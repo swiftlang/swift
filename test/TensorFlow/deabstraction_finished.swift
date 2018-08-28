@@ -96,7 +96,7 @@ CHECK-LABEL: --- INPUT FUNCTION {{.*}}stringAttributes
 public func tensorShape() -> Tensor<Float> {
   let shape : TensorShape = [1, 2]
 
-  return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [17.0 as Float, 18.0], value$shape: shape))
+  return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [17.0 as Float, 18.0], shape: shape))
 }
 
 // b/75407624
@@ -110,14 +110,14 @@ public func test75407624() {
   _ = a+b+c+d
 }
 /* CHECK-LABEL: ---- INPUT FUNCTION {{.*}}test75407624
- * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */)], value$shape: [$Int32: i32 1]
- * CHECK: [[B1X:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: (i32 1)], value$shape: [$Int32: i32 1],
+ * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */)], shape: [$Int32: i32 1]
+ * CHECK: [[B1X:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: (i32 1)], shape: [$Int32: i32 1],
  * CHECK: [[BX2:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */
  * CHECK:  graph_op "Fill,i,i"([[B1X]] : $TensorHandle<Int32>, [[BX2]] : $TensorHandle<Float>)
- * CHECK: [[C1X:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: (i32 1)], value$shape: [$Int32: i32 1],
+ * CHECK: [[C1X:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: (i32 1)], shape: [$Int32: i32 1],
  * CHECK: [[CX2:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */
  * CHECK:  graph_op "Fill,i,i"([[C1X]] : $TensorHandle<Int32>, [[CX2]] : $TensorHandle<Float>)
- * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */), (f32 0x40400000 /* 3 */), (f32 0x40800000 /* 4 */)], value$shape: [$Int32: (i32 2), (i32 2)],
+ * CHECK: graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */), (f32 0x40400000 /* 3 */), (f32 0x40800000 /* 4 */)], shape: [$Int32: (i32 2), (i32 2)],
  * CHECK-LABEL: ---- END OF
 */
 
