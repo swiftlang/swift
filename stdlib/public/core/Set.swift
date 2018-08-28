@@ -1573,7 +1573,6 @@ internal final class _SwiftNativeSetStorage<
       Element.self)
     storage.hashTable = _HashTable(
       scale: scale,
-      count: 0,
       map: UnsafeMutablePointer(mapAddr))
     storage.rawElements = UnsafeMutableRawPointer(elementsAddr)
     storage.seed = seed

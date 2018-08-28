@@ -93,8 +93,8 @@ swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
       // Setting the scale to 0 makes for a bucketCount of 1 -- so that the
       // storage consists of a single unoccupied bucket. The capacity is set to
       // 0 so that any insertion will lead to real storage being allocated.
-      0, // int capacity;
       0, // int count;
+      0, // int capacity;
       0, // int scale;
       &swift::_swiftEmptySetStorage.entries, // void *map
     },

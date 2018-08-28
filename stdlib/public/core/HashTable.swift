@@ -19,9 +19,9 @@ internal protocol _HashTableDelegate {
 @_fixed_layout
 internal struct _HashTable {
   @usableFromInline
-  internal let capacity: Int
-  @usableFromInline
   internal var count: Int
+  @usableFromInline
+  internal let capacity: Int
 
   // Bits 0..<6 hold the size scale.
   // Bits 6... are reserved for future use. (E.g., remembering reserveCapacity
@@ -31,14 +31,11 @@ internal struct _HashTable {
 
   internal let map: UnsafeMutablePointer<MapEntry>
 
-  internal init(scale: Int, count: Int, map: UnsafeMutablePointer<MapEntry>) {
+  internal init(scale: Int, map: UnsafeMutablePointer<MapEntry>) {
     _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
-    _sanityCheck(count >= 0 && count < (1 << scale) - 1)
-    let capacity = _HashTable.capacity(forScale: scale)
-    _sanityCheck(count <= capacity)
-    self.capacity = capacity
-    self.count = count
     self.limits = scale
+    self.count = 0
+    self.capacity = _HashTable.capacity(forScale: scale)
     self.map = map
 
     map.assign(repeating: .unoccupied, count: bucketCount)
