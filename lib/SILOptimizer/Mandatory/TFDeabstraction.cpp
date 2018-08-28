@@ -2256,7 +2256,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       auto elements = constValue.getArrayValue(eltType);
 
       if ((size_t)numEltsFromShapeAttr != elements.size())
-        return diagnoseInvalidAttr("has a mismatch with the shape attribute in "
+        return diagnoseInvalidAttr("does not match the shape attribute in "
                                    "the number of scalar elements");
 
       // Empty tensor value is ok.
