@@ -4913,13 +4913,6 @@ void SubscriptDecl::setIndices(ParameterList *p) {
     Indices->setDeclContextOfParamDecls(this);
 }
 
-Type SubscriptDecl::getIndicesInterfaceType() const {
-  auto indicesTy = getInterfaceType();
-  if (indicesTy->is<ErrorType>())
-    return indicesTy;
-  return indicesTy->castTo<AnyFunctionType>()->getInput();
-}
-
 Type SubscriptDecl::getElementInterfaceType() const {
   auto elementTy = getInterfaceType();
   if (elementTy->is<ErrorType>())

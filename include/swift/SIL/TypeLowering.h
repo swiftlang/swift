@@ -802,7 +802,6 @@ public:
                                            bool isNonObjC = false);
   AbstractionPattern getAbstractionPattern(SubscriptDecl *subscript,
                                            bool isNonObjC = false);
-  AbstractionPattern getIndicesAbstractionPattern(SubscriptDecl *subscript);
   AbstractionPattern getAbstractionPattern(EnumElementDecl *element);
 
   SILType getLoweredTypeOfGlobal(VarDecl *var);
