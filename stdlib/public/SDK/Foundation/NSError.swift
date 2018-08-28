@@ -162,16 +162,34 @@ public extension CustomNSError {
   }
 }
 
+/// Convert an arbitrary binary integer to an Int, reinterpreting signed
+/// -> unsigned if needed but trapping if the result is otherwise not
+/// expressible.
+func unsafeBinaryIntegerToInt<T: BinaryInteger>(_ value: T) -> Int {
+    if T.isSigned {
+        return numericCast(value)
+    }
+
+    let uintValue: UInt = numericCast(value)
+    return Int(bitPattern: uintValue)
+}
+
+/// Convert from an Int to an arbitrary binary integer, reinterpreting signed ->
+/// unsigned if needed but trapping if the result is otherwise not expressible.
+func unsafeBinaryIntegerFromInt<T: BinaryInteger>(_ value: Int) -> T {
+  if T.isSigned {
+    return numericCast(value)
+  }
+
+  let uintValue = UInt(bitPattern: value)
+  return numericCast(uintValue)
+}
+
 extension CustomNSError
     where Self: RawRepresentable, Self.RawValue: FixedWidthInteger {
   // The error code of Error with integral raw values is the raw value.
   public var errorCode: Int {
-    if Self.RawValue.isSigned {
-      return numericCast(self.rawValue)
-    }
-
-    let uintValue: UInt = numericCast(self.rawValue)
-    return Int(bitPattern: uintValue)
+    return unsafeBinaryIntegerToInt(self.rawValue)
   }
 }
 
@@ -423,14 +441,14 @@ internal func _stringDictToAnyHashableDict(_ input: [String : Any])
 /// Various helper implementations for _BridgedStoredNSError
 extension _BridgedStoredNSError {
   public var code: Code {
-    return Code(rawValue: numericCast(_nsError.code))!
+    return Code(rawValue: unsafeBinaryIntegerFromInt(_nsError.code))!
   }
 
   /// Initialize an error within this domain with the given ``code``
   /// and ``userInfo``.
   public init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: Self.errorDomain,
-                                code: numericCast(code.rawValue),
+                                code: unsafeBinaryIntegerToInt(code.rawValue),
                                 userInfo: _stringDictToAnyHashableDict(userInfo)))
   }
 
