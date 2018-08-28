@@ -2268,8 +2268,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         auto *dtypeProto =
             context.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
         currentAttr.value = SymbolicValue::getArray(
-              metatypes, dtypeProto->getInterfaceType()->getCanonicalType(),
-              context.getAllocator());
+            metatypes, dtypeProto->getInterfaceType()->getCanonicalType(),
+            context.getAllocator());
         break;
       }
       return diagnoseInvalidAttr("requires an array or a metatype");
