@@ -1887,9 +1887,9 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   for (unsigned i = 0, e = inst->getNumOperands(); i != e;) {
     switch (inputInfos[infoIndex++]) {
     case GraphOperationInfo::IM_Scalar:
-      assert(0 && "tfc.scalarToTensor should be lowered by now");
+      llvm_unreachable("tfc.scalarToTensor should be lowered by now");
     case GraphOperationInfo::IM_InputListElt:
-      assert(0 && "we handle input list elements as part of the list");
+      llvm_unreachable("we handle input list elements as part of the list");
     case GraphOperationInfo::IM_Normal: {
       // Normal tensor inputs.
       auto operand = inst->getOperand(i++);
@@ -1954,6 +1954,8 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     switch (attrInfo.second) {
     case SILTensorOpInfo::OperandClass::Input:
       assert(0 && "Input classes cannot exist for attributes");
+    case SILTensorOpInfo::OperandClass::Out:
+      assert(0 && "Attributes cannot be output parameters");
 
     case SILTensorOpInfo::OperandClass::Normal: // No modifier.
       // We add attributes based on what the type of the value is.

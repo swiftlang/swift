@@ -18,6 +18,6 @@ public func shapeError() {
 
 public func resultPacking() {
   struct Foo { var x: Tensor<Float>, y: Float }
-  // expected-error @+1 {{the specified result type is not a TensorFlow value type or an aggregate of TensorFlow value types}}
+  // expected-error @+1 {{cannot extract TensorFlow result into type 'Foo', because 'Foo' is not a TensorFlow value type or an aggregate of TensorFlow value types}}
   let _: Foo = #tfop("SomeOp")
 }

@@ -126,7 +126,16 @@ struct SILTensorOpInfo {
     Normal, // No modifier.
     Tensor, // This array or scalar should be turned into a TF_Tensor.
     Shape,  // This array of integers is a shape specifier.
+
     Array,  // This marks a normal array value, the value is a metatype.
+
+    // An operand specifying the address where an indirect output should be
+    // stored.  This occurs when the tfop exists in a context where its output
+    // is address-only.  Deabstraction eliminates Out operands before forming
+    // graph_ops, by rewriting the tfop to return the value directly.  This
+    // rewriting is possible because tfop outputs must always be loadable in
+    // deabstraction scopes.
+    Out,
   };
 
   /// Return the string suffix for the specified attribute modifier.
@@ -141,6 +150,20 @@ struct SILTensorOpInfo {
   /// Return true if the specified operand is an input (not an attribute).
   bool isInput(unsigned operandNumber) const {
     return operandClasses[operandNumber].second == OperandClass::Input;
+  }
+
+  /// Returns the full name that this builtin would have if its operands
+  /// changed to the passed-in values.
+  std::string getBuiltinNameWithNewOperands(
+      const SmallVectorImpl<std::pair<StringRef, OperandClass>>
+        &newOperandClasses) const {
+    std::string name = "__tfop_" + opName.str();
+    for (const auto &newOperandClass : newOperandClasses) {
+      name += ",";
+      name += newOperandClass.first;
+      name += getOperandClassSuffix(newOperandClass.second);
+    }
+    return name;
   }
 
   /// Analyze the specified SIL instruction and return a SILTensorOpInfo

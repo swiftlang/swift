@@ -2948,11 +2948,21 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
               .getValue());
     }
   }
+
   auto &resultTL = SGF.getTypeLowering(E->getType());
-  auto resultTy = resultTL.getLoweredType();
-  auto res = SGF.B.createBuiltin(E, SGF.getASTContext().getIdentifier(name),
-                                 resultTy, {}, args);
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(res, resultTL));
+  if (resultTL.isLoadable()) {
+    auto res = SGF.B.createBuiltin(E, SGF.getASTContext().getIdentifier(name),
+                                   resultTL.getLoweredType(), {}, args);
+    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(res, resultTL));
+  } else {
+    auto address = SGF.getBufferForExprResult(E, resultTL.getLoweredType(), C);
+    args.push_back(address);
+    name += ",$out";
+    auto voidTy = SGF.getLoweredType(SGF.getASTContext().TheEmptyTupleType);
+    SGF.B.createBuiltin(E, SGF.getASTContext().getIdentifier(name), voidTy,
+                        {}, args);
+    return RValue(SGF, E, SGF.manageBufferForExprResult(address, resultTL, C));
+  }
 }
 
 RValue RValueEmitter::
