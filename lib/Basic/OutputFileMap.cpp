@@ -1,4 +1,4 @@
-//===--- OutputFileMap.cpp - Driver output file map -----------------------===//
+//===--- OutputFileMap.h - Map of inputs to multiple outputs --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/OutputFileMap.h"
+#include "swift/Basic/OutputFileMap.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Path.h"
