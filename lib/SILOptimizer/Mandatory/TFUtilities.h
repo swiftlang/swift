@@ -115,15 +115,18 @@ struct SILTensorOpInfo {
   /// input that is an array of tensors.  An integer attribute may be either
   /// a Tensor value or an integer-encoded DType, etc.
   enum class OperandClass {
-    /// This marks three sorts of things:
+    /// This marks the following sorts of things:
     /// 1) A normal tensor input: the value is a TensorHandle.
     /// 2) An normal attribute (without modifier).
     /// 3) A tensor or shape attribute (need a modifier for proper lowering).
+    /// 4) An array attribute (needed for parsing tfop, and dropped before graph
+    ///    lowering).
     Input,
 
     Normal, // No modifier.
     Tensor, // This array or scalar should be turned into a TF_Tensor.
     Shape,  // This array of integers is a shape specifier.
+    Array,  // This marks a normal array value, the value is a metatype.
   };
 
   /// Return the string suffix for the specified attribute modifier.

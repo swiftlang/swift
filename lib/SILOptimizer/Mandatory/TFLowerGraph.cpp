@@ -2161,6 +2161,8 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       TF_SetAttrShape(op, name.c_str(), shape.data(), rank);
       break;
     }
+    case SILTensorOpInfo::OperandClass::Array: // Handled as 'normal'
+      llvm_unreachable("This is a legacy class that shouldn't happen");
     }
   }
 

@@ -44,3 +44,14 @@ public func badTensorShape() -> Tensor<Float> {
   // expected-error @+1 {{attribute 'value' does not match the shape attribute in the number of scalar elements}}
   return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [17.0 as Float, 18.0], shape$shape: badShape))
 }
+
+public func testExtractDTypeList () {
+  struct Foo {
+    let a: Int
+    let b: Tensor<Float>
+  }
+  // expected-error @+1 {{not an aggregate of TensorFlow values}}
+  let _: VariantHandle = #tfop("TensorSliceDataset", [] as [TensorHandle<Float>],
+                               Toutput_types$array: Foo.self,
+                               output_shapes: [TensorShape()])
+}
