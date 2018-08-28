@@ -756,8 +756,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   bool isStdlibOptionalMPlusOperator1 = false;
   bool isStdlibOptionalMPlusOperator2 = false;
 
-  bool isSwift4ConcreteOverProtocolVar1 = false;
-  bool isSwift4ConcreteOverProtocolVar2 = false;
+  bool isVarAndNotProtocol1 = false;
+  bool isVarAndNotProtocol2 = false;
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
     if (auto *anchor = locator->getAnchor()) {
@@ -986,8 +986,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       auto *nominal1 = dc1->getSelfNominalTypeDecl();
       auto *nominal2 = dc2->getSelfNominalTypeDecl();
       if (nominal1 && nominal2 && nominal1 != nominal2) {
-        isSwift4ConcreteOverProtocolVar1 = isa<ProtocolDecl>(nominal2);
-        isSwift4ConcreteOverProtocolVar2 = isa<ProtocolDecl>(nominal1);
+        isVarAndNotProtocol1 = !isa<ProtocolDecl>(nominal1);
+        isVarAndNotProtocol2 = !isa<ProtocolDecl>(nominal2);
       }
     }
 
@@ -1151,8 +1151,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // preferring var members in concrete types over a protocol requirement
   // (see the comment above for the rationale of this hack).
   if (!tc.Context.isSwiftVersionAtLeast(5) && score1 == score2) {
-    score1 += isSwift4ConcreteOverProtocolVar1;
-    score2 += isSwift4ConcreteOverProtocolVar2;
+    score1 += isVarAndNotProtocol1;
+    score2 += isVarAndNotProtocol2;
   }
 
   // FIXME: There are type variables and overloads not common to both solutions
