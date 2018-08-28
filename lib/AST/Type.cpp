@@ -1069,27 +1069,16 @@ void ProtocolType::canonicalizeProtocols(
   llvm::array_pod_sort(protocols.begin(), protocols.end(), TypeDecl::compare);
 }
 
-static Type
-getCanonicalInputType(AnyFunctionType *funcType,
-                      llvm::function_ref<CanType(Type)> getCanonicalType) {
-  auto origInputType = funcType->getInput();
-  bool isParen = origInputType->hasParenSugar();
-  Type inputType = getCanonicalType(origInputType);
-
-  if (!isParen && AnyFunctionType::isCanonicalFunctionInputType(inputType))
-    return inputType;
-
-  auto flags = ParameterTypeFlags().withInOut(inputType->is<InOutType>());
-  if (auto *parenTy = dyn_cast<ParenType>(origInputType.getPointer())) {
-    flags = parenTy->getParameterFlags().withInOut(flags.isInOut());
-    assert(!flags.isVariadic() && "variadic ParenType");
+static void
+getCanonicalParams(AnyFunctionType *funcType,
+                   CanGenericSignature genericSig,
+                   SmallVectorImpl<AnyFunctionType::Param> &canParams) {
+  auto origParams = funcType->getParams();
+  for (auto param : origParams) {
+    canParams.emplace_back(param.getPlainType()->getCanonicalType(genericSig),
+                           param.getLabel(),
+                           param.getParameterFlags());
   }
-
-  inputType = ParenType::get(inputType->getASTContext(),
-                             inputType->getInOutObjectType(), flags);
-  assert(AnyFunctionType::isCanonicalFunctionInputType(inputType));
-
-  return inputType;
 }
 
 CanType TypeBase::computeCanonicalType() {
@@ -1190,38 +1179,38 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::InOut:
     Result = InOutType::get(getInOutObjectType()->getCanonicalType());
     break;
+  case TypeKind::Function:
   case TypeKind::GenericFunction: {
-    GenericFunctionType *function = cast<GenericFunctionType>(this);
+    AnyFunctionType *funcTy = cast<AnyFunctionType>(this);
 
-    // Canonicalize the signature.
-    GenericSignature *sig = function->getGenericSignature()
-      ->getCanonicalSignature();
-    
-    // Transform the input and result types.
-    auto inputTy = getCanonicalInputType(function, [&](Type type) -> CanType {
-      return type->getCanonicalType(sig);
-    });
-    auto resultTy = function->getResult()->getCanonicalType(sig);
-    Result = GenericFunctionType::getOld(sig, inputTy, resultTy,
-                                         function->getExtInfo());
+    CanGenericSignature genericSig;
+    if (auto *genericFnTy = dyn_cast<GenericFunctionType>(this))
+      genericSig = genericFnTy->getGenericSignature()->getCanonicalSignature();
+
+    // Transform the parameter and result types.
+    SmallVector<AnyFunctionType::Param, 8> canParams;
+    getCanonicalParams(funcTy, genericSig, canParams);
+    auto resultTy = funcTy->getResult()->getCanonicalType(genericSig);
+
+    if (genericSig) {
+      Result = GenericFunctionType::get(genericSig, canParams, resultTy,
+                                        funcTy->getExtInfo(),
+                                        /*canonicalVararg=*/true);
+    } else {
+      Result = FunctionType::get(canParams, resultTy,
+                                 funcTy->getExtInfo(),
+                                 /*canonicalVararg=*/true);
+    }
     assert(Result->isCanonical());
     break;
   }
-      
+
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
   case TypeKind::SILFunction:
   case TypeKind::SILToken:
     llvm_unreachable("SIL-only types are always canonical!");
 
-  case TypeKind::Function: {
-    FunctionType *FT = cast<FunctionType>(this);
-    auto In = getCanonicalInputType(
-        FT, [](Type type) -> CanType { return type->getCanonicalType(); });
-    Type Out = FT->getResult()->getCanonicalType();
-    Result = FunctionType::getOld(In, Out, FT->getExtInfo());
-    break;
-  }
   case TypeKind::ProtocolComposition: {
     auto *PCT = cast<ProtocolCompositionType>(this);
     SmallVector<Type, 4> CanProtos;
