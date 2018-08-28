@@ -5,6 +5,7 @@
 import TensorFlow
 import TensorFlowUnittest
 import StdlibUnittest
+import Python
 
 var DatasetPythonInitializersTest = TestSuite("DatasetAPI")
 
