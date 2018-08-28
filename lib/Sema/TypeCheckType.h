@@ -16,6 +16,9 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_TYPE_H
 #define SWIFT_SEMA_TYPE_CHECK_TYPE_H
 
+#include "swift/AST/TypeResolutionStage.h"
+#include "llvm/ADT/None.h"
+
 namespace swift {
 
 /// Flags that describe the context of type checking a pattern or
@@ -290,6 +293,10 @@ public:
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
+  static TypeResolution forInterface(DeclContext *dc);
+
+  /// Form a type resolution for an interface type, which is a complete
+  /// description of the type using generic parameters.
   static TypeResolution forInterface(DeclContext *dc,
                                      GenericSignature *genericSig);
 
@@ -310,6 +317,9 @@ public:
   /// Retrieve the declaration context in which type resolution will be
   /// performed.
   DeclContext *getDeclContext() const { return dc; }
+
+  /// Retrieve the type resolution stage.
+  TypeResolutionStage getStage() const { return stage; }
 
   /// Retrieves the generic signature for the context, or NULL if there is
   /// no generic signature to resolve types.

@@ -41,10 +41,10 @@ class DerivedClassWithNonTrivialProperties : RootClassWithoutProperties {
 // CHECK-LABEL: sil_vtable RootClassWithTrivialProperties {
 // CHECK-NEXT:    #RootClassWithTrivialProperties.x!getter.1
 // CHECK-NEXT:    #RootClassWithTrivialProperties.x!setter.1
-// CHECK-NEXT:    #RootClassWithTrivialProperties.x!materializeForSet.1
+// CHECK-NEXT:    #RootClassWithTrivialProperties.x!modify.1
 // CHECK-NEXT:    #RootClassWithTrivialProperties.y!getter.1
 // CHECK-NEXT:    #RootClassWithTrivialProperties.y!setter.1
-// CHECK-NEXT:    #RootClassWithTrivialProperties.y!materializeForSet.1
+// CHECK-NEXT:    #RootClassWithTrivialProperties.y!modify.1
 // CHECK-NEXT:    #RootClassWithTrivialProperties.init!initializer.1
 // CHECK-NEXT:    #RootClassWithTrivialProperties.deinit!deallocator
 // CHECK-NEXT:  }
@@ -52,7 +52,7 @@ class DerivedClassWithNonTrivialProperties : RootClassWithoutProperties {
 // CHECK-LABEL: sil_vtable RootClassWithNonTrivialProperties {
 // CHECK-NEXT:    #RootClassWithNonTrivialProperties.x!getter.1
 // CHECK-NEXT:    #RootClassWithNonTrivialProperties.x!setter.1
-// CHECK-NEXT:    #RootClassWithNonTrivialProperties.x!materializeForSet.1
+// CHECK-NEXT:    #RootClassWithNonTrivialProperties.x!modify.1
 // CHECK-NEXT:    #RootClassWithNonTrivialProperties.init!initializer.1
 // CHECK-NEXT:    #RootClassWithNonTrivialProperties.deinit!deallocator
 // CHECK-NEXT:  }
@@ -61,7 +61,7 @@ class DerivedClassWithNonTrivialProperties : RootClassWithoutProperties {
 // CHECK-NEXT:    #RootClassWithoutProperties.init!initializer.1
 // CHECK-NEXT:    #DerivedClassWithTrivialProperties.z!getter.1
 // CHECK-NEXT:    #DerivedClassWithTrivialProperties.z!setter.1
-// CHECK-NEXT:    #DerivedClassWithTrivialProperties.z!materializeForSet.1
+// CHECK-NEXT:    #DerivedClassWithTrivialProperties.z!modify.1
 // CHECK-NEXT:    #DerivedClassWithTrivialProperties.deinit!deallocator
 // CHECK-NEXT:  }
 
@@ -69,7 +69,7 @@ class DerivedClassWithNonTrivialProperties : RootClassWithoutProperties {
 // CHECK-NEXT:    #RootClassWithoutProperties.init!initializer.1
 // CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.z!getter.1
 // CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.z!setter.1
-// CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.z!materializeForSet.1
+// CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.z!modify.1
 // CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.deinit!deallocator
 // CHECK-NEXT:    #DerivedClassWithNonTrivialProperties!ivardestroyer.1
 // CHECK-NEXT:  }

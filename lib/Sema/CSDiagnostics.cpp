@@ -15,11 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
-#include "ConstraintSystem.h"
 #include "CSDiag.h"
+#include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -28,6 +30,14 @@ using namespace swift;
 using namespace constraints;
 
 FailureDiagnostic::~FailureDiagnostic() {}
+
+bool FailureDiagnostic::diagnose(bool asNote) {
+  return asNote ? diagnoseAsNote() : diagnoseAsError();
+}
+
+bool FailureDiagnostic::diagnoseAsNote() {
+  return false;
+}
 
 std::pair<Expr *, bool> FailureDiagnostic::computeAnchor() const {
   auto &cs = getConstraintSystem();
@@ -55,8 +65,7 @@ std::pair<Expr *, bool> FailureDiagnostic::computeAnchor() const {
 }
 
 Type FailureDiagnostic::getType(Expr *expr) const {
-  auto &cs = getConstraintSystem();
-  return solution.simplifyType(cs.getType(expr));
+  return resolveType(CS.getType(expr));
 }
 
 template <typename... ArgTypes>
@@ -86,7 +95,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     locator = cs.getConstraintLocator(
         ctor.withPathElement(PathEltKind::ApplyFunction)
             .withPathElement(PathEltKind::ConstructorMember));
-  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+  } else if (isa<UnresolvedDotExpr>(anchor)) {
     ConstraintLocatorBuilder member(locator);
     locator =
         cs.getConstraintLocator(member.withPathElement(PathEltKind::Member));
@@ -117,7 +126,7 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
   return AffectedDecl->getAsGenericContext();
 }
 
-bool RequirementFailure::diagnose() {
+bool RequirementFailure::diagnoseAsError() {
   if (!canDiagnoseFailure())
     return false;
 
@@ -141,6 +150,15 @@ bool RequirementFailure::diagnose() {
   return true;
 }
 
+bool RequirementFailure::diagnoseAsNote() {
+  const auto &req = getRequirement();
+  const auto *reqDC = getRequirementDC();
+
+  emitDiagnostic(reqDC->getAsDecl(), getDiagnosticAsNote(), getLHS(), getRHS(),
+                 req.getFirstType(), req.getSecondType(), "");
+  return true;
+}
+
 void RequirementFailure::emitRequirementNote(const Decl *anchor) const {
   auto &req = getRequirement();
 
@@ -160,7 +178,7 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor) const {
                  req.getFirstType(), getLHS(), req.getSecondType(), getRHS());
 }
 
-bool MissingConformanceFailure::diagnose() {
+bool MissingConformanceFailure::diagnoseAsError() {
   if (!canDiagnoseFailure())
     return false;
 
@@ -221,10 +239,10 @@ bool MissingConformanceFailure::diagnose() {
 
   // If none of the special cases could be diagnosed,
   // let's fallback to the most general diagnostic.
-  return RequirementFailure::diagnose();
+  return RequirementFailure::diagnoseAsError();
 }
 
-bool LabelingFailure::diagnose() {
+bool LabelingFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *call = cast<CallExpr>(getAnchor());
   return diagnoseArgumentLabelError(cs.getASTContext(), call->getArg(),
@@ -232,7 +250,7 @@ bool LabelingFailure::diagnose() {
                                     isa<SubscriptExpr>(call->getFn()));
 }
 
-bool NoEscapeFuncToTypeConversionFailure::diagnose() {
+bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
 
   if (ConvertTo) {
@@ -255,13 +273,16 @@ bool NoEscapeFuncToTypeConversionFailure::diagnose() {
   return true;
 }
 
-bool MissingForcedDowncastFailure::diagnose() {
+bool MissingForcedDowncastFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;
 
   auto &TC = getTypeChecker();
 
-  auto *coerceExpr = dyn_cast<CoerceExpr>(getAnchor());
+  auto *expr = getAnchor();
+  if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
+    expr = assignExpr->getSrc();
+  auto *coerceExpr = dyn_cast<CoerceExpr>(expr);
   if (!coerceExpr)
     return false;
 
@@ -296,7 +317,7 @@ bool MissingForcedDowncastFailure::diagnose() {
   }
 }
 
-bool MissingAddressOfFailure::diagnose() {
+bool MissingAddressOfFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;
 
@@ -307,7 +328,7 @@ bool MissingAddressOfFailure::diagnose() {
   return true;
 }
 
-bool MissingExplicitConversionFailure::diagnose() {
+bool MissingExplicitConversionFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;
 
@@ -315,6 +336,8 @@ bool MissingExplicitConversionFailure::diagnose() {
   auto &TC = getTypeChecker();
 
   auto *anchor = getAnchor();
+  if (auto *assign = dyn_cast<AssignExpr>(anchor))
+    anchor = assign->getSrc();
   if (auto *paren = dyn_cast<ParenExpr>(anchor))
     anchor = paren->getSubExpr();
 
@@ -364,7 +387,7 @@ bool MissingExplicitConversionFailure::diagnose() {
   return true;
 }
 
-bool MemberAccessOnOptionalBaseFailure::diagnose() {
+bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;
 
@@ -517,11 +540,15 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
   return true;
 }
 
-bool MissingOptionalUnwrapFailure::diagnose() {
+bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;
 
   auto *anchor = getAnchor();
+
+  if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
+    anchor = assignExpr->getSrc();
+  
   auto *unwrapped = anchor->getValueProvidingExpr();
   auto type = getType(anchor)->getRValueType();
 
@@ -534,11 +561,15 @@ bool MissingOptionalUnwrapFailure::diagnose() {
   return true;
 }
 
-bool RValueTreatedAsLValueFailure::diagnose() {
+bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   Diag<StringRef> subElementDiagID;
-  Diag<Type> rvalueDiagID;
+  Diag<Type> rvalueDiagID = diag::assignment_lhs_not_lvalue;
   Expr *diagExpr = getLocator()->getAnchor();
-  SourceLoc loc;
+  SourceLoc loc = diagExpr->getLoc();
+
+  if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
+    diagExpr = assignExpr->getDest();
+  }
 
   if (auto callExpr = dyn_cast<ApplyExpr>(diagExpr)) {
     Expr *argExpr = callExpr->getArg();
@@ -553,7 +584,7 @@ bool RValueTreatedAsLValueFailure::diagnose() {
       rvalueDiagID = diag::cannot_apply_lvalue_binop_to_rvalue;
       auto argTuple = dyn_cast<TupleExpr>(argExpr);
       diagExpr = argTuple->getElement(0);
-    } else {
+    } else if (getLocator()->getPath().size() > 0) {
       auto lastPathElement = getLocator()->getPath().back();
       assert(lastPathElement.getKind() ==
              ConstraintLocator::PathElementKind::ApplyArgToParam);
@@ -564,10 +595,11 @@ bool RValueTreatedAsLValueFailure::diagnose() {
         diagExpr = argTuple->getElement(lastPathElement.getValue());
       else if (auto parens = dyn_cast<ParenExpr>(argExpr))
         diagExpr = parens->getSubExpr();
+    } else {
+      subElementDiagID = diag::assignment_lhs_is_apply_expression;
     }
   } else if (auto inoutExpr = dyn_cast<InOutExpr>(diagExpr)) {
-    Type type = getConstraintSystem().getType(inoutExpr);
-    if (auto restriction = restrictionForType(type)) {
+    if (auto restriction = getRestrictionForType(getType(inoutExpr))) {
       PointerTypeKind pointerKind;
       if (restriction->second == ConversionRestrictionKind::ArrayToPointer &&
           restriction->first->getAnyPointerElementType(pointerKind) &&
@@ -585,13 +617,98 @@ bool RValueTreatedAsLValueFailure::diagnose() {
 
     subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
     rvalueDiagID = diag::cannot_pass_rvalue_inout;
-    loc = diagExpr->getLoc();
     diagExpr = inoutExpr->getSubExpr();
+  } else if (isa<DeclRefExpr>(diagExpr)) {
+    subElementDiagID = diag::assignment_lhs_is_immutable_variable;
+  } else if (isa<ForceValueExpr>(diagExpr)) {
+    subElementDiagID = diag::assignment_bang_has_immutable_subcomponent;
+  } else if (isa<MemberRefExpr>(diagExpr)) {
+    subElementDiagID = diag::assignment_lhs_is_immutable_property;
+  } else if (auto member = dyn_cast<UnresolvedDotExpr>(diagExpr)) {
+    subElementDiagID = diag::assignment_lhs_is_immutable_property;
+
+    if (auto *ctor = dyn_cast<ConstructorDecl>(getDC())) {
+      if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
+        if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
+            ctor->getDelegatingOrChainedInitKind(nullptr) ==
+            ConstructorDecl::BodyInitKind::Delegating) {
+          emitDiagnostic(loc, diag::assignment_let_property_delegating_init,
+                      member->getName());
+          if (auto *ref = getResolvedMemberRef(member)) {
+            emitDiagnostic(ref, diag::decl_declared_here, member->getName());
+          }
+          return true;
+        }
+      }
+    }
+  } else if (auto sub = dyn_cast<SubscriptExpr>(diagExpr)) {
+      subElementDiagID = diag::assignment_subscript_has_immutable_base;
+
+      // If the destination is a subscript with a 'dynamicLookup:' label and if
+      // the tuple is implicit, then this was actually a @dynamicMemberLookup
+      // access. Emit a more specific diagnostic.
+      if (sub->getIndex()->isImplicit() &&
+          sub->getArgumentLabels().size() == 1 &&
+          sub->getArgumentLabels().front() == getTypeChecker().Context.Id_dynamicMember)
+        subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
   } else {
-    return false;
+    subElementDiagID = diag::assignment_lhs_is_immutable_variable;
   }
 
   diagnoseSubElementFailure(diagExpr, loc, getConstraintSystem(),
                             subElementDiagID, rvalueDiagID);
+  return true;
+}
+
+bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
+  const auto *expr = getParentExpr();
+  auto *callExpr = dyn_cast<CallExpr>(expr);
+  if (!callExpr)
+    return false;
+  if (!callExpr->hasTrailingClosure())
+    return false;
+  if (callExpr->getFn() != getAnchor())
+    return false;
+
+  llvm::SmallMapVector<Identifier, const ValueDecl *, 8> choicesByLabel;
+  for (const auto &choice : Choices) {
+    auto *callee = dyn_cast<AbstractFunctionDecl>(choice.getDecl());
+    if (!callee)
+      return false;
+
+    const ParameterList *paramList = callee->getParameters();
+    const ParamDecl *param = paramList->getArray().back();
+
+    // Sanity-check that the trailing closure corresponds to this parameter.
+    if (!param->hasValidSignature() ||
+        !param->getInterfaceType()->is<AnyFunctionType>())
+      return false;
+
+    Identifier trailingClosureLabel = param->getArgumentName();
+    auto &choiceForLabel = choicesByLabel[trailingClosureLabel];
+
+    // FIXME: Cargo-culted from diagnoseAmbiguity: apparently the same decl can
+    // appear more than once?
+    if (choiceForLabel == callee)
+      continue;
+
+    // If just providing the trailing closure label won't solve the ambiguity,
+    // don't bother offering the fix-it.
+    if (choiceForLabel != nullptr)
+      return false;
+
+    choiceForLabel = callee;
+  }
+
+  // If we got here, then all of the choices have unique labels. Offer them in
+  // order.
+  for (const auto &choicePair : choicesByLabel) {
+    auto diag = emitDiagnostic(
+        expr->getLoc(), diag::ambiguous_because_of_trailing_closure,
+        choicePair.first.empty(), choicePair.second->getFullName());
+    swift::fixItEncloseTrailingClosure(getTypeChecker(), diag, callExpr,
+                                       choicePair.first);
+  }
+
   return true;
 }

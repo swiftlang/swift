@@ -26,6 +26,7 @@
 #include "SourceKit/Support/UIdent.h"
 #include "SourceKit/SwiftLang/Factory.h"
 
+#include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -2442,11 +2443,12 @@ void serializeSyntaxTreeAsByteTree(
     ResponseBuilder::Dictionary &Dict) {
   auto StartClock = clock();
   // Serialize the syntax tree as a ByteTree
-  llvm::AppendingBinaryByteStream Stream(llvm::support::endianness::little);
-  llvm::BinaryStreamWriter Writer(Stream);
+  swift::ExponentialGrowthAppendingBinaryByteStream Stream(
+      llvm::support::endianness::little);
+  Stream.reserve(32 * 1024);
   std::map<void *, void *> UserInfo;
   UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
-  swift::byteTree::ByteTreeWriter::write(/*ProtocolVersion=*/1, Writer,
+  swift::byteTree::ByteTreeWriter::write(Stream, /*ProtocolVersion=*/1,
                                          *SyntaxTree.getRaw(), UserInfo);
 
   std::unique_ptr<llvm::WritableMemoryBuffer> Buf =

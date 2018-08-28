@@ -204,23 +204,27 @@ namespace {
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address tupleAddr,
-                                         SILType tupleType) const override {
+                                         SILType tupleType,
+                                         bool isOutlined) const override {
       Address eltAddr =
         asImpl().projectElementAddress(IGF, tupleAddr, tupleType, 0);
       auto &elt = asImpl().getFields()[0];
       return elt.getTypeInfo().getExtraInhabitantIndex(IGF, eltAddr,
-                                               elt.getType(IGF.IGM, tupleType));
+                                             elt.getType(IGF.IGM, tupleType),
+                                             false /*not outlined for field*/);
     }
   
     void storeExtraInhabitant(IRGenFunction &IGF,
                               llvm::Value *index,
                               Address tupleAddr,
-                              SILType tupleType) const override {
+                              SILType tupleType,
+                              bool isOutlined) const override {
       Address eltAddr =
         asImpl().projectElementAddress(IGF, tupleAddr, tupleType, 0);
       auto &elt = asImpl().getFields()[0];
       elt.getTypeInfo().storeExtraInhabitant(IGF, index, eltAddr,
-                                             elt.getType(IGF.IGM, tupleType));
+                                             elt.getType(IGF.IGM, tupleType),
+                                             false /*not outlined for field*/);
     }
     
     void verify(IRGenTypeVerifierFunction &IGF,

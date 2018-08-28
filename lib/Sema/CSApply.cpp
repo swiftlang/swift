@@ -695,7 +695,7 @@ namespace {
     }
 
     unsigned getNaturalArgumentCount(ValueDecl *member) {
-      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (isa<AbstractFunctionDecl>(member)) {
         // For functions, close the existential once the function
         // has been fully applied.
         return 2;
@@ -3127,6 +3127,19 @@ namespace {
       return expr;
     }
 
+    Expr *visitVarargExpansionExpr(VarargExpansionExpr *expr) {
+      simplifyExprType(expr);
+
+      auto elementTy = cs.getType(expr);
+      auto arrayTy =
+        cs.getTypeChecker().getArraySliceType(expr->getLoc(), elementTy);
+      if (!arrayTy) return expr;
+
+      expr->setSubExpr(coerceToType(expr->getSubExpr(), arrayTy,
+                                    cs.getConstraintLocator(expr)));
+      return expr;
+    }
+
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       Expr *base = expr->getBase();
       base = cs.coerceToRValue(base);
@@ -3819,18 +3832,11 @@ namespace {
     }
 
     Expr *visitAssignExpr(AssignExpr *expr) {
-      // Compute the type to which the source must be converted to allow
-      // assignment to the destination.
-      //
-      // FIXME: This is also computed when the constraint system is set up.
-      auto destTy = cs.computeAssignDestType(expr->getDest(), expr->getLoc());
-      if (!destTy)
-        return nullptr;
-
       // Convert the source to the simplified destination type.
+      auto destTy = simplifyType(cs.getType(expr->getDest()));
       auto locator =
         ConstraintLocatorBuilder(cs.getConstraintLocator(expr->getSrc()));
-      Expr *src = coerceToType(expr->getSrc(), destTy, locator);
+      Expr *src = coerceToType(expr->getSrc(), destTy->getRValueType(), locator);
       if (!src)
         return nullptr;
 
@@ -4423,7 +4429,18 @@ namespace {
           cs.TC.requestMemberLayout(subscript);
 
           auto dc = subscript->getInnermostDeclContext();
-          auto indexType = subscript->getIndicesInterfaceType();
+
+          // FIXME: It's not correct to turn the subscript's parameter list
+          // into a single type here. Further down we pass it to coerceToType(),
+          // but the rules for argument list conversions are different than
+          // tuple conversions, and coerceToType() doesn't handle varargs or
+          // default arguments.
+          auto indexType = AnyFunctionType::composeInput(
+            cs.TC.Context,
+            subscript->getInterfaceType()
+              ->castTo<AnyFunctionType>()
+              ->getParams(),
+            /*canonicalVararg=*/false);
 
           SubstitutionMap subs;
           if (auto sig = dc->getGenericSignatureOfContext()) {
@@ -5091,45 +5108,17 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   auto *fromTupleExpr = dyn_cast<TupleExpr>(innerExpr);
 
   /// Check each of the tuple elements in the destination.
-  bool hasVariadic = false;
-  unsigned variadicParamIdx = toTuple->getNumElements();
   bool anythingShuffled = false;
-  bool hasInits = false;
   SmallVector<TupleTypeElt, 4> toSugarFields;
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  fromTuple->getElements().size());
-  SmallVector<Expr *, 2> callerDefaultArgs;
-  ConcreteDeclRef callee =
-    findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
+    assert(sources[i] != TupleShuffleExpr::DefaultInitialize &&
+           sources[i] != TupleShuffleExpr::Variadic);
+
     const auto &toElt = toTuple->getElement(i);
     auto toEltType = toElt.getType();
-
-    // If we're default-initializing this member, there's nothing to do.
-    if (sources[i] == TupleShuffleExpr::DefaultInitialize) {
-      anythingShuffled = true;
-      hasInits = true;
-      toSugarFields.push_back(toElt);
-
-      // Create a caller-side default argument, if we need one.
-      if (auto defArg = getCallerDefaultArg(cs, dc, expr->getLoc(),
-                                            callee, i).first) {
-        callerDefaultArgs.push_back(defArg);
-        sources[i] = TupleShuffleExpr::CallerDefaultInitialize;
-      }
-      continue;
-    }
-
-    // If this is the variadic argument, note it.
-    if (sources[i] == TupleShuffleExpr::Variadic) {
-      assert(!hasVariadic && "two variadic parameters?");
-      toSugarFields.push_back(toElt);
-      hasVariadic = true;
-      variadicParamIdx = i;
-      anythingShuffled = true;
-      continue;
-    }
 
     // If the source and destination index are different, we'll be shuffling.
     if ((unsigned)sources[i] != i) {
@@ -5187,51 +5176,6 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       fromElt.getWithType(cs.getType(convertedElt));
   }
 
-  // Convert all of the variadic arguments to the destination type.
-  ArraySliceType *arrayType = nullptr;
-  if (hasVariadic) {
-    Type toEltType = toTuple->getElements()[variadicParamIdx].getVarargBaseTy();
-    for (int fromFieldIdx : variadicArgs) {
-      const auto &fromElt = fromTuple->getElement(fromFieldIdx);
-      Type fromEltType = fromElt.getType();
-
-      // If the source and destination types match, there's nothing to do.
-      if (toEltType->isEqual(fromEltType)) {
-        fromTupleExprFields[fromFieldIdx] = fromElt;
-        continue;
-      }
-
-      // We need to convert the source element to the destination type.
-      if (!fromTupleExpr) {
-        // FIXME: Lame! We can't express this in the AST.
-        tc.diagnose(expr->getLoc(),
-                    diag::tuple_conversion_not_expressible,
-                    fromTuple, toTuple);
-        return nullptr;
-      }
-
-      // Actually convert the source element.
-      auto convertedElt = coerceToType(
-                            fromTupleExpr->getElement(fromFieldIdx),
-                            toEltType,
-                            locator.withPathElement(
-                              LocatorPathElt::getTupleElement(fromFieldIdx)));
-      if (!convertedElt)
-        return nullptr;
-
-      fromTupleExpr->setElement(fromFieldIdx, convertedElt);
-
-      fromTupleExprFields[fromFieldIdx] =
-        fromElt.getWithType(cs.getType(convertedElt));
-    }
-
-    // Find the appropriate injection function.
-    if (tc.requireArrayLiteralIntrinsics(expr->getStartLoc()))
-      return nullptr;
-    arrayType = cast<ArraySliceType>(
-          toTuple->getElements()[variadicParamIdx].getType().getPointer());
-  }
-
   // Compute the updated 'from' tuple type, since we may have
   // performed some conversions in place.
   Type fromTupleType = TupleType::get(fromTupleExprFields, tc.Context);
@@ -5243,8 +5187,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   }
 
   // Compute the re-sugared tuple type.
-  Type toSugarType = hasInits? toTuple
-                             : TupleType::get(toSugarFields, tc.Context);
+  Type toSugarType = TupleType::get(toSugarFields, tc.Context);
 
   // If we don't have to shuffle anything, we're done.
   if (!anythingShuffled && fromTupleExpr) {
@@ -5259,13 +5202,10 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   // Create the tuple shuffle.
   return
     cs.cacheType(TupleShuffleExpr::create(tc.Context,
-                     expr, sources,
-                     TupleShuffleExpr::TupleToTuple,
-                     callee,
-                     variadicArgs,
-                     arrayType,
-                     callerDefaultArgs,
-                     toSugarType));
+                                          expr, sources,
+                                          TupleShuffleExpr::TupleToTuple,
+                                          ConcreteDeclRef(), {}, Type(), {},
+                                          toSugarType));
 }
 
 static Type getMetatypeSuperclass(Type t, TypeChecker &tc) {
@@ -7776,7 +7716,7 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
 
     bool diagnosed = false;
     for (const auto *fix : fixes->second)
-      diagnosed |= fix->diagnose(E, solution);
+      diagnosed |= fix->diagnose(E);
     return diagnosed;
   };
 

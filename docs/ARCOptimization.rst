@@ -38,7 +38,6 @@ Reference Counting Instructions
 - fix_lifetime
 - mark_dependence
 - is_unique
-- is_unique_or_pinned
 - copy_block
 
 Memory Behavior of ARC Operations
@@ -348,15 +347,10 @@ static argument type is optional, then a null check is also performed.
 Thus, is_unique only returns true for non-null, native Swift object
 references with a strong reference count of one.
 
-is_unique_or_pinned has the same semantics as is_unique except that it
-also returns true if the object is marked pinned (by strong_pin)
-regardless of the reference count. This allows for simultaneous
-non-structural modification of multiple subobjects.
-
 Builtin.isUnique
 ----------------
 
-Builtin.isUnique and Builtin.isUniqueOrPinned give the standard
+Builtin.isUnique gives the standard
 library access to optimization safe uniqueness checking. Because the
 type of reference check is derived from the builtin argument's static
 type, the most efficient check is automatically generated. However, in
@@ -367,7 +361,6 @@ additional pointer bit mask and dynamic class lookup to be bypassed in
 these cases:
 
 - isUnique_native : <T> (inout T[?]) -> Int1
-- isUniqueOrPinned_native : <T> (inout T[?]) -> Int1
 
 These builtins perform an implicit cast to NativeObject before
 checking uniqueness. There's no way at SIL level to cast the address

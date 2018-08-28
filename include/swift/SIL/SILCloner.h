@@ -1942,26 +1942,6 @@ void SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitStrongPinInst(StrongPinInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createStrongPin(getOpLocation(Inst->getLoc()),
-                                 getOpValue(Inst->getOperand()),
-                                 Inst->getAtomicity()));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitStrongUnpinInst(StrongUnpinInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createStrongUnpin(getOpLocation(Inst->getLoc()),
-                                   getOpValue(Inst->getOperand()),
-                                   Inst->getAtomicity()));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
@@ -1976,15 +1956,6 @@ void SILCloner<ImplClass>::visitIsUniqueInst(IsUniqueInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createIsUnique(getOpLocation(Inst->getLoc()),
                                 getOpValue(Inst->getOperand())));
-}
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::
-visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createIsUniqueOrPinned(getOpLocation(Inst->getLoc()),
-                                        getOpValue(Inst->getOperand())));
 }
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitIsEscapingClosureInst(

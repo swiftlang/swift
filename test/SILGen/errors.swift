@@ -527,30 +527,17 @@ func supportFirstStructure<B: Buildable>(_ b: inout B) throws {
   try b.firstStructure.support()
 }
 // CHECK-LABEL: sil hidden @$S6errors21supportFirstStructure{{.*}}F : $@convention(thin) <B where B : Buildable> (@inout B) -> @error Error {
-// CHECK: [[MATBUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
-// CHECK: [[BUFFER:%.*]] = alloc_stack $B.Structure
-// CHECK: [[BUFFER_CAST:%.*]] = address_to_pointer [[BUFFER]] : $*B.Structure to $Builtin.RawPointer
-// CHECK: [[MAT:%.*]] = witness_method $B, #Buildable.firstStructure!materializeForSet.1 :
-// CHECK: [[T1:%.*]] = apply [[MAT]]<B>([[BUFFER_CAST]], [[MATBUFFER]], [[BASE:%[0-9]*]])
-// CHECK: ([[T2:%.*]], [[CALLBACK:%.*]]) = destructure_tuple [[T1]]
-// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*B.Structure
-// CHECK: [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
-// CHECK: [[T5:%.*]] = begin_access [modify] [unsafe] [[T4]] : $*B.Structure
+// CHECK: [[MODIFY:%.*]] = witness_method $B, #Buildable.firstStructure!modify.1 :
+// CHECK: ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]<B>([[BASE:%[0-9]*]])
 // CHECK: [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
-// CHECK: try_apply [[SUPPORT]]<B.Structure>([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+// CHECK: try_apply [[SUPPORT]]<B.Structure>([[T1]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
 // CHECK: [[BB_NORMAL]]
-// CHECK: switch_enum [[CALLBACK]]
-// CHECK: apply
-// CHECK: dealloc_stack [[BUFFER]]
-// CHECK: dealloc_stack [[MATBUFFER]]
+// CHECK: end_apply [[TOKEN]]
 // CHECK: return
 
 // CHECK: [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
-// CHECK: switch_enum [[CALLBACK]]
-// CHECK: apply
-// CHECK: dealloc_stack [[BUFFER]]
-// CHECK: dealloc_stack [[MATBUFFER]]
+// CHECK: abort_apply [[TOKEN]]
 // CHECK: throw [[ERROR]]
 // CHECK: } // end sil function '$S6errors21supportFirstStructure{{.*}}F'
 
@@ -561,38 +548,21 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
 // CHECK-LABEL: sil hidden @$S6errors16supportStructure_4nameyxz_SStKAA9BuildableRzlF : $@convention(thin) <B where B : Buildable> (@inout B, @guaranteed String) -> @error Error {
 // CHECK: bb0({{.*}}, [[INDEX:%.*]] : @guaranteed $String):
 // CHECK:   [[INDEX_COPY:%.*]] = copy_value [[INDEX]] : $String
-// CHECK:   [[MATBUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
-// CHECK:   [[BUFFER:%.*]] = alloc_stack $B.Structure
-// CHECK:   [[BUFFER_CAST:%.*]] = address_to_pointer [[BUFFER]] : $*B.Structure to $Builtin.RawPointer
 // CHECK:   [[BORROWED_INDEX_COPY:%.*]] = begin_borrow [[INDEX_COPY]]
-// CHECK:   [[MAT:%.*]] = witness_method $B, #Buildable.subscript!materializeForSet.1 :
-// CHECK:   [[T1:%.*]] = apply [[MAT]]<B>([[BUFFER_CAST]], [[MATBUFFER]], [[BORROWED_INDEX_COPY]], [[BASE:%[0-9]*]])
-// CHECK:   end_borrow [[BORROWED_INDEX_COPY]] from [[INDEX_COPY]]
-// CHECK:   ([[T2:%.*]], [[CALLBACK:%.*]]) = destructure_tuple [[T1]]
-// CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*B.Structure
-// CHECK:   [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
-// CHECK:   [[T5:%.*]] = begin_access [modify] [unsafe] [[T4]] : $*B.Structure
+// CHECK:   [[MODIFY:%.*]] = witness_method $B, #Buildable.subscript!modify.1 :
+// CHECK:   ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]<B>([[BORROWED_INDEX_COPY]], [[BASE:%[0-9]*]])
 // CHECK:   [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
-// CHECK:   try_apply [[SUPPORT]]<B.Structure>([[T5]]) : $@convention(witness_method: Supportable) <τ_0_0 where τ_0_0 : Supportable> (@inout τ_0_0) -> @error Error, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+// CHECK:   try_apply [[SUPPORT]]<B.Structure>([[T1]]) : $@convention(witness_method: Supportable) <τ_0_0 where τ_0_0 : Supportable> (@inout τ_0_0) -> @error Error, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
 // CHECK: [[BB_NORMAL]]
-// CHECK:   switch_enum [[CALLBACK]] : ${{.*}}, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
-//
-// CHECK:  [[SOME_BB]](
-// CHECK:   apply
-//
-// CHECK:  [[NONE_BB]]:
-// CHECK:   dealloc_stack [[BUFFER]]
-// CHECK:   dealloc_stack [[MATBUFFER]]
+// CHECK:   end_apply [[TOKEN]]
+// CHECK:   end_borrow [[BORROWED_INDEX_COPY]] from [[INDEX_COPY]]
 // CHECK:   destroy_value [[INDEX_COPY]] : $String
 // CHECK:   return
 
 // CHECK: [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
-// CHECK:   switch_enum [[CALLBACK]]
-
-// CHECK:   apply
-// CHECK:   dealloc_stack [[BUFFER]]
-// CHECK:   dealloc_stack [[MATBUFFER]]
+// CHECK:   abort_apply [[TOKEN]]
+// CHECK:   end_borrow [[BORROWED_INDEX_COPY]] from [[INDEX_COPY]]
 // CHECK:   destroy_value [[INDEX_COPY]] : $String
 // CHECK:   throw [[ERROR]]
 // CHECK: } // end sil function '$S6errors16supportStructure{{.*}}F'
@@ -698,49 +668,6 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: destroy_value [[ARG2_COPY]] : $String
 // CHECK-NEXT: throw [[ERROR]]
 // CHECK: } // end sil function '$S6errors16supportStructure_4nameyAA11OwnedBridgeVz_SStKF'
-
-struct PinnedBridge {
-  var owner : Builtin.NativeObject
-  subscript(name: String) -> Pylon {
-    addressWithPinnedNativeOwner { return (someValidPointer(), owner) }
-    mutableAddressWithPinnedNativeOwner { return (someValidPointer(), owner) }
-  }
-}
-func supportStructure(_ b: inout PinnedBridge, name: String) throws {
-  try b[name].support()
-}
-// CHECK:      sil hidden @$S6errors16supportStructure_4nameyAA12PinnedBridgeVz_SStKF :
-// CHECK:      bb0([[ARG1:%.*]] : @trivial $*PinnedBridge, [[ARG2:%.*]] : @guaranteed $String):
-// CHECK:        [[ARG2_COPY:%.*]] = copy_value [[ARG2]] : $String
-// CHECK-NEXT:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG1]] : $*PinnedBridge
-// CHECK-NEXT:   [[BORROWED_ARG2_COPY:%.*]] = begin_borrow [[ARG2_COPY]]
-// CHECK-NEXT:   // function_ref
-// CHECK-NEXT:   [[ADDRESSOR:%.*]] = function_ref @$S6errors12PinnedBridgeVyAA5PylonVSSciaP :
-// CHECK-NEXT:   [[T0:%.*]] = apply [[ADDRESSOR]]([[BORROWED_ARG2_COPY]], [[WRITE]])
-// CHECK-NEXT:   end_borrow [[BORROWED_ARG2_COPY]]
-// CHECK-NEXT:   ([[T1:%.*]], [[OWNER:%.*]]) = destructure_tuple [[T0]]
-// CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T1]]
-// CHECK-NEXT:   [[T4:%.*]] = pointer_to_address [[T3]]
-// CHECK-NEXT:   [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
-// CHECK-NEXT:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[T5]] : $*Pylon
-// CHECK:        [[SUPPORT:%.*]] = function_ref @$S6errors5PylonV7supportyyKF
-// CHECK-NEXT:   try_apply [[SUPPORT]]([[ACCESS]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
-// CHECK:      [[BB_NORMAL]]
-// CHECK-NEXT:   end_access [[ACCESS]] : $*Pylon
-// CHECK-NEXT:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
-// CHECK-NEXT:   end_access [[WRITE]]
-// CHECK-NEXT:   destroy_value [[ARG2_COPY]] : $String
-// CHECK-NEXT:   tuple ()
-// CHECK-NEXT:   return
-// CHECK:      [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
-// CHECK-NEXT:   end_access [[ACCESS]] : $*Pylon
-// CHECK-NEXT:   [[OWNER_COPY:%.*]] = copy_value [[OWNER]]
-// CHECK-NEXT:   strong_unpin [[OWNER_COPY]] : $Optional<Builtin.NativeObject>
-// CHECK-NEXT:   destroy_value [[OWNER]]
-// CHECK-NEXT:   end_access [[WRITE]]
-// CHECK-NEXT:   destroy_value [[ARG2_COPY]] : $String
-// CHECK-NEXT:   throw [[ERROR]]
-// CHECK: } // end sil function '$S6errors16supportStructure_4nameyAA12PinnedBridgeVz_SStKF'
 
 // ! peepholes its argument with getSemanticsProvidingExpr().
 // Test that that doesn't look through try!.

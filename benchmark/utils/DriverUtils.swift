@@ -160,6 +160,7 @@ struct TestConfig {
             LogMemory: \(logMemory)
             SampleTime: \(sampleTime)
             FixedIters: \(fixedNumIters)
+            Delimiter: \(String(reflecting: delim))
             Tests Filter: \(c.tests ?? [])
             Tests to run: \(testList)
 
@@ -442,8 +443,7 @@ func runBenchmarks(_ c: TestConfig) {
     report(index, test, results:runBench(test, c))
   }
 
-  print("")
-  print("Totals\(c.delim)\(testCount)")
+  print("\nTotal performance tests executed: \(testCount)")
 }
 
 public func main() {

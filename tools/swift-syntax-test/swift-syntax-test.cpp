@@ -157,6 +157,15 @@ SerializeAsByteTree("serialize-byte-tree",
                                    "of JSON."));
 
 static llvm::cl::opt<bool>
+AddByteTreeFields("add-bytetree-fields",
+                  llvm::cl::desc("If specified, further fields will be added "
+                                 "to the syntax tree if it is serialized as a "
+                                 "ByteTree. This is to test forward "
+                                 "compatibility with future versions of "
+                                 "SwiftSyntax that might add more fields to "
+                                 "syntax nodes."));
+
+static llvm::cl::opt<bool>
 IncrementalSerialization("incremental-serialization",
                          llvm::cl::desc("If specified, the serialized syntax "
                                         "tree will omit nodes that have not "
@@ -720,11 +729,15 @@ int doSerializeRawTree(const char *MainExecutablePath,
         return EXIT_FAILURE;
       }
 
-      llvm::AppendingBinaryByteStream Stream(llvm::support::endianness::little);
-      llvm::BinaryStreamWriter Writer(Stream);
+      swift::ExponentialGrowthAppendingBinaryByteStream Stream(
+          llvm::support::endianness::little);
+      Stream.reserve(32 * 1024);
       std::map<void *, void *> UserInfo;
       UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
-      swift::byteTree::ByteTreeWriter::write(/*ProtocolVersion=*/1, Writer,
+      if (options::AddByteTreeFields) {
+        UserInfo[swift::byteTree::UserInfoKeyAddInvalidFields] = (void *)true;
+      }
+      swift::byteTree::ByteTreeWriter::write(Stream, /*ProtocolVersion=*/1,
                                              *Root, UserInfo);
       auto OutputBufferOrError = llvm::FileOutputBuffer::create(
           options::OutputFilename, Stream.data().size());

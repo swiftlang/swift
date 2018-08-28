@@ -48,9 +48,6 @@ public struct UnknownSyntax: _SyntaxBase {
   internal init(root: SyntaxData, data: SyntaxData) {
     self._root = root
     self._data = data
-#if DEBUG
-    validate()
-#endif
   }
 }
 
@@ -85,46 +82,8 @@ public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
   internal init(root: SyntaxData, data: SyntaxData) {
     self._root = root
     self._data = data
-#if DEBUG
-    validate()
-#endif
   }
 
-%     if node.requires_validation():
-#if DEBUG
-  func validate() {
-      if isMissing { return }
-    precondition(raw.layout.count == ${len(node.children)})
-%       for child in node.children:
-%         child_var = '_' + child.swift_name
-    let ${child_var} = raw[Cursor.${child.swift_syntax_kind}]
-%         if child.token_choices:
-%           choices = ["." + choice.swift_kind() for choice in child.token_choices]
-%           choice_array = "[%s]" % ', '.join(choices)
-    guard let ${child_var}TokenKind = ${child_var}.tokenKind else {
-      fatalError("expected token child, got \(${child_var}.kind)")
-    }
-    precondition(${choice_array}.contains(${child_var}TokenKind),
-      "expected one of ${choice_array} for '${child.swift_name}' " + 
-      "in node of kind ${node.swift_syntax_kind}")
-%         elif child.text_choices:
-%           choices = ", ".join("\"%s\"" % choice
-%                               for choice in child.text_choices)
-    guard let ${child_var}TokenKind = ${child_var}.tokenKind else {
-      fatalError("expected token child, got \(${child_var}.kind)")
-    }
-    precondition([${choices}].contains(${child_var}TokenKind.text),
-                 "expected one of '[${', '.join(child.text_choices)}]', got " +
-                 "'\(${child_var}TokenKind.text)'")
-%         else:
-    precondition(${child_var}.kind == .${child.swift_syntax_kind},
-                 "expected child of kind .${child.swift_syntax_kind}, " +
-                 "got \(${child_var}.kind)")
-%         end
-%       end
-  }
-#endif
-%     end
 %     for child in node.children:
 %       ret_type = child.type_name
 %       cast_symbol = 'as!'

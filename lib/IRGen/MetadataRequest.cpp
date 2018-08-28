@@ -1314,7 +1314,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   }
 
   // For in-place initialization, drill to the first element of the cache.
-  case CacheStrategy::InPlaceInitialization:
+  case CacheStrategy::SingletonInitialization:
     cacheVariable =
       llvm::ConstantExpr::getBitCast(cacheVariable,
                                      IGM.TypeMetadataPtrTy->getPointerTo());
@@ -1383,7 +1383,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   // is done within the runtime.
   llvm::BasicBlock *completionCheckBB = nullptr;
   llvm::Value *directState = nullptr;
-  if (cacheStrategy == CacheStrategy::InPlaceInitialization) {
+  if (cacheStrategy == CacheStrategy::SingletonInitialization) {
     directState = response.getDynamicState();
     completionCheckBB = IGF.Builder.GetInsertBlock();
   } else {
@@ -1699,8 +1699,8 @@ irgen::createTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
       break;
 
     // For in-place initialization, drill down to the first element.
-    case CacheStrategy::InPlaceInitialization:
-      cacheVariable = IGM.getAddrOfTypeMetadataInPlaceInitializationCache(
+    case CacheStrategy::SingletonInitialization:
+      cacheVariable = IGM.getAddrOfTypeMetadataSingletonInitializationCache(
                                           type->getAnyNominal(), ForDefinition);
       break;
     }

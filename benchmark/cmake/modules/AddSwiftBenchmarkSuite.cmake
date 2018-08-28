@@ -41,16 +41,20 @@ macro(configure_build)
   endif()
 
   set(PAGE_ALIGNMENT_OPTION "-Xllvm" "-align-module-to-page-size")
-  execute_process(
-      COMMAND "touch" "empty.swift"
-      RESULT_VARIABLE result
-      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(
-      COMMAND "${SWIFT_EXEC}" ${PAGE_ALIGNMENT_OPTION} "empty.swift"
-      RESULT_VARIABLE result
-      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT "${result}" MATCHES "0")
-    set(PAGE_ALIGNMENT_OPTION "")
+  if(EXISTS "${SWIFT_EXEC}")
+    # If we are using a pre-built compiler, check if it supports the
+    # -align-module-to-page-size option.
+    execute_process(
+        COMMAND "touch" "empty.swift"
+        RESULT_VARIABLE result
+        ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+        COMMAND "${SWIFT_EXEC}" ${PAGE_ALIGNMENT_OPTION} "empty.swift"
+        RESULT_VARIABLE result
+        ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT "${result}" MATCHES "0")
+      set(PAGE_ALIGNMENT_OPTION "")
+    endif()
   endif()
 
   # We always infer the SWIFT_LIBRARY_PATH from SWIFT_EXEC unless

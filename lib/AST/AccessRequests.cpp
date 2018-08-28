@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 
 #include "llvm/Support/MathExtras.h"
@@ -55,7 +56,6 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
       return storage->getFormalAccess();
     case AccessorKind::Set:
     case AccessorKind::MutableAddress:
-    case AccessorKind::MaterializeForSet:
     case AccessorKind::Modify:
       return storage->getSetterFormalAccess();
     case AccessorKind::WillSet:
@@ -212,12 +212,12 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
                          AccessLevel::FilePrivate);
   }
 
-  if (const GenericParamList *genericParams = ED->getGenericParams()) {
-    auto getTypeAccess = [ED](const TypeLoc &TL) -> AccessLevel {
-      if (!TL.getType())
+  if (GenericParamList *genericParams = ED->getGenericParams()) {
+    auto getTypeAccess = [ED](Type type, TypeRepr *typeRepr) -> AccessLevel {
+      if (!type)
         return AccessLevel::Public;
       auto accessScope =
-          TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(),
+          TypeReprAccessScopeChecker::getAccessScope(typeRepr,
                                                      ED->getDeclContext());
       // This is an error case and will be diagnosed elsewhere.
       if (!accessScope.hasValue())
@@ -236,21 +236,30 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
 
     // Only check the trailing 'where' requirements. Other requirements come
     // from the extended type and have already been checked.
-    for (const RequirementRepr &req : genericParams->getTrailingRequirements()){
-      switch (req.getKind()) {
-      case RequirementReprKind::TypeConstraint:
-        maxAccess = std::min(getTypeAccess(req.getSubjectLoc()), maxAccess);
-        maxAccess = std::min(getTypeAccess(req.getConstraintLoc()), maxAccess);
-        break;
-      case RequirementReprKind::LayoutConstraint:
-        maxAccess = std::min(getTypeAccess(req.getSubjectLoc()), maxAccess);
-        break;
-      case RequirementReprKind::SameType:
-        maxAccess = std::min(getTypeAccess(req.getFirstTypeLoc()), maxAccess);
-        maxAccess = std::min(getTypeAccess(req.getSecondTypeLoc()), maxAccess);
-        break;
-      }
-    }
+    RequirementRequest::visitRequirements(
+        WhereClauseOwner(ED, genericParams),
+        TypeResolutionStage::Interface,
+        [&](Requirement req, RequirementRepr *reqRepr) {
+          switch (req.getKind()) {
+          case RequirementKind::Conformance:
+          case RequirementKind::Superclass:
+          case RequirementKind::SameType:
+            maxAccess = std::min(getTypeAccess(
+                                   req.getSecondType(),
+                                   RequirementRepr::getSecondTypeRepr(reqRepr)),
+                                 maxAccess);
+            LLVM_FALLTHROUGH;
+
+          case RequirementKind::Layout:
+            maxAccess = std::min(getTypeAccess(
+                                   req.getFirstType(),
+                                   RequirementRepr::getFirstTypeRepr(reqRepr)),
+                                 maxAccess);
+            break;
+          }
+
+          return false;
+        });
   }
 
   AccessLevel defaultAccess;

@@ -2668,59 +2668,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   return !resultTy;
 }
 
-/// \brief Compute the rvalue type of the given expression, which is the
-/// destination of an assignment statement.
-Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
-  if (auto *TE = dyn_cast<TupleExpr>(dest)) {
-    auto &ctx = getASTContext();
-    SmallVector<TupleTypeElt, 4> destTupleTypes;
-    for (unsigned i = 0; i != TE->getNumElements(); ++i) {
-      Expr *subExpr = TE->getElement(i);
-      Type elemTy = computeAssignDestType(subExpr, equalLoc);
-      if (!elemTy)
-        return Type();
-      destTupleTypes.push_back(TupleTypeElt(elemTy, TE->getElementName(i)));
-    }
-
-    return TupleType::get(destTupleTypes, ctx);
-  }
-
-  Type destTy = simplifyType(getType(dest));
-  if (destTy->hasError())
-    return Type();
-
-  // If we have already resolved a concrete lvalue destination type, return it.
-  if (LValueType *destLV = destTy->getAs<LValueType>())
-    return destLV->getObjectType();
-
-  // If the destination is a type variable, the type variable must be an
-  // lvalue type, which we enforce via an equality relationship with
-  // @lvalue T, where T is a fresh type variable that will be the object type of
-  // this particular expression type.
-  if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
-    // Newly allocated type should be explicitly materializable,
-    // it's invalid to use non-materializable types as assignment destination.
-    auto objectTv = createTypeVariable(getConstraintLocator(dest));
-    auto refTv = LValueType::get(objectTv);
-    addConstraint(ConstraintKind::Bind, typeVar, refTv,
-                  getConstraintLocator(dest));
-    return objectTv;
-  }
-
-  // Otherwise, the destination is erroneous.  If there are FixIt hints
-  // introduced into the system, they may well be the reason that this isn't an
-  // lvalue.  Emit them if present.
-  if (!Fixes.empty()) {
-    auto solution = finalize(FreeTypeVariableBinding::Allow);
-    if (applySolutionFixes(dest, solution))
-      return Type();
-  }
-
-  // Otherwise, it is a structural problem, diagnose that.
-  diagnoseAssignmentFailure(dest, destTy, equalLoc);
-  return Type();
-}
-
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   // If this expression is already typechecked and has an i1 type, then it has
   // already got its conversion from Boolean back to i1.  Just re-typecheck
@@ -3104,7 +3051,7 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
   }
 
   // Load lvalues.
-  if (auto lvalue = exprTy->getAs<LValueType>())
+  if (exprTy->is<LValueType>())
     return addImplicitLoadExpr(expr, getType, setType);
 
   // Walk into parenthesized expressions to update the subexpression.
@@ -3349,7 +3296,7 @@ void Solution::dump(raw_ostream &out) const {
     out << "\nFixes:\n";
     for (auto *fix : Fixes) {
       out.indent(2);
-      fix->print(out, &ctx.SourceMgr);
+      fix->print(out);
       out << "\n";
     }
   }
@@ -3544,7 +3491,7 @@ void ConstraintSystem::print(raw_ostream &out) {
     out << "\nFixes:\n";
     for (auto *fix : Fixes) {
       out.indent(2);
-      fix->print(out, &getTypeChecker().Context.SourceMgr);
+      fix->print(out);
       out << "\n";
     }
   }

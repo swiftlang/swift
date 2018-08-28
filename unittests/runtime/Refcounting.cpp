@@ -66,37 +66,6 @@ TEST(RefcountingTest, retain_release) {
   EXPECT_EQ(1u, value);
 }
 
-TEST(RefcountingTest, pin_unpin) {
-  size_t value = 0;
-  auto object = allocTestObject(&value, 1);
-  EXPECT_EQ(0u, value);
-  auto pinResult = swift_tryPin(object);
-  EXPECT_EQ(object, pinResult);
-  EXPECT_EQ(0u, value);
-  swift_release(object);
-  EXPECT_EQ(0u, value);
-  swift_unpin(object);
-  EXPECT_EQ(1u, value);
-}
-
-TEST(RefcountingTest, pin_pin_unpin_unpin) {
-  size_t value = 0;
-  auto object = allocTestObject(&value, 1);
-  EXPECT_EQ(0u, value);
-  auto pinResult = swift_tryPin(object);
-  EXPECT_EQ(object, pinResult);
-  EXPECT_EQ(0u, value);
-  auto pinResult2 = swift_tryPin(object);
-  EXPECT_EQ(nullptr, pinResult2);
-  EXPECT_EQ(0u, value);
-  swift_unpin(pinResult2);
-  EXPECT_EQ(0u, value);
-  swift_release(object);
-  EXPECT_EQ(0u, value);
-  swift_unpin(object);
-  EXPECT_EQ(1u, value);
-}
-
 TEST(RefcountingTest, retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
@@ -186,30 +155,6 @@ TEST(RefcountingTest, isUniquelyReferenced) {
   EXPECT_EQ(1u, value);
 }
 
-TEST(RefcountingTest, isUniquelyReferencedOrPinned) {
-  size_t value = 0;
-  auto object = allocTestObject(&value, 1);
-  EXPECT_EQ(0u, value);
-  // RC 1, unpinned
-  EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
-
-  swift_retain(object);
-  // RC big, unpinned
-  EXPECT_FALSE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
-
-  swift_tryPin(object);
-  // RC big, pinned
-  EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
-
-  swift_release(object);
-  // RC 1, pinned
-  EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
-
-  swift_unpin(object);
-  swift_release(object);
-  EXPECT_EQ(1u, value);
-}
-
 /////////////////////////////////////////
 // Non-atomic reference counting tests //
 /////////////////////////////////////////
@@ -231,37 +176,6 @@ TEST(RefcountingTest, nonatomic_retain_release) {
   swift_nonatomic_release(object);
   EXPECT_EQ(0u, value);
   swift_nonatomic_release(object);
-  EXPECT_EQ(1u, value);
-}
-
-TEST(RefcountingTest, nonatomic_pin_unpin) {
-  size_t value = 0;
-  auto object = allocTestObject(&value, 1);
-  EXPECT_EQ(0u, value);
-  auto pinResult = swift_nonatomic_tryPin(object);
-  EXPECT_EQ(object, pinResult);
-  EXPECT_EQ(0u, value);
-  swift_nonatomic_release(object);
-  EXPECT_EQ(0u, value);
-  swift_nonatomic_unpin(object);
-  EXPECT_EQ(1u, value);
-}
-
-TEST(RefcountingTest, nonatomic_pin_pin_unpin_unpin) {
-  size_t value = 0;
-  auto object = allocTestObject(&value, 1);
-  EXPECT_EQ(0u, value);
-  auto pinResult = swift_nonatomic_tryPin(object);
-  EXPECT_EQ(object, pinResult);
-  EXPECT_EQ(0u, value);
-  auto pinResult2 = swift_nonatomic_tryPin(object);
-  EXPECT_EQ(nullptr, pinResult2);
-  EXPECT_EQ(0u, value);
-  swift_nonatomic_unpin(pinResult2);
-  EXPECT_EQ(0u, value);
-  swift_nonatomic_release(object);
-  EXPECT_EQ(0u, value);
-  swift_nonatomic_unpin(object);
   EXPECT_EQ(1u, value);
 }
 

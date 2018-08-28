@@ -49,6 +49,7 @@ bool swift::shouldDiagnoseObjCReason(ObjCReason reason, ASTContext &ctx) {
 
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::ElementOfObjCEnum:
   case ObjCReason::Accessor:
     return false;
   }
@@ -73,6 +74,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
 
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::ElementOfObjCEnum:
   case ObjCReason::Accessor:
     llvm_unreachable("should not diagnose this @objc reason");
   }
@@ -473,10 +475,6 @@ bool swift::isRepresentableInObjC(
     case AccessorKind::Get:
     case AccessorKind::Set:
       return true;
-
-    case AccessorKind::MaterializeForSet:
-      // materializeForSet is synthesized, so never complain about it
-      return false;
 
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
@@ -1039,7 +1037,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   }
 
   // Destructors are always @objc, with -dealloc as their entry point.
-  if (auto deinit = dyn_cast<DestructorDecl>(VD))
+  if (isa<DestructorDecl>(VD))
     return ObjCReason(ObjCReason::ImplicitlyObjC);
 
   ProtocolDecl *protocolContext =
@@ -1273,6 +1271,14 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // as an arithmetic type in C.
     if (isEnumObjC(enumDecl))
       isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
+  } else if (auto enumElement = dyn_cast<EnumElementDecl>(VD)) {
+    // Enum elements can be @objc so long as the containing enum is @objc.
+    if (enumElement->getParentEnum()->isObjC()) {
+      if (enumElement->getAttrs().hasAttribute<ObjCAttr>())
+        isObjC = ObjCReason::ExplicitlyObjC;
+      else
+        isObjC = ObjCReason::ElementOfObjCEnum;
+    }
   } else if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
     if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
       isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
@@ -1521,7 +1527,7 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     ctx.getLazyResolver()->resolveDeclSignature(D);
   }
 
-  if (!isa<AccessorDecl>(D) && !isa<TypeDecl>(D)) {
+  if (!isa<TypeDecl>(D) && !isa<AccessorDecl>(D) && !isa<EnumElementDecl>(D)) {
     useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
                                         D->getInterfaceType());
   }

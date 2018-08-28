@@ -1530,9 +1530,16 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::RValueAdjustment));
 
         // The function/enum case must be callable with the given argument.
-        auto funcTy = FunctionType::getOld(CS.getType(arg), outputTy);
-        CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
-          memberTy,
+
+        // FIXME: Redesign the AST so that an UnresolvedMemberExpr directly
+        // stores a list of arguments together with their inout-ness, instead of
+        // a single ParenExpr or TupleExpr argument.
+        SmallVector<AnyFunctionType::Param, 8> params;
+        AnyFunctionType::decomposeInput(CS.getType(arg), params);
+
+        CS.addConstraint(ConstraintKind::ApplicableFunction,
+                         FunctionType::get(params, outputTy),
+                         memberTy,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
         
         return baseTy;
@@ -2420,6 +2427,27 @@ namespace {
       return result;
     }
 
+    Type visitVarargExpansionExpr(VarargExpansionExpr *expr) {
+      // Create a fresh type variable.
+      auto element = CS.createTypeVariable(CS.getConstraintLocator(expr));
+
+      // Try to build the appropriate type for a variadic argument list of
+      // the fresh element type.  If that failed, just bail out.
+      auto array = CS.TC.getArraySliceType(expr->getLoc(), element);
+      if (!array) return element;
+
+      // Require the operand to be convertible to the array type.
+      CS.addConstraint(ConstraintKind::Conversion,
+                       CS.getType(expr->getSubExpr()), array,
+                       CS.getConstraintLocator(expr));
+
+      // The apparent type of the expression is the element type, as far as
+      // the type-checker is concerned.  When this becomes a real feature,
+      // we should syntactically restrict these expressions to only appear
+      // in specific positions.
+      return element;
+    }
+
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr));
       CS.addConstraint(ConstraintKind::DynamicTypeOf, tv,
@@ -2509,11 +2537,15 @@ namespace {
       FunctionType::ExtInfo extInfo;
       if (isa<ClosureExpr>(fnExpr->getSemanticsProvidingExpr()))
         extInfo = extInfo.withNoEscape();
-      
-      auto funcTy = FunctionType::getOld(CS.getType(expr->getArg()), outputTy,
-                                         extInfo);
 
-      CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
+      // FIXME: Redesign the AST so that an ApplyExpr directly stores a list of
+      // arguments together with their inout-ness, instead of a single
+      // ParenExpr or TupleExpr.
+      SmallVector<AnyFunctionType::Param, 8> params;
+      AnyFunctionType::decomposeInput(CS.getType(expr->getArg()), params);
+
+      CS.addConstraint(ConstraintKind::ApplicableFunction,
+                       FunctionType::get(params, outputTy, extInfo),
                        CS.getType(expr->getFn()),
         CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
@@ -2724,26 +2756,30 @@ namespace {
       auto typeVar = CS.createTypeVariable(locator);
       return LValueType::get(typeVar);
     }
-    
+
+    static Type genAssignDestType(Expr *expr, ConstraintSystem &CS) {
+      if (auto *TE = dyn_cast<TupleExpr>(expr)) {
+        SmallVector<TupleTypeElt, 4> destTupleTypes;
+        for (unsigned i = 0; i !=  TE->getNumElements(); ++i) {
+          Type subType = genAssignDestType(TE->getElement(i), CS);
+          destTupleTypes.push_back(TupleTypeElt(subType, TE->getElementName(i)));
+        }
+        return TupleType::get(destTupleTypes, CS.getASTContext());
+      } else {
+        Type destTy = CS.createTypeVariable(CS.getConstraintLocator(expr));
+        CS.addConstraint(ConstraintKind::Bind, CS.getType(expr), LValueType::get(destTy),
+                         CS.getConstraintLocator(expr));
+        return destTy;
+      }
+    }
+
     Type visitAssignExpr(AssignExpr *expr) {
       // Handle invalid code.
       if (!expr->getDest() || !expr->getSrc())
         return Type();
-      
-      // Compute the type to which the source must be converted to allow
-      // assignment to the destination.
-      auto destTy = CS.computeAssignDestType(expr->getDest(), expr->getLoc());
-      if (!destTy)
-        return Type();
-      if (destTy->is<UnresolvedType>()) {
-        return CS.createTypeVariable(CS.getConstraintLocator(expr));
-      }
-      
-      // The source must be convertible to the destination.
-      CS.addConstraint(ConstraintKind::Conversion,
-                       CS.getType(expr->getSrc()), destTy,
-                       CS.getConstraintLocator(expr->getSrc()));
-
+      Type destTy = genAssignDestType(expr->getDest(), CS);
+      CS.addConstraint(ConstraintKind::Conversion, CS.getType(expr->getSrc()), destTy,
+                       CS.getConstraintLocator(expr));
       return TupleType::getEmpty(CS.getASTContext());
     }
     

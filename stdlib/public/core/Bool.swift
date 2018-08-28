@@ -81,7 +81,7 @@ public struct Bool {
   /// Creates an instance equal to the given Boolean value.
   ///
   /// - Parameter value: The Boolean value to copy.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(_ value: Bool) {
     self = value
   }
@@ -176,7 +176,7 @@ extension Bool {
 
 extension Bool : CustomStringConvertible {
   /// A textual representation of the Boolean value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var description: String {
     return self ? "true" : "false"
   }
@@ -213,7 +213,7 @@ extension Bool : LosslessStringConvertible {
   /// `"false"`, the result is `nil`. This initializer is case sensitive.
   ///
   /// - Parameter description: A string representation of the Boolean value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init?(_ description: String) {
     if description == "true" {
       self = true

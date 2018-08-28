@@ -393,28 +393,16 @@ func testExistentialPropertyRead<T: ExistentialProperty>(_ t: inout T) {
 
 func modify(_ x: inout Int) {}
 
-// Make sure we call the materializeForSet callback with the correct
-// generic signature.
-
 func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
   modify(&x.b)
 }
 // CHECK-LABEL: sil hidden @$S9protocols14modifyPropertyyyxzAA0C16WithGetterSetterRzlF
 // CHECK:      [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*T
-// CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!materializeForSet.1
-// CHECK:      [[RESULT:%.*]] = apply [[WITNESS_FN]]<T>
-// CHECK:      ([[TEMPORARY:%.*]], [[CALLBACK:%.*]]) = destructure_tuple [[RESULT]]
-// CHECK:      [[TEMPORARY_ADDR_TMP:%.*]] = pointer_to_address [[TEMPORARY]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK:      [[TEMPORARY_ADDR:%.*]] = mark_dependence [[TEMPORARY_ADDR_TMP]] : $*Int on [[WRITE]] : $*T
-// CHECK:      [[TEMPORARY_ACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMPORARY_ADDR]] : $*Int
+// CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!modify.1
+// CHECK:      ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[WITNESS_FN]]<T>
 // CHECK:      [[MODIFY_FN:%.*]] = function_ref @$S9protocols6modifyyySizF
-// CHECK:      apply [[MODIFY_FN]]([[TEMPORARY_ACCESS]])
-// CHECK:      switch_enum [[CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
-// CHECK:    bb1([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
-// CHECK:      [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]]
-// CHECK:      [[METATYPE:%.*]] = metatype $@thick T.Type
-// CHECK:      [[TEMPORARY:%.*]] = address_to_pointer [[TEMPORARY_ACCESS]] : $*Int to $Builtin.RawPointer
-// CHECK:      apply [[CALLBACK]]<T>
+// CHECK:      apply [[MODIFY_FN]]([[ADDR]])
+// CHECK:      end_apply [[TOKEN]]
 
 public struct Val {
   public var x: Int = 0
@@ -430,11 +418,9 @@ public func test(_ p: Proto) {
 
 // CHECK-LABEL: sil @$S9protocols4testyyAA5Proto_pF : $@convention(thin) (@in_guaranteed Proto) -> ()
 // CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access
-// CHECK: [[MAT:%.*]] = witness_method $@opened("{{.*}}") Proto, #Proto.val!materializeForSet
-// CHECK: [[BUF:%.*]] = apply [[MAT]]
-// CHECK: [[WB:%.*]] = pointer_to_thin_function
-// This use looks like it is mutating but really is not. We use to assert in the SIL verifier.
-// CHECK: apply [[WB]]{{.*}}({{.*}}[[OPEN]]
+// CHECK: [[MAT:%.*]] = witness_method $@opened("{{.*}}") Proto, #Proto.val!modify
+// CHECK: ([[BUF:%.*]], [[TOKEN:%.*]]) = begin_apply [[MAT]]
+// CHECK: end_apply [[TOKEN]]
 // CHECK: return
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {
@@ -444,7 +430,7 @@ public func test(_ p: Proto) {
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetterSetter: PropertyWithGetterSetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetterSetter.b!getter.1: {{.*}} : @$S9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivgTW
 // CHECK-NEXT:  method #PropertyWithGetterSetter.b!setter.1: {{.*}} : @$S9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivsTW
-// CHECK-NEXT:  method #PropertyWithGetterSetter.b!materializeForSet.1: {{.*}} : @$S9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivmTW
+// CHECK-NEXT:  method #PropertyWithGetterSetter.b!modify.1: {{.*}} : @$S9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivMTW
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetterSetter: PropertyWithGetter module protocols {

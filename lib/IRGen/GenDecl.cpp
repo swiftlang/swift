@@ -1406,7 +1406,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::TypeMetadataInstantiationCache:
   case Kind::TypeMetadataInstantiationFunction:
-  case Kind::TypeMetadataInPlaceInitializationCache:
+  case Kind::TypeMetadataSingletonInitializationCache:
   case Kind::TypeMetadataCompletionFunction:
   case Kind::TypeMetadataPattern:
     return SILLinkage::Private;
@@ -1631,7 +1631,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::AnonymousDescriptor:
   case Kind::TypeMetadataInstantiationCache:
   case Kind::TypeMetadataInstantiationFunction:
-  case Kind::TypeMetadataInPlaceInitializationCache:
+  case Kind::TypeMetadataSingletonInitializationCache:
   case Kind::TypeMetadataCompletionFunction:
   case Kind::TypeMetadataPattern:
     return false;
@@ -3241,20 +3241,20 @@ IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
 }
 
 llvm::Constant *
-IRGenModule::getAddrOfTypeMetadataInPlaceInitializationCache(
+IRGenModule::getAddrOfTypeMetadataSingletonInitializationCache(
                                            NominalTypeDecl *D,
                                            ForDefinition_t forDefinition) {
   // Build the cache type.
   llvm::Type *cacheTy;
   if (isa<StructDecl>(D) || isa<EnumDecl>(D) || isa<ClassDecl>(D)) {
-    // This is struct InPlaceValueMetadataCache.
+    // This is struct SingletonMetadataCache.
     cacheTy = llvm::StructType::get(getLLVMContext(),
                                     {TypeMetadataPtrTy, Int8PtrTy});
   } else {
     llvm_unreachable("in-place initialization for classes not yet supported");
   }
 
-  LinkEntity entity = LinkEntity::forTypeMetadataInPlaceInitializationCache(D);
+  auto entity = LinkEntity::forTypeMetadataSingletonInitializationCache(D);
   auto variable =
     getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
                           cacheTy, DebugTypeInfo());
@@ -3275,17 +3275,16 @@ IRGenModule::getAddrOfTypeMetadataInPlaceInitializationCache(
 /// existing external declaration to the address point as an alias into the
 /// full metadata object.
 llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
-                                 bool isIndirect,
-                                 bool isPattern,
-                                 bool isConstant,
-                                 ConstantInitFuture init,
-                                 llvm::StringRef section) {
+                                                   bool isPattern,
+                                                   bool isConstant,
+                                                   ConstantInitFuture init,
+                                                   llvm::StringRef section) {
   assert(init);
-  assert(!isIndirect && "indirect type metadata not used yet");
 
   if (isPattern) {
+    assert(isConstant && "Type metadata patterns must be constant");
     auto addr = getAddrOfTypeMetadataPattern(concreteType->getAnyNominal(),
-                                             isConstant, init, section);
+                                             init, section);
 
     return cast<llvm::GlobalValue>(addr);
   }
@@ -3490,12 +3489,11 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataPattern(NominalTypeDecl *D) {
-  return getAddrOfTypeMetadataPattern(D, false, ConstantInit(), "");
+  return getAddrOfTypeMetadataPattern(D, ConstantInit(), "");
 }
 
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
-                                          bool isConstant,
                                           ConstantInit init,
                                           StringRef section) {
   if (!init)
@@ -3504,7 +3502,7 @@ IRGenModule::getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
   auto alignment = getPointerAlignment();
   LinkEntity entity = LinkEntity::forTypeMetadataPattern(D);
   auto addr = getAddrOfLLVMVariable(entity, alignment, init,
-                                   Int8PtrTy, DebugTypeInfo());
+                                   Int8Ty, DebugTypeInfo());
 
   if (init) {
     auto var = cast<llvm::GlobalVariable>(addr);
@@ -3567,7 +3565,7 @@ IRGenModule::getAddrOfTypeMetadataInstantiationFunction(NominalTypeDecl *D,
       /// Generic arguments.
       Int8PtrPtrTy,
       /// Generic metadata pattern.
-      Int8PtrPtrTy
+      Int8PtrTy
     };
 
     fnType = llvm::FunctionType::get(TypeMetadataPtrTy, argTys,
@@ -3579,6 +3577,8 @@ IRGenModule::getAddrOfTypeMetadataInstantiationFunction(NominalTypeDecl *D,
     llvm::Type *argTys[] = {
       /// Type descriptor.
       TypeContextDescriptorPtrTy,
+      /// Resilient metadata pattern.
+      Int8PtrTy
     };
 
     fnType = llvm::FunctionType::get(TypeMetadataPtrTy, argTys,

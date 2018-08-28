@@ -17,7 +17,7 @@
 // CHECK: is-debug: 1
 
 // CHECK: DEPEND START
-// CHECK: Unit | system | {{.*}}/Swift.swiftmodule |
+// CHECK: Unit | system | {{.*}}/Swift.swiftmodule
 // CHECK: DEPEND END (1)
 
 // OPT: is-debug: 1

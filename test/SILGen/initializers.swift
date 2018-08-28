@@ -1127,3 +1127,18 @@ class InOutInitializer {
 // CHECK: bb0(%0 : @trivial $*Int, %1 : @trivial $@thick InOutInitializer.Type):
   init(x: inout Int) {}
 }
+
+// <rdar://problem/16331406>
+class SuperVariadic {
+  init(ints: Int...) { }
+}
+class SubVariadic : SuperVariadic { }
+
+// CHECK-LABEL: sil hidden @$S21failable_initializers11SubVariadicC4intsACSid_tcfc
+// CHECK:       bb0(%0 : @owned $Array<Int>, %1 : @owned $SubVariadic):
+// CHECK:         [[SELF_UPCAST:%.*]] = upcast {{.*}} : $SubVariadic to $SuperVariadic
+// CHECK:         [[T0:%.*]] = begin_borrow %0 : $Array<Int>
+// CHECK:         [[T1:%.*]] = copy_value [[T0]] : $Array<Int>
+// CHECK:         [[SUPER_INIT:%.*]] = function_ref @$S21failable_initializers13SuperVariadicC4intsACSid_tcfc
+// CHECK:         apply [[SUPER_INIT]]([[T1]], [[SELF_UPCAST]])
+// CHECK-LABEL: } // end sil function

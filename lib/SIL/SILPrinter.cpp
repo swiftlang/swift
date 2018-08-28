@@ -274,10 +274,6 @@ void SILDeclRef::print(raw_ostream &OS) const {
         printValueDecl(accessor->getStorage(), OS);
         OS << "!setter";
         break;
-      case AccessorKind::MaterializeForSet:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!materializeForSet";
-        break;
       case AccessorKind::Address:
         printValueDecl(accessor->getStorage(), OS);
         OS << "!addressor";
@@ -1784,15 +1780,7 @@ public:
       *this << "[nonatomic] ";
     *this << getIDAndType(I->getOperand(0));
   }
-  void visitStrongPinInst(StrongPinInst *I) {
-    if (I->isNonAtomic())
-      *this << "[nonatomic] ";
-    *this << getIDAndType(I->getOperand());
-  }
   void visitIsUniqueInst(IsUniqueInst *CUI) {
-    *this << getIDAndType(CUI->getOperand());
-  }
-  void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
   }
   void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {

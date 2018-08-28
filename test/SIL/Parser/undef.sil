@@ -21,7 +21,7 @@ struct S {
 
 enum E {
   case Case
-  case DataCase(())
+  case DataCase(Void)
 }
 
 sil @general_test : $() -> () {
@@ -94,8 +94,6 @@ bb0:
   mark_dependence undef : $C on undef : $C
   // CHECK: is_unique undef : $C
   is_unique undef : $C
-  // CHECK: is_unique_or_pinned undef : $C
-  is_unique_or_pinned undef : $C
   // CHECK: copy_block undef : $@convention(block) () -> ()
   copy_block undef : $@convention(block) () -> ()
 

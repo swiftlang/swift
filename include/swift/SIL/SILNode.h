@@ -221,9 +221,6 @@ protected:
   SWIFT_INLINE_BITFIELD(RefCountingInst, NonValueInstruction, 1,
       atomicity : 1
   );
-  SWIFT_INLINE_BITFIELD(StrongPinInst, SingleValueInstruction, 1,
-      atomicity : 1
-  );
 
   // Ensure that BindMemoryInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(BindMemoryInst, NonValueInstruction);

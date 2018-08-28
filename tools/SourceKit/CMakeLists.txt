@@ -100,6 +100,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
                         BINARY_DIR
                           "${SWIFT_PATH_TO_LIBDISPATCH_BUILD}"
                         CMAKE_ARGS
+                          -DCMAKE_BUILD_TYPE=${LIBDISPATCH_CMAKE_BUILD_TYPE}
                           -DCMAKE_C_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang
                           -DCMAKE_CXX_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang++
                           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}

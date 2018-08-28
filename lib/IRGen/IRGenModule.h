@@ -1156,11 +1156,10 @@ public:
                                                      bool isForeign,
                                                      ForDefinition_t forDefinition);
   llvm::GlobalValue *defineTypeMetadata(CanType concreteType,
-                                  bool isIndirect,
-                                  bool isPattern,
-                                  bool isConstant,
-                                  ConstantInitFuture init,
-                                  llvm::StringRef section = {});
+                                        bool isPattern,
+                                        bool isConstant,
+                                        ConstantInitFuture init,
+                                        llvm::StringRef section = {});
 
   TypeEntityReference getTypeEntityReference(NominalTypeDecl *D);
 
@@ -1169,7 +1168,6 @@ public:
                                           SymbolReferenceKind kind);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
-                                               bool isConstant,
                                                ConstantInit init,
                                                StringRef section);
   llvm::Function *getAddrOfTypeMetadataCompletionFunction(NominalTypeDecl *D,
@@ -1178,7 +1176,7 @@ public:
                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataInstantiationCache(NominalTypeDecl *D,
                                              ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfTypeMetadataInPlaceInitializationCache(
+  llvm::Constant *getAddrOfTypeMetadataSingletonInitializationCache(
                                              NominalTypeDecl *D,
                                              ForDefinition_t forDefinition);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,

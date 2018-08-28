@@ -167,7 +167,7 @@ enum GenericFixedLayout<T> {
 
 // CHECK-LABEL: @"$S20enum_value_semantics18GenericFixedLayoutOMP" = internal constant <{ {{.*}} }> <{
 //   Instantiation function.
-// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint (%swift.type* (%swift.type_descriptor*, i8**, i8**)* @"$S20enum_value_semantics18GenericFixedLayoutOMi" to i64), i64 ptrtoint (<{ i32, i32, i32, i32 }>* @"$S20enum_value_semantics18GenericFixedLayoutOMP" to i64)) to i32),
+// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint (%swift.type* (%swift.type_descriptor*, i8**, i8*)* @"$S20enum_value_semantics18GenericFixedLayoutOMi" to i64), i64 ptrtoint (<{ i32, i32, i32, i32 }>* @"$S20enum_value_semantics18GenericFixedLayoutOMP" to i64)) to i32),
 //   Completion function.
 // CHECK-SAME:    i32 0,
 //   Pattern flags.  0x4020_0000 == (MetadataKind::Enum << 21).

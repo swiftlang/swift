@@ -53,6 +53,7 @@ value(_) // expected-error{{'_' can only appear in a pattern or on the left side
 // <rdar://problem/23798944> = vs. == in Swift if string character count statement causes segmentation fault
 func f23798944() {
   let s = ""
+  // FIXME: better would be: use of '=' in a boolean context, did you mean '=='?
   if s.count = 0 { // expected-error {{cannot assign to property: 'count' is a get-only property}}
   }
 }

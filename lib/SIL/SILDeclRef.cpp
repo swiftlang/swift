@@ -273,12 +273,21 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       return maybeAddExternal(SILLinkage::PublicNonABI);
   }
 
-  bool neverPublic = false;
+  enum class Limit {
+    /// No limit.
+    None,
+    /// The declaration is emitted on-demand; it should end up with internal
+    /// or shared linkage.
+    OnDemand,
+    /// The declaration should never be made public.
+    NeverPublic 
+  };
+  auto limit = Limit::None;
 
   // ivar initializers and destroyers are completely contained within the class
   // from which they come, and never get seen externally.
   if (isIVarInitializerOrDestroyer()) {
-    neverPublic = true;
+    limit = Limit::NeverPublic;
   }
 
   // Stored property initializers get the linkage of their containing type.
@@ -305,13 +314,21 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     // FIXME: This should always be true.
     if (d->getDeclContext()->getParentModule()->getResilienceStrategy() ==
         ResilienceStrategy::Resilient)
-      neverPublic = true;
+      limit = Limit::NeverPublic;
   }
 
   // The global addressor is never public for resilient globals.
   if (kind == Kind::GlobalAccessor) {
     if (cast<VarDecl>(d)->isResilient()) {
-      neverPublic = true;
+      limit = Limit::NeverPublic;
+    }
+  }
+
+  // Forced-static-dispatch functions are created on-demand and have
+  // at best shared linkage.
+  if (auto fn = dyn_cast<FuncDecl>(d)) {
+    if (fn->hasForcedStaticDispatch()) {
+      limit = Limit::OnDemand;
     }
   }
   
@@ -332,11 +349,15 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     return maybeAddExternal(SILLinkage::Private);
 
   case AccessLevel::Internal:
+    if (limit == Limit::OnDemand)
+      return SILLinkage::Shared;
     return maybeAddExternal(SILLinkage::Hidden);
 
   case AccessLevel::Public:
   case AccessLevel::Open:
-    if (neverPublic)
+    if (limit == Limit::OnDemand)
+      return SILLinkage::Shared;
+    if (limit == Limit::NeverPublic)
       return maybeAddExternal(SILLinkage::Hidden);
     return maybeAddExternal(SILLinkage::Public);
   }

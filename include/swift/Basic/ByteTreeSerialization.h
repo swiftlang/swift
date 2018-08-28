@@ -21,6 +21,7 @@
 
 #include "llvm/Support/BinaryStreamError.h"
 #include "llvm/Support/BinaryStreamWriter.h"
+#include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
 #include <map>
 
 namespace {
@@ -35,7 +36,7 @@ class ByteTreeWriter;
 
 using UserInfoMap = std::map<void *, void *>;
 
-/// Add a template specialization of \c ObjectTraits for any that type
+/// Add a template specialization of \c ObjectTraits for any type that
 /// serializes as an object consisting of multiple fields.
 template <class T>
 struct ObjectTraits {
@@ -55,7 +56,7 @@ struct ObjectTraits {
   //                   UserInfoMap &UserInfo);
 };
 
-/// Add a template specialization of \c ScalarTraits for any that type
+/// Add a template specialization of \c ScalarTraits for any type that
 /// serializes into a raw set of bytes.
 template <class T>
 struct ScalarTraits {
@@ -70,7 +71,17 @@ struct ScalarTraits {
   // static llvm::Error write(llvm::BinaryStreamWriter &Writer, const T &Value);
 };
 
-/// Add a template specialization of \c WrapperTypeTraits for any that type
+/// Add a template specialization of \c DirectlyEncodable for any type whose
+/// serialized form is equal to its binary representation on the serializing
+/// machine.
+template <class T>
+struct DirectlyEncodable {
+  // Must provide:
+
+  // static bool const value = true;
+};
+
+/// Add a template specialization of \c WrapperTypeTraits for any type that
 /// serializes as a type that already has a specialization of \c ScalarTypes.
 /// This will typically be useful for types like enums that have a 1-to-1
 /// mapping to e.g. an integer.
@@ -143,6 +154,12 @@ private:
   /// The writer to which the binary data is written.
   llvm::BinaryStreamWriter &StreamWriter;
 
+  /// The underlying stream of the StreamWriter. We need this reference so that
+  /// we can call \c ExponentialGrowthAppendingBinaryByteStream.writeRaw
+  /// which is more efficient than the generic \c writeBytes of
+  /// \c llvm::BinaryStreamWriter since it avoids the arbitrary size memcopy.
+  ExponentialGrowthAppendingBinaryByteStream &Stream;
+
   /// The number of fields this object contains. \c UINT_MAX if it has not been
   /// set yet. No member may be written to the object if expected number of
   /// fields has not been set yet.
@@ -157,8 +174,21 @@ private:
 
   /// The \c ByteTreeWriter can only be constructed internally. Use
   /// \c ByteTreeWriter.write to serialize a new object.
-  ByteTreeWriter(llvm::BinaryStreamWriter &StreamWriter, UserInfoMap &UserInfo)
-      : StreamWriter(StreamWriter), UserInfo(UserInfo) {}
+  /// \p Stream must be the underlying stream of \p SteamWriter.
+  ByteTreeWriter(ExponentialGrowthAppendingBinaryByteStream &Stream,
+                 llvm::BinaryStreamWriter &StreamWriter, UserInfoMap &UserInfo)
+      : StreamWriter(StreamWriter), Stream(Stream), UserInfo(UserInfo) {}
+
+  /// Write the given value to the ByteTree in the same form in which it is
+  /// represented on the serializing machine.
+  template <typename T>
+  llvm::Error writeRaw(T Value) {
+    // FIXME: We implicitly inherit the endianess of the serializing machine.
+    // Since we're currently only supporting macOS that's not a problem for now.
+    auto Error = Stream.writeRaw(StreamWriter.getOffset(), Value);
+    StreamWriter.setOffset(StreamWriter.getOffset() + sizeof(T));
+    return Error;
+  }
 
   /// Set the expected number of fields the object written by this writer is
   /// expected to have.
@@ -167,8 +197,15 @@ private:
            "NumFields may not be reset since it has already been written to "
            "the byte stream");
     assert((this->NumFields == UINT_MAX) && "NumFields has already been set");
+    // Num fields cannot exceed (1 << 31) since it would otherwise interfere
+    // with the bitflag that indicates if the next construct in the tree is an
+    // object or a scalar.
+    assert((NumFields & ((uint32_t)1 << 31)) == 0 && "Field size too large");
 
-    auto Error = StreamWriter.writeInteger(NumFields);
+    // Set the most significant bit to indicate that the next construct is an
+    // object and not a scalar.
+    uint32_t ToWrite = NumFields | (1 << 31);
+    auto Error = writeRaw(ToWrite);
     (void)Error;
     assert(!Error);
 
@@ -198,11 +235,13 @@ public:
   /// the stream by the specified ProtocolVersion.
   template <typename T>
   typename std::enable_if<has_ObjectTraits<T>::value, void>::type
-  static write(uint32_t ProtocolVersion, llvm::BinaryStreamWriter &StreamWriter,
-               const T &Object, UserInfoMap &UserInfo) {
-    ByteTreeWriter Writer(StreamWriter, UserInfo);
+  static write(ExponentialGrowthAppendingBinaryByteStream &Stream,
+               uint32_t ProtocolVersion, const T &Object,
+               UserInfoMap &UserInfo) {
+    llvm::BinaryStreamWriter StreamWriter(Stream);
+    ByteTreeWriter Writer(Stream, StreamWriter, UserInfo);
 
-    auto Error = Writer.StreamWriter.writeInteger(ProtocolVersion);
+    auto Error = Writer.writeRaw(ProtocolVersion);
     (void)Error;
     assert(!Error);
 
@@ -217,7 +256,7 @@ public:
   write(const T &Object, unsigned Index) {
     validateAndIncreaseFieldIndex(Index);
 
-    auto ObjectWriter = ByteTreeWriter(StreamWriter, UserInfo);
+    auto ObjectWriter = ByteTreeWriter(Stream, StreamWriter, UserInfo);
     ObjectWriter.setNumFields(ObjectTraits<T>::numFields(Object, UserInfo));
 
     ObjectTraits<T>::write(ObjectWriter, Object, UserInfo);
@@ -229,7 +268,11 @@ public:
     validateAndIncreaseFieldIndex(Index);
 
     uint32_t ValueSize = ScalarTraits<T>::size(Value);
-    auto SizeError = StreamWriter.writeInteger(ValueSize);
+    // Size cannot exceed (1 << 31) since it would otherwise interfere with the
+    // bitflag that indicates if the next construct in the tree is an object
+    // or a scalar.
+    assert((ValueSize & ((uint32_t)1 << 31)) == 0 && "Value size too large");
+    auto SizeError = writeRaw(ValueSize);
     (void)SizeError;
     assert(!SizeError);
 
@@ -241,6 +284,21 @@ public:
     assert((StreamWriter.getOffset() - StartOffset == ValueSize) &&
            "Number of written bytes does not match size returned by "
            "ScalarTraits<T>::size");
+  }
+
+  template <typename T>
+  typename std::enable_if<DirectlyEncodable<T>::value, void>::type
+  write(const T &Value, unsigned Index) {
+    validateAndIncreaseFieldIndex(Index);
+
+    uint32_t ValueSize = sizeof(T);
+    auto SizeError = writeRaw(ValueSize);
+    (void)SizeError;
+    assert(!SizeError);
+
+    auto ContentError = writeRaw(Value);
+    (void)ContentError;
+    assert(!ContentError);
   }
 
   template <typename T>
@@ -257,30 +315,18 @@ public:
 // Define serialization schemes for common types
 
 template <>
-struct ScalarTraits<uint8_t> {
-  static unsigned size(const uint8_t &Value) { return 1; }
-  static llvm::Error write(llvm::BinaryStreamWriter &Writer,
-                           const uint8_t &Value) {
-    return Writer.writeInteger(Value);
-  }
+struct DirectlyEncodable<uint8_t> {
+  static bool const value = true;
 };
 
 template <>
-struct ScalarTraits<uint16_t> {
-  static unsigned size(const uint16_t &Value) { return 2; }
-  static llvm::Error write(llvm::BinaryStreamWriter &Writer,
-                           const uint16_t &Value) {
-    return Writer.writeInteger(Value);
-  }
+struct DirectlyEncodable<uint16_t> {
+  static bool const value = true;
 };
 
 template <>
-struct ScalarTraits<uint32_t> {
-  static unsigned size(const uint32_t &Value) { return 4; }
-  static llvm::Error write(llvm::BinaryStreamWriter &Writer,
-                           const uint32_t &Value) {
-    return Writer.writeInteger(Value);
-  }
+struct DirectlyEncodable<uint32_t> {
+  static bool const value = true;
 };
 
 template <>
@@ -301,13 +347,16 @@ struct ScalarTraits<llvm::StringRef> {
 };
 
 template <>
-struct ScalarTraits<llvm::NoneType> {
-  // Serialize llvm::None as a value with 0 length
-  static unsigned size(const llvm::NoneType &None) { return 0; }
-  static llvm::Error write(llvm::BinaryStreamWriter &Writer,
-                           const llvm::NoneType &None) {
+struct ObjectTraits<llvm::NoneType> {
+  // Serialize llvm::None as an object without any elements
+  static unsigned numFields(const llvm::NoneType &Object,
+                            UserInfoMap &UserInfo) {
+    return 0;
+  }
+
+  static void write(ByteTreeWriter &Writer, const llvm::NoneType &Object,
+                    UserInfoMap &UserInfo) {
     // Nothing to write
-    return llvm::ErrorSuccess();
   }
 };
 
