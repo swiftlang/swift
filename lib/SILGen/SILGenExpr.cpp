@@ -2950,11 +2950,9 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   }
 
   auto &resultTL = SGF.getTypeLowering(E->getType());
-
   if (resultTL.isLoadable()) {
-    auto resultTy = resultTL.getLoweredType();
     auto res = SGF.B.createBuiltin(E, SGF.getASTContext().getIdentifier(name),
-                                   resultTy, {}, args);
+                                   resultTL.getLoweredType(), {}, args);
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(res, resultTL));
   } else {
     auto address = SGF.getBufferForExprResult(E, resultTL.getLoweredType(), C);
