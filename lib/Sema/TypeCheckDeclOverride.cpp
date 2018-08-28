@@ -62,8 +62,7 @@ static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
 }
 
 Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
-                                       ValueDecl *derivedDecl,
-                                       bool stripLabels) {
+                                       ValueDecl *derivedDecl) {
   auto *method = dyn_cast<AbstractFunctionDecl>(member);
   ConstructorDecl *ctor = nullptr;
   if (method)
@@ -96,9 +95,6 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
     if (memberType->hasError())
       return memberType;
   }
-
-  if (stripLabels)
-    memberType = memberType->getUnlabeledType(ctx);
 
   if (method) {
     // For methods, strip off the 'Self' type.
