@@ -2425,7 +2425,6 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     return diagnoseInvalid("the specified result type is not a TensorFlow "
                            "value type or an aggregate of TensorFlow value "
                            "types");
-
   auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
       return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 

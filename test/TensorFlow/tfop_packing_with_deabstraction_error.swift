@@ -6,4 +6,3 @@ public func packResultsToAggregate_addressOnlyResult<T>() -> T {
   // expected-error @+1 {{cannot extract TensorFlow result into an address-only type}}
   return #tfop("SomeOp")
 }
-

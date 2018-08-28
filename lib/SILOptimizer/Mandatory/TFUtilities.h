@@ -148,7 +148,6 @@ struct SILTensorOpInfo {
   /// Return the string suffix for the specified attribute modifier.
   static const char *getOperandClassSuffix(OperandClass opClass);
 
-
   /// Return the operand class of the specified string form like "tensor"
   static llvm::Optional<OperandClass> getOperandClass(StringRef suffix);
 
