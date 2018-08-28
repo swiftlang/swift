@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/DependencyGraph.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Frontend/ReferenceDependencyKeys.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
