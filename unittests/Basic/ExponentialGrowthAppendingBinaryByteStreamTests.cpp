@@ -116,11 +116,9 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, GrowMultipleSteps) {
 }
 
 TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteIntoMiddle) {
-  // Test that the stream resizes correctly if we write into its middle
-
   ExponentialGrowthAppendingBinaryByteStream Stream(llvm::support::little);
 
-  // Test that the buffer can grow multiple steps at once, e.g. 1 -> 2 -> 4
+  // Test that the stream resizes correctly if we write into its middle
   std::vector<uint8_t> InitialData = {'T', 'e', 's', 't'};
   auto InitialDataRef = makeArrayRef(InitialData);
   EXPECT_THAT_ERROR(Stream.writeBytes(0, InitialDataRef), Succeeded());

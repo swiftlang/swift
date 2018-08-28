@@ -35,7 +35,7 @@ class ByteTreeWriter;
 
 using UserInfoMap = std::map<void *, void *>;
 
-/// Add a template specialization of \c ObjectTraits for any that type
+/// Add a template specialization of \c ObjectTraits for any type that
 /// serializes as an object consisting of multiple fields.
 template <class T>
 struct ObjectTraits {
@@ -55,7 +55,7 @@ struct ObjectTraits {
   //                   UserInfoMap &UserInfo);
 };
 
-/// Add a template specialization of \c ScalarTraits for any that type
+/// Add a template specialization of \c ScalarTraits for any type that
 /// serializes into a raw set of bytes.
 template <class T>
 struct ScalarTraits {
