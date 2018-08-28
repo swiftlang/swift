@@ -3521,16 +3521,13 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
 
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
-    return FunctionType::getOld(getInput(), getResult(), info);
-  if (auto *genFnTy = dyn_cast<GenericFunctionType>(this))
-    return GenericFunctionType::getOld(genFnTy->getGenericSignature(),
-                                       getInput(), getResult(), info);
+    return FunctionType::get(getParams(), getResult(), info,
+                             /*canonicalVararg=*/isCanonical());
 
-  static_assert(2 - 1 ==
-                  static_cast<int>(TypeKind::Last_AnyFunctionType) -
-                    static_cast<int>(TypeKind::First_AnyFunctionType),
-                "unhandled function type");
-  llvm_unreachable("unhandled function type");
+  auto *genFnTy = cast<GenericFunctionType>(this);
+  return GenericFunctionType::get(genFnTy->getGenericSignature(),
+                                  getParams(), getResult(), info,
+                                  /*canonicalVararg=*/isCanonical());
 }
 
 void AnyFunctionType::decomposeInput(
