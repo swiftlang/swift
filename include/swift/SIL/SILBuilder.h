@@ -2202,7 +2202,9 @@ public:
   SavedInsertionPointRAII &operator=(SavedInsertionPointRAII &&) = delete;
 
   ~SavedInsertionPointRAII() {
-    if (SavedIP.is<SILInstruction *>()) {
+    if (SavedIP.isNull()) {
+      Builder.clearInsertionPoint();
+    } else if (SavedIP.is<SILInstruction *>()) {
       Builder.setInsertionPoint(SavedIP.get<SILInstruction *>());
     } else {
       Builder.setInsertionPoint(SavedIP.get<SILBasicBlock *>());
