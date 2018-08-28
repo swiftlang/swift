@@ -57,31 +57,6 @@ public:
 
   llvm::Error writeBytes(uint32_t Offset, ArrayRef<uint8_t> Buffer) override;
 
-  /// This is an optimized version of \c writeBytes that assumes we know the
-  /// size of \p Value at compile time (which in particular holds for integers).
-  /// It does so by avoiding the memcopy that \c writeBytes requires to copy
-  /// the arbitrarily sized Buffer to the output buffer and using a direct
-  /// memory assignment instead.
-  /// This assumes that the enianess of this steam is the same as the native
-  /// endianess on the executing machine. No endianess transformations are
-  /// performed.
-  template<typename T>
-  llvm::Error writeRaw(uint32_t Offset, T Value) {
-    if (auto Error = checkOffsetForWrite(Offset, sizeof(T))) {
-      return Error;
-    }
-
-    // Resize the internal buffer if needed.
-    uint32_t RequiredSize = Offset + sizeof(T);
-    if (RequiredSize > Data.size()) {
-      Data.resize(RequiredSize);
-    }
-
-    *(T *)(Data.data() + Offset) = Value;
-
-    return llvm::Error::success();
-  }
-
   llvm::Error commit() override { return llvm::Error::success(); }
 
   virtual llvm::BinaryStreamFlags getFlags() const override {
