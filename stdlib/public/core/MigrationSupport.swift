@@ -1078,7 +1078,7 @@ extension Zip2Sequence {
 ///         // With Swift 4.0 and Swift 3.2 and earlier, use PlaygroundQuickLook
 ///         // and the CustomPlaygroundQuickLookable protocol.
 ///     #endif
-@available(swift, deprecated, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
+@available(swift, deprecated: 4.2, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public typealias PlaygroundQuickLook = _PlaygroundQuickLook
 
 @_frozen // rdar://problem/38719739 - needed by LLDB
