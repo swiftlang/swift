@@ -6,35 +6,30 @@ class X {
 
   // Convenience inits must dynamically dispatch designated inits...
   // CHECK-LABEL: sil hidden @$S32convenience_init_peer_delegation1XC0A0ACyt_tcfC
-  // CHECK-LABEL: sil hidden @$S32convenience_init_peer_delegation1XC0A0ACyt_tcfc
-  // CHECK:         class_method %7 : $X, #X.init!initializer.1
+  // CHECK:         class_method {{%.*}}, #X.init!allocator.1
   convenience init(convenience: ()) {
     self.init()
   }
 
   // ...but can statically invoke peer convenience inits
   // CHECK-LABEL: sil hidden @$S32convenience_init_peer_delegation1XC17doubleConvenienceACyt_tcfC
-  // CHECK-LABEL: sil hidden @$S32convenience_init_peer_delegation1XC17doubleConvenienceACyt_tcfc
-  // CHECK:         function_ref @$S32convenience_init_peer_delegation1XC0A0ACyt_tcfc
+  // CHECK:         function_ref @$S32convenience_init_peer_delegation1XC0A0ACyt_tcfC
   convenience init(doubleConvenience: ()) {
     self.init(convenience: ())
   }
 
   // CHECK-LABEL: sil hidden @$S32convenience_init_peer_delegation1XC8requiredACyt_tcfC
-  // CHECK-LABEL: sil hidden @$S32convenience_init_peer_delegation1XC8requiredACyt_tcfc
   required init(required: ()) {
   }
 
   // CHECK-LABEL: sil hidden @$S32convenience_init_peer_delegation1XC19requiredConvenienceACyt_tcfC
-  // CHECK-LABEL: sil hidden @$S32convenience_init_peer_delegation1XC19requiredConvenienceACyt_tcfc
   required convenience init(requiredConvenience: ()) {
     self.init(required: ())
   }
 
   // Convenience inits must dynamically dispatch required peer convenience inits
   // CHECK-LABEL: sil hidden @$S32convenience_init_peer_delegation1XC25requiredDoubleConvenienceACyt_tcfC
-  // CHECK-LABEL: sil hidden @$S32convenience_init_peer_delegation1XC25requiredDoubleConvenienceACyt_tcfc
-  // CHECK:         class_method %7 : $X, #X.init!initializer.1
+  // CHECK:         class_method {{%.*}}, #X.init!allocator.1
   required convenience init(requiredDoubleConvenience: ()) {
     self.init(requiredDoubleConvenience: ())
   }
@@ -46,6 +41,12 @@ class Y: X {
   // override a nonexistent vtable entry) just because it has the same name.
   init(convenience: ()) {
     super.init()
+  }
+
+  // Conversely, a designated init *can* be overridden as a convenience
+  // initializer.
+  override convenience init() {
+    self.init(convenience: ())
   }
 
   required init(required: ()) { super.init() }
@@ -68,18 +69,18 @@ func invocations(xt: X.Type) {
   // CHECK: function_ref @$S32convenience_init_peer_delegation1XC25requiredDoubleConvenienceACyt_tcfC
   _ = X(requiredDoubleConvenience: ())
 
-  // CHECK: class_method %0 : $@thick X.Type, #X.init!allocator.1
+  // CHECK: class_method {{%.*}}, #X.init!allocator.1
   _ = xt.init(required: ())
-  // CHECK: class_method %0 : $@thick X.Type, #X.init!allocator.1
+  // CHECK: class_method {{%.*}}, #X.init!allocator.1
   _ = xt.init(requiredConvenience: ())
-  // CHECK: class_method %0 : $@thick X.Type, #X.init!allocator.1
+  // CHECK: class_method {{%.*}}, #X.init!allocator.1
   _ = xt.init(requiredDoubleConvenience: ())
 }
 
 // CHECK-LABEL: sil_vtable X
 //                -- designated init()
-// CHECK-NOT:     @$S32convenience_init_peer_delegation1XCACycfC
-// CHECK:         @$S32convenience_init_peer_delegation1XCACycfc
+// CHECK:         @$S32convenience_init_peer_delegation1XCACycfC
+// CHECK-NOT:     @$S32convenience_init_peer_delegation1XCACycfc
 
 //                -- no unrequired convenience inits
 // CHECK-NOT:     @$S32convenience_init_peer_delegation1XC0A0ACyt_tcfC
@@ -89,10 +90,18 @@ func invocations(xt: X.Type) {
 
 //                -- designated init(required:)
 // CHECK:         @$S32convenience_init_peer_delegation1XC8requiredACyt_tcfC
-// CHECK:         @$S32convenience_init_peer_delegation1XC8requiredACyt_tcfc
+// CHECK-NOT:     @$S32convenience_init_peer_delegation1XC8requiredACyt_tcfc
 //                -- convenience init(requiredConvenience:)
 // CHECK:         @$S32convenience_init_peer_delegation1XC19requiredConvenienceACyt_tcfC
-// CHECK:         @$S32convenience_init_peer_delegation1XC19requiredConvenienceACyt_tcfc
+// CHECK-NOT:     @$S32convenience_init_peer_delegation1XC19requiredConvenienceACyt_tcfc
 //                -- convenience init(requiredDoubleConvenience:)
 // CHECK:         @$S32convenience_init_peer_delegation1XC25requiredDoubleConvenienceACyt_tcfC
-// CHECK:         @$S32convenience_init_peer_delegation1XC25requiredDoubleConvenienceACyt_tcfc
+// CHECK-NOT:     @$S32convenience_init_peer_delegation1XC25requiredDoubleConvenienceACyt_tcfc
+
+// CHECK-LABEL: sil_vtable Y
+//                -- designated init() overridden by convenience init
+// CHECK:         @$S32convenience_init_peer_delegation1YCACycfC
+// CHECK-NOT:     @$S32convenience_init_peer_delegation1YCACycfc
+//                -- Y.init(convenience:) is a designated init
+// CHECK:         @$S32convenience_init_peer_delegation1YC0A0ACyt_tcfC
+// CHECK-NOT:     @$S32convenience_init_peer_delegation1YC0A0ACyt_tcfc

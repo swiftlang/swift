@@ -757,9 +757,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
   bool ForCoverageMapping = doesASTRequireProfiling(M, decl);
 
-  if (declCtx->getSelfClassDecl()) {
-    // Class constructors have separate entry points for allocation and
-    // initialization.
+  auto emitClassAllocatorThunk = [&]{
     emitOrDelayFunction(
         *this, constant, [this, constant, decl](SILFunction *f) {
           preEmitFunction(constant, decl, f, decl);
@@ -767,27 +765,8 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
           SILGenFunction(*this, *f, decl).emitClassConstructorAllocator(decl);
           postEmitFunction(constant, f);
         });
-
-    // Constructors may not have bodies if they've been imported, or if they've
-    // been parsed from a textual interface.
-    if (decl->hasBody()) {
-      SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
-      emitOrDelayFunction(
-          *this, initConstant,
-          [this, initConstant, decl, declCtx](SILFunction *initF) {
-            preEmitFunction(initConstant, decl, initF, decl);
-            PrettyStackTraceSILFunction X("silgen constructor initializer",
-                                          initF);
-            initF->setProfiler(
-                getOrCreateProfilerForConstructors(declCtx, decl));
-            SILGenFunction(*this, *initF, decl)
-              .emitClassConstructorInitializer(decl);
-            postEmitFunction(initConstant, initF);
-          },
-          /*forceEmission=*/ForCoverageMapping);
-    }
-  } else {
-    // Struct and enum constructors do everything in a single function.
+  };
+  auto emitValueConstructorIfHasBody = [&]{
     if (decl->hasBody()) {
       emitOrDelayFunction(
           *this, constant, [this, constant, decl, declCtx](SILFunction *f) {
@@ -798,6 +777,47 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
             postEmitFunction(constant, f);
           });
     }
+  };
+  
+  if (declCtx->getSelfClassDecl()) {
+    // Designated initializers for classes have have separate entry points for
+    // allocation and initialization.
+    if (decl->isDesignatedInit()) {
+      emitClassAllocatorThunk();
+
+      // Constructors may not have bodies if they've been imported, or if they've
+      // been parsed from a textual interface.
+      if (decl->hasBody()) {
+        SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
+        emitOrDelayFunction(
+            *this, initConstant,
+            [this, initConstant, decl, declCtx](SILFunction *initF) {
+              preEmitFunction(initConstant, decl, initF, decl);
+              PrettyStackTraceSILFunction X("silgen constructor initializer",
+                                            initF);
+              initF->setProfiler(
+                  getOrCreateProfilerForConstructors(declCtx, decl));
+              SILGenFunction(*this, *initF, decl)
+                .emitClassConstructorInitializer(decl);
+              postEmitFunction(initConstant, initF);
+            },
+            /*forceEmission=*/ForCoverageMapping);
+      }
+    // Convenience initializers for classes behave more like value constructors
+    // in that there's only an allocating entry point that effectively
+    // "constructs" the self reference by invoking another initializer.
+    } else {
+      emitValueConstructorIfHasBody();
+      
+      // If the convenience initializer was imported from ObjC, we still have to
+      // emit the allocator thunk.
+      if (decl->hasClangNode()) {
+        emitClassAllocatorThunk();
+      }
+    }
+  } else {
+    // Struct and enum constructors do everything in a single function.
+    emitValueConstructorIfHasBody();
   }
 }
 

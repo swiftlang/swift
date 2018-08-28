@@ -36,10 +36,11 @@ protocol Initable {
 final class Derived : Base, Initable {}
 
 // CHECK-LABEL: sil hidden @$S4main4BaseC1xACSi_tcfC : $@convention(method) (Int, @thick Base.Type) -> @owned Base
-// CHECK:         [[SELF:%.*]] = alloc_ref_dynamic %1 : $@thick Base.Type, $Base
-// CHECK:         [[METHOD:%.*]] = function_ref @$S4main4BaseC1xACSi_tcfc
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]](%0, [[SELF]])
-// CHECK-NEXT:    return [[RESULT]]
+// CHECK:         [[METHOD:%.*]] = class_method [[SELF_META:%.*]] : $@thick Base.Type, #Base.init!allocator.1
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SELF_META]])
+// CHECK-NEXT:    assign [[RESULT]] to [[BOX:%.*]] :
+// CHECK-NEXT:    [[FINAL:%.*]] = load [copy] [[BOX]]
+// CHECK:         return [[FINAL]]
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$S4main7DerivedCAA8InitableA2aDP1xxSi_tcfCTW : $@convention(witness_method: Initable) (Int, @thick Derived.Type) -> @out Derived
 // CHECK:         [[SELF:%.*]] = upcast %2 : $@thick Derived.Type to $@thick Base.Type

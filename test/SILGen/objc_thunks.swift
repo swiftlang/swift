@@ -469,17 +469,9 @@ extension Hoozit {
   // CHECK-LABEL: sil hidden [thunk] @$S11objc_thunks6HoozitC3intACSi_tcfcTo : $@convention(objc_method) (Int, @owned Hoozit) -> @owned Hoozit
   @objc dynamic convenience init(int i: Int) { self.init(bellsOn: i) }
 
-  // CHECK-LABEL: sil hidden @$S11objc_thunks6HoozitC6doubleACSd_tcfc : $@convention(method) (Double, @owned Hoozit) -> @owned Hoozit
+  // CHECK-LABEL: sil hidden @$S11objc_thunks6HoozitC6doubleACSd_tcfC : $@convention(method) (Double, @thick Hoozit.Type) -> @owned Hoozit
   convenience init(double d: Double) { 
-    // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Hoozit }
-    // CHECK: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
-    // CHECK: [[X_BOX:%[0-9]+]] = alloc_box ${ var X }
     var x = X()
-    // CHECK: [[CTOR:%[0-9]+]] = objc_method [[SELF:%[0-9]+]] : $Hoozit, #Hoozit.init!initializer.1.foreign : (Hoozit.Type) -> (Int) -> Hoozit, $@convention(objc_method) (Int, @owned Hoozit) -> @owned Hoozit
-    // CHECK: [[NEW_SELF:%[0-9]+]] = apply [[CTOR]]
-    // CHECK: store [[NEW_SELF]] to [init] [[PB_BOX]] : $*Hoozit
-    // CHECK: return
     self.init(int:Int(d))
     other()
   }

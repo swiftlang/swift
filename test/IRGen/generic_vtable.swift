@@ -43,7 +43,7 @@ public class Concrete : Derived<Int> {
 // -- vtable entry for 'm2()'
 // CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$S14generic_vtable4BaseC2m2yyF"
 // -- vtable entry for 'init()'
-// CHECK-SAME: %T14generic_vtable4BaseC* (%T14generic_vtable4BaseC*)* @"$S14generic_vtable4BaseCACycfc"
+// CHECK-SAME: %T14generic_vtable4BaseC* (%swift.type*)* @"$S14generic_vtable4BaseCACycfC"
 // --
 // CHECK-SAME: , align
 
@@ -69,7 +69,7 @@ public class Concrete : Derived<Int> {
 // -- override for constructor
 // CHECK-SAME: @"$S14generic_vtable4BaseCMn"
 // CHECK-SAME: @"$S14generic_vtable4BaseCMn", i32 0, i32 15
-// CHECK-SAME: @"$S14generic_vtable7DerivedCACyxGycfc"
+// CHECK-SAME: @"$S14generic_vtable7DerivedCACyxGycfC"
 // CHECK-SAME: section "{{.*}}", align 4
 
 //// Type metadata pattern for 'Derived' has an empty vtable, filled in at
@@ -103,7 +103,7 @@ public class Concrete : Derived<Int> {
 // -- override for constructor
 // CHECK-SAME: @"$S14generic_vtable4BaseCMn"
 // CHECK-SAME: @"$S14generic_vtable4BaseCMn", i32 0, i32 15
-// CHECK-SAME: @"$S14generic_vtable8ConcreteCACycfc"
+// CHECK-SAME: @"$S14generic_vtable8ConcreteCACycfC"
 // --
 // CHECK-SAME: section "{{.*}}", align 4
 
@@ -117,7 +117,7 @@ public class Concrete : Derived<Int> {
 // -- vtable entry for 'm2()'
 // CHECK-SAME: void (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedC2m2yyF"
 // -- vtable entry for 'init()'
-// CHECK-SAME: %T14generic_vtable8ConcreteC* (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteCACycfc"
+// CHECK-SAME: %T14generic_vtable8ConcreteC* (%swift.type*)* @"$S14generic_vtable8ConcreteCACycfC"
 // -- vtable entry for 'm3()'
 // CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteC2m3yyF"
 // -- vtable entry for 'm4()'
@@ -130,7 +130,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$S14generic_vtable4BaseC2m1yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$S14generic_vtable4BaseCMn", i32 0, i32 13)
 // CHECK-LABEL: @"$S14generic_vtable4BaseC2m2yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$S14generic_vtable4BaseCMn", i32 0, i32 14)
-// CHECK-LABEL: @"$S14generic_vtable4BaseCACycfcTq" = hidden alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$S14generic_vtable4BaseCMn", i32 0, i32 15)
+// CHECK-LABEL: @"$S14generic_vtable4BaseCACycfCTq" = hidden alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$S14generic_vtable4BaseCMn", i32 0, i32 15)
 
 // CHECK-LABEL: @"$S14generic_vtable7DerivedC2m3yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$S14generic_vtable7DerivedCMn", i32 0, i32 23)
 
