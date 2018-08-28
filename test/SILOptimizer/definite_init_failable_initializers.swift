@@ -779,14 +779,11 @@ class FailableBaseClass {
     return nil
   }
 
-// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17FailableBaseClassC20failBeforeDelegationACSgyt_tcfc
-// CHECK:       bb0(%0 : $FailableBaseClass):
+// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17FailableBaseClassC20failBeforeDelegationACSgyt_tcfC
+// CHECK:       bb0(%0 : $@thick FailableBaseClass.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $FailableBaseClass
-// CHECK:         store %0 to [[SELF_BOX]]
-// CHECK-NEXT:    br bb1
+// CHECK:         br bb1
 // CHECK:       bb1:
-// CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick FailableBaseClass.Type, %0 : $FailableBaseClass
-// CHECK-NEXT:    dealloc_partial_ref %0 : $FailableBaseClass, [[METATYPE]] : $@thick FailableBaseClass.Type
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[RESULT:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
 // CHECK-NEXT:    br bb2
@@ -796,10 +793,9 @@ class FailableBaseClass {
     return nil
   }
 
-// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17FailableBaseClassC19failAfterDelegationACSgyt_tcfc
-// CHECK:       bb0(%0 : $FailableBaseClass):
+// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17FailableBaseClassC19failAfterDelegationACSgyt_tcfC
+// CHECK:       bb0(%0 : $@thick FailableBaseClass.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $FailableBaseClass
-// CHECK:         store %0 to [[SELF_BOX]]
 // CHECK:         [[INIT_FN:%.*]] = class_method %0
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%0)
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
@@ -816,10 +812,9 @@ class FailableBaseClass {
     return nil
   }
 
-// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17FailableBaseClassC20failDuringDelegationACSgyt_tcfc
-// CHECK:       bb0(%0 : $FailableBaseClass):
+// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17FailableBaseClassC20failDuringDelegationACSgyt_tcfC
+// CHECK:       bb0(%0 : $@thick FailableBaseClass.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $FailableBaseClass
-// CHECK:         store %0 to [[SELF_BOX]]
 // CHECK:         [[INIT_FN:%.*]] = class_method %0
 // CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = apply [[INIT_FN]](%0)
 // CHECK:         [[COND:%.*]] = select_enum [[SELF_OPTIONAL]]
@@ -1270,14 +1265,13 @@ class ThrowDerivedClass : ThrowBaseClass {
     try! self.init()
   }
 
-// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC20failBeforeDelegationACSi_tKcfc
-// CHECK:       bb0(%0 : $Int, %1 : $ThrowDerivedClass):
+// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC20failBeforeDelegationACSi_tKcfC
+// CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK:         store %1 to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$S35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[ARG:%.*]] : $Int):
-// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassC6noFailACyt_tcfc
+// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassC6noFailACyt_tcfC
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%1)
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    strong_retain [[NEW_SELF]]
@@ -1285,8 +1279,6 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
 // CHECK:       bb2([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick ThrowDerivedClass.Type, %1 : $ThrowDerivedClass
-// CHECK-NEXT:    dealloc_partial_ref %1 : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   convenience init(failBeforeDelegation: Int) throws {
@@ -1294,11 +1286,10 @@ class ThrowDerivedClass : ThrowBaseClass {
     self.init(noFail: ())
   }
 
-// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC20failDuringDelegationACSi_tKcfc
-// CHECK:       bb0(%0 : $Int, %1 : $ThrowDerivedClass):
+// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC20failDuringDelegationACSi_tKcfC
+// CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK:         store %1 to [[SELF_BOX]]
-// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassCACyKcfc
+// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassCACyKcfC
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowDerivedClass):
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
@@ -1313,98 +1304,61 @@ class ThrowDerivedClass : ThrowBaseClass {
     try self.init()
   }
 
-// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC28failBeforeOrDuringDelegationACSi_tKcfc
-// CHECK:       bb0(%0 : $Int, %1 : $ThrowDerivedClass):
-// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
+// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC28failBeforeOrDuringDelegationACSi_tKcfC
+// CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]] : $*Builtin.Int1
-// CHECK:         store %1 to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$S35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[ARG:%.*]] : $Int):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
-// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassCACyKcfc
+// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassCACyKcfC
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
 // CHECK:       bb2([[NEW_SELF:%.*]] : $ThrowDerivedClass):
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    strong_retain [[NEW_SELF]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
 // CHECK:       bb3([[ERROR1:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR1]] : $Error)
 // CHECK:       bb4([[ERROR2:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR2]] : $Error)
 // CHECK:       bb5([[ERROR3:%.*]] : $Error):
-// CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    cond_br [[COND]], bb6, bb7
-// CHECK:       bb6:
-// CHECK-NEXT:    br bb8
-// CHECK:       bb7:
-// CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick ThrowDerivedClass.Type, %1 : $ThrowDerivedClass
-// CHECK-NEXT:    dealloc_partial_ref %1 : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
-// CHECK-NEXT:    br bb8
-// CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    throw [[ERROR3]]
   convenience init(failBeforeOrDuringDelegation: Int) throws {
     try unwrap(failBeforeOrDuringDelegation)
     try self.init()
   }
 
-// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC29failBeforeOrDuringDelegation2ACSi_tKcfc
-// CHECK:         bb0(%0 : $Int, %1 : $ThrowDerivedClass):
-// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
+// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC29failBeforeOrDuringDelegation2ACSi_tKcfC
+// CHECK:         bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]] : $*Builtin.Int1
-// CHECK:         store %1 to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$S35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[ARG:%.*]] : $Int):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
-// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassC20failBeforeDelegationACSi_tKcfc
+// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassC20failBeforeDelegationACSi_tKcfC
 // CHECK-NEXT:    try_apply [[INIT_FN]]([[ARG]], %1)
 // CHECK:       bb2([[NEW_SELF:%.*]] : $ThrowDerivedClass):
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    strong_retain [[NEW_SELF]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
 // CHECK:       bb3([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    store %1 to [[SELF_BOX]]
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb4([[ERROR1:%.*]] : $Error):
 // CHECK-NEXT:    br bb5([[ERROR1]] : $Error)
-// CHECK:       bb5([[ERROR2:%.*]] : $Error):
-// CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    cond_br [[COND]], bb6, bb7
-// CHECK:       bb6:
-// CHECK-NEXT:    br bb8
-// CHECK:       bb7:
-// CHECK-NEXT:    [[RELOADED_SELF:%.*]] = load [[SELF_BOX]]
-// CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick ThrowDerivedClass.Type, [[RELOADED_SELF]] : $ThrowDerivedClass
-// CHECK-NEXT:    dealloc_partial_ref [[RELOADED_SELF]] : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
-// CHECK-NEXT:    br bb8
-// CHECK:       bb8:
+// CHECK:       bb4([[ERROR2:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR2]] : $Error)
+// CHECK:       bb5([[ERROR3:%.*]] : $Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
-// CHECK-NEXT:    throw [[ERROR2]]
+// CHECK-NEXT:    throw [[ERROR3]]
   convenience init(failBeforeOrDuringDelegation2: Int) throws {
     try self.init(failBeforeDelegation: unwrap(failBeforeOrDuringDelegation2))
   }
 
-// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC19failAfterDelegationACSi_tKcfc
-// CHECK:       bb0(%0 : $Int, %1 : $ThrowDerivedClass):
+// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC19failAfterDelegationACSi_tKcfC
+// CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK:         store %1 to [[SELF_BOX]]
-// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassC6noFailACyt_tcfc
+// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassC6noFailACyt_tcfC
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%1)
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$S35definite_init_failable_initializers6unwrapyS2iKF
@@ -1423,19 +1377,16 @@ class ThrowDerivedClass : ThrowBaseClass {
     try unwrap(failAfterDelegation)
   }
 
-// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC27failDuringOrAfterDelegationACSi_tKcfc
-// CHECK:       bb0(%0 : $Int, %1 : $ThrowDerivedClass):
-// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
+// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC27failDuringOrAfterDelegationACSi_tKcfC
+// CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
+// CHECK:         [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
-// CHECK:         store %1 to [[SELF_BOX]]
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, 1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
-// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassCACyKcfc
+// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassCACyKcfC
 // CHECK-NEXT:    try_apply [[INIT_FN]](%1)
 // CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowDerivedClass):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
+// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$S35definite_init_failable_initializers6unwrapyS2iKF
@@ -1452,14 +1403,11 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    br bb5([[ERROR2]] : $Error)
 // CHECK:       bb5([[ERROR3:%.*]] : $Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
-// CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2)
-// CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP_MSB]] : $Builtin.Int2)
-// CHECK-NEXT:    cond_br [[COND]], bb6, bb7
+// CHECK:         cond_br {{.*}}, bb7, bb6
 // CHECK:       bb6:
-// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb7:
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -1470,22 +1418,19 @@ class ThrowDerivedClass : ThrowBaseClass {
     try unwrap(failDuringOrAfterDelegation)
   }
 
-// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC27failBeforeOrAfterDelegationACSi_tKcfc
-// CHECK:       bb0(%0 : $Int, %1 : $ThrowDerivedClass):
-// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int2
+// CHECK-LABEL: sil hidden @$S35definite_init_failable_initializers17ThrowDerivedClassC27failBeforeOrAfterDelegationACSi_tKcfC
+// CHECK:       bb0(%0 : $Int, %1 : $@thick ThrowDerivedClass.Type):
+// CHECK-NEXT:    [[BITMAP_BOX:%.*]] = alloc_stack $Builtin.Int1
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowDerivedClass
-// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int2, 0
+// CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    store [[ZERO]] to [[BITMAP_BOX]]
-// CHECK:         store %1 to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$S35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -2
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
-// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
-// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
-// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassC6noFailACyt_tcfc
+// CHECK:         [[INIT_FN:%.*]] = function_ref @$S35definite_init_failable_initializers17ThrowDerivedClassC6noFailACyt_tcfC
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = apply [[INIT_FN]](%1)
+// CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK:         [[UNWRAP_FN:%.*]] = function_ref @$S35definite_init_failable_initializers6unwrapyS2iKF
 // CHECK-NEXT:    try_apply [[UNWRAP_FN]](%0)
@@ -1501,27 +1446,13 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
 // CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP]] : $Builtin.Int2) : $Builtin.Int1
-// CHECK-NEXT:    cond_br [[COND]], bb6, bb10
+// CHECK:         cond_br {{.*}}, bb7, bb6
 // CHECK:       bb6:
-// CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
-// CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2)
-// CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP_MSB]] : $Builtin.Int2)
-// CHECK-NEXT:    cond_br [[COND]], bb7, bb8
+// CHECK-NEXT:    br bb8
 // CHECK:       bb7:
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
-// CHECK-NEXT:    br bb9
+// CHECK-NEXT:    br bb8
 // CHECK:       bb8:
-// CHECK-NEXT:    br bb9
-// CHECK:       bb9:
-// CHECK-NEXT:    br bb11
-// CHECK:       bb10:
-// CHECK-NEXT:    [[OLD_SELF:%.*]] = load [[SELF_BOX]]
-// CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick ThrowDerivedClass.Type, [[OLD_SELF]] : $ThrowDerivedClass
-// CHECK-NEXT:    dealloc_partial_ref [[OLD_SELF]] : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
-// CHECK-NEXT:    br bb11
-// CHECK:       bb11:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]

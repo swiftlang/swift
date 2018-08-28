@@ -358,20 +358,17 @@ class FailableBaseClass {
     return nil
   }
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17FailableBaseClassC19failAfterDelegationACSgyt_tcfc : $@convention(method) (@owned FailableBaseClass) -> @owned Optional<FailableBaseClass> {
-  // CHECK: bb0([[OLD_SELF:%.*]] : @owned $FailableBaseClass):
+  // CHECK-LABEL: sil hidden @$S21failable_initializers17FailableBaseClassC19failAfterDelegationACSgyt_tcfC
+  // CHECK: bb0([[SELF_META:%.*]] : @trivial $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
-  // CHECK:   store [[OLD_SELF]] to [init] [[PB_BOX]]
-  // CHECK:   [[TAKE_SELF:%.*]] = load [take] [[PB_BOX]]
-  // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[TAKE_SELF]]) : $@convention(method) (@owned FailableBaseClass) -> @owned FailableBaseClass
+  // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[SELF_META]])
   // CHECK:   destroy_value [[MARKED_SELF_BOX]]
   // CHECK:   [[RESULT:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
   // CHECK:   br bb2([[RESULT]] : $Optional<FailableBaseClass>)
   // CHECK: bb2([[RESULT:%.*]] : @owned $Optional<FailableBaseClass>):
   // CHECK:   return [[RESULT]]
-  // CHECK: } // end sil function '$S21failable_initializers17FailableBaseClassC19failAfterDelegationACSgyt_tcfc
   convenience init?(failAfterDelegation: ()) {
     self.init(noFail: ())
     return nil
@@ -379,14 +376,12 @@ class FailableBaseClass {
 
   // Optional to optional
   //
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17FailableBaseClassC20failDuringDelegationACSgyt_tcfc : $@convention(method) (@owned FailableBaseClass) -> @owned Optional<FailableBaseClass> {
-  // CHECK: bb0([[OLD_SELF:%.*]] : @owned $FailableBaseClass):
+  // CHECK-LABEL: sil hidden @$S21failable_initializers17FailableBaseClassC20failDuringDelegationACSgyt_tcfC
+  // CHECK: bb0([[SELF_META:%.*]] : @trivial $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
-  // CHECK:   store [[OLD_SELF]] to [init] [[PB_BOX]]
-  // CHECK:   [[TAKE_SELF:%.*]] = load [take] [[PB_BOX]]
-  // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[TAKE_SELF]]) : $@convention(method) (@owned FailableBaseClass) -> @owned Optional<FailableBaseClass>
+  // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[SELF_META]])
   // CHECK:   cond_br {{.*}}, [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
   //
   // CHECK: [[FAIL_BB:bb[0-9]+]]:
@@ -395,7 +390,7 @@ class FailableBaseClass {
   //
   // CHECK: [[SUCC_BB]]:
   // CHECK:   [[UNWRAPPED_NEW_SELF:%.*]] = unchecked_enum_data [[NEW_SELF]] : $Optional<FailableBaseClass>, #Optional.some!enumelt.1
-  // CHECK:   store [[UNWRAPPED_NEW_SELF]] to [init] [[PB_BOX]]
+  // CHECK:   assign [[UNWRAPPED_NEW_SELF]] to [[PB_BOX]]
   // CHECK:   [[RESULT:%.*]] = load [copy] [[PB_BOX]]
   // CHECK:   [[WRAPPED_RESULT:%.*]] = enum $Optional<FailableBaseClass>, #Optional.some!enumelt.1, [[RESULT]]
   // CHECK:   destroy_value [[MARKED_SELF_BOX]]
@@ -414,23 +409,19 @@ class FailableBaseClass {
 
   // IUO to optional
   //
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17FailableBaseClassC21failDuringDelegation2ACSgyt_tcfc : $@convention(method) (@owned FailableBaseClass) -> @owned Optional<FailableBaseClass> {
-  // CHECK: bb0([[OLD_SELF:%.*]] : @owned $FailableBaseClass):
+  // CHECK-LABEL: sil hidden @$S21failable_initializers17FailableBaseClassC21failDuringDelegation2ACSgyt_tcfC
+  // CHECK: bb0([[SELF_META:%.*]] : @trivial $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
-  // CHECK:   store [[OLD_SELF]] to [init] [[PB_BOX]]
-  // CHECK-NEXT:   [[TAKE_SELF:%.*]] = load [take] [[PB_BOX]]
-  // CHECK-NOT: [[OLD_SELF]]
-  // CHECK-NOT: copy_value
-  // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[TAKE_SELF]]) : $@convention(method) (@owned FailableBaseClass) -> @owned Optional<FailableBaseClass>
+  // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[SELF_META]])
   // CHECK:   switch_enum [[NEW_SELF]] : $Optional<FailableBaseClass>, case #Optional.some!enumelt.1: [[SUCC_BB:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL_BB:bb[0-9]+]]
   //
   // CHECK: [[FAIL_BB]]:
   // CHECK:   unreachable
   //
   // CHECK: [[SUCC_BB]]([[RESULT:%.*]] : @owned $FailableBaseClass):
-  // CHECK:   store [[RESULT]] to [init] [[PB_BOX]]
+  // CHECK:   assign [[RESULT]] to [[PB_BOX]]
   // CHECK:   [[RESULT:%.*]] = load [copy] [[PB_BOX]]
   // CHECK:   [[WRAPPED_RESULT:%.*]] = enum $Optional<FailableBaseClass>, #Optional.some!enumelt.1, [[RESULT]] : $FailableBaseClass
   // CHECK:   destroy_value [[MARKED_SELF_BOX]]
@@ -438,7 +429,6 @@ class FailableBaseClass {
   //
   // CHECK: [[EPILOG_BB]]([[WRAPPED_RESULT:%.*]] : @owned $Optional<FailableBaseClass>):
   // CHECK:   return [[WRAPPED_RESULT]]
-  // CHECK: } // end sil function '$S21failable_initializers17FailableBaseClassC21failDuringDelegation2ACSgyt_tcfc'
   convenience init!(failDuringDelegation2: ()) {
     self.init(failBeforeFullInitialization: ())! // unnecessary-but-correct '!'
   }
@@ -875,26 +865,23 @@ class ThrowDerivedClass : ThrowBaseClass {
     try unwrap(chainingFailAfterDelegation)
   }
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17ThrowDerivedClassC39chainingFailDuringDelegationArgEmission0fghI4CallACSi_SitKcfc : $@convention(method) (Int, Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
-  // CHECK: bb0({{.*}}, [[OLD_SELF:%.*]] : @owned $ThrowDerivedClass):
+  // CHECK-LABEL: sil hidden @$S21failable_initializers17ThrowDerivedClassC39chainingFailDuringDelegationArgEmission0fghI4CallACSi_SitKcfC
+  // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : @trivial $@thick ThrowDerivedClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
-  // CHECK:   store [[OLD_SELF]] to [init] [[PB_BOX]]
-  // CHECK:   [[MOVE_ONLY_SELF:%.*]] = load [take] [[PB_BOX]]
   // CHECK:   try_apply {{.*}}({{.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[SUCC_BB1:bb[0-9]+]], error [[ERROR_BB1:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB1]](
-  // CHECK:   try_apply {{.*}}({{.*}}, [[MOVE_ONLY_SELF]]) : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error), normal [[SUCC_BB2:bb[0-9]+]], error [[ERROR_BB2:bb[0-9]+]]
+  // CHECK:   try_apply {{.*}}({{.*}}, [[SELF_META]]) : {{.*}}, normal [[SUCC_BB2:bb[0-9]+]], error [[ERROR_BB2:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB2]]([[NEW_SELF:%.*]] : @owned $ThrowDerivedClass):
-  // CHECK-NEXT: store [[NEW_SELF]] to [init] [[PB_BOX]]
+  // CHECK-NEXT: assign [[NEW_SELF]] to [[PB_BOX]]
   // CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[PB_BOX]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: return [[RESULT]]
   //
   // CHECK: [[ERROR_BB1]]([[ERROR:%.*]] : @owned $Error):
-  // CHECK-NEXT: store [[MOVE_ONLY_SELF]] to [init] [[PB_BOX]]
   // CHECK-NEXT: br [[THROWING_BB:bb[0-9]+]]([[ERROR]]
   //
   // CHECK: [[ERROR_BB2]]([[ERROR:%.*]] : @owned $Error):
@@ -912,17 +899,15 @@ class ThrowDerivedClass : ThrowBaseClass {
     try unwrap(chainingFailAfterDelegation)
   }
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17ThrowDerivedClassC32chainingFailDuringDelegationCall0fg5AfterI0ACSi_SitKcfc : $@convention(method) (Int, Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
-  // CHECK: bb0({{.*}}, [[OLD_SELF:%.*]] : @owned $ThrowDerivedClass):
+  // CHECK-LABEL: sil hidden @$S21failable_initializers17ThrowDerivedClassC32chainingFailDuringDelegationCall0fg5AfterI0ACSi_SitKcfC
+  // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : @trivial $@thick ThrowDerivedClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
-  // CHECK:   store [[OLD_SELF]] to [init] [[PB_BOX]]
-  // CHECK:   [[MOVE_ONLY_SELF:%.*]] = load [take] [[PB_BOX]]
-  // CHECK:   try_apply {{.*}}([[MOVE_ONLY_SELF]]) : $@convention(method) (@owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error), normal [[SUCC_BB1:bb[0-9]+]], error [[ERROR_BB1:bb[0-9]+]]
+  // CHECK:   try_apply {{.*}}([[SELF_META]]) : {{.*}}, normal [[SUCC_BB1:bb[0-9]+]], error [[ERROR_BB1:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB1]]([[NEW_SELF:%.*]] : @owned $ThrowDerivedClass):
-  // CHECK-NEXT:   store [[NEW_SELF]] to [init] [[PB_BOX]]
+  // CHECK-NEXT:   assign [[NEW_SELF]] to [[PB_BOX]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   function_ref @
   // CHECK-NEXT:   try_apply {{.*}}({{.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[SUCC_BB2:bb[0-9]+]], error [[ERROR_BB2:bb[0-9]+]]

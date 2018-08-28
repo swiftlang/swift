@@ -21,7 +21,6 @@ class C : B {
 // CHECK:   #A.bas!1: {{.*}} : @$S7vtables1AC3bas{{[_0-9a-zA-Z]*}}F
 // CHECK:   #A.qux!1: {{.*}} : @$S7vtables1CC3qux{{[_0-9a-zA-Z]*}}F
 // CHECK:   #B.init!allocator.1: {{.*}} : @$S7vtables1CC{{[_0-9a-zA-Z]*}}fC
-// CHECK:   #B.init!initializer.1: {{.*}} : @$S7vtables1CC{{[_0-9a-zA-Z]*}}fc
 // CHECK:   #B.zim!1: {{.*}} : @$S7vtables1BC3zim{{[_0-9a-zA-Z]*}}F
 // CHECK:   #B.zang!1: {{.*}} : @$S7vtables1CC4zang{{[_0-9a-zA-Z]*}}F
 // CHECK:   #C.flopsy!1: {{.*}} : @$S7vtables1CC6flopsy{{[_0-9a-zA-Z]*}}F
@@ -40,7 +39,7 @@ class A {
 // CHECK:   #A.bar!1: {{.*}} : @$S7vtables1AC3bar{{[_0-9a-zA-Z]*}}F
 // CHECK:   #A.bas!1: {{.*}} : @$S7vtables1AC3bas{{[_0-9a-zA-Z]*}}F
 // CHECK:   #A.qux!1: {{.*}} : @$S7vtables1AC3qux{{[_0-9a-zA-Z]*}}F
-// CHECK:   #A.init!initializer.1: {{.*}} : @$S7vtables1AC{{[_0-9a-zA-Z]*}}fc
+// CHECK:   #A.init!allocator.1: {{.*}} : @$S7vtables1AC{{[_0-9a-zA-Z]*}}fC
 // CHECK: }
 
 class B : A {
@@ -61,14 +60,12 @@ class B : A {
 // CHECK:   #A.bas!1: {{.*}} : @$S7vtables1AC3bas{{[_0-9a-zA-Z]*}}F
 // CHECK:   #A.qux!1: {{.*}} : @$S7vtables1BC3qux{{[_0-9a-zA-Z]*}}F
 // CHECK:   #B.init!allocator.1: {{.*}} : @$S7vtables1BC{{[_0-9a-zA-Z]*}}fC
-// CHECK:   #B.init!initializer.1: {{.*}} : @$S7vtables1BC{{[_0-9a-zA-Z]*}}fc
 // CHECK:   #B.zim!1: {{.*}} : @$S7vtables1BC3zim{{[_0-9a-zA-Z]*}}F
 // CHECK:   #B.zang!1: {{.*}} : @$S7vtables1BC4zang{{[_0-9a-zA-Z]*}}F
 // CHECK: }
 
 // CHECK: sil_vtable RequiredInitDerived {
-// CHECK-NEXT: #SimpleInitBase.init!initializer.1: {{.*}} : @$S7vtables19RequiredInitDerivedC{{[_0-9a-zA-Z]*}}fc
-// CHECK-NEXT: #RequiredInitDerived.init!allocator.1: {{.*}} : @$S7vtables19RequiredInitDerivedC
+// CHECK-NEXT: #SimpleInitBase.init!allocator.1: {{.*}} : @$S7vtables19RequiredInitDerivedC{{[_0-9a-zA-Z]*}}fC
 // CHECK-NEXT: #RequiredInitDerived.deinit!deallocator.1: @$S7vtables19RequiredInitDerivedCfD
 // CHECK-NEXT: }
 

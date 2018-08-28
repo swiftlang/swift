@@ -173,7 +173,7 @@ class Opaque<T> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityMetatypes1xxmSgxm_tF      // Opaque.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctions1xxxcSgxxc_tF    // Opaque.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : @$S27vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuples1xx_xm_xxcttSgx_xm_xxctt_tF  // Opaque.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction6OpaqueCACyxGycfc       // Opaque.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction6OpaqueCACyxGycfC
 // CHECK-NEXT:   #Opaque.deinit!deallocator.1: @$S27vtable_thunks_reabstraction6OpaqueCfD        // Opaque.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -191,7 +191,7 @@ class StillOpaque<T>: Opaque<T> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityMetatypes1xxmSgxm_tF [inherited]  // Opaque.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctions1xxxcSgxxc_tF [inherited]        // Opaque.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : hidden @$S27vtable_thunks_reabstraction11StillOpaqueC24variantOptionalityTuples1xx_xm_xxcttx_xm_xxcttSg_tFAA0E0CAdeFx_xm_xxctt_tFTV [override] // vtable thunk for Opaque.variantOptionalityTuples(x:) dispatching to StillOpaque.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction11StillOpaqueCACyxGycfc [override]      // StillOpaque.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction11StillOpaqueCACyxGycfC [override]
 
 // Tuple becomes more optional -- needs new vtable entry
 
@@ -222,7 +222,7 @@ class ConcreteValue: Opaque<S> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : hidden @$S27vtable_thunks_reabstraction13ConcreteValueC27variantOptionalityMetatypes1xAA1SVmAGmSg_tFAA6OpaqueCAdExmSgxm_tFTV [override]       // vtable thunk for Opaque.variantOptionalityMetatypes(x:) dispatching to ConcreteValue.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : hidden @$S27vtable_thunks_reabstraction13ConcreteValueC27variantOptionalityFunctions1xAA1SVAGcA2GcSg_tFAA6OpaqueCAdExxcSgxxc_tFTV [override]  // vtable thunk for Opaque.variantOptionalityFunctions(x:) dispatching to ConcreteValue.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : hidden @$S27vtable_thunks_reabstraction13ConcreteValueC24variantOptionalityTuples1xAA1SV_AGm_A2GcttAG_AGm_A2GcttSg_tFAA6OpaqueCAdEx_xm_xxcttSgx_xm_xxctt_tFTV [override]       // vtable thunk for Opaque.variantOptionalityTuples(x:) dispatching to ConcreteValue.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction13ConcreteValueCACycfc [override]       // ConcreteValue.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction13ConcreteValueCACycfC [override]
 
 // Value types becoming more optional -- needs new vtable entry
 
@@ -255,7 +255,7 @@ class ConcreteClass: Opaque<C> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction13ConcreteClassC27variantOptionalityMetatypes1xAA1CCmAGmSg_tF [override]      // ConcreteClass.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : hidden @$S27vtable_thunks_reabstraction13ConcreteClassC27variantOptionalityFunctions1xAA1CCAGcA2GcSg_tFAA6OpaqueCAdExxcSgxxc_tFTV [override]  // vtable thunk for Opaque.variantOptionalityFunctions(x:) dispatching to ConcreteClass.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : hidden @$S27vtable_thunks_reabstraction13ConcreteClassC24variantOptionalityTuples1xAA1CC_AGm_A2GcttAG_AGm_A2GcttSg_tFAA6OpaqueCAdEx_xm_xxcttSgx_xm_xxctt_tFTV [override]       // vtable thunk for Opaque.variantOptionalityTuples(x:) dispatching to ConcreteClass.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction13ConcreteClassCACycfc [override]       // ConcreteClass.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction13ConcreteClassCACycfC [override]
 
 // Class references are ABI-compatible with optional class references, and
 // similarly for class metatypes.
@@ -284,7 +284,7 @@ class ConcreteClassVariance: Opaque<C> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityMetatypes1xxmSgxm_tF [inherited]  // Opaque.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctions1xxxcSgxxc_tF [inherited]        // Opaque.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : @$S27vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuples1xx_xm_xxcttSgx_xm_xxctt_tF [inherited]      // Opaque.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction21ConcreteClassVarianceCACycfc [override]       // ConcreteClassVariance.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction21ConcreteClassVarianceCACycfC [override]
 
 // No new vtable entries -- class references are ABI compatible with
 // optional class references.
@@ -307,7 +307,7 @@ class OpaqueTuple<U>: Opaque<(U, U)> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityMetatypes1xxmSgxm_tF [inherited]  // Opaque.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctions1xxxcSgxxc_tF [inherited]        // Opaque.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : @$S27vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuples1xx_xm_xxcttSgx_xm_xxctt_tF [inherited]      // Opaque.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction11OpaqueTupleCACyxGycfc [override]      // OpaqueTuple.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction11OpaqueTupleCACyxGycfC [override]
 
 // Optionality change of tuple.
 
@@ -331,7 +331,7 @@ class ConcreteTuple: Opaque<(S, S)> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityMetatypes1xxmSgxm_tF [inherited]  // Opaque.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctions1xxxcSgxxc_tF [inherited]        // Opaque.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : @$S27vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuples1xx_xm_xxcttSgx_xm_xxctt_tF [inherited]      // Opaque.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction13ConcreteTupleCACycfc [override]       // ConcreteTuple.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction13ConcreteTupleCACycfC [override]
 
 // Optionality change of tuple.
 
@@ -355,7 +355,7 @@ class OpaqueFunction<U, V>: Opaque<(U) -> V> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityMetatypes1xxmSgxm_tF [inherited]  // Opaque.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctions1xxxcSgxxc_tF [inherited]        // Opaque.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : @$S27vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuples1xx_xm_xxcttSgx_xm_xxctt_tF [inherited]      // Opaque.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction14OpaqueFunctionCACyxq_Gycfc [override] // OpaqueFunction.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction14OpaqueFunctionCACyxq_GycfC [override]
 
 // Optionality change of function.
 
@@ -379,7 +379,7 @@ class ConcreteFunction: Opaque<(S) -> S> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityMetatypes1xxmSgxm_tF [inherited]  // Opaque.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctions1xxxcSgxxc_tF [inherited]        // Opaque.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : @$S27vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuples1xx_xm_xxcttSgx_xm_xxctt_tF [inherited]      // Opaque.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction16ConcreteFunctionCACycfc [override]    // ConcreteFunction.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction16ConcreteFunctionCACycfC [override]
 
 // Optionality change of function.
 
@@ -403,7 +403,7 @@ class OpaqueMetatype<U>: Opaque<U.Type> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityMetatypes1xxmSgxm_tF [inherited]  // Opaque.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctions1xxxcSgxxc_tF [inherited]        // Opaque.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : @$S27vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuples1xx_xm_xxcttSgx_xm_xxctt_tF [inherited]      // Opaque.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction14OpaqueMetatypeCACyxGycfc [override]   // OpaqueMetatype.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction14OpaqueMetatypeCACyxGycfC [override]
 
 // Optionality change of metatype.
 
@@ -427,7 +427,7 @@ class ConcreteValueMetatype: Opaque<S.Type> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityMetatypes1xxmSgxm_tF [inherited]  // Opaque.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctions1xxxcSgxxc_tF [inherited]        // Opaque.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : @$S27vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuples1xx_xm_xxcttSgx_xm_xxctt_tF [inherited]      // Opaque.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction21ConcreteValueMetatypeCACycfc [override]       // ConcreteValueMetatype.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction21ConcreteValueMetatypeCACycfC [override]
 
 // Optionality change of metatype.
 
@@ -451,7 +451,7 @@ class ConcreteClassMetatype: Opaque<C.Type> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityMetatypes1xxmSgxm_tF [inherited]  // Opaque.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctions1xxxcSgxxc_tF [inherited]        // Opaque.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : @$S27vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuples1xx_xm_xxcttSgx_xm_xxctt_tF [inherited]      // Opaque.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction21ConcreteClassMetatypeCACycfc [override]       // ConcreteClassMetatype.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction21ConcreteClassMetatypeCACycfC [override]
 
 // Class metatypes are ABI compatible with optional class metatypes.
 
@@ -475,7 +475,7 @@ class ConcreteOptional: Opaque<S?> {
 // CHECK-NEXT:   #Opaque.variantOptionalityMetatypes!1: <T> (Opaque<T>) -> (T.Type) -> T.Type? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityMetatypes1xxmSgxm_tF [inherited]  // Opaque.variantOptionalityMetatypes(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : @$S27vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctions1xxxcSgxxc_tF [inherited]        // Opaque.variantOptionalityFunctions(x:)
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : @$S27vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuples1xx_xm_xxcttSgx_xm_xxctt_tF [inherited]      // Opaque.variantOptionalityTuples(x:)
-// CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction16ConcreteOptionalCACycfc [override]    // ConcreteOptional.init()
+// CHECK-NEXT:   #Opaque.init!allocator.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : @$S27vtable_thunks_reabstraction16ConcreteOptionalCACycfC [override]
 // CHECK-NEXT:   #ConcreteOptional.deinit!deallocator.1: @$S27vtable_thunks_reabstraction16ConcreteOptionalCfD   // ConcreteOptional.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -488,7 +488,7 @@ class GenericBase<T> {
 
 // CHECK-LABEL: sil_vtable GenericBase {
 // CHECK-NEXT:   #GenericBase.doStuff!1: <T><U> (GenericBase<T>) -> (T, U) -> () : @$S27vtable_thunks_reabstraction11GenericBaseC7doStuff1t1uyx_qd__tlF        // GenericBase.doStuff<A>(t:u:)
-// CHECK-NEXT:   #GenericBase.init!initializer.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$S27vtable_thunks_reabstraction11GenericBaseC1t1uACyxGx_qd__tclufc       // GenericBase.init<A>(t:u:)
+// CHECK-NEXT:   #GenericBase.init!allocator.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$S27vtable_thunks_reabstraction11GenericBaseC1t1uACyxGx_qd__tclufC
 // CHECK-NEXT:   #GenericBase.deinit!deallocator.1: @$S27vtable_thunks_reabstraction11GenericBaseCfD     // GenericBase.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -503,7 +503,7 @@ class ConcreteSub : GenericBase<Int> {
 
 // CHECK-LABEL: sil_vtable ConcreteSub {
 // CHECK-NEXT:   #GenericBase.doStuff!1: <T><U> (GenericBase<T>) -> (T, U) -> () : hidden @$S27vtable_thunks_reabstraction11ConcreteSubC7doStuff1t1uySi_xtlFAA11GenericBaseCAdeFyx_qd__tlFTV [override]        // vtable thunk for GenericBase.doStuff<A>(t:u:) dispatching to ConcreteSub.doStuff<A>(t:u:)
-// CHECK-NEXT:   #GenericBase.init!initializer.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : hidden @$S27vtable_thunks_reabstraction11ConcreteSubC1t1uACSi_xtclufcAA11GenericBaseCAdeGyxGx_qd__tclufcTV [override]     // vtable thunk for GenericBase.init<A>(t:u:) dispatching to ConcreteSub.init<A>(t:u:)
+// CHECK-NEXT:   #GenericBase.init!allocator.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : hidden @$S27vtable_thunks_reabstraction11ConcreteSubC1t1uACSi_xtclufCAA11GenericBaseCAdeGyxGx_qd__tclufCTV [override]
 // CHECK-NEXT:   #ConcreteSub.deinit!deallocator.1: @$S27vtable_thunks_reabstraction11ConcreteSubCfD     // ConcreteSub.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -513,7 +513,7 @@ class ConcreteBase {
 }
 
 // CHECK-LABEL: sil_vtable ConcreteBase {
-// CHECK-NEXT:   #ConcreteBase.init!initializer.1: <U> (ConcreteBase.Type) -> (Int, U) -> ConcreteBase : @$S27vtable_thunks_reabstraction12ConcreteBaseC1t1uACSi_xtclufc       // ConcreteBase.init<A>(t:u:)
+// CHECK-NEXT:   #ConcreteBase.init!allocator.1: <U> (ConcreteBase.Type) -> (Int, U) -> ConcreteBase : @$S27vtable_thunks_reabstraction12ConcreteBaseC1t1uACSi_xtclufC
 // CHECK-NEXT:   #ConcreteBase.doStuff!1: <U> (ConcreteBase) -> (Int, U) -> () : @$S27vtable_thunks_reabstraction12ConcreteBaseC7doStuff1t1uySi_xtlF   // ConcreteBase.doStuff<A>(t:u:)
 // CHECK-NEXT:   #ConcreteBase.deinit!deallocator.1: @$S27vtable_thunks_reabstraction12ConcreteBaseCfD   // ConcreteBase.__deallocating_deinit
 // CHECK-NEXT: }
@@ -528,7 +528,7 @@ class GenericSub<T> : ConcreteBase {
 }
 
 // CHECK-LABEL: sil_vtable GenericSub {
-// CHECK-NEXT:   #ConcreteBase.init!initializer.1: <U> (ConcreteBase.Type) -> (Int, U) -> ConcreteBase : @$S27vtable_thunks_reabstraction10GenericSubC1t1uACyxGSi_qd__tclufc [override]        // GenericSub.init<A>(t:u:)
+// CHECK-NEXT:   #ConcreteBase.init!allocator.1: <U> (ConcreteBase.Type) -> (Int, U) -> ConcreteBase : @$S27vtable_thunks_reabstraction10GenericSubC1t1uACyxGSi_qd__tclufC [override]
 // CHECK-NEXT:   #ConcreteBase.doStuff!1: <U> (ConcreteBase) -> (Int, U) -> () : @$S27vtable_thunks_reabstraction10GenericSubC7doStuff1t1uySi_qd__tlF [override]       // GenericSub.doStuff<A>(t:u:)
 // CHECK-NEXT:   #GenericSub.deinit!deallocator.1: @$S27vtable_thunks_reabstraction10GenericSubCfD       // GenericSub.__deallocating_deinit
 // CHECK-NEXT: }
@@ -542,7 +542,7 @@ class MoreGenericSub1<T, TT> : GenericBase<T> {
 
 // CHECK-LABEL: sil_vtable MoreGenericSub1 {
 // CHECK-NEXT:   #GenericBase.doStuff!1: <T><U> (GenericBase<T>) -> (T, U) -> () : @$S27vtable_thunks_reabstraction15MoreGenericSub1C7doStuff1t1uyx_qd__tlF [override] // MoreGenericSub1.doStuff<A>(t:u:)
-// CHECK-NEXT:   #GenericBase.init!initializer.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$S27vtable_thunks_reabstraction15MoreGenericSub1C1t1uACyxq_Gx_qd__tclufc [override] // MoreGenericSub1.init<A>(t:u:)
+// CHECK-NEXT:   #GenericBase.init!allocator.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$S27vtable_thunks_reabstraction15MoreGenericSub1C1t1uACyxq_Gx_qd__tclufC [override]
 // CHECK-NEXT:   #MoreGenericSub1.deinit!deallocator.1: @$S27vtable_thunks_reabstraction15MoreGenericSub1CfD     // MoreGenericSub1.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -554,6 +554,6 @@ class MoreGenericSub2<TT, T> : GenericBase<T> {
 
 // CHECK-LABEL: sil_vtable MoreGenericSub2 {
 // CHECK-NEXT:   #GenericBase.doStuff!1: <T><U> (GenericBase<T>) -> (T, U) -> () : @$S27vtable_thunks_reabstraction15MoreGenericSub2C7doStuff1t1uyq__qd__tlF [override]        // MoreGenericSub2.doStuff<A>(t:u:)
-// CHECK-NEXT:   #GenericBase.init!initializer.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$S27vtable_thunks_reabstraction15MoreGenericSub2C1t1uACyxq_Gq__qd__tclufc [override] // MoreGenericSub2.init<A>(t:u:)
+// CHECK-NEXT:   #GenericBase.init!allocator.1: <T><U> (GenericBase<T>.Type) -> (T, U) -> GenericBase<T> : @$S27vtable_thunks_reabstraction15MoreGenericSub2C1t1uACyxq_Gq__qd__tclufC [override]
 // CHECK-NEXT:   #MoreGenericSub2.deinit!deallocator.1: @$S27vtable_thunks_reabstraction15MoreGenericSub2CfD     // MoreGenericSub2.__deallocating_deinit
 // CHECK-NEXT: }

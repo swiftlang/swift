@@ -14,8 +14,6 @@
 
 // CHECK: @"$S16class_resilience14ResilientChildC5fields5Int32VvpWvd" = hidden global [[INT]] {{8|16}}
 
-// CHECK: @"$S15resilient_class22ResilientOutsideParentCACycfcTq" = external global %swift.method_descriptor
-
 // CHECK: @"$S16class_resilience21ResilientGenericChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS:{ (i32|i64), i32, i32 }]] zeroinitializer
 
 // CHECK: @"$S16class_resilience26ClassWithResilientPropertyCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
@@ -77,9 +75,9 @@
 // --       base class:
 // CHECK-SAME:   @"got.$S15resilient_class22ResilientOutsideParentCMn"
 // --       base method:
-// CHECK-SAME:   @"got.$S15resilient_class22ResilientOutsideParentCACycfcTq"
+// CHECK-SAME:   @"got.$S15resilient_class22ResilientOutsideParentCACycfCTq"
 // --       implementation:
-// CHECK-SAME:   @"$S16class_resilience14ResilientChildCACycfc"
+// CHECK-SAME:   @"$S16class_resilience14ResilientChildCACycfC"
 // CHECK-SAME:   }
 // CHECK-SAME: }>
 
@@ -129,9 +127,9 @@
 // CHECK: @"$S16class_resilience21ResilientGenericChildC5fields5Int32VvsTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
 // CHECK: @"$S16class_resilience21ResilientGenericChildC5fields5Int32VvMTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
 
-// CHECK: @"$S16class_resilience17MyResilientParentCACycfcTq" = hidden alias %swift.method_descriptor, getelementptr inbounds
-// CHECK: @"$S16class_resilience24MyResilientGenericParentC1tACyxGx_tcfcTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
-// CHECK: @"$S16class_resilience24MyResilientConcreteChildC1xACSi_tcfcTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+// CHECK: @"$S16class_resilience17MyResilientParentCACycfCTq" = hidden alias %swift.method_descriptor, getelementptr inbounds
+// CHECK: @"$S16class_resilience24MyResilientGenericParentC1tACyxGx_tcfCTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+// CHECK: @"$S16class_resilience24MyResilientConcreteChildC1xACSi_tcfCTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
 
 import resilient_class
 import resilient_struct
@@ -346,23 +344,6 @@ extension ResilientGenericOutsideParent {
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
 // CHECK-NEXT: call void @swift_endAccess
 // CHECK: ret i32 [[FIELD_VALUE]]
-
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %T16class_resilience14ResilientChildC* @"$S16class_resilience14ResilientChildCACycfc"(%T16class_resilience14ResilientChildC* swiftself)
-// CHECK:      [[SUPER_SELF:%.*]] = bitcast %T16class_resilience14ResilientChildC* %0 to %T15resilient_class22ResilientOutsideParentC*
-
-// Note: we know the superclass of ResilientChild statically, so we can emit
-// it directly.
-
-// CHECK:      [[SUPER_METADATA_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class22ResilientOutsideParentCMa"
-// CHECK-NEXT: [[SUPER_METADATA:%.*]] = extractvalue %swift.metadata_response [[SUPER_METADATA_RESPONSE]], 0
-
-// CHECK:      [[SUPER_METHOD:%.*]] = call swiftcc i8* @"$S15resilient_class22ResilientOutsideParentCMu"(%swift.type* [[SUPER_METADATA:%.*]], %swift.method_descriptor* @"$S15resilient_class22ResilientOutsideParentCACycfcTq")
-// CHECK-NEXT: [[SUPER_METHOD_FN:%.*]] = bitcast i8* [[SUPER_METHOD]] to %T15resilient_class22ResilientOutsideParentC* (%T15resilient_class22ResilientOutsideParentC*)*
-// CHECK-NEXT: [[RESULT:%.*]] = call swiftcc %T15resilient_class22ResilientOutsideParentC* [[SUPER_METHOD_FN]](%T15resilient_class22ResilientOutsideParentC* swiftself [[SUPER_SELF]])
-// CHECK-NEXT: [[NEW_SELF:%.*]] = bitcast %T15resilient_class22ResilientOutsideParentC* [[RESULT]] to %T16class_resilience14ResilientChildC*
-// CHECK:       ret %T16class_resilience14ResilientChildC* [[NEW_SELF]]
-
 
 // ResilientGenericChild.field getter
 

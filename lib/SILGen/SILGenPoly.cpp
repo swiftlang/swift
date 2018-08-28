@@ -3579,9 +3579,13 @@ static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness) {
     return WitnessDispatchKind::Static;
 
   // If the witness is dynamic, go through dynamic dispatch.
-  if (decl->isDynamic()
-      && witness.kind != SILDeclRef::Kind::Allocator)
+  if (decl->isDynamic()) {
+    // For initializers we still emit a static allocating thunk around
+    // the dynamic initializing entry point.
+    if (witness.kind == SILDeclRef::Kind::Allocator)
+      return WitnessDispatchKind::Static;
     return WitnessDispatchKind::Dynamic;
+  }
 
   bool isFinal = (decl->isFinal() || C->isFinal());
   if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(witness.getDecl()))
