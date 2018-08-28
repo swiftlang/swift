@@ -32,7 +32,7 @@ extension ShapedArray : ConvertibleFromNumpyArray
     }
     // Check if the dtype of the `ndarray` is compatible with the `Scalar`
     // type.
-    guard Scalar.isCompatible(withNumpyScalarType: numpyArray.dtype) else {
+    guard Scalar.numpyScalarTypes.contains(numpyArray.dtype) else {
       return nil
     }
 
@@ -80,7 +80,7 @@ extension Tensor : ConvertibleFromNumpyArray
     }
     // Check if the dtype of the `ndarray` is compatible with the `Scalar`
     // type.
-    guard Scalar.isCompatible(withNumpyScalarType: numpyArray.dtype) else {
+    guard Scalar.numpyScalarTypes.contains(numpyArray.dtype) else {
       return nil
     }
 
