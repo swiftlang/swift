@@ -1969,14 +1969,16 @@ extension _NativeSet {
     hashValue: Int
   ) -> (index: Index, found: Bool) {
     var (index, found) = _storage.hashTable.lookupFirst(hashValue: hashValue)
-    while found {
-      if uncheckedElement(at: index) == element {
-        return (index, true)
-      }
+    if _fastPath(!found || uncheckedElement(at: index) == element) {
+      return (index, found)
+    }
+    while true {
       (index, found) =
         _storage.hashTable.lookupNext(hashValue: hashValue, after: index)
+      if !found || uncheckedElement(at: index) == element {
+        return (index, found)
+      }
     }
-    return (index, false)
   }
 }
 
