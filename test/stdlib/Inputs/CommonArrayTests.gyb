@@ -303,7 +303,7 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported")
 ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1")
   .code {
   var a = getFresh${ArrayType}([ OpaqueValue(10) ])
-  var result = a._withUnsafeMutableBufferPointerIfSupported {
+  _ = a._withUnsafeMutableBufferPointerIfSupported {
     (bufferPointer) -> OpaqueValue<Int> in
     // buffer = UnsafeMutableBufferPointer(start: buffer.baseAddress, count: 0)
     // FIXME: does not trap since the buffer is not passed inout.
@@ -443,7 +443,7 @@ ${Suite}.test("${ArrayType}/init(_unsafeUninitializedCapacity:...:)/throwing") {
 ${Suite}.test(
   "${ArrayType}/mutationDoesNotAffectIterator/subscript/store") {
   var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
-  var iter = arr.makeIterator()
+  let iter = arr.makeIterator()
   arr[0] = 1011
   expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
@@ -452,7 +452,7 @@ ${Suite}.test(
   "${ArrayType}/mutationDoesNotAffectIterator/subscript/append")
   .code {
   var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
-  var iter = arr.makeIterator()
+  let iter = arr.makeIterator()
   arr.append(1040)
   expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
@@ -460,7 +460,7 @@ ${Suite}.test(
 ${Suite}.test(
   "${ArrayType}/mutationDoesNotAffectIterator/subscript/replaceSubrange") {
   var arr: ${ArrayType}<Int> = [ 1010, 1020, 1030 ]
-  var iter = arr.makeIterator()
+  let iter = arr.makeIterator()
   arr.replaceSubrange(1..<3, with: [ 1040, 1050, 1060 ])
   expectEqual([ 1010, 1020, 1030 ], Array(IteratorSequence(iter)))
 }
@@ -510,7 +510,7 @@ ${Suite}.test("${ArrayType}<Void>/map") {
 
 ${Suite}.test("${ArrayType}/AssociatedTypes") {
   typealias Collection = ${ArrayType}<OpaqueValue<Int>>
-  typealias CollectionSlice = ArraySlice<OpaqueValue<Int>>
+  typealias CollectionSlice = Slice<${ArrayType}<OpaqueValue<Int>>>
   expectCollectionAssociatedTypes(
     collectionType: Collection.self,
     iteratorType: IndexingIterator<Collection>.self,

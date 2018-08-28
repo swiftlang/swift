@@ -408,22 +408,6 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return target + initializedCount
   }
 
-  /// Returns a `_SliceBuffer` containing the given `bounds` of values
-  /// from this buffer.
-  @inlinable
-  internal subscript(bounds: Range<Int>) -> _SliceBuffer<Element> {
-    get {
-      return _SliceBuffer(
-        owner: _storage,
-        subscriptBaseAddress: subscriptBaseAddress,
-        indices: bounds,
-        hasNativeBuffer: true)
-    }
-    set {
-      fatalError("not implemented")
-    }
-  }
-
   /// Returns `true` iff this buffer's storage is uniquely-referenced.
   ///
   /// - Note: This does not mean the buffer is mutable.  Other factors

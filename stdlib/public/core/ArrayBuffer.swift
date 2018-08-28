@@ -244,57 +244,6 @@ extension _ArrayBuffer {
     return result
   }
 
-  /// Returns a `_SliceBuffer` containing the given sub-range of elements in
-  /// `bounds` from this buffer.
-  @inlinable
-  internal subscript(bounds: Range<Int>) -> _SliceBuffer<Element> {
-    get {
-      _typeCheck(bounds)
-
-      if _fastPath(_isNative) {
-        return _native[bounds]
-      }
-
-      let boundsCount = bounds.count
-      if boundsCount == 0 {
-        return _SliceBuffer(
-          _buffer: _ContiguousArrayBuffer<Element>(),
-          shiftedToStartIndex: bounds.lowerBound)
-      }
-
-      // Look for contiguous storage in the NSArray
-      let nonNative = self._nonNative
-      let cocoa = _CocoaArrayWrapper(nonNative)
-      let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices)
-
-      if let cocoaStorageBaseAddress = cocoaStorageBaseAddress {
-        let basePtr = UnsafeMutableRawPointer(cocoaStorageBaseAddress)
-          .assumingMemoryBound(to: Element.self)
-        return _SliceBuffer(
-          owner: nonNative,
-          subscriptBaseAddress: basePtr,
-          indices: bounds,
-          hasNativeBuffer: false)
-      }
-
-      // No contiguous storage found; we must allocate
-      let result = _ContiguousArrayBuffer<Element>(
-        _uninitializedCount: boundsCount, minimumCapacity: 0)
-
-      // Tell Cocoa to copy the objects into our storage
-      cocoa.buffer.getObjects(
-        UnsafeMutableRawPointer(result.firstElementAddress)
-          .assumingMemoryBound(to: AnyObject.self),
-        range: _SwiftNSRange(location: bounds.lowerBound, length: boundsCount))
-
-      return _SliceBuffer(
-        _buffer: result, shiftedToStartIndex: bounds.lowerBound)
-    }
-    set {
-      fatalError("not implemented")
-    }
-  }
-
   /// A pointer to the first element.
   ///
   /// - Precondition: The elements are known to be stored contiguously.

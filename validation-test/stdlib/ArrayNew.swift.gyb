@@ -15,7 +15,7 @@ import StdlibCollectionUnittest
 
 
 %{
-all_array_types = ['ContiguousArray', 'ArraySlice', 'Array']
+all_array_types = ['ContiguousArray', 'Array']
 }%
 
 %for Self in all_array_types:
@@ -137,10 +137,9 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
     expectEqual(identityInner, a[0]._bufferID, stackTrace: stackTrace)
 %     else:
     expectEqual(identityOuter, a._bufferID, stackTrace: stackTrace)
-    // Writeback happens in subscript(Range<Int>), but array notices that the new
-    // value did not change.
-    // Another writeback happens in Array.subscript(Int), but this is not what we
-    // want.
+    // Writeback happens in subscript(Range<Int>), but array notices that the
+    // new value did not change. Another writeback happens in
+    // Array.subscript(Int), but this is not what we want.
     expectNotEqual(identityInner, a[0]._bufferID, stackTrace: stackTrace)
     identityInner = a[0]._bufferID
 %     end
@@ -166,7 +165,7 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   withInoutT(&a[0..<1]) {
-    (x: inout ArraySlice<${array_type}<${element_type}>>) in
+    (x: inout ${array_type}<${array_type}<${element_type}>>.SubSequence) in
     x[0][3].value += 1000
   }
 

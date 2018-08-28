@@ -109,7 +109,6 @@
         "ContiguousArray.swift",
         "ContiguousArrayBuffer.swift",
         "FixedArray.swift",
-        "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
         "HashTable.swift",

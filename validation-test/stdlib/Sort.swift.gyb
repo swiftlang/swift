@@ -52,8 +52,9 @@ func expectSortedCollection(
   expectSortedCollection(sortedAry, Array(originalAry))
 }
 
-func expectSortedCollection(_ sortedAry: ArraySlice<Int>, _ originalAry: ArraySlice<Int>) {
-  expectSortedCollection([Int](sortedAry), [Int](originalAry))
+func expectSortedCollection<C: Collection>(_ sortedAry: C, _ originalAry: C)
+where C.Element == Int {
+  expectSortedCollection(Array(sortedAry), Array(originalAry))
 }
 
 class OffsetCollection : MutableCollection, RandomAccessCollection {

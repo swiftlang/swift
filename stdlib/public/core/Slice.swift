@@ -260,7 +260,6 @@ extension Slice: MutableCollection where Base: MutableCollection {
   }
 }
 
-
 extension Slice: RandomAccessCollection where Base: RandomAccessCollection { }
 
 extension Slice: RangeReplaceableCollection
@@ -345,6 +344,30 @@ extension Slice: RangeReplaceableCollection
     _base.removeSubrange(bounds)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
+  }
+
+  @inlinable
+  public subscript(bounds: Range<Index>) -> Slice<Base> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return Slice(base: _base, bounds: bounds)
+    }
+    set {
+      _base.replaceSubrange(bounds, with: newValue)
+    }
+  }
+}
+
+extension Slice where Base: MutableCollection & RangeReplaceableCollection {
+  @inlinable
+  public subscript(bounds: Range<Index>) -> Slice<Base> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return Slice(base: _base, bounds: bounds)
+    }
+    set {
+      _base.replaceSubrange(bounds, with: newValue)
+    }
   }
 }
 

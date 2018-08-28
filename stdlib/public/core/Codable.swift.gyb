@@ -1988,7 +1988,6 @@ extension Dictionary : Decodable where Key : Decodable, Value : Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  @inlinable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     self.init()
 

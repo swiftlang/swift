@@ -100,7 +100,7 @@ ${ArrayTy}Traps.test("sliceBounds1/${io}")
     ${ArrayTy}LowerBoundOutOfRangeErrorMsg : "")
   .code {
   var a: ${ArrayTy} = [ 1 ]
-  ${bounds_trap(index='-1..<1', expr_to_write='ArraySlice()')}
+  ${bounds_trap(index='-1..<1', expr_to_write='[]')}
 }
 
 ${ArrayTy}Traps.test("sliceBounds2/${io}")
@@ -111,7 +111,7 @@ ${ArrayTy}Traps.test("sliceBounds2/${io}")
     "${ArrayTy} index is out of range" : "")
   .code {
   var a: ${ArrayTy} = [ 1 ]
-  ${bounds_trap(index='0..<2', expr_to_write='ArraySlice()')}
+  ${bounds_trap(index='0..<2', expr_to_write='[]')}
 }
 
 ${ArrayTy}Traps.test("sliceBounds3/${io}")
@@ -122,7 +122,7 @@ ${ArrayTy}Traps.test("sliceBounds3/${io}")
     "${ArrayTy} index is out of range" : "")
   .code {
   var a: ${ArrayTy} = [ 1 ]
-  ${bounds_trap(index='1..<2', expr_to_write='ArraySlice()')}
+  ${bounds_trap(index='1..<2', expr_to_write='[]')}
 }
 
 %   end

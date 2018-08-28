@@ -1173,7 +1173,7 @@ f_31849281(42, y: 10, x: 20) // expected-error {{incorrect argument labels in ca
 func sr5081() {
   var a = ["1", "2", "3", "4", "5"]
   var b = [String]()
-  b = a[2...4] // expected-error {{cannot assign value of type 'ArraySlice<String>' to type '[String]'}}
+  b = a[2...4] // expected-error {{cannot assign value of type 'Slice<Array<String>>' to type '[String]'}}
 }
 
 func rdar17170728() {

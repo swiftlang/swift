@@ -60,6 +60,8 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
 
   /// The type that allows iteration over an array's elements.
   public typealias Iterator = IndexingIterator<ContiguousArray>
+  
+  public typealias SubSequence = Slice<ContiguousArray>
 
   /// The position of the first element in a nonempty array.
   ///
@@ -294,49 +296,6 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
       _checkSubscript_native(index)
       let address = _buffer.subscriptBaseAddress + index
       yield &address.pointee
-    }
-  }
-
-  /// Accesses a contiguous subrange of the array's elements.
-  ///
-  /// The returned `ArraySlice` instance uses the same indices for the same
-  /// elements as the original array. In particular, that slice, unlike an
-  /// array, may have a nonzero `startIndex` and an `endIndex` that is not
-  /// equal to `count`. Always use the slice's `startIndex` and `endIndex`
-  /// properties instead of assuming that its indices start or end at a
-  /// particular value.
-  ///
-  /// This example demonstrates getting a slice of an array of strings, finding
-  /// the index of one of the strings in the slice, and then using that index
-  /// in the original array.
-  ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
-  ///     let streetsSlice = streets[2 ..< streets.endIndex]
-  ///     print(streetsSlice)
-  ///     // Prints "["Channing", "Douglas", "Evarts"]"
-  ///
-  ///     let i = streetsSlice.firstIndex(of: "Evarts")    // 4
-  ///     print(streets[i!])
-  ///     // Prints "Evarts"
-  ///
-  /// - Parameter bounds: A range of integers. The bounds of the range must be
-  ///   valid indices of the array.
-  @inlinable
-  public subscript(bounds: Range<Int>) -> ArraySlice<Element> {
-    get {
-      _checkIndex(bounds.lowerBound)
-      _checkIndex(bounds.upperBound)
-      return ArraySlice(_buffer: _buffer[bounds])
-    }
-    set(rhs) {
-      _checkIndex(bounds.lowerBound)
-      _checkIndex(bounds.upperBound)
-      // If the replacement buffer has same identity, and the ranges match,
-      // then this was a pinned in-place modification, nothing further needed.
-      if self[bounds]._buffer.identity != rhs._buffer.identity
-      || bounds != rhs.startIndex..<rhs.endIndex {
-        self.replaceSubrange(bounds, with: rhs)
-      }
     }
   }
 }
@@ -914,17 +873,6 @@ extension ContiguousArray: RangeReplaceableCollection, ArrayProtocol {
   }
 
   //===--- algorithms -----------------------------------------------------===//
-
-  @inlinable
-  public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try withUnsafeMutableBufferPointer {
-      (bufferPointer) -> R in
-      return try body(&bufferPointer)
-    }
-  }
-
   @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {

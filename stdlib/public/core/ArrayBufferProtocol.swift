@@ -43,9 +43,6 @@ internal protocol _ArrayBufferProtocol
   /// buffer store `minimumCapacity` elements, returns that buffer.
   /// Otherwise, returns `nil`.
   ///
-  /// - Note: The result's firstElementAddress may not match ours, if we are a
-  ///   _SliceBuffer.
-  ///
   /// - Note: This function must remain mutating; otherwise the buffer
   ///   may acquire spurious extra references, which will cause
   ///   unnecessary reallocation.
@@ -76,9 +73,6 @@ internal protocol _ArrayBufferProtocol
     with newCount: Int,
     elementsOf newValues: __owned C
   ) where C : Collection, C.Element == Element
-
-  /// Returns a `_SliceBuffer` containing the elements in `bounds`.
-  subscript(bounds: Range<Int>) -> _SliceBuffer<Element> { get }
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is

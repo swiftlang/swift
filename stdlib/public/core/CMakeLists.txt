@@ -199,7 +199,6 @@ set(SWIFTLIB_SOURCES
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
-  SliceBuffer.swift
   Tuple.swift.gyb
   UnfoldSequence.swift
   VarArgs.swift

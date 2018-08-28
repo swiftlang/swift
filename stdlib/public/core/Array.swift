@@ -328,6 +328,8 @@ extension Array: RandomAccessCollection, MutableCollection {
 
   /// The type that allows iteration over an array's elements.
   public typealias Iterator = IndexingIterator<Array>
+  
+  public typealias SubSequence = Slice<Array>
 
   /// The position of the first element in a nonempty array.
   ///
@@ -525,15 +527,15 @@ extension Array: RandomAccessCollection, MutableCollection {
     return end - start
   }
 
-  @inlinable
-  public func _failEarlyRangeCheck(_ index: Int, bounds: Range<Int>) {
-    // NOTE: This method is a no-op for performance reasons.
-  }
-
-  @inlinable
-  public func _failEarlyRangeCheck(_ range: Range<Int>, bounds: Range<Int>) {
-    // NOTE: This method is a no-op for performance reasons.
-  }
+  // @inlinable
+  // public func _failEarlyRangeCheck(_ index: Int, bounds: Range<Int>) {
+  //   // NOTE: This method is a no-op for performance reasons.
+  // }
+  //
+  // @inlinable
+  // public func _failEarlyRangeCheck(_ range: Range<Int>, bounds: Range<Int>) {
+  //   // NOTE: This method is a no-op for performance reasons.
+  // }
 
   /// Accesses the element at the specified position.
   ///
@@ -575,49 +577,6 @@ extension Array: RandomAccessCollection, MutableCollection {
       _checkSubscript_native(index)
       let address = _buffer.subscriptBaseAddress + index
       yield &address.pointee
-    }
-  }
-
-  /// Accesses a contiguous subrange of the array's elements.
-  ///
-  /// The returned `ArraySlice` instance uses the same indices for the same
-  /// elements as the original array. In particular, that slice, unlike an
-  /// array, may have a nonzero `startIndex` and an `endIndex` that is not
-  /// equal to `count`. Always use the slice's `startIndex` and `endIndex`
-  /// properties instead of assuming that its indices start or end at a
-  /// particular value.
-  ///
-  /// This example demonstrates getting a slice of an array of strings, finding
-  /// the index of one of the strings in the slice, and then using that index
-  /// in the original array.
-  ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
-  ///     let streetsSlice = streets[2 ..< streets.endIndex]
-  ///     print(streetsSlice)
-  ///     // Prints "["Channing", "Douglas", "Evarts"]"
-  ///
-  ///     let i = streetsSlice.firstIndex(of: "Evarts")    // 4
-  ///     print(streets[i!])
-  ///     // Prints "Evarts"
-  ///
-  /// - Parameter bounds: A range of integers. The bounds of the range must be
-  ///   valid indices of the array.
-  @inlinable
-  public subscript(bounds: Range<Int>) -> ArraySlice<Element> {
-    get {
-      _checkIndex(bounds.lowerBound)
-      _checkIndex(bounds.upperBound)
-      return ArraySlice(_buffer: _buffer[bounds])
-    }
-    set(rhs) {
-      _checkIndex(bounds.lowerBound)
-      _checkIndex(bounds.upperBound)
-      // If the replacement buffer has same identity, and the ranges match,
-      // then this was a pinned in-place modification, nothing further needed.
-      if self[bounds]._buffer.identity != rhs._buffer.identity
-      || bounds != rhs.startIndex..<rhs.endIndex {
-        self.replaceSubrange(bounds, with: rhs)
-      }
     }
   }
 }
@@ -1269,17 +1228,6 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   }
 
   //===--- algorithms -----------------------------------------------------===//
-
-  @inlinable
-  public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try withUnsafeMutableBufferPointer {
-      (bufferPointer) -> R in
-      return try body(&bufferPointer)
-    }
-  }
-
   @inlinable
   public func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
@@ -1607,8 +1555,6 @@ extension Array: Equatable where Element: Equatable {
       return true
     }
 
-
-    _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
     _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
 
     // We know that lhs.count == rhs.count, compare element wise.
@@ -1619,20 +1565,6 @@ extension Array: Equatable where Element: Equatable {
     }
 
     return true
-  }
-
-  /// Returns a Boolean value indicating whether two arrays are not equal.
-  ///
-  /// Two arrays are equal if they contain the same elements in the same order.
-  /// You can use the not-equal-to operator (`!=`) to compare any two arrays
-  /// that store the same, `Equatable`-conforming element type.
-  ///
-  /// - Parameters:
-  ///   - lhs: An array to compare.
-  ///   - rhs: Another array to compare.
-  @inlinable
-  public static func !=(lhs: Array<Element>, rhs: Array<Element>) -> Bool {
-    return !(lhs == rhs)
   }
 }
 
