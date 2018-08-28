@@ -907,14 +907,6 @@ public:
   /// argument labels removed.
   Type removeArgumentLabels(unsigned numArgumentLabels);
 
-  /// getUnlabeledType - Retrieve a version of this type with all labels
-  /// removed at every level. For example, given a tuple type 
-  /// \code
-  /// (p : (x : int, y : int))
-  /// \endcode
-  /// the result would be the (parenthesized) type ((int, int)).
-  Type getUnlabeledType(ASTContext &Context);
-
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
 
