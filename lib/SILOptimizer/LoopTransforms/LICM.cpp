@@ -537,7 +537,8 @@ static bool handledEndAccesses(BeginAccessInst *BI, SILLoop *Loop) {
 static bool analyzeBeginAccess(BeginAccessInst *BI,
                                SmallVector<BeginAccessInst *, 8> &BeginAccesses,
                                SmallVector<FullApplySite, 8> &fullApplies,
-                               AccessedStorageAnalysis *ASA) {
+                               AccessedStorageAnalysis *ASA,
+                               DominanceInfo *DT) {
   if (BI->getEnforcement() != SILAccessEnforcement::Dynamic) {
     return false;
   }
@@ -564,8 +565,18 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
     FunctionAccessedStorage callSiteAccesses;
     ASA->getCallSiteEffects(callSiteAccesses, fullApply);
     SILAccessKind accessKind = BI->getAccessKind();
-    if (callSiteAccesses.mayConflictWith(accessKind, storage))
+    if (!callSiteAccesses.mayConflictWith(accessKind, storage))
+      continue;
+    // Check if we can ignore this conflict:
+    // If the apply is “sandwiched” between the begin and end access,
+    // there’s no reason we can’t hoist out of the loop.
+    auto *applyInstr = fullApply.getInstruction();
+    if (!DT->dominates(BI, applyInstr))
       return false;
+    for (auto *EI : BI->getEndAccesses()) {
+      if (!DT->dominates(applyInstr, EI))
+        return false;
+    }
   }
 
   return true;
@@ -687,7 +698,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
       LLVM_DEBUG(llvm::dbgs() << "Some end accesses can't be handled\n");
       continue;
     }
-    if (analyzeBeginAccess(BI, BeginAccesses, fullApplies, ASA)) {
+    if (analyzeBeginAccess(BI, BeginAccesses, fullApplies, ASA, DomTree)) {
       SpecialHoist.insert(BI);
     }
   }
