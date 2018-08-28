@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -3050,46 +3050,6 @@ public:
     // PatternBindingDecl.
   }
 
-  /// Determine whether the given declaration requires a definition.
-  ///
-  /// Only valid for declarations that can have definitions, i.e.,
-  /// functions, initializers, etc.
-  static bool requiresDefinition(Decl *decl) {
-    // Invalid, implicit, and Clang-imported declarations never
-    // require a definition.
-    if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
-      return false;
-
-    // Protocol requirements do not require definitions.
-    if (isa<ProtocolDecl>(decl->getDeclContext()))
-      return false;
-
-    // Functions can have _silgen_name, semantics, and NSManaged attributes.
-    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (func->getAttrs().hasAttribute<SILGenNameAttr>() ||
-          func->getAttrs().hasAttribute<SemanticsAttr>() ||
-          func->getAttrs().hasAttribute<NSManagedAttr>())
-        return false;
-    }
-
-    // Declarations in SIL and textual interface files don't require
-    // definitions.
-    if (auto sourceFile = decl->getDeclContext()->getParentSourceFile()) {
-      switch (sourceFile->Kind) {
-      case SourceFileKind::SIL:
-      case SourceFileKind::Interface:
-        return false;
-      case SourceFileKind::Library:
-      case SourceFileKind::Main:
-      case SourceFileKind::REPL:
-        break;
-      }
-    }
-
-    // Everything else requires a definition.
-    return true;
-  }
-
   void visitFuncDecl(FuncDecl *FD) {
     TC.validateDecl(FD);
 
@@ -5849,4 +5809,40 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       }
     }
   }
+}
+
+bool swift::requiresDefinition(Decl *decl) {
+  // Invalid, implicit, and Clang-imported declarations never
+  // require a definition.
+  if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
+    return false;
+
+  // Protocol requirements do not require definitions.
+  if (isa<ProtocolDecl>(decl->getDeclContext()))
+    return false;
+
+  // Functions can have _silgen_name, semantics, and NSManaged attributes.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (func->getAttrs().hasAttribute<SILGenNameAttr>() ||
+        func->getAttrs().hasAttribute<SemanticsAttr>() ||
+        func->getAttrs().hasAttribute<NSManagedAttr>())
+      return false;
+  }
+
+  // Declarations in SIL and textual interface files don't require
+  // definitions.
+  if (auto sourceFile = decl->getDeclContext()->getParentSourceFile()) {
+    switch (sourceFile->Kind) {
+    case SourceFileKind::SIL:
+    case SourceFileKind::Interface:
+      return false;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::REPL:
+      break;
+    }
+  }
+
+  // Everything else requires a definition.
+  return true;
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -2208,6 +2208,13 @@ Type getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
 /// information.
 bool isOverrideBasedOnType(ValueDecl *decl, Type declTy,
                            ValueDecl *parentDecl, Type parentDeclTy);
+
+
+/// Determine whether the given declaration requires a definition.
+///
+/// Only valid for declarations that can have definitions, i.e.,
+/// functions, initializers, etc.
+bool requiresDefinition(Decl *decl);
 
 } // end namespace swift
 
