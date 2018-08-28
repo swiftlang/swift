@@ -380,6 +380,8 @@ const char *SILTensorOpInfo::getOperandClassSuffix(OperandClass opClass) {
     return "";
   case OperandClass::Tensor:
     return "$tensor";
+  case OperandClass::Shape:
+    return "$shape";
   }
 }
 
@@ -390,6 +392,7 @@ SILTensorOpInfo::getOperandClass(StringRef suffix) {
       .Case("in", OperandClass::Input)
       .Case("", OperandClass::Normal)
       .Case("tensor", OperandClass::Tensor)
+      .Case("shape", OperandClass::Shape)
       .Default(None);
 }
 
@@ -580,9 +583,12 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
   attributes.push_back(
       {context.getIdentifier(std::string("value") + tensorSuffix), scalars});
 
-  // Add the shape attribute if we have an array value.
+  // Add the shape$shape attribute if we have an array value.
   if (scalars.getKind() == SymbolicValue::Array) {
-    attributes.push_back({context.getIdentifier(std::string("shape")), shape});
+    auto shapeId = SILTensorOpInfo::OperandClass::Shape;
+    auto shapeSuffix = SILTensorOpInfo::getOperandClassSuffix(shapeId);
+    attributes.push_back(
+        {context.getIdentifier(std::string("shape") + shapeSuffix), shape});
   }
 
   // All graph_op's get a device.

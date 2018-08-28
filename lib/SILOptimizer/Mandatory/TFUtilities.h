@@ -118,11 +118,12 @@ struct SILTensorOpInfo {
     /// This marks three sorts of things:
     /// 1) A normal tensor input: the value is a TensorHandle.
     /// 2) An normal attribute (without modifier).
-    /// 3) A tensor attribute.
+    /// 3) A tensor or shape attribute (need a modifier for proper lowering).
     Input,
 
     Normal, // No modifier.
     Tensor, // This array or scalar should be turned into a TF_Tensor.
+    Shape,  // This array of integers is a shape specifier.
   };
 
   /// Return the string suffix for the specified attribute modifier.

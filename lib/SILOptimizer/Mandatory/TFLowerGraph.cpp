@@ -2155,6 +2155,12 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         return GLStatus::Error;
       break;
     }
+    case SILTensorOpInfo::OperandClass::Shape: {
+      SmallVector<int64_t, 4> shape;
+      auto rank = decodeShapeAttr(SILFn.getASTContext(), attrValue, shape);
+      TF_SetAttrShape(op, name.c_str(), shape.data(), rank);
+      break;
+    }
     }
   }
 

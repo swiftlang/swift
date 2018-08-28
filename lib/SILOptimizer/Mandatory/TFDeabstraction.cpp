@@ -2179,12 +2179,53 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       return false;
     };
 
+    // Emits a diagnostic and returns a negative number if the value is not an
+    // int array.  Otherwise returns the product of the array element
+    // values. e.g. For array [2, 3], return 6.
+    auto getIntArrayProduct = [&](SymbolicValue constValue) -> long long {
+      // strip away the possible aggregate wrapper.
+      constValue = constValue.lookThroughSingleElementAggregates();
+      if (constValue.getKind() != SymbolicValue::Array) {
+        diagnoseInvalidAttr("requires an array");
+        return -1;
+      }
+      CanType eltType;
+      auto elements = constValue.getArrayValue(eltType);
+      if (!StringRef(eltType->getString()).startswith("Int")) {
+        diagnoseInvalidAttr("requires an array of ints");
+        return -1;
+      }
+      long long ret = 1;
+      for (auto elt : elements) {
+        // strip away the possible aggregate wrapper.
+        elt = elt.lookThroughSingleElementAggregates();
+        if (elt.getKind() != SymbolicValue::Integer) {
+          diagnoseInvalidAttr("requires an array of ints");
+          return -1;
+        }
+        // It is possible for this to overflow, but the resulting compilation
+        // will still be correct, so for simplicity we do not guard against
+        // overflow. More specifically, when it overflows, we would either
+        // return a negative value and thus reject the input program, or
+        // return an incorrect positive value. In both cases, the input
+        // program will still be eventually rejected (e.g. in TF graph
+        // compiler), since the specified shape is too large. As such, the
+        // correctness of compilation is preserved.
+        ret *= elt.getIntegerValue().getLimitedValue();
+      }
+      return ret;
+    };
     // Verify that the type of this attribute is ok for the OperandClass we
     // have.
     switch (operandClass.second) {
     case SILTensorOpInfo::OperandClass::Input:
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
       if (verifyNormalAttr(constValue))
+        return; // error already emitted.
+      break;
+    case SILTensorOpInfo::OperandClass::Shape:
+      // A shape attr must be an int array.
+      if (getIntArrayProduct(constValue) < 0)
         return; // error already emitted.
       break;
     case SILTensorOpInfo::OperandClass::Tensor:
@@ -2197,47 +2238,13 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         return diagnoseInvalidAttr("requires a constant that is an integer,"
                                    " floating point, or array thereof");
 
-      // Emits a diagnostic and returns a negative number if the value is not an
-      // int array.  Otherwise returns the product of the array element
-      // values. e.g. For array [2, 3], return 6.
-      auto getIntArrayProduct = [&](SymbolicValue constValue) -> long long {
-        // strip away the possible aggregate wrapper.
-        constValue = constValue.lookThroughSingleElementAggregates();
-        if (constValue.getKind() != SymbolicValue::Array) {
-          diagnoseInvalidAttr("requires an array");
-          return -1;
-        }
-        CanType eltType;
-        auto elements = constValue.getArrayValue(eltType);
-        if (!StringRef(eltType->getString()).startswith("Int")) {
-          diagnoseInvalidAttr("requires an array of ints");
-          return -1;
-        }
-        long long ret = 1;
-        for (auto elt : elements) {
-          // strip away the possible aggregate wrapper.
-          elt = elt.lookThroughSingleElementAggregates();
-          if (elt.getKind() != SymbolicValue::Integer) {
-            diagnoseInvalidAttr("requires an array of ints");
-            return -1;
-          }
-          // It is possible for this to overflow, but the resulting compilation
-          // will still be correct, so for simplicity we do not guard against
-          // overflow. More specifically, when it overflows, we would either
-          // return a negative value and thus reject the input program, or
-          // return an incorrect positive value. In both cases, the input
-          // program will still be eventually rejected (e.g. in TF graph
-          // compiler), since the specified shape is too large. As such, the
-          // correctness of compilation is preserved.
-          ret *= elt.getIntegerValue().getLimitedValue();
-        }
-        return ret;
-      };
       // Returns a negative number if the next attr is not a shape.  Otherwise
       // returns the number of elements as given by the shape attr. e.g. a
       // tensor with shape [2, 3] has 6 elements.
       auto getNumEltsFromShapeAttr = [&]() -> long long {
-        if (i + 1 >= opInfo.operandClasses.size())
+        if (i + 1 >= opInfo.operandClasses.size() ||
+            opInfo.operandClasses[i + 1].second !=
+                SILTensorOpInfo::OperandClass::Shape)
           return -1;
         auto operand = inst->getOperand(i + 1);
         auto it = constants.find(operand);

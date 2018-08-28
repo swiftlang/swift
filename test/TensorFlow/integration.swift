@@ -418,7 +418,7 @@ public func testStringHandle() {
     "Const", dtype:
     String.self,
     value$tensor: ["foo", "bar"],
-    shape: TensorShape(2)
+    shape$shape: TensorShape(2)
   )
 }
 
@@ -427,7 +427,7 @@ public func testStringHandle() {
 // CHECK: [[POS:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
 // CHECK: [[LEN:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
 // CHECK: graph_op "Substr,i,i,i"([[STR]] : $TensorHandle<String>, [[POS]] : $TensorHandle<Int32>, [[LEN]] : $TensorHandle<Int32>) {__device: "/device:CPU:0"} : $TensorHandle<String>
-// CHECK: graph_op "Const"() {dtype: $String, value$tensor: [$String: "foo", "bar"], shape: [$Int32: (i32 2)], __device: "/device:CPU:0"} : $TensorHandle<String>
+// CHECK: graph_op "Const"() {dtype: $String, value$tensor: [$String: "foo", "bar"], shape$shape: [$Int32: (i32 2)], __device: "/device:CPU:0"} : $TensorHandle<String>
 
 
 // b/76117368

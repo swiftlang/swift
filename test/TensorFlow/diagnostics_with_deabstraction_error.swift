@@ -42,5 +42,5 @@ public func noTensorShape() -> Tensor<Float> {
 public func badTensorShape() -> Tensor<Float> {
   let badShape : TensorShape = [1]
   // expected-error @+1 {{attribute 'value' does not match the shape attribute in the number of scalar elements}}
-  return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [17.0 as Float, 18.0], shape: badShape))
+  return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [17.0 as Float, 18.0], shape$shape: badShape))
 }
