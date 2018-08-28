@@ -365,9 +365,6 @@ private:
         case AccessorKind::DidSet:
           Kind = ".didset";
           break;
-        case AccessorKind::MaterializeForSet:
-          Kind = ".materialize";
-          break;
         case AccessorKind::Address:
           Kind = ".addressor";
           break;

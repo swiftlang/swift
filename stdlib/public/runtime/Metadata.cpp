@@ -3588,7 +3588,8 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
     case ProtocolRequirementFlags::Kind::Init:
     case ProtocolRequirementFlags::Kind::Getter:
     case ProtocolRequirementFlags::Kind::Setter:
-    case ProtocolRequirementFlags::Kind::MaterializeForSet:
+    case ProtocolRequirementFlags::Kind::ReadCoroutine:
+    case ProtocolRequirementFlags::Kind::ModifyCoroutine:
       break;
     case ProtocolRequirementFlags::Kind::BaseProtocol:
     case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:

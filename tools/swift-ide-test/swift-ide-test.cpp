@@ -2192,9 +2192,6 @@ public:
       case AccessorKind::MutableAddress:
         OS << "<mutableAddressor for ";
         break;
-      case AccessorKind::MaterializeForSet:
-        OS << "<materializeForSet for ";
-        break;
       case AccessorKind::Read:
         OS << "<read accessor for ";
         break;

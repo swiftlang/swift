@@ -50,7 +50,6 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
     OS << "willSet:" << ASD->getFullName() ;
     return false;
 
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Read:

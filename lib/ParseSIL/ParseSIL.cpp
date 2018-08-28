@@ -1237,7 +1237,6 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
            .Case("setter", AccessorKind::Set)
            .Case("addressor", AccessorKind::Address)
            .Case("mutableAddressor", AccessorKind::MutableAddress)
-           .Case("materializeForSet", AccessorKind::MaterializeForSet)
            .Case("read", AccessorKind::Read)
            .Case("modify", AccessorKind::Modify)
            .Default(None);
@@ -1250,7 +1249,6 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 ///  sil-decl-subref ::= '!' sil-decl-lang
 ///  sil-decl-subref-part ::= 'getter'
 ///  sil-decl-subref-part ::= 'setter'
-///  sil-decl-subref-part ::= 'materializeForSet'
 ///  sil-decl-subref-part ::= 'allocator'
 ///  sil-decl-subref-part ::= 'initializer'
 ///  sil-decl-subref-part ::= 'enumelt'

@@ -1442,8 +1442,8 @@ bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
   return Result;
 }
 
-static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
-  switch (accessor->getAccessorKind()) {
+static bool isAccessorAssumedNonMutating(AccessorKind kind) {
+  switch (kind) {
   case AccessorKind::Get:
   case AccessorKind::Address:
   case AccessorKind::Read:
@@ -1452,7 +1452,6 @@ static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   case AccessorKind::Set:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Modify:
     return false;
@@ -1510,12 +1509,15 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     return;
   }
 
+  // AbstractAccessors is suppressed by FunctionDefinitions, but not the
+  // presence of an FunctionBody callback.
+  bool PrintAbstract =
+    Options.AbstractAccessors && !Options.FunctionDefinitions;
+
   // We sometimes want to print the accessors abstractly
   // instead of listing out how they're actually implemented.
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
-  if (!Options.FunctionBody &&
-      (inProtocol ||
-        (Options.AbstractAccessors && !Options.FunctionDefinitions))) {
+  if (!Options.FunctionBody && (inProtocol || PrintAbstract)) {
     bool mutatingGetter = ASD->getGetter() && ASD->isGetterMutating();
     bool settable = ASD->isSettable(nullptr);
     bool nonmutatingSetter = false;
@@ -1551,13 +1553,25 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     return;
   }
 
+  // Should we print the 'modify' accessor?
+  auto shouldHideModifyAccessor = [&] {
+    if (impl.getReadWriteImpl() != ReadWriteImplKind::Modify)
+      return true;
+    // Always hide in a protocol.
+    return isa<ProtocolDecl>(ASD->getDeclContext());
+  };
+
+  auto isGetSetImpl = [&] {
+    return ((impl.getReadImpl() == ReadImplKind::Stored ||
+             impl.getReadImpl() == ReadImplKind::Get) &&
+            (impl.getWriteImpl() == WriteImplKind::Stored ||
+             impl.getWriteImpl() == WriteImplKind::Set) &&
+            (shouldHideModifyAccessor()));
+  };
+
   // Honor !Options.PrintGetSetOnRWProperties in the only remaining
   // case where we could end up printing { get set }.
-  if ((impl.getReadImpl() == ReadImplKind::Stored ||
-       impl.getReadImpl() == ReadImplKind::Get) &&
-      (impl.getWriteImpl() == WriteImplKind::Stored ||
-       impl.getWriteImpl() == WriteImplKind::Set) &&
-      (impl.getReadWriteImpl() == ReadWriteImplKind::MaterializeToTemporary) &&
+  if ((PrintAbstract || isGetSetImpl()) &&
       !Options.PrintGetSetOnRWProperties &&
       !Options.FunctionDefinitions &&
       !ASD->getGetter()->isMutating() &&
@@ -1573,7 +1587,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     if (!Accessor)
       return;
     if (!PrintAccessorBody) {
-      if (isAccessorAssumedNonMutating(Accessor)) {
+      if (isAccessorAssumedNonMutating(Accessor->getAccessorKind())) {
         if (Accessor->isMutating()) {
           Printer << " ";
           Printer.printKeyword("mutating");
@@ -1595,8 +1609,9 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   };
 
   Printer << " {";
-  if (impl.getReadImpl() == ReadImplKind::Get && ASD->getGetter() &&
-      !ASD->supportsMutation() &&
+  if ((PrintAbstract ||
+       (impl.getReadImpl() == ReadImplKind::Get && ASD->getGetter())) &&
+      !ASD->supportsMutation() && !ASD->isGetterMutating() &&
       PrintAccessorBody && !Options.FunctionDefinitions) {
     // Omit the 'get' keyword. Directly print getter
     if (auto BodyFunc = Options.FunctionBody) {
@@ -1604,7 +1619,11 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       IndentRAII IndentBody(*this);
       indent();
       Printer << BodyFunc(ASD->getGetter());
-    }    
+    }
+  } else if (PrintAbstract) {
+    PrintAccessor(ASD->getGetter());
+    if (ASD->supportsMutation())
+      PrintAccessor(ASD->getSetter());
   } else {
     switch (impl.getReadImpl()) {
     case ReadImplKind::Stored:
@@ -1632,7 +1651,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       break;
     case WriteImplKind::Set:
       PrintAccessor(ASD->getSetter());
-      if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify)
+      if (!shouldHideModifyAccessor())
         PrintAccessor(ASD->getModifyCoroutine());
       break;
     case WriteImplKind::MutableAddress:
@@ -2447,7 +2466,6 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Read:
   case AccessorKind::Modify:
   case AccessorKind::DidSet:
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
     recordDeclLoc(decl,
       [&]{

@@ -503,18 +503,18 @@ public class ConcreteDerived : GenericBase<Int> {
 // CHECK-NEXT:   #Foo.nativeMethod!1: {{.*}} :       @$S7dynamic3FooC12nativeMethodyyF
 // CHECK-NEXT:   #Foo.nativeProp!getter.1: {{.*}} :  @$S7dynamic3FooC10nativePropSivg     // dynamic.Foo.nativeProp.getter : Swift.Int
 // CHECK-NEXT:   #Foo.nativeProp!setter.1: {{.*}} :  @$S7dynamic3FooC10nativePropSivs     // dynamic.Foo.nativeProp.setter : Swift.Int
-// CHECK-NEXT:   #Foo.nativeProp!materializeForSet.1
+// CHECK-NEXT:   #Foo.nativeProp!modify.1:
 // CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} :   @$S7dynamic3FooC6nativeS2i_tcig    // dynamic.Foo.subscript.getter : (native: Swift.Int) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} :   @$S7dynamic3FooC6nativeS2i_tcis    // dynamic.Foo.subscript.setter : (native: Swift.Int) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!materializeForSet.1
+// CHECK-NEXT:   #Foo.subscript!modify.1:
 // CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   @$S7dynamic3FooC4objcACSi_tcfc
 // CHECK-NEXT:   #Foo.objcMethod!1: {{.*}} :         @$S7dynamic3FooC10objcMethodyyF
 // CHECK-NEXT:   #Foo.objcProp!getter.1: {{.*}} :    @$S7dynamic3FooC8objcPropSivg  // dynamic.Foo.objcProp.getter : Swift.Int
 // CHECK-NEXT:   #Foo.objcProp!setter.1: {{.*}} :    @$S7dynamic3FooC8objcPropSivs  // dynamic.Foo.objcProp.setter : Swift.Int
-// CHECK-NEXT:   #Foo.objcProp!materializeForSet.1
+// CHECK-NEXT:   #Foo.objcProp!modify.1:
 // CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} : @$S7dynamic3FooC4objcSiyXl_tcig // dynamic.Foo.subscript.getter : (objc: Swift.AnyObject) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} : @$S7dynamic3FooC4objcSiyXl_tcis // dynamic.Foo.subscript.setter : (objc: Swift.AnyObject) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!materializeForSet
+// CHECK-NEXT:   #Foo.subscript!modify.1:
 // CHECK-NEXT:   #Foo.overriddenByDynamic!1: {{.*}} : @$S7dynamic3FooC19overriddenByDynamic{{[_0-9a-zA-Z]*}}
 // CHECK-NEXT:   #Foo.deinit!deallocator.1: {{.*}}
 // CHECK-NEXT: }

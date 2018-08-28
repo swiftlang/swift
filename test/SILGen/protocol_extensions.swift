@@ -30,7 +30,7 @@ extension P1 {
   }
 
   subscript(i: Int) -> Int {
-    // materializeForSet can do static dispatch to peer accessors (tested later, in the emission of the concrete conformance)
+    // modify can do static dispatch to peer accessors (tested later, in the emission of the concrete conformance)
     get {
       return 0
     }
@@ -69,9 +69,9 @@ class C : P1 {
   func reqP1a() { }
 }
 
-//   (materializeForSet test from above)
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_extensions1CCAA2P1A2aDPyS2icimTW
-// CHECK: bb0(%0 : @trivial $Builtin.RawPointer, %1 : @trivial $*Builtin.UnsafeValueBuffer, %2 : @trivial $Int, %3 : @trivial $*τ_0_0):
+//   (modify test from above)
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_extensions1CCAA2P1A2aDPyS2iciMTW
+// CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $*τ_0_0):
 // CHECK: function_ref @$S19protocol_extensions2P1PAAEyS2icig
 // CHECK: return
 

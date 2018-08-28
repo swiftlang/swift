@@ -277,13 +277,12 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
         return isReadMutating() || isWriteMutating();
       case ReadWriteImplKind::Immutable:
         llvm_unreachable("asking for setter for immutable storage");
-      case ReadWriteImplKind::MaterializeForSet:
-        llvm_unreachable("should have a materializeForSet");
       }
     };
 
     switch (reqtAsAccessor->getAccessorKind()) {
     case AccessorKind::Get:
+    case AccessorKind::Read:
       witnessMutating = isReadMutating();
       break;
 
@@ -291,7 +290,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
       witnessMutating = isWriteMutating();
       break;
 
-    case AccessorKind::MaterializeForSet:
+    case AccessorKind::Modify:
       witnessMutating = isReadWriteMutating();
       break;
 
@@ -381,22 +380,31 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
   // to the requirement.
   switch (requirementKind) {
   case AccessorKind::Get:
-    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
-      return addressor;
     if (auto read = getExplicitAccessor(AccessorKind::Read))
       return read;
+    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
+      return addressor;
     break;
 
-  case AccessorKind::MaterializeForSet:
+  case AccessorKind::Read:
+    if (auto getter = getExplicitAccessor(AccessorKind::Get))
+      return getter;
+    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
+      return addressor;
+    break;
+
+  case AccessorKind::Modify:
     if (auto setter = getExplicitAccessor(AccessorKind::Set))
       return setter;
-    LLVM_FALLTHROUGH;
-
-  case AccessorKind::Set:
     if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
       return addressor;
+    break;
+
+  case AccessorKind::Set:
     if (auto modify = getExplicitAccessor(AccessorKind::Modify))
       return modify;
+    if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
+      return addressor;
     break;
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
@@ -4946,7 +4954,6 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     switch (*accessorKind) {
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
-    case AccessorKind::MaterializeForSet:
     case AccessorKind::Read:
     case AccessorKind::Modify:
       // These accessors are never exposed to Objective-C.

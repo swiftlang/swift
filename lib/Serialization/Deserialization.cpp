@@ -2068,6 +2068,20 @@ getActualVarDeclSpecifier(serialization::VarDeclSpecifier raw) {
   return None;
 }
 
+static Optional<swift::OpaqueReadOwnership>
+getActualOpaqueReadOwnership(unsigned rawKind) {
+  switch (serialization::OpaqueReadOwnership(rawKind)) {
+#define CASE(KIND)                               \
+  case serialization::OpaqueReadOwnership::KIND: \
+    return swift::OpaqueReadOwnership::KIND;
+  CASE(Owned)
+  CASE(Borrowed)
+  CASE(OwnedOrBorrowed)
+#undef CASE
+  }
+  return None;
+}
+
 static Optional<swift::ReadImplKind>
 getActualReadImplKind(unsigned rawKind) {
   switch (serialization::ReadImplKind(rawKind)) {
@@ -2110,7 +2124,6 @@ getActualReadWriteImplKind(unsigned rawKind) {
     return swift::ReadWriteImplKind::KIND;
   CASE(Immutable)
   CASE(Stored)
-  CASE(MaterializeForSet)
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
@@ -2120,10 +2133,17 @@ getActualReadWriteImplKind(unsigned rawKind) {
 }
 
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
+                                  uint8_t rawOpaqueReadOwnership,
                                   uint8_t rawReadImplKind,
                                   uint8_t rawWriteImplKind,
                                   uint8_t rawReadWriteImplKind,
                                   AccessorRecord &rawIDs) {
+  auto opaqueReadOwnership =
+    getActualOpaqueReadOwnership(rawOpaqueReadOwnership);
+  if (!opaqueReadOwnership)
+    return;
+  decl->setOpaqueReadOwnership(*opaqueReadOwnership);
+
   auto readImpl = getActualReadImplKind(rawReadImplKind);
   if (!readImpl) return;
 
@@ -2844,7 +2864,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
     bool isGetterMutating, isSetterMutating;
     unsigned rawSpecifier, numAccessors;
-    uint8_t readImpl, writeImpl, readWriteImpl;
+    uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
     AccessorRecord accessors;
@@ -2855,6 +2875,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                        isImplicit, isObjC, isStatic, rawSpecifier,
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
+                                       opaqueReadOwnership,
                                        readImpl, writeImpl, readWriteImpl,
                                        numAccessors,
                                        interfaceTypeID,
@@ -2921,7 +2942,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       AddAttribute(
           new (ctx) ReferenceOwnershipAttr(referenceStorage->getOwnership()));
 
-    configureStorage(var, readImpl, writeImpl, readWriteImpl, accessors);
+    configureStorage(var, opaqueReadOwnership,
+                     readImpl, writeImpl, readWriteImpl, accessors);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       var->setAccess(*accessLevel);
@@ -3701,13 +3723,14 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     AccessorRecord accessors;
     DeclID overriddenID;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
-    uint8_t readImpl, writeImpl, readWriteImpl;
+    uint8_t opaqueReadOwnership, readImpl, writeImpl, readWriteImpl;
     unsigned numArgNames, numAccessors;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
                                              isImplicit, isObjC,
                                              isGetterMutating, isSetterMutating,
+                                             opaqueReadOwnership,
                                              readImpl, writeImpl, readWriteImpl,
                                              numAccessors,
                                              genericEnvID,
@@ -3761,7 +3784,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     subscript->setIndices(readParameterList());
 
-    configureStorage(subscript, readImpl, writeImpl, readWriteImpl, accessors);
+    configureStorage(subscript, opaqueReadOwnership,
+                     readImpl, writeImpl, readWriteImpl, accessors);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       subscript->setAccess(*accessLevel);

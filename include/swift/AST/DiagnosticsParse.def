@@ -262,8 +262,8 @@ ERROR(conflicting_accessor,none,
       (unsigned, StringRef, StringRef))
 NOTE(previous_accessor,none,
      "%select{|previous definition of }1%0 %select{defined |}1here", (StringRef, bool))
-ERROR(expected_accessor_name,none,
-      "expected %select{%error|setter|%error|willSet|didSet}0 parameter name",
+ERROR(expected_accessor_parameter_name,none,
+      "expected %select{setter|willSet|didSet}0 parameter name",
       (unsigned))
 ERROR(expected_rparen_set_name,none,
       "expected ')' after setter parameter name",())

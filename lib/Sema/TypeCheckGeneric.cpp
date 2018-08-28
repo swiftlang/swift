@@ -288,6 +288,14 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
 /// All generic parameters of a generic function must be referenced in the
 /// declaration's type, otherwise we have no way to infer them.
 void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
+  // Don't do this check for accessors: they're not used directly, so we
+  // never need to infer their generic arguments.  This is mostly a
+  // compile-time optimization, but it also avoids problems with accessors
+  // like 'read' and 'modify' that would arise due to yields not being
+  // part of the formal type.
+  if (isa<AccessorDecl>(dc))
+    return;
+
   auto *genericParams = dc->getGenericParams();
   auto *genericSig = dc->getGenericSignatureOfContext();
   if (!genericParams)
