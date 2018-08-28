@@ -1047,18 +1047,13 @@ static unsigned getTFDataTypeFromTensorGenericType(Type type) {
 
 /// Decode shape elements from the tfop builtin instruction, starting at
 /// operand `operandIdx`, into `shape`.
-static void decodeShapeElements(SILValue attrValue,
-                                const SILTensorOpInfo &tfopInfo,
-                                unsigned &operandIdx, unsigned operandEndIdx,
-                                SmallVectorImpl<int64_t> &shape) {
+static void decodeShapeElementsLegacy(SILValue attrValue,
+                                      const SILTensorOpInfo &tfopInfo,
+                                      unsigned &operandIdx,
+                                      unsigned operandEndIdx,
+                                      SmallVectorImpl<int64_t> &shape) {
   assert(isa<MetatypeInst>(attrValue) && "$shape should start with a metatype");
-  while (operandIdx + 1 < operandEndIdx &&
-         tfopInfo.operandClasses[operandIdx + 1].second ==
-             SILTensorOpInfo::OperandClass::ArrayElement) {
-    auto eltValue = tfopInfo.inst->getOperand(++operandIdx);
-    auto intValue = cast<IntegerLiteralInst>(eltValue);
-    shape.push_back(intValue->getValue().getLimitedValue());
-  }
+  // Only support scalar tensor shapes (with no shape elements).
 }
 
 /// Decode the shape array attribute from the tfop builtin instruction, starting
@@ -1076,11 +1071,9 @@ static void decodeShapeArrayLegacy(const SILTensorOpInfo &tfopInfo,
     auto prevNumDims = dims.size();
     ++operandIdx; // We consumed an operand.
     auto nextOperand = inst->getOperand(operandIdx);
-    assert(tfopInfo.operandClasses[operandIdx].second ==
-               SILTensorOpInfo::OperandClass::Shape &&
-           "expected a shape value");
 
-    decodeShapeElements(nextOperand, tfopInfo, operandIdx, operandEndIdx, dims);
+    decodeShapeElementsLegacy(nextOperand, tfopInfo, operandIdx, operandEndIdx,
+                              dims);
     numDims.push_back(int(dims.size() - prevNumDims));
   }
 
@@ -1160,8 +1153,7 @@ static void decodeShapeArrayAtAttr(const ASTContext &ctx,
   auto *inst = graphOpInfo.inst;
   auto attr = inst->getAttribute(attrIdx);
   auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-  assert(attrInfo.second == SILTensorOpInfo::OperandClass::Normal ||
-         attrInfo.second == SILTensorOpInfo::OperandClass::ShapeArray);
+  assert(attrInfo.second == SILTensorOpInfo::OperandClass::Normal);
   assert(attrInfo.first == attrName);
   decodeShapeArray(ctx, attr.value, dims, numDims, dimPtrs);
 }
@@ -1942,7 +1934,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
   // Process all of the attributes.
   // For an inst like:
-  //   graph_op "Const"() {dtype$dtype: $Builtin.Int64, value$tensor: i1 0
+  //   graph_op "Const"() {dtype: $Builtin.Int64, value$tensor: i1 0
   // We will use the `dtype` attr value to lower the `value` attr, so we
   // remember the dtype info here.
   // We use unsigned instead of TF_DataType, to express the invalid initial
@@ -1961,7 +1953,6 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
     switch (attrInfo.second) {
     case SILTensorOpInfo::OperandClass::Input:
-    case SILTensorOpInfo::OperandClass::InputElt:
       assert(0 && "Input classes cannot exist for attributes");
 
     case SILTensorOpInfo::OperandClass::Normal: // No modifier.
@@ -2113,12 +2104,6 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       }
       // Done with normal attributes.
       break;
-    case SILTensorOpInfo::OperandClass::DType: {
-      auto swiftType = attrValue.getMetatypeValue();
-      dtypeAttr = convertSwiftTypeToTF(swiftType);
-      TF_SetAttrType(op, name.data(), (TF_DataType)dtypeAttr);
-      break;
-    }
     case SILTensorOpInfo::OperandClass::Tensor: {
       if (!dtypeAttr) {
         inst->dump();
@@ -2176,20 +2161,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       TF_SetAttrShape(op, name.c_str(), shape.data(), rank);
       break;
     }
-
-    case SILTensorOpInfo::OperandClass::ShapeArray:
-      // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
-      // partitioning and graph lowering passes to propagate shape info for
-      // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
-      // will not be lowered into this graph op itself.
-      if (isShapeArrayPseudoAttr(name, attrValue))
-        break;
-      internalError(getUserSourceLocation(inst->getDebugLocation()),
-                    "FIXME: Handle shapearray attributes");
-      return GLStatus::Error;
-
     case SILTensorOpInfo::OperandClass::Array: // Handled as 'normal'
-    case SILTensorOpInfo::OperandClass::ArrayElement:
       llvm_unreachable("This is a legacy class that shouldn't happen");
     }
   }

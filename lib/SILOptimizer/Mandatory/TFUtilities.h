@@ -115,26 +115,18 @@ struct SILTensorOpInfo {
   /// input that is an array of tensors.  An integer attribute may be either
   /// a Tensor value or an integer-encoded DType, etc.
   enum class OperandClass {
-    /// This marks three sorts of things:
+    /// This marks the following sorts of things:
     /// 1) A normal tensor input: the value is a TensorHandle.
-    /// 2) A scalar input suitable for scalar promotion, used by the
-    ///    tf.scalarToTensor pseudo-op, the value is a scalar value.
-    /// 3) A tensor array (TensorFlow "InputList").  The value is a metatype
-    ///    marker value (so we can represent empty arrays) followed by
-    ///    InputElt elements that make up the array.
+    /// 2) An normal attribute (without modifier).
+    /// 3) A tensor or shape attribute (need a modifier for proper lowering).
+    /// 4) An array attribute (needed for parsing tfop, and dropped before graph
+    ///    lowering).
     Input,
-    InputElt, // Element of an input list.  Always a TensorHandle.
 
     Normal, // No modifier.
-    DType,  // This integer value is a dtype.
     Tensor, // This array or scalar should be turned into a TF_Tensor.
     Shape,  // This array of integers is a shape specifier.
-
-    Array,        // This marks a normal array value, the value is a metatype.
-    ArrayElement, // This is a continuation element of an attribute array.
-
-    // This is the start of a shape array.  The value is the # elements.
-    ShapeArray,
+    Array,  // This marks a normal array value, the value is a metatype.
   };
 
   /// Return the string suffix for the specified attribute modifier.
@@ -148,8 +140,7 @@ struct SILTensorOpInfo {
 
   /// Return true if the specified operand is an input (not an attribute).
   bool isInput(unsigned operandNumber) const {
-    return operandClasses[operandNumber].second == OperandClass::Input ||
-           operandClasses[operandNumber].second == OperandClass::InputElt;
+    return operandClasses[operandNumber].second == OperandClass::Input;
   }
 
   /// Analyze the specified SIL instruction and return a SILTensorOpInfo
@@ -209,7 +200,7 @@ struct GraphOperationInfo {
   /// information about the operands.
   StringRef decodeName(SmallVectorImpl<InputMarker> &inputInfo);
 
-  /// Given an attribute name like foo$dtype, decode the name and the class.
+  /// Given an attribute name like foo$tensor, decode the name and the class.
   /// If there is no modifier specified, this defaults to
   /// OperandClass::Normal.
   static std::pair<StringRef, SILTensorOpInfo::OperandClass>

@@ -376,22 +376,14 @@ const char *SILTensorOpInfo::getOperandClassSuffix(OperandClass opClass) {
   switch (opClass) {
   case OperandClass::Input:
     return "$in";
-  case OperandClass::InputElt:
-    return "$inelt";
   case OperandClass::Normal:
     return "";
-  case OperandClass::DType:
-    return "$dtype";
   case OperandClass::Tensor:
     return "$tensor";
   case OperandClass::Shape:
     return "$shape";
   case OperandClass::Array:
     return "$array";
-  case OperandClass::ArrayElement:
-    return "$elt";
-  case OperandClass::ShapeArray:
-    return "$shapearray";
   }
 }
 
@@ -400,14 +392,10 @@ llvm::Optional<OperandClass>
 SILTensorOpInfo::getOperandClass(StringRef suffix) {
   return llvm::StringSwitch<llvm::Optional<OperandClass>>(suffix)
       .Case("in", OperandClass::Input)
-      .Case("inelt", OperandClass::InputElt)
       .Case("", OperandClass::Normal)
       .Case("tensor", OperandClass::Tensor)
       .Case("shape", OperandClass::Shape)
-      .Case("dtype", OperandClass::DType)
       .Case("array", OperandClass::Array)
-      .Case("elt", OperandClass::ArrayElement)
-      .Case("shapearray", OperandClass::ShapeArray)
       .Default(None);
 }
 
@@ -469,7 +457,7 @@ GraphOperationInfo::decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
   return opName;
 }
 
-/// Given an attribute name like foo$dtype, decode the name and the class.  If
+/// Given an attribute name like foo$tensor, decode the name and the class.  If
 /// there is no modifier specified, this defaults to OperandClass::Normal.
 std::pair<StringRef, SILTensorOpInfo::OperandClass>
 GraphOperationInfo::decodeAttributeName(Identifier name) {
@@ -480,7 +468,12 @@ GraphOperationInfo::decodeAttributeName(Identifier name) {
   auto opClass = OperandClass::Normal;
   if (dollarLoc != StringRef::npos) {
     auto suffix = nameStr.drop_front(dollarLoc + 1);
-    opClass = SILTensorOpInfo::getOperandClass(suffix).getValue();
+    if (auto res = SILTensorOpInfo::getOperandClass(suffix))
+      opClass = res.getValue();
+    else {
+      std::string msg = "invalid attribute modifier '" + name.str().str() + "'";
+      llvm_unreachable(msg.c_str());
+    }
   }
 
   // Slice the suffix off the attribute name and add the decoded version.
@@ -593,12 +586,12 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
   attributes.push_back(
       {context.getIdentifier(std::string("value") + tensorSuffix), scalars});
 
-  // Add the value$shape attribute if we have an array value.
+  // Add the shape$shape attribute if we have an array value.
   if (scalars.getKind() == SymbolicValue::Array) {
     auto shapeId = SILTensorOpInfo::OperandClass::Shape;
     auto shapeSuffix = SILTensorOpInfo::getOperandClassSuffix(shapeId);
     attributes.push_back(
-        {context.getIdentifier(std::string("value") + shapeSuffix), shape});
+        {context.getIdentifier(std::string("shape") + shapeSuffix), shape});
   }
 
   // All graph_op's get a device.

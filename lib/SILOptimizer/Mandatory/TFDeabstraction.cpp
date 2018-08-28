@@ -2212,46 +2212,49 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       return false;
     };
 
-    // Emits a diagnostic and returns true if the value is invalid for a shape
-    // attr.
-    auto verifyShapeAttr = [&](SymbolicValue constValue) -> bool {
+    // Emits a diagnostic and returns a negative number if the value is not an
+    // int array.  Otherwise returns the product of the array element
+    // values. e.g. For array [2, 3], return 6.
+    auto getIntArrayProduct = [&](SymbolicValue constValue) -> long long {
       // strip away the possible aggregate wrapper.
       constValue = constValue.lookThroughSingleElementAggregates();
       if (constValue.getKind() != SymbolicValue::Array) {
         diagnoseInvalidAttr("requires an array");
-        return true;
+        return -1;
       }
       CanType eltType;
       auto elements = constValue.getArrayValue(eltType);
       if (!StringRef(eltType->getString()).startswith("Int")) {
         diagnoseInvalidAttr("requires an array of ints");
-        return true;
+        return -1;
       }
+      long long ret = 1;
       for (auto elt : elements) {
         // strip away the possible aggregate wrapper.
         elt = elt.lookThroughSingleElementAggregates();
         if (elt.getKind() != SymbolicValue::Integer) {
           diagnoseInvalidAttr("requires an array of ints");
-          return true;
+          return -1;
         }
+        // It is possible for this to overflow, but the resulting compilation
+        // will still be correct, so for simplicity we do not guard against
+        // overflow. More specifically, when it overflows, we would either
+        // return a negative value and thus reject the input program, or
+        // return an incorrect positive value. In both cases, the input
+        // program will still be eventually rejected (e.g. in TF graph
+        // compiler), since the specified shape is too large. As such, the
+        // correctness of compilation is preserved.
+        ret *= elt.getIntegerValue().getLimitedValue();
       }
-      return false;
+      return ret;
     };
-
     // Verify that the type of this attribute is ok for the OperandClass we
     // have.
     switch (operandClass.second) {
     case SILTensorOpInfo::OperandClass::Input:
-    case SILTensorOpInfo::OperandClass::InputElt:
-      llvm_unreachable("Input classes cannot exist for attributes");
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
       if (verifyNormalAttr(constValue))
         return; // error already emitted.
-      break;
-    case SILTensorOpInfo::OperandClass::DType:
-      // This integer value is a dtype.
-      if (constValue.getKind() != SymbolicValue::Integer)
-        return diagnoseInvalidAttr("requires a constant integer");
       break;
     case SILTensorOpInfo::OperandClass::Array: {
       if (constValue.getKind() == SymbolicValue::Array)
@@ -2263,8 +2266,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
           return diagnoseInvalidAttr("not an aggregate of TensorFlow values");
         // Drop '$array' from the attribute name.
         currentAttr.name = context.getIdentifier(operandClass.first);
-        // Replace the single metatype with a list of metatypes each representing
-        // a dtype.
+        // Replace the single metatype with a list of metatypes each
+        // representing a dtype.
         auto *dtypeProto =
             context.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
         currentAttr.value = SymbolicValue::getArray(
@@ -2275,28 +2278,11 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       return diagnoseInvalidAttr("requires an array or a metatype");
     }
     case SILTensorOpInfo::OperandClass::Shape:
-      if (verifyShapeAttr(constValue))
+      // A shape attr must be an int array.
+      if (getIntArrayProduct(constValue) < 0)
         return; // error already emitted.
       break;
-    case SILTensorOpInfo::OperandClass::ShapeArray: {
-      if (constValue.getKind() != SymbolicValue::Array)
-        return diagnoseInvalidAttr("requires an array");
-      CanType eltType;
-      auto shapes = constValue.getArrayValue(eltType);
-      if (eltType->getString() != "TensorShape")
-        return diagnoseInvalidAttr("requires an array of TensorShape values");
-      for (auto shape : shapes) {
-        if (verifyShapeAttr(shape))
-          return; // error already emitted.
-      }
-      break;
-    }
-    case SILTensorOpInfo::OperandClass::ArrayElement:
-      inst->dump();
-      assert(0 && "FIXME: array elem exprs aren't handled yet");
     case SILTensorOpInfo::OperandClass::Tensor:
-      // FIXME: There needs to be a dtype attribute before this.
-
       if (constValue.getKind() == SymbolicValue::Integer ||
           constValue.getKind() == SymbolicValue::Float   ||
           constValue.getKind() == SymbolicValue::String)
@@ -2306,18 +2292,33 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         return diagnoseInvalidAttr("requires a constant that is an integer,"
                                    " floating point, or array thereof");
 
+      // Returns a negative number if the next attr is not a shape.  Otherwise
+      // returns the number of elements as given by the shape attr. e.g. a
+      // tensor with shape [2, 3] has 6 elements.
+      auto getNumEltsFromShapeAttr = [&]() -> long long {
+        if (i + 1 >= opInfo.operandClasses.size() ||
+            opInfo.operandClasses[i + 1].second !=
+                SILTensorOpInfo::OperandClass::Shape)
+          return -1;
+        auto operand = inst->getOperand(i + 1);
+        auto it = constants.find(operand);
+        if (it == constants.end() || !it->second.isConstant())
+          return -1;
+        auto constValue = it->second.lookThroughSingleElementAggregates();
+        return getIntArrayProduct(constValue);
+      };
+      // Shape attr is an int array.
+      auto numEltsFromShapeAttr = getNumEltsFromShapeAttr();
+      if (numEltsFromShapeAttr < 0)
+        return diagnoseInvalidAttr("must be followed by a shape attribute");
+
+      // Validate that the shape matches the # elements we have.
       CanType eltType;
       auto elements = constValue.getArrayValue(eltType);
 
-      /// Tensor array arguments must always be followed by a shape.
-      if (i+1 >= opInfo.operandClasses.size() ||
-          opInfo.operandClasses[i+1].second !=
-                      SILTensorOpInfo::OperandClass::Shape)
-        return diagnoseInvalidAttr("tensor attributes must be followed by "
-                                   "a shape attribute");
-
-      // TODO: Decode the shape and validate that it matches the # elements
-      // we have.
+      if ((size_t)numEltsFromShapeAttr != elements.size())
+        return diagnoseInvalidAttr("does not match the shape attribute in "
+                                   "the number of scalar elements");
 
       // Empty tensor value is ok.
       if (elements.empty()) break;
