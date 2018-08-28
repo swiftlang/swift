@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-ir %s -Onone -sil-verify-all \
 // RUN:   -Xllvm -sil-print-debuginfo -o - 2>&1 | %FileCheck %s
 
-// CHECK: define hidden swiftcc %Ts15_AnySequenceBoxC* @"$S4main18DependencyResolverC14resolveSubtree_9excludings11AnySequenceVyAA20VersionAssignmentSetVy9ContainerQzGGAK_SDyAJ_10IdentifierQZShyAA0I0VGGtF"(%swift.opaque* noalias nocapture, i64, %T4main18DependencyResolverC* swiftself)
+// CHECK: define hidden swiftcc {{.*}} @"$S4main18DependencyResolverC14resolveSubtree_9excludings11AnySequenceVyAA20VersionAssignmentSetVy9ContainerQzGGAK_SDyAJ_10IdentifierQZShyAA0I0VGGtF"
 
 public struct Version {
     public let major: Int
