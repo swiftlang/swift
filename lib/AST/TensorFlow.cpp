@@ -21,6 +21,20 @@
 using namespace swift;
 using namespace tf;
 
+/// Return true if the given type represents a TensorFlow dtype.
+bool tf::isTensorFlowDType(Type ty) {
+  auto nominal = ty->getAnyNominal();
+  if (!nominal)
+    return false;
+  auto &ctx = ty->getASTContext();
+  auto tensorProto =
+      ctx.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
+  if (!tensorProto)
+    return false;
+  SmallVector<ProtocolConformance *, 2> conformances;
+  nominal->lookupConformance(nullptr, tensorProto, conformances);
+  return !conformances.empty();
+}
 
 /// If the specified type is the well-known TensorHandle<T> type, then return
 /// "T".  If not, return a null type.

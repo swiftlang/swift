@@ -240,6 +240,14 @@ public func testTensorFlowClosures(_ a: Float) -> Tensor<Int32>{
   return closure(f);
 }
 
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensorFlowClosures{{.*}}
+// CHECK: sil private {{.*}}testTensorFlowClosures{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Int32> {
+// CHECK: bb0(%0 : @unowned $TensorHandle<Builtin.FPIEEE32>):
+// CHECK:  [[A:%.*]] = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
+// CHECK:  [[B:%.*]] = graph_op "Cast,i"([[A]] : $TensorHandle<Float>) {SrcT: $Float, DstT: $Int32, __device: "/device:CPU:0"} : $TensorHandle<Int32>
+// CHECK:  return [[B]] : $TensorHandle<Int32>
+// CHECK: } 
+
 // CHECK-LABEL --- TFPartition Accelerator Result: [[NAME:*.*]]
 // sil private @[[NAME]] : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Int32> {
 // bb0(%0 : @unowned $TensorHandle<Builtin.FPIEEE32>):
@@ -247,3 +255,33 @@ public func testTensorFlowClosures(_ a: Float) -> Tensor<Int32>{
 //   [[B:%.*]] = graph_op "Cast,i"([[A]] : $TensorHandle<Float>) {SrcT: $Float, DstT: $Int32, __device: "/device:CPU:0"} : $TensorHandle<Int32>
 //   return [[B]] : $TensorHandle<Int32>
 // } // end sil function '[[NAME]]'
+
+public func testExtractDTypeList() {
+  struct Foo {
+    let a: Tensor<Float>
+    let b: Tensor<Float>
+  }
+  let elements = Foo(a: Tensor([1]), b: Tensor([2]))
+  // TODO: Support heterogeneous input lists so that we can replace b's dtype with something else.
+  // TODO: Support unpacking a struct value into an input list so that we can replace
+  // `[elements.a, elements.b]` with `elements`.
+  let _: VariantHandle = #tfop("TensorSliceDataset", [elements.a, elements.b],
+                               Toutput_types$array: Foo.self,
+                               output_shapes: [TensorShape()])
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExtractDTypeList{{.*}}
+// CHECK: {{.*}}testExtractDTypeList
+// CHECK: graph_op "TensorSliceDataset,L,e,e"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {Toutput_types: [$AccelerableByTensorFlow.Protocol: $Float, $Float], output_shapes: [$TensorShape: ([$Int32: ])], __device: "/device:CPU:0"} : $VariantHandle
+
+public func testExtractTupleDTypeList() {
+    let bar: (a: Tensor<Int32>, b: Tensor<Int32>) = (Tensor(0), Tensor(1))
+    let _: VariantHandle = #tfop("TensorSliceDataset", [bar.a, bar.b],
+                                 Toutput_types$array: type(of: bar),
+                                 output_shapes: [TensorShape()])
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExtractTupleDTypeList{{.*}}
+// CHECK: {{.*}}testExtractTupleDTypeList
+// CHECK: graph_op "TensorSliceDataset,L,e,e"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>) {Toutput_types: [$AccelerableByTensorFlow.Protocol: $Int32, $Int32], output_shapes: [$TensorShape: ([$Int32: ])], __device: "/device:CPU:0"} : $VariantHandle
+

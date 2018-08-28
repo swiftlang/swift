@@ -1969,6 +1969,38 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
   return v;
 }
 
+/// Given a type, recursively collect all innermost element types if it's an
+/// aggregate of TensorHandle's or dtypes.
+static bool collectInnermostTensorFlowDTypes(
+    CanType type, SmallVectorImpl<SymbolicValue> &result) {
+  if (isTensorFlowDType(type)) {
+    result.push_back(SymbolicValue::getMetatype(type));
+    return true;
+  }
+  if (tf::isTensorHandle(type)) {
+    auto eltType = getTensorHandleElementType(type)->getCanonicalType();
+    assert(tf::isTensorFlowDType(eltType));
+    result.push_back(SymbolicValue::getMetatype(eltType));
+    return true;
+  }
+  if (auto tupleTy = type->getAs<TupleType>())
+    return llvm::all_of(tupleTy->getElementTypes(),
+                        [&](Type eltTy) {
+                          return collectInnermostTensorFlowDTypes(
+                              eltTy->getCanonicalType(), result);
+                        });
+  if (auto *decl = type->getStructOrBoundGenericStruct())
+    return llvm::all_of(decl->getStoredProperties(),
+                        [&](VarDecl *member) {
+                          auto subMap = type->getMemberSubstitutionMap(
+                              member->getModuleContext(), member);
+                          auto eltTy = member->getType().subst(subMap);
+                          return collectInnermostTensorFlowDTypes(
+                              eltTy->getCanonicalType(), result);
+                        });
+  return false;
+}
+
 /// Replace the specified tensor operation with a GraphOperation instruction,
 /// emitting errors if attribute arguments could not be constant folded, or if
 /// the operand/attribute types are incorrect.
@@ -2138,6 +2170,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
 
     auto attrIdentifier = context.getIdentifier(attrName);
     attributes.push_back({ attrIdentifier, constValue });
+    auto &currentAttr = attributes.back();
 
     // FIXME: Do we detect and reject duplicate attribute names already?
 
@@ -2210,7 +2243,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     switch (operandClass.second) {
     case SILTensorOpInfo::OperandClass::Input:
     case SILTensorOpInfo::OperandClass::InputElt:
-      assert(0 && "Input classes cannot exist for attributes");
+      llvm_unreachable("Input classes cannot exist for attributes");
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
       if (verifyNormalAttr(constValue))
         return; // error already emitted.
@@ -2220,10 +2253,27 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       if (constValue.getKind() != SymbolicValue::Integer)
         return diagnoseInvalidAttr("requires a constant integer");
       break;
-    case SILTensorOpInfo::OperandClass::Array:
-      if (constValue.getKind() != SymbolicValue::Array)
-        return diagnoseInvalidAttr("requires an array");
-      break;
+    case SILTensorOpInfo::OperandClass::Array: {
+      if (constValue.getKind() == SymbolicValue::Array)
+        break;
+      if (constValue.getKind() == SymbolicValue::Metatype) {
+        SmallVector<SymbolicValue, 8> metatypes;
+        if (!collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
+                                              metatypes))
+          return diagnoseInvalidAttr("not an aggregate of TensorFlow values");
+        // Drop '$array' from the attribute name.
+        currentAttr.name = context.getIdentifier(operandClass.first);
+        // Replace the single metatype with a list of metatypes each representing
+        // a dtype.
+        auto *dtypeProto =
+            context.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
+        currentAttr.value = SymbolicValue::getArray(
+            metatypes, dtypeProto->getInterfaceType()->getCanonicalType(),
+            context.getAllocator());
+        break;
+      }
+      return diagnoseInvalidAttr("requires an array or a metatype");
+    }
     case SILTensorOpInfo::OperandClass::Shape:
       if (verifyShapeAttr(constValue))
         return; // error already emitted.
