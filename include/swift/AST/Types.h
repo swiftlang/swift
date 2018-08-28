@@ -903,6 +903,10 @@ public:
   /// declaration.
   GenericTypeDecl *getAnyGeneric();
 
+  /// removeArgumentLabels -  Retrieve a version of this type with all
+  /// argument labels removed.
+  Type removeArgumentLabels(unsigned numArgumentLabels);
+
   /// getUnlabeledType - Retrieve a version of this type with all labels
   /// removed at every level. For example, given a tuple type 
   /// \code

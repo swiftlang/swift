@@ -723,6 +723,32 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   return getStrippedType(Context, Type(this), /*stripLabels=*/true);
 }
 
+/// Remove argument labels from the function type.
+Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
+  // If there is nothing to remove, don't.
+  if (numArgumentLabels == 0) return Type(this);
+
+  auto fnType = castTo<AnyFunctionType>();
+
+  // Drop argument labels from the input type.
+  llvm::SmallVector<AnyFunctionType::Param, 8> unlabeledParams;
+  unlabeledParams.reserve(fnType->getNumParams());
+  for (const auto &param : fnType->getParams())
+    unlabeledParams.push_back(param.getWithoutLabel());
+
+  auto result = fnType->getResult()
+                      ->removeArgumentLabels(numArgumentLabels - 1);
+
+  if (auto *genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
+    return GenericFunctionType::get(genericFnType->getGenericSignature(),
+                                    unlabeledParams, result,
+                                    fnType->getExtInfo());
+  }
+
+  return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
+}
+
+
 Type TypeBase::getWithoutParens() {
   Type Ty = this;
   while (auto ParenTy = dyn_cast<ParenType>(Ty.getPointer()))
