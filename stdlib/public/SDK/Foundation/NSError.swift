@@ -166,7 +166,12 @@ extension CustomNSError
     where Self: RawRepresentable, Self.RawValue: FixedWidthInteger {
   // The error code of Error with integral raw values is the raw value.
   public var errorCode: Int {
-    return numericCast(self.rawValue)
+    if Self.RawValue.isSigned {
+      return numericCast(self.rawValue)
+    }
+
+    let uintValue: UInt = numericCast(self.rawValue)
+    return Int(bitPattern: uintValue)
   }
 }
 
