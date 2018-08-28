@@ -25,7 +25,7 @@ public func packResultsToAggregate_indirectResult1() {
 // CHECK: [[B2:%.*]] = struct $Foo ([[B1]] : $Tensor<Float>)
 
 @inlinable @inline(__always)
-public func genericPackedResults2<T>() -> T {
+public func genericPackedResults2<T>() -> (T, Tensor<Float>) {
   // expected-error @+1 {{op named 'SomeOp3' is not registered in TensorFlow}}
   return #tfop("SomeOp3")
 }
