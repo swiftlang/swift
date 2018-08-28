@@ -51,16 +51,6 @@ TypeConverter::getAbstractionPattern(SubscriptDecl *decl, bool isNonObjC) {
                                 ->getCanonicalType());
 }
 
-AbstractionPattern
-TypeConverter::getIndicesAbstractionPattern(SubscriptDecl *decl) {
-  CanGenericSignature genericSig;
-  if (auto sig = decl->getGenericSignatureOfContext())
-    genericSig = sig->getCanonicalSignature();
-  auto indicesTy = decl->getIndicesInterfaceType();
-  auto indicesCanTy = indicesTy->getCanonicalType(genericSig);
-  return AbstractionPattern(genericSig, indicesCanTy);
-}
-
 static const clang::Type *getClangType(const clang::Decl *decl) {
   if (auto valueDecl = dyn_cast<clang::ValueDecl>(decl)) {
     return valueDecl->getType().getTypePtr();
