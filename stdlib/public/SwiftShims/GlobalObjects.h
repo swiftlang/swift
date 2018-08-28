@@ -48,7 +48,7 @@ struct _SwiftUnsafeBitMap {
 struct _SwiftHashTable {
   __swift_intptr_t count;
   __swift_intptr_t capacity;
-  __swift_intptr_t scale;
+  __swift_intptr_t bucketCount;
   void *map;
 };
 

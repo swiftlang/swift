@@ -95,7 +95,7 @@ swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
       // 0 so that any insertion will lead to real storage being allocated.
       0, // int count;
       0, // int capacity;
-      0, // int scale;
+      1, // int bucketCount;
       &swift::_swiftEmptySetStorage.entries, // void *map
     },
     0, // uint64 seed0;

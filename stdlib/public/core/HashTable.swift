@@ -23,19 +23,16 @@ internal struct _HashTable {
   @usableFromInline
   internal let capacity: Int
 
-  // Bits 0..<6 hold the size scale.
-  // Bits 6... are reserved for future use. (E.g., remembering reserveCapacity
-  // so that we can resize storage after removals.)
   @usableFromInline
-  internal let limits: Int
+  internal let bucketCount: Int
 
   internal let map: UnsafeMutablePointer<MapEntry>
 
   internal init(scale: Int, map: UnsafeMutablePointer<MapEntry>) {
     _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
-    self.limits = scale
     self.count = 0
     self.capacity = _HashTable.capacity(forScale: scale)
+    self.bucketCount = 1 &<< scale
     self.map = map
 
     map.assign(repeating: .unoccupied, count: bucketCount)
@@ -120,21 +117,16 @@ extension _HashTable.MapEntry: Equatable {
     return lhs.value == rhs.value
   }
 }
+
 extension _HashTable {
   @inlinable
   internal var scale: Int {
     @inline(__always) get {
-      return limits & 0x3F
+      return bucketCount.trailingZeroBitCount
     }
   }
 
   @inlinable
-  internal var bucketCount: Int {
-    @inline(__always) get {
-      return 1 &<< scale
-    }
-  }
-
   internal var bucketMask: Int {
     @inline(__always) get {
       // The bucket count is a positive power of two, so subtracting 1 will
