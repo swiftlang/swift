@@ -6298,6 +6298,27 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
   }
 }
 
+// Note: This function ignores labels.
+static bool areParameterTypesEqual(const ParameterList &params1,
+                                   const ParameterList &params2) {
+  if (params1.size() != params2.size())
+    return false;
+
+  for (unsigned i : indices(params1)) {
+    if (!params1[i]->getInterfaceType()->isEqual(
+          params2[i]->getInterfaceType())) {
+      return false;
+    }
+
+    if (params1[i]->getValueOwnership() !=
+        params2[i]->getValueOwnership()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   // Figure out the class in which this subscript occurs.
   auto classTy = subscript->getDeclContext()->getSelfClassDecl();
@@ -6314,22 +6335,14 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   subscript->getModuleContext()->lookupQualified(
       superDecl, subscript->getFullName(),
       NL_QualifiedDefault | NL_KnownNoDependency, lookup);
-  Type unlabeledIndices;
+
   for (auto result : lookup) {
     auto parentSub = dyn_cast<SubscriptDecl>(result);
     if (!parentSub)
       continue;
 
-    // Compute the type of indices for our own subscript operation, lazily.
-    if (!unlabeledIndices) {
-      unlabeledIndices = subscript->getIndicesInterfaceType()
-                             ->getUnlabeledType(Impl.SwiftContext);
-    }
-
-    // Compute the type of indices for the subscript we found.
-    auto parentUnlabeledIndices = parentSub->getIndicesInterfaceType()
-                                      ->getUnlabeledType(Impl.SwiftContext);
-    if (!unlabeledIndices->isEqual(parentUnlabeledIndices))
+    if (!areParameterTypesEqual(*subscript->getIndices(),
+                                *parentSub->getIndices()))
       continue;
 
     // The index types match. This is an override, so mark it as such.
