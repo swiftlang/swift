@@ -903,6 +903,10 @@ public:
   /// declaration.
   GenericTypeDecl *getAnyGeneric();
 
+  /// removeArgumentLabels -  Retrieve a version of this type with all
+  /// argument labels removed.
+  Type removeArgumentLabels(unsigned numArgumentLabels);
+
   /// getUnlabeledType - Retrieve a version of this type with all labels
   /// removed at every level. For example, given a tuple type 
   /// \code
@@ -3038,9 +3042,6 @@ class FunctionType final : public AnyFunctionType,
       
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *getOld(Type Input, Type Result,
-                              ExtInfo Info = ExtInfo());
-      
   static FunctionType *get(ArrayRef<Param> params,
                            Type result,
                            ExtInfo info = ExtInfo(),
@@ -3117,12 +3118,6 @@ class GenericFunctionType final : public AnyFunctionType,
                       RecursiveTypeProperties properties);
       
 public:
-  /// Create a new generic function type.
-  static GenericFunctionType *getOld(GenericSignature *sig,
-                                     Type input,
-                                     Type result,
-                                     ExtInfo info = ExtInfo());
-
   /// Create a new generic function type.
   static GenericFunctionType *get(GenericSignature *sig,
                                   ArrayRef<Param> params,

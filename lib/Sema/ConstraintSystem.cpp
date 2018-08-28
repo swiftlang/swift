@@ -590,25 +590,6 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
     });
 }
 
-/// Remove argument labels from the function type.
-static Type removeArgumentLabels(Type type, unsigned numArgumentLabels) {
-  // If there is nothing to remove, don't.
-  if (numArgumentLabels == 0) return type;
-  
-  auto fnType = type->getAs<FunctionType>();
-
-  // Drop argument labels from the input type.
-  llvm::SmallVector<AnyFunctionType::Param, 4> unlabeledParams;
-  unlabeledParams.reserve(fnType->getNumParams());
-  for (const auto &param : fnType->getParams())
-    unlabeledParams.push_back(param.getWithoutLabel());
-
-  return FunctionType::get(
-      unlabeledParams,
-      removeArgumentLabels(fnType->getResult(), numArgumentLabels - 1),
-      fnType->getExtInfo());
-}
-
 Type ConstraintSystem::openFunctionType(
        AnyFunctionType *funcType,
        unsigned numArgumentLabelsToRemove,
@@ -645,7 +626,7 @@ Type ConstraintSystem::openFunctionType(
         FunctionType::ExtInfo().withThrows(genericFn->throws()));
   }
 
-  return removeArgumentLabels(funcType, numArgumentLabelsToRemove);
+  return funcType->removeArgumentLabels(numArgumentLabelsToRemove);
 }
 
 Optional<Type> ConstraintSystem::isArrayType(Type type) {

@@ -28,6 +28,7 @@ protocol P {
 
 extension P {
   static func ≈> <R>(f: Self,  b: @escaping (inout B) -> R) -> M<Self, R> {}
+  // expected-note@-1 {{in call to operator '≈>'}}
 }
 
 extension WritableKeyPath : P {
@@ -42,4 +43,5 @@ extension WritableKeyPath : P {
 struct X { var y: Int = 0 }
 var x = X()
 x ~> \X.y ≈> { a in a += 1; return 3 }
-// expected-error@-1 {{cannot convert call result type 'M<WritableKeyPath<X, Int>, _>' to expected type 'WritableKeyPath<_, _>'}}
+// expected-error@-1 {{generic parameter 'R' could not be inferred}}
+// FIXME: Used to be better: "cannot convert call result type 'M<WritableKeyPath<X, Int>, _>' to expected type 'WritableKeyPath<_, _>'"

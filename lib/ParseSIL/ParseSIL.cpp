@@ -1816,16 +1816,25 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
     // Pick the ValueDecl that has the right type.
     ValueDecl *TheDecl = nullptr;
     auto declTy = Ty.getType()->getCanonicalType();
-    auto unlabeledDecl =
-        declTy->getUnlabeledType(P.Context)->getCanonicalType();
     for (unsigned I = 0, E = values.size(); I < E; I++) {
-      auto lookupTy = values[I]->getInterfaceType();
-      auto unlabeledLookup =
-          lookupTy->getUnlabeledType(P.Context)->getCanonicalType();
-      if (unlabeledDecl == unlabeledLookup) {
-        TheDecl = values[I];
+      auto *decl = values[I];
+
+      unsigned numArgumentLabels = 0;
+      if (auto *eed = dyn_cast<EnumElementDecl>(decl)) {
+        numArgumentLabels =
+          (eed->hasAssociatedValues() ? 2 : 1);
+      } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+        numArgumentLabels =
+          (decl->getDeclContext()->isTypeContext() ? 2 : 1);
+      }
+
+      auto lookupTy =
+        decl->getInterfaceType()
+            ->removeArgumentLabels(numArgumentLabels);
+      if (declTy == lookupTy->getCanonicalType()) {
+        TheDecl = decl;
         // Update SILDeclRef to point to the right Decl.
-        Member.loc = TheDecl;
+        Member.loc = decl;
         break;
       }
       if (values.size() == 1 && !TheDecl) {
