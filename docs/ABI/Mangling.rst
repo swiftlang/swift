@@ -262,17 +262,17 @@ return value are bridged and the type of pattern outlined.
 
 ::
 
-  bridge-spec := bridged-kind bridged-param* bridged-return '_'
+  bridge-spec ::= bridged-kind bridged-param* bridged-return '_'
 
-  bridged-param := 'n' // not bridged parameter
-  bridged-param := 'b' // bridged parameter
+  bridged-param ::= 'n' // not bridged parameter
+  bridged-param ::= 'b' // bridged parameter
 
-  bridged-return := 'n' // not bridged return
-  bridged-return := 'b' // bridged return
+  bridged-return ::= 'n' // not bridged return
+  bridged-return ::= 'b' // bridged return
 
-  bridged-kind := 'm' // bridged method
-  bridged-kind := 'a' // bridged property (by address)
-  bridged-kind := 'p' // bridged property (by value)
+  bridged-kind ::= 'm' // bridged method
+  bridged-kind ::= 'a' // bridged property (by address)
+  bridged-kind ::= 'p' // bridged property (by value)
 
 Declaration Contexts
 ~~~~~~~~~~~~~~~~~~~~
@@ -431,10 +431,10 @@ Types
 
   function-signature ::= params-type params-type throws? // results and parameters
 
-  params-type := type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
+  params-type ::= type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
                                              // they are mangled separately as part of the entity.
-  params-type := empty-list                  // shortcut for no parameters
+  params-type ::= empty-list                  // shortcut for no parameters
 
   throws ::= 'K'                             // 'throws' annotation on function types
 
