@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@usableFromInline
 internal protocol _HashTableDelegate {
   func hashValue(at index: _HashTable.Index) -> Int
   func moveEntry(from source: _HashTable.Index, to target: _HashTable.Index)
@@ -26,6 +27,7 @@ internal struct _HashTable {
   @usableFromInline
   internal let bucketCount: Int
 
+  @usableFromInline
   internal let map: UnsafeMutablePointer<MapEntry>
 
   internal init(scale: Int, map: UnsafeMutablePointer<MapEntry>) {
@@ -68,37 +70,47 @@ extension _HashTable {
 }
 
 extension _HashTable {
+  @_fixed_layout
+  @usableFromInline
   internal struct MapEntry {
+    @inlinable
     internal static var payloadMask: UInt8 {
       @inline(__always) get { return 0x7F }
     }
+    @inlinable
     internal static var unoccupied: MapEntry {
       @inline(__always) get { return MapEntry(_value: 0) }
     }
 
+    @usableFromInline
     internal var value: UInt8
 
+    @inlinable
     @inline(__always)
-    private init(_value: UInt8) {
+    internal init(_value: UInt8) {
       self.value = _value
     }
 
+    @inlinable
     @inline(__always)
     internal init(payload: UInt8) {
       _sanityCheck(payload < 0x80)
       self.init(_value: 0x80 | payload)
     }
 
+    @inlinable
     internal var isOccupied: Bool {
       @inline(__always) get { return value & 0x80 != 0 }
     }
 
+    @inlinable
     internal var payload: UInt8 {
       @inline(__always) get {
         return value & _HashTable.MapEntry.payloadMask
       }
     }
 
+    @inlinable
     @inline(__always)
     internal static func forHashValue(_ hashValue: Int) -> MapEntry {
       let payload = hashValue &>> (Int.bitWidth &- 7)
@@ -109,6 +121,7 @@ extension _HashTable {
 }
 
 extension _HashTable.MapEntry: Equatable {
+  @inlinable
   @inline(__always)
   internal static func ==(
     lhs: _HashTable.MapEntry,
@@ -135,6 +148,7 @@ extension _HashTable {
     }
   }
 
+  @inlinable
   @inline(__always)
   internal func _idealBucket(forHashValue hashValue: Int) -> Int {
     return hashValue & bucketMask
@@ -146,6 +160,7 @@ extension _HashTable {
     return bucket >= 0 && bucket < bucketCount
   }
 
+  @inlinable
   @inline(__always)
   internal func _isOccupied(_ bucket: Int) -> Bool {
     _sanityCheck(_isValid(bucket))
@@ -153,6 +168,7 @@ extension _HashTable {
   }
 
   /// The next bucket after `bucket`, with wraparound at the end of the table.
+  @inlinable
   @inline(__always)
   internal func _succ(_ bucket: Int) -> Int {
     // Bucket is less than bucketCount, which is power of two less than
@@ -162,6 +178,7 @@ extension _HashTable {
 
   /// The previous bucket after `bucket`, with wraparound at the beginning of
   /// the table.
+  @inlinable
   @inline(__always)
   internal func _pred(_ bucket: Int) -> Int {
     // Bucket is not negative. Therefore subtracting 1 does not overflow.
@@ -169,6 +186,7 @@ extension _HashTable {
   }
 
   /// The next unoccupied bucket after `bucket`, with wraparound.
+  @inlinable
   internal func _nextHole(atOrAfter bucket: Int) -> Int {
     var bucket = bucket
     while map[bucket].isOccupied {
@@ -178,11 +196,13 @@ extension _HashTable {
   }
 
   /// The next unoccupied bucket after `bucket`, with wraparound.
+  @inlinable
   internal func _nextHole(after bucket: Int) -> Int {
     return _nextHole(atOrAfter: _succ(bucket))
   }
 
   /// The previous unoccupied bucket before `bucket`, with wraparound.
+  @inlinable
   internal func _prevHole(before bucket: Int) -> Int {
     var bucket = _pred(bucket)
     while map[bucket].isOccupied {
@@ -192,6 +212,7 @@ extension _HashTable {
   }
 
   /// The next occupied bucket after `bucket`, without wraparound.
+  @inlinable
   internal func _occupiedBucket(after bucket: Int) -> Int {
     _sanityCheck(bucket < bucketCount)
     var bucket = bucket + 1
@@ -206,10 +227,14 @@ extension _HashTable {
   @_fixed_layout
   @usableFromInline
   internal struct OccupiedIndices: Sequence, IteratorProtocol {
+    @usableFromInline
     internal var bucket: Int
+    @usableFromInline
     internal let count: Int
+    @usableFromInline
     internal let base: UnsafeMutablePointer<MapEntry>
 
+    @inlinable
     internal init(
       base: UnsafeMutablePointer<MapEntry>,
       count: Int) {
@@ -218,8 +243,7 @@ extension _HashTable {
       self.base = base
     }
 
-    @usableFromInline
-    @_effects(releasenone)
+    @inlinable
     internal mutating func next() -> Index? {
       guard bucket != count else { return nil }
       bucket += 1
@@ -231,9 +255,8 @@ extension _HashTable {
     }
   }
 
-  @usableFromInline
+  @inlinable
   var occupiedIndices: OccupiedIndices {
-    @_effects(readonly)
     get {
       return OccupiedIndices(base: map, count: count > 0 ? bucketCount : 0)
     }
@@ -275,26 +298,23 @@ extension _HashTable.Index: Comparable {
 
 
 extension _HashTable {
-  @usableFromInline
-  @_effects(readonly)
+  @inlinable
   internal func isValid(_ i: Index) -> Bool {
     return _isValid(i.bucket)
   }
 
-  @usableFromInline
-  @_effects(readonly)
+  @inlinable
   internal func isOccupied(_ i: Index) -> Bool {
     return _isValid(i.bucket) && _isOccupied(i.bucket)
   }
 
-  @usableFromInline
-  @_effects(readonly)
+  @inlinable
   internal func checkOccupied(_ i: Index) {
     _precondition(isOccupied(i),
       "Attempting to access Collection elements using an invalid Index")
   }
 
-  @usableFromInline
+  @inlinable
   internal var startIndex: Index {
     @_effects(readonly)
     get {
@@ -312,8 +332,7 @@ extension _HashTable {
     }
   }
 
-  @usableFromInline
-  @_effects(readonly)
+  @inlinable
   internal func index(after i: Index) -> Index {
     checkOccupied(i)
     return Index(bucket: _occupiedBucket(after: i.bucket))
@@ -322,7 +341,8 @@ extension _HashTable {
   /// Return the bucket for the first member that may have a matching hash
   /// value, or if there's no such member, return an unoccupied bucket that is
   /// suitable for inserting a new member with the specified hash value.
-  @usableFromInline
+  @inlinable
+  @inline(__always)
   @_effects(readonly)
   internal func lookupFirst(hashValue: Int) -> (index: Index, found: Bool) {
     let index = Index(bucket: _idealBucket(forHashValue: hashValue))
@@ -333,7 +353,8 @@ extension _HashTable {
   /// Return the next bucket after `bucket` in the collision chain for the
   /// specified hash value. `bucket` must have been returned by `lookupFirst` or
   /// `lookupNext`, with `found == true`.
-  @usableFromInline
+  @inlinable
+  @inline(__always)
   @_effects(readonly)
   internal func lookupNext(
     hashValue: Int,
@@ -344,6 +365,7 @@ extension _HashTable {
     return _lookupChain(startingAt: Index(bucket: bucket), lookingFor: entry)
   }
 
+  @inlinable
   @inline(__always)
   internal func _lookupChain(
     startingAt index: Index,
@@ -402,6 +424,7 @@ extension _HashTable {
     count = 0
   }
 
+  @inlinable
   @inline(__always)
   internal mutating func delete<D: _HashTableDelegate>(
     at index: Index,
