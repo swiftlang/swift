@@ -161,6 +161,7 @@ extension _HashTable {
   }
 
   /// The next bucket after `bucket`, with wraparound at the end of the table.
+  @inline(__always)
   internal func _succ(_ bucket: Int) -> Int {
     // Bucket is less than bucketCount, which is power of two less than
     // Int.max. Therefore adding 1 does not overflow.
@@ -169,6 +170,7 @@ extension _HashTable {
 
   /// The previous bucket after `bucket`, with wraparound at the beginning of
   /// the table.
+  @inline(__always)
   internal func _pred(_ bucket: Int) -> Int {
     // Bucket is not negative. Therefore subtracting 1 does not overflow.
     return (bucket &- 1) & bucketMask
@@ -254,6 +256,7 @@ extension _HashTable {
     internal var bucket: Int
 
     @inlinable
+    @inline(__always)
     internal init(bucket: Int) {
       self.bucket = bucket
     }
@@ -262,6 +265,7 @@ extension _HashTable {
 
 extension _HashTable.Index: Equatable {
   @inlinable
+  @inline(__always)
   internal
   static func ==(lhs: _HashTable.Index, rhs: _HashTable.Index) -> Bool {
     return lhs.bucket == rhs.bucket
@@ -270,6 +274,7 @@ extension _HashTable.Index: Equatable {
 
 extension _HashTable.Index: Comparable {
   @inlinable
+  @inline(__always)
   internal
   static func < (lhs: _HashTable.Index, rhs: _HashTable.Index) -> Bool {
     return lhs.bucket < rhs.bucket
@@ -307,9 +312,9 @@ extension _HashTable {
     }
   }
 
-  @usableFromInline
+  @inlinable
   internal var endIndex: Index {
-    @_effects(readonly)
+    @inline(__always)
     get {
       return Index(bucket: bucketCount)
     }
@@ -347,6 +352,7 @@ extension _HashTable {
     return _lookupChain(startingAt: Index(bucket: bucket), lookingFor: entry)
   }
 
+  @inline(__always)
   internal func _lookupChain(
     startingAt index: Index,
     lookingFor entry: MapEntry
