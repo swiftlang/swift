@@ -20,10 +20,9 @@ public func ifelseexpr() -> Int64 {
   } else {
     x.x -= 1
   }
-  // CHECK:  [[X:%.*]] = load %T6return1XC*, %T6return1XC** [[ALLOCA]]
-  // CHECK:  @swift_release to void (%T6return1XC*)*)(%T6return1XC* [[X]])
+  // CHECK:  [[L:%.*]] = load %T6return1XC*, %T6return1XC** [[ALLOCA]]
+  // CHECK:  @swift_release to void (%T6return1XC*)*)(%T6return1XC* [[L]])
   // CHECK-SAME:                    , !dbg ![[RELEASE:.*]]
-
   // The ret instruction should be in the same scope as the return expression.
   // CHECK:  ret{{.*}}, !dbg ![[RELEASE]]
   return x.x // CHECK: ![[RELEASE]] = !DILocation(line: [[@LINE]], column: 3

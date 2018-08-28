@@ -539,6 +539,7 @@ func supportFirstStructure<B: Buildable>(_ b: inout B) throws {
 // CHECK: [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
 // CHECK: abort_apply [[TOKEN]]
 // CHECK: throw [[ERROR]]
+
 // CHECK: } // end sil function '$S6errors21supportFirstStructure{{.*}}F'
 
 func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
@@ -565,6 +566,7 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
 // CHECK:   end_borrow [[BORROWED_INDEX_COPY]] from [[INDEX_COPY]]
 // CHECK:   destroy_value [[INDEX_COPY]] : $String
 // CHECK:   throw [[ERROR]]
+
 // CHECK: } // end sil function '$S6errors16supportStructure{{.*}}F'
 
 struct Pylon {
