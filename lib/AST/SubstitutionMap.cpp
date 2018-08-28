@@ -541,6 +541,8 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
     if (derivedSubs)
       derivedClassTy = derivedClassTy.subst(*derivedSubs);
     auto baseClassTy = derivedClassTy->getSuperclassForDecl(baseClass);
+    if (baseClassTy->is<ErrorType>())
+      return SubstitutionMap();
 
     baseSubMap = baseClassTy->getContextSubstitutionMap(M, baseClass);
   }

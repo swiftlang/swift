@@ -20,6 +20,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 using namespace swift;
@@ -534,11 +535,12 @@ namespace {
     ASTContext &ctx;
     ValueDecl *decl;
 
-    /// The superclass in which we'll look.
-    Type superclass;
+    /// The set of declarations in which we'll look for overridden
+    /// methods.
+    DirectlyReferencedTypeDecls superContexts;
 
-    // Cached member lookup results.
-    LookupResult members;
+    /// Cached member lookup results.
+    SmallVector<ValueDecl *, 4> members;
 
     /// The lookup name used to find \c members.
     DeclName membersName;
@@ -551,7 +553,7 @@ namespace {
 
     /// Returns true when it's possible to perform any override matching.
     explicit operator bool() const {
-      return static_cast<bool>(superclass);
+      return !superContexts.empty();
     }
 
     /// Match this declaration against potential members in the superclass,
@@ -573,6 +575,16 @@ namespace {
 
       return cachedDeclType;
     }
+
+    /// Adjust the interface of the given declaration, which is found in
+    /// a supertype of the given type.
+    Type getSuperMemberDeclType(ValueDecl *baseDecl) const {
+      Type superclass =
+        decl->getDeclContext()->getSelfInterfaceType()->getSuperclass();
+      assert(superclass && "No superclass type?");
+      return superclass->adjustSuperclassMemberDeclType(
+               baseDecl, decl, baseDecl->getInterfaceType());
+    }
   };
 }
 
@@ -585,12 +597,10 @@ OverrideMatcher::OverrideMatcher(ValueDecl *decl)
     return;
 
   auto *dc = decl->getDeclContext();
-  auto classDecl = dc->getSelfClassDecl();
-  if (!classDecl)
-    return;
-
-  // FIXME: Get the superclass from owningTy directly?
-  superclass = classDecl->getSuperclass();
+  if (auto classDecl = dc->getSelfClassDecl()) {
+    if (auto superclassDecl = classDecl->getSuperclassDecl())
+      superContexts.push_back(superclassDecl);
+  }
 }
 
 SmallVector<OverrideMatch, 2> OverrideMatcher::match(
@@ -629,15 +639,14 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
     membersName = name;
-    members = TypeChecker::lookupMember(dc, superclass, membersName,
-                                        lookupOptions);
+    members.clear();
+    dc->lookupQualified(superContexts, membersName,
+                        NL_QualifiedDefault, members);
   }
 
   // Check each member we found.
   SmallVector<OverrideMatch, 2> matches;
-  for (auto memberResult : members) {
-    auto parentDecl = memberResult.getValueDecl();
-
+  for (auto parentDecl : members) {
     // Check whether there are any obvious reasons why the two given
     // declarations do not have an overriding relationship.
     if (!areOverrideCompatibleSimple(decl, parentDecl))
@@ -913,8 +922,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     }
   } else if (auto property = dyn_cast<VarDecl>(decl)) {
     auto propertyTy = property->getInterfaceType();
-    auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
-        baseDecl, decl, baseDecl->getInterfaceType());
+    auto parentPropertyTy = getSuperMemberDeclType(baseDecl);
 
     if (!propertyTy->matches(parentPropertyTy,
                              TypeMatchFlags::AllowOverride)) {
@@ -1445,7 +1453,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // If the overriding declaration does not have the 'override' modifier on
   // it, complain.
   if (!override->getAttrs().hasAttribute<OverrideAttr>() &&
-      overrideRequiresKeyword(base)) {
+      overrideRequiresKeyword(base) &&
+      !override->isImplicit()) {
     // FIXME: rdar://16320042 - For properties, we don't have a useful
     // location for the 'var' token.  Instead of emitting a bogus fixit, only
     // emit the fixit for 'func's.
