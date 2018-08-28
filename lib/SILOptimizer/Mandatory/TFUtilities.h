@@ -132,7 +132,7 @@ struct SILTensorOpInfo {
     // An operand specifying the address where an indirect output should be
     // stored.  This occurs when the tfop exists in a context where its output
     // is address-only.  Deabstraction eliminates Out operands before forming
-    // GraphOps, by rewriting the tfop to return the value directly.  This
+    // graph_ops, by rewriting the tfop to return the value directly.  This
     // rewriting is possible because tfop outputs must always be loadable in
     // deabstraction scopes.
     Out,
