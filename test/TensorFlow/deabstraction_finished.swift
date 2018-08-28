@@ -240,6 +240,14 @@ public func testTensorFlowClosures(_ a: Float) -> Tensor<Int32>{
   return closure(f);
 }
 
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensorFlowClosures{{.*}}
+// CHECK: sil private {{.*}}testTensorFlowClosures{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Int32> {
+// CHECK: bb0(%0 : @unowned $TensorHandle<Builtin.FPIEEE32>):
+// CHECK:  [[A:%.*]] = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
+// CHECK:  [[B:%.*]] = graph_op "Cast,i"([[A]] : $TensorHandle<Float>) {SrcT: $Float, DstT: $Int32, __device: "/device:CPU:0"} : $TensorHandle<Int32>
+// CHECK:  return [[B]] : $TensorHandle<Int32>
+// CHECK: } 
+
 // CHECK-LABEL --- TFPartition Accelerator Result: [[NAME:*.*]]
 // sil private @[[NAME]] : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Int32> {
 // bb0(%0 : @unowned $TensorHandle<Builtin.FPIEEE32>):
@@ -276,3 +284,4 @@ public func testExtractTupleDTypeList() {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExtractTupleDTypeList{{.*}}
 // CHECK: {{.*}}testExtractTupleDTypeList
 // CHECK: graph_op "TensorSliceDataset,L,e,e"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>) {Toutput_types: [$AccelerableByTensorFlow.Protocol: $Int32, $Int32], output_shapes: [$TensorShape: ([$Int32: ])], __device: "/device:CPU:0"} : $VariantHandle
+

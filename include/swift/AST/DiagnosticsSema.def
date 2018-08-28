@@ -757,8 +757,6 @@ ERROR(gradient_expr_parameter_index_out_of_bounds,none,
 ERROR(gradient_expr_parameter_not_value_type,none,
       "gradient parameter has non-value type %0 and thus cannot be a "
       "differentiation parameter", (Type))
-ERROR(gradient_expr_parameter_not_differentiable,none,
-      "gradient parameter has non-differentiable type %0", (Type))
 ERROR(gradient_expr_incompatible_contextual_type,none,
       "cannot convert gradient expression to incompatible contextual type %0",
       (Type))

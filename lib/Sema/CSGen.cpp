@@ -1358,28 +1358,6 @@ namespace {
         }
       }
 
-      // Differentiation parameter types must conform to VectorNumeric or
-      // FloatingPoint.
-      // TODO: consider generalizing to aggregate types of VectorNumeric or
-      // FloatingPoint.
-      for (auto &param : diffParamTypes) {
-        auto paramTy = param.getType();
-        // If diff parameter type does not have type variables, it must conform
-        // to VectorNumeric.
-        // NOTE: It is intentional that diff parameter types with type variables
-        // are not constrained to VectorNumeric or FloatingPoint. Instead,
-        // conformance to VectorNumeric or FloatingPoint is checked in CSApply
-        // to produce better diagnostics about specific types that are
-        // incompatible with differentiation.
-        if (!paramTy->hasTypeVariable() &&
-            !(TC.isCompatibleWithScalarAutoDiff(paramTy, CurDC) ||
-              TC.isCompatibleWithVectorAutoDiff(paramTy, CurDC))) {
-          TC.diagnose(GE->getLoc(),
-                      diag::gradient_expr_parameter_not_differentiable, paramTy);
-          return nullptr;
-        }
-      }
-
       // Create a type for the gradient. The gradient has the same generic
       // signature as the original function. The gradient's result types are
       // what we collected in `diffParamTypes`.

@@ -2364,33 +2364,47 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
   }
   // Okay, if we got this far then we have all valid attributes and inputs.
   // Figure out the result list.
-  SmallVector<SILType, 4> resultTypes;
-  if (auto tuple = inst->getType().getAs<TupleType>()) {
-    for (auto elt : tuple->getElements()) {
-      auto eltTy = elt.getType()->getCanonicalType();
-      resultTypes.push_back(SILType::getPrimitiveObjectType(eltTy));
+  SmallVector<Type, 4> resultTypes;
+  auto userResultTy = inst->getType().getASTType();
+  if (!tf::flattenTensorFlowValueAggregate(userResultTy, resultTypes))
+    return diagnoseInvalid("the specified result type is not a TensorFlow "
+                           "value type or an aggregate of TensorFlow value "
+                           "types");
+  auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
+      return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
+
+  auto loc = getUserSourceLocation(inst);
+  auto op = B.createGraphOperation(loc, context.getIdentifier(opName), inputs,
+                                   attributes, resultSILTypes);
+
+  // Recursively pack results to a value with the user-specified aggregate type.
+  auto resultIt = op->getResults().begin();
+  std::function<SILValue(SILType)> packResultsToAggregate;
+  packResultsToAggregate = [&](SILType aggregateTy) -> SILValue {
+    if (isTensorFlowValue(aggregateTy))
+      return *resultIt++;
+    if (auto tupleTy = aggregateTy.getAs<TupleType>()) {
+      SmallVector<SILValue, 8> elts;
+      for (auto i : range(tupleTy->getNumElements()))
+        elts.push_back(
+            packResultsToAggregate(aggregateTy.getTupleElementType(i)));
+      return B.createTuple(loc, aggregateTy, elts);
     }
-  } else {
-    resultTypes.push_back(inst->getType());
-  }
-
-  auto op = B.createGraphOperation(getUserSourceLocation(inst),
-                                   context.getIdentifier(opName), inputs,
-                                   attributes, resultTypes);
-
-  if (auto tuple = inst->getType().getAs<TupleType>()) {
-    SmallVector<SILValue, 4> elts;
-    for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i)
-      elts.push_back(op->getResult(i));
-    auto tupleResult = B.createTuple(inst->getLoc(), elts);
-    tupleResult->setDebugLocation(inst->getDebugLocation());
-
-    inst->replaceAllUsesWith(tupleResult);
-    inst->eraseFromParent();
-  } else {
-    inst->replaceAllUsesWith(op->getResult(0));
-    inst->eraseFromParent();
-  }
+    if (auto *decl = aggregateTy.getStructOrBoundGenericStruct()) {
+      SmallVector<SILValue, 8> elts;
+      for (auto *field : decl->getStoredProperties())
+        elts.push_back(packResultsToAggregate(
+            aggregateTy.getFieldType(field, B.getModule())));
+      return B.createStruct(loc, aggregateTy, elts);
+    }
+    llvm_unreachable("Non-TF type should have been diagnosed");
+  };
+  auto result = packResultsToAggregate(inst->getType());
+  assert(resultIt == op->getResults().end()
+         && "All result types should've been processed");
+  // Replace any use of the old builtin result with the newly packed aggregate.
+  inst->replaceAllUsesWith(result);
+  inst->eraseFromParent();
 
   // TODO: Analyze the operands to the instruction and remove them if they are
   // now dead.
