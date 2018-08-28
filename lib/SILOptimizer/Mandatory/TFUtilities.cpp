@@ -631,7 +631,8 @@ tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
 /// example) for inlined functions that take and return tensors, since we
 /// know that they are either unreachable or will be inlined into any
 /// clients that use them.
-bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
+bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
+                                                   bool forceTFFunctions) {
   // Ignore transparent functions.
   if (fn->isTransparent())
     return false;
@@ -704,8 +705,16 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
   // takes TensorHandle values as arguments or results.  If so, then we know
   // that it will be inlined away by deabstraction, and we don't need to touch
   // it.
-  if (containsTensorFlowValue(fn->getLoweredFunctionType()))
-    return false;
+  if (containsTensorFlowValue(fn->getLoweredFunctionType())) {
+    if (forceTFFunctions) {
+      // Return true if it is referenced somewhere.
+      // TODO: There might be a better check other than fn->getRefCount() > 0.
+      // See the clean up code in TFDeabstraction::inlineCalls() function.
+      return (fn->getRefCount() > 0);
+    } else {
+      return false;
+    }
+  }
 
   // If it contains no tensor inputs or results, then we are willing to
   // transform it!

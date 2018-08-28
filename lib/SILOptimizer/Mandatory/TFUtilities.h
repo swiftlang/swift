@@ -277,7 +277,11 @@ public:
   /// example) for inlined functions that take and return tensors, since we
   /// know that they are either unreachable or will be inlined into any
   /// clients that use them.
-  bool shouldBePartitioned(SILFunction *fn);
+  ///
+  /// If the flag forceTFFunctions is true, it forces partitioning of functions
+  /// that operate on Tensor values irrespective of whether they are inlinable,
+  /// private, etc.
+  bool shouldBePartitioned(SILFunction *fn, bool forceTFFunctions = false);
 
   /// Return true if the specified function type has TensorFlow values in its
   /// argument or result list (and do so recursively, if `fnType` has an
