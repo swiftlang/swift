@@ -759,20 +759,35 @@ ConstraintSystem::TypeMatchResult
 constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
                                 Type argType, Type paramType,
                                 ConstraintLocatorBuilder locator) {
+  // Extract the parameters.
+  ValueDecl *callee;
+  unsigned calleeLevel;
+  ArrayRef<Identifier> argLabels;
+  SmallVector<Identifier, 2> argLabelsScratch;
+  bool hasTrailingClosure = false;
+  std::tie(callee, calleeLevel, argLabels, hasTrailingClosure) =
+    getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
 
-  if (paramType->isAny()) {
-    if (argType->is<InOutType>())
-      return cs.getTypeMatchFailure(locator);
+  SmallVector<AnyFunctionType::Param, 4> params;
+  AnyFunctionType::decomposeInput(paramType, params);
 
-    // If the param type is Any, the function can only have one argument.
-    // Check if exactly one argument was passed to this function, otherwise
-    // we obviously have a mismatch.
-    if (auto tupleArgType = dyn_cast<TupleType>(argType.getPointer())) {
-      if (tupleArgType->getNumElements() != 1 ||
-          tupleArgType->getElement(0).hasName()) {
-        return cs.getTypeMatchFailure(locator);
-      }
-    }
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(params, callee, calleeLevel);
+
+  // Extract the arguments.
+  auto args = decomposeArgType(argType, argLabels);
+
+  // FIXME: Remove this. It's functionally identical to the real code
+  // path below, except for some behavioral differences in solution ranking
+  // that I don't understand.
+  if (params.size() == 1 &&
+      args.size() == 1 &&
+      params[0].getLabel().empty() &&
+      args[0].getLabel().empty() &&
+      !params[0].getParameterFlags().isInOut() &&
+      !args[0].getParameterFlags().isInOut() &&
+      params[0].getPlainType()->isAny()) {
+    auto argType = args[0].getPlainType();
 
     // Disallow assignment of noescape function to parameter of type
     // Any. Allowing this would allow these functions to escape.
@@ -792,24 +807,6 @@ constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
     return cs.getTypeMatchSuccess();
   }
 
-  // Extract the parameters.
-  ValueDecl *callee;
-  unsigned calleeLevel;
-  ArrayRef<Identifier> argLabels;
-  SmallVector<Identifier, 2> argLabelsScratch;
-  bool hasTrailingClosure = false;
-  std::tie(callee, calleeLevel, argLabels, hasTrailingClosure) =
-    getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
-  
-  SmallVector<AnyFunctionType::Param, 4> params;
-  AnyFunctionType::decomposeInput(paramType, params);
-  
-  llvm::SmallBitVector defaultMap =
-    computeDefaultMap(params, callee, calleeLevel);
-
-  // Extract the arguments.
-  auto args = decomposeArgType(argType, argLabels);
-  
   // Match up the call arguments to the parameters.
   ArgumentFailureTracker listener(cs, locator);
   SmallVector<ParamBinding, 4> parameterBindings;
