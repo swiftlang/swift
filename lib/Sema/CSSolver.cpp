@@ -1798,11 +1798,12 @@ void ConstraintSystem::collectDisjunctions(
 }
 
 /// \brief Check if the given disjunction choice should be attempted by solver.
-static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
-                                        DisjunctionChoice &choice,
+static bool shouldSkipDisjunctionChoice(DisjunctionChoice &choice,
                                         Optional<Score> &bestNonGenericScore) {
+  auto &cs = choice.getCS();
+  auto &TC = cs.TC;
+
   if (choice->isDisabled()) {
-    auto &TC = cs.TC;
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
       log.indent(cs.solverState->depth)
@@ -1818,7 +1819,7 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
   if (!cs.shouldAttemptFixes() && choice.isUnavailable())
     return true;
 
-  if (cs.TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+  if (TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
     return false;
 
   // Don't attempt to solve for generic operators if we already have
@@ -1927,17 +1928,14 @@ Constraint *ConstraintSystem::selectDisjunction() {
 }
 
 bool ConstraintSystem::solveForDisjunctionChoices(
-    ArrayRef<Constraint *> constraints, ConstraintLocator *disjunctionLocator,
-    SmallVectorImpl<Solution> &solutions,
-    FreeTypeVariableBinding allowFreeTypeVariables, bool explicitConversion) {
+    Disjunction &disjunction, SmallVectorImpl<Solution> &solutions,
+    FreeTypeVariableBinding allowFreeTypeVariables) {
   Optional<Score> bestNonGenericScore;
   Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
 
   // Try each of the constraints within the disjunction.
-  for (auto index : indices(constraints)) {
-    auto currentChoice =
-        DisjunctionChoice(this, constraints[index], explicitConversion);
-    if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore))
+  for (auto currentChoice : disjunction) {
+    if (shouldSkipDisjunctionChoice(currentChoice, bestNonGenericScore))
       continue;
 
     // We already have a solution; check whether we should
@@ -1971,7 +1969,8 @@ bool ConstraintSystem::solveForDisjunctionChoices(
     // If the disjunction requested us to, remember which choice we
     // took for it.
 
-    if (disjunctionLocator) {
+    if (auto *disjunctionLocator = disjunction.getLocator()) {
+      auto index = currentChoice.getIndex();
       DisjunctionChoices.push_back({disjunctionLocator, index});
 
       // Implicit unwraps of optionals are worse solutions than those
@@ -2064,9 +2063,11 @@ bool ConstraintSystem::solveForDisjunction(
       disjunction->shouldRememberChoice() ? disjunction->getLocator() : nullptr;
   assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
 
-  auto noSolutions = solveForDisjunctionChoices(
-      disjunction->getNestedConstraints(), locator, solutions,
-      allowFreeTypeVariables, disjunction->isExplicitConversion());
+  auto choices = Disjunction(*this, disjunction->getNestedConstraints(),
+                             locator, disjunction->isExplicitConversion());
+
+  auto noSolutions =
+      solveForDisjunctionChoices(choices, solutions, allowFreeTypeVariables);
 
   if (hasDisabledChoices) {
     // Re-enable previously disabled overload choices.
