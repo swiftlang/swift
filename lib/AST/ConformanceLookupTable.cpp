@@ -818,6 +818,8 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     // declared.
     auto *conformingClass = cast<ClassDecl>(conformingNominal);
     Type superclassTy = type->getSuperclassForDecl(conformingClass);
+    if (superclassTy->is<ErrorType>())
+      return nullptr;
 
     // Look up the inherited conformance.
     ModuleDecl *module = entry->getDeclContext()->getParentModule();
