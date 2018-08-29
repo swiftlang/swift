@@ -2448,7 +2448,8 @@ void serializeSyntaxTreeAsByteTree(
   Stream.reserve(32 * 1024);
   std::map<void *, void *> UserInfo;
   UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
-  swift::byteTree::ByteTreeWriter::write(Stream, /*ProtocolVersion=*/1,
+  swift::byteTree::ByteTreeWriter::write(Stream,
+                                         swift::byteTree::SYNTAX_TREE_VERSION,
                                          *SyntaxTree.getRaw(), UserInfo);
 
   std::unique_ptr<llvm::WritableMemoryBuffer> Buf =

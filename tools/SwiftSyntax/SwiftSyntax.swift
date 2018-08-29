@@ -80,8 +80,8 @@ public final class SyntaxTreeDeserializer {
     userInfo[.omittedNodeLookupFunction] = self.lookupNode
     return try ByteTreeReader.read(RawSyntax.self, from: data,
                                             userInfo: &userInfo) {
-      (version: ByteTreeReader.ProtocolVersion) in
-      return version == 1
+      (version: ByteTreeProtocolVersion) in
+      return version.major == 1
     }
   }
 

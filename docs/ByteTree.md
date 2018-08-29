@@ -21,7 +21,7 @@ Arrays are modelled as objects whose fields are all of the same type and whose l
 
 ## Versioning
 
-The ByteTree format is prepended by a 4-byte protocol version number that describes the version of the object tree that was serialized. Its exact semantics are up to each specific application, but it is encouraged to interpret it as a two-comentent number where the first component, consisting of the first three bytes, is incremented for breaking changes and the last byte is incremented for backwards-compatible changes.
+The ByteTree format is prepended by a 4-byte protocol version number that describes the version of the object tree that was serialized. Its exact semantics are up to each specific application, but it is encouraged to interpret it as a two-comentent number where the first component, consisting of the three most significant bytes, is incremented for breaking changes and the last byte is incremented for backwards-compatible changes.
 
 ## Forward compatilibity
 
