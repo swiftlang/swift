@@ -79,7 +79,7 @@ public final class SyntaxTreeDeserializer {
     userInfo[.rawSyntaxDecodedCallback] = self.addToLookupTable
     userInfo[.omittedNodeLookupFunction] = self.lookupNode
     return try ByteTreeReader.read(RawSyntax.self, from: data,
-                                            userInfo: userInfo) {
+                                            userInfo: &userInfo) {
       (version: ByteTreeReader.ProtocolVersion) in
       return version == 1
     }

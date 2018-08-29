@@ -36,6 +36,15 @@ extension ByteTreeUserInfoKey {
     ByteTreeUserInfoKey(rawValue: "SwiftSyntax.RawSyntax.OmittedNodeLookup")
 }
 
+/// Box a value type into a reference type
+class Box<T> {
+  let value: T
+
+  init(_ value: T) {
+    self.value = value
+  }
+}
+
 /// A ID that uniquely identifies a syntax node and stays stable across multiple
 /// incremental parses
 public struct SyntaxNodeId: Hashable, Codable {
@@ -66,7 +75,7 @@ public struct SyntaxNodeId: Hashable, Codable {
 }
 
 /// The data that is specific to a tree or token node
-fileprivate indirect enum RawSyntaxData {
+fileprivate enum RawSyntaxData {
   /// A tree node with a kind and an array of children
   case node(kind: SyntaxKind, layout: [RawSyntax?])
   /// A token with a token kind, leading trivia, and trailing trivia
@@ -84,11 +93,11 @@ struct RawSyntax: Codable {
   /// incremental parses
   let id: SyntaxNodeId
 
-  var _contentLength = AtomicCache<SourceLength>()
+  var _contentLength = AtomicCache<Box<SourceLength>>()
 
   /// The length of this node excluding its leading and trailing trivia
   var contentLength: SourceLength {
-    return _contentLength.value() {
+    return _contentLength.value({
       switch data {
       case .node(kind: _, layout: let layout):
         let firstElementIndex = layout.firstIndex(where: { $0 != nil })
@@ -109,11 +118,11 @@ struct RawSyntax: Codable {
             contentLength += element.trailingTriviaLength
           }
         }
-        return contentLength
+        return Box(contentLength)
       case .token(kind: let kind, leadingTrivia: _, trailingTrivia: _):
-        return SourceLength(of: kind.text)
+        return Box(SourceLength(of: kind.text))
       }
-    }
+    }).value
   }
 
   init(kind: SyntaxKind, layout: [RawSyntax?], presence: SourcePresence,
@@ -387,7 +396,7 @@ extension RawSyntax: ByteTreeObjectDecodable {
     case omitted = 2
 
     static func read(from pointer: UnsafeRawPointer, size: Int,
-                     userInfo: [ByteTreeUserInfoKey: Any]
+                     userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
     ) -> SyntaxType {
       let rawValue = UInt8.read(from: pointer, size: size, userInfo: userInfo)
       guard let type = SyntaxType(rawValue: rawValue) else {
@@ -397,29 +406,30 @@ extension RawSyntax: ByteTreeObjectDecodable {
     }
   }
 
-  static func read(from reader: ByteTreeObjectReader, numFields: Int,
-                   userInfo: [ByteTreeUserInfoKey: Any]
+  static func read(from reader: UnsafeMutablePointer<ByteTreeObjectReader>,
+                   numFields: Int,
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
   ) -> RawSyntax {
     let syntaxNode: RawSyntax
-    let type = reader.readField(SyntaxType.self, index: 0)
-    let id = reader.readField(SyntaxNodeId.self, index: 1)
+    let type = reader.pointee.readField(SyntaxType.self, index: 0)
+    let id = reader.pointee.readField(SyntaxNodeId.self, index: 1)
     switch type {
     case .token:
-      let presence = reader.readField(SourcePresence.self, index: 2)
-      let kind = reader.readField(TokenKind.self, index: 3)
-      let leadingTrivia = reader.readField(Trivia.self, index: 4)
-      let trailingTrivia = reader.readField(Trivia.self, index: 5)
+      let presence = reader.pointee.readField(SourcePresence.self, index: 2)
+      let kind = reader.pointee.readField(TokenKind.self, index: 3)
+      let leadingTrivia = reader.pointee.readField(Trivia.self, index: 4)
+      let trailingTrivia = reader.pointee.readField(Trivia.self, index: 5)
       syntaxNode = RawSyntax(kind: kind, leadingTrivia: leadingTrivia,
                              trailingTrivia: trailingTrivia,
                              presence: presence, id: id)
     case .layout:
-      let presence = reader.readField(SourcePresence.self, index: 2)
-      let kind = reader.readField(SyntaxKind.self, index: 3)
-      let layout = reader.readField([RawSyntax?].self, index: 4)
+      let presence = reader.pointee.readField(SourcePresence.self, index: 2)
+      let kind = reader.pointee.readField(SyntaxKind.self, index: 3)
+      let layout = reader.pointee.readField([RawSyntax?].self, index: 4)
       syntaxNode = RawSyntax(kind: kind, layout: layout, presence: presence,
                              id: id)
     case .omitted:
-      guard let lookupFunc = userInfo[.omittedNodeLookupFunction] as?
+      guard let lookupFunc = userInfo.pointee[.omittedNodeLookupFunction] as?
         (SyntaxNodeId) -> RawSyntax? else {
           fatalError("omittedNodeLookupFunction is required when decoding an " +
                      "incrementally transferred syntax tree")
@@ -429,7 +439,7 @@ extension RawSyntax: ByteTreeObjectDecodable {
       }
       syntaxNode = lookupNode
     }
-    if let callback = userInfo[.rawSyntaxDecodedCallback] as?
+    if let callback = userInfo.pointee[.rawSyntaxDecodedCallback] as?
       (RawSyntax) -> Void {
       callback(syntaxNode)
     }
@@ -439,7 +449,7 @@ extension RawSyntax: ByteTreeObjectDecodable {
 
 extension SyntaxNodeId: ByteTreeScalarDecodable {
   static func read(from pointer: UnsafeRawPointer, size: Int,
-                   userInfo: [ByteTreeUserInfoKey: Any]
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
   ) -> SyntaxNodeId {
     let rawValue = UInt32.read(from: pointer, size: size, userInfo: userInfo)
     return SyntaxNodeId(rawValue: UInt(rawValue))

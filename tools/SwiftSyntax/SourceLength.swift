@@ -13,7 +13,7 @@
 /// The length a syntax node spans in the source code. From any AbsolutePosition
 /// you reach a node's end location by either adding its UTF-8 length or by
 /// inserting `lines` newlines and then moving `columns` columns to the right.
-public final class SourceLength {
+public struct SourceLength {
   public let newlines: Int
   public let columnsAtLastLine: Int
   public let utf8Length: Int

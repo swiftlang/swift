@@ -26,7 +26,7 @@ public enum SourcePresence: String, Codable {
 
 extension SourcePresence: ByteTreeScalarDecodable {
   static func read(from pointer: UnsafeRawPointer, size: Int,
-                   userInfo: [ByteTreeUserInfoKey: Any]
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
   ) -> SourcePresence {
     let rawValue = pointer.bindMemory(to: UInt8.self, capacity: 1).pointee
     switch rawValue {
