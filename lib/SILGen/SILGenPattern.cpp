@@ -451,10 +451,9 @@ private:
 
   void bindRefutablePatterns(const ClauseRow &row, ArgArray args,
                              const FailureHandler &failure);
+
   void emitGuardBranch(SILLocation loc, Expr *guard,
-                       const FailureHandler &failure,
-                       Pattern *usingImplicitVariablesFromPattern,
-                       CaseStmt *usingImplicitVariablesFromStmt);
+                       const FailureHandler &failure);
 
   void bindIrrefutablePatterns(const ClauseRow &row, ArgArray args,
                                bool forIrrefutableRow, bool hasMultipleItems);
@@ -1076,19 +1075,17 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   auto stmt = clauses[row].getClientData<Stmt>();
   assert(isa<CaseStmt>(stmt) || isa<CatchStmt>(stmt));
 
-  bool hasMultipleItems = false;
-  if (auto *caseStmt = dyn_cast<CaseStmt>(stmt)) {
-    hasMultipleItems = clauses[row].hasFallthroughTo() ||
-      caseStmt->getCaseLabelItems().size() > 1;
-  }
+  auto *caseStmt = dyn_cast<CaseStmt>(stmt);
+  bool hasMultipleItems =
+      caseStmt && (clauses[row].hasFallthroughTo() ||
+                   caseStmt->getCaseLabelItems().size() > 1);
 
   // Bind the rest of the patterns.
   bindIrrefutablePatterns(clauses[row], args, !hasGuard, hasMultipleItems);
 
   // Emit the guard branch, if it exists.
   if (guardExpr) {
-    this->emitGuardBranch(guardExpr, guardExpr, failure,
-                      clauses[row].getCasePattern(), dyn_cast<CaseStmt>(stmt));
+    this->emitGuardBranch(guardExpr, guardExpr, failure);
   }
 
   // Enter the row.
@@ -1120,8 +1117,7 @@ bindRefutablePatterns(const ClauseRow &row, ArgArray args,
       FullExpr scope(SGF.Cleanups, CleanupLocation(pattern));
       bindVariable(pattern, exprPattern->getMatchVar(), args[i],
                    /*isForSuccess*/ false, /* hasMultipleItems */ false);
-      emitGuardBranch(pattern, exprPattern->getMatchExpr(), failure, nullptr,
-                      nullptr);
+      emitGuardBranch(pattern, exprPattern->getMatchExpr(), failure);
       break;
     }
     default:
@@ -1197,9 +1193,7 @@ void PatternMatchEmission::bindVariable(Pattern *pattern, VarDecl *var,
 /// Evaluate a guard expression and, if it returns false, branch to
 /// the given destination.
 void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
-                                   const FailureHandler &failure,
-                                   Pattern *usingImplicitVariablesFromPattern,
-                                   CaseStmt *usingImplicitVariablesFromStmt) {
+                                           const FailureHandler &failure) {
   SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
   SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
 
@@ -1207,16 +1201,7 @@ void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
   SILValue testBool;
   {
     FullExpr scope(SGF.Cleanups, CleanupLocation(guard));
-    auto emitTest = [&]{
-      testBool = SGF.emitRValueAsSingleValue(guard).getUnmanagedValue();
-    };
-    
-    if (usingImplicitVariablesFromPattern)
-      SGF.usingImplicitVariablesForPattern(usingImplicitVariablesFromPattern,
-                                           usingImplicitVariablesFromStmt,
-                                           emitTest);
-    else
-      emitTest();
+    testBool = SGF.emitRValueAsSingleValue(guard).getUnmanagedValue();
   }
 
   SGF.B.createCondBranch(loc, testBool, trueBB, falseBB);
@@ -2441,47 +2426,6 @@ class Lowering::PatternMatchContext {
 public:
   PatternMatchEmission &Emission;
 };
-
-void SILGenFunction::usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt *stmt,
-                                                      const llvm::function_ref<void(void)> &f) {
-  // Early exit for CatchStmt
-  if (!stmt) {
-    f();
-    return;
-  }
-
-  ArrayRef<CaseLabelItem> labelItems = stmt->getCaseLabelItems();
-  auto expectedPattern = labelItems[0].getPattern();
-  
-  if (labelItems.size() <= 1 || pattern == expectedPattern) {
-    f();
-    return;
-  }
-
-  // Remap vardecls that the case body is expecting to the pattern var locations
-  // for the given pattern, emit whatever, and switch back.
-  SmallVector<VarDecl *, 4> Vars;
-  expectedPattern->collectVariables(Vars);
-  
-  auto variableSwapper = [&] {
-    pattern->forEachVariable([&](VarDecl *VD) {
-      if (!VD->hasName())
-        return;
-      for (auto expected : Vars) {
-        if (expected->hasName() && expected->getName() == VD->getName()) {
-          auto swap = VarLocs[expected];
-          VarLocs[expected] = VarLocs[VD];
-          VarLocs[VD] = swap;
-          return;
-        }
-      }
-    });
-  };
-  
-  variableSwapper();
-  f();
-  variableSwapper();
-}
 
 static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
                                                   SILLocation loc,
