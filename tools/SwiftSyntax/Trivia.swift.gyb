@@ -221,8 +221,9 @@ extension TriviaPiece {
 }
 
 extension Trivia: ByteTreeObjectDecodable {
-  static func read(from reader: ByteTreeObjectReader, numFields: Int,
-                   userInfo: [ByteTreeUserInfoKey: Any]
+  static func read(from reader: UnsafeMutablePointer<ByteTreeObjectReader>,
+                   numFields: Int,
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
   ) -> Trivia {
     let pieces = [TriviaPiece].read(from: reader, numFields: numFields,
                                     userInfo: userInfo)
@@ -231,18 +232,19 @@ extension Trivia: ByteTreeObjectDecodable {
 }
 
 extension TriviaPiece: ByteTreeObjectDecodable {
-  static func read(from reader: ByteTreeObjectReader, numFields: Int,
-                   userInfo: [ByteTreeUserInfoKey: Any]
+  static func read(from reader: UnsafeMutablePointer<ByteTreeObjectReader>,
+                   numFields: Int,
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
   ) -> TriviaPiece {
-    let kind = reader.readField(UInt8.self, index: 0)
+    let kind = reader.pointee.readField(UInt8.self, index: 0)
     switch kind {
 % for trivia in TRIVIAS:
     case ${trivia.serialization_code}:
 %   if trivia.is_collection():
-      let count = Int(reader.readField(UInt32.self, index: 1))
+      let count = Int(reader.pointee.readField(UInt32.self, index: 1))
       return .${trivia.lower_name}s(count)      
 %   else:
-      let text = reader.readField(String.self, index: 1)
+      let text = reader.pointee.readField(String.self, index: 1)
       return .${trivia.lower_name}(text)      
 %   end
 % end
