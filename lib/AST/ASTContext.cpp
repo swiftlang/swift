@@ -3720,7 +3720,7 @@ FunctionType *FunctionType::get(Type input, Type result,
   AnyFunctionType::decomposeInput(input, params);
   void *mem = C.Allocate(sizeof(FunctionType) +
                            sizeof(AnyFunctionType::Param) * params.size(),
-                         alignof(FunctionType));
+                         alignof(FunctionType), arena);
   return Entry = new (mem) FunctionType(params, input, result,
                                         properties, info);
 }
