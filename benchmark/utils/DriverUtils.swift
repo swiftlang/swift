@@ -205,33 +205,28 @@ struct TestConfig {
   }
 }
 
-func internalMeanSD(_ inputs: [UInt64]) -> (UInt64, UInt64) {
-  // If we are empty, return 0, 0.
-  if inputs.isEmpty {
-    return (0, 0)
-  }
+struct Stats {
+    var n: Int = 0
+    var S: Double = 0.0
+    var mean: Double = 0.0
+    var variance: Double { return n < 2 ? 0.0 : S / Double(n - 1) }
+    var standardDeviation: Double { return variance.squareRoot() }
 
-  // If we have one element, return elt, 0.
-  if inputs.count == 1 {
-    return (inputs[0], 0)
-  }
+    static func collect(_ s: inout Stats, _ x: UInt64){
+        Stats.runningMeanVariance(&s, Double(x))
+    }
 
-  // Ok, we have 2 elements.
-
-  var sum1: UInt64 = 0
-  var sum2: UInt64 = 0
-
-  for i in inputs {
-    sum1 += i
-  }
-
-  let mean: UInt64 = sum1 / UInt64(inputs.count)
-
-  for i in inputs {
-    sum2 = sum2 &+ UInt64((Int64(i) &- Int64(mean))&*(Int64(i) &- Int64(mean)))
-  }
-
-  return (mean, UInt64(sqrt(Double(sum2)/(Double(inputs.count) - 1))))
+    /// Compute running mean and variance using B. P. Welford's method.
+    ///
+    /// See Knuth TAOCP vol 2, 3rd edition, page 232, or
+    /// https://www.johndcook.com/blog/standard_deviation/
+    static func runningMeanVariance(_ s: inout Stats, _ x: Double){
+        let n = s.n + 1
+        let (k, M_, S_) = (Double(n), s.mean, s.S)
+        let M = M_ + (x - M_) / k
+        let S = S_ + (x - M_) * (x - M)
+        (s.n, s.mean, s.S) = (n, M, S)
+    }
 }
 
 func internalMedian(_ inputs: [UInt64]) -> UInt64 {
@@ -456,12 +451,13 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   }
   test.tearDownFunction?()
 
-  let (mean, sd) = internalMeanSD(samples)
+  let stats = samples.reduce(into: Stats(), Stats.collect)
 
-  // Return our benchmark results.
   return BenchResults(sampleCount: UInt64(samples.count),
                       min: samples.min()!, max: samples.max()!,
-                      mean: mean, sd: sd, median: internalMedian(samples),
+                      mean: UInt64(stats.mean),
+                      sd: UInt64(stats.standardDeviation),
+                      median: internalMedian(samples),
                       maxRSS: UInt64(sampler.measureMemoryUsage()))
 }
 
