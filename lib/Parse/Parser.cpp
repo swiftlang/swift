@@ -146,12 +146,7 @@ private:
           CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
-    bool Parsed = false;
-    if (isa<AccessorDecl>(AFD)) {
-      TheParser.parseAccessorBodyDelayed(AFD);
-      Parsed = true;
-    }
-    if (!Parsed && ParserState.hasFunctionBodyState(AFD))
+    if (ParserState.hasFunctionBodyState(AFD))
       TheParser.parseAbstractFunctionBodyDelayed(AFD);
 
     if (CodeCompletion)
