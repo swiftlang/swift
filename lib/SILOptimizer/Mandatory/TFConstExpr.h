@@ -45,7 +45,7 @@ namespace tf {
 class ConstExprEvaluator {
   /// This is a long-lived bump pointer allocator that holds the arguments and
   /// result values for the cached constexpr calls we have already analyzed.
-  llvm::BumpPtrAllocator allocator;
+  llvm::BumpPtrAllocator &allocator;
 
   /// The current call stack, used for providing accurate diagnostics.
   llvm::SmallVector<SourceLoc, 4> callStack;

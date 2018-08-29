@@ -1599,7 +1599,8 @@ static llvm::Optional<SymbolicValue> evaluateAndCacheCall(
 // ConstExprEvaluator implementation.
 //===----------------------------------------------------------------------===//
 
-ConstExprEvaluator::ConstExprEvaluator(SILModule &m) {}
+ConstExprEvaluator::ConstExprEvaluator(SILModule &m)
+    : allocator(m.getASTContext().getAllocator()) {}
 
 ConstExprEvaluator::~ConstExprEvaluator() {}
 

@@ -1,9 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -Xllvm -tf-dump-graph %s
 // RUN: %target-swift-frontend -emit-sil -Xllvm -tf-dump-graph %s | %FileCheck %s
 
-// FIXME: Constexpr can't figure out the value of the 2nd TensorShape.
-// XFAIL: *
-
 // These tests are in separate files because functions appear in the GraphDef
 // in nondeterministic order.
 
