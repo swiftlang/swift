@@ -904,8 +904,7 @@ public:
   }
 
   void replaceText(SourceManager &SM, CharSourceRange Range, StringRef Text) {
-    auto BufferId = SM.getIDForBufferIdentifier(SM.
-      getBufferIdentifierForLoc(Range.getStart())).getValue();
+    auto BufferId = SM.findBufferContainingLoc(Range.getStart());
     if (BufferId == InterestedId) {
       HasChange = true;
       auto StartLoc = SM.getLocOffsetInBuffer(Range.getStart(), BufferId);
