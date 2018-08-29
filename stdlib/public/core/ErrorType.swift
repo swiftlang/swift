@@ -211,14 +211,16 @@ extension Error {
   }
 }
 
-extension Error where Self: RawRepresentable, Self.RawValue: FixedWidthInteger {
+extension Error where Self: RawRepresentable, Self.RawValue: SignedInteger {
   // The error code of Error with integral raw values is the raw value.
   public var _code: Int {
-    if Self.RawValue.isSigned {
-      return numericCast(self.rawValue)
-    }
+    return numericCast(self.rawValue)
+  }
+}
 
-    let uintValue: UInt = numericCast(self.rawValue)
-    return Int(bitPattern: uintValue)
+extension Error where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
+  // The error code of Error with integral raw values is the raw value.
+  public var _code: Int {
+    return numericCast(self.rawValue)
   }
 }
