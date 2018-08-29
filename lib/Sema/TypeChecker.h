@@ -2209,6 +2209,11 @@ Type getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
 bool isOverrideBasedOnType(ValueDecl *decl, Type declTy,
                            ValueDecl *parentDecl, Type parentDeclTy);
 
+/// Determine whether the given declaration is an operator defined in a
+/// protocol. If \p type is not null, check specifically whether \p decl
+/// could fulfill a protocol requirement for it.
+bool isMemberOperator(FuncDecl *decl, Type type);
+
 } // end namespace swift
 
 #endif
