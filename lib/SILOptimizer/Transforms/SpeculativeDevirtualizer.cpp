@@ -218,8 +218,11 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   NumTargetsPredicted++;
 
   // Devirtualize the apply instruction on the identical path.
-  assert(devirtualizeClassMethod(IdenAI, DownCastedClassInstance, nullptr) &&
-         "Expected to be able to devirtualize apply!");
+  auto NewInst =
+    devirtualizeClassMethod(IdenAI, DownCastedClassInstance, nullptr);
+  assert(NewInst && "Expected to be able to devirtualize apply!");
+  (void)NewInst;
+
   deleteDevirtualizedApply(IdenAI);
 
   // Split critical edges resulting from VirtAI.
