@@ -1766,7 +1766,8 @@ public:
   
   /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
   /// of the specified value.
-  CleanupHandle enterDeinitExistentialCleanup(SILValue valueOrAddr,
+  CleanupHandle enterDeinitExistentialCleanup(CleanupState state,
+                                              SILValue addr,
                                               CanType concreteFormalType,
                                               ExistentialRepresentation repr);
 

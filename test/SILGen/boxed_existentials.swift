@@ -20,12 +20,14 @@ func test_concrete_erasure(_ x: ClericalError) -> Error {
 }
 // CHECK-LABEL: sil hidden @$S18boxed_existentials21test_concrete_erasureys5Error_pAA08ClericalF0OF
 // CHECK:       bb0([[ARG:%.*]] : @guaranteed $ClericalError):
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $Error, $ClericalError
 // CHECK:         [[ADDR:%.*]] = project_existential_box $ClericalError in [[EXISTENTIAL]] : $Error
-// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:         store [[EXISTENTIAL]] to [init] [[EXISTENTIAL_BUF:%.*]] :
 // CHECK:         store [[ARG_COPY]] to [init] [[ADDR]] : $*ClericalError
 // CHECK-NOT:         destroy_value [[ARG]]
-// CHECK:         return [[EXISTENTIAL]] : $Error
+// CHECK:         [[EXISTENTIAL2:%.*]] = load [take] [[EXISTENTIAL_BUF]]
+// CHECK:         return [[EXISTENTIAL2]] : $Error
 
 protocol HairType {}
 
@@ -36,9 +38,11 @@ func test_composition_erasure(_ x: HairType & Error) -> Error {
 // CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr immutable_access [[OLD_EXISTENTIAL:%.*]] : $*Error & HairType to $*[[VALUE_TYPE:@opened\(.*\) Error & HairType]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
+// CHECK:         store [[NEW_EXISTENTIAL]] to [init] [[NEW_EXISTENTIALBUF:%.*]] :
 // CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[ADDR]]
 // CHECK-NOT:         destroy_addr [[OLD_EXISTENTIAL]]
-// CHECK:         return [[NEW_EXISTENTIAL]]
+// CHECK:         [[NEW_EXISTENTIAL2:%.*]] = load [take] [[NEW_EXISTENTIALBUF]]
+// CHECK:         return [[NEW_EXISTENTIAL2]]
 
 protocol HairClass: class {}
 
@@ -49,9 +53,11 @@ func test_class_composition_erasure(_ x: HairClass & Error) -> Error {
 // CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $Error & HairClass to $[[VALUE_TYPE:@opened\(.*\) Error & HairClass]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
+// CHECK:         store [[NEW_EXISTENTIAL]] to [init] [[NEW_EXISTENTIALBUF:%.*]] :
 // CHECK:         [[COPIED_VALUE:%.*]] = copy_value [[VALUE]]
 // CHECK:         store [[COPIED_VALUE]] to [init] [[ADDR]]
-// CHECK:         return [[NEW_EXISTENTIAL]]
+// CHECK:         [[NEW_EXISTENTIAL2:%.*]] = load [take] [[NEW_EXISTENTIALBUF]]
+// CHECK:         return [[NEW_EXISTENTIAL2]]
 
 func test_property(_ x: Error) -> String {
   return x._domain
