@@ -516,8 +516,11 @@ bb(%0 : $Int):
 
 bb1(%err: $Error):
   %t = tuple ()
-  br bb2(%t: $())
+  br bb3(%t: $())
 
-bb2(%v : $()):
+bb2(%r : $()):
+  br bb3(%r : $())
+
+bb3(%v : $()):
   return %v : $()
 }
