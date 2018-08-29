@@ -11,6 +11,8 @@
 
 // RUN: %target-run %t/main %t/libresil.%target-dylib-extension
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
 
 // We build this code against a version of 'resil' where

@@ -10,6 +10,8 @@
 // Type layout verifier is only compiled into the runtime in asserts builds.
 // REQUIRES: swift_stdlib_asserts
 
+// REQUIRES: executable_test
+
 // CHECK-NOT: Type verification
 
 import Swift

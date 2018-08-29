@@ -13,6 +13,8 @@
 // RUN: %target-codesign %t/a.out.fragile
 // RUN: %target-run %t/a.out.fragile
 
+// REQUIRES: executable_test
+
 import KeyPathMultiModule_b
 import StdlibUnittest
 
