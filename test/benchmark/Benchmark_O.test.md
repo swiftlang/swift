@@ -131,9 +131,9 @@ CONFIG: Tests to run: Ackermann, AngryPhonebook
 LOGMEMORY: #,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us),MAX_RSS(B)
 LOGVERBOSE-LABEL: Running Ackermann for 2 samples.
 LOGVERBOSE: Measuring with scale {{[0-9]+}}.
-LOGVERBOSE-NEXT: Sample 0,{{[0-9]+}}
-LOGVERBOSE-NEXT: Measuring with scale {{[0-9]+}}.
-LOGVERBOSE-NEXT: Sample 1,{{[0-9]+}}
+LOGVERBOSE: Sample 0,{{[0-9]+}}
+LOGVERBOSE: Measuring with scale {{[0-9]+}}.
+LOGVERBOSE: Sample 1,{{[0-9]+}}
 MEASUREENV: MAX_RSS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}} ({{[0-9]+}} pages)
 MEASUREENV: ICS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 MEASUREENV: VCS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
