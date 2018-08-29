@@ -657,6 +657,11 @@ static llvm::cl::opt<bool>
     DisableObjCInterop("disable-objc-interop",
                        llvm::cl::desc("Disable ObjC interop."),
                        llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<std::string>
+GraphVisPath("output-request-graphviz",
+             llvm::cl::desc("Emit GraphViz output visualizing the request graph."),
+             llvm::cl::cat(Category));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -3047,6 +3052,8 @@ int main(int argc, char *argv[]) {
   InitInvok.setSDKPath(options::SDK);
   InitInvok.getLangOptions().CollectParsedToken = true;
   InitInvok.getLangOptions().BuildSyntaxTree = true;
+  InitInvok.getLangOptions().RequestEvaluatorGraphVizPath =
+    options::GraphVisPath;
   if (options::DisableObjCInterop) {
     InitInvok.getLangOptions().EnableObjCInterop = false;
   } else if (options::EnableObjCInterop) {
