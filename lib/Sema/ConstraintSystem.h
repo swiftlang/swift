@@ -52,6 +52,7 @@ namespace constraints {
 class ConstraintGraph;
 class ConstraintGraphNode;
 class ConstraintSystem;
+class Disjunction;
 
 } // end namespace constraints
 
@@ -2966,10 +2967,10 @@ private:
   ///        the best solution to the constraint system.
   ///
   /// \returns true if we failed to find any solutions, false otherwise.
-  bool solveForDisjunctionChoices(
-      ArrayRef<Constraint *> constraints, ConstraintLocator *disjunctionLocator,
-      SmallVectorImpl<Solution> &solutions,
-      FreeTypeVariableBinding allowFreeTypeVariables, bool explicitConversion);
+  bool
+  solveForDisjunctionChoices(Disjunction &disjunction,
+                             SmallVectorImpl<Solution> &solutions,
+                             FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
@@ -3359,15 +3360,21 @@ Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 
 class DisjunctionChoice {
   ConstraintSystem *CS;
+  unsigned Index;
   Constraint *Choice;
   bool ExplicitConversion;
 
 public:
-  DisjunctionChoice(ConstraintSystem *const cs, Constraint *choice,
-                    bool explicitConversion)
-      : CS(cs), Choice(choice), ExplicitConversion(explicitConversion) {}
+  DisjunctionChoice(ConstraintSystem *const cs, unsigned index,
+                    Constraint *choice, bool explicitConversion)
+      : CS(cs), Index(index), Choice(choice),
+        ExplicitConversion(explicitConversion) {}
+
+  ConstraintSystem &getCS() const { return *CS; }
 
   Constraint *operator->() const { return Choice; }
+
+  unsigned getIndex() const { return Index; }
 
   bool isDisabled() const { return Choice->isDisabled(); }
 
@@ -3412,6 +3419,37 @@ private:
 
     return choice.getDecl();
   }
+};
+
+/// Iterator over disjunction choices, makes it
+/// easy to work with disjunction and encapsulates
+/// some other important information such as locator.
+class Disjunction {
+  ConstraintSystem &CS;
+  ArrayRef<Constraint *> Choices;
+  ConstraintLocator *Locator;
+  bool IsExplicitConversion;
+
+  unsigned Index = 0;
+
+public:
+  Disjunction(ConstraintSystem &cs, ArrayRef<Constraint *> choices,
+              ConstraintLocator *locator, bool explicitConversion)
+      : CS(cs), Choices(choices), Locator(locator),
+        IsExplicitConversion(explicitConversion) {}
+
+  const Disjunction &begin() const { return *this; }
+  const Disjunction &end() const { return *this; }
+
+  bool operator!=(const Disjunction &) const { return Index < Choices.size(); }
+
+  void operator++() { ++Index; }
+
+  DisjunctionChoice operator*() const {
+    return {&CS, Index, Choices[Index], IsExplicitConversion};
+  }
+
+  ConstraintLocator *getLocator() const { return Locator; }
 };
 
 /// \brief Constraint System "component" represents
