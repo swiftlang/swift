@@ -1,4 +1,4 @@
-//===--- OutputFileMap.h - Map of inputs to multiple outputs --------------===//
+//===--- OutputFileMap.cpp - Map of inputs to multiple outputs ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
