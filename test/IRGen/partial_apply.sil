@@ -236,7 +236,7 @@ sil public_external @captured_fixed_and_dependent_params : $@convention(thin) <A
 // CHECK:         [[T_FLAGS_ADDR:%.*]] = getelementptr {{.*}} [[T_VWTABLE]], i32 9
 // CHECK:         [[T_FLAGS_PTR:%.*]] = load {{.*}} [[T_FLAGS_ADDR]]
 // CHECK:         [[T_FLAGS:%.*]] = ptrtoint {{.*}} [[T_FLAGS_PTR]] to [[WORD]]
-// CHECK:         [[T_ALIGN_MASK:%.*]] = and [[WORD]] [[T_FLAGS]], 65535
+// CHECK:         [[T_ALIGN_MASK:%.*]] = and [[WORD]] [[T_FLAGS]], 255
 // CHECK:         [[T_ALIGN_MASK_NOT:%.*]] = xor [[WORD]] [[T_ALIGN_MASK]], -1
 // -- 32 is 64-bit offset of 'T' field, 16 for obj header + 8 for T metadata + 8 for SwiftClass field
 // CHECK-64:      [[T_UP_TO_ALIGN_1:%.*]] = add i64 32, [[T_ALIGN_MASK]]

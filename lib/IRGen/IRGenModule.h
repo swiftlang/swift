@@ -747,7 +747,7 @@ public:
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
-  
+
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
            "requesting clang AST context without clang importer!");
@@ -760,6 +760,8 @@ public:
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
+
+  Alignment getCappedAlignment(Alignment alignment);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
 

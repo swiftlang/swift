@@ -230,8 +230,8 @@ func use_initializable_existential(_ im: Initializable.Type, i: Int) {
 // CHECK: bb0([[IM:%[0-9]+]] : @trivial $@thick Initializable.Type, [[I:%[0-9]+]] : @trivial $Int):
 // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[IM]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
 // CHECK:   [[TEMP_VALUE:%[0-9]+]] = alloc_stack $Initializable
-// CHECK:   [[TEMP_ADDR:%[0-9]+]] = init_existential_addr [[TEMP_VALUE]] : $*Initializable, $@opened([[N]]) Initializable
 // CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method $@opened([[N]]) Initializable, #Initializable.init!allocator.1 : {{.*}}, [[ARCHETYPE_META]]{{.*}} : $@convention(witness_method: Initializable) <τ_0_0 where τ_0_0 : Initializable> (Int, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   [[TEMP_ADDR:%[0-9]+]] = init_existential_addr [[TEMP_VALUE]] : $*Initializable, $@opened([[N]]) Initializable
 // CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[TEMP_ADDR]], [[I]], [[ARCHETYPE_META]]) : $@convention(witness_method: Initializable) <τ_0_0 where τ_0_0 : Initializable> (Int, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   destroy_addr [[TEMP_VALUE]] : $*Initializable
 // CHECK:   dealloc_stack [[TEMP_VALUE]] : $*Initializable

@@ -110,6 +110,9 @@ enum class NominalTypeKind : uint32_t {
 #include "MetadataKind.def"
 };
 
+/// The maximum supported type alignment.
+const size_t MaximumAlignment = 16;
+
 /// Flags stored in the value-witness table.
 template <typename int_type>
 class TargetValueWitnessFlags {
@@ -119,7 +122,7 @@ public:
   // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
   // still require additional fixup.)
   enum : int_type {
-    AlignmentMask =       0x0000FFFF,
+    AlignmentMask =       0x000000FF,
     IsNonPOD =            0x00010000,
     IsNonInline =         0x00020000,
     HasExtraInhabitants = 0x00040000,

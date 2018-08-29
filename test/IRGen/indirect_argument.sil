@@ -6,7 +6,7 @@ struct Huge {
   var x, y, z, w, v: Builtin.Word
 }
 
-@_alignment(32)
+@_alignment(16)
 struct HugeAlignment {
   var x, y, z, w, v: Builtin.Word
 }

@@ -833,13 +833,13 @@ func testMixedTuple(p: HasClassGetter) -> (BaseClass, Any) {
 // CHECK: copy_addr [[P1]] to [initialization] [[TEMP1]] : $*@opened
 // CHECK-NOT: begin_access
 // CHECK: [[OUTC:%.*]] = apply {{.*}} $@convention(witness_method: HasClassGetter) <τ_0_0 where τ_0_0 : HasClassGetter> (@in_guaranteed τ_0_0) -> @owned BaseClass
-// CHECK: [[OUTANY:%.*]] = init_existential_addr %0 : $*Any, $BaseClass
 // CHECK: [[P2:%.*]] = open_existential_addr immutable_access %1 : $*HasClassGetter to $*@opened
 // CHECK: [[TEMP2:%.*]] = alloc_stack $@opened
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [[P2]] to [initialization] [[TEMP2]] : $*@opened
 // CHECK-NOT: begin_access
 // CHECK: apply {{.*}} $@convention(witness_method: HasClassGetter) <τ_0_0 where τ_0_0 : HasClassGetter> (@in_guaranteed τ_0_0) -> @owned BaseClass
+// CHECK: [[OUTANY:%.*]] = init_existential_addr %0 : $*Any, $BaseClass
 // CHECK: store %{{.*}} to [init] [[OUTANY]] : $*BaseClass
 // CHECK: return [[OUTC]] : $BaseClass
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify14testMixedTuple1pAA9BaseClassC_yptAA03HasH6Getter_p_tF'
@@ -1009,8 +1009,8 @@ class testInitExistentialGlobal {
 // CHECK-LABEL: sil private @globalinit{{.*}} : $@convention(c) () -> () {
 // CHECK:   alloc_global @$S20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ
 // CHECK:   [[GADR:%.*]] = global_addr @$S20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ : $*P
-// CHECK:   [[EADR:%.*]] = init_existential_addr [[GADR]] : $*P, $StructP
 // CHECK:   %{{.*}} = apply %{{.*}}({{.*}}) : $@convention(method) (@thin StructP.Type) -> StructP
+// CHECK:   [[EADR:%.*]] = init_existential_addr [[GADR]] : $*P, $StructP
 // CHECK:   store %{{.*}} to [trivial] [[EADR]] : $*StructP
 // CHECK-LABEL: } // end sil function 'globalinit
 
@@ -1025,8 +1025,10 @@ public func testInitBox() throws {
 // CHECK-LABEL: sil @$S20access_marker_verify11testInitBoxyyKF : $@convention(thin) () -> @error Error {
 // CHECK: [[BOXALLOC:%.*]] = alloc_existential_box $Error, $SomeError
 // CHECK: [[PROJ:%.*]] = project_existential_box $SomeError in [[BOXALLOC]] : $Error
+// CHECK: store [[BOXALLOC]] to [init] [[BOXBUF:%.*]] :
 // CHECK: store %{{.*}} to [trivial] [[PROJ]] : $*SomeError
-// CHECK: throw [[BOXALLOC]] : $Error
+// CHECK: [[BOXALLOC2:%.*]] = load [take] [[BOXBUF]]
+// CHECK: throw [[BOXALLOC2]] : $Error
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify11testInitBoxyyKF'
 
 public final class HasStaticProp {
