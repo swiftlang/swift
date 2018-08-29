@@ -2108,20 +2108,6 @@ public:
   Type getResultType(const AbstractClosureExpr *E);
 
 private:
-  /// Determine if the given constraint represents explicit conversion,
-  /// e.g. coercion constraint "as X" which forms a disjunction.
-  bool isExplicitConversionConstraint(Constraint *constraint) const {
-    if (constraint->getKind() != ConstraintKind::Disjunction)
-      return false;
-
-    if (auto locator = constraint->getLocator()) {
-      if (auto anchor = locator->getAnchor())
-        return isa<CoerceExpr>(anchor);
-    }
-
-    return false;
-  }
-
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
