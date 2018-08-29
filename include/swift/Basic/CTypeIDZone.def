@@ -32,6 +32,7 @@ SWIFT_TYPEID_NAMED(double, Double)
 SWIFT_TYPEID_NAMED(bool, Bool)
 SWIFT_TYPEID_NAMED(decltype(nullptr), NullPtr)
 SWIFT_TYPEID_NAMED(void, Void)
+SWIFT_TYPEID_NAMED(std::string, String)
 
 // C++ standard library types.
 SWIFT_TYPEID_TEMPLATE1_NAMED(std::vector, Vector, typename T, T)

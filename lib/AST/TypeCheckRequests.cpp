@@ -412,3 +412,19 @@ void RequirementRequest::cacheResult(Requirement value) const {
     break;
   }
 }
+
+//----------------------------------------------------------------------------//
+// USR computation.
+//----------------------------------------------------------------------------//
+
+void USRGenerationRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  const auto &storage = getStorage();
+  auto &d = std::get<0>(storage);
+  diags.diagnose(d, diag::circular_reference);
+}
+
+void USRGenerationRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  const auto &storage = getStorage();
+  auto &d = std::get<0>(storage);
+  diags.diagnose(d, diag::circular_reference);
+}
