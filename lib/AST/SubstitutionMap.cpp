@@ -505,9 +505,23 @@ SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
 }
 
 SubstitutionMap
-SubstitutionMap::getOverrideSubstitutions(const ValueDecl *baseDecl,
-                                          const ValueDecl *derivedDecl,
-                                          Optional<SubstitutionMap> derivedSubs) {
+SubstitutionMap::getOverrideSubstitutions(
+                                      const ValueDecl *baseDecl,
+                                      const ValueDecl *derivedDecl,
+                                      Optional<SubstitutionMap> derivedSubs) {
+  // For overrides within a protocol hierarchy, substitute the Self type.
+  if (auto baseProto = baseDecl->getDeclContext()->getSelfProtocolDecl()) {
+    if (auto derivedProtoSelf =
+          derivedDecl->getDeclContext()->getProtocolSelfType()) {
+      return SubstitutionMap::getProtocolSubstitutions(
+                                             baseProto,
+                                             derivedProtoSelf,
+                                             ProtocolConformanceRef(baseProto));
+    }
+
+    return SubstitutionMap();
+  }
+
   auto *baseClass = baseDecl->getDeclContext()->getSelfClassDecl();
   auto *derivedClass = derivedDecl->getDeclContext()->getSelfClassDecl();
 

@@ -332,6 +332,11 @@ protected:
   /// Gets the base implementation of a method.
   /// We always use the most overridden function to describe a method.
   AbstractFunctionDecl *getBase(AbstractFunctionDecl *FD) {
+    // FIXME: We currently don't use the most overridden function in
+    // witness tables.
+    if (isa<ProtocolDecl>(FD->getDeclContext()))
+      return FD;
+
     while (FD->getOverriddenDecl()) {
       FD = FD->getOverriddenDecl();
     }

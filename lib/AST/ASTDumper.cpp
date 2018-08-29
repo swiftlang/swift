@@ -754,9 +754,18 @@ namespace {
           << getAccessLevelSpelling(VD->getFormalAccess());
       }
 
-      if (auto Overridden = VD->getOverriddenDecl()) {
-        PrintWithColorRAII(OS, OverrideColor) << " override=";
-        Overridden->dumpRef(PrintWithColorRAII(OS, OverrideColor).getOS());
+      if (VD->overriddenDeclsComputed()) {
+        auto overridden = VD->getOverriddenDecls();
+        if (!overridden.empty()) {
+          PrintWithColorRAII(OS, OverrideColor) << " override=";
+          interleave(overridden,
+                     [&](ValueDecl *overridden) {
+                       overridden->dumpRef(
+                                PrintWithColorRAII(OS, OverrideColor).getOS());
+                     }, [&]() {
+                       OS << ", ";
+                     });
+        }
       }
 
       if (VD->isFinal())
