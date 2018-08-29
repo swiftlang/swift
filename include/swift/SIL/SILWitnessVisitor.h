@@ -61,7 +61,10 @@ public:
       SmallVector<AssociatedTypeDecl *, 2> associatedTypes;
       for (Decl *member : protocol->getMembers()) {
         if (auto associatedType = dyn_cast<AssociatedTypeDecl>(member)) {
-          associatedTypes.push_back(associatedType);
+          // If this is a new associated type (which does not override an
+          // existing associated type), add it.
+          if (associatedType->getOverriddenDecls().empty())
+            associatedTypes.push_back(associatedType);
         }
       }
 
@@ -70,7 +73,6 @@ public:
                            TypeDecl::compare);
 
       for (auto *associatedType : associatedTypes) {
-        // TODO: only add associated types when they're new?
         asDerived().addAssociatedType(AssociatedType(associatedType));
       }
     };

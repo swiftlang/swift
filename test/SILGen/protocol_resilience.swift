@@ -121,8 +121,7 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE26mutablePropertyWithDefaultSivg
 // CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivs
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE26mutablePropertyWithDefaultSivs
-// CHECK-LABEL: sil private [transparent] @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivmytfU_
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivm
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivM
   public var mutablePropertyWithDefault: Int {
     get { return 0 }
     set { }
@@ -137,8 +136,7 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE33mutableGenericPropertyWithDefault1TQzvg
 // CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvs
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE33mutableGenericPropertyWithDefault1TQzvs
-// CHECK-LABEL: sil private [transparent] @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvmytfU_
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvm
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvM
   public var mutableGenericPropertyWithDefault: T {
     get {
       return T(default: ())
@@ -150,8 +148,7 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAEy1TQzAEcig
 // CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStoragePy1TQzAEcis
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAEy1TQzAEcis
-// CHECK-LABEL: sil private [transparent] @$S19protocol_resilience16ResilientStoragePy1TQzAEcimytfU_
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStoragePy1TQzAEcim
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStoragePy1TQzAEciM
   public subscript(x: T) -> T {
     get {
       return x
@@ -163,8 +160,7 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE36mutatingGetterWithNonMutatingDefaultSivg
 // CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivs
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE36mutatingGetterWithNonMutatingDefaultSivs
-// CHECK-LABEL: sil private [transparent] @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivmytfU_
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivm
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivM
   public var mutatingGetterWithNonMutatingDefault: Int {
     get {
       return 0
@@ -240,7 +236,7 @@ func inoutFunc(_ x: inout Int) {}
 
 // CHECK-LABEL: sil hidden @$S19protocol_resilience22inoutResilientProtocolyy010resilient_A005OtherdE0_pzF
 func inoutResilientProtocol(_ x: inout OtherResilientProtocol) {
-  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE19propertyInExtensionSivm
+  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE19propertyInExtensionSivM
   inoutFunc(&x.propertyInExtension)
 }
 
@@ -248,10 +244,10 @@ struct OtherConformingType : OtherResilientProtocol {}
 
 // CHECK-LABEL: sil hidden @$S19protocol_resilience22inoutResilientProtocolyyAA19OtherConformingTypeVzF
 func inoutResilientProtocol(_ x: inout OtherConformingType) {
-  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE19propertyInExtensionSivm
+  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE19propertyInExtensionSivM
   inoutFunc(&x.propertyInExtension)
 
-  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE25staticPropertyInExtensionSivmZ
+  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE25staticPropertyInExtensionSivM
   inoutFunc(&OtherConformingType.staticPropertyInExtension)
 }
 
@@ -286,19 +282,19 @@ func inoutResilientProtocol(_ x: inout OtherConformingType) {
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!getter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivg
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!setter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivs
-// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!materializeForSet.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivm
+// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!modify.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivM
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!getter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvg
 // CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!setter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvs
-// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!materializeForSet.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvm
+// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!modify.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvM
 // CHECK-NEXT:   method #ResilientStorage.subscript!getter.1: {{.*}} : @$S19protocol_resilience16ResilientStoragePy1TQzAEcig
 // CHECK-NEXT:   method #ResilientStorage.subscript!setter.1: {{.*}} : @$S19protocol_resilience16ResilientStoragePy1TQzAEcis
-// CHECK-NEXT:   method #ResilientStorage.subscript!materializeForSet.1: {{.*}} : @$S19protocol_resilience16ResilientStoragePy1TQzAEcim
+// CHECK-NEXT:   method #ResilientStorage.subscript!modify.1: {{.*}} : @$S19protocol_resilience16ResilientStoragePy1TQzAEciM
 // CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!getter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivg
 // CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!setter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivs
-// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!materializeForSet.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivm
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!modify.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivM
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientOperators {
@@ -314,5 +310,5 @@ func inoutResilientProtocol(_ x: inout OtherConformingType) {
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!getter.1: {{.*}} : @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!setter.1: {{.*}} : @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvs
-// CHECK-NEXT:   method #ReabstractSelfRefined.callback!materializeForSet.1: {{.*}} : @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvm
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!modify.1: {{.*}} : @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvM
 // CHECK-NEXT: }

@@ -64,7 +64,7 @@ struct swift::ide::api::SDKNodeInitInfo {
 
 SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {
 #define ADD(NAME) ABIAttrs.push_back({DeclAttrKind::DAK_##NAME, \
-      NodeAnnotation::Change##NAME, getAttrName(DeclAttrKind::DAK_##NAME)});
+      getAttrName(DeclAttrKind::DAK_##NAME)});
   ADD(ObjC)
   ADD(FixedLayout)
   ADD(Frozen)
@@ -291,6 +291,22 @@ SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
   Info.Name = Ctx.buffer("TopLevel");
   Info.PrintedName = Ctx.buffer("TopLevel");
   return Info.createSDKNode(SDKNodeKind::Root);
+}
+
+StringRef SDKNodeDecl::getScreenInfo() const {
+  auto ModuleName = getModuleName();
+  auto HeaderName = getHeaderName();
+  auto &Ctx = getSDKContext();
+  llvm::SmallString<64> SS;
+  llvm::raw_svector_ostream OS(SS);
+  if (Ctx.getOpts().PrintModule)
+    OS << ModuleName;
+  if (!HeaderName.empty())
+    OS << "(" << HeaderName << ")";
+  if (!OS.str().empty())
+    OS << ": ";
+  OS << getDeclKind() << " " << getFullyQualifiedName();
+  return Ctx.buffer(OS.str());
 }
 
 bool SDKNodeDecl::isSDKPrivate() const {

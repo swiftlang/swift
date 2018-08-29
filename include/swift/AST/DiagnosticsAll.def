@@ -49,6 +49,7 @@
 #include "DiagnosticsFrontend.def"
 #include "DiagnosticsDriver.def"
 #include "DiagnosticsRefactoring.def"
+#include "DiagnosticsModuleDiffer.def"
 
 #undef DIAG_NO_UNDEF
 

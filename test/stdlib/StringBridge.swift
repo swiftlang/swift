@@ -40,7 +40,7 @@ func expectCocoa(_ str: String,
 }
 
 StringBridgeTests.test("Tagged NSString") {
-  guard #available(iOS 11.0, *) else { return }
+  guard #available(macOS 10.13, iOS 11.0, tvOS 11.0, *) else { return }
 #if arch(i386) || arch(arm)
 #else
   // Bridge tagged strings as small

@@ -36,7 +36,7 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
   return f(s)
 }
 
-// Use materializeForSet for inout access of properties in resilient structs
+// Use modify for inout access of properties in resilient structs
 // from a different resilience domain
 
 public func inoutFunc(_ x: inout Int) {}
@@ -45,7 +45,7 @@ public func inoutFunc(_ x: inout Int) {}
 
 func resilientInOutTest(_ s: inout Size) {
 
-// CHECK:         function_ref @$S16resilient_struct4SizeV1wSivm
+// CHECK:         function_ref @$S16resilient_struct4SizeV1wSivM
 // CHECK:         function_ref @$S17struct_resilience9inoutFuncyySizF
 
   inoutFunc(&s.w)
@@ -92,7 +92,7 @@ public struct MySize {
 
 // CHECK-LABEL: sil @$S17struct_resilience6MySizeV10expirationSivgZ : $@convention(method) (@thin MySize.Type) -> Int
 // CHECK-LABEL: sil @$S17struct_resilience6MySizeV10expirationSivsZ : $@convention(method) (Int, @thin MySize.Type) -> ()
-// CHECK-LABEL: sil @$S17struct_resilience6MySizeV10expirationSivmZ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil @$S17struct_resilience6MySizeV10expirationSivMZ : $@yield_once @convention(method) (@thin MySize.Type) -> @yields @inout Int
   public static var expiration: Int {
     get { return copyright + 70 }
     set { copyright = newValue - 70 }
@@ -102,7 +102,7 @@ public struct MySize {
 
 // CHECK-LABEL: sil @$S17struct_resilience6MySizeV1dSivg : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK-LABEL: sil @$S17struct_resilience6MySizeV1dSivs : $@convention(method) (Int, @inout MySize) -> ()
-// CHECK-LABEL: sil @$S17struct_resilience6MySizeV1dSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil @$S17struct_resilience6MySizeV1dSivM : $@yield_once @convention(method) (@inout MySize) -> @yields @inout Int
   public var d: Int {
     get { return 0 }
     set { }
@@ -112,7 +112,7 @@ public struct MySize {
 
 // CHECK-LABEL: sil @$S17struct_resilience6MySizeV1wSivg : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK-LABEL: sil @$S17struct_resilience6MySizeV1wSivs : $@convention(method) (Int, @inout MySize) -> ()
-// CHECK-LABEL: sil @$S17struct_resilience6MySizeV1wSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout MySize) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil @$S17struct_resilience6MySizeV1wSivM : $@yield_once @convention(method) (@inout MySize) -> @yields @inout Int
   public var w: Int
 
   // Read-only instance stored property
@@ -124,7 +124,7 @@ public struct MySize {
 
 // CHECK-LABEL: sil @$S17struct_resilience6MySizeV9copyrightSivgZ : $@convention(method) (@thin MySize.Type) -> Int
 // CHECK-LABEL: sil @$S17struct_resilience6MySizeV9copyrightSivsZ : $@convention(method) (Int, @thin MySize.Type) -> ()
-// CHECK-LABEL: sil @$S17struct_resilience6MySizeV9copyrightSivmZ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @thin MySize.Type) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil @$S17struct_resilience6MySizeV9copyrightSivMZ : $@yield_once @convention(method) (@thin MySize.Type) -> @yields @inout Int
   public static var copyright: Int = 0
 }
 
@@ -262,10 +262,10 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 @inlinable public func inlinableInoutTest(_ s: inout MySize) {
   // Inlinable functions can be inlined in other resiliene domains.
   //
-  // Make sure we use materializeForSet for an inout access of a resilient struct
+  // Make sure we use modify for an inout access of a resilient struct
   // property inside an inlinable function.
 
-  // CHECK:       function_ref @$S17struct_resilience6MySizeV1wSivm
+  // CHECK:       function_ref @$S17struct_resilience6MySizeV1wSivM
   inoutFunc(&s.w)
 
   // CHECK:       return

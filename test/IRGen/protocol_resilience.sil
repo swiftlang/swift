@@ -55,8 +55,8 @@ import resilient_protocol
 // CHECK-SAME:   @"$S19protocol_resilience17ResilientProtocolMp"
 
 // Protocol requirements
-// CHECK-SAME:   %swift.protocol_requirement { i32 6, i32 0, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 8, i32 0, i32 0 },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 17,
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP10noDefaultAyyFTj" to [[INT]]),

@@ -172,6 +172,9 @@ public:
   static RValue forInContext() {
     return RValue(InContext);
   }
+
+  static unsigned getRValueSize(CanType substType);
+  static unsigned getRValueSize(AbstractionPattern origType, CanType substType);
   
   /// Create an RValue to which values will be subsequently added using
   /// addElement(), with the level of tuple expansion in the input specified

@@ -19,6 +19,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
@@ -50,7 +51,6 @@ void checkGenericParamList(TypeChecker &tc,
          "Parsed an empty generic parameter list?");
 
   // Determine where and how to perform name lookup.
-  TypeResolutionOptions options = None;
   DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
   assert(lookupDC == resolution.getDeclContext());
 
@@ -70,104 +70,18 @@ void checkGenericParamList(TypeChecker &tc,
   }
 
 
-  // Add the requirements clause to the builder, validating the types in
-  // the requirements clause along the way.
-  tc.validateRequirements(genericParams->getWhereLoc(),
-                          genericParams->getRequirements(), resolution,
-                          options, builder);
-}
-
-bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
-                                      TypeResolution resolution,
-                                      TypeResolutionOptions options) {
-  if (req.isInvalid())
-    return true;
-
-  // Protocol where clauses cannot add conformance and superclass constraints
-  // to 'Self', because we need to be able to resolve inherited protocols and
-  // protocol superclasses before computing the protocol requirement signature.
-  if (options.is(TypeResolverContext::ProtocolWhereClause)) {
-    if (req.getKind() == RequirementReprKind::TypeConstraint ||
-        req.getKind() == RequirementReprKind::LayoutConstraint) {
-      if (auto *subjectTyR = req.getSubjectLoc().getTypeRepr()) {
-        if (auto *componentTyR = dyn_cast<ComponentIdentTypeRepr>(subjectTyR)) {
-          if (componentTyR->getIdentifier() == Context.Id_Self) {
-            diagnose(req.getSubjectLoc().getLoc(),
-                     diag::protocol_where_clause_self_requirement);
-
-            req.getSubjectLoc().setType(ErrorType::get(Context));
-
-            if (req.getKind() == RequirementReprKind::TypeConstraint)
-              req.getConstraintLoc().setType(ErrorType::get(Context));
-
-            req.setInvalid();
-            return true;
-          }
-        }
-      }
-    }
-  }
-
-  // Note that we are resolving within a requirement.
-  options.setContext(None);
-  options.setContext(TypeResolverContext::GenericRequirement);
-
-  switch (req.getKind()) {
-  case RequirementReprKind::TypeConstraint: {
-    // Validate the types.
-    if (validateType(req.getSubjectLoc(), resolution, options)) {
-      req.setInvalid();
-    }
-
-    if (validateType(req.getConstraintLoc(), resolution, options)) {
-      req.setInvalid();
-    }
-
-    return req.isInvalid();
-  }
-
-  case RequirementReprKind::LayoutConstraint: {
-    // Validate the types.
-    if (validateType(req.getSubjectLoc(), resolution, options)) {
-      req.setInvalid();
-    }
-
-    if (req.getLayoutConstraintLoc().isNull()) {
-      req.setInvalid();
-    }
-    return req.isInvalid();
-  }
-
-  case RequirementReprKind::SameType: {
-    if (validateType(req.getFirstTypeLoc(), resolution, options)) {
-      req.setInvalid();
-    }
-
-    if (validateType(req.getSecondTypeLoc(), resolution, options)) {
-      req.setInvalid();
-    }
-
-    return req.isInvalid();
-  }
-  }
-
-  llvm_unreachable("Unhandled RequirementKind in switch.");
-}
-
-void TypeChecker::validateRequirements(
-                                 SourceLoc whereLoc,
-                                 MutableArrayRef<RequirementRepr> requirements,
-                                 TypeResolution resolution,
-                                 TypeResolutionOptions options,
-                                 GenericSignatureBuilder *builder) {
-  auto dc = resolution.getDeclContext();
-  for (auto &req : requirements) {
-    if (validateRequirement(whereLoc, req, resolution, options))
-      continue;
-
-    if (builder &&
-        isErrorResult(builder->addRequirement(&req, dc->getParentModule())))
-      req.setInvalid();
+  // Add the requirements clause to the builder.
+  if (builder) {
+    WhereClauseOwner owner(resolution.getDeclContext(), genericParams);
+    using FloatingRequirementSource =
+      GenericSignatureBuilder::FloatingRequirementSource;
+    RequirementRequest::visitRequirements(owner, resolution.getStage(),
+        [&](const Requirement &req, RequirementRepr *reqRepr) {
+          auto source = FloatingRequirementSource::forExplicit(reqRepr);
+          builder->addRequirement(req, reqRepr, source, nullptr,
+                                  lookupDC->getParentModule());
+          return false;
+        });
   }
 }
 
@@ -260,36 +174,6 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
   tl.setType(Type());
 }
 
-/// Revert the dependent types within the given generic parameter list.
-static void revertGenericParamList(TypeChecker &tc,
-                                   GenericParamList *genericParams) {
-  // Revert the requirements of the generic parameter list.
-  tc.revertGenericRequirements(genericParams->getRequirements());
-}
-
-void TypeChecker::revertGenericRequirements(
-                                MutableArrayRef<RequirementRepr> requirements) {
-  for (auto &req : requirements) {
-    if (req.isInvalid())
-      continue;
-
-    switch (req.getKind()) {
-    case RequirementReprKind::TypeConstraint:
-      revertDependentTypeLoc(req.getConstraintLoc());
-      LLVM_FALLTHROUGH;
-
-    case RequirementReprKind::LayoutConstraint:
-      revertDependentTypeLoc(req.getSubjectLoc());
-      break;
-
-    case RequirementReprKind::SameType:
-      revertDependentTypeLoc(req.getFirstTypeLoc());
-      revertDependentTypeLoc(req.getSecondTypeLoc());
-      break;
-    }
-  }
-}
-
 ///
 /// Generic functions
 ///
@@ -335,7 +219,8 @@ static void checkGenericFuncSignature(TypeChecker &tc,
           GenericSignatureBuilder::FloatingRequirementSource::forInferred(
               fn->getBodyResultTypeLoc().getTypeRepr());
         builder->inferRequirements(*func->getParentModule(),
-                                   fn->getBodyResultTypeLoc(),
+                                   fn->getBodyResultTypeLoc().getType(),
+                                   fn->getBodyResultTypeLoc().getTypeRepr(),
                                    source);
       }
     }
@@ -403,6 +288,14 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
 /// All generic parameters of a generic function must be referenced in the
 /// declaration's type, otherwise we have no way to infer them.
 void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
+  // Don't do this check for accessors: they're not used directly, so we
+  // never need to infer their generic arguments.  This is mostly a
+  // compile-time optimization, but it also avoids problems with accessors
+  // like 'read' and 'modify' that would arise due to yields not being
+  // part of the formal type.
+  if (isa<AccessorDecl>(dc))
+    return;
+
   auto *genericParams = dc->getGenericParams();
   auto *genericSig = dc->getGenericSignatureOfContext();
   if (!genericParams)
@@ -618,7 +511,6 @@ computeGenericFuncSignature(TypeChecker &tc, AbstractFunctionDecl *func) {
   // there might still be errors that have not yet been diagnosed. Revert the
   // generic function signature and type-check it again, completely.
   revertGenericFuncSignature(func);
-  revertGenericParamList(tc, gp);
 
   // Debugging of the generic signature.
   if (tc.Context.LangOpts.DebugGenericSignatures) {
@@ -683,7 +575,8 @@ static void checkGenericSubscriptSignature(TypeChecker &tc,
           subscript->getElementTypeLoc().getTypeRepr());
 
     builder->inferRequirements(*subscript->getParentModule(),
-                               subscript->getElementTypeLoc(),
+                               subscript->getElementTypeLoc().getType(),
+                               subscript->getElementTypeLoc().getTypeRepr(),
                                source);
   }
 
@@ -736,7 +629,6 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
     // there might still be errors that have not yet been diagnosed. Revert the
     // generic function signature and type-check it again, completely.
     revertGenericSubscriptSignature(subscript);
-    revertGenericParamList(*this, gp);
 
     // Debugging of generic signature generation.
     if (Context.LangOpts.DebugGenericSignatures) {
@@ -850,18 +742,6 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     sig = std::move(builder).computeGenericSignature(
                                          genericParams->getSourceRange().Start,
                                          allowConcreteGenericParams);
-
-    // The generic signature builder now has all of the requirements, although
-    // there might still be errors that have not yet been diagnosed. Revert the
-    // signature and type-check it again, completely.
-    if (recursivelyVisitGenericParams) {
-      visitOuterToInner(genericParams,
-                        [&](GenericParamList *gpList) {
-        revertGenericParamList(*this, gpList);
-      });
-    } else {
-      revertGenericParamList(*this, genericParams);
-    }
 
     // Debugging of the generic signature builder and generic signature
     // generation.
@@ -1115,4 +995,58 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   if (valid)
     return RequirementCheckResult::Success;
   return RequirementCheckResult::SubstitutionFailure;
+}
+
+llvm::Expected<Requirement>
+RequirementRequest::evaluate(Evaluator &evaluator,
+                             WhereClauseOwner owner,
+                             unsigned index,
+                             TypeResolutionStage stage) const {
+  // Figure out the type resolution.
+  TypeResolutionOptions options = TypeResolverContext::GenericRequirement;
+  Optional<TypeResolution> resolution;
+  switch (stage) {
+  case TypeResolutionStage::Structural:
+    resolution = TypeResolution::forStructural(owner.dc);
+    break;
+
+  case TypeResolutionStage::Interface:
+    resolution = TypeResolution::forInterface(owner.dc);
+    break;
+
+  case TypeResolutionStage::Contextual:
+    llvm_unreachable("No clients care about this. Use mapTypeIntoContext()");
+  }
+
+  auto resolveType = [&](TypeLoc &typeLoc) -> Type {
+    Type result;
+    if (auto typeRepr = typeLoc.getTypeRepr())
+      result = resolution->resolveType(typeRepr, options);
+    else
+      result = typeLoc.getType();
+
+    return result ? result : ErrorType::get(owner.dc->getASTContext());
+  };
+
+  auto &reqRepr = getRequirement();
+  switch (reqRepr.getKind()) {
+  case RequirementReprKind::TypeConstraint: {
+    Type subject = resolveType(reqRepr.getSubjectLoc());
+    Type constraint = resolveType(reqRepr.getConstraintLoc());
+    return Requirement(constraint->getClassOrBoundGenericClass()
+                         ? RequirementKind::Superclass
+                         : RequirementKind::Conformance,
+                       subject, constraint);
+  }
+
+  case RequirementReprKind::SameType:
+    return Requirement(RequirementKind::SameType,
+                       resolveType(reqRepr.getFirstTypeLoc()),
+                       resolveType(reqRepr.getSecondTypeLoc()));
+
+  case RequirementReprKind::LayoutConstraint:
+    return Requirement(RequirementKind::Layout,
+                       resolveType(reqRepr.getSubjectLoc()),
+                       reqRepr.getLayoutConstraint());
+  }
 }

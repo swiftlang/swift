@@ -526,7 +526,6 @@ SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
   for (auto *Use : Value->getUses()) {
     SILInstruction *Inst = Use->getUser();
     if (isa<RefCountingInst>(Inst) ||
-        isa<StrongPinInst>(Inst) ||
         isa<DebugValueInst>(Inst)) {
       Uses.push_back(Inst);
       continue;

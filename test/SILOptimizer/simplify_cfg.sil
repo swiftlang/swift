@@ -3047,3 +3047,77 @@ bb3(%res : $Builtin.Int32):
   release_value %pa : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32)
   return  %res : $Builtin.Int32
 }
+
+struct TestStr {
+  let a: Int32
+  let c: Int32
+}
+
+enum TestEnm {
+  case X
+  case Y(TestStr)
+}
+
+// CHECK-LABEL: sil @dont_crash
+// CHECK:      bb0(%0 : $TestEnm, %1 : $Int32):
+// CHECK-NEXT:   %2 = tuple ()
+// CHECK-NEXT:   return %2 : $()
+sil @dont_crash : $@convention(method) (TestEnm, Int32) -> () {
+bb0(%2 : $TestEnm, %3 : $Int32):
+  %98 = integer_literal $Builtin.Int1, -1
+  cond_br %98, bb2, bb3
+
+bb2:
+  %18 = tuple()
+  return %18 : $()
+
+bb3:
+  br bb8(%2 : $TestEnm)
+
+bb8(%47 : $TestEnm):
+  %49 = unchecked_enum_data %47 : $TestEnm, #TestEnm.Y!enumelt.1
+  %57 = struct_extract %49 : $TestStr, #TestStr.c
+  cond_br undef, bb9, bb11
+
+bb9:
+  br bb10
+
+bb10:
+  %64 = struct $TestStr (%3 : $Int32, %57 : $Int32)
+  %65 = enum $TestEnm, #TestEnm.Y!enumelt.1, %64 : $TestStr
+  cond_br undef, bb2, bb16
+
+bb11:
+  br bb10
+
+
+bb16:
+  br bb8(%65 : $TestEnm)
+}
+
+sil @print : $@convention(thin) (@guaranteed String) -> ()
+sil @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed String
+
+sil @dont_clone_begin_apply : $(Builtin.Int1, @guaranteed String) -> () {
+bb0(%condition : $Builtin.Int1, %arg : $String):
+  %print = function_ref @print : $@convention(thin) (@guaranteed String) -> ()
+  cond_br %condition, bb1, bb2
+bb1:
+  apply %print(%arg) : $@convention(thin) (@guaranteed String) -> ()
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %yield_string = function_ref @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed String
+  (%yield, %token) = begin_apply %yield_string() : $@yield_once @convention(thin) () -> @yields @guaranteed String
+  cond_br %condition, bb4, bb5
+bb4:
+  apply %print(%yield) : $@convention(thin) (@guaranteed String) -> ()
+  br bb6
+bb5:
+  br bb6
+bb6:
+  end_apply %token
+  %rv = tuple ()
+  return %rv : $()
+}

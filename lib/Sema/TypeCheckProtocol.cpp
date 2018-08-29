@@ -277,13 +277,12 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
         return isReadMutating() || isWriteMutating();
       case ReadWriteImplKind::Immutable:
         llvm_unreachable("asking for setter for immutable storage");
-      case ReadWriteImplKind::MaterializeForSet:
-        llvm_unreachable("should have a materializeForSet");
       }
     };
 
     switch (reqtAsAccessor->getAccessorKind()) {
     case AccessorKind::Get:
+    case AccessorKind::Read:
       witnessMutating = isReadMutating();
       break;
 
@@ -291,7 +290,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
       witnessMutating = isWriteMutating();
       break;
 
-    case AccessorKind::MaterializeForSet:
+    case AccessorKind::Modify:
       witnessMutating = isReadWriteMutating();
       break;
 
@@ -381,22 +380,31 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
   // to the requirement.
   switch (requirementKind) {
   case AccessorKind::Get:
-    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
-      return addressor;
     if (auto read = getExplicitAccessor(AccessorKind::Read))
       return read;
+    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
+      return addressor;
     break;
 
-  case AccessorKind::MaterializeForSet:
+  case AccessorKind::Read:
+    if (auto getter = getExplicitAccessor(AccessorKind::Get))
+      return getter;
+    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
+      return addressor;
+    break;
+
+  case AccessorKind::Modify:
     if (auto setter = getExplicitAccessor(AccessorKind::Set))
       return setter;
-    LLVM_FALLTHROUGH;
-
-  case AccessorKind::Set:
     if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
       return addressor;
+    break;
+
+  case AccessorKind::Set:
     if (auto modify = getExplicitAccessor(AccessorKind::Modify))
       return modify;
+    if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
+      return addressor;
     break;
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
@@ -922,7 +930,7 @@ WitnessChecker::lookupValueWitnessesViaImplementsAttr(
   }
 }
 
-SmallVector<ValueDecl *, 4> 
+SmallVector<ValueDecl *, 4>
 WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
   
@@ -942,7 +950,10 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
                                        SourceLoc(),
                                        lookupOptions);
     for (auto candidate : lookup) {
-      witnesses.push_back(candidate.getValueDecl());
+      auto decl = candidate.getValueDecl();
+      if (swift::isMemberOperator(cast<FuncDecl>(decl), Adoptee)) {
+        witnesses.push_back(decl);
+      }
     }
   } else {
     // Variable/function/subscript requirements.
@@ -1060,6 +1071,23 @@ bool WitnessChecker::findBestWitness(
   }
 
   if (numViable == 0) {
+    // Assume any missing value witnesses for a conformance in a textual
+    // interface can be treated as opaque.
+    // FIXME: ...but we should do something better about types.
+    if (conformance && !conformance->isInvalid()) {
+      if (auto *SF = DC->getParentSourceFile()) {
+        if (SF->Kind == SourceFileKind::Interface) {
+          auto match = matchWitness(TC, ReqEnvironmentCache, Proto,
+                                    conformance, DC, requirement, requirement);
+          assert(match.isViable());
+          numViable = 1;
+          bestIdx = matches.size();
+          matches.push_back(std::move(match));
+          return true;
+        }
+      }
+    }
+
     if (anyFromUnconstrainedExtension &&
         conformance != nullptr &&
         conformance->isInvalid()) {
@@ -2501,7 +2529,7 @@ witnessHasImplementsAttrForRequirement(ValueDecl *witness,
 }
 
 /// Determine the given witness has a same-type constraint constraining the
-/// given 'Self' type, and return the
+/// given 'Self' type, and return the requirement that does.
 ///
 /// \returns None if there is no such constraint; a non-empty optional that
 /// may have the \c RequirementRepr for the actual constraint.
@@ -3349,11 +3377,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
         auto concreteConformance = conformance.getConcrete();
 
         // Map the conformance.
-        auto interfaceType =
-          concreteConformance->getType()->mapTypeOutOfContext();
-
         concreteConformance = concreteConformance->subst(
-            interfaceType,
             [](SubstitutableType *type) -> Type {
               if (auto *archetypeType = type->getAs<ArchetypeType>())
                 return archetypeType->getInterfaceType();
@@ -4598,8 +4622,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     currentDecl = cast<NominalTypeDecl>(dc);
   }
 
+  SourceFile *SF = dc->getParentSourceFile();
   ReferencedNameTracker *tracker = nullptr;
-  if (SourceFile *SF = dc->getParentSourceFile())
+  if (SF)
     tracker = SF->getReferencedNameTracker();
 
   // Check each of the conformances associated with this context.
@@ -4804,85 +4829,88 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // If there were any unsatisfied requirements, check whether there
   // are any near-matches we should diagnose.
   if (!unsatisfiedReqs.empty() && !anyInvalid) {
-    // Find all of the members that aren't used to satisfy
-    // requirements, and check whether they are close to an
-    // unsatisfied or defaulted requirement.
-    for (auto member : idc->getMembers()) {
-      // Filter out anything that couldn't satisfy one of the
-      // requirements or was used to satisfy a different requirement.
-      auto value = dyn_cast<ValueDecl>(member);
-      if (!value) continue;
-      if (isa<TypeDecl>(value)) continue;
-      if (!value->getFullName()) continue;
+    if (SF && SF->Kind != SourceFileKind::Interface) {
+      // Find all of the members that aren't used to satisfy
+      // requirements, and check whether they are close to an
+      // unsatisfied or defaulted requirement.
+      for (auto member : idc->getMembers()) {
+        // Filter out anything that couldn't satisfy one of the
+        // requirements or was used to satisfy a different requirement.
+        auto value = dyn_cast<ValueDecl>(member);
+        if (!value) continue;
+        if (isa<TypeDecl>(value)) continue;
+        if (!value->getFullName()) continue;
 
-      // If this declaration overrides another declaration, the signature is
-      // fixed; don't complain about near misses.
-      if (value->getOverriddenDecl()) continue;
+        // If this declaration overrides another declaration, the signature is
+        // fixed; don't complain about near misses.
+        if (value->getOverriddenDecl()) continue;
 
-      // If this member is a witness to any @objc requirement, ignore it.
-      if (!findWitnessedObjCRequirements(value, /*anySingleRequirement=*/true)
-            .empty())
-        continue;
+        // If this member is a witness to any @objc requirement, ignore it.
+        if (!findWitnessedObjCRequirements(value, /*anySingleRequirement=*/true)
+              .empty())
+          continue;
 
-      // Find the unsatisfied requirements with the nearest-matching
-      // names.
-      SmallVector<ValueDecl *, 4> bestOptionalReqs;
-      unsigned bestScore = UINT_MAX;
-      for (auto req : unsatisfiedReqs) {
-        // Skip unavailable requirements.
-        if (req->getAttrs().isUnavailable(Context)) continue;
+        // Find the unsatisfied requirements with the nearest-matching
+        // names.
+        SmallVector<ValueDecl *, 4> bestOptionalReqs;
+        unsigned bestScore = UINT_MAX;
+        for (auto req : unsatisfiedReqs) {
+          // Skip unavailable requirements.
+          if (req->getAttrs().isUnavailable(Context)) continue;
 
-        // Score this particular optional requirement.
-        auto score = scorePotentiallyMatching(*this, req, value, bestScore);
-        if (!score) continue;
+          // Score this particular optional requirement.
+          auto score = scorePotentiallyMatching(*this, req, value, bestScore);
+          if (!score) continue;
 
-        // If the score is better than the best we've seen, update the best
-        // and clear out the list.
-        if (*score < bestScore) {
-          bestOptionalReqs.clear();
-          bestScore = *score;
-        }
-
-        // If this score matches the (possible new) best score, record it.
-        if (*score == bestScore)
-          bestOptionalReqs.push_back(req);
-      }
-
-      // If we found some requirements with nearly-matching names, diagnose
-      // the first one.
-      if (bestScore < UINT_MAX) {
-        bestOptionalReqs.erase(
-          std::remove_if(
-            bestOptionalReqs.begin(),
-            bestOptionalReqs.end(),
-            [&](ValueDecl *req) {
-              return !shouldWarnAboutPotentialWitness(groupChecker, req, value,
-                                                      defaultAccess, bestScore);
-            }),
-          bestOptionalReqs.end());
-      }
-
-      // If we have something to complain about, do so.
-      if (!bestOptionalReqs.empty()) {
-        auto req = bestOptionalReqs[0];
-        bool diagnosed = false;
-        for (auto conformance : conformances) {
-          if (conformance->getProtocol() == req->getDeclContext()) {
-            diagnosePotentialWitness(*this,
-                                     conformance->getRootNormalConformance(),
-                                     req, value, defaultAccess);
-            diagnosed = true;
-            break;
+          // If the score is better than the best we've seen, update the best
+          // and clear out the list.
+          if (*score < bestScore) {
+            bestOptionalReqs.clear();
+            bestScore = *score;
           }
-        }
-        assert(diagnosed && "Failed to find conformance to diagnose?");
-        (void)diagnosed;
 
-        // Remove this requirement from the list. We don't want to
-        // complain about it twice.
-        unsatisfiedReqs.erase(std::find(unsatisfiedReqs.begin(),
-                                        unsatisfiedReqs.end(),
-                                        req));
+          // If this score matches the (possible new) best score, record it.
+          if (*score == bestScore)
+            bestOptionalReqs.push_back(req);
+        }
+
+        // If we found some requirements with nearly-matching names, diagnose
+        // the first one.
+        if (bestScore < UINT_MAX) {
+          bestOptionalReqs.erase(
+            std::remove_if(
+              bestOptionalReqs.begin(),
+              bestOptionalReqs.end(),
+              [&](ValueDecl *req) {
+                return !shouldWarnAboutPotentialWitness(groupChecker, req,
+                                                        value, defaultAccess,
+                                                        bestScore);
+              }),
+            bestOptionalReqs.end());
+        }
+
+        // If we have something to complain about, do so.
+        if (!bestOptionalReqs.empty()) {
+          auto req = bestOptionalReqs[0];
+          bool diagnosed = false;
+          for (auto conformance : conformances) {
+            if (conformance->getProtocol() == req->getDeclContext()) {
+              diagnosePotentialWitness(*this,
+                                       conformance->getRootNormalConformance(),
+                                       req, value, defaultAccess);
+              diagnosed = true;
+              break;
+            }
+          }
+          assert(diagnosed && "Failed to find conformance to diagnose?");
+          (void)diagnosed;
+
+          // Remove this requirement from the list. We don't want to
+          // complain about it twice.
+          unsatisfiedReqs.erase(std::find(unsatisfiedReqs.begin(),
+                                          unsatisfiedReqs.end(),
+                                          req));
+        }
       }
     }
 
@@ -4929,7 +4957,6 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     switch (*accessorKind) {
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
-    case AccessorKind::MaterializeForSet:
     case AccessorKind::Read:
     case AccessorKind::Modify:
       // These accessors are never exposed to Objective-C.

@@ -173,11 +173,11 @@ public func testAccessProp(c: C, v: Int) {
 // WMO: end_access [[A2]] : $*Int
 //
 // WMO: [[E3:%.*]] = ref_element_addr %0 : $C, #C.inlinedProp
-// WMO: [[A3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[E3]] : $*Int
+// WMO: [[A3:%.*]] = begin_access [read] [static] [no_nested_conflict] [[E3]] : $*Int
 // WMO: end_access [[A3]] : $*Int
 //
 // WMO: [[E4:%.*]] = ref_element_addr %0 : $C, #C.internalProp
-// WMO: [[A4:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[E4]] : $*Int
+// WMO: [[A4:%.*]] = begin_access [read] [static] [no_nested_conflict] [[E4]] : $*Int
 // WMO: end_access [[A4]] : $*Int
 //
 // WMO: [[E5:%.*]] = ref_element_addr %0 : $C, #C.keyPathProp
@@ -217,14 +217,13 @@ public func testAccessProp(c: C, v: Int) {
 // WMO: end_access [[A2]] : $*Int
 //
 // WMO: [[E3:%.*]] = ref_element_addr %0 : $C, #C.inlinedProp
-// WMO: begin_unpaired_access [modify] [dynamic] [[E3]] : $*Int, %{{.*}} : $*Builtin.UnsafeValueBuffer
-// WMO: end_unpaired_access [dynamic] %{{.*}} : $*Builtin.UnsafeValueBuffer
+// WMO: [[A3:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[E3]] : $*Int
+// WMO: end_access [[A3]] : $*Int
 //
 // WMO: [[E4:%.*]] = ref_element_addr %0 : $C, #C.internalProp
-// WMO: begin_unpaired_access [modify] [dynamic] [[E4]] : $*Int, %{{.*}} : $*Builtin.UnsafeValueBuffer
-// WMO: [[D4:%.*]] = mark_dependence [[E4]] : $*Int on %0 : $C
-// WMO: apply [[F1]]([[D4]], %1) : $@convention(thin) (@inout Int, Int) -> ()
-// WMO: end_unpaired_access [dynamic] %{{.*}} : $*Builtin.UnsafeValueBuffer
+// WMO: [[A4:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[E4]] : $*Int
+// WMO: apply [[F1]]([[A4]], %1) : $@convention(thin) (@inout Int, Int) -> ()
+// WMO: end_access [[A4]]
 //
 // WMO: [[KP:%.*]] = keypath $ReferenceWritableKeyPath<C, Int>, (root $C; settable_property $Int,  id #C.keyPathProp!getter.1 : (C) -> () -> Int, getter @$S10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @$S10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
 // function_ref setKeyPath(_:_:_:)
@@ -235,8 +234,7 @@ public func testAccessProp(c: C, v: Int) {
 // WMO: apply [[F2]](%0, [[FKP]], %1) : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int>, Int) -> ()
 //
 // WMO: [[E4:%.*]] = ref_element_addr %0 : $C, #C.publicProp
-// WMO: begin_unpaired_access [modify] [dynamic] [[E4]] : $*Int, %{{.*}} : $*Builtin.UnsafeValueBuffer
-// WMO: [[D4:%.*]] = mark_dependence [[E4]] : $*Int on %0 : $C
-// WMO: apply [[F1]]([[D4]], %1) : $@convention(thin) (@inout Int, Int) -> ()
-// WMO: end_unpaired_access [dynamic] %{{.*}} : $*Builtin.UnsafeValueBuffer
+// WMO: [[A4:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[E4]] : $*Int
+// WMO: apply [[F1]]([[A4]], %1) : $@convention(thin) (@inout Int, Int) -> ()
+// WMO: end_access [[A4]]
 // WMO-LABEL: } // end sil function '$S10access_wmo14testAccessProp1c1vyAA1CC_SitF'

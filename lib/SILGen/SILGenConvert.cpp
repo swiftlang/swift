@@ -514,28 +514,94 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
 namespace {
 
 /// This is an initialization for an address-only existential in memory.
-class ExistentialInitialization : public KnownAddressInitialization {
-  CleanupHandle Cleanup;
+class ExistentialInitialization final : public SingleBufferInitialization {
+  SILValue existential;
+  CanType concreteFormalType;
+  ArrayRef<ProtocolConformanceRef> conformances;
+  ExistentialRepresentation repr;
+  
+  // Initialized lazily when the address for initialization is demanded.
+  SILValue concreteBuffer;
+  CleanupHandle deinitExistentialCleanup;
 public:
   /// \param existential The existential container
-  /// \param address Address of value in existential container
   /// \param concreteFormalType Unlowered AST type of value
-  /// \param repr Representation of container
-  ExistentialInitialization(SILValue existential, SILValue address,
+  /// \param conformances Conformances for concrete type to existential's
+  ///        protocols
+  ExistentialInitialization(SILGenFunction &SGF,
+                            SILValue existential,
                             CanType concreteFormalType,
-                            ExistentialRepresentation repr,
-                            SILGenFunction &SGF)
-      : KnownAddressInitialization(address) {
-    // Any early exit before we store a value into the existential must
-    // clean up the existential container.
-    Cleanup = SGF.enterDeinitExistentialCleanup(existential,
-                                                concreteFormalType,
-                                                repr);
+                            ArrayRef<ProtocolConformanceRef> conformances,
+                            ExistentialRepresentation repr)
+    : existential(existential),
+      concreteFormalType(concreteFormalType),
+      conformances(conformances),
+      repr(repr)
+  {
+    assert(existential->getType().isAddress());
+    
+    // Create a cleanup to deallocate an allocated but uninitialized concrete
+    // type buffer.
+    // It won't be activated until that buffer is formed later, though.
+    deinitExistentialCleanup =
+      SGF.enterDeinitExistentialCleanup(CleanupState::Dormant,
+                                        existential, concreteFormalType, repr);
+
+  }
+  
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) override {
+    // Create the buffer when needed, because in some cases the type may
+    // be the opened type from another existential that hasn't been opened
+    // at the point the existential destination was formed.
+    assert(!concreteBuffer && "concrete buffer already formed?!");
+    
+    auto concreteLoweredType =
+        SGF.getLoweredType(AbstractionPattern::getOpaque(), concreteFormalType);
+    
+    switch (repr) {
+    case ExistentialRepresentation::Opaque: {
+      concreteBuffer = SGF.B.createInitExistentialAddr(loc, existential,
+                                           concreteFormalType,
+                                           concreteLoweredType.getAddressType(),
+                                           conformances);
+      break;
+    }
+    case ExistentialRepresentation::Boxed: {
+      auto box = SGF.B.createAllocExistentialBox(loc,
+                       existential->getType().getObjectType(),
+                       concreteFormalType,
+                       conformances);
+      concreteBuffer = SGF.B.createProjectExistentialBox(loc,
+                                           concreteLoweredType.getAddressType(),
+                                           box);
+      SGF.B.createStore(loc, box, existential,
+                        StoreOwnershipQualifier::Init);
+      break;
+    }
+    case ExistentialRepresentation::Class:
+    case ExistentialRepresentation::Metatype:
+    case ExistentialRepresentation::None:
+      llvm_unreachable("not supported");
+    }
+    
+    // Activate the cleanup to deallocate the buffer we just allocated, should
+    SGF.Cleanups.setCleanupState(deinitExistentialCleanup,
+                                 CleanupState::Active);
+
+    return concreteBuffer;
+  }
+
+  bool isInPlaceInitializationOfGlobal() const override {
+    return existential && isa<GlobalAddrInst>(existential);
   }
 
   void finishInitialization(SILGenFunction &SGF) override {
     SingleBufferInitialization::finishInitialization(SGF);
-    SGF.Cleanups.setCleanupState(Cleanup, CleanupState::Dead);
+    // We've fully initialized the existential by this point, so we can
+    // retire the partial cleanup.
+    SGF.Cleanups.setCleanupState(deinitExistentialCleanup,
+                                 CleanupState::Dead);
   }
 };
 
@@ -601,7 +667,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       ManagedValue nsError =
           emitRValueForStorageLoad(
               loc, nativeError, concreteFormalType,
-              /*super*/ false, nsErrorVar, RValue(),
+              /*super*/ false, nsErrorVar, PreparedArguments(),
               nsErrorVarSubstitutions,
               AccessSemantics::Ordinary, nsErrorType, SGFContext())
               .getAsSingleValue(*this, loc);
@@ -723,24 +789,32 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                                       concreteFormalType, sub, conformances);
   }
   case ExistentialRepresentation::Boxed: {
-    // Allocate the existential.
-    auto *existential = B.createAllocExistentialBox(loc,
-                                           existentialTL.getLoweredType(),
-                                           concreteFormalType,
-                                           conformances);
-    auto *valueAddr = B.createProjectExistentialBox(loc,
-                                           concreteTL.getLoweredType(),
-                                           existential);
-    // Initialize the concrete value in-place.
-    ExistentialInitialization init(existential, valueAddr, concreteFormalType,
-                                   ExistentialRepresentation::Boxed, *this);
-    ManagedValue mv = F(SGFContext(&init));
-    if (!mv.isInContext()) {
-      mv.ensurePlusOne(*this, loc).forwardInto(*this, loc, init.getAddress());
-      init.finishInitialization(*this);
+    // We defer allocation of the box to when the address is demanded.
+    // Create a stack slot to hold the box once it's allocated.
+    SILValue boxValue;
+    auto buf = B.bufferForExpr(
+      loc, existentialTL.getLoweredType(), existentialTL, C,
+      [&](SILValue existential) {
+        // Initialize the existential in-place.
+        ExistentialInitialization init(*this, existential,
+                                       concreteFormalType,
+                                       conformances,
+                                       ExistentialRepresentation::Boxed);
+        ManagedValue mv = F(SGFContext(&init));
+        if (!mv.isInContext()) {
+          init.copyOrInitValueInto(*this, loc, mv.ensurePlusOne(*this, loc),
+                                    /*init*/ true);
+          init.finishInitialization(*this);
+        }
+      });
+
+    if (buf.isInContext()) {
+      return buf;
     }
-    
-    return emitManagedRValueWithCleanup(existential);
+
+    auto value = B.createLoad(loc, buf.forward(*this),
+                              LoadOwnershipQualifier::Take);
+    return emitManagedRValueWithCleanup(value);
   }
   case ExistentialRepresentation::Opaque: {
   
@@ -779,22 +853,16 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     return B.bufferForExpr(
         loc, existentialTL.getLoweredType(), existentialTL, C,
         [&](SILValue existential) {
-          // Allocate the concrete value inside the container.
-          SILValue valueAddr = B.createInitExistentialAddr(
-              loc, existential,
-              concreteFormalType,
-              concreteTLPtr->getLoweredType(),
-              conformances);
-          // Initialize the concrete value in-place.
-          InitializationPtr init(
-              new ExistentialInitialization(existential, valueAddr, concreteFormalType,
-                                            ExistentialRepresentation::Opaque,
-                                            *this));
-          ManagedValue mv = F(SGFContext(init.get()));
+          // Initialize the existential in-place.
+          ExistentialInitialization init(*this, existential,
+                                         concreteFormalType,
+                                         conformances,
+                                         ExistentialRepresentation::Opaque);
+          ManagedValue mv = F(SGFContext(&init));
           if (!mv.isInContext()) {
-            init->copyOrInitValueInto(*this, loc, mv.ensurePlusOne(*this, loc),
+            init.copyOrInitValueInto(*this, loc, mv.ensurePlusOne(*this, loc),
                                       /*init*/ true);
-            init->finishInitialization(*this);
+            init.finishInitialization(*this);
           }
         });
   }

@@ -484,6 +484,9 @@ public:
   /// Returns the underlying referent SILType of an @sil_unowned or @sil_weak
   /// Type.
   SILType getReferentType(SILModule &M) const;
+  
+  /// Returns a SILType with any archetypes mapped out of context.
+  SILType mapTypeOutOfContext() const;
 
   /// Given two SIL types which are representations of the same type,
   /// check whether they have an abstraction difference.
@@ -563,7 +566,10 @@ NON_SIL_TYPE(LValue)
 
 CanSILFunctionType getNativeSILFunctionType(
     SILModule &M, Lowering::AbstractionPattern origType,
-    CanAnyFunctionType substType, Optional<SILDeclRef> constant = None,
+    CanAnyFunctionType substType,
+    Optional<SILDeclRef> origConstant = None,
+    Optional<SILDeclRef> constant = None,
+    Optional<SubstitutionMap> reqtSubs = None,
     Optional<ProtocolConformanceRef> witnessMethodConformance = None);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {

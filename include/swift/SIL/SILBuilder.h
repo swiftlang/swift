@@ -1588,16 +1588,6 @@ public:
     return insert(new (getModule()) StrongReleaseInst(
         getSILDebugLocation(Loc), Operand, atomicity));
   }
-  StrongPinInst *createStrongPin(SILLocation Loc, SILValue Operand,
-                                 Atomicity atomicity) {
-    return insert(new (getModule()) StrongPinInst(getSILDebugLocation(Loc),
-                                                    Operand, atomicity));
-  }
-  StrongUnpinInst *createStrongUnpin(SILLocation Loc, SILValue Operand,
-                                     Atomicity atomicity) {
-    return insert(new (getModule()) StrongUnpinInst(getSILDebugLocation(Loc),
-                                                      Operand, atomicity));
-  }
 
   EndLifetimeInst *createEndLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (getModule())
@@ -1631,12 +1621,6 @@ public:
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
     return insert(new (getModule()) IsUniqueInst(getSILDebugLocation(Loc),
                                                    operand, Int1Ty));
-  }
-  IsUniqueOrPinnedInst *createIsUniqueOrPinned(SILLocation Loc,
-                                               SILValue value) {
-    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
-    return insert(new (getModule()) IsUniqueOrPinnedInst(
-        getSILDebugLocation(Loc), value, Int1Ty));
   }
   IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
                                                  SILValue operand,

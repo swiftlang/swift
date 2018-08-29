@@ -314,11 +314,6 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return isUniquelyReferenced()
   }
 
-  @inlinable
-  internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
-    return isUniquelyReferencedOrPinned()
-  }
-
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
@@ -433,14 +428,6 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
     return _isUnique(&_storage)
-  }
-
-  /// Returns `true` iff this buffer's storage is either
-  /// uniquely-referenced or pinned.  NOTE: this does not mean
-  /// the buffer is mutable; see the comment on isUniquelyReferenced.
-  @inlinable
-  internal mutating func isUniquelyReferencedOrPinned() -> Bool {
-    return _isUniqueOrPinned(&_storage)
   }
 
 #if _runtime(_ObjC)

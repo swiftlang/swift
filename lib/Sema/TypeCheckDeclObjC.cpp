@@ -476,10 +476,6 @@ bool swift::isRepresentableInObjC(
     case AccessorKind::Set:
       return true;
 
-    case AccessorKind::MaterializeForSet:
-      // materializeForSet is synthesized, so never complain about it
-      return false;
-
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
       if (Diagnose) {
@@ -1041,7 +1037,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   }
 
   // Destructors are always @objc, with -dealloc as their entry point.
-  if (auto deinit = dyn_cast<DestructorDecl>(VD))
+  if (isa<DestructorDecl>(VD))
     return ObjCReason(ObjCReason::ImplicitlyObjC);
 
   ProtocolDecl *protocolContext =

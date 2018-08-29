@@ -4,17 +4,6 @@
 /* RawRepresentable Changes */
 
 /* Removed Decls */
-TypeAlias AbsoluteValuable has been removed
-TypeAlias BitwiseOperations has been removed (deprecated)
-TypeAlias IntMax has been removed
-TypeAlias Integer has been removed
-TypeAlias IntegerArithmetic has been removed
-TypeAlias SignedNumber has been removed
-TypeAlias StringProtocol.UTF16Index has been removed (deprecated)
-TypeAlias StringProtocol.UTF8Index has been removed (deprecated)
-TypeAlias StringProtocol.UnicodeScalarIndex has been removed (deprecated)
-TypeAlias UIntMax has been removed
-Var FixedWidthInteger.allZeros has been removed (deprecated)
 Constructor Int.init(truncatingBitPattern:) has been removed
 Constructor Int16.init(truncatingBitPattern:) has been removed
 Constructor Int32.init(truncatingBitPattern:) has been removed
@@ -64,6 +53,17 @@ Func UInt32.toIntMax() has been removed
 Func UInt64.toIntMax() has been removed
 Func UInt8.toIntMax() has been removed
 Func UnsignedInteger.toUIntMax() has been removed
+TypeAlias AbsoluteValuable has been removed
+TypeAlias BitwiseOperations has been removed (deprecated)
+TypeAlias IntMax has been removed
+TypeAlias Integer has been removed
+TypeAlias IntegerArithmetic has been removed
+TypeAlias SignedNumber has been removed
+TypeAlias StringProtocol.UTF16Index has been removed (deprecated)
+TypeAlias StringProtocol.UTF8Index has been removed (deprecated)
+TypeAlias StringProtocol.UnicodeScalarIndex has been removed (deprecated)
+TypeAlias UIntMax has been removed
+Var FixedWidthInteger.allZeros has been removed (deprecated)
 
 /* Moved Decls */
 
@@ -72,12 +72,14 @@ Func Dictionary.filter(_:obsoletedInSwift4:) has been renamed to Func Dictionary
 Func Set.filter(_:obsoletedInSwift4:) has been renamed to Func Set.filter(_:)
 
 /* Type Changes */
-Var Dictionary.keys has declared type change from LazyMapCollection<[Key : Value], Key> to Dictionary<Key, Value>.Keys
-Var Dictionary.values has declared type change from LazyMapCollection<[Key : Value], Value> to Dictionary<Key, Value>.Values
+Constructor Mirror.init(_:children:displayStyle:ancestorRepresentation:) has parameter 1 type change from DictionaryLiteral<String, Any> to KeyValuePairs<String, Any>
 Constructor String.init(_:) has return type change from String? to String
 Func Dictionary.filter(_:obsoletedInSwift4:) has return type change from [Dictionary<Key, Value>.Element] to [Dictionary<Key, Value>.Key : Dictionary<Key, Value>.Value]
 Func Dictionary.makeIterator() has return type change from DictionaryIterator<Dictionary<Key, Value>.Key, Dictionary<Key, Value>.Value> to Dictionary<Key, Value>.Iterator
 Func Set.filter(_:obsoletedInSwift4:) has return type change from [Set<Element>.Element] to Set<Element>
 Func Set.makeIterator() has return type change from SetIterator<Element> to Set<Element>.Iterator
+Var Dictionary.keys has declared type change from LazyMapCollection<[Key : Value], Key> to Dictionary<Key, Value>.Keys
+Var Dictionary.values has declared type change from LazyMapCollection<[Key : Value], Value> to Dictionary<Key, Value>.Values
+
 
 /* Decl Attribute changes */

@@ -18,7 +18,7 @@ import SwiftShims
 // This function is the implementation of the `_roundUp` overload set.  It is
 // marked `@inline(__always)` to make primary `_roundUp` entry points seem
 // cheap enough for the inliner.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _roundUpImpl(_ offset: UInt, toAlignment alignment: Int) -> UInt {
   _sanityCheck(alignment > 0)
@@ -31,12 +31,12 @@ internal func _roundUpImpl(_ offset: UInt, toAlignment alignment: Int) -> UInt {
   return x & ~(UInt(bitPattern: alignment) &- 1)
 }
 
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 internal func _roundUp(_ offset: UInt, toAlignment alignment: Int) -> UInt {
   return _roundUpImpl(offset, toAlignment: alignment)
 }
 
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 internal func _roundUp(_ offset: Int, toAlignment alignment: Int) -> Int {
   _sanityCheck(offset >= 0)
   return Int(_roundUpImpl(UInt(bitPattern: offset), toAlignment: alignment))
@@ -638,7 +638,7 @@ func _getSuperclass(_ t: Any.Type) -> AnyClass? {
 //    value... thus bumping the reference count and disturbing the
 //    result we are trying to observe, Dr. Heisenberg!
 //
-// _isUnique and _isUniquePinned cannot be made public or the compiler
+// _isUnique cannot be made public or the compiler
 // will attempt to generate generic code for the transparent function
 // and type checking will fail.
 
@@ -646,12 +646,6 @@ func _getSuperclass(_ t: Any.Type) -> AnyClass? {
 @usableFromInline @_transparent
 internal func _isUnique<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
-}
-
-/// Returns `true` if `object` is uniquely referenced or pinned.
-@usableFromInline @_transparent
-internal func _isUniqueOrPinned<T>(_ object: inout T) -> Bool {
-  return Bool(Builtin.isUniqueOrPinned(&object))
 }
 
 /// Returns `true` if `object` is uniquely referenced.
@@ -670,27 +664,20 @@ func _isUnique_native<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique_native(&object))
 }
 
-/// Returns `true` if `object` is uniquely referenced or pinned.
-/// This provides sanity checks on top of the Builtin.
-@_transparent
-public // @testable
-func _isUniqueOrPinned_native<T>(_ object: inout T) -> Bool {
-  // This could be a bridge object, single payload enum, or plain old
-  // reference. Any case it's non pointer bits must be zero.
-  _sanityCheck(
-    (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
-    == 0)
-  _sanityCheck(_usesNativeSwiftReferenceCounting(
-      type(of: Builtin.reinterpretCast(object) as AnyObject)))
-  return Bool(Builtin.isUniqueOrPinned_native(&object))
-}
-
 /// Returns `true` if type is a POD type. A POD type is a type that does not
 /// require any special handling on copying or destruction.
 @_transparent
 public // @testable
 func _isPOD<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.ispod(type))
+}
+
+/// Returns `true` if type is a bitwise takable. A bitwise takable type can
+/// just be moved to a different address in memory.
+@_transparent
+public // @testable
+func _isBitwiseTakable<T>(_ type: T.Type) -> Bool {
+  return Bool(Builtin.isbitwisetakable(type))
 }
 
 /// Returns `true` if type is nominally an Optional type.

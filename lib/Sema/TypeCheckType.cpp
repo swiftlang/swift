@@ -97,7 +97,10 @@ GenericSignature *TypeResolution::getGenericSignature() const {
     return dc->getGenericSignatureOfContext();
 
   case TypeResolutionStage::Interface:
-    return complete.genericSig;
+    if (complete.genericSig)
+      return complete.genericSig;
+
+    return dc->getGenericSignatureOfContext();
 
   case TypeResolutionStage::Structural:
     return nullptr;
@@ -2518,9 +2521,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       return ErrorType::get(Context);
 
     Type selfType = params.back().getType();
-    // The Self type can be nested in a few layers of metatypes (etc.), e.g. for
-    // a mutable static variable the materializeForSet currently has its last
-    // argument as a Self.Type.Type metatype.
+    // The Self type can be nested in a few layers of metatypes (etc.).
     while (auto metatypeType = selfType->getAs<MetatypeType>()) {
       auto next = metatypeType->getInstanceType();
       if (next->isEqual(selfType))

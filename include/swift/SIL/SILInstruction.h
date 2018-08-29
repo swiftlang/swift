@@ -4777,60 +4777,6 @@ class SetDeallocatingInst
   }
 };
 
-/// StrongPinInst - Ensure that the operand is retained and pinned, if
-/// not by this operation then by some enclosing pin.
-///
-/// Transformations must not do anything which reorders pin and unpin
-/// operations.  (This should generally be straightforward, as pin and
-/// unpin may be conservatively assumed to have arbitrary
-/// side-effects.)
-///
-/// This can't be a RefCountingInst because it returns a value.
-class StrongPinInst
-  : public UnaryInstructionBase<SILInstructionKind::StrongPinInst,
-                                SingleValueInstruction>
-{
-public:
-  using Atomicity = RefCountingInst::Atomicity;
-
-private:
-  friend SILBuilder;
-
-  StrongPinInst(SILDebugLocation DebugLoc, SILValue operand,
-                Atomicity atomicity);
-
-public:
-  void setAtomicity(Atomicity flag) {
-    SILInstruction::Bits.StrongPinInst.atomicity = bool(flag);
-  }
-  void setNonAtomic() {
-    SILInstruction::Bits.StrongPinInst.atomicity = bool(Atomicity::NonAtomic);
-  }
-  void setAtomic() {
-    SILInstruction::Bits.StrongPinInst.atomicity = bool(Atomicity::Atomic);
-  }
-  Atomicity getAtomicity() const {
-    return Atomicity(SILInstruction::Bits.StrongPinInst.atomicity);
-  }
-  bool isNonAtomic() const { return getAtomicity() == Atomicity::NonAtomic; }
-  bool isAtomic() const { return getAtomicity() == Atomicity::Atomic; }
-};
-
-/// StrongUnpinInst - Given that the operand is the result of a
-/// strong_pin instruction, unpin it.
-class StrongUnpinInst
-  : public UnaryInstructionBase<SILInstructionKind::StrongUnpinInst,
-                                RefCountingInst>
-{
-  friend SILBuilder;
-
-  StrongUnpinInst(SILDebugLocation DebugLoc, SILValue operand,
-                  Atomicity atomicity)
-      : UnaryInstructionBase(DebugLoc, operand) {
-    setAtomicity(atomicity);
-  }
-};
-
 /// ObjectInst - Represents a object value type.
 ///
 /// This instruction can only appear at the end of a gobal variable's
@@ -6258,19 +6204,6 @@ class IsUniqueInst
   friend SILBuilder;
 
   IsUniqueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType BoolTy)
-      : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
-};
-
-/// Given an object reference, return true iff it is non-nil and either refers
-/// to a native swift object with strong reference count of 1 or refers to a
-/// pinned object (for simultaneous access to multiple subobjects).
-class IsUniqueOrPinnedInst
-    : public UnaryInstructionBase<SILInstructionKind::IsUniqueOrPinnedInst,
-                                  SingleValueInstruction> {
-  friend SILBuilder;
-
-  IsUniqueOrPinnedInst(SILDebugLocation DebugLoc, SILValue Operand,
-                       SILType BoolTy)
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
 };
 

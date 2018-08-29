@@ -64,27 +64,6 @@ bool RefCounts<RefCountBits>::tryIncrementNonAtomicSlow(RefCountBits oldbits) {
 template bool RefCounts<InlineRefCountBits>::tryIncrementNonAtomicSlow(InlineRefCountBits oldbits);
 template bool RefCounts<SideTableRefCountBits>::tryIncrementNonAtomicSlow(SideTableRefCountBits oldbits);
 
-template <typename RefCountBits>
-bool RefCounts<RefCountBits>::tryIncrementAndPinSlow(RefCountBits oldbits) {
-  if (oldbits.hasSideTable())
-    return oldbits.getSideTable()->tryIncrementAndPin();
-  else
-    swift::swift_abortRetainOverflow();
-}
-template bool RefCounts<InlineRefCountBits>::tryIncrementAndPinSlow(InlineRefCountBits oldbits);
-template bool RefCounts<SideTableRefCountBits>::tryIncrementAndPinSlow(SideTableRefCountBits oldbits);
-
-template <typename RefCountBits>
-bool RefCounts<RefCountBits>::tryIncrementAndPinNonAtomicSlow(RefCountBits oldbits) {
-  if (oldbits.hasSideTable())
-    return oldbits.getSideTable()->tryIncrementAndPinNonAtomic();
-  else
-    swift::swift_abortRetainOverflow();
-}
-template bool RefCounts<InlineRefCountBits>::tryIncrementAndPinNonAtomicSlow(InlineRefCountBits oldbits);
-template bool RefCounts<SideTableRefCountBits>::tryIncrementAndPinNonAtomicSlow(SideTableRefCountBits oldbits);
-
-
 // Return an object's side table, allocating it if necessary.
 // Returns null if the object is deiniting.
 // SideTableRefCountBits specialization intentionally does not exist.

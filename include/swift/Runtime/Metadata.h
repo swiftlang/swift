@@ -330,11 +330,11 @@ ClassMetadataBounds getResilientMetadataBounds(
 int32_t getResilientImmediateMembersOffset(const ClassDescriptor *descriptor);
 
 /// \brief Fetch a uniqued metadata object for a nominal type which requires
-/// in-place metadata initialization.
+/// singleton metadata initialization.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
-swift_getInPlaceMetadata(MetadataRequest request,
-                         const TypeContextDescriptor *description);
+swift_getSingletonMetadata(MetadataRequest request,
+                           const TypeContextDescriptor *description);
 
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
@@ -574,15 +574,16 @@ void swift_initStructMetadata(StructMetadata *self,
                               const TypeLayout * const *fieldTypes,
                               uint32_t *fieldOffsets);
 
-/// Relocate the metadata for a class and copy fields from the given template.
-/// The final size of the metadata is calculated at runtime from the size of
-/// the superclass metadata together with the given number of immediate
-/// members.
+/// Allocate the metadata for a class and copy fields from the given pattern.
+/// The final size of the metadata is calculated at runtime from the metadata
+/// bounds in the class descriptor.
+///
+/// This function is only intended to be called from the relocation function
+/// of a resilient class pattern.
 SWIFT_RUNTIME_EXPORT
 ClassMetadata *
 swift_relocateClassMetadata(ClassDescriptor *descriptor,
-                            ClassMetadata *pattern,
-                            size_t patternSize);
+                            ResilientClassMetadataPattern *pattern);
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.

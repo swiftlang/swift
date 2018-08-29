@@ -369,16 +369,12 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 #include "swift/AST/ReferenceStorage.def"
   SINGLE_VALUE_INST(UncheckedOwnershipConversionInst, unchecked_ownership_conversion,
                     SingleValueInstruction, MayHaveSideEffects, MayRelease)
-  SINGLE_VALUE_INST(StrongPinInst, strong_pin,
-                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
   // IsUnique does not actually write to memory but should be modeled
   // as such. Its operand is a pointer to an object reference. The
   // optimizer should not assume that the same object is pointed to after
   // the isUnique instruction. It appears to write a new object reference.
   SINGLE_VALUE_INST(IsUniqueInst, is_unique,
-                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
-  SINGLE_VALUE_INST(IsUniqueOrPinnedInst, is_unique_or_pinned,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
   SINGLE_VALUE_INST(IsEscapingClosureInst, is_escaping_closure,
@@ -558,8 +554,6 @@ ABSTRACT_INST(RefCountingInst, SILInstruction)
                  RefCountingInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(StrongReleaseInst, strong_release,
                  RefCountingInst, MayHaveSideEffects, MayRelease)
-  NON_VALUE_INST(StrongUnpinInst, strong_unpin,
-                 RefCountingInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(UnmanagedRetainValueInst, unmanaged_retain_value,
                  RefCountingInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(UnmanagedReleaseValueInst, unmanaged_release_value,

@@ -13,10 +13,20 @@
 #
 # ===---------------------------------------------------------------------===//
 """
-This script is used for comparing performance test results.
+This script compares performance test logs and issues a formatted report.
 
-It is structured into several classes that can be imported into other modules.
+Invoke `$ compare_perf_tests.py -h ` for complete list of options.
+
+class `Sample` is single benchmark measurement.
+class `PerformanceTestSamples` is collection of `Sample`s and their statistics.
+class `PerformanceTestResult` is a summary of performance test execution.
+class `LogParser` converts log files into `PerformanceTestResult`s.
+class `ResultComparison` compares new and old `PerformanceTestResult`s.
+class `TestComparator` analyzes changes betweeen the old and new test results.
+class `ReportFormatter` creates the test comparison report in specified format.
+
 """
+
 from __future__ import print_function
 
 import argparse
@@ -48,7 +58,7 @@ class PerformanceTestSamples(object):
     """
 
     def __init__(self, name, samples=None):
-        """Initialized with benchmark name and optional list of Samples."""
+        """Initialize with benchmark name and optional list of Samples."""
         self.name = name  # Name of the performance test
         self.samples = []
         self.outliers = []
@@ -201,7 +211,7 @@ class PerformanceTestResult(object):
     """
 
     def __init__(self, csv_row):
-        """Initialized from a row with 8 or 9 columns with benchmark summary.
+        """Initialize from a row with 8 or 9 columns with benchmark summary.
 
         The row is an iterable, such as a row provided by the CSV parser.
         """
@@ -298,7 +308,7 @@ class LogParser(object):
 
     # Parse lines like this
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
-    results_re = re.compile(r'(\d+[, \t]*\w+[, \t]*' +
+    results_re = re.compile(r'( *\d+[, \t]*[\w.]+[, \t]*' +
                             r'[, \t]*'.join([r'[\d.]+'] * 6) +
                             r'[, \t]*[\d.]*)')  # optional MAX_RSS(B)
 
@@ -409,7 +419,7 @@ class TestComparator(object):
     """
 
     def __init__(self, old_results, new_results, delta_threshold):
-        """Initialized with dictionaries of old and new benchmark results.
+        """Initialize with dictionaries of old and new benchmark results.
 
         Dictionary keys are benchmark names, values are
         `PerformanceTestResult`s.

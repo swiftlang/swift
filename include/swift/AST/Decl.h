@@ -147,7 +147,6 @@ enum class DescriptiveDeclKind : uint8_t {
   ClassMethod,
   Getter,
   Setter,
-  MaterializeForSet,
   Addressor,
   MutableAddressor,
   ReadAccessor,
@@ -325,7 +324,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2,
     /// Whether the getter is mutating.
     IsGetterMutating : 1,
 
@@ -336,7 +335,10 @@ protected:
     HasStorage : 1,
 
     /// Whether this storage supports semantic mutation in some way.
-    SupportsMutation : 1
+    SupportsMutation : 1,
+
+    /// Whether an opaque read of this storage produces an owned value.
+    OpaqueReadOwnership : 2
   );
 
   SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1,
@@ -1212,6 +1214,22 @@ public:
                          SecondLayout.getSourceRange().End);
     return SourceRange(FirstType.getSourceRange().Start,
                        SecondType.getSourceRange().End);
+  }
+
+  /// Retrieve the first or subject type representation from the \c repr,
+  /// or \c nullptr if \c repr is null.
+  static TypeRepr *getFirstTypeRepr(const RequirementRepr *repr) {
+    if (!repr) return nullptr;
+    return repr->FirstType.getTypeRepr();
+  }
+
+  /// Retrieve the second or constraint type representation from the \c repr,
+  /// or \c nullptr if \c repr is null.
+  static TypeRepr *getSecondTypeRepr(const RequirementRepr *repr) {
+    if (!repr) return nullptr;
+    assert(repr->getKind() == RequirementReprKind::TypeConstraint ||
+           repr->getKind() == RequirementReprKind::SameType);
+    return repr->SecondType.getTypeRepr();
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -4126,6 +4144,8 @@ protected:
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
     Bits.AbstractStorageDecl.IsGetterMutating = false;
     Bits.AbstractStorageDecl.IsSetterMutating = true;
+    Bits.AbstractStorageDecl.OpaqueReadOwnership =
+      unsigned(OpaqueReadOwnership::Owned);
   }
 
   void setSupportsMutationIfStillStored(StorageIsMutable_t supportsMutation) {
@@ -4195,7 +4215,15 @@ public:
   bool hasAnyAccessors() const {
     return !getAllAccessors().empty();
   }
-  
+
+  /// \brief Return the ownership of values opaquely read from this storage.
+  OpaqueReadOwnership getOpaqueReadOwnership() const {
+    return OpaqueReadOwnership(Bits.AbstractStorageDecl.OpaqueReadOwnership);
+  }
+  void setOpaqueReadOwnership(OpaqueReadOwnership ownership) {
+    Bits.AbstractStorageDecl.OpaqueReadOwnership = unsigned(ownership);
+  }
+
   /// \brief Return true if reading this storage requires the ability to
   /// modify the base value.
   bool isGetterMutating() const {
@@ -4251,11 +4279,30 @@ public:
   /// \brief Add a synthesized setter.
   void setSynthesizedSetter(AccessorDecl *setter);
 
-  /// \brief Add a synthesized materializeForSet accessor.
-  void setSynthesizedMaterializeForSet(AccessorDecl *materializeForSet);
+  /// \brief Add a synthesized read coroutine.
+  void setSynthesizedReadCoroutine(AccessorDecl *read);
 
-  /// Does this storage require a materializeForSet accessor?
-  bool requiresMaterializeForSet() const;
+  /// \brief Add a synthesized modify coroutine.
+  void setSynthesizedModifyCoroutine(AccessorDecl *modify);
+
+  /// Does this storage require an opaque accessor of the given kind?
+  bool requiresOpaqueAccessor(AccessorKind kind) const;
+
+  /// Does this storage require a 'get' accessor in its opaque-accessors set?
+  bool requiresOpaqueGetter() const {
+    return getOpaqueReadOwnership() != OpaqueReadOwnership::Borrowed;
+  }
+
+  /// Does this storage require a 'read' accessor in its opaque-accessors set?
+  bool requiresOpaqueReadCoroutine() const {
+    return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+  }
+
+  /// Does this storage require a 'set' accessor in its opaque-accessors set?
+  bool requiresOpaqueSetter() const { return supportsMutation(); }
+
+  /// Does this storage require a 'modify' accessor in its opaque-accessors set?
+  bool requiresOpaqueModifyCoroutine() const;
 
   SourceRange getBracesRange() const {
     if (auto info = Accessors.getPointer())
@@ -4281,12 +4328,6 @@ public:
   }
 
   void overwriteSetterAccess(AccessLevel accessLevel);
-
-  /// \brief Retrieve the materializeForSet function, if this
-  /// declaration has one.
-  AccessorDecl *getMaterializeForSetFunc() const {
-    return getAccessor(AccessorKind::MaterializeForSet);
-  }
 
   /// \brief Return the decl for the immutable addressor if it exists.
   AccessorDecl *getAddressor() const {
@@ -4758,27 +4799,6 @@ public:
   
   SourceRange getSourceRange() const;
 
-  /// Create an implicit 'self' decl for a method in the specified decl context.
-  /// If 'static' is true, then this is self for a static method in the type.
-  ///
-  /// Note that this decl is created, but it is returned with an incorrect
-  /// DeclContext that needs to be set correctly.  This is automatically handled
-  /// when a function is created with this as part of its argument list.
-  /// For a generic context, this also gives the parameter an unbound generic
-  /// type with the expectation that type-checking will fill in the context
-  /// generic parameters.
-  static ParamDecl *createUnboundSelf(SourceLoc loc, DeclContext *DC);
-
-  /// Create an implicit 'self' decl for a method in the specified decl context.
-  /// If 'static' is true, then this is self for a static method in the type.
-  ///
-  /// Note that this decl is created, but it is returned with an incorrect
-  /// DeclContext that needs to be set correctly.  This is automatically handled
-  /// when a function is created with this as part of its argument list.
-  static ParamDecl *createSelf(SourceLoc loc, DeclContext *DC,
-                               bool isStatic = false,
-                               bool isInOut = false);
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Param;
@@ -4849,9 +4869,6 @@ public:
   ParameterList *getIndices() { return Indices; }
   const ParameterList *getIndices() const { return Indices; }
   void setIndices(ParameterList *p);
-
-  /// Retrieve the interface type of the indices.
-  Type getIndicesInterfaceType() const;
 
   /// \brief Retrieve the type of the element referenced by a subscript
   /// operation.
@@ -5153,6 +5170,8 @@ public:
 private:
   void computeNeedsNewVTableEntry();
 
+  void computeSelfDeclType();
+
 public:
   /// Compute the interface type of this function declaration from the
   /// parameter types.
@@ -5186,8 +5205,7 @@ public:
     return Params;
   }
 
-  void setParameters(ParamDecl *SelfDecl,
-                     ParameterList *Params);
+  void setParameters(ParameterList *Params);
 
   bool hasImplicitSelfDecl() const {
     return Bits.AbstractFunctionDecl.HasImplicitSelfDecl;
@@ -5195,15 +5213,13 @@ public:
 
   ParamDecl **getImplicitSelfDeclStorage();
 
-  /// Retrieve the implicit 'self' parameter for methods, or nullptr for free
-  /// functions.
-  const ParamDecl *getImplicitSelfDecl() const {
-    return const_cast<AbstractFunctionDecl*>(this)->getImplicitSelfDecl();
+  /// Retrieve the implicit 'self' parameter for methods. Returns nullptr for
+  /// free functions.
+  const ParamDecl *getImplicitSelfDecl(bool createIfNeeded=true) const {
+    return const_cast<AbstractFunctionDecl*>(this)
+        ->getImplicitSelfDecl(createIfNeeded);
   }
-  ParamDecl *getImplicitSelfDecl() {
-    auto **selfDecl = getImplicitSelfDeclStorage();
-    return (selfDecl == nullptr ? nullptr : *selfDecl);
-  }
+  ParamDecl *getImplicitSelfDecl(bool createIfNeeded=true);
 
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const {
@@ -5330,7 +5346,6 @@ private:
                               DeclName Name, SourceLoc NameLoc,
                               bool Throws, SourceLoc ThrowsLoc,
                               GenericParamList *GenericParams,
-                              bool HasImplicitSelfDecl,
                               DeclContext *Parent,
                               ClangNode ClangN);
 
@@ -5342,7 +5357,6 @@ public:
                                       DeclName Name, SourceLoc NameLoc,
                                       bool Throws, SourceLoc ThrowsLoc,
                                       GenericParamList *GenericParams,
-                                      bool HasImplicitSelfDecl,
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
@@ -5351,7 +5365,6 @@ public:
                           DeclName Name, SourceLoc NameLoc,
                           bool Throws, SourceLoc ThrowsLoc,
                           GenericParamList *GenericParams,
-                          ParamDecl *SelfDecl,
                           ParameterList *ParameterList,
                           TypeLoc FnRetType, DeclContext *Parent,
                           ClangNode ClangN = ClangNode());
@@ -5534,7 +5547,6 @@ class AccessorDecl final : public FuncDecl {
                                   SourceLoc staticLoc,
                                   StaticSpellingKind staticSpelling,
                                   bool throws, SourceLoc throwsLoc,
-                                  bool hasImplicitSelfDecl,
                                   GenericParamList *genericParams,
                                   DeclContext *parent,
                                   ClangNode clangNode);
@@ -5550,7 +5562,6 @@ public:
                               StaticSpellingKind staticSpelling,
                               bool throws, SourceLoc throwsLoc,
                               GenericParamList *genericParams,
-                              bool hasImplicitSelfDecl,
                               DeclContext *parent);
 
   static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
@@ -5562,7 +5573,6 @@ public:
                               StaticSpellingKind staticSpelling,
                               bool throws, SourceLoc throwsLoc,
                               GenericParamList *genericParams,
-                              ParamDecl *selfDecl,
                               ParameterList *parameterList,
                               TypeLoc fnRetType, DeclContext *parent,
                               ClangNode clangNode = ClangNode());
@@ -5583,9 +5593,6 @@ public:
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
   bool isSetter() const { return getAccessorKind() == AccessorKind::Set; }
-  bool isMaterializeForSet() const {
-    return getAccessorKind() == AccessorKind::MaterializeForSet;
-  }
   bool isAnyAddressor() const {
     auto kind = getAccessorKind();
     return kind == AccessorKind::Address
@@ -5870,7 +5877,7 @@ public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
                   OptionalTypeKind Failability, SourceLoc FailabilityLoc,
                   bool Throws, SourceLoc ThrowsLoc,
-                  ParamDecl *SelfParam, ParameterList *BodyParams,
+                  ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
 
@@ -5886,7 +5893,6 @@ public:
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();
-  void setInitializerInterfaceType(Type t);
 
   /// Get the typechecked call to super.init expression, which needs to be
   /// inserted at the end of the initializer by SILGen.
@@ -6042,8 +6048,7 @@ class DestructorDecl : public AbstractFunctionDecl {
   ParamDecl *SelfDecl;
 
 public:
-  DestructorDecl(SourceLoc DestructorLoc, ParamDecl *selfDecl,
-                 DeclContext *Parent);
+  DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent);
 
   ParamDecl **getImplicitSelfDeclStorage() { return &SelfDecl; }
 
@@ -6485,8 +6490,6 @@ AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
   Accessors.setInt(accessLevel);
   if (auto setter = getSetter())
     setter->overwriteAccess(accessLevel);
-  if (auto materializeForSet = getMaterializeForSetFunc())
-    materializeForSet->overwriteAccess(accessLevel);
   if (auto modify = getModifyCoroutine())
     modify->overwriteAccess(accessLevel);
   if (auto mutableAddressor = getMutableAddressor())
@@ -6635,6 +6638,9 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
 /// the type of the corresponding parameter.
 std::pair<DefaultArgumentKind, Type>
 getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
+
+/// Display Decl subclasses.
+void simple_display(llvm::raw_ostream &out, const Decl *decl);
 
 /// Display ValueDecl subclasses.
 void simple_display(llvm::raw_ostream &out, const ValueDecl *decl);

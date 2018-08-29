@@ -1237,7 +1237,6 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
            .Case("setter", AccessorKind::Set)
            .Case("addressor", AccessorKind::Address)
            .Case("mutableAddressor", AccessorKind::MutableAddress)
-           .Case("materializeForSet", AccessorKind::MaterializeForSet)
            .Case("read", AccessorKind::Read)
            .Case("modify", AccessorKind::Modify)
            .Default(None);
@@ -1250,7 +1249,6 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 ///  sil-decl-subref ::= '!' sil-decl-lang
 ///  sil-decl-subref-part ::= 'getter'
 ///  sil-decl-subref-part ::= 'setter'
-///  sil-decl-subref-part ::= 'materializeForSet'
 ///  sil-decl-subref-part ::= 'allocator'
 ///  sil-decl-subref-part ::= 'initializer'
 ///  sil-decl-subref-part ::= 'enumelt'
@@ -1818,16 +1816,25 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
     // Pick the ValueDecl that has the right type.
     ValueDecl *TheDecl = nullptr;
     auto declTy = Ty.getType()->getCanonicalType();
-    auto unlabeledDecl =
-        declTy->getUnlabeledType(P.Context)->getCanonicalType();
     for (unsigned I = 0, E = values.size(); I < E; I++) {
-      auto lookupTy = values[I]->getInterfaceType();
-      auto unlabeledLookup =
-          lookupTy->getUnlabeledType(P.Context)->getCanonicalType();
-      if (unlabeledDecl == unlabeledLookup) {
-        TheDecl = values[I];
+      auto *decl = values[I];
+
+      unsigned numArgumentLabels = 0;
+      if (auto *eed = dyn_cast<EnumElementDecl>(decl)) {
+        numArgumentLabels =
+          (eed->hasAssociatedValues() ? 2 : 1);
+      } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+        numArgumentLabels =
+          (decl->getDeclContext()->isTypeContext() ? 2 : 1);
+      }
+
+      auto lookupTy =
+        decl->getInterfaceType()
+            ->removeArgumentLabels(numArgumentLabels);
+      if (declTy == lookupTy->getCanonicalType()) {
+        TheDecl = decl;
         // Update SILDeclRef to point to the right Decl.
-        Member.loc = TheDecl;
+        Member.loc = decl;
         break;
       }
       if (values.size() == 1 && !TheDecl) {
@@ -2669,7 +2676,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     UNARY_INSTRUCTION(EndLifetime)
     UNARY_INSTRUCTION(CopyBlock)
     UNARY_INSTRUCTION(IsUnique)
-    UNARY_INSTRUCTION(IsUniqueOrPinned)
     UNARY_INSTRUCTION(DestroyAddr)
     UNARY_INSTRUCTION(CopyValue)
     UNARY_INSTRUCTION(DestroyValue)
@@ -2680,10 +2686,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
     REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
     REFCOUNTING_INSTRUCTION(UnmanagedAutoreleaseValue)
-    REFCOUNTING_INSTRUCTION(StrongPin)
     REFCOUNTING_INSTRUCTION(StrongRetain)
     REFCOUNTING_INSTRUCTION(StrongRelease)
-    REFCOUNTING_INSTRUCTION(StrongUnpin)
     REFCOUNTING_INSTRUCTION(AutoreleaseValue)
     REFCOUNTING_INSTRUCTION(SetDeallocating)
     REFCOUNTING_INSTRUCTION(ReleaseValue)

@@ -672,6 +672,12 @@ namespace swift {
       return diagnose(Loc, Diagnostic(ID, std::move(Args)...));
     }
 
+    /// Delete an API that may lead clients to avoid specifying source location.
+    template<typename ...ArgTypes>
+    InFlightDiagnostic
+    diagnose(Diag<ArgTypes...> ID,
+             typename detail::PassArgument<ArgTypes>::type... Args) = delete;
+
     /// \brief Emit a diagnostic with the given set of diagnostic arguments.
     ///
     /// \param Loc The declaration name location to which the

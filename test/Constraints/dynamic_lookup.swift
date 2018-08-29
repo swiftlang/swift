@@ -292,9 +292,9 @@ let _: String = o[s]!
 let _: String? = o[s]
 // FIXME: These should all produce lvalues that we can write through
 o.s = s // expected-error {{cannot assign to immutable expression of type 'String?'}}
-o.s! = s // expected-error {{cannot assign to immutable expression of type 'String'}}
+o.s! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
 o[s] = s // expected-error {{cannot assign to immutable expression of type 'String?'}}
-o[s]! = s // expected-error {{cannot assign to immutable expression of type 'String'}}
+o[s]! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
 
 let _: String = o.t
 let _: String = o.t!
@@ -311,8 +311,8 @@ let _: DynamicIUO = o[dyn_iuo]!!
 let _: DynamicIUO? = o[dyn_iuo]
 // FIXME: These should all produce lvalues that we can write through
 o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO??'}}
-o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO?'}}
-o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO'}}
+o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
+o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
 
 
 // Check that we avoid picking an unavailable overload if there's an

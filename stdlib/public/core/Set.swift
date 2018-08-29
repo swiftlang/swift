@@ -1102,40 +1102,6 @@ public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
   return builder.take()
 }
 
-#if _runtime(_ObjC)
-
-/// Implements an unconditional upcast that involves bridging.
-///
-/// The cast can fail if bridging fails.
-///
-/// - Precondition: `SwiftValue` is bridged to Objective-C
-///   and requires non-trivial bridging.
-@inlinable
-public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
-  _ source: Set<SwiftValue>
-) -> Set<ObjCValue> {
-  _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
-  _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
-
-  var result = Set<ObjCValue>(minimumCapacity: source.count)
-  let valueBridgesDirectly =
-    _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
-    _isBridgedVerbatimToObjectiveC(ObjCValue.self)
-
-  for member in source {
-    var bridgedMember: ObjCValue
-    if valueBridgesDirectly {
-      bridgedMember = unsafeBitCast(member, to: ObjCValue.self)
-    } else {
-      let bridged: AnyObject = _bridgeAnythingToObjectiveC(member)
-      bridgedMember = unsafeBitCast(bridged, to: ObjCValue.self)
-    }
-    result.insert(bridgedMember)
-  }
-  return result
-}
-#endif
-
 /// Called by the casting machinery.
 @_silgen_name("_swift_setDownCastIndirect")
 internal func _setDownCastIndirect<SourceValue, TargetValue>(
@@ -1203,65 +1169,6 @@ public func _setDownCastConditional<BaseValue, DerivedValue>(
   }
   return result
 }
-
-#if _runtime(_ObjC)
-
-/// Implements an unconditional downcast that involves bridging.
-///
-/// - Precondition: At least one of `SwiftValue` is a bridged value
-///   type, and the corresponding `ObjCValue` is a reference type.
-@inlinable
-public func _setBridgeFromObjectiveC<ObjCValue, SwiftValue>(
-  _ source: Set<ObjCValue>
-) -> Set<SwiftValue> {
-  let result: Set<SwiftValue>? = _setBridgeFromObjectiveCConditional(source)
-  _precondition(result != nil, "This set cannot be bridged from Objective-C")
-  return result!
-}
-
-/// Implements a conditional downcast that involves bridging.
-///
-/// If the cast fails, the function returns `nil`.  All checks should be
-/// performed eagerly.
-///
-/// - Precondition: At least one of `SwiftValue` is a bridged value
-///   type, and the corresponding `ObjCValue` is a reference type.
-@inlinable
-public func _setBridgeFromObjectiveCConditional<
-  ObjCValue, SwiftValue
->(
-  _ source: Set<ObjCValue>
-) -> Set<SwiftValue>? {
-  _sanityCheck(_isClassOrObjCExistential(ObjCValue.self))
-  _sanityCheck(!_isBridgedVerbatimToObjectiveC(SwiftValue.self))
-
-  let valueBridgesDirectly =
-    _isBridgedVerbatimToObjectiveC(SwiftValue.self) ==
-      _isBridgedVerbatimToObjectiveC(ObjCValue.self)
-
-  var result = Set<SwiftValue>(minimumCapacity: source.count)
-  for value in source {
-    // Downcast the value.
-    var resultValue: SwiftValue
-    if valueBridgesDirectly {
-      if let bridgedValue = value as? SwiftValue {
-        resultValue = bridgedValue
-      } else {
-        return nil
-      }
-    } else {
-      if let bridgedValue = _conditionallyBridgeFromObjectiveC(
-          _reinterpretCastToAnyObject(value), SwiftValue.self) {
-        resultValue = bridgedValue
-      } else {
-        return nil
-      }
-    }
-    result.insert(resultValue)
-  }
-  return result
-}
-#endif
 
 extension Set {
   /// Removes the elements of the given set from this set.

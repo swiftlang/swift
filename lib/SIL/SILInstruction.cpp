@@ -1069,7 +1069,6 @@ bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsEscapingClosureInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
     return true;
   default:
     return mayRelease();
@@ -1173,6 +1172,13 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // instructions must directly operate on the BeginAccess.
   if (isa<BeginAccessInst>(this))
     return false;
+
+  // begin_apply creates a token that has to be directly used by the
+  // corresponding end_apply and abort_apply.
+  if (isa<BeginApplyInst>(this))
+    return false;
+
+  // If you add more cases here, you should also update SILLoop:canDuplicate.
 
   return true;
 }

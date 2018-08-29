@@ -230,8 +230,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
   auto typeInContext =
     conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
 
-  for (auto witness : checker.lookupValueWitnesses(req,
-                                                   /*ignoringNames=*/nullptr)) {
+  for (auto witness :
+       checker.lookupValueWitnesses(req, /*ignoringNames=*/nullptr)) {
     LLVM_DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
                witness->dump(llvm::dbgs()));
 
@@ -399,7 +399,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
     result.push_back(std::move(witnessResult));
 next_witness:;
-  }
+}
 
   return result;
 }

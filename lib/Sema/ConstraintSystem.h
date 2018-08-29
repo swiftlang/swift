@@ -707,6 +707,16 @@ public:
     return None;
   }
 
+  /// Retrieve overload choices associated with given expression.
+  void getOverloadChoices(Expr *anchor,
+                          SmallVectorImpl<SelectedOverload> &overloads) const {
+    for (auto &e : overloadChoices) {
+      auto *locator = e.first;
+      if (locator->getAnchor() == anchor)
+        overloads.push_back(e.second);
+    }
+  }
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -1764,7 +1774,7 @@ public:
 
   /// When an assignment to an expression is detected and the destination is
   /// invalid, emit a detailed error about the condition.
-  void diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
+  bool diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
 
   
   /// \brief Mine the active and inactive constraints in the constraint
@@ -1777,6 +1787,9 @@ public:
   /// Assuming that this constraint system is actually erroneous, this *always*
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
+
+  bool diagnoseAmbiguity(Expr *expr, ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguityWithFixes(Expr *expr, ArrayRef<Solution> solutions);
 
   /// \brief Give the deprecation warning for referring to a global function
   /// when there's a method from a conditional conformance in a smaller/closer
@@ -2095,20 +2108,6 @@ public:
   Type getResultType(const AbstractClosureExpr *E);
 
 private:
-  /// Determine if the given constraint represents explicit conversion,
-  /// e.g. coercion constraint "as X" which forms a disjunction.
-  bool isExplicitConversionConstraint(Constraint *constraint) const {
-    if (constraint->getKind() != ConstraintKind::Disjunction)
-      return false;
-
-    if (auto locator = constraint->getLocator()) {
-      if (auto anchor = locator->getAnchor())
-        return isa<CoerceExpr>(anchor);
-    }
-
-    return false;
-  }
-
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
@@ -2353,10 +2352,6 @@ public:
     TypeMatchResult(SolutionKind result) : Kind(result) {}
   };
 
-  /// \brief Compute the rvalue type of the given expression, which is the
-  /// destination of an assignment statement.
-  Type computeAssignDestType(Expr *dest, SourceLoc equalLoc);
-
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
@@ -2378,15 +2373,6 @@ public:
   TypeMatchResult matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
-  
-  /// \brief Subroutine of \c matchFunctionTypes(), which matches up the
-  /// parameter types of two function types.
-  TypeMatchResult matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1,
-                                          ArrayRef<AnyFunctionType::Param> type2,
-                                          Type argType, Type paramType,
-                                          ConstraintKind kind,
-                                          TypeMatchOptions flags,
-                                          ConstraintLocatorBuilder locator);
   
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
@@ -2643,6 +2629,13 @@ private:
 
   /// \brief Attempt to simplify the optional object constraint.
   SolutionKind simplifyOptionalObjectConstraint(
+                                          Type first, Type second,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
+
+  /// \brief Attempt to simplify a function input or result constraint.
+  SolutionKind simplifyFunctionComponentConstraint(
+                                          ConstraintKind kind,
                                           Type first, Type second,
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
@@ -3320,6 +3313,11 @@ bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);
 
+ConstraintSystem::TypeMatchResult
+matchCallArguments(ConstraintSystem &cs,
+                   bool isOperator, Type argType, Type paramType,
+                   ConstraintLocatorBuilder locator);
+
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.
 /// If this cannot be proven, conservatively returns true.
@@ -3356,6 +3354,13 @@ void simplifyLocator(Expr *&anchor,
                      Expr *&targetAnchor,
                      SmallVectorImpl<LocatorPathElt> &targetPath,
                      SourceRange &range);
+
+/// Simplify the given locator down to a specific anchor expression,
+/// if possible.
+///
+/// \returns the anchor expression if it fully describes the locator, or
+/// null otherwise.
+Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 
 class DisjunctionChoice {
   ConstraintSystem *CS;

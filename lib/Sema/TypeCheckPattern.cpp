@@ -1656,12 +1656,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   };
 
   auto getType = [](const AnyFunctionType::Param &param) -> Type {
-    auto type = param.getPlainType();
-
-    if (param.isVariadic())
-      return ArraySliceType::get(type);
-
-    return type;
+    return param.getParameterType();
   };
 
   // If the closure is called with a single argument of tuple type

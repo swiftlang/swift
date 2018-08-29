@@ -350,7 +350,7 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
   // Initialize the header:
 
   // Heap destructor.
-  fullMetadata->destroy = pattern->Destroy;
+  fullMetadata->destroy = pattern->Destroy.get();
 
   // Value witness table.
 #if SWIFT_OBJC_INTEROP
@@ -539,8 +539,8 @@ swift::swift_getGenericMetadata(MetadataRequest request,
 
 namespace {
   /// A cache entry for "in-place" metadata initializations.
-  class InPlaceMetadataCacheEntry final
-      : public MetadataCacheEntryBase<InPlaceMetadataCacheEntry, int> {
+  class SingletonMetadataCacheEntry final
+      : public MetadataCacheEntryBase<SingletonMetadataCacheEntry, int> {
     ValueType Value = nullptr;
 
     friend MetadataCacheEntryBase;
@@ -556,12 +556,12 @@ namespace {
     // objects or else it gets annoyed.
     static size_t numTrailingObjects(OverloadToken<int>) { return 0; }
 
-    static const char *getName() { return "InPlaceMetadataCache"; }
+    static const char *getName() { return "SingletonMetadataCache"; }
 
-    InPlaceMetadataCacheEntry() {}
+    SingletonMetadataCacheEntry() {}
 
     AllocationResult allocate(const TypeContextDescriptor *description) {
-      auto &initialization = description->getInPlaceMetadataInitialization();
+      auto &initialization = description->getSingletonMetadataInitialization();
 
       // Classes with resilient superclasses might require their metadata to
       // be relocated.
@@ -581,7 +581,7 @@ namespace {
         // Find a pattern.  Currently we always use the default pattern.
         auto &initialization =
             metadata->getTypeContextDescriptor()
-                    ->getInPlaceMetadataInitialization();
+                    ->getSingletonMetadataInitialization();
 
         // Complete the metadata's instantiation.
         auto dependency =
@@ -607,7 +607,7 @@ namespace {
 
     void publishCompleteMetadata(Metadata *metadata) {
       auto &init = metadata->getTypeContextDescriptor()
-                           ->getInPlaceMetadataInitialization();
+                           ->getSingletonMetadataInitialization();
       auto &cache = *init.InitializationCache.get();
       cache.Metadata.store(metadata, std::memory_order_release);
     }
@@ -617,19 +617,19 @@ namespace {
   /// appropriate for the in-place metadata cache.
   ///
   /// TODO: delete the cache entry when initialization is complete.
-  class InPlaceMetadataCacheStorage {
+  class SingletonMetadataCacheStorage {
     ConcurrencyControl Concurrency;
 
   public:
     using KeyType = const TypeContextDescriptor *;
-    using EntryType = InPlaceMetadataCacheEntry;
+    using EntryType = SingletonMetadataCacheEntry;
 
     ConcurrencyControl &getConcurrency() { return Concurrency; }
 
     template <class... ArgTys>
     std::pair<EntryType*, bool>
     getOrInsert(KeyType key, ArgTys &&...args) {
-      auto &init = key->getInPlaceMetadataInitialization();
+      auto &init = key->getSingletonMetadataInitialization();
       auto &cache = *init.InitializationCache.get();
 
       // Check for an existing entry.
@@ -638,7 +638,7 @@ namespace {
       // If there isn't one there, optimistically create an entry and
       // try to swap it in.
       if (!existingEntry) {
-        auto allocatedEntry = new InPlaceMetadataCacheEntry();
+        auto allocatedEntry = new SingletonMetadataCacheEntry();
         if (cache.Private.compare_exchange_strong(existingEntry,
                                                   allocatedEntry,
                                                   std::memory_order_acq_rel,
@@ -653,13 +653,13 @@ namespace {
         delete allocatedEntry;
       }
 
-      return { static_cast<InPlaceMetadataCacheEntry*>(existingEntry), false };
+      return { static_cast<SingletonMetadataCacheEntry*>(existingEntry), false };
     }
 
     EntryType *find(KeyType key) {
-      auto &init = key->getInPlaceMetadataInitialization();
+      auto &init = key->getSingletonMetadataInitialization();
 
-      return static_cast<InPlaceMetadataCacheEntry*>(
+      return static_cast<SingletonMetadataCacheEntry*>(
         init.InitializationCache->Private.load(std::memory_order_acquire));
     }
 
@@ -672,20 +672,20 @@ namespace {
     }
   };
 
-  class InPlaceMetadataCache
-      : public LockingConcurrentMap<InPlaceMetadataCacheEntry,
-                                    InPlaceMetadataCacheStorage> {
+  class SingletonTypeMetadataCache
+      : public LockingConcurrentMap<SingletonMetadataCacheEntry,
+                                    SingletonMetadataCacheStorage> {
   };
 } // end anonymous namespace
 
 /// The cache of all in-place metadata initializations.
-static Lazy<InPlaceMetadataCache> InPlaceMetadata;
+static Lazy<SingletonTypeMetadataCache> SingletonMetadata;
 
 MetadataResponse
-swift::swift_getInPlaceMetadata(MetadataRequest request,
-                                const TypeContextDescriptor *description) {
-  auto result = InPlaceMetadata.get().getOrInsert(description, request,
-                                                  description);
+swift::swift_getSingletonMetadata(MetadataRequest request,
+                                  const TypeContextDescriptor *description) {
+  auto result = SingletonMetadata.get().getOrInsert(description, request,
+                                                    description);
 
   return result.second;
 }
@@ -1931,7 +1931,7 @@ static ValueWitnessTable *getMutableVWTableForInit(StructMetadata *self,
 }
 
 /// Initialize the value witness table and struct field offset vector for a
-/// struct, using the "Universal" layout strategy.
+/// struct.
 void swift::swift_initStructMetadata(StructMetadata *structType,
                                      StructLayoutFlags layoutFlags,
                                      size_t numFields,
@@ -1944,17 +1944,29 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
       assignUnlessEqual(fieldOffsets[i], offset);
     });
 
-  bool hasExtraInhabitants = fieldTypes[0]->flags.hasExtraInhabitants();
-
+  // We have extra inhabitants if any element does. Use the field with the most.
+  unsigned extraInhabitantField = ~0u;
+  unsigned extraInhabitantCount = 0;
+  for (unsigned i = 0; i < numFields; ++i) {
+    if (!fieldTypes[i]->flags.hasExtraInhabitants())
+      continue;
+    unsigned fieldExtraInhabitantCount =
+      fieldTypes[i]->getExtraInhabitantFlags().getNumExtraInhabitants();
+    if (fieldExtraInhabitantCount > extraInhabitantCount) {
+      extraInhabitantField = i;
+      extraInhabitantCount = fieldExtraInhabitantCount;
+    }
+  }
+    
   auto vwtable =
-    getMutableVWTableForInit(structType, layoutFlags, hasExtraInhabitants);
+    getMutableVWTableForInit(structType, layoutFlags,
+                             extraInhabitantCount > 0);
 
-  // We have extra inhabitants if the first element does.
-  // FIXME: generalize this.
-  if (hasExtraInhabitants) {
+  if (extraInhabitantCount > 0) {
     layout.flags = layout.flags.withExtraInhabitants(true);
     auto xiVWT = static_cast<ExtraInhabitantsValueWitnessTable*>(vwtable);
-    xiVWT->extraInhabitantFlags = fieldTypes[0]->getExtraInhabitantFlags();
+    xiVWT->extraInhabitantFlags =
+      fieldTypes[extraInhabitantField]->getExtraInhabitantFlags();
 
     // The compiler should already have initialized these.
     assert(xiVWT->storeExtraInhabitant);
@@ -2121,29 +2133,83 @@ static MetadataAllocator &getResilientMetadataAllocator() {
 
 ClassMetadata *
 swift::swift_relocateClassMetadata(ClassDescriptor *description,
-                                   ClassMetadata *pattern,
-                                   size_t patternSize) {
+                                   ResilientClassMetadataPattern *pattern) {
   auto bounds = description->getMetadataBounds();
-  auto metadataSize = bounds.getTotalSizeInBytes();
 
-  if (patternSize < metadataSize) {
-    auto bytes = (char*) malloc(metadataSize);
+  auto metadata = reinterpret_cast<ClassMetadata *>(
+      (char*) malloc(bounds.getTotalSizeInBytes()) +
+      bounds.getAddressPointInBytes());
+  auto fullMetadata = asFullMetadata(metadata);
+  char *rawMetadata = reinterpret_cast<char*>(metadata);
 
-    auto fullPattern = (const char*) pattern;
-    fullPattern -= pattern->getClassAddressPoint();
-    memcpy(bytes, fullPattern, patternSize);
-    memset(bytes + patternSize, 0,
-           metadataSize - patternSize);
+  // Zero out the entire immediate-members section.
+  void **immediateMembers =
+    reinterpret_cast<void**>(rawMetadata + bounds.ImmediateMembersOffset);
+  memset(immediateMembers, 0, description->getImmediateMembersSize());
 
-    auto addressPoint = bytes + bounds.getAddressPointInBytes();
-    auto metadata = reinterpret_cast<ClassMetadata *>(addressPoint);
+  // Initialize the header:
 
-    metadata->setClassSize(metadataSize);
-    assert(metadata->isTypeMetadata());
-    return metadata;
-  }
+  // Heap destructor.
+  fullMetadata->destroy = pattern->Destroy.get();
 
-  return pattern;
+  // Value witness table.
+#if SWIFT_OBJC_INTEROP
+  fullMetadata->ValueWitnesses =
+    (pattern->Flags & ClassFlags::UsesSwiftRefcounting)
+       ? &VALUE_WITNESS_SYM(Bo)
+       : &VALUE_WITNESS_SYM(BO);
+#else
+  fullMetadata->ValueWitnesses = &VALUE_WITNESS_SYM(Bo);
+#endif
+
+  // MetadataKind / isa.
+#if SWIFT_OBJC_INTEROP
+  metadata->setClassISA(pattern->Metaclass.get());
+#else
+  metadata->setKind(MetadataKind::Class);
+#endif
+
+  // Superclass.
+  metadata->Superclass = nullptr;
+
+#if SWIFT_OBJC_INTEROP
+  // Cache data.  Install the same initializer that the compiler is
+  // required to use.  We don't need to do this in non-ObjC-interop modes.
+  metadata->CacheData[0] = &_objc_empty_cache;
+  metadata->CacheData[1] = nullptr;
+#endif
+
+  // RO-data pointer.
+#if SWIFT_OBJC_INTEROP
+  auto classRO = pattern->Data.get();
+  metadata->Data =
+    reinterpret_cast<uintptr_t>(classRO) | SWIFT_CLASS_IS_SWIFT_MASK;
+#else
+  metadata->Data = SWIFT_CLASS_IS_SWIFT_MASK;
+#endif
+
+  // Class flags.
+  metadata->Flags = pattern->Flags;
+
+  // Instance layout.
+  metadata->InstanceAddressPoint = 0;
+  metadata->InstanceSize = 0;
+  metadata->InstanceAlignMask = 0;
+
+  // Reserved.
+  metadata->Reserved = 0;
+
+  // Class metadata layout.
+  metadata->ClassSize = bounds.getTotalSizeInBytes();
+  metadata->ClassAddressPoint = bounds.getAddressPointInBytes();
+
+  // Class descriptor.
+  metadata->setDescription(description);
+
+  // I-var destroyer.
+  metadata->IVarDestroyer = pattern->IVarDestroyer;
+
+  return metadata;
 }
 
 /// Initialize the field offset vector for a dependent-layout class, using the
@@ -3522,7 +3588,8 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
     case ProtocolRequirementFlags::Kind::Init:
     case ProtocolRequirementFlags::Kind::Getter:
     case ProtocolRequirementFlags::Kind::Setter:
-    case ProtocolRequirementFlags::Kind::MaterializeForSet:
+    case ProtocolRequirementFlags::Kind::ReadCoroutine:
+    case ProtocolRequirementFlags::Kind::ModifyCoroutine:
       break;
     case ProtocolRequirementFlags::Kind::BaseProtocol:
     case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
@@ -3645,8 +3712,8 @@ static Result performOnMetadataCache(const Metadata *metadata,
     case TypeContextDescriptorFlags::ForeignMetadataInitialization:
       return std::move(callbacks).forForeignMetadata(metadata, description);
 
-    case TypeContextDescriptorFlags::InPlaceMetadataInitialization:
-      return std::move(callbacks).forInPlaceMetadata(description);
+    case TypeContextDescriptorFlags::SingletonMetadataInitialization:
+      return std::move(callbacks).forSingletonMetadata(description);
     }
     swift_runtime_unreachable("bad metadata initialization kind");
   }
@@ -3681,8 +3748,8 @@ bool swift::addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
       return ForeignMetadata.get().enqueue(description, QueueEntry, Dependency);
     }
 
-    bool forInPlaceMetadata(const TypeContextDescriptor *description) && {
-      return InPlaceMetadata.get().enqueue(description, QueueEntry, Dependency);
+    bool forSingletonMetadata(const TypeContextDescriptor *description) && {
+      return SingletonMetadata.get().enqueue(description, QueueEntry, Dependency);
     }
 
     bool forTupleMetadata(const TupleTypeMetadata *metadata) {
@@ -3713,8 +3780,8 @@ void swift::resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry) {
       ForeignMetadata.get().resumeInitialization(description, QueueEntry);
     }
 
-    void forInPlaceMetadata(const TypeContextDescriptor *description) && {
-      InPlaceMetadata.get().resumeInitialization(description, QueueEntry);
+    void forSingletonMetadata(const TypeContextDescriptor *description) && {
+      SingletonMetadata.get().resumeInitialization(description, QueueEntry);
     }
 
     void forTupleMetadata(const TupleTypeMetadata *metadata) {
@@ -3748,9 +3815,9 @@ MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
       return ForeignMetadata.get().await(description, Request);
     }
 
-    MetadataResponse forInPlaceMetadata(
+    MetadataResponse forSingletonMetadata(
                                   const TypeContextDescriptor *description) && {
-      return InPlaceMetadata.get().await(description, Request);
+      return SingletonMetadata.get().await(description, Request);
     }
 
     MetadataResponse forTupleMetadata(const TupleTypeMetadata *metadata) {
@@ -3855,7 +3922,7 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
         return false;
       }
 
-      bool forInPlaceMetadata(const TypeContextDescriptor *description) && {
+      bool forSingletonMetadata(const TypeContextDescriptor *description) && {
         // TODO: this could be cheap enough.
         return true;
       }
@@ -4022,9 +4089,9 @@ checkMetadataDependency(MetadataDependency dependency) {
       return ForeignMetadata.get().checkDependency(description, Requirement);
     }
 
-    MetadataDependency forInPlaceMetadata(
+    MetadataDependency forSingletonMetadata(
                               const TypeContextDescriptor *description) && {
-      return InPlaceMetadata.get().checkDependency(description, Requirement);
+      return SingletonMetadata.get().checkDependency(description, Requirement);
     }
 
     MetadataDependency forTupleMetadata(const TupleTypeMetadata *metadata) {

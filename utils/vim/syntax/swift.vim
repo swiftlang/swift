@@ -157,7 +157,7 @@ syn match swiftOperator "\.\.[<.]" skipwhite nextgroup=swiftTypeParameters
 syn match swiftChar /'\([^'\\]\|\\\(["'tnr0\\]\|x[0-9a-fA-F]\{2}\|u[0-9a-fA-F]\{4}\|U[0-9a-fA-F]\{8}\)\)'/
 
 syn match swiftPreproc /#\(\<file\>\|\<line\>\|\<function\>\)/
-syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\<error\>\|\<warning\>\|\)/
+syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\|\<error\>\|\<warning\>\)/
 syn region swiftPreprocFalse start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
 
 syn match swiftAttribute /@\<\w\+\>/ skipwhite nextgroup=swiftType

@@ -747,7 +747,7 @@ public:
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
-  
+
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
            "requesting clang AST context without clang importer!");
@@ -760,6 +760,8 @@ public:
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
+
+  Alignment getCappedAlignment(Alignment alignment);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
 
@@ -1168,7 +1170,6 @@ public:
                                           SymbolReferenceKind kind);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
-                                               bool isConstant,
                                                ConstantInit init,
                                                StringRef section);
   llvm::Function *getAddrOfTypeMetadataCompletionFunction(NominalTypeDecl *D,
@@ -1177,7 +1178,7 @@ public:
                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataInstantiationCache(NominalTypeDecl *D,
                                              ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfTypeMetadataInPlaceInitializationCache(
+  llvm::Constant *getAddrOfTypeMetadataSingletonInitializationCache(
                                              NominalTypeDecl *D,
                                              ForDefinition_t forDefinition);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,

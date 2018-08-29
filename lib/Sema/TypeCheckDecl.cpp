@@ -207,31 +207,6 @@ public:
 /// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *D);
 
-void TypeChecker::resolveTrailingWhereClause(ProtocolDecl *proto) {
-  validateWhereClauses(proto, TypeResolution::forStructural(proto));
-}
-
-void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
-                                       TypeResolution resolution) {
-  TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
-
-  if (auto whereClause = protocol->getTrailingWhereClause()) {
-    revertGenericRequirements(whereClause->getRequirements());
-    validateRequirements(whereClause->getWhereLoc(),
-                         whereClause->getRequirements(), resolution,
-                         options);
-  }
-
-  for (auto assocType : protocol->getAssociatedTypeMembers()) {
-    if (auto whereClause = assocType->getTrailingWhereClause()) {
-      revertGenericRequirements(whereClause->getRequirements());
-      validateRequirements(whereClause->getWhereLoc(),
-                           whereClause->getRequirements(),
-                           resolution, options);
-    }
-  }
-}
-
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine performs detailed checking of the inheritance clause of the
@@ -536,14 +511,24 @@ static void checkInheritanceClause(
   }
 }
 
-/// Check the inheritance clauses generic parameters
-static void checkInheritanceClausesOfGenericParams(
-                                            GenericParamList *genericParams) {
+/// Check the inheritance clauses generic parameters along with any
+/// requirements stored within the generic parameter list.
+static void checkGenericParams(GenericParamList *genericParams,
+                               DeclContext *owningDC) {
   if (!genericParams)
     return;
 
-  for (auto gp : *genericParams)
+  for (auto gp : *genericParams) {
     checkInheritanceClause(gp);
+  }
+
+  // Force visitation of each of the requirements here.
+  RequirementRequest::visitRequirements(WhereClauseOwner(owningDC,
+                                                         genericParams),
+                                        TypeResolutionStage::Interface,
+                                        [](Requirement, RequirementRepr *) {
+                                          return false;
+                                        });
 }
 
 /// Retrieve the set of protocols the given protocol inherits.
@@ -1142,29 +1127,6 @@ static void inferFinalAndDiagnoseIfNeeded(TypeChecker &TC, ValueDecl *D,
   makeFinal(TC.Context, D);
 }
 
-/// Configure the implicit 'self' parameter of a function, setting its type,
-/// pattern, etc.
-///
-/// \param func The function whose 'self' is being configured.
-static void configureImplicitSelf(TypeChecker &tc,
-                                  AbstractFunctionDecl *func) {
-  auto selfDecl = func->getImplicitSelfDecl();
-
-  // Compute the type of self.
-  auto selfParam = computeSelfParam(func, /*isInitializingCtor*/true,
-                                    /*wantDynamicSelf*/true);
-  assert(selfDecl && selfParam.getPlainType() && "Not a method");
-
-  // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
-  // neither inout.
-  auto specifier = selfParam.getParameterFlags().isInOut()
-                       ? VarDecl::Specifier::InOut
-                       : VarDecl::Specifier::Default;
-  selfDecl->setSpecifier(specifier);
-
-  selfDecl->setInterfaceType(selfParam.getPlainType());
-}
-
 /// Try to make the given declaration 'dynamic', checking any semantic
 /// constraints before doing so.
 ///
@@ -1204,7 +1166,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return false;
 
   // If 'dynamic' was explicitly specified, check it.
-  if (auto dynamicAttr = decl->getAttrs().getAttribute<DynamicAttr>()) {
+  if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
     return makeDynamic(decl);
   }
 
@@ -2266,6 +2228,31 @@ static void finalizeAbstractStorageDecl(TypeChecker &TC,
   }
 }
 
+/// Check the requirements in the where clause of the given \c source
+/// to ensure that they don't introduce additional 'Self' requirements.
+static void checkProtocolSelfRequirements(ProtocolDecl *proto,
+                                          TypeDecl *source) {
+  RequirementRequest::visitRequirements(source, TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
+        switch (req.getKind()) {
+        case RequirementKind::Conformance:
+        case RequirementKind::Layout:
+        case RequirementKind::Superclass:
+          if (reqRepr &&
+              req.getFirstType()->isEqual(proto->getProtocolSelfType())) {
+            auto &diags = proto->getASTContext().Diags;
+            diags.diagnose(reqRepr->getSubjectLoc().getLoc(),
+                           diag::protocol_where_clause_self_requirement);
+          }
+
+          return false;
+
+        case RequirementKind::SameType:
+          return false;
+        }
+      });
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2591,7 +2578,7 @@ public:
 
     if (!SD->isInvalid()) {
       TC.checkReferencedGenericParams(SD);
-      checkInheritanceClausesOfGenericParams(SD->getGenericParams());
+      checkGenericParams(SD->getGenericParams(), SD);
       TC.checkProtocolSelfRequirements(SD);
     }
 
@@ -2632,8 +2619,10 @@ public:
     TC.checkDeclAttributes(AT);
 
     checkInheritanceClause(AT);
-
     auto *proto = AT->getProtocol();
+
+    checkProtocolSelfRequirements(proto, AT);
+
     if (proto->isObjC()) {
       TC.diagnose(AT->getLoc(),
                   diag::associated_type_objc,
@@ -2698,7 +2687,7 @@ public:
 
     checkUnsupportedNestedType(ED);
     TC.validateDecl(ED);
-    checkInheritanceClausesOfGenericParams(ED->getGenericParams());
+    checkGenericParams(ED->getGenericParams(), ED);
 
     {
       // Check for circular inheritance of the raw type.
@@ -2736,7 +2725,7 @@ public:
     checkUnsupportedNestedType(SD);
 
     TC.validateDecl(SD);
-    checkInheritanceClausesOfGenericParams(SD->getGenericParams());
+    checkGenericParams(SD->getGenericParams(), SD);
 
     TC.addImplicitConstructors(SD);
 
@@ -2865,7 +2854,7 @@ public:
 
     TC.validateDecl(CD);
     TC.requestSuperclassLayout(CD);
-    checkInheritanceClausesOfGenericParams(CD->getGenericParams());
+    checkGenericParams(CD->getGenericParams(), CD);
 
     {
       // Check for circular inheritance.
@@ -3023,8 +3012,7 @@ public:
     UsableFromInlineChecker::checkUsableFromInline(TC, PD);
 
     checkInheritanceClause(PD);
-
-    TC.validateWhereClauses(PD, TypeResolution::forContextual(PD));
+    checkProtocolSelfRequirements(PD, PD);
 
     TC.checkDeclCircularity(PD);
     if (PD->isResilient())
@@ -3105,14 +3093,10 @@ public:
   void visitFuncDecl(FuncDecl *FD) {
     TC.validateDecl(FD);
 
-    // We get bogus errors here with generic subscript materializeForSet.
     if (!FD->isInvalid()) {
-      if (!isa<AccessorDecl>(FD) ||
-          !cast<AccessorDecl>(FD)->isMaterializeForSet()) {
-        checkInheritanceClausesOfGenericParams(FD->getGenericParams());
-        TC.checkReferencedGenericParams(FD);
-        TC.checkProtocolSelfRequirements(FD);
-      }
+      checkGenericParams(FD->getGenericParams(), FD);
+      TC.checkReferencedGenericParams(FD);
+      TC.checkProtocolSelfRequirements(FD);
     }
 
     AccessControlChecker::checkAccessControl(TC, FD);
@@ -3174,6 +3158,7 @@ public:
     }
 
     checkInheritanceClause(ED);
+
     if (auto nominal = ED->getExtendedNominal()) {
       TC.validateDecl(nominal);
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
@@ -3186,6 +3171,9 @@ public:
           checkEnumRawValues(TC, enumDecl);
       }
     }
+
+    if (auto genericParams = ED->getGenericParams())
+      checkGenericParams(genericParams, ED);
 
     validateAttributes(TC, ED);
 
@@ -3258,7 +3246,7 @@ public:
     TC.validateDecl(CD);
 
     if (!CD->isInvalid()) {
-      checkInheritanceClausesOfGenericParams(CD->getGenericParams());
+      checkGenericParams(CD->getGenericParams(), CD);
       TC.checkReferencedGenericParams(CD);
       TC.checkProtocolSelfRequirements(CD);
     }
@@ -3566,38 +3554,44 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
   FD->setOperatorDecl(op);
 }
 
-void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
+bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   // Check that member operators reference the type of 'Self'.
-  if (FD->isInvalid()) return;
+  if (decl->isInvalid())
+    return true;
 
-  auto *DC = FD->getDeclContext();
+  auto *DC = decl->getDeclContext();
   auto selfNominal = DC->getSelfNominalTypeDecl();
-  if (!selfNominal) return;
 
   // Check the parameters for a reference to 'Self'.
-  bool isProtocol = isa<ProtocolDecl>(selfNominal);
-  for (auto param : *FD->getParameters()) {
+  bool isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
+  for (auto param : *decl->getParameters()) {
     auto paramType = param->getInterfaceType();
     if (!paramType) break;
 
     // Look through a metatype reference, if there is one.
     paramType = paramType->getMetatypeInstanceType();
 
-    // Is it the same nominal type?
-    if (paramType->getAnyNominal() == selfNominal) return;
+    auto nominal = paramType->getAnyNominal();
+    if (type.isNull()) {
+      // Is it the same nominal type?
+      if (selfNominal && nominal == selfNominal)
+        return true;
+    } else {
+      // Is it the same nominal type? Or a generic (which may or may not match)?
+      if (paramType->is<GenericTypeParamType>() ||
+          nominal == type->getAnyNominal())
+        return true;
+    }
 
     if (isProtocol) {
       // For a protocol, is it the 'Self' type parameter?
       if (auto genericParam = paramType->getAs<GenericTypeParamType>())
         if (genericParam->isEqual(DC->getSelfInterfaceType()))
-          return;
+          return true;
     }
   }
 
-  // We did not find 'Self'. Complain.
-  TC.diagnose(FD, diag::operator_in_unrelated_type,
-              FD->getDeclContext()->getDeclaredInterfaceType(),
-              isProtocol, FD->getFullName());
+  return false;
 }
 
 bool checkDynamicSelfReturn(FuncDecl *func,
@@ -3704,20 +3698,6 @@ Type buildAddressorResultType(TypeChecker &TC,
     TupleTypeElt elts[] = {
       pointerType,
       TC.Context.TheNativeObjectType
-    };
-    return TupleType::get(elts, TC.Context);
-  }
-
-  // For native pinning addressors, the return type is actually
-  //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
-  case AddressorKind::NativePinning: {
-    Type pinTokenType =
-      TC.getOptionalType(addressor->getLoc(), TC.Context.TheNativeObjectType);
-    if (!pinTokenType) return Type();
-
-    TupleTypeElt elts[] = {
-      pointerType,
-      pinTokenType
     };
     return TupleType::get(elts, TC.Context);
   }
@@ -3944,8 +3924,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    resolveTrailingWhereClause(proto);
-
     validateAttributes(*this, D);
 
     // FIXME: IRGen likes to emit @objc protocol descriptors even if the
@@ -4165,16 +4143,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
       // These don't mention the value type directly.
       // If we add yield types to the function type, we'll need to update this.
-      case AccessorKind::MaterializeForSet:
       case AccessorKind::Read:
       case AccessorKind::Modify:
         break;
       }
     }
-
-    // Before anything else, set up the 'self' argument correctly if present.
-    if (FD->getDeclContext()->isTypeContext())
-      configureImplicitSelf(*this, FD);
 
     // If we have generic parameters, check the generic signature now.
     if (FD->getGenericParams() || !isa<AccessorDecl>(FD)) {
@@ -4207,8 +4180,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Member functions need some special validation logic.
     if (FD->getDeclContext()->isTypeContext()) {
-      if (FD->isOperator())
-        checkMemberOperator(*this, FD);
+      if (FD->isOperator() && !isMemberOperator(FD, nullptr)) {
+        auto selfNominal = FD->getDeclContext()->getSelfNominalTypeDecl();
+        auto isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
+        // We did not find 'Self'. Complain.
+        diagnose(FD, diag::operator_in_unrelated_type,
+                 FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
+                 FD->getFullName());
+      }
 
       auto accessor = dyn_cast<AccessorDecl>(FD);
 
@@ -4302,8 +4281,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    configureImplicitSelf(*this, CD);
-
     validateGenericFuncSignature(CD);
 
     // We want the constructor to be available for name lookup as soon
@@ -4330,8 +4307,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     if (auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext()))
       DD->copyFormalAccessFrom(enclosingClass, /*sourceIsParentContext*/true);
-
-    configureImplicitSelf(*this, DD);
 
     validateGenericFuncSignature(DD);
 
@@ -4450,8 +4425,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       paramDecl->setDepth(depth);
 
     (void) proto->getFormalAccess();
-
-    resolveTrailingWhereClause(proto);
 
     for (auto ATD : proto->getAssociatedTypeMembers()) {
       validateDeclForNameLookup(ATD);
@@ -4857,7 +4830,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
       GenericSignatureBuilder::FloatingRequirementSource::forInferred(nullptr);
 
     builder.inferRequirements(*ext->getModuleContext(),
-                              TypeLoc::withoutLoc(extInterfaceType),
+                              extInterfaceType,
+                              nullptr,
                               source);
   };
 
@@ -5262,6 +5236,14 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // Don't add implicit constructors for an invalid declaration
   if (decl->isInvalid())
     return;
+
+  // Don't add implicit constructors in textual interfaces.
+  if (auto *SF = decl->getParentSourceFile()) {
+    if (SF->Kind == SourceFileKind::Interface) {
+      decl->setAddedImplicitInitializers();
+      return;
+    }
+  }
 
   // Bail out if we're validating one of our constructors already; we'll
   // revisit the issue later.

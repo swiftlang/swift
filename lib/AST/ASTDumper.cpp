@@ -256,8 +256,6 @@ StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
     return "immutable";
   case ReadWriteImplKind::Stored:
     return "stored";
-  case ReadWriteImplKind::MaterializeForSet:
-    return "materialize_for_set";
   case ReadWriteImplKind::MutableAddress:
     return "mutable_addressor";
   case ReadWriteImplKind::MaterializeToTemporary:
@@ -862,8 +860,6 @@ namespace {
 
     void visitEnumElementDecl(EnumElementDecl *EED) {
       printCommon(EED, "enum_element_decl");
-      if (EED->getAttrs().hasAttribute<DowngradeExhaustivityCheckAttr>())
-        OS << "@_downgrade_exhaustivity_check";
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

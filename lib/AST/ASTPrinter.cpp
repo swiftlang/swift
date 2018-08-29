@@ -636,9 +636,8 @@ public:
     PrintParams = 1,
     PrintRequirements = 2,
     InnermostOnly = 4,
-    SkipSelfRequirement = 8,
-    SwapSelfAndDependentMemberType = 16,
-    PrintInherited = 32,
+    SwapSelfAndDependentMemberType = 8,
+    PrintInherited = 16,
   };
 
   void printInheritedFromRequirementSignature(ProtocolDecl *proto,
@@ -1225,13 +1224,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
       if (req.getKind() != RequirementKind::Layout)
         second = req.getSecondType();
 
-      if ((flags & SkipSelfRequirement) &&
-          req.getKind() == RequirementKind::Conformance) {
-        auto proto = cast<ProtocolDecl>(second->getAnyNominal());
-        if (first->isEqual(proto->getSelfInterfaceType()))
-          continue;
-      }
-
       if (!subMap.empty()) {
         if (Type subFirst = substParam(first))
           first = subFirst;
@@ -1450,8 +1442,8 @@ bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
   return Result;
 }
 
-static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
-  switch (accessor->getAccessorKind()) {
+static bool isAccessorAssumedNonMutating(AccessorKind kind) {
+  switch (kind) {
   case AccessorKind::Get:
   case AccessorKind::Address:
   case AccessorKind::Read:
@@ -1460,7 +1452,6 @@ static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   case AccessorKind::Set:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Modify:
     return false;
@@ -1518,12 +1509,15 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     return;
   }
 
+  // AbstractAccessors is suppressed by FunctionDefinitions, but not the
+  // presence of an FunctionBody callback.
+  bool PrintAbstract =
+    Options.AbstractAccessors && !Options.FunctionDefinitions;
+
   // We sometimes want to print the accessors abstractly
   // instead of listing out how they're actually implemented.
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
-  if (!Options.FunctionBody &&
-      (inProtocol ||
-        (Options.AbstractAccessors && !Options.FunctionDefinitions))) {
+  if (!Options.FunctionBody && (inProtocol || PrintAbstract)) {
     bool mutatingGetter = ASD->getGetter() && ASD->isGetterMutating();
     bool settable = ASD->isSettable(nullptr);
     bool nonmutatingSetter = false;
@@ -1559,13 +1553,25 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     return;
   }
 
+  // Should we print the 'modify' accessor?
+  auto shouldHideModifyAccessor = [&] {
+    if (impl.getReadWriteImpl() != ReadWriteImplKind::Modify)
+      return true;
+    // Always hide in a protocol.
+    return isa<ProtocolDecl>(ASD->getDeclContext());
+  };
+
+  auto isGetSetImpl = [&] {
+    return ((impl.getReadImpl() == ReadImplKind::Stored ||
+             impl.getReadImpl() == ReadImplKind::Get) &&
+            (impl.getWriteImpl() == WriteImplKind::Stored ||
+             impl.getWriteImpl() == WriteImplKind::Set) &&
+            (shouldHideModifyAccessor()));
+  };
+
   // Honor !Options.PrintGetSetOnRWProperties in the only remaining
   // case where we could end up printing { get set }.
-  if ((impl.getReadImpl() == ReadImplKind::Stored ||
-       impl.getReadImpl() == ReadImplKind::Get) &&
-      (impl.getWriteImpl() == WriteImplKind::Stored ||
-       impl.getWriteImpl() == WriteImplKind::Set) &&
-      (impl.getReadWriteImpl() == ReadWriteImplKind::MaterializeToTemporary) &&
+  if ((PrintAbstract || isGetSetImpl()) &&
       !Options.PrintGetSetOnRWProperties &&
       !Options.FunctionDefinitions &&
       !ASD->getGetter()->isMutating() &&
@@ -1581,7 +1587,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     if (!Accessor)
       return;
     if (!PrintAccessorBody) {
-      if (isAccessorAssumedNonMutating(Accessor)) {
+      if (isAccessorAssumedNonMutating(Accessor->getAccessorKind())) {
         if (Accessor->isMutating()) {
           Printer << " ";
           Printer.printKeyword("mutating");
@@ -1603,8 +1609,9 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   };
 
   Printer << " {";
-  if (impl.getReadImpl() == ReadImplKind::Get && ASD->getGetter() &&
-      !ASD->supportsMutation() &&
+  if ((PrintAbstract ||
+       (impl.getReadImpl() == ReadImplKind::Get && ASD->getGetter())) &&
+      !ASD->supportsMutation() && !ASD->isGetterMutating() &&
       PrintAccessorBody && !Options.FunctionDefinitions) {
     // Omit the 'get' keyword. Directly print getter
     if (auto BodyFunc = Options.FunctionBody) {
@@ -1612,7 +1619,11 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       IndentRAII IndentBody(*this);
       indent();
       Printer << BodyFunc(ASD->getGetter());
-    }    
+    }
+  } else if (PrintAbstract) {
+    PrintAccessor(ASD->getGetter());
+    if (ASD->supportsMutation())
+      PrintAccessor(ASD->getSetter());
   } else {
     switch (impl.getReadImpl()) {
     case ReadImplKind::Stored:
@@ -1640,7 +1651,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       break;
     case WriteImplKind::Set:
       PrintAccessor(ASD->getSetter());
-      if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify)
+      if (!shouldHideModifyAccessor())
         PrintAccessor(ASD->getModifyCoroutine());
       break;
     case WriteImplKind::MutableAddress:
@@ -1868,14 +1879,16 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     });
     printInherited(decl);
 
-    if (decl->getGenericParams())
-      if (auto *genericSig = decl->getGenericSignature()) {
-        // For protocol extensions, don't print the 'Self : ...' requirement.
-        unsigned flags = PrintRequirements | InnermostOnly;
-        if (decl->getExtendedProtocolDecl())
-          flags |= SkipSelfRequirement;
-        printGenericSignature(genericSig, flags);
-      }
+    if (auto *genericSig = decl->getGenericSignature()) {
+      auto *baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
+      assert(baseGenericSig &&
+             "an extension can't be generic if the base type isn't");
+      printGenericSignature(genericSig, PrintRequirements | InnermostOnly,
+                            [baseGenericSig](const Requirement &req) -> bool {
+        // Only include constraints that are not satisfied by the base type.
+        return !baseGenericSig->isRequirementSatisfied(req);
+      });
+    }
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false,
@@ -2453,7 +2466,6 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Read:
   case AccessorKind::Modify:
   case AccessorKind::DidSet:
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
     recordDeclLoc(decl,
       [&]{

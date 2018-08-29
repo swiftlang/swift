@@ -144,7 +144,7 @@ protected:
     IsTypeDefaulted : 1,
     /// Number of comma source locations.
     NumCommas : 32 - 1 - NumExprBits,
-    /// Number of entries in the collection. If this is a DictionaryLiteral,
+    /// Number of entries in the collection. If this is a DictionaryExpr,
     /// each entry is a Tuple with the key and value pair.
     NumSubExprs : 32
   );

@@ -1426,7 +1426,7 @@ func testOptionalWriteGenerics2<T>(p: T) -> T? {
 
 enum TestOptionalEnum {
   case Cons(Int)
-  case Nil()
+  case Nil
 }
 
 func testOptionalWithEnum(p: TestOptionalEnum) -> TestOptionalEnum? {
