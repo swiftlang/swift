@@ -3613,6 +3613,17 @@ bool AnyFunctionType::equalParams(CanParamArrayRef a, CanParamArrayRef b) {
   return true;
 }
 
+void AnyFunctionType::relabelParams(MutableArrayRef<Param> params,
+                                    ArrayRef<Identifier> labels) {
+  assert(params.size() == labels.size());
+  for (auto i : indices(params)) {
+    auto &param = params[i];
+    param = AnyFunctionType::Param(param.getPlainType(),
+                                   labels[i],
+                                   param.getParameterFlags());
+  }
+}
+
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, ExtInfo info,
                                 bool canonicalVararg) {
