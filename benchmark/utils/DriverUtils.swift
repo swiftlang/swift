@@ -247,14 +247,16 @@ func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
 
 #endif
 
-#if os(Linux)
 final class Timer {
+#if os(Linux)
   typealias TimeT = timespec
+
   func getTime() -> TimeT {
     var ticks = timespec(tv_sec: 0, tv_nsec: 0)
     clock_gettime(CLOCK_REALTIME, &ticks)
     return ticks
   }
+
   func diffTimeInNanoSeconds(from start_ticks: TimeT, to end_ticks: TimeT) -> UInt64 {
     var elapsed_ticks = timespec(tv_sec: 0, tv_nsec: 0)
     if end_ticks.tv_nsec - start_ticks.tv_nsec < 0 {
@@ -266,23 +268,24 @@ final class Timer {
     }
     return UInt64(elapsed_ticks.tv_sec) * UInt64(1000000000) + UInt64(elapsed_ticks.tv_nsec)
   }
-}
 #else
-final class Timer {
   typealias TimeT = UInt64
   var info = mach_timebase_info_data_t(numer: 0, denom: 0)
+
   init() {
     mach_timebase_info(&info)
   }
+
   func getTime() -> TimeT {
     return mach_absolute_time()
   }
+
   func diffTimeInNanoSeconds(from start_ticks: TimeT, to end_ticks: TimeT) -> UInt64 {
     let elapsed_ticks = end_ticks - start_ticks
     return elapsed_ticks * UInt64(info.numer) / UInt64(info.denom)
   }
-}
 #endif
+}
 
 final class SampleRunner {
   let timer = Timer()
