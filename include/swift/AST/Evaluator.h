@@ -238,6 +238,9 @@ public:
   /// diagnostics through the given diagnostics engine.
   Evaluator(DiagnosticEngine &diags, CycleDiagnosticKind shouldDiagnoseCycles);
 
+  /// Emit GraphViz output visualizing the request graph.
+  void emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath);
+
   /// Set the unified stats reporter through which evaluated-request
   /// statistics will be recorded.
   void setStatsReporter(UnifiedStatsReporter *stats) { this->stats = stats; }

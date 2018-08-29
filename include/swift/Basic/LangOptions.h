@@ -176,6 +176,10 @@ namespace swift {
     CycleDiagnosticKind EvaluatorCycleDiagnostics =
         CycleDiagnosticKind::NoDiagnose;
 
+    /// \brief The path to which we should emit GraphViz output for the complete
+    /// request-evaluator graph.
+    std::string RequestEvaluatorGraphVizPath;
+
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
