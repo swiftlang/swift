@@ -3696,29 +3696,42 @@ public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
 
 extension Set {
   public // @testable performance metrics
-  var _stats: (maxLookups: Int, averageLookups: Double)? {
+  var _stats: (maxLookups: Int, averageLookups: Double, maxCollisions: Int)? {
     guard case .native(let native) = _variant else { return nil }
+    guard native.count > 0 else { return (0, 0, 0) }
     defer { _fixLifetime(self) }
-    var maxChainLength = 0
-    var sumChainLength = 0
+    var maxLookups = 0
+    var sumLookups = 0
+    var maxCollisions = 0
     for i in native.indices {
-      let delta = native.displacement(ofElementAt: i)
-      maxChainLength = Swift.max(maxChainLength, delta + 1)
-      sumChainLength += delta + 1
+      let stats = native.stats(ofElementAt: i)
+      maxLookups = Swift.max(maxLookups, stats.displacement + 1)
+      sumLookups += stats.displacement + 1
+      maxCollisions = Swift.max(maxCollisions, stats.collisions)
     }
-    return (maxChainLength, Double(sumChainLength) / Double(count))
+    return (maxLookups, Double(sumLookups) / Double(count), maxCollisions)
   }
 }
 
 extension _NativeSet {
-  internal func displacement(ofElementAt index: Index) -> Int {
+  internal func stats(
+    ofElementAt index: Index
+  ) -> (displacement: Int, collisions: Int) {
     let element = uncheckedElement(at: index)
     let hashValue = self.hashValue(for: element)
     let ideal = hashValue & _storage.hashTable.bucketMask
     let delta = ideal <= index.bucket
       ? index.bucket - ideal
       : index.bucket - ideal + bucketCount
-    return delta
+    var b = ideal
+    var collisions = 0
+    while b != index.bucket {
+      if _storage.hashTable.map[b] == _HashTable.MapEntry.forHashValue(hashValue) {
+        collisions += 1
+      }
+      b = _storage.hashTable._succ(b)
+    }
+    return (delta, collisions)
   }
 }
 
@@ -3737,11 +3750,11 @@ extension _NativeSet {
     for i in indices {
       let element = uncheckedElement(at: i)
       let hashValue = self.hashValue(for: element)
-      let delta = self.displacement(ofElementAt: i)
+      let stats = self.stats(ofElementAt: i)
       let h = String(UInt(bitPattern: hashValue), radix: 16)
       let hl = String(hashTable.map[i.bucket].payload << 1, radix: 16)
-      result += "  <bucket \(i.bucket)> "
-      result += "delta: \(delta), "
+      result += "  <\(i.bucket)> "
+      result += "delta: \(stats.displacement) (\(stats.collisions) coll) "
       result += "hash: \(hl)/\(h): "
       result += "\(element)\n"
     }
