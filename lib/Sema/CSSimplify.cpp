@@ -1276,6 +1276,19 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
                                         ConstraintKind kind,
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
+  // If the first type is a type variable or member thereof, there's nothing
+  // we can do now.
+  if (type1->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, kind, type1, type2,
+                           getConstraintLocator(locator)));
+      return getTypeMatchSuccess();
+    }
+
+    return getTypeMatchAmbiguous();
+  }
+
   // FIXME: Feels like a hack.
   if (type1->is<InOutType>())
     return getTypeMatchFailure(locator);
@@ -1298,19 +1311,6 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     }
 
     return getTypeMatchFailure(locator);
-  }
-
-  // If the first type is a type variable or member thereof, there's nothing
-  // we can do now.
-  if (type1->isTypeVariableOrMember()) {
-    if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(
-        Constraint::create(*this, kind, type1, type2,
-                           getConstraintLocator(locator)));
-      return getTypeMatchSuccess();
-    }
-
-    return getTypeMatchAmbiguous();
   }
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
