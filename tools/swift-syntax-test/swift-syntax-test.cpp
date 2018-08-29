@@ -213,6 +213,11 @@ Visual("v",
        llvm::cl::desc("Print visually"),
        llvm::cl::cat(Category),
        llvm::cl::init(false));
+
+static llvm::cl::opt<std::string>
+GraphVisPath("output-request-graphviz",
+             llvm::cl::desc("Emit GraphViz output visualizing the request graph."),
+             llvm::cl::cat(Category));
 } // end namespace options
 
 namespace {
@@ -595,6 +600,7 @@ int parseFile(
   CompilerInvocation Invocation;
   Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
+  Invocation.getLangOptions().RequestEvaluatorGraphVizPath = options::GraphVisPath;
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
