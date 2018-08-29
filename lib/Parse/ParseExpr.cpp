@@ -3185,7 +3185,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
   if (Tok.is(tok::r_square)) {
     if (SyntaxContext->isEnabled())
       SyntaxContext->addSyntax(
-          SyntaxFactory::makeBlankArrayElementList(Context.getSyntaxArena()));
+          SyntaxFactory::makeBlankArrayElementList(SyntaxContext->getArena()));
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::ArrayExpr);
     return makeParserResult(
