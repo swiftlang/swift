@@ -536,6 +536,17 @@ static void uniqueTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVars) {
                  typeVars.end());
 }
 
+bool Constraint::isExplicitConversion() const {
+  assert(Kind == ConstraintKind::Disjunction);
+
+  if (auto *locator = getLocator()) {
+    if (auto anchor = locator->getAnchor())
+      return isa<CoerceExpr>(anchor);
+  }
+
+  return false;
+}
+
 Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind, 
                                Type first, Type second,
                                ConstraintLocator *locator) {

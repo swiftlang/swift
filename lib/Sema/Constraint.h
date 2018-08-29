@@ -583,6 +583,10 @@ public:
     return count;
   }
 
+  /// Determine if this constraint represents explicit conversion,
+  /// e.g. coercion constraint "as X" which forms a disjunction.
+  bool isExplicitConversion() const;
+
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {
     assert(Kind == ConstraintKind::BindOverload);
