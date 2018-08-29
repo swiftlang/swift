@@ -144,8 +144,7 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
   unsigned line = 0;
   unsigned column = 0;
   if (sourceLoc.isValid()) {
-    unsigned bufferID = ctx.SourceMgr.findBufferContainingLoc(sourceLoc);
-    filename = ctx.SourceMgr.getIdentifierForBuffer(bufferID);
+    filename = ctx.SourceMgr.getDisplayNameForLoc(sourceLoc);
     std::tie(line, column) = ctx.SourceMgr.getLineAndColumn(sourceLoc);
   }
   
