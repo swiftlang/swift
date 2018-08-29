@@ -2689,8 +2689,9 @@ public:
     }
 
     bool operator==(Param const &b) const {
-      return Label == b.Label && getType()->isEqual(b.getType()) &&
-             Flags == b.Flags;
+      return (Label == b.Label &&
+              getPlainType()->isEqual(b.getPlainType()) &&
+              Flags == b.Flags);
     }
     bool operator!=(Param const &b) const { return !(*this == b); }
 
