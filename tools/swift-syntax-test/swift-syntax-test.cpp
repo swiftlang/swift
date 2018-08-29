@@ -729,15 +729,14 @@ int doSerializeRawTree(const char *MainExecutablePath,
         return EXIT_FAILURE;
       }
 
-      swift::ExponentialGrowthAppendingBinaryByteStream Stream(
-          llvm::support::endianness::little);
-      Stream.reserve(32 * 1024);
+      llvm::AppendingBinaryByteStream Stream(llvm::support::endianness::little);
+      llvm::BinaryStreamWriter Writer(Stream);
       std::map<void *, void *> UserInfo;
       UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
       if (options::AddByteTreeFields) {
         UserInfo[swift::byteTree::UserInfoKeyAddInvalidFields] = (void *)true;
       }
-      swift::byteTree::ByteTreeWriter::write(Stream, /*ProtocolVersion=*/1,
+      swift::byteTree::ByteTreeWriter::write(/*ProtocolVersion=*/1, Writer,
                                              *Root, UserInfo);
       auto OutputBufferOrError = llvm::FileOutputBuffer::create(
           options::OutputFilename, Stream.data().size());
