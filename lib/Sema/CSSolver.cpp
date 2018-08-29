@@ -2066,7 +2066,7 @@ bool ConstraintSystem::solveForDisjunction(
 
   auto noSolutions = solveForDisjunctionChoices(
       disjunction->getNestedConstraints(), locator, solutions,
-      allowFreeTypeVariables, isExplicitConversionConstraint(disjunction));
+      allowFreeTypeVariables, disjunction->isExplicitConversion());
 
   if (hasDisabledChoices) {
     // Re-enable previously disabled overload choices.
