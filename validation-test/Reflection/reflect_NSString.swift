@@ -10,6 +10,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
+// FIXME: Handle different forms of %target-run more robustly
+// REQUIRES: OS=macosx
+
 import SwiftReflectionTest
 import Foundation
 
