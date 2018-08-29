@@ -968,6 +968,47 @@ namespace {
   };
 } // unnamed namespace
 
+static void parseWhereGuard(Parser &P, GuardedPattern &result,
+                            ParserStatus &status,
+                            GuardedPatternContext parsingContext,
+                            bool isExprBasic) {
+  if (P.Tok.is(tok::kw_where)) {
+    SyntaxParsingContext WhereClauseCtxt(P.SyntaxContext,
+                                         SyntaxKind::WhereClause);
+    result.WhereLoc = P.consumeToken(tok::kw_where);
+    SourceLoc startOfGuard = P.Tok.getLoc();
+
+    auto diagKind = [=]() -> Diag<> {
+      switch (parsingContext) {
+      case GuardedPatternContext::Case:
+        return diag::expected_case_where_expr;
+      case GuardedPatternContext::Catch:
+        return diag::expected_catch_where_expr;
+      }
+      llvm_unreachable("bad context");
+    }();
+    ParserResult<Expr> guardResult = P.parseExprImpl(diagKind, isExprBasic);
+    status |= guardResult;
+
+    // Use the parsed guard expression if possible.
+    if (guardResult.isNonNull()) {
+      result.Guard = guardResult.get();
+
+      // Otherwise, fake up an ErrorExpr.
+    } else {
+      // If we didn't consume any tokens failing to parse the
+      // expression, don't put in the source range of the ErrorExpr.
+      SourceRange errorRange;
+      if (startOfGuard == P.Tok.getLoc()) {
+        errorRange = result.WhereLoc;
+      } else {
+        errorRange = SourceRange(startOfGuard, P.PreviousLoc);
+      }
+      result.Guard = new (P.Context) ErrorExpr(errorRange);
+    }
+  }
+}
+
 /// Parse a pattern-matching clause for a case or catch statement,
 /// including the guard expression:
 ///
@@ -1045,7 +1086,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     patternResult = makeParserResult(varPattern);
   }
 
-
   // Okay, if the special code-completion didn't kick in, parse a
   // matching pattern.
   if (patternResult.isNull()) {
@@ -1074,26 +1114,28 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       if (VD->hasName()) P.addToScope(VD);
       boundDecls.push_back(VD);
     });
+
+    // Now that we have them, mark them as being initialized without a PBD.
+    for (auto VD : boundDecls)
+      VD->setHasNonPatternBindingInit();
+
+    // Parse the optional 'where' guard.
+    parseWhereGuard(P, result, status, parsingContext, isExprBasic);
   } else {
     // If boundDecls already contains variables, then we must match the
     // same number and same names in this pattern as were declared in a
     // previous pattern (and later we will make sure they have the same
     // types).
+    Scope guardScope(&P, ScopeKind::CaseVars);
     SmallVector<VarDecl*, 4> repeatedDecls;
     patternResult.get()->forEachVariable([&](VarDecl *VD) {
       if (!VD->hasName())
         return;
       
-      for (auto repeat : repeatedDecls)
-        if (repeat->getName() == VD->getName())
-          P.addToScope(VD); // will diagnose a duplicate declaration
-
       bool found = false;
       for (auto previous : boundDecls) {
         if (previous->hasName() && previous->getName() == VD->getName()) {
           found = true;
-          // Use the same local discriminator.
-          VD->setLocalDiscriminator(previous->getLocalDiscriminator());
           break;
         }
       }
@@ -1103,6 +1145,9 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         status.setIsParseError();
       }
       repeatedDecls.push_back(VD);
+      P.setLocalDiscriminator(VD);
+      if (VD->hasName())
+        P.addToScope(VD);
     });
     
     for (auto previous : boundDecls) {
@@ -1124,47 +1169,10 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       VD->setHasNonPatternBindingInit();
       VD->setImplicit();
     }
-  }
-  
-  // Now that we have them, mark them as being initialized without a PBD.
-  for (auto VD : boundDecls)
-    VD->setHasNonPatternBindingInit();
 
-  // Parse the optional 'where' guard.
-  if (P.Tok.is(tok::kw_where)) {
-    SyntaxParsingContext WhereClauseCtxt(P.SyntaxContext,
-                                         SyntaxKind::WhereClause);
-    result.WhereLoc = P.consumeToken(tok::kw_where);
-    SourceLoc startOfGuard = P.Tok.getLoc();
-
-    auto diagKind = [=]() -> Diag<> {
-      switch (parsingContext) {
-      case GuardedPatternContext::Case:
-        return diag::expected_case_where_expr;
-      case GuardedPatternContext::Catch:
-        return diag::expected_catch_where_expr;
-      }
-      llvm_unreachable("bad context");
-    }();
-    ParserResult<Expr> guardResult = P.parseExprImpl(diagKind, isExprBasic);
-    status |= guardResult;
-
-    // Use the parsed guard expression if possible.
-    if (guardResult.isNonNull()) {
-      result.Guard = guardResult.get();
-
-    // Otherwise, fake up an ErrorExpr.
-    } else {
-      // If we didn't consume any tokens failing to parse the
-      // expression, don't put in the source range of the ErrorExpr.
-      SourceRange errorRange;
-      if (startOfGuard == P.Tok.getLoc()) {
-        errorRange = result.WhereLoc;
-      } else {
-        errorRange = SourceRange(startOfGuard, P.PreviousLoc);
-      }
-      result.Guard = new (P.Context) ErrorExpr(errorRange);
-    }
+    // Parse the optional 'where' guard, with this particular pattern's bound
+    // vars in scope.
+    parseWhereGuard(P, result, status, parsingContext, isExprBasic);
   }
 }
 
