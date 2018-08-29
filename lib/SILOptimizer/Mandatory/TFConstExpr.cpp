@@ -202,9 +202,12 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
   // If this a trivial constant instruction that we can handle, then fold it
   // immediately.
-  if (isa<IntegerLiteralInst>(value) || isa<FloatLiteralInst>(value) ||
-      isa<StringLiteralInst>(value))
-    return SymbolicValue::getConstantInst(cast<SingleValueInstruction>(value));
+  if (auto *ili = dyn_cast<IntegerLiteralInst>(value))
+    return SymbolicValue::getInteger(ili->getValue(), evaluator.getAllocator());
+  if (auto *fli = dyn_cast<FloatLiteralInst>(value))
+    return SymbolicValue::getFloat(fli->getValue(), evaluator.getAllocator());
+  if (auto *sli = dyn_cast<StringLiteralInst>(value))
+    return SymbolicValue::getString(sli->getValue(), evaluator.getAllocator());
 
   if (auto *fri = dyn_cast<FunctionRefInst>(value))
     return SymbolicValue::getFunction(fri->getReferencedFunction());
