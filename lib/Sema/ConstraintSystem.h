@@ -1771,11 +1771,6 @@ public:
   /// \c viable[0] contains the resulting solution. Otherwise, emits a
   /// diagnostic and returns true.
   bool salvage(SmallVectorImpl<Solution> &viable, Expr *expr);
-
-  /// When an assignment to an expression is detected and the destination is
-  /// invalid, emit a detailed error about the condition.
-  bool diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
-
   
   /// \brief Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be

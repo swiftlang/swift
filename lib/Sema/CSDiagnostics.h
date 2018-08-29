@@ -19,9 +19,12 @@
 #include "Constraint.h"
 #include "ConstraintSystem.h"
 #include "OverloadChoice.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <tuple>
 
@@ -93,6 +96,8 @@ protected:
   TypeChecker &getTypeChecker() const { return CS.TC; }
 
   DeclContext *getDC() const { return CS.DC; }
+
+  ASTContext &getASTContext() const { return CS.getASTContext(); }
 
   Optional<std::pair<Type, ConversionRestrictionKind>>
   getRestrictionForType(Type type) const {
@@ -485,6 +490,53 @@ public:
   bool diagnoseAsError() override { return false; }
 
   bool diagnoseAsNote() override;
+};
+
+/// Diagnose errors related to assignment expressions e.g.
+/// trying to assign something to immutable value, or trying
+/// to access mutating member on immutable base.
+class AssignmentFailure final : public FailureDiagnostic {
+  SourceLoc Loc;
+  Diag<StringRef> DeclDiagnostic;
+  Diag<Type> TypeDiagnostic;
+
+public:
+  AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,
+                    SourceLoc diagnosticLoc);
+
+  AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,
+                    SourceLoc diagnosticLoc, Diag<StringRef> declDiag,
+                    Diag<Type> typeDiag)
+      : FailureDiagnostic(destExpr, cs, cs.getConstraintLocator(destExpr)),
+        Loc(diagnosticLoc), DeclDiagnostic(declDiag), TypeDiagnostic(typeDiag) {
+  }
+
+  bool diagnoseAsError() override;
+
+private:
+  void fixItChangeInoutArgType(const Expr *arg, Type actualType,
+                               Type neededType) const;
+
+  /// Given an expression that has a non-lvalue type, dig into it until
+  /// we find the part of the expression that prevents the entire subexpression
+  /// from being mutable.  For example, in a sequence like "x.v.v = 42" we want
+  /// to complain about "x" being a let property if "v.v" are both mutable.
+  ///
+  /// \returns The base subexpression that looks immutable (or that can't be
+  /// analyzed any further) along with a decl extracted from it if we could.
+  std::pair<Expr *, ValueDecl *> resolveImmutableBase(Expr *expr) const;
+
+  static Diag<StringRef> findDeclDiagonstic(ASTContext &ctx, Expr *destExpr);
+
+  static bool isLoadedLValue(Expr *expr) {
+    expr = expr->getSemanticsProvidingExpr();
+    if (isa<LoadExpr>(expr))
+      return true;
+    if (auto ifExpr = dyn_cast<IfExpr>(expr))
+      return isLoadedLValue(ifExpr->getThenExpr()) &&
+             isLoadedLValue(ifExpr->getElseExpr());
+    return false;
+  }
 };
 
 } // end namespace constraints
