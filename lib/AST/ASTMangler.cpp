@@ -535,7 +535,6 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
     case SymbolKind::Default: return;
     case SymbolKind::DynamicThunk: return appendOperator("TD");
-    case SymbolKind::SwiftDispatchThunk: return appendOperator("Tj");
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
     case SymbolKind::DirectMethodReferenceThunk: return appendOperator("Td");

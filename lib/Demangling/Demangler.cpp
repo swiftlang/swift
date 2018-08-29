@@ -1702,6 +1702,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
   switch (char c = nextChar()) {
     case 'c': return createWithChild(Node::Kind::CurryThunk, popNode(isEntity));
     case 'j': return createWithChild(Node::Kind::DispatchThunk, popNode(isEntity));
+    case 'q': return createWithChild(Node::Kind::MethodDescriptor, popNode(isEntity));
     case 'o': return createNode(Node::Kind::ObjCAttribute);
     case 'O': return createNode(Node::Kind::NonObjCAttribute);
     case 'D': return createNode(Node::Kind::DynamicAttribute);

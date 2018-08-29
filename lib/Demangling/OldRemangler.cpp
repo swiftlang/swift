@@ -1931,12 +1931,16 @@ void Remangler::mangleGenericTypeParamDecl(Node *node) {
   unreachable("todo");
 }
 
-void Remangler::mangleCurryThunk(Node *node, EntityContext &ctx) {
+void Remangler::mangleCurryThunk(Node *node) {
   Out << "<curry-thunk>";
 }
 
-void Remangler::mangleDispatchThunk(Node *node, EntityContext &ctx) {
+void Remangler::mangleDispatchThunk(Node *node) {
   Out << "<dispatch-thunk>";
+}
+
+void Remangler::mangleMethodDescriptor(Node *node) {
+  Out << "<method-descriptor>";
 }
 
 void Remangler::mangleEmptyList(Node *node) {
