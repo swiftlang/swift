@@ -868,13 +868,6 @@ emitIndexData(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   return hadEmitIndexDataError;
 }
 
-/// Emits the request-evaluator graph to the given file in GraphViz format.
-void emitRequestEvaluatorGraphViz(ASTContext &ctx, StringRef graphVizPath) {
-  std::error_code error;
-  llvm::raw_fd_ostream out(graphVizPath, error, llvm::sys::fs::F_Text);
-  ctx.evaluator.printDependenciesGraphviz(out);
-}
-
 static bool performCompileStepsPostSILGen(
     CompilerInstance &Instance, CompilerInvocation &Invocation,
     std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
@@ -916,17 +909,6 @@ static bool performCompile(CompilerInstance &Instance,
   } else {
     Instance.performSema();
   }
-
-  SWIFT_DEFER {
-    // Emit request-evaluator graph via GraphViz, if requested.
-    if (!Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath.empty() &&
-        Instance.hasASTContext()) {
-      ASTContext &ctx = Instance.getASTContext();
-      emitRequestEvaluatorGraphViz(
-        ctx,
-        Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath);
-    }
-  };
 
   ASTContext &Context = Instance.getASTContext();
   if (Action == FrontendOptions::ActionType::Parse)
