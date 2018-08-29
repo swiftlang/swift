@@ -258,15 +258,16 @@ final class Timer {
   }
 
   func diffTimeInNanoSeconds(from start_ticks: TimeT, to end_ticks: TimeT) -> UInt64 {
+    let oneSecond = 1_000_000_000 // ns
     var elapsed_ticks = timespec(tv_sec: 0, tv_nsec: 0)
     if end_ticks.tv_nsec - start_ticks.tv_nsec < 0 {
       elapsed_ticks.tv_sec = end_ticks.tv_sec - start_ticks.tv_sec - 1
-      elapsed_ticks.tv_nsec = end_ticks.tv_nsec - start_ticks.tv_nsec + 1000000000
+      elapsed_ticks.tv_nsec = end_ticks.tv_nsec - start_ticks.tv_nsec + oneSecond
     } else {
       elapsed_ticks.tv_sec = end_ticks.tv_sec - start_ticks.tv_sec
       elapsed_ticks.tv_nsec = end_ticks.tv_nsec - start_ticks.tv_nsec
     }
-    return UInt64(elapsed_ticks.tv_sec) * UInt64(1000000000) + UInt64(elapsed_ticks.tv_nsec)
+    return UInt64(elapsed_ticks.tv_sec) * UInt64(oneSecond) + UInt64(elapsed_ticks.tv_nsec)
   }
 #else
   typealias TimeT = UInt64
