@@ -2196,11 +2196,14 @@ extension _NativeSet {
 internal func ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(
   _ elementType: Any.Type
 ) -> Never {
-  fatalError("""
+  _assertionFailure(
+    "Fatal error",
+    """
     Duplicate elements of type '\(elementType)' were found in a Set.
     This usually means that either the type violates Hashable's requirements, or
     that members of such a set were mutated after insertion.
-    """)
+    """,
+    flags: _fatalErrorFlags())
 }
 
 extension _NativeSet {
