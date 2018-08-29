@@ -13,7 +13,9 @@ class C {
   @objc func fn() { }
 }
 
-class D : C, P, ClassP { }
+class D : C, P, ClassP {
+  override func fn() { }
+}
 
 struct S {
   let x : ()
