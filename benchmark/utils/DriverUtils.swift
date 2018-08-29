@@ -252,22 +252,22 @@ final class Timer {
   typealias TimeT = timespec
 
   func getTime() -> TimeT {
-    var ticks = timespec(tv_sec: 0, tv_nsec: 0)
-    clock_gettime(CLOCK_REALTIME, &ticks)
-    return ticks
+    var ts = timespec(tv_sec: 0, tv_nsec: 0)
+    clock_gettime(CLOCK_REALTIME, &ts)
+    return ts
   }
 
-  func diffTimeInNanoSeconds(from start_ticks: TimeT, to end_ticks: TimeT) -> UInt64 {
+  func diffTimeInNanoSeconds(from start: TimeT, to end: TimeT) -> UInt64 {
     let oneSecond = 1_000_000_000 // ns
-    var elapsed_ticks = timespec(tv_sec: 0, tv_nsec: 0)
-    if end_ticks.tv_nsec - start_ticks.tv_nsec < 0 {
-      elapsed_ticks.tv_sec = end_ticks.tv_sec - start_ticks.tv_sec - 1
-      elapsed_ticks.tv_nsec = end_ticks.tv_nsec - start_ticks.tv_nsec + oneSecond
+    var elapsed = timespec(tv_sec: 0, tv_nsec: 0)
+    if end.tv_nsec - start.tv_nsec < 0 {
+      elapsed.tv_sec = end.tv_sec - start.tv_sec - 1
+      elapsed.tv_nsec = end.tv_nsec - start.tv_nsec + oneSecond
     } else {
-      elapsed_ticks.tv_sec = end_ticks.tv_sec - start_ticks.tv_sec
-      elapsed_ticks.tv_nsec = end_ticks.tv_nsec - start_ticks.tv_nsec
+      elapsed.tv_sec = end.tv_sec - start.tv_sec
+      elapsed.tv_nsec = end.tv_nsec - start.tv_nsec
     }
-    return UInt64(elapsed_ticks.tv_sec) * UInt64(oneSecond) + UInt64(elapsed_ticks.tv_nsec)
+    return UInt64(elapsed.tv_sec) * UInt64(oneSecond) + UInt64(elapsed.tv_nsec)
   }
 #else
   typealias TimeT = UInt64
@@ -281,9 +281,9 @@ final class Timer {
     return mach_absolute_time()
   }
 
-  func diffTimeInNanoSeconds(from start_ticks: TimeT, to end_ticks: TimeT) -> UInt64 {
-    let elapsed_ticks = end_ticks - start_ticks
-    return elapsed_ticks * UInt64(info.numer) / UInt64(info.denom)
+  func diffTimeInNanoSeconds(from start: TimeT, to end: TimeT) -> UInt64 {
+    let elapsed = end - start
+    return elapsed * UInt64(info.numer) / UInt64(info.denom)
   }
 #endif
 }
@@ -448,7 +448,7 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
     } else {
       scale = 1
     }
-    // save result in microseconds or k-ticks
+    // save result in microseconds
     samples[s] = elapsed_time / UInt64(scale) / 1000
     if c.verbose {
       print("    Sample \(s),\(samples[s])")
