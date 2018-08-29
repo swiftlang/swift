@@ -174,8 +174,8 @@ struct TestConfig {
   ///
   /// - Parameters:
   ///   - registeredBenchmarks: List of all performance tests to be filtered.
-  ///   - specifiedTests: List of explicitly specified tests to run. These can be
-  ///     specified either by a test name or a test number.
+  ///   - specifiedTests: List of explicitly specified tests to run. These can
+  ///     be specified either by a test name or a test number.
   ///   - tags: Run tests tagged with all of these categories.
   ///   - skipTags: Don't run tests tagged with any of these categories.
   /// - Returns: An array of test number and benchmark info tuples satisfying
@@ -394,7 +394,7 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   // the platform and we should skip it.
   guard let testFn = test.runFunction else {
     if c.verbose {
-	print("Skipping unsupported benchmark \(test.name)!")
+      print("Skipping unsupported benchmark \(test.name)!")
     }
     return nil
   }
@@ -503,9 +503,9 @@ public func main() {
   case .listTests:
     print("#\(config.delim)Test\(config.delim)[Tags]")
     for (index, t) in config.tests {
-    let testDescription = [String(index), t.name, t.tags.sorted().description]
-      .joined(separator: config.delim)
-    print(testDescription)
+      let testDescription = [index, t.name, t.tags.sorted().description]
+        .joined(separator: config.delim)
+      print(testDescription)
     }
   case .run:
     runBenchmarks(config)
