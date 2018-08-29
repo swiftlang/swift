@@ -115,7 +115,7 @@ struct SILTensorOpInfo {
   /// input that is an array of tensors.  An integer attribute may be either
   /// a Tensor value or an integer-encoded DType, etc.
   enum class OperandClass {
-    /// This marks the following sorts of things:
+    /// Indicates one of the following:
     /// 1) A normal tensor input: the value is a TensorHandle.
     /// 2) An normal attribute (without modifier).
     /// 3) A tensor or shape attribute (need a modifier for proper lowering).
@@ -123,18 +123,31 @@ struct SILTensorOpInfo {
     ///    lowering).
     Input,
 
-    Normal, // No modifier.
-    Tensor, // This array or scalar should be turned into a TF_Tensor.
-    Shape,  // This array of integers is a shape specifier.
+    /// No modifier.
+    Normal,
 
-    Array,  // This marks a normal array value, the value is a metatype.
+    /// Indicates that the array or scalar should be turned into a TF_Tensor.
+    Tensor,
 
-    // An operand specifying the address where an indirect output should be
-    // stored.  This occurs when the tfop exists in a context where its output
-    // is address-only.  Deabstraction eliminates Out operands before forming
-    // graph_ops, by rewriting the tfop to return the value directly.  This
-    // rewriting is possible because tfop outputs must always be loadable in
-    // deabstraction scopes.
+    /// Indicates that the array of integers should be interpreted as a shape.
+    Shape,
+
+    /// Indicates the metatype of a TensorFlow value type or an aggregate of
+    /// TensorFlow value types should be turned into a list of unknown shapes.
+    UnknownShapeList,
+
+    /// Indicates that the operand should be interpreted as an array. When
+    /// applied to the metatype of a TensorFlow value type or an aggregate of
+    /// TensorFlow value types, it will be flattened into an array of dtypes of
+    /// each TensorFlow value type as a Normal operand.
+    Array,
+
+    /// An operand specifying the address where an indirect output should be
+    /// stored.  This occurs when the tfop exists in a context where its output
+    /// is address-only.  Deabstraction eliminates Out operands before forming
+    /// graph_ops, by rewriting the tfop to return the value directly.  This
+    /// rewriting is possible because tfop outputs must always be loadable in
+    /// deabstraction scopes.
     Out,
   };
 
