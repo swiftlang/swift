@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -o %t/Error -DPTR_SIZE_%target-ptrsize -module-name main %s
+// RUN: %target-run %t/Error
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -141,6 +143,21 @@ ErrorTests.test("existential in lvalue") {
     expectEqual(0, e?._code)
   }
   expectEqual(0, LifetimeTracked.instances)
+}
+
+enum UnsignedError: UInt, Error {
+#if PTR_SIZE_64
+case negativeOne = 0xFFFFFFFFFFFFFFFF
+#elseif PTR_SIZE_32
+case negativeOne = 0xFFFFFFFF
+#else
+#error ("Unknown pointer size")
+#endif
+}
+
+ErrorTests.test("unsigned raw value") {
+  let negOne: Error = UnsignedError.negativeOne
+  expectEqual(-1, negOne._code)
 }
 
 runAllTests()
