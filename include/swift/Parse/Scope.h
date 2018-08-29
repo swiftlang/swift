@@ -67,13 +67,10 @@ enum class ScopeKind {
   StructBody,
   ClassBody,
   ProtocolBody,
-  ConstructorBody,
-  DestructorBody,
   InheritanceClause,
 
   Brace,
   TopLevel,
-  ForVars,
   ForeachVars,
   CaseVars,
   CatchVars,
