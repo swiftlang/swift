@@ -5543,27 +5543,6 @@ Expr *ExprRewriter::coerceCallArguments(
   auto args = decomposeArgType(cs.getType(arg), argLabels);
 
   // Quickly test if any further fix-ups for the argument types are necessary.
-  // FIXME: This hack is only necessary to work around some problems we have
-  // for inferring the type of an unresolved member reference expression in
-  // an optional context. We should seek a more holistic fix for this.
-  if (allParamsMatch &&
-      (params.size() == args.size())) {
-    if (auto argTuple = dyn_cast<TupleExpr>(arg)) {
-      auto argElts = argTuple->getElements();
-    
-      for (size_t i = 0; i < params.size(); i++) {
-        if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(argElts[i])) {
-          auto paramTy = params[i].getType();
-          auto argTy = cs.getType(dotExpr)->getWithoutSpecifierType();
-          if (!paramTy->isEqual(argTy)) {
-            allParamsMatch = false;
-            break;
-          }
-        }
-      }
-    }
-  }
-  
   if (allParamsMatch)
     return arg;
   

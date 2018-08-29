@@ -3447,13 +3447,9 @@ public:
             if (bestMethod->isStatic())
               fnType = fnType->getResult()->getAs<FunctionType>();
 
-            // Drop the argument labels.
-            // FIXME: They never should have been in the type anyway.
-            Type type = fnType->getUnlabeledType(TC.Context);
-
             // Coerce to this type.
             out << " as ";
-            type.print(out);
+            fnType->print(out);
           }
         }
 
