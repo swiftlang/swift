@@ -130,7 +130,16 @@ extension TokenKind: ByteTreeObjectDecodable {
 %   end
 % end
     default:
-      fatalError("Unknown TokenKind \(kind)")
+      if numFields > 1 {
+        // Default to an unknown token with the passed text if we don't know 
+        // its kind.
+        let text = reader.readField(String.self, index: 1)
+        return .unknown(text)
+      } else {
+        // If we were not passed the token's text, we cannot recover since we 
+        // would lose roundtripness.
+        fatalError("Unknown TokenKind \(kind)")
+      }
     }
   }
 }
