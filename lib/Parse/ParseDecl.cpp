@@ -3917,31 +3917,6 @@ static unsigned skipBracedBlock(Parser &P,
   return OpenBraces;
 }
 
-void Parser::consumeGetSetBody(AbstractFunctionDecl *AFD,
-                               SourceLoc LBLoc) {
-  SourceLoc SavedPreviousLoc = PreviousLoc;
-
-  SourceRange BodyRange;
-  BodyRange.Start = Tok.getLoc();
-
-  // Skip until the next '}' at the correct nesting level.
-  unsigned OpenBraces = skipUntilMatchingRBrace(*this, SyntaxContext);
-
-  if (OpenBraces != 1) {
-    // FIXME: implement some error recovery?
-  }
-
-  BodyRange.End = PreviousLoc;
-
-  if (DelayedParseCB->shouldDelayFunctionBodyParsing(
-          *this, AFD, AFD->getAttrs(), BodyRange)) {
-    State->delayAccessorBodyParsing(AFD, BodyRange, SavedPreviousLoc, LBLoc);
-    AFD->setBodyDelayed(BodyRange);
-  } else {
-    AFD->setBodySkipped(BodyRange);
-  }
-}
-
 /// Returns a descriptive name for the given accessor/addressor kind.
 static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
                                               AddressorKind addressorKind,
@@ -4260,46 +4235,6 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
   parseMatchingToken(tok::r_brace, accessors.RBLoc,
                      diag::expected_rbrace_in_getset, accessors.LBLoc);
   return Invalid;
-}
-
-void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
-  assert(!AFD->getBody() && "function should not have a parsed body");
-  assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed &&
-         "function body should be delayed");
-
-  auto AccessorParserState = State->takeAccessorBodyState(AFD);
-  assert(AccessorParserState.get() && "should have a valid state");
-
-  auto BeginParserPosition = getParserPosition(AccessorParserState->BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(AFD->getEndLoc());
-
-  // ParserPositionRAII needs a primed parser to restore to.
-  if (Tok.is(tok::NUM_TOKENS))
-    consumeTokenWithoutFeedingReceiver();
-
-  // Ensure that we restore the parser state at exit.
-  ParserPositionRAII PPR(*this);
-
-  // Create a lexer that cannot go past the end state.
-  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
-
-  // Temporarily swap out the parser's current lexer with our new one.
-  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
-
-  // Rewind to the first token of the accessor body.
-  restoreParserPosition(BeginParserPosition);
-
-  // Re-enter the lexical scope.
-  Scope S(this, AccessorParserState->takeScope());
-  ParseFunctionBody CC(*this, AFD);
-  setLocalDiscriminatorToParamList(AFD->getParameters());
-
-  SmallVector<ASTNode, 16> Entries;
-  parseBraceItems(Entries);
-  BraceStmt *Body =
-      BraceStmt::create(Context, AccessorParserState->LBLoc, Entries,
-                        Tok.getLoc());
-  AFD->setBody(Body);
 }
 
 static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
