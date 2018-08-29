@@ -368,6 +368,9 @@ ERROR(pound_assert_failure,none,
 // Automatic differentiation diagnostics
 ERROR(autodiff_internal_swift_not_imported,none,
       "AD internal error: the Swift module is not imported", ())
+ERROR(autodiff_incomplete_differentiable_attr,none,
+      "incomplete `reverse_differentiable` attribute; it should specify either "
+      "both primal and adjoint or nothing", ())
 ERROR(autodiff_opaque_function_unsupported,none,
       "differentiating an opaque function is not supported yet", ())
 ERROR(autodiff_cannot_synthesize_primal_yet,none,

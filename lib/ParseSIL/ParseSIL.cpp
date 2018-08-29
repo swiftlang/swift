@@ -1077,7 +1077,8 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Parse an adjoint attribute, e.g. `[differentiable wrt 0, 1 adjoint @other]`.
+/// Parse a `reverse_differentiable` attribute, e.g.
+/// `[reverse_differentiable wrt 0, 1 adjoint @other]`.
 /// Returns true on error.
 static bool parseReverseDifferentiableAttr(
   SmallVectorImpl<SILReverseDifferentiableAttr *> &DAs, SILParser &SP) {
@@ -1126,12 +1127,12 @@ static bool parseReverseDifferentiableAttr(
     P.consumeToken();
     if (parseFnName(PrimName)) return true;
   }
-  // Parse 'adjoint'.
+  // Parse optional 'adjoint'.
   Identifier AdjName;
-  if (P.parseSpecificIdentifier("adjoint", LastLoc,
-        diag::sil_attr_differentiable_expected_adjoint_identifier) ||
-      parseFnName(AdjName))
-    return true;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "adjoint") {
+    P.consumeToken();
+    if (parseFnName(AdjName)) return true;
+  }
   // Parse ']'.
   if (P.parseToken(tok::r_square,
                    diag::sil_attr_differentiable_expected_rsquare))
