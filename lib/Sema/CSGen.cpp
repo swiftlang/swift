@@ -2792,7 +2792,7 @@ namespace {
         return TupleType::get(destTupleTypes, CS.getASTContext());
       } else {
         Type destTy = CS.createTypeVariable(CS.getConstraintLocator(expr));
-        CS.addConstraint(ConstraintKind::Bind, CS.getType(expr), LValueType::get(destTy),
+        CS.addConstraint(ConstraintKind::Bind, LValueType::get(destTy), CS.getType(expr),
                          CS.getConstraintLocator(expr));
         return destTy;
       }
