@@ -20,7 +20,29 @@ import LibProc
 import TestsUtils
 
 struct BenchResults {
-  let sampleCount, min, max, mean, sd, median, maxRSS: UInt64
+  typealias T = UInt64
+  private let samples: [T]
+  let maxRSS: Int
+  let stats: Stats
+
+  init(_ samples: [T], maxRSS: Int) {
+    self.samples = samples.sorted()
+    self.maxRSS = maxRSS
+    self.stats = self.samples.reduce(into: Stats(), Stats.collect)
+  }
+
+  /// Return sample at index nearest to the `quantile`.
+  subscript(_ quantile: Double) -> T {
+    let index = Int((Double(samples.count - 1) * quantile).rounded())
+    return samples[index]
+  }
+
+  var sampleCount: T { return UInt64(samples.count) }
+  var min: T { return samples.first! }
+  var max: T { return samples.last! }
+  var mean: T { return UInt64(stats.mean.rounded()) }
+  var sd: T { return UInt64(stats.standardDeviation.rounded()) }
+  var median: T { return self[0.5] }
 }
 
 public var registeredBenchmarks: [BenchmarkInfo] = []
@@ -447,15 +469,7 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   }
   test.tearDownFunction?()
 
-  samples.sort()
-  let stats = samples.reduce(into: Stats(), Stats.collect)
-
-  return BenchResults(sampleCount: UInt64(samples.count),
-                      min: samples.first!, max: samples.last!,
-                      mean: UInt64(stats.mean),
-                      sd: UInt64(stats.standardDeviation),
-                      median: samples[(samples.count - 1) / 2],
-                      maxRSS: UInt64(sampler.measureMemoryUsage()))
+  return BenchResults(samples, maxRSS: sampler.measureMemoryUsage())
 }
 
 /// Execute benchmarks and continuously report the measurement results.
