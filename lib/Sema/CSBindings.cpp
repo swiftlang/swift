@@ -209,7 +209,43 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   if (auto *literalProtocol = binding.DefaultedProtocol)
     foundLiteralBinding(literalProtocol);
 
+  // If the type variable can't bind to an lvalue, make sure the
+  // type we pick isn't an lvalue.
+  if (!TypeVar->getImpl().canBindToLValue() &&
+      binding.BindingType->hasLValueType()) {
+    binding = binding.withType(binding.BindingType->getRValueType());
+  }
+
+  if (!isViable(binding))
+    return;
+
   Bindings.push_back(std::move(binding));
+}
+
+bool ConstraintSystem::PotentialBindings::isViable(
+    PotentialBinding &binding) const {
+  // Prevent against checking against the same bound generic type
+  // over and over again. Doing so means redundant work in the best
+  // case. In the worst case, we'll produce lots of duplicate solutions
+  // for this constraint system, which is problematic for overload
+  // resolution.
+  auto type = binding.BindingType;
+  if (type->hasTypeVariable()) {
+    auto *BGT = type->getAs<BoundGenericType>();
+    if (!BGT)
+      return true;
+
+    for (auto &existing : Bindings) {
+      auto existingBGT = existing.BindingType->getAs<BoundGenericType>();
+      if (!existingBGT)
+        continue;
+
+      if (BGT != existingBGT && BGT->getDecl() == existingBGT->getDecl())
+        return false;
+    }
+  }
+
+  return true;
 }
 
 Optional<ConstraintSystem::PotentialBinding>
