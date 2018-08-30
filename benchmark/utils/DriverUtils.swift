@@ -92,7 +92,7 @@ struct TestConfig {
     struct PartialTestConfig {
       var delim: String?
       var tags, skipTags: Set<BenchmarkCategory>?
-      var numSamples: Int?
+      var numSamples: UInt?
       var fixedNumIters: UInt?
       var afterRunSleep: UInt32?
       var sampleTime: Double?
@@ -119,7 +119,7 @@ struct TestConfig {
     let p = ArgumentParser(into: PartialTestConfig())
     p.addArgument("--num-samples", \.numSamples,
                   help: "number of samples to take per benchmark; default: 1",
-                  parser: { Int($0) })
+                  parser: { UInt($0) })
     p.addArgument("--num-iters", \.fixedNumIters,
                   help: "number of iterations averaged in the sample;\n" +
                         "default: auto-scaled to measure for `sample-time`",
@@ -155,7 +155,7 @@ struct TestConfig {
     delim = c.delim ?? ","
     sampleTime = c.sampleTime ?? 1.0
     fixedNumIters = c.fixedNumIters ?? 0
-    numSamples = c.numSamples ?? 1
+    numSamples = Int(c.numSamples ?? 1)
     verbose = c.verbose ?? false
     logMemory = c.logMemory ?? false
     afterRunSleep = c.afterRunSleep
