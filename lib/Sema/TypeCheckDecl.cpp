@@ -5296,8 +5296,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
           continue;
 
         if (!ctor->isInvalid()) {
-          auto type = getMemberTypeForComparison(Context, ctor, nullptr,
-                                                 /*stripLabels*/ false);
+          auto type = getMemberTypeForComparison(Context, ctor, nullptr);
           declaredInitializers.push_back({ctor, type});
         }
 
@@ -5458,7 +5457,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
         auto *ctor = ctorAndType.first;
         auto type = ctorAndType.second;
         auto parentType = getMemberTypeForComparison(
-            Context, superclassCtor, ctor, /*stripLabels*/ false);
+            Context, superclassCtor, ctor);
 
         if (isOverrideBasedOnType(ctor, type, superclassCtor, parentType)) {
           alreadyDeclared = true;

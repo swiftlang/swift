@@ -680,49 +680,6 @@ bool TypeBase::isExistentialWithError() {
   return layout.isExistentialWithError(getASTContext());
 }
 
-
-static Type getStrippedType(const ASTContext &context, Type type,
-                            bool stripLabels) {
-  return type.transform([&](Type type) -> Type {
-    auto *tuple = dyn_cast<TupleType>(type.getPointer());
-    if (!tuple)
-      return type;
-
-    SmallVector<TupleTypeElt, 4> elements;
-    bool anyChanged = false;
-    unsigned idx = 0;
-    for (const auto &elt : tuple->getElements()) {
-      Type eltTy = getStrippedType(context, elt.getRawType(),
-                                   stripLabels);
-      if (anyChanged || eltTy.getPointer() != elt.getRawType().getPointer() ||
-          (elt.hasName() && stripLabels)) {
-        if (!anyChanged) {
-          elements.reserve(tuple->getNumElements());
-          for (unsigned i = 0; i != idx; ++i) {
-            const TupleTypeElt &elt = tuple->getElement(i);
-            Identifier newName = stripLabels? Identifier() : elt.getName();
-            elements.push_back(elt.getWithName(newName));
-          }
-          anyChanged = true;
-        }
-
-        Identifier newName = stripLabels? Identifier() : elt.getName();
-        elements.emplace_back(eltTy, newName, elt.getParameterFlags());
-      }
-      ++idx;
-    }
-
-    if (!anyChanged)
-      return type;
-
-    return TupleType::get(elements, context);
-  });
-}
-
-Type TypeBase::getUnlabeledType(ASTContext &Context) {
-  return getStrippedType(Context, Type(this), /*stripLabels=*/true);
-}
-
 /// Remove argument labels from the function type.
 Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   // If there is nothing to remove, don't.

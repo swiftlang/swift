@@ -5543,27 +5543,6 @@ Expr *ExprRewriter::coerceCallArguments(
   auto args = decomposeArgType(cs.getType(arg), argLabels);
 
   // Quickly test if any further fix-ups for the argument types are necessary.
-  // FIXME: This hack is only necessary to work around some problems we have
-  // for inferring the type of an unresolved member reference expression in
-  // an optional context. We should seek a more holistic fix for this.
-  if (allParamsMatch &&
-      (params.size() == args.size())) {
-    if (auto argTuple = dyn_cast<TupleExpr>(arg)) {
-      auto argElts = argTuple->getElements();
-    
-      for (size_t i = 0; i < params.size(); i++) {
-        if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(argElts[i])) {
-          auto paramTy = params[i].getType();
-          auto argTy = cs.getType(dotExpr)->getWithoutSpecifierType();
-          if (!paramTy->isEqual(argTy)) {
-            allParamsMatch = false;
-            break;
-          }
-        }
-      }
-    }
-  }
-  
   if (allParamsMatch)
     return arg;
   
@@ -7942,12 +7921,16 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   cs.cacheSubExprTypes(call);
 
+  // Extract the arguments.
+  SmallVector<AnyFunctionType::Param, 8> args;
+  AnyFunctionType::decomposeInput(cs.getType(call->getArg()), args);
+
   // Add the conversion from the argument to the function parameter type.
   auto openedFuncType = openedType->castTo<FunctionType>();
   ::matchCallArguments(
       cs, /*isOperator=*/false,
-      cs.getType(call->getArg()),
-      openedFuncType->getInput(),
+      args,
+      openedFuncType->getParams(),
       cs.getConstraintLocator(call,
                               ConstraintLocator::ApplyArgument));
 

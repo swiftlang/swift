@@ -3289,7 +3289,7 @@ public:
 /// Match the call arguments (as described by the given argument type) to
 /// the parameters (as described by the given parameter type).
 ///
-/// \param argTuple The arguments.
+/// \param args The arguments.
 /// \param params The parameters.
 /// \param defaultMap A map indicating if the parameter at that index has a default value.
 /// \param hasTrailingClosure Whether the last argument is a trailing closure.
@@ -3301,7 +3301,7 @@ public:
 /// \param parameterBindings Will be populated with the arguments that are
 /// bound to each of the parameters.
 /// \returns true if the call arguments could not be matched to the parameters.
-bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
+bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                         ArrayRef<AnyFunctionType::Param> params,
                         const llvm::SmallBitVector &defaultMap,
                         bool hasTrailingClosure,
@@ -3311,7 +3311,9 @@ bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
 
 ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs,
-                   bool isOperator, Type argType, Type paramType,
+                   bool isOperator,
+                   ArrayRef<AnyFunctionType::Param> args,
+                   ArrayRef<AnyFunctionType::Param> params,
                    ConstraintLocatorBuilder locator);
 
 /// Attempt to prove that arguments with the given labels at the
