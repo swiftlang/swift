@@ -580,41 +580,9 @@ bool ConstraintSystem::tryTypeVariableBindings(
         continue;
 
       auto type = binding.BindingType;
-
-      // If the type variable can't bind to an lvalue, make sure the
-      // type we pick isn't an lvalue.
-      if (!typeVar->getImpl().canBindToLValue())
-        type = type->getRValueType();
-
-      // Remove parentheses. They're insignificant here.
-      type = type->getWithoutParens();
-
       // If we've already tried this binding, move on.
       if (!boundTypes.insert(type.getPointer()).second)
         continue;
-
-      // Prevent against checking against the same bound generic type
-      // over and over again. Doing so means redundant work in the best
-      // case. In the worst case, we'll produce lots of duplicate solutions
-      // for this constraint system, which is problematic for overload
-      // resolution.
-      if (type->hasTypeVariable()) {
-        auto triedBinding = false;
-        if (auto BGT = type->getAs<BoundGenericType>()) {
-          for (auto bt : boundTypes) {
-            if (auto BBGT = bt->getAs<BoundGenericType>()) {
-              if (BGT != BBGT &&
-                  BGT->getDecl() == BBGT->getDecl()) {
-                triedBinding = true;
-                break;
-              }
-            }
-          }
-        }
-
-        if (triedBinding)
-          continue;
-      }
 
       if (tc.getLangOpts().DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -680,8 +648,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
     // Enumerate the supertypes of each of the types we tried.
     for (auto binding : bindings) {
       const auto type = binding.BindingType;
-      if (type->hasError())
-        continue;
+      assert(!type->hasError());
 
       // After our first pass, note that we've explored these
       // types.
