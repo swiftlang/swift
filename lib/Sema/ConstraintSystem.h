@@ -2774,11 +2774,15 @@ private:
                      ConstraintKind bindingSource,
                      ProtocolDecl *defaultedProtocol = nullptr,
                      ConstraintLocator *defaultableBinding = nullptr)
-        : BindingType(type), Kind(kind), BindingSource(bindingSource),
-          DefaultedProtocol(defaultedProtocol),
+        : BindingType(type->getWithoutParens()), Kind(kind),
+          BindingSource(bindingSource), DefaultedProtocol(defaultedProtocol),
           DefaultableBinding(defaultableBinding) {}
 
     bool isDefaultableBinding() const { return DefaultableBinding != nullptr; }
+
+    PotentialBinding withType(Type type) const {
+      return {type, Kind, BindingSource, DefaultedProtocol, DefaultableBinding};
+    }
   };
 
   struct PotentialBindings {
@@ -2868,6 +2872,9 @@ private:
     /// coalescing supertype bounds when we are able to compute the meet.
     void addPotentialBinding(PotentialBinding binding,
                              bool allowJoinMeet = true);
+
+    /// Check if this binding is viable for inclusion in the set.
+    bool isViable(PotentialBinding &binding) const;
 
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
