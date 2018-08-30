@@ -131,7 +131,7 @@ class Foo {
   }
 
   // CHECK-LABEL: sil hidden @$S17default_arguments3FooCyS2icig
-  // CHECK:         string_literal utf16 "subscript"
+  // CHECK:         string_literal utf16 "subscript(_:)"
   subscript(x: Int) -> Int {
     testMagicLiterals()
     closure { testMagicLiterals() }
@@ -160,7 +160,7 @@ func testSelectorCall(_ x: Int, withMagicLiterals y: Int) {
 }
 
 // CHECK-LABEL: sil hidden @$S17default_arguments32testSelectorCallWithUnnamedPieceyySi_SitF
-// CHECK:         string_literal utf16 "testSelectorCallWithUnnamedPiece"
+// CHECK:         string_literal utf16 "testSelectorCallWithUnnamedPiece(_:_:)"
 func testSelectorCallWithUnnamedPiece(_ x: Int, _ y: Int) {
   testMagicLiterals()
 }
