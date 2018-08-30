@@ -684,8 +684,7 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
   if (Loc.isInvalid())
     return None;
   auto &SM = VD->getASTContext().SourceMgr;
-  return SM.getLocOffsetInBuffer(Loc, SM.getIDForBufferIdentifier(SM.
-    getBufferIdentifierForLoc(Loc)).getValue());
+  return SM.getLocOffsetInBuffer(Loc, SM.findBufferContainingLoc(Loc));
 }
 
 /// Returns true for failure to resolve.
