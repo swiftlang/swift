@@ -1,7 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %target-sil-opt -differentiation -sil-print-all -verify | %FileCheck %s
-
-// TODO(SWIFT-8146): Re-enable this test.
-// UNSUPPORTED: tensorflow
+// RUN: %target-swift-frontend -O -emit-llvm %s | %FileCheck %s
 
 import TensorFlow
 

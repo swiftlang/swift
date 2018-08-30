@@ -905,7 +905,7 @@ public:
     return value.realNominalType;
   }
   NominalTypeDecl *getRealVectorSpace() const {
-    assert(kind == Kind::RealScalar);
+    assert(kind == Kind::RealVector);
     return value.realNominalType;
   }
   NominalTypeDecl *getRealScalarOrVectorSpace() const {
@@ -1732,9 +1732,12 @@ static SILValue createBuiltinFPScalar(intmax_t scalar, CanType type,
 }
 
 /// Convert an integer literal to a type that is expressible by integer literal.
+///
+/// The root address derivation of `resultBufAccess` must be the result of a
+/// `begin_access`.
 static void convertIntToIndirectExpressible(intmax_t scalar,
                                             NominalTypeDecl *targetTypeDecl,
-                                            SILValue resultBuf,
+                                            SILValue resultBufAccess,
                                             SILLocation loc,
                                             SILBuilder &builder,
                                             ADContext &context) {
@@ -1831,7 +1834,7 @@ static void convertIntToIndirectExpressible(intmax_t scalar,
       SubstitutionMap::getProtocolSubstitutions(eilProto, targetTy, eilConfRef);
   // %7 = apply %6 <...>(%resultBuf, %intLitBuf, %5)
   builder.createApply(loc, initILFn, targetSubMap,
-                      {resultBuf, intLitBuf, targetMetatype},
+                      {resultBufAccess, intLitBuf, targetMetatype},
                       /*isNonThrowing*/ false);
 }
 
@@ -1880,7 +1883,6 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
     auto *targetTypeDecl = cotangentSpace->getRealVectorSpace();
     auto &astCtx = context.getASTContext();
     auto &module = context.getModule();
-    auto &typeConv = context.getTypeConverter();
     // Create a scalar value from the specified integer literal.
     DeclName scalarDeclName(astCtx.getIdentifier("ScalarElement"));
     auto currencyDeclLookupResult =
@@ -1897,59 +1899,56 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
     // %0 = ... : $<scalar type>
     auto scalarBuf = builder.createAllocStack(
         loc, SILType::getPrimitiveObjectType(scalarTy));
-    convertIntToIndirectExpressible(scalar, scalarTyDecl, scalarBuf, loc,
-                                    builder, context);
-    auto scalarLOQ = getBufferLOQ(scalarTy, builder.getFunction());
-    auto loadAccess = builder.createBeginAccess(
-        loc, scalarBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
-    auto scalarVal = builder.createLoad(loc, loadAccess, scalarLOQ);
-    builder.createEndAccess(loc, loadAccess, /*aborted*/ false);
-    // dealloc_stack %0 : $*<scalar type>
-    builder.createDeallocStack(loc, scalarBuf);
-    // %1 = metatype $<scalar type>.Type
-    auto metatypeTy = SILType::getPrimitiveObjectType(
-        CanMetatypeType::get(type, MetatypeRepresentation::Thick));
-    auto *metatype = builder.createMetatype(loc, metatypeTy);
-    // Call `init(_:)` through `VectorNumeric` protocol.
+    auto scalarBufInitAccess = builder.createBeginAccess(
+        loc, scalarBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    convertIntToIndirectExpressible(scalar, scalarTyDecl, scalarBufInitAccess,
+                                    loc, builder, context);
+    builder.createEndAccess(loc, scalarBufInitAccess, /*aborted*/ false);
+    // Prepare to call `VectorNumeric.init(_:)` on the scalar.
+    auto *vecNumProto = context.getVectorNumericProtocol();
     DeclName initName(astCtx, DeclBaseName::createConstructor(),
                       {Identifier()});
-    // Allocate buffer for passing the indirect scalar value.
-    // %2 = alloc_stack $<scalar type>
-    auto scalarValBuf =
-        builder.createAllocStack(loc, typeConv.getLoweredType(scalarTy));
-    SWIFT_DEFER {
-      // dealloc_stack %2 : $<scalar type>
-      builder.createDeallocStack(loc, scalarValBuf);
-    };
-    auto *bufAccess = builder.createBeginAccess(
-        loc, scalarValBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
-    // store %0 : $<scalar type> to $*<scalar type>
-    builder.createStore(loc, scalarVal, bufAccess,
-                        getBufferSOQ(scalarTy, builder.getFunction()));
-    builder.createEndAccess(loc, bufAccess, /*aborted*/ false);
-    auto *vecNumProto = context.getVectorNumericProtocol();
     auto *reqr =
         cast<ConstructorDecl>(vecNumProto->lookupDirect(initName).front());
     SILDeclRef reqrRef(reqr, SILDeclRef::Kind::Allocator);
     auto silInitTy = context.getTypeConverter().getConstantType(reqrRef);
-    // Get scalar's conformance to `FloatingPoint`.
-    auto conf = astCtx.getConformance(
+    // Get the target type's conformance to `VectorNumeric`.
+    auto *conf = astCtx.getConformance(
         type, vecNumProto, targetTypeDecl->getLoc(), targetTypeDecl,
         ProtocolConformanceState::Complete);
     ProtocolConformanceRef confRef(conf);
+    auto wfLookup = module.lookUpFunctionInWitnessTable(confRef, reqrRef);
+    assert(wfLookup.first);
     // $4 = witness_method ...
     auto initFnRef =
         builder.createWitnessMethod(loc, type, confRef, reqrRef, silInitTy);
+    LLVM_DEBUG({
+      auto &s = getADDebugStream();
+      s << "Real vector initialization function: " << *initFnRef;
+    });
     auto initSubMap =
         SubstitutionMap::getProtocolSubstitutions(vecNumProto, type, confRef);
-    // %5 = apply %4(%3, %2, %1)
+    LLVM_DEBUG({
+      auto &s = getADDebugStream()
+          << "Substitution map for real vector " << type << ": ";
+      initSubMap.dump(s);
+      s << '\n';
+    });
+    // %type = metatype $<scalar type>.Type
+    auto metatypeTy = SILType::getPrimitiveObjectType(
+        CanMetatypeType::get(type, MetatypeRepresentation::Thick));
+    auto *metatype = builder.createMetatype(loc, metatypeTy);
+    auto scalarReadAccess = builder.createBeginAccess(
+        loc, scalarBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    // %5 = apply %4(%3, %2, %type)
     builder.createApply(loc, initFnRef, initSubMap,
-                        {seedBufAccess, scalarValBuf, metatype},
+                        {seedBufAccess, scalarReadAccess, metatype},
                         /*isNonThrowing*/ false);
+    builder.createEndAccess(loc, scalarReadAccess, /*aborted*/ false);
+    // dealloc_stack %0 : $*<scalar type>
+    builder.createDeallocStack(loc, scalarBuf);
     return;
   }
   // Struct gets member-wise initialized.
