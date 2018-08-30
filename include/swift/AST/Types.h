@@ -907,14 +907,6 @@ public:
   /// argument labels removed.
   Type removeArgumentLabels(unsigned numArgumentLabels);
 
-  /// getUnlabeledType - Retrieve a version of this type with all labels
-  /// removed at every level. For example, given a tuple type 
-  /// \code
-  /// (p : (x : int, y : int))
-  /// \endcode
-  /// the result would be the (parenthesized) type ((int, int)).
-  Type getUnlabeledType(ASTContext &Context);
-
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
 
@@ -2697,8 +2689,9 @@ public:
     }
 
     bool operator==(Param const &b) const {
-      return Label == b.Label && getType()->isEqual(b.getType()) &&
-             Flags == b.Flags;
+      return (Label == b.Label &&
+              getPlainType()->isEqual(b.getPlainType()) &&
+              Flags == b.Flags);
     }
     bool operator!=(Param const &b) const { return !(*this == b); }
 
@@ -2951,6 +2944,11 @@ public:
 
   /// \brief Given two arrays of parameters determine if they are equal.
   static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
+
+  /// \brief Given an array of parameters and an array of labels of the
+  /// same length, update each parameter to have the corresponding label.
+  static void relabelParams(MutableArrayRef<Param> params,
+                            ArrayRef<Identifier> labels);
 
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }

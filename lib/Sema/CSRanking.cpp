@@ -726,6 +726,19 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
   return decl1Better? Comparison::Better : Comparison::Worse;
 }
 
+static Type getUnlabeledType(Type type, ASTContext &ctx) {
+  if (auto *tupleType = dyn_cast<TupleType>(type.getPointer())) {
+    SmallVector<TupleTypeElt, 8> elts;
+    for (auto elt : tupleType->getElements()) {
+      elts.push_back(elt.getWithoutName());
+    }
+
+    return TupleType::get(elts, ctx);
+  }
+
+  return type;
+}
+
 SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2,
@@ -1033,8 +1046,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score2;
 
       // Prefer the unlabeled form of a type.
-      auto unlabeled1 = type1->getUnlabeledType(cs.getASTContext());
-      auto unlabeled2 = type2->getUnlabeledType(cs.getASTContext());
+      auto unlabeled1 = getUnlabeledType(type1, cs.getASTContext());
+      auto unlabeled2 = getUnlabeledType(type2, cs.getASTContext());
       if (unlabeled1->isEqual(unlabeled2)) {
         if (type1->isEqual(unlabeled1)) {
           ++score1;

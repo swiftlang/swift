@@ -1330,10 +1330,17 @@ namespace {
       }
       auto *constr = cast<ConstructorDecl>(constrs.front());
       auto constrParamType = tc.getObjectLiteralParameterType(expr, constr);
+
+      // Extract the arguments.
+      SmallVector<AnyFunctionType::Param, 8> args;
+      AnyFunctionType::decomposeInput(CS.getType(expr->getArg()), args);
+
+      // Extract the parameters.
+      SmallVector<AnyFunctionType::Param, 8> params;
+      AnyFunctionType::decomposeInput(constrParamType, params);
+
       ::matchCallArguments(
-          CS, /*isOperator=*/false,
-          CS.getType(expr->getArg()),
-          constrParamType,
+          CS, /*isOperator=*/false, args, params,
           CS.getConstraintLocator(expr,
                                   ConstraintLocator::ApplyArgument));
 
