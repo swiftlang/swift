@@ -632,7 +632,8 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
     }
   }
 
-  updateProcessWideFrontendCounters(getFrontendCounters());
+  if (FrontendCounters)
+    updateProcessWideFrontendCounters(getFrontendCounters());
 
   // NB: Timer needs to be Optional<> because it needs to be destructed early;
   // LLVM will complain about double-stopping a timer if you tear down a
