@@ -331,13 +331,8 @@ public:
 
   /// Emit a global initialization.
   void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);
-  
-  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getMutableAddressorDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getReadCoroutineDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getModifyCoroutineDeclRef(AbstractStorageDecl *decl);
+
+  SILDeclRef getAccessorDeclRef(AccessorDecl *accessor);
 
   KeyPathPatternComponent
   emitKeyPathComponentForDecl(SILLocation loc,

@@ -2294,23 +2294,18 @@ namespace {
     }
 
     void emitUsingAccessor(AccessorKind accessorKind, bool isDirect) {
+      auto accessor =
+        SGF.SGM.getAccessorDeclRef(Storage->getAccessor(accessorKind));
+
       switch (accessorKind) {
       case AccessorKind::Get:
       case AccessorKind::Set: {
-        auto accessor =
-          accessorKind == AccessorKind::Get ?
-            SGF.SGM.getGetterDeclRef(Storage) :
-            SGF.SGM.getSetterDeclRef(Storage);
         auto typeData = getLogicalStorageTypeData(SGF.SGM, FormalRValueType);
         return asImpl().emitUsingGetterSetter(accessor, isDirect, typeData);
       }
 
       case AccessorKind::Address:
       case AccessorKind::MutableAddress: {
-        auto accessor =
-          accessorKind == AccessorKind::Address
-            ? SGF.SGM.getAddressorDeclRef(Storage)
-            : SGF.SGM.getMutableAddressorDeclRef(Storage);
         auto typeData =
           getPhysicalStorageTypeData(SGF.SGM, Storage, FormalRValueType);
         return asImpl().emitUsingAddressor(accessor, isDirect, typeData);
@@ -2318,10 +2313,6 @@ namespace {
 
       case AccessorKind::Read:
       case AccessorKind::Modify: {
-        auto accessor =
-          accessorKind == AccessorKind::Read
-            ? SGF.SGM.getReadCoroutineDeclRef(Storage)
-            : SGF.SGM.getModifyCoroutineDeclRef(Storage);
         auto typeData =
           getPhysicalStorageTypeData(SGF.SGM, Storage, FormalRValueType);
         return asImpl().emitUsingCoroutineAccessor(accessor, isDirect,

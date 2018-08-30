@@ -5480,10 +5480,9 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
   return result;
 }
 
-SILDeclRef SILGenModule::getGetterDeclRef(AbstractStorageDecl *storage) {
-  auto *getter = storage->getGetter();
-  return SILDeclRef(getter, SILDeclRef::Kind::Func)
-    .asForeign(requiresForeignEntryPoint(getter));
+SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor) {
+  return SILDeclRef(accessor, SILDeclRef::Kind::Func)
+    .asForeign(requiresForeignEntryPoint(accessor));
 }
 
 /// Emit a call to a getter.
@@ -5516,12 +5515,6 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
 
   // T
   return emission.apply(c);
-}
-
-SILDeclRef SILGenModule::getSetterDeclRef(AbstractStorageDecl *storage) {
-  auto *setter = storage->getSetter();
-  return SILDeclRef(setter, SILDeclRef::Kind::Func)
-    .asForeign(requiresForeignEntryPoint(setter));
 }
 
 void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
@@ -5567,17 +5560,6 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   emission.addCallSite(loc, std::move(values), accessType);
   // ()
   emission.apply();
-}
-
-SILDeclRef SILGenModule::getAddressorDeclRef(AbstractStorageDecl *storage) {
-  FuncDecl *addressorFunc = storage->getAddressor();
-  return SILDeclRef(addressorFunc, SILDeclRef::Kind::Func);
-}
-
-SILDeclRef SILGenModule::getMutableAddressorDeclRef(
-                                                 AbstractStorageDecl *storage) {
-  FuncDecl *addressorFunc = storage->getMutableAddressor();
-  return SILDeclRef(addressorFunc, SILDeclRef::Kind::Func);
 }
 
 /// Emit a call to an addressor.
@@ -5668,20 +5650,6 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
   }
 
   return { ManagedValue::forLValue(address), owner };
-}
-
-SILDeclRef
-SILGenModule::getReadCoroutineDeclRef(AbstractStorageDecl *storage) {
-  FuncDecl *accessorFunc = storage->getReadCoroutine();
-  assert(accessorFunc);
-  return SILDeclRef(accessorFunc, SILDeclRef::Kind::Func);
-}
-
-SILDeclRef
-SILGenModule::getModifyCoroutineDeclRef(AbstractStorageDecl *storage) {
-  FuncDecl *accessorFunc = storage->getModifyCoroutine();
-  assert(accessorFunc);
-  return SILDeclRef(accessorFunc, SILDeclRef::Kind::Func);
 }
 
 CleanupHandle

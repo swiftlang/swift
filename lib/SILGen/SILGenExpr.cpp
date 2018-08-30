@@ -952,12 +952,7 @@ static SILDeclRef getRValueAccessorDeclRef(SILGenFunction &SGF,
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor: {
     auto accessor = strategy.getAccessor();
-    assert(accessor == AccessorKind::Get || accessor == AccessorKind::Address);
-    if (accessor == AccessorKind::Get) {
-      return SGF.SGM.getGetterDeclRef(storage);
-    } else {
-      return SGF.SGM.getAddressorDeclRef(storage);
-    }
+    return SGF.SGM.getAccessorDeclRef(storage->getAccessor(accessor));
   }
   }
   llvm_unreachable("should already have been filtered out!");
@@ -3495,7 +3490,7 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
   }
   case AccessStrategy::DispatchToAccessor: {
     // Identify the property by its vtable or wtable slot.
-    return SGM.getGetterDeclRef(storage);
+    return SGM.getAccessorDeclRef(storage->getGetter());
   }
   case AccessStrategy::BehaviorStorage:
     llvm_unreachable("unpossible");
@@ -3576,7 +3571,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
         // Properties that only dispatch via ObjC lookup do not have nor need
         // property descriptors, since the selector identifies the storage.
         && (!storage->hasAnyAccessors()
-            || !getGetterDeclRef(storage).isForeign);
+            || !getAccessorDeclRef(storage->getGetter()).isForeign);
     };
   
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
