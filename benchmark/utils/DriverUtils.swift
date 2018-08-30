@@ -67,7 +67,7 @@ struct TestConfig {
   /// If we are asked to have a fixed number of iterations, the number of fixed
   /// iterations. The default value of 0 means: automatically compute the
   /// number of iterations to measure the test for a specified sample time.
-  let fixedNumIters: UInt
+  let fixedNumIters: Int
 
   /// The number of samples we should take of each test.
   let numSamples: Int
@@ -154,7 +154,7 @@ struct TestConfig {
     // Configure from the command line arguments, filling in the defaults.
     delim = c.delim ?? ","
     sampleTime = c.sampleTime ?? 1.0
-    fixedNumIters = c.fixedNumIters ?? 0
+    fixedNumIters = Int(c.fixedNumIters ?? 0)
     numSamples = Int(c.numSamples ?? 1)
     verbose = c.verbose ?? false
     logMemory = c.logMemory ?? false
@@ -386,13 +386,13 @@ final class SampleRunner {
     return timer.diffTimeInNanoSeconds(from: start, to: end)
   }
 
-  func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
+  func run(_ name: String, fn: (Int) -> Void, num_iters: Int) -> UInt64 {
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in startTrackingObjects(p) }
 #endif
 
     self.startMeasurement()
-    fn(Int(num_iters))
+    fn(num_iters)
     self.stopMeasurement()
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
@@ -428,13 +428,13 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
     let nsPerSecond = 1_000_000_000.0 // nanoseconds
     let time_per_sample = UInt64(c.sampleTime * nsPerSecond)
 
-    var scale : UInt
+    var scale : Int
     var elapsed_time : UInt64 = 0
     if c.fixedNumIters == 0 {
       elapsed_time = sampler.run(test.name, fn: testFn, num_iters: 1)
 
       if elapsed_time > 0 {
-        scale = UInt(time_per_sample / elapsed_time)
+        scale = Int(time_per_sample / elapsed_time)
       } else {
         if c.verbose {
           print("    Warning: elapsed time is 0. This can be safely ignored if the body is empty.")
@@ -451,7 +451,7 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
     // Make integer overflow less likely on platforms where Int is 32 bits wide.
     // FIXME: Switch BenchmarkInfo to use Int64 for the iteration scale, or fix
     // benchmarks to not let scaling get off the charts.
-    scale = min(scale, UInt(Int.max) / 10_000)
+    scale = min(scale, Int.max / 10_000)
 
     // Rerun the test with the computed scale factor.
     if scale > 1 {
