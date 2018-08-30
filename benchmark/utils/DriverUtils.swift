@@ -454,7 +454,7 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
                       min: samples.first!, max: samples.last!,
                       mean: UInt64(stats.mean),
                       sd: UInt64(stats.standardDeviation),
-                      median: samples[samples.count / 2],
+                      median: samples[(samples.count - 1) / 2],
                       maxRSS: UInt64(sampler.measureMemoryUsage()))
 }
 

@@ -78,10 +78,10 @@ class TestPerformanceTestSamples(unittest.TestCase):
             self.samples, (1000, 1000, 1100, 1100, 1100))
         self.samples.add(Sample(3, 1, 1050))
         self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1000, 1050, 1050, 1100))
+            self.samples, (1000, 1050, 1050, 1100, 1100))
         self.samples.add(Sample(4, 1, 1025))
         self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1025, 1050, 1100, 1100))
+            self.samples, (1000, 1025, 1050, 1050, 1100))
         self.samples.add(Sample(5, 1, 1075))
         self.assertEqualFiveNumberSummary(
             self.samples, (1000, 1025, 1050, 1075, 1100))
@@ -156,11 +156,12 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.samples.add(Sample(0, 2, 23))
         self.samples.add(Sample(1, 2, 18))
         self.samples.add(Sample(2, 2, 18))
+        self.samples.add(Sample(3, 2, 18))
         self.assertEquals(self.samples.iqr, 0)
 
         self.samples.exclude_outliers()
 
-        self.assertEquals(self.samples.count, 2)
+        self.assertEquals(self.samples.count, 3)
         self.assertEqualStats(
             (self.samples.min, self.samples.max), (18, 18))
 
