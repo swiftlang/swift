@@ -669,9 +669,7 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     return;
 
   // Second phase: transformation.
-  // Remove critical edges for the SSA-updater. We do this once and keep the
-  // CFG critical-edge free during our transformations.
-  splitAllCriticalEdges(*Fn, true, nullptr, nullptr);
+  Fn->verifyCriticalEdges();
 
   for (Edit *edit : Edits) {
     Optional<BasicBlockCloner> Cloner;
@@ -687,7 +685,7 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
 
     if (Cloner.hasValue()) {
       updateSSAAfterCloning(*Cloner.getPointer(), Cloner->getDestBB(),
-                            edit->CCBBlock, false);
+                            edit->CCBBlock);
 
       if (!Cloner->getDestBB()->pred_empty())
         BlocksForWorklist.push_back(Cloner->getDestBB());

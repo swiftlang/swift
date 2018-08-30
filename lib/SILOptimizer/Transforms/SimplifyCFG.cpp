@@ -206,14 +206,7 @@ static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
 
 /// Helper function to perform SSA updates in case of jump threading.
 void swift::updateSSAAfterCloning(BaseThreadingCloner &Cloner,
-                                  SILBasicBlock *SrcBB, SILBasicBlock *DestBB,
-                                  bool NeedToSplitCriticalEdges) {
-  // We are updating SSA form. This means we need to be able to insert phi
-  // nodes. To make sure we can do this split all critical edges from
-  // instructions that don't support block arguments.
-  if (NeedToSplitCriticalEdges)
-    splitAllCriticalEdges(*DestBB->getParent(), true, nullptr, nullptr);
-
+                                  SILBasicBlock *SrcBB, SILBasicBlock *DestBB) {
   SILSSAUpdater SSAUp;
   for (auto AvailValPair : Cloner.AvailVals) {
     ValueBase *Inst = AvailValPair.first;
@@ -333,6 +326,7 @@ public:
     // We have copied the threaded block into the edge.
     Src = Cloner.getEdgeBB();
 
+    // Rewrite the cloned branch to eliminate the non-taken path.
     if (auto *CondTerm = dyn_cast<CondBranchInst>(Src->getTerminator())) {
       // We know the direction this conditional branch is going to take thread
       // it.
@@ -371,14 +365,11 @@ public:
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
                              ArrayRef<SILValue>());
       SEI->eraseFromParent();
-
-      // Split the edge from 'Dest' to 'ThreadedSuccessorBlock' it is now
-      // critical. Doing this here safes us from doing it over the whole
-      // function in updateSSAAfterCloning because we have split all other
-      // critical edges earlier.
-      splitEdgesFromTo(Dest, ThreadedSuccessorBlock, nullptr, nullptr);
     }
-    updateSSAAfterCloning(Cloner, Src, Dest, false);
+    // After rewriting the cloned branch, split the critical edge.
+    // This does not currently update DominanceInfo.
+    Cloner.splitCriticalEdges(nullptr, nullptr);
+    updateSSAAfterCloning(Cloner, Src, Dest);
   }
 };
 
@@ -661,7 +652,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
   // also required for SSA construction in dominatorBasedSimplifications' jump
   // threading. It only splits new critical edges it creates by jump threading.
   bool Changed =
-      EnableJumpThread ? splitAllCriticalEdges(Fn, false, DT, nullptr) : false;
+      EnableJumpThread ? splitAllCriticalEdges(Fn, DT, nullptr) : false;
 
   unsigned MaxIter = MaxIterationsOfDominatorBasedSimplify;
   SmallVector<SILBasicBlock *, 16> BlocksForWorklist;
@@ -1062,9 +1053,11 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // destination block into this one, rewriting uses of the BBArgs to use the
   // branch arguments as we go.
   EdgeThreadingCloner Cloner(BI);
-
   for (auto &I : *DestBB)
     Cloner.process(&I);
+
+  // Does not currently update DominanceInfo.
+  Cloner.splitCriticalEdges(nullptr, nullptr);
 
   // Once all the instructions are copied, we can nuke BI itself.  We also add
   // the threaded and edge block to the worklist now that they (likely) can be
@@ -1291,6 +1284,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     BI->eraseFromParent();
     removeIfDead(DestBB);
     addToWorklist(BB);
+
     return true;
   }
 
@@ -2444,6 +2438,9 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
     for (auto &I : *DestBB)
       Cloner.process(&I);
 
+    // Does not currently update DominanceInfo.
+    Cloner.splitCriticalEdges(nullptr, nullptr);
+
     updateSSAAfterCloning(Cloner, Cloner.getEdgeBB(), DestBB);
     addToWorklist(Cloner.getEdgeBB());
   }
@@ -2863,9 +2860,7 @@ bool SimplifyCFG::run() {
     if (simplifyBlocks())
       removeUnreachableBlocks(Fn);
   }
-
-  // Split all critical edges from non cond_br terminators.
-  Changed |= splitAllCriticalEdges(Fn, true, nullptr, nullptr);
+  Fn.verifyCriticalEdges();
 
   // Canonicalize switch_enum instructions.
   Changed |= canonicalizeSwitchEnums();
@@ -3615,9 +3610,11 @@ public:
   void run() override {
     auto &Fn = *getFunction();
 
+    if (OnlyNonCondBrEdges)
+      Fn.verifyCriticalEdges();
+
     // Split all critical edges from all or non only cond_br terminators.
-    bool Changed =
-        splitAllCriticalEdges(Fn, OnlyNonCondBrEdges, nullptr, nullptr);
+    bool Changed = splitAllCriticalEdges(Fn, nullptr, nullptr);
 
     if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
