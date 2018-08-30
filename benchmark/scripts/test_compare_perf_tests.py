@@ -369,7 +369,6 @@ Running AngryPhonebook for 3 samples.
     Sample 0,11812
     Measuring with scale 90.
     Sample 1,13898
-    Measuring with scale 91.
     Sample 2,11467
 1,AngryPhonebook,3,11467,13898,12392,1315,11812
 Running Array2D for 3 samples.
@@ -389,7 +388,7 @@ Totals,2"""
         )
         self.assertEquals(r.num_samples, r.samples.num_samples)
         self.assertEquals(results[0].samples.all_samples,
-                          [(0, 78, 11812), (1, 90, 13898), (2, 91, 11467)])
+                          [(0, 78, 11812), (1, 90, 13898), (2, 90, 11467)])
 
         r = results[1]
         self.assertEquals(
