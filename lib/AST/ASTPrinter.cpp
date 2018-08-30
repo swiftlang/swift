@@ -2365,7 +2365,11 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << "...";
 
   if (param->isDefaultArgument()) {
-    StringRef defaultArgStr = param->getDefaultValueStringRepresentation();
+    std::string defaultArgStr;
+    if (Options.DefaultArgument)
+      defaultArgStr = Options.DefaultArgument(param);
+    else
+      defaultArgStr = param->getDefaultValueStringRepresentation();
 
     if (defaultArgStr.empty()) {
       if (Options.PrintDefaultParameterPlaceholder)

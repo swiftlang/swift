@@ -14,11 +14,16 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/Serialization/InlinableText.h"
 
 using namespace swift;
 
 bool swift::emitModuleInterface(raw_ostream &out, ModuleDecl *M) {
-  const PrintOptions printOptions = PrintOptions::printTextualInterfaceFile();
+  PrintOptions printOptions = PrintOptions::printTextualInterfaceFile();
+  printOptions.DefaultArgument = [&](const ParamDecl *pd) -> std::string {
+    SmallString<128> scratch;
+    return extractDefaultArgumentText(pd, scratch);
+  };
   SmallVector<Decl *, 16> topLevelDecls;
   M->getTopLevelDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {

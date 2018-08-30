@@ -28,6 +28,7 @@ class CanType;
 class Decl;
 class Pattern;
 class ValueDecl;
+class ParamDecl;
 class ExtensionDecl;
 class NominalTypeDecl;
 class TypeBase;
@@ -360,6 +361,10 @@ struct PrintOptions {
   /// constructors) will be printed with a body that is determined by this
   /// function.
   std::function<std::string(const ValueDecl *)> FunctionBody;
+
+  /// If this is not \c nullptr, then the default argument will be printed with
+  /// text that is determined by this function.
+  std::function<std::string(const ParamDecl *)> DefaultArgument;
 
   BracketOptions BracketOptions;
 

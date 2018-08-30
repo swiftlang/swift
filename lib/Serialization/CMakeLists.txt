@@ -1,6 +1,7 @@
 add_swift_library(swiftSerialization STATIC
   Deserialization.cpp
   DeserializeSIL.cpp
+  InlinableText.cpp
   ModuleFile.cpp
   Serialization.cpp
   SerializedModuleLoader.cpp
