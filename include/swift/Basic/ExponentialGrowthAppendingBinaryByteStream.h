@@ -59,10 +59,10 @@ public:
 
   /// This is an optimized version of \c writeBytes that assumes we know the
   /// size of \p Value at compile time (which in particular holds for integers).
-  /// It does so by avoiding the memcopy that \c writeBytes requires to copy
-  /// the arbitrarily sized Buffer to the output buffer and using a direct
-  /// memory assignment instead.
-  /// This assumes that the enianess of this steam is the same as the native
+  /// It does so by exposing the memcpy to the optimizer along with the size 
+  /// of the value being assigned; the compiler can then optimize the memcpy
+  /// into a fixed set of instructions.
+  /// This assumes that the endianess of this steam is the same as the native
   /// endianess on the executing machine. No endianess transformations are
   /// performed.
   template<typename T>
@@ -77,7 +77,7 @@ public:
       Data.resize(RequiredSize);
     }
 
-    *(T *)(Data.data() + Offset) = Value;
+    ::memcpy(Data.data() + Offset, &Value, sizeof Value);
 
     return llvm::Error::success();
   }

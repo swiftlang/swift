@@ -719,7 +719,8 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
                           DynamicSelfCaptureLoc,
                           DynamicSelf,
                           AFR);
-  AFR.getBody()->walk(finder);
+  if (AFR.getBody())
+    AFR.getBody()->walk(finder);
 
   unsigned inoutCount = 0;
   for (auto C : Captures) {

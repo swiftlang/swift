@@ -730,8 +730,13 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
     // FIXME: Some of the added new requirements may not have been taken into
     // account by the substGenericArgs. So, canonicalize in the context of the
     // specialized signature.
-    FnTy = cast<SILFunctionType>(
-        CanSpecializedGenericSig->getCanonicalTypeInContext(FnTy));
+    if (CanSpecializedGenericSig)
+      FnTy = cast<SILFunctionType>(
+          CanSpecializedGenericSig->getCanonicalTypeInContext(FnTy));
+    else {
+      FnTy = cast<SILFunctionType>(FnTy->getCanonicalType());
+      assert(!FnTy->hasTypeParameter() && "Type parameters outside generic context?");
+    }
   }
   assert(FnTy);
 
