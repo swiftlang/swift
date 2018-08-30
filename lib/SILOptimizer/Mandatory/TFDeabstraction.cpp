@@ -2334,10 +2334,11 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       if (constValue.getKind() == SymbolicValue::Array)
         break;
       if (constValue.getKind() == SymbolicValue::Metatype) {
-        SmallVector<SymbolicValue, 8> metatypes;
+        SmallVector<SymbolicValue, 8> dtypes;
         if (!collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
-                                              metatypes))
-          return diagnoseInvalidAttr("not an aggregate of TensorFlow values");
+                                              dtypes))
+          return diagnoseInvalidAttr("requires a TensorFlow value type or an "
+                                     "aggregate of TensorFlow value types");
         // Drop '$array' from the attribute name.
         currentAttr.name = context.getIdentifier(operandClass.first);
         // Replace the single metatype with a list of metatypes each
@@ -2345,7 +2346,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         auto *dtypeProto =
             context.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
         currentAttr.value = SymbolicValue::getArray(
-            metatypes, dtypeProto->getInterfaceType()->getCanonicalType(),
+            dtypes, dtypeProto->getInterfaceType()->getCanonicalType(),
             context.getAllocator());
         break;
       }
@@ -2356,6 +2357,29 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       if (getIntArrayProduct(constValue) < 0)
         return; // error already emitted.
       break;
+    case SILTensorOpInfo::OperandClass::UnknownShapeList: {
+      if (constValue.getKind() != SymbolicValue::Metatype)
+        return diagnoseInvalidAttr("requires a metatype");
+      auto type = constValue.getMetatypeValue();
+      SmallVector<Type, 8> tfValueTypes;
+      if (!tf::flattenTensorFlowValueAggregate(type, tfValueTypes))
+        return diagnoseInvalidAttr("requires a TensorFlow value type or an "
+                                   "aggregate or TensorFlow value types");
+      // Drop '$unknownShapeList' from the attribute name.
+      currentAttr.name = context.getIdentifier(operandClass.first);
+      auto tensorShapeType =
+          context.getTensorShapeDecl()->getDeclaredInterfaceType();
+      auto tensorShapeOptional =
+          BoundGenericType::get(context.getOptionalDecl(), Type(),
+                                {tensorShapeType})->getCanonicalType();
+      // Create a list of nils representing unknown shape.
+      SmallVector<SymbolicValue, 8> nils(
+          tfValueTypes.size(),
+          SymbolicValue::getEnum(context.getOptionalNoneDecl()));
+      currentAttr.value = SymbolicValue::getArray(nils, tensorShapeOptional,
+                                                  context.getAllocator());
+      break;
+    }
     case SILTensorOpInfo::OperandClass::Tensor:
       if (constValue.getKind() == SymbolicValue::Integer ||
           constValue.getKind() == SymbolicValue::Float   ||
