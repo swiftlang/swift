@@ -66,7 +66,7 @@ entry(%0 : $AnyObject):
   // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
 
   // CHECK-objc-NEXT: [[RESULT:%.*]] = call swiftcc %objc_object* @try_apply_helper(%objc_object* %0, %swift.refcounted* swiftself undef, %swift.error** noalias nocapture [[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) [[ERRORSLOT]])
-  // CHECK-native-NEXT: [[RESULT:%.*]] = call swiftcc %swift.refcounted* @try_apply_helper(%swift.refcounted* %0, %swift.refcounted* swiftself undef, %swift.error** nocapture [[SWIFTERROR]]{{( )?}}[[ERRORSLOT]])
+  // CHECK-native-NEXT: [[RESULT:%.*]] = call swiftcc %swift.refcounted* @try_apply_helper(%swift.refcounted* %0, %swift.refcounted* swiftself undef, %swift.error** noalias nocapture [[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) [[ERRORSLOT]])
   // CHECK-NEXT: [[ERR:%.*]] = load %swift.error*, %swift.error** [[ERRORSLOT]], align
   // CHECK-NEXT: [[T0:%.*]] = icmp ne %swift.error* [[ERR]], null
   // CHECK-NEXT: br i1 [[T0]],
