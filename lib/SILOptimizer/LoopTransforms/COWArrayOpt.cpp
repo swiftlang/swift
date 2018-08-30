@@ -2376,9 +2376,8 @@ class SwiftArrayOptPass : public SILFunctionTransform {
       for (auto &HoistableLoopNest : HoistableLoopNests)
         ArrayPropertiesSpecializer(DT, LA, HoistableLoopNest).run();
 
-      // We might have cloned there might be critical edges that need splitting.
-      splitAllCriticalEdges(*getFunction(), true /* only cond_br terminators*/,
-                            DT, nullptr);
+      // Verify that no illegal critical edges were created.
+      getFunction()->verifyCriticalEdges();
 
       LLVM_DEBUG(getFunction()->viewCFG());
 

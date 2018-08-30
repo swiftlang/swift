@@ -378,6 +378,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SILOpenedArchetypesTracker OpenedArchetypes;
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
+  const SILArgument *CurArgument = nullptr;
   DominanceInfo *Dominance = nullptr;
 
   // Used for dominance checking within a basic block.
@@ -404,12 +405,12 @@ public:
     if (CurInstruction) {
       llvm::dbgs() << "Verifying instruction:\n";
       CurInstruction->printInContext(llvm::dbgs());
-      llvm::dbgs() << "In function:\n";
-      F.print(llvm::dbgs());
-    } else {
-      llvm::dbgs() << "In function:\n";
-      F.print(llvm::dbgs());
+    } else if (CurArgument) {
+      llvm::dbgs() << "Verifying argument:\n";
+      CurArgument->printInContext(llvm::dbgs());
     }
+    llvm::dbgs() << "In function:\n";
+    F.print(llvm::dbgs());
 
     // We abort by default because we want to always crash in
     // the debugger.
@@ -637,26 +638,46 @@ public:
     return M.getStage() == SILStage::Raw;
   }
 
-  void visitSILArgument(SILArgument *arg) {
-    checkLegalType(arg->getFunction(), arg, nullptr);
-    checkValueBaseOwnership(arg);
-
-    if (isa<SILPHIArgument>(arg) && prohibitAddressBlockArgs()) {
-      // As a structural SIL property, we disallow address-type block
+  void visitSILPHIArgument(SILPHIArgument *arg) {
+    // Verify that the `isPhiArgument` property is sound:
+    // - Phi arguments come from branches.
+    // - Non-phi arguments have a single predecessor.
+    if (arg->isPhiArgument()) {
+      for (SILBasicBlock *predBB : arg->getParent()->getPredecessorBlocks()) {
+        auto *TI = predBB->getTerminator();
+        // FIXME: when critical edges are removed, only allow BranchInst.
+        require(isa <BranchInst>(TI) || isa<CondBranchInst>(TI),
+                "All phi argument inputs must be from branches.");
+      }
+    } else {
+    }
+    if (arg->isPhiArgument() && prohibitAddressBlockArgs()) {
+      // As a property of well-formed SIL, we disallow address-type block
       // arguments. Supporting them would prevent reliably reasoning about the
       // underlying storage of memory access. This reasoning is important for
       // diagnosing violations of memory access rules and supporting future
       // optimizations such as bitfield packing. Address-type block arguments
       // also create unnecessary complexity for SIL optimization passes that
       // need to reason about memory aliasing.
-      //
-      // Note: We could allow non-phi block arguments to be addresses, because
-      // the address source would still be uniquely recoverable. But then
-      // we would need to separately ensure that something like begin_access is
-      // never passed as a block argument before being used by end_access. For
-      // now, it simpler to have a strict prohibition.
       require(!arg->getType().isAddress(),
               "Block arguments cannot be addresses");
+    }
+  }
+
+  void visitSILArgument(SILArgument *arg) {
+    CurArgument = arg;
+    checkLegalType(arg->getFunction(), arg, nullptr);
+    checkValueBaseOwnership(arg);
+    if (auto *phiArg = dyn_cast<SILPHIArgument>(arg)) {
+      if (phiArg->isPhiArgument())
+        visitSILPHIArgument(phiArg);
+      else {
+        // A non-phi BlockArgument must have a single predecessor unless it is
+        // unreachable.
+        require(arg->getParent()->pred_empty()
+                    || arg->getParent()->getSinglePredecessorBlock(),
+                "Non-branch terminator must have a unique successor.");
+      }
     }
   }
 
@@ -4574,7 +4595,7 @@ public:
     }
   }
 
-  void verifyBranches(SILFunction *F) {
+  void verifyBranches(const SILFunction *F) {
     // Verify that there is no non_condbr critical edge.
     auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
       assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
@@ -4595,7 +4616,7 @@ public:
     };
 
     for (auto &BB : *F) {
-      TermInst *TI = BB.getTerminator();
+      const TermInst *TI = BB.getTerminator();
       CurInstruction = TI;
 
       // Check for non-cond_br critical edges.
@@ -4742,6 +4763,7 @@ public:
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {
+    CurInstruction = nullptr;
     for (auto argI = BB->args_begin(), argEnd = BB->args_end(); argI != argEnd;
          ++argI)
       visitSILArgument(*argI);
@@ -4836,6 +4858,10 @@ void SILFunction::verify(bool SingleFunction) const {
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
   SILVerifier(*this, SingleFunction).verify();
+}
+
+void SILFunction::verifyCriticalEdges() const {
+  SILVerifier(*this, /*SingleFunction=*/true).verifyBranches(this);
 }
 
 /// Verify that a property descriptor follows invariants.

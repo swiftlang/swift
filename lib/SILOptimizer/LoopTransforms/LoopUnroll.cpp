@@ -150,11 +150,11 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
 
   auto *Start = dyn_cast_or_null<IntegerLiteralInst>(
-      RecArg->getIncomingValue(Preheader));
+      RecArg->getIncomingPhiValue(Preheader));
   if (!Start)
     return None;
 
-  if (RecNext != RecArg->getIncomingValue(OrigLatch))
+  if (RecNext != RecArg->getIncomingPhiValue(OrigLatch))
     return None;
 
   auto StartVal = Start->getValue();

@@ -1161,7 +1161,7 @@ public:
     //
     // TODO: maybe we can do this lazily or maybe we should disallow SIL passes
     // to create critical edges.
-    bool EdgeChanged = splitAllCriticalEdges(*F, false, nullptr, nullptr);
+    bool EdgeChanged = splitAllCriticalEdges(*F, nullptr, nullptr);
     if (EdgeChanged)
       POA->invalidateFunction(F);
 
