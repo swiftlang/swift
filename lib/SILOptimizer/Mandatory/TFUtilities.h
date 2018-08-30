@@ -278,10 +278,9 @@ public:
   /// know that they are either unreachable or will be inlined into any
   /// clients that use them.
   ///
-  /// If the flag forceTFFunctions is true, it forces partitioning of functions
-  /// that operate on Tensor values irrespective of whether they are inlinable,
-  /// private, etc.
-  bool shouldBePartitioned(SILFunction *fn, bool forceTFFunctions = false);
+  /// If the flag forceTFFunctions is true, forces partitioning of functions
+  /// that operate on Tensors even if it would have been rejected otherwise.
+  bool shouldBePartitioned(SILFunction *fn, bool forceTFFunctions);
 
   /// Return true if the specified function type has TensorFlow values in its
   /// argument or result list (and do so recursively, if `fnType` has an

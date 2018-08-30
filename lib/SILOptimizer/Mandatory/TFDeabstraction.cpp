@@ -2515,7 +2515,7 @@ void TFDeabstractionPass::run() {
     // If this function is a building block of larger tensor programs (e.g.
     // the ops defined in the TensorFlow module), then don't transform it in
     // isolation.
-    if (!tfc.shouldBePartitioned(&fn))
+    if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false))
       continue;
 
     // If something crashes, make sure the pretty stack trace says what we
@@ -2536,8 +2536,8 @@ void TFDeabstractionPass::run() {
   // Deabstract stragglers that were left out in the previous iteration. These
   // are functions that are *still* referred to in the code and operate on
   // tensor values, but have not been partitioned. It can happen in the
-  // following case, for instance, where `foo` is an external function that
-  // takes a for which we do not have the body:
+  // following case, for instance, where `foo` is an external function that has
+  // no body and takes or returns Tensors:
   //   main() {
   //     foo() { $0 -= 0.1 * $1 }
   //   }
@@ -2550,7 +2550,13 @@ void TFDeabstractionPass::run() {
   //
   // (Note the body of a function may be missing when we are linking against a
   // library or in the REPL context where the function was defined on a
-  // different line.)
+  // different REPL line.)
+  //
+  // We are doing this in two phases because we do not want to partition a
+  // function unless it is absolutely necessary. In the first round, we
+  // inline as much of the functions as possible during deabstraction. Many
+  // of the functions would be dead after the first round, but some stragglers
+  // remain as in the example above.
   for (auto &fn : *module) {
     // Skip if it is already partitioned, or if it was ignored only because it
     // operated on tensor values.

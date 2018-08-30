@@ -626,11 +626,6 @@ tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
 // TensorFunctionClassifier Implementation
 //===----------------------------------------------------------------------===//
 
-/// Return true if the specified function is the top-level context that
-/// tensor partitioning should be applied to.  This returns false (for
-/// example) for inlined functions that take and return tensors, since we
-/// know that they are either unreachable or will be inlined into any
-/// clients that use them.
 bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
                                                    bool forceTFFunctions) {
   // Ignore transparent functions.
@@ -710,7 +705,7 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
       // Return true if it is referenced somewhere.
       // TODO: There might be a better check other than fn->getRefCount() > 0.
       // See the clean up code in TFDeabstraction::inlineCalls() function.
-      return (fn->getRefCount() > 0);
+      return fn->getRefCount() > 0;
     } else {
       return false;
     }
