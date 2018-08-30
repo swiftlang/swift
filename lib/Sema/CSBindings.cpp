@@ -224,23 +224,20 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
 
 bool ConstraintSystem::PotentialBindings::isViable(
     PotentialBinding &binding) const {
-  // Prevent against checking against the same bound generic type
+  // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
   // case. In the worst case, we'll produce lots of duplicate solutions
   // for this constraint system, which is problematic for overload
   // resolution.
   auto type = binding.BindingType;
   if (type->hasTypeVariable()) {
-    auto *BGT = type->getAs<BoundGenericType>();
-    if (!BGT)
+    auto *NTD = type->getAnyNominal();
+    if (!NTD)
       return true;
 
     for (auto &existing : Bindings) {
-      auto existingBGT = existing.BindingType->getAs<BoundGenericType>();
-      if (!existingBGT)
-        continue;
-
-      if (BGT != existingBGT && BGT->getDecl() == existingBGT->getDecl())
+      auto *existingNTD = existing.BindingType->getAnyNominal();
+      if (existingNTD && NTD == existingNTD)
         return false;
     }
   }
