@@ -1411,8 +1411,9 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     case '"':
     case '\'': {
       if (!AllowNewline.back() && inStringLiteral()) {
-        if (OpenDelimiters.back() == CurPtr[-1] &&
-            delimiterMatches(CustomDelimiter.back(), CurPtr)) {
+        unsigned InnerDelimiter = CustomDelimiter.back();
+        if (OpenDelimiters.back() == CurPtr[-1] && (!InnerDelimiter ||
+             (delimiterMatches(InnerDelimiter, CurPtr) && *CurPtr != '#'))) {
           // Closing single line string literal.
           OpenDelimiters.pop_back();
           AllowNewline.pop_back();
@@ -1800,7 +1801,8 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
       }
 
       // Is this the end of multiline/delimited string literal?
-      if (StringRef(CurPtr, BufferEnd - CurPtr).startswith(ExtraTermination)) {
+      if (StringRef(CurPtr, BufferEnd - CurPtr).startswith(ExtraTermination) &&
+          (!DelimiterLength || *(CurPtr + ExtraTermination.size()) != '#')) {
         TokStart -= DelimiterLength;
         CurPtr += ExtraTermination.size();
         if (wasErroneous)
