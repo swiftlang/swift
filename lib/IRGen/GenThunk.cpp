@@ -115,3 +115,10 @@ llvm::Function *IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
 
   return f;
 }
+
+llvm::GlobalValue *IRGenModule::defineMethodDescriptor(SILDeclRef declRef,
+                                                       NominalTypeDecl *nominalDecl,
+                                                       llvm::Constant *definition) {
+  auto entity = LinkEntity::forMethodDescriptor(declRef);
+  return defineAlias(entity, definition);
+}

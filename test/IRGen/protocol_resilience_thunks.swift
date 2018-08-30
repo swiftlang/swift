@@ -7,6 +7,17 @@
 
 import resilient_protocol
 
+// Method descriptors
+
+// CHECK-LABEL: @"$S26protocol_resilience_thunks19MyResilientProtocolP11returnsVoid1xySb_tFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr inbounds (<{{.*}}>* @"$S26protocol_resilience_thunks19MyResilientProtocolMp", i32 0, i32 6)
+// CHECK-LABEL: @"$S26protocol_resilience_thunks19MyResilientProtocolP11returnsBoolSbyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr inbounds (<{{.*}}>* @"$S26protocol_resilience_thunks19MyResilientProtocolMp", i32 0, i32 7)
+// CHECK-LABEL: @"$S26protocol_resilience_thunks19MyResilientProtocolP10returnsAnyypyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr inbounds (<{{.*}}>* @"$S26protocol_resilience_thunks19MyResilientProtocolMp", i32 0, i32 8)
+// CHECK-LABEL: @"$S26protocol_resilience_thunks19MyResilientProtocolP12throwingFuncyyKFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr inbounds (<{{.*}}>* @"$S26protocol_resilience_thunks19MyResilientProtocolMp", i32 0, i32 9)
+// CHECK-LABEL: @"$S26protocol_resilience_thunks19MyResilientProtocolP11genericFuncyqd__qd__lFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr inbounds (<{{.*}}>* @"$S26protocol_resilience_thunks19MyResilientProtocolMp", i32 0, i32 10)
+// CHECK-LABEL: @"$S26protocol_resilience_thunks19MyResilientProtocolP8propertySbvgTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr inbounds (<{{.*}}>* @"$S26protocol_resilience_thunks19MyResilientProtocolMp", i32 0, i32 11)
+// CHECK-LABEL: @"$S26protocol_resilience_thunks19MyResilientProtocolP8propertySbvsTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr inbounds (<{{.*}}>* @"$S26protocol_resilience_thunks19MyResilientProtocolMp", i32 0, i32 12)
+// CHECK-LABEL: @"$S26protocol_resilience_thunks19MyResilientProtocolP8propertySbvMTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr inbounds (<{{.*}}>* @"$S26protocol_resilience_thunks19MyResilientProtocolMp", i32 0, i32 13)
+
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S26protocol_resilience_thunks26callResilientWitnessMethodyyx010resilient_A00E12BaseProtocolRzlF"(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.ResilientBaseProtocol)
 // CHECK: call swiftcc [[INT]] @"$S18resilient_protocol21ResilientBaseProtocolP11requirementSiyFTj"(%swift.opaque* noalias nocapture swiftself %0, %swift.type* %T, i8** %T.ResilientBaseProtocol)
 // CHECK: ret void

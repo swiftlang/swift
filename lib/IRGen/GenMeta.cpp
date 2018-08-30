@@ -550,12 +550,14 @@ namespace {
     Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
       NumRequirementsInSignature,
       NumRequirements;
+
+    bool Resilient;
+
   public:
     ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *Proto,
                                      SILDefaultWitnessTable *defaultWitnesses)
-      : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses)
-    {
-    }
+      : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
+        Resilient(IGM.isResilient(Proto, ResilienceExpansion::Minimal)) {}
 
     void layout() {
       super::layout();
@@ -649,7 +651,7 @@ namespace {
 
       // Look up the dispatch thunk if the protocol is resilient.
       llvm::Constant *thunk = nullptr;
-      if (IGM.isResilient(Proto, ResilienceExpansion::Minimal))
+      if (Resilient)
         thunk = IGM.emitDispatchThunk(func);
 
       // Classify the function.
@@ -668,6 +670,15 @@ namespace {
                                pi.getNumWitnesses());
 
       for (auto &entry : pi.getWitnessEntries()) {
+        if (Resilient && entry.isFunction()) {
+          // Define the method descriptor.
+          SILDeclRef func(entry.getFunction());
+          auto *descriptor =
+            B.getAddrOfCurrentPosition(
+              IGM.ProtocolRequirementStructTy);
+          IGM.defineMethodDescriptor(func, Proto, descriptor);
+        }
+
         auto reqt = B.beginStruct(IGM.ProtocolRequirementStructTy);
 
         auto info = getRequirementInfo(entry);
@@ -1207,13 +1218,13 @@ namespace {
 
     SILVTable *VTable = nullptr;
     unsigned VTableSize = 0;
-    bool isResilient;
+    bool Resilient;
 
   public:
     ClassContextDescriptorBuilder(IRGenModule &IGM, ClassDecl *Type,
                                   RequireMetadata_t requireMetadata)
       : super(IGM, Type, requireMetadata),
-        isResilient(IGM.isResilient(Type, ResilienceExpansion::Minimal)) {
+        Resilient(IGM.isResilient(Type, ResilienceExpansion::Minimal)) {
 
       if (getType()->isForeign()) return;
 
@@ -1309,6 +1320,12 @@ namespace {
     void addMethod(SILDeclRef fn) {
       assert(VTable && "no vtable?!");
 
+      // Define the method descriptor to point to the current position in the
+      // nominal type descriptor.
+      IGM.defineMethodDescriptor(fn, Type,
+                      B.getAddrOfCurrentPosition(IGM.MethodDescriptorStructTy));
+
+      // Actually build the descriptor.
       auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
       auto descriptor = B.beginStruct(IGM.MethodDescriptorStructTy);
 
@@ -1343,7 +1360,7 @@ namespace {
       descriptor.finishAndAddTo(B);
 
       // Emit method dispatch thunk if the class is resilient.
-      if (isResilient &&
+      if (Resilient &&
           func->getEffectiveAccess() >= AccessLevel::Public) {
         IGM.emitDispatchThunk(fn);
       }
