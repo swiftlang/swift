@@ -20,7 +20,7 @@ import LibProc
 import TestsUtils
 
 struct BenchResults {
-  typealias T = UInt64
+  typealias T = Int
   private let samples: [T]
   let maxRSS: Int
   let stats: Stats
@@ -37,11 +37,11 @@ struct BenchResults {
     return samples[index]
   }
 
-  var sampleCount: T { return UInt64(samples.count) }
+  var sampleCount: T { return samples.count }
   var min: T { return samples.first! }
   var max: T { return samples.last! }
-  var mean: T { return UInt64(stats.mean.rounded()) }
-  var sd: T { return UInt64(stats.standardDeviation.rounded()) }
+  var mean: T { return Int(stats.mean.rounded()) }
+  var sd: T { return Int(stats.standardDeviation.rounded()) }
   var median: T { return self[0.5] }
 }
 
@@ -235,7 +235,7 @@ struct Stats {
     var variance: Double { return n < 2 ? 0.0 : S / Double(n - 1) }
     var standardDeviation: Double { return variance.squareRoot() }
 
-    static func collect(_ s: inout Stats, _ x: UInt64){
+    static func collect(_ s: inout Stats, _ x: Int){
         Stats.runningMeanVariance(&s, Double(x))
     }
 
@@ -387,7 +387,7 @@ final class SampleRunner {
   }
 
   /// Measure the `fn` and return the average sample time per iteration (μs).
-  func measure(_ name: String, fn: (Int) -> Void, numIters: Int) -> UInt64 {
+  func measure(_ name: String, fn: (Int) -> Void, numIters: Int) -> Int {
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in startTrackingObjects(p) }
 #endif
@@ -400,13 +400,14 @@ final class SampleRunner {
     name.withCString { p in stopTrackingObjects(p) }
 #endif
 
-    return lastSampleTime / UInt64(numIters) / 1000
+    // Convert to μs and compute the average sample time per iteration.
+    return Int(lastSampleTime / 1000) / numIters
   }
 }
 
 /// Invoke the benchmark entry point and return the run time in milliseconds.
 func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
-  var samples = [UInt64](repeating: 0, count: c.numSamples)
+  var samples = [Int](repeating: 0, count: c.numSamples)
 
   // Before we do anything, check that we actually have a function to
   // run. If we don't it is because the benchmark is not supported on
@@ -427,15 +428,15 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
 
   for s in 0..<c.numSamples {
     var scale : Int
-    var elapsed_time : UInt64 = 0
+    var elapsed_time : Int = 0
     if c.fixedNumIters == 0 {
       elapsed_time = sampler.measure(test.name, fn: testFn, numIters: 1)
 
       if elapsed_time > 0 {
         let usPerSecond = 1_000_000.0 // microseconds (μs)
-        let timePerSample = UInt64(c.sampleTime * usPerSecond)
+        let timePerSample = Int(c.sampleTime * usPerSecond)
         /// Number of iterations to make `testFn` run for the desired time.
-        scale = Int(timePerSample / elapsed_time)
+        scale = timePerSample / elapsed_time
       } else {
         if c.verbose {
           print("    Warning: elapsed time is 0. This can be safely ignored if the body is empty.")
