@@ -429,27 +429,26 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
     var numIters : Int
     var time: Int = 0
     if c.fixedNumIters == 0 {
+      // Compute the `numIters` if a `c.fixedNumIters` is not specified.
       time = sampler.measure(test.name, fn: testFn, numIters: 1)
 
       if time > 0 {
         let usPerSecond = 1_000_000.0 // microseconds (μs)
         let timePerSample = Int(c.sampleTime * usPerSecond)
-        /// Number of iterations to make `testFn` run for the desired time.
+        // Number of iterations to make `testFn` run for the desired time.
         numIters = timePerSample / time
       } else {
         logVerbose("    Warning: elapsed time is 0!")
         numIters = 1
       }
     } else {
-      // Compute the scaling factor if a fixed c.fixedNumIters is not specified.
       numIters = c.fixedNumIters
       if numIters == 1 {
         time = sampler.measure(test.name, fn: testFn, numIters: 1)
       }
     }
-    // Make integer overflow less likely on platforms where Int is 32 bits wide.
-    // FIXME: Switch BenchmarkInfo to use Int64 for the iteration scale, or fix
-    // benchmarks to not let scaling get off the charts.
+    // Cap the `numIters` to prevent overflow on 32-bit systems during
+    // multiplication with the inner loop multiplier inside the `testFn`.
     numIters = min(numIters, Int.max / 10_000)
 
     // Rerun the test with the computed scale factor.
