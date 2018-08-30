@@ -141,20 +141,24 @@ class PerformanceTestSamples(object):
         """Maximum sampled value."""
         return self.samples[-1].runtime
 
+    def _quantile_index(self, q, i):
+        """Return index of the element nearest to the i-th q-quantile."""
+        return int(round((self.count - 1) / float(q) * float(i)))
+
     @property
     def median(self):
         """Median sampled value."""
-        return self.samples[self.count / 2].runtime
+        return self.samples[self._quantile_index(2, 1)].runtime
 
     @property
     def q1(self):
         """First Quartile (25th Percentile)."""
-        return self.samples[self.count / 4].runtime
+        return self.samples[self._quantile_index(4, 1)].runtime
 
     @property
     def q3(self):
         """Third Quartile (75th Percentile)."""
-        return self.samples[(self.count / 2) + (self.count / 4)].runtime
+        return self.samples[self._quantile_index(4, 3)].runtime
 
     @property
     def iqr(self):
