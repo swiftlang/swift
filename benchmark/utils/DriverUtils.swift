@@ -386,20 +386,21 @@ final class SampleRunner {
     return timer.diffTimeInNanoSeconds(from: start, to: end)
   }
 
-  func run(_ name: String, fn: (Int) -> Void, num_iters: Int) -> UInt64 {
+  /// Measure the `fn` and return the average sample time per iteration (μs).
+  func measure(_ name: String, fn: (Int) -> Void, numIters: Int) -> UInt64 {
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in startTrackingObjects(p) }
 #endif
 
-    self.startMeasurement()
-    fn(num_iters)
-    self.stopMeasurement()
+    startMeasurement()
+    fn(numIters)
+    stopMeasurement()
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in stopTrackingObjects(p) }
 #endif
 
-    return lastSampleTime
+    return lastSampleTime / UInt64(numIters) / 1000
   }
 }
 
@@ -425,16 +426,16 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   test.setUpFunction?()
 
   for s in 0..<c.numSamples {
-    let nsPerSecond = 1_000_000_000.0 // nanoseconds
-    let time_per_sample = UInt64(c.sampleTime * nsPerSecond)
-
     var scale : Int
     var elapsed_time : UInt64 = 0
     if c.fixedNumIters == 0 {
-      elapsed_time = sampler.run(test.name, fn: testFn, num_iters: 1)
+      elapsed_time = sampler.measure(test.name, fn: testFn, numIters: 1)
 
       if elapsed_time > 0 {
-        scale = Int(time_per_sample / elapsed_time)
+        let usPerSecond = 1_000_000.0 // microseconds (μs)
+        let timePerSample = UInt64(c.sampleTime * usPerSecond)
+        /// Number of iterations to make `testFn` run for the desired time.
+        scale = Int(timePerSample / elapsed_time)
       } else {
         if c.verbose {
           print("    Warning: elapsed time is 0. This can be safely ignored if the body is empty.")
@@ -445,7 +446,7 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
       // Compute the scaling factor if a fixed c.fixedNumIters is not specified.
       scale = c.fixedNumIters
       if scale == 1 {
-        elapsed_time = sampler.run(test.name, fn: testFn, num_iters: 1)
+        elapsed_time = sampler.measure(test.name, fn: testFn, numIters: 1)
       }
     }
     // Make integer overflow less likely on platforms where Int is 32 bits wide.
@@ -458,12 +459,10 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
       if c.verbose {
         print("    Measuring with scale \(scale).")
       }
-      elapsed_time = sampler.run(test.name, fn: testFn, num_iters: scale)
-    } else {
-      scale = 1
+      elapsed_time = sampler.measure(test.name, fn: testFn, numIters: scale)
     }
-    // save result in microseconds
-    samples[s] = elapsed_time / UInt64(scale) / 1000
+
+    samples[s] = elapsed_time
     if c.verbose {
       print("    Sample \(s),\(samples[s])")
     }
