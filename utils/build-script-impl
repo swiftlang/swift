@@ -82,6 +82,7 @@ KNOWN_SETTINGS=(
     playgroundsupport-build-type "Debug"         "the build variant for PlaygroundSupport"
     xctest-build-type           "Debug"          "the build variant for xctest"
     swiftpm-build-type          "Debug"          "the build variant for swiftpm"
+    swiftsyntax-build-type      "Debug"          "the build variant for swiftSyntax"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
     enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
@@ -122,6 +123,7 @@ KNOWN_SETTINGS=(
     skip-build-lldb             ""               "set to skip building LLDB"
     skip-build-llbuild          ""               "set to skip building llbuild"
     skip-build-swiftpm          ""               "set to skip building swiftpm"
+    skip-build-swiftsyntax      ""               "set to skip building swiftSyntax"
     skip-build-xctest           ""               "set to skip building xctest"
     skip-build-foundation       ""               "set to skip building foundation"
     skip-build-libdispatch      ""               "set to skip building libdispatch"
@@ -134,6 +136,7 @@ KNOWN_SETTINGS=(
     skip-test-swift             ""               "set to skip testing Swift"
     skip-test-llbuild           ""               "set to skip testing llbuild"
     skip-test-swiftpm           ""               "set to skip testing swiftpm"
+    skip-test-swiftsyntax       ""               "set to skip testing swiftSyntax"
     skip-test-xctest            ""               "set to skip testing xctest"
     skip-test-foundation        ""               "set to skip testing foundation"
     skip-test-libdispatch       ""               "set to skip testing libdispatch"
@@ -142,7 +145,7 @@ KNOWN_SETTINGS=(
     skip-test-linux             ""               "set to skip testing Swift stdlibs for Linux"
     skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
     skip-test-cygwin            ""               "set to skip testing Swift stdlibs for Cygwin"
-    skip-test-haiku            ""                "set to skip testing Swift stdlibs for Haiku"
+    skip-test-haiku             ""               "set to skip testing Swift stdlibs for Haiku"
     skip-test-osx               ""               "set to skip testing Swift stdlibs for OS X"
     skip-test-ios-32bit-simulator     ""         "set to skip testing Swift stdlibs for iOS 32bit simulators"
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
@@ -1162,6 +1165,7 @@ CMARK_SOURCE_DIR="${WORKSPACE}/cmark"
 LLDB_SOURCE_DIR="${WORKSPACE}/lldb"
 LLBUILD_SOURCE_DIR="${WORKSPACE}/llbuild"
 SWIFTPM_SOURCE_DIR="${WORKSPACE}/swiftpm"
+SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
@@ -1202,7 +1206,7 @@ PRODUCTS=("${PRODUCTS[@]}" swift)
 if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" lldb)
 fi
-# LLBuild, SwiftPM and XCTest are dependent on Foundation, so Foundation must be
+# LLBuild, SwiftPM, SwiftSyntax and XCTest are dependent on Foundation, so Foundation must be
 # added to the list of build products first.
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libdispatch)
@@ -1216,13 +1220,18 @@ fi
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" playgroundsupport)
 fi
-# SwiftPM is dependent on XCTest, so XCTest must be added to the list of
+# SwiftPM and SwiftSyntax are dependent on XCTest, so XCTest must be added to the list of
 # build products first.
 if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" xctest)
 fi
+# SwiftSyntax is dependent on SwiftPM, so SwiftPM must be added to the list of
+# build products first.
 if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
+fi
+if [[ ! "${SKIP_BUILD_SWIFTSYNTAX}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" swiftsyntax)
 fi
 
 # Checks if a given product is enabled (i.e. part of $PRODUCTS array)
@@ -1531,6 +1540,9 @@ function build_directory_bin() {
             swiftpm)
                 echo "${root}/${SWIFTPM_BUILD_TYPE}/bin"
                 ;;
+            swiftsyntax)
+                echo "${root}/${SWIFTSYNTAX_BUILD_TYPE}/bin"
+                ;;
             xctest)
                 echo "${root}/${XCTEST_BUILD_TYPE}/bin"
                 ;;
@@ -1551,7 +1563,13 @@ function build_directory_bin() {
                 ;;
         esac
     else
-        echo "${root}/bin"
+        if [[ "${product}" == "swiftpm" ]] ; then
+            # All projects that call this depend on SwiftPM so we know that 
+            # swiftpm_bootstrap_command has already been set
+            echo "$(${swiftpm_bootstrap_command[@]} --show-bin-path)"
+        else
+            echo "${root}/bin"
+        fi
     fi
 }
 
@@ -1661,6 +1679,9 @@ function cmake_config_opt() {
             swiftpm)
                 echo "--config ${SWIFTPM_BUILD_TYPE}"
                 ;;
+            swiftsyntax)
+                echo "--config ${SWIFTSYNTAX_BUILD_TYPE}"
+                ;;
             xctest)
                 echo "--config ${XCTEST_BUILD_TYPE}"
                 ;;
@@ -1703,6 +1724,10 @@ function set_swiftpm_bootstrap_command() {
         echo "Error: Cannot build swiftpm without llbuild (swift-build-tool)."
         exit 1
     fi
+    if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
+        echo "Error: Cannot build swiftpm when llbuild is built using Xcode."
+        exit 1
+    fi
     swiftpm_bootstrap_command=("${SWIFTPM_SOURCE_DIR}/Utilities/bootstrap" "${swiftpm_bootstrap_options[@]}")
     # Add --release if we have to build in release mode.
     if [[ "${SWIFTPM_BUILD_TYPE}" ==  "Release" ]] ; then
@@ -1739,6 +1764,29 @@ function set_swiftpm_bootstrap_command() {
                 --xctest="${XCTEST_BUILD_DIR}")
         fi
     fi
+}
+
+function set_swiftsyntax_build_command() {
+    if [ "${SKIP_BUILD_SWIFTPM}" ]; then
+        echo "Error: Cannot build swiftsyntax without swiftpm."
+        exit 1
+    fi
+
+    swiftsyntax_build_command=("${SWIFTSYNTAX_SOURCE_DIR}/build-script.py")
+    # Add --release if we have to build in release mode.
+    if [[ $(is_cmake_release_build_type "${SWIFTSYNTAX_BUILD_TYPE}") ]] ; then
+        swiftsyntax_build_command+=(--release)
+    fi
+    if [[ "${VERBOSE_BUILD}" ]] ; then
+        swiftsyntax_build_command+=(-v)
+    fi
+    swiftsyntax_build_command+=(
+        --build-dir="${build_dir}"
+        --swift-build-exec="$(build_directory_bin ${LOCAL_HOST} swiftpm)/swift-build"
+        --swift-test-exec="$(build_directory_bin ${LOCAL_HOST} swiftpm)/swift-test"
+        --swiftc-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+        --swift-syntax-test-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swift-syntax-test"
+        --filecheck-exec="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck")
 }
 
 # Construct the appropriate options to pass to an Xcode
@@ -2400,6 +2448,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 # swiftpm installs itself with a bootstrap method. No further cmake building is performed.
                 continue
                 ;;
+            swiftsyntax)
+                set_swiftsyntax_build_command
+                call "${swiftsyntax_build_command[@]}"
+
+                continue
+                ;;
             xctest)
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
@@ -2937,6 +2991,15 @@ for host in "${ALL_HOSTS[@]}"; do
                 # As swiftpm tests itself, we break early here.
                 continue
                 ;;
+            swiftsyntax)
+                if [[ "${SKIP_TEST_SWIFTSYNTAX}" ]]; then
+                    continue
+                fi
+                echo "--- Running tests for ${product} ---"
+                call "${swiftsyntax_build_command[@]}" -t
+                # As swiftSyntax tests itself, we break early here.
+                continue
+                ;;
             xctest)
                 if [[ "${SKIP_TEST_XCTEST}" ]]; then
                     continue
@@ -3214,6 +3277,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Installing ${product} ---"
                 call "${swiftpm_bootstrap_command[@]}" --prefix="${host_install_destdir}${host_install_prefix}" install
                 # As swiftpm bootstraps the installation itself, we break early here.
+                continue
+                ;;
+            swiftsyntax)
+                # SwiftSyntax is not installed as part of the toolchain
                 continue
                 ;;
             xctest)

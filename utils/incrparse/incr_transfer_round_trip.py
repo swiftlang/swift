@@ -46,8 +46,8 @@ def main():
         '--swift-syntax-test', required=True,
         help='The path to swift-syntax-test')
     parser.add_argument(
-        '--swift-swiftsyntax-test', required=True,
-        help='The path to swift-swiftsyntax-test')
+        '--swiftsyntax-lit-test-helper', required=True,
+        help='The path to the lit-test-helper binary of SwiftSyntax')
     parser.add_argument(
         '--serialization-format', choices=['json', 'byteTree'], 
         default='json', help='''
@@ -61,7 +61,7 @@ def main():
     test_case = args.test_case
     temp_dir = args.temp_dir
     swift_syntax_test = args.swift_syntax_test
-    swift_swiftsyntax_test = args.swift_swiftsyntax_test
+    swiftsyntax_lit_test_helper = args.swiftsyntax_lit_test_helper
     serialization_format = args.serialization_format
 
     if not os.path.exists(temp_dir):
@@ -108,7 +108,7 @@ def main():
         sys.exit(1)
 
     try:
-        run_command([swift_swiftsyntax_test, '-deserialize-incremental'] +
+        run_command([swiftsyntax_lit_test_helper, '-deserialize-incremental'] +
                     ['-serialization-format', serialization_format] +
                     ['-pre-edit-tree', pre_edit_tree_file] +
                     ['-incr-tree', incremental_tree_file] +
