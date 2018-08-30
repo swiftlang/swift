@@ -180,7 +180,7 @@ obj.generic4!(5) // expected-error{{value of type 'Id' (aka 'AnyObject') has no 
 // Find properties via dynamic lookup.
 var prop1Result : Int = obj.prop1!
 var prop2Result : String = obj.prop2!
-obj.prop2 = "hello" // expected-error{{cannot assign to immutable expression of type 'String?'}}
+obj.prop2 = "hello" // expected-error{{cannot assign to property: 'obj' is immutable}}
 var protoPropResult : Int = obj.protoProp!
 
 // Find subscripts via dynamic lookup
@@ -290,9 +290,9 @@ let _: String = o[s]
 let _: String = o[s]!
 let _: String? = o[s]
 // FIXME: These should all produce lvalues that we can write through
-o.s = s // expected-error {{cannot assign to immutable expression of type 'String?'}}
+o.s = s // expected-error {{cannot assign to property: 'o' is immutable}}
 o.s! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
-o[s] = s // expected-error {{cannot assign to immutable expression of type 'String?'}}
+o[s] = s // expected-error {{cannot assign through subscript: 'o' is immutable}}
 o[s]! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
 
 let _: String = o.t
@@ -309,7 +309,7 @@ let _: DynamicIUO = o[dyn_iuo]!
 let _: DynamicIUO = o[dyn_iuo]!!
 let _: DynamicIUO? = o[dyn_iuo]
 // FIXME: These should all produce lvalues that we can write through
-o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO??'}}
+o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign through subscript: 'o' is immutable}}
 o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
 o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
 

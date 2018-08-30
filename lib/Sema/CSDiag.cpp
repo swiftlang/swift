@@ -4420,12 +4420,6 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
     if (calleeInfo.diagnoseSimpleErrors(SE))
       return true;
 
-    // If we haven't found a diagnostic yet, and we are in an assignment's
-    // destination, continue with diagnosing the assignment rather than giving
-    // a last resort diagnostic here.
-    if (inAssignmentDestination)
-      return false;
-
     diagnose(SE->getLoc(), diag::cannot_subscript_with_index, baseType,
              indexType);
 
@@ -5826,10 +5820,16 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
       if (diagnoseSubscriptErrors(subscriptExpr, /* inAssignmentDestination = */ true))
         return true;
     }
-
-    AssignmentFailure failure(destExpr, CS, assignExpr->getLoc());
-    if (failure.diagnoseAsError())
-      return true;
+    // Member ref assignment errors detected elsewhere, so not an assignment issue if found here.
+    // The remaining exception involves mutable pointer conversions which aren't always caught elsewhere.
+    PointerTypeKind ptk;
+    if (!isa<MemberRefExpr>(destExpr) || CS.getType(destExpr)
+                                             ->lookThroughAllOptionalTypes()
+                                             ->getAnyPointerElementType(ptk)) {
+      AssignmentFailure failure(destExpr, CS, assignExpr->getLoc());
+      if (failure.diagnoseAsError())
+        return true;
+    }
   }
 
   auto *srcExpr = assignExpr->getSrc();

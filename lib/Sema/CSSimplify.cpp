@@ -2369,7 +2369,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // If we're converting an lvalue to an inout type, add the missing '&'.
         conversionsOrFixes.push_back(
           AddAddressOf::create(*this, getConstraintLocator(locator)));
-      } else if (!isTypeVarOrMember1) {
+      } else {
         // If we have a concrete type that's an rvalue, "fix" it.
         conversionsOrFixes.push_back(
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
@@ -2377,8 +2377,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  if (attemptFixes && type2->is<LValueType>() && !isTypeVarOrMember1) {
-      conversionsOrFixes.push_back(
+  if (attemptFixes && type2->is<LValueType>()) {
+    conversionsOrFixes.push_back(
+        TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+  } else if (attemptFixes && kind == ConstraintKind::Bind && type1->is<LValueType>()) {
+    conversionsOrFixes.push_back(
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
   }
 
@@ -5008,7 +5011,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::TreatRValueAsLValue: {
-    auto result = matchTypes(LValueType::get(type1), type2,
+    if (type2->is<LValueType>() || type2->is<InOutType>())
+      type1 = LValueType::get(type1);
+    else
+      type2 = LValueType::get(type2);
+    auto result = matchTypes(type1, type2,
                              matchKind, subflags, locator);
     if (result == SolutionKind::Solved)
       if (recordFix(fix))
