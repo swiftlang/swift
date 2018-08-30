@@ -635,6 +635,29 @@ TEST_F(LexerTest, getLocForStartOfToken) {
   }
 }
 
+TEST_F(LexerTest, getLocForStartOfTokenWithCustomSourceLocation) {
+  const char *Source =
+      "aaa \n"
+      // This next line is exactly 50 bytes to make it easy to compare with the
+      // previous test.
+      "#sourceLocation(file: \"custom-50.swuft\", line: 9)\n"
+      " \tbbb \"hello\" \"-\\(val)-\"";
+
+  unsigned BufferID = SourceMgr.addMemBufferCopy(Source);
+
+  // First is character offset, second is its token offset.
+  unsigned Offs[][2] =
+    { {1, 0}, {2, 0}, {3, 3}, {4, 4},
+      {56, 56}, {59, 57}, {64, 61},
+      // interpolated string
+      {70, 69}, {73, 73}, {74, 73}, {75, 73}, {76, 76}, {77, 69} };
+
+  for (auto Pair : Offs) {
+    ASSERT_EQ(Lexer::getLocForStartOfToken(SourceMgr, BufferID, Pair[0]),
+              SourceMgr.getLocForOffset(BufferID, Pair[1]));
+  }
+}
+
 TEST_F(LexerTest, NestedSubLexers) {
   const char *Source = "aaa0 bbb1 ccc2 ddd3 eee4 fff5 ggg6";
 
