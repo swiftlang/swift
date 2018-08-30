@@ -426,39 +426,39 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   test.setUpFunction?()
 
   for s in 0..<c.numSamples {
-    var scale : Int
-    var elapsed_time : Int = 0
+    var numIters : Int
+    var time: Int = 0
     if c.fixedNumIters == 0 {
-      elapsed_time = sampler.measure(test.name, fn: testFn, numIters: 1)
+      time = sampler.measure(test.name, fn: testFn, numIters: 1)
 
-      if elapsed_time > 0 {
+      if time > 0 {
         let usPerSecond = 1_000_000.0 // microseconds (μs)
         let timePerSample = Int(c.sampleTime * usPerSecond)
         /// Number of iterations to make `testFn` run for the desired time.
-        scale = timePerSample / elapsed_time
+        numIters = timePerSample / time
       } else {
         logVerbose("    Warning: elapsed time is 0!")
-        scale = 1
+        numIters = 1
       }
     } else {
       // Compute the scaling factor if a fixed c.fixedNumIters is not specified.
-      scale = c.fixedNumIters
-      if scale == 1 {
-        elapsed_time = sampler.measure(test.name, fn: testFn, numIters: 1)
+      numIters = c.fixedNumIters
+      if numIters == 1 {
+        time = sampler.measure(test.name, fn: testFn, numIters: 1)
       }
     }
     // Make integer overflow less likely on platforms where Int is 32 bits wide.
     // FIXME: Switch BenchmarkInfo to use Int64 for the iteration scale, or fix
     // benchmarks to not let scaling get off the charts.
-    scale = min(scale, Int.max / 10_000)
+    numIters = min(numIters, Int.max / 10_000)
 
     // Rerun the test with the computed scale factor.
-    if scale > 1 {
-      logVerbose("    Measuring with scale \(scale).")
-      elapsed_time = sampler.measure(test.name, fn: testFn, numIters: scale)
+    if numIters > 1 {
+      logVerbose("    Measuring with scale \(numIters).")
+      time = sampler.measure(test.name, fn: testFn, numIters: numIters)
     }
 
-    samples[s] = elapsed_time
+    samples[s] = time
     logVerbose("    Sample \(s),\(samples[s])")
   }
   test.tearDownFunction?()
