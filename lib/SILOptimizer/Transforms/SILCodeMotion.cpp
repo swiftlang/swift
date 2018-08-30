@@ -890,7 +890,7 @@ static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
 
   // Make sure we can get all the incoming values.
   llvm::SmallVector<SILValue, 4> PredValues;
-  if (!SA->getIncomingValues(PredValues))
+  if (!SA->getIncomingPhiValues(PredValues))
     return false;
 
   // Ok, we can get all the incoming values and create releases for them.

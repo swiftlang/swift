@@ -794,20 +794,13 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
   if (auto *Arg = dyn_cast<SILArgument>(Val)) {
     HandledArgs.insert(Arg);
     llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> IncomingVals;
-    if (!Arg->getIncomingValues(IncomingVals))
+    if (!Arg->getIncomingPhiValues(IncomingVals))
       return nullptr;
 
     EnumElementDecl *CommonCase = nullptr;
     for (std::pair<SILBasicBlock *, SILValue> Incoming : IncomingVals) {
       SILBasicBlock *IncomingBlock = Incoming.first;
       SILValue IncomingVal = Incoming.second;
-      TermInst *TI = IncomingBlock->getTerminator();
-
-      // If the terminator of the incoming value is e.g. a switch_enum, the
-      // incoming value is the switch_enum operand and not the enum payload
-      // (which would be the real incoming value of the argument).
-      if (!isa<BranchInst>(TI) && !isa<CondBranchInst>(TI))
-        return nullptr;
 
       auto *IncomingArg = dyn_cast<SILArgument>(IncomingVal);
       if (IncomingArg && HandledArgs.count(IncomingArg) != 0)
@@ -2232,7 +2225,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
     if (somePredsAreConst)
       continue;
 
-    SILValue incoming = condArg->getIncomingValue(Pred);
+    SILValue incoming = condArg->getIncomingPhiValue(Pred);
     somePredsAreConst |= isa<IntegerLiteralInst>(incoming);
   }
 
@@ -2243,7 +2236,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
 
   // Move the cond_fail to the predecessor blocks.
   for (auto *Pred : BB->getPredecessorBlocks()) {
-    SILValue incoming = condArg->getIncomingValue(Pred);
+    SILValue incoming = condArg->getIncomingPhiValue(Pred);
     SILBuilderWithScope Builder(Pred->getTerminator());
     
     createCondFail(CFI, incoming, inverted, Builder);
@@ -2631,7 +2624,7 @@ bool ArgumentSplitter::createNewArguments() {
   SILBasicBlock *ParentBB = Arg->getParent();
 
   // Grab the incoming values. Return false if we can't find them.
-  if (!Arg->getIncomingValues(IncomingValues))
+  if (!Arg->getIncomingPhiValues(IncomingValues))
     return false;
 
   // Only handle struct and tuple type.
@@ -3461,7 +3454,7 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
                                              DominanceInfo *DT) {
   auto *A = BB->getArgument(i);
   SmallVector<SILValue, 4> Incoming;
-  if (!A->getIncomingValues(Incoming) || Incoming.empty())
+  if (!A->getIncomingPhiValues(Incoming) || Incoming.empty())
     return;
   
   SILValue V = Incoming[0];

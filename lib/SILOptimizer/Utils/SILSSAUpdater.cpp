@@ -524,7 +524,7 @@ replaceBBArgWithStruct(SILPHIArgument *Arg,
 /// If Arg is replaced, return the cast instruction. Otherwise return nullptr.
 SILValue swift::replaceBBArgWithCast(SILPHIArgument *Arg) {
   SmallVector<SILValue, 4> ArgValues;
-  Arg->getIncomingValues(ArgValues);
+  Arg->getIncomingPhiValues(ArgValues);
   if (isa<StructInst>(ArgValues[0]))
     return replaceBBArgWithStruct(Arg, ArgValues);
   return nullptr;
