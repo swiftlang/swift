@@ -883,6 +883,11 @@ public:
   /// invariants.
   void verify(bool SingleFunction = true) const;
 
+  /// Verify that all non-cond-br critical edges have been split.
+  ///
+  /// This is a fast subset of the checks performed in the SILVerifier.
+  void verifyCriticalEdges() const;
+
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;
   void dump() const;

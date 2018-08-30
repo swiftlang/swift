@@ -343,30 +343,30 @@ public:
   EdgeThreadingCloner(BranchInst *BI)
       : BaseThreadingCloner(*BI->getFunction(),
                             BI->getDestBB(), nullptr) {
-    DestBB = createEdgeBlockAndRedirectBranch(BI);
+    createEdgeBlockAndRedirectBranch(BI);
   }
 
-  SILBasicBlock *createEdgeBlockAndRedirectBranch(BranchInst *BI) {
+  void createEdgeBlockAndRedirectBranch(BranchInst *BI) {
     auto *Fn = BI->getFunction();
     auto *SrcBB = BI->getParent();
-    auto *DestBB = BI->getDestBB();
-    auto *EdgeBB = Fn->createBasicBlockAfter(SrcBB);
+    auto *EdgeBB = BI->getDestBB();
+
+    this->DestBB = Fn->createBasicBlockAfter(SrcBB);
 
     // Create block arguments.
-    for (unsigned ArgIdx : range(DestBB->getNumArguments())) {
-      auto *DestPHIArg = cast<SILPHIArgument>(DestBB->getArgument(ArgIdx));
+    for (unsigned ArgIdx : range(EdgeBB->getNumArguments())) {
+      auto *DestPHIArg = cast<SILPHIArgument>(EdgeBB->getArgument(ArgIdx));
       assert(BI->getArg(ArgIdx)->getType() == DestPHIArg->getType() &&
              "Types must match");
-      auto *BlockArg = EdgeBB->createPHIArgument(
+      auto *BlockArg = DestBB->createPHIArgument(
           DestPHIArg->getType(), DestPHIArg->getOwnershipKind());
       ValueMap[DestPHIArg] = SILValue(BlockArg);
       AvailVals.push_back(std::make_pair(DestPHIArg, BlockArg));
     }
 
     // Redirect the branch.
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), EdgeBB, BI->getArgs());
+    SILBuilderWithScope(BI).createBranch(BI->getLoc(), DestBB, BI->getArgs());
     BI->eraseFromParent();
-    return EdgeBB;
   }
 
   SILBasicBlock *getEdgeBB() {
@@ -374,6 +374,10 @@ public:
     // to.
     return DestBB;
   }
+
+  /// Call this after processing all instructions to fix the control flow
+  /// graph. The branch cloner may have left critical edges.
+  bool splitCriticalEdges(DominanceInfo *DT, SILLoopInfo *LI);
 };
 
 /// Helper class for cloning of basic blocks.
@@ -414,8 +418,7 @@ class BasicBlockCloner : public BaseThreadingCloner {
 /// 'NeedToSplitCriticalEdges' to false if all critical edges are split,
 /// otherwise this call will try to split all critical edges.
 void updateSSAAfterCloning(BaseThreadingCloner &Cloner, SILBasicBlock *SrcBB,
-                           SILBasicBlock *DestBB,
-                           bool NeedToSplitCriticalEdges = true);
+                           SILBasicBlock *DestBB);
 
 // Helper class that provides a callback that can be used in
 // inliners/cloners for collecting new call sites.

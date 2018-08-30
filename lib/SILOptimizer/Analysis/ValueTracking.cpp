@@ -67,7 +67,7 @@ static bool isLocalObject(SILValue Obj) {
       // A BB argument is local if all of its
       // incoming values are local.
       SmallVector<SILValue, 4> IncomingValues;
-      if (Arg->getIncomingValues(IncomingValues)) {
+      if (Arg->getSingleTerminatorOperands(IncomingValues)) {
         for (auto InValue : IncomingValues) {
           WorkList.push_back(InValue);
         }

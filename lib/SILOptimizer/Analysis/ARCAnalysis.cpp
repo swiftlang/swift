@@ -670,10 +670,9 @@ findMatchingRetains(SILBasicBlock *BB) {
         if (HandledBBs.find(X) != HandledBBs.end())
           continue;
         // Try to use the predecessor edge-value.
-        if (SA && SA->getIncomingValue(X)) {
-          WorkList.push_back(std::make_pair(X, SA->getIncomingValue(X)));
-        }
-        else 
+        if (SA && SA->getIncomingPhiValue(X)) {
+          WorkList.push_back(std::make_pair(X, SA->getIncomingPhiValue(X)));
+        } else
           WorkList.push_back(std::make_pair(X, R.second));
    
         HandledBBs.insert(X);
