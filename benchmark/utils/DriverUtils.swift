@@ -407,21 +407,20 @@ final class SampleRunner {
 
 /// Invoke the benchmark entry point and return the run time in milliseconds.
 func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
+  func logVerbose(_ msg: @autoclosure () -> String) {
+    if c.verbose { print(msg()) }
+  }
   var samples = [Int](repeating: 0, count: c.numSamples)
 
   // Before we do anything, check that we actually have a function to
   // run. If we don't it is because the benchmark is not supported on
   // the platform and we should skip it.
   guard let testFn = test.runFunction else {
-    if c.verbose {
-      print("Skipping unsupported benchmark \(test.name)!")
-    }
+    logVerbose("Skipping unsupported benchmark \(test.name)!")
     return nil
   }
 
-  if c.verbose {
-    print("Running \(test.name) for \(c.numSamples) samples.")
-  }
+  logVerbose("Running \(test.name) for \(c.numSamples) samples.")
 
   let sampler = SampleRunner(c)
   test.setUpFunction?()
@@ -438,9 +437,7 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
         /// Number of iterations to make `testFn` run for the desired time.
         scale = timePerSample / elapsed_time
       } else {
-        if c.verbose {
-          print("    Warning: elapsed time is 0. This can be safely ignored if the body is empty.")
-        }
+        logVerbose("    Warning: elapsed time is 0!")
         scale = 1
       }
     } else {
@@ -457,16 +454,12 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
 
     // Rerun the test with the computed scale factor.
     if scale > 1 {
-      if c.verbose {
-        print("    Measuring with scale \(scale).")
-      }
+      logVerbose("    Measuring with scale \(scale).")
       elapsed_time = sampler.measure(test.name, fn: testFn, numIters: scale)
     }
 
     samples[s] = elapsed_time
-    if c.verbose {
-      print("    Sample \(s),\(samples[s])")
-    }
+    logVerbose("    Sample \(s),\(samples[s])")
   }
   test.tearDownFunction?()
 
