@@ -257,10 +257,7 @@ public func testTensorFlowClosures(_ a: Float) -> Tensor<Int32>{
 // } // end sil function '[[NAME]]'
 
 public func testExtractDTypeList() {
-  struct Foo {
-    let a: Tensor<Float>
-    let b: Tensor<Float>
-  }
+  struct Foo { let a, b: Tensor<Float> }
   let elements = Foo(a: Tensor([1]), b: Tensor([2]))
   // TODO: Support heterogeneous input lists so that we can replace b's dtype with something else.
   // TODO: Support unpacking a struct value into an input list so that we can replace
@@ -271,7 +268,6 @@ public func testExtractDTypeList() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExtractDTypeList{{.*}}
-// CHECK: {{.*}}testExtractDTypeList
 // CHECK: graph_op "TensorSliceDataset,L,e,e"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {Toutput_types: [$AccelerableByTensorFlow.Protocol: $Float, $Float], output_shapes: [$TensorShape: ([$Int32: ])], __device: "/device:CPU:0"} : $VariantHandle
 
 public func testExtractTupleDTypeList() {
@@ -282,9 +278,18 @@ public func testExtractTupleDTypeList() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExtractTupleDTypeList{{.*}}
-// CHECK: {{.*}}testExtractTupleDTypeList
 // CHECK: graph_op "TensorSliceDataset,L,e,e"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>) {Toutput_types: [$AccelerableByTensorFlow.Protocol: $Int32, $Int32], output_shapes: [$TensorShape: ([$Int32: ])], __device: "/device:CPU:0"} : $VariantHandle
 
+public func testExtractUnknownShapeList() {
+  struct Foo { let a, b: Tensor<Float> }
+  let elements = Foo(a: Tensor([1]), b: Tensor([2]))
+  let _: VariantHandle = #tfop("TensorSliceDataset", [elements.a, elements.b],
+                               Toutput_types: [Float.self, Float.self],
+                               output_shapes$unknownShapeList: Foo.self)
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExtractUnknownShapeList{{.*}}
+// CHECK: graph_op "TensorSliceDataset,L,e,e"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {Toutput_types: [$Float.Type: $Float, $Float], output_shapes: [$Optional<TensorShape>: #Optional.none!enumelt, #Optional.none!enumelt], __device: "/device:CPU:0"} : $VariantHandle
 
 // Tests that private functions operating on Tensors are partitioned
 // if they are only referred in code.  In this case, addOne should be
@@ -305,3 +310,4 @@ public func getTensorAndAddOneFunction() -> (Tensor<Float>, (Tensor<Float>) -> T
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}addOne{{.*}}
 // CHECK-NOT: --- TFPartition Accelerator Result: {{.*}}getZero{{.*}}
 // CHECK: --- TFPartition Accelerator Result: {{.*}}getTensorAndAddOneFunction{{.*}}
+

@@ -536,18 +536,3 @@ public func testSR8570() {
   () = #tfop("FooOp", Targuments: [] as [Any.Type]) // expected-error {{op named 'FooOp' is not registered in TensorFlow}}
 }
 
-public func packResultsToAggregate() {
-  struct Foo {
-    let x: Tensor<Float>
-    let y: (Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>))
-  }
-  // expected-error @+1 {{op named 'SomeOp' is not registered in TensorFlow}}
-  let (r0, r1): (Foo, Tensor<Double>) = #tfop("SomeOp")
-  let _ = Tensor(0) + r0.y.1.a
-  _hostOp(r1)
-}
-// CHECK-LABEL --- TFPartition Accelerator Result: {{.*}}packResultsToAggregate{{.*}}
-// CHECK:  ([[R0:%.*]], [[R1:%.*]], [[R2:%.*]], [[R3:%.*]], [[R4:%.*]]) = graph_op "SomeOp"() {__device: "/device:CPU:0"} : $TensorHandle<Float>, $TensorHandle<Float>, $TensorHandle<Int32>, $TensorHandle<Bool>, $TensorHandle<Double>
-// CHECK: graph_op "Add,i,i"({{.*}} : $TensorHandle<Int32>, [[R2]] : $TensorHandle<Int32>) {T: $Int32, __device: "/device:CPU:0"} : $TensorHandle<Int32>
-// CHECK:  [[PACKED:%.*]] = tuple ([[R0]] : $TensorHandle<Float>, [[R1]] : $TensorHandle<Float>, [[R2]] : $TensorHandle<Int32>, [[R3]] : $TensorHandle<Bool>, [[R4]] : $TensorHandle<Double>)
-// CHECK:  return [[PACKED]] : $(TensorHandle<Float>, TensorHandle<Float>, TensorHandle<Int32>, TensorHandle<Bool>, TensorHandle<Double>)
