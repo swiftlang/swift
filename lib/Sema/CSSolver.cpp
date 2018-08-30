@@ -623,16 +623,15 @@ bool ConstraintSystem::tryTypeVariableBindings(
           << "\n";
       }
 
+      // If we were able to solve this without considering
+      // default literals, don't bother looking at default literals.
+      if (anySolved && binding.DefaultedProtocol && !sawFirstLiteralConstraint)
+        break;
+
       // Try to solve the system with typeVar := type
       ConstraintSystem::SolverScope scope(*this);
       if (binding.DefaultedProtocol) {
-        // If we were able to solve this without considering
-        // default literals, don't bother looking at default literals.
-        if (!sawFirstLiteralConstraint) {
-          sawFirstLiteralConstraint = true;
-          if (anySolved)
-            break;
-        }
+        sawFirstLiteralConstraint = true;
         type = openUnboundGenericType(type, typeVar->getImpl().getLocator());
         type = type->reconstituteSugar(/*recursive=*/false);
       } else if (binding.BindingSource == ConstraintKind::ArgumentConversion &&
