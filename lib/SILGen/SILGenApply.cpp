@@ -2081,8 +2081,7 @@ private:
   ManagedValue emitAddress(SILGenFunction &SGF, AccessKind accessKind) {
     auto tsanKind =
       (accessKind == AccessKind::Read ? TSanKind::None : TSanKind::InoutAccess);
-    return SGF.emitAddressOfLValue(LV().Loc, std::move(LV().LV),
-                                   accessKind, tsanKind);
+    return SGF.emitAddressOfLValue(LV().Loc, std::move(LV().LV), tsanKind);
   }
 
   /// Replay the original argument expression.
@@ -2686,24 +2685,10 @@ private:
       // receiver of a self argument, which will be the first inout.
       if (arg.isLValue()) {
         return std::move(arg).asKnownLValue();
-
-      // This is logically wrong, but propagating l-values within
-      // RValues is hard to avoid in custom argument-emission code
-      // without making ArgumentSource capable of holding mixed
-      // RValue/LValue tuples.  (materializeForSet has to do this,
-      // for one.)  The onus is on the caller to ensure that formal
-      // access semantics are honored.
-      } else if (arg.isRValue()) {
-        auto address = std::move(arg).asKnownRValue(SGF).getAsSingleValue(
-            SGF, arg.getKnownRValueLocation());
-        assert(address.isLValue());
-        return LValue::forAddress(address, None,
-                                  AbstractionPattern(substType),
-                                  substType);
       } else {
         auto *e = cast<InOutExpr>(std::move(arg).asKnownExpr()->
                                   getSemanticsProvidingExpr());
-        return SGF.emitLValue(e->getSubExpr(), AccessKind::ReadWrite);
+        return SGF.emitLValue(e->getSubExpr(), SGFAccessKind::ReadWrite);
       }
     }();
 
@@ -4404,6 +4389,42 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, Expr *e) {
   return emission;
 }
 
+bool SILGenModule::shouldEmitSelfAsRValue(FuncDecl *fn, CanType selfType) {
+  if (fn->isStatic())
+    return true;
+
+  switch (fn->getSelfAccessKind()) {
+  case SelfAccessKind::Mutating:
+    return false;
+  case SelfAccessKind::__Consuming:
+    return true;
+  case SelfAccessKind::NonMutating:
+    // TODO: borrow 'self' for nonmutating methods on methods on value types.
+    // return selfType->hasReferenceSemantics();
+    return true;
+  }
+  llvm_unreachable("bad self-access kind");
+}
+
+bool SILGenModule::isNonMutatingSelfIndirect(SILDeclRef methodRef) {
+  auto method = methodRef.getFuncDecl();
+  assert(method->getDeclContext()->isTypeContext());
+  assert(method->isNonMutating());
+  if (method->isStatic())
+    return false;
+
+  auto fnType = M.Types.getConstantFunctionType(methodRef);
+  auto importAsMember = method->getImportAsMemberStatus();
+
+  SILParameterInfo self;
+  if (importAsMember.isImportAsMember()) {
+    self = fnType->getParameters()[importAsMember.getSelfIndex()];
+  } else {
+    self = fnType->getSelfParameter();
+  }
+  return self.isFormalIndirect();
+}
+
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
@@ -5327,7 +5348,8 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
     // FIXME: this assumes that there's never meaningful reabstraction of self
     // arguments.
     return ArgumentSource(
-        loc, LValue::forAddress(base, None, AbstractionPattern(baseFormalType),
+        loc, LValue::forAddress(SGFAccessKind::ReadWrite, base, None,
+                                AbstractionPattern(baseFormalType),
                                 baseFormalType));
   }
 

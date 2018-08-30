@@ -116,6 +116,88 @@ enum class CaptureEmission {
   PartialApplication,
 };
 
+/// Different ways in which an l-value can be emitted.
+enum class SGFAccessKind : uint8_t {
+  /// The access is a read whose result will be ignored.
+  IgnoredRead,
+
+  /// The access is a read that would prefer the address of a borrowed value.
+  /// This should only be used when it is semantically acceptable to borrow
+  /// the value, not just because the caller would benefit from a borrowed
+  /// value.  See shouldEmitSelfAsRValue.
+  ///
+  /// The caller will be calling emitAddressOfLValue or emitLoadOfLValue
+  /// on the l-value.  The latter may be less efficient than an access
+  /// would be if the l-value had been emitted with an owned-read kind.
+  BorrowedAddressRead,
+
+  /// The access is a read that would prefer a loaded borrowed value.
+  /// This should only be used when it is semantically acceptable to borrow
+  /// the value, not just because the caller would benefit from a borrowed
+  /// value.  See shouldEmitSelfAsRValue.
+  ///
+  /// There isn't yet a way to emit the access that takes advantage of this.
+  BorrowedObjectRead,
+
+  /// The access is a read that would prefer the address of an owned value.
+  ///
+  /// The caller will be calling emitAddressOfLValue or emitLoadOfLValue
+  /// on the l-value.
+  OwnedAddressRead,
+
+  /// The access is a read that would prefer a loaded owned value.
+  ///
+  /// The caller will be calling emitLoadOfLValue on the l-value.
+  OwnedObjectRead,
+
+  /// The access is an assignment (or maybe an initialization).
+  ///
+  /// The caller will be calling emitAssignToLValue on the l-value.
+  Write,
+
+  /// The access is a read-modify-write.
+  ///
+  /// The caller will be calling emitAddressOfLValue on the l-value.
+  ReadWrite
+};
+
+static inline bool isReadAccess(SGFAccessKind kind) {
+  return uint8_t(kind) <= uint8_t(SGFAccessKind::OwnedObjectRead);
+}
+
+/// Return an address-preferring version of the given access kind.
+static inline SGFAccessKind getAddressAccessKind(SGFAccessKind kind) {
+  switch (kind) {
+  case SGFAccessKind::BorrowedObjectRead:
+    return SGFAccessKind::BorrowedAddressRead;
+  case SGFAccessKind::OwnedObjectRead:
+    return SGFAccessKind::OwnedAddressRead;
+  case SGFAccessKind::IgnoredRead:
+  case SGFAccessKind::BorrowedAddressRead:
+  case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::Write:
+  case SGFAccessKind::ReadWrite:
+    return kind;
+  }
+  llvm_unreachable("bad kind");
+}
+
+static inline AccessKind getFormalAccessKind(SGFAccessKind kind) {
+  switch (kind) {
+  case SGFAccessKind::IgnoredRead:
+  case SGFAccessKind::BorrowedAddressRead:
+  case SGFAccessKind::BorrowedObjectRead:
+  case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::OwnedObjectRead:
+    return AccessKind::Read;
+  case SGFAccessKind::Write:
+    return AccessKind::Write;
+  case SGFAccessKind::ReadWrite:
+    return AccessKind::ReadWrite;
+  }
+  llvm_unreachable("bad kind");
+}
+
 /// Parameter to \c SILGenFunction::emitAddressOfLValue that indicates
 /// what kind of instrumentation should be emitted when compiling under
 /// Thread Sanitizer.
@@ -1070,7 +1152,7 @@ public:
   /// Given that a variable is a local stored variable, return its address.
   ManagedValue emitAddressOfLocalVarDecl(SILLocation loc, VarDecl *var,
                                          CanType formalRValueType,
-                                         AccessKind accessKind);
+                                         SGFAccessKind accessKind);
 
   // FIXME: demote this to private state.
   ManagedValue maybeEmitValueOfLocalVarDecl(VarDecl *var);
@@ -1276,13 +1358,12 @@ public:
   void emitCopyLValueInto(SILLocation loc, LValue &&src,
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
-                                   AccessKind accessKind,
                                    TSanKind tsanKind = TSanKind::None);
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,
                                    CanArchetypeType openedArchetype,
                                    CanType formalRValueType,
-                                   AccessKind accessKind);
+                                   SGFAccessKind accessKind);
 
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isBaseLValueGuaranteed = false);
@@ -1317,7 +1398,7 @@ public:
   //
   // Helpers for emitting ApplyExpr chains.
   //
-  
+
   RValue emitApplyExpr(Expr *e, SGFContext c);
 
   /// Emit a function application, assuming that the arguments have been
@@ -1772,7 +1853,7 @@ public:
                                               ExistentialRepresentation repr);
 
   /// Evaluate an Expr as an lvalue.
-  LValue emitLValue(Expr *E, AccessKind accessKind,
+  LValue emitLValue(Expr *E, SGFAccessKind accessKind,
                     LValueOptions options = LValueOptions());
 
   RValue emitRValueForNonMemberVarDecl(SILLocation loc, VarDecl *var,
@@ -1785,12 +1866,13 @@ public:
   LValue emitPropertyLValue(SILLocation loc, ManagedValue base,
                             CanType baseFormalType, VarDecl *var,
                             LValueOptions options,
-                            AccessKind accessKind, AccessSemantics semantics);
+                            SGFAccessKind accessKind,
+                            AccessSemantics semantics);
 
   struct PointerAccessInfo {
     CanType PointerType;
     PointerTypeKind PointerKind;
-    swift::AccessKind AccessKind;
+    SGFAccessKind AccessKind;
   };
 
   PointerAccessInfo getPointerAccessInfo(Type pointerType);
@@ -1800,7 +1882,7 @@ public:
   struct ArrayAccessInfo {
     Type PointerType;
     Type ArrayType;
-    swift::AccessKind AccessKind;
+    SGFAccessKind AccessKind;
   };
   ArrayAccessInfo getArrayAccessInfo(Type pointerType, Type arrayType);
   std::pair<ManagedValue,ManagedValue>
