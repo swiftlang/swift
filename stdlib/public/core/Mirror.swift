@@ -524,7 +524,6 @@ extension Mirror {
 ///     let pairs = IntPairs([1: 2, 1: 1, 3: 4, 2: 1])
 ///     print(pairs.elements)
 ///     // Prints "[(1, 2), (1, 1), (3, 4), (2, 1)]"
-@_fixed_layout // FIXME(sil-serialize-all)
 public struct KeyValuePairs<Key, Value> : ExpressibleByDictionaryLiteral {
   /// Creates a new `KeyValuePairs` instance from the given dictionary
   /// literal.
@@ -534,7 +533,6 @@ public struct KeyValuePairs<Key, Value> : ExpressibleByDictionaryLiteral {
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self._elements = elements
   }
-  @usableFromInline // FIXME(sil-serialize-all)
   internal let _elements: [(Key, Value)]
 }
 
@@ -547,7 +545,6 @@ extension KeyValuePairs : RandomAccessCollection {
   ///
   /// If the `KeyValuePairs` instance is empty, `startIndex` is equal to
   /// `endIndex`.
-  @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Int { return 0 }
 
   /// The collection's "past the end" position---that is, the position one
@@ -555,7 +552,6 @@ extension KeyValuePairs : RandomAccessCollection {
   ///
   /// If the `KeyValuePairs` instance is empty, `endIndex` is equal to
   /// `startIndex`.
-  @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Int { return _elements.endIndex }
 
   // FIXME(ABI)#174 (Type checker): a typealias is needed to prevent <rdar://20248032>
@@ -569,7 +565,6 @@ extension KeyValuePairs : RandomAccessCollection {
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
   /// - Returns: The key-value pair at position `position`.
-  @inlinable // FIXME(sil-serialize-all)
   public subscript(position: Int) -> Element {
     return _elements[position]
   }
@@ -615,7 +610,6 @@ extension String {
   ///
   ///     print(String(describing: p))
   ///     // Prints "(21, 30)"
-  @inlinable // FIXME(sil-serialize-all)
   public init<Subject>(describing instance: Subject) {
     self.init()
     _print_unlocked(instance, &self)
@@ -665,7 +659,6 @@ extension String {
   ///
   ///     print(String(reflecting: p))
   ///     // Prints "Point(x: 21, y: 30)"
-  @inlinable // FIXME(sil-serialize-all)
   public init<Subject>(reflecting subject: Subject) {
     self.init()
     _debugPrint_unlocked(subject, &self)
