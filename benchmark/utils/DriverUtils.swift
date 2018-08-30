@@ -64,10 +64,10 @@ struct TestConfig {
   /// instruments.
   let sampleTime: Double
 
-  /// If we are asked to have a fixed number of iterations, the number of fixed
-  /// iterations. The default value of 0 means: automatically compute the
-  /// number of iterations to measure the test for a specified sample time.
-  let fixedNumIters: Int
+  /// Number of iterations averaged in the sample.
+  /// When not specified, we'll compute the number of iterations to be averaged
+  /// in the sample from the actual runtime and the desired `sampleTime`.
+  let numIters: Int?
 
   /// The number of samples we should take of each test.
   let numSamples: Int
@@ -93,7 +93,7 @@ struct TestConfig {
       var delim: String?
       var tags, skipTags: Set<BenchmarkCategory>?
       var numSamples: UInt?
-      var fixedNumIters: UInt?
+      var numIters: UInt?
       var afterRunSleep: UInt32?
       var sampleTime: Double?
       var verbose: Bool?
@@ -120,7 +120,7 @@ struct TestConfig {
     p.addArgument("--num-samples", \.numSamples,
                   help: "number of samples to take per benchmark; default: 1",
                   parser: { UInt($0) })
-    p.addArgument("--num-iters", \.fixedNumIters,
+    p.addArgument("--num-iters", \.numIters,
                   help: "number of iterations averaged in the sample;\n" +
                         "default: auto-scaled to measure for `sample-time`",
                   parser: { UInt($0) })
@@ -154,7 +154,7 @@ struct TestConfig {
     // Configure from the command line arguments, filling in the defaults.
     delim = c.delim ?? ","
     sampleTime = c.sampleTime ?? 1.0
-    fixedNumIters = Int(c.fixedNumIters ?? 0)
+    numIters = c.numIters.map { Int($0) }
     numSamples = Int(c.numSamples ?? 1)
     verbose = c.verbose ?? false
     logMemory = c.logMemory ?? false
@@ -183,7 +183,7 @@ struct TestConfig {
             Verbose: \(verbose)
             LogMemory: \(logMemory)
             SampleTime: \(sampleTime)
-            FixedIters: \(fixedNumIters)
+            NumIters: \(numIters ?? 0)
             Delimiter: \(String(reflecting: delim))
             Tests Filter: \(c.tests ?? [])
             Tests to run: \(testList)
@@ -405,7 +405,7 @@ final class SampleRunner {
   }
 }
 
-/// Invoke the benchmark entry point and return the run time in milliseconds.
+/// Run the benchmark and return the measured results.
 func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   func logVerbose(_ msg: @autoclosure () -> String) {
     if c.verbose { print(msg()) }
@@ -431,38 +431,30 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
 
   test.setUpFunction?()
 
-  for _ in 0..<c.numSamples {
-    var numIters : Int
-    if c.fixedNumIters == 0 {
-      // Compute the `numIters` if a `c.fixedNumIters` is not specified.
-      let oneIter = sampler.measure(test.name, fn: testFn, numIters: 1)
-      if oneIter > 0 {
-        let usPerSecond = 1_000_000.0 // microseconds (μs)
-        let timePerSample = Int(c.sampleTime * usPerSecond)
-        // Number of iterations to make `testFn` run for the desired time.
-        numIters = max(timePerSample / oneIter, 1)
-      } else {
-        logVerbose("    Warning: elapsed time is 0!")
-        numIters = 1
-      }
-
-      if numIters == 1 {
-        addSample(oneIter)
-        continue
-      }
+  // Determine number of iterations for testFn to run for desired time.
+  func iterationsPerSampleTime() -> (numIters: Int, oneIter: Int) {
+    let oneIter = sampler.measure(test.name, fn: testFn, numIters: 1)
+    if oneIter > 0 {
+      let timePerSample = Int(c.sampleTime * 1_000_000.0) // microseconds (μs)
+      return (max(timePerSample / oneIter, 1), oneIter)
     } else {
-      numIters = c.fixedNumIters
+      return (1, oneIter)
     }
-    // Cap the `numIters` to prevent overflow on 32-bit systems during
-    // multiplication with the inner loop multiplier inside the `testFn`.
-    numIters = min(numIters, Int.max / 10_000)
+  }
 
-    // Rerun the test with the computed scale factor.
-    if numIters > 1 {
-      logVerbose("    Measuring with scale \(numIters).")
-    }
+  let numIters = min( // Cap to prevent overflow on 32-bit systems when scaled
+    Int.max / 10_000, // by the inner loop multiplier inside the `testFn`.
+    c.numIters ?? {
+      let (numIters, oneIter) = iterationsPerSampleTime()
+      if numIters == 1 { addSample(oneIter) }
+      return numIters
+    }())
+
+  logVerbose("    Measuring with scale \(numIters).")
+  for _ in samples.count..<c.numSamples {
     addSample(sampler.measure(test.name, fn: testFn, numIters: numIters))
   }
+
   test.tearDownFunction?()
 
   return BenchResults(samples, maxRSS: sampler.measureMemoryUsage())
