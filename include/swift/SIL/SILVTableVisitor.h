@@ -100,10 +100,13 @@ template <class T> class SILVTableVisitor {
       maybeAddEntry(constant, constant.requiresNewVTableEntry());
     }
 
-    // All constructors have their initializing constructor in the
-    // vtable, which can be used by a convenience initializer.
-    SILDeclRef constant(cd, SILDeclRef::Kind::Initializer);
-    maybeAddEntry(constant, constant.requiresNewVTableEntry());
+    // Designated and/or required initializers have their initializing
+    // constructor in the vtable, which can be used by a convenience
+    // initializer.
+    if (cd->isDesignatedInit() || cd->isRequired()) {
+      SILDeclRef constant(cd, SILDeclRef::Kind::Initializer);
+      maybeAddEntry(constant, constant.requiresNewVTableEntry());
+    }
   }
 
   void maybeAddEntry(SILDeclRef declRef, bool needsNewEntry) {
