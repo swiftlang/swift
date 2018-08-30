@@ -410,7 +410,6 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   func logVerbose(_ msg: @autoclosure () -> String) {
     if c.verbose { print(msg()) }
   }
-  var samples = [Int](repeating: 0, count: c.numSamples)
 
   // Before we do anything, check that we actually have a function to
   // run. If we don't it is because the benchmark is not supported on
@@ -419,33 +418,40 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
     logVerbose("Skipping unsupported benchmark \(test.name)!")
     return nil
   }
-
   logVerbose("Running \(test.name) for \(c.numSamples) samples.")
 
   let sampler = SampleRunner(c)
+  var samples: [Int] = []
+  samples.reserveCapacity(c.numSamples)
+
+  func addSample(_ time: Int) {
+    logVerbose("    Sample \(samples.count),\(time)")
+    samples.append(time)
+  }
+
   test.setUpFunction?()
 
-  for s in 0..<c.numSamples {
+  for _ in 0..<c.numSamples {
     var numIters : Int
-    var time: Int = 0
     if c.fixedNumIters == 0 {
       // Compute the `numIters` if a `c.fixedNumIters` is not specified.
-      time = sampler.measure(test.name, fn: testFn, numIters: 1)
-
-      if time > 0 {
+      let oneIter = sampler.measure(test.name, fn: testFn, numIters: 1)
+      if oneIter > 0 {
         let usPerSecond = 1_000_000.0 // microseconds (μs)
         let timePerSample = Int(c.sampleTime * usPerSecond)
         // Number of iterations to make `testFn` run for the desired time.
-        numIters = timePerSample / time
+        numIters = max(timePerSample / oneIter, 1)
       } else {
         logVerbose("    Warning: elapsed time is 0!")
         numIters = 1
       }
+
+      if numIters == 1 {
+        addSample(oneIter)
+        continue
+      }
     } else {
       numIters = c.fixedNumIters
-      if numIters == 1 {
-        time = sampler.measure(test.name, fn: testFn, numIters: 1)
-      }
     }
     // Cap the `numIters` to prevent overflow on 32-bit systems during
     // multiplication with the inner loop multiplier inside the `testFn`.
@@ -454,11 +460,8 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
     // Rerun the test with the computed scale factor.
     if numIters > 1 {
       logVerbose("    Measuring with scale \(numIters).")
-      time = sampler.measure(test.name, fn: testFn, numIters: numIters)
     }
-
-    samples[s] = time
-    logVerbose("    Sample \(s),\(samples[s])")
+    addSample(sampler.measure(test.name, fn: testFn, numIters: numIters))
   }
   test.tearDownFunction?()
 
