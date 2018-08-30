@@ -538,9 +538,6 @@ public struct KeyValuePairs<Key, Value> : ExpressibleByDictionaryLiteral {
   internal let _elements: [(Key, Value)]
 }
 
-@available(swift, deprecated: 5.0, renamed: "KeyValuePairs")
-public typealias DictionaryLiteral<Key, Value> = KeyValuePairs<Key, Value>
-
 /// `Collection` conformance that allows `KeyValuePairs` to
 /// interoperate with the rest of the standard library.
 extension KeyValuePairs : RandomAccessCollection {
