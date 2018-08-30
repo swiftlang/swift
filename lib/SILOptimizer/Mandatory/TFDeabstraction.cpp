@@ -2337,7 +2337,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         SmallVector<SymbolicValue, 8> dtypes;
         if (!collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
                                               dtypes))
-          return diagnoseInvalidAttr("not a TensorFlow value type or an "
+          return diagnoseInvalidAttr("requires a TensorFlow value type or an "
                                      "aggregate of TensorFlow value types");
         // Drop '$array' from the attribute name.
         currentAttr.name = context.getIdentifier(operandClass.first);
@@ -2363,7 +2363,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       auto type = constValue.getMetatypeValue();
       SmallVector<Type, 8> tfValueTypes;
       if (!tf::flattenTensorFlowValueAggregate(type, tfValueTypes))
-        return diagnoseInvalidAttr("not a TensorFlow value type or an "
+        return diagnoseInvalidAttr("requires a TensorFlow value type or an "
                                    "aggregate or TensorFlow value types");
       // Drop '$unknownShapeList' from the attribute name.
       currentAttr.name = context.getIdentifier(operandClass.first);
