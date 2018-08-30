@@ -80,7 +80,7 @@ struct TestConfig {
 
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
-  let afterRunSleep: Int?
+  let afterRunSleep: UInt32?
 
   /// The list of tests to run.
   let tests: [(index: String, info: BenchmarkInfo)]
@@ -92,8 +92,9 @@ struct TestConfig {
     struct PartialTestConfig {
       var delim: String?
       var tags, skipTags: Set<BenchmarkCategory>?
-      var numSamples, afterRunSleep: Int?
+      var numSamples: Int?
       var fixedNumIters: UInt?
+      var afterRunSleep: UInt32?
       var sampleTime: Double?
       var verbose: Bool?
       var logMemory: Bool?
@@ -142,7 +143,7 @@ struct TestConfig {
                   parser: tags)
     p.addArgument("--sleep", \.afterRunSleep,
                   help: "number of seconds to sleep after benchmarking",
-                  parser: { Int($0) })
+                  parser: { UInt32($0) })
     p.addArgument("--list", \.action, defaultValue: .listTests,
                   help: "don't run the tests, just log the list of test \n" +
                         "numbers, names and tags (respects specified filters)")
@@ -521,7 +522,7 @@ public func main() {
   case .run:
     runBenchmarks(config)
     if let x = config.afterRunSleep {
-      sleep(UInt32(x))
+      sleep(x)
     }
   }
 }
