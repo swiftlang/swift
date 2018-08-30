@@ -229,10 +229,6 @@ struct Stats {
     }
 }
 
-func internalMedian(_ inputs: [UInt64]) -> UInt64 {
-  return inputs.sorted()[inputs.count / 2]
-}
-
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
 @_silgen_name("_swift_leaks_startTrackingObjects")
@@ -451,13 +447,14 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   }
   test.tearDownFunction?()
 
+  samples.sort()
   let stats = samples.reduce(into: Stats(), Stats.collect)
 
   return BenchResults(sampleCount: UInt64(samples.count),
-                      min: samples.min()!, max: samples.max()!,
+                      min: samples.first!, max: samples.last!,
                       mean: UInt64(stats.mean),
                       sd: UInt64(stats.standardDeviation),
-                      median: internalMedian(samples),
+                      median: samples[samples.count / 2],
                       maxRSS: UInt64(sampler.measureMemoryUsage()))
 }
 
