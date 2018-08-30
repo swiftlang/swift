@@ -650,7 +650,7 @@ namespace {
       // Look up the dispatch thunk if the protocol is resilient.
       llvm::Constant *thunk = nullptr;
       if (IGM.isResilient(Proto, ResilienceExpansion::Minimal))
-        thunk = IGM.getAddrOfDispatchThunk(func, NotForDefinition);
+        thunk = IGM.emitDispatchThunk(func);
 
       // Classify the function.
       auto flags = getMethodDescriptorFlags<Flags>(func.getDecl());
@@ -1207,12 +1207,14 @@ namespace {
 
     SILVTable *VTable = nullptr;
     unsigned VTableSize = 0;
+    bool isResilient;
 
   public:
     ClassContextDescriptorBuilder(IRGenModule &IGM, ClassDecl *Type,
                                   RequireMetadata_t requireMetadata)
-      : super(IGM, Type, requireMetadata)
-    {
+      : super(IGM, Type, requireMetadata),
+        isResilient(IGM.isResilient(Type, ResilienceExpansion::Minimal)) {
+
       if (getType()->isForeign()) return;
 
       MetadataLayout = &IGM.getClassMetadataLayout(Type);
@@ -1307,19 +1309,20 @@ namespace {
     void addMethod(SILDeclRef fn) {
       assert(VTable && "no vtable?!");
 
+      auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
       auto descriptor = B.beginStruct(IGM.MethodDescriptorStructTy);
 
       // Classify the method.
       using Flags = MethodDescriptorFlags;
-      auto flags = getMethodDescriptorFlags<Flags>(fn.getDecl());
+      auto flags = getMethodDescriptorFlags<Flags>(func);
 
       // Remember if the declaration was dynamic.
-      if (fn.getDecl()->isDynamic())
+      if (func->isDynamic())
         flags = flags.withIsDynamic(true);
 
       // TODO: final? open?
 
-      auto *dc = fn.getDecl()->getDeclContext();
+      auto *dc = func->getDeclContext();
       assert(!isa<ExtensionDecl>(dc));
 
       if (dc == getType()) {
@@ -1338,6 +1341,12 @@ namespace {
       descriptor.addInt(IGM.Int32Ty, flags.getIntValue());
 
       descriptor.finishAndAddTo(B);
+
+      // Emit method dispatch thunk if the class is resilient.
+      if (isResilient &&
+          func->getEffectiveAccess() >= AccessLevel::Public) {
+        IGM.emitDispatchThunk(fn);
+      }
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
@@ -3878,18 +3887,6 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 
   // Note that we emitted this protocol.
   SwiftProtocols.push_back(protocol);
-
-  // If the protocol is resilient, emit dispatch thunks.
-  if (isResilient(protocol, ResilienceExpansion::Minimal)) {
-    for (auto *member : protocol->getMembers()) {
-      if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
-        emitDispatchThunk(SILDeclRef(funcDecl));
-      }
-      if (auto *ctorDecl = dyn_cast<ConstructorDecl>(member)) {
-        emitDispatchThunk(SILDeclRef(ctorDecl, SILDeclRef::Kind::Allocator));
-      }
-    }
-  }
 }
 
 //===----------------------------------------------------------------------===//
