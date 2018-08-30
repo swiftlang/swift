@@ -1,7 +1,4 @@
-// We need to require macOS because swiftSyntax currently doesn't build on Linux
-// REQUIRES: OS=macosx
 // RUN: %target-swift-ide-test -syntax-coloring -source-filename %s -D CONF | %FileCheck %s
-// RUN: %swift-swiftsyntax-test -classify-syntax -source-file %s | %FileCheck %s
 
 // CHECK: <kw>var</kw> f : <type>Int</type>
 var f : Int
