@@ -290,3 +290,24 @@ public func testExtractUnknownShapeList() {
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExtractUnknownShapeList{{.*}}
 // CHECK: graph_op "TensorSliceDataset,L,e,e"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {Toutput_types: [$Float.Type: $Float, $Float], output_shapes: [$Optional<TensorShape>: #Optional.none!enumelt, #Optional.none!enumelt], __device: "/device:CPU:0"} : $VariantHandle
+
+// Tests that private functions operating on Tensors are partitioned
+// if they are only referred in code.  In this case, addOne should be
+// partitioned, but not getZero.
+//
+// expected-warning @+1 {{'x' implicitly copied to the accelerator}}
+private func addOne(_ x : Tensor<Float>) -> Tensor<Float> {
+  // expected-note @+1 {{value used here}}
+  return x + Tensor<Float>(1.0)
+}
+private func getZero() -> Tensor<Float> { return Tensor<Float>(0.0) }
+
+public func getTensorAndAddOneFunction() -> (Tensor<Float>, (Tensor<Float>) -> Tensor<Float>) {
+  let x = Tensor<Float>(1.0)
+  return (x * x, addOne)
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}addOne{{.*}}
+// CHECK-NOT: --- TFPartition Accelerator Result: {{.*}}getZero{{.*}}
+// CHECK: --- TFPartition Accelerator Result: {{.*}}getTensorAndAddOneFunction{{.*}}
+

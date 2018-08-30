@@ -2608,6 +2608,8 @@ void TFDeabstractionPass::run() {
   TensorFunctionClassifier tfc;
   ConstExprEvaluator constantEvaluator(*module);
 
+  SmallPtrSet<SILFunction*, 16> partitionedFunctions;
+
   // Loop over all of the functions in the current module processing them -
   // iff they look like they could be the top level of a deabstraction
   // context.
@@ -2615,7 +2617,7 @@ void TFDeabstractionPass::run() {
     // If this function is a building block of larger tensor programs (e.g.
     // the ops defined in the TensorFlow module), then don't transform it in
     // isolation.
-    if (!tfc.shouldBePartitioned(&fn))
+    if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false))
       continue;
 
     // If something crashes, make sure the pretty stack trace says what we
@@ -2624,12 +2626,46 @@ void TFDeabstractionPass::run() {
                                    fn.getName().str().c_str());
 
     TFDeabstraction(fn, tfc, constantEvaluator, PM).doIt();
+    partitionedFunctions.insert(&fn);
 
     // TODO(clattner): This should eventually be the driver that kicks off
     // the partitioning pass as part of it, and the partitioning and later
     // passes are just function passes that are invoked by this one.  Until
     // we are ready for that, let them run later in the pipeline after the
     // other optimization and cleanup passes.
+  }
+
+  // Deabstract stragglers that were left out in the previous iteration. These
+  // are functions that are *still* referred to in the code and operate on
+  // tensor values, but have not been partitioned. It can happen in the
+  // following case, for instance, where `foo` is an external function that has
+  // no body and takes or returns Tensors:
+  //   main() {
+  //     foo() { $0 -= 0.1 * $1 }
+  //   }
+  //
+  // In the common case where we have the body of foo(), it gets inlined, and
+  // therefore, the closure gets inlined too. However, if the body of foo() is
+  // not available, the closure never gets inlined. To ensure that the call to
+  // the closure within foo() works correctly, we will have to deabstract and
+  // partition the closure.
+  //
+  // (Note the body of a function may be missing when we are linking against a
+  // library or in the REPL context where the function was defined on a
+  // different REPL line.)
+  //
+  // We are doing this in two phases because we do not want to partition a
+  // function unless it is absolutely necessary. In the first round, we
+  // inline as much of the functions as possible during deabstraction. Many
+  // of the functions would be dead after the first round, but some stragglers
+  // remain as in the example above.
+  for (auto &fn : *module) {
+    // Skip if it is already partitioned, or if it was ignored only because it
+    // operated on tensor values.
+    if (partitionedFunctions.count(&fn) > 0 ||
+        !tfc.shouldBePartitioned(&fn, /*forceTFFunctions=*/true))
+      continue;
+    TFDeabstraction(fn, tfc, constantEvaluator, PM).doIt();
   }
 }
 
