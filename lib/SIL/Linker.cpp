@@ -157,28 +157,16 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
 //                                  Visitors
 //===----------------------------------------------------------------------===//
 
-static template<typename Inst>
-bool applyInstCalleeIsGeneric(Inst AI) {
-  return AI->getCallee()->getType().template castTo<SILFunctionType>()
-           ->getGenericSignature();
-}
-
 void SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
-  if (applyInstCalleeIsGeneric(AI)) {
-    visitApplySubstitutions(AI->getSubstitutionMap());
-  }
+  visitApplySubstitutions(AI->getSubstitutionMap());
 }
 
 void SILLinkerVisitor::visitTryApplyInst(TryApplyInst *TAI) {
-  if (applyInstCalleeIsGeneric(TAI)) {
-    visitApplySubstitutions(TAI->getSubstitutionMap());
-  }
+  visitApplySubstitutions(TAI->getSubstitutionMap());
 }
 
 void SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
-  if (applyInstCalleeIsGeneric(PAI)) {
-    visitApplySubstitutions(PAI->getSubstitutionMap());
-  }
+  visitApplySubstitutions(PAI->getSubstitutionMap());
 }
 
 void SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
