@@ -2512,6 +2512,10 @@ namespace {
         return nullptr;
       }
 
+      // Don't import nominal types that are over-aligned.
+      if (Impl.isOverAligned(decl))
+        return nullptr;
+
       Optional<ImportedName> correctSwiftName;
       auto importedName = getClangDeclName(decl, correctSwiftName);
       if (!importedName)
@@ -2996,6 +3000,10 @@ namespace {
         forwardDeclaration = true;
         return nullptr;
       }
+
+      // Don't import nominal types that are over-aligned.
+      if (Impl.isOverAligned(decl))
+        return nullptr;
 
       // FIXME: We should actually support strong ARC references and similar in
       // C structs. That'll require some SIL and IRGen work, though.
@@ -7690,6 +7698,7 @@ static void finishInheritedConformances(
                                                      inherited);
     assert(inheritedConformance && inheritedConformance->isConcrete() &&
            "inherited conformance not found");
+    (void)inheritedConformance;
   }
 }
 

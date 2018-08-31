@@ -684,8 +684,7 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
   if (Loc.isInvalid())
     return None;
   auto &SM = VD->getASTContext().SourceMgr;
-  return SM.getLocOffsetInBuffer(Loc, SM.getIDForBufferIdentifier(SM.
-    getBufferIdentifierForLoc(Loc)).getValue());
+  return SM.getLocOffsetInBuffer(Loc, SM.findBufferContainingLoc(Loc));
 }
 
 /// Returns true for failure to resolve.
@@ -873,7 +872,8 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   auto ClangNode = VD->getClangNode();
   if (ClangNode) {
     auto ClangMod = Importer->getClangOwningModule(ClangNode);
-    ModuleName = ClangMod->getFullModuleName();
+    if (ClangMod)
+      ModuleName = ClangMod->getFullModuleName();
   } else if (VD->getLoc().isInvalid() && VD->getModuleContext() != MainModule) {
     ModuleName = VD->getModuleContext()->getName().str();
   }

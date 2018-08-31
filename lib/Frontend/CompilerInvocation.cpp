@@ -259,6 +259,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::DebugDiagnose;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
+    Opts.RequestEvaluatorGraphVizPath = A->getValue();
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
     unsigned threshold;
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
@@ -1203,6 +1207,7 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
   if (info.status != serialization::Status::Valid)
     return info.status;
 
+  LangOpts.EffectiveLanguageVersion = info.compatibilityVersion;
   setTargetTriple(info.targetTriple);
   if (!extendedInfo.getSDKPath().empty())
     setSDKPath(extendedInfo.getSDKPath());

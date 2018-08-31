@@ -13,6 +13,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
+// FIXME: Handle different forms of %target-run more robustly
+// REQUIRES: OS=macosx
+
 /*
    This file pokes at the swift_reflection_infoForInstance() API
    of the SwiftRemoteMirror library.

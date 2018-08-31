@@ -297,6 +297,31 @@ public:
   void cacheResult(Requirement value) const;
 };
 
+/// Generate the USR for the given declaration.
+class USRGenerationRequest :
+    public SimpleRequest<USRGenerationRequest,
+                         CacheKind::Cached,
+                         std::string,
+                         const ValueDecl*>
+{
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend class SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<std::string> evaluate(Evaluator &eval, const ValueDecl* d) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
 

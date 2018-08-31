@@ -264,6 +264,7 @@ public:
   /// setInsertionPoint - Set the insertion point to insert before the specified
   /// instruction.
   void setInsertionPoint(SILInstruction *I) {
+    assert(I && "can't set insertion point to a null instruction");
     setInsertionPoint(I->getParent(), I->getIterator());
   }
 
@@ -276,6 +277,7 @@ public:
   /// setInsertionPoint - Set the insertion point to insert at the end of the
   /// specified block.
   void setInsertionPoint(SILBasicBlock *BB) {
+    assert(BB && "can't set insertion point to a null basic block");
     setInsertionPoint(BB, BB->end());
   }
 
@@ -2202,7 +2204,9 @@ public:
   SavedInsertionPointRAII &operator=(SavedInsertionPointRAII &&) = delete;
 
   ~SavedInsertionPointRAII() {
-    if (SavedIP.is<SILInstruction *>()) {
+    if (SavedIP.isNull()) {
+      Builder.clearInsertionPoint();
+    } else if (SavedIP.is<SILInstruction *>()) {
       Builder.setInsertionPoint(SavedIP.get<SILInstruction *>());
     } else {
       Builder.setInsertionPoint(SavedIP.get<SILBasicBlock *>());

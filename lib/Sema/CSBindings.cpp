@@ -139,9 +139,7 @@ findInferableTypeVars(Type type,
 static bool shouldBindToValueType(Constraint *constraint) {
   switch (constraint->getKind()) {
   case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::ArgumentConversion:
-  case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::Subtype:
@@ -167,6 +165,8 @@ static bool shouldBindToValueType(Constraint *constraint) {
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
     llvm_unreachable("shouldBindToValueType() may only be called on "
                      "relational constraints");
   }
@@ -209,7 +209,40 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   if (auto *literalProtocol = binding.DefaultedProtocol)
     foundLiteralBinding(literalProtocol);
 
+  // If the type variable can't bind to an lvalue, make sure the
+  // type we pick isn't an lvalue.
+  if (!TypeVar->getImpl().canBindToLValue() &&
+      binding.BindingType->hasLValueType()) {
+    binding = binding.withType(binding.BindingType->getRValueType());
+  }
+
+  if (!isViable(binding))
+    return;
+
   Bindings.push_back(std::move(binding));
+}
+
+bool ConstraintSystem::PotentialBindings::isViable(
+    PotentialBinding &binding) const {
+  // Prevent against checking against the same opened nominal type
+  // over and over again. Doing so means redundant work in the best
+  // case. In the worst case, we'll produce lots of duplicate solutions
+  // for this constraint system, which is problematic for overload
+  // resolution.
+  auto type = binding.BindingType;
+  if (type->hasTypeVariable()) {
+    auto *NTD = type->getAnyNominal();
+    if (!NTD)
+      return true;
+
+    for (auto &existing : Bindings) {
+      auto *existingNTD = existing.BindingType->getAnyNominal();
+      if (existingNTD && NTD == existingNTD)
+        return false;
+    }
+  }
+
+  return true;
 }
 
 Optional<ConstraintSystem::PotentialBinding>
@@ -383,8 +416,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
-    case ConstraintKind::ArgumentTupleConversion:
-    case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::OptionalObject: {
       auto binding = getPotentialBindingForRelationalConstraint(
@@ -426,6 +457,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
+    case ConstraintKind::FunctionInput:
+    case ConstraintKind::FunctionResult:
       // Constraints from which we can't do anything.
       break;
 

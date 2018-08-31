@@ -1292,6 +1292,24 @@ void ValueLifetimeAnalysis::dump() const {
   llvm::errs() << '\n';
 }
 
+bool EdgeThreadingCloner::splitCriticalEdges(DominanceInfo *DT,
+                                             SILLoopInfo *LI) {
+  bool changed = false;
+  // Remove any critical edges that the EdgeThreadingCloner may have
+  // accidentally created.
+  for (unsigned succIdx = 0, succEnd = FromBB->getSuccessors().size();
+       succIdx != succEnd; ++succIdx) {
+    if (nullptr != splitCriticalEdge(FromBB->getTerminator(), succIdx, DT, LI))
+      changed |= true;
+  }
+  for (unsigned succIdx = 0, succEnd = DestBB->getSuccessors().size();
+       succIdx != succEnd; ++succIdx) {
+    auto *newBB = splitCriticalEdge(DestBB->getTerminator(), succIdx, DT, LI);
+    changed |= (newBB != nullptr);
+  }
+  return changed;
+}
+
 bool swift::simplifyUsers(SingleValueInstruction *I) {
   bool Changed = false;
 

@@ -903,13 +903,9 @@ public:
   /// declaration.
   GenericTypeDecl *getAnyGeneric();
 
-  /// getUnlabeledType - Retrieve a version of this type with all labels
-  /// removed at every level. For example, given a tuple type 
-  /// \code
-  /// (p : (x : int, y : int))
-  /// \endcode
-  /// the result would be the (parenthesized) type ((int, int)).
-  Type getUnlabeledType(ASTContext &Context);
+  /// removeArgumentLabels -  Retrieve a version of this type with all
+  /// argument labels removed.
+  Type removeArgumentLabels(unsigned numArgumentLabels);
 
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
@@ -2693,8 +2689,9 @@ public:
     }
 
     bool operator==(Param const &b) const {
-      return Label == b.Label && getType()->isEqual(b.getType()) &&
-             Flags == b.Flags;
+      return (Label == b.Label &&
+              getPlainType()->isEqual(b.getPlainType()) &&
+              Flags == b.Flags);
     }
     bool operator!=(Param const &b) const { return !(*this == b); }
 
@@ -2948,6 +2945,11 @@ public:
   /// \brief Given two arrays of parameters determine if they are equal.
   static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
 
+  /// \brief Given an array of parameters and an array of labels of the
+  /// same length, update each parameter to have the corresponding label.
+  static void relabelParams(MutableArrayRef<Param> params,
+                            ArrayRef<Identifier> labels);
+
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
   ArrayRef<Param> getParams() const;
@@ -3038,9 +3040,6 @@ class FunctionType final : public AnyFunctionType,
       
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *getOld(Type Input, Type Result,
-                              ExtInfo Info = ExtInfo());
-      
   static FunctionType *get(ArrayRef<Param> params,
                            Type result,
                            ExtInfo info = ExtInfo(),
@@ -3117,12 +3116,6 @@ class GenericFunctionType final : public AnyFunctionType,
                       RecursiveTypeProperties properties);
       
 public:
-  /// Create a new generic function type.
-  static GenericFunctionType *getOld(GenericSignature *sig,
-                                     Type input,
-                                     Type result,
-                                     ExtInfo info = ExtInfo());
-
   /// Create a new generic function type.
   static GenericFunctionType *get(GenericSignature *sig,
                                   ArrayRef<Param> params,

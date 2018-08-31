@@ -42,6 +42,9 @@
 #ifdef HAVE_PROC_PID_RUSAGE
 #include <libproc.h>
 #endif
+#ifdef HAVE_MALLOC_MALLOC_H
+#include <malloc/malloc.h>
+#endif
 
 namespace swift {
 using namespace llvm;
@@ -500,6 +503,21 @@ void updateProcessWideFrontendCounters(
     C.NumInstructionsExecuted = ru.ri_instructions;
   }
 #endif
+
+#if defined(HAVE_MALLOC_ZONE_STATISTICS) && defined(HAVE_MALLOC_MALLOC_H)
+  // On Darwin we have a lifetime max that's maintained by malloc we can
+  // just directly query, even if we only make one query on shutdown.
+  malloc_statistics_t Stats;
+  malloc_zone_statistics(malloc_default_zone(), &Stats);
+  C.MaxMallocUsage = (int64_t)Stats.max_size_in_use;
+#else
+  // If we don't have a malloc-tracked max-usage counter, we have to rely
+  // on taking the max over current-usage samples while running and hoping
+  // we get called often enough. This will happen when profiling/tracing,
+  // but not while doing single-query-on-shutdown collection.
+  C.MaxMallocUsage = std::max(C.MaxMallocUsage,
+                              (int64_t)llvm::sys::Process::GetMallocUsage());
+#endif
 }
 
 static inline void
@@ -614,7 +632,8 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
     }
   }
 
-  updateProcessWideFrontendCounters(getFrontendCounters());
+  if (FrontendCounters)
+    updateProcessWideFrontendCounters(getFrontendCounters());
 
   // NB: Timer needs to be Optional<> because it needs to be destructed early;
   // LLVM will complain about double-stopping a timer if you tear down a

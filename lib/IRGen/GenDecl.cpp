@@ -1378,7 +1378,10 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   switch (getKind()) {
   case Kind::DispatchThunk:
   case Kind::DispatchThunkInitializer:
-  case Kind::DispatchThunkAllocator: {
+  case Kind::DispatchThunkAllocator:
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator: {
     auto *decl = getDecl();
 
     // Protocol requirements don't have their own access control
@@ -1586,7 +1589,10 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   switch (getKind()) {
   case Kind::DispatchThunk:
   case Kind::DispatchThunkInitializer:
-  case Kind::DispatchThunkAllocator: {
+  case Kind::DispatchThunkAllocator:
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator: {
     auto *decl = getDecl();
 
     // Protocol requirements don't have their own access control
@@ -2577,28 +2583,6 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   return {gotEquivalent, ConstantReference::Indirect};
 }
 
-/// Get or create a "GOT equivalent" llvm::GlobalVariable, if applicable.
-///
-/// Creates a private, unnamed constant containing the address of another
-/// function. LLVM can replace relative references to this variable with
-/// relative references to the GOT entry for the function in the object file.
-ConstantReference
-IRGenModule::getFunctionGOTEquivalent(LinkEntity entity,
-                                      llvm::Function *func) {
-  auto &gotEntry = GlobalGOTEquivalents[entity];
-  if (gotEntry) {
-    return {gotEntry, ConstantReference::Indirect};
-  }
-
-  // Use it as the initializer for an anonymous constant. LLVM can treat this as
-  // equivalent to the global's GOT entry.
-  llvm::SmallString<64> name;
-  entity.mangle(name);
-  auto gotEquivalent = createGOTEquivalent(*this, func, name);
-  gotEntry = gotEquivalent;
-  return {gotEquivalent, ConstantReference::Indirect};
-}
-
 static TypeEntityReference
 getTypeContextDescriptorEntityReference(IRGenModule &IGM,
                                         NominalTypeDecl *decl) {
@@ -3268,6 +3252,47 @@ IRGenModule::getAddrOfTypeMetadataSingletonInitializationCache(
   return variable;
 }
 
+llvm::GlobalValue *IRGenModule::defineAlias(LinkEntity entity,
+                                            llvm::Constant *definition) {
+  // Check for an existing forward declaration of the alias.
+  auto &entry = GlobalVars[entity];
+  llvm::GlobalValue *existingVal = nullptr;
+  if (entry) {
+    existingVal = cast<llvm::GlobalValue>(entry);
+    // Clear the existing value's name so we can steal it.
+    existingVal->setName("");
+  }
+
+  LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
+  auto *ptrTy = cast<llvm::PointerType>(definition->getType());
+  auto *alias = llvm::GlobalAlias::create(
+      ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
+      link.getName(), definition, &Module);
+  alias->setVisibility(link.getVisibility());
+  alias->setDLLStorageClass(link.getDLLStorage());
+
+  if (link.isUsed()) {
+    addUsedGlobal(alias);
+  }
+
+  // Replace an existing external declaration for the address point.
+  if (entry) {
+    auto existingVal = cast<llvm::GlobalValue>(entry);
+
+    // FIXME: MC breaks when emitting alias references on some platforms
+    // (rdar://problem/22450593 ). Work around this by referring to the aliasee
+    // instead.
+    llvm::Constant *aliasCast = alias->getAliasee();
+    aliasCast = llvm::ConstantExpr::getBitCast(aliasCast,
+                                               entry->getType());
+    existingVal->replaceAllUsesWith(aliasCast);
+    existingVal->eraseFromParent();
+  }
+  entry = alias;
+
+  return alias;
+}
+
 /// Define the metadata for a type.
 ///
 /// Some type metadata has information before the address point that the
@@ -3320,6 +3345,10 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   if (!section.empty())
     var->setSection(section);
 
+  LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
+  if (link.isUsed())
+    addUsedGlobal(var);
+
   // Keep type metadata around for all types.
   if (auto nominal = concreteType->getAnyNominal())
     addRuntimeResolvableType(nominal);
@@ -3339,47 +3368,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
                                                         addr, indices);
   }
   addr = llvm::ConstantExpr::getBitCast(addr, TypeMetadataPtrTy);
-
-  // Check for an existing forward declaration of the address point.
-  auto &directEntry = GlobalVars[directEntity];
-  llvm::GlobalValue *existingVal = nullptr;
-  if (directEntry) {
-    existingVal = cast<llvm::GlobalValue>(directEntry);
-    // Clear the existing value's name so we can steal it.
-    existingVal->setName("");
-  }
-
-  LinkInfo link = LinkInfo::get(*this, directEntity, ForDefinition);
-  auto *ptrTy = cast<llvm::PointerType>(addr->getType());
-  auto *alias = llvm::GlobalAlias::create(
-      ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
-      link.getName(), addr, &Module);
-  alias->setVisibility(link.getVisibility());
-  alias->setDLLStorageClass(link.getDLLStorage());
-
-  // The full metadata is used based on the visibility of the address point,
-  // not the metadata itself.
-  if (link.isUsed()) {
-    addUsedGlobal(var);
-    addUsedGlobal(alias);
-  }
-
-  // Replace an existing external declaration for the address point.
-  if (directEntry) {
-    auto existingVal = cast<llvm::GlobalValue>(directEntry);
-
-    // FIXME: MC breaks when emitting alias references on some platforms
-    // (rdar://problem/22450593 ). Work around this by referring to the aliasee
-    // instead.
-    llvm::Constant *aliasCast = alias->getAliasee();
-    aliasCast = llvm::ConstantExpr::getBitCast(aliasCast,
-                                               directEntry->getType());
-    existingVal->replaceAllUsesWith(aliasCast);
-    existingVal->eraseFromParent();
-  }
-  directEntry = alias;
-
-  return alias;
+  return defineAlias(directEntity, addr);
 }
 
 /// Fetch the declaration of the metadata (or metadata template) for a

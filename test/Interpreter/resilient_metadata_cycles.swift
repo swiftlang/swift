@@ -11,6 +11,8 @@
 
 // RUN: %target-run %t/main %t/libresilient_struct.%target-dylib-extension %t/libresilient_class.%target-dylib-extension
 
+// REQUIRES: executable_test
+
 import StdlibUnittest
 
 import resilient_struct

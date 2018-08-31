@@ -77,41 +77,51 @@ public:
     llvm_unreachable("SILArgument not argument of its parent BB");
   }
 
-  /// Returns the incoming SILValue from the \p BBIndex predecessor of this
-  /// argument's parent BB. If the routine fails, it returns an empty SILValue.
-  /// Note that for some predecessor terminators the incoming value is not
-  /// exactly the argument value. E.g. the incoming value for a switch_enum
-  /// payload argument is the enum itself (the operand of the switch_enum).
-  SILValue getIncomingValue(unsigned BBIndex);
+  /// Return true if this block argument is actually a phi argument as
+  /// opposed to a cast or projection.
+  bool isPhiArgument();
 
-  /// Returns the incoming SILValue for this argument from BB. If the routine
-  /// fails, it returns an empty SILValue.
-  /// Note that for some predecessor terminators the incoming value is not
-  /// exactly the argument value. E.g. the incoming value for a switch_enum
-  /// payload argument is the enum itself (the operand of the switch_enum).
-  SILValue getIncomingValue(SILBasicBlock *BB);
+  /// If this argument is a phi, return the incoming phi value for the given
+  /// predecessor BB. If this argument is not a phi, return an invalid SILValue.
+  SILValue getIncomingPhiValue(SILBasicBlock *predBB);
 
-  /// Returns true if we were able to find incoming values for each predecessor
-  /// of this arguments basic block. The found values are stored in OutArray.
-  /// Note that for some predecessor terminators the incoming value is not
-  /// exactly the argument value. E.g. the incoming value for a switch_enum
-  /// payload argument is the enum itself (the operand of the switch_enum).
-  bool getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray);
+  /// If this argument is a phi, populate `OutArray` with the incoming phi
+  /// values for each predecessor BB. If this argument is not a phi, return
+  /// false.
+  bool getIncomingPhiValues(llvm::SmallVectorImpl<SILValue> &ReturnedPhiValues);
 
-  /// Returns true if we were able to find incoming values for each predecessor
-  /// of this arguments basic block. The found values are stored in OutArray.
-  /// Note that for some predecessor terminators the incoming value is not
-  /// exactly the argument value. E.g. the incoming value for a switch_enum
-  /// payload argument is the enum itself (the operand of the switch_enum).
-  bool getIncomingValues(
+  /// If this argument is a phi, populate `OutArray` with each predecessor block
+  /// and its incoming phi value. If this argument is not a phi, return false.
+  bool getIncomingPhiValues(
+      llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
+          &ReturnedPredAndPhiValuePairs);
+
+  /// Returns true if we were able to find a single terminator operand value for
+  /// each predecessor of this arguments basic block. The found values are
+  /// stored in OutArray.
+  ///
+  /// Note: this peeks through any projections or cast implied by the
+  /// terminator. e.g. the incoming value for a switch_enum payload argument is
+  /// the enum itself (the operand of the switch_enum).
+  bool getSingleTerminatorOperands(llvm::SmallVectorImpl<SILValue> &OutArray);
+
+  /// Returns true if we were able to find single terminator operand values for
+  /// each predecessor of this arguments basic block. The found values are
+  /// stored in OutArray alongside their predecessor block.
+  ///
+  /// Note: this peeks through any projections or cast implied by the
+  /// terminator. e.g. the incoming value for a switch_enum payload argument is
+  /// the enum itself (the operand of the switch_enum).
+  bool getSingleTerminatorOperands(
       llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray);
 
-  /// If this SILArgument's parent block has one predecessor, return the
-  /// incoming value from that predecessor. Returns SILValue() otherwise.
-  /// Note that for some predecessor terminators the incoming value is not
-  /// exactly the argument value. E.g. the incoming value for a switch_enum
-  /// payload argument is the enum itself (the operand of the switch_enum).
-  SILValue getSingleIncomingValue() const;
+  /// If this SILArgument's parent block has a single predecessor whose
+  /// terminator has a single operand, return the incoming operand of the
+  /// predecessor's terminator. Returns SILValue() otherwise.  Note that for
+  /// some predecessor terminators the incoming value is not exactly the
+  /// argument value. E.g. the incoming value for a switch_enum payload argument
+  /// is the enum itself (the operand of the switch_enum).
+  SILValue getSingleTerminatorOperand() const;
 
 protected:
   SILArgument(ValueKind SubClassKind, SILBasicBlock *ParentBB, SILType Ty,
@@ -138,41 +148,59 @@ protected:
 
 class SILPHIArgument : public SILArgument {
 public:
-  /// Returns the incoming SILValue from the \p BBIndex predecessor of this
-  /// argument's parent BB. If the routine fails, it returns an empty SILValue.
-  /// Note that for some predecessor terminators the incoming value is not
-  /// exactly the argument value. E.g. the incoming value for a switch_enum
-  /// payload argument is the enum itself (the operand of the switch_enum).
-  SILValue getIncomingValue(unsigned BBIndex);
+  /// Return true if this is block argument is actually a phi argument as
+  /// opposed to a cast or projection.
+  bool isPhiArgument();
 
-  /// Returns the incoming SILValue for this argument from BB. If the routine
-  /// fails, it returns an empty SILValue.
-  /// Note that for some predecessor terminators the incoming value is not
-  /// exactly the argument value. E.g. the incoming value for a switch_enum
-  /// payload argument is the enum itself (the operand of the switch_enum).
-  SILValue getIncomingValue(SILBasicBlock *BB);
+  /// If this argument is a phi, return the incoming phi value for the given
+  /// predecessor BB. If this argument is not a phi, return an invalid SILValue.
+  ///
+  /// FIXME: Once SILPHIArgument actually implies that it is a phi argument,
+  /// this will be guaranteed to return a valid SILValue.
+  SILValue getIncomingPhiValue(SILBasicBlock *BB);
 
-  /// Returns true if we were able to find incoming values for each predecessor
-  /// of this arguments basic block. The found values are stored in OutArray.
-  /// Note that for some predecessor terminators the incoming value is not
-  /// exactly the argument value. E.g. the incoming value for a switch_enum
-  /// payload argument is the enum itself (the operand of the switch_enum).
-  bool getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray);
+  /// If this argument is a phi, populate `OutArray` with the incoming phi
+  /// values for each predecessor BB. If this argument is not a phi, return
+  /// false.
+  ///
+  /// FIXME: Once SILPHIArgument actually implies that it is a phi argument,
+  /// this will always succeed.
+  bool getIncomingPhiValues(llvm::SmallVectorImpl<SILValue> &OutArray);
 
-  /// Returns true if we were able to find incoming values for each predecessor
-  /// of this arguments basic block. The found values are stored in OutArray.
-  /// Note that for some predecessor terminators the incoming value is not
-  /// exactly the argument value. E.g. the incoming value for a switch_enum
-  /// payload argument is the enum itself (the operand of the switch_enum).
-  bool getIncomingValues(
+  /// If this argument is a phi, populate `OutArray` with each predecessor block
+  /// and its incoming phi value. If this argument is not a phi, return false.
+  ///
+  /// FIXME: Once SILPHIArgument actually implies that it is a phi argument,
+  /// this will always succeed.
+  bool getIncomingPhiValues(
       llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray);
 
-  /// If this SILArgument's parent block has one predecessor, return the
-  /// incoming value from that predecessor. Returns SILValue() otherwise.
-  /// Note that for some predecessor terminators the incoming value is not
-  /// exactly the argument value. E.g. the incoming value for a switch_enum
-  /// payload argument is the enum itself (the operand of the switch_enum).
-  SILValue getSingleIncomingValue() const;
+  /// Returns true if we were able to find a single terminator operand value for
+  /// each predecessor of this arguments basic block. The found values are
+  /// stored in OutArray.
+  ///
+  /// Note: this peeks through any projections or cast implied by the
+  /// terminator. e.g. the incoming value for a switch_enum payload argument is
+  /// the enum itself (the operand of the switch_enum).
+  bool getSingleTerminatorOperands(llvm::SmallVectorImpl<SILValue> &OutArray);
+
+  /// Returns true if we were able to find single terminator operand values for
+  /// each predecessor of this arguments basic block. The found values are
+  /// stored in OutArray alongside their predecessor block.
+  ///
+  /// Note: this peeks through any projections or cast implied by the
+  /// terminator. e.g. the incoming value for a switch_enum payload argument is
+  /// the enum itself (the operand of the switch_enum).
+  bool getSingleTerminatorOperands(
+      llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray);
+
+  /// If this SILArgument's parent block has a single predecessor whose
+  /// terminator has a single operand, return the incoming operand of the
+  /// predecessor's terminator. Returns SILValue() otherwise.  Note that for
+  /// some predecessor terminators the incoming value is not exactly the
+  /// argument value. E.g. the incoming value for a switch_enum payload argument
+  /// is the enum itself (the operand of the switch_enum).
+  SILValue getSingleTerminatorOperand() const;
 
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
@@ -254,36 +282,45 @@ private:
 // Out of line Definitions for SILArgument to avoid Forward Decl issues
 //===----------------------------------------------------------------------===//
 
-inline SILValue SILArgument::getIncomingValue(unsigned BBIndex) {
-  if (isa<SILFunctionArgument>(this))
-    return SILValue();
-  return cast<SILPHIArgument>(this)->getIncomingValue(BBIndex);
+inline bool SILArgument::isPhiArgument() {
+  if (auto *phiArg = dyn_cast<SILPHIArgument>(this))
+    return phiArg->isPhiArgument();
+
+  return false;
 }
 
-inline SILValue SILArgument::getIncomingValue(SILBasicBlock *BB) {
+inline SILValue SILArgument::getIncomingPhiValue(SILBasicBlock *BB) {
   if (isa<SILFunctionArgument>(this))
     return SILValue();
-  return cast<SILPHIArgument>(this)->getIncomingValue(BB);
+  return cast<SILPHIArgument>(this)->getIncomingPhiValue(BB);
 }
 
 inline bool
-SILArgument::getIncomingValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
+SILArgument::getIncomingPhiValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
   if (isa<SILFunctionArgument>(this))
     return false;
-  return cast<SILPHIArgument>(this)->getIncomingValues(OutArray);
+  return cast<SILPHIArgument>(this)->getIncomingPhiValues(OutArray);
 }
 
-inline bool SILArgument::getIncomingValues(
+inline bool SILArgument::getIncomingPhiValues(
     llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray) {
   if (isa<SILFunctionArgument>(this))
     return false;
-  return cast<SILPHIArgument>(this)->getIncomingValues(OutArray);
+  return cast<SILPHIArgument>(this)->getIncomingPhiValues(OutArray);
 }
 
-inline SILValue SILArgument::getSingleIncomingValue() const {
+inline bool SILArgument::getSingleTerminatorOperands(
+    llvm::SmallVectorImpl<SILValue> &OutArray) {
   if (isa<SILFunctionArgument>(this))
-    return SILValue();
-  return cast<SILPHIArgument>(this)->getSingleIncomingValue();
+    return false;
+  return cast<SILPHIArgument>(this)->getSingleTerminatorOperands(OutArray);
+}
+
+inline bool SILArgument::getSingleTerminatorOperands(
+    llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray) {
+  if (isa<SILFunctionArgument>(this))
+    return false;
+  return cast<SILPHIArgument>(this)->getSingleTerminatorOperands(OutArray);
 }
 
 } // end swift namespace

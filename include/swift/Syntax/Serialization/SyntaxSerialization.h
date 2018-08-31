@@ -203,6 +203,20 @@ struct NullableTraits<RC<syntax::RawSyntax>> {
 
 namespace byteTree {
 
+/// Increase the major version for every change that is not just adding a new
+/// field at the end of an object. Older swiftSyntax clients will no longer be
+/// able to deserialize the format.
+const uint16_t SYNTAX_TREE_VERSION_MAJOR = 1; // Last change: initial version
+/// Increase the minor version if only new field has been added at the end of
+/// an object. Older swiftSyntax clients will still be able to deserialize the
+/// format.
+const uint8_t SYNTAX_TREE_VERSION_MINOR = 0; // Last change: initial version
+
+// Combine the major and minor version into one. The first three bytes
+// represent the major version, the last byte the minor version.
+const uint32_t SYNTAX_TREE_VERSION =
+    SYNTAX_TREE_VERSION_MAJOR << 8 | SYNTAX_TREE_VERSION_MINOR;
+
 /// The key for a ByteTree serializion user info of type
 /// `std::unordered_set<unsigned> *`. Specifies the IDs of syntax nodes that
 /// shall be omitted when the syntax tree gets serialized.

@@ -245,3 +245,10 @@ func microwave() -> Dinner {
   let d: Dinner? = nil
   return (n: d) // expected-error{{cannot convert return expression of type '(n: Dinner?)' to return type 'Dinner'}}
 }
+
+// Tuple conversion with an optional
+func f(b: Bool) -> (a: Int, b: String)? {
+  let x = 3
+  let y = ""
+  return b ? (x, y) : nil
+}

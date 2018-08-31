@@ -17,6 +17,18 @@
 // PARSE-NEXT:   }
 // PARSE-NEXT: ]
 
+// RUN: %sourcekitd-test -req=track-compiles == -req=sema %S/Inputs/parse-error-with-sourceLocation.swift -- %S/Inputs/parse-error-with-sourceLocation.swift | %FileCheck %s -check-prefix=PARSE-WITH-SOURCELOCATION
+// PARSE-WITH-SOURCELOCATION: key.notification: source.notification.compile-did-finish
+// PARSE-WITH-SOURCELOCATION-NEXT: key.diagnostics: [
+// PARSE-WITH-SOURCELOCATION-NEXT:   {
+// PARSE-WITH-SOURCELOCATION-NEXT:     key.line: 2000
+// PARSE-WITH-SOURCELOCATION-NEXT:     key.column: 6
+// PARSE-WITH-SOURCELOCATION-NEXT:     key.filepath: "custom.swuft"
+// PARSE-WITH-SOURCELOCATION-NEXT:     key.severity: source.diagnostic.severity.error
+// PARSE-WITH-SOURCELOCATION-NEXT:     key.description: "function name
+// PARSE-WITH-SOURCELOCATION-NEXT:   }
+// PARSE-WITH-SOURCELOCATION-NEXT: ]
+
 // Diagnostic from other file.
 // RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s %S/Inputs/parse-error.swift | %FileCheck %s -check-prefix=PARSE
 

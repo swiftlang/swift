@@ -315,6 +315,7 @@ function (swift_benchmark_compile_archopts)
   if (is_darwin)
     list(APPEND common_options
       "-I" "${srcdir}/utils/ObjectiveCTests"
+      "-I" "${srcdir}/utils/LibProc"
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
       "-sdk" "${sdk}"
       "-no-link-objc-runtime")
@@ -344,6 +345,7 @@ function (swift_benchmark_compile_archopts)
     list(APPEND common_options_driver
       "-sdk" "${sdk}"
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
+      "-I" "${srcdir}/utils/LibProc"
       "-no-link-objc-runtime")
   endif()
   set(bench_library_objects)

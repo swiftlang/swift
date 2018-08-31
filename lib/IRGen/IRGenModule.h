@@ -747,7 +747,7 @@ public:
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
-  
+
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
            "requesting clang AST context without clang importer!");
@@ -760,6 +760,8 @@ public:
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
+
+  Alignment getCappedAlignment(Alignment alignment);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
 
@@ -1142,7 +1144,16 @@ public:
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);
 
-  llvm::Function *emitDispatchThunk(SILDeclRef declRef);
+  void emitDispatchThunk(SILDeclRef declRef);
+
+  llvm::GlobalValue *defineAlias(LinkEntity entity,
+                                 llvm::Constant *definition);
+
+  llvm::GlobalValue *defineMethodDescriptor(SILDeclRef declRef,
+                                            NominalTypeDecl *nominalDecl,
+                                            llvm::Constant *definition);
+
+
   Address getAddrOfEnumCase(EnumElementDecl *Case,
                             ForDefinition_t forDefinition);
   Address getAddrOfFieldOffset(VarDecl *D, ForDefinition_t forDefinition);
@@ -1271,10 +1282,6 @@ public:
   getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
        llvm::Type *defaultType,
        ConstantReference::Directness forceIndirect = ConstantReference::Direct);
-
-  ConstantReference
-  getFunctionGOTEquivalent(LinkEntity entity,
-                           llvm::Function *func);
 
   llvm::Constant *
   emitRelativeReference(ConstantReference target,

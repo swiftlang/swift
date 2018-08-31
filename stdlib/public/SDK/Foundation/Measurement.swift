@@ -169,7 +169,7 @@ extension Measurement {
     ///
     /// If `lhs.unit == rhs.unit`, returns `lhs.value == rhs.value`. Otherwise, converts `rhs` to the same unit as `lhs` and then compares the resulting values.
     /// - returns: `true` if the measurements are equal.
-    public static func ==<LeftHandSideType, RightHandSideType>(_ lhs: Measurement<LeftHandSideType>, _ rhs: Measurement<RightHandSideType>) -> Bool {
+    public static func ==<LeftHandSideType, RightHandSideType>(lhs: Measurement<LeftHandSideType>, rhs: Measurement<RightHandSideType>) -> Bool {
         if lhs.unit == rhs.unit {
             return lhs.value == rhs.value
         } else {

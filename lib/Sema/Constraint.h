@@ -73,11 +73,6 @@ enum class ConstraintKind : char {
   /// convertible to the second type (which represents the corresponding
   /// parameter type).
   ArgumentConversion,
-  /// \brief The first type is an argument type (or tuple) that is convertible
-  /// to the second type (which represents the parameter type/tuple).
-  ArgumentTupleConversion,
-  /// An argument tuple conversion for operators.
-  OperatorArgumentTupleConversion,
   /// \brief The first type is convertible to the second type, including inout.
   OperatorArgumentConversion,
   /// \brief The first type must conform to the second type (which is a
@@ -140,6 +135,12 @@ enum class ConstraintKind : char {
   // The key path type is chosen based on the selection of overloads for the
   // member references along the path.
   KeyPath,
+  /// \brief The first type is a function type, the second is the function's
+  /// input type.
+  FunctionInput,
+  /// \brief The first type is a function type, the second is the function's
+  /// result type.
+  FunctionResult,
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -465,8 +466,6 @@ public:
     case ConstraintKind::Conversion:
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::ArgumentConversion:
-    case ConstraintKind::ArgumentTupleConversion:
-    case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::LiteralConformsTo:
@@ -487,6 +486,8 @@ public:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::Defaultable:
+    case ConstraintKind::FunctionInput:
+    case ConstraintKind::FunctionResult:
       return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Disjunction:
@@ -581,6 +582,10 @@ public:
 
     return count;
   }
+
+  /// Determine if this constraint represents explicit conversion,
+  /// e.g. coercion constraint "as X" which forms a disjunction.
+  bool isExplicitConversion() const;
 
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {

@@ -100,7 +100,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
     SGF.emitPropertyLValue(loc, ManagedValue::forUnmanaged(foreignErrorSlot),
                            bridgedErrorPtrType, pointeeProperty,
                            LValueOptions(),
-                           AccessKind::Write,
+                           SGFAccessKind::Write,
                            AccessSemantics::Ordinary);
   RValue rvalue(SGF, loc, bridgedErrorProto,
                 SGF.emitManagedRValueWithCleanup(bridgedError));

@@ -1120,7 +1120,7 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
         continue;
 
       llvm::SmallVector<SILValue,4> Incoming;
-      if (!BBArg->getIncomingValues(Incoming)) {
+      if (!BBArg->getSingleTerminatorOperands(Incoming)) {
         // We don't know where the block argument comes from -> treat it
         // conservatively.
         ConGraph->setEscapesGlobal(ArgNode);

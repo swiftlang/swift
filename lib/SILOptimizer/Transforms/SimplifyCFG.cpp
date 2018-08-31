@@ -206,14 +206,7 @@ static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
 
 /// Helper function to perform SSA updates in case of jump threading.
 void swift::updateSSAAfterCloning(BaseThreadingCloner &Cloner,
-                                  SILBasicBlock *SrcBB, SILBasicBlock *DestBB,
-                                  bool NeedToSplitCriticalEdges) {
-  // We are updating SSA form. This means we need to be able to insert phi
-  // nodes. To make sure we can do this split all critical edges from
-  // instructions that don't support block arguments.
-  if (NeedToSplitCriticalEdges)
-    splitAllCriticalEdges(*DestBB->getParent(), true, nullptr, nullptr);
-
+                                  SILBasicBlock *SrcBB, SILBasicBlock *DestBB) {
   SILSSAUpdater SSAUp;
   for (auto AvailValPair : Cloner.AvailVals) {
     ValueBase *Inst = AvailValPair.first;
@@ -333,6 +326,7 @@ public:
     // We have copied the threaded block into the edge.
     Src = Cloner.getEdgeBB();
 
+    // Rewrite the cloned branch to eliminate the non-taken path.
     if (auto *CondTerm = dyn_cast<CondBranchInst>(Src->getTerminator())) {
       // We know the direction this conditional branch is going to take thread
       // it.
@@ -371,14 +365,11 @@ public:
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock,
                              ArrayRef<SILValue>());
       SEI->eraseFromParent();
-
-      // Split the edge from 'Dest' to 'ThreadedSuccessorBlock' it is now
-      // critical. Doing this here safes us from doing it over the whole
-      // function in updateSSAAfterCloning because we have split all other
-      // critical edges earlier.
-      splitEdgesFromTo(Dest, ThreadedSuccessorBlock, nullptr, nullptr);
     }
-    updateSSAAfterCloning(Cloner, Src, Dest, false);
+    // After rewriting the cloned branch, split the critical edge.
+    // This does not currently update DominanceInfo.
+    Cloner.splitCriticalEdges(nullptr, nullptr);
+    updateSSAAfterCloning(Cloner, Src, Dest);
   }
 };
 
@@ -661,7 +652,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
   // also required for SSA construction in dominatorBasedSimplifications' jump
   // threading. It only splits new critical edges it creates by jump threading.
   bool Changed =
-      EnableJumpThread ? splitAllCriticalEdges(Fn, false, DT, nullptr) : false;
+      EnableJumpThread ? splitAllCriticalEdges(Fn, DT, nullptr) : false;
 
   unsigned MaxIter = MaxIterationsOfDominatorBasedSimplify;
   SmallVector<SILBasicBlock *, 16> BlocksForWorklist;
@@ -794,20 +785,13 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
   if (auto *Arg = dyn_cast<SILArgument>(Val)) {
     HandledArgs.insert(Arg);
     llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> IncomingVals;
-    if (!Arg->getIncomingValues(IncomingVals))
+    if (!Arg->getIncomingPhiValues(IncomingVals))
       return nullptr;
 
     EnumElementDecl *CommonCase = nullptr;
     for (std::pair<SILBasicBlock *, SILValue> Incoming : IncomingVals) {
       SILBasicBlock *IncomingBlock = Incoming.first;
       SILValue IncomingVal = Incoming.second;
-      TermInst *TI = IncomingBlock->getTerminator();
-
-      // If the terminator of the incoming value is e.g. a switch_enum, the
-      // incoming value is the switch_enum operand and not the enum payload
-      // (which would be the real incoming value of the argument).
-      if (!isa<BranchInst>(TI) && !isa<CondBranchInst>(TI))
-        return nullptr;
 
       auto *IncomingArg = dyn_cast<SILArgument>(IncomingVal);
       if (IncomingArg && HandledArgs.count(IncomingArg) != 0)
@@ -1069,9 +1053,11 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // destination block into this one, rewriting uses of the BBArgs to use the
   // branch arguments as we go.
   EdgeThreadingCloner Cloner(BI);
-
   for (auto &I : *DestBB)
     Cloner.process(&I);
+
+  // Does not currently update DominanceInfo.
+  Cloner.splitCriticalEdges(nullptr, nullptr);
 
   // Once all the instructions are copied, we can nuke BI itself.  We also add
   // the threaded and edge block to the worklist now that they (likely) can be
@@ -1298,6 +1284,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     BI->eraseFromParent();
     removeIfDead(DestBB);
     addToWorklist(BB);
+
     return true;
   }
 
@@ -2232,7 +2219,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
     if (somePredsAreConst)
       continue;
 
-    SILValue incoming = condArg->getIncomingValue(Pred);
+    SILValue incoming = condArg->getIncomingPhiValue(Pred);
     somePredsAreConst |= isa<IntegerLiteralInst>(incoming);
   }
 
@@ -2243,7 +2230,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
 
   // Move the cond_fail to the predecessor blocks.
   for (auto *Pred : BB->getPredecessorBlocks()) {
-    SILValue incoming = condArg->getIncomingValue(Pred);
+    SILValue incoming = condArg->getIncomingPhiValue(Pred);
     SILBuilderWithScope Builder(Pred->getTerminator());
     
     createCondFail(CFI, incoming, inverted, Builder);
@@ -2451,6 +2438,9 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
     for (auto &I : *DestBB)
       Cloner.process(&I);
 
+    // Does not currently update DominanceInfo.
+    Cloner.splitCriticalEdges(nullptr, nullptr);
+
     updateSSAAfterCloning(Cloner, Cloner.getEdgeBB(), DestBB);
     addToWorklist(Cloner.getEdgeBB());
   }
@@ -2631,7 +2621,7 @@ bool ArgumentSplitter::createNewArguments() {
   SILBasicBlock *ParentBB = Arg->getParent();
 
   // Grab the incoming values. Return false if we can't find them.
-  if (!Arg->getIncomingValues(IncomingValues))
+  if (!Arg->getIncomingPhiValues(IncomingValues))
     return false;
 
   // Only handle struct and tuple type.
@@ -2870,9 +2860,7 @@ bool SimplifyCFG::run() {
     if (simplifyBlocks())
       removeUnreachableBlocks(Fn);
   }
-
-  // Split all critical edges from non cond_br terminators.
-  Changed |= splitAllCriticalEdges(Fn, true, nullptr, nullptr);
+  Fn.verifyCriticalEdges();
 
   // Canonicalize switch_enum instructions.
   Changed |= canonicalizeSwitchEnums();
@@ -3461,7 +3449,7 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
                                              DominanceInfo *DT) {
   auto *A = BB->getArgument(i);
   SmallVector<SILValue, 4> Incoming;
-  if (!A->getIncomingValues(Incoming) || Incoming.empty())
+  if (!A->getIncomingPhiValues(Incoming) || Incoming.empty())
     return;
   
   SILValue V = Incoming[0];
@@ -3622,9 +3610,11 @@ public:
   void run() override {
     auto &Fn = *getFunction();
 
+    if (OnlyNonCondBrEdges)
+      Fn.verifyCriticalEdges();
+
     // Split all critical edges from all or non only cond_br terminators.
-    bool Changed =
-        splitAllCriticalEdges(Fn, OnlyNonCondBrEdges, nullptr, nullptr);
+    bool Changed = splitAllCriticalEdges(Fn, nullptr, nullptr);
 
     if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);

@@ -16,12 +16,12 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Config.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
@@ -544,6 +544,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-module-doc-path");
 
   addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_SwiftModuleInterfaceFile,
+                   "-emit-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
 
@@ -792,6 +796,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                         Arguments);
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SwiftModuleDocFile, "-emit-module-doc-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_SwiftModuleInterfaceFile,
+                   "-emit-interface-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");

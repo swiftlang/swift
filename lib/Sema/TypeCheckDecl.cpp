@@ -3554,38 +3554,44 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
   FD->setOperatorDecl(op);
 }
 
-void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
+bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   // Check that member operators reference the type of 'Self'.
-  if (FD->isInvalid()) return;
+  if (decl->isInvalid())
+    return true;
 
-  auto *DC = FD->getDeclContext();
+  auto *DC = decl->getDeclContext();
   auto selfNominal = DC->getSelfNominalTypeDecl();
-  if (!selfNominal) return;
 
   // Check the parameters for a reference to 'Self'.
-  bool isProtocol = isa<ProtocolDecl>(selfNominal);
-  for (auto param : *FD->getParameters()) {
+  bool isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
+  for (auto param : *decl->getParameters()) {
     auto paramType = param->getInterfaceType();
     if (!paramType) break;
 
     // Look through a metatype reference, if there is one.
     paramType = paramType->getMetatypeInstanceType();
 
-    // Is it the same nominal type?
-    if (paramType->getAnyNominal() == selfNominal) return;
+    auto nominal = paramType->getAnyNominal();
+    if (type.isNull()) {
+      // Is it the same nominal type?
+      if (selfNominal && nominal == selfNominal)
+        return true;
+    } else {
+      // Is it the same nominal type? Or a generic (which may or may not match)?
+      if (paramType->is<GenericTypeParamType>() ||
+          nominal == type->getAnyNominal())
+        return true;
+    }
 
     if (isProtocol) {
       // For a protocol, is it the 'Self' type parameter?
       if (auto genericParam = paramType->getAs<GenericTypeParamType>())
         if (genericParam->isEqual(DC->getSelfInterfaceType()))
-          return;
+          return true;
     }
   }
 
-  // We did not find 'Self'. Complain.
-  TC.diagnose(FD, diag::operator_in_unrelated_type,
-              FD->getDeclContext()->getDeclaredInterfaceType(),
-              isProtocol, FD->getFullName());
+  return false;
 }
 
 bool checkDynamicSelfReturn(FuncDecl *func,
@@ -4174,8 +4180,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Member functions need some special validation logic.
     if (FD->getDeclContext()->isTypeContext()) {
-      if (FD->isOperator())
-        checkMemberOperator(*this, FD);
+      if (FD->isOperator() && !isMemberOperator(FD, nullptr)) {
+        auto selfNominal = FD->getDeclContext()->getSelfNominalTypeDecl();
+        auto isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
+        // We did not find 'Self'. Complain.
+        diagnose(FD, diag::operator_in_unrelated_type,
+                 FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
+                 FD->getFullName());
+      }
 
       auto accessor = dyn_cast<AccessorDecl>(FD);
 
@@ -5284,8 +5296,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
           continue;
 
         if (!ctor->isInvalid()) {
-          auto type = getMemberTypeForComparison(Context, ctor, nullptr,
-                                                 /*stripLabels*/ false);
+          auto type = getMemberTypeForComparison(Context, ctor, nullptr);
           declaredInitializers.push_back({ctor, type});
         }
 
@@ -5446,7 +5457,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
         auto *ctor = ctorAndType.first;
         auto type = ctorAndType.second;
         auto parentType = getMemberTypeForComparison(
-            Context, superclassCtor, ctor, /*stripLabels*/ false);
+            Context, superclassCtor, ctor);
 
         if (isOverrideBasedOnType(ctor, type, superclassCtor, parentType)) {
           alreadyDeclared = true;

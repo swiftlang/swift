@@ -32,7 +32,7 @@ func checkAssociatedTypes() {
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: IndexingIterator<Subject>.self,
-    subSequenceType: RandomAccessSlice<Subject>.self,
+    subSequenceType: Slice<Subject>.self,
     indexType: Int.self,
     indicesType: CountableRange<Int>.self)
 }

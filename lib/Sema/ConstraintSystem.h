@@ -52,6 +52,7 @@ namespace constraints {
 class ConstraintGraph;
 class ConstraintGraphNode;
 class ConstraintSystem;
+class Disjunction;
 
 } // end namespace constraints
 
@@ -1771,11 +1772,6 @@ public:
   /// \c viable[0] contains the resulting solution. Otherwise, emits a
   /// diagnostic and returns true.
   bool salvage(SmallVectorImpl<Solution> &viable, Expr *expr);
-
-  /// When an assignment to an expression is detected and the destination is
-  /// invalid, emit a detailed error about the condition.
-  bool diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
-
   
   /// \brief Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be
@@ -2108,20 +2104,6 @@ public:
   Type getResultType(const AbstractClosureExpr *E);
 
 private:
-  /// Determine if the given constraint represents explicit conversion,
-  /// e.g. coercion constraint "as X" which forms a disjunction.
-  bool isExplicitConversionConstraint(Constraint *constraint) const {
-    if (constraint->getKind() != ConstraintKind::Disjunction)
-      return false;
-
-    if (auto locator = constraint->getLocator()) {
-      if (auto anchor = locator->getAnchor())
-        return isa<CoerceExpr>(anchor);
-    }
-
-    return false;
-  }
-
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
@@ -2388,15 +2370,6 @@ public:
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
   
-  /// \brief Subroutine of \c matchFunctionTypes(), which matches up the
-  /// parameter types of two function types.
-  TypeMatchResult matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1,
-                                          ArrayRef<AnyFunctionType::Param> type2,
-                                          Type argType, Type paramType,
-                                          ConstraintKind kind,
-                                          TypeMatchOptions flags,
-                                          ConstraintLocatorBuilder locator);
-  
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
   TypeMatchResult matchSuperclassTypes(Type type1, Type type2,
@@ -2656,6 +2629,13 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
+  /// \brief Attempt to simplify a function input or result constraint.
+  SolutionKind simplifyFunctionComponentConstraint(
+                                          ConstraintKind kind,
+                                          Type first, Type second,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
+
   /// \brief Attempt to simplify the BridgingConversion constraint.
   SolutionKind simplifyBridgingConstraint(Type type1,
                                          Type type2,
@@ -2794,11 +2774,15 @@ private:
                      ConstraintKind bindingSource,
                      ProtocolDecl *defaultedProtocol = nullptr,
                      ConstraintLocator *defaultableBinding = nullptr)
-        : BindingType(type), Kind(kind), BindingSource(bindingSource),
-          DefaultedProtocol(defaultedProtocol),
+        : BindingType(type->getWithoutParens()), Kind(kind),
+          BindingSource(bindingSource), DefaultedProtocol(defaultedProtocol),
           DefaultableBinding(defaultableBinding) {}
 
     bool isDefaultableBinding() const { return DefaultableBinding != nullptr; }
+
+    PotentialBinding withType(Type type) const {
+      return {type, Kind, BindingSource, DefaultedProtocol, DefaultableBinding};
+    }
   };
 
   struct PotentialBindings {
@@ -2888,6 +2872,9 @@ private:
     /// coalescing supertype bounds when we are able to compute the meet.
     void addPotentialBinding(PotentialBinding binding,
                              bool allowJoinMeet = true);
+
+    /// Check if this binding is viable for inclusion in the set.
+    bool isViable(PotentialBinding &binding) const;
 
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
@@ -2987,10 +2974,10 @@ private:
   ///        the best solution to the constraint system.
   ///
   /// \returns true if we failed to find any solutions, false otherwise.
-  bool solveForDisjunctionChoices(
-      ArrayRef<Constraint *> constraints, ConstraintLocator *disjunctionLocator,
-      SmallVectorImpl<Solution> &solutions,
-      FreeTypeVariableBinding allowFreeTypeVariables, bool explicitConversion);
+  bool
+  solveForDisjunctionChoices(Disjunction &disjunction,
+                             SmallVectorImpl<Solution> &solutions,
+                             FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
@@ -3309,7 +3296,7 @@ public:
 /// Match the call arguments (as described by the given argument type) to
 /// the parameters (as described by the given parameter type).
 ///
-/// \param argTuple The arguments.
+/// \param args The arguments.
 /// \param params The parameters.
 /// \param defaultMap A map indicating if the parameter at that index has a default value.
 /// \param hasTrailingClosure Whether the last argument is a trailing closure.
@@ -3321,13 +3308,20 @@ public:
 /// \param parameterBindings Will be populated with the arguments that are
 /// bound to each of the parameters.
 /// \returns true if the call arguments could not be matched to the parameters.
-bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
+bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                         ArrayRef<AnyFunctionType::Param> params,
                         const llvm::SmallBitVector &defaultMap,
                         bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);
+
+ConstraintSystem::TypeMatchResult
+matchCallArguments(ConstraintSystem &cs,
+                   bool isOperator,
+                   ArrayRef<AnyFunctionType::Param> args,
+                   ArrayRef<AnyFunctionType::Param> params,
+                   ConstraintLocatorBuilder locator);
 
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.
@@ -3375,15 +3369,21 @@ Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 
 class DisjunctionChoice {
   ConstraintSystem *CS;
+  unsigned Index;
   Constraint *Choice;
   bool ExplicitConversion;
 
 public:
-  DisjunctionChoice(ConstraintSystem *const cs, Constraint *choice,
-                    bool explicitConversion)
-      : CS(cs), Choice(choice), ExplicitConversion(explicitConversion) {}
+  DisjunctionChoice(ConstraintSystem *const cs, unsigned index,
+                    Constraint *choice, bool explicitConversion)
+      : CS(cs), Index(index), Choice(choice),
+        ExplicitConversion(explicitConversion) {}
+
+  ConstraintSystem &getCS() const { return *CS; }
 
   Constraint *operator->() const { return Choice; }
+
+  unsigned getIndex() const { return Index; }
 
   bool isDisabled() const { return Choice->isDisabled(); }
 
@@ -3428,6 +3428,37 @@ private:
 
     return choice.getDecl();
   }
+};
+
+/// Iterator over disjunction choices, makes it
+/// easy to work with disjunction and encapsulates
+/// some other important information such as locator.
+class Disjunction {
+  ConstraintSystem &CS;
+  ArrayRef<Constraint *> Choices;
+  ConstraintLocator *Locator;
+  bool IsExplicitConversion;
+
+  unsigned Index = 0;
+
+public:
+  Disjunction(ConstraintSystem &cs, ArrayRef<Constraint *> choices,
+              ConstraintLocator *locator, bool explicitConversion)
+      : CS(cs), Choices(choices), Locator(locator),
+        IsExplicitConversion(explicitConversion) {}
+
+  const Disjunction &begin() const { return *this; }
+  const Disjunction &end() const { return *this; }
+
+  bool operator!=(const Disjunction &) const { return Index < Choices.size(); }
+
+  void operator++() { ++Index; }
+
+  DisjunctionChoice operator*() const {
+    return {&CS, Index, Choices[Index], IsExplicitConversion};
+  }
+
+  ConstraintLocator *getLocator() const { return Locator; }
 };
 
 /// \brief Constraint System "component" represents

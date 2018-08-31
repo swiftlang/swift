@@ -146,12 +146,7 @@ private:
           CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
-    bool Parsed = false;
-    if (isa<AccessorDecl>(AFD)) {
-      TheParser.parseAccessorBodyDelayed(AFD);
-      Parsed = true;
-    }
-    if (!Parsed && ParserState.hasFunctionBodyState(AFD))
+    if (ParserState.hasFunctionBodyState(AFD))
       TheParser.parseAbstractFunctionBodyDelayed(AFD);
 
     if (CodeCompletion)
@@ -679,6 +674,7 @@ SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
 
 void Parser::skipUntilDeclRBrace() {
   while (Tok.isNot(tok::eof, tok::r_brace, tok::pound_endif,
+                   tok::pound_else, tok::pound_elseif,
                    tok::code_complete) &&
          !isStartOfDecl())
     skipSingle();
@@ -686,6 +682,7 @@ void Parser::skipUntilDeclRBrace() {
 
 void Parser::skipUntilDeclStmtRBrace(tok T1) {
   while (Tok.isNot(T1, tok::eof, tok::r_brace, tok::pound_endif,
+                   tok::pound_else, tok::pound_elseif,
                    tok::code_complete) &&
          !isStartOfStmt() && !isStartOfDecl()) {
     skipSingle();
@@ -694,6 +691,7 @@ void Parser::skipUntilDeclStmtRBrace(tok T1) {
 
 void Parser::skipUntilDeclStmtRBrace(tok T1, tok T2) {
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
+                   tok::pound_else, tok::pound_elseif,
                    tok::code_complete) &&
          !isStartOfStmt() && !isStartOfDecl()) {
     skipSingle();
@@ -701,7 +699,8 @@ void Parser::skipUntilDeclStmtRBrace(tok T1, tok T2) {
 }
 
 void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
-  while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif) &&
+  while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
+                   tok::pound_else, tok::pound_elseif) &&
          !isStartOfDecl()) {
     skipSingle();
   }

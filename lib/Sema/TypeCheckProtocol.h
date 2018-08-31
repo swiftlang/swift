@@ -33,6 +33,7 @@ class AccessScope;
 class AssociatedTypeDecl;
 class AvailabilityContext;
 class DeclContext;
+class FuncDecl;
 class NormalProtocolConformance;
 class ProtocolDecl;
 class TypeChecker;
@@ -451,6 +452,8 @@ protected:
 
   WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
                  Type adoptee, DeclContext *dc);
+
+  bool isMemberOperator(FuncDecl *decl, Type type);
 
   /// Gather the value witnesses for the given requirement.
   ///

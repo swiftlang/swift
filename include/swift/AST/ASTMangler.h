@@ -57,7 +57,6 @@ public:
   enum class SymbolKind {
     Default,
     DynamicThunk,
-    SwiftDispatchThunk,
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
     DirectMethodReferenceThunk,

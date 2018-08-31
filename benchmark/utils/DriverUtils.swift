@@ -14,6 +14,7 @@
 import Glibc
 #else
 import Darwin
+import LibProc
 #endif
 
 import TestsUtils
@@ -247,7 +248,7 @@ func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
 #endif
 
 #if os(Linux)
-class Timer {
+final class Timer {
   typealias TimeT = timespec
   func getTime() -> TimeT {
     var ticks = timespec(tv_sec: 0, tv_nsec: 0)
@@ -267,7 +268,7 @@ class Timer {
   }
 }
 #else
-class Timer {
+final class Timer {
   typealias TimeT = UInt64
   var info = mach_timebase_info_data_t(numer: 0, denom: 0)
   init() {
@@ -283,14 +284,40 @@ class Timer {
 }
 #endif
 
-class SampleRunner {
+final class SampleRunner {
   let timer = Timer()
   let baseline = SampleRunner.getResourceUtilization()
   let c: TestConfig
+  var start, end, lastYield: Timer.TimeT
+  let schedulerQuantum = UInt64(10_000_000) // nanoseconds (== 10ms, macos)
 
   init(_ config: TestConfig) {
     self.c = config
+    sched_yield()
+    let now = timer.getTime()
+    (start, end, lastYield) = (now, now, now)
   }
+
+#if os(Linux)
+  private static func getExecutedInstructions() -> UInt64 {
+    // FIXME: there is a Linux PMC API you can use to get this, but it's
+    // not quite so straightforward.
+    return 0
+  }
+#else
+  private static func getExecutedInstructions() -> UInt64 {
+    if #available(OSX 10.9, iOS 7.0, *) {
+      var u = rusage_info_v4()
+      let p = UnsafeMutablePointer(&u)
+      p.withMemoryRebound(to: Optional<rusage_info_t>.self, capacity: 1) { up in
+        let _ = proc_pid_rusage(getpid(), RUSAGE_INFO_V4, up)
+      }
+      return u.ri_instructions
+    } else {
+      return 0
+    }
+  }
+#endif
 
   private static func getResourceUtilization() -> rusage {
     var u = rusage(); getrusage(RUSAGE_SELF, &u); return u
@@ -298,39 +325,63 @@ class SampleRunner {
 
   /// Returns maximum resident set size (MAX_RSS) delta in bytes
   func measureMemoryUsage() -> Int {
-      var current = SampleRunner.getResourceUtilization()
-      let maxRSS = current.ru_maxrss - baseline.ru_maxrss
+    let current = SampleRunner.getResourceUtilization()
+    let maxRSS = current.ru_maxrss - baseline.ru_maxrss
 
-      if c.verbose {
-        let pages = maxRSS / sysconf(_SC_PAGESIZE)
-        func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
-          let b = baseline[keyPath: stat], c = current[keyPath: stat]
-          return "\(c) - \(b) = \(c - b)"
-        }
-        print("""
-                  MAX_RSS \(deltaEquation(\rusage.ru_maxrss)) (\(pages) pages)
-                  ICS \(deltaEquation(\rusage.ru_nivcsw))
-                  VCS \(deltaEquation(\rusage.ru_nvcsw))
-              """)
+    if c.verbose {
+      let pages = maxRSS / sysconf(_SC_PAGESIZE)
+      func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
+        let b = baseline[keyPath: stat], c = current[keyPath: stat]
+        return "\(c) - \(b) = \(c - b)"
       }
-      return maxRSS
+      print("""
+                MAX_RSS \(deltaEquation(\rusage.ru_maxrss)) (\(pages) pages)
+                ICS \(deltaEquation(\rusage.ru_nivcsw))
+                VCS \(deltaEquation(\rusage.ru_nvcsw))
+            """)
+    }
+    return maxRSS
+  }
+
+  private func startMeasurement() {
+    let spent = timer.diffTimeInNanoSeconds(from: lastYield, to: end)
+    let nextSampleEstimate = UInt64(Double(lastSampleTime) * 1.5)
+
+    if (spent + nextSampleEstimate < schedulerQuantum) {
+        start = timer.getTime()
+    } else {
+        if c.verbose {
+          print("    Yielding again after estimated \(spent/1000) us")
+        }
+        sched_yield()
+        let now = timer.getTime()
+        (start, lastYield) = (now, now)
+    }
+  }
+
+  private func stopMeasurement() {
+    end = timer.getTime()
+  }
+
+  /// Time in nanoseconds spent running the last function
+  var lastSampleTime: UInt64 {
+    return timer.diffTimeInNanoSeconds(from: start, to: end)
   }
 
   func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
-    // Start the timer.
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in startTrackingObjects(p) }
 #endif
-    let start_ticks = timer.getTime()
+
+    self.startMeasurement()
     fn(Int(num_iters))
-    // Stop the timer.
-    let end_ticks = timer.getTime()
+    self.stopMeasurement()
+
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in stopTrackingObjects(p) }
 #endif
 
-    // Compute the spent time and the scaling factor.
-    return timer.diffTimeInNanoSeconds(from: start_ticks, to: end_ticks)
+    return lastSampleTime
   }
 }
 

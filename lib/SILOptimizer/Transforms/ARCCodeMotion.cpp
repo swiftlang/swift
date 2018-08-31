@@ -96,10 +96,6 @@ STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
 llvm::cl::opt<bool> DisableARCCodeMotion("disable-arc-cm", llvm::cl::init(false));
 
-/// Disable optimization if we have to break critical edges in the function.
-llvm::cl::opt<bool>
-DisableIfWithCriticalEdge("disable-with-critical-edge", llvm::cl::init(false));
-
 //===----------------------------------------------------------------------===//
 //                             Block State 
 //===----------------------------------------------------------------------===//
@@ -1156,11 +1152,6 @@ public:
     if (!F->shouldOptimize())
       return;
 
-    // Return if there is critical edge and we are disabling critical edge
-    // splitting.
-    if (DisableIfWithCriticalEdge && hasCriticalEdges(*F, false))
-      return;
-
     LLVM_DEBUG(llvm::dbgs() << "*** ARCCM on function: " << F->getName()
                             << " ***\n");
 
@@ -1170,7 +1161,7 @@ public:
     //
     // TODO: maybe we can do this lazily or maybe we should disallow SIL passes
     // to create critical edges.
-    bool EdgeChanged = splitAllCriticalEdges(*F, false, nullptr, nullptr);
+    bool EdgeChanged = splitAllCriticalEdges(*F, nullptr, nullptr);
     if (EdgeChanged)
       POA->invalidateFunction(F);
 

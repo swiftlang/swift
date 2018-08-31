@@ -550,12 +550,14 @@ namespace {
     Optional<ConstantAggregateBuilderBase::PlaceholderPosition>
       NumRequirementsInSignature,
       NumRequirements;
+
+    bool Resilient;
+
   public:
     ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *Proto,
                                      SILDefaultWitnessTable *defaultWitnesses)
-      : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses)
-    {
-    }
+      : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
+        Resilient(IGM.isResilient(Proto, ResilienceExpansion::Minimal)) {}
 
     void layout() {
       super::layout();
@@ -621,7 +623,6 @@ namespace {
 
     struct RequirementInfo {
       ProtocolRequirementFlags Flags;
-      llvm::Constant *Thunk;
       llvm::Constant *DefaultImpl;
     };
 
@@ -631,26 +632,25 @@ namespace {
       if (entry.isBase()) {
         assert(entry.isOutOfLineBase());
         auto flags = Flags(Flags::Kind::BaseProtocol);
-        return { flags, nullptr, nullptr };
+        return { flags, nullptr };
       }
 
       if (entry.isAssociatedType()) {
         auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
-        return { flags, nullptr, nullptr };
+        return { flags, nullptr };
       }
 
       if (entry.isAssociatedConformance()) {
         auto flags = Flags(Flags::Kind::AssociatedConformanceAccessFunction);
-        return { flags, nullptr, nullptr };
+        return { flags, nullptr };
       }
 
       assert(entry.isFunction());
       SILDeclRef func(entry.getFunction());
 
-      // Look up the dispatch thunk if the protocol is resilient.
-      llvm::Constant *thunk = nullptr;
-      if (IGM.isResilient(Proto, ResilienceExpansion::Minimal))
-        thunk = IGM.getAddrOfDispatchThunk(func, NotForDefinition);
+      // Emit the dispatch thunk.
+      if (Resilient)
+        IGM.emitDispatchThunk(func);
 
       // Classify the function.
       auto flags = getMethodDescriptorFlags<Flags>(func.getDecl());
@@ -658,7 +658,7 @@ namespace {
       // Look for a default witness.
       llvm::Constant *defaultImpl = findDefaultWitness(func);
 
-      return { flags, thunk, defaultImpl };
+      return { flags, defaultImpl };
     }
 
     void addRequirements() {
@@ -668,15 +668,21 @@ namespace {
                                pi.getNumWitnesses());
 
       for (auto &entry : pi.getWitnessEntries()) {
+        if (Resilient && entry.isFunction()) {
+          // Define the method descriptor.
+          SILDeclRef func(entry.getFunction());
+          auto *descriptor =
+            B.getAddrOfCurrentPosition(
+              IGM.ProtocolRequirementStructTy);
+          IGM.defineMethodDescriptor(func, Proto, descriptor);
+        }
+
         auto reqt = B.beginStruct(IGM.ProtocolRequirementStructTy);
 
         auto info = getRequirementInfo(entry);
 
         // Flags.
         reqt.addInt32(info.Flags.getIntValue());
-
-        // Dispatch thunk.
-        reqt.addRelativeAddressOrNull(info.Thunk);
 
         // Default implementation.
         reqt.addRelativeAddressOrNull(info.DefaultImpl);
@@ -1207,12 +1213,14 @@ namespace {
 
     SILVTable *VTable = nullptr;
     unsigned VTableSize = 0;
+    bool Resilient;
 
   public:
     ClassContextDescriptorBuilder(IRGenModule &IGM, ClassDecl *Type,
                                   RequireMetadata_t requireMetadata)
-      : super(IGM, Type, requireMetadata)
-    {
+      : super(IGM, Type, requireMetadata),
+        Resilient(IGM.isResilient(Type, ResilienceExpansion::Minimal)) {
+
       if (getType()->isForeign()) return;
 
       MetadataLayout = &IGM.getClassMetadataLayout(Type);
@@ -1307,19 +1315,26 @@ namespace {
     void addMethod(SILDeclRef fn) {
       assert(VTable && "no vtable?!");
 
+      // Define the method descriptor to point to the current position in the
+      // nominal type descriptor.
+      IGM.defineMethodDescriptor(fn, Type,
+                      B.getAddrOfCurrentPosition(IGM.MethodDescriptorStructTy));
+
+      // Actually build the descriptor.
+      auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
       auto descriptor = B.beginStruct(IGM.MethodDescriptorStructTy);
 
       // Classify the method.
       using Flags = MethodDescriptorFlags;
-      auto flags = getMethodDescriptorFlags<Flags>(fn.getDecl());
+      auto flags = getMethodDescriptorFlags<Flags>(func);
 
       // Remember if the declaration was dynamic.
-      if (fn.getDecl()->isDynamic())
+      if (func->isDynamic())
         flags = flags.withIsDynamic(true);
 
       // TODO: final? open?
 
-      auto *dc = fn.getDecl()->getDeclContext();
+      auto *dc = func->getDeclContext();
       assert(!isa<ExtensionDecl>(dc));
 
       if (dc == getType()) {
@@ -1338,6 +1353,12 @@ namespace {
       descriptor.addInt(IGM.Int32Ty, flags.getIntValue());
 
       descriptor.finishAndAddTo(B);
+
+      // Emit method dispatch thunk if the class is resilient.
+      if (Resilient &&
+          func->getEffectiveAccess() >= AccessLevel::Public) {
+        IGM.emitDispatchThunk(fn);
+      }
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
@@ -3878,18 +3899,6 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 
   // Note that we emitted this protocol.
   SwiftProtocols.push_back(protocol);
-
-  // If the protocol is resilient, emit dispatch thunks.
-  if (isResilient(protocol, ResilienceExpansion::Minimal)) {
-    for (auto *member : protocol->getMembers()) {
-      if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
-        emitDispatchThunk(SILDeclRef(funcDecl));
-      }
-      if (auto *ctorDecl = dyn_cast<ConstructorDecl>(member)) {
-        emitDispatchThunk(SILDeclRef(ctorDecl, SILDeclRef::Kind::Allocator));
-      }
-    }
-  }
 }
 
 //===----------------------------------------------------------------------===//

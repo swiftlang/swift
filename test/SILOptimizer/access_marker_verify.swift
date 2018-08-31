@@ -445,28 +445,36 @@ func testEnumLValue(s: inout StructOfEnum) {
   enumLValueHelper(&s.e, &s.f)
 }
 
+struct MyDict<K: Hashable, V> {
+  let s = "" // make this non-trivial
+  subscript(key: K) -> V? {
+    get { return nil }
+    set {}
+  }
+}
+
 // --- Optional access.
-func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
+func accessOptionalArray(_ dict : MyDict<Int, [Int]>) {
   var dict = dict
   dict[1]?.append(2)
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify0A13OptionalArrayyySDySiSaySiGGF : $@convention(thin) (@guaranteed Dictionary<Int, Array<Int>>) -> () {
-// CHECK: bb0(%0 : @guaranteed $Dictionary<Int, Array<Int>>):
-// CHECK:   alloc_box ${ var Dictionary<Int, Array<Int>> }, var, name "dict"
+// CHECK-LABEL: sil hidden @$S20access_marker_verify0A13OptionalArrayyyAA6MyDictVySiSaySiGGF : $@convention(thin) (@guaranteed MyDict<Int, Array<Int>>) -> () {
+// CHECK: bb0(%0 : @guaranteed $MyDict<Int, Array<Int>>):
+// CHECK:   alloc_box ${ var MyDict<Int, Array<Int>> }, var, name "dict"
 // CHECK:   [[PROJ:%.*]] = project_box
 // ----- initialize the box.
 // CHECK:   [[INITACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]]
 // CHECK:   store %{{.*}} to [init] [[INITACCESS]]
 // CHECK:   end_access [[INITACCESS]]
-// ----- begin formal access for Dictionary.subscript.setter
+// ----- begin formal access for MyDict.subscript.setter
 // CHECK:   [[BOXACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]]
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<Array<Int>>
-// CHECK:   load_borrow [[BOXACCESS]] : $*Dictionary<Int, Array<Int>>
+// CHECK:   load_borrow [[BOXACCESS]] : $*MyDict<Int, Array<Int>>
 // ----- Initialize some trivial temporaries.
 // CHECK:   alloc_stack $Int
 // CHECK-NOT: begin_access
 // CHECK:   store %{{.*}} to [trivial]
-// ----- Call Dictionary.subscript.getter.
+// ----- Call MyDict.subscript.getter.
 // CHECK-NOT: begin_access
 // CHECK:   apply %{{.*}}<Int, [Int]>
 // ----- access the temporary array result of the getter
@@ -482,10 +490,10 @@ func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
 // CHECK:   [[TEMP3:%.*]] = alloc_stack $Int
 // CHECK-NOT: begin_access
 // CHECK:   store %{{.*}} to [trivial] [[TEMP3]] : $*Int
-// Call Dictionary.subscript.setter
-// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], [[TEMP3]], [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
+// Call MyDict.subscript.setter
+// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], [[TEMP3]], [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
 // CHECK:   end_access [[TEMPACCESS]] : $*Optional<Array<Int>>
-// CHECK:   end_access [[BOXACCESS]] : $*Dictionary<Int, Array<Int>>
+// CHECK:   end_access [[BOXACCESS]] : $*MyDict<Int, Array<Int>>
 // CHECK:   br
 //
 // CHECK: bb2:
@@ -501,9 +509,9 @@ func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
 // CHECK:   store [[TEMPARRAYVAL]] to [init] [[ARRAYCOPY]] : $*Optional<Array<Int>>
 // CHECK:   alloc_stack $Int
 // CHECK:   store %{{.*}} to [trivial]
-// ----- call Dictionary.subscript.setter
-// CHECK: apply %{{.*}}<Int, [Int]>([[ARRAYCOPY]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify0A13OptionalArrayyySDySiSaySiGGF'
+// ----- call MyDict.subscript.setter
+// CHECK: apply %{{.*}}<Int, [Int]>([[ARRAYCOPY]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify0A13OptionalArrayyyAA6MyDictVySiSaySiGGF'
 
 // --- Optional map.
 enum OptionalWithMap<Wrapped> {
@@ -833,13 +841,13 @@ func testMixedTuple(p: HasClassGetter) -> (BaseClass, Any) {
 // CHECK: copy_addr [[P1]] to [initialization] [[TEMP1]] : $*@opened
 // CHECK-NOT: begin_access
 // CHECK: [[OUTC:%.*]] = apply {{.*}} $@convention(witness_method: HasClassGetter) <τ_0_0 where τ_0_0 : HasClassGetter> (@in_guaranteed τ_0_0) -> @owned BaseClass
-// CHECK: [[OUTANY:%.*]] = init_existential_addr %0 : $*Any, $BaseClass
 // CHECK: [[P2:%.*]] = open_existential_addr immutable_access %1 : $*HasClassGetter to $*@opened
 // CHECK: [[TEMP2:%.*]] = alloc_stack $@opened
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [[P2]] to [initialization] [[TEMP2]] : $*@opened
 // CHECK-NOT: begin_access
 // CHECK: apply {{.*}} $@convention(witness_method: HasClassGetter) <τ_0_0 where τ_0_0 : HasClassGetter> (@in_guaranteed τ_0_0) -> @owned BaseClass
+// CHECK: [[OUTANY:%.*]] = init_existential_addr %0 : $*Any, $BaseClass
 // CHECK: store %{{.*}} to [init] [[OUTANY]] : $*BaseClass
 // CHECK: return [[OUTC]] : $BaseClass
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify14testMixedTuple1pAA9BaseClassC_yptAA03HasH6Getter_p_tF'
@@ -1009,8 +1017,8 @@ class testInitExistentialGlobal {
 // CHECK-LABEL: sil private @globalinit{{.*}} : $@convention(c) () -> () {
 // CHECK:   alloc_global @$S20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ
 // CHECK:   [[GADR:%.*]] = global_addr @$S20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ : $*P
-// CHECK:   [[EADR:%.*]] = init_existential_addr [[GADR]] : $*P, $StructP
 // CHECK:   %{{.*}} = apply %{{.*}}({{.*}}) : $@convention(method) (@thin StructP.Type) -> StructP
+// CHECK:   [[EADR:%.*]] = init_existential_addr [[GADR]] : $*P, $StructP
 // CHECK:   store %{{.*}} to [trivial] [[EADR]] : $*StructP
 // CHECK-LABEL: } // end sil function 'globalinit
 
@@ -1025,8 +1033,10 @@ public func testInitBox() throws {
 // CHECK-LABEL: sil @$S20access_marker_verify11testInitBoxyyKF : $@convention(thin) () -> @error Error {
 // CHECK: [[BOXALLOC:%.*]] = alloc_existential_box $Error, $SomeError
 // CHECK: [[PROJ:%.*]] = project_existential_box $SomeError in [[BOXALLOC]] : $Error
+// CHECK: store [[BOXALLOC]] to [init] [[BOXBUF:%.*]] :
 // CHECK: store %{{.*}} to [trivial] [[PROJ]] : $*SomeError
-// CHECK: throw [[BOXALLOC]] : $Error
+// CHECK: [[BOXALLOC2:%.*]] = load [take] [[BOXBUF]]
+// CHECK: throw [[BOXALLOC2]] : $Error
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify11testInitBoxyyKF'
 
 public final class HasStaticProp {

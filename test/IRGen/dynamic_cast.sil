@@ -67,8 +67,10 @@ bb0(%0 : $*P):
   %1 = alloc_stack $S
   checked_cast_addr_br take_always P in %0 : $*P to S in %1 : $*S, bb1, bb2
 bb1:
-  br bb2
+  br bb3
 bb2:
+  br bb3
+bb3:
   destroy_addr %1 : $*S
   dealloc_stack %1 : $*S
   %2 = tuple ()
@@ -88,8 +90,10 @@ bb0(%0 : $*P):
   %1 = alloc_stack $S
   checked_cast_addr_br take_on_success P in %0 : $*P to S in %1 : $*S, bb1, bb2
 bb1:
-  br bb2
+  br bb3
 bb2:
+  br bb3
+bb3:
   destroy_addr %1 : $*S
   dealloc_stack %1 : $*S
   %2 = tuple ()
@@ -109,8 +113,10 @@ bb0(%0 : $*P):
   %1 = alloc_stack $S
   checked_cast_addr_br copy_on_success P in %0 : $*P to S in %1 : $*S, bb1, bb2
 bb1:
-  br bb2
+  br bb3
 bb2:
+  br bb3
+bb3:
   destroy_addr %1 : $*S
   dealloc_stack %1 : $*S
   %2 = tuple ()

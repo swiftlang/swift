@@ -89,10 +89,6 @@ public:
     MemberRefBase,
     /// \brief The lookup for a subscript member.
     SubscriptMember,
-    /// \brief The index of a subscript expression.
-    SubscriptIndex,
-    /// \brief The result of a subscript expression.
-    SubscriptResult,
     /// \brief The lookup for a constructor member.
     ConstructorMember,
     /// \brief An implicit @lvalue-to-inout conversion; only valid for operator
@@ -149,9 +145,7 @@ public:
     case Member:
     case MemberRefBase:
     case UnresolvedMember:
-    case SubscriptIndex:
     case SubscriptMember:
-    case SubscriptResult:
     case ConstructorMember:
     case LValueConversion:
     case RValueAdjustment:
@@ -214,9 +208,7 @@ public:
     case ParentType:
     case LValueConversion:
     case RValueAdjustment:
-    case SubscriptIndex:
     case SubscriptMember:
-    case SubscriptResult:
     case OpenedGeneric:
     case Archetype:
     case AssociatedType:

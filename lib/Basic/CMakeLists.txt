@@ -78,6 +78,7 @@ add_swift_library(swiftBasic STATIC
   LangOptions.cpp
   LLVMContext.cpp
   Mangler.cpp
+  OutputFileMap.cpp
   Platform.cpp
   PrefixMap.cpp
   PrettyStackTrace.cpp

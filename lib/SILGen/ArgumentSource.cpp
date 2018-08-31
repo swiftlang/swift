@@ -168,8 +168,8 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
     llvm_unreachable("argument source is invalid");
   case Kind::LValue: {
     auto loc = getKnownLValueLocation();
-    return SGF.emitAddressOfLValue(loc, std::move(*this).asKnownLValue(),
-                                   AccessKind::ReadWrite);
+    LValue &&lv = std::move(*this).asKnownLValue();
+    return SGF.emitAddressOfLValue(loc, std::move(lv));
   }
   case Kind::RValue: {
     auto loc = getKnownRValueLocation();
@@ -185,8 +185,8 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
   case Kind::Expr: {
     auto e = std::move(*this).asKnownExpr();
     if (e->isSemanticallyInOutExpr()) {
-      return SGF.emitAddressOfLValue(e, SGF.emitLValue(e, AccessKind::ReadWrite),
-                                     AccessKind::ReadWrite);
+      auto lv = SGF.emitLValue(e, SGFAccessKind::ReadWrite);
+      return SGF.emitAddressOfLValue(e, std::move(lv));
     } else {
       return SGF.emitRValueAsSingleValue(e, C);
     }
@@ -469,6 +469,41 @@ bool ArgumentSource::isObviouslyEqual(const ArgumentSource &other) const {
         return false;
     }
     return true;
+  }
+  }
+  llvm_unreachable("bad kind");
+}
+
+PreparedArguments PreparedArguments::copyForDiagnostics() const {
+  if (isNull())
+    return PreparedArguments();
+
+  assert(isValid());
+  PreparedArguments result(getFormalType(), isScalar());
+  for (auto &arg : Arguments) {
+    result.Arguments.push_back(arg.copyForDiagnostics());
+  }
+  return result;
+}
+
+ArgumentSource ArgumentSource::copyForDiagnostics() const {
+  switch (StoredKind) {
+  case Kind::Invalid:
+    return ArgumentSource();
+  case Kind::LValue:
+    // We have no way to copy an l-value for diagnostics.
+    return {getKnownLValueLocation(), LValue()};
+  case Kind::RValue:
+    return {getKnownRValueLocation(), asKnownRValue().copyForDiagnostics()};
+  case Kind::Expr:
+    return asKnownExpr();
+  case Kind::Tuple: {
+    auto &tuple = Storage.get<TupleStorage>(StoredKind);
+    SmallVector<ArgumentSource, 4> copiedElements;
+    for (auto &elt : tuple.Elements) {
+      copiedElements.push_back(elt.copyForDiagnostics());
+    }
+    return {tuple.Loc, tuple.SubstType, copiedElements};
   }
   }
   llvm_unreachable("bad kind");

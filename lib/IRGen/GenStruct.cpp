@@ -829,7 +829,8 @@ public:
       ClangDecl(clangDecl), ClangContext(clangDecl->getASTContext()),
       ClangLayout(ClangContext.getASTRecordLayout(clangDecl)),
       TotalStride(Size(ClangLayout.getSize().getQuantity())),
-      TotalAlignment(Alignment(ClangLayout.getAlignment().getQuantity())) {
+      TotalAlignment(IGM.getCappedAlignment(
+                                       Alignment(ClangLayout.getAlignment()))) {
     SpareBits.reserve(TotalStride.getValue() * 8);
   }
 

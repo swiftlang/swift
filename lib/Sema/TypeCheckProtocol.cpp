@@ -930,7 +930,7 @@ WitnessChecker::lookupValueWitnessesViaImplementsAttr(
   }
 }
 
-SmallVector<ValueDecl *, 4> 
+SmallVector<ValueDecl *, 4>
 WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
   
@@ -950,7 +950,10 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
                                        SourceLoc(),
                                        lookupOptions);
     for (auto candidate : lookup) {
-      witnesses.push_back(candidate.getValueDecl());
+      auto decl = candidate.getValueDecl();
+      if (swift::isMemberOperator(cast<FuncDecl>(decl), Adoptee)) {
+        witnesses.push_back(decl);
+      }
     }
   } else {
     // Variable/function/subscript requirements.

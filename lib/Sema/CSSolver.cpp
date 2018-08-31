@@ -580,41 +580,9 @@ bool ConstraintSystem::tryTypeVariableBindings(
         continue;
 
       auto type = binding.BindingType;
-
-      // If the type variable can't bind to an lvalue, make sure the
-      // type we pick isn't an lvalue.
-      if (!typeVar->getImpl().canBindToLValue())
-        type = type->getRValueType();
-
-      // Remove parentheses. They're insignificant here.
-      type = type->getWithoutParens();
-
       // If we've already tried this binding, move on.
       if (!boundTypes.insert(type.getPointer()).second)
         continue;
-
-      // Prevent against checking against the same bound generic type
-      // over and over again. Doing so means redundant work in the best
-      // case. In the worst case, we'll produce lots of duplicate solutions
-      // for this constraint system, which is problematic for overload
-      // resolution.
-      if (type->hasTypeVariable()) {
-        auto triedBinding = false;
-        if (auto BGT = type->getAs<BoundGenericType>()) {
-          for (auto bt : boundTypes) {
-            if (auto BBGT = bt->getAs<BoundGenericType>()) {
-              if (BGT != BBGT &&
-                  BGT->getDecl() == BBGT->getDecl()) {
-                triedBinding = true;
-                break;
-              }
-            }
-          }
-        }
-
-        if (triedBinding)
-          continue;
-      }
 
       if (tc.getLangOpts().DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -623,21 +591,18 @@ bool ConstraintSystem::tryTypeVariableBindings(
           << "\n";
       }
 
+      // If we were able to solve this without considering
+      // default literals, don't bother looking at default literals.
+      if (anySolved && binding.DefaultedProtocol && !sawFirstLiteralConstraint)
+        break;
+
       // Try to solve the system with typeVar := type
       ConstraintSystem::SolverScope scope(*this);
       if (binding.DefaultedProtocol) {
-        // If we were able to solve this without considering
-        // default literals, don't bother looking at default literals.
-        if (!sawFirstLiteralConstraint) {
-          sawFirstLiteralConstraint = true;
-          if (anySolved)
-            break;
-        }
+        sawFirstLiteralConstraint = true;
         type = openUnboundGenericType(type, typeVar->getImpl().getLocator());
         type = type->reconstituteSugar(/*recursive=*/false);
-      } else if ((binding.BindingSource == ConstraintKind::ArgumentConversion ||
-                  binding.BindingSource ==
-                      ConstraintKind::ArgumentTupleConversion) &&
+      } else if (binding.BindingSource == ConstraintKind::ArgumentConversion &&
                  !type->hasTypeVariable() && isCollectionType(type)) {
         // If the type binding comes from the argument conversion, let's
         // instead of binding collection types directly let's try to
@@ -682,8 +647,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
     // Enumerate the supertypes of each of the types we tried.
     for (auto binding : bindings) {
       const auto type = binding.BindingType;
-      if (type->hasError())
-        continue;
+      assert(!type->hasError());
 
       // After our first pass, note that we've explored these
       // types.
@@ -1800,11 +1764,12 @@ void ConstraintSystem::collectDisjunctions(
 }
 
 /// \brief Check if the given disjunction choice should be attempted by solver.
-static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
-                                        DisjunctionChoice &choice,
+static bool shouldSkipDisjunctionChoice(DisjunctionChoice &choice,
                                         Optional<Score> &bestNonGenericScore) {
+  auto &cs = choice.getCS();
+  auto &TC = cs.TC;
+
   if (choice->isDisabled()) {
-    auto &TC = cs.TC;
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
       log.indent(cs.solverState->depth)
@@ -1820,7 +1785,7 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
   if (!cs.shouldAttemptFixes() && choice.isUnavailable())
     return true;
 
-  if (cs.TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+  if (TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
     return false;
 
   // Don't attempt to solve for generic operators if we already have
@@ -1929,17 +1894,14 @@ Constraint *ConstraintSystem::selectDisjunction() {
 }
 
 bool ConstraintSystem::solveForDisjunctionChoices(
-    ArrayRef<Constraint *> constraints, ConstraintLocator *disjunctionLocator,
-    SmallVectorImpl<Solution> &solutions,
-    FreeTypeVariableBinding allowFreeTypeVariables, bool explicitConversion) {
+    Disjunction &disjunction, SmallVectorImpl<Solution> &solutions,
+    FreeTypeVariableBinding allowFreeTypeVariables) {
   Optional<Score> bestNonGenericScore;
   Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
 
   // Try each of the constraints within the disjunction.
-  for (auto index : indices(constraints)) {
-    auto currentChoice =
-        DisjunctionChoice(this, constraints[index], explicitConversion);
-    if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore))
+  for (auto currentChoice : disjunction) {
+    if (shouldSkipDisjunctionChoice(currentChoice, bestNonGenericScore))
       continue;
 
     // We already have a solution; check whether we should
@@ -1973,7 +1935,8 @@ bool ConstraintSystem::solveForDisjunctionChoices(
     // If the disjunction requested us to, remember which choice we
     // took for it.
 
-    if (disjunctionLocator) {
+    if (auto *disjunctionLocator = disjunction.getLocator()) {
+      auto index = currentChoice.getIndex();
       DisjunctionChoices.push_back({disjunctionLocator, index});
 
       // Implicit unwraps of optionals are worse solutions than those
@@ -2066,9 +2029,11 @@ bool ConstraintSystem::solveForDisjunction(
       disjunction->shouldRememberChoice() ? disjunction->getLocator() : nullptr;
   assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
 
-  auto noSolutions = solveForDisjunctionChoices(
-      disjunction->getNestedConstraints(), locator, solutions,
-      allowFreeTypeVariables, isExplicitConversionConstraint(disjunction));
+  auto choices = Disjunction(*this, disjunction->getNestedConstraints(),
+                             locator, disjunction->isExplicitConversion());
+
+  auto noSolutions =
+      solveForDisjunctionChoices(choices, solutions, allowFreeTypeVariables);
 
   if (hasDisabledChoices) {
     // Re-enable previously disabled overload choices.

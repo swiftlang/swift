@@ -1553,7 +1553,7 @@ namespace {
         index = coerceCallArguments(index, subscriptFnTy, nullptr,
                                     argLabels, hasTrailingClosure,
                                     locator.withPathElement(
-                                      ConstraintLocator::SubscriptIndex));
+                                      ConstraintLocator::ApplyArgument));
         if (!index)
           return nullptr;
 
@@ -4330,8 +4330,14 @@ namespace {
         auto kind = origComponent.getKind();
         Optional<SelectedOverload> foundDecl;
 
-        auto locator = cs.getConstraintLocator(E,
-                       ConstraintLocator::PathElement::getKeyPathComponent(i));
+        auto locator =
+          cs.getConstraintLocator(E,
+                        ConstraintLocator::PathElement::getKeyPathComponent(i));
+        if (kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
+          locator =
+            cs.getConstraintLocator(locator,
+                                    ConstraintLocator::SubscriptMember);
+        }
 
         // If this is an unresolved link, make sure we resolved it.
         if (kind == KeyPathExpr::Component::Kind::UnresolvedProperty ||
@@ -4896,22 +4902,14 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
     return nullptr;
 
   // If the locator points to a function application, find the function itself.
-  bool isSubscript =
-    locator->getPath().back().getKind() == ConstraintLocator::SubscriptIndex;
-  if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument ||
-      isSubscript) {
+  if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument) {
     assert(locator->getPath().back().getNewSummaryFlags() == 0 &&
-           "ApplyArgument/SubscriptIndex adds no flags");
+           "ApplyArgument adds no flags");
     SmallVector<LocatorPathElt, 4> newPath;
     newPath.append(locator->getPath().begin(), locator->getPath().end()-1);
 
     unsigned newFlags = locator->getSummaryFlags();
-
-    if (isSubscript) {
-      newPath.push_back(ConstraintLocator::SubscriptMember);
-    } else {
-      newPath.push_back(ConstraintLocator::ApplyFunction);
-    }
+    newPath.push_back(ConstraintLocator::ApplyFunction);
 
     assert(newPath.back().getNewSummaryFlags() == 0 &&
            "added element that changes the flags?");
@@ -5545,27 +5543,6 @@ Expr *ExprRewriter::coerceCallArguments(
   auto args = decomposeArgType(cs.getType(arg), argLabels);
 
   // Quickly test if any further fix-ups for the argument types are necessary.
-  // FIXME: This hack is only necessary to work around some problems we have
-  // for inferring the type of an unresolved member reference expression in
-  // an optional context. We should seek a more holistic fix for this.
-  if (allParamsMatch &&
-      (params.size() == args.size())) {
-    if (auto argTuple = dyn_cast<TupleExpr>(arg)) {
-      auto argElts = argTuple->getElements();
-    
-      for (size_t i = 0; i < params.size(); i++) {
-        if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(argElts[i])) {
-          auto paramTy = params[i].getType();
-          auto argTy = cs.getType(dotExpr)->getWithoutSpecifierType();
-          if (!paramTy->isEqual(argTy)) {
-            allParamsMatch = false;
-            break;
-          }
-        }
-      }
-    }
-  }
-  
   if (allParamsMatch)
     return arg;
   
@@ -7944,13 +7921,18 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   cs.cacheSubExprTypes(call);
 
+  // Extract the arguments.
+  SmallVector<AnyFunctionType::Param, 8> args;
+  AnyFunctionType::decomposeInput(cs.getType(call->getArg()), args);
+
   // Add the conversion from the argument to the function parameter type.
   auto openedFuncType = openedType->castTo<FunctionType>();
-  cs.addConstraint(
-      ConstraintKind::ArgumentTupleConversion, cs.getType(call->getArg()),
-      FunctionType::composeInput(cs.getASTContext(),
-                                 openedFuncType->getParams(), false),
-      cs.getConstraintLocator(call, ConstraintLocator::ApplyArgument));
+  ::matchCallArguments(
+      cs, /*isOperator=*/false,
+      args,
+      openedFuncType->getParams(),
+      cs.getConstraintLocator(call,
+                              ConstraintLocator::ApplyArgument));
 
   // Solve the system.
   SmallVector<Solution, 1> solutions;

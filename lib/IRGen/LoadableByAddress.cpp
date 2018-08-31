@@ -1491,7 +1491,21 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 
   assert(!ApplySite::isa(value) && "Unexpected instruction");
 
-  SILBuilderWithScope allocBuilder(&*pass.F->begin());
+  // Find the first non-AllocStackInst and use its scope when creating
+  // the new SILBuilder. An AllocStackInst does not directly cause any
+  // code to be generated. The location of an AllocStackInst carries information
+  // about the source variable; it doesn't matter where in the instruction
+  // stream the AllocStackInst is located.
+  auto BBIter = pass.F->begin()->begin();
+  SILInstruction *FirstNonAllocStack = &*BBIter;
+  while (isa<AllocStackInst>(FirstNonAllocStack) &&
+         BBIter != pass.F->begin()->end()) {
+    BBIter++;
+    FirstNonAllocStack = &*BBIter;
+  }
+  SILBuilderWithScope allocBuilder(&*pass.F->begin()->begin(),
+                                   FirstNonAllocStack);
+
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 

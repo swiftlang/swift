@@ -249,7 +249,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
     // Traverse the chain of predecessors.
     if (isa<BranchInst>(SinglePred->getTerminator()) ||
         isa<CondBranchInst>(SinglePred->getTerminator())) {
-      S = cast<SILPHIArgument>(Arg)->getIncomingValue(SinglePred);
+      S = cast<SILPHIArgument>(Arg)->getIncomingPhiValue(SinglePred);
       continue;
     }
 
@@ -374,8 +374,7 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
     // It is a BB argument, look through incoming values. If they all have the
     // same exact type, then we consider it to be the type of the BB argument.
     SmallVector<SILValue, 4> IncomingValues;
-
-    if (Arg->getIncomingValues(IncomingValues)) {
+    if (Arg->getSingleTerminatorOperands(IncomingValues)) {
       for (auto InValue : IncomingValues) {
         WorkList.push_back(InValue);
       }

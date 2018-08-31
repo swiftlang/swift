@@ -555,9 +555,11 @@ public:
   SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
 
   // Caches whether a given declaration is "as specialized" as another.
-  llvm::DenseMap<std::pair<ValueDecl*, ValueDecl*>, bool> 
-    specializedOverloadComparisonCache;
-  
+  llvm::DenseMap<std::tuple<ValueDecl *, ValueDecl *,
+                            /*isDynamicOverloadComparison*/ unsigned>,
+                 bool>
+      specializedOverloadComparisonCache;
+
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
   std::vector<AnyFunctionRef> ClosuresWithUncomputedCaptures;
@@ -2201,13 +2203,17 @@ bool overrideRequiresKeyword(ValueDecl *overridden);
 /// Compute the type of a member that will be used for comparison when
 /// performing override checking.
 Type getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
-                                ValueDecl *derivedDecl = nullptr,
-                                bool stripLabels = true);
+                                ValueDecl *derivedDecl = nullptr);
 
 /// Determine whether the given declaration is an override by comparing type
 /// information.
 bool isOverrideBasedOnType(ValueDecl *decl, Type declTy,
                            ValueDecl *parentDecl, Type parentDeclTy);
+
+/// Determine whether the given declaration is an operator defined in a
+/// protocol. If \p type is not null, check specifically whether \p decl
+/// could fulfill a protocol requirement for it.
+bool isMemberOperator(FuncDecl *decl, Type type);
 
 } // end namespace swift
 

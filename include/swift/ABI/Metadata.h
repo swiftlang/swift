@@ -1630,18 +1630,6 @@ struct TargetProtocolRequirement {
   ProtocolRequirementFlags Flags;
   // TODO: name, type
 
-  /// A function pointer to a global symbol which is used by client code
-  /// to invoke the protocol requirement from a witness table. This pointer
-  /// is also to uniquely identify the requirement in resilient witness
-  /// tables, which is why it appears here.
-  ///
-  /// This forms the basis of our mechanism to hide witness table offsets
-  /// from clients, both when calling protocol requirements and when
-  /// defining witness tables.
-  ///
-  /// Will be null if the protocol is not resilient.
-  RelativeDirectPointer<void, /*nullable*/ true> Function;
-
   /// The optional default implementation of the protocol.
   RelativeDirectPointer<void, /*nullable*/ true> DefaultImplementation;
 };
@@ -1923,11 +1911,11 @@ using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 ///
 /// This is accomplished by emitting an order-independent series of
 /// relative pointer pairs, consisting of a protocol requirement together
-/// with a witness. The requirement is identified by an indirect relative
-/// pointer to the protocol dispatch thunk.
+/// with a witness. The requirement is identified by an indirectable relative
+/// pointer to the protocol requirement descriptor.
 template <typename Runtime>
 struct TargetResilientWitness {
-  RelativeIndirectPointer<void> Function;
+  RelativeIndirectablePointer<TargetProtocolRequirement<Runtime>> Requirement;
   RelativeDirectPointer<void> Witness;
 };
 using ResilientWitness = TargetResilientWitness<InProcess>;

@@ -355,6 +355,8 @@ public:
   /// Borrow all subvalues of the rvalue.
   RValue borrow(SILGenFunction &SGF, SILLocation loc) const &;
 
+  RValue copyForDiagnostics() const;
+
   static bool areObviouslySameValue(SILValue lhs, SILValue rhs);
   bool isObviouslyEqual(const RValue &rhs) const;
 

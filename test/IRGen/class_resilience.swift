@@ -495,14 +495,6 @@ extension ResilientGenericOutsideParent {
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
 
-// ResilientChild metadata relocation function
-
-// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience14ResilientChildCMi"(%swift.type_descriptor*, i8*)
-// CHECK-NEXT: entry:
-// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type_descriptor* %0, i8* %1)
-// CHECK-NEXT: ret %swift.type* [[METADATA]]
-
-
 // ResilientChild.field setter dispatch thunk
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S16class_resilience14ResilientChildC5fields5Int32VvsTj"(i32, %T16class_resilience14ResilientChildC* swiftself)
@@ -516,6 +508,14 @@ extension ResilientGenericOutsideParent {
 // CHECK-NEXT: [[METHOD:%.*]] = load void (i32, %T16class_resilience14ResilientChildC*)*, void (i32, %T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]]
 // CHECK-NEXT: call swiftcc void [[METHOD]](i32 %0, %T16class_resilience14ResilientChildC* swiftself %1)
 // CHECK-NEXT: ret void
+
+
+// ResilientChild metadata relocation function
+
+// CHECK-LABEL: define internal %swift.type* @"$S16class_resilience14ResilientChildCMi"(%swift.type_descriptor*, i8*)
+// CHECK-NEXT: entry:
+// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type_descriptor* %0, i8* %1)
+// CHECK-NEXT: ret %swift.type* [[METADATA]]
 
 
 // FixedLayoutChild metadata initialization function

@@ -288,11 +288,14 @@ bb0(%6 : $Int, %10 : $UnicodeScalar):
   switch_enum %12 : $Singleton, case #Singleton.x!enumelt.1: bb1
 
 bb1(%15 : $(Int, UnicodeScalar)):
-  return %15 : $(Int, UnicodeScalar)
+  br bb2(%15 : $(Int, UnicodeScalar))
 
-b2:
+bb2(%16 : $(Int, UnicodeScalar)):
+  return %16 : $(Int, UnicodeScalar)
+
+b3:
   %111 = tuple (%6 : $Int, %10 : $UnicodeScalar)
-  br bb1(%111 : $(Int, UnicodeScalar))
+  br bb2(%111 : $(Int, UnicodeScalar))
 
 // CHECK-LABEL: sil @constant_fold_switch_enum_with_payload
 // CHECK: bb0(%{{[0-9]+}} : $Int, %{{[0-9]+}} : $Unicode.Scalar):
@@ -395,10 +398,12 @@ sil_scope 1 { loc "f.swift":2:1 parent 0 }
 // CHECK: sil_scope [[S:[0-9]+]] { loc "f.swift":2:1 parent [[F]] }
 // CHECK-LABEL:sil @try_apply_2
 // CHECK:    bb3({{.*}}$Never):
+// CHECK-NEXT: {{ unreachable }}, scope [[F]]
+// CHECK:    bb5({{.*}}$Never):
 // CHECK-NEXT: {{ unreachable }}, scope [[S]]
-// CHECK:    bb4(
+// CHECK:    bb7({{.*}} : $Error):
 // CHECK-NEXT: throw
-
+// CHECK-LABEL: } // end sil function 'try_apply_2'
 sil @try_apply_2 : $@convention(thin) (Builtin.Int1) -> @error Error {
 bb0(%0 : $Builtin.Int1):
   %1 = function_ref @throwing_noreturn : $@convention(thin) () -> (Never, @error Error)
@@ -406,28 +411,40 @@ bb0(%0 : $Builtin.Int1):
 bb1:
   try_apply %1() : $@convention(thin) () -> (Never, @error Error), normal bb3, error bb4, scope 0
 bb2:
-  try_apply %1() : $@convention(thin) () -> (Never, @error Error), normal bb3, error bb4, scope 1
+  try_apply %1() : $@convention(thin) () -> (Never, @error Error), normal bb5, error bb6, scope 1
 bb3(%2 : $Never):
-  %3 = tuple ()
-  return %3 : $()
+  br bb7
 bb4(%4 : $Error):
-  throw %4 : $Error
+  br bb8(%4 : $Error)
+bb5(%5 : $Never):
+  br bb7
+bb6(%7 : $Error):
+  br bb8(%7 : $Error)
+bb7:
+  %8 = tuple ()
+  return %8 : $()
+bb8(%9 : $Error):
+  throw %9 : $Error
 }
 
-// This should arguably be ill-formed.
 // CHECK-LABEL:sil @try_apply_3
 // CHECK:      br bb1
-// CHECK:    bb1(
+// CHECK:    bb1:
 // CHECK-NOT:  {{ unreachable}}
 // CHECK:      try_apply
-// CHECK:    bb2(
+// CHECK:    bb3({{.*}} : $Error):
 // CHECK-NEXT: throw
 sil @try_apply_3 : $@convention(thin) (Never) -> @error Error {
 bb0(%0 : $Never):
   br bb1(%0 : $Never)
+
 bb1(%1 : $Never):
   %2 = function_ref @throwing_noreturn : $@convention(thin) () -> (Never, @error Error)
-  try_apply %2() : $@convention(thin) () -> (Never, @error Error), normal bb1, error bb2
-bb2(%3 : $Error):
-  throw %3 : $Error
+  try_apply %2() : $@convention(thin) () -> (Never, @error Error), normal bb2, error bb3
+
+bb2(%3 : $Never):
+  br bb1(%3 : $Never)
+
+bb3(%4 : $Error):
+  throw %4 : $Error
 }
