@@ -72,6 +72,9 @@ struct TestConfig {
   /// The number of samples we should take of each test.
   let numSamples: Int
 
+  /// Quantiles to report in results.
+  let quantile: Int?
+
   /// Is verbose output enabled?
   let verbose: Bool
 
@@ -94,6 +97,7 @@ struct TestConfig {
       var tags, skipTags: Set<BenchmarkCategory>?
       var numSamples: UInt?
       var numIters: UInt?
+      var quantile: UInt?
       var afterRunSleep: UInt32?
       var sampleTime: Double?
       var verbose: Bool?
@@ -123,6 +127,11 @@ struct TestConfig {
     p.addArgument("--num-iters", \.numIters,
                   help: "number of iterations averaged in the sample;\n" +
                         "default: auto-scaled to measure for `sample-time`",
+                  parser: { UInt($0) })
+    p.addArgument("--quantile", \.quantile,
+                  help: "report quantiles instead of normal dist. stats;\n" +
+                        "use 4 to get a five-number summary with quartiles,\n" +
+                        "10 (deciles), 20 (ventiles), 100 (percentiles), etc.",
                   parser: { UInt($0) })
     p.addArgument("--sample-time", \.sampleTime,
                   help: "duration of test measurement in seconds\ndefault: 1",
@@ -156,6 +165,7 @@ struct TestConfig {
     sampleTime = c.sampleTime ?? 1.0
     numIters = c.numIters.map { Int($0) }
     numSamples = Int(c.numSamples ?? 1)
+    quantile = c.quantile.map { Int($0) }
     verbose = c.verbose ?? false
     logMemory = c.logMemory ?? false
     afterRunSleep = c.afterRunSleep
@@ -184,6 +194,7 @@ struct TestConfig {
             LogMemory: \(logMemory)
             SampleTime: \(sampleTime)
             NumIters: \(numIters ?? 0)
+            Quantile: \(quantile ?? 0)
             Delimiter: \(String(reflecting: delim))
             Tests Filter: \(c.tests ?? [])
             Tests to run: \(testList)
@@ -475,11 +486,23 @@ final class TestRunner {
 
   /// Execute benchmarks and continuously report the measurement results.
   func runBenchmarks() {
-    let withUnit = {$0 + "(us)"}
+    let withUnit = {$0 + "(μs)"}
+    func quantiles(q: Int) -> [String] {
+      // See https://en.wikipedia.org/wiki/Quantile#Specialized_quantiles
+      let prefix = [
+        2: "MEDIAN", 3: "T", 4: "Q", 5: "QU", 6: "S", 7: "O", 10: "D",
+        12: "Dd", 16: "H", 20: "V", 33: "TT", 100: "P", 1000: "Pr"
+      ][q, default: "\(q)-q"]
+      let base20 = "0123456789ABCDEFGHIJ".map { String($0) }
+      let index: (Int) -> String =
+        { q == 2 ? "" : q <= 20 ?  base20[$0] : String($0) }
+      return ["MIN"] + (1..<q).map { prefix + index($0) } + ["MAX"]
+    }
     let header = (
       ["#", "TEST", "SAMPLES"] +
-      ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)
-      + (c.logMemory ? ["MAX_RSS(B)"] : [])
+      (c.quantile.map(quantiles) ?? ["MIN", "MAX", "MEAN", "SD", "MEDIAN"])
+        .map(withUnit) +
+      (c.logMemory ? ["MAX_RSS(B)"] : [])
     ).joined(separator: c.delim)
     print(header)
 
@@ -487,8 +510,15 @@ final class TestRunner {
 
     func report(_ index: String, _ t: BenchmarkInfo, results: BenchResults?) {
       func values(r: BenchResults) -> [String] {
-        return ([r.sampleCount, r.min, r.max, r.mean, r.sd, r.median] +
-                (c.logMemory ? [r.maxRSS] : [])).map { String($0) }
+        func quantiles(q: Int) -> [Int] {
+          return (0...q).map { i in r[Double(i) / Double(q)] }
+        }
+        return (
+          [r.sampleCount] +
+          (c.quantile.map(quantiles)
+            ?? [r.min,  r.max, r.mean, r.sd, r.median]) +
+          (c.logMemory ? [r.maxRSS] : [])
+        ).map { String($0) }
       }
       let benchmarkStats = (
         [index, t.name] + (results.map(values) ?? ["Unsupported"])

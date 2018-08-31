@@ -101,34 +101,55 @@ ALPHASORT: FatCompactMap
 
 ## Running Benchmarks
 Each real benchmark execution takes about a second per sample. If possible,
-multiple checks are combined into one run to minimize the test time.
+multiple checks are combined into one run to minimise the test time.
 
 ````
 RUN: %Benchmark_O AngryPhonebook --num-iters=1 \
 RUN:              | %FileCheck %s --check-prefix NUMITERS1 \
 RUN:                              --check-prefix LOGHEADER \
 RUN:                              --check-prefix LOGBENCH
-LOGHEADER-LABEL: #,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
+LOGHEADER-LABEL: #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
 LOGBENCH: {{[0-9]+}},
 NUMITERS1: AngryPhonebook,1
 NUMITERS1-NOT: 0,0,0,0,0
 LOGBENCH-SAME: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
 ````
 
+### Reporting Quantiles
+The default benchmark result reports statistics of a normal distribution —
+mean and standard deviation. Unfortunately the samples from our benchmarks are
+*not normally distributed*. To get a better picture of the underlying
+probability distribution, we support reporting
+[quantiles](https://en.wikipedia.org/wiki/Quantile).
+
+````
+RUN: %Benchmark_O 0 --quantile=4 | %FileCheck %s --check-prefix FIVENUMSUMMARY
+FIVENUMSUMMARY: #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs)
+RUN: %Benchmark_O 0 --quantile=20 | %FileCheck %s --check-prefix VENTILES
+VENTILES: #,TEST,SAMPLES,MIN(μs),V1(μs),V2(μs),V3(μs),V4(μs),V5(μs),V6(μs),
+VENTILES: V7(μs),V8(μs),V9(μs),VA(μs),VB(μs),VC(μs),VD(μs),VE(μs),VF(μs),VG(μs),
+VENTILES: VH(μs),VI(μs),VJ(μs),MAX(μs)
+````
+
 ### Verbose Mode
+Reports detailed information during measurement, including configuration
+details, environmental statistics (memory used and number of context switches)
+and all individual samples. We'll reuse this test to check arguments that
+modify the reported columns: `--memory` and `--quantile` to end with *one less*
+number in the benchmark summary, compared to normal format.
 
 ````
 RUN: %Benchmark_O 1 Ackermann 1 AngryPhonebook \
-RUN:              --verbose --num-samples=2 --memory \
+RUN:              --verbose --num-samples=2 --memory --quantile=2 \
 RUN:              | %FileCheck %s --check-prefix RUNJUSTONCE \
 RUN:                              --check-prefix CONFIG \
 RUN:                              --check-prefix LOGVERBOSE \
 RUN:                              --check-prefix MEASUREENV \
-RUN:                              --check-prefix LOGMEMORY
+RUN:                              --check-prefix LOGFORMAT
 CONFIG: NumSamples: 2
 CONFIG: Tests Filter: ["1", "Ackermann", "1", "AngryPhonebook"]
 CONFIG: Tests to run: Ackermann, AngryPhonebook
-LOGMEMORY: #,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us),MAX_RSS(B)
+LOGFORMAT: #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
 LOGVERBOSE-LABEL: Running Ackermann for 2 samples.
 LOGVERBOSE: Measuring with scale {{[0-9]+}}.
 LOGVERBOSE: Sample 0,{{[0-9]+}}
@@ -138,7 +159,7 @@ MEASUREENV: ICS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 MEASUREENV: VCS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 RUNJUSTONCE-LABEL: 1,Ackermann
 RUNJUSTONCE-NOT: 1,Ackermann
-LOGMEMORY: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
+LOGFORMAT: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
 LOGVERBOSE-LABEL: Running AngryPhonebook for 2 samples.
 ````
 
