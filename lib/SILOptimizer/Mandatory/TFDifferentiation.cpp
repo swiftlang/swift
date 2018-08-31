@@ -3872,32 +3872,57 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
     case CotangentSpace::Kind::RealScalar:
     case CotangentSpace::Kind::RealVector: {
       // Handle any nominal type value.
+
+      // Allocate buffers for inputs and output.
       auto *resultBuf = builder.createAllocStack(loc, adjointTy);
       auto *lhsBuf = builder.createAllocStack(loc, adjointTy);
       auto *rhsBuf = builder.createAllocStack(loc, adjointTy);
+
+      // Initialize input buffers.
+      auto *lhsBufInitAccess = builder.createBeginAccess(
+          loc, lhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+      auto *rhsBufInitAccess = builder.createBeginAccess(
+          loc, rhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+      builder.createStore(loc, lhs, lhsBufInitAccess,
+                          getBufferSOQ(adjointASTTy, getAdjoint()));
+      builder.createStore(loc, rhs, rhsBufInitAccess,
+                          getBufferSOQ(adjointASTTy, getAdjoint()));
+      builder.createEndAccess(loc, lhsBufInitAccess, /*aborted*/ false);
+      builder.createEndAccess(loc, rhsBufInitAccess, /*aborted*/ false);
+
+      // Accumulate the adjoints.
       auto *resultBufAccess = builder.createBeginAccess(
           loc, resultBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
           /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      auto *lhsBufAccess = builder.createBeginAccess(loc, lhsBuf,
+      auto *lhsBufReadAccess = builder.createBeginAccess(loc, lhsBuf,
           SILAccessKind::Read, SILAccessEnforcement::Static,
           /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      auto *rhsBufAccess = builder.createBeginAccess(loc, rhsBuf,
+      auto *rhsBufReadAccess = builder.createBeginAccess(loc, rhsBuf,
           SILAccessKind::Read, SILAccessEnforcement::Static,
           /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      accumulateMaterializedAdjointsIndirect(lhsBufAccess, rhsBufAccess,
+      accumulateMaterializedAdjointsIndirect(lhsBufReadAccess, rhsBufReadAccess,
                                              resultBufAccess);
       builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
-      builder.createEndAccess(loc, rhsBufAccess, /*aborted*/ false);
-      builder.createEndAccess(loc, lhsBufAccess, /*aborted*/ false);
+      builder.createEndAccess(loc, rhsBufReadAccess, /*aborted*/ false);
+      builder.createEndAccess(loc, lhsBufReadAccess, /*aborted*/ false);
+
+      // Deallocate input buffers.
       builder.createDeallocStack(loc, rhsBuf);
       builder.createDeallocStack(loc, lhsBuf);
+
+      // Load result.
       resultBufAccess = builder.createBeginAccess(loc, resultBuf,
           SILAccessKind::Read, SILAccessEnforcement::Static,
           /*noNestedConflict*/ true, /*fromBuiltin*/ false);
       auto val = builder.createLoad(loc, resultBufAccess,
           getBufferLOQ(lhs->getType().getASTType(), getAdjoint()));
       builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
+
+      // Deallocate result buffer.
       builder.createDeallocStack(loc, resultBuf);
+
       return val;
     }
     case CotangentSpace::Kind::ProductStruct: {
