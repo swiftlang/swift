@@ -317,8 +317,6 @@ struct HasGenericSubscript<T> {
       return t as! U
     }
 
-    // FIXME
-    // CHECK: dref: FAILURE	for 'U'
     // CHECK: decl: set {}	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluis
     set {}
   }

@@ -377,25 +377,14 @@ public:
 
   void restoreParserPosition(ParserPosition PP, bool enableDiagnostics = false) {
     L->restoreState(PP.LS, enableDiagnostics);
-
-    // We might be at tok::eof now, so ensure that consumeToken() does not
-    // assert about lexing past eof.
-    Tok.setKind(tok::unknown);
-    consumeTokenWithoutFeedingReceiver();
-
+    L->lex(Tok, LeadingTrivia, TrailingTrivia);
     PreviousLoc = PP.PreviousLoc;
   }
 
   void backtrackToPosition(ParserPosition PP) {
     assert(PP.isValid());
-
     L->backtrackToState(PP.LS);
-
-    // We might be at tok::eof now, so ensure that consumeToken() does not
-    // assert about lexing past eof.
-    Tok.setKind(tok::unknown);
-    consumeTokenWithoutFeedingReceiver();
-
+    L->lex(Tok, LeadingTrivia, TrailingTrivia);
     PreviousLoc = PP.PreviousLoc;
   }
 
@@ -893,8 +882,6 @@ public:
                SourceLoc TryLoc);
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
-
-  void parseAccessorAttributes(DeclAttributes &Attributes);
 
   struct ParsedAccessors;
   bool parseGetSetImpl(ParseDeclOptions Flags,
