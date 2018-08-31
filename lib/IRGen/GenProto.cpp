@@ -1845,12 +1845,12 @@ static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
       continue;
 
     auto declRef = entry.getMethodWitness().Requirement;
-    auto entity = LinkEntity::forDispatchThunk(declRef);
-    auto *func = IGM.getAddrOfDispatchThunk(declRef,
-                                            NotForDefinition);
-    auto requirement = IGM.getFunctionGOTEquivalent(entity, func);
-
-    table.addIndirectRelativeAddress(requirement);
+    auto requirement =
+      IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+        LinkEntity::forMethodDescriptor(declRef),
+        IGM.getPointerAlignment(),
+        IGM.ProtocolRequirementStructTy);
+    table.addRelativeAddress(requirement);
 
     SILFunction *Func = entry.getMethodWitness().Witness;
     llvm::Constant *witness;
