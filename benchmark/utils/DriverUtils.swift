@@ -354,19 +354,17 @@ final class SampleRunner {
   func measureMemoryUsage() -> Int {
     let current = SampleRunner.getResourceUtilization()
     let maxRSS = current.ru_maxrss - baseline.ru_maxrss
-
-    if c.verbose {
-      let pages = maxRSS / sysconf(_SC_PAGESIZE)
-      func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
-        let b = baseline[keyPath: stat], c = current[keyPath: stat]
-        return "\(c) - \(b) = \(c - b)"
-      }
-      print("""
-                MAX_RSS \(deltaEquation(\rusage.ru_maxrss)) (\(pages) pages)
-                ICS \(deltaEquation(\rusage.ru_nivcsw))
-                VCS \(deltaEquation(\rusage.ru_nvcsw))
-            """)
+    let pages = { maxRSS / sysconf(_SC_PAGESIZE) }
+    func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
+      let b = baseline[keyPath: stat], c = current[keyPath: stat]
+      return "\(c) - \(b) = \(c - b)"
     }
+    logVerbose(
+        """
+            MAX_RSS \(deltaEquation(\rusage.ru_maxrss)) (\(pages()) pages)
+            ICS \(deltaEquation(\rusage.ru_nivcsw))
+            VCS \(deltaEquation(\rusage.ru_nvcsw))
+        """)
     return maxRSS
   }
 
@@ -377,9 +375,7 @@ final class SampleRunner {
     if (spent + nextSampleEstimate < schedulerQuantum) {
         start = timer.getTime()
     } else {
-        if c.verbose {
-          print("    Yielding again after estimated \(spent/1000) us")
-        }
+        logVerbose("    Yielding again after estimated \(spent/1000) us")
         let now = yield()
         (start, lastYield) = (now, now)
     }
@@ -416,14 +412,14 @@ final class SampleRunner {
     // Convert to μs and compute the average sample time per iteration.
     return Int(lastSampleTime / 1000) / numIters
   }
-}
 
-/// Run the benchmark and return the measured results.
-func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   func logVerbose(_ msg: @autoclosure () -> String) {
     if c.verbose { print(msg()) }
   }
 
+// FIXME: indentation
+/// Run the benchmark and return the measured results.
+func run(_ test: BenchmarkInfo) -> BenchResults? {
   // Before we do anything, check that we actually have a function to
   // run. If we don't it is because the benchmark is not supported on
   // the platform and we should skip it.
@@ -433,7 +429,6 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
   }
   logVerbose("Running \(test.name) for \(c.numSamples) samples.")
 
-  let sampler = SampleRunner(c)
   var samples: [Int] = []
   samples.reserveCapacity(c.numSamples)
 
@@ -442,11 +437,12 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
     samples.append(time)
   }
 
+  resetMeasurements()
   test.setUpFunction?()
 
   // Determine number of iterations for testFn to run for desired time.
   func iterationsPerSampleTime() -> (numIters: Int, oneIter: Int) {
-    let oneIter = sampler.measure(test.name, fn: testFn, numIters: 1)
+    let oneIter = measure(test.name, fn: testFn, numIters: 1)
     if oneIter > 0 {
       let timePerSample = Int(c.sampleTime * 1_000_000.0) // microseconds (μs)
       return (max(timePerSample / oneIter, 1), oneIter)
@@ -460,22 +456,22 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
     c.numIters ?? {
       let (numIters, oneIter) = iterationsPerSampleTime()
       if numIters == 1 { addSample(oneIter) }
-      else { sampler.resetMeasurements() } // for accurate yielding reports
+      else { resetMeasurements() } // for accurate yielding reports
       return numIters
     }())
 
   logVerbose("    Measuring with scale \(numIters).")
   for _ in samples.count..<c.numSamples {
-    addSample(sampler.measure(test.name, fn: testFn, numIters: numIters))
+    addSample(measure(test.name, fn: testFn, numIters: numIters))
   }
 
   test.tearDownFunction?()
 
-  return BenchResults(samples, maxRSS: sampler.measureMemoryUsage())
+  return BenchResults(samples, maxRSS: measureMemoryUsage())
 }
 
 /// Execute benchmarks and continuously report the measurement results.
-func runBenchmarks(_ c: TestConfig) {
+func runBenchmarks() {
   let withUnit = {$0 + "(us)"}
   let header = (
     ["#", "TEST", "SAMPLES"] +
@@ -504,10 +500,12 @@ func runBenchmarks(_ c: TestConfig) {
   }
 
   for (index, test) in c.tests {
-    report(index, test, results:runBench(test, c))
+    report(index, test, results:run(test))
   }
 
   print("\nTotal performance tests executed: \(testCount)")
+}
+// FIXME: indentation
 }
 
 public func main() {
@@ -521,7 +519,7 @@ public func main() {
       print(testDescription)
     }
   case .run:
-    runBenchmarks(config)
+    SampleRunner(config).runBenchmarks()
     if let x = config.afterRunSleep {
       sleep(x)
     }
