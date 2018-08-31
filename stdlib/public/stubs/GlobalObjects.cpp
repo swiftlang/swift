@@ -142,7 +142,7 @@ namespace llvm { namespace hashing { namespace detail {
   // hidden visibility, making this all internal to the dynamic library.
   // Systems that statically link the Swift runtime into applications (e.g. on
   // Linux) need this to handle the case when the app already uses LLVM.
-  size_t LLVM_ATTRIBUTE_WEAK fixed_seed_override = 0;
+  uint64_t LLVM_ATTRIBUTE_WEAK fixed_seed_override = 0;
 } // namespace detail
 } // namespace hashing
 } // namespace llvm
