@@ -813,3 +813,13 @@ SILType RValue::getLoweredImplodedTupleType(SILGenFunction &SGF) const & {
     return loweredType.getAddressType();
   return loweredType.getObjectType();
 }
+
+RValue RValue::copyForDiagnostics() const {
+  assert(!isInSpecialState());
+  assert(isComplete());
+  RValue result(type);
+  for (auto value : values)
+    result.values.push_back(value);
+  result.elementsToBeAdded = 0;
+  return result;
+}
