@@ -141,6 +141,7 @@
     {
     "Integers": [
       "Integers.swift",
+      "IntegerTypes.swift",
       "IntegerParsing.swift"],
     "Floating": [
       "FloatingPoint.swift",
