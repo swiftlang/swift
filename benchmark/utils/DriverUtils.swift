@@ -311,9 +311,14 @@ final class SampleRunner {
 
   init(_ config: TestConfig) {
     self.c = config
-    sched_yield()
     let now = timer.getTime()
     (start, end, lastYield) = (now, now, now)
+  }
+
+  /// Offer to yield CPU to other processes and return current time on resume.
+  func yield() -> Timer.TimeT {
+    sched_yield()
+    return timer.getTime()
   }
 
 #if os(Linux)
@@ -341,7 +346,11 @@ final class SampleRunner {
     var u = rusage(); getrusage(RUSAGE_SELF, &u); return u
   }
 
-  /// Returns maximum resident set size (MAX_RSS) delta in bytes
+  /// Returns maximum resident set size (MAX_RSS) delta in bytes.
+  ///
+  /// This method of estimating memory usage is valid only for executing single
+  /// benchmark. That's why we don't worry about reseting the `baseline` in
+  /// `resetMeasurements`.
   func measureMemoryUsage() -> Int {
     let current = SampleRunner.getResourceUtilization()
     let maxRSS = current.ru_maxrss - baseline.ru_maxrss
@@ -371,14 +380,18 @@ final class SampleRunner {
         if c.verbose {
           print("    Yielding again after estimated \(spent/1000) us")
         }
-        sched_yield()
-        let now = timer.getTime()
+        let now = yield()
         (start, lastYield) = (now, now)
     }
   }
 
   private func stopMeasurement() {
     end = timer.getTime()
+  }
+
+  private func resetMeasurements() {
+    let now = yield()
+    (start, end, lastYield) = (now, now, now)
   }
 
   /// Time in nanoseconds spent running the last function
@@ -447,6 +460,7 @@ func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
     c.numIters ?? {
       let (numIters, oneIter) = iterationsPerSampleTime()
       if numIters == 1 { addSample(oneIter) }
+      else { sampler.resetMeasurements() } // for accurate yielding reports
       return numIters
     }())
 
