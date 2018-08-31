@@ -302,15 +302,16 @@ final class Timer {
 #endif
 }
 
-final class SampleRunner {
-  let timer = Timer()
-  let baseline = SampleRunner.getResourceUtilization()
 extension UInt64 {
   var microseconds: Int { return Int(self / 1000) }
 }
 
+/// Performance test runner that measures benchmarks and reports the results.
+final class TestRunner {
   let c: TestConfig
+  let timer = Timer()
   var start, end, lastYield: Timer.TimeT
+  let baseline = TestRunner.getResourceUtilization()
   let schedulerQuantum = UInt64(10_000_000) // nanoseconds (== 10ms, macos)
 
   init(_ config: TestConfig) {
@@ -356,7 +357,7 @@ extension UInt64 {
   /// benchmark. That's why we don't worry about reseting the `baseline` in
   /// `resetMeasurements`.
   func measureMemoryUsage() -> Int {
-    let current = SampleRunner.getResourceUtilization()
+    let current = TestRunner.getResourceUtilization()
     let maxRSS = current.ru_maxrss - baseline.ru_maxrss
     let pages = { maxRSS / sysconf(_SC_PAGESIZE) }
     func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
@@ -520,7 +521,7 @@ public func main() {
       print(testDescription)
     }
   case .run:
-    SampleRunner(config).runBenchmarks()
+    TestRunner(config).runBenchmarks()
     if let x = config.afterRunSleep {
       sleep(x)
     }
