@@ -1913,19 +1913,34 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
         cast<ConstructorDecl>(vecNumProto->lookupDirect(initName).front());
     SILDeclRef reqrRef(reqr, SILDeclRef::Kind::Allocator);
     auto silInitTy = context.getTypeConverter().getConstantType(reqrRef);
+    LLVM_DEBUG({
+      auto &s = getADDebugStream();
+      s << "VectorNumeric.init(_:) definition: ";
+      reqr->print(s);
+      s << '\n' << reqrRef << " : " << silInitTy << '\n';
+    });
     // Get the target type's conformance to `VectorNumeric`.
+    
     auto *conf = astCtx.getConformance(
-        type, vecNumProto, targetTypeDecl->getLoc(), targetTypeDecl,
+        type, vecNumProto,
+        targetTypeDecl->getLoc(), targetTypeDecl,
         ProtocolConformanceState::Complete);
+    assert(conf);
+    LLVM_DEBUG({
+      auto &s = getADDebugStream() << "Found conformance ";
+      conf->dump(s);
+      s << '\n';
+    });
     ProtocolConformanceRef confRef(conf);
-    auto wfLookup = module.lookUpFunctionInWitnessTable(confRef, reqrRef);
-    assert(wfLookup.first);
+    // Make sure the witness table is linked.
+    module.lookUpFunctionInWitnessTable(confRef, reqrRef);
     // $4 = witness_method ...
     auto initFnRef =
         builder.createWitnessMethod(loc, type, confRef, reqrRef, silInitTy);
+    // debugDump(builder.getModule());
     LLVM_DEBUG({
       auto &s = getADDebugStream();
-      s << "Real vector initialization function: " << *initFnRef;
+      s << "Real vector initialization function: " << *initFnRef << '\n';
     });
     auto initSubMap =
         SubstitutionMap::getProtocolSubstitutions(vecNumProto, type, confRef);
@@ -4452,6 +4467,8 @@ void Differentiation::run() {
   // Remove all remaining `gradient` instructions.
   for (auto *gi : gradInsts)
     recursivelyDeleteTriviallyDeadInstructions(gi);
+  
+  LLVM_DEBUG(getADDebugStream() << "All differentiation finished\n");
 }
 
 //===----------------------------------------------------------------------===//
