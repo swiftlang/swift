@@ -2080,6 +2080,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                                   DenseMap<SILValue, SymbolicValue> &constants,
                                   GraphFunctionDeviceInfo &deviceInfo) {
   auto *inst = opInfo.inst;
+  auto loc = getUserSourceLocation(inst);
   auto &context = inst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
   SILBuilder B(opInfo.inst);
@@ -2148,11 +2149,48 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         continue;
       }
 
-      // Tensor operand type's are ok.
+      // Handle TensorFlow values. These must be handled separately from
+      // aggregates of TensorFlow values (handled below), so that we do not
+      // generate input lists for them.
       if (isTensorFlowValue(operandTy)) {
         opName +=
           GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
         inputs.push_back(operand);
+        continue;
+      }
+
+      // Remember that we have an input list, this marker is important because
+      // the list may be empty, and we need to know it exists in graph lowering.
+      opName +=
+        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputList);
+      const char *elementMarker =
+        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputListElt);
+
+      // Handle aggregates of TensorFlow values by unpacking them to an input
+      // list.
+      if (isTensorFlowValueOrAggregate(operandTy.getASTType())) {
+        // Recursively unpack results to an input list.
+        std::function<void(SILValue)> unpackAggregate;
+        unpackAggregate = [&](SILValue aggregate) -> void {
+          auto aggregateTy = aggregate->getType();
+          if (isTensorFlowValue(aggregateTy)) {
+            opName += elementMarker;
+            inputs.push_back(aggregate);
+            return;
+          }
+          if (auto tupleTy = aggregateTy.getAs<TupleType>()) {
+            for (auto i : range(tupleTy->getNumElements()))
+              unpackAggregate(B.createTupleExtract(loc, aggregate, i));
+            return;
+          }
+          if (auto *decl = aggregateTy.getStructOrBoundGenericStruct()) {
+            for (auto *field : decl->getStoredProperties())
+              unpackAggregate(B.createStructExtract(loc, aggregate, field));
+            return;
+          }
+          llvm_unreachable("Non-TF type should have skipped unpacking");
+        };
+        unpackAggregate(operand);
         continue;
       }
 
@@ -2168,13 +2206,6 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                         operandTy.getASTType()->getString() + "'");
         return;
       }
-
-      // Remember that we have an input list, this marker is important because
-      // the list may be empty, and we need to know it exists in graph lowering.
-      opName +=
-        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputList);
-      const char *elementMarker =
-        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputListElt);
 
       // Add each element to the input list we're building, drilling down
       // through any struct wrappers (like Tensor, etc) that may be around it.
@@ -2475,7 +2506,6 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
   auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
       return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 
-  auto loc = getUserSourceLocation(inst);
   auto op = B.createGraphOperation(loc, context.getIdentifier(opName), inputs,
                                    attributes, resultSILTypes);
 
