@@ -417,95 +417,93 @@ final class SampleRunner {
     if c.verbose { print(msg()) }
   }
 
-// FIXME: indentation
-/// Run the benchmark and return the measured results.
-func run(_ test: BenchmarkInfo) -> BenchResults? {
-  // Before we do anything, check that we actually have a function to
-  // run. If we don't it is because the benchmark is not supported on
-  // the platform and we should skip it.
-  guard let testFn = test.runFunction else {
-    logVerbose("Skipping unsupported benchmark \(test.name)!")
-    return nil
-  }
-  logVerbose("Running \(test.name) for \(c.numSamples) samples.")
-
-  var samples: [Int] = []
-  samples.reserveCapacity(c.numSamples)
-
-  func addSample(_ time: Int) {
-    logVerbose("    Sample \(samples.count),\(time)")
-    samples.append(time)
-  }
-
-  resetMeasurements()
-  test.setUpFunction?()
-
-  // Determine number of iterations for testFn to run for desired time.
-  func iterationsPerSampleTime() -> (numIters: Int, oneIter: Int) {
-    let oneIter = measure(test.name, fn: testFn, numIters: 1)
-    if oneIter > 0 {
-      let timePerSample = Int(c.sampleTime * 1_000_000.0) // microseconds (μs)
-      return (max(timePerSample / oneIter, 1), oneIter)
-    } else {
-      return (1, oneIter)
+  /// Run the benchmark and return the measured results.
+  func run(_ test: BenchmarkInfo) -> BenchResults? {
+    // Before we do anything, check that we actually have a function to
+    // run. If we don't it is because the benchmark is not supported on
+    // the platform and we should skip it.
+    guard let testFn = test.runFunction else {
+      logVerbose("Skipping unsupported benchmark \(test.name)!")
+      return nil
     }
-  }
+    logVerbose("Running \(test.name) for \(c.numSamples) samples.")
 
-  let numIters = min( // Cap to prevent overflow on 32-bit systems when scaled
-    Int.max / 10_000, // by the inner loop multiplier inside the `testFn`.
-    c.numIters ?? {
-      let (numIters, oneIter) = iterationsPerSampleTime()
-      if numIters == 1 { addSample(oneIter) }
-      else { resetMeasurements() } // for accurate yielding reports
-      return numIters
-    }())
+    var samples: [Int] = []
+    samples.reserveCapacity(c.numSamples)
 
-  logVerbose("    Measuring with scale \(numIters).")
-  for _ in samples.count..<c.numSamples {
-    addSample(measure(test.name, fn: testFn, numIters: numIters))
-  }
-
-  test.tearDownFunction?()
-
-  return BenchResults(samples, maxRSS: measureMemoryUsage())
-}
-
-/// Execute benchmarks and continuously report the measurement results.
-func runBenchmarks() {
-  let withUnit = {$0 + "(us)"}
-  let header = (
-    ["#", "TEST", "SAMPLES"] +
-    ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)
-    + (c.logMemory ? ["MAX_RSS(B)"] : [])
-  ).joined(separator: c.delim)
-  print(header)
-
-  var testCount = 0
-
-  func report(_ index: String, _ t: BenchmarkInfo, results: BenchResults?) {
-    func values(r: BenchResults) -> [String] {
-      return ([r.sampleCount, r.min, r.max, r.mean, r.sd, r.median] +
-              (c.logMemory ? [r.maxRSS] : [])).map { String($0) }
+    func addSample(_ time: Int) {
+      logVerbose("    Sample \(samples.count),\(time)")
+      samples.append(time)
     }
-    let benchmarkStats = (
-      [index, t.name] + (results.map(values) ?? ["Unsupported"])
+
+    resetMeasurements()
+    test.setUpFunction?()
+
+    // Determine number of iterations for testFn to run for desired time.
+    func iterationsPerSampleTime() -> (numIters: Int, oneIter: Int) {
+      let oneIter = measure(test.name, fn: testFn, numIters: 1)
+      if oneIter > 0 {
+        let timePerSample = Int(c.sampleTime * 1_000_000.0) // microseconds (μs)
+        return (max(timePerSample / oneIter, 1), oneIter)
+      } else {
+        return (1, oneIter)
+      }
+    }
+
+    let numIters = min( // Cap to prevent overflow on 32-bit systems when scaled
+      Int.max / 10_000, // by the inner loop multiplier inside the `testFn`.
+      c.numIters ?? {
+        let (numIters, oneIter) = iterationsPerSampleTime()
+        if numIters == 1 { addSample(oneIter) }
+        else { resetMeasurements() } // for accurate yielding reports
+        return numIters
+      }())
+
+    logVerbose("    Measuring with scale \(numIters).")
+    for _ in samples.count..<c.numSamples {
+      addSample(measure(test.name, fn: testFn, numIters: numIters))
+    }
+
+    test.tearDownFunction?()
+
+    return BenchResults(samples, maxRSS: measureMemoryUsage())
+  }
+
+  /// Execute benchmarks and continuously report the measurement results.
+  func runBenchmarks() {
+    let withUnit = {$0 + "(us)"}
+    let header = (
+      ["#", "TEST", "SAMPLES"] +
+      ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)
+      + (c.logMemory ? ["MAX_RSS(B)"] : [])
     ).joined(separator: c.delim)
+    print(header)
 
-    print(benchmarkStats)
-    fflush(stdout)
+    var testCount = 0
 
-    if (results != nil) {
-      testCount += 1
+    func report(_ index: String, _ t: BenchmarkInfo, results: BenchResults?) {
+      func values(r: BenchResults) -> [String] {
+        return ([r.sampleCount, r.min, r.max, r.mean, r.sd, r.median] +
+                (c.logMemory ? [r.maxRSS] : [])).map { String($0) }
+      }
+      let benchmarkStats = (
+        [index, t.name] + (results.map(values) ?? ["Unsupported"])
+      ).joined(separator: c.delim)
+
+      print(benchmarkStats)
+      fflush(stdout)
+
+      if (results != nil) {
+        testCount += 1
+      }
     }
-  }
 
-  for (index, test) in c.tests {
-    report(index, test, results:run(test))
-  }
+    for (index, test) in c.tests {
+      report(index, test, results:run(test))
+    }
 
-  print("\nTotal performance tests executed: \(testCount)")
-}
-// FIXME: indentation
+    print("\nTotal performance tests executed: \(testCount)")
+  }
 }
 
 public func main() {
