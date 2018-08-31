@@ -1227,7 +1227,7 @@ public struct ${Self}
 %       for x in binaryArithmetic['Numeric'] + binaryArithmetic["BinaryInteger"][:1]:
 ${assignmentOperatorComment(x.operator, True)}
   @_transparent
-  public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func ${x.operator}=(lhs: inout ${Self}, rhs: ${Self}) {
 %   if x.kind == '/':
     // No LLVM primitives for checking overflow of division operations, so we
     // check manually.
@@ -1295,7 +1295,7 @@ ${overflowOperationComment(x.operator)}
 
 ${assignmentOperatorComment('%', True)}
   @_transparent
-  public static func %=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func %=(lhs: inout ${Self}, rhs: ${Self}) {
     // No LLVM primitives for checking overflow of division operations, so we
     // check manually.
     if _slowPath(rhs == (0 as ${Self})) {
@@ -1323,7 +1323,7 @@ ${assignmentOperatorComment('%', True)}
 % for x in binaryBitwise:
 ${assignmentOperatorComment(x.operator, True)}
   @_transparent
-  public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func ${x.operator}=(lhs: inout ${Self}, rhs: ${Self}) {
     lhs = ${Self}(Builtin.${x.llvmName}_Int${bits}(lhs._value, rhs._value))
   }
 % end
@@ -1332,7 +1332,7 @@ ${assignmentOperatorComment(x.operator, True)}
 
 ${assignmentOperatorComment(x.operator, True)}
   @_transparent
-  public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func ${x.operator}=(lhs: inout ${Self}, rhs: ${Self}) {
     let rhs_ = rhs & ${bits - 1}
     lhs = ${Self}(
       Builtin.${x.llvmName(signed)}_Int${bits}(lhs._value, rhs_._value))
@@ -1736,7 +1736,7 @@ extension ${Self} {
 
 ${operatorComment(x.operator, True)}
   @_transparent
-  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
+  public static func ${x.operator}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs ${x.operator}= rhs
     return lhs

@@ -1087,7 +1087,7 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   /// - parameter rhs: The key to compare with.
   @inlinable // FIXME(sil-serialize-all)
   public static func ==(
-    _ lhs: CodingUserInfoKey, _ rhs: CodingUserInfoKey) -> Bool
+    lhs: CodingUserInfoKey, rhs: CodingUserInfoKey) -> Bool
   {
     return lhs.rawValue == rhs.rawValue
   }

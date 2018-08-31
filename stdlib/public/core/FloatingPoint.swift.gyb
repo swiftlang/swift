@@ -500,7 +500,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +(_ lhs: Self, _ rhs: Self) -> Self
+  static func +(lhs: Self, rhs: Self) -> Self
 
   /// Adds two values and stores the result in the left-hand-side variable,
   /// rounded to a representable value.
@@ -508,7 +508,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +=(_ lhs: inout Self, _ rhs: Self)
+  static func +=(lhs: inout Self, rhs: Self)
 
   /// Calculates the additive inverse of a value.
   ///
@@ -550,7 +550,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -(_ lhs: Self, _ rhs: Self) -> Self
+  static func -(lhs: Self, rhs: Self) -> Self
 
   /// Subtracts the second value from the first and stores the difference in
   /// the left-hand-side variable, rounding to a representable value.
@@ -558,7 +558,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -=(_ lhs: inout Self, _ rhs: Self)
+  static func -=(lhs: inout Self, rhs: Self)
 
   /// Multiplies two values and produces their product, rounding to a
   /// representable value.
@@ -578,7 +578,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *(_ lhs: Self, _ rhs: Self) -> Self
+  static func *(lhs: Self, rhs: Self) -> Self
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable, rounding to a representable value.
@@ -586,7 +586,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *=(_ lhs: inout Self, _ rhs: Self)
+  static func *=(lhs: inout Self, rhs: Self)
 
   /// Returns the quotient of dividing the first value by the second, rounded
   /// to a representable value.
@@ -610,7 +610,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: The value to divide.
   ///   - rhs: The value to divide `lhs` by.
-  static func /(_ lhs: Self, _ rhs: Self) -> Self
+  static func /(lhs: Self, rhs: Self) -> Self
 
   /// Divides the first value by the second and stores the quotient in the
   /// left-hand-side variable, rounding to a representable value.
@@ -618,7 +618,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: The value to divide.
   ///   - rhs: The value to divide `lhs` by.
-  static func /=(_ lhs: inout Self, _ rhs: Self)
+  static func /=(lhs: inout Self, rhs: Self)
 
   /// Returns the remainder of this value divided by the given value.
   ///

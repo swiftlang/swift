@@ -21,7 +21,7 @@ extension NSRange : Hashable {
 #endif
     }
 
-    public static func==(_ lhs: NSRange, _ rhs: NSRange) -> Bool {
+    public static func==(lhs: NSRange, rhs: NSRange) -> Bool {
         return lhs.location == rhs.location && lhs.length == rhs.length
     }
 }
