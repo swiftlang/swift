@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
-@_frozen // enum
 internal enum _Prespecialize {
   // Create specializations for the arrays of most
   // popular builtin integer and floating point types.
