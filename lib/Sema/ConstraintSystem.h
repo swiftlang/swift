@@ -53,6 +53,7 @@ class ConstraintGraph;
 class ConstraintGraphNode;
 class ConstraintSystem;
 class Disjunction;
+class TypeVarBindingGenerator;
 
 } // end namespace constraints
 
@@ -924,6 +925,7 @@ public:
   friend class DisjunctionChoice;
   friend class Component;
   friend class FailureDiagnostic;
+  friend class TypeVarBindingGenerator;
 
   class SolverScope;
 
@@ -2946,7 +2948,7 @@ private:
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
 
   bool
-  tryTypeVariableBindings(unsigned depth, TypeVariableType *typeVar,
+  tryTypeVariableBindings(TypeVariableType *typeVar,
                           ArrayRef<ConstraintSystem::PotentialBinding> bindings,
                           SmallVectorImpl<Solution> &solutions,
                           FreeTypeVariableBinding allowFreeTypeVariables);
@@ -3428,6 +3430,56 @@ private:
 
     return choice.getDecl();
   }
+};
+
+class TypeVarBindingGenerator {
+  using BindingKind = ConstraintSystem::AllowedBindingKind;
+  using Binding = ConstraintSystem::PotentialBinding;
+
+  ConstraintSystem &CS;
+  TypeVariableType *TypeVar;
+
+  llvm::SmallVector<Binding, 8> Bindings;
+
+  // The index pointing to the offset in the bindings
+  // generator is currently at, `numTries` represents
+  // the number of times bindings have been recomputed.
+  unsigned Index = 0, NumTries = 0;
+
+  llvm::SmallPtrSet<CanType, 4> ExploredTypes;
+  llvm::SmallPtrSet<TypeBase *, 4> BoundTypes;
+
+public:
+  TypeVarBindingGenerator(ConstraintSystem &cs, TypeVariableType *typeVar,
+                          ArrayRef<Binding> initialBindings)
+      : CS(cs), TypeVar(typeVar),
+        Bindings(initialBindings.begin(), initialBindings.end()) {}
+
+  Optional<Binding> operator()() {
+    // Once we reach the end of the current bindings
+    // let's try to compute new ones, e.g. supertypes,
+    // literal defaults, if that fails, we are done.
+    if (needsToComputeNext() && !computeNext())
+      return None;
+
+    return Bindings[Index++];
+  }
+
+  /// Check whether generator would have to compute next
+  /// batch of bindings because it freshly ran out of current one.
+  /// This is useful to be able to exhaustively attempt bindings
+  /// found at one level, before proceeding to supertypes or
+  /// literal defaults etc.
+  bool needsToComputeNext() const { return Index >= Bindings.size(); }
+
+private:
+  /// Compute next batch of bindings if possible, this could
+  /// be supertypes extracted from one of the current bindings
+  /// or default literal types etc.
+  ///
+  /// \returns true if some new bindings were sucessfully computed,
+  /// false otherwise.
+  bool computeNext();
 };
 
 /// Iterator over disjunction choices, makes it

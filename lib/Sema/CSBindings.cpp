@@ -751,3 +751,100 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
 
   return result;
 }
+
+/// \brief Enumerates all of the 'direct' supertypes of the given type.
+///
+/// The direct supertype S of a type T is a supertype of T (e.g., T < S)
+/// such that there is no type U where T < U and U < S.
+static SmallVector<Type, 4> enumerateDirectSupertypes(Type type) {
+  SmallVector<Type, 4> result;
+
+  if (type->mayHaveSuperclass()) {
+    // FIXME: Can also weaken to the set of protocol constraints, but only
+    // if there are any protocols that the type conforms to but the superclass
+    // does not.
+
+    // If there is a superclass, it is a direct supertype.
+    if (auto superclass = type->getSuperclass())
+      result.push_back(superclass);
+  }
+
+  if (type->is<InOutType>() || type->is<LValueType>())
+    result.push_back(type->getWithoutSpecifierType());
+
+  // FIXME: lots of other cases to consider!
+  return result;
+}
+
+bool TypeVarBindingGenerator::computeNext() {
+  SmallVector<Binding, 4> newBindings;
+  auto addNewBinding = [&](Binding binding) {
+    auto type = binding.BindingType;
+
+    // If we've already tried this binding, move on.
+    if (!BoundTypes.insert(type.getPointer()).second)
+      return;
+
+    if (!ExploredTypes.insert(type->getCanonicalType()).second)
+      return;
+
+    newBindings.push_back(std::move(binding));
+  };
+
+  for (auto &binding : Bindings) {
+    const auto type = binding.BindingType;
+    assert(!type->hasError());
+
+    // After our first pass, note that we've explored these types.
+    if (NumTries == 0)
+      ExploredTypes.insert(type->getCanonicalType());
+
+    // If we have a protocol with a default type, look for alternative
+    // types to the default.
+    if (NumTries == 0 && binding.DefaultedProtocol) {
+      auto knownKind = *(binding.DefaultedProtocol->getKnownProtocolKind());
+      for (auto altType : CS.getAlternativeLiteralTypes(knownKind)) {
+        addNewBinding({altType, BindingKind::Subtypes, binding.BindingSource,
+                       binding.DefaultedProtocol});
+      }
+    }
+
+    // Allow solving for T even for a binding kind where that's invalid
+    // if fixes are allowed, because that gives us the opportunity to
+    // match T? values to the T binding by adding an unwrap fix.
+    if (binding.Kind == BindingKind::Subtypes || CS.shouldAttemptFixes()) {
+      // If we were unsuccessful solving for T?, try solving for T.
+      if (auto objTy = type->getOptionalObjectType()) {
+        // If T is a type variable, only attempt this if both the
+        // type variable we are trying bindings for, and the type
+        // variable we will attempt to bind, both have the same
+        // polarity with respect to being able to bind lvalues.
+        if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
+          if (TypeVar->getImpl().canBindToLValue() ==
+              otherTypeVar->getImpl().canBindToLValue()) {
+            addNewBinding({objTy, binding.Kind, binding.BindingSource});
+          }
+        } else {
+          addNewBinding({objTy, binding.Kind, binding.BindingSource});
+        }
+      }
+    }
+
+    if (binding.Kind != BindingKind::Supertypes)
+      continue;
+
+    for (auto supertype : enumerateDirectSupertypes(type)) {
+      // If we're not allowed to try this binding, skip it.
+      if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
+        addNewBinding({*simplifiedSuper, binding.Kind, binding.BindingSource});
+    }
+  }
+
+  if (newBindings.empty())
+    return false;
+
+  Index = 0;
+  ++NumTries;
+  Bindings = std::move(newBindings);
+  return true;
+}
