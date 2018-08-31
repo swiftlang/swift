@@ -3597,12 +3597,11 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
       continue;
     }
 
-    void *fn = reqt.Function.get();
     void *impl = reqt.DefaultImplementation.get();
 
     // Find the witness if there is one, otherwise we use the default.
     for (auto &witness : witnesses) {
-      if (witness.Function.get() == fn) {
+      if (witness.Requirement.get() == &reqt) {
         impl = witness.Witness.get();
         break;
       }

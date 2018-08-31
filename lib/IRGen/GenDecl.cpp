@@ -2583,28 +2583,6 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   return {gotEquivalent, ConstantReference::Indirect};
 }
 
-/// Get or create a "GOT equivalent" llvm::GlobalVariable, if applicable.
-///
-/// Creates a private, unnamed constant containing the address of another
-/// function. LLVM can replace relative references to this variable with
-/// relative references to the GOT entry for the function in the object file.
-ConstantReference
-IRGenModule::getFunctionGOTEquivalent(LinkEntity entity,
-                                      llvm::Function *func) {
-  auto &gotEntry = GlobalGOTEquivalents[entity];
-  if (gotEntry) {
-    return {gotEntry, ConstantReference::Indirect};
-  }
-
-  // Use it as the initializer for an anonymous constant. LLVM can treat this as
-  // equivalent to the global's GOT entry.
-  llvm::SmallString<64> name;
-  entity.mangle(name);
-  auto gotEquivalent = createGOTEquivalent(*this, func, name);
-  gotEntry = gotEquivalent;
-  return {gotEquivalent, ConstantReference::Indirect};
-}
-
 static TypeEntityReference
 getTypeContextDescriptorEntityReference(IRGenModule &IGM,
                                         NominalTypeDecl *decl) {

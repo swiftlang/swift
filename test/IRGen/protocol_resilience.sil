@@ -158,10 +158,10 @@ protocol InternalProtocol {
 
 // CHECK-SAME: internal constant {
 
-// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTj"
+// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTq"
 // CHECK-SAME: @firstWitness
 
-// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP6secondyyFTj"
+// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP6secondyyFTq"
 // CHECK-SAME: @secondWitness
 
 // CHECK-SAME: }

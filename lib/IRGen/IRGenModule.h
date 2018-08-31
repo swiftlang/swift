@@ -1283,10 +1283,6 @@ public:
        llvm::Type *defaultType,
        ConstantReference::Directness forceIndirect = ConstantReference::Direct);
 
-  ConstantReference
-  getFunctionGOTEquivalent(LinkEntity entity,
-                           llvm::Function *func);
-
   llvm::Constant *
   emitRelativeReference(ConstantReference target,
                         llvm::Constant *base,
