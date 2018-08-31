@@ -503,7 +503,9 @@ enum class CompletionKind {
   ReturnStmtExpr,
   YieldStmtExpr,
   ForEachSequence,
-  AfterPound,
+  AfterPoundExpr,
+  AfterPoundDirective,
+  PlatformConditon,
   AfterIfStmtElse,
   GenericParams,
 };

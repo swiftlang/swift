@@ -59,14 +59,18 @@ struct LValueTypeData {
   /// get yields a value of this type.
   SILType TypeOfRValue;
 
+  SGFAccessKind AccessKind;
+
   LValueTypeData() = default;
-  LValueTypeData(AbstractionPattern origFormalType, CanType substFormalType,
-                 SILType typeOfRValue)
+  LValueTypeData(SGFAccessKind accessKind, AbstractionPattern origFormalType,
+                 CanType substFormalType, SILType typeOfRValue)
     : OrigFormalType(origFormalType), SubstFormalType(substFormalType),
-      TypeOfRValue(typeOfRValue) {
+      TypeOfRValue(typeOfRValue), AccessKind(accessKind) {
     assert(typeOfRValue.isObject());
     assert(substFormalType->isMaterializable());
   }
+
+  SGFAccessKind getAccessKind() const { return AccessKind; }
 };
 
 /// An l-value path component represents a chunk of the access path to
@@ -163,11 +167,6 @@ public:
            getKind() == OpenNonOpaqueExistentialKind;
   }
 
-  /// Return the appropriate access kind to use when producing the
-  /// base value.
-  virtual AccessKind getBaseAccessKind(SILGenFunction &SGF,
-                                       AccessKind accessKind) const = 0;
-
   /// Is loading a value from this component guaranteed to have no observable
   /// side effects?
   virtual bool isLoadingPure() const {
@@ -186,6 +185,7 @@ public:
   CanType getSubstFormalType() const { return TypeData.SubstFormalType; }
 
   const LValueTypeData &getTypeData() const { return TypeData; }
+  SGFAccessKind getAccessKind() const { return getTypeData().getAccessKind(); }
 
   KindTy getKind() const { return Kind; }
 
@@ -211,13 +211,7 @@ public:
   /// \param base - always an address, but possibly an r-value
   virtual ManagedValue offset(SILGenFunction &SGF,
                               SILLocation loc,
-                              ManagedValue base,
-                              AccessKind accessKind) && = 0;
-
-  AccessKind getBaseAccessKind(SILGenFunction &SGF,
-                               AccessKind accessKind) const override {
-    return accessKind;
-  }
+                              ManagedValue base) && = 0;
 };
 
 inline PhysicalPathComponent &PathComponent::asPhysical() {
@@ -280,8 +274,7 @@ public:
   ///
   /// \param base - always an address, but possibly an r-value
   virtual ManagedValue getMaterialized(SILGenFunction &SGF, SILLocation loc,
-                                       ManagedValue base,
-                                       AccessKind accessKind) &&;
+                                       ManagedValue base) &&;
 
   /// Perform a writeback on the property.
   ///
@@ -311,12 +304,6 @@ protected:
   }
 
 public:
-  AccessKind getBaseAccessKind(SILGenFunction &SGF,
-                               AccessKind kind) const override {
-    // Always use the same access kind for the base.
-    return kind;
-  }
-
   Optional<AccessedStorage> getAccessedStorage() const override {
     return None;
   }
@@ -362,10 +349,10 @@ public:
   LValue &operator=(const LValue &) = delete;
   LValue &operator=(LValue &&) = default;
 
-  static LValue forValue(ManagedValue value,
+  static LValue forValue(SGFAccessKind accessKind, ManagedValue value,
                          CanType substFormalType);
 
-  static LValue forAddress(ManagedValue address,
+  static LValue forAddress(SGFAccessKind accessKind, ManagedValue address,
                            Optional<SILAccessEnforcement> enforcement,
                            AbstractionPattern origFormalType,
                            CanType substFormalType);
@@ -433,6 +420,7 @@ public:
   void addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                 VarDecl *var, Optional<SubstitutionMap> subs,
                                 LValueOptions options,
+                                SGFAccessKind accessKind,
                                 AccessStrategy strategy,
                                 CanType formalRValueType);
 
@@ -442,6 +430,7 @@ public:
                           SubstitutionMap subs,
                           LValueOptions options,
                           bool isSuper,
+                          SGFAccessKind accessKind,
                           AccessStrategy accessStrategy,
                           CanType formalRValueType,
                           PreparedArguments &&indices,
@@ -452,6 +441,7 @@ public:
                              SubstitutionMap subs,
                              LValueOptions options,
                              bool isSuper,
+                             SGFAccessKind accessKind,
                              AccessStrategy accessStrategy,
                              CanType formalRValueType);
 
@@ -460,6 +450,7 @@ public:
                                    SubstitutionMap subs,
                                    LValueOptions options,
                                    bool isSuper,
+                                   SGFAccessKind accessKind,
                                    AccessStrategy accessStrategy,
                                    CanType formalRValueType,
                                    PreparedArguments &&indices,
@@ -491,6 +482,9 @@ public:
     return Path.back()->getTypeData();
   }
 
+  /// Return the access kind that this l-value was emitted for.
+  SGFAccessKind getAccessKind() const { return getTypeData().getAccessKind(); }
+
   /// Returns the type-of-rvalue of the logical object referenced by
   /// this l-value.  Note that this may differ significantly from the
   /// type of l-value.
@@ -504,8 +498,9 @@ public:
   /// access that would conflict with this the accesses begun by this
   /// LValue. This is a best-effort attempt; it may return false in cases
   /// where the two LValues do not conflict.
-  bool isObviouslyNonConflicting(const LValue &other, AccessKind selfAccess,
-                                 AccessKind otherAccess);
+  bool isObviouslyNonConflicting(const LValue &other,
+                                 SGFAccessKind selfAccess,
+                                 SGFAccessKind otherAccess);
 
   void dump() const;
   void dump(raw_ostream &os, unsigned indent = 0) const;

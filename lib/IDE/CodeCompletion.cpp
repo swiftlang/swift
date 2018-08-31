@@ -1303,16 +1303,16 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   DeclContext *CurDeclContext = nullptr;
   DeclAttrKind AttrKind;
   int AttrParamIndex;
-  bool IsInSil;
+  bool IsInSil = false;
   bool HasSpace = false;
   bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
   Optional<DeclKind> AttTargetDK;
+  Optional<StmtKind> ParentStmtKind;
 
   SmallVector<StringRef, 3> ParsedKeywords;
 
   std::vector<std::pair<std::string, bool>> SubModuleNameVisibilityPairs;
-  StmtKind ParentStmtKind;
 
   void addSuperKeyword(CodeCompletionResultSink &Sink) {
     auto *DC = CurDeclContext->getInnermostTypeContext();
@@ -1465,13 +1465,17 @@ public:
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          Optional<unsigned> yieldIndex) override;
-  void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) override;
+  void completeAfterPoundExpr(CodeCompletionExpr *E,
+                              Optional<StmtKind> ParentKind) override;
+  void completeAfterPoundDirective() override;
+  void completePlatformCondition() override;
   void completeGenericParams(TypeLoc TL) override;
   void completeAfterIfStmt(bool hasElse) override;
-  void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
 
   void doneParsing() override;
 
+private:
+  void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
   void deliverCompletionResults();
 };
 } // end anonymous namespace
@@ -2279,7 +2283,7 @@ public:
       Builder.addAnnotatedThrows();
   }
 
-  void addPoundAvailable(StmtKind ParentKind) {
+  void addPoundAvailable(Optional<StmtKind> ParentKind) {
     if (ParentKind != StmtKind::If && ParentKind != StmtKind::Guard)
       return;
     CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::ResultKind::Keyword,
@@ -2296,11 +2300,15 @@ public:
     // #selector is only available when the Objective-C runtime is.
     if (!Ctx.LangOpts.EnableObjCInterop) return;
 
+    // After #, this is a very likely result. When just in a String context,
+    // it's not.
+    auto semanticContext = needPound ? SemanticContextKind::None
+    : SemanticContextKind::ExpressionSpecific;
+
     CodeCompletionResultBuilder Builder(
                                   Sink,
                                   CodeCompletionResult::ResultKind::Keyword,
-                                  SemanticContextKind::ExpressionSpecific,
-                                  ExpectedTypes);
+                                  semanticContext, ExpectedTypes);
     if (needPound)
       Builder.addTextChunk("#selector");
     else
@@ -4614,12 +4622,22 @@ void CodeCompletionCallbacksImpl::completeYieldStmt(CodeCompletionExpr *E,
   Kind = CompletionKind::YieldStmtExpr;
 }
 
-void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E,
-                                                     StmtKind ParentKind) {
+void CodeCompletionCallbacksImpl::completeAfterPoundExpr(
+    CodeCompletionExpr *E, Optional<StmtKind> ParentKind) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
-  Kind = CompletionKind::AfterPound;
+  Kind = CompletionKind::AfterPoundExpr;
   ParentStmtKind = ParentKind;
+}
+
+void CodeCompletionCallbacksImpl::completeAfterPoundDirective() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::AfterPoundDirective;
+}
+
+void CodeCompletionCallbacksImpl::completePlatformCondition() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::PlatformConditon;
 }
 
 void CodeCompletionCallbacksImpl::completeAfterIfStmt(bool hasElse) {
@@ -4745,7 +4763,9 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::Import:
   case CompletionKind::UnresolvedMember:
   case CompletionKind::CallArg:
-  case CompletionKind::AfterPound:
+  case CompletionKind::AfterPoundExpr:
+  case CompletionKind::AfterPoundDirective:
+  case CompletionKind::PlatformConditon:
   case CompletionKind::GenericParams:
   case CompletionKind::KeyPathExprObjC:
   case CompletionKind::KeyPathExprSwift:
@@ -4811,6 +4831,121 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::AfterIfStmtElse:
     addKeyword(Sink, "if", CodeCompletionKeywordKind::kw_if);
     break;
+  }
+}
+
+static void addPoundDirectives(CodeCompletionResultSink &Sink) {
+  auto addWithName =
+      [&](StringRef name, CodeCompletionKeywordKind K,
+          llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer =
+              nullptr) {
+        CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::Keyword,
+                                            SemanticContextKind::None, {});
+        Builder.addTextChunk(name);
+        Builder.setKeywordKind(K);
+        if (consumer)
+          consumer(Builder);
+      };
+
+  addWithName("sourceLocation", CodeCompletionKeywordKind::pound_sourceLocation,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addLeftParen();
+    Builder.addTextChunk("file");
+    Builder.addCallParameterColon();
+    Builder.addSimpleTypedParameter("String");
+    Builder.addComma();
+    Builder.addTextChunk("line");
+    Builder.addCallParameterColon();
+    Builder.addSimpleTypedParameter("Int");
+    Builder.addRightParen();
+  });
+  addWithName("warning", CodeCompletionKeywordKind::pound_warning,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addLeftParen();
+    Builder.addTextChunk("\"");
+    Builder.addSimpleNamedParameter("message");
+    Builder.addTextChunk("\"");
+    Builder.addRightParen();
+  });
+  addWithName("error", CodeCompletionKeywordKind::pound_error,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addLeftParen();
+    Builder.addTextChunk("\"");
+    Builder.addSimpleNamedParameter("message");
+    Builder.addTextChunk("\"");
+    Builder.addRightParen();
+  });
+
+  addWithName("if ", CodeCompletionKeywordKind::pound_if,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("condition");
+  });
+
+  // FIXME: These directives are only valid in conditional completion block.
+  addWithName("elseif ", CodeCompletionKeywordKind::pound_elseif,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("condition");
+  });
+  addWithName("else", CodeCompletionKeywordKind::pound_else);
+  addWithName("endif", CodeCompletionKeywordKind::pound_endif);
+}
+
+/// Add platform conditions used in '#if' and '#elseif' directives.
+static void addPlatformConditions(CodeCompletionResultSink &Sink) {
+  auto addWithName =
+      [&](StringRef Name,
+          llvm::function_ref<void(CodeCompletionResultBuilder & Builder)>
+              consumer) {
+        CodeCompletionResultBuilder Builder(
+            Sink, CodeCompletionResult::ResultKind::Pattern,
+            SemanticContextKind::ExpressionSpecific, {});
+        Builder.addTextChunk(Name);
+        Builder.addLeftParen();
+        consumer(Builder);
+        Builder.addRightParen();
+      };
+  addWithName("os", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("name");
+  });
+  addWithName("arch", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("name");
+  });
+  addWithName("canImport", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("module");
+  });
+  addWithName("targetEnvironment", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk("simulator");
+  });
+  addWithName("swift", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk(">=");
+    Builder.addSimpleNamedParameter("version");
+  });
+  addWithName("swift", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk("<");
+    Builder.addSimpleNamedParameter("version");
+  });
+  addWithName("compiler", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk(">=");
+    Builder.addSimpleNamedParameter("version");
+  });
+  addWithName("compiler", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk("<");
+    Builder.addSimpleNamedParameter("version");
+  });
+
+  addKeyword(Sink, "true", CodeCompletionKeywordKind::kw_true, "Bool");
+  addKeyword(Sink, "false", CodeCompletionKeywordKind::kw_false, "Bool");
+}
+
+/// Add flags specified by '-D' to completion results.
+static void addConditionalCompilationFlags(ASTContext &Ctx,
+                                           CodeCompletionResultSink &Sink) {
+  for (auto Flag : Ctx.LangOpts.getCustomConditionalCompilationFlags()) {
+    // TODO: Should we filter out some flags?
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::ExpressionSpecific, {});
+    Builder.addTextChunk(Flag);
   }
 }
 
@@ -5420,10 +5555,24 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::AfterPound: {
+  case CompletionKind::AfterPoundExpr: {
     Lookup.addPoundAvailable(ParentStmtKind);
     Lookup.addPoundSelector(/*needPound=*/false);
     Lookup.addPoundKeyPath(/*needPound=*/false);
+    break;
+  }
+
+  case CompletionKind::AfterPoundDirective: {
+    addPoundDirectives(CompletionContext.getResultSink());
+    // FIXME: Add pound expressions (e.g. '#selector()') if it's at statements
+    // position.
+    break;
+  }
+
+  case CompletionKind::PlatformConditon: {
+    addPlatformConditions(CompletionContext.getResultSink());
+    addConditionalCompilationFlags(CurDeclContext->getASTContext(),
+                                   CompletionContext.getResultSink());
     break;
   }
 
