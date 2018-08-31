@@ -445,28 +445,36 @@ func testEnumLValue(s: inout StructOfEnum) {
   enumLValueHelper(&s.e, &s.f)
 }
 
+struct MyDict<K: Hashable, V> {
+  let s = "" // make this non-trivial
+  subscript(key: K) -> V? {
+    get { return nil }
+    set {}
+  }
+}
+
 // --- Optional access.
-func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
+func accessOptionalArray(_ dict : MyDict<Int, [Int]>) {
   var dict = dict
   dict[1]?.append(2)
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify0A13OptionalArrayyySDySiSaySiGGF : $@convention(thin) (@guaranteed Dictionary<Int, Array<Int>>) -> () {
-// CHECK: bb0(%0 : @guaranteed $Dictionary<Int, Array<Int>>):
-// CHECK:   alloc_box ${ var Dictionary<Int, Array<Int>> }, var, name "dict"
+// CHECK-LABEL: sil hidden @$S20access_marker_verify0A13OptionalArrayyyAA6MyDictVySiSaySiGGF : $@convention(thin) (@guaranteed MyDict<Int, Array<Int>>) -> () {
+// CHECK: bb0(%0 : @guaranteed $MyDict<Int, Array<Int>>):
+// CHECK:   alloc_box ${ var MyDict<Int, Array<Int>> }, var, name "dict"
 // CHECK:   [[PROJ:%.*]] = project_box
 // ----- initialize the box.
 // CHECK:   [[INITACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]]
 // CHECK:   store %{{.*}} to [init] [[INITACCESS]]
 // CHECK:   end_access [[INITACCESS]]
-// ----- begin formal access for Dictionary.subscript.setter
+// ----- begin formal access for MyDict.subscript.setter
 // CHECK:   [[BOXACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]]
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<Array<Int>>
-// CHECK:   load_borrow [[BOXACCESS]] : $*Dictionary<Int, Array<Int>>
+// CHECK:   load_borrow [[BOXACCESS]] : $*MyDict<Int, Array<Int>>
 // ----- Initialize some trivial temporaries.
 // CHECK:   alloc_stack $Int
 // CHECK-NOT: begin_access
 // CHECK:   store %{{.*}} to [trivial]
-// ----- Call Dictionary.subscript.getter.
+// ----- Call MyDict.subscript.getter.
 // CHECK-NOT: begin_access
 // CHECK:   apply %{{.*}}<Int, [Int]>
 // ----- access the temporary array result of the getter
@@ -482,10 +490,10 @@ func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
 // CHECK:   [[TEMP3:%.*]] = alloc_stack $Int
 // CHECK-NOT: begin_access
 // CHECK:   store %{{.*}} to [trivial] [[TEMP3]] : $*Int
-// Call Dictionary.subscript.setter
-// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], [[TEMP3]], [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
+// Call MyDict.subscript.setter
+// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], [[TEMP3]], [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
 // CHECK:   end_access [[TEMPACCESS]] : $*Optional<Array<Int>>
-// CHECK:   end_access [[BOXACCESS]] : $*Dictionary<Int, Array<Int>>
+// CHECK:   end_access [[BOXACCESS]] : $*MyDict<Int, Array<Int>>
 // CHECK:   br
 //
 // CHECK: bb2:
@@ -501,9 +509,9 @@ func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
 // CHECK:   store [[TEMPARRAYVAL]] to [init] [[ARRAYCOPY]] : $*Optional<Array<Int>>
 // CHECK:   alloc_stack $Int
 // CHECK:   store %{{.*}} to [trivial]
-// ----- call Dictionary.subscript.setter
-// CHECK: apply %{{.*}}<Int, [Int]>([[ARRAYCOPY]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify0A13OptionalArrayyySDySiSaySiGGF'
+// ----- call MyDict.subscript.setter
+// CHECK: apply %{{.*}}<Int, [Int]>([[ARRAYCOPY]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify0A13OptionalArrayyyAA6MyDictVySiSaySiGGF'
 
 // --- Optional map.
 enum OptionalWithMap<Wrapped> {
