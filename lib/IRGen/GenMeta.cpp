@@ -623,7 +623,6 @@ namespace {
 
     struct RequirementInfo {
       ProtocolRequirementFlags Flags;
-      llvm::Constant *Thunk;
       llvm::Constant *DefaultImpl;
     };
 
@@ -633,26 +632,25 @@ namespace {
       if (entry.isBase()) {
         assert(entry.isOutOfLineBase());
         auto flags = Flags(Flags::Kind::BaseProtocol);
-        return { flags, nullptr, nullptr };
+        return { flags, nullptr };
       }
 
       if (entry.isAssociatedType()) {
         auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
-        return { flags, nullptr, nullptr };
+        return { flags, nullptr };
       }
 
       if (entry.isAssociatedConformance()) {
         auto flags = Flags(Flags::Kind::AssociatedConformanceAccessFunction);
-        return { flags, nullptr, nullptr };
+        return { flags, nullptr };
       }
 
       assert(entry.isFunction());
       SILDeclRef func(entry.getFunction());
 
-      // Look up the dispatch thunk if the protocol is resilient.
-      llvm::Constant *thunk = nullptr;
+      // Emit the dispatch thunk.
       if (Resilient)
-        thunk = IGM.emitDispatchThunk(func);
+        IGM.emitDispatchThunk(func);
 
       // Classify the function.
       auto flags = getMethodDescriptorFlags<Flags>(func.getDecl());
@@ -660,7 +658,7 @@ namespace {
       // Look for a default witness.
       llvm::Constant *defaultImpl = findDefaultWitness(func);
 
-      return { flags, thunk, defaultImpl };
+      return { flags, defaultImpl };
     }
 
     void addRequirements() {
@@ -685,9 +683,6 @@ namespace {
 
         // Flags.
         reqt.addInt32(info.Flags.getIntValue());
-
-        // Dispatch thunk.
-        reqt.addRelativeAddressOrNull(info.Thunk);
 
         // Default implementation.
         reqt.addRelativeAddressOrNull(info.DefaultImpl);

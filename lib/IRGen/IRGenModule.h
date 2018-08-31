@@ -1144,7 +1144,7 @@ public:
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);
 
-  llvm::Function *emitDispatchThunk(SILDeclRef declRef);
+  void emitDispatchThunk(SILDeclRef declRef);
 
   llvm::GlobalValue *defineAlias(LinkEntity entity,
                                  llvm::Constant *definition);

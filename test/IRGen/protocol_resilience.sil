@@ -55,36 +55,26 @@ import resilient_protocol
 // CHECK-SAME:   @"$S19protocol_resilience17ResilientProtocolMp"
 
 // Protocol requirements
-// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 8, i32 0, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 8, i32 0 },
+
+// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
+
+// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP10noDefaultAyyFTj" to [[INT]]),
-// CHECK-SAME:     i32 0
-// CHECK-SAME:   },
-
-// CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP10noDefaultByyFTj" to [[INT]]),
-// CHECK-SAME:     i32 0
-// CHECK-SAME:   },
-
-// CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultCyyFTj" to [[INT]]),
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultC to [[INT]]),
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultDyyFTj" to [[INT]]),
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultD to [[INT]]),
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 1,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultEyyFZTj" to [[INT]]),
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultE to [[INT]]),
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 1,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultFyyFZTj" to [[INT]]),
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultF to [[INT]]),
 // CHECK-SAME:   }
 // CHECK-SAME: }

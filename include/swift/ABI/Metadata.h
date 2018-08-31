@@ -1630,17 +1630,6 @@ struct TargetProtocolRequirement {
   ProtocolRequirementFlags Flags;
   // TODO: name, type
 
-  /// A function pointer to a global symbol which is used by client code
-  /// to invoke the protocol requirement from a witness table. This pointer
-  /// is also to uniquely identify the requirement in resilient witness
-  /// tables, which is why it appears here.
-  ///
-  /// This allows clients to call protocol requirements without depending
-  /// on the witness table offset of the requirement.
-  ///
-  /// Will be null if the protocol is not resilient.
-  RelativeDirectPointer<void, /*nullable*/ true> Function;
-
   /// The optional default implementation of the protocol.
   RelativeDirectPointer<void, /*nullable*/ true> DefaultImplementation;
 };
