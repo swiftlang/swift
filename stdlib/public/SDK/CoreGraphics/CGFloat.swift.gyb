@@ -214,22 +214,22 @@ extension CGFloat : BinaryFloatingPoint {
   }
 
   @_transparent
-  public static func +=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+  public static func +=(lhs: inout CGFloat, rhs: CGFloat) {
     lhs.native += rhs.native
   }
 
   @_transparent
-  public static func -=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+  public static func -=(lhs: inout CGFloat, rhs: CGFloat) {
     lhs.native -= rhs.native
   }
 
   @_transparent
-  public static func *=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+  public static func *=(lhs: inout CGFloat, rhs: CGFloat) {
     lhs.native *= rhs.native
   }
 
   @_transparent
-  public static func /=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+  public static func /=(lhs: inout CGFloat, rhs: CGFloat) {
     lhs.native /= rhs.native
   }
 

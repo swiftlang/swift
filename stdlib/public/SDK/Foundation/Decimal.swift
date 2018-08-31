@@ -217,28 +217,28 @@ extension Decimal : SignedNumeric {
       fatalError()
   }
 
-  public static func +=(_ lhs: inout Decimal, _ rhs: Decimal) {
+  public static func +=(lhs: inout Decimal, rhs: Decimal) {
       var rhs = rhs
       _ = withUnsafeMutablePointer(to: &lhs) {
           NSDecimalAdd($0, $0, &rhs, .plain)
       }
   }
 
-  public static func -=(_ lhs: inout Decimal, _ rhs: Decimal) {
+  public static func -=(lhs: inout Decimal, rhs: Decimal) {
       var rhs = rhs
       _ = withUnsafeMutablePointer(to: &lhs) {
           NSDecimalSubtract($0, $0, &rhs, .plain)
       }
   }
 
-  public static func *=(_ lhs: inout Decimal, _ rhs: Decimal) {
+  public static func *=(lhs: inout Decimal, rhs: Decimal) {
       var rhs = rhs
       _ = withUnsafeMutablePointer(to: &lhs) {
           NSDecimalMultiply($0, $0, &rhs, .plain)
       }
   }
 
-  public static func /=(_ lhs: inout Decimal, _ rhs: Decimal) {
+  public static func /=(lhs: inout Decimal, rhs: Decimal) {
       var rhs = rhs
       _ = withUnsafeMutablePointer(to: &lhs) {
           NSDecimalDivide($0, $0, &rhs, .plain)

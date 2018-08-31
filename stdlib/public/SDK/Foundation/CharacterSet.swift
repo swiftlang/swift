@@ -58,7 +58,7 @@ fileprivate final class _CharacterSetStorage : Hashable {
         }
     }
     
-    fileprivate static func ==(_ lhs : _CharacterSetStorage, _ rhs : _CharacterSetStorage) -> Bool {
+    fileprivate static func ==(lhs : _CharacterSetStorage, rhs : _CharacterSetStorage) -> Bool {
         switch (lhs._backing, rhs._backing) {
         case (.immutable(let cs1), .immutable(let cs2)):
             return CFEqual(cs1, cs2)

@@ -133,7 +133,7 @@ extension ${vectype} : Equatable {
   /// True iff every element of lhs is equal to the corresponding element of
   /// rhs.
   @_transparent
-  public static func ==(_ lhs: ${vectype}, _ rhs: ${vectype}) -> Bool {
+  public static func ==(lhs: ${vectype}, rhs: ${vectype}) -> Bool {
     return simd_equal(lhs, rhs)
   }
 }
