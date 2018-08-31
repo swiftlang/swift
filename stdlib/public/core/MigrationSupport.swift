@@ -380,6 +380,62 @@ extension FixedWidthInteger {
   /// The empty bitset.
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
+  
+  @available(swift, deprecated: 5)
+  public func unsafeAdding(_ other: Self) -> Self {
+    let (result, overflow) = self.addingReportingOverflow(other)
+    if overflow {
+      if (_isDebugAssertConfiguration()) {
+        _preconditionFailure("Overflow in unsafeAdding(_:)")
+      }
+      else {
+        Builtin.conditionallyUnreachable()
+      }
+    }
+    return result
+  }
+  
+  @available(swift, deprecated: 5)
+  public func unsafeSubtracting(_ other: Self) -> Self {
+    let (result, overflow) = self.addingReportingOverflow(other)
+    if overflow {
+      if (_isDebugAssertConfiguration()) {
+        _preconditionFailure("Overflow in unsafeSubtracting(_:)")
+      }
+      else {
+        Builtin.conditionallyUnreachable()
+      }
+    }
+    return result
+  }
+  
+  @available(swift, deprecated: 5)
+  public func unsafeMultiplied(by other: Self) -> Self {
+    let (result, overflow) = self.multipliedReportingOverflow(by: other)
+    if overflow {
+      if (_isDebugAssertConfiguration()) {
+        _preconditionFailure("Overflow in unsafeMultiplied(by:)")
+      }
+      else {
+        Builtin.conditionallyUnreachable()
+      }
+    }
+    return result
+  }
+  
+  @available(swift, deprecated: 5)
+  public func unsafeDivided(by other: Self) -> Self {
+    let (result, overflow) = self.dividedReportingOverflow(by: other)
+    if overflow {
+      if (_isDebugAssertConfiguration()) {
+        _preconditionFailure("Overflow in unsafeDivided(by:)")
+      }
+      else {
+        Builtin.conditionallyUnreachable()
+      }
+    }
+    return result
+  }
 }
 
 extension LazyCollectionProtocol {
