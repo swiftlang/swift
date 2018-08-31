@@ -76,7 +76,8 @@ set(SWIFTLIB_ESSENTIAL
   Indices.swift
   InputStream.swift
   IntegerParsing.swift
-  Integers.swift.gyb
+  Integers.swift
+  IntegerTypes.swift.gyb
   Join.swift
   KeyPath.swift
   LazyCollection.swift
