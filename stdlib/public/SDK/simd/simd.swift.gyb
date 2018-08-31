@@ -30,6 +30,7 @@ cardinal = { 2:'two', 3:'three', 4:'four'}
 %  vectype = ctype[scalar] + str(count)
 %  llvm_vectype = "Vec" + str(count) + "x" + llvm_type[scalar]
 %  vecsize = (8 if scalar == 'Double' else 4) * (4 if count == 3 else count)
+%  vecalign = (16 if vecsize > 16 else vecsize)
 %  extractelement = "extractelement_" + llvm_vectype + "_Int32"
 %  insertelement = "insertelement_" + llvm_vectype + "_" + llvm_type[scalar] + "_Int32"
 %  is_floating = scalar in floating_types
@@ -40,23 +41,23 @@ cardinal = { 2:'two', 3:'three', 4:'four'}
 /// A vector of ${cardinal[count]} `${scalar}`.  This corresponds to the C and
 /// Obj-C type `vector_${vectype}` and the C++ type `simd::${vectype}`.
 @_fixed_layout
-@_alignment(${vecsize})
+@_alignment(${vecalign})
 public struct ${vectype} {
 
-  public var _vector: Builtin.${llvm_vectype}
+  public var _value: Builtin.${llvm_vectype}
 
 % for i in xrange(count):
   public var ${component[i]} : ${scalar} {
     @_transparent
     get {
-      let elt = Builtin.${extractelement}(_vector,
+      let elt = Builtin.${extractelement}(_value,
         (${i} as Int32)._value)
 
-      return ${scalar}(_bits: elt)
+      return ${scalar}(elt)
     }
     @_transparent
     set {
-      _vector = Builtin.${insertelement}(_vector,
+      _value = Builtin.${insertelement}(_value,
         newValue._value,
         (${i} as Int32)._value)
     }
@@ -68,8 +69,8 @@ public struct ${vectype} {
   public init() { self.init(0) }
 
   @_transparent
-  public init(_bits: Builtin.${llvm_vectype}) {
-    _vector = _bits
+  public init(_ _value: Builtin.${llvm_vectype}) {
+    self._value = _value
   }
 
   /// Initialize a vector with the specified elements.
@@ -81,7 +82,7 @@ public struct ${vectype} {
       ${component[i]}._value,
       (${i} as Int32)._value)
 % end
-    _vector = v
+    _value = v
   }
 
   /// Initialize a vector with the specified elements.
@@ -100,7 +101,7 @@ public struct ${vectype} {
   ///
   /// - Precondition: `array` must have exactly ${cardinal[count]} elements.
   public init(_ array: [${scalar}]) {
-  _precondition(array.count == ${count},
+  precondition(array.count == ${count},
                 "${vectype} requires a ${cardinal[count]}-element array")
     self.init(${', '.join(map(lambda i:
               'array[' + str(i) + ']',
@@ -111,17 +112,17 @@ public struct ${vectype} {
   public subscript(index: Int) -> ${scalar} {
     @_transparent
     get {
-      _precondition(index >= 0, "Vector index out of range")
-      _precondition(index < ${count}, "Vector index out of range")
-      let elt = Builtin.${extractelement}(_vector,
+      precondition(index >= 0, "Vector index out of range")
+      precondition(index < ${count}, "Vector index out of range")
+      let elt = Builtin.${extractelement}(_value,
         Int32(index)._value)
-      return ${scalar}(_bits: elt)
+      return ${scalar}(elt)
     }
     @_transparent
     set(value) {
-      _precondition(index >= 0, "Vector index out of range")
-      _precondition(index < ${count}, "Vector index out of range")
-      _vector = Builtin.${insertelement}(_vector,
+      precondition(index >= 0, "Vector index out of range")
+      precondition(index < ${count}, "Vector index out of range")
+      _value = Builtin.${insertelement}(_value,
         value._value,
         Int32(index)._value)
     }
@@ -132,7 +133,7 @@ extension ${vectype} : Equatable {
   /// True iff every element of lhs is equal to the corresponding element of
   /// rhs.
   @_transparent
-  public static func ==(_ lhs: ${vectype}, _ rhs: ${vectype}) -> Bool {
+  public static func ==(lhs: ${vectype}, rhs: ${vectype}) -> Bool {
     return simd_equal(lhs, rhs)
   }
 }
@@ -183,15 +184,13 @@ extension ${vectype} {
   /// Vector (elementwise) sum of `lhs` and `rhs`.
   @_transparent
   public static func ${wrap}+(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-    return ${vectype}(_bits:
-      Builtin.${prefix}add_${llvm_vectype}(lhs._vector, rhs._vector))
+    return ${vectype}(Builtin.${prefix}add_${llvm_vectype}(lhs._value, rhs._value))
   }
 
   /// Vector (elementwise) difference of `lhs` and `rhs`.
   @_transparent
   public static func ${wrap}-(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-    return ${vectype}(_bits:
-      Builtin.${prefix}sub_${llvm_vectype}(lhs._vector, rhs._vector))
+    return ${vectype}(Builtin.${prefix}sub_${llvm_vectype}(lhs._value, rhs._value))
   }
 
   /// Negation of `rhs`.
@@ -204,8 +203,7 @@ extension ${vectype} {
   /// vector product).
   @_transparent
   public static func ${wrap}*(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-    return ${vectype}(_bits:
-      Builtin.${prefix}mul_${llvm_vectype}(lhs._vector, rhs._vector))
+    return ${vectype}(Builtin.${prefix}mul_${llvm_vectype}(lhs._value, rhs._value))
   }
 
   /// Scalar-Vector product.
@@ -223,8 +221,7 @@ extension ${vectype} {
   /// Elementwise quotient of `lhs` and `rhs`.
   @_transparent
   public static func /(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-    return ${vectype}(_bits:
-      Builtin.${divide}_${llvm_vectype}(lhs._vector, rhs._vector))
+    return ${vectype}(Builtin.${divide}_${llvm_vectype}(lhs._value, rhs._value))
   }
 
   /// Divide vector by scalar.
@@ -656,7 +653,7 @@ extension ${mattype} {
 
   /// Initialize matrix to have specified `columns`.
   public init(_ columns: [${coltype}]) {
-    _precondition(columns.count == ${cols}, "Requires array of ${cols} vectors")
+    precondition(columns.count == ${cols}, "Requires array of ${cols} vectors")
     self.init()
 %   for i in range(cols):
     self.columns.${i} = columns[${i}]
@@ -665,7 +662,7 @@ extension ${mattype} {
 
   /// Initialize matrix to have specified `rows`.
   public init(rows: [${rowtype}]) {
-    _precondition(rows.count == ${rows}, "Requires array of ${rows} vectors")
+    precondition(rows.count == ${rows}, "Requires array of ${rows} vectors")
     self = ${transtype}(rows).transpose
   }
 
@@ -699,7 +696,7 @@ extension ${mattype} {
 %   for i in range(cols):
       case ${i}: return columns.${i}
 %   end
-      default: _preconditionFailure("Column index out of range")
+      default: preconditionFailure("Column index out of range")
       }
     }
     set (value) {
@@ -707,7 +704,7 @@ extension ${mattype} {
 %   for i in range(cols):
       case ${i}: columns.${i} = value
 %   end
-      default: _preconditionFailure("Column index out of range")
+      default: preconditionFailure("Column index out of range")
       }
     }
   }
@@ -745,7 +742,7 @@ extension ${mattype} {
 %   if rows == cols:
   /// Inverse of the matrix if it exists, otherwise the contents of the
   /// resulting matrix are undefined.
-  @available(OSX 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
+  @available(macOS 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
   @_transparent
   public var inverse: ${mattype} {
     return simd_inverse(self)
@@ -849,7 +846,7 @@ public func matrix_from_diagonal(_ d: ${diagtype}) -> ${mattype} {
 }
 
 @available(swift, deprecated: 4, message: "Use the .inverse property instead.")
-@available(OSX 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
+@available(macOS 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
 public func matrix_invert(_ x: ${mattype}) -> ${mattype} {
   return x.inverse
 }

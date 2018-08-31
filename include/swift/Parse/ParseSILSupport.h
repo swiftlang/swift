@@ -43,11 +43,7 @@ namespace swift {
     Parser &P;
   public:
     explicit PrettyStackTraceParser(Parser &P) : P(P) {}
-    void print(llvm::raw_ostream &out) const override {
-      out << "With parser at source location: ";
-      P.Tok.getLoc().print(out, P.Context.SourceMgr);
-      out << '\n';
-    }
+    void print(llvm::raw_ostream &out) const override;
   };
 } // end namespace swift
 

@@ -21,13 +21,11 @@
 
 using namespace swift;
 
-bool swift::_swift_reportFatalErrorsToDebugger = true;
-
 static void logPrefixAndMessageToDebugger(
     const unsigned char *prefix, int prefixLength,
     const unsigned char *message, int messageLength
 ) {
-  if (!_swift_reportFatalErrorsToDebugger)
+  if (!_swift_shouldReportFatalErrorsToDebugger())
     return;
 
   char *debuggerMessage;
@@ -48,8 +46,6 @@ void swift::_swift_stdlib_reportFatalErrorInFile(
     uint32_t line,
     uint32_t flags
 ) {
-  logPrefixAndMessageToDebugger(prefix, prefixLength, message, messageLength);
-
   char *log;
   swift_asprintf(
       &log, "%.*s: %.*s%sfile %.*s, line %" PRIu32 "\n",
@@ -61,6 +57,8 @@ void swift::_swift_stdlib_reportFatalErrorInFile(
 
   swift_reportError(flags, log);
   free(log);
+
+  logPrefixAndMessageToDebugger(prefix, prefixLength, message, messageLength);
 }
 
 void swift::_swift_stdlib_reportFatalError(
@@ -68,8 +66,6 @@ void swift::_swift_stdlib_reportFatalError(
     const unsigned char *message, int messageLength,
     uint32_t flags
 ) {
-  logPrefixAndMessageToDebugger(prefix, prefixLength, message, messageLength);
-
   char *log;
   swift_asprintf(
       &log, "%.*s: %.*s\n",
@@ -78,6 +74,8 @@ void swift::_swift_stdlib_reportFatalError(
 
   swift_reportError(flags, log);
   free(log);
+
+  logPrefixAndMessageToDebugger(prefix, prefixLength, message, messageLength);
 }
 
 void swift::_swift_stdlib_reportUnimplementedInitializerInFile(

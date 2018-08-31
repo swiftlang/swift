@@ -13,9 +13,9 @@ func test() {
 
   // Enumerator remapping.
   var excuse: HomeworkExcuse = .dogAteIt
-  excuse = .overslept // FIXME: should provide Fix-It  expected-error{{type 'HomeworkExcuse' has no member 'overslept'}} {{none}}
+  excuse = .overslept // expected-error{{type 'HomeworkExcuse' has no member 'overslept'; did you mean 'Overslept'?}} {{13-22=Overslept}}
   excuse = .tired
-  excuse = .tooHard // FIXME: should provide Fix-It expected-error{{type 'HomeworkExcuse' has no member 'tooHard'}} {{none}}
+  excuse = .tooHard // expected-error{{type 'HomeworkExcuse' has no member 'tooHard'; did you mean 'TooHard'?}} {{13-20=TooHard}}
   excuse = .challenging
 
   // Typedef-of-anonymous-type-name renaming

@@ -41,35 +41,6 @@ ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
   return PL;
 }
 
-/// Create an implicit 'self' decl for a method in the specified decl context.
-/// If 'static' is true, then this is self for a static method in the type.
-///
-/// Note that this decl is created, but it is returned with an incorrect
-/// DeclContext that needs to be set correctly.  This is automatically handled
-/// when a function is created with this as part of its argument list.
-/// For a generic context, this also gives the parameter an unbound generic
-/// type with the expectation that type-checking will fill in the context
-/// generic parameters.
-ParameterList *ParameterList::createUnboundSelf(SourceLoc loc,
-                                                DeclContext *DC) {
-  auto *PD = ParamDecl::createUnboundSelf(loc, DC);
-  return create(DC->getASTContext(), PD);
-}
-
-/// Create an implicit 'self' decl for a method in the specified decl context.
-/// If 'static' is true, then this is self for a static method in the type.
-///
-/// Note that this decl is created, but it is returned with an incorrect
-/// DeclContext that needs to be set correctly.  This is automatically handled
-/// when a function is created with this as part of its argument list.
-ParameterList *ParameterList::createSelf(SourceLoc loc,
-                                         DeclContext *DC,
-                                         bool isStaticMethod,
-                                         bool isInOut) {
-  auto *PD = ParamDecl::createSelf(loc, DC, isStaticMethod, isInOut);
-  return create(DC->getASTContext(), PD);
-}
-
 /// Change the DeclContext of any contained parameters to the specified
 /// DeclContext.
 void ParameterList::setDeclContextOfParamDecls(DeclContext *DC) {
@@ -116,56 +87,29 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   return create(C, params);
 }
 
-/// Return a TupleType or ParenType for this parameter list,
-/// based on types provided by a callback.
-Type ParameterList::getType(
-    const ASTContext &C, llvm::function_ref<Type(ParamDecl *)> getType) const {
-  if (size() == 0)
-    return TupleType::getEmpty(C);
+void ParameterList::getParams(
+                        SmallVectorImpl<AnyFunctionType::Param> &params) const {
+  getParams(params,
+            [](ParamDecl *decl) { return decl->getInterfaceType(); });
+}
 
-  SmallVector<TupleTypeElt, 8> argumentInfo;
+void ParameterList::getParams(
+                          SmallVectorImpl<AnyFunctionType::Param> &params,
+                          llvm::function_ref<Type(ParamDecl *)> getType) const {
+  if (size() == 0)
+    return;
 
   for (auto P : *this) {
     auto type = getType(P);
-    argumentInfo.emplace_back(
-        type->getInOutObjectType(), P->getArgumentName(),
-        ParameterTypeFlags::fromParameterType(type, P->isVariadic(),
-                                              P->getValueOwnership()));
+
+    if (P->isVariadic())
+      type = ParamDecl::getVarargBaseTy(type);
+
+    auto label = P->getArgumentName();
+    auto flags = ParameterTypeFlags::fromParameterType(type, P->isVariadic(),
+                                                       P->getValueOwnership());
+    params.emplace_back(type, label, flags);
   }
-
-  return TupleType::get(argumentInfo, C);
-}
-
-/// Return a TupleType or ParenType for this parameter list, written in terms
-/// of contextual archetypes.
-Type ParameterList::getType(const ASTContext &C) const {
-  return getType(C, [](ParamDecl *P) { return P->getType(); });
-}
-
-/// Return a TupleType or ParenType for this parameter list, written in terms
-/// of interface types.
-Type ParameterList::getInterfaceType(const ASTContext &C) const {
-  return getType(C, [](ParamDecl *P) {
-    auto type = P->getInterfaceType();
-    assert(!type->hasArchetype());
-    return type;
-  });
-}
-
-
-/// Return the full function type for a set of curried parameter lists that
-/// returns the specified result type.  This returns a null type if one of the
-/// ParamDecls does not have a type set for it yet.
-///
-Type ParameterList::getFullInterfaceType(Type resultType,
-                                         ArrayRef<ParameterList*> PLL,
-                                         const ASTContext &C) {
-  auto result = resultType;
-  for (auto PL : reversed(PLL)) {
-    auto paramType = PL->getInterfaceType(C);
-    result = FunctionType::get(paramType, result);
-  }
-  return result;
 }
 
 

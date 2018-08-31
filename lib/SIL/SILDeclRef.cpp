@@ -40,7 +40,7 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
 
   auto dc = method->getDeclContext();
 
-  if (dc->getAsClassOrClassExtensionContext()) {
+  if (dc->getSelfClassDecl()) {
     if (method->isDynamic())
       return MethodDispatch::Class;
 
@@ -145,8 +145,6 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
   } else if (auto *ACE = baseLoc.dyn_cast<AbstractClosureExpr *>()) {
     loc = ACE;
     kind = Kind::Func;
-    assert(ACE->getParameterLists().size() >= 1 &&
-           "no param patterns for function?!");
   } else {
     llvm_unreachable("impossible SILDeclRef loc");
   }
@@ -275,49 +273,91 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       return maybeAddExternal(SILLinkage::PublicNonABI);
   }
 
-  bool neverPublic = false;
+  enum class Limit {
+    /// No limit.
+    None,
+    /// The declaration is emitted on-demand; it should end up with internal
+    /// or shared linkage.
+    OnDemand,
+    /// The declaration should never be made public.
+    NeverPublic 
+  };
+  auto limit = Limit::None;
 
   // ivar initializers and destroyers are completely contained within the class
   // from which they come, and never get seen externally.
   if (isIVarInitializerOrDestroyer()) {
-    neverPublic = true;
+    limit = Limit::NeverPublic;
   }
 
   // Stored property initializers get the linkage of their containing type.
   if (isStoredPropertyInitializer()) {
-    // If the type is public, the property initializer is referenced from
-    // inlinable initializers, and has PublicNonABI linkage.
+    // Three cases:
     //
-    // Note that we don't serialize the presence of an initializer, so there's
-    // no way to reference one from another module except for this case.
+    // 1) Type is formally @_fixed_layout. Root initializers can be declared
+    //    @inlinable. The property initializer must only reference
+    //    public symbols, and is serialized, so we give it PublicNonABI linkage.
+    //
+    // 2) Type is not formally @_fixed_layout and the module is not resilient.
+    //    Root initializers can be declared @inlinable. This is the annoying
+    //    case. We give the initializer public linkage if the type is public.
+    //
+    // 3) Type is resilient. The property initializer is never public because
+    //    root initializers cannot be @inlinable.
+    //
+    // FIXME: Get rid of case 2 somehow.
     if (isSerialized())
       return maybeAddExternal(SILLinkage::PublicNonABI);
 
-    // Otherwise, use the visibility of the type itself, because even if the
-    // property is private, we might reference the initializer from another
-    // file.
     d = cast<NominalTypeDecl>(d->getDeclContext());
-    neverPublic = true;
+
+    // FIXME: This should always be true.
+    if (d->getDeclContext()->getParentModule()->getResilienceStrategy() ==
+        ResilienceStrategy::Resilient)
+      limit = Limit::NeverPublic;
   }
 
   // The global addressor is never public for resilient globals.
   if (kind == Kind::GlobalAccessor) {
     if (cast<VarDecl>(d)->isResilient()) {
-      neverPublic = true;
+      limit = Limit::NeverPublic;
     }
   }
 
-  switch (d->getEffectiveAccess()) {
+  // Forced-static-dispatch functions are created on-demand and have
+  // at best shared linkage.
+  if (auto fn = dyn_cast<FuncDecl>(d)) {
+    if (fn->hasForcedStaticDispatch()) {
+      limit = Limit::OnDemand;
+    }
+  }
+  
+  auto effectiveAccess = d->getEffectiveAccess();
+  
+  // Private setter implementations for an internal storage declaration should
+  // be internal as well, so that a dynamically-writable
+  // keypath can be formed from other files.
+  if (auto accessor = dyn_cast<AccessorDecl>(d)) {
+    if (accessor->isSetter()
+       && accessor->getStorage()->getEffectiveAccess() == AccessLevel::Internal)
+      effectiveAccess = AccessLevel::Internal;
+  }
+
+  switch (effectiveAccess) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
     return maybeAddExternal(SILLinkage::Private);
 
   case AccessLevel::Internal:
+    if (limit == Limit::OnDemand)
+      return SILLinkage::Shared;
     return maybeAddExternal(SILLinkage::Hidden);
 
   case AccessLevel::Public:
   case AccessLevel::Open:
-    if (neverPublic)
+    if (limit == Limit::OnDemand)
+      return SILLinkage::Shared;
+    if (limit == Limit::NeverPublic)
       return maybeAddExternal(SILLinkage::Hidden);
     return maybeAddExternal(SILLinkage::Public);
   }
@@ -414,7 +454,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     dc = getDecl()->getInnermostDeclContext();
 
     // Enum element constructors are serialized if the enum is
-    // @_versioned or public.
+    // @usableFromInline or public.
     if (isEnumElement())
       if (d->getEffectiveAccess() >= AccessLevel::Public)
         return IsSerialized;
@@ -431,11 +471,11 @@ IsSerialized_t SILDeclRef::isSerialized() const {
       return IsSerializable;
 
     // The allocating entry point for designated initializers are serialized
-    // if the class is @_versioned or public.
+    // if the class is @usableFromInline or public.
     if (kind == SILDeclRef::Kind::Allocator) {
       auto *ctor = cast<ConstructorDecl>(d);
       if (ctor->isDesignatedInit() &&
-          ctor->getDeclContext()->getAsClassOrClassExtensionContext()) {
+          ctor->getDeclContext()->getSelfClassDecl()) {
         if (ctor->getEffectiveAccess() >= AccessLevel::Public &&
             !ctor->hasClangNode())
           return IsSerialized;
@@ -446,8 +486,9 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     // marked as @_fixed_layout.
     if (isStoredPropertyInitializer()) {
       auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
-      auto scope = nominal->getFormalAccessScope(/*useDC=*/nullptr,
-                                                 /*respectVersionedAttr=*/true);
+      auto scope =
+        nominal->getFormalAccessScope(/*useDC=*/nullptr,
+                                      /*treatUsableFromInlineAsPublic=*/true);
       if (!scope.isPublic())
         return IsNotSerialized;
       if (nominal->isFormallyResilient())
@@ -457,11 +498,11 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   }
 
   // Declarations imported from Clang modules are serialized if
-  // referenced from an inlineable context.
+  // referenced from an inlinable context.
   if (isClangImported())
     return IsSerializable;
 
-  // Otherwise, ask the AST if we're inside an @_inlineable context.
+  // Otherwise, ask the AST if we're inside an @inlinable context.
   if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
     return IsSerialized;
 
@@ -642,7 +683,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   case SILDeclRef::Kind::GlobalAccessor:
     assert(!isCurried);
-    return mangler.mangleAccessorEntity(AccessorKind::IsMutableAddressor,
+    return mangler.mangleAccessorEntity(AccessorKind::MutableAddress,
                                         AddressorKind::Unsafe,
                                         cast<AbstractStorageDecl>(getDecl()),
                                         /*isStatic*/ false,
@@ -760,7 +801,15 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (context->isExtensionContext())
     return SubclassScope::NotApplicable;
 
-  auto *classType = context->getAsClassOrClassExtensionContext();
+  // Various forms of thunks don't either.
+  if (isThunk() || isForeign)
+    return SubclassScope::NotApplicable;
+
+  // Default arg generators only need to be visible in Swift 3.
+  if (isDefaultArgGenerator() && !context->getASTContext().isSwiftVersion3())
+    return SubclassScope::NotApplicable;
+
+  auto *classType = context->getSelfClassDecl();
   if (!classType || classType->isFinal())
     return SubclassScope::NotApplicable;
 
@@ -791,11 +840,9 @@ unsigned SILDeclRef::getParameterListCount() const {
   auto *vd = getDecl();
 
   if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
-    return func->getParameterLists().size();
+    return func->hasImplicitSelfDecl() ? 2 : 1;
   } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
     return ed->hasAssociatedValues() ? 2 : 1;
-  } else if (isa<DestructorDecl>(vd)) {
-    return 1;
   } else if (isa<ClassDecl>(vd)) {
     return 2;
   } else if (isa<VarDecl>(vd)) {

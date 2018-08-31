@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
@@ -39,7 +39,7 @@ func test1() {
 }
 
 protocol Bogus : Int {}
-// expected-error@-1{{inheritance from non-protocol type 'Int'}}
+// expected-error@-1{{inheritance from non-protocol, non-class type 'Int'}}
 // expected-error@-2{{type 'Self' constrained to non-protocol, non-class type 'Int'}}
 
 // Explicit conformance checks (successful).
@@ -98,15 +98,13 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{circular protocol inheritance CircleMiddle}}
-// expected-error@-1{{circular protocol inheritance 'CircleMiddle' -> 'CircleStart' -> 'CircleEnd' -> 'CircleMiddle'}}
-// expected-error @+1 {{circular protocol inheritance CircleStart}}
-protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2{{circular protocol inheritance CircleStart}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error {{protocol 'CircleMiddle' refines itself}}
+protocol CircleStart : CircleEnd { func circle_start() }
 // expected-note@-1{{protocol 'CircleStart' declared here}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
-protocol CircleTrivial : CircleTrivial { } // expected-error 2{{circular protocol inheritance CircleTrivial}}
+protocol CircleTrivial : CircleTrivial { } // expected-error {{protocol 'CircleTrivial' refines itself}}
 
 struct Circle {
   func circle_start() {}
@@ -195,7 +193,7 @@ extension IntIterator : SequenceViaStream {
 }
 
 struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
-  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'NotSequence.SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
+  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> Int {}
 }
 
@@ -266,8 +264,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
-	// FIXME: Weird diagnostic
-  var x = e.makeIterator() // expected-error{{'Sequence' is not convertible to 'Sequence.Iterator'}}
+  var x = e.makeIterator() // expected-error{{value of type 'Sequence' has no member 'makeIterator'}}
   x.next()
   x.nonexistent()
 }
@@ -466,6 +463,7 @@ protocol ShouldntCrash {
 
 // rdar://problem/18168866
 protocol FirstProtocol {
+    // expected-warning@+1 {{'weak' should not be applied to a property declaration in a protocol and will be disallowed in future versions}}
     weak var delegate : SecondProtocol? { get } // expected-error{{'weak' must not be applied to non-class-bound 'SecondProtocol'; consider adding a protocol conformance that has a class bound}}
 }
 

@@ -9,8 +9,8 @@ public struct Q<T> {
 // CHECK-SAME:       metadata ![[ARG:.*]], metadata !DIExpression())
 // CHECK: store %[[TY]]* %0, %[[TY]]** %[[ALLOCA]], align
 // No deref here: the array argument is passed by value.
-// CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
-// CHECK-SAME:                        line: [[@LINE+2]], type: ![[TY:.*]])
-// CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "$SSay12generic_arg41QVyAA3fooyySayACyxGGlFQq_GGD")
+// CHECK: ![[DITY:.*]] = !DICompositeType({{.*}}identifier: "$SSay12generic_arg41QVyxGGD")
 public func foo<T>(_ arg: [Q<T>]) {
+// CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
+// CHECK-SAME:                        line: [[@LINE-2]], type: ![[DITY:.*]])
 }

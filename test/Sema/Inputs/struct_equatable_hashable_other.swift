@@ -14,5 +14,15 @@ struct OtherFileNonconforming {
   let v: String
 }
 struct YetOtherFileNonconforming {
+// expected-note@-1{{type declared here}}
   let v: String
 }
+
+struct GenericOtherFileNonconforming<T> {
+// expected-note@-1{{type declared here}}
+    let v: T
+}
+
+protocol ImplierOther: Equatable {}
+extension ImpliedMain: ImplierOther {}
+struct ImpliedOther: ImplierOther {}

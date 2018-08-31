@@ -1,18 +1,18 @@
 import TestsUtils
 public let CSVParsing = BenchmarkInfo(
-    name: "CSVParsing",
+    name: "CSVParsing2",
     runFunction: run_CSVParsing,
     tags: [.miniapplication, .api, .String],
     setUpFunction: { buildWorkload() },
     tearDownFunction: nil)
 public let CSVParsingAlt = BenchmarkInfo(
-    name: "CSVParsingAlt",
+    name: "CSVParsingAlt2",
     runFunction: run_CSVParsingAlt,
     tags: [.miniapplication, .api, .String],
     setUpFunction: { buildWorkload() },
     tearDownFunction: nil)
 public let CSVParsingAltIndices = BenchmarkInfo(
-    name: "CSVParsingAltIndices",
+    name: "CSVParsingAltIndices2",
     runFunction: run_CSVParsingAltIndices,
     tags: [.miniapplication, .api, .String],
     setUpFunction: { buildWorkload() },
@@ -31,7 +31,7 @@ func parseQuotedField(_ remainder: inout Substring) throws -> Substring? {
     var result: Substring = "" // we accumulate the result
 
     while !remainder.isEmpty {
-        guard let nextQuoteIndex = remainder.index(of: "\"") else {
+        guard let nextQuoteIndex = remainder.firstIndex(of: "\"") else {
             throw ParseError(message: "Expected a closing \"")
         }
 
@@ -198,7 +198,7 @@ let workloadBase = """
     一,二,三,四,五,六,七,
     saquui,ta'lo,tso'i,nvgi,hisgi,sudali,galiquogi
     """
-let targetRowNumber = 200_000
+let targetRowNumber = 500
 let repeatCount = targetRowNumber / workloadBase.split(separator: "\n").count
 let workload: String = repeatElement(workloadBase, count: repeatCount).joined()
 

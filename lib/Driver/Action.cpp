@@ -18,20 +18,20 @@
 using namespace swift::driver;
 using namespace llvm::opt;
 
-const char *Action::getClassName(ActionClass AC) {
+const char *Action::getClassName(Kind AC) {
   switch (AC) {
-    case Input: return "input";
-    case CompileJob: return "compile";
-    case InterpretJob: return "interpret";
-    case BackendJob: return "backend";
-    case MergeModuleJob: return "merge-module";
-    case ModuleWrapJob: return "modulewrap";
-    case AutolinkExtractJob: return "swift-autolink-extract";
-    case REPLJob: return "repl";
-    case LinkJob: return "link";
-    case GenerateDSYMJob: return "generate-dSYM";
-    case VerifyDebugInfoJob: return "verify-debug-info";
-    case GeneratePCHJob: return "generate-pch";
+  case Kind::Input:  return "input";
+  case Kind::CompileJob:  return "compile";
+  case Kind::InterpretJob:  return "interpret";
+  case Kind::BackendJob:  return "backend";
+  case Kind::MergeModuleJob:  return "merge-module";
+  case Kind::ModuleWrapJob:  return "modulewrap";
+  case Kind::AutolinkExtractJob:  return "swift-autolink-extract";
+  case Kind::REPLJob:  return "repl";
+  case Kind::LinkJob:  return "link";
+  case Kind::GenerateDSYMJob:  return "generate-dSYM";
+  case Kind::VerifyDebugInfoJob:  return "verify-debug-info";
+  case Kind::GeneratePCHJob:  return "generate-pch";
   }
 
   llvm_unreachable("invalid class");

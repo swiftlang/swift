@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -disable-objc-interop
+// RUN: %target-typecheck-verify-swift -disable-objc-interop
 
 
 var x: Any = 1
-var y = x as AnyObject // expected-error{{not convertible}}
+var y = x as AnyObject

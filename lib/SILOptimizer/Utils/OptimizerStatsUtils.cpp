@@ -474,10 +474,10 @@ class OptimizerStatsAnalysis : public SILAnalysis {
 
 public:
   OptimizerStatsAnalysis(SILModule *M)
-      : SILAnalysis(AnalysisKind::OptimizerStats), M(*M), Cache(nullptr) {}
+      : SILAnalysis(SILAnalysisKind::OptimizerStats), M(*M), Cache(nullptr) {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::OptimizerStats;
+    return S->getKind() == SILAnalysisKind::OptimizerStats;
   }
 
   /// Invalidate all information in this analysis.
@@ -492,13 +492,13 @@ public:
   }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override {
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {
     AddedFuncs.push_back(F);
   }
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override {
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
     DeletedFuncs.push_back(F);
   };
 

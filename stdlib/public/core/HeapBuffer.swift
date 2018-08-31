@@ -11,9 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
-typealias _HeapObject = SwiftShims.HeapObject
 
-@_versioned
+@usableFromInline // FIXME(sil-serialize-all)
+internal typealias _HeapObject = SwiftShims.HeapObject
+
+@usableFromInline
 internal protocol _HeapBufferHeader_ {
   associatedtype Value
   init(_ value: Value)
@@ -21,27 +23,29 @@ internal protocol _HeapBufferHeader_ {
 }
 
 @_fixed_layout // FIXME(sil-serialize-all)
-@_versioned
+@usableFromInline
 internal struct _HeapBufferHeader<T> : _HeapBufferHeader_ {
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Value = T
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal init(_ value: T) { self.value = value }
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal var value: T
 }
 
+@usableFromInline
 internal typealias _HeapBuffer<Value,Element>
   = ManagedBufferPointer<_HeapBufferHeader<Value>, Element>
 
+@usableFromInline
 internal typealias _HeapBufferStorage<Value,Element>
   = ManagedBuffer<_HeapBufferHeader<Value>, Element>
 
 extension ManagedBufferPointer where Header : _HeapBufferHeader_ {
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Value = Header.Value
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal init(
     _ storageClass: AnyClass,
     _ initializer: Value, _ capacity: Int
@@ -54,8 +58,7 @@ extension ManagedBufferPointer where Header : _HeapBufferHeader_ {
     }
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal var value: Value {
     @inline(__always)
     get {
@@ -67,8 +70,7 @@ extension ManagedBufferPointer where Header : _HeapBufferHeader_ {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal subscript(i: Int) -> Element {
     @inline(__always)
     get {
@@ -76,8 +78,7 @@ extension ManagedBufferPointer where Header : _HeapBufferHeader_ {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal var baseAddress: UnsafeMutablePointer<Element> {
     @inline(__always)
     get {
@@ -85,8 +86,7 @@ extension ManagedBufferPointer where Header : _HeapBufferHeader_ {
     }
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal var storage: AnyObject? {
     @inline(__always)
     get {

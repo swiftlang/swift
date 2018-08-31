@@ -1,7 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 3 -typecheck %s -import-objc-header %S/Inputs/objc_curried_method.h
-// RUN: %target-swift-frontend -swift-version 4 -typecheck %s -import-objc-header %S/Inputs/objc_curried_method.h
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend -typecheck %s -enable-objc-interop -import-objc-header %S/Inputs/objc_curried_method.h
 
 // rdar://problem/32588152
 

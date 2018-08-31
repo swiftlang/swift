@@ -45,6 +45,14 @@
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_RETURN_GEN_PARAM_NO_DUP > %t.types.txt
+// RUN: %FileCheck %s -check-prefix=TYPE_IN_RETURN_GEN_PARAM_NO_DUP < %t.types.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IVAR_GEN_PARAM_NO_DUP > %t.types.txt
+// RUN: %FileCheck %s -check-prefix=TYPE_IVAR_GEN_PARAM_NO_DUP < %t.types.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP > %t.types.txt
+// RUN: %FileCheck %s -check-prefix=TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_IN_LOCAL_VAR_IN_FREE_FUNC_1 > %t.types.txt
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
@@ -574,6 +582,34 @@ struct TestTypeInConstructorParamGeneric3<
 // No tests for destructors: destructors don't have parameters.
 
 //===---
+//===--- Test that we don't duplicate generic parameters.
+//===---
+
+struct GenericStruct<T> {
+	func foo() -> #^TYPE_IN_RETURN_GEN_PARAM_NO_DUP^#
+}
+class A<T> {
+	var foo: #^TYPE_IVAR_GEN_PARAM_NO_DUP^#
+
+	subscript(_ arg: Int) -> #^TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP^#
+}
+
+// TYPE_IN_RETURN_GEN_PARAM_NO_DUP: Begin completions
+// TYPE_IN_RETURN_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]; name=T
+// TYPE_IN_RETURN_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
+// TYPE_IN_RETURN_GEN_PARAM_NO_DUP: End completions
+
+// TYPE_IVAR_GEN_PARAM_NO_DUP: Begin completions
+// TYPE_IVAR_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]; name=T
+// TYPE_IVAR_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
+// TYPE_IVAR_GEN_PARAM_NO_DUP: End completions
+
+// TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP: Begin completions
+// TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]; name=T
+// TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
+// TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP: End completions
+
+//===---
 //===--- Test that we can complete types in variable declarations.
 //===---
 
@@ -988,7 +1024,7 @@ func testTypeIdentifierGeneric3<
 
 // TYPE_IDENTIFIER_GENERIC_3: Begin completions
 // TYPE_IDENTIFIER_GENERIC_3-NEXT: Keyword/None:          Type[#GenericFoo.Type#]
-// TYPE_IDENTIFIER_GENERIC_3-NEXT: Keyword/CurrNominal:          self[#GenericFoo#]
+// TYPE_IDENTIFIER_GENERIC_3-NOT: Keyword/CurrNominal:    self[#GenericFoo#]
 // TYPE_IDENTIFIER_GENERIC_3-NEXT: End completions
 
 func testTypeIdentifierIrrelevant1() {

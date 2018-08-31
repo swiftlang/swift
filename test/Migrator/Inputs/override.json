@@ -1,0 +1,13 @@
+[
+   {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSObject(im)init",
+    "LeftComment": "SomeType",
+    "RightUsr": "",
+    "RightComment": "SomeChangedType",
+    "ModuleName": "AwesomeKit"
+  },
+]

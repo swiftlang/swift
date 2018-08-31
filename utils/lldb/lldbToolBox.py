@@ -14,6 +14,8 @@ import subprocess
 import sys
 import tempfile
 
+import lldb
+
 REPO_BASE = os.path.abspath(os.path.join(__file__, os.pardir, os.pardir,
                                          os.pardir, os.pardir))
 SWIFT_REPO = os.path.join(REPO_BASE, "swift")
@@ -67,9 +69,48 @@ def disassemble_to_file(debugger, command, exec_ctx, result, internal_dict):
     args.file.write(exec_ctx.frame.disassembly)
 
 
+def sequence(debugger, command, exec_ctx, result, internal_dict):
+    """
+    Combine multiple semicolon separated lldb commands into one command.
+
+    This command is particularly useful for defining aliases and breakpoint
+    commands. Some examples:
+
+        # Define an alias that prints rax and also steps one instruction.
+        command alias xs sequence p/x $rax; stepi
+
+        # Breakpoint command to show the frame's info and arguments.
+        breakpoint command add -o 'seq frame info; reg read arg1 arg2 arg3'
+
+        # Override `b` to allow a condition to be specified. For example:
+        #     b someMethod if someVar > 2
+        command regex b
+        s/(.+) if (.+)/seq _regexp-break %1; break mod -c "%2"/
+        s/(.*)/_regexp-break %1/
+    """
+    interpreter = debugger.GetCommandInterpreter()
+    for subcommand in command.split(';'):
+        subcommand = subcommand.strip()
+        if not subcommand:
+            continue  # skip empty commands
+
+        ret = lldb.SBCommandReturnObject()
+        interpreter.HandleCommand(subcommand, exec_ctx, ret)
+        if ret.GetOutput():
+            print >>result, ret.GetOutput().strip()
+
+        if not ret.Succeeded():
+            result.SetError(ret.GetError())
+            result.SetStatus(ret.GetStatus())
+            return
+
+
 def __lldb_init_module(debugger, internal_dict):
     import_llvm_dataformatters(debugger)
     debugger.HandleCommand('command script add disassemble-asm-cfg '
                            '-f lldbToolBox.disassemble_asm_cfg')
     debugger.HandleCommand('command script add disassemble-to-file '
                            '-f lldbToolBox.disassemble_to_file')
+    debugger.HandleCommand('command script add sequence '
+                           '-h "Run multiple semicolon separated commands" '
+                           '-f lldbToolBox.sequence')

@@ -11,8 +11,8 @@ class MixedKeywordsAndAttributes { // expected-note{{in declaration of 'MixedKey
 struct SwiftStruct { }
 
 class A {
-  @objc subscript (a: ObjCClass) -> ObjCClass { // expected-note{{overridden declaration here has type '(ObjCClass) -> ObjCClass'}}
-    get { return ObjCClass() }
+  @objc subscript (a: ObjCClass) -> ObjCClass {
+    get { return ObjCClass() }  // expected-note{{subscript getter declared here}}
   }
 
   func bar() { } // expected-note{{add '@objc' to make this declaration overridable}}{{3-3=@objc }}
@@ -25,8 +25,8 @@ extension A {
 
 class B : A {
   // Objective-C
-  @objc subscript (a: ObjCClass) -> AnyObject { // expected-error{{overriding keyed subscript with incompatible type '(ObjCClass) -> AnyObject'}}
-    get { return self }
+  @objc subscript (a: ObjCClass) -> AnyObject {
+    get { return self }  // expected-error{{subscript getter with Objective-C selector 'objectForKeyedSubscript:' conflicts with subscript getter from superclass 'A'}}
   }
 
   override func foo() { } // expected-error{{overriding non-@objc declarations from extensions is not supported}}

@@ -66,9 +66,14 @@ tests.test("FlattenCollection instances (${traversal}${kind})") {
   do {
     let expected = ["apple", "orange", "banana", "grapefruit", "lychee"]
     let base = [["apple", "orange"], ["banana", "grapefruit"], ["lychee"]]
+    let flattened = Minimal${traversal}${kind}(elements: base).joined()
     check${traversal}${kind}(
       expected,
       Minimal${traversal}${kind}(elements: base).joined(),
+      sameValue: { $0 == $1 })
+    checkSequence(
+      expected,
+      flattened.makeIterator(),
       sameValue: { $0 == $1 })
   }
 }

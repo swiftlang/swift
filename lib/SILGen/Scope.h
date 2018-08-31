@@ -31,18 +31,27 @@ class LLVM_LIBRARY_VISIBILITY Scope {
   CleanupsDepth depth;
   CleanupsDepth savedInnermostScope;
   CleanupLocation loc;
-  PostponedCleanup *currentlyActivePostponedCleanup;
 
 public:
   explicit Scope(CleanupManager &cleanups, CleanupLocation loc)
       : cleanups(cleanups), depth(cleanups.getCleanupsDepth()),
-        savedInnermostScope(cleanups.innermostScope), loc(loc),
-        currentlyActivePostponedCleanup(
-            cleanups.SGF.CurrentlyActivePostponedCleanup) {
+        savedInnermostScope(cleanups.innermostScope), loc(loc) {
     assert(depth.isValid());
     cleanups.stack.checkIterator(cleanups.innermostScope);
     cleanups.innermostScope = depth;
   }
+
+  Scope(const Scope &other) = delete;
+  Scope &operator=(const Scope &other) = delete;
+
+  Scope(Scope &&other)
+      : cleanups(other.cleanups), depth(other.depth),
+        savedInnermostScope(other.savedInnermostScope),
+        loc(other.loc) {
+    other.depth = CleanupsDepth::invalid();
+    assert(!other.isValid());
+  }
+  Scope &operator=(Scope &&other) = delete; // implementable if needed
 
   explicit Scope(SILGenFunction &SGF, SILLocation loc)
       : Scope(SGF.Cleanups, CleanupLocation::get(loc)) {}

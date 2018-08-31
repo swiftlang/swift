@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -definite-init -verify | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering -verify | %FileCheck %s
 
 // This test only tests mark_uninitialized [derivedself]
 

@@ -1,6 +1,7 @@
+
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir -g -o - -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name objc_ir -I %S/Inputs/custom-modules -emit-ir -g -o - -primary-file %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -12,6 +13,7 @@ import Foundation
 import objc_ext
 import TestProtocols
 import ObjCIRExtras
+import objc_generics
 
 // CHECK: @"\01L_selector_data(method:withFloat:)" = private global [18 x i8] c"method:withFloat:\00"
 // CHECK: @"\01L_selector_data(method:withDouble:)" = private global [19 x i8] c"method:withDouble:\00"
@@ -72,7 +74,7 @@ func propertyAccess(b b: B) {
    // CHECK: load i8*, i8** @"\01L_selector(setCounter:)"
    b.counter = b.counter + 1
 
-   // CHECK: load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
+   // CHECK: load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_B"
    // CHECK: load i8*, i8** @"\01L_selector(sharedCounter)"
    // CHECK: load i8*, i8** @"\01L_selector(setSharedCounter:)"
    B.sharedCounter = B.sharedCounter + 1
@@ -80,7 +82,7 @@ func propertyAccess(b b: B) {
 
 // CHECK-LABEL: define hidden swiftcc %TSo1BC* @"$S7objc_ir8downcast1aSo1BCSo1AC_tF"(
 func downcast(a a: A) -> B {
-  // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
+  // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_B"
   // CHECK: [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[CLASS]])
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
   // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]]) [[NOUNWIND:#[0-9]+]]
@@ -115,9 +117,9 @@ func protocolMetatype(p: FooProto) -> FooProto.Type {
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processFooType(i8* {{%.+}})
   // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
-  // CHECK: call void @swift_unknownRelease(%objc_object* %0)
+  // CHECK-NOT: call void @swift_unknownObjectRelease(%objc_object* %0)
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
-  let type = processFooType(type(of: p))
+  let type = processFooType(Swift.type(of: p))
   return type
 } // CHECK: }
 
@@ -132,9 +134,9 @@ func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType(i8* {{%.+}})
   // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
-  // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T7objc_ir4ImplC*)*)(%T7objc_ir4ImplC* %0)
+  // CHECK-NOT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T7objc_ir4ImplC*)*)(%T7objc_ir4ImplC* %0)
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
-  let type = processComboType(type(of: p))
+  let type = processComboType(Swift.type(of: p))
   return type
 } // CHECK: }
 
@@ -145,9 +147,9 @@ func protocolCompositionMetatype2(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType2(i8* {{%.+}})
   // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
-  // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T7objc_ir4ImplC*)*)(%T7objc_ir4ImplC* %0)
+  // CHECK-NOT: @swift_release
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
-  let type = processComboType2(type(of: p))
+  let type = processComboType2(Swift.type(of: p))
   return type
 } // CHECK: }
 
@@ -335,6 +337,20 @@ func testCompatibilityAliasMangling(obj: SwiftNameAlias) {
   // CHECK: call void @llvm.dbg.declare(metadata %TSo13SwiftNameTestC** {{%.+}}, metadata ![[SWIFT_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
 }
 
+func testGenericCompatibilityAliasMangling(generic_obj: SwiftGenericNameAlias<NSNumber>) {
+  // CHECK: call void @llvm.dbg.declare(metadata %TSo20SwiftGenericNameTestCySo8NSNumberCG** {{%.+}}, metadata ![[SWIFT_GENERIC_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
+}
+
+func testConstrGenericCompatibilityAliasMangling(constr_generic_obj: SwiftConstrGenericNameAlias<NSNumber>) {
+  // CHECK: call void @llvm.dbg.declare(metadata %TSo26SwiftConstrGenericNameTestCySo8NSNumberCG** {{%.+}}, metadata ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
+}
+
+// CHECK-LABEL: S7objc_ir22testBlocksWithGenerics3hbaypSo13HasBlockArrayC_tF
+func testBlocksWithGenerics(hba: HasBlockArray) -> Any {
+  // CHECK: {{call swiftcc.*SSo13HasBlockArrayC05blockC0SayyyXBGyFTcTO}}
+  let _ = hba.blockPointerType()
+  return hba.blockArray
+}
 
 // CHECK: linkonce_odr hidden {{.*}} @"$SSo1BC3intABSgs5Int32V_tcfcTO"
 // CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
@@ -346,3 +362,8 @@ func testCompatibilityAliasMangling(obj: SwiftNameAlias) {
 // CHECK: ![[SWIFT_NAME_ALIAS_VAR]] = !DILocalVariable(name: "obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_NAME_ALIAS_TYPE:[0-9]+]])
 // CHECK: ![[SWIFT_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$SSo14SwiftNameAliasaD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
 
+// CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_VAR]] = !DILocalVariable(name: "generic_obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
+// CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$SSo21SwiftGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
+
+// CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_VAR]] = !DILocalVariable(name: "constr_generic_obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
+// CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$SSo27SwiftConstrGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})

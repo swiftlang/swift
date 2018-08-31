@@ -29,8 +29,7 @@ namespace swift {
 template<typename ImplClass, typename RetTy = void, typename... Args>
 class CanTypeVisitor {
 public:
-
-  template <class... As> RetTy visit(CanType T, Args... args) {
+  RetTy visit(CanType T, Args... args) {
     switch (T->getKind()) {
 #define UNCHECKED_TYPE(CLASS, PARENT) \
     case TypeKind::CLASS:

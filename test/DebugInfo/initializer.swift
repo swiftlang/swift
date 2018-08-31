@@ -8,7 +8,7 @@ protocol Named {
 
 // initializer.Person.__allocating_init (initializer.Person.Type)() -> initializer.Person
 // CHECK: define hidden {{.*}}%T11initializer6PersonC* @"$S11initializer6PersonCACycfC"(%swift.type*{{.*}}) {{.*}} {
-// CHECK:  call {{.*}}%T11initializer6PersonC* @"$S11initializer6PersonCACycfc"(%T11initializer6PersonC* {{.*}}%3), !dbg ![[ALLOCATING_INIT:.*]]
+// CHECK:  call {{.*}}%T11initializer6PersonC* @"$S11initializer6PersonCACycfc"(%T11initializer6PersonC* {{.*}}), !dbg ![[ALLOCATING_INIT:.*]]
 
 // initializer.Person.init (initializer.Person.Type)() -> initializer.Person
 // CHECK: define hidden {{.*}}%T11initializer6PersonC* @"$S11initializer6PersonCACycfc"(%T11initializer6PersonC*{{.*}}) {{.*}} {

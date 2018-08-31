@@ -2,10 +2,6 @@
 @_exported import CoreGraphics
 @_exported import Foundation
 
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
-  return lhs.isEqual(rhs)
-}
-
 public let NSUTF8StringEncoding: UInt = 8
 
 extension AnyHashable : _ObjectiveCBridgeable {
@@ -230,7 +226,7 @@ extension NSError : Error {
   public var _code: Int { return code }
 }
 
-public enum _GenericObjCError : Error {
+internal enum _GenericObjCError : Error {
   case nilError
 }
 
@@ -244,6 +240,38 @@ public func _convertNSErrorToError(_ error: NSError?) -> Error {
 public func _convertErrorToNSError(_ x: Error) -> NSError {
   return x as NSError
 }
+
+extension _SwiftNewtypeWrapper where Self.RawValue == Error {
+  @inlinable // FIXME(sil-serialize-all)
+  public func _bridgeToObjectiveC() -> NSError {
+    return rawValue as NSError
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public static func _forceBridgeFromObjectiveC(
+    _ source: NSError,
+    result: inout Self?
+  ) {
+    result = Self(rawValue: source)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ source: NSError,
+    result: inout Self?
+  ) -> Bool {
+    result = Self(rawValue: source)
+    return result != nil
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ source: NSError?
+  ) -> Self {
+    return Self(rawValue: _convertNSErrorToError(source))!
+  }
+}
+
 
 
 extension NSArray {

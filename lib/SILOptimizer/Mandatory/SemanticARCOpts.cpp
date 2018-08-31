@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-semantic-arc-opts"
-#include "swift/SIL/OwnershipChecker.h"
+#include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"

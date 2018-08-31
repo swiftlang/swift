@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -module-name="SILDeclRef"  - | %FileCheck %s
+// RUN: %target-swift-emit-sil %s | %FileCheck %s
+// RUN: %target-swift-emit-sil %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -module-name="SILDeclRef"  - | %FileCheck %s
 
 // Check that all SILDeclRefs are represented in the text form with a signature.
 // This allows to avoid ambiguities which sometimes arise e.g. when a
@@ -59,7 +59,7 @@ public func testBase(b: Base) -> Int32 {
 // CHECK-NEXT:  #Base.foo!1: (Base) -> (Int32) -> () : @$S10SILDeclRef4BaseC3foo1nys5Int32V_tF	// Base.foo(n:)
 // CHECK-NEXT:  #Base.foo!1: (Base) -> (Float) -> Int32 : @$S10SILDeclRef4BaseC3foo1fs5Int32VSf_tF	// Base.foo(f:)
 // CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : @$S10SILDeclRef4BaseCACycfc	// Base.init()
-// CHECK-NEXT:  #Base.deinit!deallocator: @$S10SILDeclRef4BaseCfD	// Base.__deallocating_deinit
+// CHECK-NEXT:  #Base.deinit!deallocator.1: @$S10SILDeclRef4BaseCfD	// Base.__deallocating_deinit
 // CHECK-NEXT: }
 
 // CHECK:sil_witness_table [serialized] Base: P module SILDeclRef {

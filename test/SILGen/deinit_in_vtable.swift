@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-full-demangle -O %s | %FileCheck %s
 
 // The second run tests is it can be compiled without crashes.
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -S %s
@@ -31,9 +31,9 @@ public func testmain() {
 // function elimination
 
 // CHECK-LABEL: sil_vtable A
-// CHECK: A.deinit!deallocator: @[[A]]
+// CHECK: A.deinit!deallocator.1: @[[A]]
 
 // CHECK-LABEL: sil_vtable B
 // CHECK-NOT: A.deinit
-// CHECK: B.deinit!deallocator: @[[B]]
+// CHECK: B.deinit!deallocator.1: @[[B]]
 

@@ -36,10 +36,7 @@ static bool isResolvableScope(ScopeKind SK) {
     return false;
   case ScopeKind::FunctionBody:
   case ScopeKind::Generics:
-  case ScopeKind::ConstructorBody:
-  case ScopeKind::DestructorBody:
   case ScopeKind::Brace:
-  case ScopeKind::ForVars:
   case ScopeKind::ForeachVars:
   case ScopeKind::ClosureParams:
   case ScopeKind::CaseVars:

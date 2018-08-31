@@ -487,8 +487,8 @@ enum class CompletionKind {
   PostfixExprParen,
   SuperExpr,
   SuperExprDot,
-  KeyPathExpr,
-  KeyPathExprDot,
+  KeyPathExprObjC,
+  KeyPathExprSwift,
   TypeSimpleBeginning,
   TypeIdentifierWithDot,
   TypeIdentifierWithoutDot,
@@ -501,10 +501,13 @@ enum class CompletionKind {
   AssignmentRHS,
   CallArg,
   ReturnStmtExpr,
+  YieldStmtExpr,
   ForEachSequence,
-  AfterPound,
+  AfterPoundExpr,
+  AfterPoundDirective,
+  PlatformConditon,
+  AfterIfStmtElse,
   GenericParams,
-  SwiftKeyPath,
 };
 
 /// \brief A single code completion result.

@@ -6,12 +6,12 @@ import Builtin
 
 // CHECK-LABEL: @retain_release_unknown_object
 sil @retain_release_unknown_object : $@convention(thin) (@guaranteed Builtin.UnknownObject) -> () {
-entry(%x : $Builtin.UnknownObject):
+entry(%x : @guaranteed $Builtin.UnknownObject):
   // CHECK-native: swift_retain
-  // CHECK-objc: swift_unknownRetain
+  // CHECK-objc: swift_unknownObjectRetain
   %y = copy_value %x : $Builtin.UnknownObject
   // CHECK-native: swift_release
-  // CHECK-objc: swift_unknownRelease
+  // CHECK-objc: swift_unknownObjectRelease
   destroy_value %y : $Builtin.UnknownObject
   return undef : $()
 }

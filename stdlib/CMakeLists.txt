@@ -36,10 +36,6 @@ endif()
 # we get link failures regardless, so instead, this just disables the checks.
 append("-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
 
-if(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
-  append("-DSWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
-endif()
-
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_STDLIB)
   list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES SHARED)
@@ -58,6 +54,15 @@ foreach(SDK ${SWIFT_SDKS})
   add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sib")
   add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibopt")
   add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibgen")
+
+  set_property(TARGET
+      "swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
+      "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
+      "swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sib"
+      "swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibopt"
+      "swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibgen"
+      PROPERTY FOLDER "Swift libraries/Aggregate")
+
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
     set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
     add_custom_target("swift-stdlib${VARIANT_SUFFIX}")
@@ -65,6 +70,14 @@ foreach(SDK ${SWIFT_SDKS})
     add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sibopt")
     add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sibgen")
     add_custom_target("swift-test-stdlib${VARIANT_SUFFIX}")
+
+    set_property(TARGET
+        "swift-stdlib${VARIANT_SUFFIX}"
+        "swift-stdlib${VARIANT_SUFFIX}-sib"
+        "swift-stdlib${VARIANT_SUFFIX}-sibopt"
+        "swift-stdlib${VARIANT_SUFFIX}-sibgen"
+        "swift-test-stdlib${VARIANT_SUFFIX}"
+        PROPERTY FOLDER "Swift libraries/Aggregate")
 
     add_dependencies(swift-stdlib-all "swift-stdlib${VARIANT_SUFFIX}")
     add_dependencies(swift-stdlib-sib-all "swift-stdlib${VARIANT_SUFFIX}-sib")
@@ -94,6 +107,18 @@ add_custom_target(swift-stdlib-sibgen
     DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}-sibgen")
 add_custom_target(swift-test-stdlib ALL
     DEPENDS "swift-test-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}")
+
+set_property(TARGET
+    swift-stdlib-all
+    swift-stdlib-sib-all
+    swift-stdlib-sibopt-all
+    swift-stdlib-sibgen-all
+    swift-stdlib
+    swift-stdlib-sib
+    swift-stdlib-sibopt
+    swift-stdlib-sibgen
+    swift-test-stdlib
+    PROPERTY FOLDER "Swift libraries/Aggregate")
 
 add_subdirectory(public)
 add_subdirectory(private)

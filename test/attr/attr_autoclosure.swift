@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 // Simple case.
-var fn : @autoclosure () -> Int = 4  // expected-error {{@autoclosure may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
+var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
 
 @autoclosure func func1() {}  // expected-error {{attribute can only be applied to types, not declarations}}
 
@@ -15,7 +15,7 @@ func func4(fp : @autoclosure () -> Int) {func4(fp: 0)}
 func func6(_: @autoclosure () -> Int) {func6(0)}
 
 // autoclosure + inout doesn't make sense.
-func func8(_ x: inout @autoclosure () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be used on parameters}}
+func func8(_ x: inout @autoclosure () -> Bool) -> Bool {  // expected-error {{'@autoclosure' may only be used on parameters}}
 }
 
 func func9(_ x: @autoclosure (Int) -> Bool) {} // expected-error {{argument type of @autoclosure parameter must be '()'}}
@@ -73,22 +73,22 @@ struct AutoclosureEscapeTest {
 func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected parameter name followed by ':'}}
 
 func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{@escaping conflicts with @noescape}}
-  // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{28-38= @escaping}}
+  // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{28-38= @escaping}}
 
 class Super {
   func f1(_ x: @autoclosure(escaping) () -> ()) { }
-    // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{28-38= @escaping}}
+    // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{28-38= @escaping}}
   func f2(_ x: @autoclosure(escaping) () -> ()) { } // expected-note {{potential overridden instance method 'f2' here}}
-    // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{28-38= @escaping}}
+    // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{28-38= @escaping}}
   func f3(x: @autoclosure () -> ()) { }
 }
 
 class Sub : Super {
   override func f1(_ x: @autoclosure(escaping)() -> ()) { }
-    // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{37-47= @escaping }}
+    // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{37-47= @escaping }}
   override func f2(_ x: @autoclosure () -> ()) { } // expected-error{{does not override any method}} // expected-note{{type does not match superclass instance method with type '(@autoclosure @escaping () -> ()) -> ()'}}
   override func f3(_ x: @autoclosure(escaping) () -> ()) { }  // expected-error{{does not override any method}}
-    // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{37-47= @escaping}}
+    // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{37-47= @escaping}}
 }
 
 func func12_sink(_ x: @escaping () -> Int) { }
@@ -99,7 +99,7 @@ func func12a(_ x: @autoclosure () -> Int) {
   func12_sink(x) // expected-error {{passing non-escaping parameter 'x' to function expecting an @escaping closure}}
 }
 func func12b(_ x: @autoclosure(escaping) () -> Int) {
-  // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{31-41= @escaping}}
+  // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{31-41= @escaping}}
   func12_sink(x) // ok
 }
 func func12c(_ x: @autoclosure @escaping () -> Int) {
@@ -124,13 +124,15 @@ class TestFunc12 {
 
 
 enum AutoclosureFailableOf<T> {
-  case Success(@autoclosure () -> T)  // expected-error {{@autoclosure may only be used on parameters}}
-  case Failure()
+  case Success(@autoclosure () -> T)
+  case Failure
 }
+
+let _ : AutoclosureFailableOf<Int> = .Success(42)
 
 let _ : (@autoclosure () -> ()) -> ()
 let _ : (@autoclosure(escaping) () -> ()) -> ()
-  // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{22-32= @escaping}}
+  // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{22-32= @escaping}}
 
 // escaping is the name of param type
 let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{use of undeclared type 'escaping'}}
@@ -144,6 +146,7 @@ func migrateAC(@autoclosure _: () -> ()) { }
 func migrateACE(@autoclosure(escaping) _: () -> ()) { }
 
 func takesAutoclosure(_ fn: @autoclosure () -> Int) {}
+func takesThrowingAutoclosure(_: @autoclosure () throws -> Int) {}
 
 func callAutoclosureWithNoEscape(_ fn: () -> Int) {
   takesAutoclosure(1+1) // ok
@@ -155,7 +158,20 @@ func callAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
   takesAutoclosure(fn()) // ok
 }
 
-// expected-error @+1 {{@autoclosure must not be used on variadic parameters}}
+// expected-error @+1 {{'@autoclosure' must not be used on variadic parameters}}
 func variadicAutoclosure(_ fn: @autoclosure () -> ()...) {
   for _ in fn {}
+}
+
+// rdar://41219750
+// These are all arguably invalid; the autoclosure should have to be called.
+// But as long as we allow them, we shouldn't crash.
+func passNonThrowingToNonThrowingAC(_ fn: @autoclosure () -> Int) {
+  takesAutoclosure(fn)
+}
+func passNonThrowingToThrowingAC(_ fn: @autoclosure () -> Int) {
+  takesThrowingAutoclosure(fn)
+}
+func passThrowingToThrowingAC(_ fn: @autoclosure () throws -> Int) {
+  takesThrowingAutoclosure(fn)
 }

@@ -1,20 +1,30 @@
-// RUN: %target-run-simple-swiftgyb
+// RUN: %target-run-stdlib-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
 
 let SipHashTests = TestSuite("SipHashTests")
 
+extension Hasher {
+  typealias HashValue = Int
+}
+extension _SipHash13 {
+  typealias HashValue = UInt64
+}
+extension _SipHash24 {
+  typealias HashValue = UInt64
+}
+
 struct SipHashTest {
   let input: [UInt8]
-  let key: (UInt64, UInt64)
+  let seed: (UInt64, UInt64)
   let output: UInt64
 
   /// Test vector from the reference C implementation.
   ///
   /// SipHash output with
   ///
-  ///     key = 00 01 02 ...
+  ///     seed = 00 01 02 ...
   ///
   /// and
   ///
@@ -26,13 +36,13 @@ struct SipHashTest {
   ///     input = 00 01 02 ... 3e (63 bytes)
   init(referenceVectorIndex i: Int, output: UInt64) {
     self.input = Array(0..<UInt8(i))
-    self.key = (0x07060504_03020100, 0x0F0E0D0C_0B0A0908)
+    self.seed = (0x07060504_03020100, 0x0F0E0D0C_0B0A0908)
     self.output = output
   }
 
-  init(input: [UInt8], key: (UInt64, UInt64), output: UInt64) {
+  init(input: [UInt8], seed: (UInt64, UInt64), output: UInt64) {
     self.input = input
-    self.key = key
+    self.seed = seed
     self.output = output
   }
 }
@@ -116,7 +126,7 @@ let sipHash24Tests: [SipHashTest] = [
       0x8b, 0x66, 0x0b, 0xaf, 0xba, 0x16, 0x25, 0xf3,
       0x63, 0x8e, 0x69, 0x80, 0xf3, 0x7e, 0xd6, 0xe3,
     ],
-    key: (0xa3432fc680796c34, 0x1173946a79aeaae5),
+    seed: (0xa3432fc680796c34, 0x1173946a79aeaae5),
     output: 0x058b04535972ff2b),
 ]
 
@@ -193,7 +203,7 @@ let sipHash13Tests: [SipHashTest] = [
       0x8b, 0x66, 0x0b, 0xaf, 0xba, 0x16, 0x25, 0xf3,
       0x63, 0x8e, 0x69, 0x80, 0xf3, 0x7e, 0xd6, 0xe3,
     ],
-    key: (0xa3432fc680796c34, 0x1173946a79aeaae5),
+    seed: (0xa3432fc680796c34, 0x1173946a79aeaae5),
     output: 0x4d457d818f46941d),
 ]
 
@@ -209,142 +219,107 @@ let incrementalPatterns: [[Int]] = [
   [7, 9],
 ]
 
-func loadUnalignedUInt64LE(
-  from p: UnsafeRawPointer
-) -> UInt64 {
-  return
-    UInt64(p.load(fromByteOffset: 0, as: UInt8.self)) |
-    (UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) &<<  8 as UInt64) |
-    (UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) &<< 16 as UInt64) |
-    (UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) &<< 24 as UInt64) |
-    (UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) &<< 32 as UInt64) |
-    (UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) &<< 40 as UInt64) |
-    (UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) &<< 48 as UInt64) |
-    (UInt64(p.load(fromByteOffset: 7, as: UInt8.self)) &<< 56 as UInt64)
-}
+struct Loop<C: Collection>: Sequence, IteratorProtocol {
+  var base: C
+  var iterator: C.Iterator
 
-func loadUnalignedUInt32LE(
-  from p: UnsafeRawPointer
-) -> UInt32 {
-  return
-    UInt32(p.load(fromByteOffset: 0, as: UInt8.self)) |
-    (UInt32(p.load(fromByteOffset: 1, as: UInt8.self)) &<<  8 as UInt32) |
-    (UInt32(p.load(fromByteOffset: 2, as: UInt8.self)) &<< 16 as UInt32) |
-    (UInt32(p.load(fromByteOffset: 3, as: UInt8.self)) &<< 24 as UInt32)
-}
+  init(_ base: C) {
+    self.base = base
+    self.iterator = base.makeIterator()
+  }
 
-func loadUnalignedUIntLE(
-  from p: UnsafeRawPointer
-) -> UInt {
-#if arch(i386) || arch(arm)
-  return UInt(loadUnalignedUInt32LE(from: p))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  return UInt(loadUnalignedUInt64LE(from: p))
-#endif
+  mutating func next() -> C.Element? {
+    if let element = iterator.next() {
+      return element
+    }
+    iterator = base.makeIterator()
+    return iterator.next()
+  }
 }
-
-func loadPartialUnalignedUInt64LE(
-  from p: UnsafeRawPointer,
-  byteCount: Int
-) -> UInt64 {
-  _sanityCheck((0..<8).contains(byteCount))
-  var result: UInt64 = 0
-  if byteCount >= 1 { result |= UInt64(p.load(fromByteOffset: 0, as: UInt8.self)) }
-  if byteCount >= 2 { result |= UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) &<< (8 as UInt64) }
-  if byteCount >= 3 { result |= UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) &<< (16 as UInt64) }
-  if byteCount >= 4 { result |= UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) &<< (24 as UInt64) }
-  if byteCount >= 5 { result |= UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) &<< (32 as UInt64) }
-  if byteCount >= 6 { result |= UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) &<< (40 as UInt64) }
-  if byteCount >= 7 { result |= UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) &<< (48 as UInt64) }
-  return result
-}
-
-func loadPartialUnalignedUInt32LE(
-  from p: UnsafeRawPointer,
-  byteCount: Int
-) -> UInt32 {
-  _sanityCheck((0..<4).contains(byteCount))
-  var result: UInt32 = 0
-  if byteCount >= 1 { result |= UInt32(p.load(fromByteOffset: 0, as: UInt8.self)) }
-  if byteCount >= 2 { result |= UInt32(p.load(fromByteOffset: 1, as: UInt8.self)) &<< (8 as UInt32) }
-  if byteCount >= 3 { result |= UInt32(p.load(fromByteOffset: 2, as: UInt8.self)) &<< (16 as UInt32) }
-  return result
-}
-
-func loadPartialUnalignedUIntLE(
-  from p: UnsafeRawPointer,
-  byteCount: Int
-) -> UInt {
-#if arch(i386) || arch(arm)
-  return UInt(loadPartialUnalignedUInt32LE(from: p, byteCount: byteCount))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  return UInt(loadPartialUnalignedUInt64LE(from: p, byteCount: byteCount))
-#endif
-}
-
-% for data_type in ['Int', 'Int64', 'Int32']:
-func loadUnaligned${data_type}LE(
-  from p: UnsafeRawPointer
-) -> ${data_type} {
-  return ${data_type}(bitPattern: loadUnalignedU${data_type}LE(from: p))
-}
-
-func loadPartialUnaligned${data_type}LE(
-  from p: UnsafeRawPointer,
-  byteCount: Int
-) -> ${data_type} {
-  return ${data_type}(
-    bitPattern: loadPartialUnalignedU${data_type}LE(
-      from: p,
-      byteCount: byteCount))
-}
-% end
-
-% for data_type in ['UInt', 'Int', 'UInt64', 'Int64', 'UInt32', 'Int32']:
-func loadUnaligned${data_type}(
-  from p: UnsafeRawPointer
-) -> ${data_type} {
-  return ${data_type}(littleEndian: loadUnaligned${data_type}LE(from: p))
-}
-func loadPartialUnaligned${data_type}(
-  from p: UnsafeRawPointer,
-  byteCount: Int
-) -> ${data_type} {
-  return ${data_type}(littleEndian:
-    loadPartialUnaligned${data_type}LE(from: p, byteCount: byteCount))
-}
-% end
 
 % for (Self, tests) in [
+%   ('Hasher', 'sipHash13Tests'),
 %   ('_SipHash13', 'sipHash13Tests'),
 %   ('_SipHash24', 'sipHash24Tests')
 % ]:
-% for data_type in ['UInt', 'Int', 'UInt64', 'Int64', 'UInt32', 'Int32']:
-SipHashTests.test("${Self}.append(${data_type})").forEach(in: ${tests}) {
-  test in
 
-  var hasher = ${Self}(key: test.key)
+SipHashTests.test("${Self}/combine(UnsafeRawBufferPointer)")
+  .forEach(in: ${tests}) { test in
+  var hasher = ${Self}(_seed: test.seed)
+  test.input.withUnsafeBytes { hasher.combine(bytes: $0) }
+  let hash = hasher.finalize()
+  expectEqual(${Self}.HashValue(truncatingIfNeeded: test.output), hash)
+}
 
-  let chunkSize = MemoryLayout<${data_type}>.size
+SipHashTests.test("${Self}/combine(UnsafeRawBufferPointer)/pattern")
+  .forEach(in: cartesianProduct(${tests}, incrementalPatterns)) { test_ in
+  let (test, pattern) = test_
 
+  var hasher = ${Self}(_seed: test.seed)
+  var chunkSizes = Loop(pattern).makeIterator()
   var startIndex = 0
-  let endIndex = test.input.count - (test.input.count % chunkSize)
-  while startIndex != endIndex {
-    hasher.append(
-      loadUnaligned${data_type}(
-        from: Array(
-          test.input[startIndex..<(startIndex+chunkSize)])))
+  while startIndex != test.input.endIndex {
+    let chunkSize = min(
+      chunkSizes.next()!,
+      test.input.endIndex - startIndex)
+    let slice = test.input[startIndex..<(startIndex+chunkSize)]
+    slice.withUnsafeBytes { hasher.combine(bytes: $0) }
     startIndex += chunkSize
   }
-  let tailCount = test.input.count - endIndex
-  let hash = hasher.finalize(
-    tailBytes: loadPartialUnalignedUInt64(
-      from: Array(test.input.suffix(from: endIndex)),
-      byteCount: tailCount),
-    tailByteCount: tailCount)
-  expectEqual(test.output, hash)
+  let hash = hasher.finalize()
+  expectEqual(${Self}.HashValue(truncatingIfNeeded: test.output), hash)
+}
+
+% for data_type in ['UInt', 'UInt64', 'UInt32', 'UInt16', 'UInt8']:
+SipHashTests.test("${Self}._combine(${data_type})")
+  .forEach(in: ${tests}) { test in
+
+  var hasher = ${Self}(_seed: test.seed)
+
+  // Load little-endian chunks and combine them into the hasher.
+  let bitWidth = ${data_type}.bitWidth
+  var i = 0
+  var count = 0
+  var chunk: ${data_type} = 0
+  while i < test.input.count {
+    chunk |= ${data_type}(test.input[i]) << (8 * count)
+    i += 1
+    count += 1
+    if 8 * count == bitWidth {
+      hasher._combine(chunk)
+      count = 0
+      chunk = 0
+    }
+  }
+  // Combine tail bytes.
+  if count > 0 {
+    hasher._combine(bytes: UInt64(truncatingIfNeeded: chunk), count: count)
+  }
+
+  let hash = hasher.finalize()
+  expectEqual(${Self}.HashValue(truncatingIfNeeded: test.output), hash)
 }
 % end
+
+SipHashTests.test("${Self}/OperationsAfterFinalize") {
+  // Verify that finalize is nonmutating.
+  var hasher1 = ${Self}(_seed: (0, 0))
+  hasher1._combine(1 as UInt8)
+  _ = hasher1.finalize()
+  // Hasher is now consumed. The operations below are illegal, but this isn't
+  // currently enforced. Check that the behavior matches that of a nonmutating
+  // function.
+  hasher1._combine(2 as UInt16)
+  let hash1a = hasher1.finalize()
+  let hash1b = hasher1.finalize()
+  expectEqual(hash1a, hash1b)
+
+  var hasher2 = ${Self}(_seed: (0, 0))
+  hasher2._combine(1 as UInt8)
+  hasher2._combine(2 as UInt16)
+  let hash2 = hasher2.finalize()
+  expectEqual(hash1a, hash2)
+}
 % end
 
 runAllTests()

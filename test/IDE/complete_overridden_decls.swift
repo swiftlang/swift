@@ -54,6 +54,7 @@ func test1(_ b: TestABase) {
   b.#^OVER_BASE_1^#
 }
 // OVER_BASE_1: Begin completions
+// OVER_BASE_1-NEXT: Keyword[self]/CurrNominal: self[#TestABase#]; name=self
 // OVER_BASE_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseInstanceVar[#FooBase#]{{; name=.+$}}
 // OVER_BASE_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseOverInstanceVar[#FooBase#]{{; name=.+$}}
 // OVER_BASE_1-NEXT: Decl[InstanceMethod]/CurrNominal: baseOverFunc()[#Void#]{{; name=.+$}}
@@ -65,6 +66,7 @@ func test2(_ d: TestADerived) {
   d.#^OVER_DERIVED_1^#
 }
 // OVER_DERIVED_1: Begin completions
+// OVER_DERIVED_1-NEXT: Keyword[self]/CurrNominal: self[#TestADerived#]; name=self
 // OVER_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    derivedInstanceVar[#FooBase#]{{; name=.+$}}
 // OVER_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseOverInstanceVar[#FooDerived#]{{; name=.+$}}
 // OVER_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    derivedOverInstanceVar[#FooBase#]{{; name=.+$}}
@@ -78,6 +80,7 @@ func test3(_ md: TestAMoreDerived) {
   md.#^OVER_MORE_DERIVED_1^#
 }
 // OVER_MORE_DERIVED_1: Begin completions
+// OVER_MORE_DERIVED_1-NEXT: Keyword[self]/CurrNominal: self[#TestAMoreDerived#]; name=self
 // OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    moreDerivedInstanceVar[#FooBase#]{{; name=.+$}}
 // OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    baseOverInstanceVar[#FooMoreDerived#]{{; name=.+$}}
 // OVER_MORE_DERIVED_1-NEXT: Decl[InstanceVar]/CurrNominal:    derivedOverInstanceVar[#FooDerived#]{{; name=.+$}}

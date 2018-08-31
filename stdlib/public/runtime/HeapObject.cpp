@@ -372,6 +372,10 @@ size_t swift::swift_unownedRetainCount(HeapObject *object) {
   return object->refCounts.getUnownedCount();
 }
 
+size_t swift::swift_weakRetainCount(HeapObject *object) {
+  return object->refCounts.getWeakCount();
+}
+
 HeapObject *swift::swift_unownedRetain(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetain);
   if (!isValidPointerForNativeRetain(object))
@@ -472,46 +476,6 @@ void swift::swift_nonatomic_unownedRelease_n(HeapObject *object, int n) {
     swift_slowDealloc(object, classMetadata->getInstanceSize(),
                       classMetadata->getInstanceAlignMask());
   }
-}
-
-HeapObject *swift::swift_tryPin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_tryPin);
-  assert(isValidPointerForNativeRetain(object));
-
-  // Try to set the flag.  If this succeeds, the caller will be
-  // responsible for clearing it.
-  if (object->refCounts.tryIncrementAndPin())
-    return object;
-
-  // If setting the flag failed, it's because it was already set.
-  // Return nil so that the object will be deallocated later.
-  return nullptr;
-}
-
-void swift::swift_unpin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_unpin);
-  if (isValidPointerForNativeRetain(object))
-    object->refCounts.decrementAndUnpinAndMaybeDeinit();
-}
-
-HeapObject *swift::swift_nonatomic_tryPin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_tryPin);
-  assert(object);
-
-  // Try to set the flag.  If this succeeds, the caller will be
-  // responsible for clearing it.
-  if (object->refCounts.tryIncrementAndPinNonAtomic())
-    return object;
-
-  // If setting the flag failed, it's because it was already set.
-  // Return nil so that the object will be deallocated later.
-  return nullptr;
-}
-
-void swift::swift_nonatomic_unpin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_unpin);
-  if (isValidPointerForNativeRetain(object))
-    object->refCounts.decrementAndUnpinAndMaybeDeinitNonAtomic();
 }
 
 HeapObject *swift::swift_tryRetain(HeapObject *object) {

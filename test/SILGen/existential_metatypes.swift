@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership %s | %FileCheck %s
+
+@_semantics("typechecker.type(of:)")
+public func type<T, Metatype>(of value: T) -> Metatype {}
 
 struct Value {}
 
@@ -21,8 +24,8 @@ func existentialMetatype(_ x: P) {
   let type1 = type(of: x)
   // CHECK: [[INSTANCE1:%.*]] = alloc_stack $P
   // CHECK: [[OPEN_TYPE1:%.*]] = open_existential_metatype [[TYPE1]]
-  // CHECK: [[INSTANCE1_VALUE:%.*]] = init_existential_addr [[INSTANCE1]] : $*P
   // CHECK: [[INIT:%.*]] = witness_method {{.*}} #P.init!allocator
+  // CHECK: [[INSTANCE1_VALUE:%.*]] = init_existential_addr [[INSTANCE1]] : $*P
   // CHECK: apply [[INIT]]<{{.*}}>([[INSTANCE1_VALUE]], [[OPEN_TYPE1]])
   let instance1 = type1.init()
 
@@ -31,8 +34,8 @@ func existentialMetatype(_ x: P) {
   let type2: P.Type = S.self
   // CHECK: [[INSTANCE2:%.*]] = alloc_stack $P
   // CHECK: [[OPEN_TYPE2:%.*]] = open_existential_metatype [[TYPE2]]
-  // CHECK: [[INSTANCE2_VALUE:%.*]] = init_existential_addr [[INSTANCE2]] : $*P
   // CHECK: [[STATIC_METHOD:%.*]] = witness_method {{.*}} #P.staticMethod
+  // CHECK: [[INSTANCE2_VALUE:%.*]] = init_existential_addr [[INSTANCE2]] : $*P
   // CHECK: apply [[STATIC_METHOD]]<{{.*}}>([[INSTANCE2_VALUE]], [[OPEN_TYPE2]])
   let instance2 = type2.staticMethod()
 }

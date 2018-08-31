@@ -24,6 +24,10 @@ configure_file(
 set(SOURCEKIT_DEPLOYMENT_OS "${SWIFT_HOST_VARIANT}")
 set(SOURCEKIT_DEPLOYMENT_TARGET "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
 
+STRING(TOLOWER "${SWIFT_PRIMARY_VARIANT_SDK}" SOURCEKIT_PLATFORM_NAME)
+# Remove '_simulator' from the name if it exists
+STRING(REPLACE "_simulator" "" SOURCEKIT_PLATFORM_NAME "${SOURCEKIT_PLATFORM_NAME}")
+
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_SYSROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_PATH}")
   set(CMAKE_OSX_ARCHITECTURES "${SWIFT_HOST_VARIANT_ARCH}")
@@ -87,6 +91,7 @@ include_directories(BEFORE
 )
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  set(SOURCEKIT_DEFAULT_TARGET_SDK "LINUX")
   if(SWIFT_BUILD_SOURCEKIT)
     include(ExternalProject)
     ExternalProject_Add(libdispatch
@@ -95,6 +100,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
                         BINARY_DIR
                           "${SWIFT_PATH_TO_LIBDISPATCH_BUILD}"
                         CMAKE_ARGS
+                          -DCMAKE_BUILD_TYPE=${LIBDISPATCH_CMAKE_BUILD_TYPE}
                           -DCMAKE_C_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang
                           -DCMAKE_CXX_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang++
                           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}

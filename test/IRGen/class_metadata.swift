@@ -1,11 +1,13 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize
+// RUN: %empty-directory(%t)
+// RUN: %{python} %utils/chex.py < %s > %t/class_metadata.swift
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/class_metadata.swift -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize
 
 class A {}
 
 // CHECK:      [[A_NAME:@.*]] = private constant [2 x i8] c"A\00"
 // CHECK-LABEL: @"$S14class_metadata1ACMn" =
-//   Flags. -2147221424 == 0x8004_0050 == HasVTable | Reflectable | Unique | Class
-// CHECK-SAME: i32 -2147221424,
+//   Flags. 0x8000_0050 == HasVTable | Unique | Class
+// CHECK-SAME: <i32 0x8000_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -33,8 +35,8 @@ class B : A {}
 
 // CHECK:      [[B_NAME:@.*]] = private constant [2 x i8] c"B\00"
 // CHECK-LABEL: @"$S14class_metadata1BCMn" =
-//   Flags. 262224 == 0x0004_0050 == Reflectable | Unique | Class
-// CHECK-SAME: i32 262224,
+//   Flags. 0x0000_0050 == Unique | Class
+// CHECK-SAME: <i32 0x0000_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -53,8 +55,8 @@ class C<T> : B {}
 
 // CHECK:      [[C_NAME:@.*]] = private constant [2 x i8] c"C\00"
 // CHECK-LABEL: @"$S14class_metadata1CCMn" =
-//   Flags. 262352 == 0x0004_00d0 == Reflectable | Generic | Unique | Class
-// CHECK-SAME: i32 262352,
+//   Flags. 0x0000_00d0 == Generic | Unique | Class
+// CHECK-SAME: <i32 0x0000_00d0>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -80,13 +82,13 @@ class C<T> : B {}
 //   Instantiation pattern.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMP"
 //   Generic parameter count.
-// CHECK-SAME: i32 1,
+// CHECK-SAME: i16 1,
 //   Generic requirement count.
-// CHECK-SAME: i32 0,
+// CHECK-SAME: i16 0,
 //   Key generic arguments count.
-// CHECK-SAME: i32 1,
+// CHECK-SAME: i16 1,
 //   Extra generic arguments count.
-// CHECK-SAME: i32 0,
+// CHECK-SAME: i16 0,
 //   Generic parameter descriptor #1: flags. -128 == 0x80 == Key
 // CHECK-SAME: i8 -128,
 ///  Padding.
@@ -104,8 +106,8 @@ class D : E {}
 
 // CHECK:      [[D_NAME:@.*]] = private constant [2 x i8] c"D\00"
 // CHECK-LABEL: @"$S14class_metadata1DCMn" =
-//   Flags. 268697680 == 0x1004_0050 == Reflectable | IndirectSuperclass | Unique | Class
-// CHECK-SAME: i32 268697680,
+//   Flags. 0x0400_0050 == IndirectSuperclass | Unique | Class
+// CHECK-SAME: <i32 0x0400_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.

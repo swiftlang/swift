@@ -42,9 +42,10 @@ namespace irgen {
 template <class Impl>
 class ResilientTypeInfo : public WitnessSizedTypeInfo<Impl> {
 protected:
-  ResilientTypeInfo(llvm::Type *type)
+  ResilientTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
     : WitnessSizedTypeInfo<Impl>(type, Alignment(1),
-                                 IsNotPOD, IsNotBitwiseTakable) {}
+                                 IsNotPOD, IsNotBitwiseTakable,
+                                 abiAccessible) {}
 
 public:
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
@@ -84,13 +85,6 @@ public:
                                    Address dest, Address src,
                                    SILType T) const override {
     auto addr = emitInitializeBufferWithCopyOfBufferCall(IGF, T, dest, src);
-    return this->getAddressForPointer(addr);
-  }
-
-  Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                   Address dest, Address src,
-                                   SILType T) const override {
-    auto addr = emitInitializeBufferWithTakeOfBufferCall(IGF, T, dest, src);
     return this->getAddressForPointer(addr);
   }
 
@@ -145,23 +139,16 @@ public:
   }
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                        Address src,
-                                       SILType T) const override {
+                                       SILType T,
+                                       bool isOutlined) const override {
     return emitGetExtraInhabitantIndexCall(IGF, T, src);
   }
   void storeExtraInhabitant(IRGenFunction &IGF,
                             llvm::Value *index,
                             Address dest,
-                            SILType T) const override {
+                            SILType T,
+                            bool isOutlined) const override {
     emitStoreExtraInhabitantCall(IGF, T, index, dest);
-  }
-
-  void initializeMetadata(IRGenFunction &IGF,
-                          llvm::Value *metadata,
-                          bool isVWTMutable,
-                          SILType T) const override {
-    // Resilient value types and archetypes always refer to an existing type.
-    // A witness table should never be independently initialized for one.
-    llvm_unreachable("initializing value witness table for opaque type?!");
   }
 
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
@@ -177,17 +164,9 @@ public:
     emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases, enumAddr);
   }
 
-  void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const override {
-    if (!T.hasArchetype()) {
-      return;
-    }
-    auto canType = T.getSwiftRValueType();
-    auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-    assert(metadata && "Expected Type Metadata Ref");
-    typeToMetadataVec.insert(std::make_pair(canType, metadata));
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    collector.collectTypeMetadataForLayout(T);
   }
 };
 

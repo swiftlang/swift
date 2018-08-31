@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -enable-sil-ownership -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name bridged_casts_folding -O -enable-sil-ownership -emit-sil %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

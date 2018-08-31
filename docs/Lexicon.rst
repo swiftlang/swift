@@ -339,6 +339,10 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
 
   script mode
     The parsing mode that allows top-level imperative code in a source file.
+    
+  Sema
+    Short for 'Semantic Analysis', the compiler pass that performs type checking,
+    validation, and expression rewriting before SILGen.
 
   SIL
     "Swift Intermediate Language". A high-level IR used by the Swift compiler

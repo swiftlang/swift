@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules -disable-objc-attr-requires-foundation-module %s | %FileCheck -check-prefix CHECK-VTABLE %s
+// RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck -check-prefix CHECK-VTABLE %s
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
 
@@ -12,6 +12,8 @@
 
 // RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
 // RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
+
+// RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD %S/Inputs/typedefs-helper.swift -verify
 
 #if TEST
 
@@ -50,10 +52,10 @@ let _ = wrapped // expected-error {{use of unresolved identifier 'wrapped'}}
 let _ = unwrapped // okay
 
 _ = usesWrapped(nil) // expected-error {{use of unresolved identifier 'usesWrapped'}}
-_ = usesUnwrapped(nil) // expected-error {{nil is not compatible with expected argument type 'Int32'}}
+_ = usesUnwrapped(nil) // expected-error {{'nil' is not compatible with expected argument type 'Int32'}}
 
 let _: WrappedAlias = nil // expected-error {{use of undeclared type 'WrappedAlias'}}
-let _: UnwrappedAlias = nil // expected-error {{nil cannot initialize specified type 'UnwrappedAlias' (aka 'Int32')}} expected-note {{add '?'}}
+let _: UnwrappedAlias = nil // expected-error {{'nil' cannot initialize specified type 'UnwrappedAlias' (aka 'Int32')}} expected-note {{add '?'}}
 
 let _: ConstrainedWrapped<Int> = nil // expected-error {{use of undeclared type 'ConstrainedWrapped'}}
 let _: ConstrainedUnwrapped<Int> = nil // expected-error {{type 'Int' does not conform to protocol 'HasAssoc'}}
@@ -168,10 +170,10 @@ open class User {
 // (10 words of normal class metadata on 64-bit platforms, 13 on 32-bit)
 // 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter.1:
 // 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter.1:
-// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!materializeForSet.1:
+// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!modify.1:
 // 13 CHECK-VTABLE-NEXT: #User.wrappedProp!getter.1:
 // 14 CHECK-VTABLE-NEXT: #User.wrappedProp!setter.1:
-// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!materializeForSet.1:
+// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!modify.1:
 // 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod!1:
 // 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod!1:
 // 18 CHECK-VTABLE-NEXT: #User.constrainedUnwrapped!1:

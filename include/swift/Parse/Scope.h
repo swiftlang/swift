@@ -33,11 +33,11 @@ namespace swift {
 class ScopeInfo {
   friend class Scope;
 public:
-  typedef std::pair<unsigned, ValueDecl*> ValueScopeEntry;
-  
-  typedef TreeScopedHashTable<DeclName, ValueScopeEntry> ScopedHTTy;
-  typedef ScopedHTTy::ScopeTy ScopedHTScopeTy;
-  typedef ScopedHTTy::DetachedScopeTy ScopedHTDetachedScopeTy;
+  using ValueScopeEntry = std::pair<unsigned, ValueDecl *>;
+
+  using ScopedHTTy = TreeScopedHashTable<DeclName, ValueScopeEntry>;
+  using ScopedHTScopeTy = ScopedHTTy::ScopeTy;
+  using ScopedHTDetachedScopeTy = ScopedHTTy::DetachedScopeTy;
 
 private:
   ScopedHTTy HT;
@@ -67,13 +67,10 @@ enum class ScopeKind {
   StructBody,
   ClassBody,
   ProtocolBody,
-  ConstructorBody,
-  DestructorBody,
   InheritanceClause,
 
   Brace,
   TopLevel,
-  ForVars,
   ForeachVars,
   CaseVars,
   CatchVars,

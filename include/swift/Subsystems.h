@@ -46,6 +46,7 @@ namespace swift {
   class DelayedParsingCallbacks;
   class DiagnosticConsumer;
   class DiagnosticEngine;
+  class Evaluator;
   class FileUnit;
   class GenericEnvironment;
   class GenericParamList;
@@ -60,6 +61,7 @@ namespace swift {
   class SILParserTUState;
   class SourceFile;
   class SourceManager;
+  class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
   struct TypeLoc;
@@ -140,6 +142,11 @@ namespace swift {
   ///                  source file.
   void performNameBinding(SourceFile &SF, unsigned StartElem = 0);
 
+  /// Once type-checking is complete, this instruments code with calls to an
+  /// intrinsic that record the expected values of local variables so they can
+  /// be compared against the results from the debugger.
+  void performDebuggerTestingTransform(SourceFile &SF);
+
   /// Once parsing and name-binding are complete, this optionally transforms the
   /// ASTs to add calls to external logging functions.
   ///
@@ -184,7 +191,8 @@ namespace swift {
                            unsigned StartElem = 0,
                            unsigned WarnLongFunctionBodies = 0,
                            unsigned WarnLongExpressionTypeChecking = 0,
-                           unsigned ExpressionTimeoutThreshold = 0);
+                           unsigned ExpressionTimeoutThreshold = 0,
+                           unsigned SwitchCheckingInvocationThreshold = 0);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method
@@ -312,6 +320,11 @@ namespace swift {
                    StringRef OutputFilename,
                    UnifiedStatsReporter *Stats=nullptr);
 
+  /// Dump YAML describing all fixed-size types imported from the given module.
+  bool performDumpTypeInfo(IRGenOptions &Opts,
+                           SILModule &SILMod,
+                           llvm::LLVMContext &LLVMContext);
+
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>
   createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx);
@@ -320,7 +333,8 @@ namespace swift {
   class ParserUnit {
   public:
     ParserUnit(SourceManager &SM, unsigned BufferID,
-               const LangOptions &LangOpts, StringRef ModuleName);
+               const LangOptions &LangOpts, StringRef ModuleName,
+               SyntaxParsingCache *SyntaxCache = nullptr);
     ParserUnit(SourceManager &SM, unsigned BufferID);
     ParserUnit(SourceManager &SM, unsigned BufferID,
                unsigned Offset, unsigned EndOffset);
@@ -336,6 +350,24 @@ namespace swift {
     struct Implementation;
     Implementation &Impl;
   };
+
+  /// Register AST-level request functions with the evaluator.
+  ///
+  /// The ASTContext will automatically call these upon construction.
+  void registerAccessRequestFunctions(Evaluator &evaluator);
+
+  /// Register AST-level request functions with the evaluator.
+  ///
+  /// The ASTContext will automatically call these upon construction.
+  void registerNameLookupRequestFunctions(Evaluator &evaluator);
+
+  /// Register Sema-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any semantic queries
+  /// using Sema-level logic should call these functions after forming the
+  /// ASTContext.
+  void registerTypeCheckerRequestFunctions(Evaluator &evaluator);
+
 } // end namespace swift
 
 #endif // SWIFT_SUBSYSTEMS_H

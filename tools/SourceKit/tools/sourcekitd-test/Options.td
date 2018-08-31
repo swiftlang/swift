@@ -80,6 +80,9 @@ def print_response_as_json : Flag<["-"], "print-response-as-json">,
 def print_raw_response : Flag<["-"], "print-raw-response">,
   HelpText<"Dump the response to stdout">;
 
+def dont_print_response : Flag<["-"], "dont-print-response">,
+  HelpText<"Do not print the response">;
+
 def group_name : Separate<["-"], "group-name">,
   HelpText<"Module group name to print">;
 
@@ -104,6 +107,9 @@ def end_pos_EQ : Joined<["-"], "end-pos=">, Alias<end_pos>;
 def swift_version : Separate<["-"], "swift-version">, HelpText<"the swift version to use">;
 def swift_version_EQ : Joined<["-"], "swift-version=">, Alias<swift_version>;
 
+def pass_version_as_string : Flag<["-"], "pass-version-as-string">,
+  HelpText<"Pass swift-version as string">;
+
 def swift_name : Separate<["-"], "swift-name">,
   HelpText<"Swift name to translate from">;
 
@@ -120,6 +126,13 @@ def cancel_on_subsequent_request : Separate<["-"], "cancel-on-subsequent-request
   HelpText<"Whether to cancel if there is a subsequent request using the same AST">;
 def cancel_on_subsequent_request_EQ : Joined<["-"], "cancel-on-subsequent-request=">,
   Alias<cancel_on_subsequent_request>;
+
+def time_request : Flag<["-"], "time-request">,
+  HelpText<"Print the time taken to process the request">;
+
+def repeat_request : Separate<["-"], "repeat-request">,
+  HelpText<"Repeat the request n times">, MetaVarName<"<n>">;
+def repeat_request_EQ : Joined<["-"], "repeat-request=">, Alias<repeat_request>;
 
 def help : Flag<["-", "--"], "help">,
   HelpText<"Display available options">;

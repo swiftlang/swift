@@ -30,12 +30,18 @@ func test010(x: E1, y: FooBar) {
   }
 }
 
-// RUN: %sourcekitd-test -req=complete.open -pos=26:11 -req-opts=filtertext=one %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_0
-// INNER_POSTFIX_0-NOT: key.description: "one{{.+}}"
-// INNER_POSTFIX_0: key.description: "one",{{$}}
-// INNER_POSTFIX_0-NOT: key.description: "one{{.+}}"
+// RUN: %sourcekitd-test -req=complete.open -pos=26:11 -req-opts=filtertext=on %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_0a
+// INNER_POSTFIX_0a-NOT: key.description: "one{{.+}}"
+// INNER_POSTFIX_0a: key.description: "one",{{$}}
+// INNER_POSTFIX_0a-NOT: key.description: "one{{.+}}"
 
-// RUN: %sourcekitd-test -req=complete.open -pos=29:9 -req-opts=filtertext=prop %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_1
+// RUN: %sourcekitd-test -req=complete.open -pos=26:11 -req-opts=filtertext=one %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_0b
+// INNER_POSTFIX_0b-NOT: key.description: "one{{.+}}"
+// INNER_POSTFIX_0b: key.description: "one",{{$}}
+// INNER_POSTFIX_0b: key.description: "one.",{{$}}
+// INNER_POSTFIX_0b-NOT: key.description: "one{{.+}}"
+
+// RUN: %sourcekitd-test -req=complete.open -pos=29:9 -req-opts=filtertext=pro %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_1
 // INNER_POSTFIX_1-NOT: key.description: "prop{{.+}}"
 // INNER_POSTFIX_1: key.description: "prop",{{$}}
 // INNER_POSTFIX_1-NOT: key.description: "prop{{.+}}"
@@ -53,8 +59,10 @@ func test001() {
 
 // TOP_LEVEL_0-LABEL: Results for filterText: foo [
 // TOP_LEVEL_0-NEXT:   Foo
+// TOP_LEVEL_0-NEXT:   Foo.
 // TOP_LEVEL_0-NEXT:   Foo(
 // TOP_LEVEL_0-NEXT:   FooBar
+// TOP_LEVEL_0-NEXT:   Foo.self
 // TOP_LEVEL_0-NEXT:   Foo()
 // TOP_LEVEL_0-NEXT: ]
 
@@ -66,6 +74,7 @@ func test001() {
 // TOP_LEVEL_0-NEXT:   FooBar
 // TOP_LEVEL_0-NEXT:   FooBar.
 // TOP_LEVEL_0-NEXT:   FooBar(
+// TOP_LEVEL_0-NEXT:   FooBar.self
 // TOP_LEVEL_0-NEXT:   FooBar()
 // TOP_LEVEL_0-NEXT:   FooBar(x: Foo)
 // TOP_LEVEL_0-NEXT:   FooBar.fooBar()
@@ -86,6 +95,7 @@ func test002(abc: FooBar, abd: Base) {
 // TOP_LEVEL_1-NEXT:   abc.
 // TOP_LEVEL_1-NEXT:   abc===
 // TOP_LEVEL_1-NEXT:   abc!==
+// TOP_LEVEL_1-NEXT:   abc.self
 // TOP_LEVEL_1-NEXT:   abc.method()
 // TOP_LEVEL_1-NEXT:   abc.prop
 // TOP_LEVEL_1-NEXT: ]
@@ -95,6 +105,7 @@ func test002(abc: FooBar, abd: Base) {
 // TOP_LEVEL_1-NEXT:   abd.
 // TOP_LEVEL_1-NEXT:   abd===
 // TOP_LEVEL_1-NEXT:   abd!==
+// TOP_LEVEL_1-NEXT:   abd.self
 // TOP_LEVEL_1-NEXT:   abd.base()
 // TOP_LEVEL_1-NEXT: ]
 
@@ -132,12 +143,14 @@ func test003(x: FooBar) {
 // FOOBAR_QUALIFIED_NOOP-NEXT: ]
 // FOOBAR_QUALIFIED_NOOP-LABEL: Results for filterText: prop [
 // FOOBAR_QUALIFIED_NOOP-NEXT:   prop
+// FOOBAR_QUALIFIED_NOOP-NEXT:   prop.self
 // FOOBAR_QUALIFIED_NOOP-NEXT:   prop.method()
 // FOOBAR_QUALIFIED_NOOP-NEXT:   prop.prop
 // FOOBAR_QUALIFIED_NOOP-NEXT: ]
 
 // RUN: %complete-test %s -group=none -no-include-exact-match -add-inner-results -no-inner-operators -tok=FOOBAR_QUALIFIED | %FileCheck %s -check-prefix=FOOBAR_QUALIFIED_NOEXACT
 // FOOBAR_QUALIFIED_NOEXACT-LABEL: Results for filterText: prop [
+// FOOBAR_QUALIFIED_NOEXACT-NEXT:   prop.self
 // FOOBAR_QUALIFIED_NOEXACT-NEXT:   prop.method()
 // FOOBAR_QUALIFIED_NOEXACT-NEXT:   prop.prop
 // FOOBAR_QUALIFIED_NOEXACT-NEXT: ]

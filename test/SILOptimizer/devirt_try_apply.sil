@@ -856,7 +856,7 @@ sil_vtable Base {
   #Base.foo!1: @_TFC16devirt_try_apply4Base3foofS0_FzT_GSqVs5Int32_
   #Base.boo1!1: @_TFC16devirt_try_apply4Base4boo1fS0_FzT_S0_
   #Base.boo2!1: @_TFC16devirt_try_apply4Base4boo2fS0_FzT_GSqS0__
-  #Base.deinit!deallocator: @_TFC16devirt_try_apply4BaseD
+  #Base.deinit!deallocator.1: @_TFC16devirt_try_apply4BaseD
   #Base.init!initializer.1: @_TFC16devirt_try_apply4BasecfMS0_FT_S0_
 }
 
@@ -865,7 +865,7 @@ sil_vtable Derived1 {
   #Base.boo1!1: @_TFC16devirt_try_apply8Derived14boo1fS0_FzT_S0_
   #Base.boo2!1: @_TFC16devirt_try_apply8Derived14boo2fS0_FzT_GSqS0__
   #Base.init!initializer.1: @_TFC16devirt_try_apply8Derived1cfMS0_FT_S0_
-  #Derived1.deinit!deallocator: @_TFC16devirt_try_apply8Derived1D
+  #Derived1.deinit!deallocator.1: @_TFC16devirt_try_apply8Derived1D
 }
 
 sil_vtable Derived2 {
@@ -873,19 +873,19 @@ sil_vtable Derived2 {
   #Base.boo1!1: @_TFC16devirt_try_apply8Derived24boo1fS0_FzT_S0_
   #Base.boo2!1: @_TFC16devirt_try_apply8Derived24boo2fS0_FzT_S0_
   #Base.init!initializer.1: @_TFC16devirt_try_apply8Derived2cfMS0_FT_S0_
-  #Derived2.deinit!deallocator: @_TFC16devirt_try_apply8Derived2D
+  #Derived2.deinit!deallocator.1: @_TFC16devirt_try_apply8Derived2D
 }
 
 sil_vtable CP1 {
   #CP1.foo!1: @_TFC16devirt_try_apply3CP13foofS0_FzT_Vs5Int32
-  #CP1.deinit!deallocator: @_TFC16devirt_try_apply3CP1D
+  #CP1.deinit!deallocator.1: @_TFC16devirt_try_apply3CP1D
   #CP1.init!initializer.1: @_TFC16devirt_try_apply3CP1cfMS0_FT_S0_
 }
 
 sil_vtable CP2 {
   #CP1.foo!1: @_TFC16devirt_try_apply3CP23foofS0_FzT_Vs5Int32
   #CP1.init!initializer.1: @_TFC16devirt_try_apply3CP2cfMS0_FT_S0_
-  #CP2.deinit!deallocator: @_TFC16devirt_try_apply3CP2D
+  #CP2.deinit!deallocator.1: @_TFC16devirt_try_apply3CP2D
 }
 
 sil_witness_table CP1: P module devirt_try_apply {

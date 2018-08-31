@@ -23,6 +23,7 @@
 
 #include "ImageInspectionELF.h"
 #include <cstdint>
+#include <cstddef>
 
 namespace swift {
 
@@ -44,20 +45,15 @@ void initializeProtocolConformanceLookup();
 /// Load the metadata from the image necessary to find a type by name.
 void initializeTypeMetadataRecordLookup();
 
-/// Load the metadata from the image necessary to find field types
-/// based on the nominal type name.
-void initializeTypeFieldLookup();
-
 // Callbacks to register metadata from an image to the runtime.
 void addImageProtocolsBlockCallback(const void *start, uintptr_t size);
 void addImageProtocolConformanceBlockCallback(const void *start,
                                               uintptr_t size);
 void addImageTypeMetadataRecordBlockCallback(const void *start,
                                              uintptr_t size);
-void addImageTypeFieldDescriptorBlockCallback(const void *start,
-                                              uintptr_t size);
 
 int lookupSymbol(const void *address, SymbolInfo *info);
+void *lookupSection(const char *segment, const char *section, size_t *outSize);
 
 } // end namespace swift
 

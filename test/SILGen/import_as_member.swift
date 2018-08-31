@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
 // REQUIRES: objc_interop
 import ImportAsMember.A
 import ImportAsMember.Class
@@ -39,7 +39,7 @@ public func returnNullableStringGlobalVar() -> String? {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil {{.*}}useClass{{.*}}
-// CHECK: bb0([[D:%[0-9]+]] : $Double, [[OPTS:%[0-9]+]] : $SomeClass.Options):
+// CHECK: bb0([[D:%[0-9]+]] : @trivial $Double, [[OPTS:%[0-9]+]] : @trivial $SomeClass.Options):
 public func useClass(d: Double, opts: SomeClass.Options) {
   // CHECK: [[CTOR:%[0-9]+]] = function_ref @MakeIAMSomeClass : $@convention(c) (Double) -> @autoreleased SomeClass
   // CHECK: [[OBJ:%[0-9]+]] = apply [[CTOR]]([[D]])
@@ -55,7 +55,7 @@ public func useClass(d: Double, opts: SomeClass.Options) {
 
 extension SomeClass {
   // CHECK-LABEL: sil hidden @$SSo12IAMSomeClassC16import_as_memberE6doubleABSd_tcfc
-  // CHECK: bb0([[DOUBLE:%[0-9]+]] : $Double
+  // CHECK: bb0([[DOUBLE:%[0-9]+]] : @trivial $Double
   // CHECK-NOT: value_metatype
   // CHECK: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass
   // CHECK: apply [[FNREF]]([[DOUBLE]])

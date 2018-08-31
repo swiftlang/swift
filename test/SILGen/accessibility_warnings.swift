@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // This file tests that the AST produced after fixing accessibility warnings
 // is valid according to SILGen and the verifiers.
@@ -70,7 +70,7 @@ internal extension PublicStruct {
 }
 private extension PublicStruct {
   // CHECK-DAG: sil private @$S22accessibility_warnings12PublicStructV16extMemberPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
   // CHECK-DAG: sil private @$S22accessibility_warnings12PublicStructV14extImplPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPrivate() {}
 }
@@ -83,7 +83,7 @@ internal extension InternalStruct {
 }
 private extension InternalStruct {
   // CHECK-DAG: sil private @$S22accessibility_warnings14InternalStructV16extMemberPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
   // CHECK-DAG: sil private @$S22accessibility_warnings14InternalStructV14extImplPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPrivate() {}
 }
@@ -91,7 +91,7 @@ private extension InternalStruct {
 
 private extension PrivateStruct {
   // CHECK-DAG: sil private @$S22accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV09extMemberC0yyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
   // CHECK-DAG: sil private @$S22accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV07extImplC0yyF
   private func extImplPrivate() {}
 }
@@ -105,7 +105,7 @@ internal struct PrivateSettersForReadOnlyInternal : PublicReadOnlyOperations {
   // CHECK-DAG: sil hidden{{( \[.+\])*}} @$S22accessibility_warnings33PrivateSettersForReadOnlyInternalV4sizeSivg
   public private(set) var size = 0
   // CHECK-DAG: sil hidden @$S22accessibility_warnings33PrivateSettersForReadOnlyInternalVyS2icig
-  // CHECK-DAG: sil private @$S22accessibility_warnings33PrivateSettersForReadOnlyInternalVyS2icis
+  // CHECK-DAG: sil hidden @$S22accessibility_warnings33PrivateSettersForReadOnlyInternalVyS2icis
   internal private(set) subscript (_: Int) -> Int { // no-warning
     get { return 42 }
     set {}

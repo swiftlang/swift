@@ -1,6 +1,7 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t/test.swiftmodule %s
-// RUN: %target-build-swift -g -o %t/sdk-link %s
+// RUN: %empty-directory(%t/tmp)
+// RUN: env TMPDIR=%t/tmp/ %target-build-swift -emit-module -o %t/test.swiftmodule %s
+// RUN: env TMPDIR=%t/tmp/ %target-build-swift -g -v -o %t/sdk-link %s
+// RUN: %target-codesign %t/sdk-link
 // RUN: %target-run %t/sdk-link | %FileCheck %s
 // REQUIRES: executable_test
 

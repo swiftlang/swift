@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+
+// RUN: %target-swift-frontend -module-name builtins -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -13,67 +14,25 @@ typealias Bool = Builtin.Int1
 
 // CHECK: call swiftcc void @swift_errorInMain(
 
-infix operator * {
-  associativity left
-  precedence 200
-}
-infix operator / {
-  associativity left
-  precedence 200
-}
-infix operator % {
-  associativity left
-  precedence 200
-}
+infix operator *
+infix operator /
+infix operator %
 
-infix operator + {
-  associativity left
-  precedence 190
-}
-infix operator - {
-  associativity left
-  precedence 190
-}
+infix operator +
+infix operator -
 
-infix operator << {
-  associativity none
-  precedence 180
-}
-infix operator >> {
-  associativity none
-  precedence 180
-}
+infix operator <<
+infix operator >>
 
-infix operator ... {
-  associativity none
-  precedence 175
-}
+infix operator ...
 
-infix operator < {
-  associativity none
-  precedence 170
-}
-infix operator <= {
-  associativity none
-  precedence 170
-}
-infix operator > {
-  associativity none
-  precedence 170
-}
-infix operator >= {
-  associativity none
-  precedence 170
-}
+infix operator <
+infix operator <=
+infix operator >
+infix operator >=
 
-infix operator == {
-  associativity none
-  precedence 160
-}
-infix operator != {
-  associativity none
-  precedence 160
-}
+infix operator ==
+infix operator !=
 
 func * (lhs: Int, rhs: Int) -> Int {
   return Builtin.mul_Int32(lhs, rhs)
@@ -172,8 +131,9 @@ func assign_object_test(_ value: Builtin.NativeObject, ptr: Builtin.RawPointer) 
 
 // CHECK: define hidden {{.*}}void @"$S8builtins16init_object_test{{[_0-9a-zA-Z]*}}F"
 func init_object_test(_ value: Builtin.NativeObject, ptr: Builtin.RawPointer) {
-  // CHECK: [[DEST:%.*]] = bitcast i8* {{%.*}} to %swift.refcounted**
-  // CHECK-NEXT: store [[REFCOUNT]]* {{%.*}}, [[REFCOUNT]]** [[DEST]]
+  // CHECK: [[DEST:%.*]] = bitcast i8* {{%.*}} to [[REFCOUNT]]**
+  // CHECK-NEXT: call [[REFCOUNT]]* @swift_retain([[REFCOUNT]]* returned [[SRC:%.*]])
+  // CHECK-NEXT: store [[REFCOUNT]]* [[SRC]], [[REFCOUNT]]** [[DEST]]
   Builtin.initialize(value, ptr)
 }
 
@@ -223,15 +183,15 @@ func sizeof_alignof_test() {
 
 // CHECK: define hidden {{.*}}void @"$S8builtins27generic_sizeof_alignof_testyyxlF"
 func generic_sizeof_alignof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 8
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[SIZE]], i64* [[S:%.*]]
   var s = Builtin.sizeof(T.self)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
+  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
-  // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 65535
+  // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 255
   // CHECK-NEXT: [[ALIGN:%.*]] = add i64 [[T3]], 1
   // CHECK-NEXT: store i64 [[ALIGN]], i64* [[A:%.*]]
   var a = Builtin.alignof(T.self)
@@ -239,7 +199,7 @@ func generic_sizeof_alignof_test<T>(_: T) {
 
 // CHECK: define hidden {{.*}}void @"$S8builtins21generic_strideof_testyyxlF"
 func generic_strideof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 11
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[STRIDE]], i64* [[S:%.*]]
@@ -408,20 +368,24 @@ func testOnceWithContext(_ p: Builtin.RawPointer, f: @escaping @convention(c) (B
 
 class C {}
 struct S {}
+#if _runtime(_ObjC)
 @objc class O {}
 @objc protocol OP1 {}
 @objc protocol OP2 {}
+#endif
 protocol P {}
 
 // CHECK-LABEL: define hidden {{.*}}void @"$S8builtins10canBeClass{{[_0-9a-zA-Z]*}}F"
 func canBeClass<T>(_ f: @escaping (Builtin.Int8) -> (), _: T) {
-  // CHECK: call {{.*}}void {{%.*}}(i8 1
+#if _runtime(_ObjC)
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 1
   f(Builtin.canBeClass(O.self))
-  // CHECK: call {{.*}}void {{%.*}}(i8 1
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 1
   f(Builtin.canBeClass(OP1.self))
   typealias ObjCCompo = OP1 & OP2
-  // CHECK: call {{.*}}void {{%.*}}(i8 1
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 1
   f(Builtin.canBeClass(ObjCCompo.self))
+#endif
 
   // CHECK: call {{.*}}void {{%.*}}(i8 0
   f(Builtin.canBeClass(S.self))
@@ -429,9 +393,11 @@ func canBeClass<T>(_ f: @escaping (Builtin.Int8) -> (), _: T) {
   f(Builtin.canBeClass(C.self))
   // CHECK: call {{.*}}void {{%.*}}(i8 0
   f(Builtin.canBeClass(P.self))
+#if _runtime(_ObjC)
   typealias MixedCompo = OP1 & P
-  // CHECK: call {{.*}}void {{%.*}}(i8 0
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 0
   f(Builtin.canBeClass(MixedCompo.self))
+#endif
 
   // CHECK: call {{.*}}void {{%.*}}(i8 2
   f(Builtin.canBeClass(T.self))
@@ -489,9 +455,9 @@ func copyPODArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Bu
 // CHECK-NOT:       loop:
 // CHECK:         call void @swift_arrayInitWithCopy
 // CHECK:         mul nuw i64 8, %2
-// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 8, i1 false)
+// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i1 false)
 // CHECK:         mul nuw i64 8, %2
-// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 8, i1 false)
+// CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i1 false)
 // CHECK:         call void @swift_arrayAssignWithCopyNoAlias(
 // CHECK:         call void @swift_arrayAssignWithCopyFrontToBack(
 // CHECK:         call void @swift_arrayAssignWithCopyBackToFront(
@@ -649,27 +615,6 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
-// native pinned
-// CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins16isUniqueOrPinnedyBi1_BoSgzF"({{%.*}}* nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK-NEXT: entry:
-// CHECK-NEXT: bitcast [[BUILTIN_NATIVE_OBJECT_TY]]* %0 to %swift.refcounted**
-// CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_native(%swift.refcounted* %2)
-// CHECK-NEXT: ret i1 %3
-func isUniqueOrPinned(_ ref: inout Builtin.NativeObject?) -> Bool {
-  return Builtin.isUniqueOrPinned(&ref)
-}
-
-// native pinned nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins16isUniqueOrPinnedyBi1_BozF"(%swift.refcounted** nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK-NEXT: entry:
-// CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %0
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %1)
-// CHECK-NEXT: ret i1 %2
-func isUniqueOrPinned(_ ref: inout Builtin.NativeObject) -> Bool {
-  return Builtin.isUniqueOrPinned(&ref)
-}
-
 // CHECK: define hidden {{.*}}void @"$S8builtins27acceptsBuiltinUnknownObjectyyBOSgzF"([[BUILTIN_UNKNOWN_OBJECT_TY:%.*]]* nocapture dereferenceable({{.*}})) {{.*}} {
 func acceptsBuiltinUnknownObject(_ ref: inout Builtin.UnknownObject?) {}
 
@@ -697,18 +642,6 @@ func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
-// ObjC pinned nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins16isUniqueOrPinnedyBi1_BOzF"
-// CHECK-SAME:    ([[UNKNOWN_OBJECT]]** nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK-NEXT: entry:
-// CHECK-NEXT: load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** %0
-// CHECK-native-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native([[UNKNOWN_OBJECT]]* %1)
-// CHECK-objc-NEXT: call i1 @swift_isUniquelyReferencedOrPinnedNonObjC_nonNull([[UNKNOWN_OBJECT]]* %1)
-// CHECK-NEXT: ret i1 %2
-func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
-  return Builtin.isUniqueOrPinned(&ref)
-}
-
 // BridgeObject nonNull
 // CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins8isUniqueyBi1_BbzF"(%swift.bridge** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
@@ -717,16 +650,6 @@ func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
 // CHECK-NEXT: ret i1 %2
 func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
   return Builtin.isUnique(&ref)
-}
-
-// Bridge pinned nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins16isUniqueOrPinnedyBi1_BbzF"(%swift.bridge** nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK-NEXT: entry:
-// CHECK-NEXT: load %swift.bridge*, %swift.bridge** %0
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(%swift.bridge* %1)
-// CHECK-NEXT: ret i1 %2
-func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
-  return Builtin.isUniqueOrPinned(&ref)
 }
 
 // BridgeObject nonNull
@@ -738,17 +661,6 @@ func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
 // CHECK-NEXT: ret i1 %3
 func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
   return Builtin.isUnique_native(&ref)
-}
-
-// Bridge pinned nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$S8builtins23isUniqueOrPinned_nativeyBi1_BbzF"(%swift.bridge** nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK-NEXT: entry:
-// CHECK-NEXT: bitcast %swift.bridge** %0 to %swift.refcounted**
-// CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
-// CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %2)
-// CHECK-NEXT: ret i1 %3
-func isUniqueOrPinned_native(_ ref: inout Builtin.BridgeObject) -> Bool {
-  return Builtin.isUniqueOrPinned_native(&ref)
 }
 
 // ImplicitlyUnwrappedOptional argument to isUnique.
@@ -763,7 +675,7 @@ func isUniqueIUO(_ ref: inout Builtin.NativeObject?) -> Bool {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
 func generic_ispod_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[FLAGS:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i64 [[FLAGS]], 65536
@@ -777,7 +689,32 @@ func ispod_test() {
   // CHECK: store i1 true, i1*
   // CHECK: store i1 false, i1*
   var t = Builtin.ispod(Int.self)
-  var f = Builtin.ispod(Builtin.NativeObject)
+  var f = Builtin.ispod(Builtin.NativeObject.self)
+}
+
+// CHECK-LABEL: define {{.*}} @{{.*}}generic_isbitwisetakable_test
+func generic_isbitwisetakable_test<T>(_: T) {
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
+  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
+  // CHECK-NEXT: [[FLAGS:%.*]] = ptrtoint i8* [[T1]] to i64
+  // CHECK-NEXT: [[ISNOTBITWISETAKABLE:%.*]] = and i64 [[FLAGS]], 1048576
+  // CHECK-NEXT: [[ISBITWISETAKABLE:%.*]] = icmp eq i64 [[ISNOTBITWISETAKABLE]], 0
+  // CHECK-NEXT: store i1 [[ISBITWISETAKABLE]], i1* [[S:%.*]]
+  var s = Builtin.isbitwisetakable(T.self)
+}
+
+// CHECK-LABEL: define {{.*}} @{{.*}}isbitwisetakable_test
+func isbitwisetakable_test() {
+  // CHECK: store i1 true, i1*
+  // CHECK: store i1 true, i1*
+  // CHECK: store i1 true, i1*
+  // CHECK: store i1 true, i1*
+  // CHECK: store i1 false, i1*
+  var t1 = Builtin.isbitwisetakable(Int.self)
+  var t2 = Builtin.isbitwisetakable(C.self)
+  var t3 = Builtin.isbitwisetakable(Abc.self)
+  var t4 = Builtin.isbitwisetakable(Empty.self)
+  var f = Builtin.isbitwisetakable(W.self)
 }
 
 // CHECK-LABEL: define {{.*}} @{{.*}}is_same_metatype
@@ -790,7 +727,6 @@ func is_same_metatype_test(_ t1: Any.Type, _ t2: Any.Type) {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_unsafeGuaranteed_test
 // CHECK:  call {{.*}}* @{{.*}}swift_{{.*}}etain({{.*}}* returned %0)
-// CHECK:  call void @{{.*}}swift_{{.*}}elease({{.*}}* %0)
 // CHECK:  ret {{.*}}* %0
 func generic_unsafeGuaranteed_test<T: AnyObject>(_ t : T) -> T {
   let (g, _) = Builtin.unsafeGuaranteed(t)
@@ -801,7 +737,7 @@ func generic_unsafeGuaranteed_test<T: AnyObject>(_ t : T) -> T {
 // CHECK:  [[LOCAL:%.*]] = alloca %swift.refcounted*
 // CHECK:  call %swift.refcounted* @swift_retain(%swift.refcounted* returned %0)
 // CHECK:  store %swift.refcounted* %0, %swift.refcounted** [[LOCAL]]
-// CHECK:  call void @swift_release(%swift.refcounted* %0)
+// CHECK-NOT:  call void @swift_release(%swift.refcounted* %0)
 // CHECK:  ret %swift.refcounted* %0
 func unsafeGuaranteed_test(_ x: Builtin.NativeObject) -> Builtin.NativeObject {
   var (g,t) = Builtin.unsafeGuaranteed(x)
@@ -811,6 +747,8 @@ func unsafeGuaranteed_test(_ x: Builtin.NativeObject) -> Builtin.NativeObject {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteedEnd_test
 // CHECK-NEXT: {{.*}}:
+// CHECK-NEXT: alloca
+// CHECK-NEXT: store
 // CHECK-NEXT: ret void
 func unsafeGuaranteedEnd_test(_ x: Builtin.Int8) {
   Builtin.unsafeGuaranteedEnd(x)
@@ -841,9 +779,8 @@ func atomicload(_ p: Builtin.RawPointer) {
 }
 
 // CHECK-LABEL: define {{.*}} @"$S8builtins14stringObjectOryS2u_SutF"(i64, i64)
-// CHECK-NEXT: {{.*}}:
-// CHECK-NEXT: %2 = or i64 %0, %1
-// CHECK-NEXT: ret i64 %2
+// CHECK:      %4 = or i64 %0, %1
+// CHECK-NEXT: ret i64 %4
 func stringObjectOr(_ x: UInt, _ y: UInt) -> UInt {
   return UInt(Builtin.stringObjectOr_Int64(
   x._value, y._value))
@@ -856,7 +793,7 @@ func testForceTry(_ fn: () -> ()) {
   try! createInt(fn)
 }
 
-// CHECK-LABEL: declare swiftcc void @swift_unexpectedError(%swift.error*
+// CHECK-LABEL: declare{{( dllimport)?}} swiftcc void @swift_unexpectedError(%swift.error*
 
 enum MyError : Error {
   case A, B

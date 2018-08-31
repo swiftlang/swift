@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -module-name main -typecheck -swift-version 3 %s
 // RUN: %target-swift-frontend -module-name main -typecheck -swift-version 4 %s
 
 // These tests are split out to ensure that we run the AST verifier's

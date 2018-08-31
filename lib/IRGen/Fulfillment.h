@@ -32,14 +32,19 @@ namespace irgen {
 /// path from the given source.
 struct Fulfillment {
   Fulfillment() = default;
-  Fulfillment(unsigned sourceIndex, MetadataPath &&path)
-    : SourceIndex(sourceIndex), Path(std::move(path)) {}
+  Fulfillment(unsigned sourceIndex, MetadataPath &&path, MetadataState state)
+    : SourceIndex(sourceIndex), State(unsigned(state)), Path(std::move(path)) {}
 
   /// The source index.
-  unsigned SourceIndex;
+  unsigned SourceIndex : 30;
+
+  /// The state of the metadata at the fulfillment.
+  unsigned State : 2;
 
   /// The path from the source metadata.
   MetadataPath Path;
+
+  MetadataState getState() const { return MetadataState(State); }
 };
 
 class FulfillmentMap {
@@ -90,6 +95,7 @@ public:
   ///
   /// \return true if any fulfillments were added by this search.
   bool searchTypeMetadata(IRGenModule &IGM, CanType type, IsExact_t isExact,
+                          MetadataState metadataState,
                           unsigned sourceIndex, MetadataPath &&path,
                           const InterestingKeysCallback &interestingKeys);
 
@@ -109,7 +115,8 @@ public:
   ///
   /// \return true if the fulfillment was added, which won't happen if there's
   ///   already a fulfillment that was at least as good
-  bool addFulfillment(FulfillmentKey key, unsigned source, MetadataPath &&path);
+  bool addFulfillment(FulfillmentKey key, unsigned source,
+                      MetadataPath &&path, MetadataState state);
 
   const Fulfillment *getTypeMetadata(CanType type) const {
     auto it = Fulfillments.find({type, nullptr});
@@ -139,7 +146,8 @@ public:
 
 private:
   bool searchNominalTypeMetadata(IRGenModule &IGM, CanType type,
-                                 unsigned source, MetadataPath &&path,
+                                 MetadataState metadataState, unsigned source,
+                                 MetadataPath &&path,
                                  const InterestingKeysCallback &keys);
 
   /// Search the given witness table for useful fulfillments.

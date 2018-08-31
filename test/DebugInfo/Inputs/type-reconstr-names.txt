@@ -1,0 +1,14 @@
+$S4blah4mainyyF ---> () -> ()
+$SytD ---> ()
+$Ss5Int32VD ---> Int32
+$S4blah4mainyyF8PatatinoL_VMa ---> Can't resolve type of $S4blah4mainyyF8PatatinoL_VMa
+$Ss10CollectionP7Element ---> Can't resolve type of $Ss10CollectionP7Element
+$Ss15ContiguousArrayV9formIndex5afterySiz_tFSS_Tg5 ---> (inout Int) -> ()
+$S12TypeReconstr8PatatinoaySiGD ---> Patatino<Int>
+$S7ElementQzD ---> τ_0_0.Element
+$S13EyeCandySwift21_previousUniqueNumber33_ADC08935D64EA4F796440E7335798735LLs6UInt64Vvp ---> UInt64
+$SSayypXpG ---> Array<Any.Type>
+$S12EyeCandyCore11XPCListenerC14messageHandleryyAA13XPCConnectionV_AA10XPCMessageVxtcvpfiyAF_AHxtcfU_TA.4 ---> Can't resolve type of $S12EyeCandyCore11XPCListenerC14messageHandleryyAA13XPCConnectionV_AA10XPCMessageVxtcvpfiyAF_AHxtcfU_TA.4
+$Ss10CollectionP7ElementQa ---> Can't resolve type of $Ss10CollectionP7ElementQa
+$S12TypeReconstr8patatinoayAA5tinkyVGSgD ---> Optional<patatino>
+$S12TypeReconstr5OuterV3Fooayx_SiGD ---> Can't resolve type of $S12TypeReconstr5OuterV3Fooayx_SiGD

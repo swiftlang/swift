@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 func dict() -> [AnyHashable: Any] {
    return ["x": "y"]

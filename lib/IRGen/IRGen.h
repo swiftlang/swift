@@ -33,7 +33,7 @@ namespace swift {
   class CanType;
   class ClusteredBitVector;
   enum ForDefinition_t : bool;
-  
+
 namespace irgen {
   using Lowering::AbstractionPattern;
   using clang::CodeGen::ConstantInitFuture;
@@ -77,47 +77,9 @@ inline IsBitwiseTakable_t &operator&=(IsBitwiseTakable_t &l, IsBitwiseTakable_t 
   return (l = (l & r));
 }
 
-/// The kind of reference counting implementation a heap object uses.
-enum class ReferenceCounting : unsigned char {
-  /// The object uses native Swift reference counting.
-  Native,
-  
-  /// The object uses ObjC reference counting.
-  ///
-  /// When ObjC interop is enabled, native Swift class objects are also ObjC
-  /// reference counting compatible. Swift non-class heap objects are never
-  /// ObjC reference counting compatible.
-  ///
-  /// Blocks are always ObjC reference counting compatible.
-  ObjC,
-  
-  /// The object uses _Block_copy/_Block_release reference counting.
-  ///
-  /// This is a strict subset of ObjC; all blocks are also ObjC reference
-  /// counting compatible. The block is assumed to have already been moved to
-  /// the heap so that _Block_copy returns the same object back.
-  Block,
-  
-  /// The object has an unknown reference counting implementation.
-  ///
-  /// This uses maximally-compatible reference counting entry points in the
-  /// runtime.
-  Unknown,
-  
-  /// Cases prior to this one are binary-compatible with Unknown reference
-  /// counting.
-  LastUnknownCompatible = Unknown,
-
-  /// The object has an unknown reference counting implementation and
-  /// the reference value may contain extra bits that need to be masked.
-  ///
-  /// This uses maximally-compatible reference counting entry points in the
-  /// runtime, with a masking layer on top. A bit inside the pointer is used
-  /// to signal native Swift refcounting.
-  Bridge,
-  
-  /// The object uses ErrorType's reference counting entry points.
-  Error,
+enum IsABIAccessible_t : bool {
+  IsNotABIAccessible = false,
+  IsABIAccessible = true  
 };
 
 /// The atomicity of a reference counting operation to be used.
@@ -135,16 +97,16 @@ enum OnHeap_t : unsigned char {
 };
 
 /// Whether a function requires extra data.
-enum class ExtraData : unsigned char {
+enum class ExtraData : uint8_t {
   /// The function requires no extra data.
   None,
 
   /// The function requires a retainable object pointer of extra data.
   Retainable,
-  
+
   /// The function takes its block object as extra data.
   Block,
-  
+
   Last_ExtraData = Block
 };
 
@@ -159,7 +121,7 @@ enum IsExact_t : bool {
 ///
 /// See the comment in RelativePointer.h.
 
-enum class SymbolReferenceKind : unsigned char {
+enum class SymbolReferenceKind : uint8_t {
   /// An absolute reference to the object, i.e. an ordinary pointer.
   ///
   /// Generally well-suited for when C compatibility is a must, dynamic
@@ -202,26 +164,6 @@ enum class SymbolReferenceKind : unsigned char {
   /// Generally well-suited for when the reference may be dynamically
   /// initialized but may also statically refer outside of the linkage unit.
   Far_Relative_Indirectable,
-};
-
-/// Destructor variants.
-enum class DestructorKind : uint8_t {
-  /// A deallocating destructor destroys the object and deallocates
-  /// the memory associated with it.
-  Deallocating,
-
-  /// A destroying destructor destroys the object but does not
-  /// deallocate the memory associated with it.
-  Destroying
-};
-
-/// Constructor variants.
-enum class ConstructorKind : uint8_t {
-  /// An allocating constructor allocates an object and initializes it.
-  Allocating,
-
-  /// An initializing constructor just initializes an existing object.
-  Initializing
 };
 
 /// An initial value for a definition of an llvm::GlobalVariable.
@@ -293,13 +235,14 @@ inline bool operator<=(OperationCost l, OperationCost r) {
 /// An alignment value, in eight-bit units.
 class Alignment {
 public:
-  typedef uint32_t int_type;
+  using int_type = uint32_t;
 
-  Alignment() : Value(0) {}
-  explicit Alignment(int_type Value) : Value(Value) {}
+  constexpr Alignment() : Value(0) {}
+  constexpr explicit Alignment(int_type Value) : Value(Value) {}
+  explicit Alignment(clang::CharUnits value) : Value(value.getQuantity()) {}
 
-  int_type getValue() const { return Value; }
-  int_type getMaskValue() const { return Value - 1; }
+  constexpr int_type getValue() const { return Value; }
+  constexpr int_type getMaskValue() const { return Value - 1; }
 
   bool isOne() const { return Value == 1; }
   bool isZero() const { return Value == 0; }
@@ -334,7 +277,7 @@ private:
 /// A size value, in eight-bit units.
 class Size {
 public:
-  typedef uint64_t int_type;
+  using int_type = uint64_t;
 
   constexpr Size() : Value(0) {}
   explicit constexpr Size(int_type Value) : Value(Value) {}
@@ -349,7 +292,7 @@ public:
   /// Is this the "invalid" size value?
   bool isInvalid() const { return *this == Size::invalid(); }
 
-  int_type getValue() const { return Value; }
+  constexpr int_type getValue() const { return Value; }
   
   int_type getValueInBits() const { return Value * 8; }
 
@@ -446,7 +389,7 @@ inline Alignment Alignment::alignmentAtOffset(Size S) const {
   return *this;
 }
 
-/// Get this alignment asx a Size value.
+/// Get this alignment as a Size value.
 inline Size Alignment::asSize() const {
   return Size(getValue());
 }

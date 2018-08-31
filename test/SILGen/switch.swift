@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+
+// RUN: %target-swift-emit-silgen -module-name switch %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -430,15 +431,14 @@ class D1 : C {}
 class D2 : D1 {}
 class E : C {}
 
-// CHECK-LABEL: sil hidden @$S6switch16test_isa_class_11xyAA1BC_tF : $@convention(thin) (@owned B) -> () {
+// CHECK-LABEL: sil hidden @$S6switch16test_isa_class_11xyAA1BC_tF : $@convention(thin) (@guaranteed B) -> () {
 func test_isa_class_1(x: B) {
-  // CHECK: bb0([[X:%.*]] : $B):
-  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
-  // CHECK:   [[X_COPY:%.*]] = copy_value [[BORROWED_X]]
+  // CHECK: bb0([[X:%.*]] : @guaranteed $B):
+  // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   switch x {
 
-  // CHECK: [[IS_D1]]([[CAST_D1:%.*]]):
+  // CHECK: [[IS_D1]]([[CAST_D1:%.*]] : @owned $D1):
   // CHECK:   [[CAST_D1_COPY:%.*]] = copy_value [[CAST_D1]]
   // CHECK:   function_ref @$S6switch6runcedSbyF : $@convention(thin) () -> Bool
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
@@ -461,7 +461,7 @@ func test_isa_class_1(x: B) {
   // CHECK: [[NEXT_CASE]]
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
   case is D2:
-  // CHECK: [[IS_D2]]([[CAST_D2:%.*]]):
+  // CHECK: [[IS_D2]]([[CAST_D2:%.*]] : @owned $D2):
   // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
   // CHECK:   destroy_value [[CAST_D2_COPY]]
   // CHECK:   destroy_value [[X_COPY]]
@@ -475,7 +475,7 @@ func test_isa_class_1(x: B) {
   // CHECK: [[NEXT_CASE]]:
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case is E where funged():
-  // CHECK: [[IS_E]]([[CAST_E:%.*]]):
+  // CHECK: [[IS_E]]([[CAST_E:%.*]] : @owned $E):
   // CHECK:   [[CAST_E_COPY:%.*]] = copy_value [[CAST_E]]
   // CHECK:   function_ref @$S6switch6fungedSbyF
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
@@ -498,7 +498,7 @@ func test_isa_class_1(x: B) {
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
 
   case is C:
-  // CHECK: [[IS_C]]([[CAST_C:%.*]]):
+  // CHECK: [[IS_C]]([[CAST_C:%.*]] : @owned $C):
   // CHECK:   [[CAST_C_COPY:%.*]] = copy_value [[CAST_C]]
   // CHECK:   destroy_value [[CAST_C_COPY]]
   // CHECK:   destroy_value [[X_COPY]]
@@ -519,21 +519,19 @@ func test_isa_class_1(x: B) {
   // CHECK: [[CONT]]:
   // CHECK:   [[F_FUNC:%.*]] = function_ref @$S6switch1fyyF : $@convention(thin) () -> ()
   // CHECK:   apply [[F_FUNC]]()
-  // CHECK:   destroy_value [[X]]
   f()
 }
 // CHECK: } // end sil function '$S6switch16test_isa_class_11xyAA1BC_tF'
 
 // CHECK-LABEL: sil hidden @$S6switch16test_isa_class_21xyXlAA1BC_tF : $@convention(thin)
 func test_isa_class_2(x: B) -> AnyObject {
-  // CHECK: bb0([[X:%.*]] : $B):
-  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
-  // CHECK:   [[X_COPY:%.*]] = copy_value [[BORROWED_X]]
+  // CHECK: bb0([[X:%.*]] : @guaranteed $B):
+  // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   switch x {
 
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   case let y as D1 where runced():
-  // CHECK: [[IS_D1]]([[CAST_D1:%.*]] : $D1):
+  // CHECK: [[IS_D1]]([[CAST_D1:%.*]] : @owned $D1):
   // CHECK:   [[CAST_D1_COPY:%.*]] = copy_value [[CAST_D1]]
   // CHECK:   function_ref @$S6switch6runcedSbyF
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
@@ -560,7 +558,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: [[NEXT_CASE]]:
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $D2, [[CASE2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
   case let y as D2:
-  // CHECK: [[CASE2]]([[CAST_D2:%.*]]):
+  // CHECK: [[CASE2]]([[CAST_D2:%.*]] : @owned $D2):
   // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
   // CHECK:   function_ref @$S6switch1byyF
   // CHECK:   [[BORROWED_CAST_D2_COPY:%.*]] = begin_borrow [[CAST_D2_COPY]]
@@ -579,7 +577,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: [[NEXT_CASE]]:
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case let y as E where funged():
-  // CHECK: [[IS_E]]([[CAST_E:%.*]]):
+  // CHECK: [[IS_E]]([[CAST_E:%.*]] : @owned $E):
   // CHECK:   [[CAST_E_COPY:%.*]] = copy_value [[CAST_E]]
   // CHECK:   function_ref @$S6switch6fungedSbyF
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
@@ -606,7 +604,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: [[NEXT_CASE]]
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $C, [[CASE4:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
   case let y as C:
-  // CHECK: [[CASE4]]([[CAST_C:%.*]]):
+  // CHECK: [[CASE4]]([[CAST_C:%.*]] : @owned $C):
   // CHECK:   [[CAST_C_COPY:%.*]] = copy_value [[CAST_C]]
   // CHECK:   function_ref @$S6switch1dyyF
   // CHECK:   [[BORROWED_CAST_C_COPY:%.*]] = begin_borrow [[CAST_C_COPY]]
@@ -626,17 +624,14 @@ func test_isa_class_2(x: B) -> AnyObject {
   default:
   // CHECK:   destroy_value [[X_COPY]]
   // CHECK:   function_ref @$S6switch1eyyF
-  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
-  // CHECK:   [[X_COPY_2:%.*]] = copy_value [[BORROWED_X]]
+  // CHECK:   [[X_COPY_2:%.*]] = copy_value [[X]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[X_COPY_2]]
-  // CHECK:   end_borrow [[BORROWED_X]] from [[X]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     e()
     return x
   }
 
-  // CHECK: [[CONT]]([[T0:%.*]] : $AnyObject):
-  // CHECK:   destroy_value [[X]]
+  // CHECK: [[CONT]]([[T0:%.*]] : @owned $AnyObject):
   // CHECK:   return [[T0]]
 }
 // CHECK: } // end sil function '$S6switch16test_isa_class_21xyXlAA1BC_tF'
@@ -671,14 +666,14 @@ func test_union_1(u: MaybePair) {
   // CHECK:   br [[CONT]]
     b()
 
-  // CHECK: [[IS_RIGHT]]([[STR:%.*]] : $String):
+  // CHECK: [[IS_RIGHT]]([[STR:%.*]] : @owned $String):
   case var .Right:
   // CHECK:   destroy_value [[STR]] : $String
   // CHECK:   function_ref @$S6switch1cyyF
   // CHECK:   br [[CONT]]
     c()
 
-  // CHECK: [[IS_BOTH]]([[TUP:%.*]] : $(Int, String)):
+  // CHECK: [[IS_BOTH]]([[TUP:%.*]] : @owned $(Int, String)):
   case .Both:
   // CHECK:   tuple_extract [[TUP]] : $(Int, String), 0
   // CHECK:   [[TUP_STR:%.*]] = tuple_extract [[TUP]] : $(Int, String), 1
@@ -694,11 +689,10 @@ func test_union_1(u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil hidden @$S6switch12test_union_31uyAA9MaybePairO_tF : $@convention(thin) (@owned MaybePair) -> () {
+// CHECK-LABEL: sil hidden @$S6switch12test_union_31uyAA9MaybePairO_tF : $@convention(thin) (@guaranteed MaybePair) -> () {
 func test_union_3(u: MaybePair) {
-  // CHECK: bb0([[ARG:%.*]] : $MaybePair):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $MaybePair):
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   switch_enum [[SUBJECT]] : $MaybePair,
   // CHECK:     case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
   // CHECK:     case #MaybePair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
@@ -717,7 +711,7 @@ func test_union_3(u: MaybePair) {
   // CHECK:   br [[CONT]]
     b()
 
-  // CHECK: [[IS_RIGHT]]([[STR:%.*]] : $String):
+  // CHECK: [[IS_RIGHT]]([[STR:%.*]] : @owned $String):
   case .Right:
   // CHECK:   destroy_value [[STR]] : $String
   // CHECK:   function_ref @$S6switch1cyyF
@@ -737,7 +731,6 @@ func test_union_3(u: MaybePair) {
   // CHECK: [[CONT]]:
   // CHECK-NOT: switch_enum [[ARG]]
   // CHECK:   function_ref @$S6switch1eyyF
-  // CHECK:   destroy_value [[ARG]]
   e()
 }
 
@@ -751,7 +744,7 @@ func test_union_4(u: MaybePair) {
   // CHECK:   case #MaybePair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
-  case .Neither(_):
+  case .Neither:
   // CHECK:   function_ref @$S6switch1ayyF
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -790,7 +783,7 @@ func test_union_5(u: MaybePair) {
   // CHECK:   case #MaybePair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
-  case .Neither():
+  case .Neither:
   // CHECK:   function_ref @$S6switch1ayyF
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -998,7 +991,7 @@ enum LabeledScalarPayload {
 func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
   // CHECK: switch_enum {{%.*}}, case #LabeledScalarPayload.Payload!enumelt.1: bb1
   switch lsp {
-  // CHECK: bb1([[TUPLE:%.*]] : $(name: Int)):
+  // CHECK: bb1([[TUPLE:%.*]] : @trivial $(name: Int)):
   // CHECK:   [[X:%.*]] = tuple_extract [[TUPLE]]
   // CHECK:   [[ANY_X_ADDR:%.*]] = init_existential_addr {{%.*}}, $Int
   // CHECK:   store [[X]] to [trivial] [[ANY_X_ADDR]]
@@ -1030,7 +1023,7 @@ func testOptionalEnumMix(_ a : Int?) -> Int {
   case let x?:
     return 0
 
-  // CHECK: [[SOMEBB]](%3 : $Int):
+  // CHECK: [[SOMEBB]](%3 : @trivial $Int):
   // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.Int2048, 0
 
@@ -1052,7 +1045,7 @@ func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
   case let x?:
     return 0
 
-  // CHECK: [[SOMEBB]](%3 : $Int):
+  // CHECK: [[SOMEBB]](%3 : @trivial $Int):
   // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.Int2048, 0
 
@@ -1070,7 +1063,7 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
   switch(base, filter) {
     
   case (.some(let base), .some(let filter)):
-    // CHECK: bb2(%10 : $Int):
+    // CHECK: bb2(%10 : @trivial $Int):
     // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
     // CHECK-NEXT: debug_value %10 : $Int, let, name "filter"
     print("both: \(base), \(filter)")
@@ -1079,11 +1072,11 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
     // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
     // CHECK-NEXT: br bb6(%8 : $Int)
 
-    // CHECK: bb5([[OTHER_BASE:%.*]] : $Int)
+    // CHECK: bb5([[OTHER_BASE:%.*]] : @trivial $Int)
     // CHECK-NEXT: debug_value [[OTHER_BASE]] : $Int, let, name "base"
     // CHECK-NEXT: br bb6([[OTHER_BASE]] : $Int)
     
-    // CHECK: bb6([[ARG:%.*]] : $Int):
+    // CHECK: bb6([[ARG:%.*]] : @trivial $Int):
     print("single: \(base)")
   default:
     print("default")
@@ -1098,7 +1091,7 @@ func myFatalError() -> MyNever { fatalError("asdf") }
 
 func testUninhabitedSwitchScrutinee() {
   func test1(x : MyNever) {
-    // CHECK: bb0(%0 : $MyNever):
+    // CHECK: bb0(%0 : @trivial $MyNever):
     // CHECK-NEXT: debug_value %0 : $MyNever, let, name "x"
     // CHECK-NEXT: unreachable
     switch x {
@@ -1108,7 +1101,7 @@ func testUninhabitedSwitchScrutinee() {
     }
   }
   func test2(x : Never) {
-    // CHECK: bb0(%0 : $Never):
+    // CHECK: bb0(%0 : @trivial $Never):
     // CHECK-NEXT: debug_value %0 : $Never, let, name "x"
     // CHECK-NEXT: unreachable
     switch (x, x) {}

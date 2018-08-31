@@ -2,6 +2,8 @@
 // RUN: %target-build-swift %s -o %t/a.out_Debug -Onone
 // RUN: %target-build-swift %s -o %t/a.out_Release -O
 //
+// RUN: %target-codesign %t/a.out_Debug
+// RUN: %target-codesign %t/a.out_Release
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
 // REQUIRES: executable_test
@@ -53,8 +55,8 @@ var SetTraps = TestSuite("SetTraps" + testSuiteSuffix)
 
 SetTraps.test("sanity") {
   // Sanity checks.  This code should not trap.
-  var s = Set<BridgedVerbatimRefTy>()
-  var nss = s as NSSet
+  let s = Set<BridgedVerbatimRefTy>()
+  _ = s as NSSet
 }
 
 class TestObjCKeyTy : NSObject {
@@ -118,8 +120,8 @@ func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {
 
 SetTraps.test("BridgedKeyIsNotNSCopyable1") {
   // This Set is bridged in O(1).
-  var s: Set<TestObjCKeyTy> = [ TestObjCKeyTy(10) ]
-  var nss = s as NSSet
+  let s: Set<TestObjCKeyTy> = [ TestObjCKeyTy(10) ]
+  let nss = s as NSSet
 
   // Unlike NSDictionary, NSSet does not require NSCopying from its element
   // type.
@@ -135,11 +137,11 @@ SetTraps.test("Downcast1")
   let s: Set<NSObject> = [ NSObject(), NSObject() ]
   let s2: Set<TestObjCKeyTy> = _setDownCast(s)
   expectCrashLater()
-  let v1 = s2.contains(TestObjCKeyTy(10))
-  let v2 = s2.contains(TestObjCKeyTy(20))
+  _ = s2.contains(TestObjCKeyTy(10))
+  _ = s2.contains(TestObjCKeyTy(20))
 
   // This triggers failure.
-  for m in s2 { }
+  for _ in s2 { }
 }
 
 SetTraps.test("Downcast2")
@@ -149,8 +151,8 @@ SetTraps.test("Downcast2")
   .code {
   let s: Set<NSObject> = [ TestObjCKeyTy(10), NSObject() ]
   expectCrashLater()
-  let s2: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveC(s)
-  let v1 = s2.contains(TestBridgedKeyTy(10))
+  let s2 = s as! Set<TestBridgedKeyTy>
+  _ = s2.contains(TestBridgedKeyTy(10))
 }
 
 runAllTests()

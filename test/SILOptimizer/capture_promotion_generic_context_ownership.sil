@@ -1,3 +1,4 @@
+
 // RUN: %target-swift-frontend -enable-sil-ownership -emit-sil -O -Xllvm -sil-fso-enable-generics=false %s | %FileCheck %s
 
 sil_stage raw
@@ -92,11 +93,11 @@ entry(%0 : @trivial $*R<T>, %1 : @trivial $*Int, %b : @owned $<τ_0_0> { var E<(
   %e = load [copy] %a : $*E<(R<T>)->Int>
   switch_enum %e : $E<(R<T>)->Int>, case #E.Some!enumelt.1 : bb1, default bb2
 
-bb1(%f : @owned $@callee_guaranteed (@in R<T>) -> @out Int):
-  %bf = begin_borrow %f : $@callee_guaranteed (@in R<T>) -> @out Int
-  apply %bf(%1, %0) : $@callee_guaranteed (@in R<T>) -> @out Int
-  end_borrow %bf from %f : $@callee_guaranteed (@in R<T>) -> @out Int , $@callee_guaranteed (@in R<T>) -> @out Int
-  destroy_value %f : $@callee_guaranteed (@in R<T>) -> @out Int
+bb1(%f : @owned $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int):
+  %bf = begin_borrow %f : $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int
+  apply %bf(%1, %0) : $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int
+  end_borrow %bf from %f : $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int , $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int
+  destroy_value %f : $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int
   br exit
 
 bb2(%original : @owned $E<(R<T>)->Int>):

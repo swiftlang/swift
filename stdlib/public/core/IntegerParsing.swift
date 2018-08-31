@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
   codeUnit u_: CodeUnit, radix: Result
@@ -30,8 +29,7 @@ internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
   return Result(truncatingIfNeeded: d)
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _parseUnsignedASCII<
   Rest : IteratorProtocol, Result: FixedWidthInteger
@@ -47,7 +45,7 @@ where Rest.Element : UnsignedInteger {
     guard _fastPath(!overflow0) else { return nil }
     result = result0
   }
-  
+
   while let u = rest.next() {
     let d0 = _asciiDigit(codeUnit: u, radix: radix)
     guard _fastPath(d0 != nil), let d = d0 else { return nil }
@@ -62,8 +60,12 @@ where Rest.Element : UnsignedInteger {
   return result
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+//
+// TODO (TODO: JIRA): This needs to be completely rewritten. It's about 20KB of
+// always-inline code, most of which are MOV instructions.
+//
+
+@inlinable
 @inline(__always)
 internal func _parseASCII<
   CodeUnits : IteratorProtocol, Result: FixedWidthInteger
@@ -93,10 +95,9 @@ extension FixedWidthInteger {
   // _parseASCII function thunk that prevents inlining used as an implementation
   // detail for FixedWidthInteger.init(_: radix:) on the slow path to save code
   // size.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(never)
+  @usableFromInline
   internal static func _parseASCIISlowPath<
     CodeUnits : IteratorProtocol, Result: FixedWidthInteger
   >(
@@ -138,25 +139,27 @@ extension FixedWidthInteger {
   ///     `radix`.
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   public init?<S : StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
     let r = Self(radix)
     let range = text._encodedOffsetRange
     let guts = text._wholeString._guts
-    defer { _fixLifetime(guts) }
     let result: Self?
-    if _slowPath(guts._isOpaque) {
-      var i = guts._asOpaque()[range].makeIterator()
-      result = Self._parseASCIISlowPath(codeUnits: &i, radix: r)
-    } else if guts.isASCII {
-      var i = guts._unmanagedASCIIView[range].makeIterator()
-      result = _parseASCII(codeUnits: &i, radix: r)
-    } else {
-      var i = guts._unmanagedUTF16View[range].makeIterator()
-      result = Self._parseASCIISlowPath(codeUnits: &i, radix: r)
-    }
+    result = _visitGuts(guts,
+      range: (range, false), args: r,
+      ascii: { view, radix in
+        var i = view.makeIterator()
+        return _parseASCII(codeUnits: &i, radix: radix) },
+      utf16: { view, radix in
+        var i = view.makeIterator()
+        return Self._parseASCIISlowPath(codeUnits: &i, radix: radix) },
+      opaque: { view, radix in
+        var i = view.makeIterator()
+        return Self._parseASCIISlowPath(codeUnits: &i, radix: radix) }
+    )
+
     guard _fastPath(result != nil) else { return nil }
     self = result._unsafelyUnwrappedUnchecked
   }
@@ -179,7 +182,7 @@ extension FixedWidthInteger {
   ///     Int("10000000000000000000000000") // Out of range
   ///
   /// - Parameter description: The ASCII representation of a number.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init?(_ description: String) {

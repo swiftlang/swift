@@ -1,4 +1,5 @@
 #import <Foundation.h>
+#include <stdint.h>
 
 #define _CF_TYPED_ENUM __attribute__((swift_wrapper(enum)))
 #define NS_STRING_ENUM _CF_TYPED_ENUM
@@ -111,4 +112,11 @@ typedef id <Fungible> FungibleObject;
 @class Third;
 
 @interface Third : Second<Third *>
+@end
+
+typedef void (^ _Nonnull BlockPointerType)(void);
+
+@interface HasBlockArray : NSObject
+- (NSArray<BlockPointerType> * _Nonnull)blockArray;
+- (BlockPointerType)blockPointerType;
 @end

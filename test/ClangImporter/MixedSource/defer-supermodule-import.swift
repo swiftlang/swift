@@ -1,7 +1,6 @@
-// RUN: not %target-swift-frontend -F %S/Inputs/defer-supermodule-import -import-objc-header %S/Inputs/defer-supermodule-import/Some-Bridging-Header.h -typecheck %s 2>&1 | %FileCheck -check-prefix=HEADER-ERROR %s
+// RUN: not %target-swift-frontend -F %S/Inputs/defer-supermodule-import -enable-objc-interop -import-objc-header %S/Inputs/defer-supermodule-import/Some-Bridging-Header.h -typecheck %s 2>&1 | %FileCheck -check-prefix=HEADER-ERROR %s
 // HEADER-ERROR: Some-Bridging-Header.h:4:13: error: expected a type
 // HEADER-ERROR: Some-Bridging-Header.h:7:10: error: declaration of 'TYPE' must be imported from module 'Some' before it is required
-// REQUIRES: objc_interop
 
 // The bug we're testing here is that:
 //

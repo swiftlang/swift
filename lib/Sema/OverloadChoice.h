@@ -85,9 +85,9 @@ class OverloadChoice {
 
   /// We mash together OverloadChoiceKind with tuple indices into a single
   /// integer representation.
-  typedef llvm::PointerEmbeddedInt<uint32_t, 29>
-    OverloadChoiceKindWithTupleIndex;
-  
+  using OverloadChoiceKindWithTupleIndex =
+      llvm::PointerEmbeddedInt<uint32_t, 29>;
+
   /// Depending on the OverloadChoiceKind, this could be one of two cases:
   /// 1) A ValueDecl for the cases that match to a Decl.  The exactly kind of
   ///    decl reference is disambiguated with the DeclKind bits in

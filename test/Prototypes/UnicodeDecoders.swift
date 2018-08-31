@@ -9,7 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-build-swift %s -swift-version 3 -g -Onone -o %t
+// RUN: %target-build-swift %s -g -Onone -o %t
+// RUN: %target-codesign %t
 // RUN: %target-run %t
 // REQUIRES: executable_test
 
@@ -29,7 +30,7 @@
 //===----------------------------------------------------------------------===//
 extension Unicode.Scalar {
   // Hack providing an efficient API that is available to the standard library
-  @_versioned
+  @usableFromInline
   @inline(__always)
   init(_unchecked x: UInt32) { self = unsafeBitCast(x, to: Unicode.Scalar.self) }
 }

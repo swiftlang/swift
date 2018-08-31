@@ -122,9 +122,9 @@ public enum DC_PublicEnum {
 private protocol EA_PrivateProtocol {
   // CHECK: {{^}} associatedtype Foo
   associatedtype Foo
-  // CHECK: fileprivate var Bar
+  // CHECK: {{^}} var Bar
   var Bar: Int { get }
-  // CHECK: fileprivate func baz()
+  // CHECK: {{^}} func baz()
   func baz()
 } // CHECK: {{^[}]}}
 
@@ -132,9 +132,9 @@ private protocol EA_PrivateProtocol {
 public protocol EB_PublicProtocol {
   // CHECK: {{^}} associatedtype Foo
   associatedtype Foo
-  // CHECK: public var Bar
+  // CHECK: {{^}} var Bar
   var Bar: Int { get }
-  // CHECK: public func baz()
+  // CHECK: {{^}} func baz()
   func baz()
 } // CHECK: {{^[}]}}
 
@@ -345,8 +345,8 @@ public class IC_PublicAssocTypeImpl: IA_PublicAssocTypeProto, IB_FilePrivateAsso
 private class ID_PrivateAssocTypeImpl: IA_PublicAssocTypeProto, IB_FilePrivateAssocTypeProto {
   public var publicValue: Int = 0
   public var filePrivateValue: Int = 0
-  // CHECK-DAG: {{^}} internal typealias PublicValue
-  // CHECK-DAG: {{^}} internal typealias FilePrivateValue
+  // CHECK-DAG: {{^}} fileprivate typealias PublicValue
+  // CHECK-DAG: {{^}} fileprivate typealias FilePrivateValue
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: class MultipleAttributes {

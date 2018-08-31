@@ -21,8 +21,11 @@
 #include "llvm/ADT/Optional.h"
 
 namespace swift {
+  class ApplyExpr;
+  class AvailableAttr;
   class DeclContext;
   class Expr;
+  class InFlightDiagnostic;
   class TypeChecker;
   class ValueDecl;
 
@@ -39,6 +42,25 @@ bool diagnoseDeclAvailability(const ValueDecl *Decl,
                               SourceRange R,
                               bool AllowPotentiallyUnavailableProtocol,
                               bool SignalOnPotentialUnavailability);
+
+void diagnoseUnavailableOverride(ValueDecl *override,
+                                 const ValueDecl *base,
+                                 const AvailableAttr *attr);
+
+/// Emit a diagnostic for references to declarations that have been
+/// marked as unavailable, either through "unavailable" or "obsoleted:".
+bool diagnoseExplicitUnavailability(const ValueDecl *D,
+                                    SourceRange R,
+                                    const DeclContext *DC,
+                                    const ApplyExpr *call);
+
+/// Emit a diagnostic for references to declarations that have been
+/// marked as unavailable, either through "unavailable" or "obsoleted:".
+bool diagnoseExplicitUnavailability(
+    const ValueDecl *D,
+    SourceRange R,
+    const DeclContext *DC,
+    llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
 
 } // namespace swift
 

@@ -1,14 +1,14 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
 
 import Swift
 
-// CHECK-LABEL: define{{( protected)?}} void @c_native_function_pointer(void ()*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} void @c_native_function_pointer(void ()*)
 sil @c_native_function_pointer : $@convention(c) (@convention(c) () -> ()) -> () {
 entry(%f : $@convention(c) () -> ()):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @call_with_native_c_function_pointer(i8*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @call_with_native_c_function_pointer(i8*)
 sil @call_with_native_c_function_pointer : $@convention(thin) (@convention(c) () -> ()) -> () {
 entry(%f : $@convention(c) () -> ()):
   %c = function_ref @c_native_function_pointer : $@convention(c) (@convention(c) () -> ()) -> ()
@@ -16,15 +16,15 @@ entry(%f : $@convention(c) () -> ()):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @c_function_pointer_metadata()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @c_function_pointer_metadata()
 sil @c_function_pointer_metadata : $@convention(thin) () -> @thick Any.Type {
 entry:
-  // CHECK: call %swift.type* @"$SyyXCMa"()
+  // CHECK: call swiftcc %swift.metadata_response @"$SyyXCMa"([[INT]] 0)
   %m = metatype $@thick (@convention(c) () -> ()).Type
   %a = init_existential_metatype %m : $@thick (@convention(c) () -> ()).Type, $@thick Any.Type
   return %a : $@thick Any.Type
 }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$SyyXCMa"()
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SyyXCMa"(
 // --                                                                               0x3000001 -- C convention, 1 argument
 // CHECK: call %swift.type* @swift_getFunctionTypeMetadata0([[WORD:i(32|64)]] 196608, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$SytN", i32 0, i32 1))

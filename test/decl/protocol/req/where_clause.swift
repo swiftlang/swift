@@ -16,3 +16,14 @@ protocol P3 : P2 {
 }
 
 func foo<S>(_: S) where S.SubSequence.Element == C1, S : P3 {}
+
+// Invalid where clauses
+protocol InvalidWhereClause1 where Self: AnyObject {}
+// expected-error@-1 {{constraint with subject type of 'Self' is not supported; consider adding requirement to protocol inheritance clause instead}}
+
+class AlsoBad {}
+
+protocol InvalidWhereClause2 {
+  associatedtype T where Self: AlsoBad
+  // expected-error@-1 {{constraint with subject type of 'Self' is not supported; consider adding requirement to protocol inheritance clause instead}}
+}

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
+
+// RUN: %target-swift-emit-silgen -module-name objc_extensions -enable-sil-ownership -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -8,7 +9,7 @@ import objc_extensions_helper
 class Sub : Base {}
 
 extension Sub {
-  override var prop: String! {
+  @objc override var prop: String! {
     didSet {
       // Ignore it.
     }
@@ -89,10 +90,9 @@ extension Sub {
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
     // CHECK:    destroy_value [[UPCAST_SELF_COPY]]
     // CHECK:    [[BORROWED_OLD_NSSTRING_BRIDGED:%.*]] = begin_borrow [[OLD_NSSTRING_BRIDGED]]
-    // CHECK:    [[COPIED_OLD_NSSTRING_BRIDGED:%.*]] = copy_value [[BORROWED_OLD_NSSTRING_BRIDGED]]
     // This is an identity cast that should be eliminated by SILGen peepholes.
-    // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @$S15objc_extensions3SubC4propSSSgvW : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> ()
-    // CHECK:    apply [[DIDSET_NOTIFIER]]([[COPIED_OLD_NSSTRING_BRIDGED]], [[SELF]])
+    // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @$S15objc_extensions3SubC4propSSSgvW : $@convention(method) (@guaranteed Optional<String>, @guaranteed Sub) -> ()
+    // CHECK:    apply [[DIDSET_NOTIFIER]]([[BORROWED_OLD_NSSTRING_BRIDGED]], [[SELF]])
     // CHECK:    end_borrow [[BORROWED_OLD_NSSTRING_BRIDGED]] from [[OLD_NSSTRING_BRIDGED]]
     // CHECK:    destroy_value [[OLD_NSSTRING_BRIDGED]]
     // CHECK:    destroy_value [[NEW_VALUE]]
@@ -100,17 +100,16 @@ extension Sub {
 
   }
 
-  func foo() {
+  @objc func foo() {
   }
 
-  override func objCBaseMethod() {}
+  @objc override func objCBaseMethod() {}
 }
 
 // CHECK-LABEL: sil hidden @$S15objc_extensions20testOverridePropertyyyAA3SubCF
 func testOverrideProperty(_ obj: Sub) {
-  // CHECK: bb0([[ARG:%.*]] : @owned $Sub):
-  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: = objc_method [[BORROWED_ARG]] : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String?) -> ()
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $Sub):
+  // CHECK: = objc_method [[ARG]] : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String?) -> ()
   obj.prop = "abc"
 } // CHECK: } // end sil function '$S15objc_extensions20testOverridePropertyyyAA3SubCF'
 
@@ -129,7 +128,7 @@ func testCurry(_ x: Sub) {
 }
 
 extension Sub {
-  var otherProp: String {
+  @objc var otherProp: String {
     get { return "hello" }
     set { }
   }
@@ -167,7 +166,7 @@ extension SubSub {
   // CHECK:   = objc_super_method [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_2]] : $SubSub, #Sub.otherProp!setter.1.foreign
   // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY_2]] from [[UPCAST_SELF_COPY_2]]
   // CHECK: } // end sil function '$S15objc_extensions03SubC0C9otherPropSSvs'
-  override var otherProp: String {
+  @objc override var otherProp: String {
     didSet {
       // Ignore it.
     }

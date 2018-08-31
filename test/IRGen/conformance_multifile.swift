@@ -2,7 +2,13 @@
 
 func g<U>(_ f : (E) throws -> (U)) {}
 
+// The extension E: P should not show up in this filel.
+// CHECK-NOT: $S21conformance_multifile1EOAA1PAAMc
+
 // CHECK: $S21conformance_multifile1tyyF
 func t() {
   g(E2.Filter)
 }
+
+// The extension E: P should not show up in this filel.
+// CHECK-NOT: $S21conformance_multifile1EOAA1PAAMc

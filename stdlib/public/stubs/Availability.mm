@@ -30,7 +30,7 @@ using namespace swift;
 static NSDictionary *systemVersionDictionaryFromPlist() {
   NSString *plistPath = @"/System/Library/CoreServices/SystemVersion.plist";
 
-#if TARGET_IPHONE_SIMULATOR
+#if TARGET_OS_SIMULATOR
   // When targeting the iOS simulator, look in a special location so we do
   // not pick up the host OS version.
   const char *simulatorRoot = getenv("IPHONE_SIMULATOR_ROOT");

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -dump-ast %s 2>&1 | %FileCheck %s
 
-// CHECK: (func_decl "r13756261(_:_:)"
+// CHECK: (func_decl{{.*}}"r13756261(_:_:)"
 func r13756261(_ x: Bool, _ y: Int) -> Int {
   // CHECK: (if_expr
   // CHECK:   (call_expr
@@ -15,7 +15,7 @@ func r13756261(_ x: Bool, _ y: Int) -> Int {
   return (x) ? y : (x) ? y : (x) ? y : y
 }
 
-// CHECK: (func_decl "r13756221(_:_:)"
+// CHECK: (func_decl{{.*}}"r13756221(_:_:)"
 func r13756221(_ x: Bool, _ y: Int) -> Int {
   // CHECK: (if_expr
   // CHECK:   (call_expr
@@ -33,7 +33,7 @@ func r13756221(_ x: Bool, _ y: Int) -> Int {
        : y
 }
 
-// CHECK: (func_decl "telescoping_if(_:_:)"
+// CHECK: (func_decl{{.*}}"telescoping_if(_:_:)"
 func telescoping_if(_ x: Bool, _ y: Int) -> Int {
   // CHECK: (if_expr
   // CHECK:   (call_expr
@@ -69,7 +69,7 @@ func +>> (x: Bool, y: Bool) -> Bool {}
 func +<< (x: Bool, y: Bool) -> Bool {}
 func +== (x: Bool, y: Bool) -> Bool {}
 
-// CHECK: (func_decl "prec_above(_:_:_:)"
+// CHECK: (func_decl{{.*}}"prec_above(_:_:_:)"
 func prec_above(_ x: Bool, _ y: Bool, _ z: Bool) -> Bool {
   // (x +>> y) ? (y +>> z) : ((x +>> y) ? (y +>> z) : (x +>> y))
   // CHECK: (if_expr
@@ -82,7 +82,7 @@ func prec_above(_ x: Bool, _ y: Bool, _ z: Bool) -> Bool {
   return x +>> y ? y +>> z : x +>> y ? y +>> z : x +>> y
 }
 
-// CHECK: (func_decl "prec_below(_:_:_:)"
+// CHECK: (func_decl{{.*}}"prec_below(_:_:_:)"
 func prec_below(_ x: Bool, _ y: Bool, _ z: Bool) -> Bool {
   // The middle arm of the ternary is max-munched, so this is:
   // ((x +<< (y ? (y +<< z) : x)) +<< (y ? (y +<< z) : x)) +<< y
@@ -102,7 +102,7 @@ func prec_below(_ x: Bool, _ y: Bool, _ z: Bool) -> Bool {
   return x +<< y ? y +<< z : x +<< y ? y +<< z : x +<< y
 }
 
-// CHECK: (func_decl "prec_equal(_:_:_:)"
+// CHECK: (func_decl{{.*}}"prec_equal(_:_:_:)"
 func prec_equal(_ x: Bool, _ y: Bool, _ z: Bool) -> Bool {
   // The middle arm of the ternary is max-munched, so this is:
   // x +== (y ? (y +== z) : (x +== (y ? (y +== z) : (x +== y))))

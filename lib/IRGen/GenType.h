@@ -56,31 +56,31 @@ namespace irgen {
   class FixedTypeInfo;
   class LoadableTypeInfo;
   class TypeInfo;
-  class UnownedTypeInfo;
-  class WeakTypeInfo;
   
 /// Either a type or a forward-declaration.
-typedef llvm::PointerUnion<const TypeInfo*, llvm::Type*> TypeCacheEntry;
+using TypeCacheEntry = llvm::PointerUnion<const TypeInfo *, llvm::Type *>;
 
 /// The helper class for generating types.
 class TypeConverter {
 public:
   IRGenModule &IGM;
 private:
-  llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
+  bool CompletelyFragile = false;
+
+  llvm::DenseMap<ProtocolDecl*, std::unique_ptr<const ProtocolInfo>> Protocols;
   const TypeInfo *FirstType;
   
-  const ProtocolInfo *FirstProtocol;
   const LoadableTypeInfo *NativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
   const LoadableTypeInfo *RawPointerTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
-  const LoadableTypeInfo *TypeMetadataPtrTI = nullptr;
-  const LoadableTypeInfo *ObjCClassPtrTI = nullptr;
+  const TypeInfo *TypeMetadataPtrTI = nullptr;
+  const TypeInfo *ObjCClassPtrTI = nullptr;
   const LoadableTypeInfo *EmptyTI = nullptr;
 
-  const TypeInfo *ResilientStructTI = nullptr;
+  const TypeInfo *AccessibleResilientStructTI = nullptr;
+  const TypeInfo *InaccessibleResilientStructTI = nullptr;
   
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     OpaqueStorageTypes;
@@ -90,7 +90,7 @@ private:
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     PODBoxTI;
   const LoadableTypeInfo *SwiftRetainablePointerBoxTI = nullptr,
-                         *UnknownRetainablePointerBoxTI = nullptr;
+                         *UnknownObjectRetainablePointerBoxTI = nullptr;
 
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
@@ -121,37 +121,40 @@ private:
   const LoadableTypeInfo *convertBuiltinNativeObject();
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();
-  const TypeInfo *convertResilientStruct();
-  const TypeInfo *convertUnmanagedStorageType(UnmanagedStorageType *T);
-  const TypeInfo *convertUnownedStorageType(UnownedStorageType *T);
-  const TypeInfo *convertWeakStorageType(WeakStorageType *T);
+  const TypeInfo *convertResilientStruct(IsABIAccessible_t abiAccessible);
+#define REF_STORAGE(Name, ...) \
+  const TypeInfo *convert##Name##StorageType(Name##StorageType *T);
+#include "swift/AST/ReferenceStorage.def"
   
 public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
 
+  bool isCompletelyFragile() const {
+    return CompletelyFragile;
+  }
+
   TypeCacheEntry getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
-  const TypeInfo *tryGetCompleteTypeInfo(CanType type);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
-  const LoadableTypeInfo &getTypeMetadataPtrTypeInfo();
-  const LoadableTypeInfo &getObjCClassPtrTypeInfo();
+  const TypeInfo &getTypeMetadataPtrTypeInfo();
+  const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();
-  const TypeInfo &getResilientStructTypeInfo();
-  const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
+  const TypeInfo &getResilientStructTypeInfo(IsABIAccessible_t abiAccessible);
+  const ProtocolInfo &getProtocolInfo(ProtocolDecl *P, ProtocolInfoKind kind);
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize,
                                                    Alignment storageAlign);
-  const LoadableTypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);
+  const TypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);
 
-  const WeakTypeInfo *createWeakStorageType(llvm::Type *valueType,
-                                            ReferenceCounting style);
-  const TypeInfo *createUnownedStorageType(llvm::Type *valueType,
-                                           ReferenceCounting style);
-  const LoadableTypeInfo *createUnmanagedStorageType(llvm::Type *valueType);
+#define REF_STORAGE(Name, ...) \
+  const TypeInfo *create##Name##StorageType(llvm::Type *valueType, \
+                                            ReferenceCounting style, \
+                                            bool isOptional);
+#include "swift/AST/ReferenceStorage.def"
 
   /// Enter a generic context for lowering the parameters of a generic function
   /// type.
@@ -159,6 +162,12 @@ public:
   
   /// Exit a generic context.
   void popGenericContext(CanGenericSignature signature);
+
+  /// Enter a scope where all types are lowered bypassing resilience.
+  void pushCompletelyFragile();
+
+  /// Exit a completely fragile scope.
+  void popCompletelyFragile();
 
   /// Retrieve the generic environment for the current generic context.
   ///
@@ -169,10 +178,6 @@ private:
   // Debugging aids.
 #ifndef NDEBUG
   bool isExemplarArchetype(ArchetypeType *arch) const;
-
-  LLVM_ATTRIBUTE_DEPRECATED(
-    CanType getTypeThatLoweredTo(llvm::Type *t) const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
 #endif
 
   ArchetypeType *getExemplarArchetype(ArchetypeType *t);
@@ -181,19 +186,12 @@ private:
   class Types_t {
     llvm::DenseMap<TypeBase*, TypeCacheEntry> IndependentCache;
     llvm::DenseMap<TypeBase*, TypeCacheEntry> DependentCache;
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> &getCacheFor(TypeBase *t);
+    llvm::DenseMap<TypeBase*, TypeCacheEntry> FragileIndependentCache;
+    llvm::DenseMap<TypeBase*, TypeCacheEntry> FragileDependentCache;
 
-    friend TypeCacheEntry TypeConverter::getTypeEntry(CanType T);
-    friend TypeCacheEntry TypeConverter::convertAnyNominalType(CanType Type,
-                                                           NominalTypeDecl *D);
-    friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
-    friend ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t);
-    friend void TypeConverter::popGenericContext(CanGenericSignature signature);
-    
-#ifndef NDEBUG
-    friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const;
-    friend bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const;
-#endif
+  public:
+    llvm::DenseMap<TypeBase*, TypeCacheEntry> &getCacheFor(bool isDependent,
+                                                           bool completelyFragile);
   };
   Types_t Types;
 };
@@ -216,6 +214,26 @@ public:
   
   ~GenericContextScope() {
     TC.popGenericContext(sig);
+  }
+};
+
+/// An RAII interface for forcing types to be lowered bypassing resilience.
+class CompletelyFragileScope {
+  bool State;
+  TypeConverter &TC;
+public:
+  explicit CompletelyFragileScope(TypeConverter &TC) : TC(TC) {
+    State = TC.isCompletelyFragile();
+    if (!State)
+      TC.pushCompletelyFragile();
+  }
+
+  CompletelyFragileScope(IRGenModule &IGM)
+    : CompletelyFragileScope(IGM.Types) {}
+
+  ~CompletelyFragileScope() {
+    if (!State)
+      TC.popCompletelyFragile();
   }
 };
 

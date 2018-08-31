@@ -76,7 +76,7 @@ func matchStar(_ c: Character, _ regexp: Substring, _ text: Substring) -> Bool {
   }
 }
 
-let tests: DictionaryLiteral = [
+let tests: KeyValuePairs = [
   "^h..lo*!$":"hellooooo!",
   "^h..lo*!$":"hella noms",
   ".ab":"abracadabra!",

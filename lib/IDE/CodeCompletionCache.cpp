@@ -137,6 +137,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto result = llvm::support::endian::read32le(cursor);
     cursor += sizeof(result);
     assert(cursor <= end);
+    (void)end;
     return result;
   };
 
@@ -289,7 +290,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
                               const CodeCompletionCache::Key &K,
                               CodeCompletionCache::Value &V) {
   using namespace llvm::support;
-  endian::Writer<little> LE(out);
+  endian::Writer LE(out, little);
 
   // HEADER
   // Metadata required for reading the completions.
@@ -305,7 +306,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
     llvm::raw_svector_ostream OSS(scratch);
     OSS << K.ModuleFilename << "\0";
     OSS << K.ModuleName << "\0";
-    endian::Writer<little> OSSLE(OSS);
+    endian::Writer OSSLE(OSS, little);
     OSSLE.write(K.AccessPath.size());
     for (StringRef p : K.AccessPath)
       OSS << p << "\0";
@@ -321,7 +322,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
   llvm::raw_string_ostream results(results_);
   std::string chunks_;
   llvm::raw_string_ostream chunks(chunks_);
-  endian::Writer<little> chunksLE(chunks);
+  endian::Writer chunksLE(chunks, little);
   std::string strings_;
   llvm::raw_string_ostream strings(strings_);
 
@@ -329,7 +330,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
     if (str.empty())
       return ~0u;
     auto size = strings.tell();
-    endian::Writer<little> LE(strings);
+    endian::Writer LE(strings, little);
     LE.write(static_cast<uint32_t>(str.size()));
     strings << str;
     return static_cast<uint32_t>(size);
@@ -353,7 +354,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
 
   // RESULTS
   {
-    endian::Writer<little> LE(results);
+    endian::Writer LE(results, little);
     for (CodeCompletionResult *R : V.Sink.Results) {
       // FIXME: compress bitfield
       LE.write(static_cast<uint8_t>(R->getKind()));

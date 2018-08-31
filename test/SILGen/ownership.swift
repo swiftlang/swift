@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -module-name Swift -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -module-name Swift -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 protocol Error {}
 

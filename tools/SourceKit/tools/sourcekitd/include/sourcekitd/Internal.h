@@ -59,6 +59,7 @@ enum class CustomBufferKind {
   InheritedTypesArray,
   DocStructureElementArray,
   AttributesArray,
+  RawData
 };
 
 class ResponseBuilder {
@@ -77,8 +78,10 @@ public:
     void set(SourceKit::UIdent Key, sourcekitd_uid_t UID);
     void set(SourceKit::UIdent Key, const char *Str);
     void set(SourceKit::UIdent Key, llvm::StringRef Str);
+    void set(SourceKit::UIdent Key, const std::string &Str);
     void set(SourceKit::UIdent Key, int64_t val);
     void set(SourceKit::UIdent Key, llvm::ArrayRef<llvm::StringRef> Strs);
+    void set(SourceKit::UIdent Key, llvm::ArrayRef<std::string> Strs);
     void setBool(SourceKit::UIdent Key, bool val);
     Array setArray(SourceKit::UIdent Key);
     Dictionary setDictionary(SourceKit::UIdent Key);
@@ -217,6 +220,8 @@ struct VariantFunctions {
   const char *(*string_get_ptr)(sourcekitd_variant_t obj);
   int64_t (*int64_get_value)(sourcekitd_variant_t obj);
   sourcekitd_uid_t (*uid_get_value)(sourcekitd_variant_t obj);
+  size_t (*data_get_size)(sourcekitd_variant_t obj);
+  const void *(*data_get_ptr)(sourcekitd_variant_t obj);
 };
 
 }

@@ -5,7 +5,7 @@ class B {
 }
 
 class A : B {
-  let x: Int
+  let x: Int // expected-note {{change 'let' to 'var' to make it mutable}}
 
   init() {
     self.x = 12

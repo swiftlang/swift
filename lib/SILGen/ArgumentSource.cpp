@@ -168,13 +168,15 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
     llvm_unreachable("argument source is invalid");
   case Kind::LValue: {
     auto loc = getKnownLValueLocation();
-    return SGF.emitAddressOfLValue(loc, std::move(*this).asKnownLValue(),
-                                   AccessKind::ReadWrite);
+    LValue &&lv = std::move(*this).asKnownLValue();
+    return SGF.emitAddressOfLValue(loc, std::move(lv));
   }
   case Kind::RValue: {
     auto loc = getKnownRValueLocation();
     if (auto init = C.getEmitInto()) {
-      std::move(*this).asKnownRValue(SGF).forwardInto(SGF, loc, init);
+      std::move(*this).asKnownRValue(SGF)
+                      .ensurePlusOne(SGF, loc)
+                      .forwardInto(SGF, loc, init);
       return ManagedValue::forInContext();
     } else {
       return std::move(*this).asKnownRValue(SGF).getAsSingleValue(SGF, loc);
@@ -183,8 +185,8 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
   case Kind::Expr: {
     auto e = std::move(*this).asKnownExpr();
     if (e->isSemanticallyInOutExpr()) {
-      return SGF.emitAddressOfLValue(e, SGF.emitLValue(e, AccessKind::ReadWrite),
-                                     AccessKind::ReadWrite);
+      auto lv = SGF.emitLValue(e, SGFAccessKind::ReadWrite);
+      return SGF.emitAddressOfLValue(e, std::move(lv));
     } else {
       return SGF.emitRValueAsSingleValue(e, C);
     }
@@ -354,7 +356,7 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF,
   // RValue about the formal type (by using the lowered type) because
   // we're emitting into an abstracted value, which RValue doesn't
   // really handle.
-  auto substLoweredType = destTL.getLoweredType().getSwiftRValueType();
+  auto substLoweredType = destTL.getLoweredType().getASTType();
   RValue(SGF, loc, substLoweredType, outputValue).forwardInto(SGF, loc, dest);
 }
 
@@ -404,6 +406,105 @@ void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
     out << "Expr\n";
     Storage.get<Expr*>(StoredKind)->dump(out); // FIXME: indent
     return;
+  }
+  llvm_unreachable("bad kind");
+}
+
+void PreparedArguments::emplaceEmptyArgumentList(SILGenFunction &SGF) {
+  emplace(CanType(TupleType::getEmpty(SGF.getASTContext())), /*scalar*/ false);
+  assert(isValid());
+}
+
+PreparedArguments
+PreparedArguments::copy(SILGenFunction &SGF, SILLocation loc) const {
+  if (isNull()) return PreparedArguments();
+
+  assert(isValid());
+  PreparedArguments result(getFormalType(), isScalar());
+  for (auto &elt : Arguments) {
+    assert(elt.isRValue());
+    result.add(elt.getKnownRValueLocation(),
+               elt.asKnownRValue().copy(SGF, loc));
+  }
+  assert(isValid());
+  return result;
+}
+
+bool PreparedArguments::isObviouslyEqual(const PreparedArguments &other) const {
+  if (isNull() != other.isNull())
+    return false;
+  if (isNull())
+    return true;
+
+  assert(isValid() && other.isValid());
+  if (Arguments.size() != other.Arguments.size())
+    return false;
+  for (auto i : indices(Arguments)) {
+    if (!Arguments[i].isObviouslyEqual(other.Arguments[i]))
+      return false;
+  }
+  return true;
+}
+
+bool ArgumentSource::isObviouslyEqual(const ArgumentSource &other) const {
+  if (StoredKind != other.StoredKind)
+    return false;
+
+  switch (StoredKind) {
+  case Kind::Invalid:
+    llvm_unreachable("argument source is invalid");
+  case Kind::RValue:
+    return asKnownRValue().isObviouslyEqual(other.asKnownRValue());
+  case Kind::LValue:
+    return false; // TODO?
+  case Kind::Expr:
+    return false; // TODO?
+  case Kind::Tuple: {
+    auto &selfTuple = Storage.get<TupleStorage>(StoredKind);
+    auto &otherTuple = other.Storage.get<TupleStorage>(other.StoredKind);
+    if (selfTuple.Elements.size() != otherTuple.Elements.size())
+      return false;
+    for (auto i : indices(selfTuple.Elements)) {
+      if (!selfTuple.Elements[i].isObviouslyEqual(otherTuple.Elements[i]))
+        return false;
+    }
+    return true;
+  }
+  }
+  llvm_unreachable("bad kind");
+}
+
+PreparedArguments PreparedArguments::copyForDiagnostics() const {
+  if (isNull())
+    return PreparedArguments();
+
+  assert(isValid());
+  PreparedArguments result(getFormalType(), isScalar());
+  for (auto &arg : Arguments) {
+    result.Arguments.push_back(arg.copyForDiagnostics());
+  }
+  return result;
+}
+
+ArgumentSource ArgumentSource::copyForDiagnostics() const {
+  switch (StoredKind) {
+  case Kind::Invalid:
+    return ArgumentSource();
+  case Kind::LValue:
+    // We have no way to copy an l-value for diagnostics.
+    return {getKnownLValueLocation(), LValue()};
+  case Kind::RValue:
+    return {getKnownRValueLocation(), asKnownRValue().copyForDiagnostics()};
+  case Kind::Expr:
+    return asKnownExpr();
+  case Kind::Tuple: {
+    auto &tuple = Storage.get<TupleStorage>(StoredKind);
+    SmallVector<ArgumentSource, 4> copiedElements;
+    for (auto &elt : tuple.Elements) {
+      copiedElements.push_back(elt.copyForDiagnostics());
+    }
+    return {tuple.Loc, tuple.SubstType, copiedElements};
+  }
   }
   llvm_unreachable("bad kind");
 }

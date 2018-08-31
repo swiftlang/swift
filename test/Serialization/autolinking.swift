@@ -38,10 +38,10 @@ import someModule
 // FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-framework", !"someModule"}
 
 // NO-FORCE-LOAD-NOT: FORCE_LOAD
-// FORCE-LOAD: define weak_odr void @"_swift_FORCE_LOAD_$_module"() {
+// FORCE-LOAD: define void @"_swift_FORCE_LOAD_$_module"() {
 // FORCE-LOAD:   ret void
 // FORCE-LOAD: }
-// FORCE-LOAD-HEX: define weak_odr void @"_swift_FORCE_LOAD_$306d6f64756c65"() {
+// FORCE-LOAD-HEX: define void @"_swift_FORCE_LOAD_$306d6f64756c65"() {
 // FORCE-LOAD-HEX:   ret void
 // FORCE-LOAD-HEX: }
 

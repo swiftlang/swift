@@ -35,7 +35,7 @@ extension Dictionary {
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
   public init(_cocoaDictionary: _NSDictionary) {
-    _sanityCheck(
+    assert(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
       "Dictionary can be backed by NSDictionary storage only when both key and value are bridged verbatim to Objective-C")
@@ -121,7 +121,7 @@ extension Dictionary : _ObjectiveCBridgeable {
       return result != nil
     }
 
-    result = Swift._dictionaryBridgeFromObjectiveCConditional(anyDict)
+    result = anyDict as? Dictionary
     return result != nil
   }
 
@@ -135,6 +135,14 @@ extension Dictionary : _ObjectiveCBridgeable {
     var result: Dictionary? = nil
     _forceBridgeFromObjectiveC(d!, result: &result)
     return result!
+  }
+}
+
+extension NSDictionary : _HasCustomAnyHashableRepresentation {
+  // Must be @nonobjc to avoid infinite recursion during bridging
+  @nonobjc
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(self as! Dictionary<AnyHashable, AnyHashable>)
   }
 }
 
@@ -184,7 +192,8 @@ extension NSDictionary : Sequence {
 
 extension NSMutableDictionary {
   // Bridging subscript.
-  override public subscript(key: Any) -> Any? {
+  @objc override public subscript(key: Any) -> Any? {
+    @objc(_swift_objectForKeyedSubscript:)
     get {
       return self.object(forKey: key)
     }
@@ -219,8 +228,8 @@ extension NSDictionary {
     let alignment = MemoryLayout<AnyObject>.alignment
     let singleSize = stride * numElems
     let totalSize = singleSize * 2
-    _sanityCheck(stride == MemoryLayout<NSCopying>.stride)
-    _sanityCheck(alignment == MemoryLayout<NSCopying>.alignment)
+    assert(stride == MemoryLayout<NSCopying>.stride)
+    assert(alignment == MemoryLayout<NSCopying>.alignment)
 
     // Allocate a buffer containing both the keys and values.
     let buffer = UnsafeMutableRawPointer.allocate(

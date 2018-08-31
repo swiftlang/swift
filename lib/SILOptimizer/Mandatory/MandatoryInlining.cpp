@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/ImmutableSet.h"
@@ -259,8 +260,7 @@ static void collectPartiallyAppliedArguments(
 static SILFunction *getCalleeFunction(
     SILFunction *F, FullApplySite AI, bool &IsThick,
     SmallVectorImpl<std::pair<SILValue, ParameterConvention>> &CaptureArgs,
-    SmallVectorImpl<SILValue> &FullArgs, PartialApplyInst *&PartialApply,
-    SILModule::LinkingMode Mode) {
+    SmallVectorImpl<SILValue> &FullArgs, PartialApplyInst *&PartialApply) {
   IsThick = false;
   PartialApply = nullptr;
   CaptureArgs.clear();
@@ -404,15 +404,17 @@ static SILFunction *getCalleeFunction(
     return nullptr;
   }
 
-  // If CalleeFunction is a declaration, see if we can load it. If we fail to
-  // load it, bail.
-  if (CalleeFunction->empty()
-      && !AI.getModule().linkFunction(CalleeFunction, Mode))
-    return nullptr;
-
   // If the CalleeFunction is a not-transparent definition, we can not process
   // it.
   if (CalleeFunction->isTransparent() == IsNotTransparent)
+    return nullptr;
+
+  // If CalleeFunction is a declaration, see if we can load it.
+  if (CalleeFunction->empty())
+    AI.getModule().loadFunction(CalleeFunction);
+
+  // If we fail to load it, bail.
+  if (CalleeFunction->empty())
     return nullptr;
 
   if (F->isSerialized() &&
@@ -432,23 +434,18 @@ static SILFunction *getCalleeFunction(
 static std::tuple<FullApplySite, SILBasicBlock::iterator>
 tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
                            ClassHierarchyAnalysis *CHA) {
-  auto NewInstPair = tryDevirtualizeApply(InnerAI, CHA);
-  auto *NewInst = NewInstPair.first;
-  if (!NewInst)
+  auto NewInst = tryDevirtualizeApply(InnerAI, CHA);
+  if (!NewInst) {
     return std::make_tuple(InnerAI, I);
+  }
 
-  replaceDeadApply(InnerAI, NewInst);
+  deleteDevirtualizedApply(InnerAI);
 
-  auto newApplyAI = NewInstPair.second.getInstruction();
+  auto newApplyAI = NewInst.getInstruction();
   assert(newApplyAI && "devirtualized but removed apply site?");
-  I = newApplyAI->getIterator();
-  auto NewAI = FullApplySite::isa(newApplyAI);
-  // *NOTE*, it is important that we return I here since we may have
-  // devirtualized but not have a full apply site anymore.
-  if (!NewAI)
-    return std::make_tuple(FullApplySite(), I);
 
-  return std::make_tuple(NewAI, I);
+  return std::make_tuple(FullApplySite::isa(newApplyAI),
+                         newApplyAI->getIterator());
 }
 
 /// \brief Inlines all mandatory inlined functions into the body of a function,
@@ -466,8 +463,8 @@ tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
 ///
 /// \returns true if successful, false if failed due to circular inlining.
 static bool
-runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
-                         SILModule::LinkingMode Mode,
+runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
+			 SILFunction *F, FullApplySite AI,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet,
@@ -515,13 +512,13 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       bool IsThick;
       PartialApplyInst *PAI;
       SILFunction *CalleeFunction = getCalleeFunction(
-          F, InnerAI, IsThick, CaptureArgs, FullArgs, PAI, Mode);
+          F, InnerAI, IsThick, CaptureArgs, FullArgs, PAI);
 
       if (!CalleeFunction)
         continue;
 
       // Then recursively process it first before trying to inline it.
-      if (!runOnFunctionRecursively(CalleeFunction, InnerAI, Mode,
+      if (!runOnFunctionRecursively(FuncBuilder, CalleeFunction, InnerAI,
                                     FullyInlinedSet, SetFactory,
                                     CurrentInliningSet, CHA)) {
         // If we failed due to circular inlining, then emit some notes to
@@ -538,15 +535,10 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         return false;
       }
 
-      // Create our initial list of substitutions.
-      llvm::SmallVector<Substitution, 16> ApplySubs(InnerAI.subs_begin(),
-                                                    InnerAI.subs_end());
-
-      // Then if we have a partial_apply, add any additional subsitutions that
-      // we may require to the end of the list.
-      if (PAI) {
-        copy(PAI->getSubstitutions(), std::back_inserter(ApplySubs));
-      }
+      // Get our list of substitutions.
+      auto Subs = (PAI
+                   ? PAI->getSubstitutionMap()
+                   : InnerAI.getSubstitutionMap());
 
       SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
       F->getModule().registerDeleteNotificationHandler(
@@ -559,8 +551,8 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
       }
 
-      SILInliner Inliner(*F, *CalleeFunction,
-                         SILInliner::InlineKind::MandatoryInline, ApplySubs,
+      SILInliner Inliner(FuncBuilder, *F, *CalleeFunction,
+                         SILInliner::InlineKind::MandatoryInline, Subs,
                          OpenedArchetypesTracker);
       if (!Inliner.canInlineFunction(InnerAI)) {
         // See comment above about casting when devirtualizing and how this
@@ -575,9 +567,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // process the inlined body after inlining, because the inlining may
       // have exposed new inlining opportunities beyond those present in
       // the inlined function when processed independently.
-      DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
-                         << " into @" << InnerAI.getFunction()->getName()
-                         << "\n");
+      LLVM_DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
+                              << " into @" << InnerAI.getFunction()->getName()
+                              << "\n");
 
       // If we intend to inline a thick function, then we need to balance the
       // reference counts for correctness.
@@ -629,49 +621,31 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// MandatoryInlining reruns on deserialized functions for two reasons, both
-/// unrelated to mandatory inlining:
-///
-/// 1. It recursively visits the entire call tree rooted at transparent
-/// functions. This has the effect of linking all reachable functions. If they
-/// aren't linked until the explicit SILLinker pass, then they don't benefit
-/// from rerunning optimizations like PredictableMemOps. Ideally we wouldn't
-/// need to rerun PredictableMemOps and wouldn't need to eagerly link anything
-/// in the mandatory pipeline.
-///
-/// 2. It may devirtualize non-transparent methods. It's not clear whether we
-/// really need to devirtualize this early without actually inlining, but it can
-/// unblock other optimizations in the mandatory pipeline.
+
 class MandatoryInlining : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
     ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
     SILModule *M = getModule();
-    SILModule::LinkingMode Mode = getOptions().LinkMode;
     bool ShouldCleanup = !getOptions().DebugSerialization;
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
 
+    SILOptFunctionBuilder FuncBuilder(*this);
     for (auto &F : *M) {
       // Don't inline into thunks, even transparent callees.
       if (F.isThunk())
         continue;
 
-      runOnFunctionRecursively(&F,
-                               FullApplySite(static_cast<ApplyInst*>(nullptr)),
-                               Mode, FullyInlinedSet,
-                               SetFactory, SetFactory.getEmptySet(), CHA);
+      // Skip deserialized functions.
+      if (F.wasDeserializedCanonical())
+        continue;
+
+      runOnFunctionRecursively(FuncBuilder, &F,
+                               FullApplySite(), FullyInlinedSet, SetFactory,
+                               SetFactory.getEmptySet(), CHA);
     }
 
-    // Make sure that we de-serialize all transparent functions,
-    // even if we didn't inline them for some reason.
-    // Transparent functions are not available externally, so we
-    // have to generate code for them.
-    for (auto &F : *M) {
-      if (F.isTransparent())
-        M->linkFunction(&F, Mode);
-    }
-    
     if (!ShouldCleanup)
       return;
 
@@ -702,10 +676,8 @@ class MandatoryInlining : public SILModuleTransform {
       if (F.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
         continue;
 
-      notifyDeleteFunction(&F);
-
       // Okay, just erase the function from the module.
-      M->eraseFunction(&F);
+      FuncBuilder.eraseFunction(&F);
     }
   }
 

@@ -29,7 +29,7 @@ class SimpleChildClass : SimpleClass {
     let _ = SimpleChildClass.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
 
     // The enum should have a case for each of the vars.
-    // NOTE: This expectedxerror will need to be removed in the future.
+    // NOTE: This expected error will need to be removed in the future.
     let _ = SimpleChildClass.CodingKeys.w // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
 
     // Inherited vars should not be part of the CodingKeys enum.
@@ -50,3 +50,30 @@ let _ = SimpleChildClass.encode(to:)
 // The synthesized CodingKeys type should not be accessible from outside the
 // class.
 let _ = SimpleChildClass.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
+
+// Check access level issues around 'private'.
+private class PrivateClass: Codable {
+  var x: Int = 1
+}
+
+private class PrivateClassChild: PrivateClass {}
+
+_ = PrivateClass.init(from:)
+_ = PrivateClass.encode(to:)
+_ = PrivateClassChild.init(from:)
+_ = PrivateClassChild.encode(to:)
+
+_ = PrivateClass.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
+
+// Check access level issues around 'open'.
+open class OpenClass: Codable {
+  var x: Int = 1
+}
+open class OpenClassChild: OpenClass {}
+
+_ = OpenClass.init(from:)
+_ = OpenClass.encode(to:)
+_ = OpenClassChild.init(from:)
+_ = OpenClassChild.encode(to:)
+
+_ = OpenClass.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}

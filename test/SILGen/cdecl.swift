@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [thunk] @pear : $@convention(c)
 // CHECK:         function_ref @$S5cdecl5apple{{[_0-9a-zA-Z]*}}F

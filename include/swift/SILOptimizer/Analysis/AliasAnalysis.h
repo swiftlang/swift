@@ -155,11 +155,12 @@ private:
 
 
 public:
-  AliasAnalysis(SILModule *M) :
-    SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr), EA(nullptr) {}
+  AliasAnalysis(SILModule *M)
+      : SILAnalysis(SILAnalysisKind::Alias), Mod(M), SEA(nullptr), EA(nullptr) {
+  }
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::Alias;
+    return S->getKind() == SILAnalysisKind::Alias;
   }
   
   virtual void initialize(SILPassManager *PM) override;
@@ -280,11 +281,11 @@ public:
   }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override { }
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {}
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override { }
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {}
 
   virtual void invalidateFunctionTables() override { }
 };

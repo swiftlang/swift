@@ -8,8 +8,8 @@ public func f<Type>(_ value : Type)
   // CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %[[ALLOCA:[^,]+]],
   // CHECK-SAME:       metadata ![[ARG:.*]], metadata !DIExpression())
   // CHECK: store %swift.opaque* %1, %swift.opaque** %[[ALLOCA]], align
-  // No deref here: The argument is an Archetype and this implicitly indirect.
-  // CHECK: ![[TY:.*]] = !DICompositeType({{.*}}identifier: "$S12generic_arg31fyyxlFQq_D"
+  // No deref here.
+  // CHECK: ![[TY:.*]] = !DICompositeType({{.*}}identifier: "$SxD"
   // CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
   // CHECK-SAME:                        line: [[@LINE+1]], type: ![[TY]])
   apply(value) { arg in return arg }

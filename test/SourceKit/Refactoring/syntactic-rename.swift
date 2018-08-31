@@ -126,9 +126,9 @@ _ = Memberwise2.init(m: 2, n: Memberwise1(x: 34))
 // RUN: diff -u %S/syntactic-rename/rename-memberwise.expected %t.result/rename-memberwise.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-layer.in.json %s >> %t.result/rename-layer.expected
 // RUN: diff -u %S/syntactic-rename/rename-layer.expected %t.result/rename-layer.expected
-// RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-P.in.json %s -- -swift-version 3 >> %t.result/rename-P.expected
+// RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-P.in.json %s >> %t.result/rename-P.expected
 // RUN: diff -u %S/syntactic-rename/rename-P.expected %t.result/rename-P.expected
-// RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/keywordbase.in.json %s -- -swift-version 3 >> %t.result/keywordbase.expected
+// RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/keywordbase.in.json %s >> %t.result/keywordbase.expected
 // RUN: diff -u %S/syntactic-rename/keywordbase.expected %t.result/keywordbase.expected
 
 // RUN: %empty-directory(%t.ranges)

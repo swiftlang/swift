@@ -65,25 +65,6 @@ public:
   static ParameterList *createWithoutLoc(ParamDecl *decl) {
     return create(decl->getASTContext(), decl);
   }
-  
-  /// Create an implicit 'self' decl for a method in the specified decl context.
-  /// If 'static' is true, then this is self for a static method in the type.
-  ///
-  /// Note that this decl is created, but it is returned with an incorrect
-  /// DeclContext that needs to be set correctly.  This is automatically handled
-  /// when a function is created with this as part of its argument list.
-  ///
-  static ParameterList *createUnboundSelf(SourceLoc loc, DeclContext *DC);
-
-  /// Create an implicit 'self' decl for a method in the specified decl context.
-  /// If 'static' is true, then this is self for a static method in the type.
-  ///
-  /// Note that this decl is created, but it is returned with an incorrect
-  /// DeclContext that needs to be set correctly.  This is automatically handled
-  /// when a function is created with this as part of its argument list.
-  static ParameterList *createSelf(SourceLoc loc, DeclContext *DC,
-                                   bool isStatic = false,
-                                   bool isInOut = false);
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
@@ -142,23 +123,14 @@ public:
   ParameterList *clone(const ASTContext &C,
                        OptionSet<CloneFlags> options = None) const;
 
-  /// Return a TupleType or ParenType for this parameter list,
+  /// Return a list of function parameters for this parameter list,
+  /// based on the interface types of the parameters in this list.
+  void getParams(SmallVectorImpl<AnyFunctionType::Param> &params) const;
+
+  /// Return a list of function parameters for this parameter list,
   /// based on types provided by a callback.
-  Type getType(const ASTContext &C,
-               llvm::function_ref<Type(ParamDecl *)> getType) const;
-
-  /// Return a TupleType or ParenType for this parameter list, written in terms
-  /// of contextual archetypes.
-  Type getType(const ASTContext &C) const;
-
-  /// Return a TupleType or ParenType for this parameter list, written in terms
-  /// of interface types.
-  Type getInterfaceType(const ASTContext &C) const;
-
-  /// Return the full function type for a set of curried parameter lists that
-  /// returns the specified result type written in terms of interface types.
-  static Type getFullInterfaceType(Type resultType, ArrayRef<ParameterList*> PL,
-                                   const ASTContext &C);
+  void getParams(SmallVectorImpl<AnyFunctionType::Param> &params,
+                 llvm::function_ref<Type(ParamDecl *)> getType) const;
 
 
   /// Return the full source range of this parameter.

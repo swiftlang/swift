@@ -4,7 +4,7 @@ struct Outer {
   int value;
 };
 
-struct InnerInSwift4 {
+struct InnerInSwift5 {
   int value;
 };
 

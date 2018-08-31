@@ -1,0 +1,7 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %S/Inputs/FixedPointConversion.swift.gyb -o %t/FixedPointConversion.swift
+// RUN: %line-directive %t/FixedPointConversion.swift -- %target-build-swift %t/FixedPointConversion.swift -o %t/a.out_Debug -Onone
+// RUN: %target-codesign %t/a.out_Debug
+//
+// RUN: %line-directive %t/FixedPointConversion.swift -- %target-run %t/a.out_Debug
+// REQUIRES: executable_test

@@ -94,7 +94,7 @@ func test9(_ i: Int, io: Int?) {
   let _: Double = result2
 
   let result3 = test9_helper2(i)
-  var _: Double = result3
+  var _: Int = result3
   let result4 = test9_helper2(io)
   let _: Double = result4
 }
@@ -209,7 +209,7 @@ func sr2752(x: String?, y: String?) {
 var sr3248 : ((Int) -> ())!
 sr3248?(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
 sr3248!(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
-sr3248(a: 2)  // expected-error {{cannot call value of non-function type '((Int) -> ())?'}}
+sr3248(a: 2)  // expected-error {{extraneous argument label 'a:' in call}}
 
 struct SR_3248 {
     var callback: (([AnyObject]) -> Void)!
@@ -271,4 +271,24 @@ class Bar {
 // rdar://problem/37508855
 func rdar37508855(_ e1: X?, _ e2: X?) -> [X] {
   return [e1, e2].filter { $0 == nil }.map { $0! }
+}
+
+func se0213() {
+  struct Q: ExpressibleByStringLiteral {
+    typealias StringLiteralType =  String
+
+    var foo: String
+
+    init?(_ possibleQ: StringLiteralType) {
+      return nil
+    }
+
+    init(stringLiteral str: StringLiteralType) {
+      self.foo = str
+    }
+  }
+
+  _ = Q("why")?.foo // Ok
+  _ = Q("who")!.foo // Ok
+  _ = Q?("how") // Ok
 }

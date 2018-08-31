@@ -52,23 +52,6 @@ public:
     {}
   };
 
-  class AccessorBodyState {
-    ParserPos BodyPos;
-    SavedScope Scope;
-    SourceLoc LBLoc;
-    friend class Parser;
-
-    SavedScope takeScope() {
-      return std::move(Scope);
-    }
-
-  public:
-    AccessorBodyState(SourceRange BodyRange, SourceLoc PreviousLoc,
-                      SavedScope &&Scope, SourceLoc LBLoc)
-        : BodyPos{BodyRange.Start, PreviousLoc}, Scope(std::move(Scope)),
-          LBLoc(LBLoc) {}
-  };
-
   enum class DelayedDeclKind {
     TopLevelCodeDecl,
     Decl,
@@ -104,15 +87,10 @@ public:
   bool PerformConditionEvaluation = true;
 private:
   ScopeInfo ScopeInfo;
-  typedef llvm::DenseMap<AbstractFunctionDecl *,
-                         std::unique_ptr<FunctionBodyState>>
-      DelayedFunctionBodiesTy;
+  using DelayedFunctionBodiesTy =
+      llvm::DenseMap<AbstractFunctionDecl *,
+                     std::unique_ptr<FunctionBodyState>>;
   DelayedFunctionBodiesTy DelayedFunctionBodies;
-
-  typedef llvm::DenseMap<AbstractFunctionDecl *,
-                         std::unique_ptr<AccessorBodyState>>
-      DelayedAccessorBodiesTy;
-  DelayedAccessorBodiesTy DelayedAccessorBodies;
 
   /// \brief Parser sets this if it stopped parsing before the buffer ended.
   ParserPosition MarkedPos;
@@ -132,13 +110,6 @@ public:
   takeFunctionBodyState(AbstractFunctionDecl *AFD);
 
   bool hasFunctionBodyState(AbstractFunctionDecl *AFD);
-
-  void delayAccessorBodyParsing(AbstractFunctionDecl *AFD,
-                                SourceRange BodyRange,
-                                SourceLoc PreviousLoc,
-                                SourceLoc LBLoc);
-  std::unique_ptr<AccessorBodyState>
-  takeAccessorBodyState(AbstractFunctionDecl *AFD);
 
   void delayDecl(DelayedDeclKind Kind, unsigned Flags,
                  DeclContext *ParentContext,

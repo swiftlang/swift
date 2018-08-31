@@ -4,7 +4,7 @@
 import Foundation
 
 class Foo : NSObject {
-  dynamic func foo(_ f: (Int64) -> Int64, x: Int64) -> Int64 {
+  @objc dynamic func foo(_ f: (Int64) -> Int64, x: Int64) -> Int64 {
     return f(x)
   }
 }

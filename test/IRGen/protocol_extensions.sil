@@ -24,7 +24,7 @@ bb0(%0 : $*Self):
   return %5 : $()                                 // id: %6
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_TFP19protocol_extensions2P16extP1bUS0___fQPS0_FT_T_
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @_TFP19protocol_extensions2P16extP1bUS0___fQPS0_FT_T_
 sil @_TFP19protocol_extensions2P16extP1bUS0___fQPS0_FT_T_ : $@convention(method) <Self where Self : P1> (@in Self) -> () {
 bb0(%0 : $*Self):
   debug_value_addr %0 : $*Self, let, name "self" // id: %1

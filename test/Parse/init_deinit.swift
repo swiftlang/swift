@@ -11,15 +11,14 @@ struct FooStructConstructorB {
 struct FooStructConstructorC {
   init {} // expected-error {{expected '('}}{{7-7=()}}
   init<T> {} // expected-error {{expected '('}} {{10-10=()}}
-	// expected-error@-1{{generic parameter 'T' is not used in function signature}}
   init? { self.init() } // expected-error {{expected '('}} {{8-8=()}}
 }
 
 
 struct FooStructDeinitializerA {
   deinit // expected-error {{expected '{' for deinitializer}}
-  deinit x // expected-error {{deinitializers cannot have a name}} {{10-12=}}
-  deinit x() // expected-error {{deinitializers cannot have a name}} {{10-11=}}
+  deinit x // expected-error {{deinitializers cannot have a name}} {{10-12=}}  expected-error {{expected '{' for deinitializer}}
+  deinit x() // expected-error {{deinitializers cannot have a name}} {{10-11=}} expected-error {{no parameter clause allowed on deinitializer}} {{11-13=}} expected-error {{expected '{' for deinitializer}}
 }
 
 struct FooStructDeinitializerB {
@@ -36,6 +35,10 @@ class FooClassDeinitializerA {
 
 class FooClassDeinitializerB {
   deinit { }
+}
+
+class FooClassDeinitializerC {
+  deinit x (a : Int) {} // expected-error {{deinitializers cannot have a name}} {{10-12=}} expected-error{{no parameter clause allowed on deinitializer}}{{12-22=}}
 }
 
 init {} // expected-error {{initializers may only be declared within a type}} expected-error {{expected '('}} {{5-5=()}}

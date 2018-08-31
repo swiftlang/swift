@@ -378,3 +378,19 @@ typealias NotAnInt = Double
 extension X11 where NotAnInt == Int { }
 // expected-warning@-1{{neither type in same-type constraint ('NotAnInt' (aka 'Double') or 'Int') refers to a generic parameter or associated type}}
 // expected-error@-2{{generic signature requires types 'NotAnInt' (aka 'Double') and 'Int' to be the same}}
+
+
+struct X12<T> { }
+
+protocol P12 {
+  associatedtype A
+  associatedtype B
+}
+
+func testP12a<T: P12>(_: T) where T.A == X12<Int>, T.A == X12<T.B>, T.B == Int { }
+// expected-warning@-1{{redundant same-type constraint 'T.B' == 'Int'}}
+// expected-note@-2{{same-type constraint 'T.B' == 'Int' written here}}
+
+func testP12b<T: P12>(_: T) where T.B == Int, T.A == X12<T.B>, X12<T.B> == T.A { }
+// expected-warning@-1{{redundant same-type constraint 'T.A' == 'X12<Int>'}}
+// expected-note@-2{{same-type constraint 'T.A' == 'X12<Int>' written here}}

@@ -36,9 +36,7 @@ namespace swift {
   class DeclName;
 
   /// \brief Typecheck a declaration parsed during code completion.
-  ///
-  /// \returns true on success, false on error.
-  bool typeCheckCompletionDecl(Decl *D);
+  void typeCheckCompletionDecl(Decl *D);
 
   /// \brief Check if T1 is convertible to T2.
   ///
@@ -53,12 +51,6 @@ namespace swift {
 
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
-
-  /// \brief Given an unresolved member E and its parent P, this function tries
-  /// to infer the type of E.
-  /// \returns true on success, false on error.
-  bool typeCheckUnresolvedExpr(DeclContext &DC, Expr* E,
-                               Expr *P, SmallVectorImpl<Type> &PossibleTypes);
 
   enum InterestedMemberKind : uint8_t {
     Viable,
@@ -147,8 +139,8 @@ namespace swift {
     bool IsSynthesized;
   };
 
-  typedef llvm::function_ref<void(ArrayRef<ExtensionInfo>)>
-      ExtensionGroupOperation;
+  using ExtensionGroupOperation =
+      llvm::function_ref<void(ArrayRef<ExtensionInfo>)>;
 
   class SynthesizedExtensionAnalyzer {
     struct Implementation;

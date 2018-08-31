@@ -270,7 +270,8 @@ TEST_F(LexerTest, BOMNoCommentNoTrivia) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::None, TriviaRetentionMode::WithoutTrivia);
+          HashbangMode::Disallowed, CommentRetentionMode::None,
+          TriviaRetentionMode::WithoutTrivia);
   
   Token Tok;
   syntax::Trivia LeadingTrivia, TrailingTrivia;
@@ -301,7 +302,8 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::ReturnAsTokens, TriviaRetentionMode::WithoutTrivia);
+          HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
+          TriviaRetentionMode::WithoutTrivia);
   
   Token Tok;
   syntax::Trivia LeadingTrivia, TrailingTrivia;
@@ -359,7 +361,8 @@ TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::AttachToNextToken, TriviaRetentionMode::WithoutTrivia);
+          HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
+          TriviaRetentionMode::WithoutTrivia);
   
   Token Tok;
   syntax::Trivia LeadingTrivia, TrailingTrivia;
@@ -390,7 +393,8 @@ TEST_F(LexerTest, BOMNoCommentTrivia) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::None, TriviaRetentionMode::WithTrivia);
+          HashbangMode::Disallowed, CommentRetentionMode::None,
+          TriviaRetentionMode::WithTrivia);
   
   Token Tok;
   syntax::Trivia LeadingTrivia, TrailingTrivia;
@@ -431,7 +435,8 @@ TEST_F(LexerTest, BOMAttachCommentTrivia) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
   Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::AttachToNextToken, TriviaRetentionMode::WithTrivia);
+          HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
+          TriviaRetentionMode::WithTrivia);
   
   Token Tok;
   syntax::Trivia LeadingTrivia, TrailingTrivia;
@@ -630,6 +635,29 @@ TEST_F(LexerTest, getLocForStartOfToken) {
   }
 }
 
+TEST_F(LexerTest, getLocForStartOfTokenWithCustomSourceLocation) {
+  const char *Source =
+      "aaa \n"
+      // This next line is exactly 50 bytes to make it easy to compare with the
+      // previous test.
+      "#sourceLocation(file: \"custom-50.swuft\", line: 9)\n"
+      " \tbbb \"hello\" \"-\\(val)-\"";
+
+  unsigned BufferID = SourceMgr.addMemBufferCopy(Source);
+
+  // First is character offset, second is its token offset.
+  unsigned Offs[][2] =
+    { {1, 0}, {2, 0}, {3, 3}, {4, 4},
+      {56, 56}, {59, 57}, {64, 61},
+      // interpolated string
+      {70, 69}, {73, 73}, {74, 73}, {75, 73}, {76, 76}, {77, 69} };
+
+  for (auto Pair : Offs) {
+    ASSERT_EQ(Lexer::getLocForStartOfToken(SourceMgr, BufferID, Pair[0]),
+              SourceMgr.getLocForOffset(BufferID, Pair[1]));
+  }
+}
+
 TEST_F(LexerTest, NestedSubLexers) {
   const char *Source = "aaa0 bbb1 ccc2 ddd3 eee4 fff5 ggg6";
 
@@ -747,8 +775,8 @@ TEST_F(LexerTest, DiagnoseEmbeddedNul) {
   Diags.addConsumer(DiagConsumer);
 
   Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
-          /*InSILMode=*/false, CommentRetentionMode::None,
-          TriviaRetentionMode::WithTrivia);
+          /*InSILMode=*/false, HashbangMode::Disallowed,
+          CommentRetentionMode::None, TriviaRetentionMode::WithTrivia);
 
   ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
                              "1, 2: nul character embedded in middle of file"));
@@ -769,8 +797,8 @@ TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
   Diags.addConsumer(DiagConsumer);
 
   Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
-          /*InSILMode=*/false, CommentRetentionMode::None,
-          TriviaRetentionMode::WithTrivia,
+          /*InSILMode=*/false, HashbangMode::Disallowed,
+          CommentRetentionMode::None, TriviaRetentionMode::WithTrivia,
           /*Offset=*/5, /*EndOffset=*/SourceLen);
 
   ASSERT_FALSE(containsPrefix(

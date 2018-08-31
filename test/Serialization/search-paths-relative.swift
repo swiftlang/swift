@@ -12,8 +12,6 @@
 // RUN: %FileCheck %s < %t/has_xref.swiftmodule.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/has_xref.swiftmodule.txt
 
-// XFAIL: linux
-
 import has_xref
 
 numeric(42)

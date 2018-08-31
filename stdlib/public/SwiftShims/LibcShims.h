@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -130,7 +130,7 @@ int _stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr);
 // Environment
 #if defined(__APPLE__) || defined(__FreeBSD__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
-char * _Nullable *_stdlib_getEnviron();
+char * _Nullable * _Null_unspecified _stdlib_getEnviron();
 #endif
 
 // System error numbers <errno.h>
@@ -143,11 +143,9 @@ void _stdlib_setErrno(int value);
 SWIFT_READNONE SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_size_t _stdlib_malloc_size(const void *ptr);
 
-// Random number <random>
+// Random number for stdlib
 SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_uint32_t _stdlib_cxx11_mt19937(void);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_uint32_t _stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
+void _stdlib_random(void *buf, __swift_size_t nbytes);
 
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE
@@ -182,16 +180,14 @@ long double _stdlib_squareRootl(long double _self) {
 }
 #endif
 
-// Apple's math.h does not declare lgamma_r() etc by default
+// Apple's math.h does not declare lgamma_r() etc by default, but they're
+// unconditionally exported by libsystem_m.dylib in all OS versions that
+// support Swift development; we simply need to provide declarations here.
 #if defined(__APPLE__)
-SWIFT_RUNTIME_STDLIB_INTERNAL
-float _stdlib_lgammaf_r(float x, int *psigngam);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-double _stdlib_lgamma_r(double x, int *psigngam);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-long double _stdlib_lgammal_r(long double x, int *psigngam);
+float lgammaf_r(float x, int *psigngam);
+double lgamma_r(double x, int *psigngam);
+long double lgammal_r(long double x, int *psigngam);
 #endif // defined(__APPLE__)
-
 
 // TLS - thread local storage
 

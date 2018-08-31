@@ -182,8 +182,10 @@ main()
 // CHECK-IR-LABEL: define {{.*}} @_swift_eager_class_initialization
 // CHECK-IR-NEXT:  entry:
 // CHECK-IR-NEXT:    call {{.*}}IntClassCMa
+// CHECK-IR-NEXT:    extractvalue
 // CHECK-IR-NEXT:    call void asm
 // CHECK-IR-NEXT:    call {{.*}}DoubleClassCMa
+// CHECK-IR-NEXT:    extractvalue
 // CHECK-IR-NEXT:    call void asm
 // CHECK-IR-NEXT:    ret
 

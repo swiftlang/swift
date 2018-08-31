@@ -171,9 +171,8 @@ def main():
 
         out_file.write("}\n")
 
-    # Open the dot file (should be done with Graphviz).
-
-    subprocess.call(["open", file_name])
+    # Open the dot file.
+    subprocess.call(["open", "-a", "Graphviz", file_name])
 
 
 if __name__ == '__main__':

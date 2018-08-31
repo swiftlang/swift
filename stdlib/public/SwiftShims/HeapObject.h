@@ -13,6 +13,7 @@
 #define SWIFT_STDLIB_SHIMS_HEAPOBJECT_H
 
 #include "RefCount.h"
+#include "SwiftStddef.h"
 #include "System.h"
 
 #define SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_64 16
@@ -30,6 +31,7 @@ template <typename Target> struct TargetHeapMetadata;
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 #else
 typedef struct HeapMetadata HeapMetadata;
+typedef struct HeapObject HeapObject;
 #endif
 
 // The members of the HeapObject header that are not shared by a
@@ -65,9 +67,18 @@ struct HeapObject {
 extern "C" {
 #endif
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void _swift_instantiateInertHeapObject(void *address,
                                        const HeapMetadata *metadata);
+
+SWIFT_RUNTIME_STDLIB_API
+__swift_size_t swift_retainCount(HeapObject *obj);
+
+SWIFT_RUNTIME_STDLIB_API
+__swift_size_t swift_unownedRetainCount(HeapObject *obj);
+
+SWIFT_RUNTIME_STDLIB_API
+__swift_size_t swift_weakRetainCount(HeapObject *obj);
 
 #ifdef __cplusplus
 } // extern "C"

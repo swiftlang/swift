@@ -27,6 +27,7 @@
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/DJB.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 
@@ -317,7 +318,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      return llvm::HashString(key.second);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.second, 0);
     } else {
       return (hash_value_type)key.first;
     }
@@ -379,7 +381,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -429,7 +432,7 @@ class ModuleFile::LocalDeclTableInfo {
 public:
   using internal_key_type = StringRef;
   using external_key_type = internal_key_type;
-  using data_type = std::pair<DeclID, unsigned>; // ID, local discriminator
+  using data_type = DeclID;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -438,7 +441,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -447,7 +451,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, sizeof(uint32_t) + sizeof(unsigned) };
+    return { keyLength, sizeof(uint32_t) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -456,9 +460,7 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    auto declID = endian::readNext<uint32_t, little, unaligned>(data);
-    auto discriminator = endian::readNext<unsigned, little, unaligned>(data);
-    return { declID, discriminator };
+    return endian::readNext<uint32_t, little, unaligned>(data);
   }
 };
 
@@ -475,7 +477,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -530,7 +533,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     if (key.first == DeclBaseName::Kind::Normal) {
-      return llvm::HashString(key.second);
+      // FIXME: DJB seed=0, audit whether the default seed could be used.
+      return llvm::djbHash(key.second, 0);
     } else {
       return (hash_value_type)key.first;
     }
@@ -596,9 +600,8 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
     unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, dataLength };
+    return { sizeof(uint32_t), dataLength };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -703,7 +706,8 @@ public:
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -831,6 +835,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         setEntryPointClassID(scratch.front());
         break;
+      case index_block::ORDERED_TOP_LEVEL_DECLS:
+        OrderedTopLevelDecls.assign(scratch.begin(), scratch.end());
+        break;
       case index_block::LOCAL_TYPE_DECLS:
         LocalTypeDecls = readLocalDeclTable(scratch, blobData);
         break;
@@ -851,6 +858,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::GENERIC_ENVIRONMENT_OFFSETS:
         assert(blobData.empty());
         GenericEnvironments.assign(scratch.begin(), scratch.end());
+        break;
+      case index_block::SUBSTITUTION_MAP_OFFSETS:
+        assert(blobData.empty());
+        SubstitutionMaps.assign(scratch.begin(), scratch.end());
         break;
       case index_block::NORMAL_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
@@ -890,7 +901,8 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     assert(!key.empty());
-    return llvm::HashString(key);
+    // FIXME: DJB seed=0, audit whether the default seed could be used.
+    return llvm::djbHash(key, 0);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -1128,7 +1140,6 @@ ModuleFile::ModuleFile(
       }
 
       cursor.EnterSubBlock(INPUT_BLOCK_ID);
-      bool seenFlags = false;
 
       auto next = cursor.advance();
       while (next.Kind == llvm::BitstreamEntry::Record) {
@@ -1167,15 +1178,6 @@ ModuleFile::ModuleFile(
           assert(importedHeaderInfo.contents.empty() &&
                  "contents seen already");
           importedHeaderInfo.contents = blobData;
-          break;
-        }
-        case input_block::MODULE_FLAGS: {
-          assert(!seenFlags && "only one flags record allowed");
-          seenFlags = true;
-          bool hasUnderlyingModule;
-          input_block::ModuleFlagsLayout::readRecord(scratch,
-                                                     hasUnderlyingModule);
-          Bits.HasUnderlyingModule = hasUnderlyingModule;
           break;
         }
         case input_block::SEARCH_PATH: {
@@ -1433,11 +1435,6 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
-    // This is for backwards-compatibility with modules that still rely on the
-    // "HasUnderlyingModule" flag.
-    if (Bits.HasUnderlyingModule && module == ShadowedModule)
-      dependency.forceExported();
-
     if (scopePath.empty()) {
       dependency.Import = { {}, module };
     } else {
@@ -1447,6 +1444,13 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       std::pair<Identifier, SourceLoc> accessPathElem(scopeID, SourceLoc());
       dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
                            module};
+    }
+
+    if (!module->hasResolvedImports()) {
+      // Notice that we check this condition /after/ recording the module that
+      // caused the problem. Clients need to be able to track down what the
+      // cycle was.
+      return error(Status::CircularDependency);
     }
   }
 
@@ -1461,6 +1465,17 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   }
 
   return getStatus();
+}
+
+std::unique_ptr<llvm::MemoryBuffer> ModuleFile::takeBufferForDiagnostics() {
+  assert(getStatus() != Status::Valid);
+
+  // Today, the only buffer that might have diagnostics in them is the input
+  // buffer, and even then only if it has imported module contents.
+  if (!importedHeaderInfo.contents.empty())
+    return std::move(ModuleInputBuffer);
+
+  return nullptr;
 }
 
 ModuleFile::~ModuleFile() { }
@@ -1520,7 +1535,7 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
   if (iter == LocalTypeDecls->end())
     return nullptr;
 
-  return cast<TypeDecl>(getDecl((*iter).first));
+  return cast<TypeDecl>(getDecl(*iter));
 }
 
 TypeDecl *ModuleFile::lookupNestedType(Identifier name,
@@ -1591,9 +1606,26 @@ void ModuleFile::getImportedModules(
   PrettyStackTraceModuleFile stackEntry(*this);
 
   for (auto &dep : Dependencies) {
-    if (filter != ModuleDecl::ImportFilter::All &&
-        (filter == ModuleDecl::ImportFilter::Public) ^ dep.isExported())
-      continue;
+    switch (filter) {
+    case ModuleDecl::ImportFilter::All:
+      // We're including all imports.
+      break;
+
+    case ModuleDecl::ImportFilter::Private:
+      // Skip @_exported imports.
+      if (dep.isExported())
+        continue;
+
+      break;
+
+    case ModuleDecl::ImportFilter::Public:
+      // Only include @_exported imports.
+      if (!dep.isExported())
+        continue;
+
+      break;
+    }
+
     assert(dep.isLoaded());
     results.push_back(dep.Import);
   }
@@ -1643,8 +1675,8 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
 
           SmallVector<ValueDecl *, 8> Decls;
           TopLevelModule->lookupQualified(
-              ModuleType::get(TopLevelModule), ScopeID,
-              NL_QualifiedDefault | NL_KnownNoDependency, nullptr, Decls);
+              TopLevelModule, ScopeID,
+              NL_QualifiedDefault | NL_KnownNoDependency, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&
                  "deserialized imports should not be ambiguous");
@@ -1839,6 +1871,8 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
       } else {
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(mem.takeError());
+        llvm::consumeError(mem.takeError());
+
         // Treat this as a cache-miss to the caller and let them attempt
         // to refill through the normal loadAllMembers() path.
         return None;
@@ -1871,7 +1905,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
+        if (auto nominal = dc->getSelfNominalTypeDecl())
           if (nominal->getName() == accessPath.front().first)
             results.push_back(vd);
       }
@@ -1884,7 +1918,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
+        if (auto nominal = dc->getSelfNominalTypeDecl())
           if (nominal->getName() == accessPath.front().first)
             results.push_back(vd);
       }
@@ -1913,7 +1947,7 @@ void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
-        if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
+        if (auto nominal = dc->getSelfNominalTypeDecl())
           if (nominal->getName() == accessPath.front().first)
             consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
       }
@@ -1957,48 +1991,15 @@ ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
 void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
   PrettyStackTraceModuleFile stackEntry(*this);
-  if (PrecedenceGroupDecls) {
-    for (auto entry : PrecedenceGroupDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
+  for (DeclID entry : OrderedTopLevelDecls) {
+    Expected<Decl *> declOrError = getDeclChecked(entry);
+    if (!declOrError) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(declOrError.takeError());
+      llvm::consumeError(declOrError.takeError());
+      continue;
     }
-  }
-
-  if (OperatorDecls) {
-    for (auto entry : OperatorDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
-    }
-  }
-
-  if (TopLevelDecls) {
-    for (auto entry : TopLevelDecls->data()) {
-      for (auto item : entry) {
-        Expected<Decl *> declOrError = getDeclChecked(item.second);
-        if (!declOrError) {
-          if (!getContext().LangOpts.EnableDeserializationRecovery)
-            fatal(declOrError.takeError());
-          llvm::consumeError(declOrError.takeError());
-          continue;
-        }
-        results.push_back(declOrError.get());
-      }
-    }
-  }
-
-  if (ExtensionDecls) {
-    for (auto entry : ExtensionDecls->data()) {
-      for (auto item : entry) {
-        Expected<Decl *> declOrError = getDeclChecked(item.second);
-        if (!declOrError) {
-          if (!getContext().LangOpts.EnableDeserializationRecovery)
-            fatal(declOrError.takeError());
-          llvm::consumeError(declOrError.takeError());
-          continue;
-        }
-        results.push_back(declOrError.get());
-      }
-    }
+    results.push_back(declOrError.get());
   }
 }
 
@@ -2008,10 +2009,8 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
   if (!LocalTypeDecls)
     return;
 
-  for (auto entry : LocalTypeDecls->data()) {
-    auto DeclID = entry.first;
+  for (auto DeclID : LocalTypeDecls->data()) {
     auto TD = cast<TypeDecl>(getDecl(DeclID));
-    TD->setLocalDiscriminator(entry.second);
     results.push_back(TD);
   }
 }

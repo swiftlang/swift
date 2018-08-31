@@ -19,9 +19,9 @@
 // NEGATIVE-MAIN-NOT: serialized-diagnostics-batch-mode-helper.swift
 // NEGATIVE-HELPER-NOT: serialized-diagnostics-batch-mode.swift
 
-// CHECK-MAIN-DAG: serialized-diagnostics-batch-mode-other.swift:{{[0-9]+}}:6: error: invalid redeclaration of 'foo()' 
-// CHECK-HELPER-DAG: serialized-diagnostics-batch-mode-other.swift:{{[0-9]+}}:6: error: invalid redeclaration of 'foo()'
-// CHECK-STDERR-DAG: serialized-diagnostics-batch-mode-other.swift:{{[0-9]+}}:6: error: invalid redeclaration of 'foo()'
+// NEGATIVE-MAIN-NOT: invalid redeclaration of 'foo()'
+// NEGATIVE-HELPER-NOT: invalid redeclaration of 'foo()'
+// NEGATIVE-STDERR-NOT: invalid redeclaration of 'foo()'
 
 func test() {
   nonexistent() // CHECK-MAIN-DAG: serialized-diagnostics-batch-mode.swift:[[@LINE]]:3: error: use of unresolved identifier 'nonexistent'

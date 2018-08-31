@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-as-library -o %t %S/Inputs/ModuleA.swift
 // RUN: %target-swift-frontend -emit-module -parse-as-library -o %t %S/Inputs/ModuleB.swift
-// RUN: %target-swift-frontend -parse-as-library -I%t %s -Xllvm -sil-disable-pass=GlobalOpt -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-emit-sil -parse-as-library -I%t %s -Xllvm -sil-disable-pass=GlobalOpt -O | %FileCheck %s
 
 import ModuleA
 import ModuleB
@@ -13,7 +13,7 @@ var mygg = 29
 
 // CHECK: sil_global private{{.*}} @globalinit_[[T3:.*]]_token0
 
-//@_inlineable
+//@inlinable
 public func sum() -> Int {
   return mygg + get_gg_a() + get_gg_b()
 }

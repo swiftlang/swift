@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -o %t/ErrorBridged -DPTR_SIZE_%target-ptrsize -module-name main -swift-version 3 %s
+// RUN: %target-run %t/ErrorBridged
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -274,6 +276,16 @@ ErrorBridgingTests.test("Error-to-NSError bridging") {
     expectEqual(ns6._code, 4812)
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
+}
+
+ErrorBridgingTests.test("NSError-to-error bridging in bridged container") {
+  autoreleasepool {
+    let error = NSError(domain: "domain", code: 42, userInfo: nil)
+    let nsdictionary = ["error": error] as NSDictionary
+    let dictionary = nsdictionary as? Dictionary<String, Error>
+    expectNotNil(dictionary)
+    expectEqual(error, dictionary?["error"] as NSError?)
+  }
 }
 
 ErrorBridgingTests.test("enum-to-NSError round trip") {
@@ -598,6 +610,14 @@ enum DefaultCustomizedError3 : UInt, CustomNSError {
   case bad = 9
   case worse = 115
 
+  #if PTR_SIZE_64
+  case dreadful = 0xFFFFFFFFFFFFFFFF
+#elseif PTR_SIZE_32
+  case dreadful = 0xFFFFFFFF
+#else
+#error ("Unknown pointer size")
+#endif
+  
   static var errorDomain: String {
     return "customized3"
   }
@@ -613,6 +633,7 @@ ErrorBridgingTests.test("Default-customized via CustomNSError") {
   expectEqual(1, (DefaultCustomizedError1.worse as NSError).code)
   expectEqual(13, (DefaultCustomizedError2.worse as NSError).code)
   expectEqual(115, (DefaultCustomizedError3.worse as NSError).code)
+  expectEqual(-1, (DefaultCustomizedError3.dreadful as NSError).code)
   expectEqual("main.DefaultCustomizedError1", (DefaultCustomizedError1.worse as NSError).domain)
   expectEqual("customized3", (DefaultCustomizedError3.worse as NSError).domain)
   expectEqual("main.DefaultCustomizedParent.ChildError", (DefaultCustomizedParent.ChildError.foo as NSError).domain)

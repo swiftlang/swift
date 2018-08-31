@@ -15,15 +15,9 @@ import Foundation
 
 #if os(iOS) || os(watchOS)
 
-// Simply extending the INRideOption type doesn't work due to:
-// <rdar://problem/29447066>
-// Compiler incorrectly handles combinations of availability declarations on
-// independent axes.
-public protocol _INRideOptionMeteredFare {
-  var __usesMeteredFare: NSNumber? { get set }
-}
-
-extension _INRideOptionMeteredFare {
+@available(iOS 10.0, watchOS 3.2, *)
+extension INRideOption {
+  @available(iOS 10.0, watchOS 3.2, *)
   @available(swift, obsoleted: 4)
   @nonobjc
   public var usesMeteredFare: NSNumber? {
@@ -35,6 +29,7 @@ extension _INRideOptionMeteredFare {
     }
   }
 
+  @available(iOS 10.0, watchOS 3.2, *)
   @available(swift, introduced: 4.0)
   @nonobjc
   public var usesMeteredFare: Bool? {
@@ -45,10 +40,6 @@ extension _INRideOptionMeteredFare {
       __usesMeteredFare = newUsesMeteredFare.map { NSNumber(value: $0) }
     }
   }
-}
-
-@available(iOS 10.0, watchOS 3.2, *)
-extension INRideOption : _INRideOptionMeteredFare {
 }
 
 #endif

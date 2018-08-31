@@ -262,8 +262,12 @@ protocol AProtocol {
   // CHECK-NEXT: RelChild | protocol/Swift | AProtocol | s:14swift_ide_test9AProtocolP
 }
 
-protocol Q where Self: AProtocol {}
-// CHECK: [[@LINE-1]]:24 | protocol/Swift | AProtocol | [[AProtocol_USR]] | Ref | rel: 0
+protocol QBase {
+  associatedtype A
+}
+
+protocol Q : QBase where Self.A: AProtocol {}
+// CHECK: [[@LINE-1]]:34 | protocol/Swift | AProtocol | [[AProtocol_USR]] | Ref | rel: 0
 
 class ASubClass : AClass, AProtocol {
 // CHECK: [[@LINE-1]]:7 | class/Swift | ASubClass | s:14swift_ide_test9ASubClassC | Def | rel: 0
@@ -483,3 +487,18 @@ final class FinalClass {
   func foo() {}
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | {{.*}} | Def,RelChild | rel: 1
 }
+
+struct StructWithKeypath {
+  var x: Int = 0
+
+  subscript(idx: Int) -> Int { get { } set { } }
+}
+
+_ = \StructWithKeypath.x
+// CHECK: [[@LINE-1]]:24 | instance-property/Swift | x | s:14swift_ide_test17StructWithKeypathV1xSivp | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:24 | instance-method/acc-get/Swift | getter:x | s:14swift_ide_test17StructWithKeypathV1xSivg | Ref,Call,Impl | rel: 0
+
+_ = \StructWithKeypath.[0]
+// CHECK: [[@LINE-1]]:24 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test17StructWithKeypathVyS2icip | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:24 | instance-method/acc-get/Swift | getter:subscript(_:) | s:14swift_ide_test17StructWithKeypathVyS2icig | Ref,Call,Impl | rel: 0
+

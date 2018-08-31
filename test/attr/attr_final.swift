@@ -11,7 +11,7 @@ class Super {
 }
 
 class Sub : Super {
-  override var i: Int { get { return 5 } } // expected-error{{var overrides a 'final' var}}
+  override var i: Int { get { return 5 } } // expected-error{{property overrides a 'final' property}}
   override func foo() { }  // expected-error{{instance method overrides a 'final' instance method}}
   override subscript (i: Int) -> Int {  // expected-error{{subscript overrides a 'final' subscript}}
     get { 
@@ -40,8 +40,8 @@ protocol SomeProtocol {
 }
 
 extension SomeProtocol {
-  final var i: Int { return 1 } // expected-warning {{functions in a protocol extension do not need to be marked with 'final'}}
-  final func protoExtensionFunc() {}  // expected-warning {{functions in a protocol extension do not need to be marked with 'final'}} {{3-9=}}
+  final var i: Int { return 1 } // expected-error {{only classes and class members may be marked with 'final'}} {{3-9=}}
+  final func protoExtensionFunc() {}  // expected-error {{only classes and class members may be marked with 'final'}} {{3-9=}}
 }
 
 extension SomeStruct {
@@ -71,7 +71,7 @@ class Super2 {
 }
 
 class Sub2 : Super2 { //// expected-error{{inheritance from a final class 'Super2'}}
-  override var i: Int { get { return 5 } } // expected-error{{var overrides a 'final' var}}
+  override var i: Int { get { return 5 } } // expected-error{{property overrides a 'final' property}}
   override func foo() { }  // expected-error{{instance method overrides a 'final' instance method}}
   override subscript (i: Int) -> Int {  // expected-error{{subscript overrides a 'final' subscript}}
     get { 

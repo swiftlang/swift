@@ -46,7 +46,9 @@ public let PrefixWhile = [
   BenchmarkInfo(
     name: "PrefixWhile${Name}",
     runFunction: run_PrefixWhile${Name},
-    tags: [.validation, .api${', .Array' if Name == 'Array' else ''}]),
+    tags: [.validation, .api${
+      ', .Array' if Name == 'Array' else
+        ', .unstable' if 'CountableRange' in Name or 'AnySeqCntRange' in Name else ''}]),
 % end
 ]
 
@@ -63,3 +65,7 @@ public func run_PrefixWhile${Name}(_ N: Int) {
   }
 }
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

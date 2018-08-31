@@ -4,6 +4,8 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 
 add_swift_library(swiftAST STATIC
+  AccessScopeChecker.cpp
+  AccessRequests.cpp
   ASTContext.cpp
   ASTDumper.cpp
   ASTMangler.cpp
@@ -22,11 +24,11 @@ add_swift_library(swiftAST STATIC
   Decl.cpp
   DeclContext.cpp
   DeclNameLoc.cpp
-  DefaultArgumentKind.cpp
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
   DiagnosticList.cpp
   DocComment.cpp
+  Evaluator.cpp
   Expr.cpp
   GenericEnvironment.cpp
   GenericSignature.cpp
@@ -38,6 +40,7 @@ add_swift_library(swiftAST STATIC
   ModuleLoader.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp
+  NameLookupRequests.cpp
   Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
@@ -48,11 +51,10 @@ add_swift_library(swiftAST STATIC
   SyntaxASTMap.cpp
   SILLayout.cpp
   Stmt.cpp
-  Substitution.cpp
-  SubstitutionList.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
   Type.cpp
+  TypeCheckRequests.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp

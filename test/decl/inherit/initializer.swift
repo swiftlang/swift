@@ -58,8 +58,7 @@ class NotInherited1 : D {
 
 func testNotInherited1() {
   var n1 = NotInherited1(int: 5)
-  var n2 = NotInherited1(double: 2.71828) // expected-error{{argument labels '(double:)' do not match any available overloads}}
-  // expected-note @-1 {{overloads for 'NotInherited1' exist with these partially matching parameter lists: (int: Int), (float: Float)}}
+  var n2 = NotInherited1(double: 2.71828) // expected-error{{incorrect argument label in call (have 'double:', expected 'float:')}}
 }
 
 class NotInherited1Sub : NotInherited1 {
@@ -71,8 +70,7 @@ class NotInherited1Sub : NotInherited1 {
 func testNotInherited1Sub() {
   var n1 = NotInherited1Sub(int: 5)
   var n2 = NotInherited1Sub(float: 3.14159)
-  var n3 = NotInherited1Sub(double: 2.71828) // expected-error{{argument labels '(double:)' do not match any available overloads}}
-  // expected-note @-1 {{overloads for 'NotInherited1Sub' exist with these partially matching parameter lists: (int: Int), (float: Float)}}
+  var n3 = NotInherited1Sub(double: 2.71828) // expected-error{{incorrect argument label in call (have 'double:', expected 'float:')}}
 }
 
 // Having a stored property without an initial value prevents
@@ -92,55 +90,16 @@ func testNotInherited2() {
   var n2 = NotInherited2(double: 2.72828) // expected-error{{'NotInherited2' cannot be constructed because it has no accessible initializers}}
 }
 
-// Inheritance of unnamed parameters.
-class SuperUnnamed {
-  init(int _: Int) { }
-  init(_ : Double) { }
-
-  init(string _: String) { }
-  init(_ : Float) { }
-}
-
-class SubUnnamed : SuperUnnamed { }
-
-func testSubUnnamed(_ i: Int, d: Double, s: String, f: Float) {
-  _ = SubUnnamed(int: i)
-  _ = SubUnnamed(d)
-  _ = SubUnnamed(string: s)
-  _ = SubUnnamed(f)
-}
-
-// rdar://problem/17960407 - Inheritance of generic initializers
-class ConcreteBase {
-  required init(i: Int) {}
-}
-
-class GenericDerived<T> : ConcreteBase {}
-
-class GenericBase<T> {
-  required init(t: T) {}
-}
-
-class GenericDerived2<U> : GenericBase<(U, U)> {}
-
-class ConcreteDerived : GenericBase<Int> {}
-
-func testGenericInheritance() {
-  _ = GenericDerived<Int>(i: 10)
-  _ = GenericDerived2<Int>(t: (10, 100))
-  _ = ConcreteDerived(t: 1000)
-}
-
-// FIXME: <rdar://problem/16331406> Implement inheritance of variadic designated initializers
+// <rdar://problem/16331406> Implement inheritance of variadic designated initializers
 class SuperVariadic {
-  init(ints: Int...) { } // expected-note{{variadic superclass initializer defined here}}
-  init(_ : Double...) { } // expected-note{{variadic superclass initializer defined here}}
+  init(ints: Int...) { }
+  init(_ : Double...) { }
 
-  init(s: String, ints: Int...) { } // expected-note{{variadic superclass initializer defined here}}
-  init(s: String, _ : Double...) { } // expected-note{{variadic superclass initializer defined here}}
+  init(s: String, ints: Int...) { }
+  init(s: String, _ : Double...) { }
 }
 
-class SubVariadic : SuperVariadic { } // expected-warning 4{{synthesizing a variadic inherited initializer for subclass 'SubVariadic' is unsupported}}
+class SubVariadic : SuperVariadic { }
 
 // Don't crash with invalid nesting of class in generic function
 
@@ -151,58 +110,22 @@ func testClassInGenericFunc<T>(t: T) {
   _ = B(t: t)
 }
 
-// rdar://problem/34789779
-public class Node {
-  var data : Data
 
-  public struct Data {
-    var index: Int32 = 0// for helpers
-  }
+// <https://bugs.swift.org/browse/SR-5056> Required convenience init inhibits inheritance
 
- init(data: inout Data/*, context: Context*/) {
-   self.data = data
- }
-
- public required init(node: Node) {
-   data = node.data
- }
+class SR5056A {
+    required init(a: Int) {}
 }
 
-class SubNode : Node {
-  var a: Int
-
-  required init(node: Node) {
-    a = 1
-    super.init(node: node)
-  }
-
-  init(data: inout Data, additionalParam: Int) {
-    a = additionalParam
-    super.init(data: &data)
-  }
+class SR5056B : SR5056A {
+    required convenience init(b: Int) {
+        self.init(a: b)
+    }
 }
 
-class GenericSubNode<T> : SubNode {
-  required init(node: Node) {
-    super.init(node: node)
-  }
+class SR5056C : SR5056B {}
 
-  init(data: inout Data, value: T) {
-    super.init(data: &data, additionalParam: 1)
-  }
-}
-
-protocol HasValue {
-  associatedtype Value
-  func getValue() -> Value
-}
-
-class GenericWrapperNode<T : HasValue> : GenericSubNode<T.Value> {
-  required init(node: Node) {
-    super.init(node: node)
-  }
-
-  init(data: inout Data, otherValue: T) {
-    super.init(data: &data, value: otherValue.getValue())
-  }
+func useSR5056C() {
+  _ = SR5056C(a: 0)
+  _ = SR5056C(b: 0)
 }

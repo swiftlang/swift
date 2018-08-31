@@ -276,6 +276,28 @@ func patternVarDiffType(x: Int, y: Double) {
   }
 }
 
+func patternVarDiffMutability(x: Int, y: Double) {
+  switch x {
+  case let a where a < 5, var a where a > 10: // expected-error {{'var' pattern binding must match previous 'let' pattern binding}}{{27-30=let}}
+    break
+  default:
+    break
+  }
+  switch (x, y) {
+  // Would be nice to have a fixit in the following line if we detect that all bindings in the same pattern have the same problem.
+  case let (a, b) where a < 5, var (a, b) where a > 10: // expected-error 2{{'var' pattern binding must match previous 'let' pattern binding}}{{none}}
+    break
+  case (let a, var b) where a < 5, (let a, let b) where a > 10: // expected-error {{'let' pattern binding must match previous 'var' pattern binding}}{{44-47=var}}
+    break
+  case (let a, let b) where a < 5, (var a, let b) where a > 10, (let a, var b) where a == 8:
+    // expected-error@-1 {{'var' pattern binding must match previous 'let' pattern binding}}{{37-40=let}}
+    // expected-error@-2 {{'var' pattern binding must match previous 'let' pattern binding}}{{73-76=let}}
+    break
+  default:
+    break
+  }
+}
+
 func test_label(x : Int) {
 Gronk: // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
   switch x {
@@ -294,8 +316,8 @@ func enumElementSyntaxOnTuple() {
 
 // sr-176
 enum Whatever { case Thing }
-func f0(values: [Whatever]) { // expected-note {{did you mean 'values'?}}
-    switch value { // expected-error {{use of unresolved identifier 'value'}}
+func f0(values: [Whatever]) { // expected-note {{'values' declared here}}
+    switch value { // expected-error {{use of unresolved identifier 'value'; did you mean 'values'?}}
     case .Thing: // Ok. Don't emit diagnostics about enum case not found in type <<error type>>.
         break
     }
@@ -326,4 +348,264 @@ func f1(x: String, y: Whichever) {
     case Whichever.title: // expected-error {{expression pattern of type 'String' cannot match values of type 'Whichever'}}
         break
   }
+}
+
+
+switch Whatever.Thing {
+case .Thing: // expected-error{{'case' label in a 'switch' should have at least one executable statement}} {{13-13= break}}
+@unknown case _:
+  x = 0
+}
+
+switch Whatever.Thing {
+case .Thing: // expected-error{{'case' label in a 'switch' should have at least one executable statement}} {{13-13= break}}
+@unknown default:
+  x = 0
+}
+
+switch Whatever.Thing {
+case .Thing:
+  x = 0
+@unknown case _: // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
+}
+
+switch Whatever.Thing {
+case .Thing:
+  x = 0
+@unknown default: // expected-error {{'default' label in a 'switch' should have at least one executable statement}} {{18-18= break}}
+}
+
+
+switch Whatever.Thing {
+@unknown default:
+  x = 0
+default: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+  x = 0
+case .Thing:
+  x = 0
+}
+
+switch Whatever.Thing {
+default:
+  x = 0
+@unknown case _: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}} expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  x = 0
+case .Thing:
+  x = 0
+}
+
+switch Whatever.Thing {
+default:
+  x = 0
+@unknown default: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+  x = 0
+case .Thing:
+  x = 0
+}
+
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown default where x == 0: // expected-error{{'default' cannot be used with a 'where' guard expression}}
+  x = 0
+}
+
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown case _:
+  fallthrough // expected-error{{'fallthrough' without a following 'case' or 'default' block}}
+}
+
+switch Whatever.Thing {
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  fallthrough
+case .Thing:
+  break
+}
+
+switch Whatever.Thing {
+@unknown default:
+  fallthrough
+case .Thing: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+  break
+}
+
+switch Whatever.Thing {
+@unknown case _, _: // expected-error {{'@unknown' cannot be applied to multiple patterns}}
+  break
+}
+
+switch Whatever.Thing {
+@unknown case _, _, _: // expected-error {{'@unknown' cannot be applied to multiple patterns}}
+  break
+}
+
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown case let value: // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+  _ = value
+}
+
+switch (Whatever.Thing, Whatever.Thing) { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '(_, _)'}}
+@unknown case (_, _): // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+  break
+}
+
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown case is Whatever: // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+  // expected-warning@-1 {{'is' test is always true}}
+  break
+}
+
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown case .Thing: // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+  break
+}
+
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown case (_): // okay
+  break
+}
+
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown case _ where x == 0: // expected-error {{'where' cannot be used with '@unknown'}}
+  break
+}
+
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown default where x == 0: // expected-error {{'default' cannot be used with a 'where' guard expression}}
+  break
+}
+
+switch Whatever.Thing {
+case .Thing:
+  x = 0
+#if true
+@unknown case _:
+  x = 0
+#endif
+}
+
+switch x {
+case 0:
+  break
+@garbage case _: // expected-error {{unknown attribute 'garbage'}}
+  break
+}
+
+switch x {
+case 0:
+  break
+@garbage @moreGarbage default: // expected-error {{unknown attribute 'garbage'}} expected-error {{unknown attribute 'moreGarbage'}}
+  break
+}
+
+@unknown let _ = 1 // expected-error {{unknown attribute 'unknown'}}
+
+switch x {
+case _:
+  @unknown let _ = 1 // expected-error {{unknown attribute 'unknown'}}
+}
+
+switch Whatever.Thing {
+case .Thing:
+  break
+@unknown(garbage) case _: // expected-error {{unexpected '(' in attribute 'unknown'}}
+  break
+}
+switch Whatever.Thing {
+case .Thing:
+  break
+@unknown // expected-note {{attribute already specified here}}
+@unknown // expected-error {{duplicate attribute}}
+case _:
+  break
+}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note {{add missing case: '.Thing'}}
+@unknown @garbage(foobar) // expected-error {{unknown attribute 'garbage'}}
+case _:
+  break
+}
+
+switch x { // expected-error {{switch must be exhaustive}}
+case 1:
+  break
+@unknown case _: // expected-note {{remove '@unknown' to handle remaining values}} {{1-10=}}
+  break
+}
+
+switch x { // expected-error {{switch must be exhaustive}}
+@unknown case _: // expected-note {{remove '@unknown' to handle remaining values}} {{1-10=}}
+  break
+}
+
+switch x { // expected-error {{switch must be exhaustive}}
+@unknown default: // expected-note {{remove '@unknown' to handle remaining values}} {{1-10=}}
+  break
+}
+
+switch Whatever.Thing {
+case .Thing:
+  break
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown case _:
+  break
+}
+
+switch Whatever.Thing {
+case .Thing:
+  break
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown default:
+  break
+}
+
+switch Whatever.Thing {
+case .Thing:
+  break
+@unknown default:
+  break
+@unknown default: // expected-error {{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+  break
+}
+
+switch Whatever.Thing {
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown case _:
+  break
+}
+
+switch Whatever.Thing {
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown default:
+  break
+}
+
+switch Whatever.Thing {
+@unknown default:
+  break
+@unknown default: // expected-error {{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+  break
+}
+
+
+switch x {
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown case _:
+  break
+}
+
+switch x {
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown default:
+  break
+}
+
+switch x {
+@unknown default:
+  break
+@unknown default: // expected-error {{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+  break
 }

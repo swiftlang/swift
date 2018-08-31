@@ -94,14 +94,19 @@ __attribute__((availability(ios,introduced=8.0)))
 
 /// Aaa.  NSArray.  Bbb.
 @interface NSArray<ObjectType> : NSObject
+- (instancetype)initWithObjects:(const ObjectType _Nonnull [_Nullable])objects
+                          count:(NSUInteger)cnt NS_DESIGNATED_INITIALIZER;
 - (nonnull ObjectType)objectAtIndexedSubscript:(NSUInteger)idx;
 - description;
-+ (instancetype)arrayWithObjects:(const ObjectType _Nonnull[_Nullable])objects
-                           count:(NSUInteger)count;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject withObject:(nullable ObjectType)anotherObject;
 - (nonnull NSMutableArray<ObjectType> *)mutableCopy;
+@end
+
+@interface NSArray<ObjectType>(NSArrayCreation)
++ (instancetype)arrayWithObjects:(const ObjectType _Nonnull [_Nullable])objects
+                           count:(NSUInteger)cnt;
 @end
 
 @interface NSArray (AddingObject)
@@ -150,7 +155,7 @@ __attribute__((availability(ios,introduced=8.0)))
 - (id)copyWithZone:(nullable NSZone *)zone;
 @end
 
-@interface NSDictionary<KeyType : id<NSCopying>, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
+@interface NSDictionary<KeyType, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
 @property (readonly) NSUInteger count;
 - (nullable ObjectType)objectForKey:(nonnull KeyType)aKey;
 - (nonnull NSEnumerator *)keyEnumerator;
@@ -1076,6 +1081,10 @@ extern NSString *NSHTTPRequestKey;
 
 @end
 
+@protocol NSIdLoving
+- (void)takesIdViaProtocol:(id _Nonnull)x;
+@end
+
 #define NSTimeIntervalSince1970 978307200.0
 #define NS_DO_SOMETHING 17
 
@@ -1143,17 +1152,18 @@ void install_global_event_handler(_Nullable event_handler handler);
          context: (void*) options;
 @end
 
-__nullable id returnNullableId(void);
-void takeNullableId(__nullable id);
+_Nullable id returnNullableId(void);
+void takeNullableId(_Nullable id);
 
 @interface I
 @end
 
-@protocol OptionalMethods
+@protocol OptionalRequirements
 @optional
 - (Coat *)optional;
+@property NSString *name;
 @end
 
 @interface IUOProperty
-@property (readonly) id<OptionalMethods> iuo;
+@property (readonly) id<OptionalRequirements> iuo;
 @end

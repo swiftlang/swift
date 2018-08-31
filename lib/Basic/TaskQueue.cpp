@@ -29,8 +29,26 @@ using namespace swift::sys;
 #include "Default/TaskQueue.inc"
 #endif
 
-TaskQueue::TaskQueue(unsigned NumberOfParallelTasks)
-  : NumberOfParallelTasks(NumberOfParallelTasks) {}
+namespace swift {
+namespace sys {
+void TaskProcessInformation::ResourceUsage::provideMapping(json::Output &out) {
+  out.mapRequired("utime", Utime);
+  out.mapRequired("stime", Stime);
+  out.mapRequired("maxrss", Maxrss);
+}
+
+void TaskProcessInformation::provideMapping(json::Output &out) {
+  out.mapRequired("real_pid", OSPid);
+  if (ProcessUsage.hasValue())
+    out.mapRequired("usage", ProcessUsage.getValue());
+}
+}
+}
+
+TaskQueue::TaskQueue(unsigned NumberOfParallelTasks,
+                     UnifiedStatsReporter *USR)
+  : NumberOfParallelTasks(NumberOfParallelTasks),
+    Stats(USR){}
 
 TaskQueue::~TaskQueue() = default;
 
@@ -51,7 +69,7 @@ void DummyTaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
 bool DummyTaskQueue::execute(TaskQueue::TaskBeganCallback Began,
                              TaskQueue::TaskFinishedCallback Finished,
                              TaskQueue::TaskSignalledCallback Signalled) {
-  typedef std::pair<ProcessId, std::unique_ptr<DummyTask>> PidTaskPair;
+  using PidTaskPair = std::pair<ProcessId, std::unique_ptr<DummyTask>>;
   std::queue<PidTaskPair> ExecutingTasks;
 
   bool SubtaskFailed = false;
@@ -83,8 +101,8 @@ bool DummyTaskQueue::execute(TaskQueue::TaskBeganCallback Began,
       std::string Output = "Output placeholder\n";
       std::string Errors =
           P.second->SeparateErrors ? "Error placeholder\n" : "";
-      if (Finished(P.first, 0, Output, Errors, P.second->Context) ==
-          TaskFinishedResponse::StopExecution)
+      if (Finished(P.first, 0, Output, Errors, TaskProcessInformation(Pid),
+                   P.second->Context) == TaskFinishedResponse::StopExecution)
         SubtaskFailed = true;
     }
   }

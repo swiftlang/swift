@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-emit-silgen -module-name protocols -enable-sil-ownership %s | %FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Calling Existential Subscripts
@@ -26,10 +27,10 @@ func use_subscript_rvalue_get(_ i : Int) -> Int {
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[READ]] : $*SubscriptableGet to $*[[OPENED:@opened(.*) SubscriptableGet]]
 // CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $[[OPENED]]
 // CHECK: copy_addr [[PROJ]] to [initialization] [[ALLOCSTACK]] : $*[[OPENED]]
+// CHECK-NEXT: end_access [[READ]] : $*SubscriptableGet
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGet.subscript!getter.1
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[ALLOCSTACK]])
 // CHECK-NEXT: destroy_addr [[ALLOCSTACK]]
-// CHECK-NEXT: end_access [[READ]] : $*SubscriptableGet
 // CHECK-NEXT: dealloc_stack [[ALLOCSTACK]] : $*[[OPENED]]
 // CHECK-NEXT: return [[RESULT]]
 
@@ -79,7 +80,7 @@ func use_subscript_archetype_rvalue_get<T : SubscriptableGet>(_ generic : T, idx
 // CHECK-NEXT: apply [[METH]]<T>(%1, [[STACK]])
 // CHECK-NEXT: destroy_addr [[STACK]] : $*T
 // CHECK-NEXT: dealloc_stack [[STACK]] : $*T
-// CHECK-NEXT: destroy_addr %0
+// CHECK: } // end sil function '${{.*}}use_subscript_archetype_rvalue_get
 
 
 func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(_ generic: inout T, idx : Int) -> Int {
@@ -133,9 +134,9 @@ func use_property_rvalue_get() -> Int {
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[READ]] : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
 // CHECK: [[COPY:%.*]] = alloc_stack $[[OPENED]]
 // CHECK-NEXT: copy_addr [[PROJ]] to [initialization] [[COPY]] : $*[[OPENED]]
+// CHECK-NEXT: end_access [[READ]] : $*PropertyWithGetter
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetter.a!getter.1
 // CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[COPY]])
-// CHECK: end_access [[READ]] : $*PropertyWithGetter
 
 func use_property_lvalue_get() -> Int {
   return propertyGetSet.b
@@ -177,7 +178,7 @@ func use_property_archetype_rvalue_get<T : PropertyWithGetter>(_ generic : T) ->
 // CHECK-NEXT: apply [[METH]]<T>([[STACK]])
 // CHECK-NEXT: destroy_addr [[STACK]]
 // CHECK-NEXT: dealloc_stack [[STACK]]
-// CHECK-NEXT: destroy_addr %0
+// CHECK: } // end sil function '{{.*}}use_property_archetype_rvalue_get
 
 
 func use_property_archetype_lvalue_get<T : PropertyWithGetterSetter>(_ generic : T) -> Int {
@@ -192,7 +193,7 @@ func use_property_archetype_lvalue_get<T : PropertyWithGetterSetter>(_ generic :
 // CHECK-NEXT: apply [[METH]]<T>([[STACK]])
 // CHECK-NEXT: destroy_addr [[STACK]] : $*T
 // CHECK-NEXT: dealloc_stack [[STACK]] : $*T
-// CHECK-NEXT: destroy_addr %0
+// CHECK: } // end sil function '${{.*}}use_property_archetype_lvalue_get
 
 
 func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(_ generic: inout T, v : Int) {
@@ -219,7 +220,6 @@ func use_initializable_archetype<T: Initializable>(_ t: T, i: Int) {
   // CHECK:   [[T_RESULT_ADDR:%[0-9]+]] = apply [[T_INIT]]<T>([[T_RESULT]], %1, [[T_META]]) : $@convention(witness_method: Initializable) <τ_0_0 where τ_0_0 : Initializable> (Int, @thick τ_0_0.Type) -> @out τ_0_0
   // CHECK:   destroy_addr [[T_RESULT]] : $*T
   // CHECK:   dealloc_stack [[T_RESULT]] : $*T
-  // CHECK:   destroy_addr [[VAR_0:%[0-9]+]] : $*T
   // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
   // CHECK:   return [[RESULT]] : $()
   T(int: i)
@@ -230,8 +230,8 @@ func use_initializable_existential(_ im: Initializable.Type, i: Int) {
 // CHECK: bb0([[IM:%[0-9]+]] : @trivial $@thick Initializable.Type, [[I:%[0-9]+]] : @trivial $Int):
 // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[IM]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
 // CHECK:   [[TEMP_VALUE:%[0-9]+]] = alloc_stack $Initializable
-// CHECK:   [[TEMP_ADDR:%[0-9]+]] = init_existential_addr [[TEMP_VALUE]] : $*Initializable, $@opened([[N]]) Initializable
 // CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method $@opened([[N]]) Initializable, #Initializable.init!allocator.1 : {{.*}}, [[ARCHETYPE_META]]{{.*}} : $@convention(witness_method: Initializable) <τ_0_0 where τ_0_0 : Initializable> (Int, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   [[TEMP_ADDR:%[0-9]+]] = init_existential_addr [[TEMP_VALUE]] : $*Initializable, $@opened([[N]]) Initializable
 // CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[TEMP_ADDR]], [[I]], [[ARCHETYPE_META]]) : $@convention(witness_method: Initializable) <τ_0_0 where τ_0_0 : Initializable> (Int, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   destroy_addr [[TEMP_VALUE]] : $*Initializable
 // CHECK:   dealloc_stack [[TEMP_VALUE]] : $*Initializable
@@ -393,28 +393,16 @@ func testExistentialPropertyRead<T: ExistentialProperty>(_ t: inout T) {
 
 func modify(_ x: inout Int) {}
 
-// Make sure we call the materializeForSet callback with the correct
-// generic signature.
-
 func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
   modify(&x.b)
 }
 // CHECK-LABEL: sil hidden @$S9protocols14modifyPropertyyyxzAA0C16WithGetterSetterRzlF
 // CHECK:      [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*T
-// CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!materializeForSet.1
-// CHECK:      [[RESULT:%.*]] = apply [[WITNESS_FN]]<T>
-// CHECK:      [[TEMPORARY:%.*]] = tuple_extract [[RESULT]]
-// CHECK:      [[CALLBACK:%.*]] = tuple_extract [[RESULT]]
-// CHECK:      [[TEMPORARY_ADDR_TMP:%.*]] = pointer_to_address [[TEMPORARY]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK:      [[TEMPORARY_ADDR:%.*]] = mark_dependence [[TEMPORARY_ADDR_TMP]] : $*Int on [[WRITE]] : $*T
+// CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!modify.1
+// CHECK:      ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[WITNESS_FN]]<T>
 // CHECK:      [[MODIFY_FN:%.*]] = function_ref @$S9protocols6modifyyySizF
-// CHECK:      apply [[MODIFY_FN]]([[TEMPORARY_ADDR]])
-// CHECK:      switch_enum [[CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
-// CHECK:    bb1([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
-// CHECK:      [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]]
-// CHECK:      [[METATYPE:%.*]] = metatype $@thick T.Type
-// CHECK:      [[TEMPORARY:%.*]] = address_to_pointer [[TEMPORARY_ADDR]] : $*Int to $Builtin.RawPointer
-// CHECK:      apply [[CALLBACK]]<T>
+// CHECK:      apply [[MODIFY_FN]]([[ADDR]])
+// CHECK:      end_apply [[TOKEN]]
 
 public struct Val {
   public var x: Int = 0
@@ -428,13 +416,11 @@ public func test(_ p: Proto) {
   p.val.x += 1
 }
 
-// CHECK-LABEL: sil @$S9protocols4testyyAA5Proto_pF : $@convention(thin) (@in Proto) -> ()
+// CHECK-LABEL: sil @$S9protocols4testyyAA5Proto_pF : $@convention(thin) (@in_guaranteed Proto) -> ()
 // CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access
-// CHECK: [[MAT:%.*]] = witness_method $@opened("{{.*}}") Proto, #Proto.val!materializeForSet
-// CHECK: [[BUF:%.*]] = apply [[MAT]]
-// CHECK: [[WB:%.*]] = pointer_to_thin_function
-// This use looks like it is mutating but really is not. We use to assert in the SIL verifier.
-// CHECK: apply [[WB]]{{.*}}({{.*}}[[OPEN]]
+// CHECK: [[MAT:%.*]] = witness_method $@opened("{{.*}}") Proto, #Proto.val!modify
+// CHECK: ([[BUF:%.*]], [[TOKEN:%.*]]) = begin_apply [[MAT]]
+// CHECK: end_apply [[TOKEN]]
 // CHECK: return
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {
@@ -444,7 +430,7 @@ public func test(_ p: Proto) {
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetterSetter: PropertyWithGetterSetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetterSetter.b!getter.1: {{.*}} : @$S9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivgTW
 // CHECK-NEXT:  method #PropertyWithGetterSetter.b!setter.1: {{.*}} : @$S9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivsTW
-// CHECK-NEXT:  method #PropertyWithGetterSetter.b!materializeForSet.1: {{.*}} : @$S9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivmTW
+// CHECK-NEXT:  method #PropertyWithGetterSetter.b!modify.1: {{.*}} : @$S9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivMTW
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetterSetter: PropertyWithGetter module protocols {
@@ -458,15 +444,3 @@ public func test(_ p: Proto) {
 // CHECK-LABEL: sil_witness_table hidden StructWithStoredClassProperty: PropertyWithGetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @$S9protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSivgTW
 // CHECK-NEXT: }
-
-//
-// rdar://problem/37031037
-//
-
-protocol MethodWithDefaultArgGenerator {}
-extension MethodWithDefaultArgGenerator {
-  mutating func foo(_ x: Int = 0) {}
-}
-func invokeMethodWithDefaultArg(x: inout MethodWithDefaultArgGenerator) {
-  x.foo()
-}

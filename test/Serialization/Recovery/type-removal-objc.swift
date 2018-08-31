@@ -43,3 +43,15 @@ public unowned(unsafe) var someUnownedUnsafeObject: Base = Base()
 // CHECK-DAG: weak var someWeakObject: @sil_weak Base
 // CHECK-RECOVERY-NEGATIVE-NOT: var someWeakObject:
 public weak var someWeakObject: Base? = nil
+
+// CHECK-DAG: struct GenericStruct<T>
+// CHECK-RECOVERY-DAG: struct GenericStruct<T>
+struct GenericStruct<T> {}
+
+// CHECK-DAG: extension GenericStruct where T : SomeProto
+// CHECK-RECOVERY-NEGATIVE-NOT: extension GenericStruct{{.*}}SomeProto
+extension GenericStruct where T: SomeProto {
+  // CHECK-DAG: func someOperation
+  // CHECK-RECOVERY-NEGATIVE-NOT: someOperation
+  func someOperation() {}
+}

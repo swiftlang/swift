@@ -1,0 +1,128 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+// REQUIRES: CPU=i386 || CPU=x86_64
+
+// We have to claim this is raw SIL because there are critical edges from non
+// cond_br instructions.
+sil_stage raw
+
+import Builtin
+import Swift
+
+@objc class OC {}
+sil_vtable OC {}
+sil hidden @$S9enum_objc2OCCACycfcTo : $@convention(thin) (OC) -> OC {
+entry(%x : $OC):
+  return %x : $OC
+}
+
+protocol PC : class {}
+@objc protocol PO {}
+
+enum SinglePayloadClassProtocol {
+  case x(PC)
+  case y, z, w
+}
+
+enum SinglePayloadObjCProtocol {
+  case x(PO)
+  case y, z, w
+}
+
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_protocol_switch(i64, i64) {{.*}} {
+// CHECK-64:   switch i64 %0, label {{%.*}} [
+// CHECK-64:     i64 0, label {{%.*}}
+// CHECK-64:     i64 2, label {{%.*}}
+// CHECK-64:     i64 4, label {{%.*}}
+// CHECK-64:   ]
+
+// CHECK-64:     inttoptr i64 %0 to %objc_object*
+// CHECK-64:   inttoptr i64 %1 to i8**
+
+// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_protocol_switch(i32, i32) {{.*}} {
+// CHECK-32:   switch i32 %0, label {{%.*}} [
+// CHECK-32:     i32 0, label {{%.*}}
+// CHECK-32:     i32 1, label {{%.*}}
+// CHECK-32:     i32 2, label {{%.*}}
+// CHECK-32:   ]
+
+// CHECK-32:     inttoptr i32 %0 to %objc_object*
+// CHECK-32:   inttoptr i32 %1 to i8**
+
+sil @single_payload_class_protocol_switch : $(SinglePayloadClassProtocol) -> () {
+entry(%c : $SinglePayloadClassProtocol):
+  switch_enum %c : $SinglePayloadClassProtocol, case #SinglePayloadClassProtocol.x!enumelt.1: x_dest, case #SinglePayloadClassProtocol.y!enumelt: y_dest, case #SinglePayloadClassProtocol.z!enumelt: z_dest, case #SinglePayloadClassProtocol.w!enumelt: w_dest
+
+x_dest(%d : $PC):
+  br end
+y_dest:
+  br end
+z_dest:
+  br end
+w_dest:
+  br end
+
+end:
+  return undef : $()
+}
+
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_objc_protocol_switch(i64) {{.*}} {
+// CHECK-64:   switch i64 %0, label {{%.*}}
+// CHECK-64:     i64 0, label {{%.*}}
+// CHECK-64:     i64 2, label {{%.*}}
+// CHECK-64:     i64 4, label {{%.*}}
+// CHECK-64:   ]
+// CHECK-64:     inttoptr i64 %0 to %objc_object*
+
+// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_objc_protocol_switch(i32) {{.*}} {
+// CHECK-32:   switch i32 %0, label {{%.*}}
+// CHECK-32:     i32 0, label {{%.*}}
+// CHECK-32:     i32 1, label {{%.*}}
+// CHECK-32:     i32 2, label {{%.*}}
+// CHECK-32:   ]
+// CHECK-32:     inttoptr i32 %0 to %objc_object*
+
+sil @single_payload_objc_protocol_switch : $(SinglePayloadObjCProtocol) -> () {
+entry(%c : $SinglePayloadObjCProtocol):
+  switch_enum %c : $SinglePayloadObjCProtocol, case #SinglePayloadObjCProtocol.x!enumelt.1: x_dest, case #SinglePayloadObjCProtocol.y!enumelt: y_dest, case #SinglePayloadObjCProtocol.z!enumelt: z_dest, case #SinglePayloadObjCProtocol.w!enumelt: w_dest
+
+x_dest(%d : $PO):
+  br end
+y_dest:
+  br end
+z_dest:
+  br end
+w_dest:
+  br end
+
+end:
+  return undef : $()
+}
+
+protocol delegateProtocol : AnyObject { }
+
+struct StructWithWeakVar {
+weak var delegate: delegateProtocol?
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @weak_optional(%T9enum_objc17StructWithWeakVarVSg* noalias nocapture dereferenceable({{.*}}))
+sil @weak_optional : $@convention(thin) (@in StructWithWeakVar?) -> () {
+entry(%x : $*StructWithWeakVar?):
+  // CHECK:      icmp eq [[WORD:i32|i64]] {{%.*}}, 0
+  switch_enum_addr %x : $*StructWithWeakVar?,
+    case #Optional.some!enumelt.1: a,
+    case #Optional.none!enumelt:   b
+a:
+  br x
+b:
+  // CHECK:      store [[WORD]] 0
+  // CHECK:      store [[WORD]] 1
+  inject_enum_addr %x : $*StructWithWeakVar?, #Optional.none!enumelt
+  br x
+
+x:
+  return undef : $()
+}
+
+// Weak existentials allow extra inhabitants if not @objc, therefore StructWithWeakVar must emit:
+// CHECK: define linkonce_odr hidden void @"$S9enum_objc17StructWithWeakVarVwxs"

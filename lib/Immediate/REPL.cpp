@@ -869,7 +869,6 @@ private:
     if (!CI.getASTContext().hadError()) {
       sil = performSILGeneration(REPLInputFile, CI.getSILOptions(),
                                  RC.CurIRGenElem);
-      performSILLinking(sil.get());
       runSILDiagnosticPasses(*sil);
       runSILLoweringPasses(*sil);
     }
@@ -912,13 +911,13 @@ private:
 
     // LineModule will get destroy by the following link process.
     // Make a copy of it to be able to correct produce DumpModule.
-    std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(LineModule.get()));
+    std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(*LineModule));
     
     if (!linkLLVMModules(Module, std::move(LineModule))) {
       return false;
     }
 
-    std::unique_ptr<llvm::Module> NewModule(CloneModule(Module));
+    std::unique_ptr<llvm::Module> NewModule(CloneModule(*Module));
 
     Module->getFunction("main")->eraseFromParent();
 
@@ -1005,7 +1004,9 @@ public:
     IRGenOpts.OptMode = OptimizationMode::NoOptimization;
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;
-    IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::None;
+    IRGenOpts.IntegratedREPL = true;
+    IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::None;
+    IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::None;
 
     if (!ParseStdlib) {
       // Force standard library to be loaded immediately.  This forces any

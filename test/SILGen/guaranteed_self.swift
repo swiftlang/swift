@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+
+// RUN: %target-swift-emit-silgen -module-name guaranteed_self -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-sil-ownership | %FileCheck %s
 
 protocol Fooable {
   init()
@@ -67,9 +68,9 @@ struct S: Fooable {
   // CHECK-NOT:     load [[SELF_ADDR]]
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
-  // materializeForSet for prop1
-  // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop1Sivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-  // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
+  // modify for prop1
+  // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop1SivM : $@yield_once @convention(method) (@inout S) -> @yields @inout Int
+  // CHECK:       bb0([[SELF_ADDR:%.*]] : @trivial $*S):
   // CHECK-NOT:     load [[SELF_ADDR]]
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
@@ -79,7 +80,7 @@ struct S: Fooable {
     // CHECK-NOT:     destroy_value [[SELF]]
     get { return 0 }
     // CHECK-LABEL: sil hidden @$S15guaranteed_self1SV5prop2Sivs : $@convention(method) (Int, @inout S) -> ()
-    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop2Sivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop2SivM : $@yield_once @convention(method) (@inout S) -> @yields @inout Int
     set { }
   }
 
@@ -91,8 +92,8 @@ struct S: Fooable {
     // CHECK-LABEL: sil hidden @$S15guaranteed_self1SV5prop3Sivs : $@convention(method) (Int, @guaranteed S) -> ()
     // CHECK:       bb0({{.*}} [[SELF:%.*]] : @guaranteed $S):
     // CHECK-NOT:     destroy_value [[SELF]]
-    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop3Sivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-    // CHECK:       bb0({{.*}} [[SELF:%.*]] : @guaranteed $S):
+    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop3SivM : $@yield_once @convention(method) (@guaranteed S) -> @yields @inout Int
+    // CHECK:       bb0([[SELF:%.*]] : @guaranteed $S):
     // CHECK-NOT:     destroy_value [[SELF]]
     nonmutating set { }
   }
@@ -131,9 +132,9 @@ struct S: Fooable {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
-// Witness thunk for prop1 materializeForSet
-// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop1SivmTW : $@convention(witness_method: Fooable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
+// Witness thunk for prop1 modify
+// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop1SivMTW : $@yield_once @convention(witness_method: Fooable) (@inout S) -> @yields @inout Int {
+// CHECK:       bb0([[SELF_ADDR:%.*]] : @trivial $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop2 getter
@@ -148,9 +149,9 @@ struct S: Fooable {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
-// Witness thunk for prop2 materializeForSet
-// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop2SivmTW : $@convention(witness_method: Fooable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
+// Witness thunk for prop2 modify
+// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop2SivMTW : $@yield_once @convention(witness_method: Fooable) (@inout S) -> @yields @inout Int {
+// CHECK:       bb0([[SELF_ADDR:%.*]] : @trivial $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop3 getter
@@ -167,13 +168,13 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_value [[SELF]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
-// Witness thunk for prop3 nonmutating materializeForSet
-// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop3SivmTW : $@convention(witness_method: Fooable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-// CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
+// Witness thunk for prop3 nonmutating modify
+// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop3SivMTW : $@yield_once @convention(witness_method: Fooable) (@in_guaranteed S) -> @yields @inout Int
+// CHECK:       bb0([[SELF_ADDR:%.*]] : @trivial $*S):
 // CHECK:         [[SELF:%.*]] = load_borrow [[SELF_ADDR]]
 // CHECK-NOT:     destroy_value [[SELF]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-// CHECK:       } // end sil function '$S15guaranteed_self1SVAA7FooableA2aDP5prop3SivmTW'
+// CHECK:       } // end sil function '$S15guaranteed_self1SVAA7FooableA2aDP5prop3SivMTW'
 
 //
 // TODO: Expected output for the other cases
@@ -218,8 +219,8 @@ struct AO<T>: Fooable {
     // CHECK-LABEL: sil hidden @$S15guaranteed_self2AOV5prop3Sivs : $@convention(method) <T> (Int, @in_guaranteed AO<T>) -> ()
     // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*AO<T>):
     // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self2AOV5prop3Sivm : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed AO<T>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-    // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*AO<T>):
+    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self2AOV5prop3SivM : $@yield_once @convention(method) <T> (@in_guaranteed AO<T>) -> @yields @inout Int
+    // CHECK:       bb0([[SELF_ADDR:%.*]] : @trivial $*AO<T>):
     // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
     // CHECK:       }
     nonmutating set { }
@@ -388,7 +389,7 @@ func AO_curryThunk<T>(_ ao: AO<T>) -> ((AO<T>) -> (Int) -> ()/*, Int -> ()*/) {
 // ----------------------------------------------------------------------------
 
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$S15guaranteed_self9FakeArrayVAA8SequenceA2aDP17_constrainElement{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method: Sequence) (@in FakeElement, @in_guaranteed FakeArray) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$S15guaranteed_self9FakeArrayVAA8SequenceA2aDP17_constrainElement{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method: Sequence) (@in_guaranteed FakeElement, @in_guaranteed FakeArray) -> () {
 // CHECK: bb0([[ARG0_PTR:%.*]] : @trivial $*FakeElement, [[ARG1_PTR:%.*]] : @trivial $*FakeArray):
 // CHECK: [[ARG0:%.*]] = load [trivial] [[ARG0_PTR]]
 // CHECK: function_ref (extension in guaranteed_self):guaranteed_self.SequenceDefaults._constrainElement
@@ -450,33 +451,28 @@ class LetFieldClass {
   // CHECK-LABEL: sil hidden @$S15guaranteed_self13LetFieldClassC10letkMethod{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed LetFieldClass) -> () {
   // CHECK: bb0([[CLS:%.*]] : @guaranteed $LetFieldClass):
   // CHECK: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[WRITE:%.*]] = begin_access [read] [dynamic] [[KRAKEN_ADDR]] : $*Kraken
-  // CHECK-NEXT: [[KRAKEN:%.*]] = load_borrow [[WRITE]]
-  // CHECK-NEXT: end_access [[WRITE]] : $*Kraken
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load_borrow [[KRAKEN_ADDR]]
   // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
   // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
-  // CHECK-NEXT: end_borrow [[KRAKEN]] from [[WRITE]]
-  // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[KRAKEN_ADDR]] : $*Kraken
-  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[READ]]
-  // CHECK-NEXT: end_access [[READ]] : $*Kraken
+  // CHECK: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
+  // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
   // CHECK:      [[BORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
-  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = copy_value [[BORROWED_KRAKEN]]
-  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$S15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
-  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$S15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[BORROWED_KRAKEN]])
   // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]] from [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
-  // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[KRAKEN_ADDR]] : $*Kraken
-  // CHECK-NEXT: [[KRAKEN2:%.*]] = load [copy] [[READ]]
-  // CHECK-NEXT: end_access [[READ]] : $*Kraken
+  // CHECK-NEXT: [[KRAKEN2:%.*]] = load [copy] [[KRAKEN_ADDR]]
   // CHECK-NEXT: store [[KRAKEN2]] to [init] [[PB]]
   // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*Kraken
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [copy] [[READ]]
   // CHECK-NEXT: end_access [[READ]] : $*Kraken
-  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$S15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
-  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
+  // CHECK-NEXT: [[BORROWED_KRAKEN_COPY:%.*]] = begin_borrow [[KRAKEN_COPY]]
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$S15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[BORROWED_KRAKEN_COPY]])
+  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN_COPY]]
+  // CHECK-NEXT: destroy_value [[KRAKEN_COPY]]
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
   // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: tuple
@@ -501,9 +497,8 @@ class LetFieldClass {
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken, $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
   // CHECK:      [[BORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
-  // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = copy_value [[BORROWED_KRAKEN]]
-  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$S15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
-  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$S15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[BORROWED_KRAKEN]])
   // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]] from [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
@@ -513,8 +508,11 @@ class LetFieldClass {
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [read] [unknown] [[PB]] : $*Kraken
   // CHECK-NEXT: [[KRAKEN_COPY:%.*]] = load [copy] [[WRITE]]
   // CHECK-NEXT: end_access [[WRITE]] : $*Kraken
-  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$S15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()
-  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[KRAKEN_COPY]])
+  // CHECK-NEXT: [[BORROWED_KRAKEN_COPY:%.*]] = begin_borrow [[KRAKEN_COPY]]
+  // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$S15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
+  // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[BORROWED_KRAKEN_COPY]])
+  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN_COPY]]
+  // CHECK-NEXT: destroy_value [[KRAKEN_COPY]]
   // CHECK-NEXT: destroy_value [[KRAKEN_BOX]]
   // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: tuple

@@ -37,7 +37,6 @@
 ///   - line: The line number to print along with `message` if the assertion
 ///     fails. The default is the line number where `assert(_:_:file:line:)`
 ///     is called.
-@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func assert(
   _ condition: @autoclosure () -> Bool,
@@ -80,14 +79,13 @@ public func assert(
 ///   - line: The line number to print along with `message` if the assertion
 ///     fails. The default is the line number where
 ///     `precondition(_:_:file:line:)` is called.
-@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func precondition(
   _ condition: @autoclosure () -> Bool,
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
-  // Only check in debug and release mode.  In release mode just trap.
+  // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), expected: true) {
       _assertionFailure("Precondition failed", message(), file: file, line: line,
@@ -124,7 +122,7 @@ public func precondition(
 ///     where `assertionFailure(_:file:line:)` is called.
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `assertionFailure(_:file:line:)` is called.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 public func assertionFailure(
   _ message: @autoclosure () -> String = String(),
@@ -163,7 +161,6 @@ public func assertionFailure(
 ///     where `preconditionFailure(_:file:line:)` is called.
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `preconditionFailure(_:file:line:)` is called.
-@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func preconditionFailure(
   _ message: @autoclosure () -> String = String(),
@@ -187,7 +184,6 @@ public func preconditionFailure(
 ///     where `fatalError(_:file:line:)` is called.
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `fatalError(_:file:line:)` is called.
-@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func fatalError(
   _ message: @autoclosure () -> String = String(),
@@ -203,9 +199,8 @@ public func fatalError(
 /// building in fast mode they are disabled.  In release mode they don't print
 /// an error message but just trap. In debug mode they print an error message
 /// and abort.
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public func _precondition(
+@usableFromInline @_transparent
+internal func _precondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
@@ -221,9 +216,8 @@ public func _precondition(
   }
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public func _preconditionFailure(
+@usableFromInline @_transparent
+internal func _preconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
@@ -234,7 +228,6 @@ public func _preconditionFailure(
 /// If `error` is true, prints an error message in debug mode, traps in release
 /// mode, and returns an undefined error otherwise.
 /// Otherwise returns `result`.
-@_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func _overflowChecked<T>(
   _ args: (T, Bool),
@@ -260,14 +253,13 @@ public func _overflowChecked<T>(
 /// and abort.
 /// They are meant to be used when the check is not comprehensively checking for
 /// all possible errors.
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public func _debugPrecondition(
+@usableFromInline @_transparent
+internal func _debugPrecondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug mode.
-  if _isDebugAssertConfiguration() {
+  if _slowPath(_isDebugAssertConfiguration()) {
     if !_branchHint(condition(), expected: true) {
       _fatalErrorMessage("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
@@ -275,13 +267,12 @@ public func _debugPrecondition(
   }
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public func _debugPreconditionFailure(
+@usableFromInline @_transparent
+internal func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  if _isDebugAssertConfiguration() {
+  if _slowPath(_isDebugAssertConfiguration()) {
     _precondition(false, message, file: file, line: line)
   }
   _conditionallyUnreachable()
@@ -293,9 +284,8 @@ public func _debugPreconditionFailure(
 /// standard library. They are only enable when the standard library is built
 /// with the build configuration INTERNAL_CHECKS_ENABLED enabled. Otherwise, the
 /// call to this function is a noop.
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public func _sanityCheck(
+@usableFromInline @_transparent
+internal func _sanityCheck(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
@@ -307,9 +297,8 @@ public func _sanityCheck(
 #endif
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public func _sanityCheckFailure(
+@usableFromInline @_transparent
+internal func _sanityCheckFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {

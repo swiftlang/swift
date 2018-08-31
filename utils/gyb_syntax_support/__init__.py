@@ -1,9 +1,13 @@
 import textwrap
 from AttributeNodes import ATTRIBUTE_NODES
+from AvailabilityNodes import AVAILABILITY_NODES
+import Classification
 from CommonNodes import COMMON_NODES  # noqa: I201
 from DeclNodes import DECL_NODES  # noqa: I201
 from ExprNodes import EXPR_NODES  # noqa: I201
 from GenericNodes import GENERIC_NODES  # noqa: I201
+from NodeSerializationCodes import SYNTAX_NODE_SERIALIZATION_CODES, \
+    verify_syntax_node_serialization_codes
 from PatternNodes import PATTERN_NODES  # noqa: I201
 from StmtNodes import STMT_NODES  # noqa: I201
 import Token
@@ -12,9 +16,14 @@ from TypeNodes import TYPE_NODES  # noqa: I201
 
 # Re-export global constants
 SYNTAX_NODES = COMMON_NODES + EXPR_NODES + DECL_NODES + ATTRIBUTE_NODES + \
-    STMT_NODES + GENERIC_NODES + TYPE_NODES + PATTERN_NODES
+    STMT_NODES + GENERIC_NODES + TYPE_NODES + PATTERN_NODES + \
+    AVAILABILITY_NODES
 SYNTAX_TOKENS = Token.SYNTAX_TOKENS
 SYNTAX_TOKEN_MAP = Token.SYNTAX_TOKEN_MAP
+SYNTAX_CLASSIFICATIONS = Classification.SYNTAX_CLASSIFICATIONS
+
+verify_syntax_node_serialization_codes(SYNTAX_NODES, 
+                                       SYNTAX_NODE_SERIALIZATION_CODES)
 
 
 def make_missing_child(child):
@@ -23,9 +32,11 @@ def make_missing_child(child):
     """
     if child.is_token():
         token = child.main_token()
-        tok_kind = "tok::" + token.kind if token else "tok::unknown"
+        tok_kind = token.kind if token else "unknown"
         tok_text = token.text if token else ""
-        return 'RawSyntax::missing(%s, "%s")' % (tok_kind, tok_text)
+        return \
+            'RawSyntax::missing(tok::%s, OwnedString::makeUnowned("%s"))' % \
+            (tok_kind, tok_text)
     else:
         missing_kind = "Unknown" if child.syntax_kind == "Syntax" \
                        else child.syntax_kind
@@ -73,13 +84,13 @@ def make_missing_swift_child(child):
     if child.is_token():
         token = child.main_token()
         tok_kind = token.swift_kind() if token else "unknown"
-        if token and not token.text:
+        if not token or not token.text:
             tok_kind += '("")'
-        return 'RawSyntax.missingToken(.%s)' % tok_kind
+        return 'RawSyntax.missingToken(TokenKind.%s)' % tok_kind
     else:
         missing_kind = "unknown" if child.syntax_kind == "Syntax" \
                        else child.swift_syntax_kind
-        return 'RawSyntax.missing(.%s)' % missing_kind
+        return 'RawSyntax.missing(SyntaxKind.%s)' % missing_kind
 
 
 def create_node_map():
@@ -90,7 +101,7 @@ def create_node_map():
 
 
 def is_visitable(node):
-    return not node.is_base() and not node.collection_element
+    return not node.is_base()
 
 
 def dedented_lines(description):

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 
 // rdar://15763213
 // Make sure that we can parse SILDeclRef to an overloaded member.
@@ -17,7 +17,7 @@ struct A {
 
 // CHECK-LABEL: sil @_TFCSo1XcfMS_FT1aV11peer_method1A_S_
 sil @_TFCSo1XcfMS_FT1aV11peer_method1A_S_ : $@convention(method) (A, @owned X) -> @owned X {
-bb0(%0 : $A, %1 : $X):
+bb0(%0 : @trivial $A, %1 : @owned $X):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <X>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <X>, 0
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <A>

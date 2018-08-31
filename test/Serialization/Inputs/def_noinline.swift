@@ -1,14 +1,14 @@
-@_inlineable
+@inlinable
 @inline(never) public func testNoinline(x x: Bool) -> Bool {
   return x
 }
 
 @_fixed_layout
 public struct NoInlineInitStruct {
-  @_versioned
+  @usableFromInline
   var x: Bool
 
-  @_inlineable
+  @inlinable
   @inline(never)
   public init(x x2: Bool) {
     self.x = x2

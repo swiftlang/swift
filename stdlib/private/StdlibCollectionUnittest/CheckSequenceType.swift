@@ -149,7 +149,7 @@ public struct FindTest {
 
   public init(
     expected: Int?, element: Int, sequence: [Int],
-    expectedLeftoverSequence: [Int],
+    expectedLeftoverSequence: [Int] = [],
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
@@ -1577,17 +1577,17 @@ extension TestSuite {
     SequenceWithEquatableElement : Sequence
   >(
     _ testNamePrefix: String = "",
-    makeSequence: @escaping ([S.Iterator.Element]) -> S,
-    wrapValue: @escaping (OpaqueValue<Int>) -> S.Iterator.Element,
-    extractValue: @escaping (S.Iterator.Element) -> OpaqueValue<Int>,
+    makeSequence: @escaping ([S.Element]) -> S,
+    wrapValue: @escaping (OpaqueValue<Int>) -> S.Element,
+    extractValue: @escaping (S.Element) -> OpaqueValue<Int>,
 
-    makeSequenceOfEquatable: @escaping ([SequenceWithEquatableElement.Iterator.Element]) -> SequenceWithEquatableElement,
-    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> SequenceWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: @escaping ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    makeSequenceOfEquatable: @escaping ([SequenceWithEquatableElement.Element]) -> SequenceWithEquatableElement,
+    wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> SequenceWithEquatableElement.Element,
+    extractValueFromEquatable: @escaping ((SequenceWithEquatableElement.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) where
-    SequenceWithEquatableElement.Iterator.Element : Equatable {
+    SequenceWithEquatableElement.Element : Equatable {
 
     var testNamePrefix = testNamePrefix
 
@@ -1935,17 +1935,17 @@ self.test("\(testNamePrefix).forEach/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// first()
+// first(where:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).first/semantics") {
+self.test("\(testNamePrefix).first(where:)/semantics") {
   for test in findTests {
     let s = makeWrappedSequenceWithEquatableElement(test.sequence)
     let closureLifetimeTracker = LifetimeTracked(0)
-    let found = s.first {
+    let found = s.first(where: {
       _blackHole(closureLifetimeTracker)
       return $0 == wrapValueIntoEquatable(test.element)
-    }
+    })
     expectEqual(
       test.expected == nil ? nil : wrapValueIntoEquatable(test.element),
       found,

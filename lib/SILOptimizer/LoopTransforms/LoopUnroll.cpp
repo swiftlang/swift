@@ -150,11 +150,11 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
 
   auto *Start = dyn_cast_or_null<IntegerLiteralInst>(
-      RecArg->getIncomingValue(Preheader));
+      RecArg->getIncomingPhiValue(Preheader));
   if (!Start)
     return None;
 
-  if (RecNext != RecArg->getIncomingValue(OrigLatch))
+  if (RecNext != RecArg->getIncomingPhiValue(OrigLatch))
     return None;
 
   auto StartVal = Start->getValue();
@@ -198,7 +198,7 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
       if (auto AI = FullApplySite::isa(&Inst)) {
         auto Callee = AI.getCalleeFunction();
         if (Callee && getEligibleFunction(AI, InlineSelection::Everything)) {
-          // If callee is rather big and potentialy inlineable, it may be better
+          // If callee is rather big and potentialy inlinable, it may be better
           // not to unroll, so that the body of the calle can be inlined later.
           Cost += Callee->size() * InsnsPerBB;
         }
@@ -381,8 +381,9 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
     if (!isa<CondBranchInst>(Exit->getTerminator()))
       return false;
 
-  DEBUG(llvm::dbgs() << "Unrolling loop in " << Header->getParent()->getName()
-                     << " " << *Loop << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Unrolling loop in "
+                          << Header->getParent()->getName()
+                          << " " << *Loop << "\n");
 
   SmallVector<SILBasicBlock *, 16> Headers;
   Headers.push_back(Header);

@@ -11,19 +11,220 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-inliner"
+
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
-bool SILInliner::canInlineFunction(FullApplySite AI) {
-  // For now, we cannot inline begin_apply at all.
-  if (isa<BeginApplyInst>(AI))
-    return false;
+static bool canInlineBeginApply(BeginApplyInst *BA) {
+  // Don't inline if we have multiple resumption sites (i.e. end_apply or
+  // abort_apply instructions).  The current implementation clones a single
+  // copy of the end_apply and abort_apply paths, so it can't handle values
+  // that might be live in the caller across different resumption sites.  To
+  // handle this in general, we'd need to separately clone the resume/unwind
+  // paths into each end/abort.
+  bool hasEndApply = false, hasAbortApply = false;
+  for (auto tokenUse : BA->getTokenResult()->getUses()) {
+    auto user = tokenUse->getUser();
+    if (isa<EndApplyInst>(user)) {
+      if (hasEndApply) return false;
+      hasEndApply = true;
+    } else {
+      assert(isa<AbortApplyInst>(user));
+      if (hasAbortApply) return false;
+      hasAbortApply = true;
+    }
+  }
 
+  // Don't inline a coroutine with multiple yields.  The current
+  // implementation doesn't clone code from the caller, so it can't handle
+  // values that might be live in the callee across different yields.
+  // To handle this in general, we'd need to clone code in the caller,
+  // both between the begin_apply and the resumption site and then
+  // potentially after the resumption site when there are un-mergeable
+  // values alive across it.
+  bool hasYield = false;
+  for (auto &B : BA->getReferencedFunction()->getBlocks()) {
+    if (isa<YieldInst>(B.getTerminator())) {
+      if (hasYield) return false;
+      hasYield = true;
+    }
+  }
+  // Note that zero yields is fine; it just means the begin_apply is
+  // basically noreturn.
+
+  return true;
+}
+
+bool SILInliner::canInline(FullApplySite AI) {
+  if (auto BA = dyn_cast<BeginApplyInst>(AI)) {
+    return canInlineBeginApply(BA);
+  }
+  return true;
+}
+
+bool SILInliner::canInlineFunction(FullApplySite AI) {
+  if (!canInline(AI))
+    return false;
   return AI.getFunction() != &Original;
 }
+
+/// Utility class for rewiring control-flow of inlined begin_apply functions.
+class BeginApplySite {
+  SILLocation Loc;
+  SILBuilder &Builder;
+  BeginApplyInst *BeginApply;
+  bool HasYield = false;
+
+  EndApplyInst *EndApply = nullptr;
+  SILBasicBlock *EndApplyBB = nullptr;
+  SILBasicBlock *EndApplyReturnBB = nullptr;
+
+  AbortApplyInst *AbortApply = nullptr;
+  SILBasicBlock *AbortApplyBB = nullptr;
+  SILBasicBlock *AbortApplyReturnBB = nullptr;
+
+public:
+  BeginApplySite(BeginApplyInst *BeginApply, SILLocation Loc,
+                 SILBuilder &Builder)
+      : Loc(Loc), Builder(Builder), BeginApply(BeginApply) {}
+
+  static Optional<BeginApplySite> get(FullApplySite AI, SILLocation Loc,
+                                      SILBuilder &Builder) {
+    auto *BeginApply = dyn_cast<BeginApplyInst>(AI);
+    if (!BeginApply)
+      return None;
+    return BeginApplySite(BeginApply, Loc, Builder);
+  }
+
+  void preprocess(SILBasicBlock *ReturnToBB) {
+    // Get the end_apply, abort_apply instructions.
+    auto Token = BeginApply->getTokenResult();
+    for (auto *TokenUse : Token->getUses()) {
+      if (auto End = dyn_cast<EndApplyInst>(TokenUse->getUser())) {
+        collectEndApply(End);
+      } else {
+        collectAbortApply(cast<AbortApplyInst>(TokenUse->getUser()));
+      }
+    }
+  }
+
+  // Split the basic block before the end/abort_apply. We will insert code
+  // to jump to the resume/unwind blocks depending on the integer token
+  // later. And the inlined resume/unwind return blocks will jump back to
+  // the merge blocks.
+  void collectEndApply(EndApplyInst *End) {
+    assert(!EndApply);
+    EndApply = End;
+    EndApplyBB = EndApply->getParent();
+    EndApplyReturnBB = EndApplyBB->split(SILBasicBlock::iterator(EndApply));
+  }
+  void collectAbortApply(AbortApplyInst *Abort) {
+    assert(!AbortApply);
+    AbortApply = Abort;
+    AbortApplyBB = AbortApply->getParent();
+    AbortApplyReturnBB = AbortApplyBB->split(SILBasicBlock::iterator(Abort));
+  }
+
+  /// Perform special processing for the given terminator if necessary.
+  ///
+  /// \return false to use the normal inlining logic
+  bool processTerminator(
+      TermInst *terminator, SILBasicBlock *returnToBB,
+      llvm::function_ref<SILBasicBlock *(SILBasicBlock *)> remapBlock,
+      llvm::function_ref<SILValue(SILValue)> remapValue) {
+    // A yield branches to the begin_apply return block passing the yielded
+    // results as branch arguments. Collect the yields target block for
+    // resuming later. Pass an integer token to the begin_apply return block
+    // to mark the yield we came from.
+    if (auto *yield = dyn_cast<YieldInst>(terminator)) {
+      assert(!HasYield);
+      HasYield = true;
+
+      // Pairwise replace the yielded values of the BeginApply with the
+      // values that were yielded.
+      auto calleeYields = yield->getYieldedValues();
+      auto callerYields = BeginApply->getYieldedValues();
+      assert(calleeYields.size() == callerYields.size());
+      for (auto i : indices(calleeYields)) {
+        auto remappedYield = remapValue(calleeYields[i]);
+        callerYields[i]->replaceAllUsesWith(remappedYield);
+      }
+      Builder.createBranch(Loc, returnToBB);
+
+      // Add branches at the resumption sites to the resume/unwind block.
+      if (EndApply) {
+        SavedInsertionPointRAII savedIP(Builder, EndApplyBB);
+        auto resumeBB = remapBlock(yield->getResumeBB());
+        Builder.createBranch(EndApply->getLoc(), resumeBB);
+      }
+      if (AbortApply) {
+        SavedInsertionPointRAII savedIP(Builder, AbortApplyBB);
+        auto unwindBB = remapBlock(yield->getUnwindBB());
+        Builder.createBranch(AbortApply->getLoc(), unwindBB);
+      }
+      return true;
+    }
+
+    // 'return' and 'unwind' instructions turn into branches to the
+    // end_apply/abort_apply return blocks, respectively.  If those blocks
+    // are null, it's because there weren't any of the corresponding
+    // instructions in the caller.  That means this entire path is
+    // unreachable.
+    if (isa<ReturnInst>(terminator) || isa<UnwindInst>(terminator)) {
+      bool isNormal = isa<ReturnInst>(terminator);
+      auto returnBB = isNormal ? EndApplyReturnBB : AbortApplyReturnBB;
+      if (returnBB) {
+        Builder.createBranch(Loc, returnBB);
+      } else {
+        Builder.createUnreachable(Loc);
+      }
+      return true;
+    }
+
+    assert(!isa<ThrowInst>(terminator) &&
+           "Unexpected throw instruction in yield_once function");
+
+    // Otherwise, we just map the instruction normally.
+    return false;
+  }
+
+  /// Complete the begin_apply-specific inlining work.
+  void complete() {
+    // If there was no yield in the coroutine, then control never reaches
+    // the end of the begin_apply, so all the downstream code is unreachable.
+    // Make sure the function is well-formed, since we otherwise rely on
+    // having visited a yield instruction.
+    if (!HasYield) {
+      // Make sure the split resumption blocks have terminators.
+      if (EndApplyBB) {
+        SavedInsertionPointRAII savedIP(Builder, EndApplyBB);
+        Builder.createUnreachable(Loc);
+      }
+      if (AbortApplyBB) {
+        SavedInsertionPointRAII savedIP(Builder, AbortApplyBB);
+        Builder.createUnreachable(Loc);
+      }
+
+      // Replace all the yielded values in the callee with undef.
+      for (auto calleeYield : BeginApply->getYieldedValues()) {
+        calleeYield->replaceAllUsesWith(SILUndef::get(calleeYield->getType(),
+                                                      Builder.getModule()));
+      }
+    }
+
+    // Remove the resumption sites.
+    if (EndApply)
+      EndApply->eraseFromParent();
+    if (AbortApply)
+      AbortApply->eraseFromParent();
+
+    assert(!BeginApply->hasUsesOfAnyResult());
+  }
+};
 
 /// \brief Inlines the callee of a given ApplyInst (which must be the value of a
 /// FunctionRefInst referencing a function with a known body), into the caller
@@ -80,10 +281,6 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   assert(CallSiteScope && "call site has no scope");
   assert(CallSiteScope->getParentFunction() == &F);
 
-  // Increment the ref count for the inlined function, so it doesn't
-  // get deleted before we can emit abstract debug info for it.
-  CalleeFunction->setInlined();
-
   // If the caller's BB is not the last BB in the calling function, then keep
   // track of the next BB so we always insert new BBs before it; otherwise,
   // we just leave the new BBs at the end as they are by default.
@@ -114,6 +311,9 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     ValueMap.insert(std::make_pair(calleeArg, callArg));
   }
 
+  // Set up the coroutine-specific inliner if applicable.
+  auto BeginApply = BeginApplySite::get(AI, Loc.getValue(), getBuilder());
+
   // Recursively visit callee's BB in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.
   visitSILBasicBlock(CalleeEntryBB);
@@ -131,6 +331,7 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
 
   // If we're inlining into a try_apply, we already have a return-to BB.
   SILBasicBlock *ReturnToBB;
+
   if (auto tryAI = dyn_cast<TryApplyInst>(AI)) {
     ReturnToBB = tryAI->getNormalBB();
 
@@ -149,16 +350,33 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
                            SILFunction::iterator(ReturnToBB));
 
     // Create an argument on the return-to BB representing the returned value.
-    auto apply = cast<ApplyInst>(AI.getInstruction());
-    auto *RetArg = ReturnToBB->createPHIArgument(apply->getType(),
-                                                 ValueOwnershipKind::Owned);
-    // Replace all uses of the ApplyInst with the new argument.
-    apply->replaceAllUsesWith(RetArg);
+    if (auto apply = dyn_cast<ApplyInst>(AI.getInstruction())) {
+      auto *RetArg = ReturnToBB->createPHIArgument(apply->getType(),
+                                                   ValueOwnershipKind::Owned);
+      // Replace all uses of the ApplyInst with the new argument.
+      apply->replaceAllUsesWith(RetArg);
+    } else {
+      // Handle begin_apply.
+      BeginApply->preprocess(ReturnToBB);
+    }
   }
 
   // Now iterate over the callee BBs and fix up the terminators.
   for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
     getBuilder().setInsertionPoint(BI->second);
+
+    // Coroutine terminators need special handling.
+    if (BeginApply) {
+      if (BeginApply->processTerminator(
+            BI->first->getTerminator(), ReturnToBB,
+            [=](SILBasicBlock *Block) -> SILBasicBlock * {
+              return this->remapBasicBlock(Block);
+            },
+            [=](SILValue Val) -> SILValue {
+              return this->remapValue(Val);
+            }))
+        continue;
+    }
 
     // Modify return terminators to branch to the return-to BB, rather than
     // trying to clone the ReturnInst.
@@ -172,14 +390,16 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     // Modify throw terminators to branch to the error-return BB, rather than
     // trying to clone the ThrowInst.
     if (auto *TI = dyn_cast<ThrowInst>(BI->first->getTerminator())) {
-      if (auto *A = dyn_cast<ApplyInst>(AI)) {
-        (void)A;
-        assert(A->isNonThrowing() &&
+      auto tryAI = dyn_cast<TryApplyInst>(AI);
+      if (!tryAI) {
+        assert((isa<ApplyInst>(AI)
+                  ? cast<ApplyInst>(AI)->isNonThrowing()
+                  : cast<BeginApplyInst>(AI)->isNonThrowing()) &&
                "apply of a function with error result must be non-throwing");
         getBuilder().createUnreachable(Loc.getValue());
         continue;
       }
-      auto tryAI = cast<TryApplyInst>(AI);
+
       auto returnedValue = remapValue(TI->getOperand());
       getBuilder().createBranch(Loc.getValue(), tryAI->getErrorBB(),
                                 returnedValue);
@@ -190,6 +410,10 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     // but remaps basic blocks and values.
     visit(BI->first->getTerminator());
   }
+
+  // Clean up after inlining into a begin_apply.
+  if (BeginApply)
+    BeginApply->complete();
 }
 
 SILValue SILInliner::borrowFunctionArgument(SILValue callArg,
@@ -235,12 +459,21 @@ SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   if (it != InlinedScopeCache.end())
     return it->second;
 
-  auto &M = getBuilder().getFunction().getModule();
+  auto &M = getBuilder().getModule();
   auto InlinedAt =
       getOrCreateInlineScope(CalleeScope->InlinedCallSite);
+
+  auto *ParentFunction = CalleeScope->Parent.dyn_cast<SILFunction *>();
+  if (ParentFunction)
+    ParentFunction = remapParentFunction(
+        FuncBuilder, M, ParentFunction, SubsMap,
+        CalleeFunction->getLoweredFunctionType()->getGenericSignature(),
+        ForInlining);
+
+  auto *ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();
   auto *InlinedScope = new (M) SILDebugScope(
-      CalleeScope->Loc, CalleeScope->Parent.dyn_cast<SILFunction *>(),
-      CalleeScope->Parent.dyn_cast<const SILDebugScope *>(), InlinedAt);
+      CalleeScope->Loc, ParentFunction,
+      ParentScope ? getOrCreateInlineScope(ParentScope) : nullptr, InlinedAt);
   InlinedScopeCache.insert({CalleeScope, InlinedScope});
   return InlinedScope;
 }
@@ -398,12 +631,12 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::CondBranchInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::CopyBlockInst:
+  case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyAddrInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::RetainValueAddrInst:
   case SILInstructionKind::UnmanagedRetainValueInst:
   case SILInstructionKind::CopyValueInst:
-  case SILInstructionKind::CopyUnownedValueInst:
   case SILInstructionKind::DeallocBoxInst:
   case SILInstructionKind::DeallocExistentialBoxInst:
   case SILInstructionKind::DeallocRefInst:
@@ -436,8 +669,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::InjectEnumAddrInst:
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
-  case SILInstructionKind::LoadUnownedInst:
-  case SILInstructionKind::LoadWeakInst:
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialBoxValueInst:
@@ -448,18 +679,11 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ExistentialMetatypeInst:
   case SILInstructionKind::RefElementAddrInst:
   case SILInstructionKind::RefTailAddrInst:
-  case SILInstructionKind::RefToUnmanagedInst:
-  case SILInstructionKind::RefToUnownedInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreBorrowInst:
-  case SILInstructionKind::StoreUnownedInst:
-  case SILInstructionKind::StoreWeakInst:
-  case SILInstructionKind::StrongPinInst:
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::SetDeallocatingInst:
   case SILInstructionKind::StrongRetainInst:
-  case SILInstructionKind::StrongRetainUnownedInst:
-  case SILInstructionKind::StrongUnpinInst:
   case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst:
   case SILInstructionKind::SwitchEnumAddrInst:
@@ -470,19 +694,33 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastValueInst:
-  case SILInstructionKind::UnmanagedToRefInst:
-  case SILInstructionKind::UnownedReleaseInst:
-  case SILInstructionKind::UnownedRetainInst:
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
-  case SILInstructionKind::UnownedToRefInst:
   case SILInstructionKind::InitBlockStorageHeaderInst:
   case SILInstructionKind::SelectEnumAddrInst:
   case SILInstructionKind::SelectEnumInst:
   case SILInstructionKind::SelectValueInst:
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::GlobalValueInst:
+#define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name) \
+  case SILInstructionKind::Name##ToRefInst: \
+  case SILInstructionKind::RefTo##Name##Inst:
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Load##Name##Inst: \
+  case SILInstructionKind::Store##Name##Inst:
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name) \
+  case SILInstructionKind::Name##RetainInst: \
+  case SILInstructionKind::Name##ReleaseInst: \
+  case SILInstructionKind::StrongRetain##Name##Inst: \
+  case SILInstructionKind::Copy##Name##ValueInst:
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)
+#include "swift/AST/ReferenceStorage.def"
+#undef COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
     return InlineCost::Expensive;
 
   case SILInstructionKind::BuiltinInst: {

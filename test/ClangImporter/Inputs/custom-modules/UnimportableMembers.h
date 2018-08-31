@@ -32,3 +32,23 @@ __attribute__((objc_root_class))
 @interface IncompleteUnknownInitializers (CategoryConvenience)
 - (instancetype)initCategory:(long)x;
 @end
+
+@interface IncompleteDesignatedInitializersWithCategory : Base
+- (instancetype)initFirst:(long)x __attribute__((objc_designated_initializer));
+- (instancetype)initMissing:(long)x, ... __attribute__((objc_designated_initializer));
+- (instancetype)initConveniently:(long)x;
+@end
+@interface IncompleteDesignatedInitializersWithCategory (/*class extension*/)
+- (instancetype)initSecond:(long)x __attribute__((objc_designated_initializer));
+- (instancetype)initCategory:(long)x;
+@end
+
+@interface DesignatedInitializerInAnotherModule : Base
+- (instancetype)initFirst:(long)x __attribute__((objc_designated_initializer));
+- (instancetype)initSecond:(long)x __attribute__((objc_designated_initializer));
+- (instancetype)initMissing:(long)x, ... __attribute__((objc_designated_initializer));
+- (instancetype)initConveniently:(long)x;
+@end
+@interface DesignatedInitializerInAnotherModule (CategoryConvenience)
+- (instancetype)initCategory:(long)x;
+@end

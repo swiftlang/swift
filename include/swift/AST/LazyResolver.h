@@ -33,7 +33,6 @@ class NominalTypeDecl;
 class NormalProtocolConformance;
 class ProtocolConformance;
 class ProtocolDecl;
-class Substitution;
 class TypeDecl;
 class ValueDecl;
 class VarDecl;
@@ -54,11 +53,6 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve the access of a value.
-  ///
-  /// It does no type-checking.
-  virtual void resolveAccessControl(ValueDecl *VD) = 0;
-
   /// Resolve the type and declaration attributes of a value.
   ///
   /// This can be called when the type or signature of a value is needed.
@@ -66,20 +60,8 @@ public:
   /// consistency and provides the value a type.
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
 
-  /// Resolve the types in the inheritance clause of the given
-  /// declaration context, which will be a type declaration or
-  /// extension declaration.
-  virtual void resolveInheritanceClause(
-                 llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) = 0;
-
-  /// Resolve the superclass of the given class.
-  virtual void resolveSuperclass(ClassDecl *classDecl) = 0;
-
-  /// Resolve the raw type of the given enum.
-  virtual void resolveRawType(EnumDecl *enumDecl) = 0;
-
-  /// Resolve the inherited protocols of a given protocol.
-  virtual void resolveInheritedProtocols(ProtocolDecl *protocol) = 0;
+  /// Resolve the generic environment of the given protocol.
+  virtual void resolveProtocolEnvironment(ProtocolDecl *proto) = 0;
 
   /// Bind an extension to its extended type.
   virtual void bindExtension(ExtensionDecl *ext) = 0;
@@ -99,71 +81,6 @@ public:
   /// Mark the given conformance as "used" from the given declaration context.
   virtual void markConformanceUsed(ProtocolConformanceRef conformance,
                                    DeclContext *dc) = 0;
-};
-
-/// An implementation of LazyResolver that delegates to another.
-class DelegatingLazyResolver : public LazyResolver {
-protected:
-  LazyResolver &Principal;
-public:
-  DelegatingLazyResolver(LazyResolver &principal) : Principal(principal) {}
-  ~DelegatingLazyResolver(); // v-table anchor
-
-  void resolveTypeWitness(const NormalProtocolConformance *conformance,
-                          AssociatedTypeDecl *assocType) override {
-    Principal.resolveTypeWitness(conformance, assocType);
-  }
-
-  void resolveWitness(const NormalProtocolConformance *conformance,
-                      ValueDecl *requirement) override {
-    Principal.resolveWitness(conformance, requirement);
-  }
-
-  void resolveAccessControl(ValueDecl *VD) override {
-    Principal.resolveAccessControl(VD);
-  }
-
-  void resolveDeclSignature(ValueDecl *VD) override {
-    Principal.resolveDeclSignature(VD);
-  }
-
-  void resolveInheritanceClause(
-                llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) override {
-    Principal.resolveInheritanceClause(decl);
-  }
-
-  void resolveSuperclass(ClassDecl *classDecl) override {
-    Principal.resolveSuperclass(classDecl);
-  }
-
-  void resolveRawType(EnumDecl *enumDecl) override {
-    Principal.resolveRawType(enumDecl);
-  }
-
-  void resolveInheritedProtocols(ProtocolDecl *protocol) override {
-    Principal.resolveInheritedProtocols(protocol);
-  }
-
-  void bindExtension(ExtensionDecl *ext) override {
-    Principal.bindExtension(ext);
-  }
-
-  void resolveExtension(ExtensionDecl *ext) override {
-    Principal.resolveExtension(ext);
-  }
-
-  void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
-    Principal.resolveImplicitConstructors(nominal);
-  }
-
-  void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
-    Principal.resolveImplicitMember(nominal, member);
-  }
-
-  void markConformanceUsed(ProtocolConformanceRef conformance,
-                           DeclContext *dc) override {
-    return Principal.markConformanceUsed(conformance, dc);
-  }
 };
 
 class LazyMemberLoader;

@@ -11,20 +11,20 @@ _Nonnull CCPowerSupplyRef CCPowerSupplyCreate(double watts)
 _Nonnull CCRefrigeratorRef CCRefrigeratorCreate(CCPowerSupplyRef _Nonnull power)
   __attribute__((swift_name("CCRefrigerator.init(powerSupply:)")));
 
-void CCRefrigeratorOpen(CCRefrigeratorRef fridge)
+void CCRefrigeratorOpen(_Null_unspecified CCRefrigeratorRef fridge)
   __attribute__((swift_name("CCRefrigerator.open(self:)")));
 
 _Nonnull CCMutableRefrigeratorRef CCRefrigeratorCreateMutable(_Nonnull CCPowerSupplyRef power)
   __attribute__((swift_name("CCMutableRefrigerator.init(powerSupply:)")));
 
-_Nonnull CCPowerSupplyRef CCRefrigeratorGetPowerSupply(CCRefrigeratorRef fridge)
+_Nonnull CCPowerSupplyRef CCRefrigeratorGetPowerSupply(_Null_unspecified CCRefrigeratorRef fridge)
   __attribute__((swift_name("getter:CCRefrigerator.powerSupply(self:)")));
 
-void CCRefrigeratorSetPowerSupply(CCRefrigeratorRef fridge,
+void CCRefrigeratorSetPowerSupply(_Null_unspecified CCRefrigeratorRef fridge,
                                   CCPowerSupplyRef _Nonnull powerSupply)
   __attribute__((swift_name("setter:CCRefrigerator.powerSupply(self:_:)")));
 
-extern const CCPowerSupplyRef kCCPowerSupplySemiModular
+extern const _Null_unspecified CCPowerSupplyRef kCCPowerSupplySemiModular
   __attribute__((swift_name("CCPowerSupplyRef.semiModular")));
 
 _Nonnull CCPowerSupplyRef CCPowerSupplyCreateDangerous(void)

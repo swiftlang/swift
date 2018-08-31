@@ -489,11 +489,14 @@ class ASTScope {
   /// introduced by this statement.
   static ASTScope *createIfNeeded(const ASTScope *parent, Stmt *stmt);
 
-  /// Create a new AST scope if one is needed for the given expression.
+  /// Create a new AST scope if one is needed for the given child expression(s).
+  /// In the first variant, the expression can be \c null.
   ///
   /// \returns the newly-created AST scope, or \c null if there is no scope
   /// introduced by this expression.
-  static ASTScope *createIfNeeded(const ASTScope *parent, Expr *Expr);
+  static ASTScope *createIfNeeded(const ASTScope *parent, Expr *expr);
+  static ASTScope *createIfNeeded(const ASTScope *parent,
+                                  ArrayRef<Expr *> exprs);
 
   /// Create a new AST scope if one is needed for the given AST node.
   ///

@@ -89,7 +89,7 @@ bb0(%0 : $Bar):
 sil hidden @_TFC4test3BarD : $@convention(method) (@owned Bar) -> () {
 bb0(%0 : $Bar):
   debug_value %0 : $Bar, let, name "self" // id: %1
-  %2 = objc_super_method %0 : $Bar, #NSObject.deinit!deallocator.foreign : (NSObject) -> () -> (), $@convention(objc_method) (NSObject) -> ()  // user: %4
+  %2 = objc_super_method %0 : $Bar, #NSObject.deinit!deallocator.1.foreign : (NSObject) -> () -> (), $@convention(objc_method) (NSObject) -> ()  // user: %4
   %3 = upcast %0 : $Bar to $NSObject              // user: %4
   %4 = apply %2(%3) : $@convention(objc_method) (NSObject) -> ()
   %5 = tuple ()                                   // user: %6
@@ -127,28 +127,34 @@ bb0(%0 : $Walkable):
 // CHECK: open_existential_ref %0 : $AnyObject to $[[OPENED:@opened\(.*\) AnyObject]]
 // CHECK: bb1(%{{[0-9]*}} : $@convention(objc_method) ([[OPENED]]) -> @autoreleased Optional<NSString>):
 // CHECK-NOT: open_existential_ref
-// CHECK: bb2(%{{[0-9]*}} : $@convention(objc_method) ([[OPENED]]) -> @autoreleased Optional<NSString>):
+// CHECK: bb3(%{{[0-9]*}} : $@convention(objc_method) ([[OPENED]]) -> @autoreleased Optional<NSString>):
 // CHECK-NOT: open_existential_ref
 // CHECK: return
 sil @cse_open_existential_in_bbarg : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : $AnyObject):
   %1 = open_existential_ref %0 : $AnyObject to $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  dynamic_method_br %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.1.foreign, bb1, bb3
+  dynamic_method_br %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.1.foreign, bb1, bb2
 
 bb1(%3 : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
   strong_retain %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
   %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
   %6 = apply %5() : $@callee_owned () -> @owned Optional<NSString>
   %7 = open_existential_ref %0 : $AnyObject to $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  dynamic_method_br %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.1.foreign, bb2, bb3
+  dynamic_method_br %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.1.foreign, bb3, bb4
 
-bb2(%9 : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
+bb2:
+  br bb5
+
+bb3(%9 : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
   strong_retain %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
   %10 = partial_apply %9(%7) : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
   %11 = apply %10() : $@callee_owned () -> @owned Optional<NSString>
-  br bb3
+  br bb5
 
-bb3:
+bb4:
+  br bb5
+
+bb5:
   strong_release %0 : $AnyObject
   %13 = tuple ()
   return %13 : $()
@@ -269,5 +275,5 @@ bb0(%0 : $@objc_metatype XXX.Type):
 sil_vtable Bar {
   #Bar.init!initializer.1: @_TFC4test3BarcfMS0_FT_S0_	// test.Bar.init (test.Bar.Type)() -> test.Bar
   #Bar.walk!1: @_TFC4test3Bar4walkfS0_FT_T_	// test.Bar.walk (test.Bar)() -> ()
-  #Bar.deinit!deallocator: @_TFC4test3BarD	// test.Bar.__deallocating_deinit
+  #Bar.deinit!deallocator.1: @_TFC4test3BarD	// test.Bar.__deallocating_deinit
 }

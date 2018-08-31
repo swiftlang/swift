@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -enable-sil-ownership | %FileCheck %s
+
+// RUN: %target-swift-emit-silgen -module-name objc_attr_NSManaged -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -68,13 +69,11 @@ extension FinalGizmo {
   }
 }
 
-// CHECK-LABEL: sil hidden @$S19objc_attr_NSManaged9testFinalySSAA0E5GizmoCF : $@convention(thin) (@owned FinalGizmo) -> @owned String {
-// CHECK: bb0([[ARG:%.*]] : @owned $FinalGizmo):
-// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK: objc_method [[BORROWED_ARG]] : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> (), $@convention(objc_method) (FinalGizmo) -> ()
+// CHECK-LABEL: sil hidden @$S19objc_attr_NSManaged9testFinalySSAA0E5GizmoCF : $@convention(thin) (@guaranteed FinalGizmo) -> @owned String {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $FinalGizmo):
+// CHECK: objc_method [[ARG]] : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> (), $@convention(objc_method) (FinalGizmo) -> ()
 // CHECK-NOT: return
-// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK: objc_method [[BORROWED_ARG]] : $FinalGizmo, #FinalGizmo.y!getter.1.foreign : (FinalGizmo) -> () -> String, $@convention(objc_method) (FinalGizmo) -> @autoreleased NSString
+// CHECK: objc_method [[ARG]] : $FinalGizmo, #FinalGizmo.y!getter.1.foreign : (FinalGizmo) -> () -> String, $@convention(objc_method) (FinalGizmo) -> @autoreleased NSString
 // CHECK: return
 func testFinal(_ obj: FinalGizmo) -> String {
   obj.kvc2()
@@ -104,12 +103,10 @@ class FinalEntity: NSObject, EntityIDProto {
 	@NSManaged final var entityID: String
 }
 
-// CHECK-LABEL: sil private @$S19objc_attr_NSManaged11FinalEntityC8entityIDSSvmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout FinalEntity, @thick FinalEntity.Type) -> ()
-// CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!setter.1.foreign
-// CHECK: return
-
-// CHECK-LABEL: sil hidden @$S19objc_attr_NSManaged11FinalEntityC8entityIDSSvm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed FinalEntity) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil shared @$S19objc_attr_NSManaged11FinalEntityC8entityIDSSvM : $@yield_once @convention(method) (@guaranteed FinalEntity) -> @yields @inout String
 // CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!getter.1.foreign
+// CHECK: yield
+// CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!setter.1.foreign
 // CHECK: return
 
 // CHECK-NOT: sil hidden @$S19objc_attr_NSManaged10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
@@ -120,17 +117,13 @@ class FinalEntity: NSObject, EntityIDProto {
 // CHECK-LABEL: sil_vtable SwiftGizmo {
 // CHECK-NEXT:   #SwiftGizmo.modifyX!1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC7modifyXyyF
 // CHECK-NEXT:   #SwiftGizmo.testFunc!1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC8testFuncyyF
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoCACSgycfc
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC7bellsOnACSgSi_tcfc
-// CHECK-NEXT:   #SwiftGizmo.deinit!deallocator: @$S19objc_attr_NSManaged10SwiftGizmoCfD
+// CHECK-NEXT:   #SwiftGizmo.deinit!deallocator.1: @$S19objc_attr_NSManaged10SwiftGizmoCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable FinalGizmo {
 // CHECK-NEXT:   #SwiftGizmo.modifyX!1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC7modifyX{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #SwiftGizmo.testFunc!1: {{.*}} : @$S19objc_attr_NSManaged10SwiftGizmoC8testFunc{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10FinalGizmoC{{[_0-9a-zA-Z]*}}fc
-// CHECK-NEXT:   #SwiftGizmo.init!initializer.1: {{.*}} : @$S19objc_attr_NSManaged10FinalGizmoC{{[_0-9a-zA-Z]*}}fc
-// CHECK-NEXT:   #FinalGizmo.deinit!deallocator: @$S19objc_attr_NSManaged10FinalGizmoCfD
+// CHECK-NEXT:   #FinalGizmo.deinit!deallocator.1: @$S19objc_attr_NSManaged10FinalGizmoCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable ProtoAdopter {

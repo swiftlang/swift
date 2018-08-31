@@ -28,6 +28,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Parse/SyntaxParsingCache.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
@@ -62,7 +63,6 @@ namespace swift {
   class LinkLibrary;
   class LookupCache;
   class ModuleLoader;
-  class NameAliasType;
   class NominalTypeDecl;
   class EnumElementDecl;
   class OperatorDecl;
@@ -94,27 +94,26 @@ enum class FileUnitKind {
   SerializedAST,
   /// An imported Clang module.
   ClangModule,
-  /// A derived declaration.
-  Derived,
 };
 
 enum class SourceFileKind {
   Library,  ///< A normal .swift file.
   Main,     ///< A .swift file that can have top-level code.
   REPL,     ///< A virtual file that holds the user's input in the REPL.
-  SIL       ///< Came from a .sil file.
+  SIL,      ///< Came from a .sil file.
+  Interface ///< Came from a .swiftinterface file, representing another module.
 };
 
 /// Discriminator for resilience strategy.
 enum class ResilienceStrategy : unsigned {
   /// Public nominal types: fragile
-  /// Non-inlineable function bodies: resilient
+  /// Non-inlinable function bodies: resilient
   ///
   /// This is the default behavior without any flags.
   Default,
 
   /// Public nominal types: resilient
-  /// Non-inlineable function bodies: resilient
+  /// Non-inlinable function bodies: resilient
   ///
   /// This is the behavior with -enable-resilience.
   Resilient
@@ -153,7 +152,7 @@ public:
   };
 
 private:
-  /// If non-NULL, an plug-in that should be used when performing external
+  /// If non-NULL, a plug-in that should be used when performing external
   /// lookups.
   // FIXME: Do we really need to bloat all modules with this?
   DebuggerClient *DebugClient = nullptr;
@@ -207,6 +206,7 @@ private:
     unsigned TestingEnabled : 1;
     unsigned FailedToLoad : 1;
     unsigned ResilienceStrategy : 1;
+    unsigned HasResolvedImports : 1;
   } Flags;
 
   ModuleDecl(Identifier name, ASTContext &ctx);
@@ -256,6 +256,13 @@ public:
   }
   void setFailedToLoad(bool failed = true) {
     Flags.FailedToLoad = failed;
+  }
+
+  bool hasResolvedImports() const {
+    return Flags.HasResolvedImports;
+  }
+  void setHasResolvedImports() {
+    Flags.HasResolvedImports = true;
   }
 
   ResilienceStrategy getResilienceStrategy() const {
@@ -401,23 +408,17 @@ public:
   ///
   /// \param topLevelAccessPath If present, include the top-level module in the
   ///        results, with the given access path.
-  /// \param includePrivateTopLevelImports If true, imports listed in all
-  ///        file units within this module are traversed. Otherwise (the
-  ///        default), only re-exported imports are traversed.
   /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
   ///        Return \c false to abort iteration.
   ///
   /// \return True if the traversal ran to completion, false if it ended early
   ///         due to the callback.
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
                             llvm::function_ref<bool(ImportedModule)> fn);
 
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
                             llvm::function_ref<void(ImportedModule)> fn) {
     return forAllVisibleModules(topLevelAccessPath,
-                                includePrivateTopLevelImports,
                                 [=](const ImportedModule &import) -> bool {
       fn(import);
       return true;
@@ -426,19 +427,10 @@ public:
 
   template <typename Fn>
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
                             Fn &&fn) {
     using RetTy = typename std::result_of<Fn(ImportedModule)>::type;
     llvm::function_ref<RetTy(ImportedModule)> wrapped{std::forward<Fn>(fn)};
-    return forAllVisibleModules(topLevelAccessPath,
-                                includePrivateTopLevelImports,
-                                wrapped);
-  }
-
-  template <typename Fn>
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath, Fn &&fn) {
-    return forAllVisibleModules(topLevelAccessPath, false,
-                                std::forward<Fn>(fn));
+    return forAllVisibleModules(topLevelAccessPath, wrapped);
   }
 
   /// @}
@@ -492,7 +484,7 @@ public:
   SourceRange getSourceRange() const { return SourceRange(); }
 
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -846,6 +838,10 @@ public:
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
 
+  /// A cache of syntax nodes that can be reused when creating the syntax tree
+  /// for this file.
+  SyntaxParsingCache *SyntaxParsingCache = nullptr;
+
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
 
@@ -854,6 +850,14 @@ public:
   /// module is still not imported by the time type checking is
   /// complete, we diagnose.
   llvm::SetVector<const DeclAttribute *> AttrsRequiringFoundation;
+
+  /// A set of synthesized declarations that need to be type checked.
+  llvm::SmallVector<Decl *, 8> SynthesizedDecls;
+
+  /// We might perform type checking on the same source file more than once,
+  /// if its the main file or a REPL instance, so keep track of the last
+  /// checked synthesized declaration to avoid duplicating work.
+  unsigned LastCheckedSynthesizedDecl = 0;
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.
@@ -972,6 +976,10 @@ public:
   ReferencedNameTracker *getReferencedNameTracker() {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
+  const ReferencedNameTracker *getReferencedNameTracker() const {
+    return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
+  }
+
   void createReferencedNameTracker();
 
   /// \brief The buffer ID for the file that was imported, or None if there
@@ -1014,6 +1022,7 @@ public:
       return true;
       
     case SourceFileKind::Library:
+    case SourceFileKind::Interface:
     case SourceFileKind::SIL:
       return false;
     }
@@ -1222,7 +1231,7 @@ public:
 };
 
 inline bool DeclContext::isModuleContext() const {
-  if (auto D = getAsDeclOrDeclExtensionContext())
+  if (auto D = getAsDecl())
     return ModuleDecl::classof(D);
   return false;
 }

@@ -97,9 +97,8 @@ enum class ReferenceCounting : unsigned {
 
 enum class ReferenceKind : unsigned {
   Strong,
-  Unowned,
-  Weak,
-  Unmanaged
+#define REF_STORAGE(Name, ...) Name,
+#include "swift/AST/ReferenceStorage.def"
 };
 
 enum class TypeInfoKind : unsigned {

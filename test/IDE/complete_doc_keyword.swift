@@ -93,6 +93,7 @@ func foo2() {
   let c = C1()
   c.#^MEMBER1^#
 // MEMBER1: Begin completions
+// MEMBER1-NEXT: Keyword[self]/CurrNominal: self[#C1#]; name=self
 // MEMBER1-NEXT: Decl[InstanceVar]/CurrNominal/keyword[v1, Int]/recommended[v2]: v1[#Int#]
 // MEMBER1-NEXT: Decl[InstanceVar]/CurrNominal/keyword[v2, Int]/recommendedover[v1]: v2[#Int#]
 // MEMBER1-NEXT: Decl[InstanceMethod]/CurrNominal/keyword[f1, func]/recommended[f2]: f1()[#Void#]
@@ -103,6 +104,7 @@ func foo3() {
   let s = S3()
   s.#^MEMBER2^#
 // MEMBER2: Begin completions
+// MEMBER2-NEXT: Keyword[self]/CurrNominal: self[#S3#]; name=self
 // MEMBER2-NEXT: Decl[InstanceMethod]/CurrNominal/nonmutatingvariant[fooing]: foo()[#Void#]
 // MEMBER2-NEXT: Decl[InstanceMethod]/CurrNominal/mutatingvariant[foo]: fooing()[#S3#]
 }

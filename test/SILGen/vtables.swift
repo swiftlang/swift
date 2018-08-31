@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // Test for compilation order independence
 class C : B {
@@ -69,7 +69,7 @@ class B : A {
 // CHECK: sil_vtable RequiredInitDerived {
 // CHECK-NEXT: #SimpleInitBase.init!initializer.1: {{.*}} : @$S7vtables19RequiredInitDerivedC{{[_0-9a-zA-Z]*}}fc
 // CHECK-NEXT: #RequiredInitDerived.init!allocator.1: {{.*}} : @$S7vtables19RequiredInitDerivedC
-// CHECK-NEXT: #RequiredInitDerived.deinit!deallocator: @$S7vtables19RequiredInitDerivedCfD
+// CHECK-NEXT: #RequiredInitDerived.deinit!deallocator.1: @$S7vtables19RequiredInitDerivedCfD
 // CHECK-NEXT: }
 
 class SimpleInitBase { }

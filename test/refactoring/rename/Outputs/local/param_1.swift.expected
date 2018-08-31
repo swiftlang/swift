@@ -1,0 +1,46 @@
+func test1() {
+  if true {
+    let x = 1
+    print(x)
+  } else {
+    let x = 2
+    print(x)
+  }
+}
+
+func test2(arg1: Int?, arg2: (Int, String)?) {
+  if let x = arg1 {
+    print(x)
+  } else if let (x, y) = arg2 {
+    print(x, y)
+  }
+}
+
+func test3(arg: Int?) {
+  switch arg {
+  case let .some(x) where x == 0:
+    print(x)
+  case let .some(x) where x == 1,
+       let .some(x) where x == 2: // FIXME: This 'x' in '.some(x)' isn't properly renamed in 'casebind_2' case.
+    print(x)
+  default:
+    break
+  }
+}
+
+struct Err1 : Error { }
+func test4(arg: () throws -> Void) {
+  do {
+    try arg()
+  } catch let x as Err1 {
+    print(x)
+  } catch let x {
+    print(x)
+  }
+}
+
+func test5(_ xRenamed: Int) {
+  let x = xRenamed 
+  print(x)
+}
+

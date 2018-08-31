@@ -23,7 +23,7 @@ sil @$S6vtable1CCfD : $@convention(method) (@owned C) -> ()
 // CHECK-objc: void ([[C]]*)* @"$S6vtable1CCfD",
 // CHECK-objc: i8** @"$SBoWV",
 // CHECK-objc: i64 ptrtoint (%objc_class* @"$S6vtable1CCMm" to i64),
-// CHECK-objc: %objc_class* @"OBJC_CLASS_$__TtCs12_SwiftObject",
+// CHECK-objc: %objc_class* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // CHECK-objc: %swift.opaque* @_objc_empty_cache,
 // CHECK-objc: %swift.opaque* null,
 // CHECK-objc: i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, i8*, i8*, i8*, i8*, i8* }* @_DATA__TtC6vtable1C to i64), i64 {{1|2}}),

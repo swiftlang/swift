@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize -DINT_32=i32
 
 struct A<T1, T2>
 {
@@ -38,22 +38,13 @@ public struct GenericStruct<T : Proto> {
   public init() {}
 }
 
-// CHECK-32-LABEL: define{{.*}} swiftcc void @"$S15generic_structs13GenericStructVACyxGycfC"
-// CHECK-32:  [[TYPE:%.*]] =  call %swift.type* @"$S15generic_structs13GenericStructVMa"(%swift.type* %T, i8** %T.Proto)
-// CHECK-32:  [[PTR:%.*]] = bitcast %swift.type* [[TYPE]] to i32*
-// CHECK-32:  [[FIELDOFFSETS:%.*]] = getelementptr inbounds i32, i32* [[PTR]], i32 4
-// CHECK-32:  [[FIELDOFFSET:%.*]] = getelementptr inbounds i32, i32* [[FIELDOFFSETS]], i32 2
-// CHECK-32:  [[OFFSET:%.*]] = load i32, i32* [[FIELDOFFSET]]
-// CHECK-32:  [[ADDROFOPT:%.*]] = getelementptr inbounds i8, i8* {{.*}}, i32 [[OFFSET]]
-// CHECK-32:  [[OPTPTR:%.*]] = bitcast i8* [[ADDROFOPT]] to %TSq*
-// CHECK-32:  call %TSq* @"$S15generic_structsytWb3_"(%TSq* {{.*}}, %TSq* [[OPTPTR]]
-
-// CHECK-64-LABEL: define{{.*}} swiftcc void @"$S15generic_structs13GenericStructVACyxGycfC"
-// CHECK-64:  [[TYPE:%.*]] =  call %swift.type* @"$S15generic_structs13GenericStructVMa"(%swift.type* %T, i8** %T.Proto)
-// CHECK-64:  [[PTR:%.*]] = bitcast %swift.type* [[TYPE]] to i64*
-// CHECK-64:  [[FIELDOFFSETS:%.*]] = getelementptr inbounds i64, i64* [[PTR]], i64 4
-// CHECK-64:  [[FIELDOFFSET:%.*]] = getelementptr inbounds i64, i64* [[FIELDOFFSETS]], i32 2
-// CHECK-64:  [[OFFSET:%.*]] = load i64, i64* [[FIELDOFFSET]]
-// CHECK-64:  [[ADDROFOPT:%.*]] = getelementptr inbounds i8, i8* {{.*}}, i64 [[OFFSET]]
-// CHECK-64:  [[OPTPTR:%.*]] = bitcast i8* [[ADDROFOPT]] to %TSq*
-// CHECK-64:  call %TSq* @"$S15generic_structsytWb3_"(%TSq* {{.*}}, %TSq* [[OPTPTR]]
+// CHECK-LABEL: define{{.*}} swiftcc void @"$S15generic_structs13GenericStructVACyxGycfC"
+// CHECK:  [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S15generic_structs13GenericStructVMa"([[INT]] 0, %swift.type* %T, i8** %T.Proto)
+// CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK:  [[PTR:%.*]] = bitcast %swift.type* [[TYPE]] to [[INT_32]]*
+// CHECK:  [[FIELDOFFSETS:%.*]] = getelementptr inbounds [[INT_32]], [[INT_32]]* [[PTR]], [[INT]] [[IDX:4|8]]
+// CHECK:  [[FIELDOFFSET:%.*]] = getelementptr inbounds [[INT_32]], [[INT_32]]* [[FIELDOFFSETS]], i32 2
+// CHECK:  [[OFFSET:%.*]] = load [[INT_32]], [[INT_32]]* [[FIELDOFFSET]]
+// CHECK:  [[ADDROFOPT:%.*]] = getelementptr inbounds i8, i8* {{.*}}, [[INT_32]] [[OFFSET]]
+// CHECK:  [[OPTPTR:%.*]] = bitcast i8* [[ADDROFOPT]] to %TSq*
+// CHECK:  call %TSq* @"$SxSg15generic_structs5ProtoRzlWOb"(%TSq* {{.*}}, %TSq* [[OPTPTR]]

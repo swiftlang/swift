@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-emit-sil -enable-sil-ownership %s -o /dev/null -verify
 
 func testUnreachableAfterReturn() -> Int {
   var x: Int = 3

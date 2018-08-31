@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library %s
-// RUN: %target-swift-frontend -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 3 -parse-as-library %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name access_enforcement_noescape -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library %s
+// RUN: %target-swift-frontend -module-name access_enforcement_noescape -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 3 -parse-as-library %s | %FileCheck %s
 // REQUIRES: asserts
 
 // This tests SILGen and AccessEnforcementSelection as a single set of tests.
@@ -535,7 +536,7 @@ func readBlockWriteInout() {
   var x = 3
   // Around the call: [modify] [static]
   // Inside closure: [read] [static]
-  // expected-warning@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   doBlockInout({ _ = x }, &x)
 }
@@ -560,7 +561,7 @@ func readBlockWriteInout() {
 func noEscapeBlock() {
   var x = 3
   doOne {
-    // expected-warning@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
     // expected-note@+1{{conflicting access is here}}
     doBlockInout({ _ = x }, &x)
   }
@@ -575,16 +576,19 @@ func noEscapeBlock() {
 // CHECK: [[F1:%.*]] = function_ref @$S27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_yyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> ()
 // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[F1]](%0) : $@convention(thin) (@inout_aliasable Int) -> ()
 // CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
-// CHECK: [[ADDR:%.*]] = project_block_storage [[STORAGE]] : $*@block_storage @noescape @callee_guaranteed () -> ()
-// CHECK: store [[CVT]] to [[ADDR]] : $*@noescape @callee_guaranteed () -> ()
-// CHECK: [[F2:%.*]] = function_ref @$SIg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
-// CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]] : $*@block_storage @noescape @callee_guaranteed () -> (), invoke [[F2]] : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
+// CHECK: [[PA2:%.*]] = partial_apply
+// CHECK: [[SENTINEL:%.*]] = mark_dependence [[PA2]]{{.*}}on{{.*}}[[CVT]]
+// CHECK: strong_retain [[SENTINEL]]
+// CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()
+// CHECK: [[ADDR:%.*]] = project_block_storage [[STORAGE]] : $*@block_storage @callee_guaranteed () -> ()
+// CHECK: store [[SENTINEL]] to [[ADDR]] : $*@callee_guaranteed () -> ()
+// CHECK: [[F2:%.*]] = function_ref @$SIeg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+// CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]] : $*@block_storage @callee_guaranteed () -> (), invoke [[F2]] : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
 // CHECK: [[ARG:%.*]] = copy_block [[BLOCK]] : $@convention(block) @noescape () -> ()
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: apply %{{.*}}([[ARG]], [[WRITE]]) : $@convention(thin) (@owned @convention(block) @noescape () -> (), @inout Int) -> ()
+// CHECK: apply %{{.*}}([[ARG]], [[WRITE]]) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> (), @inout Int) -> ()
 // CHECK: end_access [[WRITE]] : $*Int
-// CHECK: dealloc_stack [[STORAGE]] : $*@block_storage @noescape @callee_guaranteed () -> ()
+// CHECK: dealloc_stack [[STORAGE]] : $*@block_storage @callee_guaranteed () -> ()
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_'
 
 // CHECK-LABEL: sil private @$S27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_yyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {

@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -parse-as-library %s | %FileCheck %s --check-prefix=FRAGILE --check-prefix=CHECK
-// RUN: %target-swift-frontend -enable-resilience -emit-silgen -enable-sil-ownership -parse-as-library %s | %FileCheck %s --check-prefix=RESILIENT --check-prefix=CHECK
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-as-library %s | %FileCheck %s --check-prefix=FRAGILE --check-prefix=CHECK
+// RUN: %target-swift-emit-silgen -enable-resilience -enable-sil-ownership -parse-as-library %s | %FileCheck %s --check-prefix=RESILIENT --check-prefix=CHECK
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -parse-as-library -enable-testing %s
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -parse-as-library -enable-testing -enable-resilience %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-as-library -enable-testing %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-as-library -enable-testing -enable-resilience %s
 
 public let global = 0
 
@@ -20,7 +20,8 @@ public struct NonFixedStruct {
   public var storedProperty = global
 }
 
-// CHECK-LABEL: sil hidden [transparent] @$S22fixed_layout_attribute14NonFixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
+// FRAGILE-LABEL: sil [transparent] @$S22fixed_layout_attribute14NonFixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
+// RESILIENT-LABEL: sil hidden [transparent] @$S22fixed_layout_attribute14NonFixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
 //
 //    ... okay to directly reference the addressor here:
 // CHECK: function_ref @$S22fixed_layout_attribute6globalSivau
@@ -63,9 +64,9 @@ public func usesStaticProperty() {
   _ = HasStaticProperty.staticProperty
 }
 
-// CHECK-LABEL: sil [serialized] @$S22fixed_layout_attribute28usesStaticPropertyInlineableyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [serialized] @$S22fixed_layout_attribute27usesStaticPropertyInlinableyyF : $@convention(thin) () -> ()
 
-@_inlineable
-public func usesStaticPropertyInlineable() {
+@inlinable
+public func usesStaticPropertyInlinable() {
   _ = HasStaticProperty.staticProperty
 }

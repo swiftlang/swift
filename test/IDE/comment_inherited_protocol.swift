@@ -15,7 +15,7 @@ protocol ParentProtocol1 {
 
   /// ParentProtocol.AssocType
   associatedtype AssocType
-  // CHECK: AssociatedType/ParentProtocol1.AssocType {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>AssocType</Name><USR>s:14swift_ide_test15ParentProtocol1P9AssocType</USR><Declaration>associatedtype AssocType</Declaration><CommentParts><Abstract><Para>ParentProtocol.AssocType</Para></Abstract></CommentParts></Other>]
+  // CHECK: AssociatedType/ParentProtocol1.AssocType {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>AssocType</Name><USR>s:14swift_ide_test15ParentProtocol1P9AssocTypeQa</USR><Declaration>associatedtype AssocType</Declaration><CommentParts><Abstract><Para>ParentProtocol.AssocType</Para></Abstract></CommentParts></Other>]
 
   /// ParentProtocol1.commonParentRequirement()
   func commonParentRequirement()
@@ -75,7 +75,7 @@ extension ChildProtocol {
 
   // Should come from ParentProtocol1.
   typealias AssocType = Int
-  // CHECK: TypeAlias/AssocType {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>AssocType</Name><USR>s:14swift_ide_test15ParentProtocol1P9AssocType</USR><Declaration>associatedtype AssocType</Declaration><CommentParts><Abstract><Para>ParentProtocol.AssocType</Para></Abstract></CommentParts></Other>]
+  // CHECK: TypeAlias/AssocType {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>AssocType</Name><USR>s:14swift_ide_test15ParentProtocol1P9AssocTypeQa</USR><Declaration>associatedtype AssocType</Declaration><CommentParts><Abstract><Para>ParentProtocol.AssocType</Para></Abstract></CommentParts></Other>]
 
   // Should come from ParentProtocol2.
   func onlyParent2() {}

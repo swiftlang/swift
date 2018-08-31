@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "constant-propagation"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 
 using namespace swift;
@@ -32,8 +33,9 @@ public:
 private:
   /// The entry point to the transformation.
   void run() override {
-
-    ConstantFolder Folder(getOptions().AssertConfig, EnableDiagnostics);
+    SILOptFunctionBuilder FuncBuilder(*this);
+    ConstantFolder Folder(FuncBuilder, getOptions().AssertConfig,
+                          EnableDiagnostics);
     Folder.initializeWorklist(*getFunction());
     auto Invalidation = Folder.processWorkList();
 

@@ -64,6 +64,7 @@ struct FooStruct {
 }
 
 // FOO_OBJECT_DOT: Begin completions
+// FOO_OBJECT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: End completions
@@ -320,7 +321,7 @@ func testClosureParam1() {
   }
 }
 // CLOSURE_PARAM_1: Begin completions
-// CLOSURE_PARAM_1-DAG: Decl[LocalVar]/Local:         theValue[#(Int)#]{{; name=.+$}}
+// CLOSURE_PARAM_1-DAG: Decl[LocalVar]/Local:         theValue[#Int#]{{; name=.+$}}
 func testClosureParam2() {
   closureTaker2 { (Value1, Value2) -> () in
     #^CLOSURE_PARAM_2^#

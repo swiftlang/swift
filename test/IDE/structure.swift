@@ -44,9 +44,21 @@ struct MyStruc {
 
 // CHECK: <protocol>protocol <name>MyProt</name> {
 // CHECK:   <ifunc>func <name>foo()</name></ifunc>
+// CHECK:   <ifunc>func <name>foo2()</name> throws</ifunc>
+// CHECK:   <ifunc>func <name>foo3()</name> throws -> <type>Int</type></ifunc>
+// CHECK:   <ifunc>func <name>foo4<<generic-param><name>T</name></generic-param>>()</name> where T: MyProt</ifunc>
+// CHECK:   <ifunc><name>init()</name></ifunc>
+// CHECK:   <ifunc><name>init(<param><name>a</name>: <type>Int</type></param>)</name> throws</ifunc>
+// CHECK:   <ifunc><name>init<<generic-param><name>T</name></generic-param>>(<param><name>a</name>: <type>T</type></param>)</name> where T: MyProt</ifunc>
 // CHECK: }</protocol>
 protocol MyProt {
   func foo()
+  func foo2() throws
+  func foo3() throws -> Int
+  func foo4<T>() where T: MyProt
+  init()
+  init(a: Int) throws
+  init<T>(a: T) where T: MyProt
 }
 
 // CHECK: <extension>extension <name>MyStruc</name> {
@@ -130,7 +142,7 @@ func test1() {
 // CHECK: <enum>enum <name>SomeEnum</name> {
 // CHECK:   <enum-case>case <enum-elem><name>North</name></enum-elem></enum-case>
 // CHECK:   <enum-case>case <enum-elem><name>South</name></enum-elem>, <enum-elem><name>East</name></enum-elem></enum-case>
-// CHECK:   <enum-case>case <enum-elem><name>QRCode</name>(String)</enum-elem></enum-case>
+// CHECK:   <enum-case>case <enum-elem><name>QRCode(<param><type>String</type></param>)</name></enum-elem></enum-case>
 // CHECK:   <enum-case>case</enum-case>
 // CHECK: }</enum>
 enum SomeEnum {
@@ -154,7 +166,7 @@ func rethrowFunc(_ f: () throws -> () = {}) rethrows {}
 
 class NestedPoundIf{
     func foo1() {
-        #if os(OSX)
+        #if os(macOS)
           var a = 1
             #if USE_METAL
               var b = 2
@@ -184,6 +196,9 @@ class A {
 
 // CHECK: <typealias>typealias <name>OtherA</name> = A</typealias>
 typealias OtherA = A
+
+// CHECK: <typealias>typealias <name>EqBox</name><<generic-param><name>Boxed</name></generic-param>> = Box<Boxed> where Boxed: Equatable</typealias>
+typealias EqBox<Boxed> = Box<Boxed> where Boxed: Equatable
 
 class SubscriptTest {
   subscript(index: Int) -> Int {
@@ -228,6 +243,8 @@ protocol FooProtocol {
   // CHECK:  <associatedtype>associatedtype <name>Bar</name></associatedtype>
   associatedtype Baz: Equatable
   // CHECK:  <associatedtype>associatedtype <name>Baz</name>: Equatable</associatedtype>
+  associatedtype Qux where Qux: Equatable
+  // CHECK:  <associatedtype>associatedtype <name>Qux</name> where Qux: Equatable</associatedtype>
 }
 
 // CHECK: <struct>struct <name>Generic</name><<generic-param><name>T</name>: <inherited><elem-typeref>Comparable</elem-typeref></inherited></generic-param>, <generic-param><name>X</name></generic-param>> {
@@ -259,9 +276,9 @@ struct Tuples {
   }
 }
 
-completion(a: 1) { (x: Int, y: Int) -> Int in
-  return x + y
+completion(a: 1) { (x: Any, y: Int) -> Int in
+  return x as! Int + y
 }
-// CHECK: <call><name>completion</name>(<arg><name>a</name>: 1</arg>) <arg><closure>{ (<param>x: <type>Int</type></param>, <param>y: <type>Int</type></param>) -> <type>Int</type> in
-// CHECK:    return x + y
+// CHECK: <call><name>completion</name>(<arg><name>a</name>: 1</arg>) <arg><closure>{ (<param>x: <type>Any</type></param>, <param>y: <type>Int</type></param>) -> <type>Int</type> in
+// CHECK:    return x as! Int + y
 // CHECK: }</closure></arg></call>

@@ -78,7 +78,7 @@ bool getIntegerIndex(SILValue IndexVal, unsigned &IndexConst);
 /// TypeAlignments.h.
 ///
 /// Projection Kinds which can be represented via indices can use as many bits
-/// as they want to represent the kind. When the index value is uses at most 11
+/// as they want to represent the kind. When the index value uses at most 11
 /// bits, we represent it inline in the data structure. This is taking advantage
 /// of the fact that on most modern OSes (including Darwin), the zero page is
 /// not allocated. In the case where we have more than 11 bits of value
@@ -474,6 +474,8 @@ public:
   createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
                                      SILType BaseType,
                                      llvm::SmallVectorImpl<SILValue> &Values);
+
+  void print(raw_ostream &os, SILType baseType) const;
 private:
   /// Convenience method for getting the raw underlying index as a pointer.
   TypeBase *getPointer() const {
@@ -685,8 +687,8 @@ public:
 
   void verify(SILModule &M);
 
-  raw_ostream &print(raw_ostream &OS, SILModule &M);
-  void dump(SILModule &M);
+  raw_ostream &print(raw_ostream &OS, SILModule &M) const;
+  void dump(SILModule &M) const;
 };
 
 /// Returns the hashcode for the new projection path.
@@ -836,7 +838,7 @@ class ProjectionTree {
   SILModule &Mod;
 
   /// The allocator we use to allocate ProjectionTreeNodes in the tree.
-  llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;
+  llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator;
 
   // A common pattern is a 3 field struct.
   llvm::SmallVector<ProjectionTreeNode *, 4> ProjectionTreeNodes;
@@ -846,10 +848,13 @@ class ProjectionTree {
 
 public:
   /// Construct a projection tree from BaseTy.
-  ProjectionTree(SILModule &Mod, SILType BaseTy);
+  ProjectionTree(SILModule &Mod, SILType BaseTy,
+                 llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator);
   /// Construct an uninitialized projection tree, which can then be
   /// initialized by initializeWithExistingTree.
-  ProjectionTree(SILModule &Mod) : Mod(Mod) {}
+  ProjectionTree(SILModule &Mod,
+                 llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator)
+      : Mod(Mod), Allocator(Allocator) {}
   ~ProjectionTree();
   ProjectionTree(const ProjectionTree &) = delete;
   ProjectionTree(ProjectionTree &&) = default;
@@ -924,8 +929,7 @@ public:
     return false;
   }
 
-
-  void getLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
+  void getLiveLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
     for (unsigned LeafIndex : LiveLeafIndices) {
       const ProjectionTreeNode *Node = getNode(LeafIndex);
       assert(Node->IsLive && "We are only interested in leafs that are live");
@@ -933,8 +937,8 @@ public:
     }
   }
 
-  void
-  getLeafNodes(llvm::SmallVectorImpl<const ProjectionTreeNode *> &Out) const {
+  void getLiveLeafNodes(
+      llvm::SmallVectorImpl<const ProjectionTreeNode *> &Out) const {
     for (unsigned LeafIndex : LiveLeafIndices) {
       const ProjectionTreeNode *Node = getNode(LeafIndex);
       assert(Node->IsLive && "We are only interested in leafs that are live");
@@ -943,9 +947,7 @@ public:
   }
 
   /// Return the number of live leafs in the projection.
-  size_t liveLeafCount() const {
-    return LiveLeafIndices.size();
-  }
+  unsigned getLiveLeafCount() const { return LiveLeafIndices.size(); }
 
   void createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
                            llvm::SmallVectorImpl<SILValue> &Leafs) const;

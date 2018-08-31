@@ -12,10 +12,11 @@
 
 #define DEBUG_TYPE "sil-simplify"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -45,15 +46,16 @@ namespace {
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitBuiltinInst(BuiltinInst *AI);
     SILValue visitUpcastInst(UpcastInst *UI);
-    SILValue visitRefToUnownedInst(RefToUnownedInst *RUI);
-    SILValue visitUnownedToRefInst(UnownedToRefInst *URI);
-    SILValue visitRefToUnmanagedInst(RefToUnmanagedInst *RUI);
-    SILValue visitUnmanagedToRefInst(UnmanagedToRefInst *URI);
+#define LOADABLE_REF_STORAGE(Name, ...) \
+    SILValue visitRefTo##Name##Inst(RefTo##Name##Inst *I); \
+    SILValue visit##Name##ToRefInst(Name##ToRefInst *I);
+#include "swift/AST/ReferenceStorage.def"
     SILValue visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
     SILValue visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI);
     SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
+    SILValue visitBeginAccessInst(BeginAccessInst *BAI);
 
     SILValue simplifyOverflowBuiltin(BuiltinInst *BI);
   };
@@ -366,41 +368,22 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
   return SILValue();
 }
 
-SILValue
-InstSimplifier::visitRefToUnownedInst(RefToUnownedInst *RUI) {
-  if (auto *URI = dyn_cast<UnownedToRefInst>(RUI->getOperand()))
-    if (URI->getOperand()->getType() == RUI->getType())
-      return URI->getOperand();
-
-  return SILValue();
+#define LOADABLE_REF_STORAGE(Name, ...) \
+SILValue \
+InstSimplifier::visitRefTo##Name##Inst(RefTo##Name##Inst *RUI) { \
+  if (auto *URI = dyn_cast<Name##ToRefInst>(RUI->getOperand())) \
+    if (URI->getOperand()->getType() == RUI->getType()) \
+      return URI->getOperand(); \
+  return SILValue(); \
+} \
+SILValue \
+InstSimplifier::visit##Name##ToRefInst(Name##ToRefInst *URI) { \
+  if (auto *RUI = dyn_cast<RefTo##Name##Inst>(URI->getOperand())) \
+    if (RUI->getOperand()->getType() == URI->getType()) \
+      return RUI->getOperand(); \
+  return SILValue(); \
 }
-
-SILValue
-InstSimplifier::visitUnownedToRefInst(UnownedToRefInst *URI) {
-  if (auto *RUI = dyn_cast<RefToUnownedInst>(URI->getOperand()))
-    if (RUI->getOperand()->getType() == URI->getType())
-      return RUI->getOperand();
-
-  return SILValue();
-}
-
-SILValue
-InstSimplifier::visitRefToUnmanagedInst(RefToUnmanagedInst *RUI) {
-  if (auto *URI = dyn_cast<UnmanagedToRefInst>(RUI->getOperand()))
-    if (URI->getOperand()->getType() == RUI->getType())
-      return URI->getOperand();
-
-  return SILValue();
-}
-
-SILValue
-InstSimplifier::visitUnmanagedToRefInst(UnmanagedToRefInst *URI) {
-  if (auto *RUI = dyn_cast<RefToUnmanagedInst>(URI->getOperand()))
-    if (RUI->getOperand()->getType() == URI->getType())
-      return RUI->getOperand();
-
-  return SILValue();
-}
+#include "swift/AST/ReferenceStorage.def"
 
 SILValue
 InstSimplifier::
@@ -448,6 +431,16 @@ SILValue InstSimplifier::visitPointerToThinFunctionInst(PointerToThinFunctionIns
     if (TFTPI->getOperand()->getType() == PTTFI->getType())
       return TFTPI->getOperand();
 
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
+  // Remove "dead" begin_access.
+  if (llvm::all_of(BAI->getUses(), [](Operand *operand) -> bool {
+        return isIncidentalUse(operand->getUser());
+      })) {
+    return BAI->getOperand();
+  }
   return SILValue();
 }
 
@@ -696,6 +689,34 @@ case BuiltinValueKind::id:
 ///
 SILValue swift::simplifyInstruction(SILInstruction *I) {
   return InstSimplifier().visit(I);
+}
+
+/// Replace an instruction with a simplified result, including any debug uses,
+/// and erase the instruction. If the instruction initiates a scope, do not
+/// replace the end of its scope; it will be deleted along with its parent.
+void swift::replaceAllSimplifiedUsesAndErase(
+    SILInstruction *I, SILValue result,
+    std::function<void(SILInstruction *)> eraseNotify) {
+
+  auto *SVI = cast<SingleValueInstruction>(I);
+  assert(SVI != result && "Cannot RAUW a value with itself");
+
+  // Only SingleValueInstructions are currently simplified.
+  while (!SVI->use_empty()) {
+    Operand *use = *SVI->use_begin();
+    SILInstruction *user = use->getUser();
+    // Erase the end of scope marker.
+    if (isEndOfScopeMarker(user)) {
+      if (eraseNotify)
+        eraseNotify(user);
+      user->eraseFromParent();
+      continue;
+    }
+    use->set(result);
+  }
+  I->eraseFromParent();
+  if (eraseNotify)
+    eraseNotify(I);
 }
 
 /// Simplify invocations of builtin operations that may overflow.

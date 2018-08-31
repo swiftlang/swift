@@ -65,3 +65,7 @@ public func run_DropFirst${Name}(_ N: Int) {
   }
 }
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

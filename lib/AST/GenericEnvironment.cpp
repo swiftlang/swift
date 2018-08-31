@@ -218,15 +218,31 @@ Type GenericEnvironment::getSugaredType(Type type) const {
   });
 }
 
-SubstitutionList
-GenericEnvironment::getForwardingSubstitutions() const {
+SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
   auto *genericSig = getGenericSignature();
+  return SubstitutionMap::get(genericSig,
+                              QueryInterfaceTypeSubstitutions(this),
+                              MakeAbstractConformanceForGenericType());
+}
 
-  SubstitutionMap subMap = genericSig->getSubstitutionMap(
+std::pair<Type, ProtocolConformanceRef>
+GenericEnvironment::mapConformanceRefIntoContext(GenericEnvironment *genericEnv,
+                                           Type conformingType,
+                                           ProtocolConformanceRef conformance) {
+  if (!genericEnv)
+    return {conformingType, conformance};
+  
+  return genericEnv->mapConformanceRefIntoContext(conformingType, conformance);
+}
+
+std::pair<Type, ProtocolConformanceRef>
+GenericEnvironment::mapConformanceRefIntoContext(
+                                     Type conformingInterfaceType,
+                                     ProtocolConformanceRef conformance) const {
+  auto contextConformance = conformance.subst(conformingInterfaceType,
     QueryInterfaceTypeSubstitutions(this),
-    MakeAbstractConformanceForGenericType());
-
-  SmallVector<Substitution, 4> result;
-  genericSig->getSubstitutions(subMap, result);
-  return genericSig->getASTContext().AllocateCopy(result);
+    LookUpConformanceInSignature(*getGenericSignature()));
+  
+  auto contextType = mapTypeIntoContext(conformingInterfaceType);
+  return {contextType, contextConformance};
 }

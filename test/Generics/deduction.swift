@@ -208,20 +208,20 @@ func callMin(_ x: Int, y: Int, a: Float, b: Float) {
   min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
 }
 
-func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {}
+func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {} // expected-note {{'R.Element' = 'Double'}}
 
 func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.makeIterator())
-  rangeOfIsBefore(da.makeIterator()) // expected-error{{type 'Double' does not conform to protocol 'IsBefore'}}
+  rangeOfIsBefore(da.makeIterator()) // expected-error{{global function 'rangeOfIsBefore' requires that 'Double' conform to 'IsBefore'}}
 }
 
 func testEqualIterElementTypes<A: IteratorProtocol, B: IteratorProtocol>(_ a: A, _ b: B) where A.Element == B.Element {}
-// expected-note@-1 {{candidate requires that the types 'Int' and 'Double' be equivalent (requirement specified as 'A.Element' == 'B.Element' [with A = IndexingIterator<[Int]>, B = IndexingIterator<[Double]>])}}
+// expected-note@-1 {{where 'A.Element' = 'Int', 'B.Element' = 'Double'}}
 func compareIterators() {
   var a: [Int] = []
   var b: [Double] = []
   testEqualIterElementTypes(a.makeIterator(), b.makeIterator())
-  // expected-error@-1 {{cannot invoke 'testEqualIterElementTypes(_:_:)' with an argument list of type '(IndexingIterator<[Int]>, IndexingIterator<[Double]>)'}}
+  // expected-error@-1 {{global function 'testEqualIterElementTypes' requires the types 'Int' and 'Double' be equivalent}}
 }
 
 protocol P_GI {
@@ -316,7 +316,9 @@ func foo() {
     let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
     let k = min(A(), A()) // expected-error{{argument type 'A' does not conform to expected type 'Comparable'}}
     let oi : Int? = 5
-    let l = min(3, oi) // expected-error{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
+    let l = min(3, oi) // expected-error{{value of optional type 'Int?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
 }
 
 infix operator +&

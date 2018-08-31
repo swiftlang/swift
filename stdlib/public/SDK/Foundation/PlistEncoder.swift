@@ -68,7 +68,8 @@ open class PropertyListEncoder {
       do {
           return try PropertyListSerialization.data(fromPropertyList: topLevel, format: self.outputFormat, options: 0)
       } catch {
-          throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value as a property list", underlyingError: error))
+          throw EncodingError.invalidValue(value, 
+                                           EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value as a property list", underlyingError: error))
       }
     }
 
@@ -209,7 +210,7 @@ fileprivate struct _PlistEncodingStorage {
     }
 
     fileprivate mutating func popContainer() -> NSObject {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         return self.containers.popLast()!
     }
 }
@@ -746,7 +747,7 @@ fileprivate struct _PlistDecodingStorage {
     }
 
     fileprivate var topContainer: Any {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         return self.containers.last!
     }
 
@@ -755,7 +756,7 @@ fileprivate struct _PlistDecodingStorage {
     }
 
     fileprivate mutating func popContainer() {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         self.containers.removeLast()
     }
 }

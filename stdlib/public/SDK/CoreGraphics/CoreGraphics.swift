@@ -29,7 +29,7 @@ extension CGAffineTransform: Equatable {
 //===----------------------------------------------------------------------===//
 
 extension CGColor {
-  @available(OSX 10.3, iOS 2.0, *)
+  @available(macOS 10.3, iOS 2.0, *)
   public var components: [CGFloat]? {
     guard let pointer = self.__unsafeComponents else { return nil }
     let buffer = UnsafeBufferPointer(start: pointer, count: self.numberOfComponents)
@@ -69,7 +69,8 @@ extension CGColor : _CGColorInitTrampoline, _ExpressibleByColorLiteral { }
 extension CGColorSpace {
   public var colorTable: [UInt8]? {
     guard self.model == .indexed else { return nil }
-    var table = [UInt8](repeating: 0, count: self.__colorTableCount)
+    let components = self.baseColorSpace?.numberOfComponents ?? 1
+    var table = [UInt8](repeating: 0, count: self.__colorTableCount * components)
     self.__unsafeGetColorTable(&table)
     return table
   }
@@ -227,11 +228,13 @@ public extension CGPoint {
   }
 }
 
-extension CGPoint : CustomReflectable, CustomPlaygroundQuickLookable {
+extension CGPoint : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: ["x": x, "y": y], displayStyle: .`struct`)
   }
+}
 
+extension CGPoint : _CustomPlaygroundQuickLookable {
   @available(*, deprecated, message: "CGPoint.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .point(Double(x), Double(y))
@@ -292,14 +295,16 @@ public extension CGSize {
   }
 }
 
-extension CGSize : CustomReflectable, CustomPlaygroundQuickLookable {
+extension CGSize : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self,
       children: ["width": width, "height": height],
       displayStyle: .`struct`)
   }
+}
 
+extension CGSize : _CustomPlaygroundQuickLookable {
   @available(*, deprecated, message: "CGSize.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .size(Double(width), Double(height))
@@ -430,14 +435,16 @@ public extension CGRect {
   public var y: CGFloat { return minY }
 }
 
-extension CGRect : CustomReflectable, CustomPlaygroundQuickLookable {
+extension CGRect : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self,
       children: ["origin": origin, "size": size],
       displayStyle: .`struct`)
   }
+}
 
+extension CGRect : _CustomPlaygroundQuickLookable {
   @available(*, deprecated, message: "CGRect.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .rectangle(

@@ -3,8 +3,8 @@
 // <rdar://problem/13986638> Missing Bool metadata when Bool is used as a generic
 // parameter or existential value
 
-prefix operator !! {}
-infix operator &&& {}
+prefix operator !!
+infix operator &&&
 
 protocol BooleanProtocol {
   var boolValue: Bool { get }

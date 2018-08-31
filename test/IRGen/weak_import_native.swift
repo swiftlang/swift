@@ -31,21 +31,21 @@ func testStruct() {
 
   // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SV10storedPropSivg"
   // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SV10storedPropSivs"
-  // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SV10storedPropSivm"
+  // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SV10storedPropSivM"
   let x = s.storedProp
   s.storedProp = x
   s.storedProp += 1
 
   // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SV12computedPropSivg"
   // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SV12computedPropSivs"
-  // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SV12computedPropSivm"
+  // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SV12computedPropSivM"
   let y = s.computedProp
   s.computedProp = y
   s.computedProp += 1
 
   // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SVyS2icig"
   // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SVyS2icis"
-  // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SVyS2icim"
+  // CHECK-DAG: declare extern_weak {{.+}} @"$S25weak_import_native_helper1SVyS2iciM"
   let z = s[0]
   s[0] = z
   s[0] += 1
@@ -70,21 +70,21 @@ func testClass() {
 
   // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CC10storedPropSivgTj"
   // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CC10storedPropSivsTj"
-  // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CC10storedPropSivmTj"
+  // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CC10storedPropSivMTj"
   let x = c.storedProp
   c.storedProp = x
   c.storedProp += 1
 
   // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CC12computedPropSivgTj"
   // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CC12computedPropSivsTj"
-  // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CC12computedPropSivmTj"
+  // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CC12computedPropSivMTj"
   let y = c.computedProp
   c.computedProp = y
   c.computedProp += 1
 
   // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CCyS2icigTj"
   // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CCyS2icisTj"
-  // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CCyS2icimTj"
+  // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1CCyS2iciMTj"
   let z = c[0]
   c[0] = z
   c[0] += 1
@@ -108,14 +108,14 @@ func testProtocolExistential(_ p: P) {
 
   // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1PP4propSivgTj"
   // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1PP4propSivsTj"
-  // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1PP4propSivmTj"
+  // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1PP4propSivMTj"
   let x = p.prop
   mutP.prop = x
   mutP.prop += 1
 
   // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1PPyS2icigTj"
   // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1PPyS2icisTj"
-  // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1PPyS2icimTj"
+  // CHECK-DAG: declare swiftcc {{.+}} @"$S25weak_import_native_helper1PPyS2iciMTj"
   let z = p[0]
   mutP[0] = z
   mutP[0] += 1
@@ -138,13 +138,13 @@ func testProtocolGeneric<Impl: P>(_ type: Impl.Type) {
 
 func testWeakTypes() -> [Any.Type] {
   // FIXME: These should be weak.
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper5WeakSVMa"()
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper5WeakEOMa"()
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper5WeakCCMa"()
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper5WeakSVMa"
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper5WeakEOMa"
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper5WeakCCMa"
   // CHECK-DAG: @"$S25weak_import_native_helper5WeakPMp" = extern_weak global %swift.protocol
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper8GenericSVMa"
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper8GenericEOMa"
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper8GenericCCMa"
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper8GenericSVMa"
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper8GenericEOMa"
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper8GenericCCMa"
   return [WeakS.self, WeakE.self, WeakC.self, WeakP.self, GenericS<Int>.self, GenericE<Int>.self, GenericC<Int>.self]
 }
 

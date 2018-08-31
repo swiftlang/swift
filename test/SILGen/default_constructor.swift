@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-sil-ownership -primary-file %s | %FileCheck %s
 
 struct B {
   var i : Int, j : Float
@@ -33,8 +33,7 @@ struct D {
 // CHECK: [[PB_THIS:%.*]] = project_box [[THIS]]
 // CHECK: [[INIT:%[0-9]+]] = function_ref @$S19default_constructor1DV1iSivpfi
 // CHECK: [[RESULT:%[0-9]+]] = apply [[INIT]]()
-// CHECK: [[INTVAL:%[0-9]+]] = tuple_extract [[RESULT]] : $(Int, Double), 0
-// CHECK: [[FLOATVAL:%[0-9]+]] = tuple_extract [[RESULT]] : $(Int, Double), 1
+// CHECK: ([[INTVAL:%[0-9]+]], [[FLOATVAL:%[0-9]+]]) = destructure_tuple [[RESULT]]
 // CHECK: [[IADDR:%[0-9]+]] = struct_element_addr [[PB_THIS]] : $*D, #D.i
 // CHECK: assign [[INTVAL]] to [[IADDR]]
 // CHECK: [[JADDR:%[0-9]+]] = struct_element_addr [[PB_THIS]] : $*D, #D.j

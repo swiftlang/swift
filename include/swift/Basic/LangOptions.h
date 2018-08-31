@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,9 +19,9 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Config.h"
+#include "swift/Basic/CycleDiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
-#include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
@@ -30,6 +30,7 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/VersionTuple.h"
 #include <string>
 #include <vector>
 
@@ -121,6 +122,9 @@ namespace swift {
     /// completions.
     bool CodeCompleteCallPatternHeuristics = false;
 
+    /// Disable constraint system performance hacks.
+    bool DisableConstraintSolverPerformanceHacks = false;
+
     ///
     /// Flags for use by tests
     ///
@@ -157,9 +161,6 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
-    /// \brief Enable the iterative type checker.
-    bool IterativeTypeChecker = false;
-
     /// \brief Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
 
@@ -171,6 +172,14 @@ namespace swift {
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
 
+    /// \brief How to diagnose cycles encountered
+    CycleDiagnosticKind EvaluatorCycleDiagnostics =
+        CycleDiagnosticKind::NoDiagnose;
+
+    /// \brief The path to which we should emit GraphViz output for the complete
+    /// request-evaluator graph.
+    std::string RequestEvaluatorGraphVizPath;
+
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
@@ -180,6 +189,9 @@ namespace swift {
     /// \brief The upper bound to number of sub-expressions unsolved
     /// before termination of the shrink phrase of the constraint solver.
     unsigned SolverShrinkUnsolvedThreshold = 10;
+
+    /// Disable the shrink phase of the expression type checker.
+    bool SolverDisableShrink = false;
 
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
@@ -221,7 +233,7 @@ namespace swift {
     bool EnableSILOpaqueValues = false;
     
     /// Enables key path resilience.
-    bool EnableKeyPathResilience = false;
+    bool EnableKeyPathResilience = true;
 
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
@@ -239,6 +251,10 @@ namespace swift {
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;
 
+    /// Diagnose switches over non-frozen enums that do not have catch-all
+    /// cases.
+    bool EnableNonFrozenEnumExhaustivityDiagnostics = false;
+
     /// Regex for the passes that should report passed and missed optimizations.
     ///
     /// These are shared_ptrs so that this class remains copyable.
@@ -254,7 +270,9 @@ namespace swift {
     /// Whether collect tokens during parsing for syntax coloring.
     bool CollectParsedToken = false;
 
-    /// Whether to parse syntax tree.
+    /// Whether to parse syntax tree. If the syntax tree is built, the generated
+    /// AST may not be correct when syntax nodes are reused as part of
+    /// incrementals parsing.
     bool BuildSyntaxTree = false;
 
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
@@ -271,7 +289,7 @@ namespace swift {
     ///
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
-    clang::VersionTuple getMinPlatformVersion() const {
+    llvm::VersionTuple getMinPlatformVersion() const {
       unsigned major, minor, revision;
       if (Target.isMacOSX()) {
         Target.getMacOSXVersion(major, minor, revision);
@@ -287,7 +305,7 @@ namespace swift {
       } else {
         llvm_unreachable("Unsupported target OS");
       }
-      return clang::VersionTuple(major, minor, revision);
+      return llvm::VersionTuple(major, minor, revision);
     }
 
     /// Sets an implicit platform condition.
@@ -336,8 +354,8 @@ namespace swift {
     /// This is usually the check you want; for example, when introducing
     /// a new language feature which is only visible in Swift 5, you would
     /// check for isSwiftVersionAtLeast(5).
-    bool isSwiftVersionAtLeast(unsigned major) const {
-      return EffectiveLanguageVersion.isVersionAtLeast(major);
+    bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
+      return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
     /// Returns true if the given platform condition argument represents

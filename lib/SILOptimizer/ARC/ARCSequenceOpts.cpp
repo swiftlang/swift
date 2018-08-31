@@ -52,11 +52,11 @@ llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(false));
 void ARCPairingContext::optimizeMatchingSet(
     ARCMatchingSet &MatchSet, llvm::SmallVectorImpl<SILInstruction *> &NewInsts,
     llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
-  DEBUG(llvm::dbgs() << "**** Optimizing Matching Set ****\n");
+  LLVM_DEBUG(llvm::dbgs() << "**** Optimizing Matching Set ****\n");
   // Add the old increments to the delete list.
   for (SILInstruction *Increment : MatchSet.Increments) {
     MadeChange = true;
-    DEBUG(llvm::dbgs() << "    Deleting increment: " << *Increment);
+    LLVM_DEBUG(llvm::dbgs() << "    Deleting increment: " << *Increment);
     DeadInsts.push_back(Increment);
     ++NumRefCountOpsRemoved;
   }
@@ -64,7 +64,7 @@ void ARCPairingContext::optimizeMatchingSet(
   // Add the old decrements to the delete list.
   for (SILInstruction *Decrement : MatchSet.Decrements) {
     MadeChange = true;
-    DEBUG(llvm::dbgs() << "    Deleting decrement: " << *Decrement);
+    LLVM_DEBUG(llvm::dbgs() << "    Deleting decrement: " << *Decrement);
     DeadInsts.push_back(Decrement);
     ++NumRefCountOpsRemoved;
   }
@@ -75,8 +75,8 @@ bool ARCPairingContext::performMatching(
     llvm::SmallVectorImpl<SILInstruction *> &DeadInsts) {
   bool MatchedPair = false;
 
-  DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for " << F.getName()
-                     << " ****\n");
+  LLVM_DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for "
+                          << F.getName() << " ****\n");
 
   /// For each increment that we matched to a decrement, try to match it to a
   /// decrement -> increment pair.
@@ -88,16 +88,16 @@ bool ARCPairingContext::performMatching(
     if (!Increment)
       continue; // blotted
 
-    DEBUG(llvm::dbgs() << "Constructing Matching Set For: " << *Increment);
+    LLVM_DEBUG(llvm::dbgs() << "Constructing Matching Set For: " << *Increment);
     ARCMatchingSetBuilder Builder(DecToIncStateMap, IncToDecStateMap, RCIA);
     Builder.init(Increment);
     if (Builder.matchUpIncDecSetsForPtr()) {
       MatchedPair |= Builder.matchedPair();
       auto &Set = Builder.getResult();
       for (auto *I : Set.Increments)
-        IncToDecStateMap.blot(I);
+        IncToDecStateMap.erase(I);
       for (auto *I : Set.Decrements)
-        DecToIncStateMap.blot(I);
+        DecToIncStateMap.erase(I);
 
       // Add the Set to the callback. *NOTE* No instruction destruction can
       // happen here since we may remove instructions that are insertion points
@@ -153,19 +153,19 @@ bool LoopARCPairingContext::processRegion(const LoopRegion *Region,
     MatchedPair = Context.performMatching(NewInsts, DeadInsts);
 
     if (!NewInsts.empty()) {
-      DEBUG(llvm::dbgs() << "Adding new interesting insts!\n");
+      LLVM_DEBUG(llvm::dbgs() << "Adding new interesting insts!\n");
       do {
         auto *I = NewInsts.pop_back_val();
-        DEBUG(llvm::dbgs() << "    " << *I);
+        LLVM_DEBUG(llvm::dbgs() << "    " << *I);
         Evaluator.addInterestingInst(I);
       } while (!NewInsts.empty());
     }
 
     if (!DeadInsts.empty()) {
-      DEBUG(llvm::dbgs() << "Removing dead interesting insts!\n");
+      LLVM_DEBUG(llvm::dbgs() << "Removing dead interesting insts!\n");
       do {
         SILInstruction *I = DeadInsts.pop_back_val();
-        DEBUG(llvm::dbgs() << "    " << *I);
+        LLVM_DEBUG(llvm::dbgs() << "    " << *I);
         Evaluator.removeInterestingInst(I);
         I->eraseFromParent();
       } while (!DeadInsts.empty());
@@ -202,7 +202,7 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
   if (F.getName().startswith("globalinit_"))
     return false;
 
-  DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
+  LLVM_DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
   bool Changed = false;
   BlockARCPairingContext Context(F, AA, POTA, RCIA, EAFI, PTFI);
@@ -225,10 +225,11 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
       break;
 
     // Otherwise, perform another iteration.
-    DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing Function! >>>\n");
+    LLVM_DEBUG(llvm::dbgs() << "\n<<< Made a Change! "
+                               "Reprocessing Function! >>>\n");
   }
 
-  DEBUG(llvm::dbgs() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "\n");
 
   // Return true if we moved or deleted any instructions.
   return Changed;
@@ -249,7 +250,7 @@ static bool processFunctionWithLoopSupport(
   if (F.getName().startswith("globalinit_"))
     return false;
 
-  DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
+  LLVM_DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
   LoopARCPairingContext Context(F, AA, LRFI, LI, RCFI, EAFI, PTFI);
   return Context.process();

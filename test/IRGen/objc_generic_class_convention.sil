@@ -15,12 +15,12 @@ import objc_generics
 
 // CHECK-LABEL: define swiftcc void @method(i64, %TSo12GenericClassC* swiftself)
 sil @method : $@convention(method) @pseudogeneric <T: AnyObject> (Int64, @guaranteed GenericClass<T>) -> () {
-entry(%0 : $Int64, %1 : $GenericClass<T>):
+entry(%0 : @trivial $Int64, %1 : @guaranteed $GenericClass<T>):
   return undef : $()
 }
 
 // CHECK-LABEL: define void @objcMethod(i8*, i8*, i64)
 sil @objcMethod : $@convention(objc_method) @pseudogeneric <T: AnyObject> (Int64, @guaranteed GenericClass<T>) -> () {
-entry(%0 : $Int64, %1 : $GenericClass<T>):
+entry(%0 : @trivial $Int64, %1 : @guaranteed $GenericClass<T>):
   return undef : $()
 }

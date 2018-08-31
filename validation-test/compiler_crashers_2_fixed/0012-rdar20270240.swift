@@ -10,9 +10,9 @@ protocol Bar {
 
   mutating func extend<
     C : FooProtocol
+  >(elements: C)
     where
     C.Element == Element
-  >(elements: C)
 }
 
 struct FooImpl<T> : FooProtocol {
@@ -27,8 +27,8 @@ struct BarImpl<T> : Bar {
 
   mutating func extend<
     C : FooProtocol
+  >(elements: C)
     where
-    C.Element == T
-  >(elements: C) {}
+    C.Element == T {}
 }
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership %s -o /dev/null -emit-silgen -verify
-// RUN: %target-swift-frontend -enable-sil-ownership -enforce-exclusivity=checked %s -o /dev/null -emit-silgen -verify
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s -o /dev/null -verify
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -enforce-exclusivity=checked %s -o /dev/null -verify
 
 struct MutatorStruct {
   mutating func f(_ x : inout MutatorStruct) {}
@@ -111,3 +111,19 @@ func testMultiArrayWithoutAddressors(
   swap(&global_array_without_addressors[0][j], &array[j][i])  // ok
 }
 
+// rdar://43802132
+struct ArrayWithReadModify<T> {
+  init(value: T) { self.property = value }
+  var property: T
+  subscript(i: Int) -> T {
+    _read { yield property }
+    _modify { yield &property }
+  }
+}
+
+func testArrayWithReadModify<T>(array: ArrayWithReadModify<T>) {
+  var copy = array
+  swap(&copy[0], &copy[1])
+  swap(&copy[0], // expected-note {{concurrent writeback occurred here}}
+       &copy[0]) // expected-error {{inout writeback through subscript occurs in multiple arguments to call}}
+}

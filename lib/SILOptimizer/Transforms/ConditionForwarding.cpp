@@ -100,7 +100,7 @@ private:
 
   /// The entry point to the transformation.
   void run() override {
-    DEBUG(llvm::dbgs() << "** StackPromotion **\n");
+    LLVM_DEBUG(llvm::dbgs() << "** StackPromotion **\n");
 
     bool Changed = false;
 
@@ -160,7 +160,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     if (ArgUser == SEI)
       continue;
 
-    if (isDebugInst(ArgUser))
+    if (ArgUser->isDebugInstruction())
       continue;
 
     if (ArgUser->getParent()->getSinglePredecessorBlock() == SEI->getParent()) {
@@ -227,7 +227,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   while (!Arg->use_empty()) {
     Operand *ArgUse = *Arg->use_begin();
     SILInstruction *ArgUser = ArgUse->getUser();
-    if (isDebugInst(ArgUser)) {
+    if (ArgUser->isDebugInstruction()) {
       // Don't care about debug instructions. Just remove them.
       ArgUser->eraseFromParent();
       continue;

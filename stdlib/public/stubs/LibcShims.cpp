@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,31 +14,40 @@
 #define _REENTRANT
 #include <math.h>
 #endif
-#include <random>
-#include <type_traits>
-#include <cmath>
-#if defined(_WIN32)
+
+#if defined(_WIN32) && !defined(__CYGWIN__)
 #include <io.h>
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <Bcrypt.h>
+#pragma comment(lib, "Bcrypt.lib")
 #else
-#include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 #endif
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
+#include <algorithm>
+#include <cmath>
 #include <errno.h>
-#include <sys/types.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#if __has_include(<sys/random.h>)
+#include <sys/random.h>
+#endif
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <type_traits>
+
+#include "llvm/Support/DataTypes.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Mutex.h"
 #include "../SwiftShims/LibcShims.h"
-#include "llvm/Support/DataTypes.h"
 
 using namespace swift;
 
@@ -49,12 +58,12 @@ static_assert(std::is_same<mode_t, swift::__swift_mode_t>::value,
               "__swift_mode_t must be defined as equivalent to mode_t in LibcShims.h");
 #endif
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void swift::_stdlib_free(void *ptr) {
   free(ptr);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int swift::_stdlib_putchar_unlocked(int c) {
 #if defined(_WIN32)
   return _putc_nolock(c, stdout);
@@ -63,30 +72,30 @@ int swift::_stdlib_putchar_unlocked(int c) {
 #endif
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_size_t swift::_stdlib_fwrite_stdout(const void *ptr,
                                          __swift_size_t size,
                                          __swift_size_t nitems) {
     return fwrite(ptr, size, nitems, stdout);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_size_t swift::_stdlib_strlen(const char *s) {
     return strlen(s);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_size_t swift::_stdlib_strlen_unsigned(const unsigned char *s) {
   return strlen(reinterpret_cast<const char *>(s));
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int swift::_stdlib_memcmp(const void *s1, const void *s2,
                        __swift_size_t n) {
   return memcmp(s1, s2, n);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_ssize_t
 swift::_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
 #if defined(_WIN32)
@@ -96,7 +105,7 @@ swift::_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
 #endif
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __swift_ssize_t
 swift::_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
 #if defined(_WIN32)
@@ -106,7 +115,7 @@ swift::_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
 #endif
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int swift::_stdlib_close(int fd) {
 #if defined(_WIN32)
   return _close(fd);
@@ -171,7 +180,7 @@ int swift::_stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr) {
 
 #if defined(__FreeBSD__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
-char * _Nullable *swift::_stdlib_getEnviron() {
+char * _Nullable * _Null_unspecified swift::_stdlib_getEnviron() {
   extern char **environ;
   return environ;
 }
@@ -196,32 +205,11 @@ void swift::_stdlib_setErrno(int value) {
 }
 
 
-
-#if defined(__APPLE__)
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-float swift::_stdlib_lgammaf_r(float x, int *psigngam) {
-  return lgammaf_r(x, psigngam);
-}
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-double swift::_stdlib_lgamma_r(double x, int *psigngam) {
-  return lgamma_r(x, psigngam);
-}
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-long double swift::_stdlib_lgammal_r(long double x, int *psigngam) {
-  return lgammal_r(x, psigngam);
-}
-
-#endif // defined(__APPLE__)
-
-
 #if defined(_WIN32)
 static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
               "__swift_thread_key_t is not a DWORD");
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void _stdlib_destroyTLS(void *);
 
 static void
@@ -232,7 +220,7 @@ destroyTLS_CCAdjustmentThunk(void *ptr) {
   _stdlib_destroyTLS(ptr);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int
 swift::_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
                               void (* _Nullable destructor)(void *)) {
@@ -240,13 +228,13 @@ swift::_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
   return *key != FLS_OUT_OF_INDEXES;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void * _Nullable
 swift::_stdlib_thread_getspecific(__swift_thread_key_t key) {
   return FlsGetValue(key);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int swift::_stdlib_thread_setspecific(__swift_thread_key_t key,
                                    const void * _Nullable value) {
   return FlsSetValue(key, const_cast<void *>(value)) == TRUE;
@@ -259,20 +247,20 @@ static_assert(std::is_same<__swift_thread_key_t, pthread_key_t>::value,
               "fix __swift_pthread_key_t's typedef in LibcShims.h by adding an "
               "#if guard and definition for your platform");
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int
 swift::_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
                               void (* _Nullable destructor)(void *)) {
   return pthread_key_create(key, destructor);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void * _Nullable
 swift::_stdlib_thread_getspecific(__swift_thread_key_t key) {
   return pthread_getspecific(key);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 int swift::_stdlib_thread_setspecific(__swift_thread_key_t key,
                                       const void * _Nullable value) {
   return pthread_setspecific(key, value);
@@ -281,7 +269,7 @@ int swift::_stdlib_thread_setspecific(__swift_thread_key_t key,
 
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 size_t swift::_stdlib_malloc_size(const void *ptr) {
   return malloc_size(ptr);
 }
@@ -290,19 +278,19 @@ size_t swift::_stdlib_malloc_size(const void *ptr) {
 #define _GNU_SOURCE
 #endif
 #include <malloc.h>
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 size_t swift::_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(const_cast<void *>(ptr));
 }
 #elif defined(_WIN32)
 #include <malloc.h>
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 size_t swift::_stdlib_malloc_size(const void *ptr) {
   return _msize(const_cast<void *>(ptr));
 }
 #elif defined(__FreeBSD__)
 #include <malloc_np.h>
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 size_t swift::_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(const_cast<void *>(ptr));
 }
@@ -310,22 +298,84 @@ size_t swift::_stdlib_malloc_size(const void *ptr) {
 #error No malloc_size analog known for this platform/libc.
 #endif
 
-static Lazy<std::mt19937> theGlobalMT19937;
+// _stdlib_random
+//
+// Should the implementation of this function add a new platform/change for a
+// platform, make sure to also update the documentation regarding platform
+// implementation of this function.
+// This can be found at: /docs/Random.md
 
-static std::mt19937 &getGlobalMT19937() {
-  return theGlobalMT19937.get();
+#if defined(__APPLE__)
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+  arc4random_buf(buf, nbytes);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_uint32_t swift::_stdlib_cxx11_mt19937() {
-  return getGlobalMT19937()();
+#elif defined(_WIN32) && !defined(__CYGWIN__)
+#warning TODO: Test _stdlib_random on Windows
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+  NTSTATUS status = BCryptGenRandom(nullptr,
+                                    static_cast<PUCHAR>(buf),
+                                    static_cast<ULONG>(nbytes),
+                                    BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+  if (!BCRYPT_SUCCESS(status)) {
+    fatalError(0, "Fatal error: 0x%.8X in '%s'\n", status, __func__);
+  }
 }
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_uint32_t
-swift::_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
-  if (upper_bound > 0)
-    upper_bound--;
-  std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);
-  return RandomUniform(getGlobalMT19937());
+#else
+
+#undef  WHILE_EINTR
+#define WHILE_EINTR(expression) ({                                             \
+  decltype(expression) result = -1;                                            \
+  do { result = (expression); } while (result == -1 && errno == EINTR);        \
+  result;                                                                      \
+})
+
+#if defined(__ANDROID__)
+#include <android/api-level.h>
+#if __ANDROID_API__ >= 28 // Introduced in Android API 28 - P
+#define GETRANDOM_AVAILABLE
+#endif
+#elif defined(GRND_RANDOM)
+#define GETRANDOM_AVAILABLE
+#endif
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+  while (nbytes > 0) {
+    __swift_ssize_t actual_nbytes = -1;
+#if defined(GETRANDOM_AVAILABLE)
+    static const bool getrandom_available =
+      !(getrandom(nullptr, 0, 0) == -1 && errno == ENOSYS);
+    if (getrandom_available) {
+      actual_nbytes = WHILE_EINTR(getrandom(buf, nbytes, 0));
+    }
+#elif defined(__Fuchsia__)
+    __swift_size_t getentropy_nbytes = std::min(nbytes, __swift_size_t{256});
+    if (0 == getentropy(buf, getentropy_nbytes)) {
+      actual_nbytes = getentropy_nbytes;
+    }
+#endif
+    if (actual_nbytes == -1) {
+      static const int fd =
+        WHILE_EINTR(_stdlib_open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
+      if (fd != -1) {
+        static StaticMutex mutex;
+        mutex.withLock([&] {
+          actual_nbytes = WHILE_EINTR(_stdlib_read(fd, buf, nbytes));
+        });
+      }
+    }
+    if (actual_nbytes == -1) {
+      fatalError(0, "Fatal error: %d in '%s'\n", errno, __func__);
+    }
+    buf = static_cast<uint8_t *>(buf) + actual_nbytes;
+    nbytes -= actual_nbytes;
+  }
 }
+
+#endif

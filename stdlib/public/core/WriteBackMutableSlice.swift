@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_inlineable
-@_versioned
+@inlinable
 internal func _writeBackMutableSlice<C, Slice_>(
   _ self_: inout C, bounds: Range<C.Index>, slice: Slice_
 ) where

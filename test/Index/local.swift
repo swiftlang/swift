@@ -27,16 +27,16 @@ func foo(a: Int, b: Int, c: Int) {
         // CHECK-NOT: [[@LINE-2]]:10 | enum(local)/Swift | LocalEnum | [[LocalEnum_USR:.*]] | Def,RelChild | rel: 1
 
         case foo(x: LocalStruct)
-        // LOCAL: [[@LINE-1]]:14 | enumerator(local)/Swift | foo | [[LocalEnum_foo_USR:.*]] | Def,RelChild | rel: 1
-        // CHECK-NOT: [[@LINE-2]]:14 | enumerator(local)/Swift | foo | [[LocalEnum_foo_USR:.*]] | Def,RelChild | rel: 1
+        // LOCAL: [[@LINE-1]]:14 | enumerator(local)/Swift | foo(x:) | [[LocalEnum_foo_USR:.*]] | Def,RelChild | rel: 1
+        // CHECK-NOT: [[@LINE-2]]:14 | enumerator(local)/Swift | foo(x:) | [[LocalEnum_foo_USR:.*]] | Def,RelChild | rel: 1
         // LOCAL: [[@LINE-3]]:21 | struct(local)/Swift | LocalStruct | [[LocalStruct_USR]] | Ref | rel: 0
     }
 
     let _ = LocalEnum.foo(x: LocalStruct())
     // LOCAL: [[@LINE-1]]:13 | enum(local)/Swift | LocalEnum | [[LocalEnum_USR]] | Ref,RelCont | rel: 1
     // CHECK-NOT: [[@LINE-2]]:13 | enum(local)/Swift | LocalEnum | [[LocalEnum_USR]] | Ref,RelCont | rel: 1
-    // LOCAL: [[@LINE-3]]:23 | enumerator(local)/Swift | foo | [[LocalEnum_foo_USR]] | Ref,RelCont | rel: 1
-    // CHECK-NOT: [[@LINE-4]]:23 | enumerator(local)/Swift | foo | [[LocalEnum_foo_USR]] | Ref,RelCont | rel: 1
+  // LOCAL: [[@LINE-3]]:23 | enumerator(local)/Swift | foo(x:) | [[LocalEnum_foo_USR]] | Ref,RelCont | rel: 1
+    // CHECK-NOT: [[@LINE-4]]:23 | enumerator(local)/Swift | foo(x:) | [[LocalEnum_foo_USR]] | Ref,RelCont | rel: 1
     // LOCAL: [[@LINE-5]]:30 | struct(local)/Swift | LocalStruct | [[LocalStruct_USR]] | Ref,RelCont | rel: 1
     // CHECK-NOT: [[@LINE-6]]:30 | struct(local)/Swift | LocalStruct | [[LocalStruct_USR]] | Ref,RelCont | rel: 1
 

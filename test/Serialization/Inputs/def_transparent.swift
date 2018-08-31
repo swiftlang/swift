@@ -12,20 +12,20 @@
   return x
 }
 
-@_inlineable
+@inlinable
 public func foo() -> Int32 { return 0 }
-@_inlineable
+@inlinable
 public func runced() -> Bool { return true }
 
-@_inlineable
+@inlinable
 public func a() {}
-@_inlineable
+@inlinable
 public func b() {}
-@_inlineable
+@inlinable
 public func c() {}
-@_inlineable
+@inlinable
 public func d() {}
-@_inlineable
+@inlinable
 public func e() {}
 
 @_transparent public func test_br() {
@@ -44,7 +44,8 @@ public enum MaybePair {
   case Right(String)
   case Both(Int32, String)
 }
-@_inlineable
+
+@_transparent
 public func do_switch(u u: MaybePair) {
   switch u {
   case .Neither:

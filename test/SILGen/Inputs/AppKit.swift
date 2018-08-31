@@ -9,5 +9,5 @@ public func NSApplicationMain(
   return argv.withMemoryRebound(to:UnsafePointer<Int8>.self, capacity: Int(argc)) {
     argv in
     return __NSApplicationMain(argc, argv)
-  })
+  }
 }

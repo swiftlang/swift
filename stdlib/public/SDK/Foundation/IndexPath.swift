@@ -502,19 +502,19 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         
         var debugDescription: String { return description }
         
-        static func +(_ lhs: Storage, _ rhs: Storage) -> Storage {
+        static func +(lhs: Storage, rhs: Storage) -> Storage {
             var res = lhs
             res.append(contentsOf: rhs)
             return res
         }
         
-        static func +(_ lhs: Storage, _ rhs: [Int]) -> Storage {
+        static func +(lhs: Storage, rhs: [Int]) -> Storage {
             var res = lhs
             res.append(contentsOf: rhs)
             return res
         }
         
-        static func ==(_ lhs: Storage, _ rhs: Storage) -> Bool {
+        static func ==(lhs: Storage, rhs: Storage) -> Bool {
             switch (lhs, rhs) {
             case (.empty, .empty):
                 return true

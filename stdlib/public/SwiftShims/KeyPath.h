@@ -46,27 +46,36 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_DiscriminatorShift
   = 24;
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_StructTag
-  = 0;
-static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedTag
   = 1;
-static const __swift_uint32_t _SwiftKeyPathComponentHeader_ClassTag
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedTag
   = 2;
-static const __swift_uint32_t _SwiftKeyPathComponentHeader_OptionalTag
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ClassTag
   = 3;
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_OptionalTag
+  = 4;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ExternalTag
-  = 0x7F;
+  = 0;
+
+static const __swift_uint32_t
+_SwiftKeyPathComponentHeader_TrivialPropertyDescriptorMarker = 0U;
+
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_StoredOffsetPayloadMask
+  = 0x007FFFFFU;
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_MaximumOffsetPayload
-  = 0x00FFFFFCU;
+  = 0x007FFFFCU;
   
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_UnresolvedIndirectOffsetPayload
-  = 0x00FFFFFDU;
+  = 0x007FFFFDU;
   
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload
-  = 0x00FFFFFEU;
+  = 0x007FFFFEU;
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload
-  = 0x00FFFFFFU;
+  = 0x007FFFFFU;
+  
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_StoredMutableFlag
+  = 0x00800000U;
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_OptionalChainPayload
   = 0;
@@ -88,6 +97,9 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDByVTableOff
   = 0x00100000U;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag
   = 0x00080000U;
+// Not ABI, used internally by key path runtime implementation
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedInstantiatedFromExternalWithArgumentsFlag
+  = 0x00000010U;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDResolutionMask
   = 0x0000000FU;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDResolved
@@ -95,6 +107,11 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDResolved
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
   = 0x00000002U;
 
+extern void *(swift_keyPathGenericWitnessTable[]);
+
+static inline void *__swift_keyPathGenericWitnessTable_addr(void) {
+  return swift_keyPathGenericWitnessTable;
+}
 
 #ifdef __cplusplus
 } // extern "C"

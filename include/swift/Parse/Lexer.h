@@ -51,6 +51,11 @@ enum class TriviaRetentionMode {
   WithTrivia,
 };
 
+enum class HashbangMode : bool {
+  Disallowed,
+  Allowed,
+};
+
 /// Kinds of conflict marker which the lexer might encounter.
 enum class ConflictMarkerKind {
   /// A normal or diff3 conflict marker, initiated by at least 7 "<"s,
@@ -92,27 +97,14 @@ class Lexer {
   /// Pointer to the next not consumed character.
   const char *CurPtr;
 
-  /// @{
-  /// Members that are *not* permanent lexer state.  The values only make sense
-  /// during the lexImpl() invocation.  These variables are declared as members
-  /// rather than locals so that we don't have to thread them through to all
-  /// lexing helpers.
-
-  /// Points to the point in the source buffer where we started scanning for
-  /// the current token.  Thus, the range [LastCommentBlockStart, CurPtr)
-  /// covers all comments and whitespace that we skipped, and the token itself.
-  const char *LastCommentBlockStart = nullptr;
-
-  /// True if we have seen a comment while scanning for the current token.
-  bool SeenComment = false;
-
-  /// @}
-
   Token NextToken;
   
   /// \brief This is true if we're lexing a .sil file instead of a .swift
   /// file.  This enables the 'sil' keyword.
   const bool InSILMode;
+
+  /// True if we should skip past a `#!` line at the start of the file.
+  const bool IsHashbangAllowed;
 
   const CommentRetentionMode RetainComments;
 
@@ -144,7 +136,7 @@ class Lexer {
   /// everything.
   Lexer(const PrincipalTag &, const LangOptions &LangOpts,
         const SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode,
+        DiagnosticEngine *Diags, bool InSILMode, HashbangMode HashbangAllowed,
         CommentRetentionMode RetainComments,
         TriviaRetentionMode TriviaRetention);
 
@@ -167,13 +159,14 @@ public:
   Lexer(
       const LangOptions &Options, const SourceManager &SourceMgr,
       unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+      HashbangMode HashbangAllowed = HashbangMode::Disallowed,
       CommentRetentionMode RetainComments = CommentRetentionMode::None,
       TriviaRetentionMode TriviaRetention = TriviaRetentionMode::WithoutTrivia);
 
   /// \brief Create a lexer that scans a subrange of the source buffer.
   Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
         unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
-        CommentRetentionMode RetainComments,
+        HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
         TriviaRetentionMode TriviaRetention, unsigned Offset,
         unsigned EndOffset);
 
@@ -206,6 +199,15 @@ public:
   void lex(Token &Result) {
     syntax::Trivia LeadingTrivia, TrailingTrivia;
     lex(Result, LeadingTrivia, TrailingTrivia);
+  }
+
+  /// Reset the lexer's buffer pointer to \p Offset bytes after the buffer
+  /// start.
+  void resetToOffset(size_t Offset) {
+    assert(BufferStart + Offset <= BufferEnd && "Offset after buffer end");
+
+    CurPtr = BufferStart + Offset;
+    lexImpl();
   }
 
   bool isKeepingComments() const {
@@ -334,7 +336,11 @@ public:
 
   /// Retrieve the string used to indent the line that contains the given
   /// source location.
-  static StringRef getIndentationForLine(SourceManager &SM, SourceLoc Loc);
+  ///
+  /// If \c ExtraIndentation is not null, it will be set to an appropriate
+  /// additional intendation for adding code in a smaller scope "within" \c Loc.
+  static StringRef getIndentationForLine(SourceManager &SM, SourceLoc Loc,
+                                         StringRef *ExtraIndentation = nullptr);
 
   /// \brief Determines if the given string is a valid non-operator
   /// identifier, without escaping characters.
@@ -457,14 +463,6 @@ private:
   /// pointer.
   const char *getBufferPtrForSourceLoc(SourceLoc Loc) const {
     return BufferStart + SourceMgr.getLocOffsetInBuffer(Loc, BufferID);
-  }
-
-  StringRef getSubstring(const char *Start, unsigned Length) const {
-    assert(Start >= BufferStart && Start <= BufferEnd);
-    unsigned BytesUntilBufferEnd = BufferEnd - Start;
-    if (Length > BytesUntilBufferEnd)
-      Length = BytesUntilBufferEnd;
-    return StringRef(Start, Length);
   }
 
   void lexImpl();

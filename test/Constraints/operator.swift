@@ -201,3 +201,10 @@ struct S_37290898: P_37290898 {}
 func rdar37290898(_ arr: inout [P_37290898], _ element: S_37290898?) {
   arr += [element].compactMap { $0 } // Ok
 }
+
+// SR-8221
+infix operator ??=
+func ??= <T>(lhs: inout T?, rhs: T?) {}
+var c: Int = 0
+c ??= 5 // expected-error{{binary operator '??=' cannot be applied to two 'Int' operands}}
+// expected-note@-1{{expected an argument list of type '(inout T?, T?)'}}

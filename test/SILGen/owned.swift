@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership -enable-guaranteed-normal-arguments | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
 
 // see shared.swift for thunks/conversions between __shared and __owned.
 
@@ -22,3 +22,9 @@ struct Foo {
         let r = ref
     }
 }
+
+// rdar://problem/38390524
+// CHECK-LABEL: sil hidden @$S5owned19oneUnnamedArgument1yyAA14ValueAggregateVnF : $@convention(thin) (@owned ValueAggregate) -> () {
+func oneUnnamedArgument1(_: __owned ValueAggregate) {}
+// CHECK-LABEL: sil hidden @$S5owned19oneUnnamedArgument2yyAA12RefAggregateCnF : $@convention(thin) (@owned RefAggregate) -> () {
+func oneUnnamedArgument2(_: __owned RefAggregate) {}

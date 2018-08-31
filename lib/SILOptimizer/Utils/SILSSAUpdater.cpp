@@ -248,29 +248,6 @@ public:
   static BlkSucc_iterator BlkSucc_begin(BlkT *BB) { return BB->succ_begin(); }
   static BlkSucc_iterator BlkSucc_end(BlkT *BB) { return BB->succ_end(); }
 
-  /// Iterator over the arguments (phis) of a basic block.
-  /// Defines an implicit cast operator on the iterator. So that this iterator
-  /// can be used in the SSAUpdaterImpl.
-  class PhiIt {
-  private:
-    SILBasicBlock::arg_iterator It;
-
-  public:
-    explicit PhiIt(SILBasicBlock *B) // begin iterator
-        : It(B->args_begin()) {}
-    PhiIt(SILBasicBlock *B, bool) // end iterator
-        : It(B->args_end()) {}
-    PhiIt &operator++() { ++It; return *this; }
-
-    operator SILPHIArgument *() { return cast<SILPHIArgument>(*It); }
-    bool operator==(const PhiIt& x) const { return It == x.It; }
-    bool operator!=(const PhiIt& x) const { return !operator==(x); }
-  };
-
-  typedef PhiIt PhiItT;
-  static PhiItT PhiItT_begin(BlkT *BB) { return PhiIt(BB); }
-  static PhiItT PhiItT_end(BlkT *BB) { return PhiIt(BB, true); }
-
   /// Iterator for PHI operands.
   class PHI_iterator {
   private:
@@ -547,7 +524,7 @@ replaceBBArgWithStruct(SILPHIArgument *Arg,
 /// If Arg is replaced, return the cast instruction. Otherwise return nullptr.
 SILValue swift::replaceBBArgWithCast(SILPHIArgument *Arg) {
   SmallVector<SILValue, 4> ArgValues;
-  Arg->getIncomingValues(ArgValues);
+  Arg->getIncomingPhiValues(ArgValues);
   if (isa<StructInst>(ArgValues[0]))
     return replaceBBArgWithStruct(Arg, ArgValues);
   return nullptr;

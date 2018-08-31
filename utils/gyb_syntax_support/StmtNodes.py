@@ -39,7 +39,8 @@ STMT_NODES = [
 
     # switch-case-list -> switch-case switch-case-list?
     Node('SwitchCaseList', kind='SyntaxCollection',
-         element='SwitchCase'),
+         element='Syntax',
+         element_choices=['SwitchCase', 'IfConfigDecl']),
 
     # repeat-while-stmt -> label? ':'? 'repeat' code-block 'while' expr ';'?
     Node('RepeatWhileStmt', kind='Stmt',
@@ -135,6 +136,19 @@ STMT_NODES = [
                    is_optional=True),
          ]),
 
+    # yield-stmt -> 'yield' '('? expr-list? ')'?
+    Node('YieldStmt', kind='Stmt',
+         children=[
+             Child('YieldKeyword', kind='YieldToken'),
+             Child('LeftParen', kind='LeftParenToken',
+                   is_optional=True),
+             Child('Expression', kind='Expr'),  # FIXME: allow list
+             Child('RightParen', kind='RightParenToken',
+                   is_optional=True),
+             Child('Semicolon', kind='SemicolonToken',
+                   is_optional=True),
+         ]),
+
     # fallthrough-stmt -> 'fallthrough' ';'?
     Node('FallthroughStmt', kind='Stmt',
          children=[
@@ -172,10 +186,14 @@ STMT_NODES = [
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
          ]),
+
+    # availability-condition -> '#available' '(' availability-spec ')'
     Node('AvailabilityCondition', kind='Syntax',
          children=[
              Child('PoundAvailableKeyword', kind='PoundAvailableToken'),
-             Child('Arguments', kind='TokenList'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('AvailabilitySpec', kind='AvailabilitySpecList'),
+             Child('RightParen', kind='RightParenToken'),
          ]),
     Node('MatchingPatternCondition', kind='Syntax',
          children=[
@@ -252,12 +270,17 @@ STMT_NODES = [
              Child('Body', kind='CodeBlock'),
          ]),
 
-    # switch-case -> switch-case-label stmt-list
-    #              | default-label stmt-list
+    # switch-case -> unknown-attr? switch-case-label stmt-list
+    #              | unknown-attr? switch-default-label stmt-list
     Node('SwitchCase', kind='Syntax',
          traits=['WithStatements'],
          children=[
-             Child('Label', kind='Syntax'),
+             Child('UnknownAttr', kind='Attribute', is_optional=True),
+             Child('Label', kind='Syntax',
+                   node_choices=[
+                       Child('Default', kind='SwitchDefaultLabel'),
+                       Child('Case', kind='SwitchCaseLabel'),
+                   ]),
              Child('Statements', kind='CodeBlockItemList'),
          ]),
 

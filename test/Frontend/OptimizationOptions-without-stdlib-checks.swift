@@ -15,16 +15,16 @@ func test_fatal(x: Int, y: Int) -> Int {
   if x > y {
     return x + y
   }
-  _preconditionFailure("Human nature ...")
+  preconditionFailure("Human nature ...")
 }
 
-func test_precondition_check(x: Int, y: Int) -> Int {
-  _precondition(x > y, "Test precondition check")
+func testprecondition_check(x: Int, y: Int) -> Int {
+  precondition(x > y, "Test precondition check")
   return x + y
 }
 
 func test_partial_safety_check(x: Int, y: Int) -> Int {
-  _debugPrecondition(x > y, "Test partial safety check")
+  assert(x > y, "Test partial safety check")
   return x + y
 }
 
@@ -57,14 +57,14 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // In debug mode keep verbose fatal errors.
 // DEBUG-LABEL: sil hidden @$S19OptimizationOptions10test_fatal1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
 // DEBUG-DAG: "Human nature ..."
-// DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC:.*fatalErrorMessage.*]] : $@convention(thin)
+// DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC:.*assertionFailure.*]] : $@convention(thin)
 // DEBUG: apply %[[FATAL_ERROR]]({{.*}})
 // DEBUG: unreachable
 
 // In playground mode keep verbose fatal errors.
 // PLAYGROUND-LABEL: sil hidden @$S19OptimizationOptions10test_fatal1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
 // PLAYGROUND-DAG: "Human nature ..."
-// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC:.*fatalErrorMessage.*]] : $@convention(thin)
+// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC:.*assertionFailure.*]] : $@convention(thin)
 // PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
 // PLAYGROUND: unreachable
 
@@ -84,7 +84,6 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // Precondition safety checks.
 
 // In debug mode keep verbose library precondition checks.
-// DEBUG-LABEL: sil hidden @$S19OptimizationOptions23test_precondition_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
 // DEBUG-DAG: "Fatal error"
 // DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC]]
 // DEBUG: apply %[[FATAL_ERROR]]({{.*}})
@@ -92,22 +91,22 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG: return
 
 // In playground mode keep verbose library precondition checks.
-// PLAYGROUND-LABEL: sil hidden @$S19OptimizationOptions23test_precondition_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
-// PLAYGROUND-DAG: "Fatal error"
+// PLAYGROUND-LABEL: sil hidden @$S19OptimizationOptions22testprecondition_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
+// PLAYGROUND-DAG: "Precondition failed"
 // PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC]]
 // PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
 // PLAYGROUND: unreachable
 // PLAYGROUND: return
 
 // In release mode keep succinct library precondition checks (trap).
-// RELEASE-LABEL: sil hidden @$S19OptimizationOptions23test_precondition_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
+// RELEASE-LABEL: sil hidden @$S19OptimizationOptions22testprecondition_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
 // RELEASE-NOT:  "Fatal error"
 // RELEASE:  %[[V2:.+]] = builtin "xor_Int1"(%{{.+}}, %{{.+}})
 // RELEASE:  cond_fail %[[V2]]
 // RELEASE:  return
 
 // In unchecked mode remove library precondition checks.
-// UNCHECKED-LABEL: sil hidden @$S19OptimizationOptions23test_precondition_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
+// UNCHECKED-LABEL: sil hidden @$S19OptimizationOptions22testprecondition_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
 // UNCHECKED-NOT:  "Fatal error"
 // UNCHECKED-NOT:  builtin "int_trap"
 // UNCHECKED-NOT:  unreachable
@@ -117,14 +116,14 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 
 // In debug mode keep verbose partial safety checks.
 // DEBUG-LABEL: sil hidden @$S19OptimizationOptions25test_partial_safety_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
-// DEBUG-DAG: "Fatal error"
+// DEBUG-DAG: "Assertion failed"
 // DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC]]
 // DEBUG: apply %[[FATAL_ERROR]]({{.*}})
 // DEBUG: unreachable
 
 // In playground mode keep verbose partial safety checks.
 // PLAYGROUND-LABEL: sil hidden @$S19OptimizationOptions25test_partial_safety_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
-// PLAYGROUND-DAG: "Fatal error"
+// PLAYGROUND-DAG: "Assertion failed"
 // PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC]]
 // PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
 // PLAYGROUND: unreachable

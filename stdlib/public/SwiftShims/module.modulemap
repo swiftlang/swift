@@ -60,3 +60,7 @@ module _SwiftCoreFoundationOverlayShims {
 module _SwiftFoundationOverlayShims {
   header "FoundationOverlayShims.h"
 }
+
+module _SwiftNetworkOverlayShims {
+  header "NetworkOverlayShims.h"
+}

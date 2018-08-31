@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target x86_64-apple-macosx10.11 -module-name=cgtest -emit-ir -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name=cgtest -emit-ir -O %s | %FileCheck %s
 
 // Test some imported CG APIs
 import CoreGraphics
@@ -19,7 +19,7 @@ public func testEnums(_ model: CGColorSpaceModel) -> Int {
      case .indexed : return 67
      case .pattern : return 71
 
-     default: return 0
+     default: return -1
   }
 // CHECK:   [[GEP:%.+]] = getelementptr inbounds [8 x i64], [8 x i64]* [[SWITCHTABLE]], i64 0, i64 %{{.*}}
 // CHECK:   [[LOAD:%.+]] = load i64, i64* [[GEP]], align 8
@@ -75,6 +75,7 @@ public func pdfOperations(_ context: CGContext) {
 // Test some more recently renamed APIs
 
 // CHECK-LABEL: define swiftcc void {{.*}}testColorRenames{{.*}} {
+@available(macOS 10.11, *)
 public func testColorRenames(color: CGColor,
                              intent: CGColorRenderingIntent) {
   let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!

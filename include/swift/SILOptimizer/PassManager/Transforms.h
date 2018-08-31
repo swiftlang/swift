@@ -66,6 +66,8 @@ namespace swift {
     /// Inject the pass manager running this pass.
     void injectPassManager(SILPassManager *PMM) { PM = PMM; }
 
+    SILPassManager *getPassManager() const { return PM; }
+
     irgen::IRGenModule *getIRGenModule() {
       auto *Mod = PM->getIRGenModule();
       assert(Mod && "Expecting a valid module");
@@ -113,10 +115,9 @@ namespace swift {
     /// derived from a common base function, e.g. due to specialization.
     /// The number should be small anyway, but bugs in optimizations could cause
     /// an infinite loop in the passmanager.
-    void notifyAddFunction(SILFunction *F, SILFunction *DerivedFrom) {
-      PM->notifyOfNewFunction(F, this);
+    void addFunctionToPassManagerWorklist(SILFunction *F,
+                                          SILFunction *DerivedFrom) {
       PM->addFunctionToWorklist(F, DerivedFrom);
-      PM->notifyAnalysisOfFunction(F);
     }
 
     /// \brief Reoptimize the current function by restarting the pass
@@ -164,15 +165,9 @@ namespace swift {
       PM->invalidateFunctionTables();
     }
 
-    /// Inform the pass manager of a deleted function.
-    void notifyDeleteFunction(SILFunction *F) {
-      PM->notifyDeleteFunction(F);
-    }
-
-    /// Inform the pass manager of an added function.
-    void notifyAddFunction(SILFunction *F) {
-      PM->notifyOfNewFunction(F, this);
-      PM->notifyAnalysisOfFunction(F);
+    /// Inform the pass manager that we are going to delete a function.
+    void notifyWillDeleteFunction(SILFunction *F) {
+      PM->notifyWillDeleteFunction(F);
     }
   };
 } // end namespace swift

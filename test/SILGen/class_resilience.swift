@@ -1,7 +1,8 @@
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -I %t -emit-silgen -enable-sil-ownership -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name class_resilience -I %t -enable-sil-ownership -enable-resilience %s | %FileCheck %s
 
 import resilient_class
 
@@ -23,10 +24,9 @@ public class MyResilientClass {
 // directly
 
 // CHECK-LABEL: sil @$S16class_resilience19finalPropertyOfMineyyAA16MyResilientClassCF
-// CHECK: bb0([[ARG:%.*]] : @owned $MyResilientClass):
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   ref_element_addr [[BORROWED_ARG]] : $MyResilientClass, #MyResilientClass.finalProperty
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $MyResilientClass):
+// CHECK:   ref_element_addr [[ARG]] : $MyResilientClass, #MyResilientClass.finalProperty
+// CHECK: } // end sil function '$S16class_resilience19finalPropertyOfMineyyAA16MyResilientClassCF'
 
 public func finalPropertyOfMine(_ other: MyResilientClass) {
   _ = other.finalProperty
@@ -44,5 +44,5 @@ class SubclassOfOutsideChild : ResilientOutsideChild {
 // CHECK-NEXT:  #ResilientOutsideParent.init!initializer.1: (ResilientOutsideParent.Type) -> () -> ResilientOutsideParent : @$S16class_resilience22SubclassOfOutsideChildCACycfc [override]
 // CHECK-NEXT:  #ResilientOutsideParent.method!1: (ResilientOutsideParent) -> () -> () : @$S16class_resilience22SubclassOfOutsideChildC6methodyyF [override]
 // CHECK-NEXT:  #SubclassOfOutsideChild.newMethod!1: (SubclassOfOutsideChild) -> () -> () : @$S16class_resilience22SubclassOfOutsideChildC9newMethodyyF
-// CHECK-NEXT:  #SubclassOfOutsideChild.deinit!deallocator: @$S16class_resilience22SubclassOfOutsideChildCfD
+// CHECK-NEXT:  #SubclassOfOutsideChild.deinit!deallocator.1: @$S16class_resilience22SubclassOfOutsideChildCfD
 // CHECK-NEXT: }

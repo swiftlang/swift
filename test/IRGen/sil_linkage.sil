@@ -2,25 +2,25 @@
 
 sil_stage canonical
 
-// CHECK: define{{( protected)?}} swiftcc void @public_fragile_function_test() {{.*}} {
-// CHECK: define{{( protected)?}} swiftcc void @public_transparent_fragile_function_test() {{.*}} {
-// CHECK: define{{( protected)?}} swiftcc void @public_transparent_function_test() {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @public_fragile_function_test() {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @public_transparent_fragile_function_test() {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @public_transparent_function_test() {{.*}} {
 // CHECK: define hidden swiftcc void @public_non_abi_function_test() {{.*}} {
 // CHECK: define hidden swiftcc void @hidden_fragile_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_fragile_function_test() {{.*}} {
 // CHECK: define{{( internal)?}} swiftcc void @private_fragile_function_test() {{.*}} {
 // Public external functions are not emitted into clients.
-// CHECK: declare swiftcc void @public_external_fragile_function_def_test()
-// CHECK: define{{( protected)?}} available_externally{{ (hidden)?}} swiftcc void @hidden_external_fragile_function_def_test() {{.*}} {
+// CHECK: declare{{( dllimport)?}} swiftcc void @public_external_fragile_function_def_test()
+// CHECK: define{{( protected)?}} available_externally{{ (hidden)?}}{{( dllimport)?}} swiftcc void @hidden_external_fragile_function_def_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_external_fragile_function_def_test() {{.*}} {
-// CHECK: define{{( protected)?}} available_externally{{ (hidden)?}} swiftcc void @private_external_fragile_function_def_test() {{.*}} {
-// CHECK: define{{( protected)?}} swiftcc void @public_resilient_function_test() {{.*}} {
+// CHECK: define{{( protected)?}} available_externally{{ (hidden)?}}{{( dllimport)?}} swiftcc void @private_external_fragile_function_def_test() {{.*}} {
+// CHECK: define{{( protected)?}}{{( dllexport)?}} swiftcc void @public_resilient_function_test() {{.*}} {
 // CHECK: define hidden swiftcc void @hidden_resilient_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_resilient_function_test() {{.*}} {
 // CHECK: define internal swiftcc void @private_resilient_function_test() {{.*}}{
 // Public external functions are not emitted into clients.
-// CHECK: declare swiftcc void @public_external_resilient_function_def_test()
-// CHECK: define{{( protected)?}} available_externally hidden swiftcc void @hidden_external_resilient_function_def_test() {{.*}} {
+// CHECK: declare{{( dllimport)?}} swiftcc void @public_external_resilient_function_def_test()
+// CHECK: define{{( protected)?}} available_externally hidden{{( dllimport)?}} swiftcc void @hidden_external_resilient_function_def_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_external_resilient_function_def_test() {{.*}} {
 
 sil public [serialized] @public_fragile_function_test : $@convention(thin) () -> () {

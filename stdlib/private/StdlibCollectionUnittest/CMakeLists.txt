@@ -7,19 +7,23 @@ add_swift_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
   # filename.
   StdlibCollectionUnittest.swift
 
-  CheckCollectionInstance.swift.gyb
-  CheckCollectionType.swift.gyb
-  CheckMutableCollectionType.swift.gyb
+  CheckCollectionInstance.swift
+  CheckCollectionType.swift
+  CheckMutableCollectionType.swift
   CheckRangeReplaceableCollectionType.swift
   CheckRangeReplaceableSliceType.swift
-  CheckSequenceInstance.swift.gyb
+  CheckSequenceInstance.swift
   CheckSequenceType.swift
-  LoggingWrappers.swift.gyb
-  MinimalCollections.swift.gyb
+  LoggingWrappers.swift
+  MinimalCollections.swift
   RangeSelection.swift
-  ../../public/core/WriteBackMutableSlice.swift
+  WriteBackMutableSlice.swift
 
   SWIFT_MODULE_DEPENDS StdlibUnittest
+  SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_FREEBSD Glibc
+  SWIFT_MODULE_DEPENDS_CYGWIN Glibc
+  SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags}
   TARGET_SDKS ALL_POSIX_PLATFORMS
   INSTALL_IN_COMPONENT stdlib-experimental)

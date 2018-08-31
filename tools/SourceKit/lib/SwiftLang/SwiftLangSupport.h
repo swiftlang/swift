@@ -39,6 +39,7 @@ namespace swift {
   class Type;
   class AbstractStorageDecl;
   class SourceFile;
+  class SILOptions;
   class ValueDecl;
   enum class AccessorKind;
 
@@ -83,7 +84,8 @@ public:
                                           ArrayRef<const char *> Args);
   ImmutableTextSnapshotRef replaceText(unsigned Offset, unsigned Length,
                                        llvm::MemoryBuffer *Buf,
-                                       bool ProvideSemanticInfo);
+                                       bool ProvideSemanticInfo,
+                                       std::string &error);
 
   void updateSemaInfo();
 
@@ -92,8 +94,9 @@ public:
   ImmutableTextSnapshotRef getLatestSnapshot() const;
 
   void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
-             bool BuildSyntaxTree);
-  void readSyntaxInfo(EditorConsumer& consumer);
+             bool BuildSyntaxTree,
+             swift::SyntaxParsingCache *SyntaxCache = nullptr);
+  void readSyntaxInfo(EditorConsumer &consumer);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
 
@@ -105,6 +108,14 @@ public:
 
   static void reportDocumentStructure(swift::SourceFile &SrcFile,
                                       EditorConsumer &Consumer);
+
+  const llvm::Optional<swift::SourceFileSyntax> &getSyntaxTree() const;
+
+  std::string getFilePath() const;
+
+  /// Whether or not the AST stored for this document is up-to-date or just an
+  /// artifact of incremental syntax parsing
+  bool hasUpToDateAST() const;
 };
 
 typedef IntrusiveRefCntPtr<SwiftEditorDocument> SwiftEditorDocumentRef;
@@ -396,7 +407,7 @@ public:
   void
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) override;
 
-  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
+  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                   EditorConsumer &Consumer,
                   ArrayRef<const char *> Args) override;
 
@@ -418,7 +429,7 @@ public:
                                  ArrayRef<const char *> Args,
                                  bool UsingSwiftArgs,
                                  bool SynthesizedExtensions,
-                                 Optional<unsigned> swiftVersion) override;
+                                 StringRef swiftVersion) override;
 
   void editorOpenSwiftSourceInterface(StringRef Name,
                                       StringRef SourceName,
@@ -516,9 +527,9 @@ namespace trace {
   void initTraceInfo(trace::SwiftInvocation &SwiftArgs,
                      StringRef InputFile,
                      ArrayRef<const char *> Args);
-
-  void initTraceFiles(trace::SwiftInvocation &SwiftArgs,
-                      swift::CompilerInstance &CI);
+  void initTraceInfo(trace::SwiftInvocation &SwiftArgs,
+                     StringRef InputFile,
+                     ArrayRef<std::string> Args);
 }
 
 /// When we cannot build any more clang modules, close the .pcm / files to
@@ -531,6 +542,10 @@ public:
   CloseClangModuleFiles(swift::ClangModuleLoader &loader) : loader(loader) {}
   ~CloseClangModuleFiles();
 };
+
+
+/// Disable expensive SIL options which do not affect indexing or diagnostics.
+void disableExpensiveSILOptions(swift::SILOptions &Opts);
 
 } // namespace SourceKit
 

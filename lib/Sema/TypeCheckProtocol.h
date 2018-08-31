@@ -33,6 +33,7 @@ class AccessScope;
 class AssociatedTypeDecl;
 class AvailabilityContext;
 class DeclContext;
+class FuncDecl;
 class NormalProtocolConformance;
 class ProtocolDecl;
 class TypeChecker;
@@ -115,13 +116,12 @@ struct InferredAssociatedTypesByWitness {
 
 /// The set of witnesses that were considered when attempting to
 /// infer associated types.
-typedef SmallVector<InferredAssociatedTypesByWitness, 2>
-  InferredAssociatedTypesByWitnesses;
+using InferredAssociatedTypesByWitnesses =
+    SmallVector<InferredAssociatedTypesByWitness, 2>;
 
 /// A mapping from requirements to the set of matches with witnesses.
-typedef SmallVector<std::pair<ValueDecl *,
-                              InferredAssociatedTypesByWitnesses>, 4>
-  InferredAssociatedTypes;
+using InferredAssociatedTypes =
+    SmallVector<std::pair<ValueDecl *, InferredAssociatedTypesByWitnesses>, 4>;
 
 /// A potential solution to the set of inferred type witnesses.
 struct InferredTypeWitnessesSolution {
@@ -148,7 +148,7 @@ class RequirementEnvironment;
 
 /// \brief The result of matching a particular declaration to a given
 /// requirement.
-enum class MatchKind : unsigned char {
+enum class MatchKind : uint8_t {
   /// \brief The witness matched the requirement exactly.
   ExactMatch,
 
@@ -334,14 +334,14 @@ public:
 /// \brief Describes a match between a requirement and a witness.
 struct RequirementMatch {
   RequirementMatch(ValueDecl *witness, MatchKind kind,
-                   Optional<RequirementEnvironment> &&env = None)
+                   Optional<RequirementEnvironment> env = None)
     : Witness(witness), Kind(kind), WitnessType(), ReqEnv(std::move(env)) {
     assert(!hasWitnessType() && "Should have witness type");
   }
 
   RequirementMatch(ValueDecl *witness, MatchKind kind,
                    Type witnessType,
-                   Optional<RequirementEnvironment> &&env = None,
+                   Optional<RequirementEnvironment> env = None,
                    ArrayRef<OptionalAdjustment> optionalAdjustments = {})
     : Witness(witness), Kind(kind), WitnessType(witnessType),
       ReqEnv(std::move(env)),
@@ -369,7 +369,7 @@ struct RequirementMatch {
 
   /// Substitutions mapping the type of the witness to the requirement
   /// environment.
-  SmallVector<Substitution, 2> WitnessSubstitutions;
+  SubstitutionMap WitnessSubstitutions;
 
   /// \brief Determine whether this match is viable.
   bool isViable() const {
@@ -431,6 +431,12 @@ struct RequirementMatch {
 struct RequirementCheck;
 
 class WitnessChecker {
+public:
+  using RequirementEnvironmentCacheKey =
+      std::pair<const GenericSignature *, const ClassDecl *>;
+  using RequirementEnvironmentCache =
+      llvm::DenseMap<RequirementEnvironmentCacheKey, RequirementEnvironment>;
+
 protected:
   TypeChecker &TC;
   ProtocolDecl *Proto;
@@ -442,8 +448,12 @@ protected:
   // @_implements(Protocol, DeclName)
   llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>> ImplementsTable;
 
+  RequirementEnvironmentCache ReqEnvironmentCache;
+
   WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
                  Type adoptee, DeclContext *dc);
+
+  bool isMemberOperator(FuncDecl *decl, Type type);
 
   /// Gather the value witnesses for the given requirement.
   ///
@@ -552,6 +562,11 @@ class ConformanceChecker : public WitnessChecker {
   /// Record that the given requirement has no valid witness.
   void recordInvalidWitness(ValueDecl *requirement);
 
+  /// Check for ill-formed uses of Objective-C generics in a type witness.
+  bool checkObjCTypeErasedGenerics(AssociatedTypeDecl *assocType,
+                                   Type type,
+                                   TypeDecl *typeDecl);
+
   /// Record a type witness.
   ///
   /// \param assocType The associated type whose witness is being recorded.
@@ -560,7 +575,7 @@ class ConformanceChecker : public WitnessChecker {
   ///
   /// \param typeDecl The decl the witness type came from; can be null.
   void recordTypeWitness(AssociatedTypeDecl *assocType, Type type,
-                         TypeDecl *typeDecl, bool performRedeclarationCheck);
+                         TypeDecl *typeDecl);
 
   /// Enforce restrictions on non-final classes witnessing requirements
   /// involving the protocol 'Self' type.
@@ -811,8 +826,8 @@ private:
 public:
   /// Describes a mapping from associated type declarations to their
   /// type witnesses (as interface types).
-  typedef std::vector<std::pair<AssociatedTypeDecl *, Type>>
-    InferredTypeWitnesses;
+  using InferredTypeWitnesses =
+      std::vector<std::pair<AssociatedTypeDecl *, Type>>;
 
   /// Perform associated type inference.
   ///
@@ -826,26 +841,54 @@ public:
 RequirementMatch matchWitness(
              TypeChecker &tc,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-             const std::function<
+             llvm::function_ref<
                      std::tuple<Optional<RequirementMatch>, Type, Type>(void)>
-               &setup,
-             const std::function<Optional<RequirementMatch>(Type, Type)>
-               &matchTypes,
-             const std::function<
+               setup,
+             llvm::function_ref<Optional<RequirementMatch>(Type, Type)>
+               matchTypes,
+             llvm::function_ref<
                      RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
-                   > &finalize);
+                   > finalize);
 
-RequirementMatch matchWitness(TypeChecker &tc,
-                              ProtocolDecl *proto,
-                              ProtocolConformance *conformance,
-                              DeclContext *dc,
-                              ValueDecl *req,
-                              ValueDecl *witness);
+RequirementMatch
+  matchWitness(TypeChecker &tc,
+               WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
+               ProtocolDecl *proto, ProtocolConformance *conformance,
+               DeclContext *dc, ValueDecl *req, ValueDecl *witness);
 
 /// If the given type is a direct reference to an associated type of
 /// the given protocol, return the referenced associated type.
 AssociatedTypeDecl *getReferencedAssocTypeOfProtocol(Type type,
                                                      ProtocolDecl *proto);
+
+/// Perform any necessary adjustments to the inferred associated type to
+/// make it suitable for later use.
+///
+/// \param noescapeToEscaping Will be set \c true if this operation performed
+/// the noescape-to-escaping adjustment.
+Type adjustInferredAssociatedType(Type type, bool &noescapeToEscaping);
+
+/// Find the @objc requirement that are witnessed by the given
+/// declaration.
+///
+/// \param anySingleRequirement If true, returns at most a single requirement,
+/// which might be any of the requirements that match.
+///
+/// \returns the set of requirements to which the given witness is a
+/// witness.
+llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
+                                     const ValueDecl *witness,
+                                     bool anySingleRequirement = false);
+
+/// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
+void useObjectiveCBridgeableConformances(
+                      DeclContext *dc, Type type);
+
+/// If this bound-generic type is bridged, mark any
+/// _ObjectiveCBridgeable conformances in the generic arguments of
+/// the given type as "used".
+void useObjectiveCBridgeableConformancesOfArgs(
+                      DeclContext *dc, BoundGenericType *bound);
 
 }
 

@@ -19,6 +19,7 @@
 #define SWIFT_STDLIB_SHIMS_GLOBALOBJECTS_H_
 
 #include "SwiftStdint.h"
+#include "SwiftStdbool.h"
 #include "HeapObject.h"
 #include "Visibility.h"
 
@@ -36,7 +37,7 @@ struct _SwiftEmptyArrayStorage {
   struct _SwiftArrayBodyStorage body;
 };
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
 struct _SwiftUnsafeBitMap {
@@ -71,22 +72,20 @@ struct _SwiftEmptySetStorage {
   __swift_uintptr_t entries;
 };
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 struct _SwiftEmptyDictionaryStorage _swiftEmptyDictionaryStorage;
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 struct _SwiftEmptySetStorage _swiftEmptySetStorage;
 
-struct _SwiftHashingSecretKey {
-  __swift_uint64_t key0;
-  __swift_uint64_t key1;
+struct _SwiftHashingParameters {
+  __swift_uint64_t seed0;
+  __swift_uint64_t seed1;
+  __swift_bool deterministic;
 };
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-struct _SwiftHashingSecretKey _swift_stdlib_Hashing_secretKey;
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride;
+  
+SWIFT_RUNTIME_STDLIB_API
+struct _SwiftHashingParameters _swift_stdlib_Hashing_parameters;
 
 #ifdef __cplusplus
 

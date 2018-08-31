@@ -535,3 +535,52 @@ func testDoRethrow() {
   doRethrow(fn:) { (a, b) in return a }
   DoRethrowGeneric<Int>().method(fn:) { (a, b) in return a }
 }
+
+// https://bugs.swift.org/browse/SR-7120 - capture lists
+func rethrowsWithCaptureList<R, T>(
+  array: [T],
+  operation: (Int) throws -> R
+) rethrows -> R {
+  return try array.withUnsafeBytes { [array] _ in
+    return try operation(array.count)
+  }
+}
+
+// rdar://problem/40472018: Crash on rethrows function with variadic parameter and throwing function parameter.
+public func variadic_rethrows(_ values: Int..., body: (Int) throws -> ()) rethrows { }
+public func rdar40472018() {
+  variadic_rethrows(1, 2) { _ in }
+}
+
+
+// https://bugs.swift.org/browse/SR-6299
+// Verify that we do not emit an invalid
+//   "... can throw but the expression is not marked with 'try'"
+// error on the use of the operators.
+
+infix operator <|: infixr0
+infix operator |>: infixl1
+
+precedencegroup infixr0 {
+  associativity: right
+}
+precedencegroup infixl1 {
+  associativity: left
+  higherThan: infixr0
+}
+
+func <| <A, B> (f: (A) throws -> B, a: A) rethrows -> B {
+  return try f(a)
+}
+func |> <A, B> (a: A, f: (A) -> B) -> B {
+  return try f(a) // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+}
+
+struct Box<A> {
+  let unbox: A
+}
+func suchThat<A>(_ x: Box<A>) -> (@escaping (A) -> A) -> Box<A> {
+  return { f in Box(unbox: f(x.unbox)) }
+}
+
+Box(unbox: 1) |> suchThat <| { $0 + 1 } // expected-warning {{result of operator '<|' is unused}}

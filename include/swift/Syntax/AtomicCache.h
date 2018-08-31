@@ -15,6 +15,7 @@
 
 #include <functional>
 #include "swift/Syntax/References.h"
+#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
 
@@ -38,7 +39,7 @@ public:
 
   /// Gets the value inside the cache, or creates it atomically using the
   /// provided lambda if it doesn't already exist.
-  RC<T> getOrCreate(std::function<RC<T> ()> Create) const {
+  RC<T> getOrCreate(llvm::function_ref<RC<T>()> Create) const {
     auto &Ptr = *reinterpret_cast<std::atomic<uintptr_t> *>(&Storage);
 
     // If an atomic load gets an initialized value, then return Storage.

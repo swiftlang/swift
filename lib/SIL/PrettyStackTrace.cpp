@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/QuotedString.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -27,22 +28,45 @@ llvm::cl::opt<bool>
 SILPrintOnError("sil-print-on-error", llvm::cl::init(false),
                 llvm::cl::desc("Printing SIL function bodies in crash diagnostics."));
 
+static void printDebugLocDescription(llvm::raw_ostream &out,
+                                     SILLocation::DebugLoc loc,
+                                     ASTContext &Context) {
+  out << "<<debugloc at " << QuotedString(loc.Filename)
+      << ":" << loc.Line << ":" << loc.Column << ">>";
+}
+
 void swift::printSILLocationDescription(llvm::raw_ostream &out,
                                         SILLocation loc,
                                         ASTContext &Context) {
-  if (loc.isNull()) {
+  switch (loc.getStorageKind()) {
+  case SILLocation::UnknownKind:
     out << "<<invalid location>>";
-  } else if (loc.isSILFile()) {
+    return;
+
+  case SILLocation::SILFileKind:
     printSourceLocDescription(out, loc.getSourceLoc(), Context);
-  } else if (auto decl = loc.getAsASTNode<Decl>()) {
-    printDeclDescription(out, decl, Context);
-  } else if (auto expr = loc.getAsASTNode<Expr>()) {
-    printExprDescription(out, expr, Context);
-  } else if (auto stmt = loc.getAsASTNode<Stmt>()) {
-    printStmtDescription(out, stmt, Context);
-  } else if (auto pattern = loc.castToASTNode<Pattern>()) {
-    printPatternDescription(out, pattern, Context);
+    return;
+
+  case SILLocation::ASTNodeKind:
+    if (auto decl = loc.getAsASTNode<Decl>()) {
+      printDeclDescription(out, decl, Context);
+    } else if (auto expr = loc.getAsASTNode<Expr>()) {
+      printExprDescription(out, expr, Context);
+    } else if (auto stmt = loc.getAsASTNode<Stmt>()) {
+      printStmtDescription(out, stmt, Context);
+    } else if (auto pattern = loc.castToASTNode<Pattern>()) {
+      printPatternDescription(out, pattern, Context);
+    } else {
+      out << "<<unknown AST node>>";
+    }
+    return;
+
+  case SILLocation::DebugInfoKind:
+    printDebugLocDescription(out, loc.getDebugInfoLoc(), Context);
+    return;
   }
+
+  out << "<<bad SILLocation kind>>";
 }
 
 void PrettyStackTraceSILLocation::print(llvm::raw_ostream &out) const {
@@ -72,4 +96,10 @@ void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) cons
   }
   if (SILPrintOnError)
     TheFn->print(out);
+}
+
+void PrettyStackTraceSILNode::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << " SIL node ";
+  if (Node)
+    out << *Node;
 }

@@ -21,41 +21,132 @@ import _SwiftUIKitOverlayShims
 // UIGeometry
 //===----------------------------------------------------------------------===//
 
-public extension UIEdgeInsets {
-  static var zero: UIEdgeInsets {
-    @_transparent // @fragile
-    get { return UIEdgeInsets(top: 0.0, left: 0.0, bottom: 0.0, right: 0.0) }
+extension UIEdgeInsets : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
+    return lhs.top == rhs.top &&
+           lhs.left == rhs.left &&
+           lhs.bottom == rhs.bottom &&
+           lhs.right == rhs.right
   }
 }
 
-public extension UIOffset {
-  static var zero: UIOffset {
-    @_transparent // @fragile
-    get { return UIOffset(horizontal: 0.0, vertical: 0.0) }
+@available(iOS 11.0, tvOS 11.0, watchOS 4.0, *)
+extension NSDirectionalEdgeInsets : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: NSDirectionalEdgeInsets, rhs: NSDirectionalEdgeInsets) -> Bool {
+    return lhs.top == rhs.top &&
+           lhs.leading == rhs.leading &&
+           lhs.bottom == rhs.bottom &&
+           lhs.trailing == rhs.trailing
   }
 }
 
-//===----------------------------------------------------------------------===//
-// Equatable types.
-//===----------------------------------------------------------------------===//
-
-@_transparent // @fragile
-public func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
-  return lhs.top == rhs.top &&
-         lhs.left == rhs.left &&
-         lhs.bottom == rhs.bottom &&
-         lhs.right == rhs.right
+extension UIOffset : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
+    return lhs.horizontal == rhs.horizontal &&
+           lhs.vertical == rhs.vertical
+  }
 }
 
-extension UIEdgeInsets : Equatable {}
+#if os(iOS) || os(tvOS)
+extension UIFloatRange : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: UIFloatRange, rhs: UIFloatRange) -> Bool {
+    return lhs.minimum == rhs.minimum &&
+           lhs.maximum == rhs.maximum
+  }
+}
+#endif
 
-@_transparent // @fragile
-public func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
-  return lhs.horizontal == rhs.horizontal &&
-         lhs.vertical == rhs.vertical
+@available(swift, deprecated: 4.2, message:"Use == operator instead.")
+public func UIEdgeInsetsEqualToEdgeInsets(_ insets1: UIEdgeInsets, _ insets2: UIEdgeInsets) -> Bool {
+  return insets1 == insets2
 }
 
-extension UIOffset : Equatable {}
+@available(swift, deprecated: 4.2, message:"Use == operator instead.")
+public func UIOffsetEqualToOffset(_ offset1: UIOffset, _ offset2: UIOffset) -> Bool {
+  return offset1 == offset2
+}
+
+#if os(iOS) || os(tvOS)
+@available(swift, deprecated: 4.2, message:"Use == operator instead.")
+public func UIFloatRangeIsEqualToRange(_ range: UIFloatRange, _ otherRange: UIFloatRange) -> Bool {
+  return range == otherRange
+}
+#endif
+
+extension UIEdgeInsets : Codable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let top = try container.decode(CGFloat.self)
+    let left = try container.decode(CGFloat.self)
+    let bottom = try container.decode(CGFloat.self)
+    let right = try container.decode(CGFloat.self)
+    self.init(top: top, left: left, bottom: bottom, right: right)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(top)
+    try container.encode(left)
+    try container.encode(bottom)
+    try container.encode(right)
+  }
+}
+
+@available(iOS 11.0, tvOS 11.0, watchOS 4.0, *)
+extension NSDirectionalEdgeInsets : Codable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let top = try container.decode(CGFloat.self)
+    let leading = try container.decode(CGFloat.self)
+    let bottom = try container.decode(CGFloat.self)
+    let trailing = try container.decode(CGFloat.self)
+    self.init(top: top, leading: leading, bottom: bottom, trailing: trailing)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(top)
+    try container.encode(leading)
+    try container.encode(bottom)
+    try container.encode(trailing)
+  }
+}
+
+extension UIOffset : Codable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let horizontal = try container.decode(CGFloat.self)
+    let vertical = try container.decode(CGFloat.self)
+    self.init(horizontal: horizontal, vertical: vertical)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(horizontal)
+    try container.encode(vertical)
+  }
+}
+
+#if os(iOS) || os(tvOS)
+extension UIFloatRange : Codable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let minimum = try container.decode(CGFloat.self)
+    let maximum = try container.decode(CGFloat.self)
+    self.init(minimum: minimum, maximum: maximum)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(minimum)
+    try container.encode(maximum)
+  }
+}
+#endif
 
 //===----------------------------------------------------------------------===//
 // Numeric backed types
@@ -95,12 +186,11 @@ extension _UIKitNumericRawRepresentable {
   }
 }
 
-@available(swift 4)
 extension UIFont.Weight : _UIKitNumericRawRepresentable {}
 
 #if !os(watchOS)
-@available(swift 4)
 extension UILayoutPriority : _UIKitNumericRawRepresentable {}
+extension UIWindow.Level : _UIKitNumericRawRepresentable {}
 #endif
 
 // These are un-imported macros in UIKit.
@@ -110,44 +200,27 @@ extension UILayoutPriority : _UIKitNumericRawRepresentable {}
 //===----------------------------------------------------------------------===//
 
 #if !os(watchOS) && !os(tvOS)
-public extension UIDeviceOrientation {
-  var isLandscape: Bool {
-    return self == .landscapeLeft || self == .landscapeRight
-  }
-
-  var isPortrait: Bool {
-    return self == .portrait || self == .portraitUpsideDown
-  }
-
-  var isFlat: Bool {
-    return self == .faceUp || self == .faceDown
-  }
-
-  var isValidInterfaceOrientation: Bool {
-    switch self {
-    case .portrait, .portraitUpsideDown, .landscapeLeft, .landscapeRight:
-      return true
-    default:
-      return false
-    }
-  }
-}
-
+@available(swift, obsoleted: 4.2,
+  renamed: "getter:UIDeviceOrientation.isLandscape(self:)")
 public func UIDeviceOrientationIsLandscape(
   _ orientation: UIDeviceOrientation
 ) -> Bool {
   return orientation.isLandscape
 }
 
+@available(swift, obsoleted: 4.2,
+  renamed: "getter:UIDeviceOrientation.isPortrait(self:)")
 public func UIDeviceOrientationIsPortrait(
   _ orientation: UIDeviceOrientation
 ) -> Bool {
   return orientation.isPortrait
 }
 
+@available(swift, obsoleted: 4.2,
+  renamed: "getter:UIDeviceOrientation.isValidInterfaceOrientation(self:)")
 public func UIDeviceOrientationIsValidInterfaceOrientation(
-  _ orientation: UIDeviceOrientation) -> Bool
-{
+  _ orientation: UIDeviceOrientation
+) -> Bool {
   return orientation.isValidInterfaceOrientation
 }
 #endif
@@ -157,21 +230,16 @@ public func UIDeviceOrientationIsValidInterfaceOrientation(
 //===----------------------------------------------------------------------===//
 
 #if !os(watchOS) && !os(tvOS)
-public extension UIInterfaceOrientation {
-  var isLandscape: Bool {
-    return self == .landscapeLeft || self == .landscapeRight
-  }
-
-  var isPortrait: Bool {
-    return self == .portrait || self == .portraitUpsideDown
-  }
-}
-
+@available(swift, obsoleted: 4.2,
+  renamed: "getter:UIInterfaceOrientation.isPortrait(self:)")
 public func UIInterfaceOrientationIsPortrait(
-  _ orientation: UIInterfaceOrientation) -> Bool {
+  _ orientation: UIInterfaceOrientation
+) -> Bool {
   return orientation.isPortrait
 }
 
+@available(swift, obsoleted: 4.2,
+  renamed: "getter:UIInterfaceOrientation.isLandscape(self:)")
 public func UIInterfaceOrientationIsLandscape(
   _ orientation: UIInterfaceOrientation
 ) -> Bool {
@@ -285,7 +353,7 @@ extension UIImage : _ExpressibleByImageLiteral {
 
 public typealias _ImageLiteralType = UIImage
 
-extension UIFontTextStyle {
+extension UIFont.TextStyle {
     @available(iOS 11.0, watchOS 4.0, tvOS 11.0, *)
     public var metrics: UIFontMetrics {
         return UIFontMetrics(forTextStyle: self)
@@ -356,7 +424,7 @@ extension UIDragDropSession {
   public func canLoadObjects<
     T : _ObjectiveCBridgeable
   >(ofClass: T.Type) -> Bool where T._ObjectiveCType : NSItemProviderReading {
-    return self.canLoadObjects(ofClass: T._ObjectiveCType.self);
+    return self.canLoadObjects(ofClass: T._ObjectiveCType.self)
   }
 }
 
@@ -419,6 +487,65 @@ extension UIPasteboard {
       objects.map { $0._bridgeToObjectiveC() },
       localOnly: localOnly,
       expirationDate: expirationDate)
+  }
+}
+
+#endif
+
+//===----------------------------------------------------------------------===//
+// UIPrintError compatibility
+//===----------------------------------------------------------------------===//
+
+#if os(iOS)
+
+@available(swift, obsoleted: 4.2, renamed:"UIPrintError.Code.notAvailable.rawValue")
+public let UIPrintingNotAvailableError = 1
+
+@available(swift, obsoleted: 4.2, renamed:"UIPrintError.Code.noContent.rawValue")
+public let UIPrintNoContentError = 2
+
+@available(swift, obsoleted: 4.2, renamed:"UIPrintError.Code.unknownImageFormat.rawValue")
+public let UIPrintUnknownImageFormatError = 3
+
+@available(swift, obsoleted: 4.2, renamed:"UIPrintError.Code.jobFailed.rawValue")
+public let UIPrintJobFailedError = 4
+
+#endif
+
+//===----------------------------------------------------------------------===//
+// UIApplicationMain compatibility
+//===----------------------------------------------------------------------===//
+
+#if !os(watchOS)
+
+@available(swift, deprecated: 4.2, message: "Use the overload of UIApplicationMain where the type of the second parameter is UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>, which is the same as the type of CommandLine.unsafeArgv.")
+public func UIApplicationMain(_ argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>>!, _ principalClassName: String?, _ delegateClassName: String?) -> Int32 {
+    let reboundArgv = UnsafeMutableRawPointer(argv).bindMemory(to: UnsafeMutablePointer<Int8>?.self, capacity: Int(argc))
+    return UIApplicationMain(argc, reboundArgv, principalClassName, delegateClassName)
+}
+
+#endif
+
+//===----------------------------------------------------------------------===//
+// UIAccessibilityTraits
+//===----------------------------------------------------------------------===//
+
+extension UIAccessibilityTraits: OptionSet {}
+
+//===----------------------------------------------------------------------===//
+// UITextDirection
+//===----------------------------------------------------------------------===//
+
+#if !os(watchOS)
+
+extension UITextDirection {
+
+  public static func storage(_ direction: UITextStorageDirection) -> UITextDirection {
+    return UITextDirection(rawValue: direction.rawValue)
+  }
+
+  public static func layout(_ direction: UITextLayoutDirection) -> UITextDirection {
+    return UITextDirection(rawValue: direction.rawValue)
   }
 }
 

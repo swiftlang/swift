@@ -1,0 +1,209 @@
+//===--- tgmath.swift.gyb -------------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// -*- swift -*-
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/tgmath.swift
+// RUN: %line-directive %t/tgmath.swift -- %target-build-swift %t/tgmath.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %line-directive %t/tgmath.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
+#if canImport(Darwin)
+  import Darwin.C.tgmath
+#else
+  import Glibc
+#endif
+
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
+  typealias TestLiteralType = Float80
+#else
+  typealias TestLiteralType = Double
+#endif
+
+import StdlibUnittest
+
+let MathTests = TestSuite("TGMath")
+
+func expectEqualWithTolerance<T>(_ expected: TestLiteralType, _ actual: T,
+                                 ulps allowed: T = 3,
+                                 file: String = #file, line: UInt = #line)
+                                 where T: BinaryFloatingPoint {
+  if actual == T(expected) || actual.isNaN && expected.isNaN {
+    return
+  }
+  //  Compute error in ulp, compare to tolerance.
+  let absoluteError = T(abs(TestLiteralType(actual) - expected))
+  let ulpError = absoluteError / T(expected).ulp
+  expectTrue(ulpError <= allowed,
+             "\(actual) != \(expected) as \(T.self)" +
+             "\n  \(ulpError)-ulp error exceeds \(allowed)-ulp tolerance.",
+             file: file, line: line)
+}
+
+%{
+unary = [
+  'acos', 'asin', 'atan',
+  'cos', 'sin', 'tan',
+  'acosh', 'asinh', 'atanh',
+  'cosh', 'sinh', 'tanh',
+  'exp', 'exp2', 'expm1',
+  'log', 'log2', 'log1p', 'log10', 'logb',
+  'fabs', 'cbrt', 'sqrt',
+  'erf', 'erfc',
+  'tgamma',
+  'ceil', 'floor', 'nearbyint', 'rint', 'trunc',
+]
+binary = [
+  'atan2', 'hypot', 'pow', 'fmod', 'copysign', 'nextafter',
+  'fdim', 'fmin', 'fmax'
+]
+}%
+
+internal protocol TGMath: BinaryFloatingPoint {
+%for f in unary:
+  static func _${f}(_ x: Self) -> Self
+%end
+%for f in binary:
+  static func _${f}(_ x: Self, _ y: Self) -> Self
+%end
+  static func _remquo(_ x: Self, _ y: Self) -> (Self, Int)
+  static func _fma(_ x: Self, _ y: Self, _ z: Self) -> Self
+  static func _lgamma(_ x: Self) -> (Self, Int)
+  static func _modf(_ x: Self) -> (Self, Self)
+  static func _scalbn(_ x: Self, _ n: Int) -> Self
+  static func _frexp(_ x: Self) -> (Self, Int)
+  static func _ilogb(_ x: Self) -> Int
+}
+
+internal extension TGMath {
+  static func allTests() {
+    /* Default tolerance is 3 ulps unless specified otherwise. It's OK to relax
+     * this as needed for new platforms, as these tests are *not* intended to
+     * validate the math library--they are only intended to check that the
+     * Swift bindings are calling the right functions in the math library.    */
+    expectEqualWithTolerance(1.1863995522992575361931268186727044683, Self._acos(0.375))
+    expectEqualWithTolerance(0.3843967744956390830381948729670469737, Self._asin(0.375))
+    expectEqualWithTolerance(0.3587706702705722203959200639264604997, Self._atan(0.375))
+    expectEqualWithTolerance(0.9305076219123142911494767922295555080, Self._cos(0.375))
+    expectEqualWithTolerance(0.3662725290860475613729093517162641571, Self._sin(0.375))
+    expectEqualWithTolerance(0.3936265759256327582294137871012180981, Self._tan(0.375))
+    expectEqualWithTolerance(0.4949329230945269058895630995767185785, Self._acosh(1.125))
+    expectEqualWithTolerance(0.9670596312833237113713762009167286709, Self._asinh(1.125))
+    expectEqualWithTolerance(0.7331685343967135223291211023213964500, Self._atanh(0.625))
+    expectEqualWithTolerance(1.0711403467045867672994980155670160493, Self._cosh(0.375))
+    expectEqualWithTolerance(0.3838510679136145687542956764205024589, Self._sinh(0.375))
+    expectEqualWithTolerance(0.3583573983507859463193602315531580424, Self._tanh(0.375))
+    expectEqualWithTolerance(1.4549914146182013360537936919875185083, Self._exp(0.375))
+    expectEqualWithTolerance(1.2968395546510096659337541177924511598, Self._exp2(0.375))
+    expectEqualWithTolerance(0.4549914146182013360537936919875185083, Self._expm1(0.375))
+    expectEqualWithTolerance(-0.980829253011726236856451127452003999, Self._log(0.375))
+    expectEqualWithTolerance(-1.415037499278843818546261056052183491, Self._log2(0.375))
+    expectEqualWithTolerance(0.3184537311185346158102472135905995955, Self._log1p(0.375))
+    expectEqualWithTolerance(-0.425968732272281148346188780918363771, Self._log10(0.375))
+    expectEqual(-2, Self._logb(0.375))
+    expectEqual(0.375, Self._fabs(-0.375))
+    expectEqualWithTolerance(0.7211247851537041911608191553900547941, Self._cbrt(0.375))
+    expectEqualWithTolerance(0.6123724356957945245493210186764728479, Self._sqrt(0.375))
+    expectEqualWithTolerance(0.4041169094348222983238250859191217675, Self._erf(0.375))
+    expectEqualWithTolerance(0.5958830905651777016761749140808782324, Self._erfc(0.375))
+    expectEqualWithTolerance(2.3704361844166009086464735041766525098, Self._tgamma(0.375))
+    expectEqualWithTolerance( -0.11775527074107877445136203331798850, Self._lgamma(1.375).0, ulps: 16)
+    expectEqual(1, Self._lgamma(1.375).1)
+    expectEqual(1, Self._ceil(0.375))
+    expectEqual(0, Self._floor(0.375))
+    expectEqual(0, Self._nearbyint(0.375))
+    expectEqual(0, Self._rint(0.375))
+    expectEqual(0, Self._trunc(0.375))
+    expectEqual(0, Self._ceil(-0.625))
+    expectEqual(-1, Self._floor(-0.625))
+    expectEqual(-1, Self._nearbyint(-0.625))
+    expectEqual(-1, Self._rint(-0.625))
+    expectEqual(0, Self._trunc(-0.625))
+    expectEqual(0, Self._ceil(-0.5))
+    expectEqual(-1, Self._floor(-0.5))
+    expectEqual(-0.0, Self._nearbyint(-0.5))
+    expectEqual(-0.0, Self._rint(-0.5))
+    expectEqual(0, Self._trunc(-0.5))
+    expectEqualWithTolerance(0.54041950027058415544357836460859991, Self._atan2(0.375, 0.625))
+    expectEqualWithTolerance(0.72886898685566255885926910969319788, Self._hypot(0.375, 0.625))
+    expectEqualWithTolerance(0.54171335479545025876069682133938570, Self._pow(0.375, 0.625))
+    expectEqual(0.375, Self._fmod(1, 0.625))
+    expectEqual(-0.375, Self._copysign(0.375, -0.625))
+    expectEqual(Self(0.375).nextUp, Self._nextafter(0.375, 1))
+    expectEqual(Self(0.375).nextDown, Self._nextafter(0.375, 0))
+    expectEqual(0, Self._fdim(0.375, 0.625))
+    expectEqual(0.375, Self._fmin(0.375, 0.625))
+    expectEqual(0.625, Self._fmax(0.375, 0.625))
+    expectEqual(-Self.ulpOfOne*Self.ulpOfOne,
+                Self._fma(1 + .ulpOfOne, 1 - .ulpOfOne, -1))
+    expectEqual((1.0, 0.125), Self._modf(1.125))
+    expectEqual(2.5, Self._scalbn(0.625, 2))
+    expectEqual((0.625, 2), Self._frexp(2.5))
+    expectEqual(1, Self._ilogb(2.5))
+#if os(Linux) && arch(x86_64)
+    // double-precision remquo is broken in the glibc in 14.04. Disable this
+    // test for all Linux in the short-term to un-FAIL the build. SR-7234.
+    if Self.significandBitCount != 52 {
+      expectEqual(-0.25, Self._remquo(16, 0.625).0)
+      expectEqual(2, Self._remquo(16, 0.625).1 & 7)
+    }
+#else
+    expectEqual(-0.25, Self._remquo(16, 0.625).0)
+    expectEqual(2, Self._remquo(16, 0.625).1 & 7)
+#endif
+  }
+}
+
+%for T in ['Float', 'Double', 'CGFloat', 'Float80']:
+
+% if T == 'Float80':
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
+% elif T == 'CGFloat':
+#if canImport(CoreGraphics)
+  import CoreGraphics
+% end
+
+extension ${T}: TGMath {
+% for f in unary:
+  static func _${f}(_ x: ${T}) -> ${T} { return ${f}(x) }
+% end
+%for f in binary:
+  static func _${f}(_ x: ${T}, _ y: ${T}) -> ${T} { return ${f}(x, y) }
+%end
+  static func _remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) { return remquo(x, y) }
+  static func _fma(_ x: ${T}, _ y: ${T}, _ z: ${T}) -> ${T} { return fma(x, y, z) }
+  static func _lgamma(_ x: ${T}) -> (${T}, Int) { return lgamma(x) }
+  static func _modf(_ x: ${T}) -> (${T}, ${T}) { return modf(x) }
+  static func _scalbn(_ x: ${T}, _ n: Int) -> ${T} { return scalbn(x, n) }
+  static func _frexp(_ x: ${T}) -> (${T}, Int) { return frexp(x) }
+  static func _ilogb(_ x: ${T}) -> Int { return ilogb(x) }
+}
+
+MathTests.test("${T}") {
+  ${T}.allTests()
+% if T in ['Double','CGFloat']:
+  //  Functions that are defined only for Double and CGFloat
+  expectEqualWithTolerance(0.99750156206604, j0(0.1), ulps: 16)
+  expectEqualWithTolerance(0.049937526036242, j1(0.1), ulps: 16)
+  expectEqualWithTolerance(1.2229926610356451e-22, jn(11, 0.1), ulps: 16)
+  expectEqualWithTolerance(-1.5342386513503667, y0(0.1), ulps: 16)
+  expectEqualWithTolerance(-6.458951094702027, y1(0.1), ulps: 16)
+  expectEqualWithTolerance(-2.3662012944869576e+20, yn(11, 0.1), ulps: 16)
+% end
+}
+
+% if T in ['CGFloat', 'Float80']:
+#endif
+% end
+%end
+
+runAllTests()

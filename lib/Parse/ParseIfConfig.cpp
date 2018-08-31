@@ -67,17 +67,9 @@ class ValidateIfConfigCondition :
     auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
     if (!UDRE ||
         !UDRE->hasName() ||
-        UDRE->getRefKind() != Kind)
+        UDRE->getRefKind() != Kind ||
+        UDRE->getName().isCompoundName())
       return None;
-    if (UDRE->getName().isCompoundName()) {
-      if (!Ctx.isSwiftVersion3())
-        return None;
-      // Swift3 used to accept compound names; warn and return the basename.
-      D.diagnose(UDRE->getNameLoc().getLParenLoc(),
-                 diag::swift3_conditional_compilation_expression_compound)
-        .fixItRemove({ UDRE->getNameLoc().getLParenLoc(),
-                       UDRE->getNameLoc().getRParenLoc() });
-    }
 
     return UDRE->getName().getBaseIdentifier().str();
   }
@@ -155,59 +147,6 @@ class ValidateIfConfigCondition :
     return LHS;
   }
 
-  // In Swift3 mode, leave sequence as a sequence because it has strange
-  // evaluation rule. See 'EvaluateIfConfigCondition::visitSequenceExpr'.
-  Expr *validateSequence(ArrayRef<Expr *> &S) {
-    assert(Ctx.isSwiftVersion3());
-
-    SmallVector<Expr *, 3> Filtered;
-    SmallVector<unsigned, 2> AndIdxs;
-    Filtered.push_back(validate(S[0]));
-    S = S.slice(1);
-
-    while (!S.empty()) {
-      auto OpName = getDeclRefStr(S[0], DeclRefKind::BinaryOperator);
-      if (!OpName.hasValue() || (*OpName != "||" && *OpName != "&&")) {
-        // Warning and ignore in Swift3 mode.
-        D.diagnose(
-            S[0]->getLoc(),
-            diag::swift3_unsupported_conditional_compilation_expression_type)
-          .highlight({ S[0]->getLoc(), S[1]->getEndLoc() });
-      } else {
-        // Remember the start and end of '&&' sequence.
-        bool InAnd = (AndIdxs.size() & 1) == 1;
-        if ((*OpName == "&&" && !InAnd) || (*OpName == "||" && InAnd))
-          AndIdxs.push_back(Filtered.size() - 1);
-
-        Filtered.push_back(S[0]);
-        Filtered.push_back(validate(S[1]));
-      }
-      S = S.slice(2);
-    }
-    assert((Filtered.size() & 1) == 1);
-
-    // If the last OpName is '&&', close it with a parenthesis, except if the
-    // operators are '&&' only.
-    if ((1 == (AndIdxs.size() & 1)) && AndIdxs.back() > 0)
-      AndIdxs.push_back(Filtered.size() - 1);
-    // Emit fix-its to make this sequence compatilble with Swift >=4 even in
-    // Swift3 mode.
-    if (AndIdxs.size() >= 2) {
-      assert((AndIdxs.size() & 1) == 0);
-      auto diag = D.diagnose(
-          Filtered[AndIdxs[0]]->getStartLoc(),
-          diag::swift3_conditional_compilation_expression_precedence);
-      for (unsigned i = 0, e = AndIdxs.size(); i < e; i += 2) {
-        diag.fixItInsert(Filtered[AndIdxs[i]]->getStartLoc(), "(");
-        diag.fixItInsertAfter(Filtered[AndIdxs[i + 1]]->getEndLoc(), ")");
-      }
-    }
-
-    if (Filtered.size() == 1)
-      return Filtered[0];
-    return SequenceExpr::create(Ctx, Filtered);
-  }
-
 public:
   ValidateIfConfigCondition(ASTContext &Ctx, DiagnosticEngine &D)
     : Ctx(Ctx), D(D), HasError(false) {}
@@ -278,7 +217,8 @@ public:
     }
 
     // 'swift' '(' '>=' float-literal ( '.' integer-literal )* ')'
-    if (*KindName == "swift") {
+    // 'compiler' '(' '>=' float-literal ( '.' integer-literal )* ')'
+    if (*KindName == "swift" || *KindName == "compiler") {
       auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
       llvm::Optional<StringRef> PrefixName = PUE ?
         getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator) : None;
@@ -368,14 +308,9 @@ public:
   // Fold sequence expression for non-Swift3 mode.
   Expr *visitSequenceExpr(SequenceExpr *E) {
     ArrayRef<Expr*> Elts = E->getElements();
-    Expr *foldedExpr;
-    if (Ctx.isSwiftVersion3()) {
-      foldedExpr = validateSequence(Elts);
-    } else {
-      auto LHS = validate(Elts[0]);
-      Elts = Elts.slice(1);
-      foldedExpr = foldSequence(LHS, Elts);
-    }
+    Expr *foldedExpr = validate(Elts[0]);
+    Elts = Elts.slice(1);
+    foldedExpr = foldSequence(foldedExpr, Elts);
     assert(Elts.empty());
     return foldedExpr;
   }
@@ -445,13 +380,18 @@ public:
           Str, SourceLoc(), nullptr).getValue();
       auto thisVersion = version::Version::getCurrentCompilerVersion();
       return thisVersion >= Val;
-    } else if (KindName == "swift") {
+    } else if ((KindName == "swift") || (KindName == "compiler")) {
       auto PUE = cast<PrefixUnaryExpr>(Arg);
       auto Str = extractExprSource(Ctx.SourceMgr, PUE->getArg());
       auto Val = version::Version::parseVersionString(
           Str, SourceLoc(), nullptr).getValue();
-      auto thisVersion = Ctx.LangOpts.EffectiveLanguageVersion;
-      return thisVersion >= Val;
+      if (KindName == "swift") {
+        return Ctx.LangOpts.EffectiveLanguageVersion >= Val;  
+      } else if (KindName == "compiler") {
+        return version::Version::getCurrentLanguageVersion() >= Val;
+      } else {
+        llvm_unreachable("unsupported version conditional");
+      }
     } else if (KindName == "canImport") {
       auto Str = extractExprSource(Ctx.SourceMgr, Arg);
       return Ctx.canImportModule({ Ctx.getIdentifier(Str) , E->getLoc()  });
@@ -471,40 +411,11 @@ public:
   }
 
   bool visitBinaryExpr(BinaryExpr *E) {
-    assert(!Ctx.isSwiftVersion3() && "BinaryExpr in Swift3 mode");
     auto OpName = getDeclRefStr(E->getFn());
     auto Args = E->getArg()->getElements();
     if (OpName == "||") return visit(Args[0]) || visit(Args[1]);
     if (OpName == "&&") return visit(Args[0]) && visit(Args[1]);
     llvm_unreachable("unsupported binary operator");
-  }
-
-  bool visitSequenceExpr(SequenceExpr *E) {
-    assert(Ctx.isSwiftVersion3() && "SequenceExpr in non-Swift3 mode");
-    ArrayRef<Expr *> Elems = E->getElements();
-    auto Result = visit(Elems[0]);
-    Elems = Elems.slice(1);
-    while (!Elems.empty()) {
-      auto OpName = getDeclRefStr(Elems[0]);
-
-      if (OpName == "||") {
-        Result = Result || visit(Elems[1]);
-        if (Result)
-          // Note that this is the Swift3 behavior.
-          // e.g. 'false || true && false' evaluates to 'true'.
-          return true;
-      } else if (OpName == "&&") {
-        Result = Result && visit(Elems[1]);
-        if (!Result)
-          // Ditto.
-          // e.g. 'false && true || true' evaluates to 'false'.
-          return false;
-      } else {
-        llvm_unreachable("must be removed in validation phase");
-      }
-      Elems = Elems.slice(2);
-    }
-    return Result;
   }
 
   bool visitExpr(Expr *E) { llvm_unreachable("Unvalidated condition?"); }
@@ -539,7 +450,8 @@ public:
 
   bool visitCallExpr(CallExpr *E) {
     auto KindName = getDeclRefStr(E->getFn());
-    return KindName == "_compiler_version" || KindName == "swift";
+    return KindName == "_compiler_version" || KindName == "swift" ||
+        KindName == "compiler";
   }
 
   bool visitPrefixUnaryExpr(PrefixUnaryExpr *E) { return visit(E->getArg()); }
@@ -648,52 +560,33 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 ParserResult<IfConfigDecl> Parser::parseIfConfig(
     llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
   SyntaxParsingContext IfConfigCtx(SyntaxContext, SyntaxKind::IfConfigDecl);
+
   SmallVector<IfConfigClause, 4> Clauses;
   Parser::StructureMarkerRAII ParsingDecl(
       *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
   bool foundActive = false;
   bool isVersionCondition = false;
-  enum class ClauseKind {
-    If,
-    ElseIf,
-    Else,
-  };
   while (1) {
-    ClauseKind ClKind;
-    if (Tok.is(tok::pound_if)) {
-      ClKind = ClauseKind::If;
-    } else if (Tok.is(tok::pound_elseif)) {
-      ClKind = ClauseKind::ElseIf;
-    } else {
-      ClKind = ClauseKind::Else;
-    }
-    if (ClKind == ClauseKind::Else) {
-      // Collect all #elseif to a list.
-      SyntaxContext->collectNodesInPlace(SyntaxKind::ElseifDirectiveClauseList);
-    }
     SyntaxParsingContext ClauseContext(SyntaxContext,
-                                       ClKind == ClauseKind::Else ?
-                                        SyntaxKind::ElseDirectiveClause :
-                                        SyntaxKind::ElseifDirectiveClause);
-    SWIFT_DEFER {
-      // Avoid making a clause for if
-      if (ClKind == ClauseKind::If)
-        ClauseContext.setTransparent();
-    };
+                                       SyntaxKind::IfConfigClause);
+
+    bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
     bool isActive = false;
 
     // Parse the condition.  Evaluate it to determine the active
     // clause unless we're doing a parse-only pass.
-    if (ClKind == ClauseKind::Else) {
+    if (isElse) {
       isActive = !foundActive && State->PerformConditionEvaluation;
     } else {
       llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                       /*isBasic*/true,
                                                       /*isForDirective*/true);
+      if (Result.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
       if (Result.isNull())
         return makeParserError();
       Condition = Result.get();
@@ -739,9 +632,10 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     if (Tok.isNot(tok::pound_elseif, tok::pound_else))
       break;
 
-    if (ClKind == ClauseKind::Else)
+    if (isElse)
       diagnose(Tok, diag::expected_close_after_else_directive);
   }
+  SyntaxContext->collectNodesInPlace(SyntaxKind::IfConfigClauseList);
 
   SourceLoc EndLoc;
   bool HadMissingEnd = parseEndIfDirective(EndLoc);

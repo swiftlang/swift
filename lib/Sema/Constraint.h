@@ -18,6 +18,7 @@
 #ifndef SWIFT_SEMA_CONSTRAINT_H
 #define SWIFT_SEMA_CONSTRAINT_H
 
+#include "CSFix.h"
 #include "OverloadChoice.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
@@ -72,11 +73,6 @@ enum class ConstraintKind : char {
   /// convertible to the second type (which represents the corresponding
   /// parameter type).
   ArgumentConversion,
-  /// \brief The first type is an argument type (or tuple) that is convertible
-  /// to the second type (which represents the parameter type/tuple).
-  ArgumentTupleConversion,
-  /// An argument tuple conversion for operators.
-  OperatorArgumentTupleConversion,
   /// \brief The first type is convertible to the second type, including inout.
   OperatorArgumentConversion,
   /// \brief The first type must conform to the second type (which is a
@@ -139,6 +135,12 @@ enum class ConstraintKind : char {
   // The key path type is chosen based on the selection of overloads for the
   // member references along the path.
   KeyPath,
+  /// \brief The first type is a function type, the second is the function's
+  /// input type.
+  FunctionInput,
+  /// \brief The first type is a function type, the second is the function's
+  /// result type.
+  FunctionResult,
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -168,8 +170,6 @@ enum class ConstraintClassification : char {
 enum class ConversionRestrictionKind {
   /// Tuple-to-tuple conversion.
   TupleToTuple,
-  /// Scalar-to-tuple conversion.
-  ScalarToTuple,
   /// Deep equality comparison.
   DeepEquality,
   /// Subclass-to-superclass conversion.
@@ -200,8 +200,6 @@ enum class ConversionRestrictionKind {
   ValueToOptional,
   /// T? -> U? optional to optional conversion (or unchecked to unchecked).
   OptionalToOptional,
-  /// Implicit forces of implicitly unwrapped optionals to their presumed values
-  ForceUnchecked,
   /// Implicit upcast conversion of array types.
   ArrayUpcast,
   /// Implicit upcast conversion of dictionary types, which includes
@@ -229,61 +227,6 @@ enum RememberChoice_t : bool {
   RememberChoice = true
 };
 
-/// Describes the kind of fix to apply to the given constraint before
-/// visiting it.
-enum class FixKind : uint8_t {
-  /// Introduce a '!' to force an optional unwrap.
-  ForceOptional,
-    
-  /// Introduce a '?.' to begin optional chaining.
-  OptionalChaining,
-
-  /// Append 'as! T' to force a downcast to the specified type.
-  ForceDowncast,
-
-  /// Introduce a '&' to take the address of an lvalue.
-  AddressOf,
-  
-  /// Replace a coercion ('as') with a forced checked cast ('as!').
-  CoerceToCheckedCast,
-};
-
-/// Describes a fix that can be applied to a constraint before visiting it.
-class Fix {
-  FixKind Kind;
-  uint16_t Data;
-
-  Fix(FixKind kind, uint16_t data) : Kind(kind), Data(data){ }
-
-  uint16_t getData() const { return Data; }
-
-  friend class Constraint;
-
-public:
-  Fix(FixKind kind) : Kind(kind), Data(0) {
-    assert(kind != FixKind::ForceDowncast && "Use getForceDowncast()");
-  }
-
-  /// Produce a new fix that performs a forced downcast to the given type.
-  static Fix getForcedDowncast(ConstraintSystem &cs, Type toType);
-
-  /// Retrieve the kind of fix.
-  FixKind getKind() const { return Kind; }
-
-  /// If this fix has a type argument, retrieve it.
-  Type getTypeArgument(ConstraintSystem &cs) const;
-
-  /// Return a string representation of a fix.
-  static llvm::StringRef getName(FixKind kind);
-
-  void print(llvm::raw_ostream &Out, ConstraintSystem *cs) const;
-
-  LLVM_ATTRIBUTE_DEPRECATED(void dump(ConstraintSystem *cs) const 
-                              LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
-};
-
-
 /// \brief A constraint between two type variables.
 class Constraint final : public llvm::ilist_node<Constraint>,
     private llvm::TrailingObjects<Constraint, TypeVariableType *> {
@@ -295,17 +238,11 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of restriction placed on this constraint.
   ConversionRestrictionKind Restriction : 8;
 
-  /// Data associated with the fix.
-  uint16_t FixData;
-
-  /// The kind of fix to be applied to the constraint before visiting it.
-  FixKind TheFix;
+  /// The fix to be applied to the constraint before visiting it.
+  ConstraintFix *TheFix = nullptr;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
-
-  /// Whether the \c Fix field is valid.
-  unsigned HasFix : 1;
 
   /// Whether this constraint is currently active, i.e., stored in the worklist.
   unsigned IsActive : 1;
@@ -410,9 +347,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ArrayRef<TypeVariableType *> typeVars);
   
   /// Construct a relational constraint with a fix.
-  Constraint(ConstraintKind kind, Fix fix,
-             Type first, Type second, ConstraintLocator *locator,
-             ArrayRef<TypeVariableType *> typeVars);
+  Constraint(ConstraintKind kind, ConstraintFix *fix, Type first, Type second,
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
@@ -429,6 +365,13 @@ public:
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
                             Type First, Type Second, Type Third,
                             ConstraintLocator *locator);
+
+  /// Create a new member constraint, or a disjunction of that with the outer
+  /// alternatives.
+  static Constraint *createMemberOrOuterDisjunction(
+      ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
+      DeclName member, DeclContext *useDC, FunctionRefKind functionRefKind,
+      ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator);
 
   /// Create a new member constraint.
   static Constraint *createMember(ConstraintSystem &cs, ConstraintKind kind,
@@ -451,8 +394,7 @@ public:
 
   /// Create a relational constraint with a fix.
   static Constraint *createFixed(ConstraintSystem &cs, ConstraintKind kind,
-                                 Fix fix,
-                                 Type first, Type second,
+                                 ConstraintFix *fix, Type first, Type second,
                                  ConstraintLocator *locator);
 
   /// Create a new disjunction constraint.
@@ -474,12 +416,7 @@ public:
   }
 
   /// Retrieve the fix associated with this constraint.
-  Optional<Fix> getFix() const {
-    if (!HasFix)
-      return None;
-
-    return Fix(TheFix, FixData);
-  }
+  ConstraintFix *getFix() const { return TheFix; }
 
   /// Whether this constraint is active, i.e., in the worklist.
   bool isActive() const { return IsActive; }
@@ -529,8 +466,6 @@ public:
     case ConstraintKind::Conversion:
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::ArgumentConversion:
-    case ConstraintKind::ArgumentTupleConversion:
-    case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::LiteralConformsTo:
@@ -551,6 +486,8 @@ public:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::Defaultable:
+    case ConstraintKind::FunctionInput:
+    case ConstraintKind::FunctionResult:
       return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Disjunction:
@@ -646,6 +583,10 @@ public:
     return count;
   }
 
+  /// Determine if this constraint represents explicit conversion,
+  /// e.g. coercion constraint "as X" which forms a disjunction.
+  bool isExplicitConversion() const;
+
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {
     assert(Kind == ConstraintKind::BindOverload);
@@ -698,8 +639,8 @@ namespace llvm {
 /// Specialization of \c ilist_traits for constraints.
 template<>
 struct ilist_traits<swift::constraints::Constraint>
-         : public ilist_default_traits<swift::constraints::Constraint> {
-  typedef swift::constraints::Constraint Element;
+         : public ilist_node_traits<swift::constraints::Constraint> {
+  using Element = swift::constraints::Constraint;
 
   static Element *createNode(const Element &V) = delete;
   static void deleteNode(Element *V) { /* never deleted */ }

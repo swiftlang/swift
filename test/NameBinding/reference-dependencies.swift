@@ -409,12 +409,12 @@ struct Sentinel2 {}
 // CHECK-LABEL: {{^depends-member:$}}
 // CHECK-DAG: - ["4main10IntWrapperV", "Int"]
 // CHECK-DAG: - ["4main10IntWrapperV", "deinit"]
-// CHECK-DAG: - ["s10ComparableP", ""]
+// CHECK-DAG: - ["SL", ""]
 // CHECK-DAG: - ["4main18ClassFromOtherFileC", ""]
 // CHECK-DAG: - !private ["Si", "max"]
 // CHECK-DAG: - ["s25ExpressibleByFloatLiteralP", ""]
 // CHECK-DAG: - !private ["s33ExpressibleByUnicodeScalarLiteralP", ""]
-// CHECK-DAG: - !private ["s10StrideableP", "Stride"]
+// CHECK-DAG: - !private ["Sx", "Stride"]
 // CHECK-DAG: - !private ["Sa", "reduce"]
 // CHECK-DAG: - !private ["Sb", "_getBuiltinLogicValue"]
 // CHECK-DAG: - ["Sb", "InnerToBool"]
@@ -450,7 +450,7 @@ struct Sentinel2 {}
 // CHECK: - !private "Sa"
 // CHECK: - "Sb"
 // CHECK: - "4main18ClassFromOtherFileC"
-// CHECK: - "s10ComparableP"
+// CHECK: - "SL"
 // CHECK: - "s25ExpressibleByFloatLiteralP"
 // CHECK: - !private "s33ExpressibleByUnicodeScalarLiteralP"
 // CHECK: - !private "4main18OtherFileOuterTypeV05InnerE0V"
@@ -470,7 +470,7 @@ struct Sentinel2 {}
 // CHECK: - "4main22PrivateTopLevelStruct3V"
 // CHECK: - "4main22PrivateTopLevelStruct4V"
 // CHECK: - !private "4main26OtherFileSecretTypeWrapperV0dE0V"
-// CHECK: - !private "s10StrideableP"
+// CHECK: - !private "Sx"
 // CHECK: - "4main23TopLevelForMemberLookupV"
 // CHECK: - "4main14TopLevelProto1P"
 // CHECK: - "4main14TopLevelProto2P"

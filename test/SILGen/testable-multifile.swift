@@ -3,13 +3,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/TestableMultifileHelper.swift -enable-testing -enable-sil-ownership -o %t
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %t %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %t %S/testable-multifile-other.swift %s -module-name main | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -I %t %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -I %t %S/testable-multifile-other.swift %s -module-name main | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main | %FileCheck %s
 
 // Just make sure we don't crash later on.
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-ir -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-ir -I %t -O -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
+// RUN: %target-swift-emit-ir -enable-sil-ownership -I %t -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
+// RUN: %target-swift-emit-ir -enable-sil-ownership -I %t -O -primary-file %s %S/testable-multifile-other.swift -module-name main -o /dev/null
 
 @testable import TestableMultifileHelper
 
@@ -41,19 +41,19 @@ public class PublicSub: Base {
 // CHECK-LABEL: sil_vtable PrivateSub {
 // CHECK-NEXT:   #Base.foo!1: {{.*}} : @$S4main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLC3fooyyF
 // CHECK-NEXT:   #Base.init!initializer.1: {{.*}} : @$S4main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLCADycfc
-// CHECK-NEXT:   #PrivateSub.deinit!deallocator: @$S4main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLCfD
+// CHECK-NEXT:   #PrivateSub.deinit!deallocator.1: @$S4main10PrivateSub33_F1525133BD493492AD72BF10FBCB1C52LLCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable Sub {
 // CHECK-NEXT:   #Base.foo!1: {{.*}} : @$S4main3SubC3fooyyF
 // CHECK-NEXT:   #Base.init!initializer.1: {{.*}} : @$S4main3SubCACycfc
-// CHECK-NEXT:   #Sub.deinit!deallocator: @$S4main3SubCfD
+// CHECK-NEXT:   #Sub.deinit!deallocator.1: @$S4main3SubCfD
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable [serialized] PublicSub {
 // CHECK-NEXT:   #Base.foo!1: {{.*}} : @$S4main9PublicSubC3fooyyF
 // CHECK-NEXT:   #Base.init!initializer.1: {{.*}} : @$S4main9PublicSubCACycfc
-// CHECK-NEXT:   #PublicSub.deinit!deallocator: @$S4main9PublicSubCfD
+// CHECK-NEXT:   #PublicSub.deinit!deallocator.1: @$S4main9PublicSubCfD
 // CHECK-NEXT: }
 
 

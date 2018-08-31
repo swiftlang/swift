@@ -12,21 +12,19 @@
 
 /// A type that supplies a custom description for playground logging.
 ///
-/// All types have a default description for playgrounds. This protocol
-/// allows types to provide custom descriptions which are then logged in
-/// place of the original instance.
-///
 /// Playground logging can generate, at a minimum, a structured description
-/// of any type. Playground logging is also capable of generating a richer,
-/// more specialized description of core types -- for instance, the contents
-/// of a `String` are logged, as are the components of an `NSColor` or
-/// `UIColor`.
+/// of any type. If you want to provide a custom description of your type to be
+/// logged in place of the default description, conform to the
+/// `CustomPlaygroundDisplayConvertible` protocol.
 ///
-/// The current playground logging implementation logs specialized
-/// descriptions of at least the following types:
+/// Playground logging generates a richer, more specialized description of core
+/// types. For example, the contents of a `String` are logged, as are the
+/// components of an `NSColor` or `UIColor`. The current playground logging
+/// implementation logs specialized descriptions of at least the following
+/// types:
 ///
 /// - `String` and `NSString`
-/// - `Int` and `UInt` (including the sized variants)
+/// - `Int`, `UInt`, and the other standard library integer types
 /// - `Float` and `Double`
 /// - `Bool`
 /// - `Date` and `NSDate`
@@ -43,21 +41,24 @@
 /// Playground logging may also be able to support specialized descriptions
 /// of other types.
 ///
-/// Implementors of `CustomPlaygroundDisplayConvertible` may return a value of
-/// one of the above types to also receive a specialized log description.
-/// Implementors may also return any other type, and playground logging will
-/// generated structured logging for the returned value.
+/// Conforming to the CustomPlaygroundDisplayConvertible Protocol
+/// -------------------------------------------------------------
 ///
-/// - note: `CustomPlaygroundDisplayConvertible` conformances chain -- that is,
-///   if `playgroundDescription` returns an instance which itself conforms to
-///   `CustomPlaygroundDisplayConvertible`, then playground logging will ask for
-///   that instance's `playgroundDescription` and so on. It is permissible for
-///   playground logging implementations to place a reasonable limit on this
-///   kind of chaining to prevent infinite loops.
+/// To add `CustomPlaygroundDisplayConvertible` conformance to your custom type,
+/// implement the `playgroundDescription` property. If your implementation
+/// returns an instance of one of the types above, that type's specialized
+/// description is used. If you return any other type, a structured description
+/// is generated.
+///
+/// If your type has value semantics, the `playgroundDescription` should be
+/// unaffected by subsequent mutations, if possible.
+///
+/// If your type's `playgroundDescription` returns an instance which itself
+/// conforms to `CustomPlaygroundDisplayConvertible`, then that type's
+/// `playgroundDescription` will be used, and so on. To prevent infinite loops,
+/// playground logging implementations can place a reasonable limit on this
+/// kind of chaining.
 public protocol CustomPlaygroundDisplayConvertible {
-  /// Returns the custom playground description for this instance.
-  ///
-  /// If this type has value semantics, the instance returned should be
-  /// unaffected by subsequent mutations if possible.
+  /// A custom playground description for this instance.
   var playgroundDescription: Any { get }
 }

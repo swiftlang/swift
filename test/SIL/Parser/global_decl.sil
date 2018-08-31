@@ -1,0 +1,54 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s
+
+// Check that sil_globals and their corresponding decls are
+// parsed. There is no direct way to verify that the declarations are
+// properly associated with the sil_globals, so just make sure it succeeds.
+//
+// FIXME: Add support for name collisions across private/fileprivate globals.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct S {
+  init()
+}
+
+class C {
+  init()
+  deinit
+}
+
+enum E {
+  case a
+  @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: E, _ b: E) -> Bool
+  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
+}
+
+private var global1: S
+
+fileprivate var global2: C
+
+var global3: E
+
+public var global4: Int
+
+weak var global5: @sil_weak C?
+
+// CHECK: sil_global private @$S11global_decl7global133_EB6670D548223EDC99AF0D8F02575BC4LLAA1SVvp : $S
+sil_global private @$S11global_decl7global133_EB6670D548223EDC99AF0D8F02575BC4LLAA1SVvp : $S
+
+// CHECK: sil_global private @$S11global_decl7global233_EB6670D548223EDC99AF0D8F02575BC4LLAA1CCvp : $C
+sil_global private @$S11global_decl7global233_EB6670D548223EDC99AF0D8F02575BC4LLAA1CCvp : $C
+
+// CHECK: sil_global hidden @$S11global_decl7global3AA1EOvp : $E
+sil_global hidden @$S11global_decl7global3AA1EOvp : $E
+
+// CHECK: sil_global @$S11global_decl7global4Sivp : $Int
+sil_global @$S11global_decl7global4Sivp : $Int
+
+// CHECK: sil_global hidden @$S11global_decl7global5AA1CCSgXwvp : $@sil_weak Optional<C>
+sil_global hidden @$S11global_decl7global5AA1CCSgXwvp : $@sil_weak Optional<C>

@@ -10,15 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that provides subscript access to its elements, with bidirectional
-/// index traversal.
-///
-/// In most cases, it's best to ignore this protocol and use the
-/// `BidirectionalCollection` protocol instead, because it has a more complete
-/// interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'BidirectionalCollection' instead")
-public typealias BidirectionalIndexable = BidirectionalCollection
-
 /// A collection that supports backward as well as forward traversal.
 ///
 /// Bidirectional collections offer traversal backward from any valid index,
@@ -71,6 +62,116 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   ///   `startIndex`.
   func formIndex(before i: inout Index)
 
+  /// Returns the position immediately after the given index.
+  ///
+  /// The successor of an index must be well defined. For an index `i` into a
+  /// collection `c`, calling `c.index(after: i)` returns the same index every
+  /// time.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
+  /// - Returns: The index value immediately after `i`.
+  func index(after i: Index) -> Index
+
+  /// Replaces the given index with its successor.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
+  func formIndex(after i: inout Index)
+
+  /// Returns an index that is the specified distance from the given index.
+  ///
+  /// The following example obtains an index advanced four positions from a
+  /// string's starting index and then prints the character at that position.
+  ///
+  ///     let s = "Swift"
+  ///     let i = s.index(s.startIndex, offsetBy: 4)
+  ///     print(s[i])
+  ///     // Prints "t"
+  ///
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
+  func index(_ i: Index, offsetBy distance: Int) -> Index
+
+  /// Returns an index that is the specified distance from the given index,
+  /// unless that distance is beyond a given limiting index.
+  ///
+  /// The following example obtains an index advanced four positions from a
+  /// string's starting index and then prints the character at that position.
+  /// The operation doesn't require going beyond the limiting `s.endIndex`
+  /// value, so it succeeds.
+  ///
+  ///     let s = "Swift"
+  ///     if let i = s.index(s.startIndex, offsetBy: 4, limitedBy: s.endIndex) {
+  ///         print(s[i])
+  ///     }
+  ///     // Prints "t"
+  ///
+  /// The next example attempts to retrieve an index six positions from
+  /// `s.startIndex` but fails, because that distance is beyond the index
+  /// passed as `limit`.
+  ///
+  ///     let j = s.index(s.startIndex, offsetBy: 6, limitedBy: s.endIndex)
+  ///     print(j)
+  ///     // Prints "nil"
+  ///
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, a limit that is less than `i` has no effect.
+  ///     Likewise, if `distance < 0`, a limit that is greater than `i` has no
+  ///     effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
+  func index(
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
+  ) -> Index?
+
+  /// Returns the distance between two indices.
+  ///
+  /// Unless the collection conforms to the `BidirectionalCollection` protocol,
+  /// `start` must be less than or equal to `end`.
+  ///
+  /// - Parameters:
+  ///   - start: A valid index of the collection.
+  ///   - end: Another valid index of the collection. If `end` is equal to
+  ///     `start`, the result is zero.
+  /// - Returns: The distance between `start` and `end`. The result can be
+  ///   negative only if the collection conforms to the
+  ///   `BidirectionalCollection` protocol.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the
+  ///   resulting distance.
+  func distance(from start: Index, to end: Index) -> Int
+
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   ///
@@ -119,12 +220,14 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     print(streets[index!])
   ///     // Prints "Evarts"
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
 
   // FIXME(ABI): Associated type inference requires this.
@@ -140,33 +243,45 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
 /// Default implementation for bidirectional collections.
 extension BidirectionalCollection {
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @inline(__always)
   public func formIndex(before i: inout Index) {
     i = index(before: i)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
-    if n >= 0 {
-      return _advanceForward(i, by: n)
+  @inlinable // protocol-only
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
+    return _index(i, offsetBy: distance)
+  }
+
+  @inlinable // protocol-only
+  internal func _index(_ i: Index, offsetBy distance: Int) -> Index {
+    if distance >= 0 {
+      return _advanceForward(i, by: distance)
     }
     var i = i
-    for _ in stride(from: 0, to: n, by: -1) {
+    for _ in stride(from: 0, to: distance, by: -1) {
       formIndex(before: &i)
     }
     return i
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public func index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
-    if n >= 0 {
-      return _advanceForward(i, by: n, limitedBy: limit)
+    return _index(i, offsetBy: distance, limitedBy: limit)
+  }
+
+  @inlinable // protocol-only
+  internal func _index(
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
+  ) -> Index? {
+    if distance >= 0 {
+      return _advanceForward(i, by: distance, limitedBy: limit)
     }
     var i = i
-    for _ in stride(from: 0, to: n, by: -1) {
+    for _ in stride(from: 0, to: distance, by: -1) {
       if i == limit {
         return nil
       }
@@ -175,8 +290,13 @@ extension BidirectionalCollection {
     return i
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public func distance(from start: Index, to end: Index) -> Int {
+    return _distance(from: start, to: end)
+  }
+
+  @inlinable // protocol-only
+  internal func _distance(from start: Index, to end: Index) -> Int {
     var start = start
     var count = 0
 
@@ -207,8 +327,8 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - Returns: The last element of the collection if the collection has one
   ///   or more elements; otherwise, `nil`.
   ///
-  /// - Complexity: O(1).
-  @_inlineable // FIXME(sil-serialize-all)
+  /// - Complexity: O(1)
+  @inlinable // protocol-only
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
     let element = last!
@@ -224,7 +344,7 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - Returns: The last element of the collection.
   ///
   /// - Complexity: O(1)
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @discardableResult
   public mutating func removeLast() -> Element {
     let element = last!
@@ -234,20 +354,20 @@ extension BidirectionalCollection where SubSequence == Self {
 
   /// Removes the given number of elements from the end of the collection.
   ///
-  /// - Parameter n: The number of elements to remove. `n` must be greater
+  /// - Parameter k: The number of elements to remove. `k` must be greater
   ///   than or equal to zero, and must be less than or equal to the number of
   ///   elements in the collection.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
-  ///   of the collection.
-  @_inlineable // FIXME(sil-serialize-all)
-  public mutating func removeLast(_ n: Int) {
-    if n == 0 { return }
-    _precondition(n >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= n,
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
+  ///   elements to remove.
+  @inlinable // protocol-only
+  public mutating func removeLast(_ k: Int) {
+    if k == 0 { return }
+    _precondition(k >= 0, "Number of elements to remove should be non-negative")
+    _precondition(count >= k,
       "Can't remove more items from a collection than it contains")
-    self = self[startIndex..<index(endIndex, offsetBy: -n)]
+    self = self[startIndex..<index(endIndex, offsetBy: -k)]
   }
 }
 
@@ -264,18 +384,20 @@ extension BidirectionalCollection {
   ///     print(numbers.dropLast(10))
   ///     // Prints "[]"
   ///
-  /// - Parameter n: The number of elements to drop off the end of the
-  ///   collection. `n` must be greater than or equal to zero.
-  /// - Returns: A subsequence that leaves off `n` elements from the end.
+  /// - Parameter k: The number of elements to drop off the end of the
+  ///   collection. `k` must be greater than or equal to zero.
+  /// - Returns: A subsequence that leaves off `k` elements from the end.
   ///
-  /// - Complexity: O(*n*), where *n* is the number of elements to drop.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func dropLast(_ n: Int) -> SubSequence {
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
+  ///   elements to drop.
+  @inlinable // protocol-only
+  public func dropLast(_ k: Int) -> SubSequence {
     _precondition(
-      n >= 0, "Can't drop a negative number of elements from a collection")
+      k >= 0, "Can't drop a negative number of elements from a collection")
     let end = index(
       endIndex,
-      offsetBy: -n,
+      offsetBy: -k,
       limitedBy: startIndex) ?? startIndex
     return self[startIndex..<end]
   }
@@ -297,8 +419,10 @@ extension BidirectionalCollection {
   /// - Returns: A subsequence terminating at the end of the collection with at
   ///   most `maxLength` elements.
   ///
-  /// - Complexity: O(*n*), where *n* is equal to `maxLength`.
-  @_inlineable // FIXME(sil-serialize-all)
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is equal to
+  ///   `maxLength`.
+  @inlinable // protocol-only
   public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,

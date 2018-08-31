@@ -1,0 +1,24 @@
+{
+  key.results: [
+    {
+      key.kind: source.lang.swift.decl.function.method.instance,
+      key.name: "optionalMethod()",
+      key.sourcetext: "optionalMethod?()",
+      key.description: "optionalMethod?()",
+      key.typename: "Int",
+      key.context: source.codecompletion.context.superclass,
+      key.num_bytes_to_erase: 0,
+      key.associated_usrs: "c:@M@complete_optionalmethod@objc(pl)Proto(im)optionalMethod",
+      key.modulename: "complete_optionalmethod"
+    },
+    {
+      key.kind: source.lang.swift.keyword,
+      key.name: "self",
+      key.sourcetext: "self",
+      key.description: "self",
+      key.typename: "T",
+      key.context: source.codecompletion.context.thisclass,
+      key.num_bytes_to_erase: 0
+    }
+  ]
+}

@@ -85,10 +85,11 @@ func test005() {
 }
 // Inline a lonely group
 // RUN: %complete-test -group=overloads -add-inner-results -no-inner-operators -tok=BAR_INIT_0 %s | %FileCheck -check-prefix=BAR_INIT_0 %s
-// BAR_INIT_0-NOT: (:
+// BAR_INIT_0-LABEL: (:
 // BAR_INIT_0: ()
 // BAR_INIT_0-NEXT: (x: A)
 // BAR_INIT_0-NEXT: (x: B)
+// BAR_INIT_0-NEXT: .self
 
 extension Bar {
   func foo()

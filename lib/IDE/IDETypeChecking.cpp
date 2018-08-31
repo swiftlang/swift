@@ -26,7 +26,7 @@
 
 using namespace swift;
 
-static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
+static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {
   if (!Options.TransformContext ||
       !D->getDeclContext()->isExtensionContext() ||
       !Options.TransformContext->isPrintingSynthesizedExtension())
@@ -42,7 +42,7 @@ static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
 }
 
 class ModulePrinterPrintableChecker: public ShouldPrintChecker {
-  bool shouldPrint(const Decl *D, PrintOptions &Options) override {
+  bool shouldPrint(const Decl *D, const PrintOptions &Options) override {
     if (!shouldPrintAsFavorable(D, Options))
       return false;
     return ShouldPrintChecker::shouldPrint(D, Options);
@@ -199,8 +199,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
   };
 
-  typedef llvm::MapVector<ExtensionDecl*, SynthesizedExtensionInfo> ExtensionInfoMap;
-  typedef llvm::MapVector<ExtensionDecl*, ExtensionMergeInfo> ExtensionMergeInfoMap;
+  using ExtensionInfoMap =
+      llvm::MapVector<ExtensionDecl *, SynthesizedExtensionInfo>;
+  using ExtensionMergeInfoMap =
+      llvm::MapVector<ExtensionDecl *, ExtensionMergeInfo>;
 
   struct ExtensionMergeGroup {
 
@@ -240,7 +242,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
   };
 
-  typedef std::vector<ExtensionMergeGroup> MergeGroupVector;
+  using MergeGroupVector = std::vector<ExtensionMergeGroup>;
 
   NominalTypeDecl *Target;
   Type BaseType;
@@ -261,13 +263,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   InfoMap(collectSynthesizedExtensionInfo(AllGroups)) {}
 
   unsigned countInherits(ExtensionDecl *ED) {
-    unsigned Count = 0;
-    for (auto TL : ED->getInherited()) {
-      auto *nominal = TL.getType()->getAnyNominal();
-      if (nominal && Options.shouldPrint(nominal))
-        Count ++;
-    }
-    return Count;
+    SmallVector<TypeLoc, 4> Results;
+    getInheritedForPrinting(
+        ED, [&](const Decl *D) { return Options.shouldPrint(D); }, Results);
+    return Results.size();
   }
 
   std::pair<SynthesizedExtensionInfo, ExtensionMergeInfo>
@@ -446,8 +445,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       Unhandled.push_back(Conf->getProtocol());
     }
     if (auto *CD = dyn_cast<ClassDecl>(Target)) {
-      if (auto Super = CD->getSuperclass())
-        Unhandled.push_back(Super->getAnyNominal());
+      if (auto Super = CD->getSuperclassDecl())
+        Unhandled.push_back(Super);
     }
     while (!Unhandled.empty()) {
       NominalTypeDecl* Back = Unhandled.back();
@@ -537,8 +536,6 @@ hasMergeGroup(MergeGroupKind Kind) {
 void swift::
 collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                     llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
-  Type BaseTy = PD->getDeclaredInterfaceType();
-  DeclContext *DC = PD->getInnermostDeclContext();
   auto HandleMembers = [&](DeclRange Members) {
     for (Decl *D : Members) {
       auto *VD = dyn_cast<ValueDecl>(D);
@@ -551,11 +548,8 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
       if (VD->getBaseName().empty())
         continue;
 
-      ResolvedMemberResult Result = resolveValueMember(*DC, BaseTy,
-                                                       VD->getFullName());
-      assert(Result);
-      for (auto *Default : Result.getMemberDecls(InterestedMemberKind::All)) {
-        if (PD == Default->getDeclContext()->getAsProtocolExtensionContext()) {
+      for (auto *Default: PD->lookupDirect(VD->getFullName())) {
+        if (Default->getDeclContext()->getExtendedProtocolDecl() == PD) {
           DefaultMap.insert({Default, VD});
         }
       }

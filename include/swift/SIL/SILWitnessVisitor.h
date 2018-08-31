@@ -58,11 +58,22 @@ public:
       if (haveAddedAssociatedTypes) return;
       haveAddedAssociatedTypes = true;
 
+      SmallVector<AssociatedTypeDecl *, 2> associatedTypes;
       for (Decl *member : protocol->getMembers()) {
         if (auto associatedType = dyn_cast<AssociatedTypeDecl>(member)) {
-          // TODO: only add associated types when they're new?
-          asDerived().addAssociatedType(AssociatedType(associatedType));
+          // If this is a new associated type (which does not override an
+          // existing associated type), add it.
+          if (associatedType->getOverriddenDecls().empty())
+            associatedTypes.push_back(associatedType);
         }
+      }
+
+      // Sort associated types by name, for resilience.
+      llvm::array_pod_sort(associatedTypes.begin(), associatedTypes.end(),
+                           TypeDecl::compare);
+
+      for (auto *associatedType : associatedTypes) {
+        asDerived().addAssociatedType(AssociatedType(associatedType));
       }
     };
 
@@ -113,9 +124,18 @@ public:
     // Add the associated types if we haven't yet.
     addAssociatedTypes();
 
+    if (asDerived().shouldVisitRequirementSignatureOnly())
+      return;
+
     // Visit the witnesses for the direct members of a protocol.
     for (Decl *member : protocol->getMembers())
       ASTVisitor<T>::visit(member);
+  }
+
+  /// If true, only the base protocols and associated types will be visited.
+  /// The base implementation returns false.
+  bool shouldVisitRequirementSignatureOnly() const {
+    return false;
   }
 
   /// Fallback for unexpected protocol requirements.
@@ -124,15 +144,9 @@ public:
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
-    asDerived().addMethod(SILDeclRef(sd->getGetter(),
-                                     SILDeclRef::Kind::Func));
-    if (sd->isSettable(sd->getDeclContext())) {
-      asDerived().addMethod(SILDeclRef(sd->getSetter(),
-                                       SILDeclRef::Kind::Func));
-      if (sd->getMaterializeForSetFunc())
-        asDerived().addMethod(SILDeclRef(sd->getMaterializeForSetFunc(),
-                                         SILDeclRef::Kind::Func));
-    }
+    sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
+      asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
+    });
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {

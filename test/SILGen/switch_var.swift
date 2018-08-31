@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+
+// RUN: %target-swift-emit-silgen -module-name switch_var %s | %FileCheck %s
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
@@ -408,10 +409,8 @@ func test_let() {
   case let x where runced():
   // CHECK: [[CASE1]]:
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
-  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY]]
   // CHECK:   [[A:%.*]] = function_ref @$S10switch_var1a1xySS_tF
-  // CHECK:   apply [[A]]([[VAL_COPY_COPY]])
-  // CHECK:   end_borrow [[BORROWED_VAL_COPY]] from [[VAL_COPY]]
+  // CHECK:   apply [[A]]([[BORROWED_VAL_COPY]])
   // CHECK:   destroy_value [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT:bb[0-9]+]]
@@ -426,10 +425,8 @@ func test_let() {
   case let y where funged():
   // CHECK: [[CASE2]]:
   // CHECK:   [[BORROWED_VAL_COPY_2:%.*]] = begin_borrow [[VAL_COPY_2]]
-  // CHECK:   [[VAL_COPY_2_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY_2]]
   // CHECK:   [[B:%.*]] = function_ref @$S10switch_var1b1xySS_tF
-  // CHECK:   apply [[B]]([[VAL_COPY_2_COPY]])
-  // CHECK:   end_borrow [[BORROWED_VAL_COPY_2]] from [[VAL_COPY_2]]
+  // CHECK:   apply [[B]]([[BORROWED_VAL_COPY_2]])
   // CHECK:   destroy_value [[VAL_COPY_2]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
@@ -442,8 +439,7 @@ func test_let() {
   // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[VAL]]
   // CHECK:   function_ref @$S10switch_var4barsSSyF
   // CHECK:   [[BORROWED_VAL_COPY_3:%.*]] = begin_borrow [[VAL_COPY_3]]
-  // CHECK:   [[VAL_COPY_3_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY_3]]
-  // CHECK:   store [[VAL_COPY_3_COPY]] to [init] [[IN_ARG:%.*]] :
+  // CHECK:   store_borrow [[BORROWED_VAL_COPY_3]] to [[IN_ARG:%.*]] :
   // CHECK:   apply {{%.*}}<String>({{.*}}, [[IN_ARG]])
   // CHECK:   cond_br {{%.*}}, [[YES_CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
   // ExprPatterns implicitly contain a 'let' binding.
@@ -505,9 +501,8 @@ func test_mixed_let_var() {
 
   // CHECK: [[CASE2]]:
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
-  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY]]
   // CHECK:   [[B:%.*]] = function_ref @$S10switch_var1b1xySS_tF
-  // CHECK:   apply [[B]]([[VAL_COPY_COPY]])
+  // CHECK:   apply [[B]]([[BORROWED_VAL_COPY]])
   // CHECK:   end_borrow [[BORROWED_VAL_COPY]] from [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL]]
@@ -521,8 +516,7 @@ func test_mixed_let_var() {
   // CHECK: [[NEXT_CASE]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
-  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY]]
-  // CHECK:   store [[VAL_COPY_COPY]] to [init] [[TMP_VAL_COPY_ADDR:%.*]] : $*String
+  // CHECK:   store_borrow [[BORROWED_VAL_COPY]] to [[TMP_VAL_COPY_ADDR:%.*]] :
   // CHECK:   apply {{.*}}<String>({{.*}}, [[TMP_VAL_COPY_ADDR]])
   // CHECK:   cond_br {{.*}}, [[CASE3:bb[0-9]+]], [[NOCASE3:bb[0-9]+]]
   case bars():
@@ -567,7 +561,7 @@ func test_multiple_patterns1() {
     // CHECK:   [[SECOND_MATCH_CASE]]:
     // CHECK:     debug_value [[SECOND_X:%.*]] :
     // CHECK:     br [[CASE_BODY]]([[SECOND_X]] : $Int)
-    // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
+    // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : @trivial $Int):
     // CHECK:     [[A:%.*]] = function_ref @$S10switch_var1a1xySi_tF
     // CHECK:     apply [[A]]([[BODY_VAR]])
     a(x: x)
@@ -624,23 +618,23 @@ func test_multiple_patterns3() {
   switch f {
     // CHECK:   switch_enum {{%.*}} : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
   case .A(let x, let n), .B(let n, let x), .C(_, let x, let n):
-    // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
+    // CHECK:   [[A]]({{%.*}} : @trivial $(Int, Double)):
     // CHECK:     [[A_X:%.*]] = tuple_extract
     // CHECK:     [[A_N:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int, [[A_N]] : $Double)
     
-    // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
+    // CHECK:   [[B]]({{%.*}} : @trivial $(Double, Int)):
     // CHECK:     [[B_N:%.*]] = tuple_extract
     // CHECK:     [[B_X:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int, [[B_N]] : $Double)
 
-    // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
+    // CHECK:   [[C]]({{%.*}} : @trivial $(Int, Int, Double)):
     // CHECK:     [[C__:%.*]] = tuple_extract
     // CHECK:     [[C_X:%.*]] = tuple_extract
     // CHECK:     [[C_N:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[C_X]] : $Int, [[C_N]] : $Double)
 
-    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int, [[BODY_N:%.*]] : $Double):
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : @trivial $Int, [[BODY_N:%.*]] : @trivial $Double):
     // CHECK:     [[FUNC_A:%.*]] = function_ref @$S10switch_var1a1xySi_tF
     // CHECK:     apply [[FUNC_A]]([[BODY_X]])
     a(x: x)
@@ -658,30 +652,30 @@ func test_multiple_patterns4() {
   switch b {
     // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
   case .Y(.A(let x, _), _), .Y(.B(_, let x), _), .Y(.C, let x), .Z(let x, _):
-    // CHECK:   [[Y]]({{%.*}} : $(Foo, Int)):
+    // CHECK:   [[Y]]({{%.*}} : @trivial $(Foo, Int)):
     // CHECK:     [[Y_F:%.*]] = tuple_extract
     // CHECK:     [[Y_X:%.*]] = tuple_extract
     // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
     
-    // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
+    // CHECK:   [[A]]({{%.*}} : @trivial $(Int, Double)):
     // CHECK:     [[A_X:%.*]] = tuple_extract
     // CHECK:     [[A_N:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
     
-    // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
+    // CHECK:   [[B]]({{%.*}} : @trivial $(Double, Int)):
     // CHECK:     [[B_N:%.*]] = tuple_extract
     // CHECK:     [[B_X:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
     
-    // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
+    // CHECK:   [[C]]({{%.*}} : @trivial $(Int, Int, Double)):
     // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
 
-    // CHECK:   [[Z]]({{%.*}} : $(Int, Foo)):
+    // CHECK:   [[Z]]({{%.*}} : @trivial $(Int, Foo)):
     // CHECK:     [[Z_X:%.*]] = tuple_extract
     // CHECK:     [[Z_F:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
 
-    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : @trivial $Int):
     // CHECK:     [[FUNC_A:%.*]] = function_ref @$S10switch_var1a1xySi_tF
     // CHECK:     apply [[FUNC_A]]([[BODY_X]])
     a(x: x)
@@ -696,30 +690,30 @@ func test_multiple_patterns5() {
   switch b {
     // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
   case .Y(.A(var x, _), _), .Y(.B(_, var x), _), .Y(.C, var x), .Z(var x, _):
-    // CHECK:   [[Y]]({{%.*}} : $(Foo, Int)):
+    // CHECK:   [[Y]]({{%.*}} : @trivial $(Foo, Int)):
     // CHECK:     [[Y_F:%.*]] = tuple_extract
     // CHECK:     [[Y_X:%.*]] = tuple_extract
     // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
     
-    // CHECK:   [[A]]({{%.*}} : $(Int, Double)):
+    // CHECK:   [[A]]({{%.*}} : @trivial $(Int, Double)):
     // CHECK:     [[A_X:%.*]] = tuple_extract
     // CHECK:     [[A_N:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
     
-    // CHECK:   [[B]]({{%.*}} : $(Double, Int)):
+    // CHECK:   [[B]]({{%.*}} : @trivial $(Double, Int)):
     // CHECK:     [[B_N:%.*]] = tuple_extract
     // CHECK:     [[B_X:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
     
-    // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
+    // CHECK:   [[C]]({{%.*}} : @trivial $(Int, Int, Double)):
     // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
     
-    // CHECK:   [[Z]]({{%.*}} : $(Int, Foo)):
+    // CHECK:   [[Z]]({{%.*}} : @trivial $(Int, Foo)):
     // CHECK:     [[Z_X:%.*]] = tuple_extract
     // CHECK:     [[Z_F:%.*]] = tuple_extract
     // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
     
-    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
+    // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : @trivial $Int):
     // CHECK:     store [[BODY_X]] to [trivial] [[BOX_X:%.*]] : $*Int
     // CHECK:     [[WRITE:%.*]] = begin_access [modify] [unknown] [[BOX_X]]
     // CHECK:     [[FUNC_AAA:%.*]] = function_ref @$S10switch_var3aaa1xySiz_tF

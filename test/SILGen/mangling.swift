@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -enable-sil-ownership | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name mangling -Xllvm -sil-full-demangle -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -45,7 +46,7 @@ prefix func +- <T>(_: (a: T, b: T)) {}
 // CHECK-LABEL: sil hidden @$S8mangling2psoPyyx1a_x1bt_tlF
 postfix func +- <T>(_: (a: T, b: T)) {}
 
-infix operator «+» {}
+infix operator «+»
 
 // CHECK-LABEL: sil hidden @$S8mangling007p_qcaDcoiyS2i_SitF
 func «+»(a: Int, b: Int) -> Int { return a + b }
@@ -70,10 +71,6 @@ class Zim<T> {
   // CHECK-LABEL: sil hidden @$S8mangling3ZimC4zungyyqd___xtlF
   func zung<U>(_: U, _: T) {}
 }
-
-// Don't crash mangling single-protocol "composition" types.
-// CHECK-LABEL: sil hidden @$S8mangling27single_protocol_composition1xyAA3Foo_p_tF
-func single_protocol_composition(x: protocol<Foo>) {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
 
 // Clang-imported classes and protocols get mangled into a magic 'So' context
 // to make collisions into link errors. <rdar://problem/14221244>
@@ -129,9 +126,9 @@ protocol HasAssocType {
   associatedtype Assoc
 }
 
-// CHECK-LABEL: sil hidden @$S8mangling4fooAyyxAA12HasAssocTypeRzlF : $@convention(thin) <T where T : HasAssocType> (@in T) -> ()
+// CHECK-LABEL: sil hidden @$S8mangling4fooAyyxAA12HasAssocTypeRzlF : $@convention(thin) <T where T : HasAssocType> (@in_guaranteed T) -> ()
 func fooA<T: HasAssocType>(_: T) {}
-// CHECK-LABEL: sil hidden @$S8mangling4fooByyxAA12HasAssocTypeRzAA0D4Reqt0D0RpzlF : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> (@in T) -> ()
+// CHECK-LABEL: sil hidden @$S8mangling4fooByyxAA12HasAssocTypeRzAA0D4Reqt0D0RpzlF : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> (@in_guaranteed T) -> ()
 func fooB<T: HasAssocType>(_: T) where T.Assoc: AssocReqt {}
 
 // CHECK-LABEL: sil hidden @$S8mangling2qqoiyySi_SitF
@@ -180,11 +177,11 @@ func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }
 
-// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySid_SStF : $@convention(thin) (@owned Array<Int>, @owned String) -> ()
+// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySid_SStF : $@convention(thin) (@guaranteed Array<Int>, @guaranteed String) -> ()
 func varargsVsArray(arr: Int..., n: String) { }
 
-// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySaySiG_SStF : $@convention(thin) (@owned Array<Int>, @owned String) -> ()
+// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySaySiG_SStF : $@convention(thin) (@guaranteed Array<Int>, @guaranteed String) -> ()
 func varargsVsArray(arr: [Int], n: String) { }
 
-// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySaySiGd_SStF : $@convention(thin) (@owned Array<Array<Int>>, @owned String) -> ()
+// CHECK-LABEL: sil hidden @$S8mangling14varargsVsArray3arr1nySaySiGd_SStF : $@convention(thin) (@guaranteed Array<Array<Int>>, @guaranteed String) -> ()
 func varargsVsArray(arr: [Int]..., n: String) { }

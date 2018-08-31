@@ -334,10 +334,10 @@ func r21375863() {
 //   Don't crash if we infer a closure argument to have a tuple type containing inouts.
 func r25993258_helper(_ fn: (inout Int, Int) -> ()) {}
 func r25993258a() {
-  r25993258_helper { x in () } // expected-error {{named parameter has type '(inout Int, Int)' which includes nested inout parameters}}
+  r25993258_helper { x in () } // expected-error {{contextual closure type '(inout Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
 }
 func r25993258b() {
-  r25993258_helper { _ in () }
+  r25993258_helper { _ in () } // expected-error {{contextual closure type '(inout Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
 }
 
 // We have to map the captured var type into the right generic environment.

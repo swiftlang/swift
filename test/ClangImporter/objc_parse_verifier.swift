@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify > /dev/null
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-sil -I %S/Inputs/custom-modules %s -verify > /dev/null
 
-// REQUIRES: objc_interop
 // expected-no-diagnostics
 
 // This file tests the AST verifier, which performs extra checks when there are

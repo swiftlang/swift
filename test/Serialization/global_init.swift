@@ -12,9 +12,9 @@
 // The only way to inspect the serialized module is sil-opt. The swift
 // driver will only output the SIL that it deserializes.
 
-@_versioned
+@usableFromInline
 let MyConst = 42
-@_versioned
+@usableFromInline
 var MyVar = 3
 
 // CHECK: let MyConst: Int
@@ -23,8 +23,8 @@ var MyVar = 3
 // CHECK-DAG: sil [global_init] [canonical] @$S11global_init7MyConstSivau : $@convention(thin) () -> Builtin.RawPointer
 // CHECK-DAG: sil [global_init] [canonical] @$S11global_init5MyVarSivau : $@convention(thin) () -> Builtin.RawPointer
 
-@_inlineable
-@_versioned
+@inlinable
+@usableFromInline
 func getGlobals() -> Int {
   return MyVar + MyConst
 }

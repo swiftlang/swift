@@ -5,7 +5,7 @@ import StdlibUnittest
 
 extension String {
   var bufferID: Int {
-    guard let id = _guts._objectIdentifier else { return 0 }
+    guard let id = _classify()._objectIdentifier else { return 0 }
     return id.hashValue
   }
 }

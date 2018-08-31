@@ -15,21 +15,21 @@ class MyObject : NSObject {
   // LOC-CHECK: define {{.*}} @"$S4main8MyObjectC0B3ArrSo7NSArrayCvgTo"
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
   // LOC-CHECK: ret
-  var MyArr = NSArray()
+  @objc var MyArr = NSArray()
 // IMPORT-CHECK: filename: "test-foundation.swift"
 // IMPORT-CHECK-DAG: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath:
   // IMPORT-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[NSARRAY:[0-9]+]]
   //  IMPORT-CHECK-DAG: ![[NSARRAY]] = !DIModule(scope: ![[FOUNDATION:[0-9]+]], name: "NSArray"
   // IMPORT-CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
 
-  func foo(_ obj: MyObject) {
+  @objc func foo(_ obj: MyObject) {
     return obj.foo(obj)
   }
 }
 
 // SANITY-DAG: !DISubprogram(name: "blah",{{.*}} line: [[@LINE+2]],{{.*}} isDefinition: true
 extension MyObject {
-  func blah() {
+  @objc func blah() {
     var _ = MyObject()
   }
 }
@@ -46,9 +46,9 @@ public func err() {
   // DWARF-CHECK: DW_AT_name ("NSError")
   // DWARF-CHECK: DW_AT_linkage_name{{.*}}$SSo7NSErrorC
   let _ = NSError(domain: "myDomain", code: 4, 
-                  userInfo: [AnyHashable("a"):1,
-                             AnyHashable("b"):2,
-                             AnyHashable("c"):3])
+                  userInfo: ["a":1,
+                             "b":2,
+                             "c":3])
 }
 
 // LOC-CHECK: define {{.*}}4date

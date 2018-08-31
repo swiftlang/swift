@@ -22,6 +22,7 @@
 #include "swift/Syntax/TokenKinds.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
 
 namespace swift {
 
@@ -38,16 +39,16 @@ class Token {
   /// \brief Whether this token is the first token on the line.
   unsigned AtStartOfLine : 1;
 
-  /// \brief The length of the comment that precedes the token.
-  ///
-  /// Hopefully 128 Mib is enough.
-  unsigned CommentLength : 27;
-  
   /// \brief Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
   
   /// Modifiers for string literals
   unsigned MultilineString : 1;
+
+  // Padding bits == 32 - sizeof(Kind) * 8 - 3;
+
+  /// \brief The length of the comment that precedes the token.
+  unsigned CommentLength;
 
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
@@ -59,15 +60,12 @@ class Token {
   }
 
 public:
-  Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false), CommentLength(0),
-            EscapedIdentifier(false) {}
-
-  Token(tok Kind, StringRef Text, unsigned CommentLength)
-          : Kind(Kind), AtStartOfLine(false), CommentLength(CommentLength),
-            EscapedIdentifier(false), MultilineString(false),
+  Token(tok Kind, StringRef Text, unsigned CommentLength = 0)
+          : Kind(Kind), AtStartOfLine(false), EscapedIdentifier(false),
+            MultilineString(false), CommentLength(CommentLength),
             Text(Text) {}
 
-  Token(tok Kind, StringRef Text): Token(Kind, Text, 0) {};
+  Token() : Token(tok::NUM_TOKENS, {}, 0) {}
 
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
@@ -139,34 +137,14 @@ public:
     if (isNot(tok::identifier) || isEscapedIdentifier() || Text.empty())
       return false;
 
-    switch (Text[0]) {
-    case 'c':
-      return Text == "convenience";
-    case 'd':
-      return Text == "dynamic";
-    case 'f':
-      return Text == "final";
-    case 'i':
-      return Text == "indirect" || Text == "infix";
-    case 'l':
-      return Text == "lazy";
-    case 'm':
-      return Text == "mutating";
-    case 'n':
-      return Text == "nonmutating";
-    case 'o':
-      return Text == "open" || Text == "override" || Text == "optional";
-    case 'p':
-      return Text == "prefix" || Text == "postfix";
-    case 'r':
-      return Text == "required";
-    case 'u':
-      return Text == "unowned";
-    case 'w':
-      return Text == "weak";
-    default:
-      return false;
-    }
+    return llvm::StringSwitch<bool>(Text)
+#define CONTEXTUAL_CASE(KW) .Case(#KW, true)
+#define CONTEXTUAL_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
+#define CONTEXTUAL_DECL_ATTR_ALIAS(KW, ...) CONTEXTUAL_CASE(KW)
+#define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
+#include "swift/AST/Attr.def"
+#undef CONTEXTUAL_CASE
+      .Default(false);
   }
 
   bool isContextualPunctuator(StringRef ContextPunc) const {

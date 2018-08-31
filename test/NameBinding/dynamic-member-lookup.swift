@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 var global = 42
 
 @dynamicMemberLookup
@@ -67,7 +67,7 @@ func test(a: Gettable, b: Settable, c: MutGettable, d: NonMutSettable) {
 
 func test_iuo(a : Gettable!, b : Settable!) {
   global = a.wyverns
-  a.flavor = global  // expected-error {{cannot assign through dynamic lookup property: subscript is get-only}}
+  a.flavor = global  // expected-error {{cannot assign through dynamic lookup property: 'a' is a 'let' constant}}
   
   global = b.flavor
   b.universal = global // expected-error {{cannot assign through dynamic lookup property: 'b' is a 'let' constant}}
@@ -149,8 +149,14 @@ func test_iuo_result(x : IUOResultTest) {
   x.foo?.negate()   // Test mutating writeback.
   
   let _ : Int = x.bar  // Test implicitly forced optional
-  let b = x.bar        // Should promote to 'Int?'
-  let _ : Int = b // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'}}
+  let b = x.bar
+  // expected-note@-1{{short-circuit}}
+  // expected-note@-2{{coalesce}}
+  // expected-note@-3{{force-unwrap}}
+
+  let _ : Int = b // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
 }
 
 

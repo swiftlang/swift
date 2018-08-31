@@ -67,14 +67,28 @@ static void dumpTokenKind(llvm::raw_ostream &OS, tok Kind) {
 
 } // end of anonymous namespace
 
+unsigned RawSyntax::NextFreeNodeId = 1;
+
 RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                     SourcePresence Presence, bool ManualMemory) {
+                     SourcePresence Presence, const RC<SyntaxArena> &Arena,
+                     llvm::Optional<unsigned> NodeId) {
   assert(Kind != SyntaxKind::Token &&
          "'token' syntax node must be constructed with dedicated constructor");
-  Bits.Kind = unsigned(Kind);
-  Bits.Presence = unsigned(Presence);
-  Bits.ManualMemory = unsigned(ManualMemory);
-  Bits.NumChildren = Layout.size();
+
+  RefCount = 0;
+
+  if (NodeId.hasValue()) {
+    this->NodeId = NodeId.getValue();
+    NextFreeNodeId = std::max(this->NodeId + 1, NextFreeNodeId);
+  } else {
+    this->NodeId = NextFreeNodeId++;
+  }
+  Bits.Common.Kind = unsigned(Kind);
+  Bits.Common.Presence = unsigned(Presence);
+  Bits.Layout.NumChildren = Layout.size();
+  Bits.Layout.TextLength = UINT32_MAX;
+
+  this->Arena = Arena;
 
   // Initialize layout data.
   std::uninitialized_copy(Layout.begin(), Layout.end(),
@@ -84,13 +98,23 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
 RawSyntax::RawSyntax(tok TokKind, OwnedString Text,
                      ArrayRef<TriviaPiece> LeadingTrivia,
                      ArrayRef<TriviaPiece> TrailingTrivia,
-                     SourcePresence Presence, bool ManualMemory) {
-  Bits.Kind = unsigned(SyntaxKind::Token);
-  Bits.Presence = unsigned(Presence);
-  Bits.ManualMemory = unsigned(ManualMemory);
-  Bits.TokenKind = unsigned(TokKind);
-  Bits.NumLeadingTrivia = LeadingTrivia.size();
-  Bits.NumTrailingTrivia = TrailingTrivia.size();
+                     SourcePresence Presence, const RC<SyntaxArena> &Arena,
+                     llvm::Optional<unsigned> NodeId) {
+  RefCount = 0;
+
+  if (NodeId.hasValue()) {
+    this->NodeId = NodeId.getValue();
+    NextFreeNodeId = std::max(this->NodeId + 1, NextFreeNodeId);
+  } else {
+    this->NodeId = NextFreeNodeId++;
+  }
+  Bits.Common.Kind = unsigned(SyntaxKind::Token);
+  Bits.Common.Presence = unsigned(Presence);
+  Bits.Token.TokenKind = unsigned(TokKind);
+  Bits.Token.NumLeadingTrivia = LeadingTrivia.size();
+  Bits.Token.NumTrailingTrivia = TrailingTrivia.size();
+
+  this->Arena = Arena;
 
   // Initialize token text.
   ::new (static_cast<void *>(getTrailingObjects<OwnedString>()))
@@ -101,7 +125,7 @@ RawSyntax::RawSyntax(tok TokKind, OwnedString Text,
   // Initialize trailing trivia.
   std::uninitialized_copy(TrailingTrivia.begin(), TrailingTrivia.end(),
                           getTrailingObjects<TriviaPiece>() +
-                              Bits.NumLeadingTrivia);
+                              Bits.Token.NumLeadingTrivia);
 }
 
 RawSyntax::~RawSyntax() {
@@ -118,25 +142,30 @@ RawSyntax::~RawSyntax() {
 }
 
 RC<RawSyntax> RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                              SourcePresence Presence, SyntaxArena *Arena) {
+                              SourcePresence Presence,
+                              const RC<SyntaxArena> &Arena,
+                              llvm::Optional<unsigned> NodeId) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       Layout.size(), 0, 0);
-  void *data = Arena ? Arena->AllocateRawSyntax(size, alignof(RawSyntax))
+  void *data = Arena ? Arena->Allocate(size, alignof(RawSyntax))
                      : ::operator new(size);
-  return RC<RawSyntax>(new (data)
-                           RawSyntax(Kind, Layout, Presence, bool(Arena)));
+  return RC<RawSyntax>(
+      new (data) RawSyntax(Kind, Layout, Presence, Arena, NodeId));
 }
 
 RC<RawSyntax> RawSyntax::make(tok TokKind, OwnedString Text,
                               ArrayRef<TriviaPiece> LeadingTrivia,
                               ArrayRef<TriviaPiece> TrailingTrivia,
-                              SourcePresence Presence, SyntaxArena *Arena) {
+                              SourcePresence Presence,
+                              const RC<SyntaxArena> &Arena,
+                              llvm::Optional<unsigned> NodeId) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       0, 1, LeadingTrivia.size() + TrailingTrivia.size());
-  void *data = Arena ? Arena->AllocateRawSyntax(size, alignof(RawSyntax))
+  void *data = Arena ? Arena->Allocate(size, alignof(RawSyntax))
                      : ::operator new(size);
-  return RC<RawSyntax>(new (data) RawSyntax(
-      TokKind, Text, LeadingTrivia, TrailingTrivia, Presence, bool(Arena)));
+  return RC<RawSyntax>(new (data) RawSyntax(TokKind, Text, LeadingTrivia,
+                                            TrailingTrivia, Presence,
+                                            Arena, NodeId));
 }
 
 RC<RawSyntax> RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {
@@ -189,6 +218,24 @@ RawSyntax::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
   return Ret;
 }
 
+bool RawSyntax::accumulateLeadingTrivia(AbsolutePosition &Pos) const {
+ if (isToken()) {
+    if (!isMissing()) {
+      for (auto &Leader: getLeadingTrivia())
+        Leader.accumulateAbsolutePosition(Pos);
+      return true;
+    }
+  } else {
+    for (auto &Child: getLayout()) {
+      if (!Child || Child->isMissing())
+        continue;
+      if (Child->accumulateLeadingTrivia(Pos))
+        return true;
+    }
+  }
+  return false;
+}
+
 void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
   if (isMissing())
     return;
@@ -219,6 +266,7 @@ void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
 
 void RawSyntax::dump() const {
   dump(llvm::errs(), /*Indent*/ 0);
+  llvm::errs() << '\n';
 }
 
 void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
@@ -296,4 +344,9 @@ void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind,
     Piece.Profile(ID);
   for (auto &Piece : TrailingTrivia)
     Piece.Profile(ID);
+}
+
+llvm::raw_ostream &llvm::operator<<(raw_ostream &OS, AbsolutePosition Pos) {
+  Pos.printLineAndColumn(OS);
+  return OS;
 }

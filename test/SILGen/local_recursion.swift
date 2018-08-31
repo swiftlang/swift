@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-astscope-lookup  -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen  -parse-as-library -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-astscope-lookup  -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @$S15local_recursionAA_1yySi_SitF : $@convention(thin) (Int, Int) -> () {
 // CHECK:       bb0([[X:%0]] : @trivial $Int, [[Y:%1]] : @trivial $Int):

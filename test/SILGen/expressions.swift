@@ -1,6 +1,7 @@
+
 // RUN: %empty-directory(%t)
 // RUN: echo "public var x = Int()" | %target-swift-frontend -module-name FooBar -emit-module -o %t -
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -enable-sil-ownership %s -I%t -disable-access-control | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -module-name expressions -enable-sil-ownership %s -I%t -disable-access-control | %FileCheck %s
 
 import Swift
 import FooBar
@@ -447,11 +448,11 @@ func tuple_element(_ x: (Int, Float)) {
   // CHECK: apply
 
   int(tuple().0)
-  // CHECK: [[ZERO:%.*]] = tuple_extract {{%.*}} : {{.*}}, 0
+  // CHECK: ([[ZERO:%.*]], {{%.*}}) = destructure_tuple
   // CHECK: apply {{.*}}([[ZERO]])
 
   float(tuple().1)
-  // CHECK: [[ONE:%.*]] = tuple_extract {{%.*}} : {{.*}}, 1
+  // CHECK: ({{%.*}}, [[ONE:%.*]]) = destructure_tuple
   // CHECK: apply {{.*}}([[ONE]])
 }
 
@@ -559,13 +560,9 @@ func dynamicTypePlusZero(_ a: Super1) -> Super1.Type {
   return type(of: a)
 }
 // CHECK-LABEL: dynamicTypePlusZero
-// CHECK: bb0([[ARG:%.*]] : @owned $Super1):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Super1):
 // CHECK-NOT: copy_value
-// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK-NOT: copy_value
-// CHECK: value_metatype  $@thick Super1.Type, [[BORROWED_ARG]] : $Super1
-// CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK: destroy_value [[ARG]]
+// CHECK: value_metatype  $@thick Super1.Type, [[ARG]] : $Super1
 
 struct NonTrivialStruct {
   var c : Super1
@@ -579,13 +576,10 @@ func dontEmitIgnoredLoadExpr(_ a: NonTrivialStruct) -> NonTrivialStruct.Type {
   return type(of: a)
 }
 // CHECK-LABEL: dontEmitIgnoredLoadExpr
-// CHECK: bb0(%0 : @owned $NonTrivialStruct):
+// CHECK: bb0(%0 : @guaranteed $NonTrivialStruct):
 // CHECK-NEXT: debug_value
-// CHECK-NEXT: begin_borrow
-// CHECK-NEXT: end_borrow
-// CHECK-NEXT: %4 = metatype $@thin NonTrivialStruct.Type
-// CHECK-NEXT: destroy_value %0
-// CHECK-NEXT: return %4 : $@thin NonTrivialStruct.Type
+// CHECK-NEXT: [[RESULT:%.*]] = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: return [[RESULT]] : $@thin NonTrivialStruct.Type
 
 // Test that we evaluate the force unwrap to get its side effects (a potential trap),
 // but don't actually need to perform the load of its value.
@@ -677,25 +671,27 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
   return type(of: s[keyPath: kp])
 }
 // CHECK-LABEL: evaluateIgnoredKeyPathExpr
-// CHECK: bb0(%0 : @trivial $*NonTrivialStruct, %1 : @owned $WritableKeyPath<NonTrivialStruct, Int>):
+// CHECK: bb0(%0 : @trivial $*NonTrivialStruct, %1 : @guaranteed $WritableKeyPath<NonTrivialStruct, Int>):
 // CHECK-NEXT: debug_value_addr %0
 // CHECK-NEXT: debug_value %1
 // CHECK-NEXT: [[S_READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: [[S_TEMP:%[0-9]+]] = alloc_stack $NonTrivialStruct
 // CHECK-NEXT: copy_addr [[S_READ]] to [initialization] [[S_TEMP]]
-// CHECK-NEXT: [[KP_BORROW:%[0-9]+]] = begin_borrow %1
-// CHECK-NEXT: [[KP_TEMP:%[0-9]+]] = copy_value [[KP_BORROW]]
+// CHECK-NEXT: [[KP_TEMP:%[0-9]+]] = copy_value %1
 // CHECK-NEXT: [[KP:%[0-9]+]] = upcast [[KP_TEMP]]
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @$Ss23_projectKeyPathReadOnly{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT: apply [[PROJECT_FN]]<NonTrivialStruct, Int>([[RESULT]], [[S_TEMP]], [[KP]])
+// CHECK-NEXT: [[KP_BORROW:%.*]] = begin_borrow [[KP]]
+// CHECK-NEXT: apply [[PROJECT_FN]]<NonTrivialStruct, Int>([[RESULT]], [[S_TEMP]], [[KP_BORROW]])
 // CHECK-NEXT: end_access [[S_READ]]
+// CHECK-NEXT: end_borrow [[KP_BORROW]]
 // CHECK-NEXT: dealloc_stack [[RESULT]]
-// CHECK-NEXT: end_borrow [[KP_BORROW]] from %1
+// CHECK-NEXT: destroy_value [[KP]]
+// CHECK-NEXT: destroy_addr [[S_TEMP]]
 // CHECK-NEXT: dealloc_stack [[S_TEMP]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin Int.Type
-// CHECK-NEXT: destroy_value %1
+// CHECK-NOT: destroy_value %1
 // CHECK-NEXT: return [[METATYPE]]
 
 
@@ -706,10 +702,8 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 func implodeRecursiveTuple(_ expr: ((Int, Int), Int)?) {
 
   // CHECK: bb2([[WHOLE:%.*]] : @trivial $((Int, Int), Int)):
-  // CHECK-NEXT: [[X:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 0
-  // CHECK-NEXT: [[X0:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 0
-  // CHECK-NEXT: [[X1:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 1
-  // CHECK-NEXT: [[Y:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 1
+  // CHECK-NEXT: ([[X:%[0-9]+]], [[Y:%[0-9]+]]) = destructure_tuple [[WHOLE]]
+  // CHECK-NEXT: ([[X0:%[0-9]+]], [[X1:%[0-9]+]]) = destructure_tuple [[X]]
   // CHECK-NEXT: [[X:%[0-9]+]] = tuple ([[X0]] : $Int, [[X1]] : $Int)
   // CHECK-NEXT: debug_value [[X]] : $(Int, Int), let, name "x"
   // CHECK-NEXT: debug_value [[Y]] : $Int, let, name "y"

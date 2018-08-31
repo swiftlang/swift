@@ -202,13 +202,14 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooHelperUnnamedEnumeratorA1",
     key.offset: 123,
     key.length: 45,
     key.typename: "Int",
     key.nameoffset: 127,
     key.namelength: 28,
+    key.bodyoffset: 162,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 116,
@@ -220,13 +221,14 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooHelperUnnamedEnumeratorA2",
     key.offset: 176,
     key.length: 45,
     key.typename: "Int",
     key.nameoffset: 180,
     key.namelength: 28,
+    key.bodyoffset: 215,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 169,

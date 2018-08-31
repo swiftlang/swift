@@ -17,6 +17,8 @@
 
 namespace swift {
 
+class ValueDecl;
+
 /// Linkage for a SIL object.  This concept combines the notions
 /// of symbol linkage and visibility.
 ///
@@ -29,7 +31,7 @@ namespace swift {
 /// first does not, perhaps by reading a value out of it (and then
 /// ignoring the result) or retaining it (and then releasing it
 /// later).
-enum class SILLinkage : unsigned char {
+enum class SILLinkage : uint8_t {
   /// This object definition is visible to multiple Swift modules (and
   /// thus potentially across linkage-unit boundaries).  There are no
   /// other object definitions with this name in the program.
@@ -79,7 +81,7 @@ enum class SILLinkage : unsigned char {
   /// module. Besides that caveat this should be treated exactly the same as
   /// shared.
   SharedExternal,
-  
+
   /// The same as SharedExternal, except that the definition is private in the
   /// other module. This can only occur if an inlined fragile function from
   /// another module references a private definition in the other module.
@@ -109,7 +111,7 @@ enum IsSerialized_t : unsigned char {
 };
 
 /// The scope in which a subclassable class can be subclassed.
-enum class SubclassScope : unsigned char {
+enum class SubclassScope : uint8_t {
   /// This class can be subclassed in other modules.
   External,
 
@@ -175,6 +177,8 @@ inline bool isPossiblyUsedExternally(SILLinkage linkage, bool wholeModule) {
   }
   return linkage <= SILLinkage::Hidden;
 }
+
+SILLinkage getDeclSILLinkage(const ValueDecl *decl);
 
 inline bool hasPublicVisibility(SILLinkage linkage) {
   switch (linkage) {

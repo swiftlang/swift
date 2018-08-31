@@ -106,18 +106,15 @@ public typealias CBool = Bool
 /// cannot be represented in Swift, such as incomplete struct types.
 @_fixed_layout
 public struct OpaquePointer {
-  @_versioned
+  @usableFromInline
   internal var _rawValue: Builtin.RawPointer
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
-  @_transparent
+  @usableFromInline @_transparent
   internal init(_ v: Builtin.RawPointer) {
     self._rawValue = v
   }
 
   /// Creates an `OpaquePointer` from a given address in memory.
-  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
@@ -125,7 +122,6 @@ public struct OpaquePointer {
   }
 
   /// Creates an `OpaquePointer` from a given address in memory.
-  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
@@ -133,7 +129,6 @@ public struct OpaquePointer {
   }
 
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
-  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ from: UnsafePointer<T>) {
     self._rawValue = from._rawValue
@@ -142,7 +137,6 @@ public struct OpaquePointer {
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
   ///
   /// The result is `nil` if `from` is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ from: UnsafePointer<T>?) {
     guard let unwrapped = from else { return nil }
@@ -150,7 +144,6 @@ public struct OpaquePointer {
   }
 
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
-  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ from: UnsafeMutablePointer<T>) {
     self._rawValue = from._rawValue
@@ -159,7 +152,6 @@ public struct OpaquePointer {
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
   ///
   /// The result is `nil` if `from` is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ from: UnsafeMutablePointer<T>?) {
     guard let unwrapped = from else { return nil }
@@ -168,32 +160,26 @@ public struct OpaquePointer {
 }
 
 extension OpaquePointer: Equatable {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public static func == (lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
 }
 
 extension OpaquePointer: Hashable {
-  /// The pointer's hash value.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// The hash value is not guaranteed to be stable across different
-  /// invocations of the same program.  Do not persist the hash value across
-  /// program runs.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(Int(Builtin.ptrtoint_Word(_rawValue)))
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(Int(Builtin.ptrtoint_Word(_rawValue)))
   }
 }
 
 extension OpaquePointer : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
-  @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
@@ -207,7 +193,7 @@ extension Int {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public init(bitPattern pointer: OpaquePointer?) {
     self.init(bitPattern: UnsafeRawPointer(pointer))
   }
@@ -221,7 +207,7 @@ extension UInt {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public init(bitPattern pointer: OpaquePointer?) {
     self.init(bitPattern: UnsafeRawPointer(pointer))
   }
@@ -230,10 +216,10 @@ extension UInt {
 /// A wrapper around a C `va_list` pointer.
 @_fixed_layout
 public struct CVaListPointer {
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // unsafe-performance
   internal var value: UnsafeMutableRawPointer
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public // @testable
   init(_fromUnsafeMutablePointer from: UnsafeMutableRawPointer) {
     value = from
@@ -242,14 +228,12 @@ public struct CVaListPointer {
 
 extension CVaListPointer : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
-  @_inlineable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return value.debugDescription
   }
 }
 
-@_versioned
-@_inlineable
+@inlinable
 internal func _memcpy(
   dest destination: UnsafeMutableRawPointer,
   src: UnsafeRawPointer,
@@ -260,7 +244,6 @@ internal func _memcpy(
   let size = UInt64(size)._value
   Builtin.int_memcpy_RawPointer_RawPointer_Int64(
     dest, src, size,
-    /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)
 }
 
@@ -268,8 +251,7 @@ internal func _memcpy(
 ///
 /// The memory regions `source..<source + count` and
 /// `dest..<dest + count` may overlap.
-@_versioned
-@_inlineable
+@inlinable
 internal func _memmove(
   dest destination: UnsafeMutableRawPointer,
   src: UnsafeRawPointer,
@@ -280,6 +262,5 @@ internal func _memmove(
   let size = UInt64(size)._value
   Builtin.int_memmove_RawPointer_RawPointer_Int64(
     dest, src, size,
-    /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)
 }

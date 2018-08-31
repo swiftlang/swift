@@ -1,6 +1,7 @@
+
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -22,7 +23,7 @@ import gizmo
 // CHECK: @"\01L_selector(bar)" = private externally_initialized global i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(bar)", i64 0, i64 0), section "__DATA,__objc_selrefs,literal_pointers,no_dead_strip", align 8
 
 // CHECK: @"$SSo4RectVMn" = linkonce_odr hidden constant
-// CHECK: @"$SSo4RectVN" = linkonce_odr hidden global
+// CHECK: @"$SSo4RectVN" = linkonce_odr hidden constant
 
 // CHECK: @"\01L_selector_data(acquiesce)"
 // CHECK-NOT: @"\01L_selector_data(disharmonize)"
@@ -50,12 +51,12 @@ class Test2 : Gizmo {
 // CHECK:    call {{.*}} @objc_release
 // CHECK:    ret void
 
-  dynamic func bar() {}
+  @objc dynamic func bar() {}
 }
 
 // Test @nonobjc.
 class Contrarian : Blammo {
-  func acquiesce() {}
+  @objc func acquiesce() {}
   @nonobjc func disharmonize() {}
   @nonobjc func eviscerate() {}
 }
@@ -72,10 +73,10 @@ class Octogenarian : Contrarian {
 func unknown(_ x: id) -> id
 
 // CHECK:    define hidden swiftcc %objc_object* @"$S4objc5test0{{[_0-9a-zA-Z]*}}F"(%objc_object*)
-// CHECK-NOT:  call {{.*}} @swift_unknownRetain
-// CHECK:      call {{.*}} @swift_unknownRetain
-// CHECK-NOT:  call {{.*}} @swift_unknownRelease
-// CHECK:      call {{.*}} @swift_unknownRelease
+// CHECK-NOT:  call {{.*}} @swift_unknownObjectRetain
+// CHECK:      call {{.*}} @swift_unknownObjectRetain
+// CHECK-NOT:  call {{.*}} @swift_unknownObjectRelease
+// CHECK:      call {{.*}} @swift_unknownObjectRelease
 // CHECK:      ret %objc_object*
 func test0(_ arg: id) -> id {
   var x : id
@@ -87,8 +88,12 @@ func test0(_ arg: id) -> id {
 
 func test1(_ cell: Blammo) {}
 // CHECK:  define hidden swiftcc void @"$S4objc5test1{{[_0-9a-zA-Z]*}}F"([[BLAMMO]]*) {{.*}} {
-// CHECK:    call {{.*}} @swift_release
-// CHECK:    ret void
+// CHECK-NEXT:    entry
+// CHECK-NEXT:    alloca
+// CHECK-NEXT:    bitcast
+// CHECK-NEXT:    store
+// CHECK-NEXT:    store
+// CHECK-NEXT:    ret void
 
 
 // FIXME: These ownership convention tests should become SILGen tests.
@@ -125,7 +130,7 @@ func test10(_ g: Gizmo, r: Rect) {
 func test11_helper<T>(_ t: T) {}
 // NSRect's metadata needs to be uniqued at runtime using getForeignTypeMetadata.
 // CHECK-LABEL: define hidden swiftcc void @"$S4objc6test11yySo4RectVF"
-// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @"$SSo4RectVN"
+// CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata(i64 %0, {{.*}} @"$SSo4RectVN"
 func test11(_ r: Rect) { test11_helper(r) }
 
 class WeakObjC {

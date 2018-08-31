@@ -7,6 +7,8 @@ Classes:
 Typedefs:
 - Name: RenamedTypedef
   SwiftName: RenamedTypedef
+- Name: RenamedWrappedTypedef
+  SwiftName: RenamedWrappedTypedef
 Tags:
 - Name: RenamedStruct
   SwiftName: RenamedStruct
@@ -16,22 +18,24 @@ Protocols:
 - Name: RenamedProtocol
   SwiftName: RenamedProtocol
 SwiftVersions:
-- Version: 3
+- Version: 4
   Classes:
   - Name: RenamedClass
-    SwiftName: Swift3RenamedClass
+    SwiftName: Swift4RenamedClass
   - Name: RenamedGenericClass
-    SwiftName: Swift3RenamedGenericClass
+    SwiftName: Swift4RenamedGenericClass
   Typedefs:
   - Name: RenamedTypedef
-    SwiftName: Swift3RenamedTypedef
+    SwiftName: Swift4RenamedTypedef
   - Name: NewlyWrappedTypedef
     SwiftWrapper: none
+  - Name: RenamedWrappedTypedef
+    SwiftName: Swift4RenamedWrappedTypedef
   Tags:
   - Name: RenamedStruct
-    SwiftName: Swift3RenamedStruct
+    SwiftName: Swift4RenamedStruct
   - Name: RenamedEnum
-    SwiftName: Swift3RenamedEnum
+    SwiftName: Swift4RenamedEnum
   Protocols:
   - Name: RenamedProtocol
-    SwiftName: Swift3RenamedProtocol
+    SwiftName: Swift4RenamedProtocol

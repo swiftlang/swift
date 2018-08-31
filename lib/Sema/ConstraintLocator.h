@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -89,14 +89,13 @@ public:
     MemberRefBase,
     /// \brief The lookup for a subscript member.
     SubscriptMember,
-    /// \brief The index of a subscript expression.
-    SubscriptIndex,
-    /// \brief The result of a subscript expression.
-    SubscriptResult,
     /// \brief The lookup for a constructor member.
     ConstructorMember,
-    /// \brief Rvalue adjustment.
-    RvalueAdjustment,
+    /// \brief An implicit @lvalue-to-inout conversion; only valid for operator
+    /// arguments.
+    LValueConversion,
+    /// \brief RValue adjustment.
+    RValueAdjustment,
     /// \brief The result of a closure.
     ClosureResult,
     /// \brief The parent of a nested type.
@@ -107,12 +106,9 @@ public:
     SequenceIteratorProtocol,
     /// \brief The element type of a generator.
     GeneratorElementType,
-    /// \brief The element of an array type.
-    ArrayElementType,
-    /// \brief The scalar type of a tuple type.
-    ScalarToTuple,
-    /// \brief The load of an lvalue.
-    Load,
+    /// \brief An argument passed in an autoclosure parameter
+    /// position, which must match the autoclosure return type.
+    AutoclosureResult,
     /// The requirement that we're matching during protocol conformance
     /// checking.
     Requirement,
@@ -129,8 +125,10 @@ public:
     TypeParameterRequirement,
     /// \brief Locator for a binding from an IUO disjunction choice.
     ImplicitlyUnwrappedDisjunctionChoice,
-    /// \brief A result of an expressoin involving dynamic lookup.
+    /// \brief A result of an expression involving dynamic lookup.
     DynamicLookupResult,
+    /// \brief The desired contextual type passed in to the constraint system.
+    ContextualType,
   };
 
   /// \brief Determine the number of numeric values used for the given path
@@ -147,24 +145,22 @@ public:
     case Member:
     case MemberRefBase:
     case UnresolvedMember:
-    case SubscriptIndex:
     case SubscriptMember:
-    case SubscriptResult:
     case ConstructorMember:
-    case RvalueAdjustment:
+    case LValueConversion:
+    case RValueAdjustment:
     case ClosureResult:
     case ParentType:
     case InstanceType:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ArrayElementType:
-    case ScalarToTuple:
-    case Load:
+    case AutoclosureResult:
     case Requirement:
     case Witness:
     case OpenedGeneric:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
+    case ContextualType:
       return 0;
 
     case GenericArgument:
@@ -172,9 +168,9 @@ public:
     case TupleElement:
     case KeyPathComponent:
     case ConditionalRequirement:
-    case TypeParameterRequirement:
       return 1;
 
+    case TypeParameterRequirement:
     case ApplyArgToParam:
       return 2;
     }
@@ -201,21 +197,18 @@ public:
     case ApplyArgToParam:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ArrayElementType:
     case ClosureResult:
     case ConstructorMember:
     case InstanceType:
-    case Load:
+    case AutoclosureResult:
     case OptionalPayload:
     case Member:
     case MemberRefBase:
     case UnresolvedMember:
     case ParentType:
-    case RvalueAdjustment:
-    case ScalarToTuple:
-    case SubscriptIndex:
+    case LValueConversion:
+    case RValueAdjustment:
     case SubscriptMember:
-    case SubscriptResult:
     case OpenedGeneric:
     case Archetype:
     case AssociatedType:
@@ -229,6 +222,7 @@ public:
     case TypeParameterRequirement:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
+    case ContextualType:
       return 0;
 
     case FunctionArgument:
@@ -341,7 +335,7 @@ public:
       return PathElement(NamedTupleElement, position);
     }
 
-    /// Retrieve a patch element for an argument/parameter comparison in a
+    /// Retrieve a path element for an argument/parameter comparison in a
     /// function application.
     static PathElement getApplyArgToParam(unsigned argIdx, unsigned paramIdx) {
       return PathElement(ApplyArgToParam, argIdx, paramIdx);
@@ -363,8 +357,10 @@ public:
       return PathElement(ConditionalRequirement, index);
     }
 
-    static PathElement getTypeRequirementComponent(unsigned index) {
-      return PathElement(TypeParameterRequirement, index);
+    static PathElement getTypeRequirementComponent(unsigned index,
+                                                   RequirementKind kind) {
+      return PathElement(TypeParameterRequirement, index,
+                         static_cast<unsigned>(kind));
     }
 
     /// \brief Retrieve the kind of path element.
@@ -530,7 +526,7 @@ private:
   friend class ConstraintSystem;
 };
 
-typedef ConstraintLocator::PathElement LocatorPathElt;
+using LocatorPathElt = ConstraintLocator::PathElement;
 
 /// \brief A simple stack-only builder object that constructs a
 /// constraint locator without allocating memory.

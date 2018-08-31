@@ -19,7 +19,8 @@
 #include "Callee.h"
 #include "Explosion.h"
 #include "GenDecl.h"
-#include "GenMeta.h"
+#include "GenClass.h"
+#include "GenHeap.h"
 #include "GenOpaque.h"
 #include "GenProto.h"
 #include "IRGenFunction.h"
@@ -49,7 +50,8 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
   Signature signature = getSignature(fnType);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  return createFunction(*this, link, signature);
+  entry = createFunction(*this, link, signature);
+  return entry;
 }
 
 static FunctionPointer lookupMethod(IRGenFunction &IGF,
@@ -93,7 +95,7 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF,
   return emitVirtualMethodValue(IGF, metadata, declRef, funcTy);
 }
 
-llvm::Function *IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
+void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
   auto *f = getAddrOfDispatchThunk(declRef, ForDefinition);
 
   IRGenFunction IGF(*this, f);
@@ -110,6 +112,11 @@ llvm::Function *IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
     IGF.Builder.CreateRetVoid();
   else
     IGF.Builder.CreateRet(result);
+}
 
-  return f;
+llvm::GlobalValue *IRGenModule::defineMethodDescriptor(SILDeclRef declRef,
+                                                       NominalTypeDecl *nominalDecl,
+                                                       llvm::Constant *definition) {
+  auto entity = LinkEntity::forMethodDescriptor(declRef);
+  return defineAlias(entity, definition);
 }

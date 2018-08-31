@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -split-critical-edges | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -split-critical-edges | %FileCheck %s
 
 import Builtin
 import Swift
@@ -8,47 +8,6 @@ sil_stage raw
 enum OnePayload {
   case x(Builtin.Int64)
   case y
-}
-
-// CHECK-LABEL: sil @check_switch_enum
-// CHECK: bb0(
-// CHECK:  cond_br %1, bb1, bb2
-// CHECK: bb1:
-// CHECK:   integer_literal $Builtin.Int64, 1
-// CHECK:   br bb4(
-// CHECK: bb2:
-// CHECK:   switch_enum {{.*}} : $OnePayload, case #OnePayload.x!enumelt.1: bb3, case #OnePayload.y!enumelt: bb5
-// CHECK: bb3([[PAYLOAD:%.]] : $Builtin.Int64):
-// CHECK:   br bb4([[PAYLOAD]] : $Builtin.Int64)
-// CHECK: bb4([[VAL:%.*]] : $Builtin.Int64):
-// CHECK:   struct $Int64 ([[VAL]] : $Builtin.Int64)
-// CHECK:   br bb6
-// CHECK: bb5:
-// CHECK:   br bb6
-// CHECK: bb6:
-// CHECK:   return
-
-sil @check_switch_enum : $(OnePayload, Builtin.Int1) -> () {
-entry(%0 : $OnePayload, %1: $Builtin.Int1):
-  cond_br %1, bb1, bb2
-
-bb1:
-  %2 = integer_literal $Builtin.Int64, 1
-  br x_dest(%2 : $Builtin.Int64)
-
-bb2:
-  switch_enum %0 : $OnePayload, case #OnePayload.x!enumelt.1: x_dest, case #OnePayload.y!enumelt: y_dest
-
-x_dest(%4: $Builtin.Int64):
-  %5 = struct $Int64 (%4 : $Builtin.Int64)
-  br end
-
-y_dest:
-  br end
-
-end:
-  %v = tuple ()
-  return %v : $()
 }
 
 // CHECK-LABEL: sil @check_switch_value
@@ -75,12 +34,16 @@ entry(%0 : $Builtin.Int32, %1: $Builtin.Int1):
 
 bb1:
   %2 = integer_literal $Builtin.Int64, 1
-  br x_dest
+  br x_cont
+
 bb2:
   %3 = integer_literal $Builtin.Int32, 1
   switch_value %0 : $Builtin.Int32, case %3: x_dest, default y_dest
 
 x_dest:
+  br x_cont
+
+x_cont:
   br end
 
 y_dest:
@@ -100,26 +63,22 @@ class X {
 
 // CHECK: sil @dynamic_lookup_br : $@convention(thin) (AnyObject, Builtin.Int1) -> () {
 // CHECK: bb0(
-// CHECK:   cond_br %1, bb1, bb4
+// CHECK:   cond_br %1, bb1, bb2
 // CHECK: bb1:
-// CHECK:   dynamic_method_br {{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb3, bb2
+// CHECK:   dynamic_method_br {{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb3, bb4
 // CHECK: bb2:
-// CHECK:   br bb8
+// CHECK:   dynamic_method_br {{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb5, bb6
 // CHECK: bb3({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ())
-// CHECK:   br bb7({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ())
+// CHECK:   br bb7
 // CHECK: bb4:
-// CHECK:   dynamic_method_br {{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb6, bb5
-// CHECK: bb5:
-// CHECK:   br bb8
-// CHECK: bb6({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
-// CHECK:   br bb7({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ())
-// CHECK: bb7({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
-// CHECK:   br bb9
-// CHECK: bb8:
-// CHECK:   br bb9
-// CHECK: bb9:
+// CHECK:   br bb7
+// CHECK: bb5({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+// CHECK:   br bb7
+// CHECK: bb6:
+// CHECK:   br bb7
+// CHECK: bb7:
 // CHECK:   return
-
+// CHECK-LABEL: } // end sil function 'dynamic_lookup_br'
 sil @dynamic_lookup_br : $@convention(thin) (AnyObject, Builtin.Int1) -> () {
 bb0(%0 : $AnyObject, %10: $Builtin.Int1):
   cond_br %10, lookup1, lookup2
@@ -144,15 +103,21 @@ lookup2:
   strong_retain %24 : $AnyObject
   %26 = open_existential_ref %24 : $AnyObject to $@opened("12345678-89ab-cdef-0123-000000000000") AnyObject
   %27 = unchecked_ref_cast %26 : $@opened("12345678-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
-  dynamic_method_br %27 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
+  dynamic_method_br %27 : $Builtin.UnknownObject, #X.f!1.foreign, bb3, bb4
 
 bb1(%8 : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
-  br bb3
+  br bb5
 
 bb2:
-  br bb3
+  br bb5
 
-bb3:
+bb3(%9 : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
   %43 = tuple ()
   return %43 : $()
 }
@@ -165,24 +130,20 @@ class ParentNode : Node {
 
 // CHECK-LABEL: sil @test_checked_cast_br
 // CHECK: bb0(
-// CHECK:   cond_br %1, bb1, bb4
+// CHECK:   cond_br %1, bb1, bb2
 // CHECK: bb1:
-// CHECK:   checked_cast_br [exact] {{.*}} : $Node to $ParentNode, bb3, bb2
+// CHECK:   checked_cast_br [exact] {{.*}} : $Node to $ParentNode, bb3, bb4
 // CHECK: bb2:
-// CHECK:   br bb8
+// CHECK:   checked_cast_br [exact] {{.*}} : $Node to $ParentNode, bb5, bb6
 // CHECK: bb3({{.*}} : $ParentNode):
-// CHECK:   br bb7({{.*}} : $ParentNode)
+// CHECK:   br bb7
 // CHECK: bb4:
-// CHECK:   checked_cast_br [exact] {{.*}} : $Node to $ParentNode, bb6, bb5
-// CHECK: bb5:
-// CHECK:   br bb8
-// CHECK: bb6({{.*}} : $ParentNode):
-// CHECK:   br bb7({{.*}} : $ParentNode)
-// CHECK: bb7({{.*}} : $ParentNode):
-// CHECK:   br bb9
-// CHECK: bb8:
-// CHECK:   br bb9
-// CHECK: bb9:
+// CHECK:   br bb7
+// CHECK: bb5({{.*}} : $ParentNode):
+// CHECK:   br bb7
+// CHECK: bb6:
+// CHECK:   br bb7
+// CHECK: bb7:
 // CHECK:   return
 
 sil @test_checked_cast_br : $@convention(method) (@owned Node, Builtin.Int1) -> () {
@@ -193,12 +154,18 @@ ccb1:
   checked_cast_br [exact] %0 : $Node to $ParentNode, bb2, bb3
 
 ccb2:
-  checked_cast_br [exact] %0 : $Node to $ParentNode, bb2, bb3
+  checked_cast_br [exact] %0 : $Node to $ParentNode, bb4, bb5
 
 bb2(%5 : $ParentNode):
   br bb1
 
 bb3:
+  br bb1
+
+bb4(%6 : $ParentNode):
+  br bb1
+
+bb5:
   br bb1
 
 bb1:

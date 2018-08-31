@@ -21,8 +21,6 @@ public func singleChar() -> Character {
   return "a"
 }
 
-// FIXME: The following part of this test is temporarily disabled.
-
 // CHECK-LABEL: define {{.*}}singleNonAsciiChar
 // CHECK: ret {{.*}} 26085
 public func singleNonAsciiChar() -> Character {

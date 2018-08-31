@@ -35,18 +35,6 @@ func test() {
 // CHECK:        key.modulename: "Swift"
 // CHECK-NEXT: },
 
-// CHECK-LABEL:  key.name: "abs(:)",
-// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: FloatingPoint##FloatingPoint#>)",
-// CHECK-NEXT:   key.description: "abs(x: FloatingPoint)",
-// CHECK-NEXT:   key.typename: "FloatingPoint",
-// CHECK-NEXT:   key.doc.brief: "Returns the absolute value of x.",
-// CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
-// CHECK-NEXT:   key.moduleimportdepth: 1,
-// CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK-NOT:    key.modulename
-// CHECK:        key.modulename: "Swift"
-// CHECK-NEXT: },
-
 // FooHelper.FooHelperExplicit == 1
 // CHECK-LABEL:  key.name: "fooHelperExplicitFrameworkFunc1(:)",
 // CHECK-NEXT:   key.sourcetext: "fooHelperExplicitFrameworkFunc1(<#T##a: Int32##Int32#>)",

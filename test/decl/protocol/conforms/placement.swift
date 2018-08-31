@@ -105,7 +105,7 @@ extension ExplicitSub1 : P1 { } // expected-error{{redundant conformance of 'Exp
 // ---------------------------------------------------------------------------
 // Suppression of synthesized conformances
 // ---------------------------------------------------------------------------
-class SynthesizedClass1 : AnyObject { } // expected-warning{{conformance of class 'SynthesizedClass1' to 'AnyObject' is redundant}}
+class SynthesizedClass1 : AnyObject { } // expected-error{{inheritance from non-protocol, non-class type 'AnyObject'}}
 
 class SynthesizedClass2 { }
 extension SynthesizedClass2 : AnyObject { } // expected-error{{inheritance from non-protocol type 'AnyObject'}}
@@ -115,7 +115,7 @@ class SynthesizedClass3 : AnyObjectRefinement { }
 class SynthesizedClass4 { }
 extension SynthesizedClass4 : AnyObjectRefinement { }
 
-class SynthesizedSubClass1 : SynthesizedClass1, AnyObject { } // expected-warning{{conformance of class 'SynthesizedSubClass1' to 'AnyObject' is redundant}}
+class SynthesizedSubClass1 : SynthesizedClass1, AnyObject { } // expected-error{{inheritance from non-protocol, non-class type 'AnyObject'}}
 
 class SynthesizedSubClass2 : SynthesizedClass2 { }
 extension SynthesizedSubClass2 : AnyObject { } // expected-error{{inheritance from non-protocol type 'AnyObject'}}

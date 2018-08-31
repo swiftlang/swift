@@ -5,7 +5,7 @@ struct Mystruct1 {
   func s1f1() -> Int { return 0 }
 // CHECK: decl: func s1f1() -> Int
   var intField = 3
-// CHECK: decl: var intField: Int
+// CHECK: decl: @_hasInitialValue var intField: Int
 // CHECK: decl: init(intField: Int)
 // CHECK: decl: init()
 }
@@ -22,14 +22,14 @@ struct MyStruct2 {
 class Myclass1 {
 // CHECK: decl: class Myclass1
   var intField = 4
-// CHECK: decl: var intField: Int
+// CHECK: decl: @_hasInitialValue var intField: Int
 // CHECK: decl: init()
 }
 
 func f1() {
 // CHECK: decl: func f1()
   var s1ins = Mystruct1() // Implicit ctor
-// CHECK: decl: var s1ins: Mystruct1
+// CHECK: decl: @_hasInitialValue var s1ins: Mystruct1
   _ = Mystruct1(intField: 1) // Implicit ctor
 
   s1ins.intField = 34
@@ -37,7 +37,7 @@ func f1() {
 // CHECK: type: Int
 
   var c1ins = Myclass1()
-// CHECK: decl: var c1ins: Myclass1
+// CHECK: decl: @_hasInitialValue var c1ins: Myclass1
 // CHECK: type: Myclass1
 
   c1ins.intField = 3
@@ -59,7 +59,7 @@ class Myclass2 {
 // CHECK: decl: func f1()
 
     var arr1 = [1, 2]
-// CHECK: decl: var arr1: [Int]
+// CHECK: decl: @_hasInitialValue var arr1: [Int]
 // CHECK: type: Array<Int>
 
     arr1.append(1)
@@ -151,7 +151,7 @@ struct MyGenStruct1<T, U: ExpressibleByStringLiteral, V: Sequence> {
 }
 
 let genstruct1 = MyGenStruct1<Int, String, [Float]>(x: 1, y: "", z: [1.0])
-// CHECK: decl: let genstruct1: MyGenStruct1<Int, String, [Float]>
+// CHECK: decl: @_hasInitialValue let genstruct1: MyGenStruct1<Int, String, [Float]>
 
 func test001() {
 // CHECK: decl: func test001()
@@ -257,9 +257,27 @@ func hasLocalDecls() {
 
   // FIXME
   // CHECK: decl: FAILURE for 'LocalType'
-  // The following is the implicit ctor
-  // CHECK: decl: FAILURE for ''
-  struct LocalType {}
+  struct LocalType {
+    // CHECK: FAILURE for 'localMethod'
+    func localMethod() {}
+
+    // CHECK: FAILURE for 'subscript'
+    subscript(x: Int) { get {} set {} }
+
+    // CHECK: decl: FAILURE for ''
+    // CHECK: decl: FAILURE for ''
+    // CHECK: decl: FAILURE for ''
+
+  }
+
+  // FIXME
+  // CHECK: decl: FAILURE for 'LocalClass'
+  class LocalClass {
+    // CHECK: FAILURE for 'deinit'
+    deinit {}
+
+    // CHECK: decl: FAILURE for ''
+  }
 
   // CHECK: decl: FAILURE for 'LocalAlias'
   typealias LocalAlias = LocalType
@@ -267,8 +285,7 @@ func hasLocalDecls() {
 
 fileprivate struct VeryPrivateData {}
 
-// FIXME
-// CHECK: decl: FAILURE for 'privateFunction'
+// CHECK: decl: fileprivate func privateFunction(_ d: VeryPrivateData) for 'privateFunction'
 fileprivate func privateFunction(_ d: VeryPrivateData) {}
 
 struct HasSubscript {
@@ -300,9 +317,16 @@ struct HasGenericSubscript<T> {
       return t as! U
     }
 
-    // FIXME
-    // CHECK: dref: FAILURE	for 'U'
     // CHECK: decl: set {}	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluis
     set {}
   }
+}
+
+private
+// CHECK: decl: private func patatino<T>(_ vers1: T, _ vers2: T) -> Bool where T : Comparable for
+func patatino<T: Comparable>(_ vers1: T, _ vers2: T) -> Bool {
+  // CHECK: decl: FAILURE   for 'T' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xtSLRzlF1TL_xmfp decl
+  // CHECK: decl: let vers1: T      for 'vers1' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xtSLRzlF5vers1L_xvp
+  // CHECK: decl: let vers2: T      for 'vers2' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xtSLRzlF5vers2L_xvp
+  return vers1 < vers2;
 }

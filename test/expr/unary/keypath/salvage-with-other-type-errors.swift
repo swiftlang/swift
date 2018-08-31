@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 // Ensure that key path exprs can tolerate being re-type-checked when necessary
 // to diagnose other errors in adjacent exprs.
@@ -6,7 +6,7 @@
 struct P<T: K> { }
 
 struct S {
-    init<B>(_ a: P<B>) {
+    init<B>(_ a: P<B>) { // expected-note {{where 'B' = 'String'}}
         fatalError()
     }
 }
@@ -27,7 +27,7 @@ struct A {
 }
 
 extension A: K {
-    static let j = S(\A.id + "id") // expected-error {{'+' cannot be applied}} expected-note {{}}
+    static let j = S(\A.id + "id") // expected-error {{initializer 'init' requires that 'String' conform to 'K'}}
 }
 
 // SR-5034

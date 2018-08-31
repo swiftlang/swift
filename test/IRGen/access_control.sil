@@ -4,28 +4,24 @@ import Builtin
 import Swift
 
 public struct PublicStruct { var x: Int }
-// CHECK: @"$S14access_control12PublicStructVWV" = internal constant
-// CHECK: @"$S14access_control12PublicStructVMn" = {{(protected )?}}constant
+// CHECK: @"$S14access_control12PublicStructVMn" = {{(dllexport )?}}{{(protected )?}}constant
 // CHECK: @"$S14access_control12PublicStructVMf" = internal constant
 
 internal struct InternalStruct { var x: Int }
-// CHECK: @"$S14access_control14InternalStructVWV" = internal constant
 // CHECK: @"$S14access_control14InternalStructVMn" = hidden constant
 // CHECK: @"$S14access_control14InternalStructVMf" = internal constant
 
 private struct PrivateStruct { var x: Int }
-// CHECK: @"$S14access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVWV" = internal constant
-// CHECK: @"$S14access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVMn" = hidden constant
+// CHECK: @"$S14access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVMn" = internal constant
 // CHECK: @"$S14access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVMf" = internal constant
 
 func local() {
   struct LocalStruct { var x: Int }
-  // CHECK: @"$S14access_control5localyyF11LocalStructL_VWV" = internal constant
-  // CHECK: @"$S14access_control5localyyF11LocalStructL_VMn" = hidden constant
+  // CHECK: @"$S14access_control5localyyF11LocalStructL_VMn" = internal constant
   // CHECK: @"$S14access_control5localyyF11LocalStructL_VMf" = internal constant
 }
 
-// CHECK: @"$S14access_control12PublicStructVN" = {{(protected )?}}alias
+// CHECK: @"$S14access_control12PublicStructVN" = {{(dllexport )?}}{{(protected )?}}alias
 // CHECK: @"$S14access_control14InternalStructVN" = hidden alias
-// CHECK: @"$S14access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVN" = hidden alias
-// CHECK: @"$S14access_control5localyyF11LocalStructL_VN" = hidden alias
+// CHECK: @"$S14access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVN" = internal alias
+// CHECK: @"$S14access_control5localyyF11LocalStructL_VN" = internal alias

@@ -82,20 +82,6 @@ void swift::initializeTypeMetadataRecordLookup() {
   }
 }
 
-void swift::initializeTypeFieldLookup() {
-  const swift::MetadataSections *sections = registered;
-  while (true) {
-    const swift::MetadataSections::Range &fields = sections->swift5_fieldmd;
-    if (fields.length)
-      addImageTypeFieldDescriptorBlockCallback(
-          reinterpret_cast<void *>(fields.start), fields.length);
-
-    if (sections->next == registered)
-      break;
-    sections = sections->next;
-  }
-}
-
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(const void *addr) {
   const swift::MetadataSections *sections =
@@ -137,6 +123,12 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 #else
   return 0;
 #endif // __CYGWIN__
+}
+
+// This is only used for backward deployment hooks, which we currently only support for
+// MachO. Add a stub here to make sure it still compiles.
+void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
+  return nullptr;
 }
 
 #endif // !defined(__ELF__) && !defined(__MACH__)

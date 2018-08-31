@@ -17,7 +17,7 @@ sil_global hidden @$S20tsan_instrumentation1gSiv : $Int
 // compiler-rt instrumentation. Eventually we will add a specific
 // instrumentation callback for tsan inout accesses to compiler-rt.
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S20tsan_instrumentation11inoutAccessyyF"()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S20tsan_instrumentation11inoutAccessyyF"()
 // foo() -> ()
 sil @$S20tsan_instrumentation11inoutAccessyyF : $@convention(thin) () -> () {
 bb0:

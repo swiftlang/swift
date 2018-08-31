@@ -37,6 +37,21 @@ class ManagedValue;
 class SharedBorrowFormalAccess;
 class FormalEvaluationScope;
 
+/// Is a cleanup being executed as a result of some sort of forced
+/// unwinding, such as an error being thrown, or are we just cleaning up
+/// after some operation?
+///
+/// Most cleanups don't care, but the cleanups tied to l-value accesses do:
+/// the access will be aborted rather than ended normally, which may cause
+/// e.g. writebacks to be skipped.  It is also important that no actions
+/// be undertaken by an unwind cleanup that might change control flow,
+/// such as throwing an error.  In contrast, non-unwinding cleanups are
+/// permitted to change control flow.
+enum ForUnwind_t : bool {
+  NotForUnwind,
+  IsForUnwind
+};
+
 /// The valid states that a cleanup can be in.
 enum class CleanupState {
   /// The cleanup is inactive but may be activated later.
@@ -80,7 +95,8 @@ public:
   bool isActive() const { return state >= CleanupState::Active; }
   bool isDead() const { return state == CleanupState::Dead; }
 
-  virtual void emit(SILGenFunction &SGF, CleanupLocation loc) = 0;
+  virtual void emit(SILGenFunction &SGF, CleanupLocation loc,
+                    ForUnwind_t forUnwind) = 0;
   virtual void dump(SILGenFunction &SGF) const = 0;
 };
 
@@ -120,7 +136,7 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
 
   void popTopDeadCleanups(CleanupsDepth end);
   void emitCleanups(CleanupsDepth depth, CleanupLocation l,
-                    bool popCleanups=true);
+                    ForUnwind_t forUnwind, bool popCleanups);
   void endScope(CleanupsDepth depth, CleanupLocation l);
 
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
@@ -129,7 +145,6 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class CleanupStateRestorationScope;
   friend class SharedBorrowFormalEvaluation;
   friend class FormalEvaluationScope;
-  friend class PostponedCleanup;
 
 public:
   CleanupManager(SILGenFunction &SGF)
@@ -143,6 +158,10 @@ public:
     assert(!stack.empty());
     return stack.stable_begin();
   }
+  
+  Cleanup &getCleanup(CleanupHandle iter) {
+    return *stack.find(iter);
+  }
 
   /// \brief Emit a branch to the given jump destination,
   /// threading out through any cleanups we need to run. This does not pop the
@@ -152,17 +171,19 @@ public:
   /// \param branchLoc  The location of the branch instruction.
   /// \param args       Arguments to pass to the destination block.
   void emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
-                             ArrayRef<SILValue> args = {});
+                             ArrayRef<SILValue> args = {},
+                             ForUnwind_t forUnwind = NotForUnwind);
 
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a
   /// return from the function.
-  void emitCleanupsForReturn(CleanupLocation loc);
+  void emitCleanupsForReturn(CleanupLocation loc, ForUnwind_t forUnwind);
 
   /// Emit a new block that jumps to the specified location and runs necessary
   /// cleanups based on its level.  If there are no cleanups to run, this just
   /// returns the dest block.
   SILBasicBlock *emitBlockForCleanups(JumpDest dest, SILLocation branchLoc,
-                                      ArrayRef<SILValue> args = {});
+                                      ArrayRef<SILValue> args = {},
+                                      ForUnwind_t forUnwind = NotForUnwind);
 
   /// pushCleanup - Push a new cleanup.
   template<class T, class... A>
@@ -189,6 +210,10 @@ public:
     return pushCleanupInState<T, A...>(CleanupState::Active,
                                        ::std::forward<A>(args)...);
   }
+
+  /// Emit the given active cleanup now and transition it to being inactive.
+  void popAndEmitCleanup(CleanupHandle handle, CleanupLocation loc,
+                         ForUnwind_t forUnwind);
 
   /// Transition the given active cleanup to the corresponding
   /// inactive state: Active becomes Dead and PersistentlyActive

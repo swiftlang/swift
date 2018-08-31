@@ -49,7 +49,6 @@
 ///     space (`" "`).
 ///   - terminator: The string to print after all items have been printed. The
 ///     default is a newline (`"\n"`).
-@inline(never)
 public func print(
   _ items: Any...,
   separator: String = " ",
@@ -57,14 +56,12 @@ public func print(
 ) {
   if let hook = _playgroundPrintHook {
     var output = _TeeStream(left: "", right: _Stdout())
-    _print(
-      items, separator: separator, terminator: terminator, to: &output)
+    _print(items, separator: separator, terminator: terminator, to: &output)
     hook(output.left)
   }
   else {
     var output = _Stdout()
-    _print(
-      items, separator: separator, terminator: terminator, to: &output)
+    _print(items, separator: separator, terminator: terminator, to: &output)
   }
 }
 
@@ -108,21 +105,19 @@ public func print(
 ///     space (`" "`).
 ///   - terminator: The string to print after all items have been printed. The
 ///     default is a newline (`"\n"`).
-@inline(never)
 public func debugPrint(
   _ items: Any...,
   separator: String = " ",
-  terminator: String = "\n") {
+  terminator: String = "\n"
+) {
   if let hook = _playgroundPrintHook {
     var output = _TeeStream(left: "", right: _Stdout())
-    _debugPrint(
-      items, separator: separator, terminator: terminator, to: &output)
+    _debugPrint(items, separator: separator, terminator: terminator, to: &output)
     hook(output.left)
   }
   else {
     var output = _Stdout()
-    _debugPrint(
-      items, separator: separator, terminator: terminator, to: &output)
+    _debugPrint(items, separator: separator, terminator: terminator, to: &output)
   }
 }
 
@@ -163,8 +158,6 @@ public func debugPrint(
 ///     default is a newline (`"\n"`).
 ///   - output: An output stream to receive the text representation of each
 ///     item.
-@_inlineable // FIXME(sil-serialize-all)
-@inline(__always)
 public func print<Target : TextOutputStream>(
   _ items: Any...,
   separator: String = " ",
@@ -212,20 +205,15 @@ public func print<Target : TextOutputStream>(
 ///     default is a newline (`"\n"`).
 ///   - output: An output stream to receive the text representation of each
 ///     item.
-@_inlineable // FIXME(sil-serialize-all)
-@inline(__always)
 public func debugPrint<Target : TextOutputStream>(
   _ items: Any...,
   separator: String = " ",
   terminator: String = "\n",
   to output: inout Target
 ) {
-  _debugPrint(
-    items, separator: separator, terminator: terminator, to: &output)
+  _debugPrint(items, separator: separator, terminator: terminator, to: &output)
 }
 
-@_versioned
-@inline(never)
 internal func _print<Target : TextOutputStream>(
   _ items: [Any],
   separator: String = " ",
@@ -243,8 +231,6 @@ internal func _print<Target : TextOutputStream>(
   output.write(terminator)
 }
 
-@_versioned
-@inline(never)
 internal func _debugPrint<Target : TextOutputStream>(
   _ items: [Any],
   separator: String = " ",

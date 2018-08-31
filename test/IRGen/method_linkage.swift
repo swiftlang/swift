@@ -47,12 +47,12 @@ public class PublicClass {
 }
 
 open class OpenClass {
-  // CHECK: define{{( protected)?}} swiftcc void @"$S14method_linkage9OpenClass{{.*}}4pfoo0
+  // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S14method_linkage9OpenClass{{.*}}4pfoo0
   @inline(never)
   fileprivate func pfoo() {
   }
 
-  // CHECK: define{{( protected)?}} swiftcc void @"$S14method_linkage9OpenClassC4pbaryyF
+  // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S14method_linkage9OpenClassC4pbaryyF
   @inline(never)
   internal func pbar() {
   }

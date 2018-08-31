@@ -12,7 +12,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/CollectionCasts.swift
 // RUN: %line-directive %t/CollectionCasts.swift -- %target-build-swift %t/CollectionCasts.swift -o %t/a.out
-// RUN: %line-directive %t/CollectionCasts.swift -- %target-run %t/a.out 2>&1
+// RUN: %target-codesign %t/a.out && %line-directive %t/CollectionCasts.swift -- %target-run %t/a.out 2>&1
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -47,7 +47,6 @@ func cast<T, U>(_ x: T, to result: U.Type) -> U? {
 }
 
 %{
-from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 classKeys = ('Derived', 'Base')
 classValues = classKeys + ('AnyObject', 'Any')
 nonClassKeys = ('Int',)

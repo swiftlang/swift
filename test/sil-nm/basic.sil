@@ -60,7 +60,7 @@ sil_witness_table [serialized] <T> ConformingGenericStruct<T> : ResilientProtoco
 // vtables cannot be serialized from SIL.
 // SIL-NM: V C
 sil_vtable [serialized] C {
-  #C.deinit!deallocator: @c_deinit
+  #C.deinit!deallocator.1: @c_deinit
 }
 
 

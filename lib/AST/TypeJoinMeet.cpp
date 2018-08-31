@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -38,6 +38,10 @@ struct TypeJoin : CanTypeVisitor<TypeJoin, CanType> {
   // implementation.
   CanType Unimplemented;
 
+  // Always null. Used as a marker for places where there is no join
+  // of two types in our type system.
+  CanType Nonexistent;
+
   // For convenience, TheAnyType from ASTContext;
   CanType TheAnyType;
 
@@ -69,9 +73,10 @@ struct TypeJoin : CanTypeVisitor<TypeJoin, CanType> {
   CanType visitProtocolCompositionType(CanType second);
   CanType visitLValueType(CanType second);
   CanType visitInOutType(CanType second);
+  CanType visitBuiltinType(CanType second);
 
   CanType visitType(CanType second) {
-    llvm_unreachable("Unimplemented type visitor!");
+    return Unimplemented;
   }
 
 public:
@@ -98,14 +103,13 @@ public:
     if (second->getOptionalObjectType())
       return TypeJoin(first).visit(second);
 
-    // Likewise, rather than making every visitor deal with Any, just
-    // handle it here.
-    // join with Any is always Any
+    // Likewise, rather than making every visitor deal with Any,
+    // always dispatch to the protocol composition side of the join.
     if (first->isAny())
-      return first;
+      return TypeJoin(second).visit(first);
 
     if (second->isAny())
-      return second;
+      return TypeJoin(first).visit(second);
 
     // Otherwise the first type might be an optional (or not), so
     // dispatch there.
@@ -168,7 +172,7 @@ CanType TypeJoin::visitStructType(CanType second) {
   assert(First != second);
 
   // Deal with inout cases in visitInOutType.
-  if (auto inoutTy = First->getAs<InOutType>())
+  if (First->is<InOutType>())
     return TypeJoin(second).visit(First);
 
   // FIXME: When possible we should return a protocol or protocol
@@ -229,7 +233,7 @@ CanType TypeJoin::visitBoundGenericStructType(CanType second) {
   assert(First != second);
 
   // Deal with inout cases in visitInOutType.
-  if (auto inoutTy = First->getAs<InOutType>())
+  if (First->is<InOutType>())
     return TypeJoin(second).visit(First);
 
   return Unimplemented;
@@ -301,19 +305,27 @@ CanType TypeJoin::visitDependentMemberType(CanType second) {
 CanType TypeJoin::visitFunctionType(CanType second) {
   assert(First != second);
 
-  if (First->getKind() != second->getKind())
-    return TheAnyType;
-
-  auto firstFnTy = First->castTo<FunctionType>();
   auto secondFnTy = second->castTo<FunctionType>();
 
+  if (First->getKind() != second->getKind()) {
+    if (secondFnTy->getExtInfo().isNoEscape()) {
+      return Nonexistent;
+    } else {
+      return TheAnyType;
+    }
+  }
+
+  auto firstFnTy = First->castTo<FunctionType>();
+
+  auto firstExtInfo = firstFnTy->getExtInfo();
+  auto secondExtInfo = secondFnTy->getExtInfo();
+
   // FIXME: Properly handle these attributes.
-  if (firstFnTy->getExtInfo() != secondFnTy->getExtInfo())
+  if (firstExtInfo.withNoEscape(false) != secondExtInfo.withNoEscape(false))
     return Unimplemented;
 
-  // FIXME: Properly compute parameter types from getParams().
-  if (firstFnTy->getInput()->getCanonicalType() !=
-      secondFnTy->getInput()->getCanonicalType())
+  if (!AnyFunctionType::equalParams(firstFnTy->getParams(),
+                                    secondFnTy->getParams()))
     return Unimplemented;
 
   auto firstResult = firstFnTy->getResult()->getCanonicalType();
@@ -323,8 +335,12 @@ CanType TypeJoin::visitFunctionType(CanType second) {
   if (!result)
     return Unimplemented;
 
-  return FunctionType::get(firstFnTy->getInput(), result,
-                           firstFnTy->getExtInfo())->getCanonicalType();
+  auto extInfo = firstExtInfo;
+  if (secondFnTy->getExtInfo().isNoEscape())
+    extInfo = extInfo.withNoEscape(true);
+
+  return FunctionType::get(firstFnTy->getParams(), result, extInfo)
+      ->getCanonicalType();
 }
 
 CanType TypeJoin::visitGenericFunctionType(CanType second) {
@@ -337,8 +353,13 @@ CanType TypeJoin::visitGenericFunctionType(CanType second) {
 }
 
 CanType TypeJoin::visitProtocolCompositionType(CanType second) {
-  if (second->isAny())
+  if (second->isAny()) {
+    auto *fnTy = First->getAs<AnyFunctionType>();
+    if (fnTy && fnTy->getExtInfo().isNoEscape())
+      return Nonexistent;
+
     return second;
+  }
 
   return Unimplemented;
 }
@@ -346,6 +367,13 @@ CanType TypeJoin::visitProtocolCompositionType(CanType second) {
 CanType TypeJoin::visitLValueType(CanType second) { return Unimplemented; }
 
 CanType TypeJoin::visitInOutType(CanType second) { return Unimplemented; }
+
+CanType TypeJoin::visitBuiltinType(CanType second) {
+  assert(First != second);
+
+  // BuiltinType with any non-equal type results in Any.
+  return TheAnyType;
+}
 
 } // namespace
 

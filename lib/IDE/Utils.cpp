@@ -375,7 +375,7 @@ static void walkOverriddenClangDecls(const clang::NamedDecl *D, const FnTy &Fn){
 
 void
 ide::walkOverriddenDecls(const ValueDecl *VD,
-                         std::function<void(llvm::PointerUnion<
+                         llvm::function_ref<void(llvm::PointerUnion<
                              const ValueDecl*, const clang::NamedDecl*>)> Fn) {
   for (auto CurrOver = VD; CurrOver; CurrOver = CurrOver->getOverriddenDecl()) {
     if (CurrOver != VD)
@@ -904,8 +904,7 @@ public:
   }
 
   void replaceText(SourceManager &SM, CharSourceRange Range, StringRef Text) {
-    auto BufferId = SM.getIDForBufferIdentifier(SM.
-      getBufferIdentifierForLoc(Range.getStart())).getValue();
+    auto BufferId = SM.findBufferContainingLoc(Range.getStart());
     if (BufferId == InterestedId) {
       HasChange = true;
       auto StartLoc = SM.getLocOffsetInBuffer(Range.getStart(), BufferId);

@@ -3,7 +3,7 @@
 
 // XFAIL: *
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s -import-objc-header %S/Inputs/BoolBridgingTests.h | %FileCheck %s --check-prefix=CHECK $(test '%target-os' = 'macosx' -o '(' '%target-os' = 'ios' -a '%target-ptrsize' = '32' ')' && echo '--check-prefix=CHECK-OBJCBOOL')
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) %s -import-objc-header %S/Inputs/BoolBridgingTests.h | %FileCheck %s --check-prefix=CHECK $(test '%target-os' = 'macosx' -o '(' '%target-os' = 'ios' -a '%target-ptrsize' = '32' ')' && echo '--check-prefix=CHECK-OBJCBOOL')
 
 // REQUIRES: objc_interop
 

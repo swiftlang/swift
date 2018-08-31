@@ -6,7 +6,7 @@
 // Instead, it generates custom overlay modules itself, and uses -I %t when it
 // wants to use them.
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=ctypes -function-definitions=false -prefer-type-repr=true > %t.printed.txt
@@ -21,6 +21,9 @@
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=nullability -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=CHECK-NULLABILITY -strict-whitespace < %t.printed.txt
+
+// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=bridged_typedef -function-definitions=false -prefer-type-repr=true > %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=CHECK-BRIDGED-TYPEDEF -strict-whitespace < %t.printed.txt
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct1 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS: {{^}}  var x: Int32{{$}}
@@ -85,6 +88,7 @@
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}class NSArray : NSObject {{{$}}
+// FOUNDATION-NEXT: init!(objects: UnsafePointer<AnyObject>?, count cnt: Int)
 // FOUNDATION-NEXT: subscript(idx: Int) -> Any { get }
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
@@ -153,3 +157,8 @@
 // CHECK-NULLABILITY:   func optArrayMethod() -> [Any]?
 // CHECK-NULLABILITY: }
 // CHECK-NULLABILITY: func compare_classes(_ sc1: SomeClass, _ sc2: SomeClass, _ sc3: SomeClass!)
+
+// CHECK-BRIDGED-TYPEDEF: typealias NSMyAmazingStringAlias = String
+// CHECK-BRIDGED-TYPEDEF: func acceptNSMyAmazingStringAlias(_ param: NSMyAmazingStringAlias?)
+// CHECK-BRIDGED-TYPEDEF: func acceptNSMyAmazingStringAliasArray(_ param: [NSMyAmazingStringAlias])
+// CHECK-BRIDGED-TYPEDEF: func acceptIndirectedAmazingAlias(_ param: AutoreleasingUnsafeMutablePointer<NSString>?)

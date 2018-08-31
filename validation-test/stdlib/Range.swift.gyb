@@ -266,7 +266,7 @@ struct IndexDistanceTest {
       return c.endIndex
     }
     let iterations = rightIndex - IndexDistanceTest.start
-    _precondition(iterations >= 0)
+    precondition(iterations >= 0)
     var idx = c.startIndex
     for _ in 0..<iterations {
       idx = c.index(after: idx)
@@ -284,7 +284,7 @@ struct IndexDistanceTest {
     self.openDistance = distance
     // Only set closedDistance if testing against someRange.endIndex.
     if closedDistance != nil {
-      _precondition(leftIndex == nil || rightIndex == nil)
+      precondition(leftIndex == nil || rightIndex == nil)
     }
     self.closedDistance = closedDistance ?? distance
     self.loc = SourceLoc(file, line, comment: "distance(from:to:) tests for countable ranges")
@@ -786,6 +786,12 @@ MiscTestSuite.test("reversed()") {
   expectEqualSequence(
     [ 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 ],
     result)
+}
+
+MiscTestSuite.test("Compatibility typealiases") {
+  let _: CountablePartialRangeFrom = 1...
+  let _: CountableRange = MinimalStrideableValue(3)..<MinimalStrideableValue(3)
+  let _: CountableClosedRange = MinimalStrideableValue(3)...MinimalStrideableValue(3)
 }
 
 runAllTests()

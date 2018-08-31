@@ -89,7 +89,7 @@ bb0:
   return %1 : $Int32
 }
 
-// A function annotated with the @effects(readonly) attribute.
+// A function annotated with the @_effects(readonly) attribute.
 sil [readonly] @callee_func2 : $@convention(thin) () -> Int32 {
 bb0:
   %0 = integer_literal $Builtin.Int32, 3

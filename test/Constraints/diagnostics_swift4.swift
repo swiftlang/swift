@@ -24,7 +24,7 @@ extension C_2505 {
 class C2_2505: P_2505 {
 }
 
-let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{argument labels '(arg:)' do not match any available overloads}} expected-note {{overloads for 'C_2505' exist}}
+let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{incorrect argument label in call (have 'arg:', expected 'from:')}}
 
 // rdar://problem/31898542 - Swift 4: 'type of expression is ambiguous without more context' errors, without a fixit
 
@@ -54,4 +54,5 @@ class R<K: Hashable, V> {
 infix operator +=+ : AdditionPrecedence
 func +=+(_ lhs: Int, _ rhs: Int) -> Bool { return lhs == rhs }
 func +=+<T: BinaryInteger>(_ lhs: T, _ rhs: Int) -> Bool { return lhs == rhs }
-let _ = DoubleWidth<Int>(Int.min) - 1 +=+ Int.min // Ok
+// FIXME: DoubleWidth is no longer part of the standard library
+// let _ = DoubleWidth<Int>(Int.min) - 1 +=+ Int.min // Ok

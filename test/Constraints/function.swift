@@ -90,12 +90,19 @@ private class SR2657BlockClass<T> {
   init(f: T) { self.f = f }
 }
 
-func foo(block: () -> ()) { // expected-note 2 {{parameter 'block' is implicitly non-escaping}}
-  let a = SR2657BlockClass(f: block) // No error
-  let b = SR2657BlockClass<()->()>(f: block)
+func takesAny(_: Any) {}
+
+func foo(block: () -> (), other: () -> Int) { // expected-note 2 {{parameter 'block' is implicitly non-escaping}}
+  let _ = SR2657BlockClass(f: block)
+  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+  let _ = SR2657BlockClass<()->()>(f: block)
   // expected-error@-1 {{passing non-escaping parameter 'block' to function expecting an @escaping closure}}
-  let c: SR2657BlockClass<()->()> = SR2657BlockClass(f: block)
-  // expected-error@-1 {{cannot convert value of type 'SR2657BlockClass<() -> ()>' to specified type 'SR2657BlockClass<() -> ()>'}}
-  let d: SR2657BlockClass<()->()> = SR2657BlockClass<()->()>(f: block)
+  let _: SR2657BlockClass<()->()> = SR2657BlockClass(f: block)
+  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+  let _: SR2657BlockClass<()->()> = SR2657BlockClass<()->()>(f: block)
   // expected-error@-1 {{passing non-escaping parameter 'block' to function expecting an @escaping closure}}
+  _ = SR2657BlockClass<Any>(f: block)  // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
+  _ = SR2657BlockClass<Any>(f: other) // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
+  takesAny(block)  // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
+  takesAny(other) // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
 }

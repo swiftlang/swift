@@ -63,3 +63,9 @@ var v = u
 var w = Foo()
 #endif
 var x = w
+
+// Test os(macOS) as well
+#if os(macOS)
+var y = Foo()
+#endif
+var z = y

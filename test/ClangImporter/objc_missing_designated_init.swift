@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -swift-version 4 -verify
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules %s -swift-version 4 -verify
 
 import UnimportableMembers
+import UnimportableMembersUser
 
 class IncompleteInitSubclassImplicit : IncompleteDesignatedInitializers {
   var myOneNewMember = 1
@@ -16,6 +15,16 @@ class IncompleteInitSubclass : IncompleteDesignatedInitializers {
 class IncompleteConvenienceInitSubclass : IncompleteConvenienceInitializers {}
 
 class IncompleteUnknownInitSubclass : IncompleteUnknownInitializers {}
+
+class IncompleteInitCategorySubclassImplicit : IncompleteDesignatedInitializersWithCategory {}
+
+class IncompleteInitCategorySubclass : IncompleteDesignatedInitializersWithCategory {
+  override init(first: Int) {}
+  override init(second: Int) {}
+}
+
+class DesignatedInitializerInAnotherModuleSubclass : DesignatedInitializerInAnotherModule {}
+
 
 func testBaseClassesBehaveAsExpected() {
   _ = IncompleteDesignatedInitializers(first: 0) // okay
@@ -35,6 +44,19 @@ func testBaseClassesBehaveAsExpected() {
   _ = IncompleteUnknownInitializers(missing: 0) // expected-error {{argument labels '(missing:)' do not match any available overloads}} expected-note {{overloads}}
   _ = IncompleteUnknownInitializers(conveniently: 0) // okay
   _ = IncompleteUnknownInitializers(category: 0) // okay
+
+  _ = IncompleteDesignatedInitializersWithCategory(first: 0) // okay
+  _ = IncompleteDesignatedInitializersWithCategory(second: 0) // okay
+  _ = IncompleteDesignatedInitializersWithCategory(missing: 0) // expected-error {{argument labels '(missing:)' do not match any available overloads}} expected-note {{overloads}}
+  _ = IncompleteDesignatedInitializersWithCategory(conveniently: 0) // okay
+  _ = IncompleteDesignatedInitializersWithCategory(category: 0) // okay
+
+  _ = DesignatedInitializerInAnotherModule(first: 0) // okay
+  _ = DesignatedInitializerInAnotherModule(second: 0) // okay
+  _ = DesignatedInitializerInAnotherModule(missing: 0) // expected-error {{argument labels '(missing:)' do not match any available overloads}} expected-note {{overloads}}
+  _ = DesignatedInitializerInAnotherModule(conveniently: 0) // okay
+  _ = DesignatedInitializerInAnotherModule(category: 0) // okay
+  _ = DesignatedInitializerInAnotherModule(fromOtherModule: 0) // okay
 }
 
 func testSubclasses() {
@@ -60,9 +82,24 @@ func testSubclasses() {
   _ = IncompleteUnknownInitSubclass(second: 0) // okay
   _ = IncompleteUnknownInitSubclass(missing: 0) // expected-error {{argument labels '(missing:)' do not match any available overloads}} expected-note {{overloads}}
   _ = IncompleteUnknownInitSubclass(conveniently: 0) // okay
+  _ = IncompleteUnknownInitSubclass(category: 0) // okay
 
-  // FIXME: This initializer isn't being inherited for some reason, unrelated
-  // to the non-importable -initMissing:.
-  // https://bugs.swift.org/browse/SR-4566
-  _ = IncompleteUnknownInitSubclass(category: 0) // expected-error {{argument labels '(category:)' do not match any available overloads}} expected-note {{overloads}}
+  _ = IncompleteInitCategorySubclass(first: 0) // okay
+  _ = IncompleteInitCategorySubclass(second: 0) // okay
+  _ = IncompleteInitCategorySubclass(missing: 0) // expected-error {{argument labels '(missing:)' do not match any available overloads}} expected-note {{overloads}}
+  _ = IncompleteInitCategorySubclass(conveniently: 0) // expected-error {{argument labels '(conveniently:)' do not match any available overloads}} expected-note {{overloads}}
+  _ = IncompleteInitCategorySubclass(category: 0) // expected-error {{argument labels '(category:)' do not match any available overloads}} expected-note {{overloads}}
+
+  _ = IncompleteInitCategorySubclassImplicit(first: 0) // okay
+  _ = IncompleteInitCategorySubclassImplicit(second: 0) // okay
+  _ = IncompleteInitCategorySubclassImplicit(missing: 0) // expected-error {{argument labels '(missing:)' do not match any available overloads}} expected-note {{overloads}}
+  _ = IncompleteInitCategorySubclassImplicit(conveniently: 0) // expected-error {{argument labels '(conveniently:)' do not match any available overloads}} expected-note {{overloads}}
+  _ = IncompleteInitCategorySubclassImplicit(category: 0) // expected-error {{argument labels '(category:)' do not match any available overloads}} expected-note {{overloads}}
+
+  _ = DesignatedInitializerInAnotherModuleSubclass(first: 0) // okay
+  _ = DesignatedInitializerInAnotherModuleSubclass(second: 0) // okay
+  _ = DesignatedInitializerInAnotherModuleSubclass(missing: 0) // expected-error {{argument labels '(missing:)' do not match any available overloads}} expected-note {{overloads}}
+  _ = DesignatedInitializerInAnotherModuleSubclass(conveniently: 0) // expected-error {{argument labels '(conveniently:)' do not match any available overloads}} expected-note {{overloads}}
+  _ = DesignatedInitializerInAnotherModuleSubclass(category: 0) // expected-error {{argument labels '(category:)' do not match any available overloads}} expected-note {{overloads}}
+  _ = DesignatedInitializerInAnotherModuleSubclass(fromOtherModule: 0) // okay
 }

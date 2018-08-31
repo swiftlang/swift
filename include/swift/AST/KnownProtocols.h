@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_KNOWNPROTOCOLS_H
 #define SWIFT_AST_KNOWNPROTOCOLS_H
 
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Config.h"
 
 namespace llvm {
@@ -36,6 +37,9 @@ enum : uint8_t {
   NumKnownProtocols =
 #include "swift/AST/KnownProtocols.def"
 };
+
+enum : unsigned { NumKnownProtocolKindBits =
+  countBitsUsed(static_cast<unsigned>(NumKnownProtocols - 1)) };
 
 /// Retrieve the name of the given known protocol.
 llvm::StringRef getProtocolName(KnownProtocolKind kind);

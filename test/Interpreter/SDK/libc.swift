@@ -9,7 +9,7 @@
 // TODO: rdar://problem/33388782
 // REQUIRES: CPU=x86_64
 
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
   import Glibc

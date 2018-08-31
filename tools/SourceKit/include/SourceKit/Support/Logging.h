@@ -40,7 +40,7 @@ typedef IntrusiveRefCntPtr<Logger> LogRef;
 /// \endcode
 class Logger : public llvm::RefCountedBase<Logger> {
 public:
-  enum class Level : unsigned char {
+  enum class Level : uint8_t {
     /// \brief No logging.
     None = 0,
     /// \brief Warning level.

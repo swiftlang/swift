@@ -15,6 +15,7 @@
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
@@ -25,7 +26,8 @@
 using namespace swift;
 
 /// Create a new empty function with the correct arguments and a unique name.
-SILFunction *GenericCloner::initCloned(SILFunction *Orig,
+SILFunction *GenericCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
+				       SILFunction *Orig,
                                        IsSerialized_t Serialized,
                                        const ReabstractionInfo &ReInfo,
                                        StringRef NewName) {
@@ -38,7 +40,7 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   // Create a new empty function.
-  SILFunction *NewF = Orig->getModule().createFunction(
+  SILFunction *NewF = FunctionBuilder.createFunction(
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), ReInfo.getSpecializedGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(), Serialized,
@@ -157,11 +159,36 @@ void GenericCloner::populateCloned() {
         getBuilder().createReturn(RI->getLoc(), ReturnValue);
         continue;
       }
-    } else if (isa<ThrowInst>(OrigTermInst)) {
+    } else if (OrigTermInst->isFunctionExiting()) {
       for (AllocStackInst *ASI : reverse(AllocStacks)) {
         getBuilder().createDeallocStack(ASI->getLoc(), ASI);
       }
     }
     visit(BI->first->getTerminator());
   }
+}
+
+
+const SILDebugScope *GenericCloner::remapScope(const SILDebugScope *DS) {
+  if (!DS)
+    return nullptr;
+  auto it = RemappedScopeCache.find(DS);
+  if (it != RemappedScopeCache.end())
+    return it->second;
+
+  auto &M = getBuilder().getModule();
+  auto *ParentFunction = DS->Parent.dyn_cast<SILFunction *>();
+  if (ParentFunction == &Original)
+    ParentFunction = getCloned();
+  else if (ParentFunction)
+    ParentFunction = remapParentFunction(
+        FuncBuilder, M, ParentFunction, SubsMap,
+        Original.getLoweredFunctionType()->getGenericSignature());
+
+  auto *ParentScope = DS->Parent.dyn_cast<const SILDebugScope *>();
+  auto *RemappedScope =
+      new (M) SILDebugScope(DS->Loc, ParentFunction, remapScope(ParentScope),
+                            remapScope(DS->InlinedCallSite));
+  RemappedScopeCache.insert({DS, RemappedScope});
+  return RemappedScope;
 }

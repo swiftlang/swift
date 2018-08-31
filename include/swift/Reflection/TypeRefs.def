@@ -29,9 +29,9 @@ TYPEREF(DependentMember, TypeRef)
 TYPEREF(ForeignClass, TypeRef)
 TYPEREF(ObjCClass, TypeRef)
 TYPEREF(Opaque, TypeRef)
-TYPEREF(UnownedStorage, TypeRef)
-TYPEREF(UnmanagedStorage, TypeRef)
-TYPEREF(WeakStorage, TypeRef)
+#define REF_STORAGE(Name, ...) \
+  TYPEREF(Name##Storage, TypeRef)
+#include "swift/AST/ReferenceStorage.def"
 TYPEREF(SILBox, TypeRef)
 
 #undef TYPEREF

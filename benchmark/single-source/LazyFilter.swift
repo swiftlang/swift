@@ -15,7 +15,8 @@
 import TestsUtils
 
 public let LazyFilter = [
-  BenchmarkInfo(name: "LazilyFilteredArrays", runFunction: run_LazilyFilteredArrays, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "LazilyFilteredArrays2", runFunction: run_LazilyFilteredArrays, tags: [.validation, .api, .Array],
+      setUpFunction: { blackHole(filteredRange) }),
   BenchmarkInfo(name: "LazilyFilteredRange", runFunction: run_LazilyFilteredRange, tags: [.validation, .api, .Array]),
   BenchmarkInfo(
     name: "LazilyFilteredArrayContains",
@@ -36,10 +37,12 @@ public func run_LazilyFilteredRange(_ N: Int) {
   CheckResults(res == 123)
 }
 
+let filteredRange = (1..<100_000).map({[$0]}).lazy.filter { $0.first! % 7 == 0 }
+
 @inline(never)
 public func run_LazilyFilteredArrays(_ N: Int) {
   var res = 123
-  let c = (1..<1_000_000).map({[$0]}).lazy.filter { $0.first! % 7 == 0 }
+  let c = filteredRange
   for _ in 1...N {
     res += Array(c).count
     res -= Array(c).count

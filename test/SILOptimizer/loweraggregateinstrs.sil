@@ -37,7 +37,7 @@ struct S {
 }
 
 enum E {
-  case NoElement()
+  case NoElement
   case TrivialElement(Builtin.Int64)
   case ReferenceElement(C1)
   case StructNonTrivialElt(S)

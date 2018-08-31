@@ -21,13 +21,13 @@
 
 % for N in sizes:
 
-@_versioned // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 @_fixed_layout // FIXME(sil-serialize-all)
 internal struct _FixedArray${N}<T> {
   // ABI TODO: The has assumptions about tuple layout in the ABI, namely that
   // they are laid out contiguously and individually addressable (i.e. strided).
   //
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal var storage: (
     // A ${N}-wide tuple of type T
 % for i in range(0, N-1):
@@ -36,26 +36,23 @@ internal struct _FixedArray${N}<T> {
     T
   )
 
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   var _count: Int8
 }
 
 
 extension _FixedArray${N} {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal static var capacity: Int {
     @inline(__always) get { return ${N} }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal var capacity: Int {
     @inline(__always) get { return ${N} }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal var count: Int {
     @inline(__always) get { return Int(truncatingIfNeeded: _count) }
     @inline(__always) set { _count = Int8(newValue) }
@@ -63,30 +60,26 @@ extension _FixedArray${N} {
 }
 
 extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
+  @usableFromInline
   internal typealias Index = Int
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal var startIndex : Index {
     return 0
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal var endIndex : Index {
     return count
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal subscript(i: Index) -> T {
-    @_versioned
     @inline(__always)
     get {
       let count = self.count // for exclusive access
       _sanityCheck(i >= 0 && i < count)
-      var copy = storage
-      let res: T = withUnsafeBytes(of: &copy) {
+      let res: T = withUnsafeBytes(of: storage) {
         (rawPtr : UnsafeRawBufferPointer) -> T in
         let stride = MemoryLayout<T>.stride
         _sanityCheck(rawPtr.count == ${N}*stride, "layout mismatch?")
@@ -97,7 +90,6 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
       }
       return res
     }
-    @_versioned
     @inline(__always)
     set {
       _sanityCheck(i >= 0 && i < count)
@@ -107,15 +99,13 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal func index(after i: Index) -> Index {
     return i+1
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal func index(before i: Index) -> Index {
     return i-1
@@ -123,18 +113,16 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
 }
 
 extension _FixedArray${N} {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal mutating func append(_ newElement: T) {
     _sanityCheck(count < capacity)
-    self[count] = newElement
     _count += 1
+    self[count-1] = newElement
   }
 }
 
 extension _FixedArray${N} where T : ExpressibleByIntegerLiteral {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal init(count: Int) {
     _sanityCheck(count >= 0 && count <= _FixedArray${N}.capacity)
@@ -147,15 +135,13 @@ extension _FixedArray${N} where T : ExpressibleByIntegerLiteral {
     self._count = Int8(truncatingIfNeeded: count)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal init() {
     self.init(count: 0)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal init(allZeros: ()) {
     self.init(count: ${N})
@@ -163,8 +149,7 @@ extension _FixedArray${N} where T : ExpressibleByIntegerLiteral {
 }
 
 extension _FixedArray${N} {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
@@ -180,8 +165,7 @@ extension _FixedArray${N} {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal mutating func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
@@ -199,3 +183,7 @@ extension _FixedArray${N} {
 }
 
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

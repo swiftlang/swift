@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module -Xfrontend -disable-diagnostic-passes -force-single-frontend-invocation -o %t/sil_box_types.swiftmodule %s
-// RUN: %target-build-swift -emit-sil -Xfrontend -sil-link-all -I %t %s | %FileCheck %s
+// RUN: %target-build-swift -emit-sil -I %t %s | %FileCheck %s
 
 import Builtin
 
@@ -13,14 +13,14 @@ protocol Q {
 // CHECK-LABEL: sil @boxes : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>, <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> () {
 sil @boxes : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>, <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> () {
 // CHECK: bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
-entry(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
+entry(%0 : @unowned $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, %1 : @unowned $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
   return undef : $()
 }
 
-// CHECK-LABEL: @boxes_extra_reqs : $@convention(thin) <T where T : Q, T.AT : P> (@owned <τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T, T.AT>) -> ()
-sil @boxes_extra_reqs : $@convention(thin) <T where T : Q, T.AT : P> (@owned <τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T, T.AT>) -> () {
-// CHECK: bb0(%0 : $<τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T, T.AT>)
-bb0(%0 : $<τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T, T.AT>):
-  %1 = project_box %0 : $<τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T, T.AT>, 0
+// CHECK-LABEL: sil @boxes_extra_reqs : $@convention(thin) <T where T : Q, T.AT : P> (@owned <τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T>) -> () {
+sil @boxes_extra_reqs : $@convention(thin) <T where T : Q, T.AT : P> (@owned <τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T>) -> () {
+// CHECK: bb0(%0 : $<τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T>)
+bb0(%0 : @owned $<τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T>):
+  %1 = project_box %0 : $<τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T>, 0
   return undef : $()
 }

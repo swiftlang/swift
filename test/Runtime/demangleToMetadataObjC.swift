@@ -1,10 +1,11 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift-swift3
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import StdlibUnittest
 import Foundation
 import CoreFoundation
+import CoreLocation
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadataObjC")
 
@@ -72,6 +73,16 @@ DemangleToMetadataTests.test("@objc protocol conformances") {
   expectEqual(CG4<C, C>.self,
     _typeByMangledName("4main3CG4CyAA1CCAA1CCG")!)
   expectNil(_typeByMangledName("4main3CG4CyAA1DCAA1DCG"))
+}
+
+DemangleToMetadataTests.test("synthesized declarations") {
+  expectEqual(CLError.self, _typeByMangledName("SC7CLErrorLeV")!)
+  expectNil(_typeByMangledName("SC7CLErrorV"))
+  expectEqual(CLError.Code.self, _typeByMangledName("So7CLErrorV")!)
+
+  let error = NSError(domain: NSCocoaErrorDomain, code: 0)
+  let reflectionString = String(reflecting: CLError(_nsError: error))
+  expectTrue(reflectionString.hasPrefix("__C_Synthesized.related decl 'e' for CLError(_nsError:"))
 }
 
 runAllTests()

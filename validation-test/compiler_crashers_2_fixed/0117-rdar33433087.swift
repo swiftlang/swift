@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %s
+// RUN: %target-typecheck-verify-swift
 
 class C {
   private init() {} // expected-note {{declared here}}

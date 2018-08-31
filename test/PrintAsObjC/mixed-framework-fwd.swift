@@ -32,7 +32,7 @@
 import Foundation
 
 public class Dummy: NSNumber {
-  public func getProto() -> CustomProto? {
+  @objc public func getProto() -> CustomProto? {
     return nil
   }
 }

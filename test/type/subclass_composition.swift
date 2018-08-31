@@ -301,10 +301,12 @@ func conformsToAnyObject<T : AnyObject>(_: T) {}
 func conformsToP1<T : P1>(_: T) {}
 func conformsToP2<T : P2>(_: T) {}
 func conformsToBaseIntAndP2<T : Base<Int> & P2>(_: T) {}
-// expected-note@-1 4 {{in call to function 'conformsToBaseIntAndP2'}}
+// expected-note@-1 2 {{where 'T' = 'Base<String>'}}
+// expected-note@-2   {{where 'T' = 'Base<Int>'}}
 
 func conformsToBaseIntAndP2WithWhereClause<T>(_: T) where T : Base<Int> & P2 {}
-// expected-note@-1 2 {{in call to function 'conformsToBaseIntAndP2WithWhereClause'}}
+// expected-note@-1 {{where 'T' = 'Base<String>'}}
+// expected-note@-2 {{where 'T' = 'Base<Int>'}}
 
 class FakeDerived : Base<String>, P2 {
   required init(classInit: ()) {
@@ -409,26 +411,30 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
   // expected-note@-2 {{expected an argument list of type '(T)'}}
 
   conformsToP1(p1)
-  // expected-error@-1 {{cannot invoke 'conformsToP1' with an argument list of type '(P1)'}}
-  // expected-note@-2 {{expected an argument list of type '(T)'}}
+  // expected-error@-1 {{protocol type 'P1' cannot conform to 'P1' because only concrete types can conform to protocols}}
+
+  // FIXME: Following diagnostics are not great because when
+  // `conformsTo*` methods are re-typechecked, they loose information
+  // about `& P2` in generic parameter.
 
   conformsToBaseIntAndP2(base)
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{argument type 'Base<Int>' does not conform to expected type 'P2'}}
 
   conformsToBaseIntAndP2(badBase)
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<String>' inherit from 'Base<Int>'}}
+  // expected-error@-2 {{argument type 'Base<String>' does not conform to expected type 'P2'}}
 
   conformsToBaseIntAndP2(fakeDerived)
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<String>' inherit from 'Base<Int>'}}
 
   conformsToBaseIntAndP2WithWhereClause(fakeDerived)
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2WithWhereClause' requires that 'Base<String>' inherit from 'Base<Int>'}}
 
   conformsToBaseIntAndP2(p2Archetype)
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<Int>' conform to 'P2'}}
 
   conformsToBaseIntAndP2WithWhereClause(p2Archetype)
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2WithWhereClause' requires that 'Base<Int>' conform to 'P2'}}
 
   // Good
   conformsToAnyObject(anyObject)
@@ -442,27 +448,6 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
   conformsToBaseIntAndP2WithWhereClause(derived)
   conformsToBaseIntAndP2WithWhereClause(baseAndP2Archetype)
 }
-
-//
-// Protocols with superclass-constrained Self -- not supported yet.
-//
-
-protocol ProtoConstraintsSelfToClass where Self : Base<Int> {}
-
-protocol ProtoRefinesClass : Base<Int> {} // FIXME expected-error {{}}
-protocol ProtoRefinesClassAndProtocolAlias : BaseIntAndP2 {}
-protocol ProtoRefinesClassAndProtocolDirect : Base<Int> & P2 {}
-protocol ProtoRefinesClassAndProtocolExpanded : Base<Int>, P2 {} // FIXME expected-error {{}}
-
-class ClassConformsToClassProtocolBad1 : ProtoConstraintsSelfToClass {}
-// expected-error@-1 {{'ProtoConstraintsSelfToClass' requires that 'ClassConformsToClassProtocolBad1' inherit from 'Base<Int>'}}
-// expected-note@-2 {{requirement specified as 'Self' : 'Base<Int>' [with Self = ClassConformsToClassProtocolBad1]}}
-class ClassConformsToClassProtocolGood1 : Derived, ProtoConstraintsSelfToClass {}
-
-class ClassConformsToClassProtocolBad2 : ProtoRefinesClass {}
-// expected-error@-1 {{'ProtoRefinesClass' requires that 'ClassConformsToClassProtocolBad2' inherit from 'Base<Int>'}}
-// expected-note@-2 {{requirement specified as 'Self' : 'Base<Int>' [with Self = ClassConformsToClassProtocolBad2]}}
-class ClassConformsToClassProtocolGood2 : Derived, ProtoRefinesClass {}
 
 // Subclass existentials inside inheritance clauses
 class CompositionInClassInheritanceClauseAlias : BaseIntAndP2 {

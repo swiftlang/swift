@@ -140,8 +140,11 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   }
 
   // If lookupSymbol succeeded then fileName is non-null. Thus, we find the
-  // library name here.
-  StringRef libraryName = StringRef(syminfo.fileName).rsplit('/').second;
+  // library name here. Avoid using StringRef::rsplit because its definition
+  // is not provided in the header so that it requires linking with
+  // libSupport.a.
+  StringRef libraryName = StringRef(syminfo.fileName);
+  libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
 
   // Next we get the symbol name that we are going to use in our backtrace.
   std::string symbolName;
@@ -171,7 +174,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
     fprintf(stderr, "%s`%s + %td", libraryName.data(), symbolName.c_str(),
             offset);
   } else {
-    constexpr const char *format = "%-4u %-34s 0x%0.16tx %s + %td\n";
+    constexpr const char *format = "%-4u %-34s 0x%0.16" PRIxPTR " %s + %td\n";
     fprintf(stderr, format, index, libraryName.data(), symbolAddr,
             symbolName.c_str(), offset);
   }
@@ -290,6 +293,12 @@ void _swift_runtime_on_report(uintptr_t flags, const char *message,
 void swift::_swift_reportToDebugger(uintptr_t flags, const char *message,
                                     RuntimeErrorDetails *details) {
   _swift_runtime_on_report(flags, message, details);
+}
+
+bool swift::_swift_reportFatalErrorsToDebugger = true;
+
+bool swift::_swift_shouldReportFatalErrorsToDebugger() {
+  return _swift_reportFatalErrorsToDebugger;
 }
 
 /// Report a fatal error to system console, stderr, and crash logs.

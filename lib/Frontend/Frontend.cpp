@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
@@ -103,7 +104,7 @@ CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
 }
 std::string CompilerInvocation::getTBDPathForWholeModule() const {
   assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
-         "TBDPath only makes sense in WMO mode");
+         "TBDPath only makes sense when the whole module can be seen");
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.TBDPath;
 }
@@ -135,6 +136,10 @@ void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
+  // If initializing the overlay file system fails there's no sense in
+  // continuing because the compiler will read the wrong files.
+  if (setUpVirtualFileSystemOverlays())
+    return true;
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
@@ -149,9 +154,10 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().AttachCommentsToDecls = true;
   }
 
-  Context.reset(new ASTContext(Invocation.getLangOptions(),
-                               Invocation.getSearchPathOptions(), SourceMgr,
-                               Diagnostics));
+  Context.reset(ASTContext::get(Invocation.getLangOptions(),
+                                Invocation.getSearchPathOptions(), SourceMgr,
+                                Diagnostics));
+  registerTypeCheckerRequestFunctions(Context->evaluator);
 
   if (setUpModuleLoaders())
     return true;
@@ -162,6 +168,51 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().EnableAccessControl = false;
 
   return setUpInputs();
+}
+
+static bool loadAndValidateVFSOverlay(
+    const std::string &File,
+    const llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> &BaseFS,
+    const llvm::IntrusiveRefCntPtr<clang::vfs::OverlayFileSystem> &OverlayFS,
+    DiagnosticEngine &Diag) {
+  // FIXME: It should be possible to allow chained lookup of later VFS overlays
+  // through the mapping defined by earlier overlays.
+  // See rdar://problem/39440687
+  auto Buffer = BaseFS->getBufferForFile(File);
+  if (!Buffer) {
+    Diag.diagnose(SourceLoc(), diag::cannot_open_file, File,
+                         Buffer.getError().message());
+    return true;
+  }
+
+  auto VFS = clang::vfs::getVFSFromYAML(std::move(Buffer.get()),
+                                        nullptr, File);
+  if (!VFS) {
+    Diag.diagnose(SourceLoc(), diag::invalid_vfs_overlay_file, File);
+    return true;
+  }
+  OverlayFS->pushOverlay(VFS);
+  return false;
+}
+
+bool CompilerInstance::setUpVirtualFileSystemOverlays() {
+  auto BaseFS = clang::vfs::getRealFileSystem();
+  auto OverlayFS = llvm::IntrusiveRefCntPtr<clang::vfs::OverlayFileSystem>(
+                    new clang::vfs::OverlayFileSystem(BaseFS));
+  bool hadAnyFailure = false;
+  for (const auto &File : Invocation.getSearchPathOptions().VFSOverlayFiles) {
+    hadAnyFailure |=
+        loadAndValidateVFSOverlay(File, BaseFS, OverlayFS, Diagnostics);
+  }
+
+  // If we successfully loaded all the overlays, let the source manager and
+  // diagnostic engine take advantage of the overlay file system.
+  if (!hadAnyFailure &&
+      (OverlayFS->overlays_begin() != OverlayFS->overlays_end())) {
+    SourceMgr.setFileSystem(OverlayFS);
+  }
+
+  return hadAnyFailure;
 }
 
 void CompilerInstance::setUpLLVMArguments() {
@@ -197,10 +248,10 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleLoader(SourceLoader::create(*Context,
                                                   !immediate,
                                                   enableResilience,
-                                                  DepTracker));
+                                                  getDependencyTracker()));
   }
   {
-    auto SML = SerializedModuleLoader::create(*Context, DepTracker);
+    auto SML = SerializedModuleLoader::create(*Context, getDependencyTracker());
     this->SML = SML.get();
     Context->addModuleLoader(std::move(SML));
   }
@@ -210,7 +261,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     // knowledge.
     auto clangImporter =
         ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                              Invocation.getPCHHash(), DepTracker);
+                              Invocation.getPCHHash(), getDependencyTracker());
     if (!clangImporter) {
       Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
       return true;
@@ -235,6 +286,20 @@ Optional<unsigned> CompilerInstance::setUpCodeCompletionBuffer() {
   return codeCompletionBufferID;
 }
 
+static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
+  switch (inputKind) {
+  case InputFileKind::Swift:
+  case InputFileKind::SwiftModuleInterface:
+  case InputFileKind::SIL:
+    return true;
+  case InputFileKind::SwiftLibrary:
+  case InputFileKind::SwiftREPL:
+  case InputFileKind::LLVM:
+  case InputFileKind::None:
+    return false;
+  }
+}
+
 bool CompilerInstance::setUpInputs() {
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
   // per-input setup.
@@ -252,9 +317,11 @@ bool CompilerInstance::setUpInputs() {
     recordPrimaryInputBuffer(*codeCompletionBufferID);
   }
 
-  if (isInputSwift() && MainBufferID == NO_SUCH_BUFFER &&
-      InputSourceCodeBufferIDs.size() == 1)
+  if (MainBufferID == NO_SUCH_BUFFER &&
+      InputSourceCodeBufferIDs.size() == 1 &&
+      shouldTreatSingleInputAsMain(Invocation.getInputKind())) {
     MainBufferID = InputSourceCodeBufferIDs.front();
+  }
 
   return false;
 }
@@ -267,9 +334,8 @@ bool CompilerInstance::setUpForInput(const InputFile &input) {
   if (!bufferID)
     return false;
 
-  if (isInSILMode() ||
-      (isInputSwift() &&
-       llvm::sys::path::filename(input.file()) == "main.swift")) {
+  if (isInputSwift() &&
+      llvm::sys::path::filename(input.file()) == "main.swift") {
     assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
     MainBufferID = *bufferID;
   }
@@ -324,7 +390,8 @@ CompilerInstance::getInputBufferAndModuleDocBufferIfPresent(
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
-  FileOrError inputFileOrErr = llvm::MemoryBuffer::getFileOrSTDIN(input.file());
+  FileOrError inputFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
+                                                          input.file());
   if (!inputFileOrErr) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, input.file(),
                          inputFileOrErr.getError().message());
@@ -344,11 +411,12 @@ CompilerInstance::getInputBufferAndModuleDocBufferIfPresent(
 Optional<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInstance::openModuleDoc(const InputFile &input) {
   llvm::SmallString<128> moduleDocFilePath(input.file());
-  llvm::sys::path::replace_extension(moduleDocFilePath,
-                                     SERIALIZED_MODULE_DOC_EXTENSION);
+  llvm::sys::path::replace_extension(
+      moduleDocFilePath,
+      file_types::getExtension(file_types::TY_SwiftModuleDocFile));
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
   FileOrError moduleDocFileOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(moduleDocFilePath);
+      swift::vfs::getFileOrSTDIN(getFileSystem(), moduleDocFilePath);
   if (moduleDocFileOrErr)
     return std::move(*moduleDocFileOrErr);
 
@@ -398,13 +466,6 @@ static void addAdditionalInitialImportsTo(
   SF->addImports(additionalImports);
 }
 
-static bool shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
-    FrontendOptions::ActionType RequestedAction) {
-  return RequestedAction == FrontendOptions::ActionType::EmitObject ||
-         RequestedAction == FrontendOptions::ActionType::Immediate ||
-         RequestedAction == FrontendOptions::ActionType::EmitSIL;
-}
-
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -417,18 +478,42 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
   if (Invocation.getSILOptions().shouldOptimize())
     return false;
 
-  if (shouldImportSwiftOnoneModuleIfNoneOrImplicitOptimization(
-          Invocation.getFrontendOptions().RequestedAction)) {
-    return true;
-  }
-  return Invocation.getFrontendOptions().isCreatingSIL();
+  // If we are not executing an action that has a dependency on
+  // SwiftOnoneSupport, don't load it.
+  //
+  // FIXME: Knowledge of SwiftOnoneSupport loading in the Frontend is a layering
+  // violation. However, SIL currently does not have a way to express this
+  // dependency itself for the benefit of autolinking.  In the mean time, we
+  // will be conservative and say that actions like -emit-silgen and
+  // -emit-sibgen - that don't really involve the optimizer - have a
+  // strict dependency on SwiftOnoneSupport.
+  //
+  // This optimization is disabled by -track-system-dependencies to preserve
+  // the explicit dependency.
+  const auto &options = Invocation.getFrontendOptions();
+  return options.TrackSystemDeps
+      || FrontendOptions::doesActionGenerateSIL(options.RequestedAction);
+}
+
+void CompilerInstance::performParseAndResolveImportsOnly() {
+  performSemaUpTo(SourceFile::NameBound);
 }
 
 void CompilerInstance::performSema() {
+  performSemaUpTo(SourceFile::TypeChecked);
+}
+
+void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
+  // FIXME: A lot of the logic in `performParseOnly` is a stripped-down version
+  // of the logic in `performSemaUpTo`.  We should try to unify them over time.
+  if (LimitStage <= SourceFile::Parsed) {
+    return performParseOnly();
+  }
+
   FrontendStatsTracer tracer(Context->Stats, "perform-sema");
   Context->LoadedModules[MainModule->getName()] = getMainModule();
 
-  if (Invocation.getInputKind() == InputFileKind::IFK_SIL) {
+  if (Invocation.getInputKind() == InputFileKind::SIL) {
     assert(!InputSourceCodeBufferIDs.empty());
     assert(InputSourceCodeBufferIDs.size() == 1);
     assert(MainBufferID != NO_SUCH_BUFFER);
@@ -447,7 +532,7 @@ void CompilerInstance::performSema() {
 
   const ImplicitImports implicitImports(*this);
 
-  if (Invocation.getInputKind() == InputFileKind::IFK_Swift_REPL) {
+  if (Invocation.getInputKind() == InputFileKind::SwiftREPL) {
     createREPLFile(implicitImports);
     return;
   }
@@ -456,7 +541,7 @@ void CompilerInstance::performSema() {
   if (MainBufferID != NO_SUCH_BUFFER)
     addMainFileToModule(implicitImports);
 
-  parseAndCheckTypes(implicitImports);
+  parseAndCheckTypesUpTo(implicitImports, LimitStage);
 }
 
 CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
@@ -563,19 +648,13 @@ CompilerInstance::computeDelayedParsingCallback(bool isPrimary) {
 
 void CompilerInstance::addMainFileToModule(
     const ImplicitImports &implicitImports) {
-  const InputFileKind Kind = Invocation.getInputKind();
-  assert(Kind == InputFileKind::IFK_Swift || Kind == InputFileKind::IFK_SIL);
-
-  if (Kind == InputFileKind::IFK_Swift)
-    SourceMgr.setHashbangBufferID(MainBufferID);
-
   auto *MainFile = createSourceFileForMainModule(
       Invocation.getSourceFileKind(), implicitImports.kind, MainBufferID);
   addAdditionalInitialImportsTo(MainFile, implicitImports);
 }
 
-void CompilerInstance::parseAndCheckTypes(
-    const ImplicitImports &implicitImports) {
+void CompilerInstance::parseAndCheckTypesUpTo(
+    const ImplicitImports &implicitImports, SourceFile::ASTStage_t limitStage) {
   FrontendStatsTracer tracer(Context->Stats, "parse-and-check-types");
   // Delayed parsing callback for the primary file, or all files
   // in non-WMO mode.
@@ -610,8 +689,21 @@ void CompilerInstance::parseAndCheckTypes(
   // In addition, the main file has parsing and type-checking
   // interwined.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    parseAndTypeCheckMainFile(PersistentState, PrimaryDelayedCB.get(),
-                              TypeCheckOptions);
+    parseAndTypeCheckMainFileUpTo(limitStage, PersistentState,
+                                  PrimaryDelayedCB.get(), TypeCheckOptions);
+  }
+
+  assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
+    auto *SF = dyn_cast<SourceFile>(File);
+    if (!SF)
+      return true;
+    return SF->ASTStage >= SourceFile::NameBound;
+  }) && "some files have not yet had their imports resolved");
+  MainModule->setHasResolvedImports();
+
+  // If the limiting AST stage is name binding, we're done.
+  if (limitStage <= SourceFile::NameBound) {
+    return;
   }
 
   const auto &options = Invocation.getFrontendOptions();
@@ -620,7 +712,8 @@ void CompilerInstance::parseAndCheckTypes(
                         TypeCheckOptions, /*curElem*/ 0,
                         options.WarnLongFunctionBodies,
                         options.WarnLongExpressionTypeChecking,
-                        options.SolverExpressionTimeThreshold);
+                        options.SolverExpressionTimeThreshold,
+                        options.SwitchCheckingInvocationThreshold);
   });
 
   // Even if there were no source files, we should still record known
@@ -710,7 +803,8 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   return hadLoadError;
 }
 
-void CompilerInstance::parseAndTypeCheckMainFile(
+void CompilerInstance::parseAndTypeCheckMainFileUpTo(
+    SourceFile::ASTStage_t LimitStage,
     PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB,
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
@@ -737,18 +831,36 @@ void CompilerInstance::parseAndTypeCheckMainFile(
     parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
                         TheSILModule ? &SILContext : nullptr, &PersistentState,
                         DelayedParseCB);
+
     if (mainIsPrimary) {
-      const auto &options = Invocation.getFrontendOptions();
-      performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
-                          TypeCheckOptions, CurTUElem,
-                          options.WarnLongFunctionBodies,
-                          options.WarnLongExpressionTypeChecking,
-                          options.SolverExpressionTimeThreshold);
+      switch (LimitStage) {
+      case SourceFile::Parsing:
+      case SourceFile::Parsed:
+        llvm_unreachable("invalid limit stage");
+      case SourceFile::NameBound:
+        performNameBinding(MainFile, CurTUElem);
+        break;
+      case SourceFile::TypeChecked:
+        const auto &options = Invocation.getFrontendOptions();
+        performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
+                            TypeCheckOptions, CurTUElem,
+                            options.WarnLongFunctionBodies,
+                            options.WarnLongExpressionTypeChecking,
+                            options.SolverExpressionTimeThreshold,
+                            options.SwitchCheckingInvocationThreshold);
+        break;
+      }
     }
+
     CurTUElem = MainFile.Decls.size();
   } while (!Done);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
+
+  if (mainIsPrimary && !Context->hadError() &&
+      Invocation.getFrontendOptions().DebuggerTestingTransform) {
+    performDebuggerTestingTransform(MainFile);
+  }
 
   if (mainIsPrimary && !Context->hadError() &&
       Invocation.getFrontendOptions().PCMacro) {
@@ -817,16 +929,17 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   ModuleDecl *const MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
 
-  assert((Kind == InputFileKind::IFK_Swift ||
-          Kind == InputFileKind::IFK_Swift_Library) &&
+  assert((Kind == InputFileKind::Swift ||
+          Kind == InputFileKind::SwiftLibrary ||
+          Kind == InputFileKind::SwiftModuleInterface) &&
          "only supports parsing .swift files");
   (void)Kind;
 
   // Make sure the main file is the first file in the module but parse it last,
   // to match the parsing logic used when performing Sema.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    assert(Kind == InputFileKind::IFK_Swift);
-    SourceMgr.setHashbangBufferID(MainBufferID);
+    assert(Kind == InputFileKind::Swift ||
+           Kind == InputFileKind::SwiftModuleInterface);
     createSourceFileForMainModule(Invocation.getSourceFileKind(),
                                   SourceFile::ImplicitModuleImportKind::None,
                                   MainBufferID);
@@ -856,6 +969,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   if (MainBufferID != NO_SUCH_BUFFER) {
     SourceFile &MainFile =
         MainModule->getMainSourceFile(Invocation.getSourceFileKind());
+    MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
 
     bool Done;
     do {

@@ -11,17 +11,19 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "objectoutliner"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/AST/ASTMangler.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
 namespace {
 
 class ObjectOutliner {
+  SILOptFunctionBuilder &FunctionBuilder;
   NominalTypeDecl *ArrayDecl = nullptr;
   int GlobIdx = 0;
 
@@ -45,7 +47,9 @@ class ObjectOutliner {
   void replaceFindStringCall(ApplyInst *FindStringCall);
 
 public:
-  ObjectOutliner(NominalTypeDecl *ArrayDecl) : ArrayDecl(ArrayDecl) { }
+  ObjectOutliner(SILOptFunctionBuilder &FunctionBuilder,
+                 NominalTypeDecl *ArrayDecl)
+      : FunctionBuilder(FunctionBuilder), ArrayDecl(ArrayDecl) { }
 
   bool run(SILFunction *F);
 };
@@ -331,8 +335,8 @@ bool ObjectOutliner::optimizeObjectAllocation(
       return false;
   }
 
-  DEBUG(llvm::dbgs() << "Outline global variable in " <<
-        ARI->getFunction()->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "Outline global variable in "
+                          << ARI->getFunction()->getName() << '\n');
 
   SILModule *Module = &ARI->getFunction()->getModule();
   assert(!Cl->isResilient(Module->getSwiftModule(),
@@ -431,7 +435,7 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
     return;
 
   SILDeclRef declRef(FD, SILDeclRef::Kind::Func);
-  SILFunction *replacementFunc = Module->getOrCreateFunction(
+  SILFunction *replacementFunc = FunctionBuilder.getOrCreateFunction(
       FindStringCall->getLoc(), declRef, NotForDefinition);
 
   SILFunctionType *FTy = replacementFunc->getLoweredFunctionType();
@@ -473,7 +477,7 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   FunctionRefInst *FRI = B.createFunctionRef(FindStringCall->getLoc(),
                                              replacementFunc);
   ApplyInst *NewCall = B.createApply(FindStringCall->getLoc(), FRI,
-                                     FindStringCall->getSubstitutions(),
+                                     FindStringCall->getSubstitutionMap(),
                                      { FindStringCall->getArgument(0),
                                        FindStringCall->getArgument(1),
                                        CacheAddr },
@@ -483,11 +487,12 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   FindStringCall->eraseFromParent();
 }
 
-class ObjectOutlinerPass : public SILFunctionTransform
-{
+class ObjectOutlinerPass : public SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
-    ObjectOutliner Outliner(F->getModule().getASTContext().getArrayDecl());
+    SILOptFunctionBuilder FuncBuilder(*this);
+    ObjectOutliner Outliner(FuncBuilder,
+                            F->getModule().getASTContext().getArrayDecl());
     if (Outliner.run(F)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

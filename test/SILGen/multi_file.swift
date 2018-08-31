@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -primary-file %s %S/Inputs/multi_file_helper.swift | %FileCheck %s
+
+// RUN: %target-swift-emit-silgen -module-name multi_file -enable-sil-ownership -primary-file %s %S/Inputs/multi_file_helper.swift | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -18,21 +19,17 @@ func lazyPropertiesAreNotStored(_ container: LazyContainer) {
 
 // CHECK-LABEL: sil hidden @$S10multi_file29lazyRefPropertiesAreNotStored{{[_0-9a-zA-Z]*}}F
 func lazyRefPropertiesAreNotStored(_ container: LazyContainerClass) {
-  // CHECK: bb0([[ARG:%.*]] : @owned $LazyContainerClass):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   {{%[0-9]+}} = class_method [[BORROWED_ARG]] : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : (LazyContainerClass) -> () -> Int, $@convention(method) (@guaranteed LazyContainerClass) -> Int
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $LazyContainerClass):
+  // CHECK:   {{%[0-9]+}} = class_method [[ARG]] : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : (LazyContainerClass) -> () -> Int, $@convention(method) (@guaranteed LazyContainerClass) -> Int
   markUsed(container.lazyVar)
 }
 
 // CHECK-LABEL: sil hidden @$S10multi_file25finalVarsAreDevirtualizedyyAA18FinalPropertyClassCF
 func finalVarsAreDevirtualized(_ obj: FinalPropertyClass) {
-  // CHECK: bb0([[ARG:%.*]] : @owned $FinalPropertyClass):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   ref_element_addr [[BORROWED_ARG]] : $FinalPropertyClass, #FinalPropertyClass.foo
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $FinalPropertyClass):
+  // CHECK:   ref_element_addr [[ARG]] : $FinalPropertyClass, #FinalPropertyClass.foo
   markUsed(obj.foo)
-  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: class_method [[BORROWED_ARG]] : $FinalPropertyClass, #FinalPropertyClass.bar!getter.1
+  // CHECK: class_method [[ARG]] : $FinalPropertyClass, #FinalPropertyClass.bar!getter.1
   markUsed(obj.bar)
 }
 
@@ -40,7 +37,9 @@ func finalVarsAreDevirtualized(_ obj: FinalPropertyClass) {
 // CHECK-LABEL: sil hidden @$S10multi_file34finalVarsDontNeedMaterializeForSetyyAA27ObservingPropertyFinalClassCF
 func finalVarsDontNeedMaterializeForSet(_ obj: ObservingPropertyFinalClass) {
   obj.foo += 1
-  // CHECK: function_ref @$S10multi_file27ObservingPropertyFinalClassC3fooSivg
+  // CHECK: [[T0:%.*]] = ref_element_addr %0 : $ObservingPropertyFinalClass, #ObservingPropertyFinalClass.foo
+  // CHECK-NEXT: [[T1:%.*]] = begin_access [read] [dynamic] [[T0]] : $*Int
+  // CHECK-NEXT: load [trivial] [[T1]] : $*Int
   // CHECK: function_ref @$S10multi_file27ObservingPropertyFinalClassC3fooSivs
 }
 
@@ -52,5 +51,5 @@ class HasComputedProperty: ProtocolWithProperty {
     set {}
   }
 }
-// CHECK-LABEL: sil hidden [transparent] @$S10multi_file19HasComputedPropertyC3fooSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasComputedProperty) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK-LABEL: sil private [transparent] [thunk] @$S10multi_file19HasComputedPropertyCAA012ProtocolWithE0A2aDP3fooSivmTW : $@convention(witness_method: ProtocolWithProperty) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasComputedProperty) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @$S10multi_file19HasComputedPropertyC3fooSivM : $@yield_once @convention(method) (@guaranteed HasComputedProperty) -> @yields @inout Int {
+// CHECK-LABEL: sil private [transparent] [thunk] @$S10multi_file19HasComputedPropertyCAA012ProtocolWithE0A2aDP3fooSivMTW : $@yield_once @convention(witness_method: ProtocolWithProperty) (@inout HasComputedProperty) -> @yields @inout Int {

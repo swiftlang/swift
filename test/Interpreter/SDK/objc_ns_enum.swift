@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift-swift3
 // REQUIRES: executable_test
 
 // NSButtonType (from AppKit) and UIViewAnimationCurve (from UIKit) both have
@@ -8,7 +8,7 @@
 // strict checking if we get a guarantee that certain types don't have
 // hidden or future enumeration values.)
 
-#if os(OSX)
+#if os(macOS)
 import AppKit
 
 print(NSButtonType(rawValue: 20721)!.rawValue)

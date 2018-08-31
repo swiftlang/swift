@@ -26,7 +26,7 @@ public let Suffix = [
   BenchmarkInfo(
     name: "SuffixCountableRange",
     runFunction: run_SuffixCountableRange,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .unstable]),
   BenchmarkInfo(
     name: "SuffixSequence",
     runFunction: run_SuffixSequence,
@@ -54,7 +54,7 @@ public let Suffix = [
   BenchmarkInfo(
     name: "SuffixCountableRangeLazy",
     runFunction: run_SuffixCountableRangeLazy,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .unstable]),
   BenchmarkInfo(
     name: "SuffixSequenceLazy",
     runFunction: run_SuffixSequenceLazy,
@@ -235,3 +235,7 @@ public func run_SuffixArrayLazy(_ N: Int) {
     CheckResults(result == sumCount)
   }
 }
+
+// Local Variables:
+// eval: (read-only-mode 1)
+// End:

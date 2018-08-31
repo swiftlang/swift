@@ -1,13 +1,14 @@
+
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-sil-ownership -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
-// RUN: %target-swift-frontend -I %t -emit-silgen -enable-sil-ownership -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name protocol_resilience -emit-module -enable-sil-ownership -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
+// RUN: %target-swift-emit-silgen -module-name protocol_resilience -I %t -enable-sil-ownership -enable-resilience %s | %FileCheck %s
 
 import resilient_protocol
 
-prefix operator ~~~ {}
-infix operator <*> {}
-infix operator <**> {}
-infix operator <===> {}
+prefix operator ~~~
+infix operator <*>
+infix operator <**>
+infix operator <===>
 
 public protocol P {}
 
@@ -120,8 +121,7 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE26mutablePropertyWithDefaultSivg
 // CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivs
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE26mutablePropertyWithDefaultSivs
-// CHECK-LABEL: sil private [transparent] @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivmytfU_
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivm
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivM
   public var mutablePropertyWithDefault: Int {
     get { return 0 }
     set { }
@@ -136,8 +136,7 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE33mutableGenericPropertyWithDefault1TQzvg
 // CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvs
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE33mutableGenericPropertyWithDefault1TQzvs
-// CHECK-LABEL: sil private [transparent] @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvmytfU_
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvm
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvM
   public var mutableGenericPropertyWithDefault: T {
     get {
       return T(default: ())
@@ -149,8 +148,7 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAEy1TQzAEcig
 // CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStoragePy1TQzAEcis
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAEy1TQzAEcis
-// CHECK-LABEL: sil private [transparent] @$S19protocol_resilience16ResilientStoragePy1TQzAEcimytfU_
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStoragePy1TQzAEcim
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStoragePy1TQzAEciM
   public subscript(x: T) -> T {
     get {
       return x
@@ -162,8 +160,7 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE36mutatingGetterWithNonMutatingDefaultSivg
 // CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivs
 // CHECK-LABEL: sil @$S19protocol_resilience16ResilientStoragePAAE36mutatingGetterWithNonMutatingDefaultSivs
-// CHECK-LABEL: sil private [transparent] @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivmytfU_
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivm
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivM
   public var mutatingGetterWithNonMutatingDefault: Int {
     get {
       return 0
@@ -221,13 +218,13 @@ extension ReabstractSelfBase {
   }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg : $@convention(witness_method: ReabstractSelfRefined) <τ_0_0 where τ_0_0 : ReabstractSelfRefined> (@guaranteed τ_0_0) -> @owned @callee_guaranteed (@owned τ_0_0) -> @owned τ_0_0
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg : $@convention(witness_method: ReabstractSelfRefined) <τ_0_0 where τ_0_0 : ReabstractSelfRefined> (@guaranteed τ_0_0) -> @owned @callee_guaranteed (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK: [[SELF_BOX:%.*]] = alloc_stack $τ_0_0
 // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value %0 : $τ_0_0
 // CHECK-NEXT: store [[SELF_COPY]] to [init] [[SELF_BOX]] : $*τ_0_0
 // CHECK: [[WITNESS:%.*]] = function_ref @$S19protocol_resilience18ReabstractSelfBasePAAE8callbackyxxcvg
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[WITNESS]]<τ_0_0>([[SELF_BOX]])
-// CHECK: [[THUNK_FN:%.*]] = function_ref @$SxxIegir_xxIegxo_19protocol_resilience21ReabstractSelfRefinedRzlTR
+// CHECK: [[THUNK_FN:%.*]] = function_ref @$SxxIegnr_xxIeggo_19protocol_resilience21ReabstractSelfRefinedRzlTR
 // CHECK-NEXT: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<τ_0_0>([[RESULT]])
 // CHECK-NEXT: destroy_addr [[SELF_BOX]]
 // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
@@ -239,7 +236,7 @@ func inoutFunc(_ x: inout Int) {}
 
 // CHECK-LABEL: sil hidden @$S19protocol_resilience22inoutResilientProtocolyy010resilient_A005OtherdE0_pzF
 func inoutResilientProtocol(_ x: inout OtherResilientProtocol) {
-  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE19propertyInExtensionSivm
+  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE19propertyInExtensionSivM
   inoutFunc(&x.propertyInExtension)
 }
 
@@ -247,10 +244,10 @@ struct OtherConformingType : OtherResilientProtocol {}
 
 // CHECK-LABEL: sil hidden @$S19protocol_resilience22inoutResilientProtocolyyAA19OtherConformingTypeVzF
 func inoutResilientProtocol(_ x: inout OtherConformingType) {
-  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE19propertyInExtensionSivm
+  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE19propertyInExtensionSivM
   inoutFunc(&x.propertyInExtension)
 
-  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE25staticPropertyInExtensionSivmZ
+  // CHECK: function_ref @$S18resilient_protocol22OtherResilientProtocolPAAE25staticPropertyInExtensionSivM
   inoutFunc(&OtherConformingType.staticPropertyInExtension)
 }
 
@@ -285,19 +282,19 @@ func inoutResilientProtocol(_ x: inout OtherConformingType) {
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!getter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivg
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!setter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivs
-// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!materializeForSet.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivm
+// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!modify.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivM
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!getter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvg
 // CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!setter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvs
-// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!materializeForSet.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvm
+// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!modify.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvM
 // CHECK-NEXT:   method #ResilientStorage.subscript!getter.1: {{.*}} : @$S19protocol_resilience16ResilientStoragePy1TQzAEcig
 // CHECK-NEXT:   method #ResilientStorage.subscript!setter.1: {{.*}} : @$S19protocol_resilience16ResilientStoragePy1TQzAEcis
-// CHECK-NEXT:   method #ResilientStorage.subscript!materializeForSet.1: {{.*}} : @$S19protocol_resilience16ResilientStoragePy1TQzAEcim
+// CHECK-NEXT:   method #ResilientStorage.subscript!modify.1: {{.*}} : @$S19protocol_resilience16ResilientStoragePy1TQzAEciM
 // CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!getter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivg
 // CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!setter.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivs
-// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!materializeForSet.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivm
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!modify.1: {{.*}} : @$S19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivM
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientOperators {
@@ -313,5 +310,5 @@ func inoutResilientProtocol(_ x: inout OtherConformingType) {
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!getter.1: {{.*}} : @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!setter.1: {{.*}} : @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvs
-// CHECK-NEXT:   method #ReabstractSelfRefined.callback!materializeForSet.1: {{.*}} : @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvm
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!modify.1: {{.*}} : @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvM
 // CHECK-NEXT: }

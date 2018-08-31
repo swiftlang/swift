@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 func escapeByBitCast(f: () -> ()) -> () -> () {
-  // expected-warning@+1{{'unsafeBitCast' from non-escaping function type '() -> ()' to escaping function type '() -> ()' is undefined; use 'withoutActuallyEscaping' to temporarily escape a function}}
   return unsafeBitCast(f, to: (() -> ()).self)
+  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
 }
 
 func changeFnRep(f: @escaping () -> ()) -> @convention(block) () -> () {

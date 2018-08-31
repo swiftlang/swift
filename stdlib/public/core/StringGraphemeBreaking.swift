@@ -13,57 +13,31 @@
 import SwiftShims
 
 /// CR and LF are common special cases in grapheme breaking logic
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
+@inlinable // FIXME(sil-serialize-all)
 internal var _CR: UInt8 { return 0x0d }
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
+@inlinable // FIXME(sil-serialize-all)
 internal var _LF: UInt8 { return 0x0a }
 
-extension String.Index {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal init(encodedOffset: Int, characterStride stride: Int) {
-    if _slowPath(stride == 0 || stride > UInt16.max) {
-      // Don't store a 0 stride for the endIndex
-      // or a truncated stride for an overlong grapheme cluster.
-      self.init(encodedOffset: encodedOffset)
-      return
-    }
-    self.init(
-      encodedOffset: encodedOffset,
-      .character(stride: UInt16(truncatingIfNeeded: stride)))
-  }
-}
-
 extension _StringVariant {
-  @_versioned
-  @_inlineable
+  @inlinable
   internal func _stride(at i: String.Index) -> Int {
-    if case .character(let stride) = i._cache {
-      // TODO: should _fastPath the case somehow
-      _sanityCheck(stride > 0)
-      return Int(stride)
-    }
+    if let stride = i.characterStride { return stride }
     return characterStride(atOffset: i.encodedOffset)
   }
 
-  @_versioned
-  @_inlineable
+  @inlinable
   internal func characterStride(atOffset offset: Int) -> Int {
     let slice = self.checkedSlice(from: offset)
     return slice.measureFirstExtendedGraphemeCluster()
   }
 
-  @_versioned
-  @_inlineable
+  @inlinable
   internal func characterIndex(atOffset offset: Int) -> String.Index {
     let stride = self.characterStride(atOffset: offset)
     return String.Index(encodedOffset: offset, characterStride: stride)
   }
 
-  @_versioned
-  @_inlineable
+  @inlinable
   internal func characterIndex(after i: String.Index) -> String.Index {
     let offset = i.encodedOffset
     _precondition(offset >= 0, "String index is out of bounds")
@@ -78,8 +52,7 @@ extension _StringVariant {
       characterStride: stride2)
   }
 
-  @_versioned
-  @_inlineable
+  @inlinable
   internal func characterIndex(before i: String.Index) -> String.Index {
     let offset = i.encodedOffset
     _precondition(offset > 0, "Can't move before startIndex")
@@ -92,8 +65,7 @@ extension _StringVariant {
       characterStride: stride)
   }
 
-  @_versioned
-  @_inlineable
+  @inlinable
   internal func characterIndex(
     _ i: String.Index,
     offsetBy n: Int
@@ -111,8 +83,7 @@ extension _StringVariant {
     return i
   }
 
-  @_versioned
-  @_inlineable
+  @inlinable
   internal func characterIndex(
     _ i: String.Index,
     offsetBy n: Int,
@@ -159,8 +130,7 @@ extension _StringVariant {
     return count
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func character(at i: String.Index) -> Character {
     let stride = _stride(at: i)
     let offset = i.encodedOffset
@@ -180,8 +150,7 @@ extension _StringVariant {
   // paths of grapheme breaking that we have high confidence won't change.
   /// Returns the length of the first extended grapheme cluster in UTF-16
   /// code units.
-  @_versioned
-  @_inlineable
+  @inlinable
   internal
   func measureFirstExtendedGraphemeCluster() -> Int {
     // No more graphemes at end of string.
@@ -211,8 +180,7 @@ extension _StringVariant {
   //
   /// Returns the length of the last extended grapheme cluster in UTF-16
   /// code units.
-  @_versioned
-  @_inlineable
+  @inlinable
   internal
   func measureLastExtendedGraphemeCluster() -> Int {
     let count = self.count
@@ -241,7 +209,7 @@ extension _StringVariant {
 
 extension _UnmanagedString {
   @inline(never)
-  @_versioned
+  @usableFromInline
   internal func _measureFirstExtendedGraphemeClusterSlow() -> Int {
     // ASCII case handled entirely on fast path.
     // FIXME: Have separate implementations for ASCII & UTF-16 views.
@@ -253,7 +221,7 @@ extension _UnmanagedString {
   }
 
   @inline(never)
-  @_versioned
+  @usableFromInline
   internal func _measureLastExtendedGraphemeClusterSlow() -> Int {
     // ASCII case handled entirely on fast path.
     // FIXME: Have separate implementations for ASCII & UTF-16 views.
@@ -267,7 +235,7 @@ extension _UnmanagedString {
 
 extension _UnmanagedOpaqueString {
   @inline(never)
-  @_versioned
+  @usableFromInline
   internal func _measureFirstExtendedGraphemeClusterSlow() -> Int {
     _sanityCheck(count >= 2, "should have at least two code units")
 
@@ -287,14 +255,14 @@ extension _UnmanagedOpaqueString {
 
     // Nuclear option: copy out the rest of the string into a contiguous buffer.
     let longStart = UnsafeMutablePointer<UInt16>.allocate(capacity: count)
-    defer { longStart.deallocate(capacity: count) }
+    defer { longStart.deallocate() }
     self._copy(into: UnsafeMutableBufferPointer(start: longStart, count: count))
     return UTF16._measureFirstExtendedGraphemeCluster(
       in: UnsafeBufferPointer(start: longStart, count: count))
   }
 
   @inline(never)
-  @_versioned
+  @usableFromInline
   internal func _measureLastExtendedGraphemeClusterSlow() -> Int {
     _sanityCheck(count >= 2, "should have at least two code units")
 
@@ -314,7 +282,7 @@ extension _UnmanagedOpaqueString {
 
     // Nuclear option: copy out the rest of the string into a contiguous buffer.
     let longStart = UnsafeMutablePointer<UInt16>.allocate(capacity: count)
-    defer { longStart.deallocate(capacity: count) }
+    defer { longStart.deallocate() }
     self._copy(into: UnsafeMutableBufferPointer(start: longStart, count: count))
     return UTF16._measureLastExtendedGraphemeCluster(
       in: UnsafeBufferPointer(start: longStart, count: count))
@@ -323,8 +291,7 @@ extension _UnmanagedOpaqueString {
 
 extension Unicode.UTF16 {
   /// Fast check for a (stable) grapheme break between two UInt16 code units
-  @_inlineable // Safe to inline
-  @_versioned
+  @inlinable // Safe to inline
   internal static func _quickCheckGraphemeBreakBetween(
     _ lhs: UInt16, _ rhs: UInt16
   ) -> Bool {
@@ -337,7 +304,7 @@ extension Unicode.UTF16 {
   }
 
   @inline(never) // @inline(resilient_only)
-  @_versioned
+  @usableFromInline
   internal static func _internalExtraCheckGraphemeBreakBetween(
     _ lhs: UInt16, _ rhs: UInt16
   ) -> Bool {
@@ -399,7 +366,7 @@ extension Unicode.UTF16 {
     return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs)
   }
 
-  // NOT @_versioned
+  // NOT @usableFromInline
   internal static func _measureFirstExtendedGraphemeCluster(
     in buffer: UnsafeBufferPointer<CodeUnit>
   ) -> Int {
@@ -424,7 +391,7 @@ extension Unicode.UTF16 {
     return Int(count)
   }
 
-  // NOT @_versioned
+  // NOT @usableFromInline
   internal static func _measureLastExtendedGraphemeCluster(
     in buffer: UnsafeBufferPointer<CodeUnit>
   ) -> Int {

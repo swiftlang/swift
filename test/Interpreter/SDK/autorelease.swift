@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift foo | %FileCheck %s
+// RUN: %target-run-simple-swift-swift3 | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop

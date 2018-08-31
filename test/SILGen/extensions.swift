@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class Foo {
   // CHECK-LABEL: sil hidden @$S10extensions3FooC3zim{{[_0-9a-zA-Z]*}}F
@@ -45,8 +45,7 @@ func extensionMethodCurrying(_ x: Foo) {
 // CHECK-LABEL: sil hidden [transparent] @$S10extensions3BoxV1txSgvpfi : $@convention(thin) <T> () -> @out Optional<T>
 // CHECK:      bb0(%0 : @trivial $*Optional<T>):
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Optional<T>.Type
-// CHECK:      [[FN:%.*]] = function_ref @$SSq10nilLiteralxSgyt_tcfC : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
-// CHECK-NEXT: apply [[FN]]<T>(%0, [[METATYPE]]) : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+// CHECK:      inject_enum_addr %0 : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()
 

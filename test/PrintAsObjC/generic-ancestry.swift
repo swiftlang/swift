@@ -14,7 +14,7 @@ import ObjectiveC
 // CHECK-LABEL: @interface ConcreteClass
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class ConcreteClass {}
+@objc @objcMembers class ConcreteClass {}
 
 // CHECK-NOT: @interface GenericSubclass
 // NEGATIVE-NOT: @interface GenericSubclass
@@ -30,7 +30,7 @@ class NonGenericSubclass : GenericSubclass<ConcreteClass> {}
 // CHECK-NOT: rocky
 // NEGATIVE-NOT: rocky
 // CHECK-NEXT: @end
-@objc class TopMoviesOfAllTime {
+@objc @objcMembers class TopMoviesOfAllTime {
   func rambo(c: ConcreteClass) {}
   func rocky(c: NonGenericSubclass) {}
 }

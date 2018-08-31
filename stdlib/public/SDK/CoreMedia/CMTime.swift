@@ -99,34 +99,36 @@ public func CMTIME_HAS_BEEN_ROUNDED(_ time: CMTime) -> Bool {
   return time.hasBeenRounded
 }
 
-// CMTimeAdd
-public func + (addend1: CMTime, addend2: CMTime) -> CMTime {
-  return CMTimeAdd(addend1, addend2)
+extension CMTime {
+  // CMTimeAdd
+  public static func + (addend1: CMTime, addend2: CMTime) -> CMTime {
+    return CMTimeAdd(addend1, addend2)
+  }
+  
+  // CMTimeSubtract
+  public static func - (minuend: CMTime, subtrahend: CMTime) -> CMTime {
+    return CMTimeSubtract(minuend, subtrahend)
+  }
 }
-
-// CMTimeSubtract
-public func - (minuend: CMTime, subtrahend: CMTime) -> CMTime {
-  return CMTimeSubtract(minuend, subtrahend)
-}
-
-extension CMTime : Equatable, Comparable {}
 
 // CMTimeCompare
-public func < (time1: CMTime, time2: CMTime) -> Bool {
-  return CMTimeCompare(time1, time2) < 0
-}
-public func <= (time1: CMTime, time2: CMTime) -> Bool {
-  return CMTimeCompare(time1, time2) <= 0
-}
-public func > (time1: CMTime, time2: CMTime) -> Bool {
-  return CMTimeCompare(time1, time2) > 0
-}
-public func >= (time1: CMTime, time2: CMTime) -> Bool {
-  return CMTimeCompare(time1, time2) >= 0
-}
-public func == (time1: CMTime, time2: CMTime) -> Bool {
-  return CMTimeCompare(time1, time2) == 0
-}
-public func != (time1: CMTime, time2: CMTime) -> Bool {
-  return CMTimeCompare(time1, time2) != 0
+extension CMTime : Equatable, Comparable {
+  public static func < (time1: CMTime, time2: CMTime) -> Bool {
+    return CMTimeCompare(time1, time2) < 0
+  }
+  public static func <= (time1: CMTime, time2: CMTime) -> Bool {
+    return CMTimeCompare(time1, time2) <= 0
+  }
+  public static func > (time1: CMTime, time2: CMTime) -> Bool {
+    return CMTimeCompare(time1, time2) > 0
+  }
+  public static func >= (time1: CMTime, time2: CMTime) -> Bool {
+    return CMTimeCompare(time1, time2) >= 0
+  }
+  public static func == (time1: CMTime, time2: CMTime) -> Bool {
+    return CMTimeCompare(time1, time2) == 0
+  }
+  public static func != (time1: CMTime, time2: CMTime) -> Bool {
+    return CMTimeCompare(time1, time2) != 0
+  }
 }

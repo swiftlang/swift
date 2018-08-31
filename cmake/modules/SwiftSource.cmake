@@ -232,7 +232,8 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
-  if(SWIFT_STDLIB_ENABLE_RESILIENCE AND SWIFTFILE_IS_STDLIB)
+  # The standard library and overlays are always built with resilience.
+  if(SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
   endif()
 
@@ -256,9 +257,9 @@ function(_compile_swift_files
                             "-Xfrontend" "${GROUP_INFO_JSON_FILE}")
   endif()
 
-  # Force swift 3 compatibility mode for Standard Library.
+  # Force swift 5 mode for Standard Library.
   if (SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-swift-version" "3")
+    list(APPEND swift_flags "-swift-version" "5")
   endif()
   
   # Force swift 4 compatibility mode for overlays.
@@ -316,6 +317,7 @@ function(_compile_swift_files
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
     set(module_doc_file "${module_base}.swiftdoc")
+    set(interface_file "${module_base}.swiftinterface")
 
     list(APPEND command_create_dirs
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${module_dir}")
@@ -394,7 +396,7 @@ function(_compile_swift_files
 
   set(standard_outputs ${SWIFTFILE_OUTPUT})
   set(apinotes_outputs ${apinote_files})
-  set(module_outputs "${module_file}" "${module_doc_file}")
+  set(module_outputs "${module_file}" "${module_doc_file}" "${interface_file}")
   set(sib_outputs "${sib_file}")
   set(sibopt_outputs "${sibopt_file}")
   set(sibgen_outputs "${sibgen_file}")
@@ -482,13 +484,14 @@ function(_compile_swift_files
   #
   # 1. *.swiftmodule
   # 2. *.swiftdoc
-  # 3. *.Onone.sib
-  # 4. *.O.sib
-  # 5. *.sibgen
+  # 3. *.swiftinterface
+  # 4. *.Onone.sib
+  # 5. *.O.sib
+  # 6. *.sibgen
   #
-  # Only 1,2 are built by default. 3,4,5 are utility targets for use by engineers
-  # and thus even though the targets are generated, the targets are not built by
-  # default.
+  # Only 1,2,3 are built by default. 4,5,6 are utility targets for use by
+  # engineers and thus even though the targets are generated, the targets are
+  # not built by default.
   #
   # We only build these when we are not producing a main file. We could do this
   # with sib/sibgen, but it is useful for looking at the stdlib.
@@ -500,9 +503,11 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_doc_file}"
         COMMAND
+          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${interface_file}"
+        COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
-          "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}" ${swift_flags}
-          "@${file_path}"
+          "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
+          "-experimental-emit-interface" ${swift_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS

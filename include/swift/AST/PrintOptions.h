@@ -112,8 +112,8 @@ public:
 };
 
 struct ShouldPrintChecker {
-  virtual bool shouldPrint(const Decl *D, PrintOptions &Options);
-  bool shouldPrint(const Pattern *P, PrintOptions &Options);
+  virtual bool shouldPrint(const Decl *D, const PrintOptions &Options);
+  bool shouldPrint(const Pattern *P, const PrintOptions &Options);
   virtual ~ShouldPrintChecker() = default;
 };
 
@@ -285,6 +285,7 @@ struct PrintOptions {
     ArgumentOnly,
     MatchSource,
     BothAlways,
+    EnumElement,
   };
 
   /// Whether to print the doc-comment from the conformance if a member decl
@@ -362,6 +363,9 @@ struct PrintOptions {
 
   BracketOptions BracketOptions;
 
+  // This is explicit to guarantee that it can be called from LLDB.
+  PrintOptions() {}
+
   bool excludeAttrKind(AnyAttrKind K) const {
     if (std::any_of(ExcludeAttrList.begin(), ExcludeAttrList.end(),
                     [K](AnyAttrKind other) { return other == K; }))
@@ -422,6 +426,14 @@ struct PrintOptions {
     result.PrintDocumentationComments = true;
     return result;
   }
+
+  /// Retrieve the set of options suitable for stable textual interfaces.
+  ///
+  /// This is a format that will be parsed again later, so the output must be
+  /// consistent and well-formed.
+  ///
+  /// \see swift::emitModuleInterface
+  static PrintOptions printTextualInterfaceFile();
 
   static PrintOptions printModuleInterface();
   static PrintOptions printTypeInterface(Type T);

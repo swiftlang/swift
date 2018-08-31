@@ -5,6 +5,9 @@ roots:
   - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared"
     type: directory
     contents:
+      - name: Bcrypt.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/bcrypt.h"
       - name: DriverSpecs.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/driverspecs.h"

@@ -51,26 +51,29 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
       auto ASD = accessor->getStorage();
       if (ASD->hasName()) {
         switch (accessor->getAccessorKind()) {
-        case AccessorKind::IsGetter:
+        case AccessorKind::Get:
           out << "getter";
           break;
-        case AccessorKind::IsSetter:
+        case AccessorKind::Set:
           out << "setter";
           break;
-        case AccessorKind::IsWillSet:
+        case AccessorKind::WillSet:
           out << "willset";
           break;
-        case AccessorKind::IsDidSet:
+        case AccessorKind::DidSet:
           out << "didset";
           break;
-        case AccessorKind::IsMaterializeForSet:
-          out << "materializeForSet";
-          break;
-        case AccessorKind::IsAddressor:
+        case AccessorKind::Address:
           out << "addressor";
           break;
-        case AccessorKind::IsMutableAddressor:
+        case AccessorKind::MutableAddress:
           out << "mutableAddressor";
+          break;
+        case AccessorKind::Read:
+          out << "read";
+          break;
+        case AccessorKind::Modify:
+          out << "modify";
           break;
         }
 
@@ -220,4 +223,8 @@ void PrettyStackTraceGenericSignature::print(llvm::raw_ostream &out) const {
     out << " in requirement #" << *Requirement;
   }
   out << '\n';
+}
+
+void PrettyStackTraceSelector::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << " '" << Selector << "'";
 }

@@ -1,3 +1,4 @@
+
 // REQUIRES: no_asan
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -emit-module -emit-library -module-name capture_descriptors -o %t/capture_descriptors.%target-dylib-extension
@@ -18,13 +19,13 @@ protocol P {}
 extension Int: P {}
 
 sil @concrete_callee1 : $@convention(thin) (Int, @owned <τ_0_0> { var τ_0_0 } <Int>, @thin Int.Type, @thick P.Type) -> () {
-bb0(%i: $Int, %b: $<τ_0_0> { var τ_0_0 } <Int>, %m: $@thin Int.Type, %p: $@thick P.Type):
+bb0(%i : @trivial $Int, %b : @owned $<τ_0_0> { var τ_0_0 } <Int>, %m : @trivial $@thin Int.Type, %p : @trivial $@thick P.Type):
   %12 = tuple ()
   return %12 : $()
 }
 
 sil @concrete_caller1 : $@convention(thin) (Int, @thick P.Type) -> @owned @callee_guaranteed () -> () {
-bb0(%i: $Int, %p: $@thick P.Type):
+bb0(%i : @trivial $Int, %p : @trivial $@thick P.Type):
   %f = function_ref @concrete_callee1 : $@convention(thin) (Int, @owned <τ_0_0> { var τ_0_0 } <Int>, @thin Int.Type, @thick P.Type) -> ()
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %m = metatype $@thin Int.Type
@@ -40,8 +41,7 @@ bb0(%i: $Int, %p: $@thick P.Type):
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (struct Swift.Int)
-// CHECK-NEXT: (sil_box
-// CHECK-NEXT:   (struct Swift.Int))
+// CHECK-NEXT: (builtin Builtin.NativeObject)
 // CHECK-NEXT: (existential_metatype
 // CHECK-NEXT:   (protocol_composition
 // CHECK-NEXT:     (protocol capture_descriptors.P)))
@@ -52,7 +52,7 @@ bb0(%i: $Int, %p: $@thick P.Type):
 // and there are no metadata bindings
 
 sil @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> () {
-bb0(%i: $*T, %b: $<τ_0_0> { var τ_0_0 } <U>):
+bb0(%i : @trivial $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <U>):
   %12 = tuple ()
   return %12 : $()
 }
@@ -75,8 +75,7 @@ bb0:
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (struct Swift.Int)
-// CHECK-NEXT: (sil_box
-// CHECK-NEXT:   (struct Swift.String))
+// CHECK-NEXT: (builtin Builtin.NativeObject)
 // CHECK-NEXT:   - Metadata sources:
 
 
@@ -85,18 +84,18 @@ bb0:
 // structural sub-terms of the callee's substituted generic parameters that
 // contain the caller's generic parameters.
 
-sil @generic_callee3 : $@convention(thin) <T, U> (@in T) -> () {
-bb0(%t: $*T):
+sil @generic_callee3 : $@convention(thin) <T, U> (@in_guaranteed T) -> () {
+bb0(%t : @trivial $*T):
   %12 = tuple ()
   return %12 : $()
 }
 
 sil @generic_caller3 : $@convention(thin) <A, B, C> () -> @owned @callee_guaranteed () -> () {
 bb0:
-  %f = function_ref @generic_callee3 : $@convention(thin) <T, U> (@in T) -> ()
-  %t = alloc_stack $Optional<@callee_guaranteed (@in A) -> @out B>
-  %c = partial_apply [callee_guaranteed] %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in T) -> ()
-  dealloc_stack %t : $*Optional<@callee_guaranteed (@in A) -> @out B>
+  %f = function_ref @generic_callee3 : $@convention(thin) <T, U> (@in_guaranteed T) -> ()
+  %t = alloc_stack $Optional<@callee_guaranteed (@in_guaranteed A) -> @out B>
+  %c = partial_apply [callee_guaranteed] %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in_guaranteed T) -> ()
+  dealloc_stack %t : $*Optional<@callee_guaranteed (@in_guaranteed A) -> @out B>
   return %c : $@callee_guaranteed () -> ()
 }
 
@@ -124,7 +123,7 @@ bb0:
 // fulfilled by a thick metatype value.
 
 sil @generic_callee4 : $@convention(thin) <T, U> (@thick Optional<T>.Type) -> () {
-bb0(%t: $@thick Optional<T>.Type):
+bb0(%t : @trivial $@thick Optional<T>.Type):
   %12 = tuple ()
   return %12 : $()
 }
@@ -161,13 +160,13 @@ bb0:
 class GenericClass<T, U> {}
 
 sil @generic_callee5 : $@convention(thin) <T, U, V> (@owned GenericClass<T, U>) -> () {
-bb0(%t: $GenericClass<T, U>):
+bb0(%t : @owned $GenericClass<T, U>):
   %12 = tuple ()
   return %12 : $()
 }
 
 sil @generic_caller5 : $@convention(thin) <A, B, C> (@owned GenericClass<(A, B), (B, C)>) -> @owned @callee_guaranteed () -> () {
-bb0(%g: $GenericClass<(A, B), (B, C)>):
+bb0(%g : @owned $GenericClass<(A, B), (B, C)>):
   %f = function_ref @generic_callee5 : $@convention(thin) <T, U, V> (@owned GenericClass<T, U>) -> ()
   %c = partial_apply [callee_guaranteed] %f<(A, B), (B, C), (C, A)>(%g) : $@convention(thin) <T, U, V> (@owned GenericClass<T, U>) -> ()
   return %c : $@callee_guaranteed () -> ()
@@ -204,16 +203,16 @@ sil_vtable GenericClass {}
 // erased at runtime.
 
 sil @pseudogeneric_callee : $@convention(thin) @pseudogeneric <T : AnyObject, U : AnyObject> (@owned T, @owned U) -> () {
-bb0(%t: $T, %u: $U):
+bb0(%t : @owned $T, %u : @owned $U):
   %12 = tuple ()
   return %12 : $()
 }
 
-sil @pseudogeneric_caller : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject, C : AnyObject> (@owned A, @owned B) -> @owned @pseudogeneric @callee_guaranteed () -> () {
-bb0(%a: $A, %b: $B):
+sil @pseudogeneric_caller : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject, C : AnyObject> (@owned A, @owned B) -> @owned @callee_guaranteed () -> () {
+bb0(%a : @owned $A, %b : @owned $B):
   %f = function_ref @pseudogeneric_callee : $@convention(thin) @pseudogeneric <T : AnyObject, U : AnyObject> (@owned T, @owned U) -> ()
   %c = partial_apply [callee_guaranteed] %f<A, B>(%a, %b) : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject> (@owned A, @owned B) -> ()
-  return %c : $@pseudogeneric @callee_guaranteed () -> ()
+  return %c : $@callee_guaranteed () -> ()
 }
 
 // CHECK:      - Capture types:
@@ -225,13 +224,13 @@ bb0(%a: $A, %b: $B):
 // Capturing lowered function types
 
 sil @function_callee : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> () {
-bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@convention(block) () -> (), %thick: $@convention(thick) () -> (), %method: $@convention(method) () -> (), %witness_method: $@convention(witness_method: P) (Int) -> ()):
+bb0(%thin : @trivial $@convention(thin) () -> (), %c : @trivial $@convention(c) () -> (), %block : @unowned $@convention(block) () -> (), %thick : @unowned $@convention(thick) () -> (), %method : @trivial $@convention(method) () -> (), %witness_method : @trivial $@convention(witness_method: P) (Int) -> ()):
   %12 = tuple ()
   return %12 : $()
 }
 
 sil @function_caller : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> @owned @callee_guaranteed () -> () {
-bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@convention(block) () -> (), %thick: $@convention(thick) () -> (), %method: $@convention(method) () -> (), %witness_method: $@convention(witness_method: P) (Int) -> ()):
+bb0(%thin: @trivial $@convention(thin) () -> (), %c: @trivial $@convention(c) () -> (), %block: @unowned $@convention(block) () -> (), %thick: @unowned $@convention(thick) () -> (), %method: @trivial $@convention(method) () -> (), %witness_method: @trivial $@convention(witness_method: P) (Int) -> ()):
   %f = function_ref @function_callee : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> ()
   %result = partial_apply [callee_guaranteed] %f(%thin, %c, %block, %thick, %method, %witness_method) : $@convention(thin) (@convention(thin) () -> (), @convention(c) () -> (), @convention(block) () -> (), @convention(thick) () -> (), @convention(method) () -> (), @convention(witness_method: P) (Int) -> ()) -> ()
   return %result : $@callee_guaranteed () -> ()
@@ -272,13 +271,13 @@ bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: $@
 // for this case.
 
 sil @existential_callee : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P {
-bb0(%0 : $*P):
+bb0(%0 : @trivial $*P):
   unreachable
 }
 
 
 sil @existential_caller : $@convention(thin) (@in P) -> () {
-bb0(%0 : $*P):
+bb0(%0 : @trivial $*P):
   %payload = open_existential_addr immutable_access %0 : $*P to $*@opened("2D7A8F84-2973-11E7-838D-34363BD08DA0") P
   %f = function_ref @existential_callee : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P
   %result = partial_apply [callee_guaranteed] %f<@opened("2D7A8F84-2973-11E7-838D-34363BD08DA0") P>() : $@convention(thin) <τ_0_0 where τ_0_0 : P> () -> @out P

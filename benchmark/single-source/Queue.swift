@@ -28,7 +28,6 @@ public let QueueConcrete = BenchmarkInfo(
  
 // TODO: remove when there is a native equivalent in the std lib
 extension RangeReplaceableCollection where Self: BidirectionalCollection {
-  @_inlineable
   public mutating func popLast() -> Element? {
     if isEmpty { return nil}
     else { return removeLast() }

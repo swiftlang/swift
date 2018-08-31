@@ -57,7 +57,6 @@ struct OwnershipModelEliminatorVisitor
   bool visitStoreInst(StoreInst *SI);
   bool visitStoreBorrowInst(StoreBorrowInst *SI);
   bool visitCopyValueInst(CopyValueInst *CVI);
-  bool visitCopyUnownedValueInst(CopyUnownedValueInst *CVI);
   bool visitDestroyValueInst(DestroyValueInst *DVI);
   bool visitLoadBorrowInst(LoadBorrowInst *LBI);
   bool visitBeginBorrowInst(BeginBorrowInst *BBI) {
@@ -156,19 +155,6 @@ bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
   // operation will delegate to the appropriate strong_release, etc.
   B.emitCopyValueOperation(CVI->getLoc(), CVI->getOperand());
   CVI->replaceAllUsesWith(CVI->getOperand());
-  CVI->eraseFromParent();
-  return true;
-}
-
-bool OwnershipModelEliminatorVisitor::visitCopyUnownedValueInst(
-    CopyUnownedValueInst *CVI) {
-  B.createStrongRetainUnowned(CVI->getLoc(), CVI->getOperand(),
-                              B.getDefaultAtomicity());
-  // Users of copy_value_unowned expect an owned value. So we need to convert
-  // our unowned value to a ref.
-  auto *UTRI =
-      B.createUnownedToRef(CVI->getLoc(), CVI->getOperand(), CVI->getType());
-  CVI->replaceAllUsesWith(UTRI);
   CVI->eraseFromParent();
   return true;
 }

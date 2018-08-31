@@ -51,6 +51,8 @@ class EditorAdapter {
   /// below. That doesn't handle duplicate or redundant changes.
   mutable llvm::SmallSet<Replacement, 32> Replacements;
 
+  bool CacheEnabled;
+
   /// A running transactional collection of basic edit operations.
   /// Clang uses this transaction concept to cancel a batch of edits due to
   /// incompatibilities, such as those due to macro expansions, but we don't
@@ -82,7 +84,7 @@ class EditorAdapter {
 public:
   EditorAdapter(swift::SourceManager &SwiftSrcMgr,
                 clang::SourceManager &ClangSrcMgr)
-    : SwiftSrcMgr(SwiftSrcMgr), ClangSrcMgr(ClangSrcMgr),
+    : SwiftSrcMgr(SwiftSrcMgr), ClangSrcMgr(ClangSrcMgr), CacheEnabled(true),
       Edits(clang::edit::Commit(ClangSrcMgr, clang::LangOptions())) {}
 
   /// Lookup the BufferID in the SwiftToClangBufferMap. If it doesn't exist,
@@ -128,6 +130,8 @@ public:
   const clang::edit::Commit &getEdits() const {
     return Edits;
   }
+  void enableCache() { CacheEnabled = true; }
+  void disableCache() { CacheEnabled = false; }
 };
 
 } // end namespace migrator

@@ -29,15 +29,15 @@
 /// example shows how the `contains(_:)` method can be used with an array of
 /// strings.
 ///
-///     let students = ["Nora", "Fern", "Ryan", "Rainer"]
+///     let students = ["Kofi", "Abena", "Efua", "Kweku", "Akosua"]
 ///
-///     let nameToCheck = "Ryan"
+///     let nameToCheck = "Kofi"
 ///     if students.contains(nameToCheck) {
 ///         print("\(nameToCheck) is signed up!")
 ///     } else {
 ///         print("No record of \(nameToCheck).")
 ///     }
-///     // Prints "Ryan is signed up!"
+///     // Prints "Kofi is signed up!"
 ///
 /// Conforming to the Equatable Protocol
 /// ====================================
@@ -188,7 +188,6 @@ extension Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
@@ -245,7 +244,7 @@ extension Equatable {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -267,7 +266,7 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }

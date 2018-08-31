@@ -20,6 +20,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -65,11 +66,16 @@ struct IRGenContext {
 
 private:
   IRGenContext(ASTContext &ctx, ModuleDecl *module)
-    : SILMod(SILModule::createEmptyModule(module, SILOpts)),
+    : IROpts(createIRGenOptions()),
+      SILMod(SILModule::createEmptyModule(module, SILOpts)),
       IRGen(IROpts, *SILMod),
-      IGM(IRGen, IRGen.createTargetMachine(), /*SourceFile*/ nullptr,
-          LLVMContext, "<fake module name>", "<fake output filename>",
-          "<fake main input filename>") {}
+      IGM(IRGen, IRGen.createTargetMachine(), LLVMContext) {}
+
+  static IRGenOptions createIRGenOptions() {
+    IRGenOptions IROpts;
+    IROpts.EnableResilienceBypass = true;
+    return IROpts;
+  }
 
 public:
   static std::unique_ptr<IRGenContext>
@@ -176,7 +182,8 @@ public:
     if (genericParams.size() != args.size())
       return Type();
 
-    auto subMap = genericSig->getSubstitutionMap(
+    auto subMap = SubstitutionMap::get(
+        genericSig,
         [&](SubstitutableType *t) -> Type {
           for (unsigned i = 0, e = genericParams.size(); i < e; ++i) {
             if (t->isEqual(genericParams[i]))
@@ -404,23 +411,13 @@ public:
     return Type();
   }
 
-  Type createUnownedStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return UnownedStorageType::get(base, Ctx);
+#define REF_STORAGE(Name, ...) \
+  Type create##Name##StorageType(Type base) { \
+    if (!base->allowsOwnership()) \
+      return Type(); \
+    return Name##StorageType::get(base, Ctx); \
   }
-
-  Type createUnmanagedStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return UnmanagedStorageType::get(base, Ctx);
-  }
-
-  Type createWeakStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return WeakStorageType::get(base, Ctx);
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   Type createSILBoxType(Type base) {
     return SILBoxType::get(base->getCanonicalType());
@@ -452,8 +449,7 @@ public:
 
 private:
   bool validateNominalParent(NominalTypeDecl *decl, Type parent) {
-    auto parentDecl =
-      decl->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto parentDecl = decl->getDeclContext()->getSelfNominalTypeDecl();
 
     // If we don't have a parent type, fast-path.
     if (!parent) {
@@ -746,7 +742,17 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(StringRef name,
       if (HadError) return;
       if (decl == Result) return;
       if (!Result) {
-        Result = cast<NominalTypeDecl>(decl);
+        // A synthesized type from the Clang importer may resolve to a
+        // compatibility alias.
+        if (auto resultAlias = dyn_cast<TypeAliasDecl>(decl)) {
+          if (resultAlias->isCompatibilityAlias()) {
+            Result = resultAlias->getUnderlyingTypeLoc().getType()
+                                ->getAnyNominal();
+          }
+        } else {
+          Result = dyn_cast<NominalTypeDecl>(decl);
+        }
+        HadError |= !Result;
       } else {
         HadError = true;
         Result = nullptr;
@@ -802,6 +808,9 @@ public:
   getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) = 0;
   virtual Result<RemoteAddress>
   getHeapMetadataForObject(RemoteAddress object) = 0;
+  virtual Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressForExistential(RemoteAddress object,
+                                         Type staticType) = 0;
 
   Result<uint64_t>
   getOffsetOfMember(Type type, RemoteAddress optMetadata, StringRef memberName){
@@ -1154,6 +1163,105 @@ public:
     if (result) return RemoteAddress(*result);
     return getFailure<RemoteAddress>();
   }
+
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressClassExistential(RemoteAddress object) {
+    auto pointed = Reader.readPointedValue(object.getAddressData());
+    if (!pointed)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto result = Reader.readMetadataFromInstance(*pointed);
+    if (!result)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto typeResult = Reader.readTypeFromMetadata(result.getValue());
+    if (!typeResult)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
+                                               std::move(object));
+  }
+
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressErrorExistential(RemoteAddress object) {
+    auto pointed = Reader.readPointedValue(object.getAddressData());
+    if (!pointed)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto result =
+        Reader.readMetadataAndValueErrorExistential(RemoteAddress(*pointed));
+    if (!result)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    RemoteAddress metadataAddress = result->first;
+    RemoteAddress valueAddress = result->second;
+
+    auto typeResult =
+        Reader.readTypeFromMetadata(metadataAddress.getAddressData());
+    if (!typeResult)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
+                                               std::move(valueAddress));
+  }
+
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressOpaqueExistential(RemoteAddress object) {
+    auto result = Reader.readMetadataAndValueOpaqueExistential(object);
+    if (!result)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    RemoteAddress metadataAddress = result->first;
+    RemoteAddress valueAddress = result->second;
+
+    auto typeResult =
+        Reader.readTypeFromMetadata(metadataAddress.getAddressData());
+    if (!typeResult)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
+                                               std::move(valueAddress));
+  }
+
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressExistentialMetatype(RemoteAddress object) {
+    // The value of the address is just the input address.
+    // The type is obtained through the following sequence of steps:
+    // 1) Loading a pointer from the input address
+    // 2) Reading it as metadata and resolving the type
+    // 3) Wrapping the resolved type in an existential metatype.
+    auto pointed = Reader.readPointedValue(object.getAddressData());
+    if (!pointed)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto typeResult = Reader.readTypeFromMetadata(*pointed);
+    if (!typeResult)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto wrappedType = ExistentialMetatypeType::get(typeResult);
+    if (!wrappedType)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    return std::make_pair<Type, RemoteAddress>(std::move(wrappedType),
+                                               std::move(object));
+  }
+
+  /// Resolve the dynamic type and the value address of an existential,
+  /// given its address and its static type. For class and error existentials,
+  /// this API takes a pointer to the instance reference rather than the
+  /// instance reference itself.
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressForExistential(RemoteAddress object,
+                                         Type staticType) override {
+    // If this is not an existential, give up.
+    if (!staticType->isAnyExistentialType())
+      return getFailure<std::pair<Type, RemoteAddress>>();
+
+    // Handle the case where this is an ExistentialMetatype.
+    if (!staticType->isExistentialType())
+      return getDynamicTypeAndAddressExistentialMetatype(object);
+
+    // This should be an existential type at this point.
+    auto layout = staticType->getExistentialLayout();
+    switch (layout.getKind()) {
+    case ExistentialLayout::Kind::Class:
+      return getDynamicTypeAndAddressClassExistential(object);
+    case ExistentialLayout::Kind::Error:
+      return getDynamicTypeAndAddressErrorExistential(object);
+    case ExistentialLayout::Kind::Opaque:
+      return getDynamicTypeAndAddressOpaqueExistential(object);
+    }
+    llvm_unreachable("invalid type kind");
+  }
 };
 
 } // end anonymous namespace
@@ -1210,4 +1318,11 @@ RemoteASTContext::getOffsetOfMember(Type type, RemoteAddress optMetadata,
 Result<remote::RemoteAddress>
 RemoteASTContext::getHeapMetadataForObject(remote::RemoteAddress address) {
   return asImpl(Impl)->getHeapMetadataForObject(address);
+}
+
+Result<std::pair<Type, remote::RemoteAddress>>
+RemoteASTContext::getDynamicTypeAndAddressForExistential(
+    remote::RemoteAddress address, Type staticType) {
+  return asImpl(Impl)->getDynamicTypeAndAddressForExistential(address,
+                                                              staticType);
 }

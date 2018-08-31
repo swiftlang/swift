@@ -2,6 +2,9 @@
 // RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Debug -Onone
 // RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Release -O
 // RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Unchecked -Ounchecked
+// RUN: %target-codesign %t/Assert_Debug
+// RUN: %target-codesign %t/Assert_Release
+// RUN: %target-codesign %t/Assert_Unchecked
 //
 // RUN: %target-run %t/Assert_Debug
 // RUN: %target-run %t/Assert_Release
@@ -23,7 +26,7 @@ func testTrapsAreNoreturn(i: Int) -> Int {
   case 2:
     preconditionFailure("cannot happen")
   case 3:
-    _preconditionFailure("cannot happen")
+    preconditionFailure("cannot happen")
   case 4:
     _debugPreconditionFailure("cannot happen")
   case 5:
@@ -149,26 +152,26 @@ Assert.test("fatalError/StringInterpolation")
 // characters, and that use NSString-backed String.
 // We had to rewrite a part of fatalError() in the indexing effort.
 
-Assert.test("_precondition")
+Assert.test("precondition")
   .xfail(.custom(
     { _isFastAssertConfiguration() },
     reason: "preconditions are disabled in Unchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   var x = 2
-  _precondition(x * 21 == 42, "should not fail")
+  precondition(x * 21 == 42, "should not fail")
   expectCrashLater()
-  _precondition(x == 42, "this should fail")
+  precondition(x == 42, "this should fail")
 }
 
-Assert.test("_preconditionFailure")
+Assert.test("preconditionFailure")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "optimizer assumes that the code path is unreachable"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
   .code {
   expectCrashLater()
-  _preconditionFailure("this should fail")
+  preconditionFailure("this should fail")
 }
 
 Assert.test("_debugPrecondition")

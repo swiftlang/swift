@@ -64,6 +64,12 @@ public:
 
   bool isDynamicSelfMetadata() const { return !Value.getPointer(); }
 
+  CapturedValue mergeFlags(CapturedValue cv) {
+    assert(Value.getPointer() == cv.Value.getPointer() &&
+           "merging flags on two different value decls");
+    return CapturedValue(Value.getPointer(), getFlags() & cv.getFlags());
+  }
+
   ValueDecl *getDecl() const {
     assert(Value.getPointer() && "dynamic Self metadata capture does not "
            "have a value");

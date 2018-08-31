@@ -101,6 +101,15 @@ public:
 
   /// \returns true if an error occurred while finishing-up.
   virtual bool finishProcessing() { return false; }
+
+  /// In batch mode, any error causes failure for all primary files, but
+  /// anyone consulting .dia files will only see an error for a particular
+  /// primary in that primary's serialized diagnostics file. For other
+  /// primaries' serialized diagnostics files, do something to signal the driver
+  /// what happened. This is only meaningful for SerializedDiagnosticConsumers,
+  /// so here's a placeholder.
+
+  virtual void informDriverOfIncompleteBatchModeCompilation() {}
 };
   
 /// \brief DiagnosticConsumer that discards all diagnostics.
@@ -127,20 +136,113 @@ public:
 /// current file.
 class FileSpecificDiagnosticConsumer : public DiagnosticConsumer {
 public:
+  class Subconsumer;
+
+  /// Given a vector of subconsumers, return the most specific
+  /// DiagnosticConsumer for that vector. That will be a
+  /// FileSpecificDiagnosticConsumer if the vector has > 1 subconsumer, the
+  /// subconsumer itself if the vector has just one, or a null pointer if there
+  /// are no subconsumers. Takes ownership of the DiagnosticConsumers specified
+  /// in \p subconsumers.
+  static std::unique_ptr<DiagnosticConsumer>
+  consolidateSubconsumers(SmallVectorImpl<Subconsumer> &subconsumers);
+
   /// A diagnostic consumer, along with the name of the buffer that it should
-  /// be associated with. An empty string means that a consumer is not
-  /// associated with any particular buffer, and should only receive diagnostics
-  /// that are not in any of the other consumers' files.
-  using ConsumerPair =
-      std::pair<std::string, std::unique_ptr<DiagnosticConsumer>>;
+  /// be associated with.
+  class Subconsumer {
+    friend std::unique_ptr<DiagnosticConsumer>
+    FileSpecificDiagnosticConsumer::consolidateSubconsumers(
+        SmallVectorImpl<Subconsumer> &subconsumers);
+
+    /// The name of the input file that a consumer and diagnostics should
+    /// be associated with. An empty string means that a consumer is not
+    /// associated with any particular buffer, and should only receive
+    /// diagnostics that are not in any of the other consumers' files.
+    std::string inputFileName;
+
+    /// The consumer (if any) for diagnostics associated with the inputFileName.
+    /// A null pointer for the DiagnosticConsumer means that diagnostics for
+    /// this file should not be emitted.
+    std::unique_ptr<DiagnosticConsumer> consumer;
+
+    // Has this subconsumer ever handled a diagnostic that is an error?
+    bool hasAnErrorBeenConsumed = false;
+
+  public:
+    std::string getInputFileName() const { return inputFileName; }
+
+    DiagnosticConsumer *getConsumer() const { return consumer.get(); }
+
+    Subconsumer(std::string inputFileName,
+                std::unique_ptr<DiagnosticConsumer> consumer)
+        : inputFileName(inputFileName), consumer(std::move(consumer)) {}
+
+    void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+                          DiagnosticKind Kind,
+                          StringRef FormatString,
+                          ArrayRef<DiagnosticArgument> FormatArgs,
+                          const DiagnosticInfo &Info) {
+      if (!getConsumer())
+        return;
+      hasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
+      getConsumer()->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
+                                      Info);
+    }
+    
+    void informDriverOfIncompleteBatchModeCompilation() {
+      if (!hasAnErrorBeenConsumed && getConsumer())
+        getConsumer()->informDriverOfIncompleteBatchModeCompilation();
+    }
+  };
 
 private:
   /// All consumers owned by this FileSpecificDiagnosticConsumer.
-  const SmallVector<ConsumerPair, 4> SubConsumers;
+  SmallVector<Subconsumer, 4> Subconsumers;
 
-  using ConsumersOrderedByRangeEntry =
-    std::pair<CharSourceRange, DiagnosticConsumer *>;
+public:
+  class ConsumerAndRange {
+  private:
+    /// The range of SourceLoc's for which diagnostics should be directed to
+    /// this subconsumer.
+    /// Should be const but then the sort won't compile.
+    /*const*/ CharSourceRange range;
 
+    /// Index into Subconsumers vector for this subconsumer.
+    /// Should be const but then the sort won't compile.
+    /*const*/ unsigned subconsumerIndex;
+
+  public:
+    unsigned getSubconsumerIndex() const { return subconsumerIndex; }
+
+    ConsumerAndRange(const CharSourceRange range, unsigned subconsumerIndex)
+        : range(range), subconsumerIndex(subconsumerIndex) {}
+
+    /// Compare according to range:
+    bool operator<(const ConsumerAndRange &right) const {
+      auto compare = std::less<const char *>();
+      return compare(getRawLoc(range.getEnd()).getPointer(),
+                     getRawLoc(right.range.getEnd()).getPointer());
+    }
+
+    /// Overlaps by range:
+    bool overlaps(const ConsumerAndRange &other) const {
+      return range.overlaps(other.range);
+    }
+
+    /// Does my range end after \p loc?
+    bool endsAfter(const SourceLoc loc) const {
+      auto compare = std::less<const char *>();
+      return compare(getRawLoc(range.getEnd()).getPointer(),
+                     getRawLoc(loc).getPointer());
+    }
+
+    bool contains(const SourceLoc loc) const { return range.contains(loc); }
+  };
+
+private:
+  Subconsumer &operator[](const ConsumerAndRange &consumerAndRange) {
+    return Subconsumers[consumerAndRange.getSubconsumerIndex()];
+  }
   /// The consumers owned by this FileSpecificDiagnosticConsumer, sorted by
   /// the end locations of each file so that a lookup by position can be done
   /// using binary search.
@@ -149,37 +251,50 @@ private:
   /// This allows diagnostics to be emitted before files are actually opened,
   /// as long as they don't have source locations.
   ///
-  /// \see #consumerForLocation
-  SmallVector<ConsumersOrderedByRangeEntry, 4> ConsumersOrderedByRange;
+  /// \see #subconsumerForLocation
+  SmallVector<ConsumerAndRange, 4> ConsumersOrderedByRange;
 
   /// Indicates which consumer to send Note diagnostics too.
   ///
   /// Notes are always considered attached to the error, warning, or remark
   /// that was most recently emitted.
   ///
-  /// If null, Note diagnostics are sent to every consumer.
-  DiagnosticConsumer *ConsumerForSubsequentNotes = nullptr;
+  /// If None, Note diagnostics are sent to every consumer.
+  /// If null, diagnostics are suppressed.
+  Optional<Subconsumer *> SubconsumerForSubsequentNotes = None;
 
-public:
+  bool HasAnErrorBeenConsumed = false;
+
   /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
   ///
   /// There must not be two consumers for the same file (i.e., having the same
   /// buffer name).
   explicit FileSpecificDiagnosticConsumer(
-      SmallVectorImpl<ConsumerPair> &consumers);
+      SmallVectorImpl<Subconsumer> &consumers);
 
+public:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override;
 
-   bool finishProcessing() override;
+  bool finishProcessing() override;
 
 private:
+  /// In batch mode, any error causes failure for all primary files, but
+  /// Xcode will only see an error for a particular primary in that primary's
+  /// serialized diagnostics file. So, tell the subconsumers to inform the
+  /// driver of incomplete batch mode compilation.
+  void tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation();
+
   void computeConsumersOrderedByRange(SourceManager &SM);
-  DiagnosticConsumer *consumerForLocation(SourceManager &SM,
-                                          SourceLoc loc) const;
+
+  /// Returns nullptr if diagnostic is to be suppressed,
+  /// None if diagnostic is to be distributed to every consumer,
+  /// a particular consumer if diagnostic goes there.
+  Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+  subconsumerForLocation(SourceManager &SM, SourceLoc loc);
 };
   
 } // end namespace swift

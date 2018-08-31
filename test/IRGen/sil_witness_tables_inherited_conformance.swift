@@ -40,5 +40,5 @@ func wangle<T : Cat>(_ t: T.Type) {
 }
 
 feed(Cat())
-wangle(Cat)
+wangle(Cat.self)
 Anesthesiologist<Cat>().disentangle(Cat())

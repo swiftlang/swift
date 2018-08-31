@@ -14,7 +14,7 @@
 
 % for Self in ['SKShapeNode', 'SKSpriteNode', 'SKTextureAtlas', 'SKTexture']:
 
-extension ${Self} : CustomPlaygroundQuickLookable {
+extension ${Self} : _CustomPlaygroundQuickLookable {
   @available(*, deprecated, message: "${Self}.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     let data = (self as AnyObject)._copyImageData?() as Data?

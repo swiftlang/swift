@@ -8,13 +8,13 @@
 // CHECK-LABEL: sil [noinline] @$S13prespecialize4test_4sizeySaySiGz_SitF
 //
 // function_ref specialized Collection<A where ...>.makeIterator() -> IndexingIterator<A>
-// CHECK: function_ref @$Ss10CollectionPss16IndexingIteratorVyxG0C0RtzrlE04makeC0AEyFs5RangeVySiG_Tg5
+// CHECK: function_ref @$SSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyFSnySiG_Tg5
 //
 // function_ref specialized IndexingIterator.next() -> A.Element?
-// CHECK: function_ref @$Ss16IndexingIteratorV4next7ElementQzSgyFs5RangeVySiG_Tg5
+// CHECK: function_ref @$Ss16IndexingIteratorV4next7ElementQzSgyFSnySiG_Tg5
 //
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
-// CHECK: function_ref @$Ss5RangeV15uncheckedBoundsAByxGx5lower_x5uppert_tcfCSi_Tg5
+// CHECK: function_ref @$SSn15uncheckedBoundsSnyxGx5lower_x5uppert_tcfCSi_Tg5
 // CHECK: return
 @inline(never)
 public func test(_ a: inout [Int], size: Int) {

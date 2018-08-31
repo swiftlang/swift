@@ -23,12 +23,11 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
   
   typealias CodeUnit = UInt16
   
-  init(_ opaqueString: _UnmanagedOpaqueString, startIndex: Int = 0) {
-    source = _UnmanagedOpaqueStringSource(opaqueString, start: startIndex)
-  }
-  
-  init(_ unmanagedString: _UnmanagedString<UInt16>, startIndex: Int = 0) {
-    source = _UnmanagedStringSource(unmanagedString, start: startIndex)
+  init<Source: BidirectionalCollection>
+    (_ collection: Source)
+    where Source.Element == UInt16, Source.SubSequence == Source
+  {
+    source = _CollectionSource(collection)
   }
   
   init(_ guts: _StringGuts, _ range: Range<Int>, startIndex: Int = 0) {
@@ -60,23 +59,31 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
     }
   }
   
-  struct _UnmanagedOpaqueStringSource: _SegmentSource {
+  struct _CollectionSource<Source: BidirectionalCollection>: _SegmentSource
+    where Source.Element == UInt16, Source.SubSequence == Source
+  {
     var remaining: Int {
-      return opaqueString.count - index
+      @_specialize(where Source == _UnmanagedString<UInt16>)
+      @_specialize(where Source == _UnmanagedOpaqueString)
+      get {
+        return collection.distance(from: index, to: collection.endIndex)
+      }
     }
-    var opaqueString: _UnmanagedOpaqueString
-    var index: Int
+    var collection: Source
+    var index: Source.Index
     
-    init(_ opaqueString: _UnmanagedOpaqueString, start: Int = 0) {
-      self.opaqueString = opaqueString
-      index = start
+    init(_ collection: Source) {
+      self.collection = collection
+      index = collection.startIndex
     }
     
+    @_specialize(where Source == _UnmanagedString<UInt16>)
+    @_specialize(where Source == _UnmanagedOpaqueString)
     mutating func tryFill(buffer: UnsafeMutableBufferPointer<UInt16>) -> Int? {
       var bufferIndex = 0
       let originalIndex = index
       repeat {
-        guard index < opaqueString.count else {
+        guard index != collection.endIndex else {
           break
         }
         
@@ -86,49 +93,11 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
           return nil
         }
         
-        let cu = opaqueString[index]
+        let cu = collection[index]
         buffer[bufferIndex] = cu
-        index += 1
+        index = collection.index(after: index)
         bufferIndex += 1
-      } while !opaqueString.hasNormalizationBoundary(after: index - 1)
-      
-      return bufferIndex
-    }
-  }
-  
-  struct _UnmanagedStringSource: _SegmentSource {
-    var remaining: Int {
-      return unmanagedString.count - index
-    }
-    
-    var unmanagedString: _UnmanagedString<UInt16>
-    var index: Int
-    
-    init(_ unmanagedString: _UnmanagedString<UInt16>, start: Int = 0) {
-      self.unmanagedString = unmanagedString
-      index = start
-    }
-    
-    mutating func tryFill(buffer: UnsafeMutableBufferPointer<UInt16>) -> Int? {
-      var bufferIndex = 0
-      let originalIndex = index
-      repeat {
-        guard index < unmanagedString.count else {
-          break
-        }
-        
-        guard bufferIndex < buffer.count else {
-          //The buffer isn't big enough for the current segment
-          index = originalIndex
-          return nil
-        }
-        
-        let cu = unmanagedString[index]
-        buffer[bufferIndex] = cu
-        index += 1
-        bufferIndex += 1
-      } while unmanagedString.hasNormalizationBoundary(
-          after: index - 1) == false
+      } while !collection.hasNormalizationBoundary(after: collection.index(before: index))
       
       return bufferIndex
     }
@@ -162,7 +131,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
           return nil
         }
         
-        let cu = guts[index]
+        let cu = guts.codeUnit(atCheckedOffset: index)
         buffer[bufferIndex] = cu
         index += 1
         bufferIndex += 1

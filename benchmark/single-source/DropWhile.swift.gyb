@@ -64,3 +64,7 @@ public func run_DropWhile${Name}(_ N: Int) {
   }
 }
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

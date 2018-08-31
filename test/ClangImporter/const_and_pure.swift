@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -import-objc-header %S/Inputs/const_and_pure.h | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s -enable-objc-interop -import-objc-header %S/Inputs/const_and_pure.h | %FileCheck %s
 
 func testit() {
 	const_function()

@@ -1,6 +1,6 @@
-set(PASSMANAGER_SOURCES
-  PassManager/PassManager.cpp
-  PassManager/Passes.cpp
-  PassManager/PassPipeline.cpp
-  PassManager/PrettyStackTrace.cpp
-  PARENT_SCOPE)
+silopt_register_sources(
+  PassManager.cpp
+  Passes.cpp
+  PassPipeline.cpp
+  PrettyStackTrace.cpp
+)

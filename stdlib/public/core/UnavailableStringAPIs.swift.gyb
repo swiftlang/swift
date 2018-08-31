@@ -69,3 +69,7 @@ ${stringSubscriptComment}
   }
 }
 
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

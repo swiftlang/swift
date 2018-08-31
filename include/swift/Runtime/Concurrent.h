@@ -12,10 +12,15 @@
 #ifndef SWIFT_RUNTIME_CONCURRENTUTILS_H
 #define SWIFT_RUNTIME_CONCURRENTUTILS_H
 #include <iterator>
+#include <algorithm>
 #include <atomic>
 #include <functional>
 #include <stdint.h>
+#include <vector>
 #include "llvm/Support/Allocator.h"
+#include "Atomic.h"
+#include "Debug.h"
+#include "Mutex.h"
 
 #if defined(__FreeBSD__) || defined(__CYGWIN__) || defined(__HAIKU__)
 #include <stdio.h>
@@ -403,6 +408,136 @@ public:
       assert(node && "spurious failure from compare_exchange_strong?");
       goto searchFromNode;
     }
+  }
+};
+
+
+/// An append-only array that can be read without taking locks. Writes
+/// are still locked and serialized, but only with respect to other
+/// writes.
+template <class ElemTy> struct ConcurrentReadableArray {
+private:
+  /// The struct used for the array's storage. The `Elem` member is
+  /// considered to be the first element of a variable-length array,
+  /// whose size is determined by the allocation. The `Capacity` member
+  /// from `ConcurrentReadableArray` indicates how large it can be.
+  struct Storage {
+    std::atomic<size_t> Count;
+    typename std::aligned_storage<sizeof(ElemTy), alignof(ElemTy)>::type Elem;
+
+    static Storage *allocate(size_t capacity) {
+      auto size = sizeof(Storage) + (capacity - 1) * sizeof(Storage().Elem);
+      auto *ptr = reinterpret_cast<Storage *>(malloc(size));
+      if (!ptr) swift::crash("Could not allocate memory.");
+      ptr->Count.store(0, std::memory_order_relaxed);
+      return ptr;
+    }
+
+    void deallocate() {
+      for (size_t i = 0; i < Count; i++) {
+        data()[i].~ElemTy();
+      }
+      free(this);
+    }
+
+    ElemTy *data() {
+      return reinterpret_cast<ElemTy *>(&Elem);
+    }
+  };
+  
+  size_t Capacity;
+  std::atomic<size_t> ReaderCount;
+  std::atomic<Storage *> Elements;
+  Mutex WriterLock;
+  std::vector<Storage *> FreeList;
+  
+  void incrementReaders() {
+    ReaderCount.fetch_add(1, std::memory_order_acquire);
+  }
+  
+  void decrementReaders() {
+    ReaderCount.fetch_sub(1, std::memory_order_release);
+  }
+  
+  void deallocateFreeList() {
+    for (Storage *storage : FreeList)
+      storage->deallocate();
+    FreeList.clear();
+    FreeList.shrink_to_fit();
+  }
+  
+public:
+  struct Snapshot {
+    ConcurrentReadableArray *Array;
+    const ElemTy *Start;
+    size_t Count;
+    
+    Snapshot(ConcurrentReadableArray *array, const ElemTy *start, size_t count)
+      : Array(array), Start(start), Count(count) {}
+    
+    Snapshot(const Snapshot &other)
+      : Array(other.Array), Start(other.Start), Count(other.Count) {
+      Array->incrementReaders();
+    }
+    
+    ~Snapshot() {
+      Array->decrementReaders();
+    }
+    
+    const ElemTy *begin() { return Start; }
+    const ElemTy *end() { return Start + Count; }
+    size_t count() { return Count; }
+  };
+  
+  // This type cannot be safely copied, moved, or deleted.
+  ConcurrentReadableArray(const ConcurrentReadableArray &) = delete;
+  ConcurrentReadableArray(ConcurrentReadableArray &&) = delete;
+  ConcurrentReadableArray &operator=(const ConcurrentReadableArray &) = delete;
+  
+  ConcurrentReadableArray() : Capacity(0), ReaderCount(0), Elements(nullptr) {}
+  
+  ~ConcurrentReadableArray() {
+    assert(ReaderCount.load(std::memory_order_acquire) == 0 &&
+           "deallocating ConcurrentReadableArray with outstanding snapshots");
+    deallocateFreeList();
+  }
+  
+  void push_back(const ElemTy &elem) {
+    ScopedLock guard(WriterLock);
+    
+    auto *storage = Elements.load(std::memory_order_relaxed);
+    auto count = storage ? storage->Count.load(std::memory_order_relaxed) : 0;
+    if (count >= Capacity) {
+      auto newCapacity = std::max((size_t)16, count * 2);
+      auto *newStorage = Storage::allocate(newCapacity);
+      if (storage) {
+        std::copy(storage->data(), storage->data() + count, newStorage->data());
+        newStorage->Count.store(count, std::memory_order_relaxed);
+        FreeList.push_back(storage);
+      }
+      
+      storage = newStorage;
+      Capacity = newCapacity;
+      Elements.store(storage, std::memory_order_release);
+    }
+    
+    new(&storage->data()[count]) ElemTy(elem);
+    storage->Count.store(count + 1, std::memory_order_release);
+    
+    if (ReaderCount.load(std::memory_order_acquire) == 0)
+      deallocateFreeList();
+  }
+  
+  Snapshot snapshot() {
+    incrementReaders();
+    auto *storage = Elements.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (storage == nullptr) {
+      return Snapshot(this, nullptr, 0);
+    }
+    
+    auto count = storage->Count.load(std::memory_order_acquire);
+    const auto *ptr = storage->data();
+    return Snapshot(this, ptr, count);
   }
 };
 

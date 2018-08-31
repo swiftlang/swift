@@ -64,24 +64,24 @@ public func foo(_ empty : Nothing) { }
 // CHECK-SAME:             {{.*}}identifier: "$S4enum4RoseOyxG{{z?}}D")
 enum Rose<A> {
 	case MkRose(() -> A, () -> [Rose<A>])
-  // DWARF: !DICompositeType({{.*}}name: "Rose",{{.*}}identifier: "$S4enum4RoseOyAA3fooyACyxGAElFQq_GD")
+  // DWARF: !DICompositeType({{.*}}name: "Rose",{{.*}}identifier: "$S4enum4RoseOyxGD")
 	case IORose(() -> Rose<A>)
 }
 
 func foo<T>(_ x : Rose<T>) -> Rose<T> { return x }
 
-// CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]], {{.*}}identifier: "$S4enum5TupleOyAA3baryACyxGAElFQq_GD")
+// CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]], {{.*}}identifier: "$S4enum5TupleOyxGD")
 // DWARF: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
 // DWARF-SAME:             {{.*}}identifier: "$S4enum5TupleOyxG{{z?}}D")
 public enum Tuple<P> {
-  // DWARF: !DICompositeType({{.*}}name: "Tuple",{{.*}}identifier: "$S4enum5TupleOyAA3baryACyxGAElFQq_GD")
+  // DWARF: !DICompositeType({{.*}}name: "Tuple",{{.*}}identifier: "$S4enum5TupleOyxGD")
 	case C(P, () -> Tuple)
 }
 
 func bar<T>(_ x : Tuple<T>) -> Tuple<T> { return x }
 
-// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+5]], type: ![[LIST:.*]], flags: DIFlagArtificial)
-// CHECK: ![[LIST]] = !DICompositeType({{.*}}identifier: "$S4enum4ListOyACQq_GD"
+// CHECK: ![[LIST:.*]] = !DICompositeType({{.*}}identifier: "$S4enum4ListOyxGD"
+// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+4]], type: ![[LIST]], flags: DIFlagArtificial)
 public enum List<T> {
        indirect case Tail(List, T)
        case End

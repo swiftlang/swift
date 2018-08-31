@@ -12,16 +12,28 @@
 
 @_exported import Metal // Clang module
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLBlitCommandEncoder {
     
     public func fill(buffer: MTLBuffer, range: Range<Int>, value: UInt8) {
         __fill(buffer, range: NSRange(location: range.lowerBound, length: range.count), value: value)
     }
+
+    @available(macOS 10.14, iOS 12.0, tvOS 12.0, *)
+    public func resetCommandsInBuffer(_ buffer: MTLIndirectCommandBuffer, range: Range<Int>) {
+        __resetCommands(in: buffer, with: NSRange(location: range.lowerBound, length: range.count))
+    }
+
+    @available(macOS 10.14, iOS 12.0, tvOS 12.0, *)
+    public func copyIndirectCommandBuffer (_ buffer: MTLIndirectCommandBuffer, sourceRange: Range<Int>, destination: MTLIndirectCommandBuffer, destinationIndex: Int) {
+        __copy (buffer, sourceRange: NSRange(location: sourceRange.lowerBound, length: sourceRange.count),destination: destination, destinationIndex: destinationIndex)
+    }
+    @available(macOS 10.14, iOS 12.0, tvOS 12.0, *)
+    public func optimizeIndirectCommandBuffer (_ buffer: MTLIndirectCommandBuffer, range: Range<Int>) {
+        __optimizeIndirectCommandBuffer(buffer, with: NSRange(location: range.lowerBound, length: range.count))
+    }
 }
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLBuffer {
     
@@ -38,7 +50,6 @@ extension MTLBuffer {
     }
 }
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLComputeCommandEncoder {
     
@@ -67,9 +78,13 @@ extension MTLComputeCommandEncoder {
     public func setSamplerStates(_ samplers: [MTLSamplerState?], lodMinClamps: [Float], lodMaxClamps: [Float], range: Range<Int>) {
         __setSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSRange(location: range.lowerBound, length: range.count))
     }
+    
+    @available(macOS 10.14, iOS 12.0, tvOS 12.0, *)
+    public func memoryBarrier(resources:[MTLResource]) {
+        __memoryBarrier(resources: resources, count: resources.count)
+    }
 }
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLDevice {
     
@@ -92,7 +107,6 @@ public func MTLCopyAllDevicesWithObserver(handler: @escaping MTLDeviceNotificati
 }
 #endif
 
-@available(swift 4)
 @available(macOS 10.12, iOS 10.0, tvOS 10.0, *)
 extension MTLFunctionConstantValues {
     
@@ -102,7 +116,6 @@ extension MTLFunctionConstantValues {
     
 }
 
-@available(swift 4)
 @available(macOS 10.13, iOS 11.0, tvOS 11.0, *)
 extension MTLArgumentEncoder {
     
@@ -117,9 +130,20 @@ extension MTLArgumentEncoder {
     public func setSamplerStates(_ samplers: [MTLSamplerState?], range: Range<Int>) {
         __setSamplerStates(samplers, with: NSRange(location: range.lowerBound, length: range.count))
     }
+
+    #if os(macOS)
+    @available(macOS 10.14, *)
+    public func setRenderPipelineStates(_ pipelines: [MTLRenderPipelineState?], range: Range<Int>) {
+        __setRenderPipelineStates(pipelines, with: NSRange(location: range.lowerBound, length: range.count))
+    }
+    #endif
+    
+    @available(macOS 10.14, iOS 12.0, tvOS 12.0, *)
+    public func setIndirectCommandBuffers(_ buffers: [MTLIndirectCommandBuffer?], range: Range<Int>) {
+        __setIndirectCommandBuffers(buffers, with: NSRange(location: range.lowerBound, length: range.count))
+    }
 }
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLRenderCommandEncoder {
     
@@ -199,9 +223,34 @@ extension MTLRenderCommandEncoder {
         __setTileSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSRange(location: range.lowerBound, length: range.count))
     }
 #endif
+    
+#if os(macOS)
+    @available(macOS 10.14, *)
+    public func memoryBarrier(resources: [MTLResource], after: MTLRenderStages, before: MTLRenderStages) {
+        __memoryBarrier(resources: resources, count: resources.count, after: after, before: before)
+    }
+#endif
+
+    @available(macOS 10.14, iOS 12.0, tvOS 12.0, *)
+    public func executeCommandsInBuffer(_ buffer: MTLIndirectCommandBuffer, range: Range<Int>) {
+        __executeCommands(in: buffer, with: NSRange(location: range.lowerBound, length: range.count))
+    }
+
+    #if os(macOS)
+    @available(macOS 10.14, *)
+    public func executeCommandsInBuffer(_ buffer: MTLIndirectCommandBuffer, indirectBuffer indirectRangeBuffer: MTLBuffer, offset: Int) {
+        __executeCommands(in: buffer, indirectBuffer: indirectRangeBuffer, indirectBufferOffset: offset)
+    }
+    #endif
 }
 
-@available(swift 4)
+@available(macOS 10.14, iOS 12.0, tvOS 12.0, *)
+extension MTLIndirectCommandBuffer {
+    public func reset(_ range: Range<Int>) {
+        __reset(with: NSRange(location: range.lowerBound, length: range.count))
+    }
+}
+
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLRenderPassDescriptor {
     
@@ -220,7 +269,6 @@ extension MTLRenderPassDescriptor {
     
 }
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLTexture {
     

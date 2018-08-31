@@ -17,8 +17,79 @@
 #ifndef SWIFT_RUNTIME_CONFIG_H
 #define SWIFT_RUNTIME_CONFIG_H
 
-// Bring in visibility attribute macros for library visibility.
-#include "llvm/Support/Compiler.h"
+/// \macro SWIFT_RUNTIME_GNUC_PREREQ
+/// Extend the default __GNUC_PREREQ even if glibc's features.h isn't
+/// available.
+#ifndef SWIFT_RUNTIME_GNUC_PREREQ
+# if defined(__GNUC__) && defined(__GNUC_MINOR__) && defined(__GNUC_PATCHLEVEL__)
+#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) \
+    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) + __GNUC_PATCHLEVEL__ >= \
+     ((maj) << 20) + ((min) << 10) + (patch))
+# elif defined(__GNUC__) && defined(__GNUC_MINOR__)
+#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) \
+    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) >= ((maj) << 20) + ((min) << 10))
+# else
+#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) 0
+# endif
+#endif
+
+/// SWIFT_RUNTIME_LIBRARY_VISIBILITY - If a class marked with this attribute is
+/// linked into a shared library, then the class should be private to the
+/// library and not accessible from outside it.  Can also be used to mark
+/// variables and functions, making them private to any shared library they are
+/// linked into.
+/// On PE/COFF targets, library visibility is the default, so this isn't needed.
+#if (__has_attribute(visibility) || SWIFT_RUNTIME_GNUC_PREREQ(4, 0, 0)) &&    \
+    !defined(__MINGW32__) && !defined(__CYGWIN__) && !defined(_WIN32)
+#define SWIFT_RUNTIME_LIBRARY_VISIBILITY __attribute__ ((visibility("hidden")))
+#else
+#define SWIFT_RUNTIME_LIBRARY_VISIBILITY
+#endif
+
+/// Attributes.
+/// SWIFT_RUNTIME_ATTRIBUTE_NOINLINE - On compilers where we have a directive to do so,
+/// mark a method "not for inlining".
+#if __has_attribute(noinline) || SWIFT_RUNTIME_GNUC_PREREQ(3, 4, 0)
+#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE __attribute__((noinline))
+#elif defined(_MSC_VER)
+#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE __declspec(noinline)
+#else
+#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+#endif
+
+/// SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE - On compilers where we have a directive to do
+/// so, mark a method "always inline" because it is performance sensitive. GCC
+/// 3.4 supported this but is buggy in various cases and produces unimplemented
+/// errors, just use it in GCC 4.0 and later.
+#if __has_attribute(always_inline) || SWIFT_RUNTIME_GNUC_PREREQ(4, 0, 0)
+#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE __forceinline
+#else
+#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+#endif
+
+#ifdef __GNUC__
+#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN __declspec(noreturn)
+#else
+#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+#endif
+
+/// SWIFT_RUNTIME_BUILTIN_TRAP - On compilers which support it, expands to an expression
+/// which causes the program to exit abnormally.
+#if __has_builtin(__builtin_trap) || SWIFT_RUNTIME_GNUC_PREREQ(4, 3, 0)
+# define SWIFT_RUNTIME_BUILTIN_TRAP __builtin_trap()
+#elif defined(_MSC_VER)
+// The __debugbreak intrinsic is supported by MSVC, does not require forward
+// declarations involving platform-specific typedefs (unlike RaiseException),
+// results in a call to vectored exception handlers, and encodes to a short
+// instruction that still causes the trapping behavior we want.
+# define SWIFT_RUNTIME_BUILTIN_TRAP __debugbreak()
+#else
+# define SWIFT_RUNTIME_BUILTIN_TRAP *(volatile int*)0x11 = 0
+#endif
 
 /// Does the current Swift platform support "unbridged" interoperation
 /// with Objective-C?  If so, the implementations of various types must
@@ -54,7 +125,7 @@
 /// above, information other than the class pointer could be contained in the
 /// ISA.
 #ifndef SWIFT_HAS_OPAQUE_ISAS
-#if __ARM_ARCH_7K__ >= 2
+#if defined(__arm__) && __ARM_ARCH_7K__ >= 2
 #define SWIFT_HAS_OPAQUE_ISAS 1
 #else
 #define SWIFT_HAS_OPAQUE_ISAS 0
@@ -68,7 +139,7 @@
 /// Which bits in the class metadata are used to distinguish Swift classes
 /// from ObjC classes?
 #ifndef SWIFT_CLASS_IS_SWIFT_MASK
-# if __APPLE__ && SWIFT_OBJC_INTEROP && SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
+# if defined(__APPLE__) && SWIFT_OBJC_INTEROP && SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
 #  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
 # else
 #  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
@@ -134,17 +205,5 @@
 // FIXME: the runtime's code does not honor DefaultCC
 // so changing this value is not sufficient.
 #define SWIFT_DEFAULT_LLVM_CC llvm::CallingConv::C
-
-// These are temporary macros during the +0 cc exploration to cleanly support
-// both +0 and +1 in the runtime.
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-#define SWIFT_NS_RELEASES_ARGUMENT NS_RELEASES_ARGUMENT
-#define SWIFT_CC_PLUSONE_GUARD(...) do { __VA_ARGS__ ; } while (0)
-#define SWIFT_CC_PLUSZERO_GUARD(...)
-#else
-#define SWIFT_NS_RELEASES_ARGUMENT
-#define SWIFT_CC_PLUSONE_GUARD(...)
-#define SWIFT_CC_PLUSZERO_GUARD(...)  do { __VA_ARGS__ ; } while (0)
-#endif
 
 #endif // SWIFT_RUNTIME_CONFIG_H

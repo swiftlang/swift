@@ -37,3 +37,5 @@ public enum Breakfast<Champions> : Int {
   case Bacon
   case Coffee
 }
+
+@_frozen public enum Exhaustive {}

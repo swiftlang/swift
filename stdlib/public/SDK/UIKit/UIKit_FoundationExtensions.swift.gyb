@@ -88,4 +88,8 @@ public extension URLResourceValues {
 // Bridge UIKit structs to NSValue.
 
 ${ ObjectiveCBridgeableImplementationForNSValue("UIEdgeInsets") }
+
+@available(iOS 11.0, tvOS 11.0, watchOS 4.0, *)
+${ ObjectiveCBridgeableImplementationForNSValue("NSDirectionalEdgeInsets") }
+
 ${ ObjectiveCBridgeableImplementationForNSValue("UIOffset") }

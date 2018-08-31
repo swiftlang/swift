@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 @objc enum Foo: Int {
   case Zim, Zang, Zung
@@ -16,7 +16,7 @@
   case Zim, Zang, Zung
 }
 
-@objc enum NonIntegerRawType: Float { // expected-error{{'@objc' enum raw type 'Float' is not an integer type}} expected-error {{'NonIntegerRawType' declares raw type 'Float', but does not conform to RawRepresentable and conformance could not be synthesized}}
+@objc enum NonIntegerRawType: Float { // expected-error{{'@objc' enum raw type 'Float' is not an integer type}}
   case Zim = 1.0, Zang = 1.5, Zung = 2.0
 }
 

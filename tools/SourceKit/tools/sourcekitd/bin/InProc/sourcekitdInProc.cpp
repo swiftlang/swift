@@ -154,15 +154,12 @@ sourcekitd_set_notification_handler(sourcekitd_response_receiver_t receiver) {
 }
 
 void sourcekitd::postNotification(sourcekitd_response_t Notification) {
-  sourcekitd_response_receiver_t receiver = Block_copy(NotificationReceiver);
-  if (!receiver) {
-    sourcekitd_response_dispose(Notification);
-    return;
-  }
-
   WorkQueue::dispatchOnMain([=]{
+    if (!NotificationReceiver) {
+      sourcekitd_response_dispose(Notification);
+      return;
+    }
     // The receiver accepts ownership of the notification object.
-    receiver(Notification);
-    Block_release(receiver);
+    NotificationReceiver(Notification);
   });
 }

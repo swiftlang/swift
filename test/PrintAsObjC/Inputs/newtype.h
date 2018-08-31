@@ -3,3 +3,6 @@
 
 typedef NSString *StructLikeStringWrapper __attribute__((swift_newtype(struct)));
 typedef NSString *EnumLikeStringWrapper __attribute__((swift_newtype(enum)));
+
+typedef NSObject *StructLikeObjectWrapper __attribute__((swift_newtype(struct)));
+typedef NSError *StructLikeErrorWrapper __attribute__((swift_newtype(struct)));

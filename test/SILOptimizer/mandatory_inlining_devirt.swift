@@ -30,3 +30,22 @@ public class PublicClass {
   }
 }
 
+public protocol Thrower {
+  func fail() throws
+}
+
+@_transparent public func callee<T : Thrower>(_ t: T) throws {
+  try t.fail()
+}
+
+public struct Concrete : Thrower {
+  public func fail() throws {}
+}
+
+// CHECK-LABEL: sil @$S4test6calleryyAA8ConcreteVKF : $@convention(thin) (Concrete) -> @error Error
+public func caller(_ c: Concrete) throws {
+  // CHECK: [[ARG:%.*]] = struct $Concrete ()
+  // CHECK: [[FN:%.*]] = function_ref @$S4test8ConcreteV4failyyKF : $@convention(method) (Concrete) -> @error Error
+  // CHECK: try_apply [[FN]]([[ARG]]) : $@convention(method) (Concrete) -> @error Error
+  try callee(c)
+}

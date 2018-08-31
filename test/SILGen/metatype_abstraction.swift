@@ -1,4 +1,8 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -module-name Swift -parse-stdlib %s | %FileCheck %s
+
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name Swift -parse-stdlib %s | %FileCheck %s
+
+@_semantics("typechecker.type(of:)")
+public func type<T, Metatype>(of value: T) -> Metatype {}
 
 enum Optional<Wrapped> {
   case none
@@ -83,7 +87,7 @@ func staticMetatypeToGenericMetatype(_ x: S.Type) {
 }
 // CHECK-LABEL: sil hidden @$Ss24dynamicMetatypeToGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[MAT:%.*]] = alloc_stack $@thick C.Type
-// CHECK:         apply {{%.*}}<C.Type>([[MAT]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+// CHECK:         apply {{%.*}}<C.Type>([[MAT]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 func dynamicMetatypeToGeneric(_ x: C.Type) {
   var x = x
   takeGeneric(x)
@@ -100,7 +104,7 @@ func dynamicMetatypeToGenericMetatype(_ x: C.Type) {
 }
 // CHECK-LABEL: sil hidden @$Ss24genericMetatypeToGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[MAT:%.*]] = alloc_stack $@thick U.Type
-// CHECK:         apply {{%.*}}<U.Type>([[MAT]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+// CHECK:         apply {{%.*}}<U.Type>([[MAT]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 func genericMetatypeToGeneric<U>(_ x: U.Type) {
   var x = x
   takeGeneric(x)

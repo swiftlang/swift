@@ -104,7 +104,7 @@ class OffsetCollection : MutableCollection, RandomAccessCollection {
 
 Algorithm.test("${t}/sorted/${name}") {
   let count = 1000
-  var ary = ${t}(randArray(count))
+  var ary = ${t}((0 ..< count).map { _ in Int.random(in: .min ... .max) })
   var sortedAry1 = [Int]()
   var sortedAry2 = ${t}<Int>()
 
@@ -120,7 +120,7 @@ Algorithm.test("${t}/sorted/${name}") {
   let i1 = 400
   let i2 = 700
   sortedAry2 = ary
-  _introSort(&sortedAry2, subRange: i1..<i2${commaComparePredicate})
+  sortedAry2._introSort(within: i1..<i2, by: <)
   expectEqual(ary[0..<i1], sortedAry2[0..<i1])
   expectSortedCollection(sortedAry2[i1..<i2], ary[i1..<i2])
   expectEqual(ary[i2..<count], sortedAry2[i2..<count])
@@ -130,7 +130,7 @@ Algorithm.test("${t}/sorted/${name}") {
 
 Algorithm.test("sort/CollectionsWithUnusualIndices") {
   let count = 1000
-  let ary = randArray(count)
+  let ary = (0 ..< count).map { _ in Int.random(in: .min ... .max) }
 
   // Check if sorting routines work well on collections with startIndex != 0.
   var offsetAry = OffsetCollection(ary, offset: 500, forward: false)

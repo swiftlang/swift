@@ -18,23 +18,23 @@ public struct DispatchWorkItemFlags : OptionSet, RawRepresentable {
 
 	public static let barrier = DispatchWorkItemFlags(rawValue: 0x1)
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public static let detached = DispatchWorkItemFlags(rawValue: 0x2)
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public static let assignCurrentContext = DispatchWorkItemFlags(rawValue: 0x4)
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public static let noQoS = DispatchWorkItemFlags(rawValue: 0x8)
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public static let inheritQoS = DispatchWorkItemFlags(rawValue: 0x10)
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public static let enforceQoS = DispatchWorkItemFlags(rawValue: 0x20)
 }
 
-@available(OSX 10.10, iOS 8.0, *)
+@available(macOS 10.10, iOS 8.0, *)
 public class DispatchWorkItem {
 	internal var _block: _DispatchBlock
 

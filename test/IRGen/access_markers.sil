@@ -27,7 +27,7 @@ bb0(%0 : $A):
   // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH1]] to i8*
   // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 {{.*}}, i8* [[T0]])
   // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
-  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH1]], [[SIZE]] 1, i8* null)
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH1]], [[SIZE]] 33, i8* null)
   %3 = begin_access [modify] [dynamic] %2 : $*Int
 
   // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH1]])
@@ -38,7 +38,7 @@ bb0(%0 : $A):
   // CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[SCRATCH2]] to i8*
   // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 {{.*}}, i8* [[T0]])
   // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
-  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH2]], [[SIZE]] 0, i8* null)
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH2]], [[SIZE]] 32, i8* null)
   %5 = begin_access [read] [dynamic] %2 : $*Int
 
   // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH2]])
@@ -60,14 +60,14 @@ bb0(%0 : $A):
   %2 = ref_element_addr %0 : $A, #A.property
 
   // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
-  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH]], [[SIZE]] 1, i8* null)
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH]], [[SIZE]] 33, i8* null)
   begin_unpaired_access [modify] [dynamic] %2 : $*Int, %1 : $*Builtin.UnsafeValueBuffer
 
   // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH]])
   end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
 
   // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
-  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH]], [[SIZE]] 0, i8* null)
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH]], [[SIZE]] 32, i8* null)
   begin_unpaired_access [read] [dynamic] %2 : $*Int, %1 : $*Builtin.UnsafeValueBuffer
 
   // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH]])
@@ -87,7 +87,7 @@ bb0(%0 : $A, %1 : $*Builtin.UnsafeValueBuffer):
 
   // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
   // CHECK-NEXT: [[PC:%.*]] = call i8* @llvm.returnaddress(i32 0)
-  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH:%1]], [[SIZE]] 1, i8* [[PC]])
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH:%1]], [[SIZE]] 33, i8* [[PC]])
   begin_unpaired_access [modify] [dynamic] %2 : $*Int, %1 : $*Builtin.UnsafeValueBuffer
 
   // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH]])
@@ -95,7 +95,7 @@ bb0(%0 : $A, %1 : $*Builtin.UnsafeValueBuffer):
 
   // CHECK-NEXT: [[T1:%.*]] = bitcast [[INT]]* [[PROPERTY]] to i8*
   // CHECK-NEXT: [[PC:%.*]] = call i8* @llvm.returnaddress(i32 0)
-  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH]], [[SIZE]] 0, i8* [[PC]])
+  // CHECK-NEXT: call void @swift_beginAccess(i8* [[T1]], [[BUFFER]]* [[SCRATCH]], [[SIZE]] 32, i8* [[PC]])
   begin_unpaired_access [read] [dynamic] %2 : $*Int, %1 : $*Builtin.UnsafeValueBuffer
 
   // CHECK-NEXT: call void @swift_endAccess([[BUFFER]]* [[SCRATCH]])
@@ -142,6 +142,27 @@ bb0(%0 : $A):
   end_access %3 : $*Any
   destroy_addr %1 : $*Any
   dealloc_stack %1 : $*Any
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// CHECK-LABEL: define {{.*}}void @testNontracking(
+sil @testNontracking : $(@guaranteed A) -> () {
+bb0(%0 : $A):
+  %1 = alloc_stack $Int
+  // CHECK:      [[PROPERTY:%.*]] = getelementptr inbounds [[C]], [[C]]* %0, i32 0, i32 1
+  %2 = ref_element_addr %0 : $A, #A.property
+  // CHECK: call void @swift_beginAccess(i8* %{{.*}}, [[BUFFER]]* %{{.*}}, [[SIZE]] 0, i8* null)
+  %3 = begin_access [read] [dynamic] [no_nested_conflict] %2 : $*Int
+  copy_addr %3 to [initialization] %1 : $*Int
+  // CHECK-NOT: end_access
+  end_access %3 : $*Int
+  %9 = alloc_stack $Builtin.UnsafeValueBuffer
+  // CHECK: call void @swift_beginAccess(i8* %{{.*}}, [[BUFFER]]* %{{.*}}, [[SIZE]] 0, i8* null)
+  begin_unpaired_access [read] [dynamic] [no_nested_conflict] %2 : $*Int, %9 : $*Builtin.UnsafeValueBuffer
+  copy_addr %2 to %1 : $*Int
+  dealloc_stack %9 : $*Builtin.UnsafeValueBuffer
+  dealloc_stack %1 : $*Int
   %20 = tuple ()
   return %20 : $()
 }

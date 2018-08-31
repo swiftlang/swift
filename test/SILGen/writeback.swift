@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 struct Foo {
   mutating           // used to test writeback.
@@ -130,7 +130,7 @@ protocol Frobable {
 }
 
 // CHECK-LABEL: sil hidden @$S9writeback12test_generic{{[_0-9a-zA-Z]*}}F 
-// CHECK:         witness_method $Runce, #Runcible.frob!materializeForSet.1
+// CHECK:         witness_method $Runce, #Runcible.frob!modify.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!setter.1
 func test_generic<Runce: Runcible>(runce runce: inout Runce, anse: Runce.Frob.Anse) {
   runce.frob.anse = anse

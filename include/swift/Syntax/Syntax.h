@@ -84,6 +84,9 @@ public:
   /// Get the shared raw syntax.
   RC<RawSyntax> getRaw() const;
 
+  /// Get an ID for this node that is stable across incremental parses
+  SyntaxNodeId getId() const { return getRaw()->getId(); }
+
   /// Get the number of child nodes in this piece of syntax, not including
   /// tokens.
   size_t getNumChildren() const;
@@ -132,7 +135,10 @@ public:
 
   /// Returns the child index of this node in its parent,
   /// if it has one, otherwise 0.
-  CursorIndex getIndexInParent() const;
+  CursorIndex getIndexInParent() const { return getData().getIndexInParent(); }
+
+  /// Return the number of bytes this node takes when spelled out in the source
+  size_t getTextLength() const { return getRaw()->getTextLength(); }
 
   /// Returns true if this syntax node represents a token.
   bool isToken() const;
@@ -190,7 +196,20 @@ public:
 
   /// Get the absolute position of this raw syntax: its offset, line,
   /// and column.
-  AbsolutePosition getAbsolutePosition() const;
+  AbsolutePosition getAbsolutePosition() const {
+    return Data->getAbsolutePosition();
+  }
+
+  /// Get the absolute end position (exclusively) where the trailing trivia of
+  /// this node ends.
+  AbsolutePosition getAbsoluteEndPositionAfterTrailingTrivia() const {
+    return Data->getAbsoluteEndPositionAfterTrailingTrivia();
+  }
+
+  /// Get the absolute position at which the leading trivia of this node starts.
+  AbsolutePosition getAbsolutePositionBeforeLeadingTrivia() const {
+    return Data->getAbsolutePositionBeforeLeadingTrivia();
+  }
 
   // TODO: hasSameStructureAs ?
 };

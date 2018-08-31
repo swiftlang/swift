@@ -140,17 +140,17 @@ struct OneOf_match;
 
 template <typename T0>
 struct OneOf_match<T0> {
-  typedef T0 Ty;
+  using Ty = T0;
 };
 
 template <typename T0, typename T1>
 struct OneOf_match<T0, T1> {
-  typedef match_combine_or<T0, T1> Ty;
+  using Ty = match_combine_or<T0, T1>;
 };
 
 template <typename T0, typename T1, typename ...Arguments>
 struct OneOf_match<T0, T1, Arguments ...> {
-  typedef typename OneOf_match<match_combine_or<T0, T1>, Arguments ...>::Ty Ty;
+  using Ty = typename OneOf_match<match_combine_or<T0, T1>, Arguments...>::Ty;
 };
 
 /// This is a vararg version of m_CombineOr. It is a boolean "or" of
@@ -329,7 +329,6 @@ struct UnaryOp_match {
     return T;                                         \
   }
 UNARY_OP_MATCH_WITH_ARG_MATCHER(AllocRefDynamicInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(LoadWeakInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ConvertFunctionInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UpcastInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(PointerToAddressInst)
@@ -339,10 +338,6 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedAddrCastInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedTrivialBitCastInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedBitwiseCastInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(RawPointerToRefInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(RefToUnownedInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedToRefInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(RefToUnmanagedInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UnmanagedToRefInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ThinToThickFunctionInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ThickToObjCMetatypeInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCToThickMetatypeInst)
@@ -380,9 +375,6 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(DeinitExistentialValueInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ProjectBlockStorageInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongReleaseInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainUnownedInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedRetainInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedReleaseInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ClassifyBridgeObjectInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ValueToBridgeObjectInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(FixLifetimeInst)
@@ -394,6 +386,24 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocBoxInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(DestroyAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(CondFailInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ReturnInst)
+#define LOADABLE_REF_STORAGE_HELPER(Name) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(RefTo##Name##Inst) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(Name##ToRefInst)
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(Load##Name##Inst)
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(Name##RetainInst) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(Name##ReleaseInst) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetain##Name##Inst)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name)
+#include "swift/AST/ReferenceStorage.def"
+#undef LOADABLE_REF_STORAGE_HELPER
+
 #undef UNARY_OP_MATCH_WITH_ARG_MATCHER
 
 //===----------------------------------------------------------------------===//
@@ -584,18 +594,18 @@ struct Apply_match;
 
 template <typename CalleeTy>
 struct Apply_match<CalleeTy> {
-  typedef Callee_match<CalleeTy> Ty;
+  using Ty = Callee_match<CalleeTy>;
 };
 
 template <typename CalleeTy, typename T0>
 struct Apply_match<CalleeTy, T0> {
-  typedef match_combine_and<Callee_match<CalleeTy>, Argument_match<T0>> Ty;
+  using Ty = match_combine_and<Callee_match<CalleeTy>, Argument_match<T0>>;
 };
 
 template <typename CalleeTy, typename T0, typename ...Arguments>
 struct Apply_match<CalleeTy, T0, Arguments ...> {
-  typedef match_combine_and<typename Apply_match<CalleeTy, Arguments ...>::Ty,
-                            Argument_match<T0> > Ty;
+  using Ty = match_combine_and<typename Apply_match<CalleeTy, Arguments...>::Ty,
+                               Argument_match<T0>>;
 };
 
 /// Match only an ApplyInst's Callee.

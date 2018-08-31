@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -I %S/Inputs -enable-source-import %s -swift-version 3 | %FileCheck %s
 
 // REQUIRES: objc_interop
 
