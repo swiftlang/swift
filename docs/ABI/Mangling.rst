@@ -115,6 +115,8 @@ field offsets are therefore required when accessing fields in generic
 types where the metadata itself has unknown layout.)
 
 ::
+  global ::= global 'Tj'                 // resilient method dispatch thunk
+  global ::= global 'Tq'                 // method descriptor
 
   global ::= global 'TO'                 // ObjC-as-swift thunk
   global ::= global 'To'                 // swift-as-ObjC thunk

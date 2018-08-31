@@ -58,23 +58,39 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 std::string LinkEntity::mangleAsString() const {
   IRGenMangler mangler;
   switch (getKind()) {
-    case Kind::DispatchThunk:
-      return mangler.mangleEntity(getDecl(), /*isCurried=*/false,
-                                  ASTMangler::SymbolKind::SwiftDispatchThunk);
+    case Kind::DispatchThunk: {
+      auto *func = cast<FuncDecl>(getDecl());
+      return mangler.mangleDispatchThunk(func);
+    }
 
-    case Kind::DispatchThunkInitializer:
-      return mangler.mangleConstructorEntity(
-          cast<ConstructorDecl>(getDecl()),
-          /*isAllocating=*/false,
-          /*isCurried=*/false,
-          ASTMangler::SymbolKind::SwiftDispatchThunk);
+    case Kind::DispatchThunkInitializer: {
+      auto *ctor = cast<ConstructorDecl>(getDecl());
+      return mangler.mangleConstructorDispatchThunk(ctor,
+                                                    /*isAllocating=*/false);
+    }
 
-    case Kind::DispatchThunkAllocator:
-      return mangler.mangleConstructorEntity(
-          cast<ConstructorDecl>(getDecl()),
-          /*isAllocating=*/true,
-          /*isCurried=*/false,
-          ASTMangler::SymbolKind::SwiftDispatchThunk);
+    case Kind::DispatchThunkAllocator: {
+      auto *ctor = cast<ConstructorDecl>(getDecl());
+      return mangler.mangleConstructorDispatchThunk(ctor,
+                                                    /*isAllocating=*/true);
+    }
+
+    case Kind::MethodDescriptor: {
+      auto *func = cast<FuncDecl>(getDecl());
+      return mangler.mangleMethodDescriptor(func);
+    }
+
+    case Kind::MethodDescriptorInitializer: {
+      auto *ctor = cast<ConstructorDecl>(getDecl());
+      return mangler.mangleConstructorMethodDescriptor(ctor,
+                                                       /*isAllocating=*/false);
+    }
+
+    case Kind::MethodDescriptorAllocator: {
+      auto *ctor = cast<ConstructorDecl>(getDecl());
+      return mangler.mangleConstructorMethodDescriptor(ctor,
+                                                       /*isAllocating=*/true);
+    }
 
     case Kind::ValueWitness:
       return mangler.mangleValueWitness(getType(), getValueWitness());

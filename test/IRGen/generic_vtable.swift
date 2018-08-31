@@ -107,6 +107,17 @@ public class Concrete : Derived<Int> {
 // CHECK-SAME: }>, align
 
 
+//// Method descriptors
+
+// CHECK-LABEL: @"$S14generic_vtable4BaseC2m1yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$S14generic_vtable4BaseCMn", i32 0, i32 13)
+// CHECK-LABEL: @"$S14generic_vtable4BaseC2m2yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$S14generic_vtable4BaseCMn", i32 0, i32 14)
+// CHECK-LABEL: @"$S14generic_vtable4BaseCACycfcTq" = hidden alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$S14generic_vtable4BaseCMn", i32 0, i32 15)
+
+// CHECK-LABEL: @"$S14generic_vtable7DerivedC2m3yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$S14generic_vtable7DerivedCMn", i32 0, i32 23)
+
+// CHECK-LABEL: @"$S14generic_vtable8ConcreteC2m4yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$S14generic_vtable8ConcreteCMn", i32 0, i32 16)
+
+
 //// Metadata initialization function for 'Derived' copies superclass vtable
 //// and installs overrides for 'm2()' and 'init()'.
 

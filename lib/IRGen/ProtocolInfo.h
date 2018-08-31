@@ -81,8 +81,8 @@ public:
   }
   
   bool isFunction() const {
-    auto decl = MemberOrAssociatedType.get<Decl*>();
-    return Protocol == nullptr && isa<AbstractFunctionDecl>(decl);
+    auto decl = MemberOrAssociatedType.dyn_cast<Decl*>();
+    return Protocol == nullptr && decl && isa<AbstractFunctionDecl>(decl);
   }
 
   bool matchesFunction(AbstractFunctionDecl *func) const {

@@ -62,6 +62,8 @@ private:
 
   void addDispatchThunk(SILDeclRef declRef);
 
+  void addMethodDescriptor(SILDeclRef declRef);
+
 public:
   TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
                 tapi::internal::ArchitectureSet archs, StringSet *stringSymbols,
