@@ -594,7 +594,7 @@ public:
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
-    require(DebugScope->Parent.get<SILFunction *>() == &F,
+    require(DebugScope->getParent().get<SILFunction *>() == &F,
             "Scope of SIL function points to different function");
   }
 
@@ -820,7 +820,7 @@ public:
     // for each argument slot. This catches SIL transformations
     // that accidentally remove inline information (stored in the SILDebugScope)
     // from debug-variable-carrying instructions.
-    if (!DS->InlinedCallSite) {
+    if (!DS->getInlinedCallSite()) {
       Optional<SILDebugVariable> VarInfo;
       if (auto *DI = dyn_cast<AllocStackInst>(I))
         VarInfo = DI->getVarInfo();
@@ -4717,8 +4717,7 @@ public:
         const SILDebugScope *Tmp = Previous;
         assert(Tmp && "scope can't be null");
         while (Tmp) {
-          PointerUnion<const SILDebugScope *, SILFunction *> Parent =
-              Tmp->Parent;
+          SILDebugScope::ParentType Parent = Tmp->getParent();
           auto *ParentScope = Parent.dyn_cast<const SILDebugScope *>();
           if (!ParentScope)
             break;

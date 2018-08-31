@@ -22,36 +22,42 @@
 
 using namespace swift;
 
+static_assert(sizeof(SILDebugScope) == 4*sizeof(void*),
+              "SILDebugScope should be small");
+
 SILDebugScope::SILDebugScope(SILLocation Loc, SILFunction *SILFn,
                              const SILDebugScope *ParentScope,
                              const SILDebugScope *InlinedCallSite)
-    : Loc(Loc), InlinedCallSite(InlinedCallSite) {
+    : Loc(Loc) {
   if (ParentScope)
-    Parent = ParentScope;
+    ParentAndHasInlinedCallSite.setPointer(ParentScope);
   else {
     assert(SILFn && "no parent provided");
-    Parent = SILFn;
+    ParentAndHasInlinedCallSite.setPointer(SILFn);
+  }
+  if (InlinedCallSite) {
+    *this->getTrailingObjects<const SILDebugScope *>() = InlinedCallSite;
+    ParentAndHasInlinedCallSite.setInt(true);
   }
 }
 
-SILDebugScope::SILDebugScope(SILLocation Loc)
-    : Loc(Loc), InlinedCallSite(nullptr) {}
+SILDebugScope::SILDebugScope(SILLocation Loc) : Loc(Loc) {}
 
 SILFunction *SILDebugScope::getInlinedFunction() const {
-  if (Parent.isNull())
+  if (getParent().isNull())
     return nullptr;
 
   const SILDebugScope *Scope = this;
-  while (Scope->Parent.is<const SILDebugScope *>())
-    Scope = Scope->Parent.get<const SILDebugScope *>();
-  assert(Scope->Parent.is<SILFunction *>() && "orphaned scope");
-  return Scope->Parent.get<SILFunction *>();
+  while (Scope->getParent().is<const SILDebugScope *>())
+    Scope = Scope->getParent().get<const SILDebugScope *>();
+  assert(Scope->getParent().is<SILFunction *>() && "orphaned scope");
+  return Scope->getParent().get<SILFunction *>();
 }
 
 SILFunction *SILDebugScope::getParentFunction() const {
-  if (InlinedCallSite)
+  if (const SILDebugScope *InlinedCallSite = getInlinedCallSite())
     return InlinedCallSite->getParentFunction();
-  if (auto *ParentScope = Parent.dyn_cast<const SILDebugScope *>())
+  if (auto *ParentScope = getParent().dyn_cast<const SILDebugScope *>())
     return ParentScope->getParentFunction();
-  return Parent.get<SILFunction *>();
+  return getParent().get<SILFunction *>();
 }

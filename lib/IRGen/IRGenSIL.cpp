@@ -862,7 +862,7 @@ public:
   static bool isInlinedGeneric(VarDecl *VarDecl, const SILDebugScope *DS) {
     if (DebugInfoInlinedGenerics)
       return false;
-    if (!DS->InlinedCallSite)
+    if (!DS->getInlinedCallSite())
       return false;
     if (VarDecl->hasType())
       return VarDecl->getType()->hasArchetype();
@@ -3688,7 +3688,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (isa<SILUndef>(SILVal)) {
     // We cannot track the location of inlined error arguments because it has no
     // representation in SIL.
-    if (!i->getDebugScope()->InlinedCallSite && VarInfo->Name == "$error") {
+    if (!i->getDebugScope()->getInlinedCallSite() &&
+        VarInfo->Name == "$error") {
       auto funcTy = CurSILFn->getLoweredFunctionType();
       emitErrorResultVar(funcTy->getErrorResult(), i);
     }

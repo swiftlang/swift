@@ -711,19 +711,19 @@ public:
       return;
 
     if (!Ctx.hasScopeID(DS)) {
-      printDebugScope(DS->Parent.dyn_cast<const SILDebugScope *>(), SM);
-      printDebugScope(DS->InlinedCallSite, SM);
+      printDebugScope(DS->getParent().dyn_cast<const SILDebugScope *>(), SM);
+      printDebugScope(DS->getInlinedCallSite(), SM);
       unsigned ID = Ctx.assignScopeID(DS);
       *this << "sil_scope " << ID << " { ";
       printDebugLocRef(DS->Loc, SM, false);
       *this << " parent ";
-      if (auto *F = DS->Parent.dyn_cast<SILFunction *>())
+      if (auto *F = DS->getParent().dyn_cast<SILFunction *>())
         *this << "@" << F->getName() << " : $" << F->getLoweredFunctionType();
       else {
-        auto *PS = DS->Parent.get<const SILDebugScope *>();
+        auto *PS = DS->getParent().get<const SILDebugScope *>();
         *this << Ctx.getScopeID(PS);
       }
-      if (auto *CS = DS->InlinedCallSite)
+      if (auto *CS = DS->getInlinedCallSite())
         *this << " inlined_at " << Ctx.getScopeID(CS);
       *this << " }\n";
     }
@@ -805,7 +805,7 @@ public:
 
     // Print inlined-at location, if any.
     const SILDebugScope *CS = DS;
-    while ((CS = CS->InlinedCallSite)) {
+    while ((CS = CS->getInlinedCallSite())) {
       *this << ": ";
       if (auto *InlinedF = CS->getInlinedFunction())
         *this << demangleSymbol(InlinedF->getName());
@@ -2955,18 +2955,18 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
   OS << "\n";
   OS.indent(Indent + 2);
   OS << " parent: ";
-  if (auto *P = Parent.dyn_cast<const SILDebugScope *>()) {
+  if (auto *P = getParent().dyn_cast<const SILDebugScope *>()) {
     P->dump(SM, OS, Indent + 2);
     OS.indent(Indent + 2);
   }
-  else if (auto *F = Parent.dyn_cast<SILFunction *>())
+  else if (auto *F = getParent().dyn_cast<SILFunction *>())
     OS << "@" << F->getName();
   else
     OS << "nullptr";
 
   OS << "\n";
   OS.indent(Indent + 2);
-  if (auto *CS = InlinedCallSite) {
+  if (auto *CS = getInlinedCallSite()) {
     OS << "inlinedCallSite: ";
     CS->dump(SM, OS, Indent + 2);
     OS.indent(Indent + 2);

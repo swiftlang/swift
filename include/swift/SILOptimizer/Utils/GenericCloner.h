@@ -52,8 +52,10 @@ public:
                 StringRef NewName,
                 CloneCollector::CallbackType Callback)
     : SuperTy(*initCloned(FuncBuilder, F, Serialized, ReInfo, NewName), *F,
-	      ParamSubs), FuncBuilder(FuncBuilder), ReInfo(ReInfo), Callback(Callback) {
-    assert(F->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
+              ParamSubs),
+      FuncBuilder(FuncBuilder), ReInfo(ReInfo), Callback(Callback) {
+    assert(F->getDebugScope()->getParent() !=
+           getCloned()->getDebugScope()->getParent());
   }
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs. Parameters are re-abstracted (changed from indirect to
