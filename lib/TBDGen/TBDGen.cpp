@@ -84,6 +84,11 @@ void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
   addSymbol(entity);
 }
 
+void TBDGenVisitor::addMethodDescriptor(SILDeclRef declRef) {
+  auto entity = LinkEntity::forMethodDescriptor(declRef);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addConformances(DeclContext *DC) {
   for (auto conformance : DC->getLocalConformances()) {
     auto protocol = conformance->getProtocol();
@@ -289,15 +294,8 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   }
 
   // Types with resilient superclasses have some extra symbols.
-  if (!hasResilientAncestor)
-    return;
-
-  addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
-
-  // And classes that are themselves resilient (not just a superclass) have even
-  // more.
-  if (!CD->isResilient())
-    return;
+  if (hasResilientAncestor)
+    addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
 
   // Emit dispatch thunks for every new vtable entry.
   struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
@@ -309,8 +307,11 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
         : TBD(TBD), CD(CD) {}
 
     void addMethod(SILDeclRef method) {
-      if (method.getDecl()->getDeclContext() == CD)
-        TBD.addDispatchThunk(method);
+      if (method.getDecl()->getDeclContext() == CD) {
+        if (CD->isResilient())
+          TBD.addDispatchThunk(method);
+        TBD.addMethodDescriptor(method);
+      }
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
@@ -363,11 +364,9 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 
     if (PD->isResilient()) {
       for (auto *member : PD->getMembers()) {
-        if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
+        if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(member)) {
           addDispatchThunk(SILDeclRef(funcDecl));
-        }
-        if (auto *ctorDecl = dyn_cast<ConstructorDecl>(member)) {
-          addDispatchThunk(SILDeclRef(ctorDecl, SILDeclRef::Kind::Allocator));
+          addMethodDescriptor(SILDeclRef(funcDecl));
         }
       }
     }

@@ -1887,6 +1887,11 @@ void Remangler::mangleDispatchThunk(Node *node) {
   Buffer << "Tj";
 }
 
+void Remangler::mangleMethodDescriptor(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Tq";
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << 'K';
 }
