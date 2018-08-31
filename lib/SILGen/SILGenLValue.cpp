@@ -1512,14 +1512,22 @@ namespace {
 
   class EndApplyPseudoComponent : public WritebackPseudoComponent {
     CleanupHandle EndApplyHandle;
-    Optional<AccessedStorage> Access;
+    AbstractStorageDecl *Storage;
+    bool IsSuper;
+    PreparedArguments PeekedIndices;
+    Expr *IndexExprForDiagnostics;
   public:
     EndApplyPseudoComponent(const LValueTypeData &typeData,
                             CleanupHandle endApplyHandle,
-                            Optional<AccessedStorage> access)
+                            AbstractStorageDecl *storage,
+                            bool isSuper,
+                            PreparedArguments &&peekedIndices,
+                            Expr *indexExprForDiagnostics)
       : WritebackPseudoComponent(typeData),
         EndApplyHandle(endApplyHandle),
-        Access(access) {}
+        Storage(storage), IsSuper(isSuper),
+        PeekedIndices(std::move(peekedIndices)),
+        IndexExprForDiagnostics(indexExprForDiagnostics) {}
 
   private:
     void writeback(SILGenFunction &SGF, SILLocation loc,
@@ -1539,7 +1547,9 @@ namespace {
     }
 
     Optional<AccessedStorage> getAccessedStorage() const override {
-      return Access;
+      return AccessedStorage{Storage, IsSuper,
+                             PeekedIndices.isNull() ? nullptr : &PeekedIndices,
+                             IndexExprForDiagnostics};
     }
   };
 
@@ -1570,12 +1580,9 @@ namespace {
 
       ManagedValue result;
 
-      LogicalPathComponent::AccessedStorage abstractStorage = {
-        Storage, IsSuper, /*indices*/ nullptr, IndexExprForDiagnostics
-      };
-
       auto args =
         std::move(*this).prepareAccessorArgs(SGF, loc, base, Accessor);
+      auto peekedIndices = args.Indices.copyForDiagnostics();
       SmallVector<ManagedValue, 4> yields;
       auto endApplyHandle =
         SGF.emitCoroutineAccessor(
@@ -1585,7 +1592,9 @@ namespace {
       // Push a writeback that ends the access.
       std::unique_ptr<LogicalPathComponent>
         component(new EndApplyPseudoComponent(getTypeData(), endApplyHandle,
-                                              abstractStorage));
+                                              Storage, IsSuper,
+                                              std::move(peekedIndices),
+                                              IndexExprForDiagnostics));
       pushWriteback(SGF, loc, std::move(component), ManagedValue(),
                     MaterializedLValue());
 
