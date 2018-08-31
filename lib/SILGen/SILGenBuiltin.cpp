@@ -411,15 +411,14 @@ static ManagedValue emitBuiltinAddressOf(SILGenFunction &SGF,
   // If the argument is inout, try forming its lvalue. This builtin only works
   // if it's trivially physically projectable.
   auto inout = cast<InOutExpr>(argument->getSemanticsProvidingExpr());
-  auto lv = SGF.emitLValue(inout->getSubExpr(), AccessKind::ReadWrite);
+  auto lv = SGF.emitLValue(inout->getSubExpr(), SGFAccessKind::ReadWrite);
   if (!lv.isPhysical() || !lv.isLoadingPure()) {
     SGF.SGM.diagnose(argument->getLoc(), diag::non_physical_addressof);
     return ManagedValue::forUnmanaged(SILUndef::get(rawPointerTy, &SGF.SGM.M));
   }
   
-  auto addr = SGF.emitAddressOfLValue(argument, std::move(lv),
-                                      AccessKind::ReadWrite)
-                 .getValue();
+  auto addr = SGF.emitAddressOfLValue(argument, std::move(lv))
+                 .getLValueAddress();
   
   // Take the address argument and cast it to RawPointer.
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());

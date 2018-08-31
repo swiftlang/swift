@@ -168,8 +168,8 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
     llvm_unreachable("argument source is invalid");
   case Kind::LValue: {
     auto loc = getKnownLValueLocation();
-    return SGF.emitAddressOfLValue(loc, std::move(*this).asKnownLValue(),
-                                   AccessKind::ReadWrite);
+    LValue &&lv = std::move(*this).asKnownLValue();
+    return SGF.emitAddressOfLValue(loc, std::move(lv));
   }
   case Kind::RValue: {
     auto loc = getKnownRValueLocation();
@@ -185,8 +185,8 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
   case Kind::Expr: {
     auto e = std::move(*this).asKnownExpr();
     if (e->isSemanticallyInOutExpr()) {
-      return SGF.emitAddressOfLValue(e, SGF.emitLValue(e, AccessKind::ReadWrite),
-                                     AccessKind::ReadWrite);
+      auto lv = SGF.emitLValue(e, SGFAccessKind::ReadWrite);
+      return SGF.emitAddressOfLValue(e, std::move(lv));
     } else {
       return SGF.emitRValueAsSingleValue(e, C);
     }

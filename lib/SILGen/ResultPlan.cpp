@@ -495,7 +495,8 @@ public:
     managedErrorTemp = SGF.emitManagedBufferWithCleanup(errorTemp, errorTL);
 
     // Create the appropriate pointer type.
-    lvalue = LValue::forAddress(ManagedValue::forLValue(errorTemp),
+    lvalue = LValue::forAddress(SGFAccessKind::ReadWrite,
+                                ManagedValue::forLValue(errorTemp),
                                 /*TODO: enforcement*/ None,
                                 AbstractionPattern(errorType), errorType);
   }
@@ -514,7 +515,7 @@ public:
   Optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
     SILGenFunction::PointerAccessInfo pointerInfo = {
-      unwrappedPtrType, ptrKind, AccessKind::ReadWrite
+      unwrappedPtrType, ptrKind, SGFAccessKind::ReadWrite
     };
     auto pointerValue =
         SGF.emitLValueToPointer(loc, std::move(lvalue), pointerInfo);
