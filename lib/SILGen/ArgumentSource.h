@@ -317,6 +317,8 @@ public:
 
   bool isObviouslyEqual(const ArgumentSource &other) const;
 
+  ArgumentSource copyForDiagnostics() const;
+
   void dump() const;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
@@ -426,6 +428,8 @@ public:
   PreparedArguments copy(SILGenFunction &SGF, SILLocation loc) const;
 
   bool isObviouslyEqual(const PreparedArguments &other) const;
+
+  PreparedArguments copyForDiagnostics() const;
 };
 
 } // end namespace Lowering

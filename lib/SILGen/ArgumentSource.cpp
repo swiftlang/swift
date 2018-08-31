@@ -473,3 +473,38 @@ bool ArgumentSource::isObviouslyEqual(const ArgumentSource &other) const {
   }
   llvm_unreachable("bad kind");
 }
+
+PreparedArguments PreparedArguments::copyForDiagnostics() const {
+  if (isNull())
+    return PreparedArguments();
+
+  assert(isValid());
+  PreparedArguments result(getFormalType(), isScalar());
+  for (auto &arg : Arguments) {
+    result.Arguments.push_back(arg.copyForDiagnostics());
+  }
+  return result;
+}
+
+ArgumentSource ArgumentSource::copyForDiagnostics() const {
+  switch (StoredKind) {
+  case Kind::Invalid:
+    return ArgumentSource();
+  case Kind::LValue:
+    // We have no way to copy an l-value for diagnostics.
+    return {getKnownLValueLocation(), LValue()};
+  case Kind::RValue:
+    return {getKnownRValueLocation(), asKnownRValue().copyForDiagnostics()};
+  case Kind::Expr:
+    return asKnownExpr();
+  case Kind::Tuple: {
+    auto &tuple = Storage.get<TupleStorage>(StoredKind);
+    SmallVector<ArgumentSource, 4> copiedElements;
+    for (auto &elt : tuple.Elements) {
+      copiedElements.push_back(elt.copyForDiagnostics());
+    }
+    return {tuple.Loc, tuple.SubstType, copiedElements};
+  }
+  }
+  llvm_unreachable("bad kind");
+}
