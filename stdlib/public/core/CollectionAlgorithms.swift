@@ -72,13 +72,6 @@ extension Collection where Element : Equatable {
     }
     return nil
   }
-  
-  /// Returns the first index where the specified value appears in the
-  /// collection.
-  @inlinable
-  public func index(of _element: Element) -> Index? {
-    return firstIndex(of: _element)
-  }
 }
 
 extension Collection {
@@ -116,15 +109,6 @@ extension Collection {
       self.formIndex(after: &i)
     }
     return nil
-  }
-  
-  /// Returns the first index in which an element of the collection satisfies
-  /// the given predicate.
-  @inlinable
-  public func index(
-    where _predicate: (Element) throws -> Bool
-  ) rethrows -> Index? {
-    return try firstIndex(where: _predicate)
   }
 }
 

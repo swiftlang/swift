@@ -1011,6 +1011,28 @@ extension Collection {
   }
 }
 
+extension Collection {
+  /// Returns the first index in which an element of the collection satisfies
+  /// the given predicate.
+  @available(swift, deprecated: 5.0, renamed: "firstIndex(where:)")
+  @inlinable
+  public func index(
+    where _predicate: (Element) throws -> Bool
+  ) rethrows -> Index? {
+    return try firstIndex(where: _predicate)
+  }
+}
+
+extension Collection where Element: Equatable {
+  /// Returns the first index where the specified value appears in the
+  /// collection.
+  @available(swift, deprecated: 5.0, renamed: "firstIndex(of:)")
+  @inlinable
+  public func index(of element: Element) -> Index? {
+    return firstIndex(of: element)
+  }
+}
+
 extension String.Index {
   @available(swift, deprecated: 3.2, obsoleted: 4.0)
   public init(_position: Int) {
