@@ -1270,7 +1270,7 @@ public:
   /// Returns the name of the source variable, if it is stored in the
   /// instruction.
   StringRef getName(const char *buf) const;
-  bool isLet() const  { return Bits.Data.Constant; }
+  bool isLet() const { return Bits.Data.Constant; }
 
   Optional<SILDebugVariable> get(VarDecl *VD, const char *buf) const {
     if (!Bits.Data.HasValue)
