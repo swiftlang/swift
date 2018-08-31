@@ -4107,7 +4107,6 @@ public:
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
         Options.setBaseType(transformType);
-      Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(TAK_escaping);
       Options.PrintOverrideKeyword = false;
@@ -4204,7 +4203,6 @@ public:
       PrintOptions Options;
       Options.PrintImplicitAttrs = false;
       Options.SkipAttributes = true;
-      Options.PrintDefaultParameterPlaceholder = false;
       CD->print(OS, Options);
     }
     Builder.addTextChunk(DeclStr);

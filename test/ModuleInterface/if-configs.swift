@@ -1,33 +1,46 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -o %t/Test~partial.swiftmodule -module-name Test -primary-file %s
+// RUN: %target-swift-frontend -merge-modules -emit-module -o %t/Test.swiftmodule %t/Test~partial.swiftmodule
+// RUN: %target-swift-ide-test -print-module -module-to-print=Test -source-filename=x -I %t | %FileCheck %s
+
 // RUN: %target-swift-frontend -emit-interface-path %t.swiftinterface -enable-resilience -emit-module -o /dev/null %s
 // RUN: %FileCheck %s < %t.swiftinterface
 
-// CHECK: public func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1){{$}}
-public func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1) {
-}
-
-// CHECK: public func hasClosureDefaultArg(_ x: () -> Void = {{{$}}
-// CHECK-NEXT: }){{$}}
+// CHECK: func hasClosureDefaultArg(_ x: () -> Void = {
+// CHECK-NEXT: })
 public func hasClosureDefaultArg(_ x: () -> Void = {
 }) {
 }
 
-// CHECK: public func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Void = {{{$}}
-// CHECK-NOT: #if true
-// CHECK: print("true")
+// CHECK: func hasClosureDefaultArgWithComplexNestedPoundIfs(_ x: () -> Void = {
+// CHECK-NOT: #if NOT_PROVIDED
+// CHECK-NOT: print("should not exist")
+// CHECK-NOT: #elseif !NOT_PROVIDED
+// CHECK: let innerClosure = {
+// CHECK-NOT: #if false
+// CHECK-NOT: print("should also not exist")
 // CHECK-NOT: #else
-// CHECK-NOT: print("false")
+// CHECK: print("should exist")
 // CHECK-NOT: #endif
-// CHECK-NEXT: }){{$}}
-public func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Void = {
-  #if true
-  print("true")
-  #else
-  print("false")
+// CHECK: }
+// CHECK-NOT: #endif
+// CHECK: })
+public func hasClosureDefaultArgWithComplexNestedPoundIfs(_ x: () -> Void = {
+  #if NOT_PROVIDED
+    print("should not exist")
+  #elseif !NOT_PROVIDED
+    let innerClosure = {
+      #if false
+        print("should also not exist")
+      #else
+        print("should exist")
+      #endif
+    }
   #endif
 }) {
 }
 
-// CHECK: public func hasClosureDefaultArgWithComplexPoundIf(_ x: () -> Void = {{{$}}
+// CHECK: func hasClosureDefaultArgWithComplexPoundIf(_ x: () -> Void = {
 // CHECK-NOT: #if NOT_PROVIDED
 // CHECK-NOT: print("should not exist")
 // CHECK-NOT: #else
@@ -38,21 +51,41 @@ public func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Void = {
 // CHECK-NOT: #if !second
 // CHECK: print("should also exist"){{$}}
 // CHECK-NOT: #endif
-// CHECK-NEXT: }){{$}}
+// CHECK-NEXT: })
 public func hasClosureDefaultArgWithComplexPoundIf(_ x: () -> Void = {
   #if NOT_PROVIDED
     print("should not exist")
     #else
       #if NOT_PROVIDED
-    print("should also not exist")
+        print("should also not exist")
       #else
-    print("should exist")
+        print("should exist")
       #endif
     #endif
 
     #if !second
-    print("should also exist")
+      print("should also exist")
     #endif
 }) {
 }
 
+// CHECK: func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Void = {
+// CHECK-NOT: #if true
+// CHECK: print("true")
+// CHECK-NOT: #else
+// CHECK-NOT: print("false")
+// CHECK-NOT: #endif
+// CHECK-NEXT: })
+public func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Void = {
+  #if true
+  print("true")
+  #else
+  print("false")
+  #endif
+}) {
+}
+
+
+// CHECK: func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1)
+public func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1) {
+}

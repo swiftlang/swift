@@ -111,7 +111,6 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.PrintAccess = true;
 
   result.ExcludeAttrList = {DAK_ImplicitlyUnwrappedOptional, DAK_AccessControl};
-  result.PrintDefaultParameterPlaceholder = false;
 
   return result;
 }
@@ -2365,31 +2364,24 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << "...";
 
   if (param->isDefaultArgument()) {
-    std::string defaultArgStr;
-    if (Options.DefaultArgument)
-      defaultArgStr = Options.DefaultArgument(param);
-    else
-      defaultArgStr = param->getDefaultValueStringRepresentation();
+    SmallString<128> scratch;
+    auto defaultArgStr = param->getDefaultValueStringRepresentation(scratch);
 
-    if (defaultArgStr.empty()) {
-      if (Options.PrintDefaultParameterPlaceholder)
-        Printer << " = " << tok::kw_default;
-    } else {
-      Printer << " = ";
+    assert(!defaultArgStr.empty() && "empty default argument?");
+    Printer << " = ";
 
-      switch (param->getDefaultArgumentKind()) {
-      case DefaultArgumentKind::File:
-      case DefaultArgumentKind::Line:
-      case DefaultArgumentKind::Column:
-      case DefaultArgumentKind::Function:
-      case DefaultArgumentKind::DSOHandle:
-      case DefaultArgumentKind::NilLiteral:
-        Printer.printKeyword(defaultArgStr);
-        break;
-      default:
-        Printer << defaultArgStr;
-        break;
-      }
+    switch (param->getDefaultArgumentKind()) {
+    case DefaultArgumentKind::File:
+    case DefaultArgumentKind::Line:
+    case DefaultArgumentKind::Column:
+    case DefaultArgumentKind::Function:
+    case DefaultArgumentKind::DSOHandle:
+    case DefaultArgumentKind::NilLiteral:
+      Printer.printKeyword(defaultArgStr);
+      break;
+    default:
+      Printer << defaultArgStr;
+      break;
     }
   }
 }

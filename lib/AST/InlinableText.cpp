@@ -1,14 +1,25 @@
+//===---- InlinableText.cpp - Extract inlinable source text -----*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+#include "swift/AST/InlinableText.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Serialization/InlinableText.h"
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallString.h"
 
-namespace swift {
+using namespace swift;
 
 /// Gets the last token that exists inside this IfConfigClause, ignoring
 /// hoisted elements.
@@ -17,20 +28,20 @@ namespace swift {
 /// before the parent IfConfigDecl's #endif token. Otherwise, it's the beginning
 /// of the line before the next clause's #else or #elseif token.
 static SourceLoc
-getEffectiveEndLoc(SourceManager &sourceMgr,
-                   const IfConfigClause *clause, IfConfigDecl *decl) {
-  if (clause == &decl->getClauses().back())
+getEffectiveEndLoc(SourceManager &sourceMgr, const IfConfigClause *clause,
+                   const IfConfigDecl *decl) {
+  auto clauses = decl->getClauses();
+  if (clause == &clauses.back())
     return Lexer::getLocForStartOfLine(sourceMgr, decl->getEndLoc());
 
-  for (size_t i = 0; i < decl->getClauses().size(); ++i)
-    if (clause == &decl->getClauses()[i]) {
-      auto &nextClause = decl->getClauses()[i + 1];
-      return Lexer::getLocForStartOfLine(sourceMgr, nextClause.Loc);
-    }
+  assert(clause >= clauses.begin() && clause < clauses.end() &&
+         "clauses must be contiguous");
 
-  llvm_unreachable("clause must exist inside if config");
+  auto *nextClause = clause + 1;
+  return Lexer::getLocForStartOfLine(sourceMgr, nextClause->Loc);
 }
 
+namespace {
 /// A walker that searches through #if declarations, finding all text that does
 /// not contribute to the final evaluated AST.
 ///
@@ -54,11 +65,12 @@ struct ExtractInactiveRanges : public ASTWalker {
   SmallVector<CharSourceRange, 4> ranges;
   SourceManager &sourceMgr;
 
-  ExtractInactiveRanges(SourceManager &sourceMgr): sourceMgr(sourceMgr) {}
+  explicit ExtractInactiveRanges(SourceManager &sourceMgr)
+    : sourceMgr(sourceMgr) {}
 
   /// Adds the two SourceLocs as a CharSourceRange to the set of ignored
   /// ranges.
-  /// @note: This assumes each of these locs is a character location, not a
+  /// \note: This assumes each of these locs is a character location, not a
   ///        token location.
   void addRange(SourceLoc start, SourceLoc end) {
     auto charRange = CharSourceRange(sourceMgr, start, end);
@@ -101,17 +113,16 @@ struct ExtractInactiveRanges : public ASTWalker {
   ArrayRef<CharSourceRange> getSortedRanges() {
     std::sort(ranges.begin(), ranges.end(),
               [&](CharSourceRange r1, CharSourceRange r2) {
+                assert(!r1.overlaps(r2) && "no overlapping ranges");
                 return sourceMgr.isBeforeInBuffer(r1.getStart(), r2.getStart());
               });
     return ranges;
   }
 };
+} // end anonymous namespace
 
-/// Extracts the text of this ASTNode from the source buffer, ignoring
-/// all #if declarations and clauses except the elements that are active.
-static StringRef
-extractInlinableText(SourceManager &sourceMgr,
-                     ASTNode node, SmallVectorImpl<char> &scratch) {
+StringRef swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
+                                      SmallVectorImpl<char> &scratch) {
   // Extract inactive ranges from the text of the node.
   ExtractInactiveRanges extractor(sourceMgr);
   node.walk(extractor);
@@ -148,16 +159,3 @@ extractInlinableText(SourceManager &sourceMgr,
   }
   return { scratch.data(), scratch.size() };
 }
-
-StringRef extractDefaultArgumentText(const ParamDecl *PD,
-                                     SmallVectorImpl<char> &scratch) {
-  assert(PD->isDefaultArgument() && "must have default argument");
-  auto existing = PD->getDefaultValueStringRepresentation();
-  if (!existing.empty())
-    return existing;
-  return extractInlinableText(PD->getASTContext().SourceMgr,
-                              const_cast<Expr *>(PD->getDefaultValue()),
-                              scratch);
-}
-
-} // end namespace swift

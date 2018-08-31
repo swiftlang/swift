@@ -4770,14 +4770,29 @@ public:
 
   void setDefaultArgumentInitContext(Initializer *initContext);
 
-  /// Returns a saved string representation of the parameter's default value.
+  /// Extracts the text of the default argument attached to the provided
+  /// ParamDecl, removing all inactive #if clauses and providing only the
+  /// text of active #if clauses.
   ///
-  /// This should only be called if the default value expression is absent or
-  /// doesn't have a valid source range; otherwise, clients should extract the
-  /// source text from that range.
-  ///
+  /// For example, the default argument:
+  /// ```
+  /// {
+  ///   #if false
+  ///   print("false")
+  ///   #else
+  ///   print("true")
+  ///   #endif
+  /// }
+  /// ```
+  /// will return
+  /// ```
+  /// {
+  ///   print("true")
+  /// }
+  /// ```
   /// \sa getDefaultValue
-  StringRef getDefaultValueStringRepresentation() const;
+  StringRef getDefaultValueStringRepresentation(
+    SmallVectorImpl<char> &scratch) const;
 
   void setDefaultValueStringRepresentation(StringRef stringRepresentation);
 

@@ -28,7 +28,6 @@ class CanType;
 class Decl;
 class Pattern;
 class ValueDecl;
-class ParamDecl;
 class ExtensionDecl;
 class NominalTypeDecl;
 class TypeBase;
@@ -147,9 +146,6 @@ struct PrintOptions {
 
   /// \brief Whether to print variable initializers.
   bool VarInitializers = false;
-
-  /// \brief Whether to print a placeholder for default parameters.
-  bool PrintDefaultParameterPlaceholder = true;
 
   /// \brief Whether to print enum raw value expressions.
   bool EnumRawValues = false;
@@ -362,10 +358,6 @@ struct PrintOptions {
   /// function.
   std::function<std::string(const ValueDecl *)> FunctionBody;
 
-  /// If this is not \c nullptr, then the default argument will be printed with
-  /// text that is determined by this function.
-  std::function<std::string(const ParamDecl *)> DefaultArgument;
-
   BracketOptions BracketOptions;
 
   // This is explicit to guarantee that it can be called from LLDB.
@@ -386,7 +378,6 @@ struct PrintOptions {
     PrintOptions result;
     result.TypeDefinitions = true;
     result.VarInitializers = true;
-    result.PrintDefaultParameterPlaceholder = true;
     result.PrintDocumentationComments = true;
     result.PrintRegularClangComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
@@ -514,7 +505,6 @@ struct PrintOptions {
   static PrintOptions printQuickHelpDeclaration() {
     PrintOptions PO;
     PO.EnumRawValues = true;
-    PO.PrintDefaultParameterPlaceholder = true;
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;
     PO.PrintDocumentationComments = false;

@@ -35,7 +35,6 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Serialization/InlinableText.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
 
@@ -3201,7 +3200,8 @@ void Serializer::writeDecl(const Decl *D) {
     StringRef defaultArgumentText;
     SmallString<128> scratch;
     if (param->getDefaultArgumentKind() == swift::DefaultArgumentKind::Normal)
-      defaultArgumentText = extractDefaultArgumentText(param, scratch);
+      defaultArgumentText =
+        param->getDefaultValueStringRepresentation(scratch);
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
