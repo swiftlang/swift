@@ -758,16 +758,18 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
 }
 
 static Type getUnlabeledType(Type type, ASTContext &ctx) {
-  if (auto *tupleType = dyn_cast<TupleType>(type.getPointer())) {
-    SmallVector<TupleTypeElt, 8> elts;
-    for (auto elt : tupleType->getElements()) {
-      elts.push_back(elt.getWithoutName());
+  return type.transform([&](Type type) -> Type {
+    if (auto *tupleType = dyn_cast<TupleType>(type.getPointer())) {
+      SmallVector<TupleTypeElt, 8> elts;
+      for (auto elt : tupleType->getElements()) {
+        elts.push_back(elt.getWithoutName());
+      }
+
+      return TupleType::get(elts, ctx);
     }
 
-    return TupleType::get(elts, ctx);
-  }
-
-  return type;
+    return type;
+  });
 }
 
 SolutionCompareResult ConstraintSystem::compareSolutions(
