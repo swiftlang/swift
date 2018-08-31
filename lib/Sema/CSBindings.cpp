@@ -756,8 +756,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
 ///
 /// The direct supertype S of a type T is a supertype of T (e.g., T < S)
 /// such that there is no type U where T < U and U < S.
-static SmallVector<Type, 4> enumerateDirectSupertypes(TypeChecker &tc,
-                                                      Type type) {
+static SmallVector<Type, 4> enumerateDirectSupertypes(Type type) {
   SmallVector<Type, 4> result;
 
   if (type->mayHaveSuperclass()) {
@@ -766,11 +765,11 @@ static SmallVector<Type, 4> enumerateDirectSupertypes(TypeChecker &tc,
     // does not.
 
     // If there is a superclass, it is a direct supertype.
-    if (auto superclass = tc.getSuperClassOf(type))
+    if (auto superclass = type->getSuperclass())
       result.push_back(superclass);
   }
 
-  if (!type->isMaterializable())
+  if (type->is<InOutType>() || type->is<LValueType>())
     result.push_back(type->getWithoutSpecifierType());
 
   // FIXME: lots of other cases to consider!
@@ -834,7 +833,7 @@ bool TypeVarBindingGenerator::computeNext() {
     if (binding.Kind != BindingKind::Supertypes)
       continue;
 
-    for (auto supertype : enumerateDirectSupertypes(CS.TC, type)) {
+    for (auto supertype : enumerateDirectSupertypes(type)) {
       // If we're not allowed to try this binding, skip it.
       if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
         addNewBinding({*simplifiedSuper, binding.Kind, binding.BindingSource});
