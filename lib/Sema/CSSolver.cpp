@@ -307,31 +307,6 @@ void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
                       savedBindings.end());
 }
 
-/// \brief Enumerates all of the 'direct' supertypes of the given type.
-///
-/// The direct supertype S of a type T is a supertype of T (e.g., T < S)
-/// such that there is no type U where T < U and U < S.
-static SmallVector<Type, 4> 
-enumerateDirectSupertypes(TypeChecker &tc, Type type) {
-  SmallVector<Type, 4> result;
-
-  if (type->mayHaveSuperclass()) {
-    // FIXME: Can also weaken to the set of protocol constraints, but only
-    // if there are any protocols that the type conforms to but the superclass
-    // does not.
-
-    // If there is a superclass, it is a direct supertype.
-    if (auto superclass = tc.getSuperClassOf(type))
-      result.push_back(superclass);
-  }
-
-  if (!type->isMaterializable())
-    result.push_back(type->getWithoutSpecifierType());
-
-  // FIXME: lots of other cases to consider!
-  return result;
-}
-
 bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
   // While we have a constraint in the worklist, process it.
   while (!ActiveConstraints.empty()) {
@@ -537,199 +512,107 @@ ConstraintSystem::SolverScope::~SolverScope() {
 /// \brief Try each of the given type variable bindings to find solutions
 /// to the given constraint system.
 ///
-/// \param depth The depth of the solution stack.
 /// \param typeVar The type variable we're binding.
-/// \param bindings The initial set of bindings to explore.
+/// \param initialBindings The initial set of bindings to explore.
 /// \param solutions The set of solutions.
 ///
 /// \returns true if there are no solutions.
 bool ConstraintSystem::tryTypeVariableBindings(
-    unsigned depth, TypeVariableType *typeVar,
-    ArrayRef<ConstraintSystem::PotentialBinding> bindings,
+    TypeVariableType *typeVar,
+    ArrayRef<ConstraintSystem::PotentialBinding> initialBindings,
     SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables) {
+  auto &TC = getTypeChecker();
   bool anySolved = false;
-  llvm::SmallPtrSet<CanType, 4> exploredTypes;
-  llvm::SmallPtrSet<TypeBase *, 4> boundTypes;
+  bool sawFirstLiteralConstraint = false;
 
-  SmallVector<PotentialBinding, 4> storedBindings;
-  auto &tc = getTypeChecker();
-  ++solverState->NumTypeVariablesBound;
+  auto attemptTypeVarBinding = [&](PotentialBinding &binding) -> bool {
+    auto type = binding.BindingType;
 
-  for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
-    // Try each of the bindings in turn.
-    ++solverState->NumTypeVariableBindings;
-    bool sawFirstLiteralConstraint = false;
+    // Try to solve the system with typeVar := type
+    ConstraintSystem::SolverScope scope(*this);
+    if (binding.DefaultedProtocol) {
+      type = openUnboundGenericType(type, typeVar->getImpl().getLocator());
+      type = type->reconstituteSugar(/*recursive=*/false);
+    } else if (binding.BindingSource == ConstraintKind::ArgumentConversion &&
+               !type->hasTypeVariable() && isCollectionType(type)) {
+      // If the type binding comes from the argument conversion, let's
+      // instead of binding collection types directly, try to bind
+      // using temporary type variables substituted for element
+      // types, that's going to ensure that subtype relationship is
+      // always preserved.
+      auto *BGT = type->castTo<BoundGenericType>();
+      auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
+                                         BGT->getASTContext());
 
-    if (tc.getLangOpts().DebugConstraintSolver) {
-      auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(depth * 2) << "Active bindings: ";
-
-      for (auto binding : bindings) {
-        log << typeVar->getString() << " := "
-            << binding.BindingType->getString() << " ";
-      }
-
-      log <<"\n";
+      type = openUnboundGenericType(UGT, typeVar->getImpl().getLocator());
+      type = type->reconstituteSugar(/*recursive=*/false);
     }
 
-    for (const auto &binding : bindings) {
-      // If this is a defaultable binding and we have found any solutions,
+    // FIXME: We want the locator that indicates where the binding came
+    // from.
+    addConstraint(ConstraintKind::Bind, typeVar, type,
+                  typeVar->getImpl().getLocator());
+
+    // If this was from a defaultable binding note that.
+    if (binding.isDefaultableBinding())
+      DefaultedConstraints.push_back(binding.DefaultableBinding);
+
+    return !solveRec(solutions, allowFreeTypeVariables);
+  };
+
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    log.indent(solverState->depth * 2) << "Initial bindings: ";
+    interleave(initialBindings.begin(), initialBindings.end(),
+               [&](const ConstraintSystem::PotentialBinding &binding) {
+                 log << typeVar->getString()
+                     << " := " << binding.BindingType->getString();
+               },
+               [&log] { log << ", "; });
+
+    log << '\n';
+  }
+
+  ++solverState->NumTypeVariablesBound;
+  TypeVarBindingGenerator bindings(*this, typeVar, initialBindings);
+  while (auto binding = bindings()) {
+    // Try each of the bindings in turn.
+    ++solverState->NumTypeVariableBindings;
+
+    if (anySolved) {
+      // If this is a defaultable binding and we have found solutions,
       // don't explore the default binding.
-      if (binding.isDefaultableBinding() && anySolved)
+      if (binding->isDefaultableBinding())
         continue;
-
-      auto type = binding.BindingType;
-      // If we've already tried this binding, move on.
-      if (!boundTypes.insert(type.getPointer()).second)
-        continue;
-
-      if (tc.getLangOpts().DebugConstraintSolver) {
-        auto &log = getASTContext().TypeCheckerDebug->getStream();
-        log.indent(depth * 2)
-          << "(trying " << typeVar->getString() << " := " << type->getString()
-          << "\n";
-      }
 
       // If we were able to solve this without considering
       // default literals, don't bother looking at default literals.
-      if (anySolved && binding.DefaultedProtocol && !sawFirstLiteralConstraint)
+      if (binding->DefaultedProtocol && !sawFirstLiteralConstraint)
         break;
+    }
 
-      // Try to solve the system with typeVar := type
-      ConstraintSystem::SolverScope scope(*this);
-      if (binding.DefaultedProtocol) {
-        sawFirstLiteralConstraint = true;
-        type = openUnboundGenericType(type, typeVar->getImpl().getLocator());
-        type = type->reconstituteSugar(/*recursive=*/false);
-      } else if (binding.BindingSource == ConstraintKind::ArgumentConversion &&
-                 !type->hasTypeVariable() && isCollectionType(type)) {
-        // If the type binding comes from the argument conversion, let's
-        // instead of binding collection types directly let's try to
-        // bind using temporary type variables substituted for element
-        // types, that's going to ensure that subtype relationship is
-        // always preserved.
-        auto *BGT = type->castTo<BoundGenericType>();
-        auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
-                                           BGT->getASTContext());
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth * 2)
+          << "(trying " << typeVar->getString()
+          << " := " << binding->BindingType->getString() << '\n';
+    }
 
-        type = openUnboundGenericType(UGT, typeVar->getImpl().getLocator());
-        type = type->reconstituteSugar(/*recursive=*/false);
-      }
+    if (binding->DefaultedProtocol)
+      sawFirstLiteralConstraint = true;
 
-      // FIXME: We want the locator that indicates where the binding came
-      // from.
-      addConstraint(ConstraintKind::Bind, typeVar, type,
-                    typeVar->getImpl().getLocator());
+    if (attemptTypeVarBinding(*binding))
+      anySolved = true;
 
-      // If this was from a defaultable binding note that.
-      if (binding.isDefaultableBinding()) {
-        DefaultedConstraints.push_back(binding.DefaultableBinding);
-      }
-
-      if (!solveRec(solutions, allowFreeTypeVariables))
-        anySolved = true;
-
-      if (tc.getLangOpts().DebugConstraintSolver) {
-        auto &log = getASTContext().TypeCheckerDebug->getStream();
-        log.indent(depth * 2) << ")\n";
-      }
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log.indent(solverState->depth * 2) << ")\n";
     }
 
     // If we found any solution, we're done.
-    if (anySolved)
+    if (anySolved && bindings.needsToComputeNext())
       break;
-
-    // None of the children had solutions, enumerate supertypes and
-    // try again.
-    SmallVector<PotentialBinding, 4> newBindings;
-
-    // Enumerate the supertypes of each of the types we tried.
-    for (auto binding : bindings) {
-      const auto type = binding.BindingType;
-      assert(!type->hasError());
-
-      // After our first pass, note that we've explored these
-      // types.
-      if (tryCount == 0)
-        exploredTypes.insert(type->getCanonicalType());
-
-      // If we have a protocol with a default type, look for alternative
-      // types to the default.
-      if (tryCount == 0 && binding.DefaultedProtocol) {
-        KnownProtocolKind knownKind =
-            *(binding.DefaultedProtocol->getKnownProtocolKind());
-        for (auto altType : getAlternativeLiteralTypes(knownKind)) {
-          if (exploredTypes.insert(altType->getCanonicalType()).second)
-            newBindings.push_back({altType, AllowedBindingKind::Subtypes,
-                                   binding.BindingSource,
-                                   binding.DefaultedProtocol});
-        }
-      }
-
-      // Handle simple subtype bindings.
-      if (binding.Kind == AllowedBindingKind::Subtypes &&
-          typeVar->getImpl().canBindToLValue() &&
-          !type->hasLValueType() &&
-          !type->is<InOutType>()) {
-        // Try lvalue qualification in addition to rvalue qualification.
-        auto subtype = LValueType::get(type);
-        if (exploredTypes.insert(subtype->getCanonicalType()).second)
-          newBindings.push_back({subtype, binding.Kind, binding.BindingSource});
-      }
-
-      // Allow solving for T even for a binding kind where that's invalid
-      // if fixes are allowed, because that gives us the opportunity to
-      // match T? values to the T binding by adding an unwrap fix.
-      if (binding.Kind == AllowedBindingKind::Subtypes ||
-          shouldAttemptFixes()) {
-        // If we were unsuccessful solving for T?, try solving for T.
-        if (auto objTy = type->getOptionalObjectType()) {
-          if (exploredTypes.insert(objTy->getCanonicalType()).second) {
-            // If T is a type variable, only attempt this if both the
-            // type variable we are trying bindings for, and the type
-            // variable we will attempt to bind, both have the same
-            // polarity with respect to being able to bind lvalues.
-            if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
-              if (typeVar->getImpl().canBindToLValue() ==
-                  otherTypeVar->getImpl().canBindToLValue()) {
-                newBindings.push_back(
-                    {objTy, binding.Kind, binding.BindingSource});
-              }
-            } else {
-              newBindings.push_back(
-                  {objTy, binding.Kind, binding.BindingSource});
-            }
-          }
-        }
-      }
-
-      if (binding.Kind != AllowedBindingKind::Supertypes)
-        continue;
-
-      for (auto supertype : enumerateDirectSupertypes(getTypeChecker(), type)) {
-        // If we're not allowed to try this binding, skip it.
-        auto simpleSuper = checkTypeOfBinding(typeVar, supertype);
-        if (!simpleSuper)
-          continue;
-
-        // If we haven't seen this supertype, add it.
-        if (exploredTypes.insert((*simpleSuper)->getCanonicalType()).second)
-          newBindings.push_back({
-              *simpleSuper,
-              binding.Kind,
-              binding.BindingSource,
-          });
-      }
-    }
-
-    // If we didn't compute any new bindings, we're done.
-    if (newBindings.empty())
-      break;
-
-    // We have a new set of bindings; use them for our next loop.
-    storedBindings = std::move(newBindings);
-    bindings = storedBindings;
   }
 
   return !anySolved;
@@ -2067,7 +1950,7 @@ bool ConstraintSystem::solveSimplified(
   // go ahead and try the bindings for this type variable.
   if (bestBindings && (!disjunction || (!bestBindings->InvolvesTypeVariables &&
                                         !bestBindings->FullyBound))) {
-    return tryTypeVariableBindings(solverState->depth, bestBindings->TypeVar,
+    return tryTypeVariableBindings(bestBindings->TypeVar,
                                    bestBindings->Bindings, solutions,
                                    allowFreeTypeVariables);
   }
