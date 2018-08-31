@@ -305,6 +305,10 @@ final class Timer {
 final class SampleRunner {
   let timer = Timer()
   let baseline = SampleRunner.getResourceUtilization()
+extension UInt64 {
+  var microseconds: Int { return Int(self / 1000) }
+}
+
   let c: TestConfig
   var start, end, lastYield: Timer.TimeT
   let schedulerQuantum = UInt64(10_000_000) // nanoseconds (== 10ms, macos)
@@ -375,7 +379,7 @@ final class SampleRunner {
     if (spent + nextSampleEstimate < schedulerQuantum) {
         start = timer.getTime()
     } else {
-        logVerbose("    Yielding again after estimated \(spent/1000) us")
+        logVerbose("    Yielding after ~\(spent.microseconds) μs")
         let now = yield()
         (start, lastYield) = (now, now)
     }
@@ -409,8 +413,7 @@ final class SampleRunner {
     name.withCString { p in stopTrackingObjects(p) }
 #endif
 
-    // Convert to μs and compute the average sample time per iteration.
-    return Int(lastSampleTime / 1000) / numIters
+    return lastSampleTime.microseconds / numIters
   }
 
   func logVerbose(_ msg: @autoclosure () -> String) {
