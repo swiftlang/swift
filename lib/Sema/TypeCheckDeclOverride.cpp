@@ -555,6 +555,14 @@ namespace {
     /// The type of the declaration, cached here once it has been computed.
     Type cachedDeclType;
 
+  public:
+    OverrideMatcher(ValueDecl *decl);
+
+    /// Returns true when it's possible to perform any override matching.
+    explicit operator bool() const {
+      return !superContexts.empty();
+    }
+
     /// Whether this is an override of a class member.
     bool isClassOverride() const {
       return decl->getDeclContext()->getSelfClassDecl() != nullptr;
@@ -563,14 +571,6 @@ namespace {
     /// Whether this is an override of a protocol member.
     bool isProtocolOverride() const {
       return decl->getDeclContext()->getSelfProtocolDecl() != nullptr;
-    }
-
-  public:
-    OverrideMatcher(ValueDecl *decl);
-
-    /// Returns true when it's possible to perform any override matching.
-    explicit operator bool() const {
-      return !superContexts.empty();
     }
 
     /// Match this declaration against potential members in the superclass,
@@ -948,7 +948,10 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     auto propertyTy = property->getInterfaceType();
     auto parentPropertyTy = getSuperMemberDeclType(baseDecl);
 
-    if (!propertyTy->matches(parentPropertyTy,
+    CanType parentPropertyCanTy =
+      parentPropertyTy->getCanonicalType(
+        decl->getInnermostDeclContext()->getGenericSignatureOfContext());
+    if (!propertyTy->matches(parentPropertyCanTy,
                              TypeMatchFlags::AllowOverride)) {
       diags.diagnose(property, diag::override_property_type_mismatch,
                      property->getName(), propertyTy, parentPropertyTy);
@@ -1091,6 +1094,12 @@ bool swift::checkOverrides(ValueDecl *decl) {
     matches = matcher.match(attempt);
     if (!matches.empty())
       break;
+
+    // If we're computing implicit overrides for a protocol member, don't
+    // look any further unless there's an `override` attribute.
+    if (matcher.isProtocolOverride() &&
+        !decl->getAttrs().hasAttribute<OverrideAttr>())
+      return false;
 
     // Try the next version.
     ++attempt;
