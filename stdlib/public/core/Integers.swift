@@ -120,14 +120,14 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +(_ lhs: Self, _ rhs: Self) -> Self
+  static func +(lhs: Self, rhs: Self) -> Self
 
   /// Adds two values and stores the result in the left-hand-side variable.
   ///
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +=(_ lhs: inout Self, rhs: Self)
+  static func +=(lhs: inout Self, rhs: Self)
 
   /// Subtracts one value from another and produces their difference.
   ///
@@ -149,7 +149,7 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -(_ lhs: Self, _ rhs: Self) -> Self
+  static func -(lhs: Self, rhs: Self) -> Self
 
   /// Subtracts the second value from the first and stores the difference in the
   /// left-hand-side variable.
@@ -157,7 +157,7 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -=(_ lhs: inout Self, rhs: Self)
+  static func -=(lhs: inout Self, rhs: Self)
 
   /// Multiplies two values and produces their product.
   ///
@@ -179,7 +179,7 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *(_ lhs: Self, _ rhs: Self) -> Self
+  static func *(lhs: Self, rhs: Self) -> Self
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable.
@@ -187,7 +187,7 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *=(_ lhs: inout Self, rhs: Self)
+  static func *=(lhs: inout Self, rhs: Self)
 }
 
 /// A type that can represent both positive and negative values.
@@ -679,7 +679,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The value to divide.
   ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
-  static func /(_ lhs: Self, _ rhs: Self) -> Self
+  static func /(lhs: Self, rhs: Self) -> Self
 
   /// Divides the first value by the second and stores the quotient in the
   /// left-hand-side variable.
@@ -693,7 +693,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The value to divide.
   ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
-  static func /=(_ lhs: inout Self, _ rhs: Self)
+  static func /=(lhs: inout Self, rhs: Self)
 
   /// Returns the remainder of dividing the first value by the second.
   ///
@@ -713,7 +713,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The value to divide.
   ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
-  static func %(_ lhs: Self, _ rhs: Self) -> Self
+  static func %(lhs: Self, rhs: Self) -> Self
 
   /// Divides the first value by the second and stores the remainder in the
   /// left-hand-side variable.
@@ -736,7 +736,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The value to divide.
   ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
-  static func %=(_ lhs: inout Self, _ rhs: Self)
+  static func %=(lhs: inout Self, rhs: Self)
 
   /// Adds two values and produces their sum.
   ///
@@ -758,14 +758,14 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +(_ lhs: Self, _ rhs: Self) -> Self
+  static func +(lhs: Self, rhs: Self) -> Self
 
   /// Adds two values and stores the result in the left-hand-side variable.
   ///
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +=(_ lhs: inout Self, _ rhs: Self)
+  static func +=(lhs: inout Self, rhs: Self)
 
   /// Subtracts one value from another and produces their difference.
   ///
@@ -787,7 +787,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -(_ lhs: Self, _ rhs: Self) -> Self
+  static func -(lhs: Self, rhs: Self) -> Self
 
   /// Subtracts the second value from the first and stores the difference in the
   /// left-hand-side variable.
@@ -795,7 +795,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -=(_ lhs: inout Self, _ rhs: Self)
+  static func -=(lhs: inout Self, rhs: Self)
 
   /// Multiplies two values and produces their product.
   ///
@@ -817,7 +817,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *(_ lhs: Self, _ rhs: Self) -> Self
+  static func *(lhs: Self, rhs: Self) -> Self
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable.
@@ -825,7 +825,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *=(_ lhs: inout Self, _ rhs: Self)
+  static func *=(lhs: inout Self, rhs: Self)
 
   /// Returns the inverse of the bits set in the argument.
   ///
@@ -860,7 +860,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: An integer value.
   ///   - rhs: Another integer value.
-  static func &(_ lhs: Self, _ rhs: Self) -> Self
+  static func &(lhs: Self, rhs: Self) -> Self
 
   /// Stores the result of performing a bitwise AND operation on the two given
   /// values in the left-hand-side variable.
@@ -875,7 +875,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: An integer value.
   ///   - rhs: Another integer value.
-  static func &=(_ lhs: inout Self, _ rhs: Self)
+  static func &=(lhs: inout Self, rhs: Self)
 
   /// Returns the result of performing a bitwise OR operation on the two given
   /// values.
@@ -892,7 +892,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: An integer value.
   ///   - rhs: Another integer value.
-  static func |(_ lhs: Self, _ rhs: Self) -> Self
+  static func |(lhs: Self, rhs: Self) -> Self
 
   /// Stores the result of performing a bitwise OR operation on the two given
   /// values in the left-hand-side variable.
@@ -908,7 +908,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: An integer value.
   ///   - rhs: Another integer value.
-  static func |=(_ lhs: inout Self, _ rhs: Self)
+  static func |=(lhs: inout Self, rhs: Self)
 
   /// Returns the result of performing a bitwise XOR operation on the two given
   /// values.
@@ -925,7 +925,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: An integer value.
   ///   - rhs: Another integer value.
-  static func ^(_ lhs: Self, _ rhs: Self) -> Self
+  static func ^(lhs: Self, rhs: Self) -> Self
 
   /// Stores the result of performing a bitwise XOR operation on the two given
   /// values in the left-hand-side variable.
@@ -941,7 +941,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: An integer value.
   ///   - rhs: Another integer value.
-  static func ^=(_ lhs: inout Self, _ rhs: Self)
+  static func ^=(lhs: inout Self, rhs: Self)
 
   /// Returns the result of shifting a value's binary representation the
   /// specified number of digits to the right.
@@ -992,7 +992,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the right.
-  static func >> <RHS: BinaryInteger>(_ lhs: Self, _ rhs: RHS) -> Self
+  static func >> <RHS: BinaryInteger>(lhs: Self, rhs: RHS) -> Self
 
   /// Stores the result of shifting a value's binary representation the
   /// specified number of digits to the right in the left-hand-side variable.
@@ -1048,7 +1048,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the right.
-  static func >>= <RHS: BinaryInteger>(_ lhs: inout Self, _ rhs: RHS)
+  static func >>= <RHS: BinaryInteger>(lhs: inout Self, rhs: RHS)
 
   /// Returns the result of shifting a value's binary representation the
   /// specified number of digits to the left.
@@ -1088,7 +1088,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the left.
-  static func << <RHS: BinaryInteger>(_ lhs: Self, _ rhs: RHS) -> Self
+  static func << <RHS: BinaryInteger>(lhs: Self, rhs: RHS) -> Self
 
   /// Stores the result of shifting a value's binary representation the
   /// specified number of digits to the left in the left-hand-side variable.
@@ -1132,7 +1132,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the left.
-  static func <<=<RHS: BinaryInteger>(_ lhs: inout Self, _ rhs: RHS)
+  static func <<=<RHS: BinaryInteger>(lhs: inout Self, rhs: RHS)
 
   /// Returns the quotient and remainder of this value divided by the given
   /// value.
@@ -1347,7 +1347,7 @@ extension BinaryInteger {
   ///   - rhs: The number of bits to shift `lhs` to the right.
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inlinable
-  public static func >> <RHS: BinaryInteger>(_ lhs: Self, _ rhs: RHS) -> Self {
+  public static func >> <RHS: BinaryInteger>(lhs: Self, rhs: RHS) -> Self {
     var r = lhs
     r >>= rhs
     return r
@@ -1393,7 +1393,7 @@ extension BinaryInteger {
   ///   - rhs: The number of bits to shift `lhs` to the left.
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inlinable
-  public static func << <RHS: BinaryInteger>(_ lhs: Self, _ rhs: RHS) -> Self {
+  public static func << <RHS: BinaryInteger>(lhs: Self, rhs: RHS) -> Self {
     var r = lhs
     r <<= rhs
     return r
@@ -2086,7 +2086,7 @@ where Magnitude : FixedWidthInteger & UnsignedInteger,
   ///   - rhs: The number of bits to shift `lhs` to the right. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  static func &>>(_ lhs: Self, _ rhs: Self) -> Self
+  static func &>>(lhs: Self, rhs: Self) -> Self
 
   /// Calculates the result of shifting a value's binary representation the
   /// specified number of digits to the right, masking the shift amount to the
@@ -2116,7 +2116,7 @@ where Magnitude : FixedWidthInteger & UnsignedInteger,
   ///   - rhs: The number of bits to shift `lhs` to the right. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  static func &>>=(_ lhs: inout Self, _ rhs: Self)
+  static func &>>=(lhs: inout Self, rhs: Self)
 
   /// Returns the result of shifting a value's binary representation the
   /// specified number of digits to the left, masking the shift amount to the
@@ -2152,7 +2152,7 @@ where Magnitude : FixedWidthInteger & UnsignedInteger,
   ///   - rhs: The number of bits to shift `lhs` to the left. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  static func &<<(_ lhs: Self, _ rhs: Self) -> Self
+  static func &<<(lhs: Self, rhs: Self) -> Self
 
   /// Returns the result of shifting a value's binary representation the
   /// specified number of digits to the left, masking the shift amount to the
@@ -2182,7 +2182,7 @@ where Magnitude : FixedWidthInteger & UnsignedInteger,
   ///   - rhs: The number of bits to shift `lhs` to the left. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  static func &<<=(_ lhs: inout Self, _ rhs: Self)
+  static func &<<=(lhs: inout Self, rhs: Self)
 }
 
 extension FixedWidthInteger {
