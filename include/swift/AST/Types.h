@@ -296,6 +296,12 @@ protected:
     HasOriginalType : 1
   );
 
+  SWIFT_INLINE_BITFIELD(UnresolvedType, TypeBase, 1,
+    /// Whether there is an original type.
+    HasOriginalType : 1
+  );
+
+
   SWIFT_INLINE_BITFIELD(SugarType, TypeBase, 1,
     HasCachedType : 1
   );
@@ -1203,11 +1209,31 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorType, Type)
 /// cause the entire expression to be ambiguously typed.
 class UnresolvedType : public TypeBase {
   friend class ASTContext;
-  // The Unresolved type is always canonical.
-  UnresolvedType(ASTContext &C)
-    : TypeBase(TypeKind::Unresolved, &C,
-       RecursiveTypeProperties(RecursiveTypeProperties::HasUnresolvedType)) { }
+  UnresolvedType(const ASTContext *C, Type originalType = Type())
+    : TypeBase(TypeKind::Unresolved, C,
+       RecursiveTypeProperties(RecursiveTypeProperties::HasUnresolvedType)) {
+      if (originalType) {
+        Bits.UnresolvedType.HasOriginalType = true;
+        *reinterpret_cast<Type *>(this + 1) = originalType;
+      } else {
+        Bits.UnresolvedType.HasOriginalType = false;
+      }
+    }
 public:
+
+  /// Produce an unresolved type which records the original type we were trying to
+  /// substitute when we ran into a problem.
+  static Type get(Type originalType);
+
+  /// Retrieve the original type that this unresolved type replaces, or none if
+  /// there is no such type.
+  Type getOriginalType() const {
+    if (Bits.UnresolvedType.HasOriginalType)
+      return *reinterpret_cast<const Type *>(this + 1);
+
+    return Type();
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Unresolved;
