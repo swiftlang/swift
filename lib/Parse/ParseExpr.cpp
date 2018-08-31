@@ -1721,9 +1721,14 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     Result.setHasCodeCompletion();
     if (CodeCompletion &&
         // We cannot code complete anything after var/let.
-        (!InVarOrLetPattern || InVarOrLetPattern == IVOLP_InMatchingPattern))
-      CodeCompletion->completePostfixExprBeginning(
-          dyn_cast<CodeCompletionExpr>(Result.get()));
+        (!InVarOrLetPattern || InVarOrLetPattern == IVOLP_InMatchingPattern)) {
+      if (InPoundIfEnvironment) {
+        CodeCompletion->completePlatformCondition();
+      } else {
+        CodeCompletion->completePostfixExprBeginning(
+            cast<CodeCompletionExpr>(Result.get()));
+      }
+    }
     consumeToken(tok::code_complete);
     return Result;
   }
@@ -1732,6 +1737,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     if (peekToken().is(tok::identifier) && !peekToken().isEscapedIdentifier() &&
         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
       return parseExprPoundUnknown(SourceLoc());
+    }
+    if (peekToken().is(tok::code_complete) &&
+        Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
+      return parseExprPoundCodeCompletion(/*ParentKind*/None);
     }
     goto UnknownCharacter;
 
@@ -3111,6 +3120,25 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
         {RPoundLoc, RSquareLoc.isValid() ? RSquareLoc : RPoundLoc});
 
   return makeParserError();
+}
+
+/// \brief Handle code completion after pound in expression position.
+///
+/// In case it's in a stmt condition position, specify \p ParentKind to
+/// decide the position accepts #available(...) condtion.
+///
+/// expr-pound-codecompletion:
+///   '#' code-completion-token
+ParserResult<Expr>
+Parser::parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind) {
+  assert(Tok.is(tok::pound) && peekToken().is(tok::code_complete) &&
+         Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc());
+  consumeToken(); // '#' token.
+  auto CodeCompletionPos = consumeToken();
+  auto Expr = new (Context) CodeCompletionExpr(CodeCompletionPos);
+  if (CodeCompletion)
+    CodeCompletion->completeAfterPoundExpr(Expr, ParentKind);
+  return makeParserCodeCompletionResult(Expr);
 }
 
 /// \brief Parse an expression call suffix.

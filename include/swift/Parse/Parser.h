@@ -1331,6 +1331,8 @@ public:
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
+  ParserResult<Expr>
+  parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
 
   UnresolvedDeclRefExpr *parseExprOperator();
 

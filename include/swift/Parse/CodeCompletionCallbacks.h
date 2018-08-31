@@ -208,7 +208,12 @@ public:
   virtual void completeYieldStmt(CodeCompletionExpr *E,
                                  Optional<unsigned> yieldIndex) = 0;
 
-  virtual void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) = 0;
+  virtual void completeAfterPoundExpr(CodeCompletionExpr *E,
+                                      Optional<StmtKind> ParentKind) = 0;
+
+  virtual void completeAfterPoundDirective() = 0;
+
+  virtual void completePlatformCondition() = 0;
 
   virtual void completeAfterIfStmt(bool hasElse) = 0;
 
