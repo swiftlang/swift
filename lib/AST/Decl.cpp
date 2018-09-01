@@ -28,7 +28,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/InlinableText.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
@@ -56,6 +55,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
+#include "InlinableText.h"
 #include <algorithm>
 
 using namespace swift;
