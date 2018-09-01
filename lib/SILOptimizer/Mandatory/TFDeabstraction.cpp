@@ -2177,8 +2177,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         // Remember that we have an input list, this marker is important because
         // the list may be empty, and we need to know it exists in graph
         // lowering.
-        opName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputList);
+        opName += GraphOperationInfo::getInputMarker(
+            GraphOperationInfo::IM_InputList);
         const char *elementMarker = GraphOperationInfo::getInputMarker(
             GraphOperationInfo::IM_InputListElt);
 
@@ -2202,7 +2202,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                             "values");
             return;
           }
-          auto unpackedInputsCount = inputs.size() - beforeUnpackInputsCount;
+          unsigned unpackedInputsCount =
+              inputs.size() - beforeUnpackInputsCount;
           for (unsigned i = 0; i < unpackedInputsCount; i++)
             opName += elementMarker;
         }
@@ -2219,7 +2220,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                         "or aggregate of TensorFlow values");
         return;
       }
-      auto unpackedInputsCount = inputs.size() - beforeUnpackInputsCount;
+      unsigned unpackedInputsCount = inputs.size() - beforeUnpackInputsCount;
       if (unpackedInputsCount != 1) {
         // We could accept this situation and unpack the input into an input
         // list.  However, we want users to explicitly indicate that they want
@@ -2233,7 +2234,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                             : "aggregate of more than one TensorFlow value"));
       }
       opName +=
-        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
       continue;
     }
 

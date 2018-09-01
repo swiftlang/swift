@@ -106,6 +106,8 @@ public func unpackAggregate_reuse(x: Tensor<Float>) {
 }
 
 // CHECK-LABEL: --- TFDeabstraction Result: {{.*}}unpackAggregate_reuse{{.*}}
+// CHECK: struct_extract
+// CHECK: struct_extract
 // CHECK: [[F_TensorHandle:%.*]] = struct_extract %0 : $Tensor<Float>, #Tensor.handle
 // CHECK: graph_op "SomeOp7,L,e,e"([[F_TensorHandle]] : $TensorHandle<Float>, [[F_TensorHandle]] : $TensorHandle<Float>)
 
