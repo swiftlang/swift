@@ -804,10 +804,13 @@ public:
   /// entries occupy in instantiated class metadata.
   uint32_t VTableSize;
 
-  uint32_t getVTableOffset(const TargetClassMetadata<Runtime> *metadata) const {
-    const auto *description = metadata->getDescription();
-    if (description->hasResilientSuperclass())
-      return metadata->Superclass->getSizeInWords() + VTableOffset;
+  uint32_t getVTableOffset(const TargetClassDescriptor<Runtime> *description) const {
+    if (description->hasResilientSuperclass()) {
+      auto bounds = description->getMetadataBounds();
+      return (bounds.ImmediateMembersOffset / sizeof(StoredPointer)
+              + VTableOffset);
+    }
+
     return VTableOffset;
   }
 };
@@ -1107,7 +1110,7 @@ public:
   /// Get a pointer to the field offset vector, if present, or null.
   const StoredPointer *getFieldOffsets() const {
     assert(isTypeMetadata());
-    auto offset = getDescription()->getFieldOffsetVectorOffset(this);
+    auto offset = getDescription()->getFieldOffsetVectorOffset();
     if (offset == 0)
       return nullptr;
     auto asWords = reinterpret_cast<const void * const*>(this);
@@ -3722,11 +3725,12 @@ public:
   /// its stored properties.
   bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
 
-  unsigned getFieldOffsetVectorOffset(const ClassMetadata *metadata) const {
-    const auto *description = metadata->getDescription();
-
-    if (description->hasResilientSuperclass())
-      return metadata->Superclass->getSizeInWords() + FieldOffsetVectorOffset;
+  unsigned getFieldOffsetVectorOffset() const {
+    if (hasResilientSuperclass()) {
+      auto bounds = getMetadataBounds();
+      return (bounds.ImmediateMembersOffset / sizeof(StoredPointer)
+              + FieldOffsetVectorOffset);
+    }
 
     return FieldOffsetVectorOffset;
   }

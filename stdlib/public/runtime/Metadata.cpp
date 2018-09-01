@@ -2088,8 +2088,9 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass,
     // Copy the generic requirements.
     if (description->isGeneric()
         && description->getGenericContextHeader().hasArguments()) {
-      memcpy(classWords + description->getGenericArgumentOffset(),
-             superWords + description->getGenericArgumentOffset(),
+      auto genericOffset = description->getGenericArgumentOffset();
+      memcpy(classWords + genericOffset,
+             superWords + genericOffset,
              description->getGenericContextHeader().getNumArguments() *
                sizeof(uintptr_t));
     }
@@ -2097,15 +2098,16 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass,
     // Copy the vtable entries.
     if (description->hasVTable() && !hasStaticVTable(layoutFlags)) {
       auto *vtable = description->getVTableDescriptor();
-      memcpy(classWords + vtable->getVTableOffset(ancestor),
-             superWords + vtable->getVTableOffset(ancestor),
+      auto vtableOffset = vtable->getVTableOffset(description);
+      memcpy(classWords + vtableOffset,
+             superWords + vtableOffset,
              vtable->VTableSize * sizeof(uintptr_t));
     }
 
     // Copy the field offsets.
     if (description->hasFieldOffsetVector()) {
       unsigned fieldOffsetVector =
-        description->getFieldOffsetVectorOffset(ancestor);
+        description->getFieldOffsetVectorOffset();
       memcpy(classWords + fieldOffsetVector,
              superWords + fieldOffsetVector,
              description->NumFields * sizeof(uintptr_t));
@@ -2248,9 +2250,9 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 
     if (description->hasVTable()) {
       auto *vtable = description->getVTableDescriptor();
+      auto vtableOffset = vtable->getVTableOffset(description);
       for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
-        classWords[vtable->getVTableOffset(self) + i]
-          = description->getMethod(i);
+        classWords[vtableOffset + i] = description->getMethod(i);
       }
     }
   }
