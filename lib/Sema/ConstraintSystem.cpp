@@ -2081,11 +2081,11 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
 
   {
     // Set up solver state.
-    SolverState state(expr, *this);
+    SolverState state(expr, *this, FreeTypeVariableBinding::Disallow);
     state.recordFixes = true;
 
     // Solve the system.
-    solveRec(viable, FreeTypeVariableBinding::Disallow);
+    solveRec(viable);
 
     // Check whether we have a best solution; this can happen if we found
     // a series of fixes that worked.

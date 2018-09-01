@@ -1139,13 +1139,16 @@ private:
 
   /// \brief Describes the current solver state.
   struct SolverState {
-    SolverState(Expr *const expr, ConstraintSystem &cs);
+    SolverState(Expr *const expr, ConstraintSystem &cs,
+                FreeTypeVariableBinding allowFreeTypeVariables);
     ~SolverState();
 
     llvm::DenseMap<Expr *, unsigned> ExprWeights;
 
     /// The constraint system.
     ConstraintSystem &CS;
+
+    FreeTypeVariableBinding AllowFreeTypeVariables;
 
     /// Old value of DebugConstraintSolver.
     /// FIXME: Move the "debug constraint solver" bit into the constraint 
@@ -1286,6 +1289,12 @@ private:
       }
 
       generatedConstraints.erase(genStart, genEnd);
+    }
+
+    /// Check whether constraint system is allowed to form solutions
+    /// even with unbound type variables present.
+    bool allowsFreeTypeVariables() const {
+      return AllowFreeTypeVariables != FreeTypeVariableBinding::Disallow;
     }
 
   private:
@@ -1507,7 +1516,7 @@ private:
   /// it.
   ///
   /// \returns the solution.
-  Solution finalize(FreeTypeVariableBinding allowFreeTypeVariables);
+  Solution finalize();
 
   /// \brief Apply the given solution to the current constraint system.
   ///
@@ -2950,8 +2959,7 @@ private:
   bool
   tryTypeVariableBindings(TypeVariableType *typeVar,
                           ArrayRef<ConstraintSystem::PotentialBinding> bindings,
-                          SmallVectorImpl<Solution> &solutions,
-                          FreeTypeVariableBinding allowFreeTypeVariables);
+                          SmallVectorImpl<Solution> &solutions);
 
 private:
   /// \brief Add a constraint to the constraint system.
@@ -2967,8 +2975,7 @@ private:
   ///
   /// \returns true if we failed to find any solutions, false otherwise.
   bool solveForDisjunction(Constraint *disjunction,
-                           SmallVectorImpl<Solution> &solutions,
-                           FreeTypeVariableBinding allowFreeTypeVariables);
+                           SmallVectorImpl<Solution> &solutions);
 
   /// \brief Attempt to solve for some subset of the constraints in a
   ///        disjunction, skipping constraints that we decide do not
@@ -2976,22 +2983,16 @@ private:
   ///        the best solution to the constraint system.
   ///
   /// \returns true if we failed to find any solutions, false otherwise.
-  bool
-  solveForDisjunctionChoices(Disjunction &disjunction,
-                             SmallVectorImpl<Solution> &solutions,
-                             FreeTypeVariableBinding allowFreeTypeVariables);
+  bool solveForDisjunctionChoices(Disjunction &disjunction,
+                                  SmallVectorImpl<Solution> &solutions);
 
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
   ///
   /// \param solutions The set of solutions to this system of constraints.
   ///
-  /// \param allowFreeTypeVariables How to bind free type variables in
-  /// the solution.
-  ///
   /// \returns true if an error occurred, false otherwise.
-  bool solveSimplified(SmallVectorImpl<Solution> &solutions,
-                       FreeTypeVariableBinding allowFreeTypeVariables);
+  bool solveSimplified(SmallVectorImpl<Solution> &solutions);
 
   /// \brief Find reduced domains of disjunction constraints for given
   /// expression, this is achieved to solving individual sub-expressions
@@ -3075,12 +3076,8 @@ public:
   ///
   /// \param solutions The set of solutions to this system of constraints.
   ///
-  /// \param allowFreeTypeVariables How to bind free type variables in
-  /// the solution.
-  ///
   /// \returns true if there are no solutions
-  bool solveRec(SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables);
+  bool solveRec(SmallVectorImpl<Solution> &solutions);
 
   /// \brief Solve the system of constraints.
   ///
@@ -3402,8 +3399,7 @@ public:
   bool isSymmetricOperator() const;
 
   /// \brief Apply given choice to the system and try to solve it.
-  Optional<Score> solve(SmallVectorImpl<Solution> &solutions,
-                        FreeTypeVariableBinding allowFreeTypeVariables);
+  Optional<Score> solve(SmallVectorImpl<Solution> &solutions);
 
   operator Constraint *() { return Choice; }
 
@@ -3536,8 +3532,7 @@ public:
       Disjunctions.push_back(constraint);
   }
 
-  bool solve(ConstraintSystem &cs, SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables) {
+  bool solve(ConstraintSystem &cs, SmallVectorImpl<Solution> &solutions) {
     // Return constraints from the bucket back into circulation.
     reinstateTo(cs.InactiveConstraints);
 
@@ -3550,7 +3545,7 @@ public:
       llvm::SaveAndRestore<ConstraintSystem::SolverScope *>
           partialSolutionScope(cs.solverState->PartialSolutionScope, &scope);
 
-      failed = cs.solveSimplified(solutions, allowFreeTypeVariables);
+      failed = cs.solveSimplified(solutions);
     }
 
     // Put the constraints back into their original bucket.
