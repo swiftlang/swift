@@ -16,6 +16,11 @@ class A {}
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1ACMa"
 //   Superclass.
 // CHECK-SAME: i32 0,
+//   Negative size in words.
+// CHECK-SAME: i32 2,
+//   Positive size in words.
+// CHECK-32-SAME: i32 14,
+// CHECK-64-SAME: i32 11,
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
@@ -26,6 +31,7 @@ class A {}
 // CHECK-64-SAME: i32 10,
 //   V-table length.
 // CHECK-SAME: i32 1,
+// CHECK-SMAE: %swift.method_descriptor {
 //   V-table entry #1: invocation function.
 // CHECK-SAME: @"$S14class_metadata1ACACycfc"
 //   V-table entry #1: flags.
@@ -35,8 +41,8 @@ class B : A {}
 
 // CHECK:      [[B_NAME:@.*]] = private constant [2 x i8] c"B\00"
 // CHECK-LABEL: @"$S14class_metadata1BCMn" =
-//   Flags. 0x0000_0050 == Unique | Class
-// CHECK-SAME: <i32 0x0000_0050>,
+//   Flags. 0x4000_0050 == HasOverrideTable | Unique | Class
+// CHECK-SAME: <i32 0x4000_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -44,19 +50,37 @@ class B : A {}
 //   Metadata access function.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1BCMa"
 //   Superclass.
-// CHECK-SAME: i32 {{.*}} @"$S14class_metadata1ACMn"
+// CHECK-SAME: @"$S14class_metadata1ACMn"
+//   Negative size in words.
+// CHECK-SAME: i32 2,
+//   Positive size in words.
+// CHECK-32-SAME: i32 14,
+// CHECK-64-SAME: i32 11,
+//   Immediate member count.
+// CHECK-SAME: i32 0,
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-32-SAME: i32 14 }>, section
-// CHECK-64-SAME: i32 11 }>, section
+// CHECK-32-SAME: i32 14,
+// CHECK-64-SAME: i32 11,
+//   Number of method overrides.
+// CHECK-SAME: i32 1,
+// CHECK-SAME: %swift.method_override_descriptor {
+//   Override table entry #1: base class.
+// CHECK-SAME: @"$S14class_metadata1ACMn"
+//   Override table entry #1: base method.
+// CHECK-SAME: @"$S14class_metadata1ACMn", i32 0, i32 13
+//   Override table entry #1: invocation function.
+// CHECK-SAME: @"$S14class_metadata1BCACycfc"
+
+// CHECK-SAME: }>, section
 
 class C<T> : B {}
 
 // CHECK:      [[C_NAME:@.*]] = private constant [2 x i8] c"C\00"
 // CHECK-LABEL: @"$S14class_metadata1CCMn" =
-//   Flags. 0x0000_00d0 == Generic | Unique | Class
-// CHECK-SAME: <i32 0x0000_00d0>,
+//   Flags. 0x4000_00d0 == HasOverrideTable | Generic | Unique | Class
+// CHECK-SAME: <i32 0x4000_00d0>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -91,10 +115,20 @@ class C<T> : B {}
 // CHECK-SAME: i16 0,
 //   Generic parameter descriptor #1: flags. -128 == 0x80 == Key
 // CHECK-SAME: i8 -128,
-///  Padding.
+//   Padding.
 // CHECK-SAME: i8 0,
 // CHECK-SAME: i8 0,
-// CHECK-SAME: i8 0 }>, section
+// CHECK-SAME: i8 0,
+//   Number of method overrides.
+// CHECK-SAME: i32 1,
+// CHECK-SAME: %swift.method_override_descriptor {
+//   Override table entry #1: base class.
+// CHECK-SAME: @"$S14class_metadata1ACMn"
+//   Override table entry #1: base method.
+// CHECK-SAME: @"$S14class_metadata1ACMn", i32 0, i32 13
+//   Override table entry #1: invocation function.
+// CHECK-SAME: @"$S14class_metadata1CCACyxGycfc"
+// CHECK-SAME: }>, section
 
 // CHECK-LABEL: @"$S14class_metadata1CCMP" =
 //   Instantiation function.
@@ -106,8 +140,8 @@ class D : E {}
 
 // CHECK:      [[D_NAME:@.*]] = private constant [2 x i8] c"D\00"
 // CHECK-LABEL: @"$S14class_metadata1DCMn" =
-//   Flags. 0x0400_0050 == IndirectSuperclass | Unique | Class
-// CHECK-SAME: <i32 0x0400_0050>,
+//   Flags. 0x4200_0050 == HasOverrideTable | IndirectSuperclass | Unique | Class
+// CHECK-SAME: <i32 0x4200_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadataMXM"
 //   Name.
@@ -115,11 +149,27 @@ class D : E {}
 //   Metadata access function.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1DCMa"
 //   Superclass.
-// CHECK-SAME: i32 {{.*}} @"got.$S14class_metadata1ECMn
+// CHECK-SAME: @"got.$S14class_metadata1ECMn.1"
+//   Negative size in words.
+// CHECK-SAME: i32 2,
+//   Positive size in words.
+// CHECK-32-SAME: i32 14,
+// CHECK-64-SAME: i32 11,
+//   Immediate member count.
+// CHECK-SAME: i32 0,
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-32-SAME: i32 14 }>, section
-// CHECK-64-SAME: i32 11 }>, section
-
+// CHECK-32-SAME: i32 14,
+// CHECK-64-SAME: i32 11,
+//   Number of method overrides.
+// CHECK-SAME: i32 1,
+// CHECK-SAME: %swift.method_override_descriptor {
+//   Override table entry #1: base class.
+// CHECK-SAME: @"got.$S14class_metadata1ECMn.1"
+//   Override table entry #1: base method.
+// CHECK-SAME: @"got.$S14class_metadata1ECACycfcTq"
+//   Override table entry #1: invocation function.
+// CHECK-SAME: @"$S14class_metadata1DCACycfc"
+// CHECK-SAME: }>, section
 class E {}

@@ -353,6 +353,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       Int32Ty
     });
 
+  MethodOverrideDescriptorStructTy
+    = createStructType(*this, "swift.method_override_descriptor", {
+      RelativeAddressTy,
+      RelativeAddressTy,
+      RelativeAddressTy
+    });
+
   TypeMetadataRecordTy
     = createStructType(*this, "swift.type_metadata_record", {
       RelativeAddressTy

@@ -2069,7 +2069,7 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
 /// Initialize the invariant superclass components of a class metadata,
 /// such as the generic type arguments, field offsets, and so on.
 static void _swift_initializeSuperclass(ClassMetadata *theClass,
-                                       ClassLayoutFlags layoutFlags) {
+                                        ClassLayoutFlags layoutFlags) {
   const ClassMetadata *theSuperclass = theClass->Superclass;
   if (theSuperclass == nullptr)
     return;
@@ -2242,6 +2242,9 @@ swift::swift_initClassMetadata(ClassMetadata *self,
     _swift_initGenericClassObjCName(self);
 #endif
 
+  // Copy vtable entries and field offsets from our superclass.
+  _swift_initializeSuperclass(self, layoutFlags);
+
   // Copy the class's immediate methods from the nominal type descriptor
   // to the class metadata.
   if (!hasStaticVTable(layoutFlags)) {
@@ -2251,13 +2254,34 @@ swift::swift_initClassMetadata(ClassMetadata *self,
     if (description->hasVTable()) {
       auto *vtable = description->getVTableDescriptor();
       auto vtableOffset = vtable->getVTableOffset(description);
-      for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
+      for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i)
         classWords[vtableOffset + i] = description->getMethod(i);
+    }
+
+    if (description->hasOverrideTable()) {
+      auto *overrideTable = description->getOverrideTable();
+      auto overrideDescriptors = description->getMethodOverrideDescriptors();
+
+      for (unsigned i = 0, e = overrideTable->NumEntries; i < e; ++i) {
+        auto &descriptor = overrideDescriptors[i];
+
+        // Get the base class and method.
+        auto *baseClass = descriptor.Class.get();
+        auto *baseMethod = descriptor.Method.get();
+
+        // Calculate the base method's vtable offset from the
+        // base method descriptor. The offset will be relative
+        // to the base class's vtable start offset.
+        auto baseClassMethods = baseClass->getMethodDescriptors().data();
+        auto offset = baseMethod - baseClassMethods;
+
+        // Install the method override in our vtable.
+        auto baseVTable = baseClass->getVTableDescriptor();
+        classWords[baseVTable->getVTableOffset(baseClass) + offset]
+          = descriptor.Impl.get();
       }
     }
   }
-
-  _swift_initializeSuperclass(self, layoutFlags);
 
   // Start layout by appending to a standard heap object header.
   size_t size, alignMask;
