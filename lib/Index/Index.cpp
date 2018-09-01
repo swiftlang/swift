@@ -373,6 +373,28 @@ private:
     return true;
   }
 
+  bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override {
+    SourceLoc Loc = Range.getStart();
+
+    if (Loc.isInvalid())
+      return true;
+
+    IndexSymbol Info;
+    std::tie(Info.line, Info.column) = getLineCol(Loc);
+    Info.roles |= (unsigned)SymbolRole::Reference;
+    Info.name = Mod.getName();
+
+    const ModuleDecl *D = Mod.getAsSwiftModule();
+    Info.symInfo = getSymbolInfoForDecl(D);
+
+    if (!IdxConsumer.startSourceEntity(Info)) {
+      Cancelled = true;
+      return true;
+    }
+
+    return finishSourceEntity(Info.symInfo, Info.roles);
+  }
+
   Decl *getParentDecl() const {
     if (!EntitiesStack.empty())
       return EntitiesStack.back().D;
@@ -437,7 +459,11 @@ private:
   bool finishCurrentEntity() {
     Entity CurrEnt = EntitiesStack.pop_back_val();
     assert(CurrEnt.SymInfo.Kind != SymbolKind::Unknown);
-    if (!IdxConsumer.finishSourceEntity(CurrEnt.SymInfo, CurrEnt.Roles)) {
+    return finishSourceEntity(CurrEnt.SymInfo, CurrEnt.Roles);
+  }
+
+  bool finishSourceEntity(SymbolInfo symInfo, SymbolRoleSet roles) {
+    if (!IdxConsumer.finishSourceEntity(symInfo, roles)) {
       Cancelled = true;
       return false;
     }
