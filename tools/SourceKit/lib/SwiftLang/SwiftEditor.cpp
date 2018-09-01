@@ -676,7 +676,7 @@ public:
     DiagConsumer.setInputBufferIDs(BufferID);
 
     Parser.reset(
-      new ParserUnit(SM, BufferID,
+                 new ParserUnit(SM, SourceFileKind::Main, BufferID,
                      CompInv.getLangOptions(),
                      CompInv.getModuleName(),
                      CompInv.getMainFileSyntaxParsingCache())

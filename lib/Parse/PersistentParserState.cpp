@@ -14,11 +14,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/Parse/PersistentParserState.h"
 
 using namespace swift;
+
+PersistentParserState::PersistentParserState(ASTContext &Ctx):
+  Ctx(Ctx) { Ctx.addLazyParser(this); }
+
+PersistentParserState::~PersistentParserState() { Ctx.removeLazyParser(this); }
 
 void PersistentParserState::delayFunctionBodyParsing(AbstractFunctionDecl *AFD,
                                                      SourceRange BodyRange,
@@ -45,6 +51,15 @@ bool PersistentParserState::hasFunctionBodyState(AbstractFunctionDecl *AFD) {
   return DelayedFunctionBodies.find(AFD) != DelayedFunctionBodies.end();
 }
 
+std::unique_ptr<PersistentParserState::DelayedDeclListState>
+PersistentParserState::takeDelayedDeclListState(IterableDeclContext *IDC) {
+  auto I = DelayedDeclListStates.find(IDC);
+  assert(I != DelayedDeclListStates.end() && "State should be saved");
+  auto State = std::move(I->second);
+  DelayedDeclListStates.erase(I);
+  return State;
+}
+
 void PersistentParserState::delayDecl(DelayedDeclKind Kind,
                                       unsigned Flags,
                                       DeclContext *ParentContext,
@@ -57,10 +72,18 @@ void PersistentParserState::delayDecl(DelayedDeclKind Kind,
       ScopeInfo.saveCurrentScope()));
 }
 
+void PersistentParserState::delayDeclList(IterableDeclContext* D,
+                                          unsigned Flags,
+                                          DeclContext *ParentContext,
+                                          SourceRange BodyRange,
+                                          SourceLoc PreviousLoc) {
+  DelayedDeclListStates[D] = llvm::make_unique<DelayedDeclListState>(Flags,
+    ParentContext, BodyRange, PreviousLoc, ScopeInfo.saveCurrentScope());
+}
+
 void PersistentParserState::delayTopLevel(TopLevelCodeDecl *TLCD,
                                           SourceRange BodyRange,
                                           SourceLoc PreviousLoc) {
   delayDecl(DelayedDeclKind::TopLevelCodeDecl, 0U, TLCD, BodyRange,
             PreviousLoc);
 }
-

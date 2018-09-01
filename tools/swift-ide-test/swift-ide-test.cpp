@@ -1475,7 +1475,8 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 
   llvm::raw_ostream &OS = llvm::outs();
   OS << SourceFilename << ": ";
-  if (isSourceInputComplete(std::move(FileBufOrErr.get())).IsComplete) {
+  if (isSourceInputComplete(std::move(FileBufOrErr.get()),
+                            SourceFileKind::Main).IsComplete) {
     OS << "IS_COMPLETE\n";
   } else {
     OS << "IS_INCOMPLETE\n";
