@@ -1328,6 +1328,20 @@ ERROR(attr_availability_expected_equal,none,
 ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
 
+WARNING(attr_availability_swift_expected_option,none,
+      "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
+      "for platform 'swift'", (StringRef))
+WARNING(attr_availability_swift_expected_deprecated_version,none,
+      "expected version number with 'deprecated' in '%0' attribute for "
+      "platform 'swift'", (StringRef))
+WARNING(attr_availability_swift_infeasible_option,none,
+      "'%0' cannot be used in '%1' attribute for platform 'swift'",
+      (StringRef, StringRef))
+
+WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
+      "unexpected version number in '%0' attribute for non-specific platform "
+      "'*'", (StringRef))
+
 // autoclosure
 ERROR(attr_autoclosure_expected_r_paren,PointsToFirstBadToken,
       "expected ')' in @autoclosure", ())
