@@ -87,8 +87,16 @@ public:
       return makeUnowned(Str);
     } else {
       llvm::IntrusiveRefCntPtr<TextOwner> OwnedPtr(TextOwner::make(Str));
-      return OwnedString(StringRef(OwnedPtr->getText(), Str.size()),
-                         std::move(OwnedPtr));
+      // Allocate the StringRef on the stack first.  This is to ensure that the
+      // order of evaluation of the arguments is specified.  The specification
+      // does not specify the order of evaluation for the arguments.  Itanium
+      // chose to evaluate left to right, while Windows evaluates right to left.
+      // As such, it is possible that the OwnedPtr has already been `std::move`d
+      // by the time that the StringRef is attempted to be created.  In such a
+      // case, the offset of the field (+4) is used instead of the pointer to
+      // the text, resulting in invalid memory references.
+      StringRef S(OwnedPtr->getText(), Str.size());
+      return OwnedString(S, std::move(OwnedPtr));
     }
   }
 
