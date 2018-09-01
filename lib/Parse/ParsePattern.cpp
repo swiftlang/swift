@@ -601,14 +601,6 @@ mapParsedParameters(Parser &parser,
       DefaultArgumentKind kind = getDefaultArgKind(param.DefaultArg);
       result->setDefaultArgumentKind(kind);
       result->setDefaultValue(param.DefaultArg);
-      if (kind == DefaultArgumentKind::Normal) {
-        SourceRange defaultArgRange = param.DefaultArg->getSourceRange();
-        CharSourceRange charRange =
-            Lexer::getCharSourceRangeFromSourceRange(parser.SourceMgr,
-                                                     defaultArgRange);
-        StringRef defaultArgText = parser.SourceMgr.extractText(charRange);
-        result->setDefaultValueStringRepresentation(defaultArgText);
-      }
     }
 
     elements.push_back(result);

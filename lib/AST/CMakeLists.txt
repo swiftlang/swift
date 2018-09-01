@@ -34,6 +34,7 @@ add_swift_library(swiftAST STATIC
   GenericSignature.cpp
   GenericSignatureBuilder.cpp
   Identifier.cpp
+  InlinableText.cpp
   LayoutConstraint.cpp
   LookupVisibleDecls.cpp
   Module.cpp

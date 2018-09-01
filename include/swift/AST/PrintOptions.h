@@ -147,9 +147,6 @@ struct PrintOptions {
   /// \brief Whether to print variable initializers.
   bool VarInitializers = false;
 
-  /// \brief Whether to print a placeholder for default parameters.
-  bool PrintDefaultParameterPlaceholder = true;
-
   /// \brief Whether to print enum raw value expressions.
   bool EnumRawValues = false;
 
@@ -381,7 +378,6 @@ struct PrintOptions {
     PrintOptions result;
     result.TypeDefinitions = true;
     result.VarInitializers = true;
-    result.PrintDefaultParameterPlaceholder = true;
     result.PrintDocumentationComments = true;
     result.PrintRegularClangComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
@@ -509,7 +505,6 @@ struct PrintOptions {
   static PrintOptions printQuickHelpDeclaration() {
     PrintOptions PO;
     PO.EnumRawValues = true;
-    PO.PrintDefaultParameterPlaceholder = true;
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;
     PO.PrintDocumentationComments = false;

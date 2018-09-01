@@ -55,6 +55,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
+#include "InlinableText.h"
 #include <algorithm>
 
 using namespace swift;
@@ -4829,14 +4830,22 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndIsVariadic.getPointer()->InitContext = initContext;
 }
 
-StringRef ParamDecl::getDefaultValueStringRepresentation() const {
+StringRef
+ParamDecl::getDefaultValueStringRepresentation(
+  SmallVectorImpl<char> &scratch) const {
   switch (getDefaultArgumentKind()) {
   case DefaultArgumentKind::None:
     llvm_unreachable("called on a ParamDecl with no default value");
-  case DefaultArgumentKind::Normal:
+  case DefaultArgumentKind::Normal: {
     assert(DefaultValueAndIsVariadic.getPointer() &&
            "default value not provided yet");
-    return DefaultValueAndIsVariadic.getPointer()->StringRepresentation;
+    auto existing =
+      DefaultValueAndIsVariadic.getPointer()->StringRepresentation;
+    if (!existing.empty())
+      return existing;
+    return extractInlinableText(getASTContext().SourceMgr, getDefaultValue(),
+                                scratch);
+  }
   case DefaultArgumentKind::Inherited:
     // FIXME: This needs /some/ kind of textual representation, but this isn't
     // a great one.

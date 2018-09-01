@@ -3198,8 +3198,10 @@ void Serializer::writeDecl(const Decl *D) {
     // Only save the text for normal default arguments, not any of the special
     // ones.
     StringRef defaultArgumentText;
+    SmallString<128> scratch;
     if (param->getDefaultArgumentKind() == swift::DefaultArgumentKind::Normal)
-      defaultArgumentText = param->getDefaultValueStringRepresentation();
+      defaultArgumentText =
+        param->getDefaultValueStringRepresentation(scratch);
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
