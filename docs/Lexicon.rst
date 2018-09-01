@@ -26,7 +26,7 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
       struct Foo<T> {
         var value: T
         // Foo.value has abstraction pattern <T> T
-    
+      }
       struct Bar<T, U> {
         var value: (T) -> U
         // Bar.value has abstraction pattern <T, U> (T) -> U
