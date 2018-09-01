@@ -19,6 +19,7 @@
 #include "swift/Basic/Timer.h"
 
 #include <thread>
+#include <tuple>
 
 #define SWIFT_FUNC_STAT                                                 \
   do {                                                                  \
@@ -328,6 +329,69 @@ inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
                                                 StringRef S,
                                                 const TypeRepr *TR)
     : FrontendStatsTracer(R, S, TR, getTraceFormatter<const TypeRepr *>()) {}
+
+/// Utilities for constructing TraceFormatters from entities in the request-evaluator:
+
+template <typename T>
+typename std::enable_if<
+    std::is_constructible<FrontendStatsTracer, UnifiedStatsReporter *,
+                          StringRef, const T *>::value,
+    FrontendStatsTracer>::type
+make_tracer_direct(UnifiedStatsReporter *Reporter, StringRef Name, T *Value) {
+  return FrontendStatsTracer(Reporter, Name, static_cast<const T *>(Value));
+}
+
+template <typename T>
+typename std::enable_if<
+    std::is_constructible<FrontendStatsTracer, UnifiedStatsReporter *,
+                          StringRef, const T *>::value,
+    FrontendStatsTracer>::type
+make_tracer_direct(UnifiedStatsReporter *Reporter, StringRef Name,
+                   const T *Value) {
+  return FrontendStatsTracer(Reporter, Name, Value);
+}
+
+template <typename T>
+typename std::enable_if<
+    !std::is_constructible<FrontendStatsTracer, UnifiedStatsReporter *,
+                           StringRef, const T *>::value,
+    FrontendStatsTracer>::type
+make_tracer_direct(UnifiedStatsReporter *Reporter, StringRef Name, T *Value) {
+  return FrontendStatsTracer(Reporter, Name);
+}
+
+template <typename T>
+typename std::enable_if<!std::is_pointer<T>::value, FrontendStatsTracer>::type
+make_tracer_direct(UnifiedStatsReporter *Reporter, StringRef Name, T Value) {
+  return FrontendStatsTracer(Reporter, Name);
+}
+
+template <typename T> struct is_pointerunion : std::false_type {};
+template <typename T, typename U>
+struct is_pointerunion<llvm::PointerUnion<T, U>> : std::true_type {};
+
+template <typename T, typename U>
+FrontendStatsTracer make_tracer_pointerunion(UnifiedStatsReporter *Reporter,
+                                             StringRef Name,
+                                             llvm::PointerUnion<T, U> Value) {
+  if (Value.template is<T>())
+    return make_tracer_direct(Reporter, Name, Value.template get<T>());
+  else
+    return make_tracer_direct(Reporter, Name, Value.template get<U>());
+}
+
+template <typename T>
+typename std::enable_if<!is_pointerunion<T>::value, FrontendStatsTracer>::type
+make_tracer_pointerunion(UnifiedStatsReporter *Reporter, StringRef Name,
+                         T Value) {
+  return make_tracer_direct(Reporter, Name, Value);
+}
+
+template <typename First, typename... Rest>
+FrontendStatsTracer make_tracer(UnifiedStatsReporter *Reporter, StringRef Name,
+                                std::tuple<First, Rest...> Value) {
+  return make_tracer_pointerunion(Reporter, Name, std::get<0>(Value));
+}
 
 } // namespace swift
 #endif // SWIFT_BASIC_STATISTIC_H
