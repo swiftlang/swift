@@ -315,11 +315,19 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     return true;
   };
 
+  struct VersionArg {
+    llvm::VersionTuple Version;
+    SourceRange Range;
+    SourceLoc DelimiterLoc;
+    bool empty() const {
+      return Version.empty();
+    }
+  };
+
   StringRef Platform = Tok.getText();
 
   StringRef Message, Renamed;
-  llvm::VersionTuple Introduced, Deprecated, Obsoleted;
-  SourceRange IntroducedRange, DeprecatedRange, ObsoletedRange;
+  VersionArg Introduced, Deprecated, Obsoleted;
   auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
   SyntaxParsingContext AvailabilitySpecContext(
@@ -443,7 +451,9 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     case IsIntroduced:
     case IsObsoleted: {
       // Items with version arguments.
+      SourceLoc DelimiterLoc;
       if (findAttrValueDelimiter()) {
+        DelimiterLoc = Tok.getLoc();
         consumeToken();
       } else {
         diagnose(Tok, diag::attr_availability_expected_equal, AttrName,
@@ -454,24 +464,19 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
         break;
       }
 
-      auto &VersionArg =
+      auto &VerArg =
           (ArgumentKind == IsIntroduced)
               ? Introduced
               : (ArgumentKind == IsDeprecated) ? Deprecated : Obsoleted;
 
-      auto &VersionRange = (ArgumentKind == IsIntroduced)
-                               ? IntroducedRange
-                               : (ArgumentKind == IsDeprecated)
-                                     ? DeprecatedRange
-                                     : ObsoletedRange;
-
       if (parseVersionTuple(
-              VersionArg, VersionRange,
+              VerArg.Version, VerArg.Range,
               Diagnostic(diag::attr_availability_expected_version, AttrName))) {
         AnyArgumentInvalid = true;
         if (peekToken().isAny(tok::r_paren, tok::comma))
           consumeToken();
       }
+      VerArg.DelimiterLoc = DelimiterLoc;
 
       SyntaxContext->createNodeInPlace(SyntaxKind::AvailabilityLabeledArgument);
 
@@ -511,10 +516,26 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   bool SomeVersion = (!Introduced.empty() ||
                       !Deprecated.empty() ||
                       !Obsoleted.empty());
-  if (!PlatformKind.hasValue() &&
-      Platform == "swift" &&
-      SomeVersion &&
-      PlatformAgnostic == PlatformAgnosticAvailabilityKind::None) {
+  if (!PlatformKind.hasValue() && Platform == "swift") {
+    if (PlatformAgnostic == PlatformAgnosticAvailabilityKind::Deprecated) {
+      diagnose(AttrLoc,
+               diag::attr_availability_swift_expected_deprecated_version,
+               AttrName);
+      return nullptr;
+    }
+    if (PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
+      diagnose(AttrLoc, diag::attr_availability_swift_infeasible_option,
+               "unavailable", AttrName);
+      return nullptr;
+    }
+    assert(PlatformAgnostic == PlatformAgnosticAvailabilityKind::None);
+
+    if (!SomeVersion) {
+      diagnose(AttrLoc, diag::attr_availability_swift_expected_option,
+               AttrName);
+      return nullptr;
+    }
+
     PlatformKind = PlatformKind::none;
     PlatformAgnostic = PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
   }
@@ -528,13 +549,30 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     return nullptr;
   }
 
+  // Warn if any version is specified for non-specific platform '*'.
+  if (Platform == "*" && SomeVersion) {
+    auto diag = diagnose(AttrLoc,
+        diag::attr_availability_nonspecific_platform_unexpected_version,
+        AttrName);
+    if (!Introduced.empty())
+      diag.fixItRemove(SourceRange(Introduced.DelimiterLoc,
+                                   Introduced.Range.End));
+    if (!Deprecated.empty())
+      diag.fixItRemove(SourceRange(Deprecated.DelimiterLoc,
+                                   Deprecated.Range.End));
+    if (!Obsoleted.empty())
+      diag.fixItRemove(SourceRange(Obsoleted.DelimiterLoc,
+                                   Obsoleted.Range.End));
+    return nullptr;
+  }
+
   auto Attr = new (Context)
   AvailableAttr(AtLoc, SourceRange(AttrLoc, Tok.getLoc()),
                 PlatformKind.getValue(),
                 Message, Renamed,
-                Introduced, IntroducedRange,
-                Deprecated, DeprecatedRange,
-                Obsoleted, ObsoletedRange,
+                Introduced.Version, Introduced.Range,
+                Deprecated.Version, Deprecated.Range,
+                Obsoleted.Version, Obsoleted.Range,
                 PlatformAgnostic,
                 /*Implicit=*/false);
   return makeParserResult(Attr);
