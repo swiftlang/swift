@@ -1946,100 +1946,109 @@ void TFDeabstraction::cleanupDeadInstructions() {
     removeArrayValueIfPossible(inst);
 }
 
-/// If the specified type conforms to the TensorProtocol protocol, return the
-/// Scalar type for it.  Otherwise return a null type.
-static Type conformsToTensorProtocol(Type ty, ModuleDecl *module) {
-  auto nominal = ty->getAnyNominal();
+/// Recursively unwraps a sequence of aggregate construction/extraction
+/// instructions to find the earliest definition of `value`.  May return
+/// `value` if there is nothing to unwrap.
+static SILValue
+unwrapAggregateInstructions(SILValue value,
+                            llvm::DenseMap<SILValue, SILValue> &cache) {
+  auto &unwrapped = cache[value];
+  if (unwrapped)
+    return unwrapped;
 
-  auto &ctx = ty->getASTContext();
-  auto tensorProto = ctx.getProtocol(KnownProtocolKind::TensorProtocol);
-  if (!tensorProto || !nominal)
-    return Type();
-
-  SmallVector<ProtocolConformance *, 2> conformances;
-  nominal->lookupConformance(/*unused module*/ nullptr, tensorProto,
-                             conformances);
-  if (conformances.size() != 1)
-    return Type();
-
-  auto scalarMembers =
-      nominal->lookupDirect(DeclName(ctx.getIdentifier("Scalar")));
-  if (scalarMembers.size() != 1)
-    return Type();
-  if (auto member = dyn_cast<TypeDecl>(scalarMembers[0]))
-    return ty->getTypeOfMember(module, member,
-                               member->getDeclaredInterfaceType());
-  return Type();
-}
-
-/// Given something that conforms to the TensorProtocol protocol, extract the
-/// 'handle' out of it.
-// TODO: This should not be specific to TensorProtocol because TensorProtocol
-// requires a TensorHandle whereas members can be other opaque handles. This
-// will go away when TensorHandle unifies all handle types in the future.
-static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
-                                              SILBuilder &B) {
-  // If we already have a TensorFlow value, just use it.
-  if (classifyTensorFlowValue(v->getType()) != TFValueKind::Nope)
-    return v;
-
-  auto module = B.getFunction().getModule().getSwiftModule();
-
-  auto vType = v->getType().getASTType();
-  if (!vType->getStructOrBoundGenericStruct() ||
-      !conformsToTensorProtocol(vType, module))
-    return SILValue();
-
-  // If this value is just a struct wrapper around a TensorHandle, use the
-  // input of it.  In the case of Tensor2D, we have multiple levels of struct
-  // wrapper.
-  while (1) {
-    auto si = dyn_cast<StructInst>(v);
-    if (!si)
-      break;
-
-    if (si->getNumOperands() != 1)
-      break;
-
-    auto operand = si->getOperand(0);
-    // If we found the TensorHandle itself, then we win - return it.
-    if (isTensorHandle(operand->getType()))
-      return operand;
-
-    // If we found a wrapper around another TensorProtocol, dig deeper.
-    if (!conformsToTensorProtocol(operand->getType().getASTType(), module))
-      break;
-
-    v = operand;
+  if (auto *tei = dyn_cast<TupleExtractInst>(value)) {
+    auto tupleValue = unwrapAggregateInstructions(tei->getOperand(), cache);
+    if (auto *ti = dyn_cast<TupleInst>(tupleValue)) {
+      unwrapped =
+          unwrapAggregateInstructions(ti->getOperand(tei->getFieldNo()),
+                                      cache);
+      return unwrapped;
+    }
   }
 
-  // TODO(clattner): it would be more correct to generate a call to an accessor
-  // to get the handle out, but for now, we know we're always dealing with types
-  // that store the field by-value so we can dig it out in with an easier
-  // approach.  This handles structs of TensorHandle (like Tensor) and structs
-  // of structs of TensorHandle.
-  while (!isTensorHandle(v->getType())) {
-    auto vTy = v->getType().getASTType();
-    auto decl = vTy.getNominalOrBoundGenericNominal();
-    assert(decl && "Type must be nominal to conform to TensorProtocol");
-
-    auto fieldIt = decl->getStoredProperties().begin();
-    assert(fieldIt != decl->getStoredProperties().end() &&
-           "Tensor should have one member");
-    VarDecl *field = *fieldIt++;
-    assert(fieldIt == decl->getStoredProperties().end() &&
-           "Expected one stored field in TensorProtocol type");
-
-    // 'vTy' is usually a bound generic type.  Use getTypeOfMember to substitute
-    // the type bound into the member type.
-    auto fieldTy = vTy->getTypeOfMember(module, field);
-
-    auto silTy = SILType::getPrimitiveObjectType(fieldTy->getCanonicalType());
-    v = B.createStructExtract(loc, v, field, silTy);
+  if (auto *sei = dyn_cast<StructExtractInst>(value)) {
+    auto structValue = unwrapAggregateInstructions(sei->getOperand(), cache);
+    if (auto *si = dyn_cast<StructInst>(structValue)) {
+      unwrapped =
+          unwrapAggregateInstructions(si->getFieldValue(sei->getField()),
+                                      cache);
+      return unwrapped;
+    }
   }
 
-  return v;
+  unwrapped = value;
+  return unwrapped;
 }
+
+/// Recursively unpacks aggregates to `inputList`, using the already-lowered
+/// values when possible to avoid code bloat.  Returns true to represent error
+/// if it detects a non-TensorFlow leaf field.
+static bool unpackTensorAggregates(
+    SILLocation loc, SILBuilder &B, SILValue rootAggregate,
+    llvm::DenseMap<std::pair<SILValue, unsigned>, SILValue> &loweredTupleElts,
+    llvm::DenseMap<std::pair<SILValue, VarDecl*>, SILValue>
+        &loweredStructFields,
+    llvm::DenseMap<SILValue, SILValue> &unwrapCache,
+    SmallVectorImpl<SILValue> &inputList) {
+
+  // Extracts a field from a tuple.  If the tuple comes from a `tuple`
+  // instruction, uses the appropriate operand instead of emitting a new
+  // `tuple_extract`.
+  auto extractElement = [&](SILValue tupleValue, unsigned i) -> SILValue {
+    if (auto *ti = dyn_cast<TupleInst>(tupleValue))
+      return ti->getOperand(i);
+    return B.createTupleExtract(loc, tupleValue, i);
+  };
+
+  // Extracts a field from a struct.  If the struct comes from a `struct`
+  // instruction, uses the appropriate operand instead of emitting a new
+  // `struct_extract`.
+  auto extractField = [&](SILValue structValue, VarDecl *field) -> SILValue {
+    if (auto *si = dyn_cast<StructInst>(structValue))
+      return si->getFieldValue(field);
+    return B.createStructExtract(loc, structValue, field);
+  };
+
+  std::function<bool(SILValue)> recurse;
+  recurse = [&](SILValue aggregate) -> bool {
+    auto aggregateTy = aggregate->getType();
+    if (isTensorFlowValue(aggregateTy)) {
+      inputList.push_back(aggregate);
+      return false;
+    }
+    if (auto tupleTy = aggregateTy.getAs<TupleType>()) {
+      for (auto i : range(tupleTy->getNumElements())) {
+        auto eltIdx = std::pair<SILValue, unsigned>(aggregate, i);
+        auto &eltValue = loweredTupleElts[eltIdx];
+        if (!eltValue) {
+          eltValue =
+              unwrapAggregateInstructions(extractElement(aggregate, i),
+                                          unwrapCache);
+        }
+        if (recurse(eltValue))
+          return true;
+      }
+      return false;
+    }
+    if (auto *decl = aggregateTy.getStructOrBoundGenericStruct()) {
+      for (auto *field : decl->getStoredProperties()) {
+        auto fieldIdx = std::pair<SILValue, VarDecl*>(aggregate, field);
+        auto &fieldValue = loweredStructFields[fieldIdx];
+        if (!fieldValue) {
+          fieldValue =
+              unwrapAggregateInstructions(extractField(aggregate, field),
+                                          unwrapCache);
+        }
+        if (recurse(fieldValue))
+          return true;
+      }
+      return false;
+    }
+    return true;
+  };
+
+  return recurse(unwrapAggregateInstructions(rootAggregate, unwrapCache));
+};
 
 /// Given a type, recursively collect all innermost element types if it's an
 /// aggregate of TensorHandle's or dtypes.
@@ -2080,7 +2089,6 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                                   DenseMap<SILValue, SymbolicValue> &constants,
                                   GraphFunctionDeviceInfo &deviceInfo) {
   auto *inst = opInfo.inst;
-  auto loc = getUserSourceLocation(inst);
   auto &context = inst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
   SILBuilder B(opInfo.inst);
@@ -2099,6 +2107,15 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
 
   // Find the device attribute specified for the instruction if present.
   StringRef opDevice;
+
+  // It is common to have input lists with repeated elements.  These will
+  // generally be uniqued on entry to this routine.  We cache the projections in
+  // these maps so that we can reuse them and avoid code bloat.
+  llvm::DenseMap<std::pair<SILValue, unsigned>, SILValue> loweredTupleElts;
+  llvm::DenseMap<std::pair<SILValue, VarDecl*>, SILValue> loweredStructFields;
+
+  // A cache for calls to `unwrapAggregateInstructions`.
+  llvm::DenseMap<SILValue, SILValue> unwrapCache;
 
   for (unsigned i = 0, e = opInfo.operandClasses.size(); i != e; ++i) {
     auto operand = inst->getOperand(i);
@@ -2149,91 +2166,74 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         continue;
       }
 
-      // Handle TensorFlow values. These must be handled separately from
-      // aggregates of TensorFlow values (handled below), so that we do not
-      // generate input lists for them.
-      if (isTensorFlowValue(operandTy)) {
-        opName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
-        inputs.push_back(operand);
-        continue;
-      }
-
-      // Remember that we have an input list, this marker is important because
-      // the list may be empty, and we need to know it exists in graph lowering.
-      opName +=
-        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputList);
-      const char *elementMarker =
-        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputListElt);
-
-      // Handle aggregates of TensorFlow values by unpacking them to an input
-      // list.
-      if (isTensorFlowValueOrAggregate(operandTy.getASTType())) {
-        // Recursively unpack results to an input list.
-        std::function<void(SILValue)> unpackAggregate;
-        unpackAggregate = [&](SILValue aggregate) -> void {
-          auto aggregateTy = aggregate->getType();
-          if (isTensorFlowValue(aggregateTy)) {
-            opName += elementMarker;
-            inputs.push_back(aggregate);
-            return;
-          }
-          if (auto tupleTy = aggregateTy.getAs<TupleType>()) {
-            for (auto i : range(tupleTy->getNumElements()))
-              unpackAggregate(B.createTupleExtract(loc, aggregate, i));
-            return;
-          }
-          if (auto *decl = aggregateTy.getStructOrBoundGenericStruct()) {
-            for (auto *field : decl->getStoredProperties())
-              unpackAggregate(B.createStructExtract(loc, aggregate, field));
-            return;
-          }
-          llvm_unreachable("Non-TF type should have skipped unpacking");
-        };
-        unpackAggregate(operand);
-        continue;
-      }
-
       // Remove the operand so decodeArrayElements doesn't see the use.
       inst->setOperand(i, SILUndef::get(operand->getType(),
                                         fn.getModule()));
 
-      // Otherwise this must be an array, representing an input list.
+      // Handle the case where this is an array, representing an input list.
       ArrayElementDecoder arrayDecoder;
       auto elementType = arrayDecoder.decode(operand);
-      if (!elementType) {
-        diagnoseInvalid("operand has unrecognized type '" +
-                        operandTy.getASTType()->getString() + "'");
-        return;
-      }
+      if (elementType) {
+        // Remember that we have an input list, this marker is important because
+        // the list may be empty, and we need to know it exists in graph
+        // lowering.
+        opName +=
+          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputList);
+        const char *elementMarker = GraphOperationInfo::getInputMarker(
+            GraphOperationInfo::IM_InputListElt);
 
-      // Add each element to the input list we're building, drilling down
-      // through any struct wrappers (like Tensor, etc) that may be around it.
-      //
-      // It is common to have arrays with repeated elements.  These will
-      // generally be uniqued on entry to this routine.  If so, make sure to
-      // reuse them as we project out the .handle members to avoid code bloat.
-      llvm::DenseMap<SILValue, SILValue> loweredElts;
-      for (auto *use : arrayDecoder.elementsAtInit) {
-        auto *store = dyn_cast<StoreInst>(use->getUser());
-        if (!store) {
-          diagnoseInvalid("element initialization error");
-          return;
-        }
-        auto elt = store->getSrc();
-        auto &eltVal = loweredElts[elt];
-        if (!eltVal) {
-          eltVal = getTensorProtocolHandleMember(elt, inst->getLoc(), B);
-          if (!eltVal) {
-            diagnoseInvalid("elements to input list have invalid type '" +
-                            elementType->getString() + "'");
+        // Add each element to the input list we're building, drilling down
+        // through any aggregates that may be around it.
+        //
+        for (auto *use : arrayDecoder.elementsAtInit) {
+          auto *store = dyn_cast<StoreInst>(use->getUser());
+          if (!store) {
+            diagnoseInvalid("element initialization error");
             return;
           }
-        }
 
-        opName += elementMarker;
-        inputs.push_back(eltVal);
+          unsigned beforeUnpackInputsCount = inputs.size();
+          if (unpackTensorAggregates(inst->getLoc(), B, store->getSrc(),
+                                     loweredTupleElts, loweredStructFields,
+                                     unwrapCache, inputs)) {
+            diagnoseInvalid("elements of input list have invalid type '" +
+                            elementType->getString() + "'; they must be " +
+                            "TensorFlow values or aggregates of TensorFlow " +
+                            "values");
+            return;
+          }
+          auto unpackedInputsCount = inputs.size() - beforeUnpackInputsCount;
+          for (unsigned i = 0; i < unpackedInputsCount; i++)
+            opName += elementMarker;
+        }
+        continue;
       }
+
+      // Otherwise, this must be a single input.
+      unsigned beforeUnpackInputsCount = inputs.size();
+      if (unpackTensorAggregates(inst->getLoc(), B, operand, loweredTupleElts,
+                                 loweredStructFields, unwrapCache, inputs)) {
+        auto astTypeString = operandTy.getASTType().getString();
+        diagnoseInvalid("operand has unrecognized type '" +
+                        astTypeString + "'; it must be a TensorFlow value " +
+                        "or aggregate of TensorFlow values");
+        return;
+      }
+      auto unpackedInputsCount = inputs.size() - beforeUnpackInputsCount;
+      if (unpackedInputsCount != 1) {
+        // We could accept this situation and unpack the input into an input
+        // list.  However, we want users to explicitly indicate that they want
+        // unpacking to an input list by wrapping their input in an array, so we
+        // reject this situation.
+        auto astTypeString = operandTy.getASTType().getString();
+        diagnoseInvalid("operand of type '" + astTypeString + "' must be " +
+                        "wrapped in an array because it is an " +
+                        (unpackedInputsCount == 0
+                            ? "empty aggregate"
+                            : "aggregate of more than one TensorFlow value"));
+      }
+      opName +=
+        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
       continue;
     }
 
@@ -2506,6 +2506,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
   auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
       return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 
+  auto loc = getUserSourceLocation(inst);
   auto op = B.createGraphOperation(loc, context.getIdentifier(opName), inputs,
                                    attributes, resultSILTypes);
 

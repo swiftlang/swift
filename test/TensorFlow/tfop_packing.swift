@@ -63,28 +63,20 @@ public func unpackAggregate_basic() {
   }
   let foo = Foo(x: Tensor(1), y: (Tensor(2), (a: Tensor(3), b: Tensor(false))))
   // expected-error @+1 {{op named 'SomeOp5' is not registered in TensorFlow}}
-  let r: Tensor<Float> = #tfop("SomeOp5", foo)
-  _hostOp(r)
+  let _: Tensor<Float> = #tfop("SomeOp5", [foo])
 }
 
 // CHECK-LABEL: --- TFDeabstraction Result: {{.*}}unpackAggregate_basic{{.*}}
-// CHECK: [[D_Foo:%.*]] = struct $Foo
-// CHECK: [[D_Foo_x:%.*]] = struct_extract [[D_Foo]]{{.*}}Foo.x{{.*}}
-// CHECK: [[D_Foo_x_h:%.*]] = struct_extract [[D_Foo_x]]{{.*}}Tensor.handle{{.*}}
-// CHECK: [[D_Foo_y:%.*]] = struct_extract [[D_Foo]]{{.*}}Foo.y{{.*}}
-// CHECK: [[D_Foo_y_0:%.*]] = tuple_extract [[D_Foo_y]] : $(Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>)), 0
-// CHECK: [[D_Foo_y_0_h:%.*]] = struct_extract [[D_Foo_y_0]]{{.*}}Tensor.handle{{.*}}
-// CHECK: [[D_Foo_y_1:%.*]] = tuple_extract [[D_Foo_y]] : $(Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>)), 1
-// CHECK: [[D_Foo_y_1_a:%.*]] = tuple_extract [[D_Foo_y_1]] : $(a: Tensor<Int32>, b: Tensor<Bool>), 0
-// CHECK: [[D_Foo_y_1_a_h:%.*]] = struct_extract [[D_Foo_y_1_a]]{{.*}}Tensor.handle{{.*}}
-// CHECK: [[D_Foo_y_1_b:%.*]] = tuple_extract [[D_Foo_y_1]] : $(a: Tensor<Int32>, b: Tensor<Bool>), 1
-// CHECK: [[D_Foo_y_1_b_h:%.*]] = struct_extract [[D_Foo_y_1_b]]{{.*}}Tensor.handle{{.*}}
-// CHECK: graph_op "SomeOp5,L,e,e,e,e"([[D_Foo_x_h]] : $TensorHandle<Float>, [[D_Foo_y_0_h]] : $TensorHandle<Float>, [[D_Foo_y_1_a_h]] : $TensorHandle<Int32>, [[D_Foo_y_1_b_h]] : $TensorHandle<Bool>)
+// CHECK: [[D_Foo_x:%.*]] = graph_op "Const"(){{.*}}f32 0x3F800000 /* 1 */{{.*}}
+// CHECK: [[D_Foo_y_0:%.*]] = graph_op "Const"(){{.*}}f32 0x40000000 /* 2 */{{.*}}
+// CHECK: [[D_Foo_y_1_a:%.*]] = graph_op "Const"(){{.*}}i32 3{{.*}}
+// CHECK: [[D_Foo_y_1_b:%.*]] = graph_op "Const"(){{.*}}i1 0{{.*}}
+// CHECK: graph_op "SomeOp5,L,e,e,e,e"([[D_Foo_x]] : $TensorHandle<Float>, [[D_Foo_y_0]] : $TensorHandle<Float>, [[D_Foo_y_1_a]] : $TensorHandle<Int32>, [[D_Foo_y_1_b]] : $TensorHandle<Bool>)
 
 @inlinable @inline(__always)
 public func genericUnpackedAggregate<T>(t: T) -> Tensor<Float> {
   // expected-error @+1 {{op named 'SomeOp6' is not registered in TensorFlow}}
-  return #tfop("SomeOp6", (t, Tensor<Float>(1)))
+  return #tfop("SomeOp6", [t])
 }
 
 public func unpackAggregate_generic() {
@@ -93,22 +85,35 @@ public func unpackAggregate_generic() {
     let y: (Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>))
   }
   let foo = Foo(x: Tensor(1), y: (Tensor(2), (a: Tensor(3), b: Tensor(false))))
-  _hostOp(genericUnpackedAggregate(t: foo))
+  let _: Tensor<Float> = genericUnpackedAggregate(t: foo)
 }
 
 // CHECK-LABEL: --- TFDeabstraction Result: {{.*}}unpackAggregate_generic{{.*}}
-// CHECK: [[F_Foo:%.*]] = tuple_extract {{.*}} : $(Foo, Tensor<Float>), 0
-// CHECK: [[F_Foo_x:%.*]] = struct_extract [[F_Foo]]{{.*}}Foo.x{{.*}}
-// CHECK: [[F_Foo_x_h:%.*]] = struct_extract [[F_Foo_x]]{{.*}}Tensor.handle{{.*}}
-// CHECK: [[F_Foo_y:%.*]] = struct_extract [[F_Foo]]{{.*}}Foo.y{{.*}}
-// CHECK: [[F_Foo_y_0:%.*]] = tuple_extract [[F_Foo_y]] : $(Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>)), 0
-// CHECK: [[F_Foo_y_0_h:%.*]] = struct_extract [[F_Foo_y_0]]{{.*}}Tensor.handle{{.*}}
-// CHECK: [[F_Foo_y_1:%.*]] = tuple_extract [[F_Foo_y]] : $(Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>)), 1
-// CHECK: [[F_Foo_y_1_a:%.*]] = tuple_extract [[F_Foo_y_1]] : $(a: Tensor<Int32>, b: Tensor<Bool>), 0
-// CHECK: [[F_Foo_y_1_a_h:%.*]] = struct_extract [[F_Foo_y_1_a]]{{.*}}Tensor.handle{{.*}}
-// CHECK: [[F_Foo_y_1_b:%.*]] = tuple_extract [[F_Foo_y_1]] : $(a: Tensor<Int32>, b: Tensor<Bool>), 1
-// CHECK: [[F_Foo_y_1_b_h:%.*]] = struct_extract [[F_Foo_y_1_b]]{{.*}}Tensor.handle{{.*}}
-// CHECK: graph_op "SomeOp6,L,e,e,e,e,e"([[F_Foo_x_h]] : $TensorHandle<Float>, [[F_Foo_y_0_h]] : $TensorHandle<Float>, [[F_Foo_y_1_a_h]] : $TensorHandle<Int32>, [[F_Foo_y_1_b_h]] : $TensorHandle<Bool>, {{.*}} : $TensorHandle<Float>)
+// CHECK: [[E_Foo_x:%.*]] = graph_op "Const"(){{.*}}f32 0x3F800000 /* 1 */{{.*}}
+// CHECK: [[E_Foo_y_0:%.*]] = graph_op "Const"(){{.*}}f32 0x40000000 /* 2 */{{.*}}
+// CHECK: [[E_Foo_y_1_a:%.*]] = graph_op "Const"(){{.*}}i32 3{{.*}}
+// CHECK: [[E_Foo_y_1_b:%.*]] = graph_op "Const"(){{.*}}i1 0{{.*}}
+// CHECK: graph_op "SomeOp6,L,e,e,e,e"([[E_Foo_x]] : $TensorHandle<Float>, [[E_Foo_y_0]] : $TensorHandle<Float>, [[E_Foo_y_1_a]] : $TensorHandle<Int32>, [[E_Foo_y_1_b]] : $TensorHandle<Bool>)
+
+// Checks that unpacking reuses extraction instructions instead of making new
+// ones for each element of the input list.
+// TODO(SR-8680): After fixing tuples, make x a tuple, so that we also test tuple extract reuse.
+// expected-warning @+1 {{copied to the accelerator}}
+public func unpackAggregate_reuse(x: Tensor<Float>) {
+  // expected-error @+2 {{op named 'SomeOp7' is not registered in TensorFlow}}
+  // expected-note @+1 {{value used here}}
+  let _: Tensor<Float> = #tfop("SomeOp7", [x, x])
+}
+
+// CHECK-LABEL: --- TFDeabstraction Result: {{.*}}unpackAggregate_reuse{{.*}}
+// CHECK: [[F_TensorHandle:%.*]] = struct_extract %0 : $Tensor<Float>, #Tensor.handle
+// CHECK: graph_op "SomeOp7,L,e,e"([[F_TensorHandle]] : $TensorHandle<Float>, [[F_TensorHandle]] : $TensorHandle<Float>)
+
+// TODO(SR-8680): Make this testcase work.
+// public func unpackAggregate_tuple() {
+//   // xpected-error @+1 {{op named 'SomeOp7' is not registered in TensorFlow}}
+//   let _: Tensor<Float> = #tfop("SomeOp7", [(Tensor<Int32>(1), Tensor<Int32>(2))])
+// }
 
 public func packResultsToAggregate_basic() {
   struct Foo {
