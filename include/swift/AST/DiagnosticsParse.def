@@ -139,7 +139,9 @@ ERROR(lex_invalid_u_escape,none,
 ERROR(lex_invalid_u_escape_rbrace,none,
       "expected '}' in \\u{...} escape sequence", ())
 ERROR(lex_invalid_delimiter_escape,none,
-      "Too many # characters in delimited escape", ())
+      "too many # characters in delimited escape", ())
+ERROR(lex_zerowidth_in_string_delimiter,none,
+      "zero-width character detected in string delimiter", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
       "invalid unicode scalar", ())
