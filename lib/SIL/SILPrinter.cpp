@@ -2663,7 +2663,6 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     Options.SkipImplicit = false;
     Options.PrintGetSetOnRWProperties = true;
     Options.PrintInSILBody = false;
-    Options.PrintDefaultParameterPlaceholder = false;
     bool WholeModuleMode = (M == AssociatedDeclContext);
 
     SmallVector<Decl *, 32> topLevelDecls;

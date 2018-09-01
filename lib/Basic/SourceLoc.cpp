@@ -302,10 +302,7 @@ void CharSourceRange::print(raw_ostream &OS, const SourceManager &SM,
     return;
 
   if (PrintText) {
-    OS << " RangeText=\""
-       << StringRef(Start.Value.getPointer(),
-                    getEnd().Value.getPointer() - Start.Value.getPointer() + 1)
-       << '"';
+    OS << " RangeText=\"" << SM.extractText(*this) << '"';
   }
 }
 

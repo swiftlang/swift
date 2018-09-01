@@ -5185,7 +5185,6 @@ static void diagnoseMissingRequiredInitializer(
   std::string initializerText;
   {
     PrintOptions options;
-    options.PrintDefaultParameterPlaceholder = false;
     options.PrintImplicitAttrs = false;
 
     // Render the text.
