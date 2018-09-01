@@ -361,8 +361,6 @@ ERROR(expected_rbrace_protocol,none,
       "expected '}' in protocol", ())
 ERROR(protocol_setter_name,none,
       "setter in a protocol cannot have a name", ())
-ERROR(protocol_method_with_body,none,
-      "protocol methods must not have bodies", ())
 ERROR(protocol_init_with_body,none,
       "protocol initializers must not have bodies", ())
 

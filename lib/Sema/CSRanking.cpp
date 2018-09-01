@@ -309,14 +309,24 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
 /// another.
 static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
                                                DeclContext *dc1,
-                                               DeclContext *dc2) {
-  assert(dc1->getExtendedProtocolDecl());
-  assert(dc2->getExtendedProtocolDecl());
-
+                                               DeclContext *dc2,
+                                               bool checkProtocolItself = false) {
+  ProtocolDecl *proto1 = nullptr;
+  ProtocolDecl *proto2 = nullptr;
+  
+  if (checkProtocolItself) {
+    proto1 = dc1->getSelfProtocolDecl();
+    proto2 = dc2->getSelfProtocolDecl();
+  } else {
+    proto1 = dc1->getExtendedProtocolDecl();
+    proto2 = dc2->getExtendedProtocolDecl();
+  }
+  
+  assert(proto1);
+  assert(proto2);
+  
   // If one of the protocols being extended inherits the other, prefer the
   // more specialized protocol.
-  auto proto1 = dc1->getExtendedProtocolDecl();
-  auto proto2 = dc2->getExtendedProtocolDecl();
   if (proto1 != proto2) {
     if (proto1->inheritsFrom(proto2))
       return true;
@@ -436,12 +446,49 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       // Members of protocol extensions have special overloading rules.
       ProtocolDecl *inProtocolExtension1 = outerDC1->getExtendedProtocolDecl();
       ProtocolDecl *inProtocolExtension2 = outerDC2->getExtendedProtocolDecl();
+      
+      // Check if decl1 is potentially a default implementation in a protocol
+      bool decl1IsDefaultImpl = false;
+      if (!inProtocolExtension1) {
+        if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl1)) {
+          if (afd->hasBody() && outerDC1->getSelfProtocolDecl()) {
+            inProtocolExtension1 = outerDC1->getSelfProtocolDecl();
+            decl1IsDefaultImpl = true;
+          }
+        }
+      }
+      
+      // Do the same for decl2
+      bool decl2IsDefaultImpl = false;
+      if (!inProtocolExtension2) {
+        if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl2)) {
+          if (afd->hasBody() && outerDC2->getSelfProtocolDecl()) {
+            inProtocolExtension2 = outerDC2->getSelfProtocolDecl();
+            decl2IsDefaultImpl = true;
+          }
+        }
+      }
+      
       if (inProtocolExtension1 && inProtocolExtension2) {
+        bool checkProtocolItself = false;
+        
+        if (decl1IsDefaultImpl && decl2IsDefaultImpl) {
+          checkProtocolItself = true;
+        }
+        
         // Both members are in protocol extensions.
         // Determine whether the 'Self' type from the first protocol extension
         // satisfies all of the requirements of the second protocol extension.
-        bool better1 = isProtocolExtensionAsSpecializedAs(tc, outerDC1, outerDC2);
-        bool better2 = isProtocolExtensionAsSpecializedAs(tc, outerDC2, outerDC1);
+        bool better1 = isProtocolExtensionAsSpecializedAs(
+          tc,
+          outerDC1,
+          outerDC2,
+          checkProtocolItself);
+        bool better2 = isProtocolExtensionAsSpecializedAs(
+          tc,
+          outerDC2,
+          outerDC1,
+          checkProtocolItself);
         if (better1 != better2) {
           return better1;
         }

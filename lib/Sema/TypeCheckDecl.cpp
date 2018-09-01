@@ -749,6 +749,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   CanType currentSigType = current->getOverloadSignatureType();
   ModuleDecl *currentModule = current->getModuleContext();
   for (auto other : otherDefinitions) {
+    DeclContext *otherDC = other->getDeclContext();
+    
     // Skip invalid declarations and ourselves.
     if (current == other || other->isInvalid())
       continue;
@@ -759,17 +761,30 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
     // Don't compare methods vs. non-methods (which only happens with
     // operators).
-    if (currentDC->isTypeContext() != other->getDeclContext()->isTypeContext())
+    if (currentDC->isTypeContext() != otherDC->isTypeContext())
       continue;
 
     // Check whether the overload signatures conflict (ignoring the type for
     // now).
     auto otherSig = other->getOverloadSignature();
-    if (!conflicting(currentSig, otherSig))
+    
+    // Check whether currentDC is an extension of otherDC if it's a protocol. If
+    // it is, check if other decl has a body in the protocol.
+    bool skipProtocolExtensionCheck = false;
+    
+    if (isa<ExtensionDecl>(currentDC) && isa<ProtocolDecl>(otherDC)) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(other)) {
+        if (afd->hasBody()) {
+          skipProtocolExtensionCheck = true;
+        }
+      }
+    }
+    
+    if (!conflicting(currentSig, otherSig, skipProtocolExtensionCheck))
       continue;
 
     // Validate the declaration but only if it came from a different context.
-    if (other->getDeclContext() != current->getDeclContext())
+    if (otherDC != currentDC)
       tc.validateDecl(other);
 
     // Skip invalid or not yet seen declarations.
@@ -809,12 +824,13 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     bool wouldBeSwift5Redeclaration = false;
     auto isRedeclaration = conflicting(tc.Context, currentSig, currentSigType,
                                        otherSig, otherSigType,
-                                       &wouldBeSwift5Redeclaration);
+                                       &wouldBeSwift5Redeclaration,
+                                       skipProtocolExtensionCheck);
     // If there is another conflict, complain.
     if (isRedeclaration || wouldBeSwift5Redeclaration) {
       // If the two declarations occur in the same source file, make sure
       // we get the diagnostic ordering to be sensible.
-      if (auto otherFile = other->getDeclContext()->getParentSourceFile()) {
+      if (auto otherFile = otherDC->getParentSourceFile()) {
         if (currentFile == otherFile &&
             current->getLoc().isValid() &&
             other->getLoc().isValid() &&
@@ -830,7 +846,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       // one we want.
       if (currentFile->Kind == SourceFileKind::SIL) {
         auto *otherFile = dyn_cast<SerializedASTFile>(
-            other->getDeclContext()->getModuleScopeContext());
+            otherDC->getModuleScopeContext());
         if (otherFile && otherFile->isSIB())
           continue;
       }
@@ -3015,6 +3031,8 @@ public:
     checkProtocolSelfRequirements(PD, PD);
 
     TC.checkDeclCircularity(PD);
+    TC.ConformanceContexts.push_back(PD);
+    
     if (PD->isResilient())
       TC.inferDefaultWitnesses(PD);
 

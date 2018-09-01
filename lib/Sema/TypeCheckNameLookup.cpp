@@ -190,13 +190,25 @@ namespace {
         }
       };
 
+      // Check if found is potentially a default implementation in a protocol.
+      bool foundIsDefaultImpl = false;
+
+      if (isa<ProtocolDecl>(foundDC)) {
+        if (auto *afd = dyn_cast<AbstractFunctionDecl>(found)) {
+          if (afd->hasBody()) {
+            foundIsDefaultImpl = true;
+          }
+        }
+      }
+
       // If this isn't a protocol member to be given special
       // treatment, just add the result.
       if (!Options.contains(NameLookupFlags::ProtocolMembers) ||
           !isa<ProtocolDecl>(foundDC) ||
           isa<GenericTypeParamDecl>(found) ||
           isa<TypeAliasDecl>(found) ||
-          (isa<FuncDecl>(found) && cast<FuncDecl>(found)->isOperator())) {
+          (isa<FuncDecl>(found) && cast<FuncDecl>(found)->isOperator()) ||
+          foundIsDefaultImpl) {
         addResult(found);
         return;
       }
@@ -273,14 +285,21 @@ namespace {
         }
       }
 
-      // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
-      // default implementations in protocols.
-      //
       // If we have an imported conformance or the witness could
       // not be deserialized, getWitnessDecl() will just return
       // the requirement, so just drop the lookup result here.
-      if (witness && !isa<ProtocolDecl>(witness->getDeclContext()))
-        addResult(witness);
+      
+      if (witness) {
+        if (isa<ProtocolDecl>(witness->getDeclContext())) {
+          if (auto *afc = dyn_cast<AbstractFunctionDecl>(witness)) {
+            if (afc->hasBody()) {
+              addResult(witness);
+            }
+          }
+        } else {
+          addResult(witness);
+        }
+      }
     }
   };
 } // end anonymous namespace

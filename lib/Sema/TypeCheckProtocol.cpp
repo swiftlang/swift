@@ -1035,12 +1035,13 @@ bool WitnessChecker::findBestWitness(
     bestIdx = 0;
 
     for (auto witness : witnesses) {
-      // Don't match anything in a protocol.
-      // FIXME: When default implementations come along, we can try to match
-      // these when they're default implementations coming from another
-      // (unrelated) protocol.
+      // Check if witness may be a default implementation in a protocol.
       if (isa<ProtocolDecl>(witness->getDeclContext())) {
-        continue;
+        if (auto *afd = dyn_cast<AbstractFunctionDecl>(witness)) {
+          if (!afd->hasBody()) {
+            continue;
+          }
+        }
       }
 
       if (!witness->hasValidSignature()) {

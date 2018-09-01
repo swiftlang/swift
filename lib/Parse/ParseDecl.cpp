@@ -5254,14 +5254,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   DefaultArgs.setFunctionContext(FD, FD->getParameters());
   setLocalDiscriminator(FD);
 
-  if (Flags.contains(PD_InProtocol)) {
-    if (Tok.is(tok::l_brace)) {
-      diagnose(Tok, diag::protocol_method_with_body);
-      skipSingle();
-    }
-  } else {
-    parseAbstractFunctionBody(FD);
-  }
+  parseAbstractFunctionBody(FD);
 
   // Exit the scope introduced for the generic parameters.
   GenericsScope.reset();
