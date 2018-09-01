@@ -515,7 +515,12 @@ private:
 void IndexSwiftASTWalker::visitDeclContext(DeclContext *Context) {
   IsModuleFile = false;
   isSystemModule = Context->getParentModule()->isSystemModule();
+  auto accessor = dyn_cast<AccessorDecl>(Context);
+  if (accessor)
+    ManuallyVisitedAccessorStack.push_back(accessor);
   walk(Context);
+  if (accessor)
+    ManuallyVisitedAccessorStack.pop_back();
 }
 
 void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod, StringRef KnownHash) {
