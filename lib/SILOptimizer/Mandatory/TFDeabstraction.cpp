@@ -2048,7 +2048,7 @@ static bool unpackTensorAggregates(
   };
 
   return recurse(unwrapAggregateInstructions(rootAggregate, unwrapCache));
-};
+}
 
 /// Given a type, recursively collect all innermost element types if it's an
 /// aggregate of TensorHandle's or dtypes.
