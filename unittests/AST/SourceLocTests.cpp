@@ -291,7 +291,7 @@ TEST(SourceLoc, TupleExpr) {
   
 }
 
-TEST(SourceLoc, CharSourceRange) {
+TEST(SourceLoc, CharSourceRangeOverlaps) {
   TestContext C;
   auto bufferID = C.Ctx.SourceMgr.addMemBufferCopy("func foo()");
   SourceLoc start = C.Ctx.SourceMgr.getLocForBufferStart(bufferID);
