@@ -536,7 +536,7 @@ SILDebugLocation tf::skipInternalLocations(SILDebugLocation loc) {
 }
 
 SILLocation tf::getUserSourceLocation(SILValue value) {
-  if (auto *inst = dyn_cast<SILInstruction>((SILNode *)value))
+  if (auto *inst = value->getDefiningInstruction())
     return getUserSourceLocation(inst);
   return getUserSourceLocation(value.getDebugLocation());
 }

@@ -994,7 +994,7 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
        SM.getLineNumber(loc.getSourceLoc()) !=
            SM.getLineNumber(userLoc.getSourceLoc()))) {
     diagnose(ctx, userLoc.getSourceLoc(),
-             diag::tf_value_implicitly_copied_to_host_computed_used_here)
+             diag::tf_value_used_here)
         .highlight(userLoc.getSourceRange());
   }
 }
@@ -1080,7 +1080,7 @@ void TFFunctionPartition::diagnoseCopyToHost(SILValue value,
   // If the use is at a different position, emit a note showing where it is.
   if (!userLoc.isNull() && loc.getSourceLoc() != userLoc.getSourceLoc()) {
     diagnose(ctx, userLoc.getSourceLoc(),
-             diag::tf_value_implicitly_copied_to_host_computed_used_here)
+             diag::tf_value_used_here)
         .highlight(userLoc.getSourceRange());
   }
 }
@@ -1095,7 +1095,7 @@ void TFFunctionPartition::diagnoseOpaqueHandleCopy(SILValue value,
   diagnose(ctx, getUserSourceLocation(value).getSourceLoc(),
            diag::tfop_value_no_send_receive);
   diagnose(ctx, getUserSourceLocation(user).getSourceLoc(),
-           diag::tf_value_implicitly_copied_to_host_computed_used_here);
+           diag::tf_value_used_here);
 }
 
 /// Some instruction in the specified block needs to be split out to the

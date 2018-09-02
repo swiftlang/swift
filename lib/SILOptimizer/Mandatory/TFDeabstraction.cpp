@@ -2092,13 +2092,16 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
   auto &context = inst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
   SILBuilder B(opInfo.inst);
+  auto instLoc = getUserSourceLocation(inst);
 
   // This is a helper function to emit a diagnostic.
-  auto diagnoseInvalid = [&](const Twine &message) {
-    auto loc = getUserSourceLocation(inst);
+  auto diagnoseInvalid = [&](SILLocation loc, const Twine &message,
+                             SILLocation userNoteLoc = (Expr *)nullptr) {
     diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
              diag::tf_op_misuse, message.str())
       .highlight(loc.getSourceRange());
+    if (userNoteLoc)
+      diagnose(context, userNoteLoc.getSourceLoc(), diag::tf_value_used_here);
   };
 
   std::string opName = opInfo.opName.str();
@@ -2121,6 +2124,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     auto operand = inst->getOperand(i);
     auto operandTy = operand->getType();
     auto operandClass = opInfo.operandClasses[i];
+    auto operandLoc = getUserSourceLocation(operand);
 
     // Collect and validate input operands.
     if (opInfo.isInput(i)) {
@@ -2133,7 +2137,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       if (opInfo.opName == "tfc.scalarToTensor") {
         auto scalarType = operandTy.getASTType();
         if (convertSwiftTypeToTF(scalarType) == 0) {
-          diagnoseInvalid("scalarToTensor requires scalar value; unrecognized"
+          diagnoseInvalid(instLoc,
+                          "scalarToTensor requires scalar value; unrecognized"
                           " type '" + scalarType->getString() +
                           "' is not allowed");
           return;
@@ -2188,7 +2193,10 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         for (auto *use : arrayDecoder.elementsAtInit) {
           auto *store = dyn_cast<StoreInst>(use->getUser());
           if (!store) {
-            diagnoseInvalid("element initialization error");
+            diagnoseInvalid(operandLoc,
+                            "argument of type '" + elementType->getString() +
+                            "' is not a TensorFlow value or an aggregate of "
+                            "TensorFlow values");
             return;
           }
 
@@ -2196,10 +2204,10 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
           if (unpackTensorAggregates(inst->getLoc(), B, store->getSrc(),
                                      loweredTupleElts, loweredStructFields,
                                      unwrapCache, inputs)) {
-            diagnoseInvalid("elements of input list have invalid type '" +
-                            elementType->getString() + "'; they must be " +
-                            "TensorFlow values or aggregates of TensorFlow " +
-                            "values");
+            diagnoseInvalid(operandLoc,
+                            "argument of type '" + elementType->getString() +
+                            "' is not a TensorFlow value or an aggregate of "
+                            "TensorFlow values");
             return;
           }
           unsigned unpackedInputsCount =
@@ -2214,10 +2222,14 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       unsigned beforeUnpackInputsCount = inputs.size();
       if (unpackTensorAggregates(inst->getLoc(), B, operand, loweredTupleElts,
                                  loweredStructFields, unwrapCache, inputs)) {
+        // FIXME: Since TFDeabstraction happens after mandatory inlining,
+        // numeric operands will appear as having a builtin type such as
+        // `Builtin.FPIEEE32`. This is undesirable for user-facing diagnostics.
         auto astTypeString = operandTy.getASTType().getString();
-        diagnoseInvalid("operand has unrecognized type '" +
-                        astTypeString + "'; it must be a TensorFlow value " +
-                        "or aggregate of TensorFlow values");
+        diagnoseInvalid(operandLoc,
+                        "argument of type '" + astTypeString +
+                        "' is not a TensorFlow value or an aggregate of "
+                        "TensorFlow values");
         return;
       }
       unsigned unpackedInputsCount = inputs.size() - beforeUnpackInputsCount;
@@ -2227,11 +2239,12 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         // unpacking to an input list by wrapping their input in an array, so we
         // reject this situation.
         auto astTypeString = operandTy.getASTType().getString();
-        diagnoseInvalid("operand of type '" + astTypeString + "' must be " +
-                        "wrapped in an array because it is an " +
-                        (unpackedInputsCount == 0
-                            ? "empty aggregate"
-                            : "aggregate of more than one TensorFlow value"));
+        // FIXME: We could use `operandLoc`, but the error would show up on the
+        // type declaration instead. Need to investigate how to get the argument
+        // location.
+        diagnoseInvalid(operandLoc, "argument of type '" + astTypeString +
+                        "' must contain exactly one TensorFlow value",
+                        instLoc);
       }
       opName +=
           GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
@@ -2240,7 +2253,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
 
     // Helper to diagnose invalid attributes.
     auto diagnoseInvalidAttr = [&](const Twine &message) {
-      diagnoseInvalid(Twine("attribute '") + operandClass.first.str() +
+      diagnoseInvalid(instLoc,
+                      Twine("attribute '") + operandClass.first.str() +
                       "' " + message.str());
     };
 
@@ -2294,10 +2308,11 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       switch (constValue.getKind()) {
       case SymbolicValue::Unknown:
       case SymbolicValue::UninitMemory:
-        assert(0 && "earlier code should have ruled out non-constant values");
+        llvm_unreachable(
+            "earlier code should have ruled out non-constant values");
 
       case SymbolicValue::Address:
-        assert(0 && "it's impossible to pass an address as an attr");
+        llvm_unreachable("it's impossible to pass an address as an attr");
 
       case SymbolicValue::Enum:
       case SymbolicValue::EnumWithPayload:
@@ -2369,8 +2384,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         SmallVector<SymbolicValue, 8> dtypes;
         if (!collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
                                               dtypes))
-          return diagnoseInvalidAttr("requires a TensorFlow value type or an "
-                                     "aggregate of TensorFlow value types");
+          return diagnoseInvalidAttr("requires a TensorFlow value or an "
+                                     "aggregate of TensorFlow values");
         // Drop '$array' from the attribute name.
         currentAttr.name = context.getIdentifier(operandClass.first);
         // Replace the single metatype with a list of metatypes each
@@ -2395,8 +2410,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       auto type = constValue.getMetatypeValue();
       SmallVector<Type, 8> tfValueTypes;
       if (!tf::flattenTensorFlowValueAggregate(type, tfValueTypes))
-        return diagnoseInvalidAttr("requires a TensorFlow value type or an "
-                                   "aggregate or TensorFlow value types");
+        return diagnoseInvalidAttr("requires a TensorFlow value or an "
+                                   "aggregate or TensorFlow values");
       // Drop '$unknownShapeList' from the attribute name.
       currentAttr.name = context.getIdentifier(operandClass.first);
       auto tensorShapeType =
