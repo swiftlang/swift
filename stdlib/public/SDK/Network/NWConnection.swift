@@ -23,6 +23,7 @@ import _SwiftNetworkOverlayShims
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public final class NWConnection : CustomDebugStringConvertible {
 
+	/// String based debugging representation of the NWConnection type.
 	public var debugDescription: String {
 		return String("\(self.nw)")
 	}
@@ -354,7 +355,7 @@ public final class NWConnection : CustomDebugStringConvertible {
         }
 
 		/// Create a context for sending, that optionally can set expiration (default 0),
-		/// priority (default 0.5), antecendent (default nil), and protocol metadata (default []]).
+		/// priority (default 0.5), antecedent (default nil), and protocol metadata (default []]).
 		public init(identifier: String, expiration: UInt64 = 0, priority: Double = 0.5, isFinal: Bool = false, antecedent: NWConnection.ContentContext? = nil, metadata: [NWProtocolMetadata]? = []) {
             self.nw = nw_content_context_create(identifier)
 
@@ -478,6 +479,7 @@ public final class NWConnection : CustomDebugStringConvertible {
 		}
 	}
 
+	/// Definition of callbacks used when sending data to the protocol stack. 
 	public enum SendCompletion {
 		/// Completion handler to be invoked when send content has been successfully processed, or failed to send due to an error.
 		/// Note that this does not guarantee that the data was sent out over the network, or acknowledge, but only that
