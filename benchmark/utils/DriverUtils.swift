@@ -75,6 +75,9 @@ struct TestConfig {
   /// Quantiles to report in results.
   let quantile: Int?
 
+  /// Report quantiles with delta encoding.
+  let delta: Bool
+
   /// Is verbose output enabled?
   let verbose: Bool
 
@@ -98,6 +101,7 @@ struct TestConfig {
       var numSamples: UInt?
       var numIters: UInt?
       var quantile: UInt?
+      var delta: Bool?
       var afterRunSleep: UInt32?
       var sampleTime: Double?
       var verbose: Bool?
@@ -133,6 +137,8 @@ struct TestConfig {
                         "use 4 to get a five-number summary with quartiles,\n" +
                         "10 (deciles), 20 (ventiles), 100 (percentiles), etc.",
                   parser: { UInt($0) })
+    p.addArgument("--delta", \.delta, defaultValue: true,
+                  help: "report quantiles with delta encoding")
     p.addArgument("--sample-time", \.sampleTime,
                   help: "duration of test measurement in seconds\ndefault: 1",
                   parser: finiteDouble)
@@ -166,6 +172,7 @@ struct TestConfig {
     numIters = c.numIters.map { Int($0) }
     numSamples = Int(c.numSamples ?? 1)
     quantile = c.quantile.map { Int($0) }
+    delta = c.delta ?? false
     verbose = c.verbose ?? false
     logMemory = c.logMemory ?? false
     afterRunSleep = c.afterRunSleep
@@ -485,9 +492,9 @@ final class TestRunner {
     return BenchResults(samples, maxRSS: measureMemoryUsage())
   }
 
-  /// Execute benchmarks and continuously report the measurement results.
-  func runBenchmarks() {
+  var header: String {
     let withUnit = {$0 + "(μs)"}
+    let withDelta = {"𝚫" + $0}
     func quantiles(q: Int) -> [String] {
       // See https://en.wikipedia.org/wiki/Quantile#Specialized_quantiles
       let prefix = [
@@ -497,29 +504,36 @@ final class TestRunner {
       let base20 = "0123456789ABCDEFGHIJ".map { String($0) }
       let index: (Int) -> String =
         { q == 2 ? "" : q <= 20 ?  base20[$0] : String($0) }
-      return ["MIN"] + (1..<q).map { prefix + index($0) } + ["MAX"]
+      let tail = (1..<q).map { prefix + index($0) } + ["MAX"]
+      return [withUnit("MIN")] + tail.map(c.delta ? withDelta : withUnit)
     }
-    let header = (
+    return (
       ["#", "TEST", "SAMPLES"] +
-      (c.quantile.map(quantiles) ?? ["MIN", "MAX", "MEAN", "SD", "MEDIAN"])
-        .map(withUnit) +
+      (c.quantile.map(quantiles)
+        ?? ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)) +
       (c.logMemory ? ["MAX_RSS(B)"] : [])
     ).joined(separator: c.delim)
-    print(header)
+  }
 
+  /// Execute benchmarks and continuously report the measurement results.
+  func runBenchmarks() {
     var testCount = 0
 
     func report(_ index: String, _ t: BenchmarkInfo, results: BenchResults?) {
       func values(r: BenchResults) -> [String] {
         func quantiles(q: Int) -> [Int] {
-          return (0...q).map { i in r[Double(i) / Double(q)] }
+          let qs = (0...q).map { i in r[Double(i) / Double(q)] }
+          return c.delta ?
+            qs.reduce(into: (encoded: [], last: 0)) {
+              $0.encoded.append($1 - $0.last); $0.last = $1
+            }.encoded : qs
         }
         return (
           [r.sampleCount] +
           (c.quantile.map(quantiles)
             ?? [r.min,  r.max, r.mean, r.sd, r.median]) +
-        ).map { String($0) }
           [r.maxRSS].compactMap { $0 }
+        ).map { (c.delta && $0 == 0) ? "" : String($0) } // drop 0s in deltas
       }
       let benchmarkStats = (
         [index, t.name] + (results.map(values) ?? ["Unsupported"])
@@ -532,6 +546,8 @@ final class TestRunner {
         testCount += 1
       }
     }
+
+    print(header)
 
     for (index, test) in c.tests {
       report(index, test, results:run(test))
