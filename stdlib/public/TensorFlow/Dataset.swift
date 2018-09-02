@@ -95,20 +95,24 @@ extension Dataset : Sequence {
   }
 }
 
-public extension Dataset {
+/// FIXME(SR-8684): @convention(tensorflow) types crash SILGen when their
+/// parameters or results have generic parameters. This is blocking generic
+/// higher-order dataset transformation functions.
+public extension Dataset where Element == Tensor<Float> {
   @inlinable @inline(__always)
-  func map<T>(
-    _ transform: @convention(tensorflow) (Element) -> T
-  ) -> Dataset<T> {
+  func map(
+    _ transform: @convention(tensorflow) (Element) -> Element
+  ) -> Dataset {
     // FIXME(SR-8570): If we pass an empty Array<TensorHandle<T>> as
     // other_arguments and an empty Array<Any.Type> as Targuments, partitioning
     // won't recognize the attribute:
     //    error: unknown array attribute
-    return Dataset<T>(
+    return Dataset(
       _handle: #tfop(
         "MapDataset", _handle, [Tensor<Int32>(0)], f: transform,
         Targuments: [Int32.self],
-        output_types$array: T.self, output_shapes$unknownShapeList: T.self
+        output_types$array: Element.self,
+        output_shapes$unknownShapeList: Element.self
       )
     )
   }
@@ -131,7 +135,9 @@ public extension Dataset {
       )
     )
   }
+}
 
+public extension Dataset {
   @inlinable @inline(__always)
   func shuffled(
     sampleCount: Int64, randomSeed: Int64

@@ -40,21 +40,21 @@ DatasetAPITests.testAllBackends("DatasetIteration") {
   }
 }
 
-// DatasetAPITests.testAllBackends("SingleValueTransformations") {
-//   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
-//   let dataset = Dataset(elements: scalars)
-//   let shuffled = dataset.shuffled(sampleCount: 5, randomSeed: 42)
-//   expectEqual([0, 4, 1, 3, 2], shuffled.map { $0.scalar! })
-// }
+DatasetAPITests.testAllBackends("SingleValueTransformations") {
+  let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+  let dataset = Dataset(elements: scalars)
+  let shuffled = dataset.shuffled(sampleCount: 5, randomSeed: 42)
+  expectEqual([0, 4, 1, 3, 2], shuffled.map { $0.scalar! })
+}
 
-// DatasetAPITests.testAllBackends("SingleValueHOFs") {
-//   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
-//   let dataset = Dataset(elements: scalars)
-//   let addedOne: Dataset = dataset.map { $0 + 1 }
-//   expectEqual([1, 2, 3, 4, 5], addedOne.flatMap { $0.scalars })
-//   let evens: Dataset = dataset.filter { Tensor($0 % 2 == Tensor(0)) }
-//   expectEqual([0, 2, 4], evens.flatMap { $0.scalars })
-// }
+DatasetAPITests.testAllBackends("SingleValueHOFs") {
+  let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+  let dataset = Dataset(elements: scalars)
+  let addedOne: Dataset = dataset.map { $0 + 1 }
+  expectEqual([1, 2, 3, 4, 5], addedOne.flatMap { $0.scalars })
+  let evens: Dataset = dataset.filter { Tensor($0 % 2 == Tensor(0)) }
+  expectEqual([0, 2, 4], evens.flatMap { $0.scalars })
+}
 
 DatasetAPITests.testAllBackends("SingleValueBatched") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
