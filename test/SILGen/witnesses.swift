@@ -174,7 +174,7 @@ final class ConformingClass : X {
   // CHECK:    [[FUNC:%.*]] = function_ref @$S9witnesses15ConformingClassC9selfTypes{{[_0-9a-zA-Z]*}}F
   // CHECK:    [[FUNC_RESULT:%.*]] = apply [[FUNC]]([[ARG2_LOADED]], [[ARG3_LOADED]]) : $@convention(method) (@guaranteed ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
   // CHECK:    store [[FUNC_RESULT]] to [init] [[ARG1]] : $*ConformingClass
-  // CHECK:    end_borrow [[ARG3_LOADED]] from [[ARG3]]
+  // CHECK:    end_borrow [[ARG3_LOADED]]
   // CHECK:  } // end sil function '$S9witnesses15ConformingClassCAA1XA2aDP9selfTypes{{[_0-9a-zA-Z]*}}FTW'
   func loadable(x: Loadable) -> Loadable { return x }
   func addrOnly(x: AddrOnly) -> AddrOnly { return x }
@@ -468,7 +468,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: yield [[RES]]
   // CHECK:      end_apply [[TOKEN]]
   // CHECK-NEXT: [[TUPLE:%.*]] = tuple ()
-  // CHECK-NEXT: end_borrow [[ARG2_LOADED]] from [[ARG2]]
+  // CHECK-NEXT: end_borrow [[ARG2_LOADED]]
   // CHECK-NEXT: return [[TUPLE]]
 
   // CHECK-LABEL: sil private [transparent] [thunk] @$S9witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP6heightSivMZTW : {{.*}} {
@@ -488,7 +488,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: yield [[RES]]
   // CHECK:      end_apply [[TOKEN]]
   // CHECK-NEXT: [[TUPLE:%.*]] = tuple ()
-  // CHECK-NEXT: end_borrow [[ARG2_LOADED]] from [[ARG2]]
+  // CHECK-NEXT: end_borrow [[ARG2_LOADED]]
   // CHECK-NEXT: return [[TUPLE]]
 }
 
@@ -507,7 +507,7 @@ class CrashableBase {
 // CHECK-NEXT: [[FN:%.*]] = class_method [[BASE]] : $CrashableBase, #CrashableBase.crash!1 : (CrashableBase) -> () -> (), $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: apply [[FN]]([[BASE]]) : $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
-// CHECK-NEXT: end_borrow [[SELF]] from %0
+// CHECK-NEXT: end_borrow [[SELF]]
 // CHECK-NEXT: return [[RESULT]] : $()
 
 class GenericCrashable<T> : CrashableBase, Crashable {}

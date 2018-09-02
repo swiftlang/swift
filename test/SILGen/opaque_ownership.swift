@@ -31,7 +31,7 @@ public protocol Decoder {
 // CHECK:  [[OPENED2:%.*]] = open_existential_value [[BORROW2]] : $UnkeyedDecodingContainer to $@opened("{{.*}}") UnkeyedDecodingContainer
 // CHECK:  [[WT2:%.*]] = witness_method $@opened("{{.*}}") UnkeyedDecodingContainer, #UnkeyedDecodingContainer.isAtEnd!getter.1 : <Self where Self : UnkeyedDecodingContainer> (Self) -> () -> Builtin.Int1, [[OPENED2]] : $@opened("{{.*}}") UnkeyedDecodingContainer : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // CHECK:  [[RET2:%.*]] = apply [[WT2]]<@opened("{{.*}}") UnkeyedDecodingContainer>([[OPENED2]]) : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
-// CHECK:  end_borrow [[BORROW2]] from [[RET1]] : $UnkeyedDecodingContainer, $UnkeyedDecodingContainer
+// CHECK:  end_borrow [[BORROW2]] : $UnkeyedDecodingContainer
 // CHECK:  destroy_value [[RET1]] : $UnkeyedDecodingContainer
 // CHECK-NOT:  destroy_value %0 : $Decoder
 // CHECK:  return [[RET2]] : $Builtin.Int1
@@ -175,7 +175,7 @@ public enum FloatingPointSign: Int64 {
 // CHECK-OSX:   [[VAL:%.*]] = open_existential_value [[BORROW2]] : $Any to $@opened
 // CHECK-OSX:   [[COPY2:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX:   destroy_value [[COPY2]] : $@opened
-// CHECK-OSX:   end_borrow [[BORROW2]] from [[COPY]] : $Any, $Any
+// CHECK-OSX:   end_borrow [[BORROW2]] : $Any
 // CHECK-OSX:   destroy_value [[COPY]] : $Any
 // CHECK-OSX-NOT:   destroy_value %0 : $Any
 // CHECK-OSX:   return undef : $AnyObject
@@ -195,7 +195,7 @@ public protocol Error {}
 // CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $Error to $@opened
 // CHECK-OSX: [[COPY:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened
-// CHECK-OSX: end_borrow [[BORROW]] from %{{.*}} : $Error, $Error
+// CHECK-OSX: end_borrow [[BORROW]] : $Error
 // CHECK-OSX-LABEL: } // end sil function '$Ss3foo1eys5Error_pSg_tF'
 public func foo(e: Error?) {
   if let u = e {
@@ -240,7 +240,7 @@ public struct EnumIter<Base : IP> : IP, Seq {
 // CHECK:  [[BORROW:%.*]] = begin_borrow [[COPY]] : $Base
 // CHECK:  [[WT:%.*]] = witness_method $Base, #Seq.makeIterator!1 : <Self where Self : Seq> (Self) -> () -> Self.Iterator : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
 // CHECK:  [[ITER:%.*]] = apply [[WT]]<Base>([[BORROW]]) : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
-// CHECK:  end_borrow [[BORROW]] from [[COPY]] : $Base, $Base
+// CHECK:  end_borrow [[BORROW]] : $Base
 // CHECK:  destroy_value [[COPY]] : $Base
 // CHECK: [[FN:%.*]] = function_ref @$Ss8EnumIterV5_baseAByxGx_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
 // CHECK:  [[RET:%.*]] = apply [[FN]]<Base.Iterator>([[ITER]], [[MT]]) : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>

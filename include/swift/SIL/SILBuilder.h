@@ -716,10 +716,15 @@ public:
     return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
+  EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue) {
+    return insert(new (getModule())
+                      EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
+  }
+
   EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue BorrowedValue,
                                  SILValue OriginalValue) {
-    return insert(new (getModule()) EndBorrowInst(
-        getSILDebugLocation(Loc), BorrowedValue, OriginalValue));
+    return insert(new (getModule())
+                      EndBorrowInst(getSILDebugLocation(Loc), BorrowedValue));
   }
 
   EndBorrowArgumentInst *createEndBorrowArgument(SILLocation Loc,

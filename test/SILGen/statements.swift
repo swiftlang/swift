@@ -623,7 +623,7 @@ func testRequireOptional2(_ a : String?) -> String {
   // CHECK:  [[CONT_BB]]:
   // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
   // CHECK-NEXT:   [[RETURN:%.*]] = copy_value [[BORROWED_STR]]
-  // CHECK-NEXT:   end_borrow [[BORROWED_STR]] from [[STR]]
+  // CHECK-NEXT:   end_borrow [[BORROWED_STR]]
   // CHECK-NEXT:   destroy_value [[STR]] : $String
   // CHECK-NEXT:   return [[RETURN]] : $String
 
@@ -669,7 +669,7 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
   // CHECK: [[CONT_BB]]:
   // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [[PTR]]
   // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[BORROWED_PTR]]
-  // CHECK-NEXT: end_borrow [[BORROWED_PTR]] from [[PTR]]
+  // CHECK-NEXT: end_borrow [[BORROWED_PTR]]
   // CHECK-NEXT: destroy_value [[PTR]] : $DerivedClass
   // CHECK-NEXT: return [[RESULT]] : $DerivedClass
   return result

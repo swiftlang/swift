@@ -3094,6 +3094,8 @@ class LoadBorrowInst :
                              LValue->getType().getObjectType()) {}
 };
 
+class EndBorrowInst;
+
 /// Represents the begin scope of a borrowed value. Must be paired with an
 /// end_borrow instruction in its use-def list.
 class BeginBorrowInst
@@ -3104,7 +3106,31 @@ class BeginBorrowInst
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {}
+
+private:
+  /// Predicate used to filer EndBorrowRange.
+  struct UseToEndBorrow;
+
+public:
+  using EndBorrowRange =
+      OptionalTransformRange<use_range, UseToEndBorrow, use_iterator>;
+
+  /// Find all associated end_borrow instructions for this begin_borrow.
+  EndBorrowRange getEndBorrows() const;
 };
+
+struct BeginBorrowInst::UseToEndBorrow {
+  Optional<EndBorrowInst *> operator()(Operand *use) const {
+    if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
+      return ebi;
+    }
+    return None;
+  }
+};
+
+inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
+  return EndBorrowRange(getUses(), UseToEndBorrow());
+}
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
 /// address. Must be paired with an end_borrow in its use-def list.
@@ -3133,37 +3159,66 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
-/// Represents the end of a borrow scope for a value or address from another
-/// value or address.
+/// Represents the end of a borrow scope of a value %val from a
+/// value or address %src.
 ///
-/// The semantics of the instruction here is that the "dest" SILValue can not be
-/// used after this instruction and the "src" SILValue must stay alive up to
-/// EndBorrowInst.
+/// While %val is "live" in a region then,
+///
+///   1. If %src is an object, it is undefined behavior for %src to be
+///   destroyed. This is enforced by the ownership verifier.
+///
+///   2. If %src is an address, it is undefined behavior for %src to be
+///   destroyed or written to.
 class EndBorrowInst
-    : public InstructionBase<SILInstructionKind::EndBorrowInst,
-                             NonValueInstruction> {
+    : public UnaryInstructionBase<SILInstructionKind::EndBorrowInst,
+                                  NonValueInstruction> {
   friend class SILBuilder;
 
-public:
-  enum {
-    /// The borrowed value.
-    BorrowedValue,
-    /// The original value that was borrowed from.
-    OriginalValue
-  };
-
-private:
-  FixedOperandList<2> Operands;
-  EndBorrowInst(SILDebugLocation DebugLoc, SILValue BorrowedValue,
-                SILValue OriginalValue);
+  EndBorrowInst(SILDebugLocation debugLoc, SILValue borrowedValue)
+      : UnaryInstructionBase(debugLoc, borrowedValue) {}
 
 public:
-  SILValue getBorrowedValue() const { return Operands[BorrowedValue].get(); }
+  /// Return the value that this end_borrow is ending the borrow of if we are
+  /// borrowing a single value.
+  SILValue getSingleOriginalValue() const {
+    SILValue v = getOperand();
+    if (auto *bbi = dyn_cast<BeginBorrowInst>(v))
+      return bbi->getOperand();
+    if (auto *lbi = dyn_cast<LoadBorrowInst>(v))
+      return lbi->getOperand();
+    llvm::errs() << "Can not end borrow for value: " << v;
+    llvm_unreachable("standard error assertion");
+  }
 
-  SILValue getOriginalValue() const { return Operands[OriginalValue].get(); }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  /// Return the set of guaranteed values that have scopes ended by this
+  /// end_borrow.
+  ///
+  /// Discussion: We can only have multiple values associated with an end_borrow
+  /// in the case of having Phi arguments with guaranteed inputs. This is
+  /// necessary to represent certain conditional operations such as:
+  ///
+  /// class Klass {
+  ///   let k1: Klass
+  ///   let k2: Klass
+  /// }
+  ///
+  /// func useKlass(k: Klass) { ... }
+  /// var boolValue : Bool { ... }
+  ///
+  /// func f(k: Klass) {
+  ///   useKlass(boolValue ? k.k1 : k.k2)
+  /// }
+  ///
+  /// Today, when we SILGen such code, we copy k.k1 and k.k2 before the Phi when
+  /// it could potentially be avoided. So today this just appends
+  /// getSingleOriginalValue() to originalValues.
+  ///
+  /// TODO: Once this changes, this code must be update.
+  void getOriginalValues(SmallVectorImpl<SILValue> &originalValues) const {
+    SILValue value = getSingleOriginalValue();
+    assert(value && "Guaranteed phi arguments are not supported now");
+    originalValues.emplace_back(value);
+  }
 };
 
 /// Represents the end of a borrow scope for an argument. The reason why this is

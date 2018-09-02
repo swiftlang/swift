@@ -1275,10 +1275,7 @@ public:
   }
 
   void visitEndBorrowInst(EndBorrowInst *EBI) {
-    *this << Ctx.getID(EBI->getBorrowedValue()) << " from "
-          << Ctx.getID(EBI->getOriginalValue()) << " : "
-          << EBI->getBorrowedValue()->getType() << ", "
-          << EBI->getOriginalValue()->getType();
+    *this << getIDAndType(EBI->getOperand());
   }
 
   void visitEndBorrowArgumentInst(EndBorrowArgumentInst *EBAI) {

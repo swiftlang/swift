@@ -282,7 +282,7 @@ class C: Fooable, Barrable {
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         apply {{.*}}({{.*}}, [[BORROWED_SELF_COPY]])
-  // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+  // CHECK:         end_borrow [[BORROWED_SELF_COPY]]
   // CHECK:         destroy_value [[SELF_COPY]]
   // CHECK-NOT:     destroy_value [[SELF_COPY]]
   // CHECK-NOT:     destroy_value [[SELF]]
@@ -302,7 +302,7 @@ class C: Fooable, Barrable {
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         apply {{.*}}([[BORROWED_SELF_COPY]])
-  // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+  // CHECK:         end_borrow [[BORROWED_SELF_COPY]]
   // CHECK:         destroy_value [[SELF_COPY]]
   // CHECK-NOT:     destroy_value [[SELF]]
   // CHECK-NOT:     destroy_value [[SELF_COPY]]
@@ -312,7 +312,7 @@ class C: Fooable, Barrable {
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         apply {{.*}} [[BORROWED_SELF_COPY]]
-  // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+  // CHECK:         end_borrow [[BORROWED_SELF_COPY]]
   // CHECK:         destroy_value [[SELF_COPY]]
   // CHECK-NOT:     destroy_value [[SELF_COPY]]
   // CHECK-NOT:     destroy_value [[SELF]]
@@ -459,7 +459,7 @@ class LetFieldClass {
   // CHECK:      [[BORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$S15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[BORROWED_KRAKEN]])
-  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]] from [[KRAKEN]]
+  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
@@ -492,14 +492,14 @@ class LetFieldClass {
   // CHECK-NEXT: [[BORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[BORROWED_KRAKEN]]
   // CHECK-NEXT: apply [[KRAKEN_METH]]([[BORROWED_KRAKEN]])
-  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]] from [[KRAKEN]]
+  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]]
   // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken, $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
   // CHECK:      [[BORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @$S15guaranteed_self11destroyShipyyAA6KrakenCF : $@convention(thin) (@guaranteed Kraken) -> ()
   // CHECK-NEXT: apply [[DESTROY_SHIP_FUN]]([[BORROWED_KRAKEN]])
-  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]] from [[KRAKEN]]
+  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_BOX:%.*]] = alloc_box ${ var Kraken }
   // CHECK-NEXT: [[PB:%.*]] = project_box [[KRAKEN_BOX]]
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken, $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken

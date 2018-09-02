@@ -18,7 +18,7 @@ class A {
 // CHECK:      [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
 // CHECK:      [[T0:%.*]] = function_ref @$S8optional1AC3fooSSSgyF
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[BORROWED_SELF_COPY]])
-// CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+// CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]]
 // CHECK-NEXT: destroy_value [[SELF_COPY]]
 // CHECK-NEXT: switch_enum [[T1]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
@@ -28,7 +28,7 @@ class A {
 // CHECK-NEXT: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[BORROWED_STR]])
 // CHECK-NEXT: enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]]
-// CHECK-NEXT: end_borrow [[BORROWED_STR:%.*]] from [[STR]]
+// CHECK-NEXT: end_borrow [[BORROWED_STR:%.*]]
 // CHECK-NEXT: destroy_value [[STR]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
@@ -68,8 +68,8 @@ class A {
 // CHECK:      [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
 // CHECK:      [[T1:%.*]] = function_ref @$S8optional1AC3bar1xySSSg_tF
 // CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[BORROWED_T0]], [[BORROWED_SELF_COPY]])
-// CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
-// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
+// CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]]
+// CHECK-NEXT: end_borrow [[BORROWED_T0]]
 // CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: destroy_value [[SELF_COPY]]
 // CHECK-NEXT: return [[T2]] : $()

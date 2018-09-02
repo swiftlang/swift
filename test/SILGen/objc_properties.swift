@@ -42,7 +42,7 @@ class A {
     // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[SELF_A]] : $*Int
     // CHECK: assign %1 to [[WRITE]]
     // CHECK: end_access [[WRITE]] : $*Int
-    // CHECK: end_borrow [[BORROWED_SELF]] from [[SELF]]
+    // CHECK: end_borrow [[BORROWED_SELF]]
     prop = x
 
     // CHECK: objc_method
@@ -163,7 +163,7 @@ class HasUnmanaged : NSObject {
   // CHECK:     [[BORROWED_CLS_COPY:%.*]] = begin_borrow [[CLS_COPY]]
   // CHECK:     [[NATIVE:%.+]] = function_ref @$S15objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvg
   // CHECK:     [[RESULT:%.+]] = apply [[NATIVE]]([[BORROWED_CLS_COPY]])
-  // CHECK:     end_borrow [[BORROWED_CLS_COPY]] from [[CLS_COPY]]
+  // CHECK:     end_borrow [[BORROWED_CLS_COPY]]
   // CHECK-NOT: {{(retain|release)}}
   // CHECK:     destroy_value [[CLS_COPY]] : $HasUnmanaged
   // CHECK-NOT: {{(retain|release)}}
@@ -177,7 +177,7 @@ class HasUnmanaged : NSObject {
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[NATIVE:%.+]] = function_ref @$S15objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvs
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[NATIVE]]([[NEW_VALUE]], [[BORROWED_SELF_COPY]])
-  // CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+  // CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]]
   // CHECK-NEXT: destroy_value [[SELF_COPY]] : $HasUnmanaged
   // CHECK-NEXT: return [[RESULT:%.*]]
   // CHECK: } // end sil function '$S15objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvsTo'
@@ -200,7 +200,7 @@ class NonObjCClassWithObjCProperty {
   // CHECK: ([[OBJECT:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[ARG]])
   // CHECK: [[LOADED_OBJECT:%.*]] = load_borrow [[OBJECT]]
   // CHECK: [[UNMANAGED_OBJECT:%.*]] = ref_to_unmanaged [[LOADED_OBJECT]] : $NSObject to $@sil_unmanaged NSObject
-  // CHECK: end_borrow [[LOADED_OBJECT]] from [[OBJECT]]
+  // CHECK: end_borrow [[LOADED_OBJECT]]
   func useProperty() {
     useAutoreleasingUnsafeMutablePointer(&property)
   }

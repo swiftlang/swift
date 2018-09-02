@@ -115,7 +115,7 @@ class MyNSError : NSError {
 // CHECK:   [[EXISTENTIAL_REF:%.*]] = init_existential_ref [[UPCAST]]
 // CHECK:   [[BORROWED_EXISTENTIAL_REF:%.*]] = begin_borrow [[EXISTENTIAL_REF]]
 // CHECK:   [[COPY_BORROWED_EXISTENTIAL_REF:%.*]] = copy_value [[BORROWED_EXISTENTIAL_REF]]
-// CHECK:   end_borrow [[BORROWED_EXISTENTIAL_REF]] from [[EXISTENTIAL_REF]]
+// CHECK:   end_borrow [[BORROWED_EXISTENTIAL_REF]]
 // CHECK:   destroy_value [[EXISTENTIAL_REF]]
 // CHECK:   return [[COPY_BORROWED_EXISTENTIAL_REF]]
 // CHECK: } // end sil function '$S10objc_error14eraseMyNSError{{[_0-9a-zA-Z]*}}F'

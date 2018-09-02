@@ -773,10 +773,9 @@ void SILCloner<ImplClass>::visitStoreBorrowInst(StoreBorrowInst *Inst) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitEndBorrowInst(EndBorrowInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(
-      Inst, getBuilder().createEndBorrow(getOpLocation(Inst->getLoc()),
-                                         getOpValue(Inst->getBorrowedValue()),
-                                         getOpValue(Inst->getOriginalValue())));
+  doPostProcess(Inst, getBuilder().createEndBorrow(
+                          getOpLocation(Inst->getLoc()),
+                          getOpValue(Inst->getOperand()), SILValue()));
 }
 
 template <typename ImplClass>

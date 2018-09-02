@@ -1216,6 +1216,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::RetainValueAddrInst:
   case SILInstructionKind::UnmanagedRetainValueInst:
   case SILInstructionKind::EndBorrowArgumentInst:
+  case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::ReleaseValueInst:
@@ -1559,24 +1560,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              S.addTypeRef(CI->getDest()->getType().getASTType()),
              (unsigned)CI->getDest()->getType().getCategory(),
              llvm::makeArrayRef(listOfValues));
-    break;
-  }
-
-  case SILInstructionKind::EndBorrowInst: {
-    unsigned abbrCode = SILAbbrCodes[SILTwoOperandsLayout::Code];
-    unsigned Attr = 0;
-    auto *EBI = cast<EndBorrowInst>(&SI);
-    SILValue BorrowedValue = EBI->getBorrowedValue();
-    SILValue OriginalValue = EBI->getOriginalValue();
-
-    SILTwoOperandsLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), Attr,
-        S.addTypeRef(BorrowedValue->getType().getASTType()),
-        (unsigned)BorrowedValue->getType().getCategory(),
-        addValueRef(BorrowedValue),
-        S.addTypeRef(OriginalValue->getType().getASTType()),
-        (unsigned)OriginalValue->getType().getCategory(),
-        addValueRef(OriginalValue));
     break;
   }
 

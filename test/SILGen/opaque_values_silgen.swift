@@ -167,7 +167,7 @@ enum AddressOnlyEnum {
 // CHECK: %[[APY:.*]] = apply %{{.*}}<Any>(%{{.*}}) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: %[[BRW:.*]] = begin_borrow %[[APY]]
 // CHECK: %[[TPL:.*]] = tuple_extract %[[BRW]] : $(Array<Any>, Builtin.RawPointer), 1
-// CHECK: end_borrow %[[BRW]] from %[[APY]] : $(Array<Any>, Builtin.RawPointer), $(Array<Any>, Builtin.RawPointer)
+// CHECK: end_borrow %[[BRW]] : $(Array<Any>, Builtin.RawPointer)
 // CHECK: destroy_value %[[APY]]
 // CHECK: %[[PTR:.*]] = pointer_to_address %[[TPL]] : $Builtin.RawPointer to [strict] $*Any
 // CHECK: [[IOPAQUE:%.*]] = init_existential_value %{{.*}} : $Int, $Int, $Any
@@ -205,9 +205,9 @@ func s030______assigninout<T>(_ a: inout T, _ b: T) {
 // CHECK:   [[GEN:%.*]] = tuple_extract [[BORROWED_CPY]] : $(Int, T), 1
 // CHECK:   [[COPY_GEN:%.*]] = copy_value [[GEN]]
 // CHECK:   destroy_value [[COPY_GEN]]
-// CHECK:   end_borrow [[BORROWED_CPY]] from [[CPY]]
+// CHECK:   end_borrow [[BORROWED_CPY]]
 // CHECK:   destroy_value [[CPY]]
-// CHECK:   end_borrow [[BORROWED_ARG1]] from [[TPL]] : $(Int, T), $(Int, T)
+// CHECK:   end_borrow [[BORROWED_ARG1]] : $(Int, T)
 // CHECK:   destroy_value [[TPL]] : $(Int, T)
 // CHECK:   return [[INT]]
 // CHECK-LABEL: } // end sil function '$S20opaque_values_silgen21s040___tupleReturnIntyS2i_xt_tlF'
@@ -319,7 +319,7 @@ struct s110___GuaranteedSelf : Foo {
 // CHECK:   [[COPY_ARG1:%.*]] = copy_value [[ARG]] : $T
 // CHECK:   [[BORROWED_ARG2:%.*]] = begin_borrow [[COPY_ARG1]]
 // CHECK:   [[COPY_ARG2:%.*]] = copy_value [[BORROWED_ARG2]] : $T
-// CHECK:   end_borrow [[BORROWED_ARG2]] from [[COPY_ARG1]]
+// CHECK:   end_borrow [[BORROWED_ARG2]]
 // CHECK:   return [[COPY_ARG2]] : $T
 // CHECK-LABEL: } // end sil function '$S20opaque_values_silgen21s120______returnValueyxxlF'
 func s120______returnValue<T>(_ x: T) -> T {
@@ -399,7 +399,7 @@ func s160_______callAnyArg() {
 // CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_value [[INT_ARG]] : $Int to $T
 // CHECK:   [[CAST_BORROW:%.*]] = begin_borrow [[INT_CAST]] : $T
 // CHECK:   [[RETURN_VAL:%.*]] = copy_value [[CAST_BORROW]] : $T
-// CHECK:   end_borrow [[CAST_BORROW]] from [[INT_CAST]] : $T, $T
+// CHECK:   end_borrow [[CAST_BORROW]] : $T
 // CHECK:   destroy_value [[INT_CAST]] : $T
 // CHECK:   return [[RETURN_VAL]] : $T
 // CHECK-LABEL: } // end sil function '$S20opaque_values_silgen21s170____force_convertxylF'
@@ -1151,7 +1151,7 @@ public func s020_______assignToVar() {
 // CHECK:   [[RET_VAL0:%.*]] = tuple_extract [[TUPLE_BORROW]] : $(Int, T), 0
 // CHECK:   [[TUPLE_EXTRACT:%.*]] = tuple_extract [[TUPLE_BORROW]] : $(Int, T), 1
 // CHECK:   [[RET_VAL1:%.*]] = copy_value [[TUPLE_EXTRACT]] : $T
-// CHECK:   end_borrow [[TUPLE_BORROW]] from [[TUPLE_APPLY]] : $(Int, T), $(Int, T)
+// CHECK:   end_borrow [[TUPLE_BORROW]] : $(Int, T)
 // CHECK:   destroy_value [[TUPLE_APPLY]] : $(Int, T)
 // CHECK:   [[RET_VAL_TUPLE:%.*]] = tuple ([[RET_VAL0]] : $Int, [[RET_VAL1]] : $T)
 // CHECK:   return [[RET_VAL_TUPLE]] : $(Int, T)

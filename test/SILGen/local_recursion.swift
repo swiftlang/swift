@@ -22,7 +22,7 @@ func local_recursion(_ x: Int, y: Int) {
   // CHECK: apply [[B]]([[Y]])
   // CHECK: end_borrow [[B]]
   // CHECK: destroy_value [[CLOSURE_COPY]]
-  // CHECK: end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
+  // CHECK: end_borrow [[BORROWED_CLOSURE]]
   sr(y)
 
   func mutually_recursive_1(_ a: Int) {
@@ -59,7 +59,7 @@ func local_recursion(_ x: Int, y: Int) {
   // CHECK: apply [[B]]([[X]])
   // CHECK: end_borrow [[B]]
   // CHECK: destroy_value [[CLOSURE_COPY]]
-  // CHECK: end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
+  // CHECK: end_borrow [[BORROWED_CLOSURE]]
   tc(x)
 
   // CHECK: [[CLOSURE_REF:%.*]] = function_ref @$S15local_recursionAA_1yySi_SitFySiXEfU_
@@ -77,7 +77,7 @@ func local_recursion(_ x: Int, y: Int) {
   // CHECK: apply [[B]]([[X]])
   // CHECK: end_borrow [[B]]
   // CHECK: destroy_value [[CLOSURE_COPY]]
-  // CHECK: end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
+  // CHECK: end_borrow [[BORROWED_CLOSURE]]
   let f: (Int) -> () = {
     self_recursive($0)
     transitive_capture_2($0)

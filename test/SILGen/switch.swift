@@ -541,7 +541,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   [[BORROWED_CAST_D1_COPY:%.*]] = begin_borrow [[CAST_D1_COPY]]
   // CHECK:   [[CAST_D1_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_D1_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_D1_COPY_COPY]]
-  // CHECK:   end_borrow [[BORROWED_CAST_D1_COPY]] from [[CAST_D1_COPY]]
+  // CHECK:   end_borrow [[BORROWED_CAST_D1_COPY]]
   // CHECK:   destroy_value [[CAST_D1_COPY]]
   // CHECK:   destroy_value [[X_COPY]] : $B
   // CHECK:   br [[CONT:bb[0-9]+]]([[RET]] : $AnyObject)
@@ -564,7 +564,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   [[BORROWED_CAST_D2_COPY:%.*]] = begin_borrow [[CAST_D2_COPY]]
   // CHECK:   [[CAST_D2_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_D2_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_D2_COPY_COPY]]
-  // CHECK:   end_borrow [[BORROWED_CAST_D2_COPY]] from [[CAST_D2_COPY]]
+  // CHECK:   end_borrow [[BORROWED_CAST_D2_COPY]]
   // CHECK:   destroy_value [[CAST_D2_COPY]]
   // CHECK:   destroy_value [[X_COPY]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
@@ -587,7 +587,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   [[BORROWED_CAST_E_COPY:%.*]] = begin_borrow [[CAST_E_COPY]]
   // CHECK:   [[CAST_E_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_E_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_E_COPY_COPY]]
-  // CHECK:   end_borrow [[BORROWED_CAST_E_COPY]] from [[CAST_E_COPY]]
+  // CHECK:   end_borrow [[BORROWED_CAST_E_COPY]]
   // CHECK:   destroy_value [[CAST_E_COPY]]
   // CHECK:   destroy_value [[X_COPY]] : $B
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
@@ -610,7 +610,7 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK:   [[BORROWED_CAST_C_COPY:%.*]] = begin_borrow [[CAST_C_COPY]]
   // CHECK:   [[CAST_C_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_C_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_C_COPY_COPY]]
-  // CHECK:   end_borrow [[BORROWED_CAST_C_COPY]] from [[CAST_C_COPY]]
+  // CHECK:   end_borrow [[BORROWED_CAST_C_COPY]]
   // CHECK:   destroy_value [[CAST_C_COPY]]
   // CHECK:   destroy_value [[X_COPY]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)

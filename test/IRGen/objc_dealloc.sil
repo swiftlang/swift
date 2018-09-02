@@ -43,7 +43,7 @@ bb0(%0 : @owned $SwiftGizmo):
   %3 = begin_borrow %0 : $SwiftGizmo
   %4 = ref_element_addr %3 : $SwiftGizmo, #SwiftGizmo.x      // user: %4
   destroy_addr %4 : $*X                           // id: %4
-  end_borrow %3 from %0 : $SwiftGizmo, $SwiftGizmo
+  end_borrow %3 : $SwiftGizmo
   %5 = unchecked_ref_cast %0 : $SwiftGizmo to $Builtin.NativeObject // user: %6
   return %5 : $Builtin.NativeObject              // id: %6
 }
@@ -53,7 +53,7 @@ bb0(%0 : @unowned $SwiftGizmo):
   %1 = begin_borrow %0 : $SwiftGizmo
   %2 = ref_element_addr %1 : $SwiftGizmo, #SwiftGizmo.x      // user: %2
   %3 = load [copy] %2 : $*X                              // users: %4, %3
-  end_borrow %1 from %0 : $SwiftGizmo, $SwiftGizmo
+  end_borrow %1 : $SwiftGizmo
   return %3 : $X                                  // id: %4
 }
 
@@ -64,7 +64,7 @@ bb0(%0 : @unowned $X, %1 : @unowned $SwiftGizmo):
   %4 = begin_borrow %3 : $SwiftGizmo
   %5 = ref_element_addr %4 : $SwiftGizmo, #SwiftGizmo.x      // user: %5
   assign %2 to %5 : $*X                           // id: %5
-  end_borrow %4 from %3 : $SwiftGizmo, $SwiftGizmo
+  end_borrow %4 : $SwiftGizmo
   destroy_value %3 : $SwiftGizmo                 // id: %6
   %7 = tuple ()                                   // user: %8
   return %7 : $()                                 // id: %8
@@ -95,7 +95,7 @@ bb0(%0 : @unowned $SwiftGizmo):
   %3 = begin_borrow %0 : $SwiftGizmo
   %4 = ref_element_addr %3 : $SwiftGizmo, #SwiftGizmo.x      // user: %4
   destroy_addr %4 : $*X                           // id: %4
-  end_borrow %3 from %0 : $SwiftGizmo, $SwiftGizmo
+  end_borrow %3 : $SwiftGizmo
 
   // Call super -dealloc.
   // CHECK: [[SUPER:%[a-zA-Z0-9]+]] = bitcast [[SGIZMO]]* [[SGIZMOVAL]] to [[GIZMO]]*

@@ -26,7 +26,7 @@ func if_no_else() {
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[A:%.*]] = function_ref @$S16if_while_binding1a
   // CHECK:   apply [[A]]([[BORROWED_VAL]])
-  // CHECK:   end_borrow [[BORROWED_VAL]] from [[VAL]]
+  // CHECK:   end_borrow [[BORROWED_VAL]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
     a(x)
@@ -50,7 +50,7 @@ func if_else_chain() {
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[A:%.*]] = function_ref @$S16if_while_binding1a
   // CHECK:   apply [[A]]([[BORROWED_VAL]])
-  // CHECK:   end_borrow [[BORROWED_VAL]] from [[VAL]]
+  // CHECK:   end_borrow [[BORROWED_VAL]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT_X:bb[0-9]+]]
     a(x)
@@ -162,7 +162,7 @@ func while_loop_multi() {
     // CHECK:   [[BORROWED_A:%.*]] = begin_borrow [[A]]
     // CHECK:   [[A_COPY:%.*]] = copy_value [[BORROWED_A]]
     // CHECK:   debug_value [[A_COPY]] : $String, let, name "c"
-    // CHECK:   end_borrow [[BORROWED_A]] from [[A]]
+    // CHECK:   end_borrow [[BORROWED_A]]
     // CHECK:   destroy_value [[A_COPY]]
     // CHECK:   destroy_value [[B]]
     // CHECK:   destroy_value [[A]]
@@ -301,7 +301,7 @@ func if_leading_boolean(_ a : Int) {
   // CHECK:   [[BORROWED_B:%.*]] = begin_borrow [[B]]
   // CHECK:   [[B_COPY:%.*]] = copy_value [[BORROWED_B]]
   // CHECK:   debug_value [[B_COPY]] : $String, let, name "c"
-  // CHECK:   end_borrow [[BORROWED_B]] from [[B]]
+  // CHECK:   end_borrow [[BORROWED_B]]
   // CHECK:   destroy_value [[B_COPY]]
   // CHECK:   destroy_value [[B]]
   // CHECK:   br [[IFDONE]]

@@ -141,7 +141,7 @@ func physical_struct_rvalue() -> Int {
   // CHECK: [[STRUCT:%[0-9]+]] = apply [[FUNC]]()
   // CHECK: [[BORROWED_STRUCT:%.*]] = begin_borrow [[STRUCT]]
   // CHECK: [[RET:%[0-9]+]] = struct_extract [[BORROWED_STRUCT]] : $Val, #Val.y
-  // CHECK: end_borrow [[BORROWED_STRUCT]] from [[STRUCT]]
+  // CHECK: end_borrow [[BORROWED_STRUCT]]
   // CHECK: destroy_value [[STRUCT]]
   // CHECK: return [[RET]]
 }
@@ -211,7 +211,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: ([[T0:%.*]], [[T1:%.*]]) = destructure_tuple [[V_R_VP_Z_TUPLE]]
   // CHECK: store [[T0]] to [trivial] [[A0]]
   // CHECK: store [[T1]] to [trivial] [[A1]]
-  // CHECK: end_borrow [[LD]] from [[VAL_REF_VAL_PROP_MAT]]
+  // CHECK: end_borrow [[LD]]
   // -- write to val.ref.val_prop.z_tuple.1
   // CHECK: [[V_R_VP_Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[V_R_VP_Z_TUPLE_1]]
@@ -247,7 +247,7 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: ([[T0:%.*]], [[T1:%.*]]) = destructure_tuple [[Z_TUPLE]]
   // CHECK: store [[T0]] to [trivial] [[A0]]
   // CHECK: store [[T1]] to [trivial] [[A1]]
-  // CHECK: end_borrow [[VAL1]] from [[WRITE]]
+  // CHECK: end_borrow [[VAL1]]
   // CHECK: [[Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[Z_TUPLE_1]]
   // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [trivial] [[Z_TUPLE_MATERIALIZED]]
@@ -1184,7 +1184,7 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
 // CHECK-NEXT:    [[BORROWED_SUPER:%.*]] = begin_borrow [[SUPER]]
 // CHECK-NEXT:    [[DOWNCAST_BORROWED_SUPER:%.*]] = unchecked_ref_cast [[BORROWED_SUPER]] : $BaseClassWithInternalProperty to $DerivedClassWithPublicProperty
 // CHECK-NEXT:    [[METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_SUPER]] : $DerivedClassWithPublicProperty, #BaseClassWithInternalProperty.x!getter.1 : (BaseClassWithInternalProperty) -> () -> (), $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
-// CHECK-NEXT:    end_borrow [[BORROWED_SUPER]] from [[SUPER]]
+// CHECK-NEXT:    end_borrow [[BORROWED_SUPER]]
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    destroy_value [[SUPER]] : $BaseClassWithInternalProperty
 // CHECK: } // end sil function '$S10properties30DerivedClassWithPublicPropertyC1xytvg'

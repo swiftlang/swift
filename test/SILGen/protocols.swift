@@ -259,7 +259,7 @@ class ClassWithGetter : PropertyWithGetter {
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load_borrow %0
 // CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : (ClassWithGetter) -> () -> Int, $@convention(method) (@guaranteed ClassWithGetter) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
-// CHECK-NEXT: end_borrow [[CCOPY_LOADED]] from %0
+// CHECK-NEXT: end_borrow [[CCOPY_LOADED]]
 // CHECK-NEXT: return
 
 class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
@@ -282,7 +282,7 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load_borrow %0
 // CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : (ClassWithGetterSetter) -> () -> Int, $@convention(method) (@guaranteed ClassWithGetterSetter) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
-// CHECK-NEXT: end_borrow [[CCOPY_LOADED]] from %0
+// CHECK-NEXT: end_borrow [[CCOPY_LOADED]]
 // CHECK-NEXT: return
 
 // Stored variables fulfilling property requirements
@@ -361,7 +361,7 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[FUN:%.*]] = function_ref @$S9protocols29StructWithStoredClassPropertyV1aSivg : $@convention(method) (@guaranteed StructWithStoredClassProperty) -> Int
 // CHECK-NEXT: apply [[FUN]]([[CCOPY_LOADED]])
-// CHECK-NEXT: end_borrow [[CCOPY_LOADED]] from %0
+// CHECK-NEXT: end_borrow [[CCOPY_LOADED]]
 // CHECK-NEXT: return
 
 // rdar://22676810

@@ -29,7 +29,7 @@ extension Hive {
   // CHECK:   store [[OLD_HIVE]] to [init] [[PB_BOX]]
   // CHECK:   [[BORROWED_SELF:%.*]] = load_borrow [[PB_BOX]]
   // CHECK:   [[META:%[0-9]+]] = value_metatype $@thick Hive.Type, [[BORROWED_SELF]] : $Hive
-  // CHECK:   end_borrow [[BORROWED_SELF]] from [[PB_BOX]]
+  // CHECK:   end_borrow [[BORROWED_SELF]]
   // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
   // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [[QUEEN]]
   // CHECK:   [[COPIED_BORROWED_QUEEN:%.*]] = copy_value [[BORROWED_QUEEN]]
@@ -37,7 +37,7 @@ extension Hive {
   // CHECK:   [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee?) -> Hive?, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK:   [[NEW_HIVE:%.*]] = apply [[FACTORY]]([[OPT_COPIED_BORROWED_QUEEN]], [[OBJC_META]]) : $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK:   destroy_value [[OPT_COPIED_BORROWED_QUEEN]]
-  // CHECK:   end_borrow [[BORROWED_QUEEN]] from [[QUEEN]]
+  // CHECK:   end_borrow [[BORROWED_QUEEN]]
   // CHECK:   switch_enum [[NEW_HIVE]] : $Optional<Hive>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]]
   //
   // CHECK: [[SOME_BB]]([[NEW_HIVE:%.*]] : @owned $Hive):
@@ -87,7 +87,7 @@ class SubHive : Hive {
   // CHECK:   [[BORROWED_SELF:%.*]] = load_borrow [[PB_BOX]]
   // CHECK:   [[UPCAST_BORROWED_SELF:%.*]] = upcast [[BORROWED_SELF]] : $SubHive to $Hive
   // CHECK:   [[METATYPE:%.*]] = value_metatype $@thick Hive.Type, [[UPCAST_BORROWED_SELF:%.*]]
-  // CHECK:   end_borrow [[BORROWED_SELF]] from [[PB_BOX]]
+  // CHECK:   end_borrow [[BORROWED_SELF]]
   // CHECK:   [[OBJC_METATYPE:%.*]] = thick_to_objc_metatype [[METATYPE]]
   // CHECK:   [[QUEEN:%.*]] = unchecked_ref_cast {{.*}} : $Bee to $Optional<Bee>
   // CHECK:   [[HIVE_INIT_FN:%.*]] = objc_method [[OBJC_METATYPE]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign
