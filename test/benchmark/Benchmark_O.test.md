@@ -135,12 +135,15 @@ VENTILES: VH(μs),VI(μs),VJ(μs),MAX(μs)
 Reports detailed information during measurement, including configuration
 details, environmental statistics (memory used and number of context switches)
 and all individual samples. We'll reuse this test to check arguments that
-modify the reported columns: `--memory` and `--quantile` to end with *one less*
-number in the benchmark summary, compared to normal format.
+modify the reported columns: `--memory`, `--quantile` and `--delta` to end with
+*one less* number in the benchmark summary, compared to normal format. Given
+that we are taking only 2 samples, the MEDIAN and MAX will be the same number.
+With the `--delta` option this means that 𝚫MAX is zero, so the penultimate
+number will be omitted from the output, giving us 2 consecutive delimiters (,,).
 
 ````
 RUN: %Benchmark_O 1 Ackermann 1 AngryPhonebook \
-RUN:              --verbose --num-samples=2 --memory --quantile=2 \
+RUN:              --verbose --num-samples=2 --memory --quantile=2 --delta \
 RUN:              | %FileCheck %s --check-prefix RUNJUSTONCE \
 RUN:                              --check-prefix CONFIG \
 RUN:                              --check-prefix LOGVERBOSE \
@@ -149,7 +152,7 @@ RUN:                              --check-prefix LOGFORMAT
 CONFIG: NumSamples: 2
 CONFIG: Tests Filter: ["1", "Ackermann", "1", "AngryPhonebook"]
 CONFIG: Tests to run: Ackermann, AngryPhonebook
-LOGFORMAT: #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
+LOGFORMAT: #,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX,MAX_RSS(B)
 LOGVERBOSE-LABEL: Running Ackermann for 2 samples.
 LOGVERBOSE: Measuring with scale {{[0-9]+}}.
 LOGVERBOSE: Sample 0,{{[0-9]+}}
@@ -159,7 +162,7 @@ MEASUREENV: ICS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 MEASUREENV: VCS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 RUNJUSTONCE-LABEL: 1,Ackermann
 RUNJUSTONCE-NOT: 1,Ackermann
-LOGFORMAT: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
+LOGFORMAT: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},,{{[0-9]+}}
 LOGVERBOSE-LABEL: Running AngryPhonebook for 2 samples.
 ````
 
