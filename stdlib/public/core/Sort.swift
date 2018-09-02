@@ -507,7 +507,7 @@ extension MutableCollection where Self: RandomAccessCollection {
       // If a child is bigger than the current node, swap them and continue sifting
       // down.
       if largest != i {
-        swapAt(idx, largest)
+        swapAt(i, largest)
         i = largest
         countToIndex = distance(from: range.lowerBound, to: i)
         countFromIndex = distance(from: i, to: range.upperBound)
