@@ -85,6 +85,9 @@ PrintTests.test("CustomStringInterpolationExtra") {
   
   let s4 = (try? "aaa\(fails: false)bbb" as MyString)?.value
   expectEqual("6/1<literal aaa><interpolation:fails ><literal bbb>", s4)
+  
+  let s5 = ("aaa\(required: true)bbb\(required: true, optional: true)ccc\(required: true, optional: false)ddd" as MyString).value
+  expectEqual("12/3<literal aaa><interpolation:required:optional true false><literal bbb><interpolation:required:optional true true><literal ccc><interpolation:required:optional true false><literal ddd>", s5)
 }
 
 extension DefaultStringInterpolation {
@@ -102,6 +105,10 @@ extension DefaultStringInterpolation {
     }
     appendInterpolation("OK")
   }
+  
+  public mutating func appendInterpolation(required: Bool, optional: Bool = false) {
+    appendInterpolation(String(reflecting: required) + " " + String(reflecting: optional))
+  }
 }
 
 PrintTests.test("StringInterpolationExtra") {
@@ -116,6 +123,9 @@ PrintTests.test("StringInterpolationExtra") {
   
   let s4 = try? "aaa\(fails: false)bbb"
   expectEqual("aaaOKbbb", s4)
+  
+  let s5 = "aaa\(required: true)bbb\(required: true, optional: true)ccc\(required: true, optional: false)ddd"
+  expectEqual("aaatrue falsebbbtrue trueccctrue falseddd", s5)
 }
 
 runAllTests()
