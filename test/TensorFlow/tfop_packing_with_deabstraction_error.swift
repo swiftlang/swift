@@ -57,7 +57,7 @@ public func unpackInput_nonTensorFlow() {
     let x: Int
     let y: Int
   }
-  // expected-error @+1 {{operand has unrecognized type 'Foo'; it must be a TensorFlow value or aggregate of TensorFlow values}}
+  // expected-error @+1 {{argument of type 'Foo' is not a TensorFlow value or an aggregate of TensorFlow values}}
   let _: Tensor<Float> = #tfop("SomeOp", Foo(x: 1, y: 1))
 }
 
@@ -66,21 +66,36 @@ public func unpackInput_nonTensorFlowList() {
     let x: Int
     let y: Int
   }
-  // expected-error @+1 {{elements of input list have invalid type 'Foo'; they must be TensorFlow values or aggregates of TensorFlow values}}
+  // expected-error @+1 {{argument of type 'Foo' is not a TensorFlow value or an aggregate of TensorFlow values}}
   let _: Tensor<Float> = #tfop("SomeOp", [Foo(x: 1, y: 1)])
 }
 
 public func unpackInput_nonWrappedZero() {
   struct Foo {}
-  // expected-error @+1 {{operand of type 'Foo' must be wrapped in an array because it is an empty aggregate}}
+  // expected-error @+2 {{argument of type 'Foo' must contain exactly one TensorFlow value}}
+  // expected-note @+1 {{value used here}}
   let _: Tensor<Float> = #tfop("SomeOp", Foo())
 }
 
+
 public func unpackInput_nonWrappedMoreThanOne() {
+  // expected-error @+1 {{argument of type 'Foo' must contain exactly one TensorFlow value}}
   struct Foo {
     let x: Tensor<Float>
     let y: Tensor<Int32>
   }
-  // expected-error @+1 {{operand of type 'Foo' must be wrapped in an array because it is an aggregate of more than one TensorFlow value}}
+  // expected-note @+1 {{value used here}}
   let _: Tensor<Float> = #tfop("SomeOp", Foo(x: Tensor(1), y: Tensor(2)))
 }
+
+public func testExtractDTypeList() {
+  struct Foo {
+    let a: Int
+    let b: Tensor<Float>
+  }
+  // expected-error @+1 {{a TensorFlow value or an aggregate of TensorFlow values}}
+  let _: VariantHandle = #tfop("TensorSliceDataset", [] as [TensorHandle<Float>],
+                               Toutput_types$array: Foo.self,
+                               output_shapes: [TensorShape()])
+}
+
