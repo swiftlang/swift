@@ -540,7 +540,8 @@ extension MutableCollection where Self: RandomAccessCollection {
   }
 
   @inlinable
-  internal mutating func _heapSort(
+  public // @testable
+  mutating func _heapSort(
     within range: Range<Index>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {
