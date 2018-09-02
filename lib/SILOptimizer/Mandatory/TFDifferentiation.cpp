@@ -1444,6 +1444,21 @@ public:
 } // end anonymous namespace
 
 namespace {
+/// Represents the differentiation activity associated with a SIL value.
+enum class ActivityFlags : unsigned {
+  /// The value depends on a function parameter.
+  Varied = 1 << 1,
+  /// The value contributes to a result.
+  Useful = 1 << 2,
+  /// The value is both varied and useful.
+  Active = Varied | Useful,
+};
+
+using Activity = OptionSet<ActivityFlags>;
+static inline Activity operator|(ActivityFlags lhs, ActivityFlags rhs) {
+  return Activity(unsigned(lhs) | unsigned(rhs));
+}
+
 /// Result of activity analysis on a function. Accepts queries for whether a
 /// value is "varied", "useful" or "active" against certain differentiation
 /// indices.
@@ -1479,6 +1494,11 @@ public:
   bool isVaried(SILValue value,
                 const llvm::SmallBitVector &parameterIndices) const;
   bool isActive(SILValue value, const SILReverseAutoDiffIndices &indices) const;
+
+  Activity getActivity(SILValue value,
+                       const SILReverseAutoDiffIndices &indices) const;
+  Activity getActivity(SILInstruction *inst,
+                       const SILReverseAutoDiffIndices &indices) const;
 };
 } // end anonymous namespace
 
@@ -1627,17 +1647,36 @@ bool DifferentiableActivityInfo::isActive(
   return isVaried(value, indices.parameters) && isUseful(value, indices.source);
 }
 
+Activity DifferentiableActivityInfo::getActivity(
+    SILValue value, const SILReverseAutoDiffIndices &indices) const {
+  Activity activity;
+  if (isVaried(value, indices.parameters))
+    activity |= ActivityFlags::Varied;
+  if (isUseful(value, indices.source))
+    activity |= ActivityFlags::Useful;
+  return activity;
+}
+
+Activity DifferentiableActivityInfo::getActivity(
+    SILInstruction *inst, const SILReverseAutoDiffIndices &indices) const {
+  Activity activity;
+  for (auto result : inst->getResults())
+    activity |= getActivity(result, indices);
+  return activity;
+}
+
 static void dumpActivityInfo(SILValue value,
                              const SILReverseAutoDiffIndices &indices,
                              const DifferentiableActivityInfo &activityInfo,
                              llvm::raw_ostream &s = llvm::dbgs()) {
   s << '[';
-  if (activityInfo.isActive(value, indices))
-    s << "ACTIVE";
-  else if (activityInfo.isVaried(value, indices.parameters))
-    s << "VARIED";
-  else if (activityInfo.isUseful(value, indices.source))
-    s << "USEFUL";
+  auto activity = activityInfo.getActivity(value, indices);
+  switch (activity.toRaw()) {
+  case 0: s << "NONE"; break;
+  case (unsigned)ActivityFlags::Varied: s << "VARIED"; break;
+  case (unsigned)ActivityFlags::Useful: s << "USEFUL"; break;
+  case (unsigned)ActivityFlags::Active: s << "ACTIVE"; break;
+  }
   s << "] " << value;
 }
 
@@ -2363,6 +2402,9 @@ public:
     if (errorOccurred)
       return;
     SILClonerWithScopes::postProcess(orig, cloned);
+    auto &indices = getDifferentiationTask()->getIndices();
+    if (!(activityInfo.getActivity(orig, indices) & ActivityFlags::Active))
+      return;
     switch (classifyPrimalValue(orig)) {
     case PrimalValueKind::Conversion:
       break;
@@ -4301,7 +4343,7 @@ static void fillCanonicalGradient(SILFunction &canGrad,
   // If the original result is a direct return, add it to the direct return list
   // of the canonical gradient.
   if (primalConv.getResults().back().isFormalDirect())
-    directResults.push_back(*primalResults.rbegin());
+    directResults.push_back(primalResults.back());
   // Add the adjoint's results to the direct return list.
   if (adjointConv.getNumDirectSILResults() == 1)
     directResults.push_back(adjApply);
