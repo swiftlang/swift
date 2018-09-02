@@ -46,7 +46,7 @@ class Token {
   unsigned MultilineString : 1;
 
   /// Length of custom delimiter of "raw" string literals
-  unsigned StringDelimiterLength : 8;
+  unsigned CustomDelimiterLen : 8;
 
   // Padding bits == 32 - 11;
 
@@ -65,7 +65,7 @@ class Token {
 public:
   Token(tok Kind, StringRef Text, unsigned CommentLength = 0)
           : Kind(Kind), AtStartOfLine(false), EscapedIdentifier(false),
-            MultilineString(false), StringDelimiterLength(0),
+            MultilineString(false), CustomDelimiterLen(0),
             CommentLength(CommentLength), Text(Text) {}
 
   Token() : Token(tok::NUM_TOKENS, {}, 0) {}
@@ -269,22 +269,23 @@ public:
 
   /// \brief Set the token to the specified kind and source range.
   void setToken(tok K, StringRef T, unsigned CommentLength = 0,
-                bool MultilineString = false, unsigned DelimiterLength = 0) {
+                bool IsMultilineString = false, unsigned CustomDelimiterLen = 0) {
     Kind = K;
     Text = T;
     this->CommentLength = CommentLength;
     EscapedIdentifier = false;
-    this->MultilineString = MultilineString;
-    StringDelimiterLength = DelimiterLength;
-    assert(StringDelimiterLength == DelimiterLength && "delimiter too long");
+    this->MultilineString = IsMultilineString;
+    this->CustomDelimiterLen = CustomDelimiterLen;
+    assert(this->CustomDelimiterLen == CustomDelimiterLen &&
+           "string custom delimiter too long");
   }
 
-  bool IsMultilineString() const {
+  bool isMultilineString() const {
     return MultilineString;
   }
 
-  unsigned getDelimiterLength() const {
-    return StringDelimiterLength;
+  unsigned getCustomDelimiterLen() const {
+    return CustomDelimiterLen;
   }
 };
   

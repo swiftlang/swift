@@ -268,7 +268,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
 }
 
 void Lexer::formToken(tok Kind, const char *TokStart,
-                      bool MultilineString, unsigned DelimiterLength) {
+                      bool IsMultilineString, unsigned CustomDelimiterLen) {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
@@ -295,7 +295,7 @@ void Lexer::formToken(tok Kind, const char *TokStart,
   }
 
   NextToken.setToken(Kind, TokenText, CommentLength,
-                     MultilineString, DelimiterLength);
+                     IsMultilineString, CustomDelimiterLen);
 }
 
 void Lexer::formEscapedIdentifierToken(const char *TokStart) {
@@ -1206,26 +1206,38 @@ static bool maybeConsumeNewlineEscape(const char *&CurPtr, ssize_t Offset) {
   }
 }
 
-/// diagnoseZeroWidth - check for and error zero-width characters in delimiters
+/// diagnoseZeroWidth - Check for and error zero-width characters in delimiters.
+/// A non visible character in the middle of a delimter can be used to extend
+/// the literal beyond what it would appear creating potential security bugs.
 static bool diagnoseZeroWidth(const char *&CurPtr, DiagnosticEngine *Diags) {
-  const unsigned char *TmpPtr = (const unsigned char *)CurPtr;
-  // zero-width set assumed to be: U+200B, U+200C, U+200D, U+2060, U+FEFF
-  while ((TmpPtr[0] == 0xE2 && ((TmpPtr[1] == 0x80 &&
-           (TmpPtr[2] == 0x8B || TmpPtr[2] == 0x8C || TmpPtr[2] == 0x8D)) ||
-          (TmpPtr[1] == 0x81 && TmpPtr[2] == 0xA0))) ||
-         (TmpPtr[0] == 0xEF && TmpPtr[1] == 0xBB && TmpPtr[2] == 0xBF)) {
-    if (Diags)
-      Diags->diagnose(Lexer::getSourceLoc(CurPtr),
-                      diag::lex_zerowidth_in_string_delimiter)
-      .fixItRemoveChars(Lexer::getSourceLoc(CurPtr),
-                        Lexer::getSourceLoc(CurPtr + 3));
-    TmpPtr += 3;
-    CurPtr += 3;
-  }
+  //  A way needs to be found to find the complete set of zero width chars or
+  //  this security mitigation will be in vain. Current list was taken from:
+  //  https://www.ptiglobal.com/2018/04/26/the-beauty-of-unicode-zero-width-characters/
+  //  https://github.com/dblspk/web-app
+  //  As this list may not be complete this code is not currently implemented.
+//  const  char *TmpPtr = CurPtr;
+//  while (true) {
+//    switch (validateUTF8CharacterAndAdvance(TmpPtr, TmpPtr+3)) {
+//    case 0x200B: case 0x200C: case 0x200D: case 0x2060:
+//    case 0x2061: case 0x2062: case 0x2063: case 0x2064:
+//    case 0x206A: case 0x206B: case 0x206C: case 0x206D:
+//    case 0x206E: case 0x206F: case 0xFE00: case 0xFE01:
+//    case 0xFEFF:
+//      if (Diags)
+//        Diags->diagnose(Lexer::getSourceLoc(CurPtr),
+//                        diag::lex_zerowidth_in_string_delimiter)
+//          .fixItRemoveChars(Lexer::getSourceLoc(CurPtr),
+//                            Lexer::getSourceLoc(CurPtr + 3));
+//      CurPtr = TmpPtr;
+//      break;
+//    default:
+//      return true;
+//    }
+//  }
   return true;
 }
 
-/// advanceIfMultilineDelimiter - centralized check for multiline delimiter
+/// advanceIfMultilineDelimiter - Centralized check for multiline delimiter.
 static bool advanceIfMultilineDelimiter(const char *&CurPtr,
                                         DiagnosticEngine *Diags) {
   const char *TmpPtr = CurPtr - 1;
@@ -1238,17 +1250,17 @@ static bool advanceIfMultilineDelimiter(const char *&CurPtr,
   return false;
 }
 
-/// extractStringDelimiterLength - Extracts/detects any custom delimiter on
+/// advanceIfCustomDelimiterLen - Extracts/detects any custom delimiter on
 /// opening a string literal and advances CurPtr if a delimiter is found and
 /// returns a non-zero delimiter length. CurPtr[-1] generally '#' when called.
-static unsigned extractStringDelimiterLength(const char *&CurPtr) {
+static unsigned advanceIfCustomDelimiterLen(const char *&CurPtr) {
   const char *Lookahead = CurPtr;
   while (*Lookahead == '#')
     Lookahead++;
   if (*Lookahead++ == '"') {
-    unsigned DelimiterLength = Lookahead - CurPtr;
+    unsigned CustomDelimiterLen = Lookahead - CurPtr;
     CurPtr = Lookahead;
-    return DelimiterLength;
+    return CustomDelimiterLen;
   }
   return 0;
 }
@@ -1258,12 +1270,12 @@ static unsigned extractStringDelimiterLength(const char *&CurPtr) {
 /// interpolation inside a "raw" string. Normal/cooked string processing is
 /// the degenerate case of there being no # characters surrounding the quotes.
 /// If delimiter matches, advances byte pointer passed in and returns true.
-static bool delimiterMatches(unsigned DelimiterLength, const char *&BytesPtr,
+static bool delimiterMatches(unsigned CustomDelimiterLen, const char *&BytesPtr,
                              DiagnosticEngine *Diags) {
-  if (!DelimiterLength)
+  if (!CustomDelimiterLen)
     return true;
   const char *TmpPtr = BytesPtr;
-  for (unsigned i = 0; i < DelimiterLength; i++)
+  for (unsigned i = 0; i < CustomDelimiterLen; i++)
     if (diagnoseZeroWidth(TmpPtr, Diags) && *TmpPtr++ != '#')
       return false;
   BytesPtr = TmpPtr;
@@ -1279,8 +1291,8 @@ static bool delimiterMatches(unsigned DelimiterLength, const char *&BytesPtr,
 ///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
 ///   character_escape  ::= unicode_character_escape
 unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
-                             bool EmitDiagnostics, bool MultilineString,
-                             unsigned DelimiterLength) {
+                             bool EmitDiagnostics, bool IsMultilineString,
+                             unsigned CustomDelimiterLen) {
   const char *CharStart = CurPtr;
 
   switch (*CurPtr++) {
@@ -1288,7 +1300,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     // If this is a "high" UTF-8 character, validate it.
     if ((signed char)(CurPtr[-1]) >= 0) {
       if (isPrintable(CurPtr[-1]) == 0)
-        if (!(MultilineString && (CurPtr[-1] == '\t')))
+        if (!(IsMultilineString && (CurPtr[-1] == '\t')))
           if (EmitDiagnostics)
             diagnose(CharStart, diag::lex_unprintable_ascii_character);
       return CurPtr[-1];
@@ -1323,13 +1335,13 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     return ~1U;
   case '\n':  // String literals cannot have \n or \r in them.
   case '\r':
-    if (MultilineString) // ... unless they are multiline
+    if (IsMultilineString) // ... unless they are multiline
       return CurPtr[-1];
     if (EmitDiagnostics)
       diagnose(CurPtr-1, diag::lex_unterminated_string);
     return ~1U;
   case '\\':  // Escapes.
-    if (!delimiterMatches(DelimiterLength, CurPtr, Diags))
+    if (!delimiterMatches(CustomDelimiterLen, CurPtr, Diags))
       return '\\';
     break;
   }
@@ -1339,16 +1351,16 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   switch (*CurPtr) {
   case ' ': case '\t': case '\n': case '\r': case '#':
     if (*CurPtr == '#') {
-      if (DelimiterLength) {
+      if (CustomDelimiterLen) {
         if (EmitDiagnostics)
           diagnose(CurPtr, diag::lex_invalid_delimiter_escape)
-          .fixItRemoveChars(Lexer::getSourceLoc(CurPtr),
-                            Lexer::getSourceLoc(CurPtr + 1));
+            .fixItRemoveChars(Lexer::getSourceLoc(CurPtr),
+                              Lexer::getSourceLoc(CurPtr + 1));
         CurPtr++;
         return ~1U;
       }
     }
-    else if (MultilineString && maybeConsumeNewlineEscape(CurPtr, 0))
+    else if (IsMultilineString && maybeConsumeNewlineEscape(CurPtr, 0))
       return '\n';
     LLVM_FALLTHROUGH;
   default:  // Invalid escape.
@@ -1406,11 +1418,11 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
 static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
                                                      const char *EndPtr,
                                                      DiagnosticEngine *Diags,
-                                                     bool MultilineString) {
+                                                     bool IsMultilineString) {
   SmallVector<char, 4> OpenDelimiters;
   SmallVector<bool, 4> AllowNewline;
   SmallVector<unsigned, 4> CustomDelimiter;
-  AllowNewline.push_back(MultilineString);
+  AllowNewline.push_back(IsMultilineString);
 
   auto inStringLiteral = [&]() {
     return !OpenDelimiters.empty() &&
@@ -1425,7 +1437,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     // On success scanning the expression body, the real lexer will be used to
     // relex the body when parsing the expressions.  We let it diagnose any
     // issues with malformed tokens or other problems.
-    unsigned DelimiterLength = 0;
+    unsigned CustomDelimiterLen = 0;
     switch (*CurPtr++) {
     // String literals in general cannot be split across multiple lines;
     // interpolated ones are no exception - unless multiline literals.
@@ -1438,7 +1450,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 
     case '#':
       if (inStringLiteral() ||
-          !(DelimiterLength = extractStringDelimiterLength(CurPtr)))
+          !(CustomDelimiterLen = advanceIfCustomDelimiterLen(CurPtr)))
         continue;
       LLVM_FALLTHROUGH;
 
@@ -1446,9 +1458,8 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     case '\'': {
       if (!AllowNewline.back() && inStringLiteral()) {
         unsigned InnerDelimiter = CustomDelimiter.back();
-        if (OpenDelimiters.back() == CurPtr[-1] && (!InnerDelimiter ||
-             (delimiterMatches(InnerDelimiter, CurPtr, Diags)
-              && *CurPtr != '#'))) {
+        if (OpenDelimiters.back() == CurPtr[-1] &&
+            delimiterMatches(InnerDelimiter, CurPtr, Diags)) {
           // Closing single line string literal.
           OpenDelimiters.pop_back();
           AllowNewline.pop_back();
@@ -1464,7 +1475,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         // Open string literal
         OpenDelimiters.push_back(CurPtr[-1]);
         AllowNewline.push_back(isMultilineQuote);
-        CustomDelimiter.push_back(DelimiterLength);
+        CustomDelimiter.push_back(CustomDelimiterLen);
         continue;
       }
 
@@ -1543,10 +1554,10 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 static StringRef getStringLiteralContent(const Token &Str) {
   StringRef Bytes = Str.getText();
 
-  if (unsigned DelimiterLength = Str.getDelimiterLength())
-    Bytes = Bytes.drop_front(DelimiterLength).drop_back(DelimiterLength);
+  if (unsigned CustomDelimiterLen = Str.getCustomDelimiterLen())
+    Bytes = Bytes.drop_front(CustomDelimiterLen).drop_back(CustomDelimiterLen);
 
-  if (Str.IsMultilineString())
+  if (Str.isMultilineString())
     Bytes = Bytes.drop_front(3).drop_back(3);
   else
     Bytes = Bytes.drop_front().drop_back();
@@ -1584,7 +1595,7 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
       auto string = StringRef(start, end - start);
 
       // Disallow escaped newline in the last line.
-      if (Diags && Str.getDelimiterLength() == 0) {
+      if (Diags && Str.getCustomDelimiterLen() == 0) {
         auto *Ptr = start - 1;
         if (*Ptr == '\n') --Ptr;
         if (*Ptr == '\r') --Ptr;
@@ -1741,7 +1752,7 @@ static void validateMultilineIndents(const Token &Str,
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
 ///   string_literal ::= ["]["]["].*["]["]["] - approximately
 ///   string_literal ::= (#+)("")?".*"(\2\1) - "raw" strings
-void Lexer::lexStringLiteral(unsigned DelimiterLength) {
+void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
   const char *TokStart = CurPtr-1;
   assert((*TokStart == '"' || *TokStart == '\'') && "Unexpected start");
   // NOTE: We only allow single-quote string literals so we can emit useful
@@ -1759,7 +1770,7 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
   while (true) {
     const char *TmpPtr = CurPtr + 1;
     if (*CurPtr == '\\' &&
-        delimiterMatches(DelimiterLength, TmpPtr, Diags) && *TmpPtr == '(') {
+        delimiterMatches(CustomDelimiterLen, TmpPtr, Diags) && *TmpPtr == '(') {
       // Consume tokens until we hit the corresponding ')'.
       CurPtr = TmpPtr + 1;
       const char *EndPtr =
@@ -1779,13 +1790,13 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
     // String literals cannot have \n or \r in them (unless multiline).
     if (((*CurPtr == '\r' || *CurPtr == '\n') && !MultilineString)
         || CurPtr == BufferEnd) {
-      TokStart -= DelimiterLength;
+      TokStart -= CustomDelimiterLen;
       diagnose(TokStart, diag::lex_unterminated_string);
       return formToken(tok::unknown, TokStart);
     }
 
     unsigned CharValue = lexCharacter(CurPtr, *TokStart, true,
-                                      MultilineString, DelimiterLength);
+                                      MultilineString, CustomDelimiterLen);
     wasErroneous |= CharValue == ~1U;
 
     // If this is the end of string, we are done.  If it is a normal character
@@ -1827,16 +1838,15 @@ void Lexer::lexStringLiteral(unsigned DelimiterLength) {
                              replacement);
       }
 
-      // Is this the end of multiline/delimited string literal?
+      // Is this the end of multiline/custom-delimited string literal?
       if ((!MultilineString || advanceIfMultilineDelimiter(CurPtr, Diags)) &&
-          (!DelimiterLength || (delimiterMatches(DelimiterLength, CurPtr, Diags)
-                                && *CurPtr != '#'))) {
-        TokStart -= DelimiterLength;
+          delimiterMatches(CustomDelimiterLen, CurPtr, Diags)) {
+        TokStart -= CustomDelimiterLen;
         if (wasErroneous)
           return formToken(tok::unknown, TokStart);
 
         formToken(tok::string_literal, TokStart,
-                  MultilineString, DelimiterLength);
+                  MultilineString, CustomDelimiterLen);
         if (MultilineString && Diags)
           validateMultilineIndents(NextToken, Diags);
         return;
@@ -2106,7 +2116,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          bool IsFirstSegment,
                                          bool IsLastSegment,
                                          unsigned IndentToStrip,
-                                         unsigned DelimiterLength) {
+                                         unsigned CustomDelimiterLen) {
 
   TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because
@@ -2114,11 +2124,11 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
   // range check subscripting on the StringRef.
   const char *BytesPtr = Bytes.begin();
 
-  // Special case when being called from EncodedDiagnosticMessage(...)
+  // Special case when being called from EncodedDiagnosticMessage(...).
   // This allows multiline and delimited strings to work in attributes.
   // The string has already been validated by the initial parse.
-  if (IndentToStrip == ~0u && DelimiterLength == ~0u) {
-    IndentToStrip = DelimiterLength = 0;
+  if (IndentToStrip == ~0u && CustomDelimiterLen == ~0u) {
+    IndentToStrip = CustomDelimiterLen = 0;
 
     // restore trailing indent removal for multiline
     const char *Backtrack = BytesPtr - 1;
@@ -2131,7 +2141,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
 
     // restore delimiter if any
     while (*--Backtrack == '#')
-      DelimiterLength++;
+      CustomDelimiterLen++;
   }
 
   bool IsEscapedNewline = false;
@@ -2155,7 +2165,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     }
 
     if (CurChar != '\\' ||
-        !delimiterMatches(DelimiterLength, BytesPtr, nullptr)) {
+        !delimiterMatches(CustomDelimiterLen, BytesPtr, nullptr)) {
       TempString.push_back(CurChar);
       continue;
     }
@@ -2225,8 +2235,8 @@ void Lexer::getStringLiteralSegments(
 
   // Are substitutions required either for indent stripping or line ending
   // normalization?
-  bool MultilineString = Str.IsMultilineString(), IsFirstSegment = true;
-  unsigned IndentToStrip = 0, DelimiterLength = Str.getDelimiterLength();
+  bool MultilineString = Str.isMultilineString(), IsFirstSegment = true;
+  unsigned IndentToStrip = 0, CustomDelimiterLen = Str.getCustomDelimiterLen();
   if (MultilineString)
     IndentToStrip = 
       std::get<0>(getMultilineTrailingIndent(Str, /*Diags=*/nullptr)).size();
@@ -2240,7 +2250,7 @@ void Lexer::getStringLiteralSegments(
   while ((pos = Bytes.find('\\', BytesPtr-Bytes.begin())) != StringRef::npos) {
     BytesPtr = Bytes.begin() + pos + 1;
 
-    if (!delimiterMatches(DelimiterLength, BytesPtr, Diags) ||
+    if (!delimiterMatches(CustomDelimiterLen, BytesPtr, Diags) ||
         *BytesPtr++ != '(')
       continue;
 
@@ -2249,9 +2259,9 @@ void Lexer::getStringLiteralSegments(
     // Push the current segment.
     Segments.push_back(
         StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
-                                  BytesPtr-SegmentStartPtr-2-DelimiterLength,
+                                  BytesPtr-SegmentStartPtr-2-CustomDelimiterLen,
                                   IsFirstSegment, false, IndentToStrip,
-                                  DelimiterLength));
+                                  CustomDelimiterLen));
     IsFirstSegment = false;
 
     // Find the closing ')'.
@@ -2275,7 +2285,7 @@ void Lexer::getStringLiteralSegments(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                 Bytes.end()-SegmentStartPtr,
                                 IsFirstSegment, true, IndentToStrip,
-                                DelimiterLength));
+                                CustomDelimiterLen));
 }
 
 
@@ -2373,8 +2383,8 @@ void Lexer::lexImpl() {
   case '\\': return formToken(tok::backslash, TokStart);
 
   case '#':
-    if (unsigned DelimiterLength = extractStringDelimiterLength(CurPtr))
-      return lexStringLiteral(DelimiterLength);
+    if (unsigned CustomDelimiterLen = advanceIfCustomDelimiterLen(CurPtr))
+      return lexStringLiteral(CustomDelimiterLen);
     return lexHash();
 
       // Operator characters.
