@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
-// FIXME(SR-8675): Mem2Reg fails when the -O is on.
 
 @_fixed_layout
 public struct Vector : VectorNumeric {
@@ -77,20 +76,26 @@ public func test1() -> Vector {
 // CHECK:   %20 = alloc_stack $Vector
 // CHECK:   %21 = alloc_stack $Vector
 // CHECK:   %22 = alloc_stack $Vector
-// CHECK:   %23 = begin_access [init] [static] [no_nested_conflict] %20 : $*Vector
-// CHECK:   %24 = begin_access [read] [static] [no_nested_conflict] %21 : $*Vector
-// CHECK:   %25 = begin_access [read] [static] [no_nested_conflict] %22 : $*Vector
-// CHECK:   %26 = witness_method $Vector, #VectorNumeric."+"!1 : <Self where Self : VectorNumeric> (Self.Type) -> (Self, Self) -> @dynamic_self Self : $@convention(witness_method: VectorNumeric) <τ_0_0 where τ_0_0 : VectorNumeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
-// CHECK:   %27 = metatype $@thick Vector.Type
-// CHECK:   %28 = apply %26<Vector>(%23, %25, %24, %27) : $@convention(witness_method: VectorNumeric) <τ_0_0 where τ_0_0 : VectorNumeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   %23 = begin_access [init] [static] [no_nested_conflict] %21 : $*Vector
+// CHECK:   %24 = begin_access [init] [static] [no_nested_conflict] %22 : $*Vector
+// CHECK:   store %18 to %23 : $*Vector
+// CHECK:   store %19 to %24 : $*Vector
 // CHECK:   end_access %23 : $*Vector
-// CHECK:   end_access %25 : $*Vector
 // CHECK:   end_access %24 : $*Vector
+// CHECK:   %29 = begin_access [init] [static] [no_nested_conflict] %20 : $*Vector
+// CHECK:   %30 = begin_access [read] [static] [no_nested_conflict] %21 : $*Vector
+// CHECK:   %31 = begin_access [read] [static] [no_nested_conflict] %22 : $*Vector
+// CHECK:   %32 = witness_method $Vector, #VectorNumeric."+"!1 : <Self where Self : VectorNumeric> (Self.Type) -> (Self, Self) -> @dynamic_self Self : $@convention(witness_method: VectorNumeric) <τ_0_0 where τ_0_0 : VectorNumeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   %33 = metatype $@thick Vector.Type
+// CHECK:   %34 = apply %32<Vector>(%29, %31, %30, %33) : $@convention(witness_method: VectorNumeric) <τ_0_0 where τ_0_0 : VectorNumeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   end_access %29 : $*Vector
+// CHECK:   end_access %31 : $*Vector
+// CHECK:   end_access %30 : $*Vector
 // CHECK:   dealloc_stack %22 : $*Vector
 // CHECK:   dealloc_stack %21 : $*Vector
-// CHECK:   %34 = begin_access [read] [static] [no_nested_conflict] %20 : $*Vector
-// CHECK:   %35 = load %34 : $*Vector
-// CHECK:   end_access %34 : $*Vector
+// CHECK:   %40 = begin_access [read] [static] [no_nested_conflict] %20 : $*Vector
+// CHECK:   %41 = load %40 : $*Vector
+// CHECK:   end_access %40 : $*Vector
 // CHECK:   dealloc_stack %20 : $*Vector
-// CHECK:   return %35 : $Vector
+// CHECK:   return %41 : $Vector
 // CHECK: }
