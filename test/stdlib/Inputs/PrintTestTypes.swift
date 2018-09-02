@@ -183,6 +183,10 @@ public struct MyString : ExpressibleByStringLiteral,
       }
       result += "<interpolation:fails >"
     }
+    
+    public mutating func appendInterpolation(required: Bool, optional: Bool = false) {
+      result += "<interpolation:required:optional " + String(reflecting: required) + " " + String(reflecting: optional) + ">"
+    }
   }
 }
 
