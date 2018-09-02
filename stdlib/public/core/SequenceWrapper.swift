@@ -18,11 +18,10 @@
 /// A type that is just a wrapper over some base Sequence
 @_show_in_interface
 public // @testable
-protocol _SequenceWrapper : Sequence {
+protocol _SequenceWrapper : Sequence where Filtered == Base.Filtered {
   associatedtype Base : Sequence where Base.Element == Element
   associatedtype Iterator = Base.Iterator
   associatedtype SubSequence = Base.SubSequence
-  associatedtype Filtered = Base.Filtered
   
   var _base: Base { get }
 }

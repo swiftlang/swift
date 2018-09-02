@@ -14,6 +14,7 @@
 internal protocol ArrayProtocol
   : RangeReplaceableCollection,
     ExpressibleByArrayLiteral
+  where Filtered == [Element]
 {
   //===--- public interface -----------------------------------------------===//
   /// The number of elements the Array stores.
@@ -79,7 +80,7 @@ extension ArrayProtocol {
   @inlinable
   public func filter(
     _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  ) rethrows -> Filtered {
     return try _filter(isIncluded)
   }
 }

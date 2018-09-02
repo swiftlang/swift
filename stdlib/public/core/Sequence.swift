@@ -1017,7 +1017,7 @@ extension Sequence where Element : Equatable {
 
 extension Sequence where Filtered: RangeReplaceableCollection {
   
-  /// Returns an array containing, in order, the elements of the sequence
+  /// Returns a collection containing, in order, the elements of the sequence
   /// that satisfy the given predicate.
   ///
   /// In this example, `filter(_:)` is used to include only names shorter than

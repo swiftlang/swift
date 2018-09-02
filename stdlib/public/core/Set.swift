@@ -245,7 +245,7 @@ extension Set: Sequence {
     return _variantBuffer.makeIterator()
   }
 
-  typealias Filtered = Set<Element>
+  public typealias Filtered = Set<Element>
   
   /// Returns a Boolean value that indicates whether the given element exists
   /// in the set.

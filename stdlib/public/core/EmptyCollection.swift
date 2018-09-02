@@ -47,6 +47,22 @@ extension EmptyCollection.Iterator: IteratorProtocol, Sequence {
   public mutating func next() -> Element? {
     return nil
   }
+  
+  /// Returns a sequence containing, in order, the elements of the sequence
+  /// that satisfy the given predicate.
+  ///
+  /// - Parameter isIncluded: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be included in the returned array.
+  /// - Returns: An collection of the elements that `isIncluded` allowed.
+  ///
+  /// - Complexity: O(1)
+  @inlinable
+  public func filter(
+    _ isIncluded: (Element) throws -> Bool
+    ) rethrows -> Filtered {
+    return self
+  }
 }
 
 extension EmptyCollection: Sequence {
@@ -144,6 +160,22 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
     return n == 0 ? i : nil
   }
 
+  /// Returns a collection containing, in order, the elements of the sequence
+  /// that satisfy the given predicate.
+  ///
+  /// - Parameter isIncluded: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be included in the returned array.
+  /// - Returns: An collection of the elements that `isIncluded` allowed.
+  ///
+  /// - Complexity: O(1)
+  @inlinable
+  public func filter(
+    _ isIncluded: (Element) throws -> Bool
+    ) rethrows -> Filtered {
+    return self
+  }
+  
   /// The distance between two indexes (always zero).
   @inlinable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> Int {

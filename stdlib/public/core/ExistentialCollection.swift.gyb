@@ -202,7 +202,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   @inlinable
   internal func _filter(
     _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  ) rethrows -> Filtered {
     _abstract()
   }
 
@@ -432,7 +432,7 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
   @inlinable
   internal override func _filter(
     _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  ) rethrows -> Filtered {
     return try _base.filter(isIncluded)
   }
   @inlinable
@@ -733,7 +733,7 @@ extension Any${Kind} {
   @inlinable
   public func filter(
     _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  ) rethrows -> Filtered {
     return try _box._filter(isIncluded)
   }
 
