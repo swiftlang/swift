@@ -22,10 +22,10 @@ import TestsUtils
 struct BenchResults {
   typealias T = Int
   private let samples: [T]
-  let maxRSS: Int
+  let maxRSS: Int?
   let stats: Stats
 
-  init(_ samples: [T], maxRSS: Int) {
+  init(_ samples: [T], maxRSS: Int?) {
     self.samples = samples.sorted()
     self.maxRSS = maxRSS
     self.stats = self.samples.reduce(into: Stats(), Stats.collect)
@@ -367,7 +367,8 @@ final class TestRunner {
   /// This method of estimating memory usage is valid only for executing single
   /// benchmark. That's why we don't worry about reseting the `baseline` in
   /// `resetMeasurements`.
-  func measureMemoryUsage() -> Int {
+  func measureMemoryUsage() -> Int? {
+    guard c.logMemory else { return nil }
     let current = TestRunner.getResourceUtilization()
     let maxRSS = current.ru_maxrss - baseline.ru_maxrss
     let pages = { maxRSS / sysconf(_SC_PAGESIZE) }
@@ -517,8 +518,8 @@ final class TestRunner {
           [r.sampleCount] +
           (c.quantile.map(quantiles)
             ?? [r.min,  r.max, r.mean, r.sd, r.median]) +
-          (c.logMemory ? [r.maxRSS] : [])
         ).map { String($0) }
+          [r.maxRSS].compactMap { $0 }
       }
       let benchmarkStats = (
         [index, t.name] + (results.map(values) ?? ["Unsupported"])
