@@ -1794,6 +1794,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
   bool First = true;
 
   DeclName appendLiteral(Context, Context.Id_appendLiteral, { Identifier() });
+  DeclName appendInterpolation(Context.Id_appendInterpolation);
 
   for (auto Segment : Segments) {
     auto InterpolationVarRef =
@@ -1943,8 +1944,6 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
         }
       }
       
-      DeclName appendInterpolation(Context, Context.Id_appendInterpolation,
-                                   argLabels);
       auto AppendInterpolationRef =
         new (Context) UnresolvedDotExpr(InterpolationVarRef,
                                         /*dotloc=*/SourceLoc(),
@@ -1954,7 +1953,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       auto AppendInterpolationCall =
         CallExpr::create(Context, AppendInterpolationRef,
                          lParen, args, argLabels, argLabelLocs, rParen,
-                         /*trailingClosure=*/nullptr, /*implicit=*/true);
+                         /*trailingClosure=*/nullptr, /*implicit=*/false);
       
       Stmts.push_back(AppendInterpolationCall);
 
