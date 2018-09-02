@@ -7,8 +7,10 @@
 protocol P0 {
   associatedtype A
 
+  // expected-note@+1{{potential overridden instance method 'foo()' here}}
   func foo()
 
+  // expected-note@+1{{attempt to override property here}}
   var prop: A { get }
 }
 
@@ -79,4 +81,25 @@ protocol P5: P0 where Self.A == Int {
   // CHECK-SAME: "prop"
   // CHECK-SAME: override=override.(file).P0.prop
   var prop: Int { get }
+}
+
+// Allow the 'override' keyword on protocol members (it is not required).
+// CHECK: protocol{{.*}}"P6"
+protocol P6: P0 {
+  // CHECK: func_decl{{.*}}foo(){{.*}}Self : P6{{.*}}override={{.*}}P0.foo
+  override func foo()
+
+  // CHECK: var_decl
+  // CHECK-SAME: "prop"
+  // CHECK-SAME: override=override.(file).P0.prop
+  override var prop: A { get }
+}
+
+// Complain if 'override' is present but there is no overridden declaration.
+protocol P7: P0 {
+  // expected-error@+1{{method does not override any method from its superclass}}
+  override func foo() -> Int
+
+  // expected-error@+1{{property 'prop' with type 'Int' cannot override a property with type 'Self.A'}}
+  override var prop: Int { get }
 }
