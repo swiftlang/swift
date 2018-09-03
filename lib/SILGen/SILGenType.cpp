@@ -834,9 +834,7 @@ public:
   }
   void visitFuncDecl(FuncDecl *fd) {
     SGM.emitFunction(fd);
-    // FIXME: Default implementations in protocols.
-    if (SGM.requiresObjCMethodEntryPoint(fd) &&
-        !isa<ProtocolDecl>(fd->getDeclContext()))
+    if (SGM.requiresObjCMethodEntryPoint(fd) && fd->isDefaultImplInProtocol())
       SGM.emitObjCMethodThunk(fd);
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
@@ -880,8 +878,7 @@ public:
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *asd) {
-    // FIXME: Default implementations in protocols.
-    if (asd->isObjC() && !isa<ProtocolDecl>(asd->getDeclContext()))
+    if (asd->isObjC() && asd->isDefaultImplInProtocol())
       SGM.emitObjCPropertyMethodThunks(asd);
     
     SGM.tryEmitPropertyDescriptor(asd);
