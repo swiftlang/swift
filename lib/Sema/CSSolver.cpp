@@ -13,6 +13,7 @@
 // This file implements the constraint solver used in the type checker.
 //
 //===----------------------------------------------------------------------===//
+#include "CSStep.h"
 #include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
 #include "TypeCheckType.h"
@@ -24,6 +25,7 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <list>
 #include <memory>
 #include <tuple>
 
@@ -1554,6 +1556,68 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions) {
   } while (!done);
 
   return !anySolutions;
+}
+
+bool ConstraintSystem::solveIteratively(
+    Expr *expr, SmallVectorImpl<Solution> &solutions,
+    FreeTypeVariableBinding allowFreeTypeVariables) {
+  SolverState state(expr, *this, allowFreeTypeVariables);
+
+  std::list<SolverStep> workList;
+  // First step is always wraps whole constraint system.
+  workList.push_back(
+      SolverStep::create(*this, TypeVariables, InactiveConstraints, solutions));
+
+  // Execute steps in LIFO order, which means that
+  // each individual step would either end up producing
+  // a solution, or producing another set of mergeable
+  // steps to take before arriving to solution.
+  while (!workList.empty()) {
+    auto &step = workList.back();
+
+    // Now let's try to advance to the next step,
+    // which should produce another steps to follow,
+    // or error, which means that we'll have to stop.
+    {
+      SolutionKind result;
+      std::list<SolverStep> followupSteps;
+
+      std::tie(result, followupSteps) = step.advance();
+      switch (result) {
+      // Step has been solved successfully by either
+      // producing a partial solution, or more steps
+      // toward that solution.
+      case SolutionKind::Solved: {
+        workList.pop_back();
+        break;
+      }
+
+      // Keep this step in the work list to return to it
+      // once all other steps are done, this could be a
+      // disjunction which has to peek a new choice until
+      // it completely runs out of choices, or type variable
+      // binding.
+      case SolutionKind::Unsolved:
+        break;
+
+      // It was impossible to produce a solution for this step,
+      // let's terminate the solver loop.
+      case SolutionKind::Error:
+        return true;
+      }
+
+      workList.splice(workList.end(), followupSteps);
+    }
+  }
+
+  // Filter deduced solutions, try to figure out if there is
+  // a single best solution to use, if not explicitly disabled
+  // by constraint system options.
+  if (!retainAllSolutions())
+    filterSolutions(solutions, state.ExprWeights);
+
+  // We fail if there is no solution or the expression was too complex.
+  return solutions.empty() || getExpressionTooComplex(solutions);
 }
 
 /// Whether we should short-circuit a disjunction that already has a
