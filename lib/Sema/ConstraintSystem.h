@@ -57,6 +57,7 @@ class DisjunctionChoiceProducer;
 class TypeBinding;
 class TypeVariableBinding;
 class TypeVarBindingProducer;
+class SolverStep;
 
 } // end namespace constraints
 
@@ -930,6 +931,7 @@ public:
   friend class FailureDiagnostic;
   friend class TypeVarBindingProducer;
   friend class TypeVariableBinding;
+  friend class SolverStep;
 
   class SolverScope;
 
@@ -3087,6 +3089,9 @@ public:
   ///
   /// \returns true if there are no solutions
   bool solveRec(SmallVectorImpl<Solution> &solutions);
+
+  bool solveIteratively(Expr *expr, SmallVectorImpl<Solution> &solutions,
+                        FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Solve the system of constraints.
   ///
