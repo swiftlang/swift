@@ -88,7 +88,7 @@ public:
   /// for this step.
   ///
   /// \returns true if there are any solutions, false otherwise.
-  bool mergePartialSolutions() const { return false; }
+  bool mergePartialSolutions() const;
 
 private:
   struct Scope {
@@ -104,6 +104,7 @@ private:
     // Partial solutions associated with given step, each element
     // of the array presents a disjoint component (or follow-up step)
     // that current step has been split into.
+    unsigned NumComponents = 0;
     std::unique_ptr<SmallVector<Solution, 4>[]> PartialSolutions = nullptr;
 
     Scope(SolverStep &step) : CS(step.CS) {
