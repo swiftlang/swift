@@ -2,7 +2,7 @@
 // XFAIL: *
 
 @_fixed_layout
-public struct Vector<T : Numeric> : VectorNumeric {
+public struct Vector<T> : VectorNumeric {
   public var x: T
   public var y: T
 
@@ -39,9 +39,9 @@ public func fakeAdj<T>(lhs: Vector<T>, rhs: Vector<T>, y: Vector<T>, seed: Vecto
   abort()
 }
 
-public func callGenericFunctionOnConcrete(_ x: Vector<Float>) {
-  func foo(x: Vector<Float>, y: Vector<Float>) -> Vector<Float> {
-    return x + y
+public func test1() {
+  func foo(_ x: Vector<Float>) -> Vector<Float> {
+    return x + x
   }
   _ = #gradient(foo)
 }
