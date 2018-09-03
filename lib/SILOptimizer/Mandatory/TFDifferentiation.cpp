@@ -1455,9 +1455,6 @@ enum class ActivityFlags : unsigned {
 };
 
 using Activity = OptionSet<ActivityFlags>;
-static inline Activity operator|(ActivityFlags lhs, ActivityFlags rhs) {
-  return Activity(unsigned(lhs) | unsigned(rhs));
-}
 
 /// Result of activity analysis on a function. Accepts queries for whether a
 /// value is "varied", "useful" or "active" against certain differentiation
