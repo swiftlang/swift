@@ -57,6 +57,41 @@ public protocol VectorNumeric {
   static func * (lhs: ScalarElement, rhs: Self) -> Self
 }
 
+/// A type that represents an vector space that corresponds to a differentiable
+/// manifold. A differentiable vector space defines a corresponding tangent
+/// space and a corresponding cotangent space, i.e. the dual space of the
+/// tangent space.
+///
+/// In automatic differentiation, forward-mode differentiation will produce
+/// Jacobian-vector products of `Tangent` type; reverse-mode differentiation
+/// will produce vector-Jacobian products of `Cotangent` type.
+public protocol DifferentiableVectorNumeric : VectorNumeric
+  where ScalarElement : FloatingPoint {
+  /// The tangent space of the vector space represented by the enclosing type.
+  associatedtype Tangent : VectorNumeric
+    where Tangent.ScalarElement == ScalarElement
+
+  /// The cotangent space of the vector space represented by the enclosing type.
+  associatedtype Cotangent : VectorNumeric
+    where Cotangent.ScalarElement == ScalarElement
+
+  var tangent: Tangent { get }
+
+  var cotangent: Cotangent { get }
+}
+
+public extension DifferentiableVectorNumeric where Tangent == Self {
+  var tangent: Tangent {
+    return self
+  }
+}
+
+public extension DifferentiableVectorNumeric where Cotangent == Self {
+  var cotangent: Cotangent {
+    return self
+  }
+}
+
 public extension VectorNumeric {
   static func + (lhs: Self, rhs: ScalarElement) -> Self {
     return lhs + Self(rhs)
@@ -103,98 +138,96 @@ func _valueAndGradientBodyUnreachable() {
   // `Swift.valueAndGradient(of:)` are resolved as a special case by the type
   // checker.
   Builtin.staticReport(_trueAfterDiagnostics(), true._value,
-    ("internal consistency error: 'valueAndGradient(of:)' operation failed to resolve"
-     as StaticString).utf8Start._rawValue)
+    ("""
+     internal consistency error: 'valueAndGradient(of:)' operation failed to \
+     resolve
+     """ as StaticString).utf8Start._rawValue)
   Builtin.unreachable()
 }
 
 @inlinable // FIXME(sil-serialize-all)
-@_transparent
-@_semantics("typechecker.gradient(of:)")
-public func gradient<T, Result>(of function: (T) -> Result) -> (T) -> T
-  where T : VectorNumeric, Result : VectorNumeric {
+@_transparent @_semantics("typechecker.gradient(of:)")
+public func gradient<T, R>(of function: (T) -> R) -> (T) -> T.Cotangent
+  where T : DifferentiableVectorNumeric, R : DifferentiableVectorNumeric {
   _gradientBodyUnreachable()
 }
 
 @inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.gradient(of:)")
-public func gradient<T, U, Result>(
-  of function: (T, U) -> Result
-) -> (T, U) -> (T, U)
-  where T : VectorNumeric, U : VectorNumeric, Result : VectorNumeric,
-        T.ScalarElement : FloatingPoint, U.ScalarElement : FloatingPoint {
+public func gradient<T, U, R>(
+  of function: (T, U) -> R
+) -> (T, U) -> (T.Cotangent, U.Cotangent)
+  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
+        R : DifferentiableVectorNumeric {
   _gradientBodyUnreachable()
 }
 
 @inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.gradient(of:)")
-public func gradient<T, U, V, Result>(
-  of function: (T, U, V) -> Result
-) -> (T, U, V) -> (T, U, V)
-  where T : VectorNumeric, U : VectorNumeric, V : VectorNumeric,
-        Result : VectorNumeric, T.ScalarElement : FloatingPoint,
-        U.ScalarElement : FloatingPoint, V.ScalarElement : FloatingPoint {
+public func gradient<T, U, V, R>(
+  of function: (T, U, V) -> R
+) -> (T, U, V) -> (T.Cotangent, U.Cotangent, V.Cotangent)
+  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
+        V : DifferentiableVectorNumeric, R : DifferentiableVectorNumeric {
   _gradientBodyUnreachable()
 }
 
 @inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.gradient(of:)")
-public func gradient<T, U, V, W, Result>(
-  of function: (T, U, V, W) -> Result
-) -> (T, U, V, W) -> (T, U, V, W)
-  where T : VectorNumeric, U : VectorNumeric, V : VectorNumeric,
-        W : VectorNumeric, Result : VectorNumeric, T.ScalarElement : FloatingPoint,
-        U.ScalarElement : FloatingPoint, V.ScalarElement : FloatingPoint,
-        W.ScalarElement : FloatingPoint {
+public func gradient<T, U, V, W, R>(
+  of function: (T, U, V, W) -> R
+) -> (T, U, V, W) -> (T.Cotangent, U.Cotangent, V.Cotangent, W.Cotangent)
+  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
+        V : DifferentiableVectorNumeric, W : DifferentiableVectorNumeric,
+        R : DifferentiableVectorNumeric {
   _gradientBodyUnreachable()
 }
 
 @inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.valueAndGradient(of:)")
-public func valueAndGradient<T, Result>(
-  of function: (T) -> Result
-) -> (T) -> (value: Result, gradient: T)
-  where T : VectorNumeric, Result : VectorNumeric, T.ScalarElement : FloatingPoint {
+public func valueAndGradient<T, R>(
+  of function: (T) -> R
+) -> (T) -> (value: R, gradient: T.Cotangent)
+  where T : DifferentiableVectorNumeric, R : DifferentiableVectorNumeric {
   _valueAndGradientBodyUnreachable()
 }
 
 @inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.valueAndGradient(of:)")
-public func valueAndGradient<T, U, Result>(
-  of function: (T, U) -> Result
-) -> (T, U) -> (value: Result, gradient: (T, U))
-  where T : VectorNumeric, U : VectorNumeric, Result : VectorNumeric,
-        T.ScalarElement : FloatingPoint, U.ScalarElement : FloatingPoint {
+public func valueAndGradient<T, U, R>(
+  of function: (T, U) -> R
+) -> (T, U) -> (value: R, gradient: (T.Cotangent, U.Cotangent))
+  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
+        R : DifferentiableVectorNumeric {
   _valueAndGradientBodyUnreachable()
 }
 
 @inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.valueAndGradient(of:)")
-public func valueAndGradient<T, U, V, Result>(
-  of function: (T, U, V) -> Result
-) -> (T, U, V) -> (value: Result, gradient: (T, U, V))
-  where T : VectorNumeric, U : VectorNumeric, V : VectorNumeric,
-        Result : VectorNumeric, T.ScalarElement : FloatingPoint,
-        U.ScalarElement : FloatingPoint, V.ScalarElement : FloatingPoint {
+public func valueAndGradient<T, U, V, R>(
+  of function: (T, U, V) -> R
+) -> (T, U, V) -> (value: R, gradient: (T.Cotangent, U.Cotangent, V.Cotangent))
+  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
+        V : DifferentiableVectorNumeric, R : DifferentiableVectorNumeric {
   _valueAndGradientBodyUnreachable()
 }
 
 @inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.valueAndGradient(of:)")
-public func valueAndGradient<T, U, V, W, Result>(
-  of function: (T, U, V, W) -> Result
-) -> (T, U, V, W) -> (value: Result, gradient: (T, U, V, W))
-  where T : VectorNumeric, U : VectorNumeric, V : VectorNumeric,
-        W : VectorNumeric, Result : VectorNumeric, T.ScalarElement : FloatingPoint,
-        U.ScalarElement : FloatingPoint, V.ScalarElement : FloatingPoint,
-        W.ScalarElement : FloatingPoint {
+public func valueAndGradient<T, U, V, W, R>(
+  of function: (T, U, V, W) -> R
+) -> (T, U, V, W)
+  -> (value: R, gradient: (T.Cotangent, U.Cotangent, V.Cotangent, W.Cotangent))
+  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
+        V : DifferentiableVectorNumeric, W : DifferentiableVectorNumeric,
+        R : DifferentiableVectorNumeric {
   _valueAndGradientBodyUnreachable()
 }
 
