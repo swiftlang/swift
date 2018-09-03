@@ -280,11 +280,8 @@ namespace {
       
       if (witness) {
         if (isa<ProtocolDecl>(witness->getDeclContext())) {
-          if (auto *afc = dyn_cast<AbstractFunctionDecl>(witness)) {
-            if (afc->hasBody()) {
-              addResult(witness);
-            }
-          }
+          if (witness->isDefaultImplInProtocol())
+            addResult(witness);
         } else {
           addResult(witness);
         }

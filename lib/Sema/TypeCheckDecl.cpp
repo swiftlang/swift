@@ -772,12 +772,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     // it is, check if other decl has a body in the protocol.
     bool skipProtocolExtensionCheck = false;
     
-    if (isa<ExtensionDecl>(currentDC) && isa<ProtocolDecl>(otherDC)) {
-      if (auto *afd = dyn_cast<AbstractFunctionDecl>(other)) {
-        if (afd->hasBody()) {
-          skipProtocolExtensionCheck = true;
-        }
-      }
+    if (isa<ExtensionDecl>(currentDC) && other->isDefaultImplInProtocol()) {
+      skipProtocolExtensionCheck = true;
     }
     
     if (!conflicting(currentSig, otherSig, skipProtocolExtensionCheck))
