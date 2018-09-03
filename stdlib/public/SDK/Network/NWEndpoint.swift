@@ -631,7 +631,6 @@ public enum NWEndpoint: Hashable, CustomDebugStringConvertible {
 			interface = NWInterface(nwinterface)
 		}
 		if nw_endpoint_get_type(nw) == Network.nw_endpoint_type_host {
-
 			let host = NWEndpoint.Host.name(String(cString: nw_endpoint_get_hostname(nw)), interface)
 			self = .hostPort(host: host, port: NWEndpoint.Port(nw_endpoint_get_port(nw)))
 		} else if nw_endpoint_get_type(nw) == Network.nw_endpoint_type_address {

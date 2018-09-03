@@ -478,7 +478,7 @@ public final class NWConnection : CustomDebugStringConvertible {
 		}
 	}
 
-	/// Callbacks used when sending data to the protocol stack. 
+	/// A type representing a wrapped completion handler invoked when send content has been consumed by the protocol stack, or the lack of a completion handler because the content is idempotent.
 	public enum SendCompletion {
 		/// Completion handler to be invoked when send content has been successfully processed, or failed to send due to an error.
 		/// Note that this does not guarantee that the data was sent out over the network, or acknowledge, but only that

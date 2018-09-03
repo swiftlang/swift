@@ -74,8 +74,8 @@ public struct NWInterface : Hashable, CustomDebugStringConvertible {
 			}
 		}
 	}
-	
-	/// The interface types wifi, cellular, wiredEthernet, and loopback.
+
+	/// The interface type wifi, cellular, wiredEthernet, and loopback.
 	public let type: InterfaceType
 
 	/// The name of the interface, such as "en0"
