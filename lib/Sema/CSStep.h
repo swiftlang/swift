@@ -18,11 +18,11 @@
 #ifndef SWIFT_SEMA_CSSTEP_H
 #define SWIFT_SEMA_CSSTEP_H
 
+#include "Constraint.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include <list>
 #include <memory>
 
 using namespace llvm;
@@ -48,7 +48,7 @@ class SolverStep {
 
 public:
   using StepResult =
-      std::pair<ConstraintSystem::SolutionKind, std::list<SolverStep>>;
+      std::pair<ConstraintSystem::SolutionKind, SmallVector<SolverStep *, 4>>;
 
   explicit SolverStep(ConstraintSystem &cs,
                       SmallVectorImpl<Solution> &solutions)
@@ -78,10 +78,13 @@ public:
   /// let's compute them using connected components algorithm.
   StepResult computeFollowupSteps() const;
 
-  static SolverStep create(ConstraintSystem &cs,
-                           ArrayRef<TypeVariableType *> typeVars,
-                           ConstraintList &constraints,
-                           SmallVectorImpl<Solution> &solutions);
+  static SolverStep *create(ConstraintSystem &cs,
+                            SmallVectorImpl<Solution> &solutions);
+
+  static SolverStep *create(ConstraintSystem &cs,
+                            ArrayRef<TypeVariableType *> typeVars,
+                            ConstraintList &constraints,
+                            SmallVectorImpl<Solution> &solutions);
 
   /// Once all of the follow-up steps are complete, let's try
   /// to merge resulting solutions together, to form final solution(s)

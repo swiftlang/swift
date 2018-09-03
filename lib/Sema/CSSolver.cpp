@@ -25,7 +25,6 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <list>
 #include <memory>
 #include <tuple>
 
@@ -1563,7 +1562,7 @@ bool ConstraintSystem::solveIteratively(
     FreeTypeVariableBinding allowFreeTypeVariables) {
   SolverState state(expr, *this, allowFreeTypeVariables);
 
-  std::list<SolverStep> workList;
+  SmallVector<SolverStep *, 16> workList;
   // First step is always wraps whole constraint system.
   workList.push_back(
       SolverStep::create(*this, TypeVariables, InactiveConstraints, solutions));
@@ -1573,16 +1572,16 @@ bool ConstraintSystem::solveIteratively(
   // a solution, or producing another set of mergeable
   // steps to take before arriving to solution.
   while (!workList.empty()) {
-    auto &step = workList.back();
+    auto *step = workList.back();
 
     // Now let's try to advance to the next step,
     // which should produce another steps to follow,
     // or error, which means that we'll have to stop.
     {
       SolutionKind result;
-      std::list<SolverStep> followupSteps;
+      SmallVector<SolverStep *, 4> followupSteps;
 
-      std::tie(result, followupSteps) = step.advance();
+      std::tie(result, followupSteps) = step->advance();
       switch (result) {
       // Step has been solved successfully by either
       // producing a partial solution, or more steps
@@ -1606,7 +1605,8 @@ bool ConstraintSystem::solveIteratively(
         return true;
       }
 
-      workList.splice(workList.end(), followupSteps);
+      workList.reserve(followupSteps.size());
+      workList.append(followupSteps.begin(), followupSteps.end());
     }
   }
 
