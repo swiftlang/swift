@@ -18,6 +18,7 @@
 set(SWIFTLIB_ESSENTIAL
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   # Some files can't be sorted alphabetically, see notes in the list below.
+  AdjacentPairs.swift
   Algorithm.swift
   ArrayBody.swift
   ArrayBuffer.swift

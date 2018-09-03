@@ -1032,6 +1032,27 @@ SequenceTypeTests.test("Sequence/split/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
+// adjacentPairs()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("adjacentPairs") {
+  typealias Element = (OpaqueValue<Int>, OpaqueValue<Int>)
+  func compareElements(_ lhs: Element, rhs: Element) -> Bool {
+      return lhs.0.value == rhs.0.value && lhs.1.value == rhs.1.value
+  }
+
+  for test in adjacentPairsTests {
+    let s = MinimalSequence<OpaqueValue<Int>>(
+      elements: test.sequence.map(OpaqueValue.init))
+    checkSequence(
+      test.expected.map { (OpaqueValue($0), OpaqueValue($1)) },
+      s.adjacentPairs(),
+      stackTrace: SourceLocStack().with(test.loc),
+      sameValue: compareElements) 
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // zip()
 //===----------------------------------------------------------------------===//
 

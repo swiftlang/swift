@@ -81,6 +81,7 @@
         "ExistentialCollection.swift"
       ],
       "Lazy Views": [
+        "AdjacentPairs.swift",
         "Algorithm.swift",
         "Flatten.swift",
         "FlatMap.swift",

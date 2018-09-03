@@ -17,6 +17,18 @@ internal enum TestError : Error {
   case error2
 }
 
+public struct AdjacentPairsTest {
+    public let expected: [(Int, Int)]
+    public let sequence: [Int]
+    public let loc: SourceLoc
+
+    public init(expected: [(Int, Int)], sequence: [Int], file: String = #file, line: UInt = #line) {
+        self.expected = expected
+        self.sequence = sequence
+        self.loc = SourceLoc(file, line, comment: "adjacentPairs() test data")
+    }
+}
+
 public struct DropFirstTest {
   public var sequence: [Int]
   public let dropElements: Int
@@ -438,6 +450,7 @@ public struct StartsWithTest {
     self.loc = SourceLoc(file, line, comment: "test data")
   }
 }
+
 public struct ZipTest {
   public let expected: [(Int, Int32)]
   public let sequence: [Int]
@@ -463,6 +476,14 @@ public struct ZipTest {
   }
 }
 
+
+public let adjacentPairsTests: [AdjacentPairsTest] = [
+    AdjacentPairsTest(expected: [], sequence: []),
+    AdjacentPairsTest(expected: [], sequence: [0]),
+    AdjacentPairsTest(expected: [(1, 2)], sequence: [1, 2]),
+    AdjacentPairsTest(expected: [(1, 2), (2, 3)], sequence: [1, 2, 3]),
+    AdjacentPairsTest(expected: [(1, 2), (2, 3), (3, 4)], sequence: [1, 2, 3, 4])
+]
 
 public let elementsEqualTests: [ElementsEqualTest] = [
   ElementsEqualTest(true, [], [], [], []),
