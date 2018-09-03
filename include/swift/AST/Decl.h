@@ -2312,6 +2312,10 @@ public:
   /// Asserts if this is not a member of a protocol.
   bool isProtocolRequirement() const;
 
+  /// Returns true if this member is a default implementation in a
+  /// protocol.
+  bool isDefaultImplInProtocol() const;
+
   /// Determine whether we have already checked whether this
   /// declaration is a redeclaration.
   bool alreadyCheckedRedeclaration() const { 

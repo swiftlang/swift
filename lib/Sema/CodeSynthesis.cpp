@@ -325,11 +325,11 @@ static void maybeMarkTransparent(TypeChecker &TC, AccessorDecl *accessor) {
     return;
 
   // Accessors for protocol storage requirements are never @_transparent
-  // since they do not have bodies.
-  //
-  // FIXME: Revisit this if we ever get 'real' default implementations.
-  if (isa<ProtocolDecl>(nominalDecl))
-    return;
+  // if the accessor does not have a body.
+  if (isa<ProtocolDecl>(nominalDecl)) {
+    if (!accessor->hasBody())
+      return;
+  }
 
   // Accessors for classes with @objc ancestry are not @_transparent,
   // since they use a field offset variable which is not exported.
@@ -2066,8 +2066,10 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
         TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
     }
 
-    setProtocolStorageImpl(TC, storage);
-    return;
+    if (!storage->isDefaultImplInProtocol()) {
+      setProtocolStorageImpl(TC, storage);
+      return;
+    }
 
   // NSManaged properties on classes require special handling.
   } else if (dc->getSelfClassDecl()) {

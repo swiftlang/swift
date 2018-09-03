@@ -2183,6 +2183,29 @@ bool ValueDecl::isProtocolRequirement() const {
   return true;
 }
 
+bool ValueDecl::isDefaultImplInProtocol() const {
+  if (isa<ProtocolDecl>(getDeclContext())) {
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(this)) {
+      if (func->hasBody()) {
+        return true;
+      }
+    }
+    
+    if (auto *storage = dyn_cast<AbstractStorageDecl>(this)) {
+      if (storage->hasAnyAccessors()) {
+        auto accessors = storage->getAllAccessors();
+        
+        for (auto *accessor : accessors) {
+          if (accessor->hasBody())
+            return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
 bool ValueDecl::hasInterfaceType() const {
   return !TypeAndAccess.getPointer().isNull();
 }

@@ -5183,7 +5183,6 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
 
   // If this is a method in a protocol, generate it as a protocol call.
   if (isa<ProtocolDecl>(decl->getDeclContext())) {
-    assert(!isDirectUse && "direct use of protocol accessor?");
     assert(!isSuper && "super call to protocol method?");
 
     return Callee::forWitnessMethod(

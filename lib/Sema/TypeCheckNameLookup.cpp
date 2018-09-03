@@ -190,17 +190,6 @@ namespace {
         }
       };
 
-      // Check if found is potentially a default implementation in a protocol.
-      bool foundIsDefaultImpl = false;
-
-      if (isa<ProtocolDecl>(foundDC)) {
-        if (auto *afd = dyn_cast<AbstractFunctionDecl>(found)) {
-          if (afd->hasBody()) {
-            foundIsDefaultImpl = true;
-          }
-        }
-      }
-
       // If this isn't a protocol member to be given special
       // treatment, just add the result.
       if (!Options.contains(NameLookupFlags::ProtocolMembers) ||
@@ -208,7 +197,7 @@ namespace {
           isa<GenericTypeParamDecl>(found) ||
           isa<TypeAliasDecl>(found) ||
           (isa<FuncDecl>(found) && cast<FuncDecl>(found)->isOperator()) ||
-          foundIsDefaultImpl) {
+          found->isDefaultImplInProtocol()) {
         addResult(found);
         return;
       }

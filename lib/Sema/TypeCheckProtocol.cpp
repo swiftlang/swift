@@ -1037,11 +1037,8 @@ bool WitnessChecker::findBestWitness(
     for (auto witness : witnesses) {
       // Check if witness may be a default implementation in a protocol.
       if (isa<ProtocolDecl>(witness->getDeclContext())) {
-        if (auto *afd = dyn_cast<AbstractFunctionDecl>(witness)) {
-          if (!afd->hasBody()) {
-            continue;
-          }
-        }
+        if (!witness->isDefaultImplInProtocol())
+          continue;
       }
 
       if (!witness->hasValidSignature()) {
@@ -1060,6 +1057,10 @@ bool WitnessChecker::findBestWitness(
         bestIdx = matches.size();
       } else if (match.Kind == MatchKind::WitnessInvalid) {
         doNotDiagnoseMatches = true;
+      }
+
+      if (auto *proto = dyn_cast<ProtocolDecl>(match.Witness->getDeclContext())) {
+        anyFromUnconstrainedExtension = true;
       }
 
       if (auto *ext = dyn_cast<ExtensionDecl>(match.Witness->getDeclContext())){

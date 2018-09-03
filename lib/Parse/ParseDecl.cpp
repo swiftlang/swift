@@ -4150,6 +4150,14 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
     }
   }
 
+  // Check if the storage has any accessors right now, if not protocols are
+  // allowed default implementation.
+  bool isEligibleForDefaultImpl = false;
+  if (!storage->hasAnyAccessors() && Flags.contains(PD_InProtocol)) {
+    // Protocols can have bodies as part of default implementation.
+    isEligibleForDefaultImpl = true;
+  }
+
   SyntaxParsingContext AccessorListCtx(SyntaxContext,
                                        SyntaxKind::AccessorBlock);
 
@@ -4164,7 +4172,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
     accessors.RBLoc = consumeToken(tok::r_brace);
 
     // In the limited syntax, fall out and let the caller handle it.
-    if (parsingLimitedSyntax)
+    if (parsingLimitedSyntax && !isEligibleForDefaultImpl)
       return false;
 
     diagnose(accessors.RBLoc, diag::computed_property_no_accessors,
@@ -4209,7 +4217,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
       AccessorCtx.reset();
 
       // parsingLimitedSyntax mode cannot have a body.
-      if (parsingLimitedSyntax) {
+      if (parsingLimitedSyntax && !isEligibleForDefaultImpl) {
         diagnose(Tok, diag::expected_getset_in_protocol);
         Invalid = true;
         break;
@@ -4229,11 +4237,20 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
       AccessorListCtx.setTransparent();
       return parseImplicitGetter();
     }
+    
+    // Protocols are eligible for default implementation
+    if (IsFirstAccessor && isEligibleForDefaultImpl) {
+      if (!Tok.is(tok::l_brace))
+        isEligibleForDefaultImpl = false;
+    }
+    
     IsFirstAccessor = false;
 
     // For now, immediately reject illegal accessors in protocols just to
     // avoid having to deal with them everywhere.
-    if (parsingLimitedSyntax && !isAllowedInLimitedSyntax(Kind)) {
+    if (parsingLimitedSyntax &&
+        !isAllowedInLimitedSyntax(Kind) &&
+        !isEligibleForDefaultImpl) {
       diagnose(Loc, diag::expected_getset_in_protocol);
       continue;
     }
@@ -4262,7 +4279,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
     }
 
     // There's no body in the limited syntax.
-    if (parsingLimitedSyntax)
+    if (parsingLimitedSyntax && !isEligibleForDefaultImpl)
       continue;
 
     // It's okay not to have a body if there's an external asm name.
