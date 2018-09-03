@@ -88,22 +88,18 @@ swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
   
   // _SwiftSetBodyStorage body;
   {
-    // _SwiftHashTable hashTable;
-    {
-      // Setting the scale to 0 makes for a bucketCount of 1 -- so that the
-      // storage consists of a single unoccupied bucket. The capacity is set to
-      // 0 so that any insertion will lead to real storage being allocated.
-      0, // int count;
-      0, // int capacity;
-      1, // int bucketCount;
-      &swift::_swiftEmptySetStorage.entries, // void *map
-    },
+    // Setting the scale to 0 makes for a bucketCount of 1 -- so that the
+    // storage consists of a single unoccupied bucket. The capacity is set to
+    // 0 so that any insertion will lead to real storage being allocated.
+    0, // int count;
+    0, // int capacity;
+    0, // int scale;
     0, // uint64 seed0;
     0, // uint64 seed1;
     (void *)1, // void *rawElements; (non-null garbage)
   },
 
-  0 // int entries; (zeroed bytes)
+  0 // int buckets; (zeroed bytes)
 };
 
 static swift::_SwiftHashingParameters initializeHashingParameters() {

@@ -45,13 +45,6 @@ struct _SwiftUnsafeBitMap {
   __swift_intptr_t bitCount;
 };
 
-struct _SwiftHashTable {
-  __swift_intptr_t count;
-  __swift_intptr_t capacity;
-  __swift_intptr_t bucketCount;
-  void *map;
-};
-
 struct _SwiftDictionaryBodyStorage {
   __swift_intptr_t capacity;
   __swift_intptr_t count;
@@ -61,7 +54,9 @@ struct _SwiftDictionaryBodyStorage {
 };
 
 struct _SwiftSetBodyStorage {
-  struct _SwiftHashTable hashTable;
+  __swift_uint64_t count;
+  __swift_uint64_t capacity;
+  __swift_uint64_t scale;
   __swift_uint64_t seed0;
   __swift_uint64_t seed1;
   void *rawElements;

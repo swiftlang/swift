@@ -185,11 +185,6 @@ extension Set {
   }
 #endif
 
-  //
-  // All APIs below should dispatch to `_variant`, without doing any
-  // additional processing.
-  //
-
 #if _runtime(_ObjC)
   /// Private initializer used for bridging.
   ///
@@ -276,11 +271,13 @@ extension Set: Sequence {
   /// - Complexity: O(1)
   @inlinable
   public func contains(_ member: Element) -> Bool {
+    defer { _fixLifetime(self) }
     return _variant.contains(member)
   }
 
   @inlinable
   public func _customContainsEquatableElement(_ member: Element) -> Bool? {
+    defer { _fixLifetime(self) }
     return contains(member)
   }
 }
@@ -327,6 +324,7 @@ extension Set: Collection {
   /// If the set is empty, `startIndex` is equal to `endIndex`.
   @inlinable
   public var startIndex: Index {
+    defer { _fixLifetime(self) }
     return _variant.startIndex
   }
 
@@ -336,17 +334,20 @@ extension Set: Collection {
   /// If the set is empty, `endIndex` is equal to `startIndex`.
   @inlinable
   public var endIndex: Index {
+    defer { _fixLifetime(self) }
     return _variant.endIndex
   }
 
   /// Accesses the member at the given position.
   @inlinable
   public subscript(position: Index) -> Element {
+    defer { _fixLifetime(self) }
     return _variant.element(at: position)
   }
 
   @inlinable
   public func index(after i: Index) -> Index {
+    defer { _fixLifetime(self) }
     return _variant.index(after: i)
   }
 
@@ -362,6 +363,7 @@ extension Set: Collection {
   /// - Complexity: O(1)
   @inlinable
   public func firstIndex(of member: Element) -> Index? {
+    defer { _fixLifetime(self) }
     return _variant.index(for: member)
   }
 
@@ -369,6 +371,7 @@ extension Set: Collection {
   public func _customIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
+    defer { _fixLifetime(self) }
     return Optional(firstIndex(of: member))
   }
 
@@ -376,6 +379,7 @@ extension Set: Collection {
   public func _customLastIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
+    defer { _fixLifetime(self) }
     // The first and last elements are the same because each element is unique.
     return _customIndexOfEquatableElement(member)
   }
@@ -402,6 +406,7 @@ extension Set: Collection {
   /// If the set is empty, the value of this property is `nil`.
   @inlinable
   public var first: Element? {
+    defer { _fixLifetime(self) }
     // FIXME: It'd better to use an iterator than to subscript with startIndex,
     // because startIndex is currently O(n) in bridged sets. However,
     // enumerators aren't guaranteed to have the same element order as allKeys.
@@ -579,6 +584,7 @@ extension Set: SetAlgebra {
   public mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
+    defer { _fixLifetime(self) }
     return _variant.insert(newMember)
   }
 
@@ -605,6 +611,7 @@ extension Set: SetAlgebra {
   @inlinable
   @discardableResult
   public mutating func update(with newMember: Element) -> Element? {
+    defer { _fixLifetime(self) }
     return _variant.update(with: newMember)
   }
 
@@ -625,6 +632,7 @@ extension Set: SetAlgebra {
   @inlinable
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
+    defer { _fixLifetime(self) }
     return _variant.remove(member)
   }
 
@@ -637,6 +645,7 @@ extension Set: SetAlgebra {
   @inlinable
   @discardableResult
   public mutating func remove(at position: Index) -> Element {
+    defer { _fixLifetime(self) }
     return _variant.remove(at: position)
   }
 
@@ -647,6 +656,7 @@ extension Set: SetAlgebra {
   ///   default is `false`.
   @inlinable
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
+    defer { _fixLifetime(self) }
     _variant.removeAll(keepingCapacity: keepCapacity)
   }
 
@@ -663,6 +673,7 @@ extension Set: SetAlgebra {
   @inlinable
   @discardableResult
   public mutating func removeFirst() -> Element {
+    defer { _fixLifetime(self) }
     _precondition(!isEmpty, "Can't removeFirst from an empty Set")
     return remove(at: startIndex)
   }
@@ -749,6 +760,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
     where S.Element == Element {
+    defer { _fixLifetime(self) }
     if self.isEmpty { return true }
     if self.count == 1 { return possibleSuperset.contains(self.first!) }
     if let s = possibleSuperset as? Set<Element> {
@@ -787,6 +799,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func isStrictSubset<S: Sequence>(of possibleStrictSuperset: S) -> Bool
     where S.Element == Element {
+    defer { _fixLifetime(self) }
     if let s = possibleStrictSuperset as? Set<Element> {
       return isStrictSubset(of: s)
     }
@@ -819,6 +832,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func isSuperset<S: Sequence>(of possibleSubset: S) -> Bool
     where S.Element == Element {
+    defer { _fixLifetime(self) }
     if possibleSubset.underestimatedCount > self.count {
       return false
     }
@@ -852,6 +866,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func isStrictSuperset<S: Sequence>(of possibleStrictSubset: S) -> Bool
     where S.Element == Element {
+    defer { _fixLifetime(self) }
     if isEmpty { return false }
     if let s = possibleStrictSubset as? Set<Element> {
       return isStrictSuperset(of: s)
@@ -885,6 +900,7 @@ extension Set: SetAlgebra {
   @inlinable
   internal func _isDisjoint<S: Sequence>(with other: S) -> Bool
     where S.Element == Element {
+    defer { _fixLifetime(self) }
     for element in other {
       if self.contains(element) { return false }
     }
@@ -938,6 +954,7 @@ extension Set: SetAlgebra {
   @inlinable
   public mutating func formUnion<S: Sequence>(_ other: S)
     where S.Element == Element {
+    defer { _fixLifetime(self) }
     _variant.formUnion(other)
   }
 
@@ -958,6 +975,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func subtracting<S: Sequence>(_ other: S) -> Set<Element>
     where S.Element == Element {
+    defer { _fixLifetime(self) }
     return Set(_native: _variant.subtracting(other))
   }
 
@@ -977,12 +995,14 @@ extension Set: SetAlgebra {
   @inlinable
   public mutating func subtract<S: Sequence>(_ other: S)
     where S.Element == Element {
+    defer { _fixLifetime(self) }
     _subtract(other)
   }
 
   @inlinable
   internal mutating func _subtract<S: Sequence>(_ other: S)
   where S.Element == Element {
+    defer { _fixLifetime(self) }
     guard _variant.isUniquelyReferenced() else {
       self = Set(_native: _variant.subtracting(other))
       return
@@ -1011,6 +1031,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func intersection<S: Sequence>(_ other: S) -> Set<Element>
     where S.Element == Element {
+    defer { _fixLifetime(self) }
     return Set(_native: _variant.intersection(other))
   }
 
@@ -1052,6 +1073,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func symmetricDifference<S: Sequence>(_ other: S) -> Set<Element>
     where S.Element == Element {
+    defer { _fixLifetime(self) }
     if let other = other as? Set<Element> {
       return Set(_native: _variant.symmetricDifference(other))
     }
@@ -1212,6 +1234,7 @@ extension Set {
   /// - Parameter other: Another set.
   @inlinable
   public mutating func subtract(_ other: Set<Element>) {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     _subtract(other)
   }
 
@@ -1230,6 +1253,7 @@ extension Set {
   /// - Returns: `true` if the set is a subset of `other`; otherwise, `false`.
   @inlinable
   public func isSubset(of other: Set<Element>) -> Bool {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     guard self.count > 0 else { return true }
     guard self.count <= other.count else { return false }
     for member in self {
@@ -1256,6 +1280,7 @@ extension Set {
   ///   `false`.
   @inlinable
   public func isSuperset(of other: Set<Element>) -> Bool {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     return other.isSubset(of: self)
   }
 
@@ -1275,6 +1300,7 @@ extension Set {
   ///   otherwise, `false`.
   @inlinable
   public func isDisjoint(with other: Set<Element>) -> Bool {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     return _isDisjoint(with: other)
   }
 
@@ -1294,6 +1320,7 @@ extension Set {
   /// - Returns: A new set.
   @inlinable
   public func subtracting(_ other: Set<Element>) -> Set<Element> {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     return Set(_native: _variant.subtracting(other))
   }
 
@@ -1316,6 +1343,7 @@ extension Set {
   ///   `other`; otherwise, `false`.
   @inlinable
   public func isStrictSuperset(of other: Set<Element>) -> Bool {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     return self.count > other.count && self.isSuperset(of: other)
   }
 
@@ -1340,6 +1368,7 @@ extension Set {
   ///   `other`; otherwise, `false`.
   @inlinable
   public func isStrictSubset(of other: Set<Element>) -> Bool {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     return other.isStrictSuperset(of: self)
   }
 
@@ -1361,6 +1390,7 @@ extension Set {
   /// - Returns: A new set.
   @inlinable
   public func intersection(_ other: Set<Element>) -> Set<Element> {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     return Set(_native: _variant.intersection(other))
   }
 
@@ -1383,6 +1413,7 @@ extension Set {
   /// - Parameter other: Another set.
   @inlinable
   public mutating func formSymmetricDifference(_ other: Set<Element>) {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     self = self.symmetricDifference(other)
   }
 }
@@ -1404,10 +1435,8 @@ internal protocol _SetBuffer {
   func element(at i: Index) -> Element
 }
 
-/// An instance of this class has all `Set` data tail-allocated.  Enough bytes
-/// are allocated to hold the _HashTable's metadata entries as well of all
-/// buckets.  The data layout starts with the metadata entries, followed by the
-/// element-sized buckets.
+/// An instance of this class has all `Set` data tail-allocated, starting with
+/// hash table metadata, followed by element storage.
 ///
 /// **Note:** The precise layout of this type is relied on in the runtime
 /// to provide a statically allocated empty singleton.
@@ -1416,18 +1445,29 @@ internal protocol _SetBuffer {
 @usableFromInline
 @_objc_non_lazy_realization
 internal class _SwiftRawSetStorage: _SwiftNativeNSSet {
-  // The _HashTable struct contains pointers into tail-allocated storage, so
-  // this is unsafe and needs `_fixLifetime` calls in the caller.
+  /// The current number of occupied entries in this hash table.
   @usableFromInline
   @nonobjc
-  internal final var hashTable: _HashTable
+  internal final var _count: Int
+
+  /// The maximum number of entries that can be inserted into this hash table
+  /// without exceeding its maximum load factor.
+  @usableFromInline
+  @nonobjc
+  internal final var _capacity: Int
+
+  /// The scale of this hash table. The number of buckets is 2 raised to the
+  /// power of `scale`.
+  @usableFromInline
+  @nonobjc
+  internal final var _scale: Int
 
   @usableFromInline
-  internal final var seed: Hasher._Seed
+  internal final var _seed: Hasher._Seed
 
   @usableFromInline
   @nonobjc
-  internal final var rawElements: UnsafeMutableRawPointer
+  internal final var _rawElements: UnsafeMutableRawPointer
 
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
@@ -1438,6 +1478,37 @@ internal class _SwiftRawSetStorage: _SwiftNativeNSSet {
 
   @usableFromInline
   internal func invalidate() {}
+
+  @inlinable
+  @nonobjc
+  internal final var _bucketCount: Int {
+    @inline(__always) get { return 1 &<< _scale }
+  }
+
+  @inlinable
+  @nonobjc
+  internal final var _entryCount: Int {
+    @inline(__always) get { return 1 &<< (_scale &+ 3) }
+  }
+
+  @inlinable
+  @nonobjc
+  internal final var _buckets: UnsafeMutablePointer<_HashTable.Bucket> {
+    @inline(__always) get {
+      let bucketsAddr = Builtin.projectTailElems(self, _HashTable.Bucket.self)
+      return UnsafeMutablePointer(bucketsAddr)
+    }
+  }
+
+  // The _HashTable struct contains pointers into tail-allocated storage, so
+  // this is unsafe and needs `_fixLifetime` calls in the caller.
+  @inlinable
+  @nonobjc
+  internal final var _hashTable: _HashTable {
+    @inline(__always) get {
+      return _HashTable(buckets: _buckets, bucketCount: _bucketCount)
+    }
+  }
 }
 
 /// The storage class for the singleton empty set.
@@ -1526,30 +1597,18 @@ internal final class _SwiftNativeSetStorage<
   }
 
   deinit {
-    let elements = self.elements
-
-    if !_isPOD(Element.self) && hashTable.count > 0 {
-      for index in hashTable.occupiedIndices {
-        (elements + index.bucket).deinitialize(count: 1)
+    if !_isPOD(Element.self) && _count > 0 {
+      for index in _hashTable.indices {
+        (_elements + index.offset).deinitialize(count: 1)
       }
-      hashTable.count = -1
+      _count = -1
     }
-
     _fixLifetime(self)
   }
 
   @usableFromInline
   internal override func invalidate() {
-    hashTable.count = -1
-  }
-
-  @inlinable
-  static internal func allocate(
-    capacity: Int,
-    seed: Hasher._Seed
-  ) -> _SwiftNativeSetStorage {
-    let scale = _HashTable.scale(forCapacity: Swift.max(1 ,capacity))
-    return allocate(scale: scale, seed: seed)
+    _count = -1
   }
 
   @usableFromInline
@@ -1558,32 +1617,35 @@ internal final class _SwiftNativeSetStorage<
     scale: Int,
     seed: Hasher._Seed
   ) -> _SwiftNativeSetStorage {
-    _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
+    // The entry count must be representable by an Int value; hence the scale's
+    // weird upper bound.
+    _sanityCheck(scale >= 0 && scale < Int.bitWidth - 4)
+
     let bucketCount = 1 &<< scale
+    let entryCount = 1 &<< (scale + 3)
     let storage = Builtin.allocWithTailElems_2(
       _SwiftNativeSetStorage<Element>.self,
-      bucketCount._builtinWordValue, _HashTable.MapEntry.self,
-      bucketCount._builtinWordValue, Element.self)
+      bucketCount._builtinWordValue, _HashTable.Bucket.self,
+      entryCount._builtinWordValue, Element.self)
 
-    let mapAddr = Builtin.projectTailElems(storage, _HashTable.MapEntry.self)
+    let bucketsAddr = Builtin.projectTailElems(storage, _HashTable.Bucket.self)
     let elementsAddr = Builtin.getTailAddr_Word(
-      mapAddr,
-      bucketCount._builtinWordValue,
-      _HashTable.MapEntry.self,
+      bucketsAddr, bucketCount._builtinWordValue, _HashTable.Bucket.self,
       Element.self)
-    storage.hashTable = _HashTable(
-      scale: scale,
-      map: UnsafeMutablePointer(mapAddr))
-    storage.rawElements = UnsafeMutableRawPointer(elementsAddr)
-    storage.seed = seed
+    storage._count = 0
+    storage._capacity = _HashTable.capacity(forScale: scale)
+    storage._scale = scale
+    storage._rawElements = UnsafeMutableRawPointer(elementsAddr)
+    storage._seed = seed
+    storage._buckets.assign(repeating: _HashTable.Bucket(0), count: bucketCount)
     return storage
   }
 
   @inlinable
-  final var elements: UnsafeMutablePointer<Element> {
+  final var _elements: UnsafeMutablePointer<Element> {
     @inline(__always)
     get {
-      return self.rawElements.assumingMemoryBound(to: Element.self)
+      return self._rawElements.assumingMemoryBound(to: Element.self)
     }
   }
 
@@ -1609,7 +1671,7 @@ internal final class _SwiftNativeSetStorage<
 
   @objc
   internal var count: Int {
-    return hashTable.count
+    return _count
   }
 
   @objc
@@ -1627,7 +1689,7 @@ internal final class _SwiftNativeSetStorage<
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(asNative.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(asNative.startIndex.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -1637,21 +1699,24 @@ internal final class _SwiftNativeSetStorage<
       return 0
     }
 
+    let hashTable = _hashTable
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var index = _HashTable.Index(bucket: Int(theState.extra.0))
-    hashTable.checkOccupied(index)
-    let endIndex = asNative.endIndex
+    var index = _HashTable.Index(offset: Int(theState.extra.0))
+    let endIndex = hashTable.endIndex
+    if index != endIndex {
+      hashTable.checkOccupied(index)
+    }
     var stored = 0
     for i in 0..<count {
       guard index < endIndex else { break }
 
-      let element = asNative.uncheckedElement(at: index)
+      let element = _elements[index.offset]
       unmanagedObjects[i] = _bridgeAnythingToObjectiveC(element)
 
       stored += 1
-      asNative.formIndex(after: &index)
+      hashTable.formIndex(after: &index)
     }
-    theState.extra.0 = CUnsignedLong(index.bucket)
+    theState.extra.0 = CUnsignedLong(index.offset)
     state.pointee = theState
     return stored
   }
@@ -1663,7 +1728,7 @@ internal final class _SwiftNativeSetStorage<
 
     let (index, found) = asNative.find(native)
     guard found else { return nil }
-    return _bridgeAnythingToObjectiveC(asNative.uncheckedElement(at: index))
+    return _bridgeAnythingToObjectiveC(_elements[index.offset])
   }
 #endif
 }
@@ -1695,11 +1760,13 @@ internal struct _NativeSet<Element: Hashable> {
     self._storage = storage
   }
 
-  @inlinable
+  @usableFromInline
+  @_effects(releasenone)
   internal init(capacity: Int) {
-    self._storage = _SwiftNativeSetStorage<Element>.allocate(
-      capacity: capacity,
-      seed: Hasher._randomSeed())
+    let scale = _HashTable.scale(forCapacity: capacity)
+    let seed = _HashTable.newSeed(forScale: scale)
+    self._storage =
+      _SwiftNativeSetStorage<Element>.allocate(scale: scale, seed: seed)
   }
 
 #if _runtime(_ObjC)
@@ -1721,10 +1788,10 @@ internal struct _NativeSet<Element: Hashable> {
 
 extension _NativeSet {
   @inlinable
-  internal var bucketCount: Int {
+  internal var entryCount: Int {
     @inline(__always)
     get {
-      return _assumeNonNegative(_storage.hashTable.bucketCount)
+      return _assumeNonNegative(_storage._entryCount)
     }
   }
 
@@ -1732,15 +1799,7 @@ extension _NativeSet {
   internal var capacity: Int {
     @inline(__always)
     get {
-      return _assumeNonNegative(_storage.hashTable.capacity)
-    }
-  }
-
-  @inlinable
-  internal var indices: _HashTable.OccupiedIndices {
-    @inline(__always)
-    get {
-      return _storage.hashTable.occupiedIndices
+      return _assumeNonNegative(_storage._capacity)
     }
   }
 
@@ -1748,85 +1807,71 @@ extension _NativeSet {
   internal var elements: UnsafeMutablePointer<Element> {
     @inline(__always)
     get {
-      return _storage.rawElements.assumingMemoryBound(to: Element.self)
+      return _storage._rawElements.assumingMemoryBound(to: Element.self)
+    }
+  }
+
+  @inlinable
+  internal var hashTable: _HashTable {
+    @inline(__always) get {
+      return _storage._hashTable
     }
   }
 
   @inlinable
   @inline(__always)
-  internal func uncheckedElement(at i: Index) -> Element {
-    _sanityCheck(_storage.hashTable.isOccupied(i))
-    defer { _fixLifetime(self) }
-    return elements[i.bucket]
+  internal func uncheckedElement(at index: Index) -> Element {
+    _sanityCheck(hashTable.isOccupied(index))
+    return elements[index.offset]
   }
 
   @usableFromInline @_transparent
-  internal func uncheckedDestroyElement(at i: Index) {
-    _sanityCheck(_storage.hashTable.isValid(i))
-    defer { _fixLifetime(self) }
-    (elements + i.bucket).deinitialize(count: 1)
+  internal func uncheckedDestroy(at index: Index) {
+    _sanityCheck(hashTable.isValid(index))
+    (elements + index.offset).deinitialize(count: 1)
   }
 
   @usableFromInline @_transparent
-  internal func uncheckedInitializeElement(at i: Index, to element: Element) {
-    _sanityCheck(_storage.hashTable.isValid(i))
-    defer { _fixLifetime(self) }
-    (elements + i.bucket).initialize(to: element)
-  }
-
-  @usableFromInline @_transparent
-  internal func uncheckedMoveInitializeElement(
-    from source: _NativeSet,
-    at sourceIndex: Index,
-    to targetIndex: Index
-  ) {
-    _sanityCheck(source._storage.hashTable.isOccupied(sourceIndex))
-    _sanityCheck(_storage.hashTable.isValid(targetIndex))
-    defer { _fixLifetime(self) }
-    (elements + targetIndex.bucket).moveInitialize(
-      from: source.elements + sourceIndex.bucket,
-      count: 1)
+  internal func uncheckedInitialize(at index: Index, to element: Element) {
+    _sanityCheck(hashTable.isValid(index))
+    (elements + index.offset).initialize(to: element)
   }
 }
 
 extension _NativeSet {
   @inlinable
   internal mutating func reallocate(
-    isUnique: Bool,
+    movingElements move: Bool,
     capacity: Int
   ) -> Bool {
     let scale = _HashTable.scale(forCapacity: capacity)
-    let rehash = (scale != _storage.hashTable.scale)
+    let rehash = (scale != _storage._scale)
 
     // We generate a unique hash seed whenever we change the size of the hash
     // table, so that we avoid certain copy operations becoming quadratic,
     // without breaking value semantics. (For background details, see
     // https://bugs.swift.org/browse/SR-3268)
-    let seed = rehash ? Hasher._randomSeed() : _storage.seed
+    let seed = rehash ? _HashTable.newSeed(forScale: scale) : _storage._seed
 
     var result = _NativeSet(
       _SwiftNativeSetStorage<Element>.allocate(scale: scale, seed: seed))
-    switch (isUnique, rehash) {
-    case (true, true): // Move & rehash elements
-      for index in self.indices {
-        result._unsafeMoveNew(from: self, at: index)
-      }
-      _storage.invalidate()
-    case (true, false): // Move elements to same buckets in new storage
-      result._storage.hashTable.copyContents(of: _storage.hashTable)
-      for index in self.indices {
-        result.uncheckedMoveInitializeElement(from: self, at: index, to: index)
+    let hashTable = self.hashTable
+    switch (move, rehash) {
+    case (true, _): // Move & rehash elements
+      for index in hashTable.indices {
+        result._unsafeMoveNew(from: self.elements + index.offset)
       }
       _storage.invalidate()
     case (false, true): // Copy & rehash elements
-      for index in self.indices {
-        result.insertNew(self.uncheckedElement(at: index))
+      for index in hashTable.indices {
+        result._unsafeInsertNew(self.uncheckedElement(at: index))
       }
-    case (false, false): // Copy elements to same buckets in new storage
-      result._storage.hashTable.copyContents(of: _storage.hashTable)
-      for index in self.indices {
+    case (false, false): // Copy elements to same entries in new storage
+      result.hashTable.copyContents(of: hashTable)
+      result._storage._count = self.count
+      for index in hashTable.indices {
         let element = uncheckedElement(at: index)
-        result.uncheckedInitializeElement(at: index, to: element)
+        result.uncheckedInitialize(at: index, to: element)
       }
     }
     _storage = result._storage
@@ -1842,32 +1887,46 @@ extension _NativeSet {
     if isUnique && capacity <= self.capacity {
       return (false, false)
     }
-    return (true, reallocate(isUnique: isUnique, capacity: capacity))
+    return (true, reallocate(movingElements: isUnique, capacity: capacity))
   }
 }
 
 extension _NativeSet: _SetBuffer {
   @usableFromInline
   internal typealias Index = _HashTable.Index
+  @usableFromInline
+  internal typealias Indices = _HashTable.Indices
 
   @inlinable
   internal var startIndex: Index {
-    return _storage.hashTable.startIndex
+    return hashTable.startIndex
   }
 
   @inlinable
   internal var endIndex: Index {
-    return _storage.hashTable.endIndex
+    return hashTable.endIndex
   }
 
   @inlinable
-  internal func index(after i: Index) -> Index {
-    return _storage.hashTable.index(after: i)
+  internal func index(after index: Index) -> Index {
+    return hashTable.index(after: index)
   }
 
   @inlinable
-  internal func formIndex(after i: inout Index) {
-    i = index(after: i)
+  internal func formIndex(after index: inout Index) {
+    hashTable.formIndex(after: &index)
+  }
+
+  @inlinable
+  internal var indices: _HashTable.Indices {
+    @inline(__always)
+    get {
+      // Note: _HashTable.Indices does not include a storage reference, so all
+      // callers must manually ensure self survives all usages of the returned
+      // struct.  (Top-level Set operations already include a _fixLifetime for
+      // this.)
+      return hashTable.indices
+    }
   }
 
   @inlinable
@@ -1884,38 +1943,36 @@ extension _NativeSet: _SetBuffer {
   @inlinable
   internal var count: Int {
     get {
-      return _assumeNonNegative(_storage.hashTable.count)
+      return _assumeNonNegative(_storage._count)
     }
   }
 
   @inlinable
   @inline(__always)
   internal func contains(_ member: Element) -> Bool {
-    if count == 0 { // Fast path that avoids computing the hash of the key.
-      return false
-    }
+    // if count == 0 {
+    //   // Fast path that avoids computing the hash of the key.
+    //   return false
+    // }
     return find(member).found
   }
 
   @inlinable
   @inline(__always)
   internal func element(at index: Index) -> Element {
-    _storage.hashTable.checkOccupied(index)
-    defer { _fixLifetime(self) }
-    return elements[index.bucket]
+    hashTable.checkOccupied(index)
+    return elements[index.offset]
   }
 }
 
 extension _NativeSet: _HashTableDelegate {
   internal func hashValue(at index: Index) -> Int {
-    return uncheckedElement(at: index)._rawHashValue(seed: _storage.seed)
+    return uncheckedElement(at: index)._rawHashValue(seed: _storage._seed)
   }
 
   internal func moveEntry(from source: Index, to target: Index) {
-    _sanityCheck(source != target)
-    (elements + target.bucket).moveInitialize(
-      from: elements + source.bucket,
-      count: 1)
+    (elements + target.offset)
+      .moveInitialize(from: elements + source.offset, count: 1)
   }
 }
 
@@ -1949,7 +2006,7 @@ extension _NativeSet {
   @inlinable
   @inline(__always)
   internal func hashValue(for element: Element) -> Int {
-    return element._rawHashValue(seed: _storage.seed)
+    return element._rawHashValue(seed: _storage._seed)
   }
 
   @inlinable
@@ -1958,23 +2015,18 @@ extension _NativeSet {
     return find(element, hashValue: self.hashValue(for: element))
   }
 
-  /// Search for a given key starting from the specified bucket.
+  /// Search for a given element, assuming it has the specified hash value.
   ///
-  /// If the key is not present, returns the position where it could be
-  /// inserted.
+  /// If the element is not present in this set, return the position where it
+  /// could be inserted.
   @inlinable
-  @inline(__always)
   internal func find(
     _ element: Element,
     hashValue: Int
   ) -> (index: Index, found: Bool) {
-    var (index, found) = _storage.hashTable.lookupFirst(hashValue: hashValue)
-    if _fastPath(!found || uncheckedElement(at: index) == element) {
-      return (index, found)
-    }
+    var candidates = hashTable.lookup(hashValue: hashValue)
     while true {
-      (index, found) =
-        _storage.hashTable.lookupNext(hashValue: hashValue, after: index)
+      let (index, found) = candidates.next()
       if !found || uncheckedElement(at: index) == element {
         return (index, found)
       }
@@ -1988,13 +2040,13 @@ extension _NativeSet {
     where S.Element == Element {
     // Allocate a temporary bitmap to mark elements in self that we've seen in
     // possibleSuperset.
-    var bitmap = _Bitmap(bitCount: self.bucketCount)
+    var bitmap = _Bitmap(bitCount: self.entryCount)
     var seen = 0
     for element in possibleSuperset {
       // Found a new element of self in possibleSuperset.
       let (index, found) = find(element)
       guard found else { continue }
-      if bitmap._uncheckedInsert(index.bucket) {
+      if bitmap._uncheckedInsert(index.offset) {
         seen += 1
         if seen == self.count {
           return true
@@ -2009,7 +2061,7 @@ extension _NativeSet {
     where S.Element == Element {
     // Allocate a temporary bitmap to mark elements in self that we've seen in
     // possibleSuperset.
-    var bitmap = _Bitmap(bitCount: self.bucketCount)
+    var bitmap = _Bitmap(bitCount: self.entryCount)
     var seen = 0
     var isStrict = false
     for element in possibleSuperset {
@@ -2021,7 +2073,7 @@ extension _NativeSet {
         }
         continue
       }
-      if bitmap._uncheckedInsert(index.bucket) {
+      if bitmap._uncheckedInsert(index.offset) {
         // Found a new element of self in possibleSuperset.
         seen += 1
         if seen == self.count && isStrict {
@@ -2037,12 +2089,12 @@ extension _NativeSet {
     where S.Element == Element {
     // Allocate a temporary bitmap to mark elements in self that we've seen in
     // possibleStrictSubset.
-    var bitmap = _Bitmap(bitCount: self.bucketCount)
+    var bitmap = _Bitmap(bitCount: self.entryCount)
     var seen = 0
     for element in possibleSubset {
       let (index, found) = find(element)
       guard found else { return false }
-      if bitmap._uncheckedInsert(index.bucket) {
+      if bitmap._uncheckedInsert(index.offset) {
         // Found a new element of possibleSubset in self.
         seen += 1
         if seen == self.count {
@@ -2058,11 +2110,11 @@ extension _NativeSet {
     markingElementsIn other: S
   ) -> (bitmap: _Bitmap, count: Int)
   where S.Element == Element {
-    var bitmap = _Bitmap(bitCount: self.bucketCount)
+    var bitmap = _Bitmap(bitCount: self.entryCount)
     var count = 0
     for element in other {
       let (index, found) = find(element)
-      if found, bitmap._uncheckedInsert(index.bucket) {
+      if found, bitmap._uncheckedInsert(index.offset) {
         count += 1
       }
     }
@@ -2098,7 +2150,7 @@ extension _NativeSet {
     if dupeCount == 0 { return self }
     if dupeCount == self.count { return _NativeSet() }
     var result = _NativeSet(capacity: self.count - dupeCount)
-    for index in self.indices where !dupes._uncheckedContains(index.bucket) {
+    for index in self.indices where !dupes._uncheckedContains(index.offset) {
       result.insertNew(self.uncheckedElement(at: index))
     }
     return result
@@ -2117,8 +2169,8 @@ extension _NativeSet {
       return other
     }
     var result = _NativeSet(capacity: dupeCount)
-    for bucket in dupes {
-      result.insertNew(self.uncheckedElement(at: Index(bucket: bucket)))
+    for offset in dupes {
+      result.insertNew(self.uncheckedElement(at: Index(offset: offset)))
     }
     _sanityCheck(result.count == dupeCount)
     return result
@@ -2131,13 +2183,13 @@ extension _NativeSet {
     // in a bitmap, and collect distinct elements from `other` in an array.
     // This minimizes hashing, and ensures that we'll have an exact count for
     // the result set, preventing rehashings during insertions.
-    var dupes = _Bitmap(bitCount: self.bucketCount)
+    var dupes = _Bitmap(bitCount: self.entryCount)
     var dupeCount = 0
     var distinctsInOther: [Element] = []
     for element in other {
       let (index, found) = find(element)
       if found {
-        if dupes._uncheckedInsert(index.bucket) {
+        if dupes._uncheckedInsert(index.offset) {
           dupeCount += 1
         }
       } else {
@@ -2146,7 +2198,7 @@ extension _NativeSet {
     }
     var result = _NativeSet<Element>(
       capacity: count - dupeCount + distinctsInOther.count)
-    for index in self.indices where !dupes._uncheckedContains(index.bucket) {
+    for index in self.indices where !dupes._uncheckedContains(index.offset) {
       result.insertNew(self.uncheckedElement(at: index))
     }
     for element in distinctsInOther {
@@ -2165,14 +2217,14 @@ extension _NativeSet {
     // and `other` in two bitmaps.  This minimizes hashing, and ensures that
     // we'll have an exact count for the result set, preventing rehashings
     // during insertions.
-    var selfDupes = _Bitmap(bitCount: self.bucketCount)
-    var otherDupes = _Bitmap(bitCount: other.bucketCount)
+    var selfDupes = _Bitmap(bitCount: self.entryCount)
+    var otherDupes = _Bitmap(bitCount: other.entryCount)
     var dupeCount = 0
     for otherIndex in other.indices {
       let (selfIndex, found) = self.find(other.uncheckedElement(at: otherIndex))
       if found {
-        if !selfDupes._uncheckedInsert(selfIndex.bucket) ||
-          !otherDupes._uncheckedInsert(otherIndex.bucket) {
+        if !selfDupes._uncheckedInsert(selfIndex.offset) ||
+          !otherDupes._uncheckedInsert(otherIndex.offset) {
           ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
         }
         dupeCount += 1
@@ -2180,10 +2232,10 @@ extension _NativeSet {
     }
     var result = _NativeSet<Element>(
       capacity: self.count + other.count - 2 * dupeCount)
-    for i in self.indices where !selfDupes._uncheckedContains(i.bucket) {
+    for i in self.indices where !selfDupes._uncheckedContains(i.offset) {
       result.insertNew(self.uncheckedElement(at: i))
     }
-    for i in other.indices where !otherDupes._uncheckedContains(i.bucket) {
+    for i in other.indices where !otherDupes._uncheckedContains(i.offset) {
       result.insertNew(other.uncheckedElement(at: i))
     }
     return result
@@ -2200,7 +2252,7 @@ internal func ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(
     "Fatal error",
     """
     Duplicate elements of type '\(elementType)' were found in a Set.
-    This usually means that either the type violates Hashable's requirements, or
+    This usually means either that the type violates Hashable's requirements, or
     that members of such a set were mutated after insertion.
     """,
     flags: _fatalErrorFlags())
@@ -2208,34 +2260,33 @@ internal func ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(
 
 extension _NativeSet {
   @inlinable
-  internal func _unsafeMoveNew(from source: _NativeSet, at sourceIndex: Index) {
-    _sanityCheck(source._storage.hashTable.isOccupied(sourceIndex))
+  internal func _unsafeMoveNew(from source: UnsafeMutablePointer<Element>) {
     _sanityCheck(count + 1 <= capacity)
-    let sourcePtr = source.elements + sourceIndex.bucket
-    let hashValue = self.hashValue(for: sourcePtr.pointee)
+    let hashValue = self.hashValue(for: source.pointee)
     if _isDebugAssertConfiguration() {
       // In debug builds, perform a full lookup and trap if we detect duplicate
       // elements -- these imply that the Element type violates Hashable
       // requirements. This is generally more costly than a direct insertion,
       // because we'll need to compare elements in case of hash collisions.
-      let (index, found) = find(sourcePtr.pointee, hashValue: hashValue)
+      let (index, found) = find(source.pointee, hashValue: hashValue)
       guard !found else {
         ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
       }
-      _storage.hashTable.insert(hashValue: hashValue, at: index)
-      uncheckedMoveInitializeElement(from: source, at: sourceIndex, to: index)
+      hashTable.insert(hashValue: hashValue, at: index)
+      uncheckedInitialize(at: index, to: source.move())
     } else {
-      let index = _storage.hashTable.insertNew(hashValue: hashValue)
-      uncheckedMoveInitializeElement(from: source, at: sourceIndex, to: index)
+      let index = hashTable.insertNew(hashValue: hashValue)
+      uncheckedInitialize(at: index, to: source.move())
     }
+    _storage._count += 1
   }
 
   /// Insert a new element into uniquely held storage.
-  /// Storage must be uniquely referenced.
+  /// Storage must be uniquely referenced with adequate capacity.
   /// The `element` must not be already present in the Set.
   @inlinable
-  internal mutating func insertNew(_ element: Element) {
-    _ = ensureUnique(isUnique: true, capacity: count + 1)
+  internal mutating func _unsafeInsertNew(_ element: Element) {
+    _sanityCheck(count + 1 <= capacity)
     let hashValue = self.hashValue(for: element)
     if _isDebugAssertConfiguration() {
       // In debug builds, perform a full lookup and trap if we detect duplicate
@@ -2246,12 +2297,22 @@ extension _NativeSet {
       guard !found else {
         ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
       }
-      _storage.hashTable.insert(hashValue: hashValue, at: index)
-      uncheckedInitializeElement(at: index, to: element)
+      hashTable.insert(hashValue: hashValue, at: index)
+      uncheckedInitialize(at: index, to: element)
     } else {
-      let index = _storage.hashTable.insertNew(hashValue: hashValue)
-      uncheckedInitializeElement(at: index, to: element)
+      let index = hashTable.insertNew(hashValue: hashValue)
+      uncheckedInitialize(at: index, to: element)
     }
+    _storage._count += 1
+  }
+
+  /// Insert a new element into uniquely held storage.
+  /// Storage must be uniquely referenced.
+  /// The `element` must not be already present in the Set.
+  @inlinable
+  internal mutating func insertNew(_ element: Element) {
+    _ = ensureUnique(isUnique: true, capacity: count + 1)
+    _unsafeInsertNew(element)
   }
 }
 
@@ -2276,17 +2337,18 @@ extension _NativeSet {
       (index, found) = find(element, hashValue: hashValue)
     }
     if found {
-      let old = (elements + index.bucket).move()
-      uncheckedInitializeElement(at: index, to: element)
+      let old = (elements + index.offset).move()
+      uncheckedInitialize(at: index, to: element)
       return old
     }
-    _storage.hashTable.insert(hashValue: hashValue, at: index)
-    uncheckedInitializeElement(at: index, to: element)
+    hashTable.insert(hashValue: hashValue, at: index)
+    uncheckedInitialize(at: index, to: element)
+    _storage._count += 1
     return nil
   }
 
   /// A variant of insert that returns the inserted index rather than the
-  /// element stored in the corresponding bucket.
+  /// corresponding member.
   @inlinable
   @discardableResult
   internal mutating func _insert(
@@ -2303,8 +2365,9 @@ extension _NativeSet {
         ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
       }
     }
-    _storage.hashTable.insert(hashValue: hashValue, at: index)
-    uncheckedInitializeElement(at: index, to: element)
+    hashTable.insert(hashValue: hashValue, at: index)
+    _storage._count += 1
+    uncheckedInitialize(at: index, to: element)
     return (true, index)
   }
 
@@ -2323,7 +2386,8 @@ extension _NativeSet {
   @usableFromInline
   @_effects(releasenone)
   internal mutating func _delete(at index: Index, hashValue: Int) {
-    _storage.hashTable.delete(at: index, hashValue: hashValue, with: self)
+    hashTable.delete(hashValue: hashValue, at: index, with: self)
+    _storage._count -= 1
   }
 
   @inlinable
@@ -2345,18 +2409,18 @@ extension _NativeSet {
       }
     }
 
-    let old = (elements + index.bucket).move()
+    let old = (elements + index.offset).move()
     _delete(at: index, hashValue: hashValue)
     return old
   }
 
   @inlinable
   internal mutating func remove(at index: Index, isUnique: Bool) -> Element {
-    _precondition(_storage.hashTable.isOccupied(index), "Invalid index")
+    _precondition(hashTable.isOccupied(index), "Invalid index")
     let (_, rehashed) = ensureUnique(isUnique: isUnique, capacity: capacity)
     _sanityCheck(!rehashed)
 
-    let old = (elements + index.bucket).move()
+    let old = (elements + index.offset).move()
     _delete(at: index, hashValue: self.hashValue(for: old))
     return old
   }
@@ -2364,15 +2428,17 @@ extension _NativeSet {
   @usableFromInline
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
-      _storage = _SwiftNativeSetStorage<Element>.allocate(
-        scale: self._storage.hashTable.scale,
-        seed: Hasher._randomSeed())
+      let scale = self._storage._scale
+      let seed = _HashTable.newSeed(forScale: scale)
+      _storage =
+        _SwiftNativeSetStorage<Element>.allocate(scale: scale, seed: seed)
       return
     }
     for index in indices {
-      uncheckedDestroyElement(at: index)
+      uncheckedDestroy(at: index)
     }
-    _storage.hashTable.removeAll()
+    hashTable.removeAll()
+    _storage._count = 0
   }
 }
 
@@ -2530,7 +2596,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     }
 
     // Allocate and initialize heap storage for bridged objects.
-    let bridged = _BridgingHashBuffer.create(bucketCount: native.bucketCount)
+    let bridged = _BridgingHashBuffer.create(entryCount: native.entryCount)
     for index in native.indices {
       let object = _bridgeAnythingToObjectiveC(native.element(at: index))
       bridged.initialize(at: index, to: object)
@@ -2596,7 +2662,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(native.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(native.startIndex.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -2607,7 +2673,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var currIndex = _NativeSet<Element>.Index(bucket: Int(theState.extra.0))
+    var currIndex = _NativeSet<Element>.Index(offset: Int(theState.extra.0))
     let endIndex = native.endIndex
     var stored = 0
 
@@ -2626,7 +2692,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
       stored += 1
       native.formIndex(after: &currIndex)
     }
-    theState.extra.0 = CUnsignedLong(currIndex.bucket)
+    theState.extra.0 = CUnsignedLong(currIndex.offset)
     state.pointee = theState
     return stored
   }
@@ -3341,13 +3407,13 @@ extension Set.Index: Hashable {
     switch _variant {
     case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.bucket)
+      hasher.combine(nativeIndex.offset)
     case .cocoa(let cocoaIndex):
       hasher.combine(1 as UInt8)
       hasher.combine(cocoaIndex.currentKeyIndex)
     }
   #else
-    hasher.combine(_asNative.bucket)
+    hasher.combine(_asNative.offset)
   #endif
   }
 }
@@ -3383,7 +3449,7 @@ extension _NativeSet.Iterator: IteratorProtocol {
   @inlinable
   internal mutating func next() -> Element? {
     guard index != endIndex else { return nil }
-    let result = base.element(at: index)
+    let result = base.uncheckedElement(at: index)
     base.formIndex(after: &index)
     return result
   }
@@ -3698,6 +3764,7 @@ public typealias SetIndex<Element: Hashable> = Set<Element>.Index
 public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
 
 extension Set {
+  // FIXME: Remove
   public // @testable performance metrics
   var _stats: (maxLookups: Int, averageLookups: Double, maxCollisions: Int)? {
     guard case .native(let native) = _variant else { return nil }
@@ -3722,17 +3789,17 @@ extension _NativeSet {
   ) -> (displacement: Int, collisions: Int) {
     let element = uncheckedElement(at: index)
     let hashValue = self.hashValue(for: element)
-    let ideal = hashValue & _storage.hashTable.bucketMask
+    let ideal = hashTable._idealBucket(forHashValue: hashValue)
     let delta = ideal <= index.bucket
       ? index.bucket - ideal
-      : index.bucket - ideal + bucketCount
-    var b = ideal
+      : index.bucket + _storage._bucketCount - ideal
+    var i = Index(bucket: ideal, slot: .start)
     var collisions = 0
-    while b != index.bucket {
-      if _storage.hashTable.map[b] == _HashTable.MapEntry.forHashValue(hashValue) {
+    while i != index {
+      if hashTable[i] == _HashTable.Entry(forHashValue: hashValue) {
         collisions += 1
       }
-      b = _storage.hashTable._succ(b)
+      i.offset = (i.offset + 1) & (entryCount - 1)
     }
     return (delta, collisions)
   }
@@ -3740,23 +3807,27 @@ extension _NativeSet {
 
 extension _NativeSet {
   // FIXME: Remove
+  @usableFromInline
   internal func _dump() -> String {
     var result = ""
     defer { _fixLifetime(self) }
-    let hashTable = _storage.hashTable
-    let bits = String(unsafeBitCast(self, to: UInt.self), radix: 16)
-    result += "Native set of \(Element.self) at 0x\(bits)\n"
-    result += "  count: \(hashTable.count)\n"
-    result += "  capacity: \(hashTable.capacity)\n"
-    result += "  scale: \(hashTable.scale)\n"
+    let bitPattern = String(unsafeBitCast(self, to: UInt.self), radix: 16)
+    result += "Native set of \(Element.self) at 0x\(bitPattern)\n"
+    result += "  count: \(self.count)\n"
+    result += "  capacity: \(self.capacity)\n"
+    result += "  entryCount: \(self.entryCount)\n"
+    result += "  scale: \(self._storage._scale)\n"
     result += "  bucketCount: \(hashTable.bucketCount)\n"
+    for b in 0 ..< hashTable.bucketCount {
+      result += "  (\(b)): \(String(hashTable.buckets[b]._value, radix: 16))\n"
+    }
     for i in indices {
       let element = uncheckedElement(at: i)
       let hashValue = self.hashValue(for: element)
       let stats = self.stats(ofElementAt: i)
       let h = String(UInt(bitPattern: hashValue), radix: 16)
-      let hl = String(hashTable.map[i.bucket].payload << 1, radix: 16)
-      result += "  <\(i.bucket)> "
+      let hl = String(hashTable[i].payload << 1, radix: 16)
+      result += "  <\(i.offset)> "
       result += "delta: \(stats.displacement) (\(stats.collisions) coll) "
       result += "hash: \(hl)/\(h): "
       result += "\(element)\n"
@@ -3790,8 +3861,9 @@ extension Set {
 }
 
 extension Set {
-  @usableFromInline // @testable
-  internal func _invariantCheck() {
+  // FIXME: Remove
+  public // @testable
+  func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
     guard case .native(let native) = self._variant else {
       return
@@ -3802,14 +3874,25 @@ extension Set {
 }
 
 extension _NativeSet {
+  // FIXME: Remove
   @usableFromInline // @testable
   internal func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
     _sanityCheck(
       _storage === _SwiftRawSetStorage.empty ||
-      _isValidAddress(UInt(bitPattern: _storage.rawElements)),
-    "Invalid rawElements pointer")
-    _storage.hashTable._invariantCheck(with: self)
+      _isValidAddress(UInt(bitPattern: _storage._rawElements)),
+      "Invalid rawElements pointer")
+    _sanityCheck(count >= 0 && count < entryCount,
+      "Invalid Set count")
+    _sanityCheck(capacity == _HashTable.capacity(forScale: _storage._scale),
+      "Invalid Set capacity")
+    _sanityCheck(capacity >= 0 && capacity < entryCount,
+      "Set's capacity is inconsistent with its entryCount")
+    _sanityCheck(count <= capacity,
+      "Set count exceeds its capacity")
+    let observedCount = hashTable._invariantCheck(with: self)
+    _sanityCheck(observedCount == count,
+      "Hash table count doesn't match the number of occupied entries")
 #endif
   }
 }

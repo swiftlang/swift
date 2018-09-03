@@ -111,7 +111,7 @@ final internal class _SwiftEmptyNSEnumerator
 /// Using a dedicated class for this rather than a _HeapBuffer makes it easy to
 /// recognize these in heap dumps etc.
 internal final class _BridgingHashBuffer {
-  internal var _bucketCount: Int
+  internal var _entryCount: Int
 
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
@@ -119,16 +119,16 @@ internal final class _BridgingHashBuffer {
     _sanityCheckFailure("This class cannot be directly initialized")
   }
 
-  internal static func create(bucketCount: Int) -> _BridgingHashBuffer {
+  internal static func create(entryCount: Int) -> _BridgingHashBuffer {
     let object = Builtin.allocWithTailElems_1(
       _BridgingHashBuffer.self,
-      bucketCount._builtinWordValue, AnyObject.self)
-    object._bucketCount = bucketCount
+      entryCount._builtinWordValue, AnyObject.self)
+    object._entryCount = entryCount
     return object
   }
 
   deinit {
-    _sanityCheck(_bucketCount == -1)
+    _sanityCheck(_entryCount == -1)
   }
 
   private var _baseAddress: UnsafeMutablePointer<AnyObject> {
@@ -137,20 +137,20 @@ internal final class _BridgingHashBuffer {
   }
 
   internal subscript(index: _HashTable.Index) -> AnyObject {
-    _sanityCheck(index.bucket >= 0 && index.bucket < _bucketCount)
-    return _baseAddress[index.bucket]
+    _sanityCheck(index.offset >= 0 && index.offset < _entryCount)
+    return _baseAddress[index.offset]
   }
 
   internal func initialize(at index: _HashTable.Index, to object: AnyObject) {
-    _sanityCheck(index.bucket >= 0 && index.bucket < _bucketCount)
-    (_baseAddress + index.bucket).initialize(to: object)
+    _sanityCheck(index.offset >= 0 && index.offset < _entryCount)
+    (_baseAddress + index.offset).initialize(to: object)
   }
 
-  internal func invalidate(with indices: _HashTable.OccupiedIndices) {
+  internal func invalidate(with indices: _HashTable.Indices) {
     for index in indices {
-      (_baseAddress + index.bucket).deinitialize(count: 1)
+      (_baseAddress + index.offset).deinitialize(count: 1)
     }
-    _bucketCount = -1
+    _entryCount = -1
   }
 }
 #endif

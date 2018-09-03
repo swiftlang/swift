@@ -19,123 +19,24 @@ internal protocol _HashTableDelegate {
 @usableFromInline
 @_fixed_layout
 internal struct _HashTable {
+  /// Unsafe pointer to the beginning of metadata storage.
   @usableFromInline
-  internal var count: Int
-  @usableFromInline
-  internal let capacity: Int
+  internal let buckets: UnsafeMutablePointer<Bucket>
 
   @usableFromInline
   internal let bucketCount: Int
 
-  @usableFromInline
-  internal let map: UnsafeMutablePointer<MapEntry>
-
-  internal init(scale: Int, map: UnsafeMutablePointer<MapEntry>) {
-    _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
-    self.count = 0
-    self.capacity = _HashTable.capacity(forScale: scale)
-    self.bucketCount = 1 &<< scale
-    self.map = map
-
-    map.assign(repeating: .unoccupied, count: bucketCount)
-  }
-}
-
-extension _HashTable {
-  /// The inverse of the hash table load factor.
-  @_transparent
-  private static var maxLoadFactorInverse: Double {
-    return 4 / 3
-  }
-
-  internal static func capacity(forScale scale: Int) -> Int {
-    return Int(Double(1 &<< scale) / maxLoadFactorInverse)
-  }
-
-  @usableFromInline
-  internal static func scale(
-    forCapacity capacity: Int
-  ) -> Int {
-    let capacity = Swift.max(capacity, 1)
-    // `capacity + 1` below ensures that we don't fill in the last hole.
-    let bucketCount = Swift.max(
-      Int((Double(capacity) * maxLoadFactorInverse).rounded(.up)),
-      capacity + 1)
-    // Actual bucket count is the next power of two greater than or equal to the
-    // minimum count satisying the load factor constraint.
-    let scale = (Swift.max(bucketCount, 2) - 1)._binaryLogarithm() + 1
-    _sanityCheck(scale < Int.bitWidth)
-    return scale
-  }
-}
-
-extension _HashTable {
-  @_fixed_layout
-  @usableFromInline
-  internal struct MapEntry {
-    @inlinable
-    internal static var payloadMask: UInt8 {
-      @inline(__always) get { return 0x7F }
-    }
-    @inlinable
-    internal static var unoccupied: MapEntry {
-      @inline(__always) get { return MapEntry(_value: 0) }
-    }
-
-    @usableFromInline
-    internal var value: UInt8
-
-    @inlinable
-    @inline(__always)
-    internal init(_value: UInt8) {
-      self.value = _value
-    }
-
-    @inlinable
-    @inline(__always)
-    internal init(payload: UInt8) {
-      _sanityCheck(payload < 0x80)
-      self.init(_value: 0x80 | payload)
-    }
-
-    @inlinable
-    internal var isOccupied: Bool {
-      @inline(__always) get { return value & 0x80 != 0 }
-    }
-
-    @inlinable
-    internal var payload: UInt8 {
-      @inline(__always) get {
-        return value & _HashTable.MapEntry.payloadMask
-      }
-    }
-
-    @inlinable
-    @inline(__always)
-    internal static func forHashValue(_ hashValue: Int) -> MapEntry {
-      let payload = hashValue &>> (Int.bitWidth &- 7)
-      return MapEntry(
-        payload: UInt8(truncatingIfNeeded: payload) & MapEntry.payloadMask)
-    }
-  }
-}
-
-extension _HashTable.MapEntry: Equatable {
   @inlinable
   @inline(__always)
-  internal static func ==(
-    lhs: _HashTable.MapEntry,
-    rhs: _HashTable.MapEntry
-  ) -> Bool {
-    return lhs.value == rhs.value
+  internal init(buckets: UnsafeMutablePointer<Bucket>, bucketCount: Int) {
+    self.buckets = buckets
+    self.bucketCount = bucketCount
   }
-}
 
-extension _HashTable {
   @inlinable
-  internal var scale: Int {
+  internal var entryCount: Int {
     @inline(__always) get {
-      return bucketCount.trailingZeroBitCount
+      return bucketCount &<< 3
     }
   }
 
@@ -147,24 +48,489 @@ extension _HashTable {
       return bucketCount &- 1
     }
   }
+}
 
+extension _HashTable {
+  @inlinable
+  internal static func newSeed(forScale scale: Int) -> Hasher._Seed {
+    if Hasher._isDeterministic {
+      // We can't use per-instance seeding when deterministic hashing is
+      // enabled. The next best thing is per-capacity seeding -- however, this
+      // means there will be a correlation between hash values in same-sized
+      // hash tables, so some operations will become quadratic.
+      return (
+        Hasher._seed.0,
+        Hasher._seed.1 ^ UInt64(truncatingIfNeeded: scale))
+    }
+    return Hasher._randomSeed()
+  }
+
+  /// The inverse of the maximum hash table load factor.
+  private static var maxLoadFactorInverse: Double {
+    @inline(__always) get { return 100 / 90 }
+  }
+
+  internal static func capacity(forScale scale: Int) -> Int {
+    let entryCount = 1 &<< (scale + 3)
+    return Int(Double(entryCount) / maxLoadFactorInverse)
+  }
+
+  @usableFromInline
+  @_effects(readnone)
+  internal static func scale(
+    forCapacity capacity: Int
+  ) -> Int {
+    let capacity = Swift.max(capacity, 1)
+    // Calculate the minimum number of entries we need to allocate to satisfy
+    // the maximum load factor. `capacity + 1` below ensures that we always
+    // leave at least one hole.
+    let minimumEntries = Swift.max(
+      Int((Double(capacity) * maxLoadFactorInverse).rounded(.up)),
+      capacity + 1)
+    // The actual number of entries we need to allocate is the lowest power of
+    // two greater than or equal to the minimum entry count. Calculate its
+    // exponent.
+    let exponent = (Swift.max(minimumEntries, 2) - 1)._binaryLogarithm() + 1
+    _sanityCheck(exponent < Int.bitWidth)
+    // The scale is the exponent corresponding to the bucket count, which is the
+    // entry count divided by 8. Ensure we always have at least one bucket.
+    return Swift.max(exponent - 3, 0)
+  }
+}
+
+extension _HashTable {
+  /// Metadata for an entry in the hash table. Includes a flag indicating
+  /// whether there is an element at this entry, as well as a 7-bit payload
+  /// value. Occupied entries use the payload to store additional bits of the
+  /// entry's hash value; this is used to speed up lookup operations.
+  /// Unoccupied entries are called "holes"; they have a zero payload of zero.
+  @usableFromInline
+  @_fixed_layout
+  internal struct Entry {
+    @inlinable
+    internal static var occupiedFlag: UInt8 {
+      @inline(__always) get { return 0x80 }
+    }
+    @inlinable
+    internal static var payloadMask: UInt8 {
+      @inline(__always) get { return 0x7F }
+    }
+    @inlinable
+    internal static var unoccupied: Entry {
+      @inline(__always) get { return Entry(_value: 0) }
+    }
+
+    @usableFromInline
+    internal var _value: UInt8
+
+    @inlinable
+    @inline(__always)
+    internal init(_value: UInt8) {
+      self._value = _value
+    }
+
+    @inlinable
+    @inline(__always)
+    internal init(payload: UInt8) {
+      _sanityCheck(payload & ~Entry.payloadMask == 0)
+      self.init(_value: Entry.occupiedFlag | payload)
+    }
+
+    @inlinable
+    @inline(__always)
+    internal init(forHashValue hashValue: Int) {
+      // Use the highest seven bits of the hash value.
+      let payload = UInt(bitPattern: hashValue) &>> (Int.bitWidth &- 7)
+      self.init(payload: UInt8(truncatingIfNeeded: payload))
+    }
+
+    @inlinable
+    internal var isOccupied: Bool {
+      @inline(__always) get { return _value != 0 }
+    }
+
+    @inlinable
+    internal var payload: UInt8 {
+      @inline(__always) get {
+        return _value & _HashTable.Entry.payloadMask
+      }
+    }
+  }
+}
+
+extension _HashTable.Entry: Equatable {
+  @inlinable
+  @inline(__always)
+  internal static func ==(
+    left: _HashTable.Entry,
+    right: _HashTable.Entry
+  ) -> Bool {
+    return left._value == right._value
+  }
+}
+
+extension _HashTable {
+  /// A bucket in the hash table. Buckets hold eight slots, each of which
+  /// contain an Entry. Holes (if any) are always at the highest-numbered slots,
+  /// sorted after occupied entries.
+  ///
+  /// Internally, each bucket is represented by a single 64-bit integer value.
+  /// This enables us to perform operations on all 8 slots at once.
+  @_fixed_layout
+  @usableFromInline
+  internal struct Bucket {
+    @usableFromInline
+    internal var _value: UInt64
+
+    @inlinable
+    @inline(__always)
+    internal init(_ value: UInt64) {
+      self._value = value
+    }
+  }
+}
+
+extension _HashTable {
+  /// An index-like value identifying one of the eight slots of a bucket.
+  @_fixed_layout
+  @usableFromInline
+  internal struct Slot: Comparable {
+    /// The index of the first bit of the byte corresponding to this slot within
+    /// the bucket's value.
+    @usableFromInline
+    var shift: Int
+
+    @inlinable
+    @inline(__always)
+    internal init(slot: Int) {
+      _sanityCheck(slot >= 0 && slot <= UInt8.bitWidth)
+      self.shift = slot &<< 3
+    }
+
+    @inlinable
+    @inline(__always)
+    internal init(shift: Int) {
+      _sanityCheck(shift >= 0 && shift <= UInt64.bitWidth)
+      _sanityCheck(shift & 7 == 0)
+      self.shift = shift
+    }
+
+    @inlinable
+    internal static var start: Slot {
+      @inline(__always) get { return Slot(shift: 0) }
+    }
+    @inlinable
+    internal static var end: Slot {
+      @inline(__always) get { return Slot(shift: UInt64.bitWidth) }
+    }
+
+    @inlinable
+    internal var offset: Int {
+      @inline(__always) get { return shift &>> 3 }
+    }
+
+    @inlinable
+    @inline(__always)
+    internal mutating func formSuccessor() {
+      _sanityCheck(self != Slot.end)
+      shift += UInt8.bitWidth
+    }
+
+    @inlinable
+    @inline(__always)
+    internal static func ==(left: Slot, right: Slot) -> Bool {
+      return left.shift == right.shift
+    }
+    @inlinable
+    @inline(__always)
+    internal static func <(left: Slot, right: Slot) -> Bool {
+      return left.shift < right.shift
+    }
+  }
+}
+
+extension _HashTable.Bucket {
+  @inlinable
+  internal subscript(slot: _HashTable.Slot) -> _HashTable.Entry {
+    @inline(__always) get {
+      return _HashTable.Entry(
+        _value: UInt8(truncatingIfNeeded: _value &>> slot.shift))
+    }
+    @inline(__always) set {
+      _value &= ~(0xFF &<< slot.shift)
+      _value |= (UInt64(newValue._value) &<< slot.shift)
+    }
+  }
+}
+
+extension _HashTable.Bucket {
+  /// Returns true if there are no holes in this bucket.
+  @inlinable
+  internal var isFull: Bool {
+    @inline(__always)
+    get {
+      // Holes are always at the end, so it's enough to check the highest byte.
+      return _value &>> (UInt64.bitWidth &- UInt8.bitWidth) != 0
+    }
+  }
+
+  /// Returns true if this bucket has no occupied slots.
+  @inlinable
+  internal var isEmpty: Bool {
+    @inline(__always) get { return _value == 0 }
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func isOccupied(at slot: _HashTable.Slot) -> Bool {
+    // Unoccupied slots are never followed by occupied ones, so we don't need to
+    // isolate the entry.
+    return (_value &>> slot.shift) != 0
+  }
+
+  /// Find the slot for the first hole in this bucket.
+  /// Returns `Slot.end` if the bucket is full.
+  @inlinable
+  internal var slotForLowestHole: _HashTable.Slot {
+    @inline(__always)
+    get {
+      // Holes are zero bytes at the most significant places.
+      let shift = UInt64.bitWidth - (_value.leadingZeroBitCount & ~7)
+      return _HashTable.Slot(shift: shift)
+    }
+  }
+
+  /// Insert an entry to this bucket for the specified hash value, and return
+  /// its slot. The bucket must not be full.
+  @inlinable
+  internal mutating func insertEntry(
+    forHashValue hashValue: Int
+  ) -> _HashTable.Slot {
+    _sanityCheck(!isFull)
+    let slot = self.slotForLowestHole
+    self[slot] = _HashTable.Entry(forHashValue: hashValue)
+    return slot
+  }
+
+  /// Remove the entry at the specified index. If there are occupied entries at
+  /// higher indices, compress the bucket by moving the highest occupied entry
+  /// in place of the removed one, and return its index. Otherwise return
+  /// `index`.
+  @inlinable
+  internal mutating func removeEntry(
+    at slot: _HashTable.Slot
+  ) -> _HashTable.Slot {
+    _sanityCheck(self[slot].isOccupied)
+    let replacement = _HashTable.Slot(
+      shift: self.slotForLowestHole.shift - UInt8.bitWidth)
+    if slot == replacement {
+      self[slot] = .unoccupied
+    } else {
+      let hm: UInt64 = 0xFF &<< replacement.shift
+      let lm: UInt64 = 0xFF &<< slot.shift
+      let distance = replacement.shift - slot.shift
+      _value = ((_value &>> distance) & lm) | (_value & ~(hm | lm))
+    }
+    return replacement
+  }
+
+  // Represents a subset of bucket indices, using a single bit pattern.
+  @_fixed_layout
+  @usableFromInline
+  internal struct SlotSet: Sequence, IteratorProtocol {
+    // Each bit set to one in this pattern sits at the beginning of a byte,
+    // corresponding to a single slot shift within this set.
+    @usableFromInline
+    internal var _shifts: UInt64
+
+    @inlinable
+    @inline(__always)
+    internal init(_shifts: UInt64) {
+      _sanityCheck(_shifts & ~0x01010101_01010101 == 0)
+      self._shifts = _shifts
+    }
+
+    @inlinable
+    @inline(__always)
+    internal mutating func next() -> _HashTable.Slot? {
+      if _shifts == 0 { return nil }
+      let shift = _shifts.trailingZeroBitCount
+      // Clear the lowest bit set in _shifts.
+      _shifts &= _shifts &- 1
+      return _HashTable.Slot(shift: shift)
+    }
+  }
+
+  /// Returns a sequence of Slots matching the given entry.
+  @inlinable
+  internal func slots(matching entry: _HashTable.Entry) -> SlotSet {
+    // Fill a 64-bit integer with 8 copies of the entry we're looking for.
+    var p = UInt64(entry._value)
+    p |= p &<< 8
+    p |= p &<< 16
+    p |= p &<< 32
+    // Xoring `p` to `self._value` turns matching bytes into zeroes.
+    p ^= self._value
+    // The problem now reduces to finding zero bytes in `p`.  For every 8-bit
+    // integer `b`, `x = ((b & 0x7F) + 0x7F) | b` has bit 7 set iff `b !=
+    // 0`. Further, `~(x | 0x7F)` leaves bit 7 set to one iff `b == 0` and
+    // clears all other bits.  Use this formula to check for zero values in all
+    // 8 bytes of `p` at the same time. These 8-bit calculations never overflow,
+    // so it's safe to perform them in parallel on bytes within the same word.
+    let m: UInt64 = 0x7F7F7F7F7F7F7F7F
+    let y = ~(((p & m) + m) | p | m)
+    // `y` has bit 7 set in all bytes that match the payload in `self`, with all
+    // other bits cleared. Shifting it seven places to the right moves the set
+    // bits to the start of their corresponding bytes.
+    return SlotSet(_shifts: y &>> 7)
+  }
+}
+
+extension _HashTable {
+  @_fixed_layout
+  @usableFromInline
+  internal struct Index {
+    @usableFromInline
+    internal var offset: Int
+
+    @inlinable
+    @inline(__always)
+    internal init(offset: Int) {
+      self.offset = offset
+    }
+
+    @inlinable
+    @inline(__always)
+    internal init(bucket: Int, slotOffset: Int = 0) {
+      _sanityCheck(bucket >= 0)
+      _sanityCheck(slotOffset >= 0 && slotOffset < 8)
+      self.offset = (bucket &<< 3) | slotOffset
+    }
+
+    @inlinable
+    @inline(__always)
+    internal init(bucket: Int, slot: Slot) {
+      self.init(bucket: bucket, slotOffset: slot.offset)
+    }
+
+    @inlinable
+    internal var bucket: Int {
+      @inline(__always) get {
+        return offset &>> 3
+      }
+    }
+
+    @inlinable
+    internal var slot: Slot {
+      @inline(__always) get {
+        return Slot(slot: offset & 7)
+      }
+    }
+  }
+}
+
+extension _HashTable.Index: Equatable {
+  @inlinable
+  @inline(__always)
+  internal
+  static func ==(lhs: _HashTable.Index, rhs: _HashTable.Index) -> Bool {
+    return lhs.offset == rhs.offset
+  }
+}
+
+extension _HashTable.Index: Comparable {
+  @inlinable
+  @inline(__always)
+  internal
+  static func < (lhs: _HashTable.Index, rhs: _HashTable.Index) -> Bool {
+    return lhs.offset < rhs.offset
+  }
+}
+
+extension _HashTable: Collection {
+  @inlinable
+  @inline(__always)
+  internal func isValid(_ index: Index) -> Bool {
+    return index.offset >= 0 && index.offset < entryCount
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func _isOccupied(_ index: Index) -> Bool {
+    _sanityCheck(isValid(index))
+    return self[index].isOccupied
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func isOccupied(_ index: Index) -> Bool {
+    return isValid(index) && _isOccupied(index)
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func checkOccupied(_ i: Index) {
+    _precondition(isOccupied(i),
+      "Attempting to access Collection elements using an invalid Index")
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func index(after index: Index) -> Index {
+    var index = index
+    formIndex(after: &index)
+    return index
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func formIndex(after index: inout Index) {
+    index.offset += 1
+    if index.bucket >= bucketCount { return }
+    if buckets[index.bucket].isOccupied(at: index.slot) { return }
+    // Find next occupied bucket.
+    var bucket = index.bucket + 1
+    while bucket < bucketCount, buckets[bucket].isEmpty {
+      bucket += 1
+    }
+    index = Index(bucket: bucket)
+  }
+
+  @inlinable
+  internal var startIndex: Index {
+    get {
+      // We start at the index after offset -1 instead of the index at offset 0
+      // because we need to find the first occupied slot.
+      return index(after: Index(offset: -1))
+    }
+  }
+
+  @inlinable
+  internal var endIndex: Index {
+    @inline(__always)
+    get {
+      return Index(offset: entryCount)
+    }
+  }
+
+  @inlinable
+  internal subscript(index: Index) -> Entry {
+    @inline(__always) get {
+      _sanityCheck(isValid(index))
+      return buckets[index.bucket][index.slot]
+    }
+    @inline(__always) nonmutating set {
+      _sanityCheck(isValid(index))
+      buckets[index.bucket][index.slot] = newValue
+    }
+  }
+}
+
+extension _HashTable {
   @inlinable
   @inline(__always)
   internal func _idealBucket(forHashValue hashValue: Int) -> Int {
     return hashValue & bucketMask
-  }
-
-  @inlinable
-  @inline(__always)
-  internal func _isValid(_ bucket: Int) -> Bool {
-    return bucket >= 0 && bucket < bucketCount
-  }
-
-  @inlinable
-  @inline(__always)
-  internal func _isOccupied(_ bucket: Int) -> Bool {
-    _sanityCheck(_isValid(bucket))
-    return map[bucket].isOccupied
   }
 
   /// The next bucket after `bucket`, with wraparound at the end of the table.
@@ -184,344 +550,201 @@ extension _HashTable {
     // Bucket is not negative. Therefore subtracting 1 does not overflow.
     return (bucket &- 1) & bucketMask
   }
-
-  /// The next unoccupied bucket after `bucket`, with wraparound.
-  @inlinable
-  internal func _nextHole(atOrAfter bucket: Int) -> Int {
-    var bucket = bucket
-    while map[bucket].isOccupied {
-      bucket = _succ(bucket)
-    }
-    return bucket
-  }
-
-  /// The next unoccupied bucket after `bucket`, with wraparound.
-  @inlinable
-  internal func _nextHole(after bucket: Int) -> Int {
-    return _nextHole(atOrAfter: _succ(bucket))
-  }
-
-  /// The previous unoccupied bucket before `bucket`, with wraparound.
-  @inlinable
-  internal func _prevHole(before bucket: Int) -> Int {
-    var bucket = _pred(bucket)
-    while map[bucket].isOccupied {
-      bucket = _pred(bucket)
-    }
-    return bucket
-  }
-
-  /// The next occupied bucket after `bucket`, without wraparound.
-  @inlinable
-  internal func _occupiedBucket(after bucket: Int) -> Int {
-    _sanityCheck(bucket < bucketCount)
-    var bucket = bucket + 1
-    while bucket < bucketCount && !map[bucket].isOccupied {
-      bucket += 1
-    }
-    return bucket
-  }
 }
+
 
 extension _HashTable {
   @_fixed_layout
   @usableFromInline
-  internal struct OccupiedIndices: Sequence, IteratorProtocol {
+  internal struct LookupCandidates {
     @usableFromInline
-    internal var bucket: Int
+    let _hashTable: _HashTable
     @usableFromInline
-    internal let count: Int
+    let _entry: Entry
     @usableFromInline
-    internal let base: UnsafeMutablePointer<MapEntry>
+    var _bucket: Int
+    @usableFromInline
+    var _matches: Bucket.SlotSet
 
     @inlinable
-    internal init(
-      base: UnsafeMutablePointer<MapEntry>,
-      count: Int) {
-      self.bucket = -1
-      self.count = count
-      self.base = base
+    internal init(hashTable: _HashTable, hashValue: Int) {
+      self._hashTable = hashTable
+      self._entry = Entry(forHashValue: hashValue)
+      self._bucket = hashTable._idealBucket(forHashValue: hashValue)
+      self._matches = hashTable.buckets[_bucket].slots(matching: _entry)
     }
 
     @inlinable
-    internal mutating func next() -> Index? {
-      guard bucket != count else { return nil }
-      bucket += 1
-      while bucket != count && !base[bucket].isOccupied {
-        bucket += 1
-      }
-      guard bucket != count else { return nil }
-      return Index(bucket: bucket)
+    internal mutating func next() -> (index: Index, found: Bool) {
+      repeat {
+        if let slot = _matches.next() {
+          return (Index(bucket: _bucket, slot: slot), true)
+        }
+        let b = _hashTable.buckets[_bucket]
+        if !b.isFull {
+          let hole = b.slotForLowestHole
+          return (Index(bucket: _bucket, slot: hole), false)
+        }
+        _bucket = _hashTable._succ(_bucket)
+        _matches = _hashTable.buckets[_bucket].slots(matching: _entry)
+      } while true
     }
   }
 
   @inlinable
-  var occupiedIndices: OccupiedIndices {
-    get {
-      return OccupiedIndices(base: map, count: count > 0 ? bucketCount : 0)
-    }
+  func lookup(hashValue: Int) -> LookupCandidates {
+    return LookupCandidates(hashTable: self, hashValue: hashValue)
   }
 }
 
 extension _HashTable {
-  @_fixed_layout
-  @usableFromInline
-  internal struct Index {
-    @usableFromInline
-    internal var bucket: Int
-
-    @inlinable
-    @inline(__always)
-    internal init(bucket: Int) {
-      self.bucket = bucket
-    }
-  }
-}
-
-extension _HashTable.Index: Equatable {
-  @inlinable
-  @inline(__always)
-  internal
-  static func ==(lhs: _HashTable.Index, rhs: _HashTable.Index) -> Bool {
-    return lhs.bucket == rhs.bucket
-  }
-}
-
-extension _HashTable.Index: Comparable {
-  @inlinable
-  @inline(__always)
-  internal
-  static func < (lhs: _HashTable.Index, rhs: _HashTable.Index) -> Bool {
-    return lhs.bucket < rhs.bucket
-  }
-}
-
-
-extension _HashTable {
-  @inlinable
-  internal func isValid(_ i: Index) -> Bool {
-    return _isValid(i.bucket)
-  }
-
-  @inlinable
-  internal func isOccupied(_ i: Index) -> Bool {
-    return _isValid(i.bucket) && _isOccupied(i.bucket)
-  }
-
-  @inlinable
-  internal func checkOccupied(_ i: Index) {
-    _precondition(isOccupied(i),
-      "Attempting to access Collection elements using an invalid Index")
-  }
-
-  @inlinable
-  internal var startIndex: Index {
-    @_effects(readonly)
-    get {
-      // We start at "bucket after -1" instead of "0" because we need to find
-      // the first occupied slot.
-      return Index(bucket: _occupiedBucket(after: -1))
-    }
-  }
-
-  @inlinable
-  internal var endIndex: Index {
-    @inline(__always)
-    get {
-      return Index(bucket: bucketCount)
-    }
-  }
-
-  @inlinable
-  internal func index(after i: Index) -> Index {
-    checkOccupied(i)
-    return Index(bucket: _occupiedBucket(after: i.bucket))
-  }
-
-  /// Return the bucket for the first member that may have a matching hash
-  /// value, or if there's no such member, return an unoccupied bucket that is
-  /// suitable for inserting a new member with the specified hash value.
-  @inlinable
-  @inline(__always)
-  @_effects(readonly)
-  internal func lookupFirst(hashValue: Int) -> (index: Index, found: Bool) {
-    let index = Index(bucket: _idealBucket(forHashValue: hashValue))
-    let entry = MapEntry.forHashValue(hashValue)
-    return _lookupChain(startingAt: index, lookingFor: entry)
-  }
-
-  /// Return the next bucket after `bucket` in the collision chain for the
-  /// specified hash value. `bucket` must have been returned by `lookupFirst` or
-  /// `lookupNext`, with `found == true`.
-  @inlinable
-  @inline(__always)
-  @_effects(readonly)
-  internal func lookupNext(
-    hashValue: Int,
-    after index: Index
-  ) -> (index: Index, found: Bool) {
-    let bucket = _succ(index.bucket)
-    let entry = MapEntry.forHashValue(hashValue)
-    return _lookupChain(startingAt: Index(bucket: bucket), lookingFor: entry)
-  }
-
-  @inlinable
-  @inline(__always)
-  internal func _lookupChain(
-    startingAt index: Index,
-    lookingFor entry: MapEntry
-  ) -> (index: Index, found: Bool) {
-    var bucket = index.bucket
-    // We guarantee there's always a hole in the table, so we just loop until we
-    // find one.
-    while true {
-      switch map[bucket] {
-      case entry:
-        return (Index(bucket: bucket), true)
-      case MapEntry.unoccupied:
-        return (Index(bucket: bucket), false)
-      default:
-        bucket = _succ(bucket)
-      }
-    }
-  }
-
-
   @usableFromInline
   @_effects(releasenone)
-  internal mutating func copyContents(of other: _HashTable) {
-    _sanityCheck(scale == other.scale)
-    self.count = other.count
-    self.map.assign(from: other.map, count: self.bucketCount)
+  internal func copyContents(of other: _HashTable) {
+    _sanityCheck(bucketCount == other.bucketCount)
+    self.buckets.assign(from: other.buckets, count: bucketCount)
   }
 
   /// Insert a new entry with the specified hash value into the table.
   /// The entry must not already exist in the table -- duplicates are ignored.
   @usableFromInline
   @_effects(releasenone)
-  internal mutating func insertNew(hashValue: Int) -> Index {
-    _sanityCheck(count < capacity)
-    let bucket = _nextHole(atOrAfter: _idealBucket(forHashValue: hashValue))
-    map[bucket] = MapEntry.forHashValue(hashValue)
-    count += 1
-    return Index(bucket: bucket)
+  internal func insertNew(hashValue: Int) -> Index {
+    var bucket = _idealBucket(forHashValue: hashValue)
+    while buckets[bucket].isFull {
+      bucket = _succ(bucket)
+    }
+    let slot = buckets[bucket].insertEntry(forHashValue: hashValue)
+    return Index(bucket: bucket, slot: slot)
   }
 
   /// Insert a new entry for an element with the specified hash value at
   /// `bucket`. The bucket must have been returned by `lookupFirst` or
   /// `lookupNext` for the same hash value, with `found == false`.
   @usableFromInline
+  @inline(__always)
   @_effects(releasenone)
-  internal mutating func insert(hashValue: Int, at index: Index) {
-    _sanityCheck(count < capacity)
-    _sanityCheck(!map[index.bucket].isOccupied)
-    map[index.bucket] = MapEntry.forHashValue(hashValue)
-    count += 1
+  internal func insert(hashValue: Int, at index: Index) {
+    _sanityCheck(!isOccupied(index))
+    self[index] = Entry(forHashValue: hashValue)
   }
 
-  internal mutating func removeAll() {
-    map.assign(repeating: .unoccupied, count: bucketCount)
-    count = 0
+  internal func removeAll() {
+    buckets.assign(repeating: Bucket(0), count: bucketCount)
+  }
+
+  @inlinable
+  internal func _startBucket(forChainContaining bucket: Int) -> Int {
+    var bucket = bucket
+    while true {
+      let previous = _pred(bucket)
+      guard buckets[previous].isFull else { return bucket }
+      bucket = previous
+    }
   }
 
   @inlinable
   @inline(__always)
-  internal mutating func delete<D: _HashTableDelegate>(
-    at index: Index,
+  internal func delete<D: _HashTableDelegate>(
     hashValue: Int,
+    at index: Index,
     with delegate: D
   ) {
-    _sanityCheck(map[index.bucket] == MapEntry.forHashValue(hashValue))
+    _sanityCheck(self[index] == Entry(forHashValue: hashValue))
 
-    // Remove the element.
-    self.count -= 1
-
-    let idealBucket = _idealBucket(forHashValue: hashValue)
+    if !buckets[index.bucket].isFull {
+      // Fast path: If bucket already has another hole, then we aren't splitting
+      // any chains, so we're done.
+      let replacement = buckets[index.bucket].removeEntry(at: index.slot)
+      delegate.moveEntry(
+        from: Index(bucket: index.bucket, slot: replacement),
+        to: index)
+      return
+    }
 
     // If we've put a hole in a chain of contiguous elements, some element after
     // the hole may belong where the new hole is.
-    var hole = index.bucket
 
-    // Find the first and last buckets in the contiguous chain containing hole.
-    let start = _prevHole(before: idealBucket)
-    let end = _pred(_nextHole(after: hole))
+    // Find the first bucket in the contiguous chain that contains the entry
+    // we've just deleted.
+    let startBucket = _startBucket(
+      forChainContaining: _idealBucket(forHashValue: hashValue))
 
-    // Relocate out-of-place elements in the chain, repeating until none are
-    // found.
-    while hole != end {
-      // Walk backwards from the end of the chain looking for something out of
-      // place.
-      // FIXME: Walking forwards may be more efficient if we expect long chains.
-      var candidate = end
-      while candidate != hole {
-        let candidateHash = delegate.hashValue(at: Index(bucket: candidate))
-        _sanityCheck(map[candidate] == MapEntry.forHashValue(candidateHash))
-        let ideal = _idealBucket(forHashValue: candidateHash)
+    var hole = index
+    var candidate = Index(bucket: _succ(hole.bucket))
 
-        // Does this element belong between start and hole?  We need two
-        // separate tests depending on whether [start, hole] wraps around the
-        // end of the storage.
-        let c0 = ideal >= start
-        let c1 = ideal <= hole
-        if start <= hole ? (c0 && c1) : (c0 || c1) {
-          break // Found it
+    // Relocate out-of-place elements in the chain, repeating until we get to
+    // the end of the chain or until we move the hole into a bucket that already
+    // has another.
+    while self[candidate].isOccupied {
+      let candidateHash = delegate.hashValue(at: candidate)
+      _sanityCheck(self[candidate] == Entry(forHashValue: candidateHash))
+      let idealBucket = _idealBucket(forHashValue: candidateHash)
+
+      // Does this element belong between start and hole?  We need two
+      // separate tests depending on whether [start, hole] wraps around the
+      // end of the storage.
+      let c0 = idealBucket >= startBucket
+      let c1 = idealBucket <= hole.bucket
+      if startBucket <= hole.bucket ? (c0 && c1) : (c0 || c1) {
+        self[hole] = Entry(forHashValue: candidateHash)
+        delegate.moveEntry(from: candidate, to: hole)
+        hole = candidate
+        guard buckets[hole.bucket].isFull else {
+          break
         }
-        candidate = _pred(candidate)
       }
-
-      if candidate == hole {
-        // No out-of-place elements found. It is safe to leave the hole in
-        // place; we're done adjusting.
-        break
-      }
-
-      // Move the found element into the hole.
-      map[hole] = map[candidate]
-      delegate.moveEntry(
-        from: Index(bucket: candidate),
-        to: Index(bucket: hole))
-      hole = candidate
+      candidate.offset = (candidate.offset &+ 1) & (entryCount &- 1)
     }
-    // Mark new hole as empty.
-    map[hole] = .unoccupied
+
+    // Compact bucket with the newly created hole.
+    let replacement = buckets[hole.bucket].removeEntry(at: hole.slot)
+    delegate.moveEntry(
+      from: Index(bucket: hole.bucket, slot: replacement),
+      to: hole)
   }
 }
 
 extension _HashTable {
-  internal func _invariantCheck(with delegate: _HashTableDelegate) {
+  /// Check for consistency and return the count of occupied entries.
+  internal func _invariantCheck(with delegate: _HashTableDelegate) -> Int {
 #if INTERNAL_CHECKS_ENABLED
-    _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1,
-      "Invalid hash table scale")
-    _sanityCheck(count >= 0 && count < bucketCount,
-      "Invalid hash table count")
-    _sanityCheck(capacity == _HashTable.capacity(forScale: scale),
-      "Invalid hash table capacity")
-    _sanityCheck(capacity >= 0 && capacity < bucketCount,
-      "Invalid hash table capacity formula")
-    _sanityCheck(count <= capacity,
-      "Hash table count exceeds its capacity")
-    _sanityCheck(_isValidAddress(UInt(bitPattern: self.map)),
-      "Invalid hash table map pointer")
-    _sanityCheck(_isValidAddress(UInt(bitPattern: self.map + bucketCount)),
-      "Invalid hash table map pointer")
+    _sanityCheck(bucketCount > 0 && bucketCount & (bucketCount &- 1) == 0,
+      "Invalid bucketCount")
+    _sanityCheck(_isValidAddress(UInt(bitPattern: buckets)),
+      "Invalid buckets pointer")
+    _sanityCheck(_isValidAddress(UInt(bitPattern: buckets + bucketCount - 1)),
+      "Invalid buckets buffer")
 
     var occupiedCount = 0
-    for bucket in 0 ..< bucketCount where map[bucket].isOccupied {
-      occupiedCount += 1
-      let hashValue = delegate.hashValue(at: Index(bucket: bucket))
-      _sanityCheck(map[bucket] == MapEntry.forHashValue(hashValue),
-        "Some hash table elements are stored with mismatching hash bits")
-      var b = _idealBucket(forHashValue: hashValue)
-      // There must be no holes between the ideal and actual buckets for this
-      // hash value.
-      while b != bucket {
-        _sanityCheck(map[b].isOccupied,
-          "Some hash table elements aren't stored on their collision chain")
-        b = _succ(b)
+    for b in 0 ..< bucketCount {
+      let bucket = buckets[b]
+      var slot = Slot.start
+      var foundHole = false
+      while slot != Slot.end {
+        defer { slot.formSuccessor() }
+        guard bucket[slot].isOccupied else {
+          foundHole = true
+          continue
+        }
+        _sanityCheck(!foundHole, "Bucket's holes aren't all at the end")
+        occupiedCount += 1
+        let hashValue = delegate.hashValue(at: Index(bucket: b, slot: slot))
+        _sanityCheck(bucket[slot] == Entry(forHashValue: hashValue),
+          "Some hash table elements are stored with mismatching hash bits")
+        // There must be no holes between the ideal and actual buckets for this
+        // hash value.
+        var i = _idealBucket(forHashValue: hashValue)
+        while i != b {
+          _sanityCheck(buckets[i].isFull,
+            "Some hash table elements are stored outside their collision chain")
+          i = _succ(i)
+        }
       }
     }
-    _sanityCheck(occupiedCount == count,
-      "Hash table count doesn't match the number of occupied buckets")
+    return occupiedCount
+#else
+    return 0
 #endif
   }
 }
