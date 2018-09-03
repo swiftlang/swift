@@ -19,7 +19,7 @@ DatasetAPITests.testAllBackends("SingleValueManualIterator") {
   // [[1], [2], [3], [4], [5]]
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
     .reshaped(to: [5, 1])
-  let dataset = SingleValueDataset(elements: scalars)
+  let dataset = Dataset(elements: scalars)
   var iterator = dataset.makeIterator()
   var i: Int32 = 0
   while let item = iterator.next() {
@@ -28,11 +28,11 @@ DatasetAPITests.testAllBackends("SingleValueManualIterator") {
   }
 }
 
-DatasetAPITests.testAllBackends("SingleValueDatasetIteration") {
+DatasetAPITests.testAllBackends("DatasetIteration") {
   // [[1], [2], [3], [4], [5]]
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
     .reshaped(to: [5, 1])
-  let dataset = SingleValueDataset(elements: scalars)
+  let dataset = Dataset(elements: scalars)
   var i: Int32 = 0
   for item in dataset {
     expectEqual(scalars[i].array, item.array)
@@ -42,23 +42,23 @@ DatasetAPITests.testAllBackends("SingleValueDatasetIteration") {
 
 DatasetAPITests.testAllBackends("SingleValueTransformations") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
-  let dataset = SingleValueDataset(elements: scalars)
+  let dataset = Dataset(elements: scalars)
   let shuffled = dataset.shuffled(sampleCount: 5, randomSeed: 42)
   expectEqual([0, 4, 1, 3, 2], shuffled.map { $0.scalar! })
 }
 
 DatasetAPITests.testAllBackends("SingleValueHOFs") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
-  let dataset = SingleValueDataset(elements: scalars)
-  let addedOne: SingleValueDataset = dataset.map { $0 + 1 }
+  let dataset = Dataset(elements: scalars)
+  let addedOne: Dataset = dataset.map { $0 + 1 }
   expectEqual([1, 2, 3, 4, 5], addedOne.flatMap { $0.scalars })
-  let evens: SingleValueDataset = dataset.filter { Tensor($0 % 2 == Tensor(0)) }
+  let evens: Dataset = dataset.filter { Tensor($0 % 2 == Tensor(0)) }
   expectEqual([0, 2, 4], evens.flatMap { $0.scalars })
 }
 
 DatasetAPITests.testAllBackends("SingleValueBatched") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
-  let dataset = SingleValueDataset(elements: scalars)
+  let dataset = Dataset(elements: scalars)
   let batched = dataset.batched(2)
 
   var iterator = batched.makeIterator()
@@ -70,8 +70,8 @@ DatasetAPITests.testAllBackends("SingleValueBatched") {
 DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
   let scalars1 = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
   let scalars2 = Tensor<Float>(rangeFrom: 5, to: 10, stride: 1)
-  let datasetLeft = SingleValueDataset(elements: scalars1)
-  let datasetRight = SingleValueDataset(elements: scalars2)
+  let datasetLeft = Dataset(elements: scalars1)
+  let datasetRight = Dataset(elements: scalars2)
   var i: Int32 = 0
   for (item1, item2) in zip(datasetLeft, datasetRight) {
     expectEqual(scalars1[i].array, item1.array)

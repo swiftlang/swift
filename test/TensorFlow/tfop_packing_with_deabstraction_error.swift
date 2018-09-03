@@ -99,3 +99,13 @@ public func testExtractDTypeList() {
                                output_shapes: [TensorShape()])
 }
 
+public func invalidDatasetElementType1() {
+  // expected-error @+1 {{argument of type 'Float' is not a TensorFlow value or an aggregate of TensorFlow values}}
+  let _ = Dataset<Float>(elements: 1)
+}
+
+public func invalidDatasetElementType2() {
+  struct S { var x: Tensor<Float>; var y: Float }
+  // expected-error @+1 {{argument of type 'S' is not a TensorFlow value or an aggregate of TensorFlow values}}
+  let _ = Dataset<S>(elements: S(x: Tensor(1), y: 1))
+}
