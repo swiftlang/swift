@@ -3,23 +3,27 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include <list>
 
 using namespace llvm;
 using namespace swift;
 using namespace constraints;
 
-SolverStep SolverStep::create(ConstraintSystem &cs,
-                              ArrayRef<TypeVariableType *> typeVars,
-                              ConstraintList &constraints,
-                              SmallVectorImpl<Solution> &solutions) {
-  SolverStep step(cs, solutions);
+SolverStep *SolverStep::create(ConstraintSystem &cs,
+                               SmallVectorImpl<Solution> &solutions) {
+  return new (cs.getAllocator()) SolverStep(cs, solutions);
+}
+
+SolverStep *SolverStep::create(ConstraintSystem &cs,
+                               ArrayRef<TypeVariableType *> typeVars,
+                               ConstraintList &constraints,
+                               SmallVectorImpl<Solution> &solutions) {
+  auto *step = SolverStep::create(cs, solutions);
 
   for (auto *typeVar : typeVars)
-    step.record(typeVar);
+    step->record(typeVar);
 
   for (auto &constraint : constraints)
-    step.record(&constraint);
+    step->record(&constraint);
 
   return step;
 }
@@ -64,9 +68,64 @@ SolverStep::StepResult SolverStep::advance() {
 }
 
 SolverStep::StepResult SolverStep::computeFollowupSteps() const {
-  std::list<SolverStep> nextSteps;
+  SmallVector<SolverStep *, 4> nextSteps;
+
   // Compute next steps based on that connected components
   // algorithm tells us is splittable.
+
+  auto &CG = CS.getConstraintGraph();
+  // Contract the edges of the constraint graph.
+  CG.optimize();
+
+  // Compute the connected components of the constraint graph.
+  // FIXME: We're seeding typeVars with TypeVariables so that the
+  // connected-components algorithm only considers those type variables within
+  // our component. There are clearly better ways to do this.
+  SmallVector<TypeVariableType *, 16> typeVars(CS.TypeVariables);
+  SmallVector<unsigned, 16> components;
+  unsigned numComponents = CG.computeConnectedComponents(typeVars, components);
+
+  std::unique_ptr<SmallVector<Solution, 4>[]> partialSolutions(
+      new SmallVector<Solution, 4>[numComponents]);
+
+  ActiveScope->NumComponents = numComponents;
+  ActiveScope->PartialSolutions = std::move(partialSolutions);
+
+  for (unsigned i = 0, n = numComponents; i != n; ++i)
+    nextSteps.push_back(SolverStep::create(CS, partialSolutions[i]));
+
+  if (CS.getASTContext().LangOpts.DebugConstraintSolver) {
+    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+
+    // Verify that the constraint graph is valid.
+    CG.verify();
+
+    log << "---Constraint graph---\n";
+    CG.print(log);
+
+    log << "---Connected components---\n";
+    CG.printConnectedComponents(log);
+  }
+
+  // Map type variables and constraints into appropriate steps.
+  for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
+    auto *typeVar = typeVars[i];
+    auto &step = *nextSteps[components[i]];
+
+    step.record(typeVar);
+    for (auto *constraint : CG[typeVar].getConstraints())
+      step.record(constraint);
+  }
+
+  // Add the orphaned components to the mapping from constraints to components.
+  unsigned firstOrphanedConstraint =
+      numComponents - CG.getOrphanedConstraints().size();
+  {
+    unsigned component = firstOrphanedConstraint;
+    for (auto constraint : CG.getOrphanedConstraints())
+      nextSteps[component++]->record(constraint);
+  }
+
   return {ConstraintSystem::SolutionKind::Unsolved, std::move(nextSteps)};
 }
 
