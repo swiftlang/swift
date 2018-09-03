@@ -192,13 +192,13 @@ bb0(%0 : $@thick ResilientOutsideChild.Type):
 // CHECK: call swiftcc void
 
 sil_vtable ChildToResilientParent {
-  #ResilientOutsideParent.method!1: @$S5super22ChildToResilientParentC6methodyyF	// super.ChildToResilientParent.method () -> ()
-  #ResilientOutsideParent.classMethod!1: @$S5super22ChildToResilientParentC11classMethodyyFZ	// static super.ChildToResilientParent.classMethod () -> ()
+  #ResilientOutsideParent.method!1: @$S5super22ChildToResilientParentC6methodyyF [override]	// super.ChildToResilientParent.method () -> ()
+  #ResilientOutsideParent.classMethod!1: @$S5super22ChildToResilientParentC11classMethodyyFZ [override]	// static super.ChildToResilientParent.classMethod () -> ()
 }
 
 sil_vtable ChildToFixedParent {
-  #OutsideParent.method!1: @$S5super18ChildToFixedParentC6methodyyF	// super.ChildToFixedParent.method () -> ()
-  #OutsideParent.classMethod!1: @$S5super18ChildToFixedParentC11classMethodyyFZ	// static super.ChildToFixedParent.classMethod () -> ()
+  #OutsideParent.method!1: @$S5super18ChildToFixedParentC6methodyyF [override]	// super.ChildToFixedParent.method () -> ()
+  #OutsideParent.classMethod!1: @$S5super18ChildToFixedParentC11classMethodyyFZ [override]	// static super.ChildToFixedParent.classMethod () -> ()
 }
 
 protocol Proto {
