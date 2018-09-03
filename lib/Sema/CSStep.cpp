@@ -69,3 +69,63 @@ SolverStep::StepResult SolverStep::computeFollowupSteps() const {
   // algorithm tells us is splittable.
   return {ConstraintSystem::SolutionKind::Unsolved, std::move(nextSteps)};
 }
+
+bool SolverStep::mergePartialSolutions() const {
+  assert(ActiveScope);
+
+  auto numComponents = ActiveScope->NumComponents;
+  auto &partialSolutions = ActiveScope->PartialSolutions;
+
+  // TODO: Optimize when there is only one component
+  //       because it would be inefficient to create all
+  //       these data structures and do nothing.
+
+  // Produce all combinations of partial solutions.
+  SmallVector<unsigned, 2> indices(numComponents, 0);
+  bool done = false;
+  bool anySolutions = false;
+  do {
+    // Create a new solver scope in which we apply all of the partial
+    // solutions.
+    ConstraintSystem::SolverScope scope(CS);
+    for (unsigned i = 0; i != numComponents; ++i)
+      CS.applySolution(partialSolutions[i][indices[i]]);
+
+    // This solution might be worse than the best solution found so far.
+    // If so, skip it.
+    if (!CS.worseThanBestSolution()) {
+      // Finalize this solution.
+      auto solution = CS.finalize();
+      if (CS.TC.getLangOpts().DebugConstraintSolver) {
+        auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+        log.indent(CS.solverState->depth * 2)
+            << "(composed solution " << CS.CurrentScore << ")\n";
+      }
+
+      // Save this solution.
+      Solutions.push_back(std::move(solution));
+      anySolutions = true;
+    }
+
+    // Find the next combination.
+    for (unsigned n = numComponents; n > 0; --n) {
+      ++indices[n - 1];
+
+      // If we haven't run out of solutions yet, we're done.
+      if (indices[n - 1] < partialSolutions[n - 1].size())
+        break;
+
+      // If we ran out of solutions at the first position, we're done.
+      if (n == 1) {
+        done = true;
+        break;
+      }
+
+      // Zero out the indices from here to the end.
+      for (unsigned i = n - 1; i != numComponents; ++i)
+        indices[i] = 0;
+    }
+  } while (!done);
+
+  return anySolutions;
+}
