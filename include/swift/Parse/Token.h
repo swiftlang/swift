@@ -277,7 +277,7 @@ public:
     this->MultilineString = IsMultilineString;
     this->CustomDelimiterLen = CustomDelimiterLen;
     assert(this->CustomDelimiterLen == CustomDelimiterLen &&
-           "string custom delimiter too long");
+           "custom string delimiter length > 255");
   }
 
   bool isMultilineString() const {
