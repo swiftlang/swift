@@ -62,203 +62,203 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 std::string LinkEntity::mangleAsString() const {
   IRGenMangler mangler;
   switch (getKind()) {
-    case Kind::DispatchThunk: {
-      auto *func = cast<FuncDecl>(getDecl());
-      return mangler.mangleDispatchThunk(func);
+  case Kind::DispatchThunk: {
+    auto *func = cast<FuncDecl>(getDecl());
+    return mangler.mangleDispatchThunk(func);
+  }
+
+  case Kind::DispatchThunkInitializer: {
+    auto *ctor = cast<ConstructorDecl>(getDecl());
+    return mangler.mangleConstructorDispatchThunk(ctor,
+                                                  /*isAllocating=*/false);
+  }
+
+  case Kind::DispatchThunkAllocator: {
+    auto *ctor = cast<ConstructorDecl>(getDecl());
+    return mangler.mangleConstructorDispatchThunk(ctor,
+                                                  /*isAllocating=*/true);
+  }
+
+  case Kind::MethodDescriptor: {
+    auto *func = cast<FuncDecl>(getDecl());
+    return mangler.mangleMethodDescriptor(func);
+  }
+
+  case Kind::MethodDescriptorInitializer: {
+    auto *ctor = cast<ConstructorDecl>(getDecl());
+    return mangler.mangleConstructorMethodDescriptor(ctor,
+                                                     /*isAllocating=*/false);
+  }
+
+  case Kind::MethodDescriptorAllocator: {
+    auto *ctor = cast<ConstructorDecl>(getDecl());
+    return mangler.mangleConstructorMethodDescriptor(ctor,
+                                                     /*isAllocating=*/true);
+  }
+
+  case Kind::ValueWitness:
+    return mangler.mangleValueWitness(getType(), getValueWitness());
+
+  case Kind::ValueWitnessTable:
+    return mangler.mangleValueWitnessTable(getType());
+
+  case Kind::TypeMetadataAccessFunction:
+    return mangler.mangleTypeMetadataAccessFunction(getType());
+
+  case Kind::TypeMetadataLazyCacheVariable:
+    return mangler.mangleTypeMetadataLazyCacheVariable(getType());
+
+  case Kind::TypeMetadataInstantiationCache:
+    return mangler.mangleTypeMetadataInstantiationCache(
+                                            cast<NominalTypeDecl>(getDecl()));
+
+  case Kind::TypeMetadataInstantiationFunction:
+    return mangler.mangleTypeMetadataInstantiationFunction(
+                                            cast<NominalTypeDecl>(getDecl()));
+
+  case Kind::TypeMetadataSingletonInitializationCache:
+    return mangler.mangleTypeMetadataSingletonInitializationCache(
+                                            cast<NominalTypeDecl>(getDecl()));
+
+  case Kind::TypeMetadataCompletionFunction:
+    return mangler.mangleTypeMetadataCompletionFunction(
+                                            cast<NominalTypeDecl>(getDecl()));
+
+  case Kind::TypeMetadata:
+    switch (getMetadataAddress()) {
+      case TypeMetadataAddress::FullMetadata:
+        return mangler.mangleTypeFullMetadataFull(getType());
+      case TypeMetadataAddress::AddressPoint:
+        return mangler.mangleTypeMetadataFull(getType());
     }
+    llvm_unreachable("invalid metadata address");
 
-    case Kind::DispatchThunkInitializer: {
-      auto *ctor = cast<ConstructorDecl>(getDecl());
-      return mangler.mangleConstructorDispatchThunk(ctor,
-                                                    /*isAllocating=*/false);
-    }
+  case Kind::TypeMetadataPattern:
+    return mangler.mangleTypeMetadataPattern(
+                                        cast<NominalTypeDecl>(getDecl()));
 
-    case Kind::DispatchThunkAllocator: {
-      auto *ctor = cast<ConstructorDecl>(getDecl());
-      return mangler.mangleConstructorDispatchThunk(ctor,
-                                                    /*isAllocating=*/true);
-    }
+  case Kind::ForeignTypeMetadataCandidate:
+    return mangler.mangleTypeMetadataFull(getType());
 
-    case Kind::MethodDescriptor: {
-      auto *func = cast<FuncDecl>(getDecl());
-      return mangler.mangleMethodDescriptor(func);
-    }
+  case Kind::SwiftMetaclassStub:
+    return mangler.mangleClassMetaClass(cast<ClassDecl>(getDecl()));
 
-    case Kind::MethodDescriptorInitializer: {
-      auto *ctor = cast<ConstructorDecl>(getDecl());
-      return mangler.mangleConstructorMethodDescriptor(ctor,
-                                                       /*isAllocating=*/false);
-    }
+  case Kind::ClassMetadataBaseOffset:               // class metadata base offset
+    return mangler.mangleClassMetadataBaseOffset(cast<ClassDecl>(getDecl()));
 
-    case Kind::MethodDescriptorAllocator: {
-      auto *ctor = cast<ConstructorDecl>(getDecl());
-      return mangler.mangleConstructorMethodDescriptor(ctor,
-                                                       /*isAllocating=*/true);
-    }
+  case Kind::NominalTypeDescriptor:
+    return mangler.mangleNominalTypeDescriptor(
+                                        cast<NominalTypeDecl>(getDecl()));
 
-    case Kind::ValueWitness:
-      return mangler.mangleValueWitness(getType(), getValueWitness());
+  case Kind::PropertyDescriptor:
+    return mangler.manglePropertyDescriptor(
+                                        cast<AbstractStorageDecl>(getDecl()));
 
-    case Kind::ValueWitnessTable:
-      return mangler.mangleValueWitnessTable(getType());
-
-    case Kind::TypeMetadataAccessFunction:
-      return mangler.mangleTypeMetadataAccessFunction(getType());
-
-    case Kind::TypeMetadataLazyCacheVariable:
-      return mangler.mangleTypeMetadataLazyCacheVariable(getType());
-
-    case Kind::TypeMetadataInstantiationCache:
-      return mangler.mangleTypeMetadataInstantiationCache(
-                                              cast<NominalTypeDecl>(getDecl()));
-
-    case Kind::TypeMetadataInstantiationFunction:
-      return mangler.mangleTypeMetadataInstantiationFunction(
-                                              cast<NominalTypeDecl>(getDecl()));
-
-    case Kind::TypeMetadataSingletonInitializationCache:
-      return mangler.mangleTypeMetadataSingletonInitializationCache(
-                                              cast<NominalTypeDecl>(getDecl()));
-
-    case Kind::TypeMetadataCompletionFunction:
-      return mangler.mangleTypeMetadataCompletionFunction(
-                                              cast<NominalTypeDecl>(getDecl()));
-
-    case Kind::TypeMetadata:
-      switch (getMetadataAddress()) {
-        case TypeMetadataAddress::FullMetadata:
-          return mangler.mangleTypeFullMetadataFull(getType());
-        case TypeMetadataAddress::AddressPoint:
-          return mangler.mangleTypeMetadataFull(getType());
-      }
-      llvm_unreachable("invalid metadata address");
-
-    case Kind::TypeMetadataPattern:
-      return mangler.mangleTypeMetadataPattern(
-                                          cast<NominalTypeDecl>(getDecl()));
-
-    case Kind::ForeignTypeMetadataCandidate:
-      return mangler.mangleTypeMetadataFull(getType());
-
-    case Kind::SwiftMetaclassStub:
-      return mangler.mangleClassMetaClass(cast<ClassDecl>(getDecl()));
-
-    case Kind::ClassMetadataBaseOffset:               // class metadata base offset
-      return mangler.mangleClassMetadataBaseOffset(cast<ClassDecl>(getDecl()));
-
-    case Kind::NominalTypeDescriptor:
-      return mangler.mangleNominalTypeDescriptor(
-                                          cast<NominalTypeDecl>(getDecl()));
-
-    case Kind::PropertyDescriptor:
-      return mangler.manglePropertyDescriptor(
-                                          cast<AbstractStorageDecl>(getDecl()));
-
-    case Kind::ModuleDescriptor:
-      return mangler.mangleModuleDescriptor(cast<ModuleDecl>(getDecl()));
+  case Kind::ModuleDescriptor:
+    return mangler.mangleModuleDescriptor(cast<ModuleDecl>(getDecl()));
   
-    case Kind::ExtensionDescriptor:
-      return mangler.mangleExtensionDescriptor(getExtension());
-    
-    case Kind::AnonymousDescriptor:
-      return mangler.mangleAnonymousDescriptor(getDeclContext());
+  case Kind::ExtensionDescriptor:
+    return mangler.mangleExtensionDescriptor(getExtension());
 
-    case Kind::ProtocolDescriptor:
-      return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
+  case Kind::AnonymousDescriptor:
+    return mangler.mangleAnonymousDescriptor(getDeclContext());
 
-    case Kind::ProtocolConformanceDescriptor:
-      return mangler.mangleProtocolConformanceDescriptor(
-                     cast<NormalProtocolConformance>(getProtocolConformance()));
+  case Kind::ProtocolDescriptor:
+    return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
 
-    case Kind::EnumCase:
-      return mangler.mangleEnumCase(getDecl());
+  case Kind::ProtocolConformanceDescriptor:
+    return mangler.mangleProtocolConformanceDescriptor(
+                   cast<NormalProtocolConformance>(getProtocolConformance()));
 
-    case Kind::FieldOffset:
-      return mangler.mangleFieldOffset(getDecl());
+  case Kind::EnumCase:
+    return mangler.mangleEnumCase(getDecl());
 
-    case Kind::DirectProtocolWitnessTable:
-      return mangler.mangleDirectProtocolWitnessTable(getProtocolConformance());
+  case Kind::FieldOffset:
+    return mangler.mangleFieldOffset(getDecl());
 
-    case Kind::GenericProtocolWitnessTableCache:
-      return mangler.mangleGenericProtocolWitnessTableCache(
-                                                      getProtocolConformance());
+  case Kind::DirectProtocolWitnessTable:
+    return mangler.mangleDirectProtocolWitnessTable(getProtocolConformance());
 
-    case Kind::GenericProtocolWitnessTableInstantiationFunction:
-      return mangler.mangleGenericProtocolWitnessTableInstantiationFunction(
-                                                      getProtocolConformance());
+  case Kind::GenericProtocolWitnessTableCache:
+    return mangler.mangleGenericProtocolWitnessTableCache(
+                                                    getProtocolConformance());
 
-    case Kind::ResilientProtocolWitnessTable:
-      return mangler.mangleResilientProtocolWitnessTable(getProtocolConformance());
+  case Kind::GenericProtocolWitnessTableInstantiationFunction:
+    return mangler.mangleGenericProtocolWitnessTableInstantiationFunction(
+                                                    getProtocolConformance());
 
-    case Kind::ProtocolWitnessTableAccessFunction:
-      return mangler.mangleProtocolWitnessTableAccessFunction(
-                                                      getProtocolConformance());
+  case Kind::ResilientProtocolWitnessTable:
+    return mangler.mangleResilientProtocolWitnessTable(getProtocolConformance());
 
-    case Kind::ProtocolWitnessTablePattern:
-      return mangler.mangleProtocolWitnessTablePattern(getProtocolConformance());
+  case Kind::ProtocolWitnessTableAccessFunction:
+    return mangler.mangleProtocolWitnessTableAccessFunction(
+                                                    getProtocolConformance());
 
-    case Kind::ProtocolWitnessTableLazyAccessFunction:
-      return mangler.mangleProtocolWitnessTableLazyAccessFunction(getType(),
-                                                      getProtocolConformance());
+  case Kind::ProtocolWitnessTablePattern:
+    return mangler.mangleProtocolWitnessTablePattern(getProtocolConformance());
 
-    case Kind::ProtocolWitnessTableLazyCacheVariable:
-      return mangler.mangleProtocolWitnessTableLazyCacheVariable(getType(),
-                                                      getProtocolConformance());
+  case Kind::ProtocolWitnessTableLazyAccessFunction:
+    return mangler.mangleProtocolWitnessTableLazyAccessFunction(getType(),
+                                                    getProtocolConformance());
 
-    case Kind::AssociatedTypeMetadataAccessFunction:
-      return mangler.mangleAssociatedTypeMetadataAccessFunction(
-                  getProtocolConformance(), getAssociatedType()->getNameStr());
+  case Kind::ProtocolWitnessTableLazyCacheVariable:
+    return mangler.mangleProtocolWitnessTableLazyCacheVariable(getType(),
+                                                    getProtocolConformance());
 
-    case Kind::AssociatedTypeWitnessTableAccessFunction: {
-      auto assocConf = getAssociatedConformance();
-      return mangler.mangleAssociatedTypeWitnessTableAccessFunction(
-                  getProtocolConformance(), assocConf.first, assocConf.second);
-    }
+  case Kind::AssociatedTypeMetadataAccessFunction:
+    return mangler.mangleAssociatedTypeMetadataAccessFunction(
+                getProtocolConformance(), getAssociatedType()->getNameStr());
 
-    case Kind::CoroutineContinuationPrototype:
-      return mangler.mangleCoroutineContinuationPrototype(
-                                              cast<SILFunctionType>(getType()));
+  case Kind::AssociatedTypeWitnessTableAccessFunction: {
+    auto assocConf = getAssociatedConformance();
+    return mangler.mangleAssociatedTypeWitnessTableAccessFunction(
+                getProtocolConformance(), assocConf.first, assocConf.second);
+  }
 
-      // An Objective-C class reference reference. The symbol is private, so
-      // the mangling is unimportant; it should just be readable in LLVM IR.
-    case Kind::ObjCClassRef: {
-      llvm::SmallString<64> tempBuffer;
-      StringRef name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(tempBuffer);
-      std::string Result("\01l_OBJC_CLASS_REF_$_");
-      Result.append(name.data(), name.size());
-      return Result;
-    }
+  case Kind::CoroutineContinuationPrototype:
+    return mangler.mangleCoroutineContinuationPrototype(
+                                            cast<SILFunctionType>(getType()));
 
-      // An Objective-C class reference;  not a swift mangling.
-    case Kind::ObjCClass: {
-      llvm::SmallString<64> TempBuffer;
-      StringRef Name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(TempBuffer);
-      std::string Result("OBJC_CLASS_$_");
-      Result.append(Name.data(), Name.size());
-      return Result;
-    }
+    // An Objective-C class reference reference. The symbol is private, so
+    // the mangling is unimportant; it should just be readable in LLVM IR.
+  case Kind::ObjCClassRef: {
+    llvm::SmallString<64> tempBuffer;
+    StringRef name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(tempBuffer);
+    std::string Result("\01l_OBJC_CLASS_REF_$_");
+    Result.append(name.data(), name.size());
+    return Result;
+  }
 
-      // An Objective-C metaclass reference;  not a swift mangling.
-    case Kind::ObjCMetaclass: {
-      llvm::SmallString<64> TempBuffer;
-      StringRef Name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(TempBuffer);
-      std::string Result("OBJC_METACLASS_$_");
-      Result.append(Name.data(), Name.size());
-      return Result;
-    }
+    // An Objective-C class reference;  not a swift mangling.
+  case Kind::ObjCClass: {
+    llvm::SmallString<64> TempBuffer;
+    StringRef Name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(TempBuffer);
+    std::string Result("OBJC_CLASS_$_");
+    Result.append(Name.data(), Name.size());
+    return Result;
+  }
 
-    case Kind::SILFunction:
-      return getSILFunction()->getName();
-    case Kind::SILGlobalVariable:
-      return getSILGlobalVariable()->getName();
+    // An Objective-C metaclass reference;  not a swift mangling.
+  case Kind::ObjCMetaclass: {
+    llvm::SmallString<64> TempBuffer;
+    StringRef Name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(TempBuffer);
+    std::string Result("OBJC_METACLASS_$_");
+    Result.append(Name.data(), Name.size());
+    return Result;
+  }
 
-    case Kind::ReflectionBuiltinDescriptor:
-      return mangler.mangleReflectionBuiltinDescriptor(getType());
-    case Kind::ReflectionFieldDescriptor:
-      return mangler.mangleReflectionFieldDescriptor(getType());
-    case Kind::ReflectionAssociatedTypeDescriptor:
-      return mangler.mangleReflectionAssociatedTypeDescriptor(
-                                                      getProtocolConformance());
+  case Kind::SILFunction:
+    return getSILFunction()->getName();
+  case Kind::SILGlobalVariable:
+    return getSILGlobalVariable()->getName();
+
+  case Kind::ReflectionBuiltinDescriptor:
+    return mangler.mangleReflectionBuiltinDescriptor(getType());
+  case Kind::ReflectionFieldDescriptor:
+    return mangler.mangleReflectionFieldDescriptor(getType());
+  case Kind::ReflectionAssociatedTypeDescriptor:
+    return mangler.mangleReflectionAssociatedTypeDescriptor(
+                                                    getProtocolConformance());
   }
   llvm_unreachable("bad entity kind!");
 }
