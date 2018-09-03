@@ -84,6 +84,11 @@ void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
   addSymbol(entity);
 }
 
+void TBDGenVisitor::addMethodDescriptor(SILDeclRef declRef) {
+  auto entity = LinkEntity::forMethodDescriptor(declRef);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addConformances(DeclContext *DC) {
   for (auto conformance : DC->getLocalConformances()) {
     auto protocol = conformance->getProtocol();
@@ -208,9 +213,7 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
       addSymbol(mangler.mangleEntity(VD, false));
     }
 
-    // Top-level variables (*not* statics) in the main file don't get accessors,
-    // despite otherwise looking like globals.
-    if (!FileHasEntryPoint || VD->isStatic())
+    if (VD->isLazilyInitializedGlobal())
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
   }
 
@@ -291,15 +294,8 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   }
 
   // Types with resilient superclasses have some extra symbols.
-  if (!hasResilientAncestor)
-    return;
-
-  addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
-
-  // And classes that are themselves resilient (not just a superclass) have even
-  // more.
-  if (!CD->isResilient())
-    return;
+  if (hasResilientAncestor)
+    addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
 
   // Emit dispatch thunks for every new vtable entry.
   struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
@@ -311,8 +307,11 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
         : TBD(TBD), CD(CD) {}
 
     void addMethod(SILDeclRef method) {
-      if (method.getDecl()->getDeclContext() == CD)
-        TBD.addDispatchThunk(method);
+      if (method.getDecl()->getDeclContext() == CD) {
+        if (CD->isResilient())
+          TBD.addDispatchThunk(method);
+        TBD.addMethodDescriptor(method);
+      }
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
@@ -328,7 +327,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 }
 
 void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
-  if (CD->getParent()->getAsClassOrClassExtensionContext()) {
+  if (CD->getParent()->getSelfClassDecl()) {
     // Class constructors come in two forms, allocating and non-allocating. The
     // default ValueDecl handling gives the allocating one, so we have to
     // manually include the non-allocating one.
@@ -342,7 +341,7 @@ void TBDGenVisitor::visitDestructorDecl(DestructorDecl *DD) {
   // like constructors above. This is the deallocating one:
   visitAbstractFunctionDecl(DD);
 
-  auto parentClass = DD->getParent()->getAsClassOrClassExtensionContext();
+  auto parentClass = DD->getParent()->getSelfClassDecl();
 
   // But the non-deallocating one doesn't apply to some @objc classes.
   if (!Lowering::usesObjCAllocator(parentClass)) {
@@ -365,11 +364,9 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 
     if (PD->isResilient()) {
       for (auto *member : PD->getMembers()) {
-        if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
+        if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(member)) {
           addDispatchThunk(SILDeclRef(funcDecl));
-        }
-        if (auto *ctorDecl = dyn_cast<ConstructorDecl>(member)) {
-          addDispatchThunk(SILDeclRef(ctorDecl, SILDeclRef::Kind::Allocator));
+          addMethodDescriptor(SILDeclRef(funcDecl));
         }
       }
     }
@@ -411,19 +408,38 @@ void TBDGenVisitor::addFirstFileSymbols() {
   }
 }
 
+/// Converts a version tuple into a packed version, ignoring components beyond
+/// major, minor, and subminor.
+static tapi::internal::PackedVersion
+convertToPacked(const version::Version &version) {
+  // FIXME: Warn if version is greater than 3 components?
+  unsigned major = 0, minor = 0, subminor = 0;
+  if (version.size() > 0) major = version[0];
+  if (version.size() > 1) minor = version[1];
+  if (version.size() > 2) subminor = version[2];
+  return tapi::internal::PackedVersion(major, minor, subminor);
+}
+
+static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
+  return LangOpts.EnableAppExtensionRestrictions;
+}
+
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet *symbols,
                                            llvm::raw_ostream *os,
-                                           TBDGenOptions &opts) {
+                                           const TBDGenOptions &opts) {
   auto isWholeModule = singleFile == nullptr;
   const auto &target = M->getASTContext().LangOpts.Target;
   UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, isWholeModule);
 
   tapi::internal::InterfaceFile file;
   file.setFileType(tapi::internal::FileType::TBD_V3);
+  file.setApplicationExtensionSafe(
+    isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);
-  // FIXME: proper version
-  file.setCurrentVersion(tapi::internal::PackedVersion(1, 0, 0));
+  file.setCurrentVersion(convertToPacked(opts.CurrentVersion));
+  file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
+  file.setTwoLevelNamespace();
   file.setSwiftABIVersion(TAPI_SWIFT_ABI_VERSION);
   file.setPlatform(tapi::internal::mapToSinglePlatform(target));
   auto arch = tapi::internal::getArchType(target.getArchName());
@@ -440,7 +456,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
     SmallVector<Decl *, 16> decls;
     file->getTopLevelDecls(decls);
 
-    visitor.setFileHasEntryPoint(file->hasEntryPoint());
+    visitor.addMainIfNecessary(file);
 
     for (auto d : decls)
       visitor.visit(d);
@@ -468,15 +484,15 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
-                                   TBDGenOptions &opts) {
+                                   const TBDGenOptions &opts) {
   enumeratePublicSymbolsAndWrite(file->getParentModule(), file, &symbols,
                                  nullptr, opts);
 }
 void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
-                                   TBDGenOptions &opts) {
+                                   const TBDGenOptions &opts) {
   enumeratePublicSymbolsAndWrite(M, nullptr, &symbols, nullptr, opts);
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                         TBDGenOptions &opts) {
+                         const TBDGenOptions &opts) {
   enumeratePublicSymbolsAndWrite(M, nullptr, nullptr, &os, opts);
 }

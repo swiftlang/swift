@@ -1052,28 +1052,6 @@ bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
   return %5 : $()
 }
 
-// CHECK-LABEL: CG of test_pin
-// CHECK-NEXT:    Arg %0 Esc: A, Succ:
-// CHECK-NEXT:    Ret  Esc: R, Succ: %0
-// CHECK-NEXT:  End
-sil @test_pin : $@convention(thin) (Builtin.NativeObject) -> Optional<Builtin.NativeObject> {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = strong_pin %0 : $Builtin.NativeObject
-  return %1 : $Optional<Builtin.NativeObject>
-}
-
-// CHECK-LABEL: CG of test_unpin
-// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
-// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ:
-// CHECK-NEXT:  End
-sil @test_unpin : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
-bb0(%0 : $Optional<Builtin.NativeObject>):
-  strong_unpin %0 : $Optional<Builtin.NativeObject>
-  %2 = tuple ()
-  return %2 : $()
-}
-
 sil_global @global_y : $SomeData
 
 // CHECK-LABEL: CG of test_node_merge_during_struct_inst

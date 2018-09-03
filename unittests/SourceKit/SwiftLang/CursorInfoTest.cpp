@@ -85,12 +85,6 @@ class NullEditorConsumer : public EditorConsumer {
     return SyntaxTreeTransferMode::Off;
   }
 
-  bool syntaxReuseInfoEnabled() override { return false; }
-
-  void
-  handleSyntaxReuseRegions(std::vector<SourceFileRange> ReuseRegions) override {
-  }
-
 public:
   bool needsSema = false;
 };

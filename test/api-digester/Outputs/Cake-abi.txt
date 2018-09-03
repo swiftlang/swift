@@ -1,0 +1,31 @@
+
+/* Generic Signature Changes */
+cake1: Func P1.P1Constraint() has generic signature change from <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> to <τ_0_0 where τ_0_0 : P1>
+
+/* RawRepresentable Changes */
+
+/* Removed Decls */
+cake1: Constructor Somestruct2.init(_:) has been removed
+cake1: Func C4.foo() has been removed
+
+/* Moved Decls */
+
+/* Renamed Decls */
+cake1: Func S1.foo5(x:y:) has been renamed to Func S1.foo5(x:y:z:)
+cake1: Struct Somestruct2 has been renamed to Struct NSSomestruct2
+
+/* Type Changes */
+cake1: Constructor S1.init(_:) has parameter 0 type change from Int to Double
+cake1: Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
+cake1: Func Somestruct2.foo1(_:) has parameter 0 type change from C3 to C1
+
+/* Decl Attribute changes */
+cake1: Class C5 is now without @objc
+cake1: Enum IceKind is now without @_frozen
+cake1: Func C1.foo1() is now not static
+cake1: Func C5.dy_foo() is now with dynamic
+cake1: Func S1.foo1() is now mutating
+cake1: Func S1.foo3() is now static
+cake1: Struct C6 is now with @_fixed_layout
+cake1: Var C1.CIIns1 changes from weak to strong
+cake1: Var C1.CIIns2 changes from strong to weak

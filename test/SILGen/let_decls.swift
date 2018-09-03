@@ -344,12 +344,11 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : @trivial $*SimpleProtocol, %1 : @trivial $Int):
-// CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds"
+// CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr %0 to [initialization] %3 : $*SimpleProtocol
 // CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 1
 // CHECK-NEXT:    store %1 to [trivial] %5 : $*Int
-// CHECK-NEXT:    debug_value_addr %2
 // CHECK-NEXT:    destroy_addr %2 : $*(start: SimpleProtocol, pastEnd: Int)
 // CHECK-NEXT:    dealloc_stack %2 : $*(start: SimpleProtocol, pastEnd: Int)
 }
@@ -425,8 +424,7 @@ struct StructMemberTest {
   // CHECK: bb0(%0 : @guaranteed $StructMemberTest):
   // CHECK-NEXT:   debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK-NEXT:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
-  // CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 0
-  // CHECK-NEXT:   [[T2:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 1
+  // CHECK-NEXT:   ({{%.*}}, [[T2:%.*]]) = destructure_tuple [[T0]]
   // CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T2]] : $AnotherStruct, #AnotherStruct.i
   // CHECK-NEXT:   return [[T3]] : $Int
 

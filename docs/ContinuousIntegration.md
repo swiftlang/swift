@@ -135,7 +135,9 @@ Python       | @swift-ci Please Python lint | Lints Python sources | `./utils/py
 
 Platform       | Comment | Check Status
 ------------   | ------- | ------------
-macOS platform | @swift-ci Please Test Source Compatibility | Swift Source Compatibility Suite on macOS Platform
+macOS platform | @swift-ci Please Test Source Compatibility | Swift Source Compatibility Suite on macOS Platform (Release and Debug)
+macOS platform | @swift-ci Please Test Source Compatibility Release | Swift Source Compatibility Suite on macOS Platform (Release)
+macOS platform | @swift-ci Please Test Source Compatibility Debug | Swift Source Compatibility Suite on macOS Platform (Debug)
 
 ### Specific Preset Testing
 

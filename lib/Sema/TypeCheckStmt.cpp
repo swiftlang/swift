@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTPrinter.h"
@@ -482,7 +483,7 @@ public:
       return YS;
     }
 
-    SmallVector<AnyFunctionRef::YieldResult, 4> buffer;
+    SmallVector<AnyFunctionType::Yield, 4> buffer;
     auto yieldResults = TheFunc->getBodyYieldResults(buffer);
 
     auto yieldExprs = YS->getMutableYields();
@@ -493,7 +494,7 @@ public:
     }
 
     for (auto i : indices(yieldExprs)) {
-      Type yieldType = yieldResults[i].Ty;
+      Type yieldType = yieldResults[i].getType();
       auto exprToCheck = yieldExprs[i];
 
       InOutExpr *inout = nullptr;
@@ -501,7 +502,7 @@ public:
       // Classify whether we're yielding by reference or by value.
       ContextualTypePurpose contextTypePurpose;
       Type contextType = yieldType;
-      if (yieldResults[i].Specifier == VarDecl::Specifier::InOut) {
+      if (yieldResults[i].isInOut()) {
         contextTypePurpose = CTP_YieldByReference;
         contextType = LValueType::get(contextType);
 
@@ -629,10 +630,9 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    TypeResolutionOptions options;
+    TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-    options |= TypeResolutionFlags::InExpression;
     
     if (auto *P = TC.resolvePattern(S->getPattern(), DC,
                                     /*isStmtCondition*/false)) {
@@ -926,8 +926,10 @@ public:
                                                  /*isStmtCondition*/false)) {
           pattern = newPattern;
           // Coerce the pattern to the subject's type.
-          if (!subjectType || TC.coercePatternToType(pattern, DC, subjectType,
-                                     TypeResolutionFlags::InExpression)) {
+          TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+          if (!subjectType ||
+              TC.coercePatternToType(pattern, TypeResolution::forContextual(DC),
+                                     subjectType, patternOptions)) {
             limitExhaustivityChecks = true;
 
             // If that failed, mark any variables binding pieces of the pattern
@@ -1132,9 +1134,10 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
     pattern = newPattern;
 
     // Coerce the pattern to the exception type.
+    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
     if (!exnType ||
-        coercePatternToType(pattern, DC, exnType,
-                            TypeResolutionFlags::InExpression)) {
+        coercePatternToType(pattern, TypeResolution::forContextual(DC), exnType,
+                            patternOptions)) {
       // If that failed, be sure to give the variables error types
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
@@ -1534,6 +1537,7 @@ void TypeChecker::checkDefaultArguments(ParameterList *params,
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                                      SourceLoc EndTypeCheckLoc) {
   validateDecl(AFD);
+  checkDefaultArguments(AFD->getParameters(), AFD);
 
   if (!AFD->getBody())
     return false;
@@ -1555,9 +1559,6 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (AFD->isBodyTypeChecked())
     return false;
 
-  if (!AFD->getBody())
-    return false;
-
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-fn", AFD);
   PrettyStackTraceDecl StackEntry("type-checking", AFD);
 
@@ -1576,7 +1577,9 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (error)
     return true;
 
-  performAbstractFuncDeclDiagnostics(*this, AFD);
+  if (AFD->getBody())
+    performAbstractFuncDeclDiagnostics(*this, AFD);
+
   return false;
 }
 
@@ -1584,9 +1587,6 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 // named function or an anonymous func expression.
 bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                              SourceLoc EndTypeCheckLoc) {
-  // Check the default argument definitions.
-  checkDefaultArguments(FD->getParameters(), FD);
-
   // Clang imported inline functions do not have a Swift body to
   // typecheck.
   if (FD->getClangDecl())
@@ -1689,12 +1689,8 @@ static bool isKnownEndOfConstructor(ASTNode N) {
 
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
-  // Check the default argument definitions.
-  checkDefaultArguments(ctor->getParameters(), ctor);
-
   BraceStmt *body = ctor->getBody();
-  if (!body)
-    return true;
+  assert(body);
 
   // For constructors, we make sure that the body ends with a "return" stmt,
   // which we either implicitly synthesize, or the user can write.  This
@@ -1720,8 +1716,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     return HadError;
 
   // Determine whether we need to introduce a super.init call.
-  auto nominalDecl = ctor->getDeclContext()
-    ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominalDecl = ctor->getDeclContext()->getSelfNominalTypeDecl();
 
   // Error case.
   if (nominalDecl == nullptr)
@@ -1824,8 +1819,7 @@ bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
   StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(DD));
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
   BraceStmt *Body = DD->getBody();
-  if (!Body)
-    return false;
+  assert(Body);
 
   bool HadError = SC.typeCheckBody(Body);
 

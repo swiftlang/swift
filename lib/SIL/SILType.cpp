@@ -385,6 +385,12 @@ SILType SILType::getReferentType(SILModule &M) const {
   return M.Types.getLoweredType(Ty->getReferentType()->getCanonicalType());
 }
 
+SILType SILType::mapTypeOutOfContext() const {
+  return SILType::getPrimitiveType(getASTType()->mapTypeOutOfContext()
+                                               ->getCanonicalType(),
+                                   getCategory());
+}
+
 CanType
 SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
   auto fieldTy = getLayout()->getFields()[index].getLoweredType();

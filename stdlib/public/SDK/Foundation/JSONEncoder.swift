@@ -17,7 +17,7 @@
 /// runtime when running on i386 simulator. The issue is tracked in https://bugs.swift.org/browse/SR-8276
 /// Making the protocol `internal` instead of `fileprivate` works around this issue.
 /// Once SR-8276 is fixed, this check can be removed and the protocol always be made fileprivate.
-#if arch(i386) && targetEnvironment(simulator)
+#if arch(i386) || arch(arm)
 internal protocol _JSONStringDictionaryEncodableMarker { }
 #else
 fileprivate protocol _JSONStringDictionaryEncodableMarker { }
@@ -32,7 +32,7 @@ extension Dictionary : _JSONStringDictionaryEncodableMarker where Key == String,
 /// which is needed for the implementation of the key conversion strategy exemption.
 ///
 /// NOTE: Please see comment above regarding SR-8276
-#if arch(i386) && targetEnvironment(simulator)
+#if arch(i386) || arch(arm)
 internal protocol _JSONStringDictionaryDecodableMarker {
     static var elementType: Decodable.Type { get }
 }

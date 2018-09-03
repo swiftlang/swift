@@ -47,7 +47,7 @@ void EpilogueARCContext::initializeDataflow() {
       // Find predecessor and break the SILArgument to predecessors.
       for (auto *X : A->getParent()->getPredecessorBlocks()) {
         // Try to find the predecessor edge-value.
-        SILValue IA = A->getIncomingValue(X);
+        SILValue IA = A->getIncomingPhiValue(X);
         getState(X).LocalArg = IA;
 
         // Maybe the edge value is another SILArgument.

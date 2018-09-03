@@ -35,6 +35,8 @@ public:
   typedef SmallVector<NominalTypeDecl *, 8> NominalTypeList;
   typedef llvm::DenseMap<ProtocolDecl *, NominalTypeList>
       ProtocolConformanceMap;
+  typedef llvm::DenseMap<ProtocolDecl *, NominalTypeDecl *>
+      SoleConformingTypeMap;
 
   ProtocolConformanceAnalysis(SILModule *Mod)
       : SILAnalysis(SILAnalysisKind::ProtocolConformance), M(Mod) {
@@ -71,6 +73,10 @@ public:
                                              ConformsListIt->second.end())
                : ArrayRef<NominalTypeDecl *>();
   }
+  
+  /// Traverse ProtocolConformanceMapCache recursively to determine sole
+  /// conforming concrete type. 
+  NominalTypeDecl *findSoleConformingType(ProtocolDecl *Protocol);
 
 private:
   /// Compute inheritance properties.
@@ -79,8 +85,11 @@ private:
   /// The module.
   SILModule *M;
 
-  /// A cache that maps a protocol to its conformances
+  /// A cache that maps a protocol to its conformances.
   ProtocolConformanceMap ProtocolConformanceCache;
+
+  /// A cache that holds SoleConformingType for protocols.
+  SoleConformingTypeMap SoleConformingTypeCache;
 };
 
 } // namespace swift

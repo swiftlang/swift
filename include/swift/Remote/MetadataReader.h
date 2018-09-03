@@ -207,24 +207,24 @@ public:
   }
 
   /// Get the remote process's swift_isaMask.
-  llvm::Optional<StoredPointer> readIsaMask() {
+  Optional<StoredPointer> readIsaMask() {
     auto encoding = getIsaEncoding();
     if (encoding != IsaEncodingKind::Masked) {
       // Still return success if there's no isa encoding at all.
       if (encoding == IsaEncodingKind::None)
         return 0;
       else
-        return llvm::None;
+        return None;
     }
 
     return IsaMask;
   }
 
   /// Given a remote pointer to metadata, attempt to discover its MetadataKind.
-  llvm::Optional<MetadataKind>
+  Optional<MetadataKind>
   readKindFromMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
-    if (!meta) return llvm::None;
+    if (!meta) return None;
 
     return meta->getKind();
   }
@@ -242,41 +242,41 @@ public:
 
   /// Given a remote pointer to class metadata, attempt to discover its class
   /// instance size and whether fields should use the resilient layout strategy.
-  llvm::Optional<unsigned>
+  Optional<unsigned>
   readInstanceStartAndAlignmentFromClassMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::Class)
-      return llvm::None;
+      return None;
 
     // The following algorithm only works on the non-fragile Apple runtime.
 
     // Grab the RO-data pointer.  This part is not ABI.
     StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
     if (!roDataPtr)
-      return llvm::None;
+      return None;
 
     // Get the address of the InstanceStart field.
     auto address = roDataPtr + sizeof(uint32_t) * 1;
 
     unsigned start;
     if (!Reader->readInteger(RemoteAddress(address), &start))
-      return llvm::None;
+      return None;
 
     return start;
   }
 
   /// Given a pointer to an address, attemp to read the pointed value.
-  llvm::Optional<StoredPointer> readPointedValue(StoredPointer Address) {
+  Optional<StoredPointer> readPointedValue(StoredPointer Address) {
     StoredPointer PointedVal;
     if (!Reader->readInteger(RemoteAddress(Address), &PointedVal))
-      return llvm::None;
-    return llvm::Optional<StoredPointer>(PointedVal);
+      return None;
+    return Optional<StoredPointer>(PointedVal);
   }
 
   /// Given a pointer to the metadata, attempt to read the value
   /// witness table. Note that it's not safe to access any non-mandatory
   /// members of the value witness table, like extra inhabitants or enum members.
-  llvm::Optional<TargetValueWitnessTable<Runtime>>
+  Optional<TargetValueWitnessTable<Runtime>>
   readValueWitnessTable(StoredPointer MetadataAddress) {
     // The value witness table pointer is at offset -1 from the metadata
     // pointer, that is, the pointer-sized word immediately before the
@@ -286,22 +286,22 @@ public:
     StoredPointer ValueWitnessTableAddr;
     if (!Reader->readInteger(RemoteAddress(ValueWitnessTableAddrAddr),
                              &ValueWitnessTableAddr))
-      return llvm::None;
+      return None;
     if (!Reader->readBytes(RemoteAddress(ValueWitnessTableAddr),
                            (uint8_t *)&VWT, sizeof(VWT)))
-      return llvm::None;
+      return None;
     return VWT;
   }
 
   /// Given a pointer to a known-error existential, attempt to discover the
   /// pointer to its metadata address and its value address.
-  llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>
+  Optional<std::pair<RemoteAddress, RemoteAddress>>
   readMetadataAndValueErrorExistential(RemoteAddress ExistentialAddress) {
     // An pointer to an error existential is always an heap object.
     auto MetadataAddress =
         readMetadataFromInstance(ExistentialAddress.getAddressData());
     if (!MetadataAddress)
-      return llvm::None;
+      return None;
 
     bool isObjC = false;
 
@@ -318,7 +318,7 @@ public:
       auto Meta = readMetadata(*MetadataAddress);
       auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta);
       if (!ClassMeta)
-        return llvm::None;
+        return None;
 
       isObjC = ClassMeta->isPureObjC();
     }
@@ -336,12 +336,12 @@ public:
     auto InstanceMetadataAddress =
         readMetadataFromInstance(InstanceMetadataAddressAddress);
     if (!InstanceMetadataAddress)
-      return llvm::None;
+      return None;
 
     // Read the value witness table.
     auto VWT = readValueWitnessTable(*InstanceMetadataAddress);
     if (!VWT)
-      return llvm::None;
+      return None;
 
     // Now we need to skip over the instance metadata pointer and instance's
     // conformance pointer for Swift.Error.
@@ -354,46 +354,46 @@ public:
     auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
     InstanceAddress += Offset;
 
-    return llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>(
+    return Optional<std::pair<RemoteAddress, RemoteAddress>>(
         {RemoteAddress(*InstanceMetadataAddress),
          RemoteAddress(InstanceAddress)});
   }
 
   /// Given a known-opaque existential, attemp to discover the pointer to its
   /// metadata address and its value.
-  llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>
+  Optional<std::pair<RemoteAddress, RemoteAddress>>
   readMetadataAndValueOpaqueExistential(RemoteAddress ExistentialAddress) {
     // OpaqueExistentialContainer is the layout of an opaque existential.
     // `Type` is the pointer to the metadata.
     TargetOpaqueExistentialContainer<Runtime> Container;
     if (!Reader->readBytes(RemoteAddress(ExistentialAddress),
                            (uint8_t *)&Container, sizeof(Container)))
-      return llvm::None;
+      return None;
     auto MetadataAddress = reinterpret_cast<StoredPointer>(Container.Type);
     auto Metadata = readMetadata(MetadataAddress);
     if (!Metadata)
-      return llvm::None;
+      return None;
 
     auto VWT = readValueWitnessTable(MetadataAddress);
     if (!VWT)
-      return llvm::None;
+      return None;
 
     // Inline representation (the value fits in the existential container).
     // So, the value starts at the first word of the container.
     if (VWT->isValueInline())
-      return llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>(
+      return Optional<std::pair<RemoteAddress, RemoteAddress>>(
           {RemoteAddress(MetadataAddress), ExistentialAddress});
 
     // Non-inline (box'ed) representation.
     // The first word of the container stores the address to the box.
     StoredPointer BoxAddress;
     if (!Reader->readInteger(ExistentialAddress, &BoxAddress))
-      return llvm::None;
+      return None;
 
     auto AlignmentMask = VWT->getAlignmentMask();
     auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
     auto StartOfValue = BoxAddress + Offset;
-    return llvm::Optional<std::pair<RemoteAddress, RemoteAddress>>(
+    return Optional<std::pair<RemoteAddress, RemoteAddress>>(
         {RemoteAddress(MetadataAddress), RemoteAddress(StartOfValue)});
   }
 
@@ -619,16 +619,16 @@ public:
 
   /// Read the isa pointer of a class or closure context instance and apply
   /// the isa mask.
-  llvm::Optional<StoredPointer>
+  Optional<StoredPointer>
   readMetadataFromInstance(StoredPointer objectAddress) {
     StoredPointer isa;
     if (!Reader->readInteger(RemoteAddress(objectAddress), &isa))
-      return llvm::None;
+      return None;
 
     switch (getIsaEncoding()) {
     case IsaEncodingKind::Unknown:
     case IsaEncodingKind::Error:
-      return llvm::None;
+      return None;
 
     case IsaEncodingKind::None:
       return isa;
@@ -647,7 +647,7 @@ public:
 
       // 0 is never a valid index.
       if (classIndex == 0) {
-        return llvm::None;
+        return None;
 
       // If the index is out of range, it's an error; but check for an
       // update first.  (This will also trigger the first time because
@@ -656,12 +656,12 @@ public:
         StoredPointer count;
         if (!Reader->readInteger(RemoteAddress(IndexedClassesCountPointer),
                                  &count)) {
-          return llvm::None;
+          return None;
         }
 
         LastIndexedClassesCount = count;
         if (classIndex >= count) {
-          return llvm::None;
+          return None;
         }
       }
 
@@ -671,7 +671,7 @@ public:
                         + classIndex * sizeof(StoredPointer));
       StoredPointer metadataPointer;
       if (!Reader->readInteger(eltPointer, &metadataPointer)) {
-        return llvm::None;
+        return None;
       }
 
       return metadataPointer;
@@ -687,7 +687,7 @@ public:
   ///
   /// The offset is in units of words, from the start of the class's
   /// metadata.
-  llvm::Optional<int32_t>
+  Optional<int32_t>
   readGenericArgsOffset(MetadataRef metadata,
                         ContextDescriptorRef descriptor) {
     switch (descriptor->getKind()) {
@@ -699,7 +699,7 @@ public:
 
       auto bounds = readMetadataBoundsOfSuperclass(descriptor);
       if (!bounds)
-        return llvm::None;
+        return None;
 
       bounds->adjustForSubclass(type->areImmediateMembersNegative(),
                                 type->NumImmediateMembers);
@@ -718,14 +718,14 @@ public:
     }
 
     default:
-      return llvm::None;
+      return None;
     }
   }
 
   using ClassMetadataBounds = TargetClassMetadataBounds<Runtime>;
 
   // This follows computeMetadataBoundsForSuperclass.
-  llvm::Optional<ClassMetadataBounds>
+  Optional<ClassMetadataBounds>
   readMetadataBoundsOfSuperclass(ContextDescriptorRef subclassRef) {
     auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
 
@@ -738,28 +738,28 @@ public:
     return forTypeReference<ClassMetadataBounds>(
       subclass->getSuperclassReferenceKind(), *rawSuperclass,
       [&](ContextDescriptorRef superclass)
-            -> llvm::Optional<ClassMetadataBounds> {
+            -> Optional<ClassMetadataBounds> {
         if (!isa<TargetClassDescriptor<Runtime>>(superclass))
-          return llvm::None;
+          return None;
         return readMetadataBoundsOfSuperclass(superclass);
       },
-      [&](MetadataRef metadata) -> llvm::Optional<ClassMetadataBounds> {
+      [&](MetadataRef metadata) -> Optional<ClassMetadataBounds> {
         auto cls = dyn_cast<TargetClassMetadata<Runtime>>(metadata);
         if (!cls)
-          return llvm::None;
+          return None;
 
         return cls->getClassBoundsAsSwiftSuperclass();
       },
-      [](StoredPointer objcClassName) -> llvm::Optional<ClassMetadataBounds> {
+      [](StoredPointer objcClassName) -> Optional<ClassMetadataBounds> {
         // We have no ability to look up an ObjC class by name.
         // FIXME: add a query for this; clients may have a way to do it.
-        return llvm::None;
+        return None;
       });
   }
 
   template <class Result, class DescriptorFn, class MetadataFn,
             class ClassNameFn>
-  llvm::Optional<Result>
+  Optional<Result>
   forTypeReference(TypeReferenceKind refKind, StoredPointer ref,
                    const DescriptorFn &descriptorFn,
                    const MetadataFn &metadataFn,
@@ -768,7 +768,7 @@ public:
     case TypeReferenceKind::IndirectNominalTypeDescriptor: {
       StoredPointer descriptorAddress = 0;
       if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress))
-        return llvm::None;
+        return None;
 
       ref = descriptorAddress;
       LLVM_FALLTHROUGH;
@@ -777,7 +777,7 @@ public:
     case TypeReferenceKind::DirectNominalTypeDescriptor: {
       auto descriptor = readContextDescriptor(ref);
       if (!descriptor)
-        return llvm::None;
+        return None;
 
       return descriptorFn(descriptor);
     }
@@ -788,43 +788,43 @@ public:
     case TypeReferenceKind::IndirectObjCClass: {
       StoredPointer classRef = 0;
       if (!Reader->readInteger(RemoteAddress(ref), &classRef))
-        return llvm::None;
+        return None;
 
       auto metadata = readMetadata(classRef);
       if (!metadata)
-        return llvm::None;
+        return None;
 
       return metadataFn(metadata);
     }
     }
 
-    return llvm::None;
+    return None;
   }
 
   /// Read a single generic type argument from a bound generic type
   /// metadata.
-  llvm::Optional<StoredPointer>
+  Optional<StoredPointer>
   readGenericArgFromMetadata(StoredPointer metadata, unsigned index) {
     auto Meta = readMetadata(metadata);
     if (!Meta)
-      return llvm::None;
+      return None;
 
     auto descriptorAddress = readAddressOfNominalTypeDescriptor(Meta);
     if (!descriptorAddress)
-      return llvm::None;
+      return None;
 
     // Read the nominal type descriptor.
     auto descriptor = readContextDescriptor(descriptorAddress);
     if (!descriptor)
-      return llvm::None;
+      return None;
 
     auto generics = descriptor->getGenericContext();
     if (!generics)
-      return llvm::None;
+      return None;
     
     auto offsetToGenericArgs = readGenericArgsOffset(Meta, descriptor);
     if (!offsetToGenericArgs)
-      return llvm::None;
+      return None;
 
     auto addressOfGenericArgAddress =
       (Meta.getAddress() +
@@ -832,12 +832,12 @@ public:
        index * sizeof(StoredPointer));
 
     if (index >= generics->getGenericContextHeader().getNumArguments())
-      return llvm::None;
+      return None;
 
     StoredPointer genericArgAddress;
     if (!Reader->readInteger(RemoteAddress(addressOfGenericArgAddress),
                              &genericArgAddress))
-      return llvm::None;
+      return None;
 
     return genericArgAddress;
   }
@@ -876,22 +876,22 @@ public:
   }
 
   /// Given a remote pointer to class metadata, attempt to read its superclass.
-  llvm::Optional<StoredPointer>
+  Optional<StoredPointer>
   readOffsetToFirstCaptureFromMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::HeapLocalVariable)
-      return llvm::None;
+      return None;
 
     auto heapMeta = cast<TargetHeapLocalVariableMetadata<Runtime>>(meta);
     return heapMeta->OffsetToFirstCapture;
   }
 
   /// Given a remote pointer to class metadata, attempt to read its superclass.
-  llvm::Optional<StoredPointer>
+  Optional<StoredPointer>
   readCaptureDescriptorFromMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::HeapLocalVariable)
-      return llvm::None;
+      return None;
 
     auto heapMeta = cast<TargetHeapLocalVariableMetadata<Runtime>>(meta);
     return heapMeta->CaptureDescription;
@@ -910,11 +910,11 @@ protected:
   }
 
   template<typename Offset>
-  llvm::Optional<StoredPointer>
+  Optional<StoredPointer>
   resolveNullableRelativeOffset(StoredPointer targetAddress) {
     Offset relative;
     if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
-      return llvm::None;
+      return None;
     if (relative == 0)
       return 0;
     using SignedOffset = typename std::make_signed<Offset>::type;
@@ -924,11 +924,11 @@ protected:
   }
 
   template<typename Offset>
-  llvm::Optional<StoredPointer>
+  Optional<StoredPointer>
   resolveNullableRelativeIndirectableOffset(StoredPointer targetAddress) {
     Offset relative;
     if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
-      return llvm::None;
+      return None;
     if (relative == 0)
       return 0;
     bool indirect = relative & 1;
@@ -946,7 +946,7 @@ protected:
       if (!Reader->readBytes(RemoteAddress(resultAddress),
                              (uint8_t *)&resultAddress,
                              sizeof(StoredPointer)))
-        return llvm::None;
+        return None;
     }
     return resultAddress;
   }
@@ -960,7 +960,7 @@ protected:
   }
   
   template<typename Base, typename Field>
-  llvm::Optional<StoredPointer> resolveNullableRelativeField(
+  Optional<StoredPointer> resolveNullableRelativeField(
                             RemoteRef<Runtime, Base> base, const Field &field) {
     // Map the offset from within our local buffer to the remote address.
     auto distance = (intptr_t)&field - (intptr_t)base.getLocalBuffer();
@@ -969,7 +969,7 @@ protected:
   }
 
   template<typename Base, typename Field>
-  llvm::Optional<StoredPointer> resolveNullableRelativeIndirectableField(
+  Optional<StoredPointer> resolveNullableRelativeIndirectableField(
                             RemoteRef<Runtime, Base> base, const Field &field) {
     // Map the offset from within our local buffer to the remote address.
     auto distance = (intptr_t)&field - (intptr_t)base.getLocalBuffer();
@@ -1204,9 +1204,9 @@ private:
       switch (typeFlags.getMetadataInitialization()) {
       case TypeContextDescriptorFlags::NoMetadataInitialization:
         return 0;
-      case TypeContextDescriptorFlags::InPlaceMetadataInitialization:
+      case TypeContextDescriptorFlags::SingletonMetadataInitialization:
         // FIXME: classes
-        return sizeof(TargetInPlaceValueMetadataInitialization<Runtime>);
+        return sizeof(TargetSingletonMetadataInitialization<Runtime>);
       case TypeContextDescriptorFlags::ForeignMetadataInitialization:
         return sizeof(TargetForeignMetadataInitialization<Runtime>);
       }

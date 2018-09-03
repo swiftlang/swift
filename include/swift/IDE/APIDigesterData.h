@@ -33,7 +33,7 @@ enum class SDKNodeKind: uint8_t {
 #include "DigesterEnums.def"
 };
 
-SDKNodeKind parseSDKNodeKind(StringRef Content);
+Optional<SDKNodeKind> parseSDKNodeKind(StringRef Content);
 
 enum class NodeAnnotation: uint8_t{
 #define NODE_ANNOTATION(NAME) NAME,
@@ -59,6 +59,11 @@ raw_ostream &operator<<(raw_ostream &Out, const NodeAnnotation Value);
 
 // Redefine << so that we can output the name of the node kind.
 raw_ostream &operator<<(raw_ostream &Out, const SDKNodeKind Value);
+
+StringRef getDeclKindStr(const DeclKind Value);
+
+// Redefine << so that we can output the name of decl kind.
+raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value);
 
 struct APIDiffItem {
   virtual void streamDef(llvm::raw_ostream &S) const = 0;

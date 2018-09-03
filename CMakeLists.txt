@@ -898,6 +898,11 @@ cmake_pop_check_state()
 
 check_symbol_exists(wait4 "sys/wait.h" HAVE_WAIT4)
 
+check_symbol_exists(proc_pid_rusage "libproc.h" HAVE_PROC_PID_RUSAGE)
+if(HAVE_PROC_PID_RUSAGE)
+    list(APPEND CMAKE_REQUIRED_LIBRARIES proc)
+endif()
+
 if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")
 endif()
@@ -937,11 +942,7 @@ add_subdirectory(stdlib)
 if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
-endif()
-
-include(SwiftExternal)
-
-if(SWIFT_INCLUDE_TOOLS)
+  
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.
   # https://bugs.swift.org/browse/SR-5975

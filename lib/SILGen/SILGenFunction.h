@@ -38,6 +38,7 @@ class ConsumableManagedValue;
 class LogicalPathComponent;
 class LValue;
 class ManagedValue;
+class PreparedArguments;
 class RValue;
 class CalleeTypeInfo;
 class ResultPlan;
@@ -115,6 +116,88 @@ enum class CaptureEmission {
   PartialApplication,
 };
 
+/// Different ways in which an l-value can be emitted.
+enum class SGFAccessKind : uint8_t {
+  /// The access is a read whose result will be ignored.
+  IgnoredRead,
+
+  /// The access is a read that would prefer the address of a borrowed value.
+  /// This should only be used when it is semantically acceptable to borrow
+  /// the value, not just because the caller would benefit from a borrowed
+  /// value.  See shouldEmitSelfAsRValue.
+  ///
+  /// The caller will be calling emitAddressOfLValue or emitLoadOfLValue
+  /// on the l-value.  The latter may be less efficient than an access
+  /// would be if the l-value had been emitted with an owned-read kind.
+  BorrowedAddressRead,
+
+  /// The access is a read that would prefer a loaded borrowed value.
+  /// This should only be used when it is semantically acceptable to borrow
+  /// the value, not just because the caller would benefit from a borrowed
+  /// value.  See shouldEmitSelfAsRValue.
+  ///
+  /// There isn't yet a way to emit the access that takes advantage of this.
+  BorrowedObjectRead,
+
+  /// The access is a read that would prefer the address of an owned value.
+  ///
+  /// The caller will be calling emitAddressOfLValue or emitLoadOfLValue
+  /// on the l-value.
+  OwnedAddressRead,
+
+  /// The access is a read that would prefer a loaded owned value.
+  ///
+  /// The caller will be calling emitLoadOfLValue on the l-value.
+  OwnedObjectRead,
+
+  /// The access is an assignment (or maybe an initialization).
+  ///
+  /// The caller will be calling emitAssignToLValue on the l-value.
+  Write,
+
+  /// The access is a read-modify-write.
+  ///
+  /// The caller will be calling emitAddressOfLValue on the l-value.
+  ReadWrite
+};
+
+static inline bool isReadAccess(SGFAccessKind kind) {
+  return uint8_t(kind) <= uint8_t(SGFAccessKind::OwnedObjectRead);
+}
+
+/// Return an address-preferring version of the given access kind.
+static inline SGFAccessKind getAddressAccessKind(SGFAccessKind kind) {
+  switch (kind) {
+  case SGFAccessKind::BorrowedObjectRead:
+    return SGFAccessKind::BorrowedAddressRead;
+  case SGFAccessKind::OwnedObjectRead:
+    return SGFAccessKind::OwnedAddressRead;
+  case SGFAccessKind::IgnoredRead:
+  case SGFAccessKind::BorrowedAddressRead:
+  case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::Write:
+  case SGFAccessKind::ReadWrite:
+    return kind;
+  }
+  llvm_unreachable("bad kind");
+}
+
+static inline AccessKind getFormalAccessKind(SGFAccessKind kind) {
+  switch (kind) {
+  case SGFAccessKind::IgnoredRead:
+  case SGFAccessKind::BorrowedAddressRead:
+  case SGFAccessKind::BorrowedObjectRead:
+  case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::OwnedObjectRead:
+    return AccessKind::Read;
+  case SGFAccessKind::Write:
+    return AccessKind::Write;
+  case SGFAccessKind::ReadWrite:
+    return AccessKind::ReadWrite;
+  }
+  llvm_unreachable("bad kind");
+}
+
 /// Parameter to \c SILGenFunction::emitAddressOfLValue that indicates
 /// what kind of instrumentation should be emitted when compiling under
 /// Thread Sanitizer.
@@ -127,8 +210,7 @@ enum class TSanKind : bool {
 
 /// Represents an LValue opened for mutating access.
 ///
-/// This is used by LogicalPathComponent::getMaterialized() and
-/// SILGenFunction::emitMaterializeForSetAccessor().
+/// This is used by LogicalPathComponent::getMaterialized().
 struct MaterializedLValue {
   ManagedValue temporary;
 
@@ -253,16 +335,6 @@ public:
 
   /// \brief The current context where formal evaluation cleanups are managed.
   FormalEvaluationContext FormalEvalContext;
-
-  /// \brief Values to end dynamic access enforcement on.  A hack for
-  /// materializeForSet.
-  struct UnpairedAccesses {
-    SILValue Buffer;
-    unsigned NumAccesses = 0; // Values besides 0 and 1 are unsupported.
-
-    explicit UnpairedAccesses(SILValue buffer) : Buffer(buffer) {}
-  };
-  UnpairedAccesses *UnpairedAccessesForMaterializeForSet = nullptr;
 
   /// VarLoc - representation of an emitted local variable or constant.  There
   /// are three scenarios here:
@@ -557,6 +629,7 @@ public:
   void emitProtocolWitness(AbstractionPattern reqtOrigTy,
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement,
+                           SubstitutionMap reqtSubs,
                            SILDeclRef witness,
                            SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree);
@@ -636,7 +709,9 @@ public:
   /// first block.  (This is clearly desirable behavior when blocks
   /// are created by different emissions; it's just a little
   /// counter-intuitive within a single emission.)
-  SILBasicBlock *createBasicBlock(SILBasicBlock *afterBB = nullptr);  
+  SILBasicBlock *createBasicBlock();
+  SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
+  SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
   /// Create a new basic block at the end of the given function
   /// section.
@@ -1077,7 +1152,7 @@ public:
   /// Given that a variable is a local stored variable, return its address.
   ManagedValue emitAddressOfLocalVarDecl(SILLocation loc, VarDecl *var,
                                          CanType formalRValueType,
-                                         AccessKind accessKind);
+                                         SGFAccessKind accessKind);
 
   // FIXME: demote this to private state.
   ManagedValue maybeEmitValueOfLocalVarDecl(VarDecl *var);
@@ -1101,7 +1176,7 @@ public:
                                   ManagedValue base,
                                   CanType baseFormalType,
                                   bool isSuper, AbstractStorageDecl *storage,
-                                  RValue indexes,
+                                  PreparedArguments &&indices,
                                   SubstitutionMap substitutions,
                                   AccessSemantics semantics, Type propTy,
                                   SGFContext C,
@@ -1119,7 +1194,12 @@ public:
                                 SILDeclRef function,
                                 CanType expectedType,
                                 SubstitutionMap subs);
-  
+
+  PreparedArguments prepareSubscriptIndices(SubscriptDecl *subscript,
+                                            SubstitutionMap subs,
+                                            AccessStrategy strategy,
+                                            Expr *indices);
+
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
@@ -1128,22 +1208,15 @@ public:
                          SubstitutionMap substitutions,
                          ArgumentSource &&optionalSelfValue,
                          bool isSuper, bool isDirectAccessorUse,
-                         RValue &&optionalSubscripts, SGFContext C);
+                         PreparedArguments &&optionalSubscripts, SGFContext C);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionMap substitutions,
                        ArgumentSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
-                       RValue &&optionalSubscripts,
+                       PreparedArguments &&optionalSubscripts,
                        ArgumentSource &&value);
 
-  MaterializedLValue
-  emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
-                                SubstitutionMap substitutions,
-                                ArgumentSource &&optionalSelfValue,
-                                bool isSuper, bool isDirectAccessorUse,
-                                RValue &&optionalSubscripts,
-                                SILValue buffer, SILValue callbackStorage);
   bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
                                        Type selfInterfaceType, Type selfType,
@@ -1151,14 +1224,13 @@ public:
                                        AccessorDecl *requirement,
                                        AccessorDecl *witness,
                                        SubstitutionMap witnessSubs);
-  void emitMaterializeForSet(AccessorDecl *decl);
 
   std::pair<ManagedValue,ManagedValue>
   emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                         SubstitutionMap substitutions,
                         ArgumentSource &&optionalSelfValue,
                         bool isSuper, bool isDirectAccessorUse,
-                        RValue &&optionalSubscripts,
+                        PreparedArguments &&optionalSubscripts,
                         SILType addressType);
 
   CleanupHandle
@@ -1166,7 +1238,7 @@ public:
                         SubstitutionMap substitutions,
                         ArgumentSource &&optionalSelfValue,
                         bool isSuper, bool isDirectAccessorUse,
-                        RValue &&optionalSubscripts,
+                        PreparedArguments &&optionalSubscripts,
                         SmallVectorImpl<ManagedValue> &yields);
 
   RValue emitApplyConversionFunction(SILLocation loc,
@@ -1286,13 +1358,12 @@ public:
   void emitCopyLValueInto(SILLocation loc, LValue &&src,
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
-                                   AccessKind accessKind,
                                    TSanKind tsanKind = TSanKind::None);
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,
                                    CanArchetypeType openedArchetype,
                                    CanType formalRValueType,
-                                   AccessKind accessKind);
+                                   SGFAccessKind accessKind);
 
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isBaseLValueGuaranteed = false);
@@ -1311,6 +1382,8 @@ public:
   void emitYield(SILLocation loc, MutableArrayRef<ArgumentSource> yieldValues,
                  ArrayRef<AbstractionPattern> origTypes,
                  JumpDest unwindDest);
+  void emitRawYield(SILLocation loc, ArrayRef<ManagedValue> yieldArgs,
+                    JumpDest unwindDest, bool isUniqueYield);
 
   RValue emitAnyHashableErasure(SILLocation loc,
                                 ManagedValue value,
@@ -1325,7 +1398,7 @@ public:
   //
   // Helpers for emitting ApplyExpr chains.
   //
-  
+
   RValue emitApplyExpr(Expr *e, SGFContext c);
 
   /// Emit a function application, assuming that the arguments have been
@@ -1375,6 +1448,13 @@ public:
                                 SILType substFnType,
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
+
+  SILValue emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
+                                     SILType substFnType,
+                                     SubstitutionMap subs,
+                                     ArrayRef<SILValue> args,
+                                     SmallVectorImpl<SILValue> &yields);
+  void emitEndApplyWithRethrow(SILLocation loc, SILValue token);
 
   /// Emit a literal that applies the various initializers.
   RValue emitLiteral(LiteralExpr *literal, SGFContext C);
@@ -1483,20 +1563,6 @@ public:
       llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
       ProfileCounter TrueCount = ProfileCounter(),
       ProfileCounter FalseCount = ProfileCounter());
-
-  /// A form of checked cast branch that uses the old non-ownership preserving
-  /// semantics.
-  ///
-  /// The main difference is that this code does not pass the old argument as a
-  /// block argument in the failure case. This causes values to be double
-  /// consumed.
-  void
-  emitCheckedCastBranchOld(SILLocation loc, Expr *source, Type targetType,
-                           SGFContext ctx,
-                           llvm::function_ref<void(ManagedValue)> handleTrue,
-                           llvm::function_ref<void()> handleFalse,
-                           ProfileCounter TrueCount = ProfileCounter(),
-                           ProfileCounter FalseCount = ProfileCounter());
 
   /// \brief Emit a conditional checked cast branch, starting from an
   /// expression.  Terminates the current BB.
@@ -1658,8 +1724,7 @@ public:
                               CanType outputSubstType,
                               SGFContext ctx = SGFContext());
 
-  /// Used for emitting SILArguments of bare functions, such as thunks and
-  /// open-coded materializeForSet.
+  /// Used for emitting SILArguments of bare functions, such as thunks.
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<SILArgument *> *indirectResultParams = nullptr);
@@ -1782,12 +1847,13 @@ public:
   
   /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
   /// of the specified value.
-  CleanupHandle enterDeinitExistentialCleanup(SILValue valueOrAddr,
+  CleanupHandle enterDeinitExistentialCleanup(CleanupState state,
+                                              SILValue addr,
                                               CanType concreteFormalType,
                                               ExistentialRepresentation repr);
 
   /// Evaluate an Expr as an lvalue.
-  LValue emitLValue(Expr *E, AccessKind accessKind,
+  LValue emitLValue(Expr *E, SGFAccessKind accessKind,
                     LValueOptions options = LValueOptions());
 
   RValue emitRValueForNonMemberVarDecl(SILLocation loc, VarDecl *var,
@@ -1800,12 +1866,13 @@ public:
   LValue emitPropertyLValue(SILLocation loc, ManagedValue base,
                             CanType baseFormalType, VarDecl *var,
                             LValueOptions options,
-                            AccessKind accessKind, AccessSemantics semantics);
+                            SGFAccessKind accessKind,
+                            AccessSemantics semantics);
 
   struct PointerAccessInfo {
     CanType PointerType;
     PointerTypeKind PointerKind;
-    swift::AccessKind AccessKind;
+    SGFAccessKind AccessKind;
   };
 
   PointerAccessInfo getPointerAccessInfo(Type pointerType);
@@ -1815,7 +1882,7 @@ public:
   struct ArrayAccessInfo {
     Type PointerType;
     Type ArrayType;
-    swift::AccessKind AccessKind;
+    SGFAccessKind AccessKind;
   };
   ArrayAccessInfo getArrayAccessInfo(Type pointerType, Type arrayType);
   std::pair<ManagedValue,ManagedValue>

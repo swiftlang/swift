@@ -204,7 +204,7 @@ variadics4()
 variadics4(y: 0, x: 1, 2, 3) // expected-error{{argument 'x' must precede argument 'y'}} {{12-12=x: 1, 2, 3, }} {{16-28=}}
 variadics4(z: 1, x: 1) // expected-error{{argument 'x' must precede argument 'z'}} {{12-12=x: 1, }} {{16-22=}}
 
-func variadics5(_ x: Int, y: Int, _ z: Int...) { }
+func variadics5(_ x: Int, y: Int, _ z: Int...) { } // expected-note {{declared here}}
 
 // Using variadics (in-order, complete)
 variadics5(1, y: 2)
@@ -214,7 +214,7 @@ variadics5(1, y: 2, 1, 2, 3)
 
 // Using various (out-of-order)
 variadics5(1, 2, 3, 4, 5, 6, y: 7) // expected-error{{argument 'y' must precede unnamed argument #2}} {{15-15=y: 7, }} {{28-34=}}
-variadics5(y: 1, 2, 3, 4, 5, 6, 7) // expected-error{{unnamed argument #2 must precede argument 'y'}} {{12-12=2, }} {{16-19=}}
+variadics5(y: 1, 2, 3, 4, 5, 6, 7) // expected-error{{missing argument for parameter #1 in call}}
 
 func variadics6(x: Int..., y: Int = 2, z: Int) { } // expected-note 4 {{'variadics6(x:y:z:)' declared here}}
 

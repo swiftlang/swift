@@ -95,7 +95,7 @@ static FunctionPointer lookupMethod(IRGenFunction &IGF,
   return emitVirtualMethodValue(IGF, metadata, declRef, funcTy);
 }
 
-llvm::Function *IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
+void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
   auto *f = getAddrOfDispatchThunk(declRef, ForDefinition);
 
   IRGenFunction IGF(*this, f);
@@ -112,6 +112,11 @@ llvm::Function *IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
     IGF.Builder.CreateRetVoid();
   else
     IGF.Builder.CreateRet(result);
+}
 
-  return f;
+llvm::GlobalValue *IRGenModule::defineMethodDescriptor(SILDeclRef declRef,
+                                                       NominalTypeDecl *nominalDecl,
+                                                       llvm::Constant *definition) {
+  auto entity = LinkEntity::forMethodDescriptor(declRef);
+  return defineAlias(entity, definition);
 }

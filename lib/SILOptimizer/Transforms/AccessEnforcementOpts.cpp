@@ -638,25 +638,31 @@ void AccessConflictAndMergeAnalysis::visitBeginAccess(
   }
   SILAccessKind beginAccessKind = beginAccess->getAccessKind();
   // check the current in-scope accesses for conflicts:
-  for (auto pair : info.getInScopeAccesses()) {
-    auto *outerBeginAccess = pair.second;
-    // If both are reads, keep the mapped access.
-    if (!accessKindMayConflict(beginAccessKind,
-                               outerBeginAccess->getAccessKind())) {
-      continue;
+  bool changed = false;
+  do {
+    changed = false;
+    for (auto pair : info.getInScopeAccesses()) {
+      auto *outerBeginAccess = pair.second;
+      // If both are reads, keep the mapped access.
+      if (!accessKindMayConflict(beginAccessKind,
+                                 outerBeginAccess->getAccessKind())) {
+        continue;
+      }
+
+      auto &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
+      // If there is no potential conflict, leave the outer access mapped.
+      if (!outerAccessInfo.isDistinctFrom(beginAccessInfo))
+        continue;
+
+      LLVM_DEBUG(beginAccessInfo.dump();
+                 llvm::dbgs() << "  may conflict with:\n";
+                 outerAccessInfo.dump());
+
+      recordConflict(info, outerAccessInfo);
+      changed = true;
+      break;
     }
-
-    auto &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
-    // If there is no potential conflict, leave the outer access mapped.
-    if (!outerAccessInfo.isDistinctFrom(beginAccessInfo))
-      continue;
-
-    LLVM_DEBUG(beginAccessInfo.dump(); llvm::dbgs() << "  may conflict with:\n";
-               outerAccessInfo.dump());
-
-    recordConflict(info, outerAccessInfo);
-    break;
-  }
+  } while (changed);
 
   // Record the current access to InScopeAccesses.
   // It can potentially be folded
@@ -691,22 +697,27 @@ void AccessConflictAndMergeAnalysis::detectApplyConflicts(
     const swift::FunctionAccessedStorage &callSiteAccesses,
     const DenseAccessMap &conflictFreeSet,
     const swift::FullApplySite &fullApply, RegionInfo &info) {
-  for (auto pair : conflictFreeSet) {
-    auto *outerBeginAccess = pair.second;
-    // If there is no potential conflict, leave the outer access mapped.
-    SILAccessKind accessKind = outerBeginAccess->getAccessKind();
-    AccessInfo &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
-    if (!callSiteAccesses.mayConflictWith(accessKind, outerAccessInfo))
-      continue;
+  bool changed = false;
+  do {
+    changed = false;
+    for (auto pair : conflictFreeSet) {
+      auto *outerBeginAccess = pair.second;
+      // If there is no potential conflict, leave the outer access mapped.
+      SILAccessKind accessKind = outerBeginAccess->getAccessKind();
+      AccessInfo &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
+      if (!callSiteAccesses.mayConflictWith(accessKind, outerAccessInfo))
+        continue;
 
-    LLVM_DEBUG(
-        llvm::dbgs() << *fullApply.getInstruction() << "  call site access: ";
-        callSiteAccesses.dump(); llvm::dbgs() << "  may conflict with:\n";
-        outerAccessInfo.dump());
+      LLVM_DEBUG(
+          llvm::dbgs() << *fullApply.getInstruction() << "  call site access: ";
+          callSiteAccesses.dump(); llvm::dbgs() << "  may conflict with:\n";
+          outerAccessInfo.dump());
 
-    recordConflict(info, outerAccessInfo);
-    break;
-  }
+      recordConflict(info, outerAccessInfo);
+      changed = true;
+      break;
+    }
+  } while (changed);
 }
 
 void AccessConflictAndMergeAnalysis::visitFullApply(FullApplySite fullApply,
@@ -730,6 +741,8 @@ void AccessConflictAndMergeAnalysis::mergePredAccesses(
     assert((predRegion->getParentID() == bbRegionParentID) &&
            "predecessor is not part of the parent region - unhandled control "
            "flow");
+    (void)predRegion;
+    (void)bbRegionParentID;
     if (localRegionInfos.find(pred) == localRegionInfos.end()) {
       // Backedge / irreducable control flow - bail
       info.reset();
@@ -759,18 +772,25 @@ void AccessConflictAndMergeAnalysis::mergePredAccesses(
 void AccessConflictAndMergeAnalysis::visitSetForConflicts(
     const DenseAccessMap &accessSet, RegionInfo &info,
     AccessConflictAndMergeAnalysis::AccessedStorageSet &loopStorage) {
-  for (auto pair : accessSet) {
-    BeginAccessInst *beginAccess = pair.second;
-    AccessInfo &accessInfo = result.getAccessInfo(beginAccess);
+  bool changed = false;
+  do {
+    changed = false;
+    for (auto pair : accessSet) {
+      BeginAccessInst *beginAccess = pair.second;
+      AccessInfo &accessInfo = result.getAccessInfo(beginAccess);
 
-    for (auto loopAccess : loopStorage) {
-      if (loopAccess.isDistinctFrom(accessInfo) && !info.unidentifiedAccess)
-        continue;
+      for (auto loopAccess : loopStorage) {
+        if (loopAccess.isDistinctFrom(accessInfo) && !info.unidentifiedAccess)
+          continue;
 
-      recordConflict(info, loopAccess);
-      break;
+        recordConflict(info, loopAccess);
+        changed = true;
+        break;
+      }
+      if (changed)
+        break;
     }
-  }
+  } while (changed);
 }
 
 void AccessConflictAndMergeAnalysis::detectConflictsInLoop(

@@ -622,8 +622,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   uint64_t offset = conformanceEntry;
   conformanceEntry = conformance;
 
-  dc->getAsNominalTypeOrNominalTypeExtensionContext()
-    ->registerProtocolConformance(conformance);
+  dc->getSelfNominalTypeDecl()->registerProtocolConformance(conformance);
 
   // If the conformance is complete, we're done.
   if (conformance->isComplete())
@@ -1227,8 +1226,8 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
     // filter by whether we expect to find something in a protocol extension or
     // not. This lets us distinguish between a protocol member and a protocol
     // extension member that have the same type.
-    if (value->getDeclContext()->getAsProtocolOrProtocolExtensionContext() &&
-        (bool)value->getDeclContext()->getAsProtocolExtensionContext()
+    if (value->getDeclContext()->getSelfProtocolDecl() &&
+        (bool)value->getDeclContext()->getExtendedProtocolDecl()
           != inProtocolExt)
       return true;
 
@@ -2022,8 +2021,6 @@ getActualAddressorKind(uint8_t raw) {
     return swift::AddressorKind::Owning;
   case serialization::AddressorKind::NativeOwning:
     return swift::AddressorKind::NativeOwning;
-  case serialization::AddressorKind::NativePinning:
-    return swift::AddressorKind::NativePinning;
   }
 
   return None;
@@ -2071,6 +2068,20 @@ getActualVarDeclSpecifier(serialization::VarDeclSpecifier raw) {
   return None;
 }
 
+static Optional<swift::OpaqueReadOwnership>
+getActualOpaqueReadOwnership(unsigned rawKind) {
+  switch (serialization::OpaqueReadOwnership(rawKind)) {
+#define CASE(KIND)                               \
+  case serialization::OpaqueReadOwnership::KIND: \
+    return swift::OpaqueReadOwnership::KIND;
+  CASE(Owned)
+  CASE(Borrowed)
+  CASE(OwnedOrBorrowed)
+#undef CASE
+  }
+  return None;
+}
+
 static Optional<swift::ReadImplKind>
 getActualReadImplKind(unsigned rawKind) {
   switch (serialization::ReadImplKind(rawKind)) {
@@ -2113,7 +2124,6 @@ getActualReadWriteImplKind(unsigned rawKind) {
     return swift::ReadWriteImplKind::KIND;
   CASE(Immutable)
   CASE(Stored)
-  CASE(MaterializeForSet)
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
@@ -2123,10 +2133,17 @@ getActualReadWriteImplKind(unsigned rawKind) {
 }
 
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
+                                  uint8_t rawOpaqueReadOwnership,
                                   uint8_t rawReadImplKind,
                                   uint8_t rawWriteImplKind,
                                   uint8_t rawReadWriteImplKind,
                                   AccessorRecord &rawIDs) {
+  auto opaqueReadOwnership =
+    getActualOpaqueReadOwnership(rawOpaqueReadOwnership);
+  if (!opaqueReadOwnership)
+    return;
+  decl->setOpaqueReadOwnership(*opaqueReadOwnership);
+
   auto readImpl = getActualReadImplKind(rawReadImplKind);
   if (!readImpl) return;
 
@@ -2700,6 +2717,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return nullptr;
     }
 
+    theStruct->setAddedImplicitInitializers();
     if (isImplicit)
       theStruct->setImplicit();
     theStruct->setIsObjC(isObjC);
@@ -2795,7 +2813,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       createDecl<ConstructorDecl>(name, SourceLoc(),
                                   failability, /*FailabilityLoc=*/SourceLoc(),
                                   /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-                                  /*BodyParams=*/nullptr, nullptr,
+                                  /*BodyParams=*/nullptr,
                                   genericParams, parent);
     declOrOffset = ctor;
 
@@ -2808,17 +2826,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return nullptr;
     }
 
-    bool mutating = parent->getDeclaredInterfaceType()->hasReferenceSemantics();
-    auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parent,
-                                           /*static*/ false,
-                                           /*mutating*/ mutating);
-    selfDecl->setImplicit();
-
     auto *bodyParams = readParameterList();
     assert(bodyParams && "missing parameters for constructor");
-    ctor->setParameters(selfDecl, bodyParams);
-
-    ctor->computeType();
+    ctor->setParameters(bodyParams);
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
@@ -2843,6 +2853,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return nullptr;
     }
 
+    ctor->computeType();
+
     break;
   }
 
@@ -2852,7 +2864,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
     bool isGetterMutating, isSetterMutating;
     unsigned rawSpecifier, numAccessors;
-    uint8_t readImpl, writeImpl, readWriteImpl;
+    uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
     AccessorRecord accessors;
@@ -2863,6 +2875,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                        isImplicit, isObjC, isStatic, rawSpecifier,
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
+                                       opaqueReadOwnership,
                                        readImpl, writeImpl, readWriteImpl,
                                        numAccessors,
                                        interfaceTypeID,
@@ -2929,7 +2942,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       AddAttribute(
           new (ctx) ReferenceOwnershipAttr(referenceStorage->getOwnership()));
 
-    configureStorage(var, readImpl, writeImpl, readWriteImpl, accessors);
+    configureStorage(var, opaqueReadOwnership,
+                     readImpl, writeImpl, readWriteImpl, accessors);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       var->setAccess(*accessLevel);
@@ -3154,21 +3168,20 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    bool hasImplicitSelfDecl = DC->isTypeContext();
     FuncDecl *fn;
     if (!isAccessor) {
       fn = FuncDecl::createDeserialized(
         ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-        genericParams, hasImplicitSelfDecl, DC);
+        genericParams, DC);
     } else {
       fn = AccessorDecl::createDeserialized(
         ctx, /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
         accessorKind, addressorKind, storage,
         /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-        genericParams, hasImplicitSelfDecl, DC);
+        genericParams, DC);
     }
     fn->setEarlyAttrValidation();
     declOrOffset = fn;
@@ -3208,20 +3221,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     fn->getBodyResultTypeLoc().setType(getType(resultInterfaceTypeID));
 
-    ParamDecl *selfDecl = nullptr;
-    if (DC->isTypeContext()) {
-      selfDecl = ParamDecl::createSelf(SourceLoc(), DC,
-                                       fn->isStatic(),
-                                       fn->isMutating());
-      selfDecl->setImplicit();
-    }
-
     ParameterList *paramList = readParameterList();
-
-    fn->setParameters(selfDecl, paramList);
-
-    // Set the interface type.
-    fn->computeType();
+    fn->setParameters(paramList);
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
@@ -3246,6 +3247,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       error();
       return nullptr;
     }
+
+    // Set the interface type.
+    fn->computeType();
 
     break;
   }
@@ -3607,6 +3611,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return nullptr;
     }
 
+    theEnum->setAddedImplicitInitializers();
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setIsObjC(isObjC);
@@ -3718,13 +3723,14 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     AccessorRecord accessors;
     DeclID overriddenID;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
-    uint8_t readImpl, writeImpl, readWriteImpl;
+    uint8_t opaqueReadOwnership, readImpl, writeImpl, readWriteImpl;
     unsigned numArgNames, numAccessors;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
                                              isImplicit, isObjC,
                                              isGetterMutating, isSetterMutating,
+                                             opaqueReadOwnership,
                                              readImpl, writeImpl, readWriteImpl,
                                              numAccessors,
                                              genericEnvID,
@@ -3778,7 +3784,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     subscript->setIndices(readParameterList());
 
-    configureStorage(subscript, readImpl, writeImpl, readWriteImpl, accessors);
+    configureStorage(subscript, opaqueReadOwnership,
+                     readImpl, writeImpl, readWriteImpl, accessors);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       subscript->setAccess(*accessLevel);
@@ -3903,19 +3910,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto dtor = createDecl<DestructorDecl>(SourceLoc(), /*selfpat*/nullptr, DC);
+    auto dtor = createDecl<DestructorDecl>(SourceLoc(), DC);
     declOrOffset = dtor;
 
     configureGenericEnvironment(dtor, genericEnvID);
 
     dtor->setAccess(std::max(cast<ClassDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
-    auto *selfDecl = ParamDecl::createSelf(SourceLoc(), DC,
-                                           /*static*/ false,
-                                           /*mutating*/ false);
-    selfDecl->setImplicit();
-    dtor->setParameters(selfDecl, ParameterList::createEmpty(ctx));
-
     dtor->computeType();
 
     if (isImplicit)

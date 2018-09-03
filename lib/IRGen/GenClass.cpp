@@ -61,12 +61,6 @@
 using namespace swift;
 using namespace irgen;
 
-/// What reference counting mechanism does a class-like type have?
-ReferenceCounting irgen::getReferenceCountingForType(IRGenModule &IGM,
-                                                     CanType type) {
-  return type->getReferenceCounting(ResilienceExpansion::Maximal);
-}
-
 namespace {
   /// Layout information for class types.
   class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
@@ -259,6 +253,9 @@ namespace {
       return Elements;
     }
 
+    /// Does the class metadata have a completely known, static layout that
+    /// does not require initialization at runtime beyond registeration of
+    /// the class with the Objective-C runtime?
     bool isFixedSize() const {
       return !(ClassHasMissingMembers ||
                ClassHasResilientMembers ||
@@ -267,11 +264,20 @@ namespace {
                ClassHasObjCAncestry);
     }
 
-    bool doesMetadataRequireDynamicInitialization() const {
+    /// Note that unlike the top-level doesClassMetadataRequireInitialization(),
+    /// this returns false if the class is generic but otherwise fixed size
+    /// and without resilient or generic ancestry.
+    bool doesMetadataRequireInitialization() const {
       return (ClassHasMissingMembers ||
               ClassHasResilientMembers ||
               ClassHasResilientAncestry ||
               ClassHasGenericAncestry);
+    }
+
+    /// Note that unlike the top-level doesClassMetadataRequireRelocation(),
+    /// this returns false if the class is generic and not resilient.
+    bool doesMetadataRequireRelocation() const {
+      return ClassHasResilientAncestry;
     }
 
     ClassLayout getClassLayout(llvm::Type *classTy) const {
@@ -283,7 +289,8 @@ namespace {
 
       return ClassLayout(*this,
                          isFixedSize(),
-                         doesMetadataRequireDynamicInitialization(),
+                         doesMetadataRequireInitialization(),
+                         doesMetadataRequireRelocation(),
                          classTy,
                          allStoredProps,
                          allFieldAccesses,
@@ -1012,36 +1019,6 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
 
   emitNestedTypeDecls(D->getMembers());
   emitFieldMetadataRecord(D);
-
-  // If the class is resilient, emit dispatch thunks.
-  if (isResilient(D, ResilienceExpansion::Minimal)) {
-    struct ThunkEmitter : public SILVTableVisitor<ThunkEmitter> {
-      IRGenModule &IGM;
-      ClassDecl *D;
-
-      ThunkEmitter(IRGenModule &IGM, ClassDecl *D)
-        : IGM(IGM), D(D) {
-        addVTableEntries(D);
-      }
-
-      void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
-
-      void addMethod(SILDeclRef member) {
-        auto *func = cast<AbstractFunctionDecl>(member.getDecl());
-        if (func->getDeclContext() == D &&
-            func->getEffectiveAccess() >= AccessLevel::Public) {
-          IGM.emitDispatchThunk(member);
-        }
-      }
-
-      void addPlaceholder(MissingMemberDecl *m) {
-        assert(m->getNumberOfVTableEntries() == 0
-               && "Should not be emitting class with missing members");
-      }
-    };
-
-    ThunkEmitter emitter(*this, D);
-  }
 }
 
 namespace {
@@ -2107,6 +2084,7 @@ namespace {
 llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
                                             ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", cls);
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
 
@@ -2127,6 +2105,7 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
                                   ConstantStructBuilder &init,
                                   ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", cls);
 
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
@@ -2160,11 +2139,11 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
 llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
                                         ExtensionDecl *ext) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
-  ClassDecl *cls = ext->getAsClassOrClassExtensionContext();
+  ClassDecl *cls = ext->getSelfClassDecl();
   assert(cls && "generating category metadata for a non-class extension");
   
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", ext);
   ClassDataBuilder builder(IGM, cls, ext);
-  
   return builder.emitCategory();
 }
   
@@ -2172,6 +2151,7 @@ llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
 llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
                                             ProtocolDecl *proto) {
   assert(proto->isObjC() && "not an objc protocol");
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", proto);
   ClassDataBuilder builder(IGM, proto);
   return builder.emitProtocol();
 }
@@ -2180,7 +2160,7 @@ const TypeInfo *
 TypeConverter::convertClassType(CanType type, ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(type);
   llvm::PointerType *irType = ST->getPointerTo();
-  ReferenceCounting refcount = ::getReferenceCountingForType(IGM, type);
+  ReferenceCounting refcount = type->getReferenceCounting();
   
   SpareBitVector spareBits;
   
@@ -2264,25 +2244,44 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
                                      IGM.Context.Id_SwiftObject);
 }
 
-bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
-                                                          ClassDecl *theClass) {
-  // Classes imported from Objective-C never requires dynamic initialization.
+bool irgen::doesClassMetadataRequireRelocation(IRGenModule &IGM,
+                                               ClassDecl *theClass) {
+  // Classes imported from Objective-C never require dynamic initialization.
   if (theClass->hasClangNode())
     return false;
+
+  // Generic classes always require relocation.
+  if (theClass->isGenericContext())
+    return true;
 
   SILType selfType = getSelfType(theClass);
   auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
 
-  // FIXME: The correct thing is to do in-place initialization of
-  // metadata with resiliently-sized fields, even if we emitted
-  // a fragile layout statically. We can then verify or update
-  // the layout at runtime.
-  //
-  // First, the 'does class metadata require initialization'
-  // condition has to be made more fine grained.
+  // A completely fragile layout does not change whether the metadata
+  // requires *relocation*, since that only depends on resilient class
+  // ancestry, or the class itself being generic.
+  auto &layout = selfTI.getClassLayout(IGM, selfType,
+                                       /*completelyFragileLayout=*/false);
+  return layout.doesMetadataRequireRelocation();
+}
+
+bool irgen::doesClassMetadataRequireInitialization(IRGenModule &IGM,
+                                                   ClassDecl *theClass) {
+  // Classes imported from Objective-C never require dynamic initialization.
+  if (theClass->hasClangNode())
+    return false;
+
+  // Generic classes always require initialization.
+  if (theClass->isGenericContext())
+    return true;
+
+  SILType selfType = getSelfType(theClass);
+  auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+
+  // FIXME: Remove the completelyFragileLayout parameter here.
   auto &layout = selfTI.getClassLayout(IGM, selfType,
                                        /*CompletelyFragileLayout=*/true);
-  return layout.doesMetadataRequireDynamicInitialization();
+  return layout.doesMetadataRequireInitialization();
 }
 
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {

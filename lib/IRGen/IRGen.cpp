@@ -262,8 +262,13 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
       TargetMachine->getTargetIRAnalysis()));
 
   // If we're generating a profile, add the lowering pass now.
-  if (Opts.GenerateProfile)
-    ModulePasses.add(createInstrProfilingLegacyPass());
+  if (Opts.GenerateProfile) {
+    // TODO: Surface the option to emit atomic profile counter increments at
+    // the driver level.
+    InstrProfOptions Options;
+    Options.Atomic = bool(Opts.Sanitizers & SanitizerKind::Thread);
+    ModulePasses.add(createInstrProfilingLegacyPass(Options));
+  }
 
   PMBuilder.populateModulePassManager(ModulePasses);
 

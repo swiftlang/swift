@@ -11,28 +11,30 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-module"
-#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/SIL/SILModule.h"
+#include "Linker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/SIL/FormalLinkage.h"
-#include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILModule.h"
-#include "swift/Strings.h"
-#include "Linker.h"
-#include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/Notifications.h"
+#include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <functional>
 using namespace swift;
 using namespace Lowering;
 
-class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
+class SILModule::SerializationCallback final
+    : public DeserializationNotificationHandler {
   void didDeserialize(ModuleDecl *M, SILFunction *fn) override {
     updateLinkage(fn);
   }
@@ -83,19 +85,21 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
     }
   }
 
-  void didDeserializeFunctionBody(ModuleDecl *M, SILFunction *fn) override {
-    // Callbacks are currently applied in the order they are registered.
-    for (auto callBack : fn->getModule().getDeserializationCallbacks())
-      callBack(M, fn);
+  StringRef getName() const override {
+    return "SILModule::SerializationCallback";
   }
 };
 
 SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
                      const DeclContext *associatedDC, bool wholeModule)
     : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
-      Stage(SILStage::Raw), Callback(new SILModule::SerializationCallback()),
-      wholeModule(wholeModule), Options(Options), serialized(false),
-      SerializeSILAction(), Types(*this) {}
+      Stage(SILStage::Raw), wholeModule(wholeModule), Options(Options),
+      serialized(false), SerializeSILAction(), Types(*this) {
+  // We always add the base SILModule serialization callback.
+  std::unique_ptr<DeserializationNotificationHandler> callback(
+      new SILModule::SerializationCallback());
+  deserializationNotificationHandlers.add(std::move(callback));
+}
 
 SILModule::~SILModule() {
   // Decrement ref count for each SILGlobalVariable with static initializers.
@@ -203,7 +207,7 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
   case SILStage::Canonical:
   case SILStage::Raw:
     break;
-    
+
   case SILStage::Lowered:
     return wtable;
   }
@@ -469,8 +473,8 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
 SerializedSILLoader *SILModule::getSILLoader() {
   // If the SILLoader is null, create it.
   if (!SILLoader)
-    SILLoader = SerializedSILLoader::create(getASTContext(), this,
-                                            Callback.get());
+    SILLoader = SerializedSILLoader::create(
+        getASTContext(), this, &deserializationNotificationHandlers);
   // Return the SerializedSILLoader.
   return SILLoader.get();
 }
@@ -569,25 +573,17 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
   return nullptr;
 }
 
-void SILModule::registerDeserializationCallback(
-    SILFunctionBodyCallback callBack) {
-  if (std::find(DeserializationCallbacks.begin(),
-                DeserializationCallbacks.end(), callBack)
-      == DeserializationCallbacks.end())
-    DeserializationCallbacks.push_back(callBack);
+void SILModule::registerDeserializationNotificationHandler(
+    std::unique_ptr<DeserializationNotificationHandler> &&handler) {
+  deserializationNotificationHandlers.add(std::move(handler));
 }
 
-ArrayRef<SILModule::SILFunctionBodyCallback>
-SILModule::getDeserializationCallbacks() {
-  return DeserializationCallbacks;
-}
-
-void SILModule::
-registerDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
+void SILModule::registerDeleteNotificationHandler(
+    DeleteNotificationHandler *handler) {
   // Ask the handler (that can be an analysis, a pass, or some other data
   // structure) if it wants to receive delete notifications.
-  if (Handler->needsNotifications()) {
-    NotificationHandlers.insert(Handler);
+  if (handler->needsNotifications()) {
+    NotificationHandlers.insert(handler);
   }
 }
 

@@ -28,8 +28,7 @@ DerivedConformance::DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
                                        ProtocolDecl *protocol)
     : TC(tc), ConformanceDecl(conformanceDecl), Nominal(nominal),
       Protocol(protocol) {
-  assert(getConformanceContext()
-             ->getAsNominalTypeOrNominalTypeExtensionContext() == nominal);
+  assert(getConformanceContext()->getSelfNominalTypeDecl() == nominal);
 }
 
 DeclContext *DerivedConformance::getConformanceContext() const {
@@ -48,8 +47,7 @@ Type DerivedConformance::getProtocolType() const {
   return Protocol->getDeclaredType();
 }
 
-bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
-                                                    DeclContext *DC,
+bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
                                                     NominalTypeDecl *Nominal,
                                                     ProtocolDecl *Protocol) {
   // Only known protocols can be derived.
@@ -74,7 +72,7 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
         // Enums without associated values can implicitly derive Equatable
         // conformance.
       case KnownProtocolKind::Equatable:
-        return canDeriveEquatable(TC, DC, Nominal);
+        return canDeriveEquatable(DC, Nominal);
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
@@ -127,10 +125,10 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
     }
 
     // Structs can explicitly derive Equatable conformance.
-    if (auto structDecl = dyn_cast<StructDecl>(Nominal)) {
+    if (isa<StructDecl>(Nominal)) {
       switch (*knownProtocol) {
         case KnownProtocolKind::Equatable:
-          return canDeriveEquatable(TC, DC, Nominal);
+          return canDeriveEquatable(DC, Nominal);
         default:
           return false;
       }
@@ -159,8 +157,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
             ConformanceCheckFlags::SkipConditionalRequirements)) {
       auto DC = conformance->getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
-      if (!DerivedConformance::derivesProtocolConformance(tc, DC, nominal,
-                                                          proto))
+      if (!DerivedConformance::derivesProtocolConformance(DC, nominal, proto))
         return nullptr;
     }
 
@@ -287,7 +284,6 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
 
   auto &C = tc.Context;
   auto parentDC = property->getDeclContext();
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC, isStatic);
   ParameterList *params = ParameterList::createEmpty(C);
 
   Type propertyInterfaceType = property->getInterfaceType();
@@ -297,15 +293,14 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     AccessorKind::Get, AddressorKind::NotAddressor, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-    /*GenericParams=*/nullptr, selfDecl, params,
+    /*GenericParams=*/nullptr, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
 
   // If this is supposed to be a final method, mark it as such.
-  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
-  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
-      !getterDecl->isFinal())
+  assert(isFinal || !parentDC->getSelfClassDecl());
+  if (isFinal && parentDC->getSelfClassDecl() && !getterDecl->isFinal())
     getterDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   // Compute the interface type of the getter.
@@ -338,9 +333,8 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->setValidationToChecked();
 
   // If this is supposed to be a final property, mark it as such.
-  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
-  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
-      !propDecl->isFinal())
+  assert(isFinal || !parentDC->getSelfClassDecl());
+  if (isFinal && parentDC->getSelfClassDecl() && !propDecl->isFinal())
     propDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);

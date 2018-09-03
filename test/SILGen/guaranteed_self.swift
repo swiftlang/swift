@@ -68,9 +68,9 @@ struct S: Fooable {
   // CHECK-NOT:     load [[SELF_ADDR]]
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
-  // materializeForSet for prop1
-  // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop1Sivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-  // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
+  // modify for prop1
+  // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop1SivM : $@yield_once @convention(method) (@inout S) -> @yields @inout Int
+  // CHECK:       bb0([[SELF_ADDR:%.*]] : @trivial $*S):
   // CHECK-NOT:     load [[SELF_ADDR]]
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
@@ -80,7 +80,7 @@ struct S: Fooable {
     // CHECK-NOT:     destroy_value [[SELF]]
     get { return 0 }
     // CHECK-LABEL: sil hidden @$S15guaranteed_self1SV5prop2Sivs : $@convention(method) (Int, @inout S) -> ()
-    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop2Sivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop2SivM : $@yield_once @convention(method) (@inout S) -> @yields @inout Int
     set { }
   }
 
@@ -92,8 +92,8 @@ struct S: Fooable {
     // CHECK-LABEL: sil hidden @$S15guaranteed_self1SV5prop3Sivs : $@convention(method) (Int, @guaranteed S) -> ()
     // CHECK:       bb0({{.*}} [[SELF:%.*]] : @guaranteed $S):
     // CHECK-NOT:     destroy_value [[SELF]]
-    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop3Sivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-    // CHECK:       bb0({{.*}} [[SELF:%.*]] : @guaranteed $S):
+    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self1SV5prop3SivM : $@yield_once @convention(method) (@guaranteed S) -> @yields @inout Int
+    // CHECK:       bb0([[SELF:%.*]] : @guaranteed $S):
     // CHECK-NOT:     destroy_value [[SELF]]
     nonmutating set { }
   }
@@ -132,9 +132,9 @@ struct S: Fooable {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
-// Witness thunk for prop1 materializeForSet
-// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop1SivmTW : $@convention(witness_method: Fooable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
+// Witness thunk for prop1 modify
+// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop1SivMTW : $@yield_once @convention(witness_method: Fooable) (@inout S) -> @yields @inout Int {
+// CHECK:       bb0([[SELF_ADDR:%.*]] : @trivial $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop2 getter
@@ -149,9 +149,9 @@ struct S: Fooable {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
-// Witness thunk for prop2 materializeForSet
-// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop2SivmTW : $@convention(witness_method: Fooable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
+// Witness thunk for prop2 modify
+// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop2SivMTW : $@yield_once @convention(witness_method: Fooable) (@inout S) -> @yields @inout Int {
+// CHECK:       bb0([[SELF_ADDR:%.*]] : @trivial $*S):
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for prop3 getter
@@ -168,13 +168,13 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_value [[SELF]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
-// Witness thunk for prop3 nonmutating materializeForSet
-// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop3SivmTW : $@convention(witness_method: Fooable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-// CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*S):
+// Witness thunk for prop3 nonmutating modify
+// CHECK-LABEL: sil private [transparent] [thunk] @$S15guaranteed_self1SVAA7FooableA2aDP5prop3SivMTW : $@yield_once @convention(witness_method: Fooable) (@in_guaranteed S) -> @yields @inout Int
+// CHECK:       bb0([[SELF_ADDR:%.*]] : @trivial $*S):
 // CHECK:         [[SELF:%.*]] = load_borrow [[SELF_ADDR]]
 // CHECK-NOT:     destroy_value [[SELF]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-// CHECK:       } // end sil function '$S15guaranteed_self1SVAA7FooableA2aDP5prop3SivmTW'
+// CHECK:       } // end sil function '$S15guaranteed_self1SVAA7FooableA2aDP5prop3SivMTW'
 
 //
 // TODO: Expected output for the other cases
@@ -219,8 +219,8 @@ struct AO<T>: Fooable {
     // CHECK-LABEL: sil hidden @$S15guaranteed_self2AOV5prop3Sivs : $@convention(method) <T> (Int, @in_guaranteed AO<T>) -> ()
     // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*AO<T>):
     // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self2AOV5prop3Sivm : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed AO<T>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-    // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : @trivial $*AO<T>):
+    // CHECK-LABEL: sil hidden [transparent] @$S15guaranteed_self2AOV5prop3SivM : $@yield_once @convention(method) <T> (@in_guaranteed AO<T>) -> @yields @inout Int
+    // CHECK:       bb0([[SELF_ADDR:%.*]] : @trivial $*AO<T>):
     // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
     // CHECK:       }
     nonmutating set { }

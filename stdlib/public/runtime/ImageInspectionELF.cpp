@@ -86,20 +86,6 @@ void swift::initializeTypeMetadataRecordLookup() {
   }
 }
 
-void swift::initializeTypeFieldLookup() {
-  const swift::MetadataSections *sections = registered;
-  while (true) {
-    const swift::MetadataSections::Range &fields = sections->swift5_fieldmd;
-    if (fields.length)
-      addImageTypeFieldDescriptorBlockCallback(
-          reinterpret_cast<void *>(fields.start), fields.length);
-
-    if (sections->next == registered)
-      break;
-    sections = sections->next;
-  }
-}
-
 // As ELF images are loaded, ImageInspectionInit:sectionDataInit() will call
 // addNewDSOImage() with an address in the image that can later be used via
 // dladdr() to dlopen() the image after the appropriate initialize*Lookup()

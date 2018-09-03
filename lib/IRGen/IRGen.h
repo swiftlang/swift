@@ -239,6 +239,7 @@ public:
 
   constexpr Alignment() : Value(0) {}
   constexpr explicit Alignment(int_type Value) : Value(Value) {}
+  explicit Alignment(clang::CharUnits value) : Value(value.getQuantity()) {}
 
   constexpr int_type getValue() const { return Value; }
   constexpr int_type getMaskValue() const { return Value - 1; }

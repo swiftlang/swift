@@ -47,6 +47,21 @@ struct InProcess;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
 
+/// Non-type metadata kinds have this bit set.
+const unsigned MetadataKindIsNonType = 0x400;
+
+/// Non-heap metadata kinds have this bit set.
+const unsigned MetadataKindIsNonHeap = 0x200;
+
+// The above two flags are negative because the "class" kind has to be zero,
+// and class metadata is both type and heap metadata.
+
+/// Runtime-private metadata has this bit set. The compiler must not statically
+/// generate metadata objects with these kinds, and external tools should not
+/// rely on the stability of these values or the precise binary layout of
+/// their associated data structures.
+const unsigned MetadataKindIsRuntimePrivate = 0x100;
+
 /// Kinds of Swift metadata records.  Some of these are types, some
 /// aren't.
 enum class MetadataKind : uint32_t {
@@ -63,11 +78,21 @@ enum class MetadataKind : uint32_t {
   /// runtime must tolerate metadata with unknown kinds.
   /// This specific value is not mapped to a valid metadata kind at this time,
   /// however.
-  LastEnumerated = 2047,
+  LastEnumerated = 0x7FF,
 };
 
 const unsigned LastEnumeratedMetadataKind =
   (unsigned)MetadataKind::LastEnumerated;
+
+inline bool isHeapMetadataKind(MetadataKind k) {
+  return !((uint32_t)k & MetadataKindIsNonHeap);
+}
+inline bool isTypeMetadataKind(MetadataKind k) {
+  return !((uint32_t)k & MetadataKindIsNonType);
+}
+inline bool isRuntimePrivateMetadataKind(MetadataKind k) {
+  return (uint32_t)k & MetadataKindIsRuntimePrivate;
+}
 
 /// Try to translate the 'isa' value of a type/heap metadata into a value
 /// of the MetadataKind enum.
@@ -85,6 +110,9 @@ enum class NominalTypeKind : uint32_t {
 #include "MetadataKind.def"
 };
 
+/// The maximum supported type alignment.
+const size_t MaximumAlignment = 16;
+
 /// Flags stored in the value-witness table.
 template <typename int_type>
 class TargetValueWitnessFlags {
@@ -94,7 +122,7 @@ public:
   // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
   // still require additional fixup.)
   enum : int_type {
-    AlignmentMask =       0x0000FFFF,
+    AlignmentMask =       0x000000FF,
     IsNonPOD =            0x00010000,
     IsNonInline =         0x00020000,
     HasExtraInhabitants = 0x00040000,
@@ -297,7 +325,8 @@ public:
     Init,
     Getter,
     Setter,
-    MaterializeForSet,
+    ModifyCoroutine,
+    ReadCoroutine,
   };
 
 private:
@@ -517,7 +546,8 @@ public:
     Init,
     Getter,
     Setter,
-    MaterializeForSet,
+    ReadCoroutine,
+    ModifyCoroutine,
     AssociatedTypeAccessFunction,
     AssociatedConformanceAccessFunction,
   };
@@ -1014,6 +1044,12 @@ enum class ClassLayoutFlags : uintptr_t {
 
   /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
   Swift5Algorithm   = 0x00,
+
+  /// If true, the vtable for this class and all of its superclasses was emitted
+  /// statically in the class metadata. If false, the superclass vtable is
+  /// copied from superclass metadata, and the immediate class vtable is
+  /// initialized from the type context descriptor.
+  HasStaticVTable   = 0x100,
 };
 static inline ClassLayoutFlags operator|(ClassLayoutFlags lhs,
                                          ClassLayoutFlags rhs) {
@@ -1026,6 +1062,9 @@ static inline ClassLayoutFlags &operator|=(ClassLayoutFlags &lhs,
 static inline ClassLayoutFlags getLayoutAlgorithm(ClassLayoutFlags flags) {
   return ClassLayoutFlags(uintptr_t(flags)
                              & uintptr_t(ClassLayoutFlags::AlgorithmMask));
+}
+static inline bool hasStaticVTable(ClassLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(ClassLayoutFlags::HasStaticVTable);
 }
 
 /// Flags for enum layout.
@@ -1183,17 +1222,11 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     // Generic flags build upwards from 0.
     // Type-specific flags build downwards from 15.
 
-    /// Set if the type supports reflection.  C and Objective-C enums
-    /// currently don't.
-    ///
-    /// Meaningful for all type-descriptor kinds.
-    IsReflectable = 0,
-
     /// Whether there's something unusual about how the metadata is
     /// initialized.
     ///
     /// Meaningful for all type-descriptor kinds.
-    MetadataInitialization = 1,
+    MetadataInitialization = 0,
     MetadataInitialization_width = 2,
 
     /// Set if the type has extended import information.
@@ -1204,8 +1237,7 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// these strings and the order in which they appear.
     ///
     /// Meaningful for all type-descriptor kinds.
-    HasImportInfo = 3,
-
+    HasImportInfo = 2,
 
     // Type-specific flags:
 
@@ -1236,8 +1268,6 @@ public:
   explicit TypeContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
   constexpr TypeContextDescriptorFlags() {}
 
-  FLAGSET_DEFINE_FLAG_ACCESSORS(IsReflectable, isReflectable, setIsReflectable)
-
   enum MetadataInitializationKind {
     /// There are either no special rules for initializing the metadata
     /// or the metadata is generic.  (Genericity is set in the
@@ -1246,7 +1276,7 @@ public:
 
     /// The type requires non-trivial singleton initialization using the
     /// "in-place" code pattern.
-    InPlaceMetadataInitialization = 1,
+    SingletonMetadataInitialization = 1,
 
     /// The type requires non-trivial singleton initialization using the
     /// "foreign" code pattern.
@@ -1262,8 +1292,8 @@ public:
                                  getMetadataInitialization,
                                  setMetadataInitialization)
 
-  bool hasInPlaceMetadataInitialization() const {
-    return getMetadataInitialization() == InPlaceMetadataInitialization;
+  bool hasSingletonMetadataInitialization() const {
+    return getMetadataInitialization() == SingletonMetadataInitialization;
   }
 
   bool hasForeignMetadataInitialization() const {

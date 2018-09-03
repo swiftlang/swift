@@ -193,7 +193,8 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
       return SILValue();
 
     SmallVector<SILValue, 4> IncomingValues;
-    if (!V->getIncomingValues(IncomingValues) || IncomingValues.empty())
+    if (!V->getSingleTerminatorOperands(IncomingValues)
+        || IncomingValues.empty())
       return SILValue();
 
     ValueBase *Def = nullptr;
@@ -387,8 +388,9 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
   // Incoming values for the BBArg.
   SmallVector<SILValue, 4> IncomingValues;
 
-  if (ArgBB->getIterator() != ArgBB->getParent()->begin() &&
-      (!Arg->getIncomingValues(IncomingValues) || IncomingValues.empty()))
+  if (ArgBB->getIterator() != ArgBB->getParent()->begin()
+      && (!Arg->getSingleTerminatorOperands(IncomingValues)
+          || IncomingValues.empty()))
     return false;
 
   // Check for each predecessor, if the incoming value coming from it
@@ -667,9 +669,7 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     return;
 
   // Second phase: transformation.
-  // Remove critical edges for the SSA-updater. We do this once and keep the
-  // CFG critical-edge free during our transformations.
-  splitAllCriticalEdges(*Fn, true, nullptr, nullptr);
+  Fn->verifyCriticalEdges();
 
   for (Edit *edit : Edits) {
     Optional<BasicBlockCloner> Cloner;
@@ -685,7 +685,7 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
 
     if (Cloner.hasValue()) {
       updateSSAAfterCloning(*Cloner.getPointer(), Cloner->getDestBB(),
-                            edit->CCBBlock, false);
+                            edit->CCBBlock);
 
       if (!Cloner->getDestBB()->pred_empty())
         BlocksForWorklist.push_back(Cloner->getDestBB());

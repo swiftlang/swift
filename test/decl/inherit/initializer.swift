@@ -90,16 +90,16 @@ func testNotInherited2() {
   var n2 = NotInherited2(double: 2.72828) // expected-error{{'NotInherited2' cannot be constructed because it has no accessible initializers}}
 }
 
-// FIXME: <rdar://problem/16331406> Implement inheritance of variadic designated initializers
+// <rdar://problem/16331406> Implement inheritance of variadic designated initializers
 class SuperVariadic {
-  init(ints: Int...) { } // expected-note{{variadic superclass initializer defined here}}
-  init(_ : Double...) { } // expected-note{{variadic superclass initializer defined here}}
+  init(ints: Int...) { }
+  init(_ : Double...) { }
 
-  init(s: String, ints: Int...) { } // expected-note{{variadic superclass initializer defined here}}
-  init(s: String, _ : Double...) { } // expected-note{{variadic superclass initializer defined here}}
+  init(s: String, ints: Int...) { }
+  init(s: String, _ : Double...) { }
 }
 
-class SubVariadic : SuperVariadic { } // expected-warning 4{{synthesizing a variadic inherited initializer for subclass 'SubVariadic' is unsupported}}
+class SubVariadic : SuperVariadic { }
 
 // Don't crash with invalid nesting of class in generic function
 

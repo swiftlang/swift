@@ -381,6 +381,7 @@ private:
     case Node::Kind::MaterializeForSet:
     case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
+    case Node::Kind::MethodDescriptor:
     case Node::Kind::ModifyAccessor:
     case Node::Kind::NativeOwningAddressor:
     case Node::Kind::NativeOwningMutableAddressor:
@@ -430,7 +431,7 @@ private:
     case Node::Kind::TypeMetadataCompletionFunction:
     case Node::Kind::TypeMetadataInstantiationCache:
     case Node::Kind::TypeMetadataInstantiationFunction:
-    case Node::Kind::TypeMetadataInPlaceInitializationCache:
+    case Node::Kind::TypeMetadataSingletonInitializationCache:
     case Node::Kind::TypeMetadataLazyCache:
     case Node::Kind::UncurriedFunctionType:
 #define REF_STORAGE(Name, ...) \
@@ -905,6 +906,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::DispatchThunk:
     Printer << "dispatch thunk of ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::MethodDescriptor:
+    Printer << "method descriptor for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::OutlinedBridgedMethod:
@@ -1514,8 +1519,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "type metadata instantiation function for ";
     print(Node->getChild(0));
     return nullptr;
-  case Node::Kind::TypeMetadataInPlaceInitializationCache:
-    Printer << "type metadata in-place initialization cache for ";
+  case Node::Kind::TypeMetadataSingletonInitializationCache:
+    Printer << "type metadata singleton initialization cache for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::TypeMetadataCompletionFunction:

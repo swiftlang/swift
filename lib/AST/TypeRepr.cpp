@@ -572,10 +572,10 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
     Printer.printKeyword("inout");
     break;
   case TypeReprKind::Shared:
-    Printer.printKeyword("shared");
+    Printer.printKeyword("__shared");
     break;
   case TypeReprKind::Owned:
-    Printer.printKeyword("owned");
+    Printer.printKeyword("__owned");
     break;
   default:
     llvm_unreachable("unknown specifier type repr");

@@ -482,10 +482,9 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
   if (isCoroutine()) {
     auto allocToken = address.getExtraInfo();
     assert(allocToken && "dynamic alloca in coroutine without alloc token?");
-    (void)allocToken;
     auto freeFn = llvm::Intrinsic::getDeclaration(
         &IGM.Module, llvm::Intrinsic::ID::coro_alloca_free);
-    Builder.CreateCall(freeFn, address.getAddressPointer());
+    Builder.CreateCall(freeFn, allocToken);
     return;
   }
 

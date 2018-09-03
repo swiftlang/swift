@@ -129,7 +129,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   // We might have to re-abstract the 'self' value if it is an
   // Optional.
   AbstractionPattern origSelfType(witness->getInterfaceType());
-  origSelfType = origSelfType.getFunctionInputType();
+  origSelfType = origSelfType.getFunctionParamType(0);
 
   swiftValue = SGF.emitSubstToOrigValue(loc, swiftValue,
                                         origSelfType,
@@ -704,7 +704,8 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
     auto openedType = ArchetypeType::getOpened(nativeType);
 
     auto openedExistential = SGF.emitOpenExistential(
-        loc, v, openedType, SGF.getLoweredType(openedType), AccessKind::Read);
+        loc, v, openedType, SGF.getLoweredType(openedType),
+        AccessKind::Read);
 
     v = SGF.manageOpaqueValue(openedExistential, loc, SGFContext());
     nativeType = openedType;
@@ -947,7 +948,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   CanSILFunctionType substFnTy = thunkTy;
 
-  if (auto genericSig = thunkTy->getGenericSignature()) {
+  if (thunkTy->getGenericSignature()) {
     substFnTy = thunkTy->substGenericArgs(F.getModule(),
                                           interfaceSubs);
   }

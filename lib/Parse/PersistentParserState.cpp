@@ -45,28 +45,6 @@ bool PersistentParserState::hasFunctionBodyState(AbstractFunctionDecl *AFD) {
   return DelayedFunctionBodies.find(AFD) != DelayedFunctionBodies.end();
 }
 
-void PersistentParserState::delayAccessorBodyParsing(AbstractFunctionDecl *AFD,
-                                                     SourceRange BodyRange,
-                                                     SourceLoc PreviousLoc,
-                                                     SourceLoc LBLoc) {
-  std::unique_ptr<AccessorBodyState> State;
-  State.reset(new AccessorBodyState(BodyRange, PreviousLoc,
-                                    ScopeInfo.saveCurrentScope(), LBLoc));
-  assert(DelayedAccessorBodies.find(AFD) == DelayedAccessorBodies.end() &&
-         "Already recorded state for this body");
-  DelayedAccessorBodies[AFD] = std::move(State);
-}
-
-std::unique_ptr<PersistentParserState::AccessorBodyState>
-PersistentParserState::takeAccessorBodyState(AbstractFunctionDecl *AFD) {
-  assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed);
-  DelayedAccessorBodiesTy::iterator I = DelayedAccessorBodies.find(AFD);
-  assert(I != DelayedAccessorBodies.end() && "State should be saved");
-  std::unique_ptr<AccessorBodyState> State = std::move(I->second);
-  DelayedAccessorBodies.erase(I);
-  return State;
-}
-
 void PersistentParserState::delayDecl(DelayedDeclKind Kind,
                                       unsigned Flags,
                                       DeclContext *ParentContext,

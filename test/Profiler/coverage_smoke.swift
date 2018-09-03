@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -profile-generate -profile-coverage-mapping -Xfrontend -disable-incremental-llvm-codegen -o %t/main
-// RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
+
+// This unusual use of 'sh' allows the path of the profraw file to be
+// substituted by %target-run.
+// RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default.profraw %t/main
+
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
 // RUN: %llvm-profdata show %t/default.profdata -function=f_internal | %FileCheck %s --check-prefix=CHECK-INTERNAL
 // RUN: %llvm-profdata show %t/default.profdata -function=f_private | %FileCheck %s --check-prefix=CHECK-PRIVATE
@@ -11,6 +15,7 @@
 // RUN: rm -rf %t
 
 // REQUIRES: profile_runtime
+// REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
 // CHECK-INTERNAL: Functions shown: 1

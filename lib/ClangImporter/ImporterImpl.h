@@ -961,6 +961,11 @@ public:
   /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
   bool matchesHashableBound(Type type);
 
+  /// \brief Determines whether the type declared by the given declaration
+  /// is over-aligned.
+  bool isOverAligned(const clang::TypeDecl *typeDecl);
+  bool isOverAligned(clang::QualType type);
+
   /// \brief Look up and attempt to import a Clang declaration with
   /// the given name.
   Decl *importDeclByName(StringRef name);
@@ -1029,10 +1034,13 @@ public:
       bool resugarNSErrorPointer = true);
 
   /// \brief Import the given Clang type into Swift, returning the
-  /// Swift type and whether we should treat it as an optional that is
-  /// implicitly unwrapped.
+  /// Swift parameters and result type and whether we should treat it
+  /// as an optional that is implicitly unwrapped.
   ///
-  /// \returns A pair of the imported type and whether we should treat
+  /// The parameters are returned via \c parameterList, and the result type is
+  /// the return type of this method.
+  ///
+  /// \returns A pair of the imported result type and whether we should treat
   /// it as an optional that is implicitly unwrapped. The returned
   /// type is null if it cannot be represented in Swift.
 
@@ -1052,9 +1060,6 @@ public:
   ///   to system APIs.
   /// \param name The name of the function.
   /// \param[out] parameterList The parameters visible inside the function body.
-  ///
-  /// \returns the imported function type, or null if the type cannot be
-  /// imported.
   ImportedType importFunctionType(DeclContext *dc,
                                   const clang::FunctionDecl *clangDecl,
                                   ArrayRef<const clang::ParmVarDecl *> params,
@@ -1104,7 +1109,10 @@ public:
                        StringRef argumentLabel, bool isFirstParameter,
                        bool isLastParameter, importer::NameImporter &);
 
-  /// Import the type of an Objective-C method.
+  /// Import the parameter and return types of an Objective-C method.
+  ///
+  /// The parameters are returned via \c bodyParams, and the result type is
+  /// the return type of this method.
   ///
   /// Note that this is not appropriate to use for property accessor methods.
   /// Use #importAccessorMethodType instead.
@@ -1122,7 +1130,7 @@ public:
   /// \param kind Controls whether we're building a type for a method that
   ///   needs special handling.
   ///
-  /// \returns the imported function type, or null if the type cannot be
+  /// \returns the imported result type, or null if the type cannot be
   /// imported.
   ImportedType
   importMethodType(const DeclContext *dc,
@@ -1136,6 +1144,9 @@ public:
   /// Import the type of an Objective-C method that will be imported as an
   /// accessor for \p property.
   ///
+  /// The parameters are returned via \c bodyParams, and the result type is
+  /// the return type of this method.
+  ///
   /// \param dc The context the method is being imported into.
   /// \param property The property the method will be an accessor for.
   /// \param clangDecl The underlying declaration.
@@ -1146,7 +1157,7 @@ public:
   ///   accessor.
   /// \param[out] params The patterns visible inside the function body.
   ///
-  /// \returns the imported function type, or null if the type cannot be
+  /// \returns the imported result type, or null if the type cannot be
   /// imported.
   ImportedType importAccessorMethodType(const DeclContext *dc,
                                         const clang::ObjCPropertyDecl *property,

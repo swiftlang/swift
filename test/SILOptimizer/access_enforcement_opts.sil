@@ -1,10 +1,12 @@
-// RUN: %target-sil-opt -access-enforcement-opts -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -access-enforcement-opts -I %S/Inputs/abi -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 import Swift
 import SwiftShims
+import c_layout
+
 
 struct X {
   @sil_stored var i: Int64 { get set }
@@ -1266,6 +1268,44 @@ bb5:
   return %16 : $()
 }
 
+class RefElemClass {
+  var x : BitfieldOne
+  var y : Int32
+  init()
+}
+
+// CHECK-LABEL: sil @ref_elem_c : $@convention(thin) (RefElemClass) -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: [[REFX:%.*]] = ref_element_addr %0 : $RefElemClass, #RefElemClass.x
+// CHECK-NEXT: [[REFY:%.*]] = ref_element_addr %0 : $RefElemClass, #RefElemClass.y
+// CHECK-NEXT: [[BEGINX:%.*]] = begin_access [modify] [dynamic] [[REFX]] : $*BitfieldOne
+// CHECK: [[BEGINY:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFY]] : $*Int32
+// CHECK-NEXT: end_access [[BEGINX]] : $*BitfieldOne
+// CHECK-NEXT: end_access [[BEGINY]] : $*Int32
+// CHECK-LABEL: } // end sil function 'ref_elem_c'
+
+sil @ref_elem_c : $@convention(thin) (RefElemClass) -> () {
+bb0(%0 : $RefElemClass):
+  %b0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %b0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %x = ref_element_addr %0 : $RefElemClass, #RefElemClass.x
+  %y = ref_element_addr %0 : $RefElemClass, #RefElemClass.y
+  %b1 = begin_access [modify] [dynamic] %x : $*BitfieldOne
+  %u0 = function_ref @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+  %u1 = apply %u0() : $@convention(thin) () -> Builtin.RawPointer
+  end_access %b1 : $*BitfieldOne
+  %b2 = begin_access [modify] [dynamic] %y : $*Int32
+  %b3 = begin_access [modify] [dynamic] %x : $*BitfieldOne
+  end_access %b3 : $*BitfieldOne
+  end_access %b2 : $*Int32
+  %10 = tuple ()
+  return %10 : $()
+}
 
 // public func testStronglyConnectedComponent() {
 // During the merge optimization,

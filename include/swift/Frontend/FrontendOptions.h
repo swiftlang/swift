@@ -14,6 +14,7 @@
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/Version.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -70,10 +71,6 @@ public:
 
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
-
-  /// The path to which we should emit GraphViz output for the complete
-  /// request-evaluator graph.
-  std::string RequestEvaluatorGraphVizPath;
 
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
@@ -258,9 +255,6 @@ public:
 
   /// Compare the symbols in the IR against the TBD file we would generate.
   TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::Default;
-
-  /// The install_name to use in the TBD file.
-  std::string TBDInstallName;
 
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {

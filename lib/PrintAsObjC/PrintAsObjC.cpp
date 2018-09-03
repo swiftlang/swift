@@ -193,7 +193,7 @@ public:
     assert(members.begin() != members.end());
 
     const DeclContext *origDC = (*members.begin())->getDeclContext();
-    auto *baseClass = origDC->getAsClassOrClassExtensionContext();
+    auto *baseClass = origDC->getSelfClassDecl();
 
     os << "@interface " << getNameForObjC(baseClass);
     maybePrintObjCGenericParameters(baseClass);
@@ -365,7 +365,7 @@ private:
     if (isEmptyExtensionDecl(ED))
       return;
 
-    auto baseClass = ED->getAsClassOrClassExtensionContext();
+    auto baseClass = ED->getSelfClassDecl();
 
     if (printAvailability(ED, PrintLeadingSpace::No))
       os << "\n";
@@ -656,9 +656,9 @@ private:
         // inherits from NSObject.
         if (selectorIsInit(selector) && !ctor->getOverriddenDecl()) {
           auto container = ctor->getDeclContext();
-          auto *classDecl = container->getAsClassOrClassExtensionContext();
+          auto *classDecl = container->getSelfClassDecl();
           if (!classDecl) {
-            assert(container->getAsProtocolOrProtocolExtensionContext());
+            assert(container->getSelfProtocolDecl());
           } else {
             while (classDecl->hasSuperclass()) {
               classDecl = classDecl->getSuperclassDecl();
@@ -932,9 +932,9 @@ private:
       renamedDecl = lookup.getSingleTypeResult();
     } else {
       SmallVector<ValueDecl *, 4> lookupResults;
-      declContext->lookupQualified(declContext->getSelfTypeInContext(),
-                                   renamedDeclName, NL_QualifiedDefault, NULL,
-                                   lookupResults);
+      declContext->lookupQualified(
+        declContext->getSelfNominalTypeDecl(),
+        renamedDeclName, NL_QualifiedDefault, lookupResults);
       for (auto candidate : lookupResults) {
         if (!shouldInclude(candidate))
           continue;
@@ -988,8 +988,7 @@ private:
     else
       os << "method";
     os << " '";
-    auto nominal =
-      VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto nominal = VD->getDeclContext()->getSelfNominalTypeDecl();
     printEncodedString(nominal->getName().str(), /*includeQuotes=*/false);
     os << ".";
     SmallString<32> scratch;
@@ -1524,12 +1523,8 @@ private:
 
   bool printImportedAlias(const TypeAliasDecl *alias,
                           Optional<OptionalTypeKind> optionalKind) {
-    if (!alias->hasClangNode()) {
-      if (!alias->isObjC()) return false;
-
-      os << alias->getName();
-      return true;
-    }
+    if (!alias->hasClangNode())
+      return false;
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
@@ -1561,7 +1556,7 @@ private:
     if (printImportedAlias(alias, optionalKind))
       return;
 
-    visitPart(alias->getUnderlyingTypeLoc().getType(), optionalKind);
+    visitPart(aliasTy->getSinglyDesugaredType(), optionalKind);
   }
 
   void maybePrintTagKeyword(const TypeDecl *NTD) {
@@ -1839,8 +1834,7 @@ private:
     assert(decl && "can't print canonicalized GenericTypeParamType");
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
-      const ClassDecl *extendedClass =
-          extension->getAsClassOrClassExtensionContext();
+      const ClassDecl *extendedClass = extension->getSelfClassDecl();
       assert(extendedClass->isGeneric());
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
@@ -1995,7 +1989,10 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   }
 
   void visitNameAliasType(NameAliasType *aliasTy) {
-    Callback(*this, aliasTy->getDecl());
+    if (aliasTy->getDecl()->hasClangNode())
+      Callback(*this, aliasTy->getDecl());
+    else
+      visit(aliasTy->getSinglyDesugaredType());
   }
 
   void visitParenType(ParenType *parenTy) {
@@ -2314,9 +2311,8 @@ public:
         } else if (auto PD = dyn_cast<ProtocolDecl>(TD)) {
           forwardDeclare(PD);
         } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
-          (void)addImport(TD);
-          // Just in case, make sure the underlying type is visible too.
-          finder.visit(TAD->getUnderlyingTypeLoc().getType());
+          if (TAD->hasClangNode())
+            (void)addImport(TD);
         } else if (addImport(TD)) {
           return;
         } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
@@ -2406,7 +2402,7 @@ public:
   bool writeExtension(const ExtensionDecl *ED) {
     bool allRequirementsSatisfied = true;
 
-    const ClassDecl *CD = ED->getAsClassOrClassExtensionContext();
+    const ClassDecl *CD = ED->getSelfClassDecl();
     allRequirementsSatisfied &= require(CD);
     for (auto proto : ED->getLocalProtocols())
       if (printer.shouldInclude(proto))
@@ -2768,7 +2764,7 @@ public:
         return !printer.shouldInclude(VD);
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-        auto baseClass = ED->getAsClassOrClassExtensionContext();
+        auto baseClass = ED->getSelfClassDecl();
         return !baseClass || !printer.shouldInclude(baseClass) ||
                baseClass->isForeign();
       }
@@ -2792,7 +2788,7 @@ public:
           return VD->getBaseName().userFacingName();
 
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-          auto baseClass = ED->getAsClassOrClassExtensionContext();
+          auto baseClass = ED->getSelfClassDecl();
           return baseClass->getName().str();
         }
         llvm_unreachable("unknown top-level ObjC decl");

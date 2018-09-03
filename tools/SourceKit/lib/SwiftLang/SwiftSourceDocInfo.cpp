@@ -387,7 +387,7 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
   if (!VD->getDeclContext()->isTypeContext())
     return Type();
 
-  return Ty->getRValueType()->getRValueInstanceType();
+  return Ty->getRValueType()->getInOutObjectType()->getMetatypeInstanceType();
 }
 
 static void printAnnotatedDeclaration(const ValueDecl *VD,
@@ -479,7 +479,7 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   }
 
   // Now provide the results along with whether the name is duplicate or not.
-  ValueDecl *OriginalBase = VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  ValueDecl *OriginalBase = VD->getDeclContext()->getSelfNominalTypeDecl();
   for (auto Related : RelatedDecls) {
     ValueDecl *RelatedVD = Related.getValueDecl();
     bool SameBase = Related.getBaseDecl() && Related.getBaseDecl() == OriginalBase;
@@ -684,8 +684,7 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
   if (Loc.isInvalid())
     return None;
   auto &SM = VD->getASTContext().SourceMgr;
-  return SM.getLocOffsetInBuffer(Loc, SM.getIDForBufferIdentifier(SM.
-    getBufferIdentifierForLoc(Loc)).getValue());
+  return SM.getLocOffsetInBuffer(Loc, SM.findBufferContainingLoc(Loc));
 }
 
 /// Returns true for failure to resolve.
@@ -873,7 +872,8 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   auto ClangNode = VD->getClangNode();
   if (ClangNode) {
     auto ClangMod = Importer->getClangOwningModule(ClangNode);
-    ModuleName = ClangMod->getFullModuleName();
+    if (ClangMod)
+      ModuleName = ClangMod->getFullModuleName();
   } else if (VD->getLoc().isInvalid() && VD->getModuleContext() != MainModule) {
     ModuleName = VD->getModuleContext()->getName().str();
   }

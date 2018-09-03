@@ -882,10 +882,16 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         // mutating method, we model that as an escape of self.  If an
         // individual sub-member is passed as inout, then we model that as an
         // inout use.
-        auto Kind = DIUseKind::InOutUse;
+        DIUseKind Kind;
         if (TheMemory.isStructInitSelf() &&
-            getAccessedPointer(Pointer) == TheMemory.getAddress())
+            getAccessedPointer(Pointer) == TheMemory.getAddress()) {
           Kind = DIUseKind::Escape;
+        } else if (Apply.hasSelfArgument() &&
+                   Op == &Apply.getSelfArgumentOperand()) {
+          Kind = DIUseKind::InOutSelfArgument;
+        } else {
+          Kind = DIUseKind::InOutArgument;
+        }
 
         addElementUses(BaseEltNo, PointeeType, User, Kind);
         continue;
@@ -896,7 +902,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     if (isa<AddressToPointerInst>(User) && TreatAddressToPointerAsInout) {
       // address_to_pointer is a mutable escape, which we model as an inout use.
-      addElementUses(BaseEltNo, PointeeType, User, DIUseKind::InOutUse);
+      addElementUses(BaseEltNo, PointeeType, User,
+                     DIUseKind::InOutArgument);
       continue;
     }
 
@@ -932,12 +939,23 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // open_existential_addr is a use of the protocol value,
-    // so it is modeled as a load.
-    if (isa<OpenExistentialAddrInst>(User)) {
-      trackUse(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
-      // TODO: Is it safe to ignore all uses of the open_existential_addr?
-      continue;
+    // open_existential_addr is either a load or a modification depending on
+    // how it's marked.  Note that the difference is just about immutability
+    // checking rather than checking initialization before use.
+    if (auto open = dyn_cast<OpenExistentialAddrInst>(User)) {
+      // TODO: Is it reasonable to just honor the marking, or should we look
+      // at all the uses of the open_existential_addr in case one they're
+      // all really just loads?
+      switch (open->getAccessKind()) {
+      case OpenedExistentialAccess::Immutable:
+        trackUse(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
+        continue;
+
+      case OpenedExistentialAccess::Mutable:
+        trackUse(DIMemoryUse(User, DIUseKind::InOutArgument, BaseEltNo, 1));
+        continue;
+      }
+      llvm_unreachable("bad access kind");
     }
 
     // unchecked_take_enum_data_addr takes the address of the payload of an

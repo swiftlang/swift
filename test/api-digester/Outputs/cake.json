@@ -121,6 +121,7 @@
       "usr": "s:4cake2C0C",
       "location": "",
       "moduleName": "cake",
+      "genericSig": "<T1, T2, T3>",
       "children": [
         {
           "kind": "Constructor",
@@ -130,6 +131,7 @@
           "usr": "s:4cake2C0CACyxq_q0_Gycfc",
           "location": "",
           "moduleName": "cake",
+          "genericSig": "<T1, T2, T3>",
           "children": [
             {
               "kind": "TypeNominal",
@@ -164,11 +166,7 @@
           "usr": "s:4cake2C0CA2A2S1VRszAERs_AERs0_rlE17conditionalFooExtyyF",
           "location": "",
           "moduleName": "cake",
-          "parentExtensionReqs": [
-            "T1 == cake.S1",
-            "T2 == cake.S1",
-            "T3 == cake.S1"
-          ],
+          "genericSig": "<T1, T2, T3 where T1 == S1, T2 == S1, T3 == S1>",
           "children": [
             {
               "kind": "TypeNominal",
@@ -185,7 +183,7 @@
           "usr": "s:4cake2C0C19unconditionalFooExtyyF",
           "location": "",
           "moduleName": "cake",
-          "parentExtensionReqs": [],
+          "genericSig": "<T1, T2, T3>",
           "children": [
             {
               "kind": "TypeNominal",
@@ -709,8 +707,8 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
-        "Decodable",
         "Encodable",
+        "Decodable",
         "Hashable",
         "Equatable",
         "_HasCustomAnyHashableRepresentation",
@@ -731,7 +729,6 @@
           "usr": "s:Si4cakeE3fooyyF",
           "location": "",
           "moduleName": "cake",
-          "parentExtensionReqs": [],
           "children": [
             {
               "kind": "TypeNominal",

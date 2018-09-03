@@ -465,7 +465,7 @@ void swift::findClosuresForFunctionValue(
     // This should be done before calling findClosureStoredIntoBlock.
     if (auto *arg = dyn_cast<SILPHIArgument>(V)) {
       SmallVector<std::pair<SILBasicBlock *, SILValue>, 2> blockArgs;
-      arg->getIncomingValues(blockArgs);
+      arg->getIncomingPhiValues(blockArgs);
       for (auto &blockAndArg : blockArgs)
         worklistInsert(blockAndArg.second);
 

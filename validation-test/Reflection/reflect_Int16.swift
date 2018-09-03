@@ -1,9 +1,17 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_Int16
 // RUN: %target-codesign %t/reflect_Int16
-// RUN: %target-run %target-swift-reflection-test %t/reflect_Int16 2>&1 | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+
+// Link %target-swift-reflection-test into %t to convince %target-run to copy
+// it.
+// RUN: ln -s %target-swift-reflection-test %t/swift-reflection-test
+// RUN: %target-run %t/swift-reflection-test %t/reflect_Int16 | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+
+// FIXME: Handle different forms of %target-run more robustly
+// REQUIRES: OS=macosx
 
 import SwiftReflectionTest
 

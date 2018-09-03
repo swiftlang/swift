@@ -786,7 +786,8 @@ static bool hasNonCanonicalSelfProtocolRequirement(
 
 /// Retrieve the best requirement source from the list
 static const RequirementSource *
-getBestRequirementSource(ArrayRef<GSBConstraint<ProtocolDecl *>> constraints) {
+getBestRequirementSource(GenericSignatureBuilder &builder,
+                         ArrayRef<GSBConstraint<ProtocolDecl *>> constraints) {
   const RequirementSource *bestSource = nullptr;
   bool bestIsNonCanonical = false;
 
@@ -801,6 +802,16 @@ getBestRequirementSource(ArrayRef<GSBConstraint<ProtocolDecl *>> constraints) {
 
   for (const auto &constraint : constraints) {
     auto source = constraint.source;
+
+    // Skip self-recursive sources.
+    bool derivedViaConcrete = false;
+    if (source->getMinimalConformanceSource(
+                                        builder,
+                                        constraint.getSubjectDependentType({ }),
+                                        constraint.value,
+                                        derivedViaConcrete)
+          != source)
+      continue;
 
     // If there is a non-canonical protocol requirement next to the root,
     // skip this requirement source.
@@ -817,9 +828,148 @@ getBestRequirementSource(ArrayRef<GSBConstraint<ProtocolDecl *>> constraints) {
   return bestSource;
 }
 
-ConformanceAccessPath GenericSignature::getConformanceAccessPath(
-                                                       Type type,
-                                                       ProtocolDecl *protocol) {
+void GenericSignature::buildConformanceAccessPath(
+    SmallVectorImpl<ConformanceAccessPath::Entry> &path,
+    ArrayRef<Requirement> reqs, const void *opaqueSource,
+    ProtocolDecl *conformingProto, Type rootType,
+    ProtocolDecl *requirementSignatureProto) {
+  auto *source = reinterpret_cast<const RequirementSource *>(opaqueSource);
+  // Each protocol requirement is a step along the path.
+  if (source->isProtocolRequirement()) {
+    // If we're expanding for a protocol that had no requirement signature
+    // and have hit the penultimate step, this is the last step
+    // that would occur in the requirement signature.
+    Optional<GenericSignatureBuilder> replacementBuilder;
+    if (!source->parent->parent && requirementSignatureProto) {
+      // If we have a requirement signature now, we're done.
+      if (source->usesRequirementSignature) {
+        Type subjectType = source->getStoredType()->getCanonicalType();
+        path.push_back({subjectType, conformingProto});
+        return;
+      }
+
+      // The generic signature builder we're using for this protocol
+      // wasn't built from its own requirement signature, so we can't
+      // trust it. Make sure we have a requirement signature, then build
+      // a new generic signature builder.
+      // FIXME: It would be better if we could replace the canonical generic
+      // signature builder with the rebuilt one.
+      if (!requirementSignatureProto->isRequirementSignatureComputed())
+        requirementSignatureProto->computeRequirementSignature();
+      assert(requirementSignatureProto->isRequirementSignatureComputed());
+
+      replacementBuilder.emplace(getASTContext());
+      replacementBuilder->addGenericSignature(
+                          requirementSignatureProto->getGenericSignature());
+      replacementBuilder->processDelayedRequirements();
+    }
+
+    // Follow the rest of the path to derive the conformance into which
+    // this particular protocol requirement step would look.
+    auto inProtocol = source->getProtocolDecl();
+    buildConformanceAccessPath(path, reqs, source->parent, inProtocol, rootType,
+                               requirementSignatureProto);
+    assert(path.back().second == inProtocol &&
+           "path produces incorrect conformance");
+
+    // If this step was computed via the requirement signature, add it
+    // directly.
+    if (source->usesRequirementSignature) {
+      // Add this step along the path, which involves looking for the
+      // conformance we want (\c conformingProto) within the protocol
+      // described by this source.
+
+      // Canonicalize the subject type within the protocol's generic
+      // signature.
+      Type subjectType = source->getStoredType();
+      subjectType = inProtocol->getGenericSignature()
+        ->getCanonicalTypeInContext(subjectType);
+
+      assert(hasConformanceInSignature(inProtocol->getRequirementSignature(),
+                                       subjectType, conformingProto) &&
+             "missing explicit conformance in requirement signature");
+
+      // Record this step.
+      path.push_back({subjectType, conformingProto});
+      return;
+    }
+
+    // Get the generic signature builder for the protocol.
+    // Get a generic signature for the protocol's signature.
+    auto inProtoSig = inProtocol->getGenericSignature();
+    auto &inProtoSigBuilder =
+        replacementBuilder ? *replacementBuilder
+                           : *inProtoSig->getGenericSignatureBuilder();
+
+    // Retrieve the stored type, but erase all of the specific associated
+    // type declarations; we don't want any details of the enclosing context
+    // to sneak in here.
+    Type storedType = eraseAssociatedTypes(source->getStoredType());
+
+    // Dig out the potential archetype for this stored type.
+    auto equivClass =
+      inProtoSigBuilder.resolveEquivalenceClass(
+                               storedType,
+                               ArchetypeResolutionKind::CompleteWellFormed);
+
+    // Find the conformance of this potential archetype to the protocol in
+    // question.
+    auto conforms = equivClass->conformsTo.find(conformingProto);
+    assert(conforms != equivClass->conformsTo.end());
+
+    // Compute the root type, canonicalizing it w.r.t. the protocol context.
+    auto conformsSource = getBestRequirementSource(inProtoSigBuilder,
+                                                   conforms->second);
+    assert(conformsSource != source || !requirementSignatureProto);
+    Type localRootType = conformsSource->getRootType();
+    localRootType = inProtoSig->getCanonicalTypeInContext(localRootType);
+
+    // Build the path according to the requirement signature.
+    buildConformanceAccessPath(path, inProtocol->getRequirementSignature(),
+                               conformsSource, conformingProto, localRootType,
+                               inProtocol);
+
+    // We're done.
+    return;
+  }
+
+  // If we have a superclass or concrete requirement, the conformance
+  // we need is stored in it.
+  if (source->kind == RequirementSource::Superclass ||
+      source->kind == RequirementSource::Concrete) {
+    auto conformance = source->getProtocolConformance();
+    (void)conformance;
+    assert(conformance.getRequirement() == conformingProto);
+    path.push_back({source->getAffectedType(), conformingProto});
+    return;
+  }
+
+  // If we still have a parent, keep going.
+  if (source->parent) {
+    buildConformanceAccessPath(path, reqs, source->parent, conformingProto,
+                               rootType, requirementSignatureProto);
+    return;
+  }
+
+  // We are at an explicit or inferred requirement.
+  assert(source->kind == RequirementSource::Explicit ||
+         source->kind == RequirementSource::Inferred);
+
+  // Skip trivial path elements. These occur when querying a requirement
+  // signature.
+  if (!path.empty() && conformingProto == path.back().second &&
+      rootType->isEqual(conformingProto->getSelfInterfaceType()))
+    return;
+
+  assert(hasConformanceInSignature(reqs, rootType, conformingProto) &&
+         "missing explicit conformance in signature");
+
+  // Add the root of the path, which starts at this explicit requirement.
+  path.push_back({rootType, conformingProto});
+}
+
+ConformanceAccessPath
+GenericSignature::getConformanceAccessPath(Type type, ProtocolDecl *protocol) {
   assert(type->isTypeParameter() && "not a type parameter");
 
   // Resolve this type to a potential archetype.
@@ -829,163 +979,28 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
                                   type,
                                   ArchetypeResolutionKind::CompleteWellFormed);
 
+  auto cached = equivClass->conformanceAccessPathCache.find(protocol);
+  if (cached != equivClass->conformanceAccessPathCache.end())
+    return cached->second;
+
   // Dig out the conformance of this type to the given protocol, because we
   // want its requirement source.
   auto conforms = equivClass->conformsTo.find(protocol);
   assert(conforms != equivClass->conformsTo.end());
 
-  // Follow the requirement source to form the conformance access path.
-  typedef GenericSignatureBuilder::RequirementSource RequirementSource;
-  ConformanceAccessPath path;
-
-  // Local function to construct the conformance access path from the
-  // requirement.
-  std::function<void(ArrayRef<Requirement>, const RequirementSource *,
-                     ProtocolDecl *, Type, ProtocolDecl *)> buildPath;
-  buildPath = [&](ArrayRef<Requirement> reqs, const RequirementSource *source,
-                  ProtocolDecl *conformingProto, Type rootType,
-                  ProtocolDecl *requirementSignatureProto) {
-    // Each protocol requirement is a step along the path.
-    if (source->isProtocolRequirement()) {
-      // If we're expanding for a protocol that had no requirement signature
-      // and have hit the penultimate step, this is the last step
-      // that would occur in the requirement signature.
-      Optional<GenericSignatureBuilder> replacementBuilder;
-      if (!source->parent->parent && requirementSignatureProto) {
-        // If we have a requirement signature now, we're done.
-        if (source->usesRequirementSignature) {
-          Type subjectType = source->getStoredType()->getCanonicalType();
-          path.path.push_back({subjectType, conformingProto});
-          return;
-        }
-
-        // The generic signature builder we're using for this protocol
-        // wasn't built from its own requirement signature, so we can't
-        // trust it. Make sure we have a requirement signature, then build
-        // a new generic signature builder.
-        // FIXME: It would be better if we could replace the canonical generic
-        // signature builder with the rebuilt one.
-        if (!requirementSignatureProto->isRequirementSignatureComputed())
-          requirementSignatureProto->computeRequirementSignature();
-        assert(requirementSignatureProto->isRequirementSignatureComputed());
-
-        replacementBuilder.emplace(getASTContext());
-        replacementBuilder->addGenericSignature(
-                            requirementSignatureProto->getGenericSignature());
-        replacementBuilder->processDelayedRequirements();
-      }
-
-      // Follow the rest of the path to derive the conformance into which
-      // this particular protocol requirement step would look.
-      auto inProtocol = source->getProtocolDecl();
-      buildPath(reqs, source->parent, inProtocol, rootType,
-                requirementSignatureProto);
-      assert(path.path.back().second == inProtocol &&
-             "path produces incorrect conformance");
-
-      // If this step was computed via the requirement signature, add it
-      // directly.
-      if (source->usesRequirementSignature) {
-        // Add this step along the path, which involves looking for the
-        // conformance we want (\c conformingProto) within the protocol
-        // described by this source.
-
-        // Canonicalize the subject type within the protocol's generic
-        // signature.
-        Type subjectType = source->getStoredType();
-        subjectType = inProtocol->getGenericSignature()
-          ->getCanonicalTypeInContext(subjectType);
-
-        assert(hasConformanceInSignature(inProtocol->getRequirementSignature(),
-                                         subjectType, conformingProto) &&
-               "missing explicit conformance in requirement signature");
-
-        // Record this step.
-        path.path.push_back({subjectType, conformingProto});
-        return;
-      }
-
-      // Get the generic signature builder for the protocol.
-      // Get a generic signature for the protocol's signature.
-      auto inProtoSig = inProtocol->getGenericSignature();
-      auto &inProtoSigBuilder =
-          replacementBuilder ? *replacementBuilder
-                             : *inProtoSig->getGenericSignatureBuilder();
-
-      // Retrieve the stored type, but erase all of the specific associated
-      // type declarations; we don't want any details of the enclosing context
-      // to sneak in here.
-      Type storedType = eraseAssociatedTypes(source->getStoredType());
-
-      // Dig out the potential archetype for this stored type.
-      auto equivClass =
-        inProtoSigBuilder.resolveEquivalenceClass(
-                                 storedType,
-                                 ArchetypeResolutionKind::CompleteWellFormed);
-
-      // Find the conformance of this potential archetype to the protocol in
-      // question.
-      auto conforms = equivClass->conformsTo.find(conformingProto);
-      assert(conforms != equivClass->conformsTo.end());
-
-      // Compute the root type, canonicalizing it w.r.t. the protocol context.
-      auto conformsSource = getBestRequirementSource(conforms->second);
-      assert(conformsSource != source || !requirementSignatureProto);
-      Type localRootType = conformsSource->getRootType();
-      localRootType = inProtoSig->getCanonicalTypeInContext(localRootType);
-
-      // Build the path according to the requirement signature.
-      buildPath(inProtocol->getRequirementSignature(), conformsSource,
-                conformingProto, localRootType, inProtocol);
-
-      // We're done.
-      return;
-    }
-
-    // If we have a superclass or concrete requirement, the conformance
-    // we need is stored in it.
-    if (source->kind == RequirementSource::Superclass ||
-        source->kind == RequirementSource::Concrete) {
-      auto conformance = source->getProtocolConformance();
-      (void)conformance;
-      assert(conformance.getRequirement() == conformingProto);
-      path.path.push_back({source->getAffectedType(), conformingProto});
-      return;
-    }
-
-    // If we still have a parent, keep going.
-    if (source->parent) {
-      buildPath(reqs, source->parent, conformingProto, rootType,
-                requirementSignatureProto);
-      return;
-    }
-
-    // We are at an explicit or inferred requirement.
-    assert(source->kind == RequirementSource::Explicit ||
-           source->kind == RequirementSource::Inferred);
-
-    // Skip trivial path elements. These occur when querying a requirement
-    // signature.
-    if (!path.path.empty() && conformingProto == path.path.back().second &&
-        rootType->isEqual(conformingProto->getSelfInterfaceType()))
-      return;
-
-    assert(hasConformanceInSignature(reqs, rootType, conformingProto) &&
-           "missing explicit conformance in signature");
-
-    // Add the root of the path, which starts at this explicit requirement.
-    path.path.push_back({rootType, conformingProto});
-  };
-
   // Canonicalize the root type.
-  auto source = getBestRequirementSource(conforms->second);
+  auto source = getBestRequirementSource(builder, conforms->second);
   Type rootType = source->getRootType()->getCanonicalType(this);
 
   // Build the path.
-  buildPath(getRequirements(), source, protocol, rootType, nullptr);
+  SmallVector<ConformanceAccessPath::Entry, 2> path;
+  buildConformanceAccessPath(path, getRequirements(), source, protocol,
+                             rootType, nullptr);
 
   // Return the path; we're done!
-  return path;
+  ConformanceAccessPath result(getASTContext().AllocateCopy(path));
+  equivClass->conformanceAccessPathCache.insert({protocol, result});
+  return result;
 }
 
 unsigned GenericParamKey::findIndexIn(

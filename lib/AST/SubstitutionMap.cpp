@@ -437,20 +437,44 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
                                        LookupConformanceFn conformances) const {
   if (empty()) return SubstitutionMap();
 
-  return get(
-    getGenericSignature(),
-    [&](SubstitutableType *type) {
-      return Type(type).subst(*this, SubstFlags::UseErrorType)
-               .subst(subs, conformances, SubstFlags::UseErrorType);
-    },
-    [&](CanType dependentType, Type replacementType,
-        ProtocolDecl *proto) ->Optional<ProtocolConformanceRef> {
-      auto conformance =
-        lookupConformance(dependentType, proto)
-          .getValueOr(ProtocolConformanceRef::forInvalid());
-      auto substType = dependentType.subst(*this, SubstFlags::UseErrorType);
-      return conformance.subst(substType, subs, conformances);
-    });
+  SmallVector<Type, 4> newSubs;
+  for (Type type : getReplacementTypes()) {
+    if (!type) {
+      // Non-canonical parameter.
+      newSubs.push_back(Type());
+      continue;
+    }
+    newSubs.push_back(type.subst(subs, conformances, SubstFlags::UseErrorType));
+  }
+
+  SmallVector<ProtocolConformanceRef, 4> newConformances;
+  auto oldConformances = getConformances();
+
+  auto *genericSig = getGenericSignature();
+  for (const auto &req : genericSig->getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance) continue;
+
+    auto conformance = oldConformances[0];
+
+    // Fast path for concrete case -- we don't need to compute substType
+    // at all.
+    if (conformance.isConcrete()) {
+      newConformances.push_back(
+        ProtocolConformanceRef(
+          conformance.getConcrete()->subst(subs, conformances)));
+    } else {
+      auto origType = req.getFirstType();
+      auto substType = origType.subst(*this, SubstFlags::UseErrorType);
+
+      newConformances.push_back(
+        conformance.subst(substType, subs, conformances));
+    }
+
+    oldConformances = oldConformances.slice(1);
+  }
+
+  assert(oldConformances.empty());
+  return SubstitutionMap(genericSig, newSubs, newConformances);
 }
 
 SubstitutionMap
@@ -484,10 +508,8 @@ SubstitutionMap
 SubstitutionMap::getOverrideSubstitutions(const ValueDecl *baseDecl,
                                           const ValueDecl *derivedDecl,
                                           Optional<SubstitutionMap> derivedSubs) {
-  auto *baseClass = baseDecl->getDeclContext()
-      ->getAsClassOrClassExtensionContext();
-  auto *derivedClass = derivedDecl->getDeclContext()
-      ->getAsClassOrClassExtensionContext();
+  auto *baseClass = baseDecl->getDeclContext()->getSelfClassDecl();
+  auto *derivedClass = derivedDecl->getDeclContext()->getSelfClassDecl();
 
   auto *baseSig = baseDecl->getInnermostDeclContext()
       ->getGenericSignatureOfContext();

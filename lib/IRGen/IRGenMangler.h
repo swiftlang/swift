@@ -35,6 +35,36 @@ class IRGenMangler : public Mangle::ASTMangler {
 public:
   IRGenMangler() { }
 
+  std::string mangleDispatchThunk(const FuncDecl *func) {
+    beginMangling();
+    appendEntity(func);
+    appendOperator("Tj");
+    return finalize();
+  }
+
+  std::string mangleConstructorDispatchThunk(const ConstructorDecl *ctor,
+                                             bool isAllocating) {
+    beginMangling();
+    appendConstructorEntity(ctor, isAllocating);
+    appendOperator("Tj");
+    return finalize();
+  }
+
+  std::string mangleMethodDescriptor(const FuncDecl *func) {
+    beginMangling();
+    appendEntity(func);
+    appendOperator("Tq");
+    return finalize();
+  }
+
+  std::string mangleConstructorMethodDescriptor(const ConstructorDecl *ctor,
+                                                bool isAllocating) {
+    beginMangling();
+    appendConstructorEntity(ctor, isAllocating);
+    appendOperator("Tq");
+    return finalize();
+  }
+
   std::string mangleValueWitness(Type type, ValueWitness witness);
 
   std::string mangleValueWitnessTable(Type type) {
@@ -82,7 +112,7 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mi");
   }
 
-  std::string mangleTypeMetadataInPlaceInitializationCache(
+  std::string mangleTypeMetadataSingletonInitializationCache(
                                                   const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Ml");
   }

@@ -80,6 +80,12 @@ DRIVER_STATISTIC(ChildrenMaxRSS)
 /// EXIT_SUCCESS.
 FRONTEND_STATISTIC(Frontend, NumProcessFailures)
 
+/// Total instructions-executed count in each frontend process.
+FRONTEND_STATISTIC(Frontend, NumInstructionsExecuted)
+
+/// Maximum number of bytes allocated via malloc.
+FRONTEND_STATISTIC(Frontend, MaxMallocUsage)
+
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)
 

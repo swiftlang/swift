@@ -1787,7 +1787,7 @@ void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
   Buffer << "Mi";
 }
 
-void Remangler::mangleTypeMetadataInPlaceInitializationCache(Node *node) {
+void Remangler::mangleTypeMetadataSingletonInitializationCache(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Ml";
 }
@@ -1885,6 +1885,11 @@ void Remangler::mangleCurryThunk(Node *node) {
 void Remangler::mangleDispatchThunk(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Tj";
+}
+
+void Remangler::mangleMethodDescriptor(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Tq";
 }
 
 void Remangler::mangleThrowsAnnotation(Node *node) {

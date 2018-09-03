@@ -526,7 +526,6 @@ SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
   for (auto *Use : Value->getUses()) {
     SILInstruction *Inst = Use->getUser();
     if (isa<RefCountingInst>(Inst) ||
-        isa<StrongPinInst>(Inst) ||
         isa<DebugValueInst>(Inst)) {
       Uses.push_back(Inst);
       continue;
@@ -601,6 +600,102 @@ SILInstruction *
 SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   // String literals concatenation optimizer.
   return tryToConcatenateStrings(AI, Builder);
+}
+
+/// This routine replaces the old witness method inst with a new one.
+void SILCombiner::replaceWitnessMethodInst(
+    WitnessMethodInst *WMI, SILBuilderContext &BuilderCtx, CanType ConcreteType,
+    const ProtocolConformanceRef ConformanceRef) {
+  SILBuilderWithScope WMIBuilder(WMI, BuilderCtx);
+  auto *NewWMI = WMIBuilder.createWitnessMethod(
+      WMI->getLoc(), ConcreteType, ConformanceRef, WMI->getMember(),
+      WMI->getType());
+  WMI->replaceAllUsesWith(NewWMI);
+  if (WMI->use_empty())
+    eraseInstFromFunction(*WMI);
+}
+
+//  This function propagates concrete type of existential self argument using
+//  ProtocolConformanceAnalysis. The concrete type of self can be a class,
+//  struct, or an enum. It replaces the witness_method instruction
+//  with one that has a concrete type, allowing other optimizations to
+//  devirtualize it later.
+SILInstruction *
+SILCombiner::propagateSoleConformingType(FullApplySite Apply,
+                                         WitnessMethodInst *WMI) {
+  // If WMI has concrete conformance, it can be optimized.
+  if (WMI->getConformance().isConcrete())
+    return nullptr;
+
+  // If the lookup type is an opened existential type,
+  // it cannot be made concrete.
+  if (!WMI->getLookupType()->isOpenedExistential())
+    return nullptr;
+
+  // If the witness method mutates self, we cannot replace self.
+  if (Apply.getOrigCalleeType()->getSelfParameter().isIndirectMutating())
+    return nullptr;
+
+  // Only applicable in whole-module compilation.
+  if (!Apply.getModule().isWholeModule())
+    return nullptr;
+
+  auto *PD = WMI->getLookupProtocol();
+
+  // Determine the sole conforming type.
+  auto *NTD = PCA->findSoleConformingType(PD);
+  if (!NTD)
+    return nullptr;
+
+  // Sole conforming class should not be open access or have any derived class.
+  ClassDecl *CD;
+  if ((CD = dyn_cast<ClassDecl>(NTD)) &&
+      (CD->getEffectiveAccess() == AccessLevel::Open ||
+       CHA->hasKnownDirectSubclasses(CD))) {
+    return nullptr;
+  }
+
+  // Create SIL type for the concrete type.
+  auto ElementType = NTD->getDeclaredType();
+  auto ConcreteType = ElementType->getCanonicalType();
+  auto &M = Builder.getModule();
+
+  /// Determine OpenedArchetypeDef and SubstituionMap.
+  ConcreteExistentialInfo CEI(Apply.getSelfArgumentOperand(), ConcreteType, PD);
+  if (!CEI.isValid())
+    return nullptr;
+
+  if (!CEI.InitExistential) {
+    // Create SIL type for the concrete type.
+    SILType ConcreteSILType = M.Types.getLoweredType(ConcreteType);
+
+    // Prepare the code by adding UncheckedCast instructions that cast opened
+    // existentials to concrete types. Set the ConcreteValue of CEI.
+    if (auto *OER = dyn_cast<OpenExistentialRefInst>(CEI.OpenedArchetypeDef)) {
+      auto *URCI =
+          Builder.createUncheckedRefCast(OER->getLoc(), OER, ConcreteSILType);
+      CEI.ConcreteValue = URCI;
+    } else if (auto *OEA =
+                   dyn_cast<OpenExistentialAddrInst>(CEI.OpenedArchetypeDef)) {
+      auto *UACI = Builder.createUncheckedAddrCast(
+          OEA->getLoc(), OEA, ConcreteSILType.getAddressType());
+      CEI.ConcreteValue = UACI;
+    } else {
+      llvm_unreachable(
+          "Unhandled Argument Type in propagateSoleConformingType");
+    }
+  }
+
+  assert(CEI.ConcreteValue);
+
+  /// Replace the old WitnessMethod with a new one that has concrete type and
+  /// conformance.
+  SILBuilderContext BuilderCtx(M, Builder.getTrackingList());
+  replaceWitnessMethodInst(WMI, BuilderCtx, ConcreteType,
+                           *(CEI.ExistentialSubs.getConformances().begin()));
+  /// Create the new apply instruction using the concrete type.
+  auto *NewAI = createApplyWithConcreteType(Apply, CEI, BuilderCtx);
+  return NewAI;
 }
 
 /// Given an Apply and an argument value produced by InitExistentialAddrInst,
@@ -712,8 +807,10 @@ SILCombiner::createApplyWithConcreteType(FullApplySite Apply,
   }
   // The apply can only be rewritten in terms of the concrete value if it is
   // legal to pass that value as the self argument.
-  if (CEI.isCopied && !canReplaceCopiedSelf(Apply, CEI.InitExistential, DA))
+  if (CEI.isCopied && (!CEI.InitExistential ||
+                       !canReplaceCopiedSelf(Apply, CEI.InitExistential, DA))) {
     return nullptr;
+  }
 
   // Create a set of arguments.
   SmallVector<SILValue, 8> NewArgs;
@@ -780,7 +877,6 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   if (WMI->getConformance().isConcrete())
     return nullptr;
 
-
   // If the lookup type is not an opened existential type,
   // it cannot be made more concrete.
   if (!WMI->getLookupType()->isOpenedExistential())
@@ -819,24 +915,10 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   // are stuck:
   // We will re-create the same instruction and re-populate the worklist
   // with it.
-  if (CEI.ConcreteType != WMI->getLookupType()
-      || SelfConformance != WMI->getConformance()) {
-    SILBuilderWithScope WMIBuilder(WMI, BuilderCtx);
-    // Keep around the dependence on the open instruction unless we've
-    // actually eliminated the use.
-    auto *NewWMI = WMIBuilder.createWitnessMethod(
-        WMI->getLoc(), CEI.ConcreteType, SelfConformance, WMI->getMember(),
-        WMI->getType());
-    // Replace only uses of the witness_method in the apply that was analyzed by
-    // ConcreteExistentialInfo.
-    MutableArrayRef<Operand> Operands =
-        Apply.getInstruction()->getAllOperands();
-    for (auto &Op : Operands) {
-      if (Op.get() == WMI)
-        Op.set(NewWMI);
-    }
-    if (WMI->use_empty())
-      eraseInstFromFunction(*WMI);
+  if (CEI.ConcreteType != WMI->getLookupType() ||
+      SelfConformance != WMI->getConformance()) {
+    replaceWitnessMethodInst(WMI, BuilderCtx, CEI.ConcreteType,
+                             SelfConformance);
   }
   // Try to rewrite the apply.
   return createApplyWithConcreteType(Apply, CEI, BuilderCtx);
@@ -1096,7 +1178,12 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
   if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
-    propagateConcreteTypeOfInitExistential(AI, WMI);
+    if (!propagateConcreteTypeOfInitExistential(AI, WMI)) {
+      if (auto *WitnessMethod = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
+        // Propagate concrete type from ProtocolConformanceAnalysis.
+        propagateSoleConformingType(AI, WitnessMethod);
+      }
+    }
     return nullptr;
   }
 
@@ -1214,10 +1301,16 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
     if (!AI->getOrigCalleeType()->isCalleeConsumed())
       return rewriteApplyCallee(AI, TTTFI->getOperand()).getInstruction();
   }
+
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
   if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
-    propagateConcreteTypeOfInitExistential(AI, WMI);
+    if (!propagateConcreteTypeOfInitExistential(AI, WMI)) {
+      if (auto *WitnessMethod = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
+        // Propagate concrete type from ProtocolConformanceAnalysis.
+        propagateSoleConformingType(AI, WitnessMethod);
+      }
+    }
     return nullptr;
   }
 

@@ -89,6 +89,7 @@
 
 #include "swift/Basic/OwnedString.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/Basic/ByteTreeSerialization.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -373,6 +374,51 @@ private:
 };
 } // namespace syntax
 
+namespace byteTree {
+
+template <>
+struct WrapperTypeTraits<syntax::TriviaKind> {
+  static uint8_t numericValue(const syntax::TriviaKind &Kind) {
+    switch (Kind) {
+% for trivia in TRIVIAS:
+  case syntax::TriviaKind::${trivia.name}: return ${trivia.serialization_code};
+% end
+    }
+  }
+
+  static void write(ByteTreeWriter &Writer, const syntax::TriviaKind &Kind,
+                    unsigned Index) {
+    Writer.write(numericValue(Kind), Index);
+  }
+};
+
+template <>
+struct ObjectTraits<syntax::TriviaPiece> {
+  static unsigned numFields(const syntax::TriviaPiece &Trivia,
+                            UserInfoMap &UserInfo) {
+    return 2;
+  }
+
+  static void write(ByteTreeWriter &Writer, const syntax::TriviaPiece &Trivia,
+                    UserInfoMap &UserInfo) {
+    Writer.write(Trivia.getKind(), /*Index=*/0);
+    // Write the trivia's text or count depending on its kind
+    switch (Trivia.getKind()) {
+% for trivia in TRIVIAS:
+    case syntax::TriviaKind::${trivia.name}:
+% if trivia.is_collection():
+      Writer.write(static_cast<uint32_t>(Trivia.getCount()), /*Index=*/1);
+% else:
+      Writer.write(Trivia.getText(), /*Index=*/1);
+% end
+      break;
+% end
+    }
+  }
+};
+
+} // end namespace byteTree
+
 namespace json {
 /// Serialization traits for TriviaPiece.
 /// - All trivia pieces will have a "kind" key that contains the serialized
@@ -454,7 +500,8 @@ struct MappingTraits<swift::syntax::TriviaPiece> {
 % else:
       StringRef text;
       in.mapRequired("value", text);
-      return swift::syntax::TriviaPiece(kind, text);
+      return swift::syntax::TriviaPiece(
+          kind, swift::OwnedString::makeRefCounted(text));
 % end
       break;
     }

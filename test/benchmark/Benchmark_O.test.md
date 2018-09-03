@@ -131,9 +131,9 @@ CONFIG: Tests to run: Ackermann, AngryPhonebook
 LOGMEMORY: #,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us),MAX_RSS(B)
 LOGVERBOSE-LABEL: Running Ackermann for 2 samples.
 LOGVERBOSE: Measuring with scale {{[0-9]+}}.
-LOGVERBOSE-NEXT: Sample 0,{{[0-9]+}}
-LOGVERBOSE-NEXT: Measuring with scale {{[0-9]+}}.
-LOGVERBOSE-NEXT: Sample 1,{{[0-9]+}}
+LOGVERBOSE: Sample 0,{{[0-9]+}}
+LOGVERBOSE: Measuring with scale {{[0-9]+}}.
+LOGVERBOSE: Sample 1,{{[0-9]+}}
 MEASUREENV: MAX_RSS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}} ({{[0-9]+}} pages)
 MEASUREENV: ICS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 MEASUREENV: VCS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
@@ -141,6 +141,17 @@ RUNJUSTONCE-LABEL: 1,Ackermann
 RUNJUSTONCE-NOT: 1,Ackermann
 LOGMEMORY: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
 LOGVERBOSE-LABEL: Running AngryPhonebook for 2 samples.
+````
+
+Verify the specified delimiter is used when logging to console. The non-verbose
+variant of this invocation is used from [`Benchmark_Driver`][BD] to get the list
+of all tests. That's why it is *crucial* to tests this integration point.
+
+````
+RUN: %Benchmark_O --list --skip-tags= --delim=$'\t' --verbose \
+RUN:              | %FileCheck %s --check-prefix LOGVERBOSEDELIM
+LOGVERBOSEDELIM: Delimiter: "\t"
+LOGVERBOSEDELIM: #	Test	[Tags]
 ````
 
 ## Error Handling

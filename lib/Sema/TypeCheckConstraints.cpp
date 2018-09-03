@@ -17,10 +17,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
-#include "GenericTypeResolver.h"
-#include "TypeChecker.h"
-#include "TypoCorrection.h"
 #include "MiscDiagnostics.h"
+#include "TypeChecker.h"
+#include "TypeCheckType.h"
+#include "TypoCorrection.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
@@ -755,8 +755,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       // conditional conformance for the type with the method in question
       // (NB. that type may not be the type associated with DC, for tested types
       // with static methods).
-      if (auto Proto = Value->getDeclContext()
-                           ->getAsProtocolOrProtocolExtensionContext()) {
+      if (auto Proto = Value->getDeclContext()->getSelfProtocolDecl()) {
         auto contextSelfType =
             BaseDC->getInnermostTypeContext()->getDeclaredInterfaceType();
         auto conformance = conformsToProtocol(
@@ -1036,7 +1035,8 @@ namespace {
 
       if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
         if (!PlaceholderE->getTypeLoc().isNull()) {
-          if (!TC.validateType(PlaceholderE->getTypeLoc(), DC))
+          if (!TC.validateType(PlaceholderE->getTypeLoc(),
+                               TypeResolution::forContextual(DC), None))
             expr->setType(PlaceholderE->getTypeLoc().getType());
         }
         return finish(true, expr);
@@ -1244,16 +1244,13 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   auto *PL = closure->getParameters();
 
   // Validate the parameters.
-  TypeResolutionOptions options;
+  TypeResolutionOptions options(TypeResolverContext::ClosureExpr);
   options |= TypeResolutionFlags::AllowUnspecifiedTypes;
   options |= TypeResolutionFlags::AllowUnboundGenerics;
-  options |= TypeResolutionFlags::InExpression;
-
   bool hadParameterError = false;
 
-  GenericTypeToArchetypeResolver resolver(closure);
-
-  if (TC.typeCheckParameterList(PL, DC, options, resolver)) {
+  auto resolution = TypeResolution::forContextual(closure);
+  if (TC.typeCheckParameterList(PL, resolution, options)) {
     // If we encounter an error validating the parameter list, don't bail.
     // Instead, go on to validate any potential result type, and bail
     // afterwards.  This allows for better diagnostics, and keeps the
@@ -1263,8 +1260,8 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
-      TC.validateType(closure->getExplicitResultTypeLoc(), DC,
-                      TypeResolutionFlags::InExpression, &resolver)) {
+      TC.validateType(closure->getExplicitResultTypeLoc(), resolution,
+                      TypeResolverContext::InExpression)) {
     return false;
   }
 
@@ -1346,10 +1343,11 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     // Resolve the TypeRepr to get the base type for the lookup.
     // Disable availability diagnostics here, because the final
     // TypeRepr will be resolved again when generating constraints.
-    TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
-    options |= TypeResolutionFlags::InExpression;
+    TypeResolutionOptions options(TypeResolverContext::InExpression);
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
     options |= TypeResolutionFlags::AllowUnavailable;
-    auto BaseTy = TC.resolveType(InnerTypeRepr, DC, options);
+    auto resolution = TypeResolution::forContextual(DC);
+    auto BaseTy = resolution.resolveType(InnerTypeRepr, options);
 
     if (BaseTy && BaseTy->mayHaveMembers()) {
       auto lookupOptions = defaultMemberLookupOptions;
@@ -1863,10 +1861,10 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   if (typeExpr->getTypeLoc().wasValidated()) {
     type = typeExpr->getTypeLoc().getType();
   } else if (auto *rep = typeExpr->getTypeRepr()) {
-    TypeResolutionOptions options;
+    TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-    options |= TypeResolutionFlags::InExpression;
-    type = TC.resolveType(rep, DC, options);
+    auto resolution = TypeResolution::forContextual(DC);
+    type = resolution.resolveType(rep, options);
     typeExpr->getTypeLoc().setType(type);
   }
 
@@ -2245,7 +2243,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (CS.solve(expr, viable, FreeTypeVariableBinding::UnresolvedType))
+  if (CS.solve(expr, viable, FreeTypeVariableBinding::Disallow))
     return true;
 
   auto &solution = viable[0];
@@ -2258,12 +2256,6 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   auto &solutionCS = solution.getConstraintSystem();
   expr->setType(solution.simplifyType(solutionCS.getType(expr)));
   auto completionType = solution.simplifyType(solutionCS.getType(CCE));
-
-  // If completion expression is unresolved it doesn't provide
-  // any meaningful information so shouldn't be in the results.
-  if (completionType->is<UnresolvedType>())
-    return true;
-
   CCE->setType(completionType);
   return false;
 }
@@ -2422,11 +2414,11 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   assert(!listener.isInOut());
 
   if (resultTy) {
-    TypeResolutionOptions options = TypeResolutionFlags::OverrideType;
-    options |= TypeResolutionFlags::InExpression;
-    if (isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())) {
-      options |= TypeResolutionFlags::EditorPlaceholder;
-    }
+    TypeResolutionOptions options =
+        isa<EditorPlaceholderExpr>(initializer->getSemanticsProvidingExpr())
+        ? TypeResolverContext::EditorPlaceholderExpr
+        : TypeResolverContext::InExpression;
+    options |= TypeResolutionFlags::OverrideType;
 
     // FIXME: initTy should be the same as resultTy; now that typeCheckExpression()
     // returns a Type and not bool, we should be able to simplify the listener
@@ -2436,8 +2428,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       return true;
 
     // Apply the solution to the pattern as well.
-    if (coercePatternToType(pattern, DC, initTy, options,
-                            nullptr, TypeLoc())) {
+    if (coercePatternToType(pattern, TypeResolution::forContextual(DC), initTy,
+                            options, TypeLoc())) {
       return true;
     }
   }
@@ -2652,10 +2644,10 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       // Apply the solution to the iteration pattern as well.
       Pattern *pattern = Stmt->getPattern();
-      TypeResolutionOptions options = TypeResolutionFlags::OverrideType;
-      options |= TypeResolutionFlags::EnumerationVariable;
-      options |= TypeResolutionFlags::InExpression;
-      if (tc.coercePatternToType(pattern, cs.DC, InitType, options)) {
+      TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
+      options |= TypeResolutionFlags::OverrideType;
+      if (tc.coercePatternToType(pattern, TypeResolution::forContextual(cs.DC),
+                                 InitType, options)) {
         return nullptr;
       }
 
@@ -2674,59 +2666,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   // Type-check the for-each loop sequence and element pattern.
   auto resultTy = typeCheckExpression(seq, dc, &listener);
   return !resultTy;
-}
-
-/// \brief Compute the rvalue type of the given expression, which is the
-/// destination of an assignment statement.
-Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
-  if (auto *TE = dyn_cast<TupleExpr>(dest)) {
-    auto &ctx = getASTContext();
-    SmallVector<TupleTypeElt, 4> destTupleTypes;
-    for (unsigned i = 0; i != TE->getNumElements(); ++i) {
-      Expr *subExpr = TE->getElement(i);
-      Type elemTy = computeAssignDestType(subExpr, equalLoc);
-      if (!elemTy)
-        return Type();
-      destTupleTypes.push_back(TupleTypeElt(elemTy, TE->getElementName(i)));
-    }
-
-    return TupleType::get(destTupleTypes, ctx);
-  }
-
-  Type destTy = simplifyType(getType(dest));
-  if (destTy->hasError())
-    return Type();
-
-  // If we have already resolved a concrete lvalue destination type, return it.
-  if (LValueType *destLV = destTy->getAs<LValueType>())
-    return destLV->getObjectType();
-
-  // If the destination is a type variable, the type variable must be an
-  // lvalue type, which we enforce via an equality relationship with
-  // @lvalue T, where T is a fresh type variable that will be the object type of
-  // this particular expression type.
-  if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
-    // Newly allocated type should be explicitly materializable,
-    // it's invalid to use non-materializable types as assignment destination.
-    auto objectTv = createTypeVariable(getConstraintLocator(dest));
-    auto refTv = LValueType::get(objectTv);
-    addConstraint(ConstraintKind::Bind, typeVar, refTv,
-                  getConstraintLocator(dest));
-    return objectTv;
-  }
-
-  // Otherwise, the destination is erroneous.  If there are FixIt hints
-  // introduced into the system, they may well be the reason that this isn't an
-  // lvalue.  Emit them if present.
-  if (!Fixes.empty()) {
-    auto solution = finalize(FreeTypeVariableBinding::Allow);
-    if (applySolutionFixes(dest, solution))
-      return Type();
-  }
-
-  // Otherwise, it is a structural problem, diagnose that.
-  diagnoseAssignmentFailure(dest, destTy, equalLoc);
-  return Type();
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
@@ -2823,7 +2762,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
 
     // Check the pattern, it allows unspecified types because the pattern can
     // provide type information.
-    TypeResolutionOptions options = TypeResolutionFlags::InExpression;
+    TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     if (typeCheckPattern(pattern, dc, options)) {
@@ -3112,7 +3051,7 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
   }
 
   // Load lvalues.
-  if (auto lvalue = exprTy->getAs<LValueType>())
+  if (exprTy->is<LValueType>())
     return addImplicitLoadExpr(expr, getType, setType);
 
   // Walk into parenthesized expressions to update the subexpression.
@@ -3355,11 +3294,9 @@ void Solution::dump(raw_ostream &out) const {
 
   if (!Fixes.empty()) {
     out << "\nFixes:\n";
-    for (auto &fix : Fixes) {
+    for (auto *fix : Fixes) {
       out.indent(2);
-      fix.first.print(out, &getConstraintSystem());
-      out << " @ ";
-      fix.second->dump(sm, out);
+      fix->print(out);
       out << "\n";
     }
   }
@@ -3552,11 +3489,9 @@ void ConstraintSystem::print(raw_ostream &out) {
 
   if (!Fixes.empty()) {
     out << "\nFixes:\n";
-    for (auto &fix : Fixes) {
+    for (auto *fix : Fixes) {
       out.indent(2);
-      fix.first.print(out, this);
-      out << " @ ";
-      fix.second->dump(&getTypeChecker().Context.SourceMgr, out);
+      fix->print(out);
       out << "\n";
     }
   }

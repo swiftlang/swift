@@ -11,8 +11,7 @@ extension Array where Element == Int {
 
   // CHECK-LABEL: sil @$SSa22constrained_extensionsSiRszlE16instancePropertySivg : $@convention(method) (@guaranteed Array<Int>) -> Int
   // CHECK-LABEL: sil @$SSa22constrained_extensionsSiRszlE16instancePropertySivs : $@convention(method) (Int, @inout Array<Int>) -> ()
-  // CHECK-LABEL: sil shared [transparent] [serialized] @$SSa22constrained_extensionsSiRszlE16instancePropertySivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Array<Int>, @thick Array<Int>.Type) -> ()
-  // CHECK-LABEL: sil [transparent] [serialized] @$SSa22constrained_extensionsSiRszlE16instancePropertySivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Array<Int>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+  // CHECK-LABEL: sil [transparent] [serialized] @$SSa22constrained_extensionsSiRszlE16instancePropertySivM : $@yield_once @convention(method) (@inout Array<Int>) -> @yields @inout Int
 
   public var instanceProperty: Element {
     get {
@@ -72,8 +71,7 @@ extension Dictionary where Key == Int {
 
   // CHECK-LABEL: sil @$SSD22constrained_extensionsSiRszrlE16instancePropertyq_vg : $@convention(method) <Key, Value where Key == Int> (@guaranteed Dictionary<Int, Value>) -> @out Value
   // CHECK-LABEL: sil @$SSD22constrained_extensionsSiRszrlE16instancePropertyq_vs : $@convention(method) <Key, Value where Key == Int> (@in Value, @inout Dictionary<Int, Value>) -> ()
-  // CHECK-LABEL: sil shared [transparent] [serialized] @$SSD22constrained_extensionsSiRszrlE16instancePropertyq_vmytfU_ : $@convention(method) <Key, Value where Key == Int> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Dictionary<Int, Value>, @thick Dictionary<Int, Value>.Type) -> ()
-  // CHECK-LABEL: sil [transparent] [serialized] @$SSD22constrained_extensionsSiRszrlE16instancePropertyq_vm : $@convention(method) <Key, Value where Key == Int> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Dictionary<Int, Value>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+  // CHECK-LABEL: sil [transparent] [serialized] @$SSD22constrained_extensionsSiRszrlE16instancePropertyq_vM : $@yield_once @convention(method) <Key, Value where Key == Int> (@inout Dictionary<Int, Value>) -> @yields @inout Value
   public var instanceProperty: Value {
     get {
       return self[0]!
@@ -138,8 +136,7 @@ public class GenericClass<X, Y> {}
 extension GenericClass where Y == () {
   // CHECK-LABEL: sil @$S22constrained_extensions12GenericClassCAAytRs_rlE5valuexvg : $@convention(method) <X, Y where Y == ()> (@guaranteed GenericClass<X, ()>) -> @out X
   // CHECK-LABEL: sil @$S22constrained_extensions12GenericClassCAAytRs_rlE5valuexvs : $@convention(method) <X, Y where Y == ()> (@in X, @guaranteed GenericClass<X, ()>) -> ()
-  // CHECK-LABEL: sil shared [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlE5valuexvmytfU_ : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed GenericClass<X, ()>, @thick GenericClass<X, ()>.Type) -> ()
-  // CHECK-LABEL: sil [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlE5valuexvm : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed GenericClass<X, ()>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+  // CHECK-LABEL: sil [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlE5valuexvM : $@yield_once @convention(method) <X, Y where Y == ()> (@guaranteed GenericClass<X, ()>) -> @yields @inout X
   public var value: X {
     get { while true {} }
     set {}
@@ -147,8 +144,7 @@ extension GenericClass where Y == () {
 
   // CHECK-LABEL: sil @$S22constrained_extensions12GenericClassCAAytRs_rlE5emptyytvg : $@convention(method) <X, Y where Y == ()> (@guaranteed GenericClass<X, ()>) -> ()
   // CHECK-LABEL: sil @$S22constrained_extensions12GenericClassCAAytRs_rlE5emptyytvs : $@convention(method) <X, Y where Y == ()> (@guaranteed GenericClass<X, ()>) -> ()
-  // CHECK-LABEL: sil shared [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlE5emptyytvmytfU_ : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed GenericClass<X, ()>, @thick GenericClass<X, ()>.Type) -> ()
-  // CHECK-LABEL: sil [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlE5emptyytvm : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed GenericClass<X, ()>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+  // CHECK-LABEL: sil [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlE5emptyytvM : $@yield_once @convention(method) <X, Y where Y == ()> (@guaranteed GenericClass<X, ()>) ->  @yields @inout ()
   public var empty: Y {
     get { return () }
     set {}
@@ -156,8 +152,7 @@ extension GenericClass where Y == () {
 
   // CHECK-LABEL: sil @$S22constrained_extensions12GenericClassCAAytRs_rlEyxyt_tcig : $@convention(method) <X, Y where Y == ()> (@guaranteed GenericClass<X, ()>) -> @out X
   // CHECK-LABEL: sil @$S22constrained_extensions12GenericClassCAAytRs_rlEyxyt_tcis : $@convention(method) <X, Y where Y == ()> (@in X, @guaranteed GenericClass<X, ()>) -> ()
-  // CHECK-LABEL: sil shared [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlEyxyt_tcimytfU_ : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed GenericClass<X, ()>, @thick GenericClass<X, ()>.Type) -> ()
-  // CHECK-LABEL: sil [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlEyxyt_tcim : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed GenericClass<X, ()>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+  // CHECK-LABEL: sil [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlEyxyt_tciM : $@yield_once @convention(method) <X, Y where Y == ()> (@guaranteed GenericClass<X, ()>) ->  @yields @inout X
   public subscript(_: Y) -> X {
     get { while true {} }
     set {}
@@ -165,8 +160,7 @@ extension GenericClass where Y == () {
 
   // CHECK-LABEL: sil @$S22constrained_extensions12GenericClassCAAytRs_rlEyyxcig : $@convention(method) <X, Y where Y == ()> (@in_guaranteed X, @guaranteed GenericClass<X, ()>) -> ()
   // CHECK-LABEL: sil @$S22constrained_extensions12GenericClassCAAytRs_rlEyyxcis : $@convention(method) <X, Y where Y == ()> (@in X, @guaranteed GenericClass<X, ()>) -> ()
-  // CHECK-LABEL: sil shared [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlEyyxcimytfU_ : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed GenericClass<X, ()>, @thick GenericClass<X, ()>.Type) -> ()
-  // CHECK-LABEL: sil [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlEyyxcim : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed X, @guaranteed GenericClass<X, ()>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+  // CHECK-LABEL: sil [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlEyyxciM : $@yield_once @convention(method) <X, Y where Y == ()> (@in_guaranteed X, @guaranteed GenericClass<X, ()>) ->  @yields @inout ()
   public subscript(_: X) -> Y {
     get { while true {} }
     set {}

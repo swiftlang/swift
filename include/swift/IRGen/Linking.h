@@ -117,6 +117,18 @@ class LinkEntity {
     /// ConstructorDecl* inside a protocol or a class.
     DispatchThunkAllocator,
 
+    /// A method descriptor.  The pointer is a FuncDecl* inside a protocol
+    /// or a class.
+    MethodDescriptor,
+
+    /// A method descriptor for an initializing constructor.  The pointer
+    /// is a ConstructorDecl* inside a class.
+    MethodDescriptorInitializer,
+
+    /// A method descriptor for an allocating constructor.  The pointer is a
+    /// ConstructorDecl* inside a protocol or a class.
+    MethodDescriptorAllocator,
+
     /// A resilient enum tag index. The pointer is a EnumElementDecl*.
     EnumCase,
 
@@ -165,7 +177,7 @@ class LinkEntity {
 
     /// The in-place initialization cache for a generic nominal type.
     /// The pointer is a NominalTypeDecl*.
-    TypeMetadataInPlaceInitializationCache,
+    TypeMetadataSingletonInitializationCache,
 
     /// The completion function for a generic or resilient nominal type.
     /// The pointer is a NominalTypeDecl*.
@@ -412,18 +424,22 @@ class LinkEntity {
 
   LinkEntity() = default;
 
-public:
-  static LinkEntity forDispatchThunk(SILDeclRef declRef) {
-    assert(!declRef.isForeign &&
-           !declRef.isDirectReference &&
-           !declRef.isCurried);
-
-    LinkEntity::Kind kind;
+  static bool isValidResilientMethodRef(SILDeclRef declRef) {
+    if (declRef.isForeign ||
+        declRef.isDirectReference ||
+        declRef.isCurried)
+      return false;
 
     auto *decl = declRef.getDecl();
-    assert(isa<ClassDecl>(decl->getDeclContext()) ||
-           isa<ProtocolDecl>(decl->getDeclContext()));
+    return (isa<ClassDecl>(decl->getDeclContext()) ||
+            isa<ProtocolDecl>(decl->getDeclContext()));
+  }
 
+public:
+  static LinkEntity forDispatchThunk(SILDeclRef declRef) {
+    assert(isValidResilientMethodRef(declRef));
+
+    LinkEntity::Kind kind;
     switch (declRef.kind) {
     case SILDeclRef::Kind::Func:
       kind = Kind::DispatchThunk;
@@ -439,7 +455,30 @@ public:
     }
 
     LinkEntity entity;
-    entity.setForDecl(kind, decl);
+    entity.setForDecl(kind, declRef.getDecl());
+    return entity;
+  }
+
+  static LinkEntity forMethodDescriptor(SILDeclRef declRef) {
+    assert(isValidResilientMethodRef(declRef));
+
+    LinkEntity::Kind kind;
+    switch (declRef.kind) {
+    case SILDeclRef::Kind::Func:
+      kind = Kind::MethodDescriptor;
+      break;
+    case SILDeclRef::Kind::Initializer:
+      kind = Kind::MethodDescriptorInitializer;
+      break;
+    case SILDeclRef::Kind::Allocator:
+      kind = Kind::MethodDescriptorAllocator;
+      break;
+    default:
+      llvm_unreachable("Bad SILDeclRef for method descriptor");
+    }
+
+    LinkEntity entity;
+    entity.setForDecl(kind, declRef.getDecl());
     return entity;
   }
 
@@ -513,10 +552,10 @@ public:
     return entity;
   }
 
-  static LinkEntity forTypeMetadataInPlaceInitializationCache(
+  static LinkEntity forTypeMetadataSingletonInitializationCache(
                                                       NominalTypeDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::TypeMetadataInPlaceInitializationCache, decl);
+    entity.setForDecl(Kind::TypeMetadataSingletonInitializationCache, decl);
     return entity;
   }
 

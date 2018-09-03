@@ -13,7 +13,10 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_EXISTENTIAL_H
 #define SWIFT_SILOPTIMIZER_UTILS_EXISTENTIAL_H
 
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 
 namespace swift {
 
@@ -86,11 +89,24 @@ struct ConcreteExistentialInfo {
   // Constructs a valid ConcreteExistentialInfo object if successfull.
   ConcreteExistentialInfo(Operand &openedUse);
 
+  // This constructor initializes a ConcreteExistentialInfo based on already
+  // known ConcreteType and ProtocolDecl pair. It determines the
+  // OpenedArchetypeDef for the ArgOperand that will be used by unchecked_cast
+  // instructions to cast OpenedArchetypeDef to ConcreteType.
+  ConcreteExistentialInfo(Operand &ArgOperand, CanType ConcreteType,
+                          ProtocolDecl *Protocol);
+
   ConcreteExistentialInfo(ConcreteExistentialInfo &) = delete;
 
+  /// For scenerios where ConcreteExistentialInfo is created using a known
+  /// ConcreteType and ProtocolDecl, both of InitExistential
+  /// and ConcreteValue can be null. So there is no need for explicit check for
+  /// not null for them instead we assert on (!InitExistential ||
+  /// ConcreteValue). 
   bool isValid() const {
-    return OpenedArchetype && OpenedArchetypeDef && InitExistential
-           && ConcreteType && !ExistentialSubs.empty() && ConcreteValue;
+    assert(!InitExistential || ConcreteValue);
+    return OpenedArchetype && OpenedArchetypeDef && ConcreteType &&
+           !ExistentialSubs.empty();
   }
 
   // Do a conformance lookup on ConcreteType with the given requirement, P. If P

@@ -169,6 +169,23 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                                           SyntaxKind::FunctionParameterList);
     }
     rightParenLoc = consumeToken(tok::r_paren);
+
+    // Per SE-0155, enum elements may not have empty parameter lists.
+    if (paramContext == ParameterContextKind::EnumElement) {
+      decltype(diag::enum_element_empty_arglist) diagnostic;
+      if (Context.isSwiftVersionAtLeast(5)) {
+        diagnostic = diag::enum_element_empty_arglist;
+      } else {
+        diagnostic = diag::enum_element_empty_arglist_swift4;
+      }
+
+      diagnose(leftParenLoc, diagnostic)
+        .highlight({leftParenLoc, rightParenLoc});
+      diagnose(leftParenLoc, diag::enum_element_empty_arglist_delete)
+        .fixItRemoveChars(leftParenLoc, rightParenLoc);
+      diagnose(leftParenLoc, diag::enum_element_empty_arglist_add_void)
+        .fixItInsert(leftParenLoc, "Void");
+    }
     return ParserStatus();
   }
 
@@ -429,6 +446,14 @@ mapParsedParameters(Parser &parser,
                                      paramNameLoc, paramName,
                                      parser.CurDeclContext);
     param->getAttrs() = paramInfo.Attrs;
+
+    auto setInvalid = [&]{
+      if (param->isInvalid())
+        return;
+      param->getTypeLoc().setInvalidType(ctx);
+      param->setInvalid();
+    };
+
     bool parsingEnumElt
       = (paramContext == Parser::ParameterContextKind::EnumElement);
     // If we're not parsing an enum case, lack of a SourceLoc for both
@@ -438,7 +463,7 @@ mapParsedParameters(Parser &parser,
     
     // If we diagnosed this parameter as a parse error, propagate to the decl.
     if (paramInfo.isInvalid)
-      param->setInvalid();
+      setInvalid();
     
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
@@ -462,8 +487,7 @@ mapParsedParameters(Parser &parser,
       if (!param->isInvalid())
         parser.diagnose(param->getLoc(), diag::missing_parameter_type);
       
-      param->getTypeLoc() = TypeLoc::withoutLoc(ErrorType::get(ctx));
-      param->setInvalid();
+      setInvalid();
     } else if (paramInfo.SpecifierLoc.isValid()) {
       StringRef specifier;
       switch (paramInfo.SpecifierKind) {
@@ -577,14 +601,6 @@ mapParsedParameters(Parser &parser,
       DefaultArgumentKind kind = getDefaultArgKind(param.DefaultArg);
       result->setDefaultArgumentKind(kind);
       result->setDefaultValue(param.DefaultArg);
-      if (kind == DefaultArgumentKind::Normal) {
-        SourceRange defaultArgRange = param.DefaultArg->getSourceRange();
-        CharSourceRange charRange =
-            Lexer::getCharSourceRangeFromSourceRange(parser.SourceMgr,
-                                                     defaultArgRange);
-        StringRef defaultArgText = parser.SourceMgr.extractText(charRange);
-        result->setDefaultValueStringRepresentation(defaultArgText);
-      }
     }
 
     elements.push_back(result);
@@ -914,7 +930,7 @@ ParserResult<Pattern> Parser::parsePattern() {
   }
     
   case tok::code_complete:
-    if (!CurDeclContext->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (!CurDeclContext->isTypeContext()) {
       // This cannot be an overridden property, so just eat the token. We cannot
       // code complete anything here -- we expect an identifier.
       consumeToken(tok::code_complete);

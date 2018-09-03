@@ -443,7 +443,10 @@ DECL_NODES = [
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
              # the body is not necessary inside a protocol definition
-             Child('Accessor', kind='AccessorBlock', is_optional=True),
+             Child('Accessor', kind='Syntax', is_optional=True,
+                   node_choices=[
+                      Child('Accessors', kind='AccessorBlock'),
+                      Child('Getter', kind='CodeBlock')]),
          ]),
 
     # access-level-modifier -> 'private' | 'private' '(' 'set' ')'
@@ -502,10 +505,9 @@ DECL_NODES = [
                    text_choices=[
                       'get', 'set', 'didSet', 'willSet', 'unsafeAddress', 
                       'addressWithOwner', 'addressWithNativeOwner', 
-                      'addressWithPinnedNativeOwner', 'unsafeMutableAddress', 
+                      'unsafeMutableAddress', 
                       'mutableAddressWithOwner', 
                       'mutableAddressWithNativeOwner', 
-                      'mutableAddressWithPinnedNativeOwner',
                       '_read', '_modify'
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
@@ -517,10 +519,7 @@ DECL_NODES = [
     Node('AccessorBlock', kind="Syntax", traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
-             Child('AccessorListOrStmtList', kind='Syntax',
-                   node_choices=[
-                      Child('Accessors', kind='AccessorList'),
-                      Child('Statements', kind='CodeBlockItemList')]),
+             Child('Accessors', kind='AccessorList'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
@@ -531,7 +530,10 @@ DECL_NODES = [
              Child('Pattern', kind='Pattern'),
              Child('TypeAnnotation', kind='TypeAnnotation', is_optional=True),
              Child('Initializer', kind='InitializerClause', is_optional=True),
-             Child('Accessor', kind='AccessorBlock', is_optional=True),
+             Child('Accessor', kind='Syntax', is_optional=True,
+                   node_choices=[
+                      Child('Accessors', kind='AccessorBlock'),
+                      Child('Getter', kind='CodeBlock')]),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 

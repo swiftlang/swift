@@ -332,20 +332,23 @@ hoistSpecialInstruction(std::unique_ptr<LoopNestSummary> &LoopSummary,
   bool Changed = false;
 
   for (auto *Inst : Special) {
-    auto *BI = dyn_cast<BeginAccessInst>(Inst);
-    assert(BI && "Only BeginAccessInst are supported");
-    SmallVector<EndAccessInst *, 2> Ends;
-    getEndAccesses(BI, Ends);
-    if (!hoistInstruction(DT, BI, Loop, Preheader)) {
+    if (!hoistInstruction(DT, Inst, Loop, Preheader)) {
       continue;
     }
-    LLVM_DEBUG(llvm::dbgs() << "Hoisted " << *BI);
-    for (auto *instSink : Ends) {
-      if (!sinkInstruction(DT, LoopSummary, instSink, LI)) {
-        llvm_unreachable("LICM: Could not perform must-sink instruction");
+    if (auto *BI = dyn_cast<BeginAccessInst>(Inst)) {
+      SmallVector<EndAccessInst *, 2> Ends;
+      getEndAccesses(BI, Ends);
+      LLVM_DEBUG(llvm::dbgs() << "Hoisted BeginAccess " << *BI);
+      for (auto *instSink : Ends) {
+        if (!sinkInstruction(DT, LoopSummary, instSink, LI)) {
+          llvm_unreachable("LICM: Could not perform must-sink instruction");
+        }
       }
+      LLVM_DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "Hoisted RefElementAddr "
+                              << *static_cast<RefElementAddrInst *>(Inst));
     }
-    LLVM_DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
     Changed = true;
   }
 
@@ -534,7 +537,8 @@ static bool handledEndAccesses(BeginAccessInst *BI, SILLoop *Loop) {
 static bool analyzeBeginAccess(BeginAccessInst *BI,
                                SmallVector<BeginAccessInst *, 8> &BeginAccesses,
                                SmallVector<FullApplySite, 8> &fullApplies,
-                               AccessedStorageAnalysis *ASA) {
+                               AccessedStorageAnalysis *ASA,
+                               DominanceInfo *DT) {
   if (BI->getEnforcement() != SILAccessEnforcement::Dynamic) {
     return false;
   }
@@ -561,8 +565,18 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
     FunctionAccessedStorage callSiteAccesses;
     ASA->getCallSiteEffects(callSiteAccesses, fullApply);
     SILAccessKind accessKind = BI->getAccessKind();
-    if (callSiteAccesses.mayConflictWith(accessKind, storage))
+    if (!callSiteAccesses.mayConflictWith(accessKind, storage))
+      continue;
+    // Check if we can ignore this conflict:
+    // If the apply is “sandwiched” between the begin and end access,
+    // there’s no reason we can’t hoist out of the loop.
+    auto *applyInstr = fullApply.getInstruction();
+    if (!DT->dominates(BI, applyInstr))
       return false;
+    for (auto *EI : BI->getEndAccesses()) {
+      if (!DT->dominates(applyInstr, EI))
+        return false;
+    }
   }
 
   return true;
@@ -613,6 +627,11 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         assert(BI && "Expected a Begin Access");
         BeginAccesses.push_back(BI);
         checkSideEffects(Inst, MayWrites);
+        break;
+      }
+      case SILInstructionKind::RefElementAddrInst: {
+        auto *REA = static_cast<RefElementAddrInst *>(&Inst);
+        SpecialHoist.insert(REA);
         break;
       }
       case swift::SILInstructionKind::CondFailInst: {
@@ -679,7 +698,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
       LLVM_DEBUG(llvm::dbgs() << "Some end accesses can't be handled\n");
       continue;
     }
-    if (analyzeBeginAccess(BI, BeginAccesses, fullApplies, ASA)) {
+    if (analyzeBeginAccess(BI, BeginAccesses, fullApplies, ASA, DomTree)) {
       SpecialHoist.insert(BI);
     }
   }

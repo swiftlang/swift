@@ -76,7 +76,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
   auto parentDC = toRawDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto enumDecl = parentDC->getSelfEnumDecl();
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
@@ -207,7 +207,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
   auto parentDC = initDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto nominalTypeDecl = parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominalTypeDecl = parentDC->getSelfNominalTypeDecl();
   auto enumDecl = cast<EnumDecl>(nominalTypeDecl);
 
   Type rawTy = enumDecl->getRawType();
@@ -317,9 +317,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   assert(equatableProto);
   assert(tc.conformsToProtocol(rawType, equatableProto, enumDecl, None));
   (void)equatableProto;
-
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
-                                         /*static*/false, /*inout*/true);
+  (void)rawType;
 
   auto *rawDecl = new (C)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
@@ -335,7 +333,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
                             /*Failability=*/ OTK_Optional,
                             /*FailabilityLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                            selfDecl, paramList,
+                            paramList,
                             /*GenericParams=*/nullptr, parentDC);
   
   initDecl->setImplicit();

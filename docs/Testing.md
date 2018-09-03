@@ -80,7 +80,7 @@ targets mentioned above and modify it as necessary. lit.py also has several
 useful features, like timing tests and providing a timeout. Check these features
 out with ``lit.py -h``. We document some of the more useful ones below:
 
-##### Extra lit.py invocation options
+##### Standard lit.py invocation options
 
 * ``-s`` reduces the amount of output that lit shows.
 * ``-v`` causes a test's commandline and output to be printed if the test fails.
@@ -100,6 +100,9 @@ out with ``lit.py -h``. We document some of the more useful ones below:
   running a single test (in seconds). 0 (the default means no time limit.
 * ``--max-failures=<MAXFAILURES>`` stops execution after ``MAXFAILURES`` number
   of failures.
+
+##### Swift-specific testing options
+
 * ``--param gmalloc`` will run all tests under Guard Malloc (macOS only). See
   ``man libgmalloc`` for more information.
 * ``--param swift-version=<MAJOR>`` overrides the default Swift language
@@ -110,6 +113,25 @@ out with ``lit.py -h``. We document some of the more useful ones below:
 * ``--param swift_test_mode=<MODE>`` drives the various suffix variations
   mentioned above. Again, it's best to get the invocation from the existing
   build system targets and modify it rather than constructing it yourself.
+
+##### Remote testing options
+
+* ``--param remote_run_host=[USER@]<HOST>[:PORT]`` causes execution tests that
+  would normally be run on the host (via the ``%target-run`` substitutions
+  described below) to be run over SSH on another machine instead, using the
+  `remote-run` tool in the `utils` directory. Requires that `remote_run_tmpdir`
+  also be provided.
+* ``--param remote_run_tmpdir=<PATH>`` specifies the scratch directory to be
+  used on the remote machine when testing with `remote_run_host`.
+* ``--param remote_run_identity=<FILE>`` provides an SSH private key to be used
+  when testing with `remote_run_host`. (`remote-run` does not support
+  passwords.)
+* ``--param remote_run_extra_args="ARG1 ARG2 ..."`` provides a list of extra
+  arguments to pass to `remote-run`. (This can be used with `remote-run`'s `-o`
+  option to pass extra options to SSH.)
+* ``--param remote_run_skip_upload_stdlib`` assumes that the standard library
+  binaries have already been uploaded to `remote_run_tmpdir` and are up to date.
+  This is meant for repeat runs and probably shouldn't be used in automation.
 
 #### CMake
 
@@ -482,3 +504,18 @@ code that uses an ``if true {}`` or similar no-op scope instead of
 If you're specifically testing the autoreleasing behavior of code, or do not
 expect code to interact with the Objective-C runtime, it may be OK to use ``if
 true {}``, but those assumptions should be commented in the test.
+
+#### Enabling/disabling the lldb test whitelist
+
+It's possible to enable a whitelist of swift-specific lldb tests to run during
+PR smoke testing. Note that the default set of tests which run (which includes
+tests not in the whitelist) already only includes swift-specific tests.
+
+Enabling the whitelist is an option of last-resort to unblock swift PR testing
+in the event that lldb test failures cannot be resolved in a timely way. If
+this becomes necessary, be sure to double-check that enabling the whitelist
+actually unblocks PR testing by running the smoke test build preset locally.
+
+To enable the lldb test whitelist, add `-G swiftpr` to the
+`LLDB_TEST_CATEGORIES` variable in `utils/build-script-impl`. Disable it by
+removing that option.

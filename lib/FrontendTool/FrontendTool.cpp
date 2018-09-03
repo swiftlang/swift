@@ -283,6 +283,7 @@ static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
   auto bufferID = SF->getBufferID();
   assert(bufferID && "frontend should have a buffer ID "
          "for the main source file");
+  (void)bufferID;
 
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;
@@ -782,6 +783,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
   const auto &frontendOpts = Invocation.getFrontendOptions();
+  const auto &tbdOpts = Invocation.getTBDGenOptions();
   if (!frontendOpts.InputsAndOutputs.hasTBDPath())
     return false;
 
@@ -793,16 +795,7 @@ static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
 
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
 
-  auto installName = frontendOpts.TBDInstallName.empty()
-                         ? "lib" + Invocation.getModuleName().str() + ".dylib"
-                         : frontendOpts.TBDInstallName;
-
-  TBDGenOptions opts;
-  opts.InstallName = installName;
-  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
-  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
-
-  return writeTBD(Instance.getMainModule(), TBDPath, opts);
+  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
 }
 
 static std::deque<PostSILGenInputs>
@@ -875,13 +868,6 @@ emitIndexData(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   return hadEmitIndexDataError;
 }
 
-/// Emits the request-evaluator graph to the given file in GraphViz format.
-void emitRequestEvaluatorGraphViz(ASTContext &ctx, StringRef graphVizPath) {
-  std::error_code error;
-  llvm::raw_fd_ostream out(graphVizPath, error, llvm::sys::fs::F_Text);
-  ctx.evaluator.printDependenciesGraphviz(out);
-}
-
 static bool performCompileStepsPostSILGen(
     CompilerInstance &Instance, CompilerInvocation &Invocation,
     std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
@@ -923,17 +909,6 @@ static bool performCompile(CompilerInstance &Instance,
   } else {
     Instance.performSema();
   }
-
-  SWIFT_DEFER {
-    // Emit request-evaluator graph via GraphViz, if requested.
-    if (!Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath.empty() &&
-        Instance.hasASTContext()) {
-      ASTContext &ctx = Instance.getASTContext();
-      emitRequestEvaluatorGraphViz(
-        ctx,
-        Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath);
-    }
-  };
 
   ASTContext &Context = Instance.getASTContext();
   if (Action == FrontendOptions::ActionType::Parse)
@@ -987,6 +962,9 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }
 
+  if (writeTBDIfNeeded(Invocation, Instance))
+    return true;
+
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.
   bool moduleIsPublic =
@@ -1008,9 +986,6 @@ static bool performCompile(CompilerInstance &Instance,
 
     return hadPrintAsObjCError || hadEmitIndexDataError || Context.hadError();
   }
-
-  if (writeTBDIfNeeded(Invocation, Instance))
-    return true;
 
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&
          "All actions not requiring SILGen must have been handled!");
@@ -1211,14 +1186,13 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   case FrontendOptions::TBDValidationMode::MissingFromTBD:
     break;
   }
-  TBDGenOptions opts;
-  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
-  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
 
   const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
   return MSF.is<SourceFile *>()
-             ? validateTBD(MSF.get<SourceFile *>(), IRModule, opts, allSymbols)
-             : validateTBD(MSF.get<ModuleDecl *>(), IRModule, opts, allSymbols);
+             ? validateTBD(MSF.get<SourceFile *>(), IRModule,
+                           Invocation.getTBDGenOptions(), allSymbols)
+             : validateTBD(MSF.get<ModuleDecl *>(), IRModule,
+                           Invocation.getTBDGenOptions(), allSymbols);
 }
 
 static bool generateCode(CompilerInvocation &Invocation,

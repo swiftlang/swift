@@ -79,3 +79,55 @@ bb0(%0 : $Val<Bool>, %1 : $Val<Int>):
   %8 = apply %7(%1) : $@callee_owned (Val<Int>) -> Val<(Bool, Int)>
   return %8 : $Val<(Bool, Int)>
 }
+
+// CHECK-LABEL: sil shared @$S9coroutineSb_Tg5 : $@yield_once @convention(thin) (Bool) -> @yields @inout Bool {
+// CHECK:       bb0(%0 : $Bool):
+// CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $Bool
+// CHECK-NEXT:    store %0 to [[TEMP]] : $*Bool
+// CHECK-NEXT:    yield [[TEMP]] : $*Bool, resume bb1, unwind bb2
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_addr [[TEMP]] : $*Bool
+// CHECK-NEXT:    [[RV:%.*]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[TEMP]] : $*Bool
+// CHECK-NEXT:    return [[RV]] : $()
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_addr [[TEMP]] : $*Bool
+// CHECK-NEXT:    dealloc_stack [[TEMP]] : $*Bool
+// CHECK-NEXT:    unwind
+// CHECK-NEXT:  }
+sil @coroutine : $@yield_once @convention(thin) <T> (@in T) -> @yields @inout T {
+bb0(%0 : $*T):
+  yield %0 : $*T, resume bb1, unwind bb2
+bb1:
+  destroy_addr %0 : $*T
+  %rv = tuple ()
+  return %rv : $()
+bb2:
+  destroy_addr %0 : $*T
+  unwind
+}
+
+// CHECK-LABEL: @test_coroutine : $@convention(thin) (Bool) -> () {
+// CHECK:       bb0(%0 : $Bool):
+// CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $Bool
+// CHECK-NEXT:    store %0 to [[TEMP]] : $*Bool
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[CORO:%.*]] = function_ref @$S9coroutineSb_Tg5 : $@yield_once @convention(thin) (Bool) -> @yields @inout Bool
+// CHECK-NEXT:    [[LOAD:%.*]] = load [[TEMP]] : $*Bool
+// CHECK-NEXT:    ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[CORO]]([[LOAD]])
+// CHECK-NEXT:    end_apply [[TOKEN]]
+// CHECK-NEXT:    dealloc_stack [[TEMP]] : $*Bool
+// CHECK-NEXT:    [[RV:%.*]] = tuple ()
+// CHECK-NEXT:    return [[RV]] : $()
+// CHECK-NEXT:  }
+sil @test_coroutine : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %coro = function_ref @coroutine : $@yield_once @convention(thin) <T> (@in T) -> @yields @inout T
+  %temp = alloc_stack $Bool
+  store %0 to %temp : $*Bool
+  (%addr, %token) = begin_apply %coro<Bool>(%temp) : $@yield_once @convention(thin) <T> (@in T) -> @yields @inout T
+  end_apply %token
+  dealloc_stack %temp : $*Bool
+  %rv = tuple ()
+  return %rv : $()
+}

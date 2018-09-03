@@ -448,7 +448,7 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   auto contextOpt = translateContext(effectiveContext);
   if (!contextOpt) {
     // We might be able to resolve this later.
-    if (auto decl = newEntry.dyn_cast<clang::NamedDecl *>()) {
+    if (newEntry.is<clang::NamedDecl *>()) {
       UnresolvedEntries.push_back(
         std::make_tuple(name, newEntry, effectiveContext));
     }

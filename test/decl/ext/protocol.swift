@@ -180,8 +180,8 @@ extension S1 {
 // Protocol extensions with additional requirements
 // ----------------------------------------------------------------------------
 extension P4 where Self.AssocP4 : P1 {
-// expected-note@-1 {{where 'Self.AssocP4' = 'S4aHelper'}}
-// expected-note@-2 {{'Self.AssocP4' = 'Int'}}
+// expected-note@-1 {{candidate requires that 'Int' conform to 'P1' (requirement specified as 'Self.AssocP4' == 'P1')}}
+// expected-note@-2 {{candidate requires that 'S4aHelper' conform to 'P1' (requirement specified as 'Self.AssocP4' == 'P1')}}
   func extP4a() {
     acceptsP1(reqP4a())
   }
@@ -213,13 +213,19 @@ extension P4 where Self.AssocP4 == Int {
 }
 
 extension P4 where Self.AssocP4 == Bool {
+// expected-note@-1 {{candidate requires that the types 'Int' and 'Bool' be equivalent (requirement specified as 'Self.AssocP4' == 'Bool')}}
+// expected-note@-2 {{candidate requires that the types 'S4aHelper' and 'Bool' be equivalent (requirement specified as 'Self.AssocP4' == 'Bool')}}
   func extP4a() -> Bool { return reqP4a() }
 }
 
 func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
-  s4a.extP4a() // expected-error{{referencing instance method 'extP4a()' on 'P4' requires that 'S4aHelper' conform to 'P1'}}
+  // FIXME: Both of the 'ambiguous' examples below are indeed ambiguous,
+  //        because they don't match on conformance and same-type
+  //        requirement of different overloads, but diagnostic
+  //        could be improved to point out exactly what is missing in each case.
+  s4a.extP4a() // expected-error{{ambiguous reference to instance method 'extP4a()'}}
   s4b.extP4a() // ok
-  s4c.extP4a() // expected-error{{referencing instance method 'extP4a()' on 'P4' requires that 'Int' conform to 'P1'}}
+  s4c.extP4a() // expected-error{{ambiguous reference to instance method 'extP4a()'}}
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above

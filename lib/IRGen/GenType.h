@@ -67,10 +67,9 @@ public:
 private:
   bool CompletelyFragile = false;
 
-  llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
+  llvm::DenseMap<ProtocolDecl*, std::unique_ptr<const ProtocolInfo>> Protocols;
   const TypeInfo *FirstType;
   
-  const ProtocolInfo *FirstProtocol;
   const LoadableTypeInfo *NativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
@@ -91,7 +90,7 @@ private:
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     PODBoxTI;
   const LoadableTypeInfo *SwiftRetainablePointerBoxTI = nullptr,
-                         *UnknownRetainablePointerBoxTI = nullptr;
+                         *UnknownObjectRetainablePointerBoxTI = nullptr;
 
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
@@ -146,7 +145,7 @@ public:
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();
   const TypeInfo &getResilientStructTypeInfo(IsABIAccessible_t abiAccessible);
-  const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
+  const ProtocolInfo &getProtocolInfo(ProtocolDecl *P, ProtocolInfoKind kind);
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize,
                                                    Alignment storageAlign);
   const TypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);

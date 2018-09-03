@@ -160,8 +160,6 @@ public:
   bool InPoundLineEnvironment = false;
   bool InPoundIfEnvironment = false;
   bool InSwiftKeyPath = false;
-  Expr* SwiftKeyPathRoot = nullptr;
-  SourceLoc SwiftKeyPathSlashLoc = SourceLoc();
 
   LocalContext *CurLocalContext = nullptr;
 
@@ -379,25 +377,14 @@ public:
 
   void restoreParserPosition(ParserPosition PP, bool enableDiagnostics = false) {
     L->restoreState(PP.LS, enableDiagnostics);
-
-    // We might be at tok::eof now, so ensure that consumeToken() does not
-    // assert about lexing past eof.
-    Tok.setKind(tok::unknown);
-    consumeTokenWithoutFeedingReceiver();
-
+    L->lex(Tok, LeadingTrivia, TrailingTrivia);
     PreviousLoc = PP.PreviousLoc;
   }
 
   void backtrackToPosition(ParserPosition PP) {
     assert(PP.isValid());
-
     L->backtrackToState(PP.LS);
-
-    // We might be at tok::eof now, so ensure that consumeToken() does not
-    // assert about lexing past eof.
-    Tok.setKind(tok::unknown);
-    consumeTokenWithoutFeedingReceiver();
-
+    L->lex(Tok, LeadingTrivia, TrailingTrivia);
     PreviousLoc = PP.PreviousLoc;
   }
 
@@ -896,8 +883,6 @@ public:
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
 
-  void parseAccessorAttributes(DeclAttributes &Attributes);
-
   struct ParsedAccessors;
   bool parseGetSetImpl(ParseDeclOptions Flags,
                        GenericParamList *GenericParams,
@@ -930,6 +915,7 @@ public:
                                        StaticSpellingKind StaticSpelling,
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
+  void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   bool parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
@@ -1332,6 +1318,8 @@ public:
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
+  ParserResult<Expr>
+  parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
 
   UnresolvedDeclRefExpr *parseExprOperator();
 

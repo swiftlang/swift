@@ -256,8 +256,6 @@ StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
     return "immutable";
   case ReadWriteImplKind::Stored:
     return "stored";
-  case ReadWriteImplKind::MaterializeForSet:
-    return "materialize_for_set";
   case ReadWriteImplKind::MutableAddress:
     return "mutable_addressor";
   case ReadWriteImplKind::MaterializeToTemporary:
@@ -282,17 +280,7 @@ static StringRef getImportKindString(ImportKind value) {
   
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
-static StringRef getAccessLevelString(AccessLevel value) {
-  switch (value) {
-  case AccessLevel::Private: return "private";
-  case AccessLevel::FilePrivate: return "fileprivate";
-  case AccessLevel::Internal: return "internal";
-  case AccessLevel::Public: return "public";
-  case AccessLevel::Open: return "open";
-  }
 
-  llvm_unreachable("Unhandled AccessLevel in switch.");
-}
 static StringRef
 getForeignErrorConventionKindString(ForeignErrorConvention::Kind value) {
   switch (value) {
@@ -763,7 +751,7 @@ namespace {
 
       if (VD->hasAccess()) {
         PrintWithColorRAII(OS, AccessLevelColor) << " access="
-          << getAccessLevelString(VD->getFormalAccess());
+          << getAccessLevelSpelling(VD->getFormalAccess());
       }
 
       if (auto Overridden = VD->getOverriddenDecl()) {
@@ -872,8 +860,6 @@ namespace {
 
     void visitEnumElementDecl(EnumElementDecl *EED) {
       printCommon(EED, "enum_element_decl");
-      if (EED->getAttrs().hasAttribute<DowngradeExhaustivityCheckAttr>())
-        OS << "@_downgrade_exhaustivity_check";
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -2261,6 +2247,12 @@ public:
 
   void visitInOutExpr(InOutExpr *E) {
     printCommon(E, "inout_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitVarargExpansionExpr(VarargExpansionExpr *E) {
+    printCommon(E, "vararg_expansion_expr") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

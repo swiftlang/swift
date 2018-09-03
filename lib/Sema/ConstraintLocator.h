@@ -89,10 +89,6 @@ public:
     MemberRefBase,
     /// \brief The lookup for a subscript member.
     SubscriptMember,
-    /// \brief The index of a subscript expression.
-    SubscriptIndex,
-    /// \brief The result of a subscript expression.
-    SubscriptResult,
     /// \brief The lookup for a constructor member.
     ConstructorMember,
     /// \brief An implicit @lvalue-to-inout conversion; only valid for operator
@@ -149,9 +145,7 @@ public:
     case Member:
     case MemberRefBase:
     case UnresolvedMember:
-    case SubscriptIndex:
     case SubscriptMember:
-    case SubscriptResult:
     case ConstructorMember:
     case LValueConversion:
     case RValueAdjustment:
@@ -174,9 +168,9 @@ public:
     case TupleElement:
     case KeyPathComponent:
     case ConditionalRequirement:
-    case TypeParameterRequirement:
       return 1;
 
+    case TypeParameterRequirement:
     case ApplyArgToParam:
       return 2;
     }
@@ -214,9 +208,7 @@ public:
     case ParentType:
     case LValueConversion:
     case RValueAdjustment:
-    case SubscriptIndex:
     case SubscriptMember:
-    case SubscriptResult:
     case OpenedGeneric:
     case Archetype:
     case AssociatedType:
@@ -343,7 +335,7 @@ public:
       return PathElement(NamedTupleElement, position);
     }
 
-    /// Retrieve a patch element for an argument/parameter comparison in a
+    /// Retrieve a path element for an argument/parameter comparison in a
     /// function application.
     static PathElement getApplyArgToParam(unsigned argIdx, unsigned paramIdx) {
       return PathElement(ApplyArgToParam, argIdx, paramIdx);
@@ -365,8 +357,10 @@ public:
       return PathElement(ConditionalRequirement, index);
     }
 
-    static PathElement getTypeRequirementComponent(unsigned index) {
-      return PathElement(TypeParameterRequirement, index);
+    static PathElement getTypeRequirementComponent(unsigned index,
+                                                   RequirementKind kind) {
+      return PathElement(TypeParameterRequirement, index,
+                         static_cast<unsigned>(kind));
     }
 
     /// \brief Retrieve the kind of path element.

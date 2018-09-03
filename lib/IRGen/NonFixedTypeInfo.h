@@ -110,6 +110,10 @@ public:
     return emitLoadOfIsPOD(IGF, T);
   }
 
+  llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsBitwiseTakable(IGF, T);
+  }
+
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override {
     return emitLoadOfIsInline(IGF, T);
@@ -118,12 +122,14 @@ public:
   /// FIXME: Dynamic extra inhabitant lookup.
   bool mayHaveExtraInhabitants(IRGenModule &) const override { return false; }
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src, SILType T) const override {
+                                       Address src, SILType T,
+                                       bool isOutlined) const override {
     llvm_unreachable("dynamic extra inhabitants not supported");
   }
   void storeExtraInhabitant(IRGenFunction &IGF,
                             llvm::Value *index,
-                            Address dest, SILType T) const override {
+                            Address dest, SILType T,
+                            bool isOutlined) const override {
     llvm_unreachable("dynamic extra inhabitants not supported");
   }
 

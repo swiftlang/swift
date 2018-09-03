@@ -297,15 +297,12 @@ protected:
     if (SubsMap.empty())
       return false;
 
-    auto Params = Sig->getSubstitutableParams();
-    return std::any_of(Params.begin(), Params.end(), [&](Type ParamType) {
-      // FIXME: It would be more elegant to run
-      // SubsMap.mapReplacementTypesOutOfContext() bup front, but it can assert.
-      Type Substitution = Type(ParamType).subst(SubsMap)->mapTypeOutOfContext();
-      return !Substitution->isOpenedExistential() &&
-             (Substitution->getCanonicalType() !=
-              ParamType->getCanonicalType());
-    });
+    for (auto ParamType : Sig->getSubstitutableParams()) {
+      if (!Type(ParamType).subst(SubsMap)->isEqual(ParamType))
+        return true;
+    }
+
+    return false;
   }
 
   enum { ForInlining = true };
@@ -314,7 +311,7 @@ protected:
   /// \param SubsMap - the substitutions of the inlining/specialization process.
   /// \param RemappedSig - the generic signature.
   static SILFunction *remapParentFunction(FunctionBuilderTy &FuncBuilder,
-					  SILModule &M,
+                                          SILModule &M,
                                           SILFunction *ParentFunction,
                                           SubstitutionMap SubsMap,
                                           GenericSignature *RemappedSig,
@@ -325,14 +322,15 @@ protected:
     if (!RemappedSig || !OriginalEnvironment)
       return ParentFunction;
 
-    if (!substitutionsChangeGenericTypeParameters(SubsMap, RemappedSig))
-      return ParentFunction;
-
     if (SubsMap.hasArchetypes())
       SubsMap = SubsMap.mapReplacementTypesOutOfContext();
 
-    // This is a bug in mapReplacementTypesOutOfContext(). Archetypes can't be
-    // mangled, only type parameters can; ignore this for now.
+    if (!substitutionsChangeGenericTypeParameters(SubsMap, RemappedSig))
+      return ParentFunction;
+
+    // Note that mapReplacementTypesOutOfContext() can't do anything for
+    // opened existentials, and since archetypes can't be mangled, ignore
+    // this case for now.
     if (SubsMap.hasArchetypes())
       return ParentFunction;
 
@@ -361,7 +359,7 @@ protected:
         // If the function was newly created with an empty body mark it as
         // undead.
         if (ParentFunction->empty()) {
-          M.eraseFunction(ParentFunction);
+          FuncBuilder.eraseFunction(ParentFunction);
           ParentFunction->setGenericEnvironment(OriginalEnvironment);
         }
       }

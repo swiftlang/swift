@@ -29,3 +29,21 @@ public struct NSSomestruct2 {
 }
 
 public class C4: NewType {}
+
+public class C5 {
+  @objc
+  public dynamic func dy_foo() {}
+}
+
+@_fixed_layout
+public struct C6 {}
+
+public enum IceKind {}
+
+public protocol P1 {}
+
+public protocol P2 {}
+
+public extension P1 {
+  func P1Constraint() {}
+}

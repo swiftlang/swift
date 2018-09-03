@@ -757,14 +757,23 @@ extension Int {
   func inspect() {}
 }
 
+extension Array {
+  subscript(replacing index: Int, with newValue: Element) -> Element {
+    mutating get {
+      let oldValue = self[index]
+      self[index] = newValue
+      return oldValue
+    }
+  }
+}
 
 func throwingSwap<T>(_ a: inout T, _ b: inout T) throws {}
 
 // <rdar://problem/19035287> let properties should only be initializable, not reassignable
 struct LetProperties {
-  // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  // expected-note @+1 5 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let arr : [Int]
-  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
+  // expected-note @+1 7 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let (u, v) : (Int, Int)
   // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let w : (Int, Int)
@@ -828,10 +837,11 @@ struct LetProperties {
     arr = []
     arr += []      // expected-error {{mutating operator '+=' may not be used on immutable value 'self.arr'}}
     arr.append(4)  // expected-error {{mutating method 'append' may not be used on immutable value 'self.arr'}}
-    arr[12] = 17   // expected-error {{mutating subscript 'subscript' may not be used on immutable value 'self.arr'}}
+    arr[12] = 17   // expected-error {{cannot mutate subscript of immutable value 'self.arr'}}
+    let _ = arr[replacing: 12, with: 17] // expected-error {{mutating accessor for subscript may not be used on immutable value 'self.arr'}}
 
-    methodTakesInOut(&u)  // expected-error {{mutating method 'methodTakesInOut' may not be used on immutable value 'self.u'}}
-    try throwingMethodTakesInOut(&u)  // expected-error {{mutating method 'throwingMethodTakesInOut' may not be used on immutable value 'self.u'}}
+    methodTakesInOut(&u)  // expected-error {{immutable value 'self.u' must not be passed inout}}
+    try throwingMethodTakesInOut(&u)  // expected-error {{immutable value 'self.u' must not be passed inout}}
   }
 }
 
@@ -844,7 +854,7 @@ protocol TestMutabilityProtocol {
  
 class C<T : TestMutabilityProtocol> {
   let x : T
-  let y : T
+  let y : T // expected-note {{change 'let' to 'var' to make it mutable}}
   
   init(a : T) {
     x = a; y = a
@@ -886,7 +896,7 @@ func testLocalProperties(_ b : Int) -> Int {
 // Should be rejected as multiple assignment.
 func testAddressOnlyProperty<T>(_ b : T) -> T {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
-  let x : T
+  let x : T  // expected-note {{change 'let' to 'var' to make it mutable}}
   let y : T
   let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}} {{7-8=_}}
   x = b
@@ -938,8 +948,8 @@ struct StructMutatingMethodTest {
 
  // <rdar://problem/19268443> DI should reject this call to transparent function
  class TransparentFunction {
-  let x : Int
-  let y : Int
+  let x : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
+  let y : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
   init() {
     x = 42
     x += 1     // expected-error {{mutating operator '+=' may not be used on immutable value 'self.x'}}
@@ -1082,7 +1092,7 @@ extension ProtocolInitTest {
 // <rdar://problem/22436880> Function accepting UnsafeMutablePointer is able to change value of immutable value
 func bug22436880(_ x: UnsafeMutablePointer<Int>) {}
 func test22436880() {
-  let x: Int
+  let x: Int // expected-note {{change 'let' to 'var' to make it mutable}}
   x = 1
   bug22436880(&x) // expected-error {{immutable value 'x' must not be passed inout}}
 }
@@ -1416,7 +1426,7 @@ func testOptionalWriteGenerics2<T>(p: T) -> T? {
 
 enum TestOptionalEnum {
   case Cons(Int)
-  case Nil()
+  case Nil
 }
 
 func testOptionalWithEnum(p: TestOptionalEnum) -> TestOptionalEnum? {

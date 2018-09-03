@@ -13,6 +13,8 @@
 // RUN: %target-codesign %t/a.out.fragile
 // RUN: %target-run %t/a.out.fragile
 
+// REQUIRES: executable_test
+
 import KeyPathMultiModule_b
 import StdlibUnittest
 
@@ -52,6 +54,7 @@ keyPathMultiModule.test("identity across multiple modules") {
     expectEqualWithHashes(A_x_keypath(), \A.x)
     expectEqualWithHashes(A_y_keypath(), \A.y)
     expectEqualWithHashes(A_z_keypath(), \A.z)
+    expectEqualWithHashes(A_immutable_keypath(), \A.immutable)
     expectEqualWithHashes(A_subscript_withGeneric_keypath(index: 0), \A.[withGeneric: 0])
     expectEqualWithHashes(A_subscript_withGeneric_keypath(index: "butt"),
                 \A.[withGeneric: "butt"])
@@ -156,6 +159,8 @@ keyPathMultiModule.test("identity across multiple modules") {
                           \ResilientRoot.storedA)
     expectEqualWithHashes(ResilientRoot_storedB_keypath(),
                           \ResilientRoot.storedB)
+    expectEqualWithHashes(ResilientRoot_storedLet_keypath(),
+                          \ResilientRoot.storedLet)
     expectEqualWithHashes(ResilientRoot_virtual_keypath(),
                           \ResilientRoot.virtual)
     expectEqualWithHashes(ResilientRoot_virtualRO_keypath(),

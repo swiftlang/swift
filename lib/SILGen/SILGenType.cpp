@@ -283,7 +283,7 @@ static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
            && "generic static vars are not implemented yet");
   }
 
-  if (var->getDeclContext()->getAsClassOrClassExtensionContext()) {
+  if (var->getDeclContext()->getSelfClassDecl()) {
     assert(var->isFinal() && "only 'static' ('class final') stored properties are implemented in classes");
   }
 
@@ -640,13 +640,28 @@ SILFunction *SILGenModule::emitProtocolWitness(
                                        reqtOrigTy->getExtInfo());
   }
 
+  // Coroutine lowering requires us to provide these substitutions
+  // in order to recreate the appropriate yield types for the accessor
+  // because they aren't reflected in the accessor's AST type.
+  // But this is expensive, so we only do it for coroutine lowering.
+  // When they're part of the AST function type, we can remove this
+  // parameter completely.
+  Optional<SubstitutionMap> witnessSubsForTypeLowering;
+  if (auto accessor = dyn_cast<AccessorDecl>(requirement.getDecl())) {
+    if (accessor->isCoroutine()) {
+      witnessSubsForTypeLowering =
+        witness.getSubstitutions().mapReplacementTypesOutOfContext();
+    }
+  }
+
   // FIXME: this needs to pull out the conformances/witness-tables for any
   // conditional requirements from the witness table and pass them to the
   // underlying function in the thunk.
 
   // Lower the witness thunk type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(
-      M, AbstractionPattern(reqtOrigTy), reqtSubstTy, witnessRef, conformance);
+      M, AbstractionPattern(reqtOrigTy), reqtSubstTy,
+      requirement, witnessRef, witnessSubsForTypeLowering, conformance);
 
   // Mangle the name of the witness thunk.
   Mangle::ASTMangler NewMangler;
@@ -683,31 +698,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // archetypes of the witness thunk generic environment.
   auto witnessSubs = witness.getSubstitutions();
 
-  // Open-code protocol witness thunks for materializeForSet.
-  if (auto witnessFn = dyn_cast<AccessorDecl>(witnessRef.getDecl())) {
-    if (witnessFn->isMaterializeForSet()) {
-      assert(!isFree);
-
-      auto *proto = cast<ProtocolDecl>(requirement.getDecl()->getDeclContext());
-      auto selfInterfaceType = proto->getSelfInterfaceType().subst(reqtSubMap);
-      auto selfType = GenericEnvironment::mapTypeIntoContext(
-          genericEnv, selfInterfaceType);
-
-      auto reqFn = cast<AccessorDecl>(requirement.getDecl());
-      assert(reqFn->isMaterializeForSet());
-
-      if (SGF.maybeEmitMaterializeForSetThunk(conformance, linkage,
-                                              selfInterfaceType, selfType,
-                                              genericEnv, reqFn, witnessFn,
-                                              witnessSubs))
-        return f;
-
-      // Proceed down the normal path.
-    }
-  }
-
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
-                          requirement, witnessRef,
+                          requirement, reqtSubMap, witnessRef,
                           witnessSubs, isFree);
 
   return f;

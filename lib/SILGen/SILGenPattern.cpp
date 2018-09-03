@@ -451,25 +451,16 @@ private:
 
   void bindRefutablePatterns(const ClauseRow &row, ArgArray args,
                              const FailureHandler &failure);
-  void bindRefutablePattern(Pattern *pattern, ConsumableManagedValue v,
-                            const FailureHandler &failure);
-  void bindExprPattern(ExprPattern *pattern, ConsumableManagedValue v,
-                       const FailureHandler &failure);
+
   void emitGuardBranch(SILLocation loc, Expr *guard,
-                       const FailureHandler &failure,
-                       Pattern *usingImplicitVariablesFromPattern,
-                       CaseStmt *usingImplicitVariablesFromStmt);
+                       const FailureHandler &failure);
 
   void bindIrrefutablePatterns(const ClauseRow &row, ArgArray args,
                                bool forIrrefutableRow, bool hasMultipleItems);
-  void bindIrrefutablePattern(Pattern *pattern, ConsumableManagedValue v,
-                              bool forIrrefutableRow, bool hasMultipleItems);
-  void bindNamedPattern(NamedPattern *pattern, ConsumableManagedValue v,
-                        bool forIrrefutableRow, bool hasMultipleItems);
 
-  void bindVariable(SILLocation loc, VarDecl *var,
-                    ConsumableManagedValue value, CanType formalValueType,
-                    bool isIrrefutable, bool hasMultipleItems);
+  void bindVariable(Pattern *pattern, VarDecl *var,
+                    ConsumableManagedValue value, bool isIrrefutable,
+                    bool hasMultipleItems);
 
   void emitSpecializedDispatch(ClauseMatrix &matrix, ArgArray args,
                                unsigned &lastRow, unsigned column,
@@ -1084,19 +1075,17 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   auto stmt = clauses[row].getClientData<Stmt>();
   assert(isa<CaseStmt>(stmt) || isa<CatchStmt>(stmt));
 
-  bool hasMultipleItems = false;
-  if (auto *caseStmt = dyn_cast<CaseStmt>(stmt)) {
-    hasMultipleItems = clauses[row].hasFallthroughTo() ||
-      caseStmt->getCaseLabelItems().size() > 1;
-  }
+  auto *caseStmt = dyn_cast<CaseStmt>(stmt);
+  bool hasMultipleItems =
+      caseStmt && (clauses[row].hasFallthroughTo() ||
+                   caseStmt->getCaseLabelItems().size() > 1);
 
   // Bind the rest of the patterns.
   bindIrrefutablePatterns(clauses[row], args, !hasGuard, hasMultipleItems);
 
   // Emit the guard branch, if it exists.
   if (guardExpr) {
-    this->emitGuardBranch(guardExpr, guardExpr, failure,
-                      clauses[row].getCasePattern(), dyn_cast<CaseStmt>(stmt));
+    this->emitGuardBranch(guardExpr, guardExpr, failure);
   }
 
   // Enter the row.
@@ -1104,63 +1093,37 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   assert(!SGF.B.hasValidInsertionPoint());
 }
 
-/// Bind all the irrefutable patterns in the given row, which is
-/// nothing but wildcard patterns.
+/// Bind all the refutable patterns in the given row.
 void PatternMatchEmission::
 bindRefutablePatterns(const ClauseRow &row, ArgArray args,
                       const FailureHandler &failure) {
   assert(row.columns() == args.size());
   for (unsigned i = 0, e = args.size(); i != e; ++i) {
-    bindRefutablePattern(row[i], args[i], failure);
+    if (!row[i]) // We use null patterns to mean artificial AnyPatterns
+      continue;
+
+    Pattern *pattern = row[i]->getSemanticsProvidingPattern();
+    switch (pattern->getKind()) {
+    // Irrefutable patterns that we'll handle in a later pass.
+    case PatternKind::Any:
+      break;
+    case PatternKind::Named:
+      break;
+
+    case PatternKind::Expr: {
+      ExprPattern *exprPattern = cast<ExprPattern>(pattern);
+      DebugLocOverrideRAII LocOverride{SGF.B,
+                                       getSubjectLocationOverride(pattern)};
+      FullExpr scope(SGF.Cleanups, CleanupLocation(pattern));
+      bindVariable(pattern, exprPattern->getMatchVar(), args[i],
+                   /*isForSuccess*/ false, /* hasMultipleItems */ false);
+      emitGuardBranch(pattern, exprPattern->getMatchExpr(), failure);
+      break;
+    }
+    default:
+      llvm_unreachable("bad pattern kind");
+    }
   }
-}
-
-/// Bind a refutable wildcard pattern to a given value.
-void PatternMatchEmission::bindRefutablePattern(Pattern *pattern,
-                                                ConsumableManagedValue value,
-                                                const FailureHandler &failure) {
-  // We use null patterns to mean artificial AnyPatterns.
-  if (!pattern) return;
-
-  pattern = pattern->getSemanticsProvidingPattern();
-  switch (pattern->getKind()) {
-  // Non-wildcard patterns.
-  case PatternKind::Tuple:
-  case PatternKind::EnumElement:
-  case PatternKind::OptionalSome:
-  case PatternKind::Bool:
-  case PatternKind::Is:
-    llvm_unreachable("didn't specialize specializable pattern?");
-
-  // Non-semantic patterns.
-  case PatternKind::Paren:
-  case PatternKind::Typed:
-  case PatternKind::Var:
-    llvm_unreachable("should have skipped non-semantic pattern");
-
-  // Refutable patterns that we'll handle in a later pass.
-  case PatternKind::Any:
-  case PatternKind::Named:
-    return;
-
-  case PatternKind::Expr:
-    bindExprPattern(cast<ExprPattern>(pattern), value, failure);
-    return;
-  }
-  llvm_unreachable("bad pattern kind");
-}
-
-/// Check whether an expression pattern is satisfied.
-void PatternMatchEmission::bindExprPattern(ExprPattern *pattern,
-                                           ConsumableManagedValue value,
-                                           const FailureHandler &failure) {
-  DebugLocOverrideRAII LocOverride{SGF.B, getSubjectLocationOverride(pattern)};
-  FullExpr scope(SGF.Cleanups, CleanupLocation(pattern));
-  bindVariable(pattern, pattern->getMatchVar(), value,
-               pattern->getType()->getCanonicalType(),
-               /*isForSuccess*/ false, /* hasMultipleItems */ false);
-  emitGuardBranch(pattern, pattern->getMatchExpr(), failure,
-                  nullptr, nullptr);
 }
 
 /// Bind all the irrefutable patterns in the given row, which is nothing
@@ -1174,59 +1137,26 @@ void PatternMatchEmission::bindIrrefutablePatterns(const ClauseRow &row,
                                                    bool hasMultipleItems) {
   assert(row.columns() == args.size());
   for (unsigned i = 0, e = args.size(); i != e; ++i) {
-    bindIrrefutablePattern(row[i], args[i], forIrrefutableRow, hasMultipleItems);
+    if (!row[i]) // We use null patterns to mean artificial AnyPatterns
+      continue;
+
+    Pattern *pattern = row[i]->getSemanticsProvidingPattern();
+    switch (pattern->getKind()) {
+    case PatternKind::Any: // We can just drop Any values.
+      break;
+    case PatternKind::Expr: // Ignore expression patterns, which we should have
+                            // bound in an earlier pass.
+      break;
+    case PatternKind::Named: {
+      NamedPattern *named = cast<NamedPattern>(pattern);
+      bindVariable(pattern, named->getDecl(), args[i], forIrrefutableRow,
+                   hasMultipleItems);
+      break;
+    }
+    default:
+      llvm_unreachable("bad pattern kind");
+    }
   }
-}
-
-/// Bind an irrefutable wildcard pattern to a given value.
-void PatternMatchEmission::bindIrrefutablePattern(Pattern *pattern,
-                                                  ConsumableManagedValue value,
-                                                  bool forIrrefutableRow,
-                                                  bool hasMultipleItems) {
-  // We use null patterns to mean artificial AnyPatterns.
-  if (!pattern) return;
-
-  pattern = pattern->getSemanticsProvidingPattern();
-  switch (pattern->getKind()) {
-  // Non-wildcard patterns.
-  case PatternKind::Tuple:
-  case PatternKind::EnumElement:
-  case PatternKind::OptionalSome:
-  case PatternKind::Bool:
-  case PatternKind::Is:
-    llvm_unreachable("didn't specialize specializable pattern?");
-
-  // Non-semantic patterns.
-  case PatternKind::Paren:
-  case PatternKind::Typed:
-  case PatternKind::Var:
-    llvm_unreachable("should have skipped non-semantic pattern");
-
-  // We can just drop Any values.
-  case PatternKind::Any:
-    return;
-
-  // Ignore expression patterns, which we should have bound in an
-  // earlier pass.
-  case PatternKind::Expr:
-    return;
-
-  case PatternKind::Named:
-    bindNamedPattern(cast<NamedPattern>(pattern), value,
-                     forIrrefutableRow, hasMultipleItems);
-    return;
-  }
-  llvm_unreachable("bad pattern kind");
-}
-
-/// Bind a named pattern to a given value.
-void PatternMatchEmission::bindNamedPattern(NamedPattern *pattern,
-                                            ConsumableManagedValue value,
-                                            bool forIrrefutableRow,
-                                            bool hasMultipleItems) {
-  bindVariable(pattern, pattern->getDecl(), value,
-               pattern->getType()->getCanonicalType(), forIrrefutableRow,
-               hasMultipleItems);
 }
 
 /// Should we take control of the mang
@@ -1240,35 +1170,30 @@ static bool shouldTake(ConsumableManagedValue value, bool isIrrefutable) {
 }
 
 /// Bind a variable into the current scope.
-void PatternMatchEmission::bindVariable(SILLocation loc, VarDecl *var,
+void PatternMatchEmission::bindVariable(Pattern *pattern, VarDecl *var,
                                         ConsumableManagedValue value,
-                                        CanType formalValueType,
                                         bool isIrrefutable,
                                         bool hasMultipleItems) {
   // If this binding is one of multiple patterns, each individual binding
   // will just be let, and then the chosen value will get forwarded into
   // a var box in the final shared case block.
-  bool forcedLet = var->isLet();
-  if (hasMultipleItems && !var->isLet())
-    forcedLet = true;
-  
-  // Initialize the variable value.
-  InitializationPtr init = SGF.emitInitializationForVarDecl(var, forcedLet);
+  bool immutable = var->isLet() || hasMultipleItems;
 
-  RValue rv(SGF, loc, formalValueType, value.getFinalManagedValue());
+  // Initialize the variable value.
+  InitializationPtr init = SGF.emitInitializationForVarDecl(var, immutable);
+  CanType formalValueType = pattern->getType()->getCanonicalType();
+  RValue rv(SGF, pattern, formalValueType, value.getFinalManagedValue());
   if (shouldTake(value, isIrrefutable)) {
-    std::move(rv).forwardInto(SGF, loc, init.get());
+    std::move(rv).forwardInto(SGF, pattern, init.get());
   } else {
-    std::move(rv).copyInto(SGF, loc, init.get());
+    std::move(rv).copyInto(SGF, pattern, init.get());
   }
 }
 
 /// Evaluate a guard expression and, if it returns false, branch to
 /// the given destination.
 void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
-                                   const FailureHandler &failure,
-                                   Pattern *usingImplicitVariablesFromPattern,
-                                   CaseStmt *usingImplicitVariablesFromStmt) {
+                                           const FailureHandler &failure) {
   SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
   SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
 
@@ -1276,16 +1201,7 @@ void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
   SILValue testBool;
   {
     FullExpr scope(SGF.Cleanups, CleanupLocation(guard));
-    auto emitTest = [&]{
-      testBool = SGF.emitRValueAsSingleValue(guard).getUnmanagedValue();
-    };
-    
-    if (usingImplicitVariablesFromPattern)
-      SGF.usingImplicitVariablesForPattern(usingImplicitVariablesFromPattern,
-                                           usingImplicitVariablesFromStmt,
-                                           emitTest);
-    else
-      emitTest();
+    testBool = SGF.emitRValueAsSingleValue(guard).getUnmanagedValue();
   }
 
   SGF.B.createCondBranch(loc, testBool, trueBB, falseBB);
@@ -1771,7 +1687,7 @@ CaseBlocks::CaseBlocks(
     if (!insertionResult.second) {
       index = insertionResult.first->second;
     } else {
-      curBB = SGF.createBasicBlock(curBB);
+      curBB = SGF.createBasicBlockAfter(curBB);
       CaseBBs.push_back({formalElt, curBB});
       CaseInfos.push_back(CaseInfo());
       CaseInfos.back().FirstMatcher = row.Pattern;
@@ -1806,8 +1722,7 @@ CaseBlocks::CaseBlocks(
       enumDecl->isEffectivelyExhaustive(SGF.getModule().getSwiftModule(),
                                         SGF.F.getResilienceExpansion());
   if (canAssumeExhaustive) {
-    // Check that Sema didn't let any cases slip through. (This can happen
-    // with @_downgrade_exhaustivity_check.)
+    // Check that Sema didn't let any cases slip through.
     canAssumeExhaustive = llvm::all_of(enumDecl->getAllElements(),
                                        [&](const EnumElementDecl *elt) {
       return caseToIndex.count(elt);
@@ -1815,7 +1730,7 @@ CaseBlocks::CaseBlocks(
   }
 
   if (!canAssumeExhaustive)
-    DefaultBB = SGF.createBasicBlock(curBB);
+    DefaultBB = SGF.createBasicBlockAfter(curBB);
 }
 
 /// Perform specialized dispatch for a sequence of EnumElementPattern or an
@@ -2201,7 +2116,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     } else {
       caseToIndex[isTrue] = index;
     
-      curBB = SGF.createBasicBlock(curBB);
+      curBB = SGF.createBasicBlockAfter(curBB);
       auto *IL = SGF.B.createIntegerLiteral(PatternMatchStmt,
                                     SILType::getBuiltinIntegerType(1, Context),
                                             isTrue ? 1 : 0);
@@ -2223,7 +2138,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
 
   // Check to see if we need a default block.
   if (caseBBs.size() < 2)
-    defaultBB = SGF.createBasicBlock(curBB);
+    defaultBB = SGF.createBasicBlockAfter(curBB);
 
   // Emit the switch_value
   SILLocation loc = PatternMatchStmt;
@@ -2511,47 +2426,6 @@ class Lowering::PatternMatchContext {
 public:
   PatternMatchEmission &Emission;
 };
-
-void SILGenFunction::usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt *stmt,
-                                                      const llvm::function_ref<void(void)> &f) {
-  // Early exit for CatchStmt
-  if (!stmt) {
-    f();
-    return;
-  }
-
-  ArrayRef<CaseLabelItem> labelItems = stmt->getCaseLabelItems();
-  auto expectedPattern = labelItems[0].getPattern();
-  
-  if (labelItems.size() <= 1 || pattern == expectedPattern) {
-    f();
-    return;
-  }
-
-  // Remap vardecls that the case body is expecting to the pattern var locations
-  // for the given pattern, emit whatever, and switch back.
-  SmallVector<VarDecl *, 4> Vars;
-  expectedPattern->collectVariables(Vars);
-  
-  auto variableSwapper = [&] {
-    pattern->forEachVariable([&](VarDecl *VD) {
-      if (!VD->hasName())
-        return;
-      for (auto expected : Vars) {
-        if (expected->hasName() && expected->getName() == VD->getName()) {
-          auto swap = VarLocs[expected];
-          VarLocs[expected] = VarLocs[VD];
-          VarLocs[VD] = swap;
-          return;
-        }
-      }
-    });
-  };
-  
-  variableSwapper();
-  f();
-  variableSwapper();
-}
 
 static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
                                                   SILLocation loc,

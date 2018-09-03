@@ -144,7 +144,7 @@ protected:
     IsTypeDefaulted : 1,
     /// Number of comma source locations.
     NumCommas : 32 - 1 - NumExprBits,
-    /// Number of entries in the collection. If this is a DictionaryLiteral,
+    /// Number of entries in the collection. If this is a DictionaryExpr,
     /// each entry is a Tuple with the key and value pair.
     NumSubExprs : 32
   );
@@ -3344,6 +3344,25 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::InOut;
+  }
+};
+
+/// The not-yet-actually-surfaced '...' varargs expansion operator,
+/// which splices an array into a sequence of variadic arguments.
+class VarargExpansionExpr : public Expr {
+  Expr *SubExpr;
+
+public:
+  VarargExpansionExpr(Expr *subExpr, bool implicit, Type type = Type())
+    : Expr(ExprKind::VarargExpansion, implicit, type), SubExpr(subExpr) {}
+
+  SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::VarargExpansion;
   }
 };
 

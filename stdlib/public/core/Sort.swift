@@ -45,9 +45,7 @@ extension Sequence where Element: Comparable {
   /// - Complexity: O(*n* log *n*), where *n* is the length of the sequence.
   @inlinable
   public func sorted() -> [Element] {
-    var result = ContiguousArray(self)
-    result.sort()
-    return Array(result)
+    return sorted(by: <)
   }
 }
 
@@ -142,7 +140,6 @@ extension Sequence {
 
 extension MutableCollection
 where Self: RandomAccessCollection, Element: Comparable {
-
   /// Sorts the collection in place.
   ///
   /// You can sort any mutable collection of elements that conform to the
@@ -171,13 +168,7 @@ where Self: RandomAccessCollection, Element: Comparable {
   /// - Complexity: O(*n* log *n*), where *n* is the length of the collection.
   @inlinable
   public mutating func sort() {
-    let didSortUnsafeBuffer = _withUnsafeMutableBufferPointerIfSupported {
-      buffer -> Void? in
-       buffer.sort()
-    }
-    if didSortUnsafeBuffer == nil {
-      _introSort(&self, subRange: startIndex..<endIndex, by: <)
-    }
+    sort(by: <)
   }
 }
 
@@ -261,334 +252,306 @@ extension MutableCollection where Self: RandomAccessCollection {
         try buffer.sort(by: areInIncreasingOrder)
     }
     if didSortUnsafeBuffer == nil {
-      try _introSort(
-        &self,
-        subRange: startIndex..<endIndex,
-        by: areInIncreasingOrder)
+      try _introSort(within: startIndex..<endIndex, by: areInIncreasingOrder)
     }
   }
 }
 
-@inlinable
-internal func _insertionSort<C: MutableCollection & BidirectionalCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>, 
-  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
+extension MutableCollection where Self: BidirectionalCollection {
+  @inlinable
+  internal mutating func _insertionSort(
+    within range: Range<Index>, 
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows {
 
-  if !range.isEmpty {
+    guard !range.isEmpty else { return }
+
     let start = range.lowerBound
 
-    // Keep track of the end of the initial sequence of sorted
-    // elements.
-    var sortedEnd = start
+    // Keep track of the end of the initial sequence of sorted elements. One
+    // element is trivially already-sorted, thus pre-increment Continue until
+    // the sorted elements cover the whole sequence
+    var sortedEnd = index(after: start)
 
-    // One element is trivially already-sorted, thus pre-increment
-    // Continue until the sorted elements cover the whole sequence
-    elements.formIndex(after: &sortedEnd)
     while sortedEnd != range.upperBound {
       // get the first unsorted element
-      let x: C.Element = elements[sortedEnd]
+      // FIXME: by stashing the element, instead of using indexing and swapAt,
+      // this method won't work for collections of move-only types.
+      let x = self[sortedEnd]
 
       // Look backwards for x's position in the sorted sequence,
       // moving elements forward to make room.
       var i = sortedEnd
       repeat {
-        let predecessor: C.Element = elements[elements.index(before: i)]
+        let j = index(before: i)
+        let predecessor = self[j]
 
-        // If clouser throws the error, We catch the error put the element at right
-        // place and rethrow the error.
+        // If closure throws, put the element at right place and rethrow.
         do {
           // if x doesn't belong before y, we've found its position
-          if !(try areInIncreasingOrder(x, predecessor)) {
+          if try !areInIncreasingOrder(x, predecessor) {
             break
           }
         } catch {
-          elements[i] = x
+          self[i] = x
           throw error
         }
 
         // Move y forward
-        elements[i] = predecessor
-        elements.formIndex(before: &i)
+        self[i] = predecessor
+        i = j
       } while i != start
 
       if i != sortedEnd {
         // Plop x into position
-        elements[i] = x
+        self[i] = x
       }
-      elements.formIndex(after: &sortedEnd)
+      formIndex(after: &sortedEnd)
     }
   }
 }
 
-/// Sorts the elements at `elements[a]`, `elements[b]`, and `elements[c]`.
-/// Stable.
-///
-/// The indices passed as `a`, `b`, and `c` do not need to be consecutive, but
-/// must be in strict increasing order.
-///
-/// - Precondition: `a < b && b < c`
-/// - Postcondition: `elements[a] <= elements[b] && elements[b] <= elements[c]`
-@inlinable
-public // @testable
-func _sort3<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  _ a: C.Index, _ b: C.Index, _ c: C.Index, 
-  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
-  // There are thirteen possible permutations for the original ordering of
-  // the elements at indices `a`, `b`, and `c`. The comments in the code below
-  // show the relative ordering of the three elements using a three-digit
-  // number as shorthand for the position and comparative relationship of
-  // each element. For example, "312" indicates that the element at `a` is the
-  // largest of the three, the element at `b` is the smallest, and the element
-  // at `c` is the median. This hypothetical input array has a 312 ordering for
-  // `a`, `b`, and `c`:
-  //
-  //      [ 7, 4, 3, 9, 2, 0, 3, 7, 6, 5 ]
-  //        ^              ^           ^
-  //        a              b           c
-  //
-  // - If each of the three elements is distinct, they could be ordered as any
-  //   of the permutations of 1, 2, and 3: 123, 132, 213, 231, 312, or 321.
-  // - If two elements are equivalent and one is distinct, they could be
-  //   ordered as any permutation of 1, 1, and 2 or 1, 2, and 2: 112, 121, 211,
-  //   122, 212, or 221.
-  // - If all three elements are equivalent, they are already in order: 111.
+extension MutableCollection {
+  /// Sorts the elements at `elements[a]`, `elements[b]`, and `elements[c]`.
+  /// Stable.
+  ///
+  /// The indices passed as `a`, `b`, and `c` do not need to be consecutive, but
+  /// must be in strict increasing order.
+  ///
+  /// - Precondition: `a < b && b < c`
+  /// - Postcondition: `self[a] <= self[b] && self[b] <= self[c]`
+  @inlinable
+  public // @testable
+  mutating func _sort3(
+    _ a: Index, _ b: Index, _ c: Index, 
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows {
+    // There are thirteen possible permutations for the original ordering of
+    // the elements at indices `a`, `b`, and `c`. The comments in the code below
+    // show the relative ordering of the three elements using a three-digit
+    // number as shorthand for the position and comparative relationship of
+    // each element. For example, "312" indicates that the element at `a` is the
+    // largest of the three, the element at `b` is the smallest, and the element
+    // at `c` is the median. This hypothetical input array has a 312 ordering for
+    // `a`, `b`, and `c`:
+    //
+    //      [ 7, 4, 3, 9, 2, 0, 3, 7, 6, 5 ]
+    //        ^              ^           ^
+    //        a              b           c
+    //
+    // - If each of the three elements is distinct, they could be ordered as any
+    //   of the permutations of 1, 2, and 3: 123, 132, 213, 231, 312, or 321.
+    // - If two elements are equivalent and one is distinct, they could be
+    //   ordered as any permutation of 1, 1, and 2 or 1, 2, and 2: 112, 121, 211,
+    //   122, 212, or 221.
+    // - If all three elements are equivalent, they are already in order: 111.
 
-  switch ((try areInIncreasingOrder(elements[b], elements[a])),
-    (try areInIncreasingOrder(elements[c], elements[b]))) {
-  case (false, false):
-    // 0 swaps: 123, 112, 122, 111
-    break
+    switch try (areInIncreasingOrder(self[b], self[a]),
+                areInIncreasingOrder(self[c], self[b])) {
+    case (false, false):
+      // 0 swaps: 123, 112, 122, 111
+      break
 
-  case (true, true):
-    // 1 swap: 321
-    // swap(a, c): 312->123
-    elements.swapAt(a, c)
+    case (true, true):
+      // 1 swap: 321
+      // swap(a, c): 312->123
+      swapAt(a, c)
 
-  case (true, false):
-    // 1 swap: 213, 212 --- 2 swaps: 312, 211
-    // swap(a, b): 213->123, 212->122, 312->132, 211->121
-    elements.swapAt(a, b)
+    case (true, false):
+      // 1 swap: 213, 212 --- 2 swaps: 312, 211
+      // swap(a, b): 213->123, 212->122, 312->132, 211->121
+      swapAt(a, b)
 
-    if (try areInIncreasingOrder(elements[c], elements[b])) {
-      // 132 (started as 312), 121 (started as 211)
-      // swap(b, c): 132->123, 121->112
-      elements.swapAt(b, c)
-    }
-
-  case (false, true):
-    // 1 swap: 132, 121 --- 2 swaps: 231, 221
-    // swap(b, c): 132->123, 121->112, 231->213, 221->212
-    elements.swapAt(b, c)
-
-    if (try areInIncreasingOrder(elements[b], elements[a])) {
-      // 213 (started as 231), 212 (started as 221)
-      // swap(a, b): 213->123, 212->122
-      elements.swapAt(a, b)
-    }
-  }
-}
-
-/// Reorders `elements` and returns an index `p` such that every element in
-/// `elements[range.lowerBound..<p]` is less than every element in
-/// `elements[p..<range.upperBound]`.
-///
-/// - Precondition: The count of `range` must be >= 3:
-///   `elements.distance(from: range.lowerBound, to: range.upperBound) >= 3`
-@inlinable
-internal func _partition<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>, 
-  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows -> C.Index {
-  var lo = range.lowerBound
-  var hi = elements.index(before: range.upperBound)
-
-  // Sort the first, middle, and last elements, then use the middle value
-  // as the pivot for the partition.
-  let half = numericCast(elements.distance(from: lo, to: hi)) as UInt / 2
-  let mid = elements.index(lo, offsetBy: numericCast(half))
-  try _sort3(&elements, lo, mid, hi
-    , by: areInIncreasingOrder)
-  let pivot = elements[mid]
-
-  // Loop invariants:
-  // * lo < hi
-  // * elements[i] < pivot, for i in range.lowerBound..<lo
-  // * pivot <= elements[i] for i in hi..<range.upperBound
-  Loop: while true {
-    FindLo: do {
-      elements.formIndex(after: &lo)
-      while lo != hi {
-        if !(try areInIncreasingOrder(elements[lo], pivot)) { break FindLo }
-        elements.formIndex(after: &lo)
+      if try areInIncreasingOrder(self[c], self[b]) {
+        // 132 (started as 312), 121 (started as 211)
+        // swap(b, c): 132->123, 121->112
+        swapAt(b, c)
       }
-      break Loop
-    }
 
-    FindHi: do {
-      elements.formIndex(before: &hi)
-      while hi != lo {
-        if (try areInIncreasingOrder(elements[hi], pivot)) { break FindHi }
-        elements.formIndex(before: &hi)
+    case (false, true):
+      // 1 swap: 132, 121 --- 2 swaps: 231, 221
+      // swap(b, c): 132->123, 121->112, 231->213, 221->212
+      swapAt(b, c)
+
+      if try areInIncreasingOrder(self[b], self[a]) {
+        // 213 (started as 231), 212 (started as 221)
+        // swap(a, b): 213->123, 212->122
+        swapAt(a, b)
       }
-      break Loop
-    }
-
-    elements.swapAt(lo, hi)
-  }
-
-  return lo
-}
-
-@inlinable
-public // @testable
-func _introSort<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>
-  , by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
-
-  let count = elements.distance(from: range.lowerBound, to: range.upperBound)
-  if count < 2 {
-    return
-  }
-  // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
-  // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
-  let depthLimit = 2 * count._binaryLogarithm()
-  try _introSortImpl(
-    &elements,
-    subRange: range,
-    by: areInIncreasingOrder,
-    depthLimit: depthLimit)
-}
-
-@inlinable
-internal func _introSortImpl<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>
-  , by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool,
-  depthLimit: Int
-) rethrows {
-
-  // Insertion sort is better at handling smaller regions.
-  if elements.distance(from: range.lowerBound, to: range.upperBound) < 20 {
-    try _insertionSort(
-      &elements,
-      subRange: range
-      , by: areInIncreasingOrder)
-    return
-  }
-  if depthLimit == 0 {
-    try _heapSort(
-      &elements,
-      subRange: range
-      , by: areInIncreasingOrder)
-    return
-  }
-
-  // Partition and sort.
-  // We don't check the depthLimit variable for underflow because this variable
-  // is always greater than zero (see check above).
-  let partIdx: C.Index = try _partition(
-    &elements,
-    subRange: range
-    , by: areInIncreasingOrder)
-  try _introSortImpl(
-    &elements,
-    subRange: range.lowerBound..<partIdx,
-    by: areInIncreasingOrder, 
-    depthLimit: depthLimit &- 1)
-  try _introSortImpl(
-    &elements,
-    subRange: partIdx..<range.upperBound,
-    by: areInIncreasingOrder, 
-    depthLimit: depthLimit &- 1)
-}
-
-@inlinable
-internal func _siftDown<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  index: C.Index,
-  subRange range: Range<C.Index>,
-  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
-
-  let countToIndex = elements.distance(from: range.lowerBound, to: index)
-  let countFromIndex = elements.distance(from: index, to: range.upperBound)
-  // Check if left child is within bounds. If not, return, because there are
-  // no children of the given node in the heap.
-  if countToIndex + 1 >= countFromIndex {
-    return
-  }
-  let left = elements.index(index, offsetBy: countToIndex + 1)
-  var largest = index
-  if (try areInIncreasingOrder(elements[largest], elements[left])) {
-    largest = left
-  }
-  // Check if right child is also within bounds before trying to examine it.
-  if countToIndex + 2 < countFromIndex {
-    let right = elements.index(after: left)
-    if (try areInIncreasingOrder(elements[largest], elements[right])) {
-      largest = right
     }
   }
-  // If a child is bigger than the current node, swap them and continue sifting
-  // down.
-  if largest != index {
-    elements.swapAt(index, largest)
-    try _siftDown(
-      &elements,
-      index: largest,
-      subRange: range
-      , by: areInIncreasingOrder)
-  }
 }
 
-@inlinable
-internal func _heapify<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>, 
-  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
-  // Here we build a heap starting from the lowest nodes and moving to the root.
-  // On every step we sift down the current node to obey the max-heap property:
-  //   parent >= max(leftChild, rightChild)
-  //
-  // We skip the rightmost half of the array, because these nodes don't have
-  // any children.
-  let root = range.lowerBound
-  var node = elements.index(
-    root,
-    offsetBy: elements.distance(
-      from: range.lowerBound, to: range.upperBound) / 2)
+extension MutableCollection where Self: RandomAccessCollection {
+  /// Reorders the collection and returns an index `p` such that every element
+  /// in `range.lowerBound..<p` is less than every element in
+  /// `p..<range.upperBound`.
+  ///
+  /// - Precondition: The count of `range` must be >= 3 i.e.
+  ///   `distance(from: range.lowerBound, to: range.upperBound) >= 3`
+  @inlinable
+  internal mutating func _partition(
+    within range: Range<Index>,
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows -> Index {
+    var lo = range.lowerBound
+    var hi = index(before: range.upperBound)
 
-  while node != root {
-    elements.formIndex(before: &node)
-    try _siftDown(
-      &elements,
-      index: node,
-      subRange: range
-      , by: areInIncreasingOrder)
+    // Sort the first, middle, and last elements, then use the middle value
+    // as the pivot for the partition.
+    let half = distance(from: lo, to: hi) / 2
+    let mid = index(lo, offsetBy: half)
+    try _sort3(lo, mid, hi, by: areInIncreasingOrder)
+    let pivot = self[mid]
+
+    // Loop invariants:
+    // * lo < hi
+    // * self[i] < pivot, for i in range.lowerBound..<lo
+    // * pivot <= self[i] for i in hi..<range.upperBound
+    Loop: while true {
+      FindLo: do {
+        formIndex(after: &lo)
+        while lo != hi {
+          if try !areInIncreasingOrder(self[lo], pivot) { break FindLo }
+          formIndex(after: &lo)
+        }
+        break Loop
+      }
+
+      FindHi: do {
+        formIndex(before: &hi)
+        while hi != lo {
+          if try areInIncreasingOrder(self[hi], pivot) { break FindHi }
+          formIndex(before: &hi)
+        }
+        break Loop
+      }
+
+      swapAt(lo, hi)
+    }
+
+    return lo
   }
-}
 
-@inlinable
-internal func _heapSort<C: MutableCollection & RandomAccessCollection>(
-  _ elements: inout C,
-  subRange range: Range<C.Index>
-  , by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows {
-  var hi = range.upperBound
-  let lo = range.lowerBound
-  try _heapify(&elements, subRange: range, by: areInIncreasingOrder)
-  elements.formIndex(before: &hi)
-  while hi != lo {
-    elements.swapAt(lo, hi)
-    try _siftDown(&elements, index: lo, subRange: lo..<hi, by: areInIncreasingOrder)
-    elements.formIndex(before: &hi)
+  @inlinable
+  public // @testable
+  mutating func _introSort(
+    within range: Range<Index>,
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows {
+
+    let n = distance(from: range.lowerBound, to: range.upperBound)
+    guard n > 1 else { return }
+
+    // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
+    // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
+    let depthLimit = 2 * n._binaryLogarithm()
+    try _introSortImpl(
+      within: range,
+      by: areInIncreasingOrder,
+      depthLimit: depthLimit)
+  }
+
+  @inlinable
+  internal mutating func _introSortImpl(
+    within range: Range<Index>,
+    by areInIncreasingOrder: (Element, Element) throws -> Bool,
+    depthLimit: Int
+  ) rethrows {
+
+    // Insertion sort is better at handling smaller regions.
+    if distance(from: range.lowerBound, to: range.upperBound) < 20 {
+      try _insertionSort(within: range, by: areInIncreasingOrder)
+    } else if depthLimit == 0 {
+      try _heapSort(within: range, by: areInIncreasingOrder)
+    } else {
+      // Partition and sort.
+      // We don't check the depthLimit variable for underflow because this
+      // variable is always greater than zero (see check above).
+      let partIdx = try _partition(within: range, by: areInIncreasingOrder)
+      try _introSortImpl(
+        within: range.lowerBound..<partIdx,
+        by: areInIncreasingOrder, 
+        depthLimit: depthLimit &- 1)
+      try _introSortImpl(
+        within: partIdx..<range.upperBound,
+        by: areInIncreasingOrder, 
+        depthLimit: depthLimit &- 1)      
+    }
+  }
+
+  @inlinable
+  internal mutating func _siftDown(
+    _ idx: Index,
+    within range: Range<Index>,
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows {
+    var i = idx
+    var countToIndex = distance(from: range.lowerBound, to: i)
+    var countFromIndex = distance(from: i, to: range.upperBound)
+    // Check if left child is within bounds. If not, stop iterating, because
+    // there are no children of the given node in the heap.
+    while countToIndex + 1 < countFromIndex {
+      let left = index(i, offsetBy: countToIndex + 1)
+      var largest = i
+      if try areInIncreasingOrder(self[largest], self[left]) {
+        largest = left
+      }
+      // Check if right child is also within bounds before trying to examine it.
+      if countToIndex + 2 < countFromIndex {
+        let right = index(after: left)
+        if try areInIncreasingOrder(self[largest], self[right]) {
+          largest = right
+        }
+      }
+      // If a child is bigger than the current node, swap them and continue sifting
+      // down.
+      if largest != i {
+        swapAt(idx, largest)
+        i = largest
+        countToIndex = distance(from: range.lowerBound, to: i)
+        countFromIndex = distance(from: i, to: range.upperBound)
+      } else {
+        break
+      }
+    }
+  }
+
+  @inlinable
+  internal mutating func _heapify(
+    within range: Range<Index>, 
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows {
+    // Here we build a heap starting from the lowest nodes and moving to the
+    // root. On every step we sift down the current node to obey the max-heap
+    // property:
+    //   parent >= max(leftChild, rightChild)
+    //
+    // We skip the rightmost half of the array, because these nodes don't have
+    // any children.
+    let root = range.lowerBound
+    let half = distance(from: range.lowerBound, to: range.upperBound) / 2
+    var node = index(root, offsetBy: half)
+
+    while node != root {
+      formIndex(before: &node)
+      try _siftDown(node, within: range, by: areInIncreasingOrder)
+    }
+  }
+
+  @inlinable
+  internal mutating func _heapSort(
+    within range: Range<Index>,
+    by areInIncreasingOrder: (Element, Element) throws -> Bool
+  ) rethrows {
+    var hi = range.upperBound
+    let lo = range.lowerBound
+    try _heapify(within: range, by: areInIncreasingOrder)
+    formIndex(before: &hi)
+    while hi != lo {
+      swapAt(lo, hi)
+      try _siftDown(lo, within: lo..<hi, by: areInIncreasingOrder)
+      formIndex(before: &hi)
+    }
   }
 }

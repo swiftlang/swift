@@ -136,8 +136,7 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
 
   void popTopDeadCleanups(CleanupsDepth end);
   void emitCleanups(CleanupsDepth depth, CleanupLocation l,
-                    ForUnwind_t forUnwind,
-                    bool popCleanups=true);
+                    ForUnwind_t forUnwind, bool popCleanups);
   void endScope(CleanupsDepth depth, CleanupLocation l);
 
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
@@ -159,6 +158,10 @@ public:
     assert(!stack.empty());
     return stack.stable_begin();
   }
+  
+  Cleanup &getCleanup(CleanupHandle iter) {
+    return *stack.find(iter);
+  }
 
   /// \brief Emit a branch to the given jump destination,
   /// threading out through any cleanups we need to run. This does not pop the
@@ -173,7 +176,7 @@ public:
 
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a
   /// return from the function.
-  void emitCleanupsForReturn(CleanupLocation loc);
+  void emitCleanupsForReturn(CleanupLocation loc, ForUnwind_t forUnwind);
 
   /// Emit a new block that jumps to the specified location and runs necessary
   /// cleanups based on its level.  If there are no cleanups to run, this just

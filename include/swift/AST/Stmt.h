@@ -237,7 +237,8 @@ class YieldStmt final
 
 public:
   static YieldStmt *create(const ASTContext &ctx, SourceLoc yieldLoc,
-                           SourceLoc lp, ArrayRef<Expr*> yields, SourceLoc rp);
+                           SourceLoc lp, ArrayRef<Expr*> yields, SourceLoc rp,
+                           Optional<bool> implicit = None);
 
   SourceLoc getYieldLoc() const { return YieldLoc; }
   SourceLoc getLParenLoc() const { return LPLoc; }

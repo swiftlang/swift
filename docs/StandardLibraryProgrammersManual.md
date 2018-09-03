@@ -37,7 +37,7 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
     1. `@inline(__always)` and `@inline(never)`
     1. `@semantics(...)`
     1. Builtins
-        1. Builtin.addressof, _isUnique, _isUniqueOrPinned, etc
+        1. Builtin.addressof, _isUnique, etc
 1. Dirty hacks
     1. Why all the underscores and extra protocols?
     1. How does the `...` ranges work?

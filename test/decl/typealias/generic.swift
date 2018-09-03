@@ -28,7 +28,7 @@ let _: Container.YourType<Int>
 
 typealias DS<T> = MyType<String, T>
 
-typealias BadA<T : Int> = MyType<String, T>  // expected-error {{inheritance from non-protocol, non-class type 'Int'}}
+typealias BadA<T : Int> = MyType<String, T>  // expected-error {{type 'T' constrained to non-protocol, non-class type 'Int'}}
 
 typealias BadB<T where T == Int> = MyType<String, T>  // expected-error {{associated types must not have a generic parameter list}}
 // expected-error@-1 {{same-type requirement makes generic parameter 'T' non-generic}}

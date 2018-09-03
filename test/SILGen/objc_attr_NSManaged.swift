@@ -103,12 +103,10 @@ class FinalEntity: NSObject, EntityIDProto {
 	@NSManaged final var entityID: String
 }
 
-// CHECK-LABEL: sil private @$S19objc_attr_NSManaged11FinalEntityC8entityIDSSvmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed FinalEntity, @thick FinalEntity.Type) -> ()
-// CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!setter.1.foreign
-// CHECK: return
-
-// CHECK-LABEL: sil hidden @$S19objc_attr_NSManaged11FinalEntityC8entityIDSSvm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed FinalEntity) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil shared @$S19objc_attr_NSManaged11FinalEntityC8entityIDSSvM : $@yield_once @convention(method) (@guaranteed FinalEntity) -> @yields @inout String
 // CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!getter.1.foreign
+// CHECK: yield
+// CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!setter.1.foreign
 // CHECK: return
 
 // CHECK-NOT: sil hidden @$S19objc_attr_NSManaged10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X

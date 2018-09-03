@@ -32,7 +32,7 @@ void test1() {
   id<MyProt> p;
   // CHECK: [[@LINE-1]]:6 | protocol/Swift | MyProt | [[MyProt_USR]] |
   [p someProtMeth];
-  // CHECK: [[@LINE-1]]:6 | instance-method/Swift | someProtMeth | [[MyProt_someProtMeth_USR]] |
+  // CHECK: [[@LINE-1]]:6 | instance-method(protocol)/Swift | someProtMeth | [[MyProt_someProtMeth_USR]] |
 
   MyEnum myenm = MyEnumSomeEnumConst;
   // CHECK: [[@LINE-1]]:3 | enum/Swift | MyEnum | [[MyEnum_USR]] |

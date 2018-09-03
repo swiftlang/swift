@@ -98,22 +98,14 @@ ProtocolConformanceRef::subst(Type origType,
   if (isInvalid())
     return *this;
 
-  auto substType = origType.subst(subs, conformances,
-                                  SubstFlags::UseErrorType);
-
   // If we have a concrete conformance, we need to substitute the
   // conformance to apply to the new type.
-  if (isConcrete()) {
-    auto concrete = getConcrete();
-    if (auto classDecl = concrete->getType()->getClassOrBoundGenericClass()) {
-      // If this is a class, we need to traffic in the actual type that
-      // implements the protocol, not 'Self' and not any subclasses (with their
-      // inherited conformances).
-      substType = substType->getSuperclassForDecl(classDecl);
-    }
-    return ProtocolConformanceRef(
-      getConcrete()->subst(substType, subs, conformances));
-  }
+  if (isConcrete())
+    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances));
+
+  // Otherwise, compute the substituted type.
+  auto substType = origType.subst(subs, conformances,
+                                  SubstFlags::UseErrorType);
 
   // Opened existentials trivially conform and do not need to go through
   // substitution map lookup.
@@ -444,7 +436,7 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     return;
   }
 
-  auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = DC->getSelfNominalTypeDecl();
   auto typeSig = nominal->getGenericSignature();
 
   // A non-generic type won't have conditional requirements.
@@ -1047,67 +1039,54 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
 }
 
 ProtocolConformance *
-ProtocolConformance::subst(Type substType,
-                           SubstitutionMap subMap) const {
-  return subst(substType,
-               QuerySubstitutionMap{subMap},
+ProtocolConformance::subst(SubstitutionMap subMap) const {
+  return subst(QuerySubstitutionMap{subMap},
                LookUpConformanceInSubstitutionMap(subMap));
 }
 
 ProtocolConformance *
-ProtocolConformance::subst(Type substType,
-                           TypeSubstitutionFn subs,
+ProtocolConformance::subst(TypeSubstitutionFn subs,
                            LookupConformanceFn conformances) const {
-  // ModuleDecl::lookupConformance() strips off dynamic Self, so
-  // we should do the same here.
-  if (auto selfType = substType->getAs<DynamicSelfType>())
-    substType = selfType->getSelfType();
-
-  if (getType()->isEqual(substType))
-    return const_cast<ProtocolConformance *>(this);
-  
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
-    if (substType->isSpecialized()) {
-      assert(getType()->isSpecialized()
-             && "substitution mapped non-specialized to specialized?!");
-      assert(getType()->getNominalOrBoundGenericNominal()
-               == substType->getNominalOrBoundGenericNominal()
-             && "substitution mapped to different nominal?!");
+    auto origType = getType();
+    if (!origType->hasTypeParameter() &&
+        !origType->hasArchetype())
+      return const_cast<ProtocolConformance *>(this);
 
-      auto subMap = SubstitutionMap::get(getGenericSignature(),
-                                         subs, conformances);
+    auto subMap = SubstitutionMap::get(getGenericSignature(),
+                                       subs, conformances);
+    auto substType = origType.subst(subMap, SubstFlags::UseErrorType);
+    if (substType->isEqual(origType))
+      return const_cast<ProtocolConformance *>(this);
 
-      return substType->getASTContext()
+    return substType->getASTContext()
         .getSpecializedConformance(substType,
                                    const_cast<ProtocolConformance *>(this),
                                    subMap);
-    }
-
-    assert(substType->isEqual(getType())
-           && "substitution changed non-specialized type?!");
-    return const_cast<ProtocolConformance *>(this);
   }
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
     auto inheritedConformance
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
-    ProtocolConformance *newBase;
-    if (inheritedConformance->getType()->isSpecialized()) {
-      // Follow the substituted type up the superclass chain until we reach
-      // the underlying class type.
-      auto targetClass =
-        inheritedConformance->getType()->getClassOrBoundGenericClass();
-      auto superclassType = substType->getSuperclassForDecl(targetClass);
 
-      // Substitute into the superclass.
-      newBase = inheritedConformance->subst(superclassType, subs, conformances);
-    } else {
-      newBase = inheritedConformance;
+    auto origType = getType();
+    if (!origType->hasTypeParameter() &&
+        !origType->hasArchetype()) {
+      return const_cast<ProtocolConformance *>(this);
     }
 
+    auto origBaseType = inheritedConformance->getType();
+    if (origBaseType->hasTypeParameter() ||
+        origBaseType->hasArchetype()) {
+      // Substitute into the superclass.
+      inheritedConformance = inheritedConformance->subst(subs, conformances);
+    }
+
+    auto substType = origType.subst(subs, conformances,
+                                    SubstFlags::UseErrorType);
     return substType->getASTContext()
-      .getInheritedConformance(substType, newBase);
+      .getInheritedConformance(substType, inheritedConformance);
   }
   case ProtocolConformanceKind::Specialized: {
     // Substitute the substitutions in the specialized conformance.
@@ -1115,6 +1094,9 @@ ProtocolConformance::subst(Type substType,
     auto genericConformance = spec->getGenericConformance();
     auto subMap = spec->getSubstitutionMap();
 
+    auto origType = getType();
+    auto substType = origType.subst(subs, conformances,
+                                    SubstFlags::UseErrorType);
     return substType->getASTContext()
       .getSpecializedConformance(substType, genericConformance,
                                  subMap.subst(subs, conformances));
@@ -1137,8 +1119,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
   ASTContext &ctx = getASTContext();
-  auto resolver = ctx.getLazyResolver();
-  ConformanceTable = new (ctx) ConformanceLookupTable(ctx, resolver);
+  ConformanceTable = new (ctx) ConformanceLookupTable(ctx);
   ++NumConformanceLookupTables;
 
   // If this type declaration was not parsed from source code or introduced
@@ -1190,7 +1171,6 @@ bool NominalTypeDecl::lookupConformance(
            module,
            const_cast<NominalTypeDecl *>(this),
            protocol,
-           getASTContext().getLazyResolver(),
            conformances);
 }
 
@@ -1198,7 +1178,6 @@ SmallVector<ProtocolDecl *, 2> NominalTypeDecl::getAllProtocols() const {
   prepareConformanceTable();
   SmallVector<ProtocolDecl *, 2> result;
   ConformanceTable->getAllProtocols(const_cast<NominalTypeDecl *>(this),
-                                    getASTContext().getLazyResolver(),
                                     result);
   return result;
 }
@@ -1209,7 +1188,6 @@ SmallVector<ProtocolConformance *, 2> NominalTypeDecl::getAllConformances(
   prepareConformanceTable();
   SmallVector<ProtocolConformance *, 2> result;
   ConformanceTable->getAllConformances(const_cast<NominalTypeDecl *>(this),
-                                       getASTContext().getLazyResolver(),
                                        sorted,
                                        result);
   return result;
@@ -1231,13 +1209,11 @@ ArrayRef<ValueDecl *>
 NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
                                              const ValueDecl *member,
                                              bool sorted) const {
-  assert(member->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext()
-           == this);
+  assert(member->getDeclContext()->getSelfNominalTypeDecl() == this);
   assert(!isa<ProtocolDecl>(this));
   prepareConformanceTable();
   return ConformanceTable->getSatisfiedProtocolRequirementsForMember(member,
                                            const_cast<NominalTypeDecl *>(this),
-                                           getASTContext().getLazyResolver(),
                                            sorted);
 }
 
@@ -1250,7 +1226,7 @@ DeclContext::getLocalProtocols(
   SmallVector<ProtocolDecl *, 2> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = getAsNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
   if (!nominal)
     return result;
 
@@ -1259,7 +1235,6 @@ DeclContext::getLocalProtocols(
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<DeclContext *>(this),
-    getASTContext().getLazyResolver(),
     lookupKind,
     &result,
     nullptr,
@@ -1282,7 +1257,7 @@ DeclContext::getLocalConformances(
   SmallVector<ProtocolConformance *, 2> result;
 
   // Dig out the nominal type.
-  NominalTypeDecl *nominal = getAsNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *nominal = getSelfNominalTypeDecl();
   if (!nominal)
     return result;
 
@@ -1295,7 +1270,6 @@ DeclContext::getLocalConformances(
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<DeclContext *>(this),
-    nominal->getASTContext().getLazyResolver(),
     lookupKind,
     nullptr,
     &result,
@@ -1412,7 +1386,7 @@ struct ProtocolConformanceTraceFormatter
     if (auto const *NPC = dyn_cast<NormalProtocolConformance>(C)) {
       NPC->getLoc().print(OS, *SM);
     } else if (auto const *DC = C->getDeclContext()) {
-      if (auto const *D = DC->getAsDeclOrDeclExtensionContext())
+      if (auto const *D = DC->getAsDecl())
         D->getLoc().print(OS, *SM);
     }
   }

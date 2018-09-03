@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -enable-sil-ownership -O -emit-sil -primary-file %s | %FileCheck %s
 
-// CHECK-LABEL: sil private [transparent] @$S18subscript_accessor1XVxSgycimytfU_
+// CHECK-LABEL: sil hidden [transparent] @$S18subscript_accessor1XVxSgyciM
 // CHECK: [[SETTER:%.*]] = function_ref @$S18subscript_accessor1XVxSgycis
 // CHECK-NEXT: apply [[SETTER]]<T>
 struct X<T> {

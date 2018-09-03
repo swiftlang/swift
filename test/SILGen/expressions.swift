@@ -448,11 +448,11 @@ func tuple_element(_ x: (Int, Float)) {
   // CHECK: apply
 
   int(tuple().0)
-  // CHECK: [[ZERO:%.*]] = tuple_extract {{%.*}} : {{.*}}, 0
+  // CHECK: ([[ZERO:%.*]], {{%.*}}) = destructure_tuple
   // CHECK: apply {{.*}}([[ZERO]])
 
   float(tuple().1)
-  // CHECK: [[ONE:%.*]] = tuple_extract {{%.*}} : {{.*}}, 1
+  // CHECK: ({{%.*}}, [[ONE:%.*]]) = destructure_tuple
   // CHECK: apply {{.*}}([[ONE]])
 }
 
@@ -702,10 +702,8 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 func implodeRecursiveTuple(_ expr: ((Int, Int), Int)?) {
 
   // CHECK: bb2([[WHOLE:%.*]] : @trivial $((Int, Int), Int)):
-  // CHECK-NEXT: [[X:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 0
-  // CHECK-NEXT: [[X0:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 0
-  // CHECK-NEXT: [[X1:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 1
-  // CHECK-NEXT: [[Y:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 1
+  // CHECK-NEXT: ([[X:%[0-9]+]], [[Y:%[0-9]+]]) = destructure_tuple [[WHOLE]]
+  // CHECK-NEXT: ([[X0:%[0-9]+]], [[X1:%[0-9]+]]) = destructure_tuple [[X]]
   // CHECK-NEXT: [[X:%[0-9]+]] = tuple ([[X0]] : $Int, [[X1]] : $Int)
   // CHECK-NEXT: debug_value [[X]] : $(Int, Int), let, name "x"
   // CHECK-NEXT: debug_value [[Y]] : $Int, let, name "y"

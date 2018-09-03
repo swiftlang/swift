@@ -370,15 +370,12 @@ func convClassBoundArchetypeUpcast<T : Parent>(_ f1: @escaping (Parent) -> (T, T
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T, [[CLOSURE:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed Parent) -> (@owned T, Trivial)):
 // CHECK:    [[CASTED_ARG:%.*]] = upcast [[ARG]] : $T to $Parent
 // CHECK:    [[RESULT:%.*]] = apply %1([[CASTED_ARG]])
-// CHECK:    [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]] : $(T, Trivial)
-// CHECK:    [[FIRST_RESULT:%.*]] = tuple_extract [[BORROWED_RESULT]] : $(T, Trivial), 0
-// CHECK:    [[COPIED_FIRST_RESULT:%.*]] = copy_value [[FIRST_RESULT]]
-// CHECK:    tuple_extract [[BORROWED_RESULT]] : $(T, Trivial), 1
-// CHECK:    destroy_value [[RESULT]]
-// CHECK:    [[CAST_COPIED_FIRST_RESULT:%.*]] = upcast [[COPIED_FIRST_RESULT]] : $T to $Parent
-// CHECK:    enum $Optional<Trivial>
-// CHECK:    [[RESULT:%.*]] = tuple ([[CAST_COPIED_FIRST_RESULT]] : $Parent, {{.*}} : $Optional<Trivial>)
+// CHECK:    ([[LHS:%.*]], [[RHS:%.*]]) = destructure_tuple [[RESULT]]
+// CHECK:    [[LHS_CAST:%.*]] = upcast [[LHS]] : $T to $Parent
+// CHECK:    [[RHS_OPT:%.*]] = enum $Optional<Trivial>, #Optional.some!enumelt.1, [[RHS]]
+// CHECK:    [[RESULT:%.*]] = tuple ([[LHS_CAST]] : $Parent, [[RHS_OPT]] : $Optional<Trivial>)
 // CHECK:    return [[RESULT]]
+// CHECK: } // end sil function '$S19function_conversion6ParentCxAA7TrivialVIeggod_xAcESgIeggod_ACRbzlTR'
 
 // CHECK-LABEL: sil hidden @$S19function_conversion37convClassBoundMetatypeArchetypeUpcast{{[_0-9a-zA-Z]*}}F
 func convClassBoundMetatypeArchetypeUpcast<T : Parent>(_ f1: @escaping (Parent.Type) -> (T.Type, Trivial)) {
@@ -388,10 +385,10 @@ func convClassBoundMetatypeArchetypeUpcast<T : Parent>(_ f1: @escaping (Parent.T
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$S19function_conversion6ParentCXMTxXMTAA7TrivialVIegydd_xXMTACXMTAESgIegydd_ACRbzlTR : $@convention(thin) <T where T : Parent> (@thick T.Type, @guaranteed @callee_guaranteed (@thick Parent.Type) -> (@thick T.Type, Trivial)) -> (@thick Parent.Type, Optional<Trivial>)
-// CHECK:         upcast %0 : $@thick T.Type to $@thick Parent.Type
+// CHECK: bb0([[META:%.*]] : 
+// CHECK:         upcast %0 : $@thick T.Type
 // CHECK-NEXT:    apply
-// CHECK-NEXT:    tuple_extract
-// CHECK-NEXT:    tuple_extract
+// CHECK-NEXT:    destructure_tuple
 // CHECK-NEXT:    upcast {{.*}} : $@thick T.Type to $@thick Parent.Type
 // CHECK-NEXT:    enum $Optional<Trivial>
 // CHECK-NEXT:    tuple
@@ -431,11 +428,11 @@ func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) ->
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SS3iIegydd_S2i_SitSgIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> (Int, Int)) -> Optional<(Int, Int)>
 // CHECK:         bb0(%0 : @trivial $Int, %1 : @guaranteed $@callee_guaranteed (Int) -> (Int, Int)):
 // CHECK:           [[RESULT:%.*]] = apply %1(%0)
-// CHECK-NEXT:      [[LEFT:%.*]] = tuple_extract [[RESULT]]
-// CHECK-NEXT:      [[RIGHT:%.*]] = tuple_extract [[RESULT]]
+// CHECK-NEXT:      ([[LEFT:%.*]], [[RIGHT:%.*]]) = destructure_tuple [[RESULT]]
 // CHECK-NEXT:      [[RESULT:%.*]] = tuple ([[LEFT]] : $Int, [[RIGHT]] : $Int)
 // CHECK-NEXT:      [[OPTIONAL:%.*]] = enum $Optional<(Int, Int)>, #Optional.some!enumelt.1, [[RESULT]]
 // CHECK-NEXT:      return [[OPTIONAL]]
+// CHECK-NEXT: } // end sil function '$SS3iIegydd_S2i_SitSgIegyd_TR'
 
 func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (Int, Int)? {
   return f
@@ -534,8 +531,7 @@ func convTupleAny(_ f1: @escaping () -> (),
 // CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
 // CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
 // CHECK-NEXT:    [[RESULT:%.*]] = apply %1()
-// CHECK-NEXT:    [[LEFT:%.*]] = tuple_extract [[RESULT]]
-// CHECK-NEXT:    [[RIGHT:%.*]] = tuple_extract [[RESULT]]
+// CHECK-NEXT:    ([[LEFT:%.*]], [[RIGHT:%.*]]) = destructure_tuple [[RESULT]]
 // CHECK-NEXT:    store [[LEFT:%.*]] to [trivial] [[LEFT_ADDR]]
 // CHECK-NEXT:    store [[RIGHT:%.*]] to [trivial] [[RIGHT_ADDR]]
 // CHECK-NEXT:    tuple ()
@@ -547,8 +543,7 @@ func convTupleAny(_ f1: @escaping () -> (),
 // CHECK-NEXT:    [[LEFT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
 // CHECK-NEXT:    [[RIGHT_ADDR:%.*]] = tuple_element_addr [[ANY_PAYLOAD]]
 // CHECK-NEXT:    [[RESULT:%.*]] = apply %1()
-// CHECK-NEXT:    [[LEFT:%.*]] = tuple_extract [[RESULT]]
-// CHECK-NEXT:    [[RIGHT:%.*]] = tuple_extract [[RESULT]]
+// CHECK-NEXT:    ([[LEFT:%.*]], [[RIGHT:%.*]]) = destructure_tuple [[RESULT]]
 // CHECK-NEXT:    store [[LEFT:%.*]] to [trivial] [[LEFT_ADDR]]
 // CHECK-NEXT:    store [[RIGHT:%.*]] to [trivial] [[RIGHT_ADDR]]
 // CHECK-NEXT:    inject_enum_addr %0
@@ -668,17 +663,13 @@ struct FunctionConversionParameterSubstToOrigReabstractionTest {
 
 // CHECK: sil {{.*}} @$SS4SIgggoo_S2Ss11AnyHashableVyps5Error_pIegggrrzo_TR
 // CHECK:  [[TUPLE:%.*]] = apply %4(%2, %3) : $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)
-// CHECK:  [[BORROW:%.*]] = begin_borrow [[TUPLE]] : $(String, String)
-// CHECK:  [[FRST:%.*]] = tuple_extract [[BORROW]] : $(String, String), 0
-// CHECK:  [[COPY1:%.*]] = copy_value [[FRST]] : $String
-// CHECK:  [[SND:%.*]] = tuple_extract [[BORROW]] : $(String, String), 1
-// CHECK:  [[COPY2:%.*]] = copy_value [[SND]] : $String
-// CHECK:  end_borrow [[BORROW]] from [[TUPLE]] : $(String, String), $(String, String)
-// CHECK:  destroy_value [[TUPLE]] : $(String, String)
+// CHECK:  ([[LHS:%.*]], [[RHS:%.*]]) = destructure_tuple [[TUPLE]]
 // CHECK:  [[ADDR:%.*]] = alloc_stack $String
-// CHECK:  store [[COPY1]] to [init] [[ADDR]] : $*String
+// CHECK:  store [[LHS]] to [init] [[ADDR]] : $*String
 // CHECK:  [[CVT:%.*]] = function_ref @$Ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
 // CHECK:  apply [[CVT]]<String>(%0, [[ADDR]])
+// CHECK: } // end sil function '$SS4SIgggoo_S2Ss11AnyHashableVyps5Error_pIegggrrzo_TR'
+
 func dontCrash() {
   let userInfo = ["hello": "world"]
   let d = [AnyHashable: Any](uniqueKeysWithValues: userInfo.map { ($0.key, $0.value) })

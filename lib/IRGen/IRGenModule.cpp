@@ -51,6 +51,7 @@
 #include "GenType.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
+#include "ProtocolInfo.h"
 #include "StructLayout.h"
 
 #include <initializer_list>
@@ -234,7 +235,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ProtocolRequirementStructTy =
       createStructType(*this, "swift.protocol_requirement", {
     Int32Ty,                // flags
-    Int32Ty,                // thunk
     Int32Ty                 // default implementation
   });
   

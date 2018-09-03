@@ -15,6 +15,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -88,7 +89,7 @@ static bool printObjCUSRFragment(const ValueDecl *D, StringRef ObjCName,
 static bool printObjCUSRContext(const Decl *D, raw_ostream &OS) {
   OS << clang::index::getUSRSpacePrefix();
   auto *DC = D->getDeclContext();
-  if (auto *Parent = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
+  if (auto *Parent = DC->getSelfNominalTypeDecl()) {
     auto *extContextD = dyn_cast<ExtensionDecl>(DC);
     auto ObjCName = objc_translation::getObjCNameForSwiftDecl(Parent);
     if (printObjCUSRFragment(Parent, ObjCName.first.str(), extContextD, OS))
@@ -156,20 +157,21 @@ static bool shouldUseObjCUSR(const Decl *D) {
   }
 
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    if (auto baseClass = ED->getAsClassOrClassExtensionContext()) {
+    if (auto baseClass = ED->getSelfClassDecl()) {
       return shouldUseObjCUSR(baseClass) && !baseClass->isForeign();
     }
   }
   return false;
 }
 
-bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
+llvm::Expected<std::string>
+swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl* D) const {
   if (!D->hasName() && !isa<ParamDecl>(D) && !isa<AccessorDecl>(D))
-    return true; // Ignore.
+    return std::string(); // Ignore.
   if (D->getModuleContext()->isBuiltinModule())
-    return true; // Ignore.
+    return std::string(); // Ignore.
   if (isa<ModuleDecl>(D))
-    return true; // Ignore.
+    return std::string(); // Ignore.
 
   auto interpretAsClangNode = [](const ValueDecl *D)->ClangNode {
     ClangNode ClangN = D->getClangNode();
@@ -200,13 +202,17 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     return ClangN;
   };
 
+  llvm::SmallString<128> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+
   if (ClangNode ClangN = interpretAsClangNode(D)) {
-    llvm::SmallString<128> Buf;
     if (auto ClangD = ClangN.getAsDecl()) {
-      bool Ignore = clang::index::generateUSRForDecl(ClangD, Buf);
-      if (!Ignore)
-        OS << Buf.str();
-      return Ignore;
+      bool Ignore = clang::index::generateUSRForDecl(ClangD, Buffer);
+      if (!Ignore) {
+        return Buffer.str();
+      } else {
+        return std::string();
+      }
     }
 
     auto &Importer = *D->getASTContext().getClangModuleLoader();
@@ -215,30 +221,41 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     bool Ignore = clang::index::generateUSRForMacro(
         D->getBaseName().getIdentifier().str(),
         ClangMacroInfo->getDefinitionLoc(),
-        Importer.getClangASTContext().getSourceManager(), Buf);
+        Importer.getClangASTContext().getSourceManager(), Buffer);
     if (!Ignore)
-      OS << Buf.str();
-    return Ignore;
+      return Buffer.str();
+    else
+      return std::string();
   }
 
   if (shouldUseObjCUSR(D)) {
-    return printObjCUSR(D, OS);
+    if (printObjCUSR(D, OS)) {
+      return std::string();
+    } else {
+      return OS.str();
+    }
   }
 
   if (!D->hasInterfaceType())
-    return true;
+    return std::string();
 
   // Invalid code.
   if (D->getInterfaceType().findIf([](Type t) -> bool {
         return t->is<ModuleType>();
       }))
-    return true;
+    return std::string();
 
   Mangle::ASTMangler NewMangler;
-  std::string Mangled = NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
+  return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
+}
 
-  OS << Mangled;
-
+bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
+  auto result = evaluateOrDefault(D->getASTContext().evaluator,
+                                  USRGenerationRequest { D },
+                                  std::string());
+  if (result.empty())
+    return true;
+  OS << result;
   return false;
 }
 

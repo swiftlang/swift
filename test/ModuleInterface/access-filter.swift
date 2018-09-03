@@ -60,8 +60,7 @@ extension PublicProto {
   @usableFromInline internal func ufiMethod() {}
 } // CHECK: {{^[}]$}}
 
-// FIXME: We shouldn't print access on extensions in textual interface files.
-// CHECK: {{^}}public extension PublicProto {{[{]$}}
+// CHECK: {{^}}extension PublicProto {{[{]$}}
 public extension PublicProto {
   // CHECK: public func publicExtPublicMethod(){{$}}
   func publicExtPublicMethod() {}

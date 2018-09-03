@@ -178,6 +178,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::IsBitwiseTakable) {
+    (void)args.claimAll();
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+                                             substitutions.getReplacementTypes()[0]);
+    out.add(valueTy.second.getIsBitwiseTakable(IGF, valueTy.first));
+    return;
+  }
 
   // addressof expects an lvalue argument.
   if (Builtin.ID == BuiltinValueKind::AddressOf) {

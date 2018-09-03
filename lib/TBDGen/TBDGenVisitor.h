@@ -48,11 +48,9 @@ public:
 
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
-  TBDGenOptions &Opts;
+  const TBDGenOptions &Opts;
 
 private:
-  bool FileHasEntryPoint = false;
-
   void addSymbol(StringRef name, tapi::internal::SymbolKind kind =
                                      tapi::internal::SymbolKind::GlobalSymbol);
 
@@ -64,19 +62,22 @@ private:
 
   void addDispatchThunk(SILDeclRef declRef);
 
+  void addMethodDescriptor(SILDeclRef declRef);
+
 public:
   TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
                 tapi::internal::ArchitectureSet archs, StringSet *stringSymbols,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, TBDGenOptions &opts)
+                ModuleDecl *swiftModule, const TBDGenOptions &opts)
       : Symbols(symbols), Archs(archs), StringSymbols(stringSymbols),
         UniversalLinkInfo(universalLinkInfo), SwiftModule(swiftModule),
         Opts(opts) {}
 
-  void setFileHasEntryPoint(bool hasEntryPoint) {
-    FileHasEntryPoint = hasEntryPoint;
-
-    if (hasEntryPoint)
+  void addMainIfNecessary(FileUnit *file) {
+    // HACK: 'main' is a special symbol that's always emitted in SILGen if
+    //       the file has an entry point. Since it doesn't show up in the
+    //       module until SILGen, we need to explicitly add it here.
+    if (file->hasEntryPoint())
       addSymbol("main");
   }
 

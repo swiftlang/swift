@@ -1,0 +1,39 @@
+REQUIRES: sftp_server
+
+RUN: %debug-remote-run --input-prefix %S/Inputs/upload/ ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt | %FileCheck -check-prefix CHECK-REMOTE %s
+RUN: ls %t-REMOTE/input/ | %FileCheck %s
+
+RUN: %empty-directory(%t-REMOTE)
+RUN: %debug-remote-run --input-prefix %S/Inputs/ ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt | %FileCheck -check-prefix CHECK-REMOTE-NESTED %s
+RUN: ls %t-REMOTE/input/upload/ | %FileCheck %s
+RUN: %debug-remote-run -v --input-prefix %S/Inputs/ ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt 2>&1 >/dev/null | %FileCheck -check-prefix VERBOSE-NESTED %s
+
+RUN: %empty-directory(%t-REMOTE)
+RUN: %debug-remote-run --input-prefix %S/Inputs/upload/1 ls %S/Inputs/upload/1.txt | %FileCheck -check-prefix CHECK-REMOTE-SINGLE-FILE %s
+RUN: test -f %t-REMOTE/input.txt
+
+RUN: %empty-directory(%t-REMOTE)
+RUN: %debug-remote-run --input-prefix %S/Inputs/upload/ --remote-input-prefix custom-input ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt | %FileCheck -check-prefix CHECK-REMOTE-CUSTOM %s
+RUN: ls %t-REMOTE/custom-input/ | %FileCheck %s
+
+CHECK-REMOTE: {{-REMOTE/input/1.txt$}}
+CHECK-REMOTE-NEXT: {{-REMOTE/input/2.txt$}}
+
+CHECK-REMOTE-NESTED: {{-REMOTE/input/upload/1.txt$}}
+CHECK-REMOTE-NESTED-NEXT: {{-REMOTE/input/upload/2.txt$}}
+
+CHECK-REMOTE-SINGLE-FILE: {{-REMOTE/input.txt$}}
+
+CHECK-REMOTE-CUSTOM: {{-REMOTE/custom-input/1.txt$}}
+CHECK-REMOTE-CUSTOM-NEXT: {{-REMOTE/custom-input/2.txt$}}
+
+CHECK-NOT: BAD
+CHECK: {{^1.txt$}}
+CHECK-NEXT: {{^2.txt$}}
+CHECK-NOT: BAD
+
+VERBOSE-NESTED: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/input/upload
+VERBOSE-NESTED-NEXT: /usr/bin/sftp
+VERBOSE-NESTED-DAG: -put '{{.+}}/Inputs/upload/1.txt' '{{.+}}-REMOTE/input/upload/1.txt'
+VERBOSE-NESTED-DAG: -put '{{.+}}/Inputs/upload/2.txt' '{{.+}}-REMOTE/input/upload/2.txt'
+VERBOSE-NESTED: /usr/bin/env ls

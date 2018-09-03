@@ -1043,22 +1043,22 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @_transparent
-  public static func +=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func +=(lhs: inout ${Self}, rhs: ${Self}) {
     lhs._value = Builtin.fadd_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public static func -=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func -=(lhs: inout ${Self}, rhs: ${Self}) {
     lhs._value = Builtin.fsub_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public static func *=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func *=(lhs: inout ${Self}, rhs: ${Self}) {
     lhs._value = Builtin.fmul_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public static func /=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func /=(lhs: inout ${Self}, rhs: ${Self}) {
     lhs._value = Builtin.fdiv_FPIEEE${bits}(lhs._value, rhs._value)
   }
 

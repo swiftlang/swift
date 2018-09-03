@@ -20,7 +20,7 @@ using namespace swift;
 using namespace swift::index;
 
 static NominalTypeDecl *getNominalParent(const ValueDecl *D) {
-  return D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  return D->getDeclContext()->getSelfNominalTypeDecl();
 }
 
 /// \returns true if \c D is a subclass of 'XCTestCase'.
@@ -234,8 +234,6 @@ SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
     return SymbolSubKind::SwiftAccessorMutableAddressor;
   case AccessorKind::Read:      return SymbolSubKind::SwiftAccessorRead;
   case AccessorKind::Modify:    return SymbolSubKind::SwiftAccessorModify;
-  case AccessorKind::MaterializeForSet:
-    llvm_unreachable("unexpected MaterializeForSet");
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");

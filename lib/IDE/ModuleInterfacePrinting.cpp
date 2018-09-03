@@ -207,8 +207,6 @@ static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
   // Print var declarations separately, one variable per decl.
   AdjustedOptions.ExplodePatternBindingDecls = true;
   AdjustedOptions.VarInitializers = false;
-
-  AdjustedOptions.PrintDefaultParameterPlaceholder = true;
 }
 
 ArrayRef<StringRef>

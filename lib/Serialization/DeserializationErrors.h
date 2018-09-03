@@ -116,9 +116,6 @@ class XRefTracePath {
         case Set:
           os << "(setter)";
           break;
-        case MaterializeForSet:
-          os << "(materializeForSet)";
-          break;
         case Address:
           os << "(addressor)";
           break;

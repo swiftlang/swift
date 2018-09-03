@@ -585,6 +585,8 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                       /*isBasic*/true,
                                                       /*isForDirective*/true);
+      if (Result.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
       if (Result.isNull())
         return makeParserError();
       Condition = Result.get();

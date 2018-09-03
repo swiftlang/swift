@@ -27,7 +27,7 @@ func physical_tuple_rvalue() -> Int {
   return tuple_rvalue().1
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @$S10properties12tuple_rvalue{{[_0-9a-zA-Z]*}}F
   // CHECK: [[TUPLE:%[0-9]+]] = apply [[FUNC]]()
-  // CHECK: [[RET:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 1
+  // CHECK: ({{%.*}}, [[RET:%[0-9]+]]) = destructure_tuple [[TUPLE]]
   // CHECK: return [[RET]]
 }
 
@@ -50,8 +50,7 @@ func tuple_assignment_2(_ a: inout Int, b: inout Int, xy: (Int, Int)) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : @trivial $*Int, [[B_ADDR:%[0-9]+]] : @trivial $*Int, [[X:%[0-9]+]] : @trivial $Int, [[Y:%[0-9]+]] : @trivial $Int):
   (a, b) = xy
   // CHECK: [[XY2:%[0-9]+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
-  // CHECK: [[X:%[0-9]+]] = tuple_extract [[XY2]] : {{.*}}, 0
-  // CHECK: [[Y:%[0-9]+]] = tuple_extract [[XY2]] : {{.*}}, 1
+  // CHECK: ([[X:%[0-9]+]], [[Y:%[0-9]+]]) = destructure_tuple [[XY2]]
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[A_ADDR]]
   // CHECK: assign [[X]] to [[WRITE]]
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[B_ADDR]]
@@ -200,18 +199,8 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[VAL_REF:%[0-9]+]] = load [copy] [[VAL_REF_ADDR]]
   // -- getters and setters
   // -- val.ref.val_prop
-  // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
-  // CHECK: [[VAL_REF_VAL_PROP_TEMP:%.*]] = alloc_stack $Val
-  // CHECK: [[VAL_REF_BORROWED:%.*]] = begin_borrow [[VAL_REF]]
-  // CHECK: [[T0:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_TEMP]] : $*Val to $Builtin.RawPointer
-  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : (Ref) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?)
-  // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[STORAGE]], [[VAL_REF_BORROWED]])
-  // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
-  // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 1  
-  // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Val
-  // CHECK: [[T2:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
-  // CHECK: end_borrow [[VAL_REF_BORROWED]] from [[VAL_REF]]
-  // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = begin_access [modify] [unsafe] [[T2]] : $*Val
+  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!modify.1 : (Ref) -> ()
+  // CHECK: ([[VAL_REF_VAL_PROP_MAT:%[0-9]+]], [[TOKEN:%.*]]) = begin_apply [[MAT_VAL_PROP_METHOD]]([[VAL_REF]])
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load_borrow [[VAL_REF_VAL_PROP_MAT]]
@@ -219,8 +208,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[A1:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
   // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV7z_tupleSi_Sitvg
   // CHECK: [[V_R_VP_Z_TUPLE:%[0-9]+]] = apply [[GET_Z_TUPLE_METHOD]]([[LD]])
-  // CHECK: [[T0:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 0
-  // CHECK: [[T1:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 1
+  // CHECK: ([[T0:%.*]], [[T1:%.*]]) = destructure_tuple [[V_R_VP_Z_TUPLE]]
   // CHECK: store [[T0]] to [trivial] [[A0]]
   // CHECK: store [[T1]] to [trivial] [[A1]]
   // CHECK: end_borrow [[LD]] from [[VAL_REF_VAL_PROP_MAT]]
@@ -232,19 +220,9 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[SET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV7z_tupleSi_Sitvs
   // CHECK: apply [[SET_Z_TUPLE_METHOD]]({{%[0-9]+, %[0-9]+}}, [[VAL_REF_VAL_PROP_MAT]])
   // -- writeback to val.ref.val_prop
-  // CHECK: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
-  // CHECK: [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
-  // CHECK: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed Ref, @thick Ref.Type) -> ()
-  // CHECK: [[REF_MAT:%.*]] = alloc_stack $Ref
-  // CHECK: store [[VAL_REF]] to [init] [[REF_MAT]]
-  // CHECK: [[T0:%.*]] = metatype $@thick Ref.Type
-  // CHECK: [[T1:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_MAT]]
-  // CHECK: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[REF_MAT]], [[T0]])
-  // CHECK: br [[CONT]]
-  // CHECK: [[CONT]]:
+  // CHECK: end_apply [[TOKEN]]
   // -- cleanup
   // CHECK: dealloc_stack [[V_R_VP_Z_TUPLE_MAT]]
-  // CHECK: dealloc_stack [[VAL_REF_VAL_PROP_TEMP]]
   // -- don't need to write back to val.ref because it's a ref type
 }
 
@@ -266,8 +244,7 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: [[A1:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @$S10properties3ValV7z_tupleSi_Sitvg
   // CHECK: [[Z_TUPLE:%[0-9]+]] = apply [[Z_GET_METHOD]]([[VAL1]])
-  // CHECK: [[T0:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 0
-  // CHECK: [[T1:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 1
+  // CHECK: ([[T0:%.*]], [[T1:%.*]]) = destructure_tuple [[Z_TUPLE]]
   // CHECK: store [[T0]] to [trivial] [[A0]]
   // CHECK: store [[T1]] to [trivial] [[A1]]
   // CHECK: end_borrow [[VAL1]] from [[WRITE]]
@@ -947,21 +924,6 @@ struct SomeGenericStruct<T> {
 // CHECK:         struct_extract {{%.*}} : $SomeGenericStruct<T>, #SomeGenericStruct.x
 func getX<T>(_ g: SomeGenericStruct<T>) -> Int {
   return g.x
-}
-
-
-// <rdar://problem/16189360> [DF] Assert on subscript with variadic parameter
-struct VariadicSubscript {
-  subscript(subs: Int...) -> Int {
-    get {
-      return 42
-    }
-  }
-
-  func test() {
-    var s = VariadicSubscript()
-    var x = s[0, 1, 2]
-  }
 }
 
 

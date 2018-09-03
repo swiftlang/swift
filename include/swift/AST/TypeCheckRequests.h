@@ -19,12 +19,17 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
 
+class GenericParamList;
+class RequirementRepr;
+class SpecializeAttr;
 struct TypeLoc;
 
 /// Display a nominal type or extension thereof.
@@ -39,7 +44,8 @@ class InheritedTypeRequest :
                          CacheKind::SeparatelyCached,
                          Type,
                          llvm::PointerUnion<TypeDecl *, ExtensionDecl *>,
-                         unsigned>
+                         unsigned,
+                         TypeResolutionStage>
 {
   /// Retrieve the TypeLoc for this inherited type.
   TypeLoc &getTypeLoc(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
@@ -52,18 +58,19 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator,
-                llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                unsigned index) const;
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator,
+           llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+           unsigned index,
+           TypeResolutionStage stage) const;
 
 public:
   // Cycle handling
-  Type breakCycle() const { return Type(); }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Caching
-  bool isCached() const { return true; }
+  bool isCached() const;
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
@@ -73,7 +80,8 @@ class SuperclassTypeRequest :
     public SimpleRequest<SuperclassTypeRequest,
                          CacheKind::SeparatelyCached,
                          Type,
-                         NominalTypeDecl *> {
+                         NominalTypeDecl *,
+                         TypeResolutionStage> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -81,16 +89,17 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl) const;
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl,
+           TypeResolutionStage stage) const;
 
 public:
   // Cycle handling
-  Type breakCycle() const { return Type(); }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Separate caching.
-  bool isCached() const { return true; }
+  bool isCached() const;
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
@@ -100,7 +109,8 @@ class EnumRawTypeRequest :
     public SimpleRequest<EnumRawTypeRequest,
                          CacheKind::SeparatelyCached,
                          Type,
-                         EnumDecl *> {
+                         EnumDecl *,
+                         TypeResolutionStage> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -108,16 +118,17 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const;
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
+           TypeResolutionStage stage) const;
 
 public:
   // Cycle handling
-  Type breakCycle() const { return Type(); }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Separate caching.
-  bool isCached() const { return true; }
+  bool isCached() const;
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
@@ -136,12 +147,11 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  llvm::TinyPtrVector<ValueDecl *> evaluate(Evaluator &evaluator,
-                                            ValueDecl *decl) const;
+  llvm::Expected<llvm::TinyPtrVector<ValueDecl *>>
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Cycle handling
-  llvm::TinyPtrVector<ValueDecl *> breakCycle() const { return { }; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -164,11 +174,10 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Cycle handling
-  bool breakCycle() const;
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -191,11 +200,10 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Cycle handling
-  bool breakCycle() const;
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -203,6 +211,115 @@ public:
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
+};
+
+/// Describes the owner of a where clause, from which we can extract
+/// requirements.
+struct WhereClauseOwner {
+  /// The declaration context in which the where clause will be evaluated.
+  DeclContext *dc;
+
+  /// The source of the where clause, which can be a generic parameter list
+  /// or a declaration that can have a where clause.
+  llvm::PointerUnion3<GenericParamList *, Decl *, SpecializeAttr *> source;
+
+  WhereClauseOwner(Decl *decl);
+
+  WhereClauseOwner(DeclContext *dc, GenericParamList *genericParams)
+    : dc(dc), source(genericParams) { }
+
+  WhereClauseOwner(DeclContext *dc, SpecializeAttr *attr)
+    : dc(dc), source(attr) { }
+
+  SourceLoc getLoc() const;
+
+  friend hash_code hash_value(const WhereClauseOwner &owner) {
+    return hash_combine(hash_value(owner.dc),
+                        hash_value(owner.source.getOpaqueValue()));
+  }
+
+  friend bool operator==(const WhereClauseOwner &lhs,
+                         const WhereClauseOwner &rhs) {
+    return lhs.dc == rhs.dc &&
+           lhs.source.getOpaqueValue() == rhs.source.getOpaqueValue();
+  }
+
+  friend bool operator!=(const WhereClauseOwner &lhs,
+                         const WhereClauseOwner &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const WhereClauseOwner &owner);
+
+/// Retrieve a requirement from the where clause of the given declaration.
+class RequirementRequest :
+    public SimpleRequest<RequirementRequest,
+                         CacheKind::SeparatelyCached,
+                         Requirement,
+                         WhereClauseOwner,
+                         unsigned,
+                         TypeResolutionStage> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  /// Retrieve the array of requirements from the given owner.
+  static MutableArrayRef<RequirementRepr> getRequirements(WhereClauseOwner);
+
+  /// Visit each of the requirements in the given owner,
+  ///
+  /// \returns true after short-circuiting if the callback returned \c true
+  /// for any of the requirements.
+  static bool visitRequirements(
+      WhereClauseOwner, TypeResolutionStage stage,
+      llvm::function_ref<bool(Requirement, RequirementRepr*)> callback);
+
+private:
+  friend class SimpleRequest;
+
+  /// Retrieve the requirement this request operates on.
+  RequirementRepr &getRequirement() const;
+
+  // Evaluation.
+  llvm::Expected<Requirement> evaluate(Evaluator &evaluator,
+                                       WhereClauseOwner,
+                                       unsigned index,
+                                       TypeResolutionStage stage) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const;
+  Optional<Requirement> getCachedResult() const;
+  void cacheResult(Requirement value) const;
+};
+
+/// Generate the USR for the given declaration.
+class USRGenerationRequest :
+    public SimpleRequest<USRGenerationRequest,
+                         CacheKind::Cached,
+                         std::string,
+                         const ValueDecl*>
+{
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend class SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<std::string> evaluate(Evaluator &eval, const ValueDecl* d) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Caching
+  bool isCached() const { return true; }
 };
 
 /// The zone number for the type checker.

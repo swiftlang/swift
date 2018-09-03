@@ -25,7 +25,7 @@ using namespace swift;
 
 static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
   auto *Preheader =
-      Header->getParent()->createBasicBlock(&*std::prev(Header->getIterator()));
+      Header->getParent()->createBasicBlockBefore(Header);
 
   // Clone the arguments from header into the pre-header.
   llvm::SmallVector<SILValue, 8> Args;
@@ -117,7 +117,7 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   }
 
   // Create and insert the new backedge block...
-  SILBasicBlock *BEBlock = F->createBasicBlock(BackedgeBlocks.back());
+  SILBasicBlock *BEBlock = F->createBasicBlockAfter(BackedgeBlocks.back());
 
   LLVM_DEBUG(llvm::dbgs() << "  Inserting unique backedge block " << *BEBlock
                           << "\n");

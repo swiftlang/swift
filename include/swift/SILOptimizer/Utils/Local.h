@@ -119,11 +119,6 @@ SILValue castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
 /// after \p ABI and returns it.
 ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index);
 
-/// Replace an apply with an instruction that produces the same value,
-/// then delete the apply and the instructions that produce its callee
-/// if possible.
-void replaceDeadApply(ApplySite Old, ValueBase *New);
-
 /// \brief Return true if any call inside the given function may bind dynamic
 /// 'Self' to a generic argument of the callee.
 bool mayBindDynamicSelf(SILFunction *F);
@@ -348,30 +343,30 @@ public:
   EdgeThreadingCloner(BranchInst *BI)
       : BaseThreadingCloner(*BI->getFunction(),
                             BI->getDestBB(), nullptr) {
-    DestBB = createEdgeBlockAndRedirectBranch(BI);
+    createEdgeBlockAndRedirectBranch(BI);
   }
 
-  SILBasicBlock *createEdgeBlockAndRedirectBranch(BranchInst *BI) {
+  void createEdgeBlockAndRedirectBranch(BranchInst *BI) {
     auto *Fn = BI->getFunction();
     auto *SrcBB = BI->getParent();
-    auto *DestBB = BI->getDestBB();
-    auto *EdgeBB = Fn->createBasicBlock(SrcBB);
+    auto *EdgeBB = BI->getDestBB();
+
+    this->DestBB = Fn->createBasicBlockAfter(SrcBB);
 
     // Create block arguments.
-    for (unsigned ArgIdx : range(DestBB->getNumArguments())) {
-      auto *DestPHIArg = cast<SILPHIArgument>(DestBB->getArgument(ArgIdx));
+    for (unsigned ArgIdx : range(EdgeBB->getNumArguments())) {
+      auto *DestPHIArg = cast<SILPHIArgument>(EdgeBB->getArgument(ArgIdx));
       assert(BI->getArg(ArgIdx)->getType() == DestPHIArg->getType() &&
              "Types must match");
-      auto *BlockArg = EdgeBB->createPHIArgument(
+      auto *BlockArg = DestBB->createPHIArgument(
           DestPHIArg->getType(), DestPHIArg->getOwnershipKind());
       ValueMap[DestPHIArg] = SILValue(BlockArg);
       AvailVals.push_back(std::make_pair(DestPHIArg, BlockArg));
     }
 
     // Redirect the branch.
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), EdgeBB, BI->getArgs());
+    SILBuilderWithScope(BI).createBranch(BI->getLoc(), DestBB, BI->getArgs());
     BI->eraseFromParent();
-    return EdgeBB;
   }
 
   SILBasicBlock *getEdgeBB() {
@@ -379,6 +374,10 @@ public:
     // to.
     return DestBB;
   }
+
+  /// Call this after processing all instructions to fix the control flow
+  /// graph. The branch cloner may have left critical edges.
+  bool splitCriticalEdges(DominanceInfo *DT, SILLoopInfo *LI);
 };
 
 /// Helper class for cloning of basic blocks.
@@ -419,8 +418,7 @@ class BasicBlockCloner : public BaseThreadingCloner {
 /// 'NeedToSplitCriticalEdges' to false if all critical edges are split,
 /// otherwise this call will try to split all critical edges.
 void updateSSAAfterCloning(BaseThreadingCloner &Cloner, SILBasicBlock *SrcBB,
-                           SILBasicBlock *DestBB,
-                           bool NeedToSplitCriticalEdges = true);
+                           SILBasicBlock *DestBB);
 
 // Helper class that provides a callback that can be used in
 // inliners/cloners for collecting new call sites.
@@ -647,6 +645,52 @@ protected:
     return ArtificialUnreachableLocation();
   }
 };
+
+/// Move only data structure that is the result of findLocalApplySite.
+///
+/// NOTE: Generally it is not suggested to have move only types that contain
+/// small vectors. Since our small vectors contain one element or a std::vector
+/// like data structure , this is ok since we will either just copy the single
+/// element when we do the move or perform a move of the vector type.
+struct LLVM_LIBRARY_VISIBILITY FindLocalApplySitesResult {
+  /// Contains the list of local non fully applied partial apply sites that we
+  /// found.
+  SmallVector<ApplySite, 1> partialApplySites;
+
+  /// Contains the list of full apply sites that we found.
+  SmallVector<FullApplySite, 1> fullApplySites;
+
+  /// Set to true if the function_ref escapes into a use that our analysis does
+  /// not understand. Set to false if we found a use that had an actual
+  /// escape. Set to None if we did not find any call sites, but also didn't
+  /// find any "escaping uses" as well.
+  ///
+  /// The none case is so that we can distinguish in between saying that a value
+  /// did escape and saying that we did not find any conservative information.
+  bool escapes;
+
+  FindLocalApplySitesResult() = default;
+  FindLocalApplySitesResult(const FindLocalApplySitesResult &) = delete;
+  FindLocalApplySitesResult &
+  operator=(const FindLocalApplySitesResult &) = delete;
+  FindLocalApplySitesResult(FindLocalApplySitesResult &&) = default;
+  FindLocalApplySitesResult &operator=(FindLocalApplySitesResult &&) = default;
+  ~FindLocalApplySitesResult() = default;
+
+  /// Treat this function ref as escaping only if we found an actual user we
+  /// didn't understand. Do not treat it as escaping if we did not find any
+  /// users at all.
+  bool isEscaping() const { return escapes; }
+};
+
+/// Returns .some(FindLocalApplySitesResult) if we found any interesting
+/// information for the given function_ref. Otherwise, returns None.
+///
+/// We consider "interesting information" to mean inclusively that:
+///
+/// 1. We discovered that the function_ref never escapes.
+/// 2. We were able to find either a partial apply or a full apply site.
+Optional<FindLocalApplySitesResult> findLocalApplySites(FunctionRefInst *FRI);
 
 } // end namespace swift
 
