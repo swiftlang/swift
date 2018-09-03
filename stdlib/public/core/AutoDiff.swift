@@ -69,11 +69,9 @@ public protocol DifferentiableVectorNumeric : VectorNumeric
   where ScalarElement : FloatingPoint {
   /// The tangent space of the vector space represented by the enclosing type.
   associatedtype Tangent : VectorNumeric
-    where Tangent.ScalarElement == ScalarElement
 
   /// The cotangent space of the vector space represented by the enclosing type.
   associatedtype Cotangent : VectorNumeric
-    where Cotangent.ScalarElement == ScalarElement
 
   var tangent: Tangent { get }
 
