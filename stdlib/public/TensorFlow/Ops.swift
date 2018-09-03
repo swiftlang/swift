@@ -134,6 +134,12 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
   }
 }
 
+extension Tensor : DifferentiableVectorNumeric
+  where ScalarElement : FloatingPoint {
+  public typealias Tangent = Tensor
+  public typealias Cotangent = Tensor
+}
+
 public extension Tensor where Scalar : Numeric {
   /// Adds two tensors and stores the result in the left-hand-side variable.
   /// - Note: `+=` supports broadcasting.
