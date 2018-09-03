@@ -22,7 +22,6 @@ public struct NWInterface : Hashable, CustomDebugStringConvertible {
 		return self.name
 	}
 
-	/// Comparison function to determine the equality of two network interfaces by name and kernel index.
 	public static func ==(lhs: NWInterface, rhs: NWInterface) -> Bool {
 		return lhs.index == rhs.index && lhs.name == rhs.name
 	}
@@ -75,7 +74,8 @@ public struct NWInterface : Hashable, CustomDebugStringConvertible {
 			}
 		}
 	}
-	// The interface type, such as other, wifi, cellular, wiredEthernet, and loopback.
+	
+	/// The interface types wifi, cellular, wiredEthernet, and loopback.
 	public let type: InterfaceType
 
 	/// The name of the interface, such as "en0"

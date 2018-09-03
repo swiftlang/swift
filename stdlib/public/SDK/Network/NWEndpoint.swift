@@ -114,7 +114,7 @@ private func getnameinfo_numeric(address: UnsafeRawPointer) -> String {
 	return result ?? "?"
 }
 
-/// An IP address protocol
+/// An IP address
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public protocol IPAddress {
 
@@ -244,7 +244,7 @@ public struct IPv4Address: IPAddress, Hashable, CustomDebugStringConvertible {
 	/// The interface the address is scoped to, if any.
 	public let interface: NWInterface?
 
-	/// Hashable
+	// Hashable
 	public static func == (lhs: IPv4Address, rhs: IPv4Address) -> Bool {
 		return lhs.address.s_addr == rhs.address.s_addr && lhs.interface == rhs.interface
 	}
@@ -254,7 +254,7 @@ public struct IPv4Address: IPAddress, Hashable, CustomDebugStringConvertible {
 		hasher.combine(self.interface)
 	}
 
-	/// CustomDebugStringConvertible returning a debug description string of the IPv4 address and interface or just the address.
+	// CustomDebugStringConvertible
 	public var debugDescription: String {
 		var sin = sockaddr_in(self.address, 0)
 		let addressString = getnameinfo_numeric(address: &sin)
@@ -434,7 +434,7 @@ public struct IPv6Address: IPAddress, Hashable, CustomDebugStringConvertible {
 		hasher.combine(self.interface)
 	}
 
-	/// CustomDebugStringConvertible returning a debug description string of the IPv6 address and interface or just the address.
+	// CustomDebugStringConvertible
 	public var debugDescription: String {
 		var sin6 = sockaddr_in6(self.address, 0)
 		let addressString = getnameinfo_numeric(address: &sin6)
@@ -524,7 +524,7 @@ public enum NWEndpoint: Hashable, CustomDebugStringConvertible {
 				return interface
 			}
 		}
-		
+
 		public var debugDescription: String {
 			switch self {
 			case .ipv4(let ip4):
@@ -630,12 +630,11 @@ public enum NWEndpoint: Hashable, CustomDebugStringConvertible {
 		if let nwinterface = nw_endpoint_copy_interface(nw) {
 			interface = NWInterface(nwinterface)
 		}
-		if nw_endpoint_get_type(nw) == Network.nw_endpoint_type_host{
+		if nw_endpoint_get_type(nw) == Network.nw_endpoint_type_host {
 
 			let host = NWEndpoint.Host.name(String(cString: nw_endpoint_get_hostname(nw)), interface)
 			self = .hostPort(host: host, port: NWEndpoint.Port(nw_endpoint_get_port(nw)))
 		} else if nw_endpoint_get_type(nw) == Network.nw_endpoint_type_address {
-			
 			let port = NWEndpoint.Port(nw_endpoint_get_port(nw))
 			let address = nw_endpoint_get_address(nw)
 			if address.pointee.sa_family == AF_INET && address.pointee.sa_len == MemoryLayout<sockaddr_in>.size {
