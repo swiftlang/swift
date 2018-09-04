@@ -778,11 +778,11 @@ using HeapMetadata = TargetHeapMetadata<InProcess>;
 /// other than it having 4 byte alignment.
 template <typename Runtime>
 struct TargetMethodDescriptor {
-  /// The method implementation.
-  TargetRelativeDirectPointer<Runtime, void> Impl;
-
   /// Flags describing the method.
   MethodDescriptorFlags Flags;
+
+  /// The method implementation.
+  TargetRelativeDirectPointer<Runtime, void> Impl;
 
   // TODO: add method types or anything else needed for reflection.
 };

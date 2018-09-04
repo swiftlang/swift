@@ -32,10 +32,11 @@ class A {}
 //   V-table length.
 // CHECK-SAME: i32 1,
 // CHECK-SMAE: %swift.method_descriptor {
+//   V-table entry #1: flags.
+// CHECK-SAME: i32 1
 //   V-table entry #1: invocation function.
 // CHECK-SAME: @"$S14class_metadata1ACACycfc"
-//   V-table entry #1: flags.
-// CHECK-SAME: i32 1 } }>, section
+// CHECK-SAME: } }>, section
 
 class B : A {}
 

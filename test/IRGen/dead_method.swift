@@ -19,14 +19,16 @@ public class Class {
 
 // -- vtable
 // CHECK-SAME: %swift.method_descriptor {
+// CHECK-SAME: i32 1,
 // CHECK-SAME: @"$S11dead_method5ClassCACycfc"
-// CHECK-SAME: , i32 1 }
+// CHECK-SAME: }
 
 // CHECK-SAME: %swift.method_descriptor {
+// CHECK-SAME: i32 16,
 // CHECK-SAME: @"$S11dead_method5ClassC4liveyyF"
-// CHECK-SAME: , i32 16 }
+// CHECK-SAME: }
 
-// CHECK-SAME: %swift.method_descriptor { i32 0, i32 16 }
+// CHECK-SAME: %swift.method_descriptor { i32 16, i32 0 }
 // CHECK-SAME: }>
 
 // CHECK-LABEL: @"$S11dead_method5ClassCMf" = internal global <{{.*}}> <{

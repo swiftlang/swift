@@ -1343,6 +1343,7 @@ namespace {
         flags = flags.withIsDynamic(true);
 
       // TODO: final? open?
+      descriptor.addInt(IGM.Int32Ty, flags.getIntValue());
 
       if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
         assert(entry->TheKind == SILVTable::Entry::Kind::Normal);
@@ -1354,8 +1355,6 @@ namespace {
         // It should be never called. We add a pointer to an error function.
         descriptor.addRelativeAddressOrNull(nullptr);
       }
-
-      descriptor.addInt(IGM.Int32Ty, flags.getIntValue());
 
       descriptor.finishAndAddTo(B);
 
