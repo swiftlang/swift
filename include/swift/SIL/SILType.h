@@ -492,6 +492,9 @@ public:
   /// Returns the underlying referent SILType of an @sil_unowned or @sil_weak
   /// Type.
   SILType getReferentType(SILModule &M) const;
+  
+  /// Returns a SILType with any archetypes mapped out of context.
+  SILType mapTypeOutOfContext() const;
 
   /// Given two SIL types which are representations of the same type,
   /// check whether they have an abstraction difference.
