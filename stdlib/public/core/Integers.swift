@@ -758,14 +758,14 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +(lhs: Self, rhs: Self) -> Self
+  override static func +(lhs: Self, rhs: Self) -> Self
 
   /// Adds two values and stores the result in the left-hand-side variable.
   ///
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +=(lhs: inout Self, rhs: Self)
+  override static func +=(lhs: inout Self, rhs: Self)
 
   /// Subtracts one value from another and produces their difference.
   ///
@@ -787,7 +787,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -(lhs: Self, rhs: Self) -> Self
+  override static func -(lhs: Self, rhs: Self) -> Self
 
   /// Subtracts the second value from the first and stores the difference in the
   /// left-hand-side variable.
@@ -795,7 +795,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -=(lhs: inout Self, rhs: Self)
+  override static func -=(lhs: inout Self, rhs: Self)
 
   /// Multiplies two values and produces their product.
   ///
@@ -817,7 +817,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *(lhs: Self, rhs: Self) -> Self
+  override static func *(lhs: Self, rhs: Self) -> Self
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable.
@@ -825,7 +825,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *=(lhs: inout Self, rhs: Self)
+  override static func *=(lhs: inout Self, rhs: Self)
 
   /// Returns the inverse of the bits set in the argument.
   ///
