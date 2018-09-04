@@ -2527,6 +2527,12 @@ extension FixedWidthInteger {
   ///     // Prints "44"
   ///     // Prints "21"
   ///
+  /// - Note: The algorithm used to create random values may change in a future
+  ///   version of Swift. If you're passing a generator that results in the
+  ///   same sequence of integer values each time you run your program, that
+  ///   sequence may change when your program is compiled using a different
+  ///   version of Swift.
+  ///
   /// - Parameters:
   ///   - range: The range in which to create a random value.
   ///     `range` must not be empty.
@@ -2649,8 +2655,8 @@ extension FixedWidthInteger {
   ///     // Prints "64"
   ///     // Prints "5"
   ///
-  /// This method is equivalent to calling the version that takes a generator,
-  /// passing in the system's default random generator.
+  /// This method is equivalent to calling `random(in:using:)`, passing in the
+  /// system's default random generator.
   ///
   /// - Parameter range: The range in which to create a random value.
   /// - Returns: A random value within the bounds of `range`.
