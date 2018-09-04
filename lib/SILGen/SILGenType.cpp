@@ -834,8 +834,15 @@ public:
   }
   void visitFuncDecl(FuncDecl *fd) {
     SGM.emitFunction(fd);
-    if (SGM.requiresObjCMethodEntryPoint(fd) && fd->isDefaultImplInProtocol())
-      SGM.emitObjCMethodThunk(fd);
+    
+    if (SGM.requiresObjCMethodEntryPoint(fd)) {
+      if (isa<ProtocolDecl>(fd->getDeclContext())) {
+        if (fd->isDefaultImplInProtocol())
+          SGM.emitObjCMethodThunk(fd);
+      } else {
+        SGM.emitObjCMethodThunk(fd);
+      }
+    }
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
     SGM.emitConstructor(cd);
@@ -878,8 +885,14 @@ public:
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *asd) {
-    if (asd->isObjC() && asd->isDefaultImplInProtocol())
-      SGM.emitObjCPropertyMethodThunks(asd);
+    if (asd->isObjC()) {
+      if (isa<ProtocolDecl>(asd->getDeclContext())) {
+        if (asd->isDefaultImplInProtocol())
+          SGM.emitObjCPropertyMethodThunks(asd);
+      } else {
+        SGM.emitObjCPropertyMethodThunks(asd);
+      }
+    }
     
     SGM.tryEmitPropertyDescriptor(asd);
   }
