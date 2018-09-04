@@ -65,6 +65,10 @@ static llvm::cl::opt<bool> VerifyDIHoles(
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
+// Allow unit tests to gradually migrate toward -allow-critical-edges=false.
+static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
+                                              llvm::cl::init(true));
+
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
 
@@ -5147,7 +5151,7 @@ public:
   }
 
   void verifyBranches(const SILFunction *F) {
-    // Verify that there is no non_condbr critical edge.
+    // Verify no critical edge.
     auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
       assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
 
@@ -5170,10 +5174,11 @@ public:
       const TermInst *TI = BB.getTerminator();
       CurInstruction = TI;
 
-      // Check for non-cond_br critical edges.
-      if (isa<CondBranchInst>(TI)) {
+      // FIXME: In OSSA, critical edges will never be allowed.
+      // In Lowered SIL, they are allowed on unconditional branches only.
+      //   if (!(isSILOwnershipEnabled() && F->hasOwnership()))
+      if (AllowCriticalEdges && isa<CondBranchInst>(TI))
         continue;
-      }
 
       for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
         require(!isCriticalEdgePred(TI, Idx),
