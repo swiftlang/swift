@@ -4238,7 +4238,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
       return parseImplicitGetter();
     }
     
-    // Protocols are eligible for default implementation
+    // If the next token is not the start of a body, this is no longer eligible
+    // for default implementation
     if (IsFirstAccessor && isEligibleForDefaultImpl) {
       if (!Tok.is(tok::l_brace))
         isEligibleForDefaultImpl = false;
