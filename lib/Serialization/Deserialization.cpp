@@ -1589,6 +1589,7 @@ giveUpFastPath:
             return nullptr;
           }
           values.front() = storage->getAccessor(*actualKind);
+          assert(values.front() && "missing accessor");
         }
         break;
       }
@@ -1706,6 +1707,7 @@ giveUpFastPath:
                                        getXRefDeclNameForError());
   }
 
+  assert(values.front() != nullptr);
   return values.front();
 }
 
