@@ -100,6 +100,12 @@ public struct Bool {
   ///         print("Maybe another try?")
   ///     }
   ///
+  /// - Note: The algorithm used to create random values may change in a future
+  ///   version of Swift. If you're passing a generator that results in the
+  ///   same sequence of Boolean values each time you run your program, that
+  ///   sequence may change when your program is compiled using a different
+  ///   version of Swift.
+  ///
   /// - Parameter generator: The random number generator to use when creating
   ///   the new random value.
   /// - Returns: Either `true` or `false`, randomly chosen with equal
@@ -122,9 +128,8 @@ public struct Bool {
   ///         print("Maybe another try?")
   ///     }
   ///
-  /// `Bool.random()` uses the default random generator,
-  /// `SystemRandomNumberGenerator`. To supply a non-default generator, call the
-  /// equivalent method that takes one as an argument.
+  /// This method is equivalent to calling `Bool.random(using:)`, passing in
+  /// the system's default random generator.
   ///
   /// - Returns: Either `true` or `false`, randomly chosen with equal
   ///   probability.
