@@ -729,6 +729,11 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     let r = x._internalDivide(by: rhs)
     return (x, r)
   }
+  
+  public func isMultiple(of other: _BigInt) -> Bool {
+    if other == 0 { return self == 0 }
+    return self % other == 0
+  }
 
   public static func &=(lhs: inout _BigInt, rhs: _BigInt) {
     var lhsTemp = lhs._dataAsTwosComplement()
@@ -1867,3 +1872,9 @@ BigIntBitTests.test("words") {
 }
 
 runAllTests()
+
+BigIntTests.test("isMultiple") {
+  // Test that these do not crash.
+  expectTrue((0 as _BigInt<UInt>).isMultiple(of: 0))
+  expectFalse((1 as _BigInt<UInt>).isMultiple(of: 0))
+}
