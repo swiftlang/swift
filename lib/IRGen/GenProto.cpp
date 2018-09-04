@@ -969,7 +969,13 @@ bool irgen::isDependentConformance(const NormalProtocolConformance *conformance)
     return true;
 
   // Check whether any of the inherited conformances are dependent.
-  for (auto inherited : conformance->getProtocol()->getInheritedProtocols()) {
+  auto proto = conformance->getProtocol();
+  for (const auto &req : proto->getRequirementSignature()) {
+    if (req.getKind() != RequirementKind::Conformance ||
+        !req.getFirstType()->isEqual(proto->getProtocolSelfType()))
+      continue;
+
+    auto inherited = req.getSecondType()->castTo<ProtocolType>()->getDecl();
     if (inherited->isObjC())
       continue;
 
