@@ -86,8 +86,14 @@ func largeRuns(_ size: Int) -> [Int] {
 
 /// Integers ascending to the middle of the array, then descending to the end
 func pyramid(_ size: Int) -> [Int] {
-    let r = 0..<size / 2
-    return Array(r) + r.reversed()
+  let r = 0..<size / 2
+  return Array(r) + r.reversed()
+}
+
+/// Integers ascending to the middle of the array, then descending to the end
+func adjacentPyramids(_ size: Int) -> [Int] {
+  let r = 0..<size / 4
+  return Array(r) + r.reversed() + Array(r) + r.reversed()
 }
 
 /// Integers descending to the middle of the array, then ascending to the end
@@ -116,8 +122,9 @@ let generators: KeyValuePairs = [
     "RandomSmallRange": randomSmallRange,
     "Pyramid": pyramid,
     "Valley": valley,
+    "AdjacentPyramids": adjacentPyramids,
 ]
-let allGenerators = generators + generators.dropLast(4).map({ (name, generator) in
+let allGenerators = generators + generators.dropLast(5).map({ (name, generator) in
     (name + "Reversed", reverse(generator))
 })
 
