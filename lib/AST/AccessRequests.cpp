@@ -63,6 +63,14 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     }
   }
 
+  DeclContext *DC = D->getDeclContext();
+
+  // Special case for generic parameters; we just give them a dummy
+  // access level.
+  if (auto genericParam = dyn_cast<GenericTypeParamDecl>(D)) {
+    return AccessLevel::Internal;
+  }
+
   // Special case for associated types: inherit access from protocol.
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(D)) {
     auto prot = assocType->getProtocol();
@@ -80,7 +88,6 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     }
   }
 
-  DeclContext *DC = D->getDeclContext();
   switch (DC->getContextKind()) {
   case DeclContextKind::TopLevelCodeDecl:
     // Variables declared in a top-level 'guard' statement can be accessed in
