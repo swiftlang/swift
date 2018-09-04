@@ -188,9 +188,7 @@ func produceBenchmark<T: Comparable>(
     return { N in
         for _ in 0..<N {
             let sortedArray = array.sorted()
-            // disabled until sorting issue is fixed
-            // CheckResults(sortedArray.isSorted())
-            CheckResults(sortedArray.count == array.count)
+            CheckResults(sortedArray.isSorted())
         }
     }
 }
