@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -426,6 +426,9 @@ ERROR(deprecated_operator_body_use_group,PointsToFirstBadToken,
       "use a precedence group instead", ())
 ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
+
+ERROR(operator_decl_trailing_comma,none,
+      "expected designated protocol in operator declaration", ())
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,

@@ -2803,9 +2803,10 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (!decl->getPrecedenceGroupName().empty()) {
-    Printer << " : " << decl->getPrecedenceGroupName();
-  }
+  if (!decl->getFirstIdentifier().empty())
+    Printer << " : " << decl->getFirstIdentifier();
+  if (!decl->getSecondIdentifier().empty())
+    Printer << ", " << decl->getSecondIdentifier();
 }
 
 void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
@@ -2878,6 +2879,8 @@ void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
+  if (!decl->getDesignatedProtocolName().empty())
+    Printer << " : " << decl->getDesignatedProtocolName();
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
@@ -2887,6 +2890,8 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
+  if (!decl->getDesignatedProtocolName().empty())
+    Printer << " : " << decl->getDesignatedProtocolName();
 }
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) { }
