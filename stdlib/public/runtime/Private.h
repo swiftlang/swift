@@ -333,14 +333,4 @@ public:
 
 } // end namespace swift
 
-// ADT uses report_bad_alloc_error to report an error when it can't allocate
-// elements for a data structure. The swift runtime uses ADT without linking
-// against libSupport, so here we provide a stub to make sure we don't fail
-// to link. Give it `weak` linkage so, in case the `strong` definition of
-// the function is available, that has precedence.
-namespace llvm {
-  __attribute__((weak))
-  void report_bad_alloc_error(const char *Reason, bool GenCrashDiag) {};
-} // end namespace llvm
-
 #endif /* SWIFT_RUNTIME_PRIVATE_H */
