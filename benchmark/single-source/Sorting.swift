@@ -186,7 +186,7 @@ func produceBenchmark<T: Comparable>(
     ) -> (Int) -> Void {
     let array = generator(arraySize).map(transform)
     return { N in
-        for _ in 0..<N {
+        for _ in 0..<25*N {
             let sortedArray = array.sorted()
             CheckResults(sortedArray.isSorted())
         }
