@@ -2775,7 +2775,7 @@ extension FixedWidthInteger {
     // Nothing but zero is a multiple of zero.
     if other == 0 { return self == 0 }
     // Special case to avoid overflow on .min / -1 for signed types.
-    if Self.isSigned && self == .min && other == -1 { return true }
+    if Self.isSigned && other == -1 { return true }
     // Having handled those special cases, this is safe.
     return self % other == 0
   }
