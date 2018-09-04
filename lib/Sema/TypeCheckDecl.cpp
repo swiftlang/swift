@@ -4306,9 +4306,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     checkDeclAttributesEarly(DD);
 
-    if (auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext()))
-      DD->copyFormalAccessFrom(enclosingClass, /*sourceIsParentContext*/true);
-
     validateGenericFuncSignature(DD);
 
     DD->setSignatureIsValidated();
