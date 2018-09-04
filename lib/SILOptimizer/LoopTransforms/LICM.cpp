@@ -534,9 +534,21 @@ static bool handledEndAccesses(BeginAccessInst *BI, SILLoop *Loop) {
   return true;
 }
 
+static bool isCoveredByScope(BeginAccessInst *BI, DominanceInfo *DT,
+                             SILInstruction *applyInstr) {
+  if (!DT->dominates(BI, applyInstr))
+    return false;
+  for (auto *EI : BI->getEndAccesses()) {
+    if (!DT->dominates(applyInstr, EI))
+      return false;
+  }
+  return true;
+}
+
 static bool analyzeBeginAccess(BeginAccessInst *BI,
                                SmallVector<BeginAccessInst *, 8> &BeginAccesses,
                                SmallVector<FullApplySite, 8> &fullApplies,
+                               WriteSet &MayWrites,
                                AccessedStorageAnalysis *ASA,
                                DominanceInfo *DT) {
   if (BI->getEnforcement() != SILAccessEnforcement::Dynamic) {
@@ -571,12 +583,26 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
     // If the apply is “sandwiched” between the begin and end access,
     // there’s no reason we can’t hoist out of the loop.
     auto *applyInstr = fullApply.getInstruction();
-    if (!DT->dominates(BI, applyInstr))
+    if (!isCoveredByScope(BI, DT, applyInstr))
       return false;
-    for (auto *EI : BI->getEndAccesses()) {
-      if (!DT->dominates(applyInstr, EI))
-        return false;
+  }
+
+  // Check may releases
+  // Only class and global access that may alias would conflict
+  const AccessedStorage::Kind kind = storage.getKind();
+  if (kind != AccessedStorage::Class && kind != AccessedStorage::Global) {
+    return true;
+  }
+  // TODO Introduce "Pure Swift" deinitializers
+  // We can then make use of alias information for instr's operands
+  // If they don't alias - we might get away with not recording a conflict
+  for (auto mayWrite : MayWrites) {
+    // we actually compute all MayWrites in analyzeCurrentLoop
+    if (!mayWrite->mayRelease()) {
+      continue;
     }
+    if (!isCoveredByScope(BI, DT, mayWrite))
+      return false;
   }
 
   return true;
@@ -698,7 +724,8 @@ void LoopTreeOptimization::analyzeCurrentLoop(
       LLVM_DEBUG(llvm::dbgs() << "Some end accesses can't be handled\n");
       continue;
     }
-    if (analyzeBeginAccess(BI, BeginAccesses, fullApplies, ASA, DomTree)) {
+    if (analyzeBeginAccess(BI, BeginAccesses, fullApplies, MayWrites, ASA,
+                           DomTree)) {
       SpecialHoist.insert(BI);
     }
   }

@@ -296,6 +296,8 @@ protected:
 
   void visitFullApply(FullApplySite fullApply, RegionInfo &info);
 
+  void visitMayRelease(SILInstruction *instr, RegionInfo &info);
+
   void mergePredAccesses(LoopRegion *region,
                          RegionIDToLocalInfoMap &localRegionInfos);
 
@@ -325,6 +327,9 @@ private:
   detectApplyConflicts(const swift::FunctionAccessedStorage &callSiteAccesses,
                        const DenseAccessMap &conflictFreeSet,
                        const swift::FullApplySite &fullApply, RegionInfo &info);
+
+  void detectMayReleaseConflicts(const DenseAccessMap &conflictFreeSet,
+                                 SILInstruction *instr, RegionInfo &info);
 };
 } // namespace
 
@@ -731,6 +736,42 @@ void AccessConflictAndMergeAnalysis::visitFullApply(FullApplySite fullApply,
                        fullApply, info);
 }
 
+void AccessConflictAndMergeAnalysis::detectMayReleaseConflicts(
+    const DenseAccessMap &conflictFreeSet, SILInstruction *instr,
+    RegionInfo &info) {
+  // TODO Introduce "Pure Swift" deinitializers
+  // We can then make use of alias information for instr's operands
+  // If they don't alias - we might get away with not recording a conflict
+  bool changed = false;
+  do {
+    changed = false;
+    for (auto pair : conflictFreeSet) {
+      auto *outerBeginAccess = pair.second;
+      // Only class and global access that may alias would conflict
+      AccessInfo &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
+      const AccessedStorage::Kind outerKind = outerAccessInfo.getKind();
+      if (outerKind != AccessedStorage::Class &&
+          outerKind != AccessedStorage::Global) {
+        continue;
+      }
+      // We can't prove what the deinitializer might do
+      // TODO Introduce "Pure Swift" deinitializers
+      LLVM_DEBUG(llvm::dbgs() << "MayRelease Instruction: " << *instr
+                              << "  may conflict with:\n";
+                 outerAccessInfo.dump());
+      recordConflict(info, outerAccessInfo);
+      changed = true;
+      break;
+    }
+  } while (changed);
+}
+
+void AccessConflictAndMergeAnalysis::visitMayRelease(SILInstruction *instr,
+                                                     RegionInfo &info) {
+  detectMayReleaseConflicts(info.getInScopeAccesses(), instr, info);
+  detectMayReleaseConflicts(info.getOutOfScopeAccesses(), instr, info);
+}
+
 void AccessConflictAndMergeAnalysis::mergePredAccesses(
     LoopRegion *region, RegionIDToLocalInfoMap &localRegionInfos) {
   RegionInfo &info = localRegionInfos.find(region->getID())->getSecond();
@@ -821,6 +862,10 @@ void AccessConflictAndMergeAnalysis::localDataFlowInBlock(
     }
     if (auto fullApply = FullApplySite::isa(&instr)) {
       visitFullApply(fullApply, info);
+      continue;
+    }
+    if (instr.mayRelease()) {
+      visitMayRelease(&instr, info);
     }
   }
 }
