@@ -105,6 +105,7 @@ protocol P7: P0 {
 }
 
 // Suppress overrides.
+// CHECK: protocol{{.*}}"P8"
 protocol P8: P0 {
   // CHECK: associated_type_decl
   // CHECK-SAME: "A"
@@ -125,4 +126,34 @@ protocol P8: P0 {
   // CHECK-SAME: immutable
   @_nonoverride
   var prop: A { get }
+}
+
+class Base { }
+class Derived : Base { }
+
+// Protocol overrides require exact type matches.
+protocol SubtypingP0 {
+  init?()
+  func foo() -> Base
+}
+
+// CHECK: protocol{{.*}}"SubtypingP1"
+protocol SubtypingP1: SubtypingP0 {
+  // CHECK: constructor_decl{{.*}}Self : SubtypingP1
+  // CHECK-NOT: override=
+  // CHECK-SAME: designated
+  init()
+
+  // CHECK: func_decl{{.*}}foo(){{.*}}Self : SubtypingP1
+  // CHECK-NOT: override=
+  // CHECK-SAME: )
+  func foo() -> Derived
+}
+
+// CHECK: protocol{{.*}}"SubtypingP2"
+protocol SubtypingP2: SubtypingP0 {
+  // CHECK: constructor_decl{{.*}}Self : SubtypingP2
+  // CHECK: override={{.*}}SubtypingP0.init
+  // CHECK-SAME: designated
+  init?()
 }

@@ -138,6 +138,13 @@ bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
 
   // If this is a constructor, let's compare only parameter types.
   if (isa<ConstructorDecl>(decl)) {
+    // Within a protocol context, check for a failability mismatch.
+    if (isa<ProtocolDecl>(decl->getDeclContext())) {
+      if (cast<ConstructorDecl>(decl)->getFailability() !=
+            cast<ConstructorDecl>(parentDecl)->getFailability())
+        return false;
+    }
+
     auto fnType1 = declTy->castTo<AnyFunctionType>();
     auto fnType2 = parentDeclTy->castTo<AnyFunctionType>();
     return AnyFunctionType::equalParams(fnType1->getParams(),
@@ -697,6 +704,11 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     if ((isa<VarDecl>(parentDecl) && isClassOverride()) ||
         attempt == OverrideCheckingAttempt::MismatchedTypes) {
       matches.push_back({parentDecl, false});
+      continue;
+    }
+
+    // For a protocol override, we require an exact match.
+    if (isProtocolOverride()) {
       continue;
     }
 
