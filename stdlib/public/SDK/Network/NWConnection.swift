@@ -354,7 +354,7 @@ public final class NWConnection : CustomDebugStringConvertible {
         }
 
 		/// Create a context for sending, that optionally can set expiration (default 0),
-		/// priority (default 0.5), antecendent (default nil), and protocol metadata (default []]).
+		/// priority (default 0.5), antecedent (default nil), and protocol metadata (default []]).
 		public init(identifier: String, expiration: UInt64 = 0, priority: Double = 0.5, isFinal: Bool = false, antecedent: NWConnection.ContentContext? = nil, metadata: [NWProtocolMetadata]? = []) {
             self.nw = nw_content_context_create(identifier)
 
@@ -478,6 +478,7 @@ public final class NWConnection : CustomDebugStringConvertible {
 		}
 	}
 
+	/// A type representing a wrapped completion handler invoked when send content has been consumed by the protocol stack, or the lack of a completion handler because the content is idempotent.
 	public enum SendCompletion {
 		/// Completion handler to be invoked when send content has been successfully processed, or failed to send due to an error.
 		/// Note that this does not guarantee that the data was sent out over the network, or acknowledge, but only that
