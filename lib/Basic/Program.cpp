@@ -34,7 +34,9 @@ int swift::ExecuteInPlace(const char *Program, const char **args,
 
   return result;
 #else
-  llvm::ArrayRef<llvm::StringRef> Env = llvm::toStringRefArray(env);
+  llvm::Optional<llvm::ArrayRef<llvm::StringRef>> Env = llvm::None;
+  if (env)
+    Env = llvm::toStringRefArray(env);
   int result =
       llvm::sys::ExecuteAndWait(Program, llvm::toStringRefArray(args), Env);
   if (result >= 0)
