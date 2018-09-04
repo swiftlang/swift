@@ -52,8 +52,9 @@ namespace constraints {
 class ConstraintGraph;
 class ConstraintGraphNode;
 class ConstraintSystem;
-class Disjunction;
-class TypeVarBindingGenerator;
+class DisjunctionChoiceProducer;
+class TypeVarBindingProducer;
+class TypeVariableBinding;
 
 } // end namespace constraints
 
@@ -925,7 +926,8 @@ public:
   friend class DisjunctionChoice;
   friend class Component;
   friend class FailureDiagnostic;
-  friend class TypeVarBindingGenerator;
+  friend class TypeVarBindingProducer;
+  friend class TypeVariableBinding;
 
   class SolverScope;
 
@@ -2983,7 +2985,7 @@ private:
   ///        the best solution to the constraint system.
   ///
   /// \returns true if we failed to find any solutions, false otherwise.
-  bool solveForDisjunctionChoices(Disjunction &disjunction,
+  bool solveForDisjunctionChoices(DisjunctionChoiceProducer &disjunction,
                                   SmallVectorImpl<Solution> &solutions);
 
   /// \brief Solve the system of constraints after it has already been
@@ -3366,7 +3368,15 @@ void simplifyLocator(Expr *&anchor,
 /// null otherwise.
 Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 
-class DisjunctionChoice {
+/// Common interface to encapsulate attempting choices of
+/// different entities, such as type variables (types)
+/// or disjunctions (their choices).
+struct TypeBinding {
+  virtual ~TypeBinding() {}
+  virtual void attempt(ConstraintSystem &cs) const = 0;
+};
+
+class DisjunctionChoice : public TypeBinding {
   ConstraintSystem *CS;
   unsigned Index;
   Constraint *Choice;
@@ -3398,8 +3408,10 @@ public:
   bool isGenericOperator() const;
   bool isSymmetricOperator() const;
 
+  void attempt(ConstraintSystem &cs) const override;
+
   /// \brief Apply given choice to the system and try to solve it.
-  Optional<Score> solve(SmallVectorImpl<Solution> &solutions);
+  Optional<Score> attempt(SmallVectorImpl<Solution> &solutions);
 
   operator Constraint *() { return Choice; }
 
@@ -3428,7 +3440,25 @@ private:
   }
 };
 
-class TypeVarBindingGenerator {
+class TypeVariableBinding : public TypeBinding {
+  TypeVariableType *TypeVar;
+  ConstraintSystem::PotentialBinding Binding;
+
+public:
+  TypeVariableBinding(TypeVariableType *typeVar,
+                      ConstraintSystem::PotentialBinding &binding)
+      : TypeVar(typeVar), Binding(binding) {}
+
+  Type getType() const { return Binding.BindingType; }
+
+  void attempt(ConstraintSystem &cs) const override;
+
+  bool isDefaultableBinding() const { return Binding.isDefaultableBinding(); }
+
+  bool hasDefaultedProtocol() const { return Binding.DefaultedProtocol; }
+};
+
+class TypeVarBindingProducer {
   using BindingKind = ConstraintSystem::AllowedBindingKind;
   using Binding = ConstraintSystem::PotentialBinding;
 
@@ -3446,19 +3476,19 @@ class TypeVarBindingGenerator {
   llvm::SmallPtrSet<TypeBase *, 4> BoundTypes;
 
 public:
-  TypeVarBindingGenerator(ConstraintSystem &cs, TypeVariableType *typeVar,
-                          ArrayRef<Binding> initialBindings)
+  TypeVarBindingProducer(ConstraintSystem &cs, TypeVariableType *typeVar,
+                         ArrayRef<Binding> initialBindings)
       : CS(cs), TypeVar(typeVar),
         Bindings(initialBindings.begin(), initialBindings.end()) {}
 
-  Optional<Binding> operator()() {
+  Optional<TypeVariableBinding> operator()() {
     // Once we reach the end of the current bindings
     // let's try to compute new ones, e.g. supertypes,
     // literal defaults, if that fails, we are done.
     if (needsToComputeNext() && !computeNext())
       return None;
 
-    return Bindings[Index++];
+    return TypeVariableBinding(TypeVar, Bindings[Index++]);
   }
 
   /// Check whether generator would have to compute next
@@ -3481,7 +3511,7 @@ private:
 /// Iterator over disjunction choices, makes it
 /// easy to work with disjunction and encapsulates
 /// some other important information such as locator.
-class Disjunction {
+class DisjunctionChoiceProducer {
   ConstraintSystem &CS;
   ArrayRef<Constraint *> Choices;
   ConstraintLocator *Locator;
@@ -3490,20 +3520,20 @@ class Disjunction {
   unsigned Index = 0;
 
 public:
-  Disjunction(ConstraintSystem &cs, ArrayRef<Constraint *> choices,
-              ConstraintLocator *locator, bool explicitConversion)
+  DisjunctionChoiceProducer(ConstraintSystem &cs,
+                            ArrayRef<Constraint *> choices,
+                            ConstraintLocator *locator, bool explicitConversion)
       : CS(cs), Choices(choices), Locator(locator),
         IsExplicitConversion(explicitConversion) {}
 
-  const Disjunction &begin() const { return *this; }
-  const Disjunction &end() const { return *this; }
+  Optional<DisjunctionChoice> operator()() {
+    unsigned currIndex = Index;
+    if (currIndex >= Choices.size())
+      return None;
 
-  bool operator!=(const Disjunction &) const { return Index < Choices.size(); }
-
-  void operator++() { ++Index; }
-
-  DisjunctionChoice operator*() const {
-    return {&CS, Index, Choices[Index], IsExplicitConversion};
+    ++Index;
+    return DisjunctionChoice(&CS, currIndex, Choices[currIndex],
+                             IsExplicitConversion);
   }
 
   ConstraintLocator *getLocator() const { return Locator; }
