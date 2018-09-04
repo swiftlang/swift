@@ -1848,8 +1848,7 @@ static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
     auto requirement =
       IGM.getAddrOfLLVMVariableOrGOTEquivalent(
         LinkEntity::forMethodDescriptor(declRef),
-        IGM.getPointerAlignment(),
-        IGM.ProtocolRequirementStructTy);
+        Alignment(4), IGM.ProtocolRequirementStructTy);
     table.addRelativeAddress(requirement);
 
     SILFunction *Func = entry.getMethodWitness().Witness;

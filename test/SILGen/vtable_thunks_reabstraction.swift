@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s
 
 struct S {}
 class B {}
