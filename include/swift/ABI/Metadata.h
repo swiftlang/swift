@@ -770,13 +770,19 @@ struct TargetHeapMetadata : TargetMetadata<Runtime> {
 };
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 
+/// An opaque descriptor describing a class or protocol method. References to
+/// these descriptors appear in the method override table of a class context
+/// descriptor, or a resilient witness table pattern, respectively.
+///
+/// Clients should not assume anything about the contents of this descriptor
+/// other than it having 4 byte alignment.
 template <typename Runtime>
 struct TargetMethodDescriptor {
-  /// The method implementation.
-  TargetRelativeDirectPointer<Runtime, void> Impl;
-
   /// Flags describing the method.
   MethodDescriptorFlags Flags;
+
+  /// The method implementation.
+  TargetRelativeDirectPointer<Runtime, void> Impl;
 
   // TODO: add method types or anything else needed for reflection.
 };
@@ -804,12 +810,39 @@ public:
   /// entries occupy in instantiated class metadata.
   uint32_t VTableSize;
 
-  uint32_t getVTableOffset(const TargetClassMetadata<Runtime> *metadata) const {
-    const auto *description = metadata->getDescription();
-    if (description->hasResilientSuperclass())
-      return metadata->Superclass->getSizeInWords() + VTableOffset;
+  uint32_t getVTableOffset(const TargetClassDescriptor<Runtime> *description) const {
+    if (description->hasResilientSuperclass()) {
+      auto bounds = description->getMetadataBounds();
+      return (bounds.ImmediateMembersOffset / sizeof(StoredPointer)
+              + VTableOffset);
+    }
+
     return VTableOffset;
   }
+};
+
+/// An entry in the method override table, referencing a method from one of our
+/// ancestor classes, together with an implementation.
+template <typename Runtime>
+struct TargetMethodOverrideDescriptor {
+  /// The class containing the base method.
+  TargetRelativeIndirectablePointer<Runtime, TargetClassDescriptor<Runtime>> Class;
+
+  /// The base method.
+  TargetRelativeIndirectablePointer<Runtime, TargetMethodDescriptor<Runtime>> Method;
+
+  /// The implementation of the override.
+  TargetRelativeDirectPointer<Runtime, void, /*Nullable=*/true> Impl;
+};
+
+/// Header for a class vtable override descriptor. This is a variable-sized
+/// structure that provides implementations for overrides of methods defined
+/// in superclasses.
+template <typename Runtime>
+struct TargetOverrideTableHeader {
+  /// The number of MethodOverrideDescriptor records following the vtable
+  /// override header in the class's nominal type descriptor.
+  uint32_t NumEntries;
 };
 
 /// The bounds of a class metadata object.
@@ -1107,7 +1140,7 @@ public:
   /// Get a pointer to the field offset vector, if present, or null.
   const StoredPointer *getFieldOffsets() const {
     assert(isTypeMetadata());
-    auto offset = getDescription()->getFieldOffsetVectorOffset(this);
+    auto offset = getDescription()->getFieldOffsetVectorOffset();
     if (offset == 0)
       return nullptr;
     auto asWords = reinterpret_cast<const void * const*>(this);
@@ -3580,7 +3613,9 @@ class TargetClassDescriptor final
                               TargetForeignMetadataInitialization<Runtime>,
                               TargetSingletonMetadataInitialization<Runtime>,
                               TargetVTableDescriptorHeader<Runtime>,
-                              TargetMethodDescriptor<Runtime>> {
+                              TargetMethodDescriptor<Runtime>,
+                              TargetOverrideTableHeader<Runtime>,
+                              TargetMethodOverrideDescriptor<Runtime>> {
 private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
@@ -3588,7 +3623,9 @@ private:
                                   TargetForeignMetadataInitialization<Runtime>,
                                   TargetSingletonMetadataInitialization<Runtime>,
                                   TargetVTableDescriptorHeader<Runtime>,
-                                  TargetMethodDescriptor<Runtime>>;
+                                  TargetMethodDescriptor<Runtime>,
+                                  TargetOverrideTableHeader<Runtime>,
+                                  TargetMethodOverrideDescriptor<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -3597,6 +3634,8 @@ private:
 public:
   using MethodDescriptor = TargetMethodDescriptor<Runtime>;
   using VTableDescriptorHeader = TargetVTableDescriptorHeader<Runtime>;
+  using OverrideTableHeader = TargetOverrideTableHeader<Runtime>;
+  using MethodOverrideDescriptor = TargetMethodOverrideDescriptor<Runtime>;
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
   using SingletonMetadataInitialization =
@@ -3707,6 +3746,17 @@ private:
     return getVTableDescriptor()->VTableSize;
   }
 
+  size_t numTrailingObjects(OverloadToken<OverrideTableHeader>) const {
+    return hasOverrideTable() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<MethodOverrideDescriptor>) const {
+    if (!hasOverrideTable())
+      return 0;
+
+    return getOverrideTable()->NumEntries;
+  }
+
 public:
   const ForeignMetadataInitialization &getForeignMetadataInitialization() const{
     assert(this->hasForeignMetadataInitialization());
@@ -3722,17 +3772,22 @@ public:
   /// its stored properties.
   bool hasFieldOffsetVector() const { return FieldOffsetVectorOffset != 0; }
 
-  unsigned getFieldOffsetVectorOffset(const ClassMetadata *metadata) const {
-    const auto *description = metadata->getDescription();
-
-    if (description->hasResilientSuperclass())
-      return metadata->Superclass->getSizeInWords() + FieldOffsetVectorOffset;
+  unsigned getFieldOffsetVectorOffset() const {
+    if (hasResilientSuperclass()) {
+      auto bounds = getMetadataBounds();
+      return (bounds.ImmediateMembersOffset / sizeof(StoredPointer)
+              + FieldOffsetVectorOffset);
+    }
 
     return FieldOffsetVectorOffset;
   }
 
   bool hasVTable() const {
     return this->getTypeContextDescriptorFlags().class_hasVTable();
+  }
+
+  bool hasOverrideTable() const {
+    return this->getTypeContextDescriptorFlags().class_hasOverrideTable();
   }
 
   bool hasResilientSuperclass() const {
@@ -3744,12 +3799,25 @@ public:
       return nullptr;
     return this->template getTrailingObjects<VTableDescriptorHeader>();
   }
-  
+
   llvm::ArrayRef<MethodDescriptor> getMethodDescriptors() const {
     if (!hasVTable())
       return {};
     return {this->template getTrailingObjects<MethodDescriptor>(),
             numTrailingObjects(OverloadToken<MethodDescriptor>{})};
+  }
+
+  const OverrideTableHeader *getOverrideTable() const {
+    if (!hasOverrideTable())
+      return nullptr;
+    return this->template getTrailingObjects<OverrideTableHeader>();
+  }
+
+  llvm::ArrayRef<MethodOverrideDescriptor> getMethodOverrideDescriptors() const {
+    if (!hasOverrideTable())
+      return {};
+    return {this->template getTrailingObjects<MethodOverrideDescriptor>(),
+            numTrailingObjects(OverloadToken<MethodOverrideDescriptor>{})};
   }
 
   /// Return the bounds of this class's metadata.

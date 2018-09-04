@@ -51,8 +51,8 @@ public class Concrete : Derived<Int> {
 //// Nominal type descriptor for 'Derived' with method descriptors.
 
 // CHECK-LABEL: @"$S14generic_vtable7DerivedCMn" = {{(dllexport )?}}{{(protected )?}}constant
-// -- flags: has vtable, is class, is unique, is generic
-// CHECK-SAME: <i32 0x8000_00D0>,
+// -- flags: has vtable, has override table, is class, is unique, is generic
+// CHECK-SAME: <i32 0xC000_00D0>,
 // -- vtable offset
 // CHECK-32-SAME: i32 17,
 // CHECK-64-SAME: i32 14,
@@ -60,7 +60,16 @@ public class Concrete : Derived<Int> {
 // CHECK-SAME: i32 1,
 // -- vtable entry for m3()
 // CHECK-SAME: void (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedC2m3yyF"
-// --
+// -- override table size
+// CHECK-SAME: i32 2,
+// -- override for m2()
+// CHECK-SAME: @"$S14generic_vtable4BaseCMn"
+// CHECK-SAME: @"$S14generic_vtable4BaseCMn", i32 0, i32 14
+// CHECK-SAME: @"$S14generic_vtable7DerivedC2m2yyF"
+// -- override for constructor
+// CHECK-SAME: @"$S14generic_vtable4BaseCMn"
+// CHECK-SAME: @"$S14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-SAME: @"$S14generic_vtable7DerivedCACyxGycfc"
 // CHECK-SAME: section "{{.*}}", align 4
 
 //// Type metadata pattern for 'Derived' has an empty vtable, filled in at
@@ -76,8 +85,8 @@ public class Concrete : Derived<Int> {
 //// Nominal type descriptor for 'Concrete' with method descriptors.
 
 // CHECK-LABEL: @"$S14generic_vtable8ConcreteCMn" = {{(dllexport )?}}{{(protected )?}}constant
-// -- flags: has vtable, in-place initialization, is class, is unique
-// CHECK-SAME: <i32 0x8001_0050>,
+// -- flags: has vtable, has override table, in-place initialization, is class, is unique
+// CHECK-SAME: <i32 0xC001_0050>,
 // -- vtable offset
 // CHECK-32-SAME: i32 19,
 // CHECK-64-SAME: i32 15,
@@ -85,6 +94,16 @@ public class Concrete : Derived<Int> {
 // CHECK-SAME: i32 1,
 // -- vtable entry for m4()
 // CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteC2m4yyF"
+// -- override table size
+// CHECK-SAME: i32 2,
+// -- override for m3()
+// CHECK-SAME: @"$S14generic_vtable7DerivedCMn"
+// CHECK-SAME: @"$S14generic_vtable7DerivedCMn", i32 0, i32 23
+// CHECK-SAME: @"$S14generic_vtable8ConcreteC2m3yyF"
+// -- override for constructor
+// CHECK-SAME: @"$S14generic_vtable4BaseCMn"
+// CHECK-SAME: @"$S14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-SAME: @"$S14generic_vtable8ConcreteCACycfc"
 // --
 // CHECK-SAME: section "{{.*}}", align 4
 
@@ -132,18 +151,6 @@ public class Concrete : Derived<Int> {
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S14generic_vtable7DerivedCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 // CHECK: call void @swift_initClassMetadata(%swift.type* [[METADATA]], %swift.type* {{%.*}}, [[INT]] 0, {{.*}})
-
-// -- method override for 'm2()'
-// CHECK: [[WORDS:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK-32: [[VTABLE0:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], [[INT]] 14
-// CHECK-64: [[VTABLE0:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], [[INT]] 11
-// CHECK: store i8* bitcast (void (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedC2m2yyF" to i8*), i8** [[VTABLE0]]
-
-// -- method override for 'init()'
-// CHECK: [[WORDS:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK-32: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], [[INT]] 15
-// CHECK-64: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], [[INT]] 12
-// CHECK: store i8* bitcast (%T14generic_vtable7DerivedC* (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedCACyxGycfc" to i8*), i8** [[VTABLE1]]
 
 // CHECK: ret %swift.metadata_response
 

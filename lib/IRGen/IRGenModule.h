@@ -566,6 +566,7 @@ public:
   llvm::PointerType *TypeContextDescriptorPtrTy;
   llvm::StructType *ClassContextDescriptorTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
+  llvm::StructType *MethodOverrideDescriptorStructTy; /// %swift.method_override_descriptor
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;

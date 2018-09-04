@@ -30,9 +30,12 @@
 
 // CHECK: @"$S16class_resilience14ResilientChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS]] zeroinitializer
 
+// CHECK: @"$S15resilient_class22ResilientOutsideParentC8getValueSiyFTq" = external global %swift.method_descriptor
+// CHECK: @"$S15resilient_class22ResilientOutsideParentCACycfcTq" = external global %swift.method_descriptor
+
 // CHECK: @"$S16class_resilience14ResilientChildCMn" = {{(protected )?}}{{(dllexport )?}}constant <{{.*}}> <{
-// --       flags: class, unique, has vtable, in-place initialization, has resilient superclass
-// CHECK-SAME:   <i32 0xC401_0050>
+// --       flags: class, unique, has vtable, has override table, in-place initialization, has resilient superclass
+// CHECK-SAME:   <i32 0xE201_0050>
 // --       parent:
 // CHECK-SAME:   @"$S16class_resilienceMXM"
 // --       name:
@@ -59,6 +62,24 @@
 // CHECK-SAME:   @"$S16class_resilience14ResilientChildCMP"
 // --       completion function:
 // CHECK-SAME:   @"$S16class_resilience14ResilientChildCMr"
+// --       number of method overrides:
+// CHECK-SAME:   i32 2,
+// CHECK-SAME:   %swift.method_override_descriptor {
+// --       base class:
+// CHECK-SAME:   @"got.$S15resilient_class22ResilientOutsideParentCMn"
+// --       base method:
+// CHECK-SAME:   @"got.$S15resilient_class22ResilientOutsideParentC8getValueSiyFTq"
+// --       implementation:
+// CHECK-SAME:   @"$S16class_resilience14ResilientChildC8getValueSiyF"
+// CHECK-SAME:   }
+// CHECK-SAME:   %swift.method_override_descriptor {
+// --       base class:
+// CHECK-SAME:   @"got.$S15resilient_class22ResilientOutsideParentCMn"
+// --       base method:
+// CHECK-SAME:   @"got.$S15resilient_class22ResilientOutsideParentCACycfcTq"
+// --       implementation:
+// CHECK-SAME:   @"$S16class_resilience14ResilientChildCACycfc"
+// CHECK-SAME:   }
 // CHECK-SAME: }>
 
 // CHECK: @"$S16class_resilience14ResilientChildCMP" = internal constant <{{.*}}> <{
@@ -94,6 +115,22 @@
 // CHECK: @"$S16class_resilience24MyResilientConcreteChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
 // CHECK-SAME-32: { [[INT]] 64, i32 2, i32 16 }
 // CHECK-SAME-64: { [[INT]] 104, i32 2, i32 13 }
+
+// CHECK: @"$S16class_resilience14ResilientChildC5fields5Int32VvgTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+// CHECK: @"$S16class_resilience14ResilientChildC5fields5Int32VvsTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+// CHECK: @"$S16class_resilience14ResilientChildC5fields5Int32VvMTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+
+// CHECK: @"$S16class_resilience16FixedLayoutChildC5fields5Int32VvgTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+// CHECK: @"$S16class_resilience16FixedLayoutChildC5fields5Int32VvsTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+// CHECK: @"$S16class_resilience16FixedLayoutChildC5fields5Int32VvMTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+
+// CHECK: @"$S16class_resilience21ResilientGenericChildC5fields5Int32VvgTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+// CHECK: @"$S16class_resilience21ResilientGenericChildC5fields5Int32VvsTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+// CHECK: @"$S16class_resilience21ResilientGenericChildC5fields5Int32VvMTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+
+// CHECK: @"$S16class_resilience17MyResilientParentCACycfcTq" = hidden alias %swift.method_descriptor, getelementptr inbounds
+// CHECK: @"$S16class_resilience24MyResilientGenericParentC1tACyxGx_tcfcTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
+// CHECK: @"$S16class_resilience24MyResilientConcreteChildC1xACSi_tcfcTq" = {{(protected )?}}{{(dllexport )?}}alias %swift.method_descriptor, getelementptr inbounds
 
 import resilient_class
 import resilient_struct
@@ -467,22 +504,6 @@ extension ResilientGenericOutsideParent {
 
 // Initialize field offset vector...
 // CHECK:      call void @swift_initClassMetadata(%swift.type* %0, %swift.type* [[SUPER]], [[INT]] 0, [[INT]] 1, i8*** {{.*}}, [[INT]]* {{.*}})
-
-// Initialize constructor vtable override...
-// CHECK:      [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S15resilient_class22ResilientOutsideParentCMo", i32 0, i32 0)
-// CHECK:      [[OFFSET:%.*]] = add [[INT]] [[BASE]], {{16|32}}
-// CHECK:      [[METADATA_BYTES:%.*]] = bitcast %swift.type* %0 to i8*
-// CHECK:      [[VTABLE_ENTRY_ADDR:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[OFFSET]]
-// CHECK:      [[VTABLE_ENTRY_TMP:%.*]] = bitcast i8* [[VTABLE_ENTRY_ADDR]] to i8**
-// CHECK:      store i8* bitcast (%T16class_resilience14ResilientChildC* (%T16class_resilience14ResilientChildC*)* @"$S16class_resilience14ResilientChildCACycfc" to i8*), i8** [[VTABLE_ENTRY_TMP]]
-
-// Initialize getValue() vtable override...
-// CHECK:      [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S15resilient_class22ResilientOutsideParentCMo", i32 0, i32 0)
-// CHECK:      [[OFFSET:%.*]] = add [[INT]] [[BASE]], {{28|56}}
-// CHECK:      [[METADATA_BYTES:%.*]] = bitcast %swift.type* %0 to i8*
-// CHECK:      [[VTABLE_ENTRY_ADDR:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[OFFSET]]
-// CHECK:      [[VTABLE_ENTRY_TMP:%.*]] = bitcast i8* [[VTABLE_ENTRY_ADDR]] to i8**
-// CHECK:      store i8* bitcast ([[INT]] (%T16class_resilience14ResilientChildC*)* @"$S16class_resilience14ResilientChildC8getValueSiyF" to i8*), i8** [[VTABLE_ENTRY_TMP]]
 
 // CHECK:      br label %metadata-dependencies.cont
 
