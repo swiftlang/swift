@@ -1528,7 +1528,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // it, complain.
   if (!override->getAttrs().hasAttribute<OverrideAttr>() &&
       overrideRequiresKeyword(base) != OverrideRequiresKeyword::Never &&
-      !override->isImplicit()) {
+      !override->isImplicit() &&
+      override->getDeclContext()->getParentSourceFile()) {
     // FIXME: rdar://16320042 - For properties, we don't have a useful
     // location for the 'var' token.  Instead of emitting a bogus fixit, only
     // emit the fixit for 'func's.
