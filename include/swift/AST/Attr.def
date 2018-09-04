@@ -240,7 +240,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(convenience, Convenience,
   DeclModifier |
   NotSerialized, 43)
 CONTEXTUAL_SIMPLE_DECL_ATTR(override, Override,
-  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor |
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType |
   DeclModifier |
   NotSerialized, 44)
 SIMPLE_DECL_ATTR(sil_stored, SILStored,
