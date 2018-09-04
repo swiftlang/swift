@@ -1032,6 +1032,10 @@ TinyPtrVector<ValueDecl *> OverrideMatcher::checkPotentialOverrides(
 ///
 /// \returns true if an error occurred.
 bool swift::checkOverrides(ValueDecl *decl) {
+  // If there is a @_nonoverride attribute, this does not override anything.
+  if (decl->getAttrs().hasAttribute<NonOverrideAttr>())
+    return false;
+
   // If we already computed overridden declarations and either succeeded
   // or invalidated the attribute, there's nothing more to do.
   if (decl->overriddenDeclsComputed()) {
@@ -1170,6 +1174,7 @@ namespace  {
     UNINTERESTING_ATTR(Mutating)
     UNINTERESTING_ATTR(NonMutating)
     UNINTERESTING_ATTR(NonObjC)
+    UNINTERESTING_ATTR(NonOverride)
     UNINTERESTING_ATTR(NoReturn)
     UNINTERESTING_ATTR(NSApplicationMain)
     UNINTERESTING_ATTR(NSCopying)
@@ -1695,14 +1700,18 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
 
 llvm::Expected<llvm::TinyPtrVector<ValueDecl *>>
 OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  // Value to return in error cases
+  auto noResults = llvm::TinyPtrVector<ValueDecl *>();
+
+  // If there is a @_nonoverride attribute, this does not override anything.
+  if (decl->getAttrs().hasAttribute<NonOverrideAttr>())
+    return noResults;
+
   // For an associated type, compute the (minimized) set of overridden
   // declarations.
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
     return computeOverriddenAssociatedTypes(assocType);
   }
-
-  // Value to return in error cases
-  auto noResults = llvm::TinyPtrVector<ValueDecl *>();
 
   // Only members of classes or protocols can override other declarations.
   if (!decl->getDeclContext()->getSelfClassDecl() &&

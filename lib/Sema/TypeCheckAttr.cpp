@@ -258,6 +258,7 @@ public:
   void visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr);
   void visitNSManagedAttr(NSManagedAttr *attr);
   void visitOverrideAttr(OverrideAttr *attr);
+  void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitAccessControlAttr(AccessControlAttr *attr);
   void visitSetterAccessAttr(SetterAccessAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
@@ -574,6 +575,13 @@ void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::override_nonclass_decl);
 }
 
+void AttributeEarlyChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
+  if (!isa<ClassDecl>(D->getDeclContext()) &&
+      !isa<ProtocolDecl>(D->getDeclContext()) &&
+      !isa<ExtensionDecl>(D->getDeclContext()))
+    diagnoseAndRemoveAttr(attr, diag::nonoverride_wrong_decl_context);
+}
+
 void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   // lazy may only be used on properties.
   auto *VD = cast<VarDecl>(D);
@@ -862,6 +870,8 @@ public:
   void visitImplementsAttr(ImplementsAttr *attr);
 
   void visitFrozenAttr(FrozenAttr *attr);
+
+  void visitNonOverrideAttr(NonOverrideAttr *attr);
 };
 } // end anonymous namespace
 
@@ -1954,6 +1964,12 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   if (ED->getFormalAccess() < AccessLevel::Public &&
       !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+  }
+}
+
+void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
+  if (auto overrideAttr = D->getAttrs().getAttribute<OverrideAttr>()) {
+    diagnoseAndRemoveAttr(overrideAttr, diag::nonoverride_and_override_attr);
   }
 }
 

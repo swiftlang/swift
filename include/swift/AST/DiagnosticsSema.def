@@ -2094,6 +2094,10 @@ NOTE(override_type_mismatch_with_fixits_init,none,
      (unsigned, Type))
 ERROR(override_nonclass_decl,none,
       "'override' can only be specified on class members", ())
+ERROR(nonoverride_wrong_decl_context,none,
+      "'@_nonoverride' can only be specified on class or protocol members", ())
+ERROR(nonoverride_and_override_attr,none,
+      "'override' cannot be combined with '@_nonoverride'", ())
 ERROR(override_property_type_mismatch,none,
       "property %0 with type %1 cannot override a property with type %2",
       (Identifier, Type, Type))

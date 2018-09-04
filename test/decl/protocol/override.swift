@@ -103,3 +103,26 @@ protocol P7: P0 {
   // expected-error@+1{{property 'prop' with type 'Int' cannot override a property with type 'Self.A'}}
   override var prop: Int { get }
 }
+
+// Suppress overrides.
+protocol P8: P0 {
+  // CHECK: associated_type_decl
+  // CHECK-SAME: "A"
+  // CHECK-NOT: override
+  // CHECK-SAME: )
+  @_nonoverride
+  associatedtype A
+
+  // CHECK: func_decl{{.*}}foo(){{.*}}Self : P8
+  // CHECK-NOT: override=
+  // CHECK-SAME: )
+  @_nonoverride
+  func foo()
+
+  // CHECK: var_decl
+  // CHECK-SAME: "prop"
+  // CHECK-NOT: override=
+  // CHECK-SAME: immutable
+  @_nonoverride
+  var prop: A { get }
+}
