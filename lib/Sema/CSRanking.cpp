@@ -448,27 +448,24 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       ProtocolDecl *inProtocolExtension2 = outerDC2->getExtendedProtocolDecl();
       
       // Check if decl1 is potentially a default implementation in a protocol
-      bool decl1IsDefaultImpl = false;
       if (!inProtocolExtension1) {
         if (decl1->isDefaultImplInProtocol()) {
           inProtocolExtension1 = outerDC1->getSelfProtocolDecl();
-          decl1IsDefaultImpl = true;
         }
       }
       
       // Do the same for decl2
-      bool decl2IsDefaultImpl = false;
       if (!inProtocolExtension2) {
         if (decl2->isDefaultImplInProtocol()) {
           inProtocolExtension2 = outerDC2->getSelfProtocolDecl();
-          decl2IsDefaultImpl = true;
         }
       }
       
       if (inProtocolExtension1 && inProtocolExtension2) {
         bool checkProtocolItself = false;
         
-        if (decl1IsDefaultImpl && decl2IsDefaultImpl) {
+        if (decl1->isDefaultImplInProtocol() &&
+            decl2->isDefaultImplInProtocol()) {
           checkProtocolItself = true;
         }
         
