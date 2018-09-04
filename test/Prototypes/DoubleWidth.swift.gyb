@@ -39,8 +39,7 @@ import StdlibUnittest
 /// integer type. Nesting `DoubleWidth` instances, in particular, may result in
 /// undesirable performance.
 public struct DoubleWidth<Base : FixedWidthInteger>
-  where Base.Magnitude : UnsignedInteger,
-  Base.Words : Collection, Base.Magnitude.Words : Collection {
+  where Base.Words : Collection, Base.Magnitude.Words : Collection {
 
   public typealias High = Base
   public typealias Low = Base.Magnitude
@@ -282,7 +281,7 @@ extension DoubleWidth.Words: Collection {
 
   public func index(after i: Index) -> Index {
     switch i._value {
-    case let .low(li) where Base.bitWidth < UInt.bitWidth:
+    case .low where Base.bitWidth < UInt.bitWidth:
       return Index(.high(_high.endIndex)) 
     case let .low(li):
       let next = _low.index(after: li)
@@ -1002,6 +1001,19 @@ dwTests.test("DivideMinByMinusOne") {
   }
   expectCrashLater()
   _ = f(Int1024.min)
+}
+
+dwTests.test("isMultiple") {
+  func isMultipleTest<T: FixedWidthInteger>(type: T.Type) {
+    expectTrue(T.min.isMultiple(of: 2))
+    expectFalse(T.max.isMultiple(of: 10))
+    // Test that these do not crash.
+    expectTrue((0 as T).isMultiple(of: 0))
+    expectFalse((1 as T).isMultiple(of: 0))
+    expectTrue(T.min.isMultiple(of: 0 &- 1))
+  }
+  isMultipleTest(type: Int128.self)
+  isMultipleTest(type: UInt128.self)
 }
 
 dwTests.test("MultiplyMinByMinusOne") {
