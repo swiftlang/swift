@@ -253,5 +253,52 @@ Algorithm.test("sort3/stable")
     })
 }
 
+Algorithm.test("heapSort") {
+  // This function generate next permutation of 0-1 using long arithmetics 
+  // approach.
+  func addOne(to num: inout [Int]) {
+
+    if num.isEmpty {
+      return
+    }
+    // Consider our num array reflects a binary integer.
+    // Here we are trying to add one to it.
+    var i = num.index(before: num.endIndex)
+    var carrier = 1
+
+    while carrier != 0 {
+      let b = num[i] + carrier
+      // Updating i's bit.
+      num[i] = b % 2
+      // Recalculate new carrier.
+      carrier = b / 2
+
+      // If the length of number was n, we don't want to create new number with
+      // length n + 1 in this test.
+      if i == num.startIndex {
+        break
+      } else {
+        num.formIndex(before: &i)
+      }
+    }
+  } // addOne end.
+
+  // Test binary number size.
+  let numberLength = 21
+  var binaryNumber = [Int](repeating: 0, count: numberLength)
+
+  // We are testing sort on all permutations off 0-1s of size `numberLength`
+  // except the all 1's case (Its equals to all 0's case).
+  while !binaryNumber.allSatisfy({ $0 == 1 }) {
+    var buffer = binaryNumber
+
+    buffer._heapSort(within: buffer.startIndex..<buffer.endIndex, by: <)
+
+    expectTrue(isSorted(buffer, by: <))
+
+    addOne(to: &binaryNumber)
+  }
+}
+
 runAllTests()
 
