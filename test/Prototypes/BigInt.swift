@@ -729,11 +729,6 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     let r = x._internalDivide(by: rhs)
     return (x, r)
   }
-  
-  public func isMultiple(of other: _BigInt) -> Bool {
-    if other == 0 { return self == 0 }
-    return self % other == 0
-  }
 
   public static func &=(lhs: inout _BigInt, rhs: _BigInt) {
     var lhsTemp = lhs._dataAsTwosComplement()

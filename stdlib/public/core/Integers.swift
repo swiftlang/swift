@@ -1239,6 +1239,16 @@ extension BinaryInteger {
     -> (quotient: Self, remainder: Self) {
     return (self / rhs, self % rhs)
   }
+  
+  @inlinable
+  public func isMultiple(of other: Self) -> Bool {
+    // Nothing but zero is a multiple of zero.
+    if other == 0 { return self == 0 }
+    // Do the test in terms of magnitude, which guarantees there are no other
+    // edge cases. If we write this as `self % other` instead, it could trap
+    // for types that are not symmetric around zero.
+    return self.magnitude % other.magnitude == 0
+  }
 
 //===----------------------------------------------------------------------===//
 //===--- Homogeneous ------------------------------------------------------===//
@@ -2776,16 +2786,6 @@ extension FixedWidthInteger {
     lhs = _nonMaskingRightShift(lhs, shift)
   }
 
-  @inlinable
-  public func isMultiple(of other: Self) -> Bool {
-    // Nothing but zero is a multiple of zero.
-    if other == 0 { return self == 0 }
-    // Special case to avoid overflow on .min / -1 for signed types.
-    if Self.isSigned && other == -1 { return true }
-    // Having handled those special cases, this is safe.
-    return self % other == 0
-  }
-
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public static func _nonMaskingRightShift(_ lhs: Self, _ rhs: Int) -> Self {
@@ -3623,6 +3623,16 @@ extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public static var min: Self {
     return (-1 as Self) &<< Self._highBitIndex
+  }
+  
+  @inlinable
+  public func isMultiple(of other: Self) -> Bool {
+    // Nothing but zero is a multiple of zero.
+    if other == 0 { return self == 0 }
+    // Special case to avoid overflow on .min / -1 for signed types.
+    if other == -1 { return true }
+    // Having handled those special cases, this is safe.
+    return self % other == 0
   }
 }
 
