@@ -392,7 +392,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence = Slice<Self> where SubSequence.Index == Index
 
-  /// A type that represents a collection composed of an arbatrary
+  /// A type that represents a collection composed of an arbitrary
   /// assortment of the collection's elements.
   ///
   /// This associated type appears as a requirement in the `Sequence`

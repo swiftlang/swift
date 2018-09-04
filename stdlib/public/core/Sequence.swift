@@ -335,7 +335,7 @@ public protocol Sequence {
     where Element == SubSequence.Element,
           SubSequence.SubSequence == SubSequence
   
-  /// A type that represents a sequence composed of an arbatrary
+  /// A type that represents a sequence composed of an arbitrary
   /// assortment of this sequence's elements.
   associatedtype Filtered : Sequence = Array<Element>
     where Element == Filtered.Element
@@ -391,7 +391,7 @@ public protocol Sequence {
   /// - Parameter isIncluded: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
-  /// - Returns: An sequence of the elements that `isIncluded` allowed.
+  /// - Returns: A sequence of the elements that `isIncluded` allowed.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   __consuming func filter(
@@ -1037,14 +1037,14 @@ extension Sequence where Filtered: RangeReplaceableCollection {
   @inlinable
   public func filter(
     _ isIncluded: (Element) throws -> Bool
-    ) rethrows -> Filtered {
+  ) rethrows -> Filtered {
     return try _filter(isIncluded)
   }
   
   @_transparent
   public func _filter(
     _ isIncluded: (Element) throws -> Bool
-    ) rethrows -> Filtered {
+  ) rethrows -> Filtered {
     
     // FIXME: should we directly do this 2-pass like this?
     // or filter directly into `Filtered`?
@@ -1085,14 +1085,14 @@ extension Sequence where Filtered == Array<Element> {
   @inlinable
   public func filter(
     _ isIncluded: (Element) throws -> Bool
-    ) rethrows -> [Element] {
+  ) rethrows -> [Element] {
     return try _filter(isIncluded)
   }
   
   @_transparent
   public func _filter(
     _ isIncluded: (Element) throws -> Bool
-    ) rethrows -> [Element] {
+  ) rethrows -> [Element] {
     
     var result = ContiguousArray<Element>()
     

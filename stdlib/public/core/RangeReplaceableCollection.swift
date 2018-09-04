@@ -66,7 +66,7 @@ public protocol RangeReplaceableCollection : Collection
   // FIXME(ABI): Associated type inference requires this.
   associatedtype SubSequence
   
-  /// A type that represents a collection composed of an arbatrary
+  /// A type that represents a collection composed of an arbitrary
   /// assortment of the collection's elements.
   ///
   /// This associated type appears as a requirement in the `Sequence`

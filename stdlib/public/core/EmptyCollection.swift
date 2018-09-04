@@ -60,7 +60,7 @@ extension EmptyCollection.Iterator: IteratorProtocol, Sequence {
   @inlinable
   public func filter(
     _ isIncluded: (Element) throws -> Bool
-    ) rethrows -> Filtered {
+  ) rethrows -> Filtered {
     return self
   }
 }
@@ -172,7 +172,7 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
   @inlinable
   public func filter(
     _ isIncluded: (Element) throws -> Bool
-    ) rethrows -> Filtered {
+  ) rethrows -> Filtered {
     return self
   }
   
