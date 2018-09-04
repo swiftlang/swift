@@ -1,23 +1,32 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-object-format
 
 // REQUIRES: CPU=x86_64
-
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
 
 import Foundation
 import gizmo
 
 // -- Protocol records for cast-to ObjC protocols
 // CHECK: @_PROTOCOL__TtP13generic_casts10ObjCProto1_ = private constant
-// CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$__TtP13generic_casts10ObjCProto1_" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL__TtP13generic_casts10ObjCProto1_ to i8*), section "__DATA,__objc_protolist,coalesced,no_dead_strip"
-// CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL__TtP13generic_casts10ObjCProto1_ to i8*), section "__DATA,__objc_protorefs,coalesced,no_dead_strip"
+// CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$__TtP13generic_casts10ObjCProto1_" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL__TtP13generic_casts10ObjCProto1_ to i8*)
+// CHECK-coff: section ".objc_protolist$B"
+// CHECK-elf: section ".data"
+// CHECK-macho: section "__DATA,__objc_protolist,coalesced,no_dead_strip"
+// CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL__TtP13generic_casts10ObjCProto1_ to i8*)
+// CHECK-coff: section ".objc_protorefs$B"
+// CHECK-elf: section ".data"
+// CHECK-macho: section "__DATA,__objc_protorefs,coalesced,no_dead_strip"
 
 // CHECK: @_PROTOCOL_NSRuncing = private constant
-// CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section "__DATA,__objc_protolist,coalesced,no_dead_strip"
-// CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section "__DATA,__objc_protorefs,coalesced,no_dead_strip"
+// CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*)
+// CHECK-coff: section ".objc_protolist$B"
+// CHECK-elf: section ".data"
+// CHECK-macho: section "__DATA,__objc_protolist,coalesced,no_dead_strip"
+// CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*)
+// CHECK-coff: section ".objc_protorefs$B"
+// CHECK-elf: section ".data"
+// CHECK-macho: section "__DATA,__objc_protorefs,coalesced,no_dead_strip"
 
 // CHECK: @_PROTOCOLS__TtC13generic_casts10ObjCClass2 = private constant { i64, [1 x i8*] } {
 // CHECK:   i64 1, 

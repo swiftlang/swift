@@ -2,7 +2,7 @@
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.ll
 
-// CHECK: @"$S27protocol_accessor_multifile5ProtoMp" = external global
+// CHECK: @"$S27protocol_accessor_multifile5ProtoMp" = external {{(dllimport )?}}global
 // NEGATIVE-NOT: @"$S27protocol_accessor_multifile10ClassProtoMp" =
 
 // CHECK-LABEL: define{{.*}} void @"$S27protocol_accessor_multifile14useExistentialyyF"()
