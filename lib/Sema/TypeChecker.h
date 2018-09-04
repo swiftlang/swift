@@ -2197,8 +2197,18 @@ bool isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
 /// \endcode
 bool isPassThroughTypealias(TypeAliasDecl *typealias);
 
+/// Whether an overriding declaration requires the 'override' keyword.
+enum class OverrideRequiresKeyword {
+  /// The keyword is never required.
+  Never,
+  /// The keyword is always required.
+  Always,
+  /// The keyword can be implicit; it is not required.
+  Implicit,
+};
+
 /// Determine whether overriding the given declaration requires a keyword.
-bool overrideRequiresKeyword(ValueDecl *overridden);
+OverrideRequiresKeyword overrideRequiresKeyword(ValueDecl *overridden);
 
 /// Compute the type of a member that will be used for comparison when
 /// performing override checking.

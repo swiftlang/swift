@@ -1278,18 +1278,25 @@ namespace  {
 } // end anonymous namespace
 
 /// Determine whether overriding the given declaration requires a keyword.
-bool swift::overrideRequiresKeyword(ValueDecl *overridden) {
+OverrideRequiresKeyword swift::overrideRequiresKeyword(ValueDecl *overridden) {
   if (isa<AccessorDecl>(overridden))
-    return false;
+    return OverrideRequiresKeyword::Never;
 
-  if (isa<ProtocolDecl>(overridden->getDeclContext()))
-    return false;
+  if (isa<ProtocolDecl>(overridden->getDeclContext())) {
+    if (overridden->getASTContext().LangOpts.WarnImplicitOverrides)
+      return OverrideRequiresKeyword::Implicit;
 
-  if (auto ctor = dyn_cast<ConstructorDecl>(overridden)) {
-    return ctor->isDesignatedInit() && !ctor->isRequired();
+    return OverrideRequiresKeyword::Never;
   }
 
-  return true;
+  if (auto ctor = dyn_cast<ConstructorDecl>(overridden)) {
+    if (ctor->isDesignatedInit() && !ctor->isRequired())
+      return OverrideRequiresKeyword::Always;
+
+    return OverrideRequiresKeyword::Never;
+  }
+
+  return OverrideRequiresKeyword::Always;
 }
 
 /// \brief Returns true if the availability of the overriding declaration
@@ -1508,16 +1515,20 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // If the overriding declaration does not have the 'override' modifier on
   // it, complain.
   if (!override->getAttrs().hasAttribute<OverrideAttr>() &&
-      overrideRequiresKeyword(base) &&
+      overrideRequiresKeyword(base) != OverrideRequiresKeyword::Never &&
       !override->isImplicit()) {
     // FIXME: rdar://16320042 - For properties, we don't have a useful
     // location for the 'var' token.  Instead of emitting a bogus fixit, only
     // emit the fixit for 'func's.
+    auto theDiag =
+      overrideRequiresKeyword(base) == OverrideRequiresKeyword::Always
+        ? diag::missing_override
+        : diag::missing_override_warn;
     if (!isa<VarDecl>(override))
-      diags.diagnose(override, diag::missing_override)
+      diags.diagnose(override, theDiag)
           .fixItInsert(override->getStartLoc(), "override ");
     else
-      diags.diagnose(override, diag::missing_override);
+      diags.diagnose(override, theDiag);
     diags.diagnose(base, diag::overridden_here);
   }
 

@@ -2031,6 +2031,9 @@ NOTE(overridden_here_can_be_objc,none,
 
 ERROR(missing_override,none,
       "overriding declaration requires an 'override' keyword", ())
+WARNING(missing_override_warn,none,
+        "implicit override should be marked with 'override' or suppressed "
+        "with '@_nonoverride'", ())
 
 ERROR(multiple_override,none,
       "%0 has already been overridden", (DeclName))

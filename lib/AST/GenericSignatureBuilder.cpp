@@ -4381,9 +4381,11 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
       bool shouldWarnAboutRedeclaration =
         source->kind == RequirementSource::RequirementSignatureSelf &&
+        !assocTypeDecl->getAttrs().hasAttribute<NonOverrideAttr>() &&
         assocTypeDecl->getDefaultDefinitionLoc().isNull() &&
         (!assocTypeDecl->getInherited().empty() ||
-         assocTypeDecl->getTrailingWhereClause());
+         assocTypeDecl->getTrailingWhereClause() ||
+         getASTContext().LangOpts.WarnImplicitOverrides);
       for (auto inheritedType : knownInherited->second) {
         // If we have inherited associated type...
         if (auto inheritedAssocTypeDecl =

@@ -248,6 +248,9 @@ namespace swift {
     Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
       Swift3ObjCInferenceWarnings::None;
 
+    /// Diagnose implicit 'override'.
+    bool WarnImplicitOverrides = false;
+
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;
 
