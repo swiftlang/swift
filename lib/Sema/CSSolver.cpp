@@ -527,13 +527,6 @@ bool ConstraintSystem::tryTypeVariableBindings(
   bool anySolved = false;
   bool sawFirstLiteralConstraint = false;
 
-  auto attemptTypeVarBinding = [&](TypeVariableBinding &binding) -> bool {
-    // Try to solve the system with typeVar := type
-    ConstraintSystem::SolverScope scope(*this);
-    binding.attempt(*this);
-    return !solveRec(solutions);
-  };
-
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState->depth * 2) << "Initial bindings: ";
@@ -575,8 +568,12 @@ bool ConstraintSystem::tryTypeVariableBindings(
     if (binding->hasDefaultedProtocol())
       sawFirstLiteralConstraint = true;
 
-    if (attemptTypeVarBinding(*binding))
-      anySolved = true;
+    {
+      // Try to solve the system with typeVar := type
+      ConstraintSystem::SolverScope scope(*this);
+      binding->attempt(*this);
+      anySolved |= !solveRec(solutions);
+    }
 
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
