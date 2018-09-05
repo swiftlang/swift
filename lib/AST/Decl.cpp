@@ -2331,6 +2331,11 @@ bool ValueDecl::isUsableFromInline() const {
     if (ATD->getProtocol()->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
 
+  if (auto *DD = dyn_cast<DestructorDecl>(this))
+    if (auto *CD = dyn_cast<ClassDecl>(DD->getDeclContext()))
+      if (CD->getAttrs().hasAttribute<UsableFromInlineAttr>())
+        return true;
+
   return false;
 }
 
