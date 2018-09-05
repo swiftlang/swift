@@ -1792,7 +1792,7 @@ bool ConstraintSystem::solveForDisjunctionChoices(
   Optional<Score> bestNonGenericScore;
   Optional<std::pair<Constraint *, Score>> lastSolvedChoice;
 
-  DisjunctionChoiceProducer producer(choices, disjunctionLocator,
+  DisjunctionChoiceProducer producer(*this, choices, disjunctionLocator,
                                      isExplicitConversion);
 
   // Try each of the constraints within the disjunction.

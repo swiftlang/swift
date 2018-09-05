@@ -37,6 +37,7 @@
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -3485,13 +3486,35 @@ public:
   }
 };
 
-class TypeVarBindingProducer {
+template<typename Choice>
+class BindingProducer {
+  ConstraintLocator *Locator;
+
+protected:
+  ConstraintSystem &CS;
+
+public:
+  BindingProducer(ConstraintSystem &cs, ConstraintLocator *locator)
+      : Locator(locator), CS(cs) {}
+
+  virtual ~BindingProducer() {}
+  virtual Optional<Choice> operator()() = 0;
+
+  ConstraintLocator *getLocator() const { return Locator; }
+
+  /// Check whether generator would have to compute next
+  /// batch of bindings because it freshly ran out of current one.
+  /// This is useful to be able to exhaustively attempt bindings
+  /// for type variables found at one level, before proceeding to
+  /// supertypes or literal defaults etc.
+  virtual bool needsToComputeNext() const { return false; }
+};
+
+class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
   using BindingKind = ConstraintSystem::AllowedBindingKind;
   using Binding = ConstraintSystem::PotentialBinding;
 
-  ConstraintSystem &CS;
   TypeVariableType *TypeVar;
-
   llvm::SmallVector<Binding, 8> Bindings;
 
   // The index pointing to the offset in the bindings
@@ -3505,10 +3528,10 @@ class TypeVarBindingProducer {
 public:
   TypeVarBindingProducer(ConstraintSystem &cs, TypeVariableType *typeVar,
                          ArrayRef<Binding> initialBindings)
-      : CS(cs), TypeVar(typeVar),
+      : BindingProducer(cs, typeVar->getImpl().getLocator()), TypeVar(typeVar),
         Bindings(initialBindings.begin(), initialBindings.end()) {}
 
-  Optional<TypeVariableBinding> operator()() {
+  Optional<TypeVariableBinding> operator()() override {
     // Once we reach the end of the current bindings
     // let's try to compute new ones, e.g. supertypes,
     // literal defaults, if that fails, we are done.
@@ -3519,12 +3542,7 @@ public:
     return TypeVariableBinding(currIndex, TypeVar, Bindings[currIndex]);
   }
 
-  /// Check whether generator would have to compute next
-  /// batch of bindings because it freshly ran out of current one.
-  /// This is useful to be able to exhaustively attempt bindings
-  /// found at one level, before proceeding to supertypes or
-  /// literal defaults etc.
-  bool needsToComputeNext() const { return Index >= Bindings.size(); }
+  bool needsToComputeNext() const override { return Index >= Bindings.size(); }
 
 private:
   /// Compute next batch of bindings if possible, this could
@@ -3539,20 +3557,20 @@ private:
 /// Iterator over disjunction choices, makes it
 /// easy to work with disjunction and encapsulates
 /// some other important information such as locator.
-class DisjunctionChoiceProducer {
+class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
   ArrayRef<Constraint *> Choices;
-  ConstraintLocator *Locator;
   bool IsExplicitConversion;
 
   unsigned Index = 0;
 
 public:
-  DisjunctionChoiceProducer(ArrayRef<Constraint *> choices,
+  DisjunctionChoiceProducer(ConstraintSystem &cs,
+                            ArrayRef<Constraint *> choices,
                             ConstraintLocator *locator, bool explicitConversion)
-      : Choices(choices), Locator(locator),
+      : BindingProducer(cs, locator), Choices(choices),
         IsExplicitConversion(explicitConversion) {}
 
-  Optional<DisjunctionChoice> operator()() {
+  Optional<DisjunctionChoice> operator()() override {
     unsigned currIndex = Index;
     if (currIndex >= Choices.size())
       return None;
@@ -3561,8 +3579,6 @@ public:
     return DisjunctionChoice(currIndex, Choices[currIndex],
                              IsExplicitConversion);
   }
-
-  ConstraintLocator *getLocator() const { return Locator; }
 };
 
 /// \brief Constraint System "component" represents
