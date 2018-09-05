@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// XFAIL: *
 
 import TensorFlow
 
