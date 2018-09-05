@@ -33,16 +33,10 @@
 public protocol RandomAccessCollection: BidirectionalCollection
 where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
 {
-  // FIXME(ABI): Associated type inference requires this.
+  // FIXME: Associated type inference requires these.
   override associatedtype Element
-
-  // FIXME(ABI): Associated type inference requires this.
   override associatedtype Index
-
-  // FIXME(ABI): Associated type inference requires this.
   override associatedtype SubSequence
-
-  // FIXME(ABI): Associated type inference requires this.
   override associatedtype Indices
 
   /// The indices that are valid for subscripting the collection, in ascending
@@ -89,13 +83,9 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   /// - Complexity: O(1)
   override subscript(bounds: Range<Index>) -> SubSequence { get }
 
-  // FIXME(ABI): Associated type inference requires this.
+  // FIXME: Associated type inference requires these.
   override subscript(position: Index) -> Element { get }
-
-  // FIXME(ABI): Associated type inference requires this.
   override var startIndex: Index { get }
-
-  // FIXME(ABI): Associated type inference requires this.
   override var endIndex: Index { get }
 
   /// Returns the position immediately before the given index.

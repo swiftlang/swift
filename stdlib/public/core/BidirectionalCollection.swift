@@ -37,16 +37,10 @@
 ///   `c.index(after: c.index(before: i)) == i`.
 public protocol BidirectionalCollection: Collection
 where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
-  // FIXME(ABI): Associated type inference requires this.
+  // FIXME: Only needed for associated type inference.
   override associatedtype Element
-
-  // FIXME(ABI): Associated type inference requires this.
   override associatedtype Index
-
-  // FIXME(ABI): Associated type inference requires this.
   override associatedtype SubSequence
-
-  // FIXME(ABI): Associated type inference requires this.
   override associatedtype Indices
 
   /// Returns the position immediately before the given index.
@@ -230,13 +224,9 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   /// - Complexity: O(1)
   override subscript(bounds: Range<Index>) -> SubSequence { get }
 
-  // FIXME(ABI): Associated type inference requires this.
+  // FIXME: Only needed for associated type inference.
   override subscript(position: Index) -> Element { get }
-
-  // FIXME(ABI): Associated type inference requires this.
   override var startIndex: Index { get }
-
-  // FIXME(ABI): Associated type inference requires this.
   override var endIndex: Index { get }
 }
 
