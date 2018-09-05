@@ -388,6 +388,27 @@ public:
                                  SILDeclRef c,
                                  SubstitutionMap subs,
                                  SILLocation l) {
+    // Find a witness that has an entry in the witness table.
+    if (!c.requiresNewWitnessTableEntry()) {
+      auto origProto =
+        cast<ProtocolDecl>(c.getDecl()->getDeclContext());
+
+      // Retrieve the constant that has an entry in the witness table.
+      c = c.getOverriddenWitnessTableEntry();
+      c = c.asForeign(c.getDecl()->isObjC());
+
+      // Substitute the 'Self' type of the base protocol.
+      auto baseProto = cast<ProtocolDecl>(c.getDecl()->getDeclContext());
+      Type origProtoSelfType = origProto->getProtocolSelfType();
+      auto baseProtoSubs =
+          SubstitutionMap::getProtocolSubstitutions(
+            baseProto,
+            origProtoSelfType.subst(subs),
+            *subs.lookupConformance(origProtoSelfType->getCanonicalType(),
+                                    baseProto));
+      subs = baseProtoSubs;
+    }
+
     auto &ci = SGF.getConstantInfo(c);
     return Callee(Kind::WitnessMethod, SGF, c, ci.FormalPattern,
                   ci.FormalType, subs, l);

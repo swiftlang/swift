@@ -2522,6 +2522,9 @@ public:
       require(AMI->getModule().lookUpWitnessTable(conformance, false),
               "Could not find witness table for conformance");
     }
+
+    require(AMI->getMember().requiresNewWitnessTableEntry(),
+            "method does not have a witness table entry");
   }
 
   // Get the expected type of a dynamic method reference.
