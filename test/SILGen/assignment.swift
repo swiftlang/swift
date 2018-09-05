@@ -27,7 +27,7 @@ func test1() {
   // CHECK: [[C:%.*]] = apply [[CTOR]]([[T0]]) : $@convention(method) (@thick C.Type) -> @owned C
   // CHECK: [[SETTER:%.*]] = class_method [[BORROWED_D]] : $D,  #D.child!setter.1
   // CHECK: apply [[SETTER]]([[C]], [[BORROWED_D]])
-  // CHECK: end_borrow [[BORROWED_D]] from [[D]]
+  // CHECK: end_borrow [[BORROWED_D]]
   // CHECK: destroy_value [[D]]
   D().child = C()
 }

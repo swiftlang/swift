@@ -61,7 +61,7 @@ class E {
 // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[IREF]] : $*Int64
 // CHECK-NEXT: assign [[VALUE]] to [[WRITE]] : $*Int64
 // CHECK-NEXT: end_access [[WRITE]] : $*Int64
-// CHECK-NEXT: end_borrow [[BORROWED_SELF]] from [[SELF]]
+// CHECK-NEXT: end_borrow [[BORROWED_SELF]]
 // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK-NEXT: destroy_value [[SELF]]
 // CHECK-NEXT: return [[SELF_COPY]] : $E

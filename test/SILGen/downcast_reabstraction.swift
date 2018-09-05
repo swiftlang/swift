@@ -21,7 +21,7 @@ func condFunctionFromAny(_ x: Any) {
 // CHECK:         [[SUBST_VAL:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT]]([[ORIG_VAL]])
 // CHECK:         [[BORROW:%.*]] = begin_borrow [[SUBST_VAL]]
 // CHECK:         apply [[BORROW]]()
-// CHECK:         end_borrow [[BORROW]] from [[SUBST_VAL]]
+// CHECK:         end_borrow [[BORROW]]
 // CHECK:         destroy_value [[SUBST_VAL]]
 func uncondFunctionFromAny(_ x: Any) {
   (x as! () -> ())()

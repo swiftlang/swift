@@ -503,7 +503,7 @@ func test_mixed_let_var() {
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
   // CHECK:   [[B:%.*]] = function_ref @$S10switch_var1b1xySS_tF
   // CHECK:   apply [[B]]([[BORROWED_VAL_COPY]])
-  // CHECK:   end_borrow [[BORROWED_VAL_COPY]] from [[VAL_COPY]]
+  // CHECK:   end_borrow [[BORROWED_VAL_COPY]]
   // CHECK:   destroy_value [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]  

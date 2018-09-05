@@ -44,7 +44,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[BORROWED_STRING_COPY:%.*]] = begin_borrow [[STRING_COPY]]
   // CHECK:   [[BRIDGED:%.*]] = apply [[BRIDGE_STRING]]([[BORROWED_STRING_COPY]])
   // CHECK:   [[ANYOBJECT:%.*]] = init_existential_ref [[BRIDGED]] : $NSString : $NSString, $AnyObject
-  // CHECK:   end_borrow [[BORROWED_STRING_COPY]] from [[STRING_COPY]]
+  // CHECK:   end_borrow [[BORROWED_STRING_COPY]]
   // CHECK:   destroy_value [[STRING_COPY]]
   // CHECK:   [[METHOD:%.*]] = objc_method [[SELF]]
   // CHECK:   apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
@@ -152,7 +152,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[BORROWED_OPT_STRING_COPY:%.*]] = begin_borrow [[OPT_STRING_COPY]]
   // CHECK:   store_borrow [[BORROWED_OPT_STRING_COPY]] to [[TMP]]
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<String>([[TMP]])
-  // CHECK:   end_borrow [[BORROWED_OPT_STRING_COPY]] from [[OPT_STRING_COPY]]
+  // CHECK:   end_borrow [[BORROWED_OPT_STRING_COPY]]
   // CHECK:   [[METHOD:%.*]] = objc_method [[SELF]] : $NSIdLover,
   // CHECK:   apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalA)
@@ -163,7 +163,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[BORROWED_OPT_NSSTRING_COPY:%.*]] = begin_borrow [[OPT_NSSTRING_COPY]]
   // CHECK:   store_borrow [[BORROWED_OPT_NSSTRING_COPY]] to [[TMP]]
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<NSString>([[TMP]])
-  // CHECK:   end_borrow [[BORROWED_OPT_NSSTRING_COPY]] from [[OPT_NSSTRING]]
+  // CHECK:   end_borrow [[BORROWED_OPT_NSSTRING_COPY]]
   // CHECK:   [[METHOD:%.*]] = objc_method [[SELF]] : $NSIdLover,
   // CHECK:   apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalB)
@@ -252,7 +252,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK: [[BRIDGED:%.*]] = apply [[BRIDGE_STRING]]([[BORROWED_STRING_COPY]])
   // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[BRIDGED]] : $NSString : $NSString, $AnyObject
   // CHECK: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
-  // CHECK: end_borrow [[BORROWED_STRING_COPY]] from [[STRING_COPY]]
+  // CHECK: end_borrow [[BORROWED_STRING_COPY]]
   // CHECK: destroy_value [[STRING_COPY]]
   // CHECK: [[METHOD:%.*]] = objc_method [[SELF]]
   // CHECK: apply [[METHOD]]([[OPT_ANYOBJECT]], [[SELF]])
@@ -370,7 +370,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[BRIDGED:%.*]] = apply [[BRIDGE_STRING]]([[BORROWED_STRING_DATA]])
   // CHECK:   [[ANYOBJECT:%.*]] = init_existential_ref [[BRIDGED]] : $NSString : $NSString, $AnyObject
   // CHECK:   [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
-  // CHECK:   end_borrow [[BORROWED_STRING_DATA]] from [[STRING_DATA]]
+  // CHECK:   end_borrow [[BORROWED_STRING_DATA]]
   // CHECK:   destroy_value [[STRING_DATA]]
   // CHECK:   br [[JOIN:bb.*]]([[OPT_ANYOBJECT]]
   //
@@ -429,7 +429,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:   [[NATIVE_IMP:%.*]] = function_ref @$S17objc_bridging_any12SwiftIdLoverC18methodReturningAnyypyF
   // CHECK:   apply [[NATIVE_IMP]]([[NATIVE_RESULT]], [[BORROWED_SELF_COPY]])
-  // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+  // CHECK:   end_borrow [[BORROWED_SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]]
   // CHECK:   [[OPEN_RESULT:%.*]] = open_existential_addr immutable_access [[NATIVE_RESULT]]
 	// CHECK:   [[TMP:%.*]] = alloc_stack
@@ -469,7 +469,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @$S17objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyyypXEF
   // CHECK-NEXT:  [[RESULT:%.*]] = apply [[METHOD]]([[THUNK_CVT]], [[BORROWED_SELF_COPY]])
-  // CHECK-NEXT:  end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+  // CHECK-NEXT:  end_borrow [[BORROWED_SELF_COPY]]
   // CHECK-NEXT:  destroy_value [[THUNK]]
   // CHECK-NEXT:  destroy_value [[SELF_COPY]]
   // CHECK-NEXT:  return [[RESULT]]
@@ -500,7 +500,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @$S17objc_bridging_any12SwiftIdLoverC29methodReturningBlockTakingAnyyypcyF
   // CHECK-NEXT:  [[RESULT:%.*]] = apply [[METHOD:%.*]]([[BORROWED_SELF_COPY]])
-  // CHECK-NEXT:  end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+  // CHECK-NEXT:  end_borrow [[BORROWED_SELF_COPY]]
   // CHECK-NEXT:  destroy_value [[SELF_COPY]]
   // CHECK-NEXT:  [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage @callee_guaranteed (@in_guaranteed Any) -> ()
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage [[BLOCK_STORAGE]]
@@ -523,7 +523,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  store [[OPENED_ANY]] to [init] [[INIT]]
   // CHECK-NEXT:  [[BORROW_FUN:%.*]] =  begin_borrow [[FUNCTION]]
   // CHECK-NEXT:  apply [[BORROW_FUN]]([[RESULT]])
-  // CHECK-NEXT:  end_borrow [[BORROW_FUN]] from [[FUNCTION]]
+  // CHECK-NEXT:  end_borrow [[BORROW_FUN]]
   // CHECK-NEXT:  [[VOID:%.*]] = tuple ()
   // CHECK-NEXT:  destroy_addr [[RESULT]]
   // CHECK-NEXT:  dealloc_stack [[RESULT]]
@@ -548,7 +548,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @$S17objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyyypyXEF
   // CHECK-NEXT:  [[RESULT:%.*]] = apply [[METHOD]]([[THUNK_CVT]], [[BORROWED_ANY_COPY]])
-  // CHECK-NEXT:  end_borrow [[BORROWED_ANY_COPY]] from [[ANY_COPY]]
+  // CHECK-NEXT:  end_borrow [[BORROWED_ANY_COPY]]
   // CHECK-NEXT:  destroy_value [[THUNK]]
   // CHECK-NEXT:  destroy_value [[ANY_COPY]]
   // CHECK-NEXT:  return [[RESULT]]
@@ -579,7 +579,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @$S17objc_bridging_any12SwiftIdLoverC020methodReturningBlockH3AnyypycyF
   // CHECK-NEXT:  [[FUNCTION:%.*]] = apply [[METHOD]]([[BORROWED_SELF_COPY]])
-  // CHECK-NEXT:  end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+  // CHECK-NEXT:  end_borrow [[BORROWED_SELF_COPY]]
   // CHECK-NEXT:  destroy_value [[SELF_COPY]]
   // CHECK-NEXT:  [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> @out Any
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage [[BLOCK_STORAGE]]
@@ -599,7 +599,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $Any
   // CHECK-NEXT:  [[BORROW_FUN:%.*]] = begin_borrow [[FUNCTION]]
   // CHECK-NEXT:  apply [[BORROW_FUN]]([[RESULT]])
-  // CHECK-NEXT:  end_borrow [[BORROW_FUN]] from [[FUNCTION]]
+  // CHECK-NEXT:  end_borrow [[BORROW_FUN]]
   // CHECK-NEXT:  [[OPENED:%.*]] = open_existential_addr immutable_access [[RESULT]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
   // CHECK:       [[TMP:%.*]] = alloc_stack $[[OPENED_TYPE]]
   // CHECK:       copy_addr [[OPENED]] to [initialization] [[TMP]]

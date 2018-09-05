@@ -11,7 +11,7 @@ struct S { var x, y: Int }
 // CHECK: [[FN:%.*]] = function_ref @$Ss15_arrayForceCastySayq_GSayxGr0_lF
 // CHECK: [[BORROWED_ARG_COPY:%.*]] = begin_borrow [[ARG_COPY]]
 // CHECK: [[RESULT:%.*]] = apply [[FN]]<S, Any>([[BORROWED_ARG_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
-// CHECK: end_borrow [[BORROWED_ARG_COPY]] from [[ARG_COPY]]
+// CHECK: end_borrow [[BORROWED_ARG_COPY]]
 // CHECK: destroy_value [[ARG_COPY]]
 // CHECK: return [[RESULT]]
 func array_upcast(array: [S]) -> [Any] {

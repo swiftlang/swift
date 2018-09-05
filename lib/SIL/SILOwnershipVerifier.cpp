@@ -810,11 +810,8 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitEndBorrowInst(EndBorrowInst *I) {
-  // We do not consider the original value to be a verified use. But the value
-  // does need to be alive.
-  if (getOperandIndex() == EndBorrowInst::OriginalValue)
-    return {true, UseLifetimeConstraint::MustBeLive};
-  // The borrowed value is a verified use though of the begin_borrow.
+  /// An end_borrow is modeled as invalidating the guaranteed value preventing
+  /// any further uses of the value.
   return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed),
           UseLifetimeConstraint::MustBeInvalidated};
 }
@@ -1327,14 +1324,22 @@ class SILValueOwnershipChecker {
 
   /// The list of lifetime ending users that we found. Only valid if check is
   /// successful.
-  llvm::SmallVector<BranchPropagatedUser, 16> LifetimeEndingUsers;
+  SmallVector<BranchPropagatedUser, 16> LifetimeEndingUsers;
 
   /// The list of non lifetime ending users that we found. Only valid if check
   /// is successful.
-  llvm::SmallVector<BranchPropagatedUser, 16> RegularUsers;
+  SmallVector<BranchPropagatedUser, 16> RegularUsers;
+
+  /// The list of implicit non lifetime ending users that we found. This
+  /// consists of instructions like end_borrow that end a scoped lifetime. We
+  /// must treat those as regular uses and ensure that our value is not
+  /// destroyed while that sub-scope is valid.
+  ///
+  /// TODO: Rename to SubBorrowScopeUsers?
+  SmallVector<BranchPropagatedUser, 4> ImplicitRegularUsers;
 
   /// The set of blocks that we have visited.
-  llvm::SmallPtrSetImpl<SILBasicBlock *> &VisitedBlocks;
+  SmallPtrSetImpl<SILBasicBlock *> &VisitedBlocks;
 
 public:
   SILValueOwnershipChecker(
@@ -1359,7 +1364,10 @@ public:
     if (!Result.getValue())
       return false;
 
-    Result = valueHasLinearLifetime(Value, LifetimeEndingUsers, RegularUsers,
+    SmallVector<BranchPropagatedUser, 32> allRegularUsers;
+    copy(RegularUsers, std::back_inserter(allRegularUsers));
+    copy(ImplicitRegularUsers, std::back_inserter(allRegularUsers));
+    Result = valueHasLinearLifetime(Value, LifetimeEndingUsers, allRegularUsers,
                                     VisitedBlocks, DEBlocks, ErrorBehavior);
 
     return Result.getValue();
@@ -1398,9 +1406,9 @@ public:
 
 private:
   bool checkUses();
-  void gatherUsers(
-      llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
-      llvm::SmallVectorImpl<BranchPropagatedUser> &NonLifetimeEndingUsers);
+  void gatherUsers(SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
+                   SmallVectorImpl<BranchPropagatedUser> &RegularUsers,
+                   SmallVectorImpl<BranchPropagatedUser> &ImplicitRegularUsers);
 
   bool checkValueWithoutLifetimeEndingUses();
 
@@ -1435,8 +1443,9 @@ private:
 } // end anonymous namespace
 
 void SILValueOwnershipChecker::gatherUsers(
-    llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
-    llvm::SmallVectorImpl<BranchPropagatedUser> &NonLifetimeEndingUsers) {
+    SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
+    SmallVectorImpl<BranchPropagatedUser> &NonLifetimeEndingUsers,
+    SmallVectorImpl<BranchPropagatedUser> &ImplicitRegularUsers) {
 
   // See if Value is guaranteed. If we are guaranteed and not forwarding, then
   // we need to look through subobject uses for more uses. Otherwise, if we are
@@ -1449,21 +1458,20 @@ void SILValueOwnershipChecker::gatherUsers(
     return;
 
   // Then gather up our initial list of users.
-  llvm::SmallVector<Operand *, 8> Users;
+  SmallVector<Operand *, 8> Users;
   std::copy(Value->use_begin(), Value->use_end(), std::back_inserter(Users));
 
-  auto addCondBranchToList =
-      [](llvm::SmallVectorImpl<BranchPropagatedUser> &List, CondBranchInst *CBI,
-         unsigned OperandIndex) {
-        if (CBI->isConditionOperandIndex(OperandIndex)) {
-          List.emplace_back(CBI);
-          return;
-        }
+  auto addCondBranchToList = [](SmallVectorImpl<BranchPropagatedUser> &List,
+                                CondBranchInst *CBI, unsigned OperandIndex) {
+    if (CBI->isConditionOperandIndex(OperandIndex)) {
+      List.emplace_back(CBI);
+      return;
+    }
 
-        bool isTrueOperand = CBI->isTrueOperandIndex(OperandIndex);
-        List.emplace_back(CBI, isTrueOperand ? CondBranchInst::TrueIdx
-                                             : CondBranchInst::FalseIdx);
-      };
+    bool isTrueOperand = CBI->isTrueOperandIndex(OperandIndex);
+    List.emplace_back(CBI, isTrueOperand ? CondBranchInst::TrueIdx
+                                         : CondBranchInst::FalseIdx);
+  };
 
   while (!Users.empty()) {
     Operand *Op = Users.pop_back_val();
@@ -1496,6 +1504,20 @@ void SILValueOwnershipChecker::gatherUsers(
     // ownership forwarding inst, continue. We do not want to visit any
     // subobjects recursively.
     if (!IsGuaranteed || !isGuaranteedForwardingInst(User)) {
+      // Do a check if any of our users are begin_borrows. If we find such a
+      // use, then we want to include the end_borrow associated with the
+      // begin_borrow in our NonLifetimeEndingUser lists.
+      //
+      // For correctness reasons we use indices to make sure that we can append
+      // to NonLifetimeEndingUsers without needing to deal with iterator
+      // invalidation.
+      SmallVector<SILInstruction *, 4> endBorrowInsts;
+      for (unsigned i : indices(NonLifetimeEndingUsers)) {
+        if (auto *bbi = dyn_cast<BeginBorrowInst>(
+                NonLifetimeEndingUsers[i].getInst())) {
+          copy(bbi->getEndBorrows(), std::back_inserter(ImplicitRegularUsers));
+        }
+      }
       continue;
     }
 
@@ -1562,8 +1584,8 @@ void SILValueOwnershipChecker::gatherUsers(
         if (BBArgOwnershipKind == ValueOwnershipKind::Trivial)
           continue;
 
-        // Otherwise, 
-        std::copy(BBArg->use_begin(), BBArg->use_end(), std::back_inserter(Users));
+        // Otherwise,
+        copy(BBArg->getUses(), std::back_inserter(Users));
       }
     }
   }
@@ -1711,7 +1733,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // 1. Verify that none of the uses are in the same block. This would be an
   // overconsume so in this case we assert.
   // 2. Verify that the uses are compatible with our ownership convention.
-  gatherUsers(LifetimeEndingUsers, RegularUsers);
+  gatherUsers(LifetimeEndingUsers, RegularUsers, ImplicitRegularUsers);
 
   // We can only have no lifetime ending uses if we have:
   //

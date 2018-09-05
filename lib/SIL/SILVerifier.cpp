@@ -1531,13 +1531,6 @@ public:
     require(
         F.hasQualifiedOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
-    // We allow for end_borrow to express relationships in between addresses and
-    // values, but we require that the types are the same ignoring value
-    // category.
-    require(EBI->getBorrowedValue()->getType().getObjectType() ==
-                EBI->getOriginalValue()->getType().getObjectType(),
-            "end_borrow can only relate the same types ignoring value "
-            "category");
   }
 
   template <class AI>

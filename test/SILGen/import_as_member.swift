@@ -48,7 +48,7 @@ public func useClass(d: Double, opts: SomeClass.Options) {
   // CHECK: [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
   // CHECK: [[APPLY_FN:%[0-9]+]] = function_ref @IAMSomeClassApplyOptions : $@convention(c) (SomeClass, SomeClass.Options) -> ()
   // CHECK: apply [[APPLY_FN]]([[BORROWED_OBJ]], [[OPTS]])
-  // CHECK: end_borrow [[BORROWED_OBJ]] from [[OBJ]]
+  // CHECK: end_borrow [[BORROWED_OBJ]]
   // CHECK: destroy_value [[OBJ]]
   o.applyOptions(opts)
 }

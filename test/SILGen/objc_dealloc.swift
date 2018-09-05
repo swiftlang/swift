@@ -27,7 +27,7 @@ class SwiftGizmo : Gizmo {
     // CHECK-NEXT:   [[BORROWED_UPCAST_SELF:%.*]] = begin_borrow [[UPCAST_SELF]]
     // CHECK-NEXT:   [[DOWNCAST_BORROWED_UPCAST_SELF:%.*]] = unchecked_ref_cast [[BORROWED_UPCAST_SELF]] : $Gizmo to $SwiftGizmo
     // CHECK-NEXT:   objc_super_method [[DOWNCAST_BORROWED_UPCAST_SELF]] : $SwiftGizmo
-    // CHECK-NEXT:   end_borrow [[BORROWED_UPCAST_SELF]] from [[UPCAST_SELF]]
+    // CHECK-NEXT:   end_borrow [[BORROWED_UPCAST_SELF]]
     // CHECK:   return
     super.init()
   }
@@ -73,7 +73,7 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[X]] : $*X
   // CHECK-NEXT:   assign [[XOBJ]] to [[WRITE]] : $*X
   // CHECK-NEXT:   end_access [[WRITE]] : $*X
-  // CHECK-NEXT:   end_borrow [[BORROWED_SELF]] from [[SELF]]
+  // CHECK-NEXT:   end_borrow [[BORROWED_SELF]]
   // CHECK-NEXT:   return [[SELF]] : $SwiftGizmo
 
   // Objective-C IVar destroyer (i.e., -.cxx_destruct)
@@ -83,7 +83,7 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT: [[SELF_BORROW:%.*]] = begin_borrow [[SELF]]
   // CHECK-NEXT: [[X:%[0-9]+]] = ref_element_addr [[SELF_BORROW]] : $SwiftGizmo, #SwiftGizmo.x
   // CHECK-NEXT: destroy_addr [[X]] : $*X
-  // CHECK-NEXT: end_borrow [[SELF_BORROW]] from [[SELF]]
+  // CHECK-NEXT: end_borrow [[SELF_BORROW]]
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[RESULT]] : $()
 }

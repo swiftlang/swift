@@ -185,7 +185,7 @@ func opt_to_property(_ obj: AnyObject) {
   // GUARANTEED:   [[BOUND_METHOD:%[0-9]+]] = partial_apply [callee_guaranteed] [[METHOD]]([[RAWOBJ_SELF_COPY]])
   // GUARANTEED:   [[BEGIN_BORROW:%.*]] = begin_borrow [[BOUND_METHOD]]
   // GUARANTEED:   [[VALUE:%[0-9]+]] = apply [[BEGIN_BORROW]]
-  // GUARANTEED:   end_borrow [[BEGIN_BORROW]] from [[BOUND_METHOD]]
+  // GUARANTEED:   end_borrow [[BEGIN_BORROW]]
   // GUARANTEED:   [[VALUETEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // GUARANTEED:   store [[VALUE]] to [trivial] [[VALUETEMP]]
   // GUARANTEED:   inject_enum_addr [[OPTTEMP]]{{.*}}some
@@ -253,7 +253,7 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // GUARANTEED:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [callee_guaranteed] [[GETTER]]([[OBJ_REF_COPY]])
   // GUARANTEED:   [[BORROW:%.*]] = begin_borrow [[GETTER_WITH_SELF]]
   // GUARANTEED:   [[RESULT:%[0-9]+]] = apply [[BORROW]]([[I]])
-  // GUARANTEED:   end_borrow [[BORROW]] from [[GETTER_WITH_SELF]]
+  // GUARANTEED:   end_borrow [[BORROW]]
   // GUARANTEED:   [[RESULTTEMP:%.*]] = init_enum_data_addr [[OPTTEMP]]
   // GUARANTEED:   store [[RESULT]] to [trivial] [[RESULTTEMP]]
   // GUARANTEED:   inject_enum_addr [[OPTTEMP]]{{.*}}some

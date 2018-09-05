@@ -75,7 +75,7 @@ func sr3758() {
   // CHECK: = apply [[BORROWED_CALLEE]]({{%.+}}) : $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
   // CHECK: end_borrow [[BORROWED_CALLEE]]
   // destroy_value [[CALLEE]]
-  // CHECK: end_borrow [[BORROWED_F]] from [[F]]
+  // CHECK: end_borrow [[BORROWED_F]]
   // CHECK: destroy_value [[F]]
   let f: ((Any?) -> Void) = { (arg: Any!) in }
   f(nil)

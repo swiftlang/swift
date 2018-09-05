@@ -54,7 +54,7 @@ bb3:
 sil @test3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
-  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
 
 bb1(%2 : @owned $Builtin.NativeObject):

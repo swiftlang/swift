@@ -21,7 +21,7 @@
 // CHECK:   debug_value %13 : $@callee_guaranteed () -> Int, let, name "f", loc {{.*}}:33:7, scope 3
 // CHECK:   %15 = begin_borrow %13 : $@callee_guaranteed () -> Int, loc {{.*}}:34:10, scope 3
 // CHECK:   %16 = copy_value %15 : $@callee_guaranteed () -> Int, loc {{.*}}:34:10, scope 3
-// CHECK:   end_borrow %15 from %13 : $@callee_guaranteed () -> Int, $@callee_guaranteed () -> Int, loc {{.*}}:34:10, scope 3
+// CHECK:   end_borrow %15 : $@callee_guaranteed () -> Int
 // CHECK:   destroy_value %13 : $@callee_guaranteed () -> Int, loc {{.*}}:35:1, scope 3
 // CHECK:   destroy_value %0 : ${ var Int }, loc {{.*}}:35:1, scope 3
 // CHECK:   return %16 : $@callee_guaranteed () -> Int, loc {{.*}}:34:3, scope 3

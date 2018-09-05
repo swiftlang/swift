@@ -68,7 +68,7 @@ func test0(c c: C) {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
   // CHECK:   [[T2:%.*]] = load_borrow [[READ]] : $*@sil_unowned C     
   // CHECK:   [[T3:%.*]] = copy_unowned_value  [[T2]] : $@sil_unowned C  
-  // CHECK:   end_borrow [[T2]] from [[READ]]
+  // CHECK:   end_borrow [[T2]]
   // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBA]]
   // CHECK:   [[XP:%.*]] = struct_element_addr [[WRITE]] : $*A, #A.x
   // CHECK:   [[T4:%.*]] = ref_to_unowned [[T3]] : $C to $@sil_unowned C
@@ -93,12 +93,12 @@ func testunowned_local() -> C {
   // CHECK: [[tmp1_copy:%.*]] = copy_value [[tmp1]]
   // CHECK: store [[tmp1_copy]] to [init] [[PB_UC]]
   // CHECK: destroy_value [[C_COPY]]
-  // CHECK: end_borrow [[BORROWED_C]] from [[C]]
+  // CHECK: end_borrow [[BORROWED_C]]
   unowned let uc = c
 
   // CHECK: [[tmp2:%.*]] = load_borrow [[PB_UC]]
   // CHECK: [[tmp3:%.*]] = copy_unowned_value [[tmp2]]
-  // CHECK: end_borrow [[tmp2]] from [[PB_UC]]
+  // CHECK: end_borrow [[tmp2]]
   return uc
 
   // CHECK: destroy_value [[UC]]
@@ -144,8 +144,8 @@ class TestUnownedMember {
 // CHECK:   [[INVAL_COPY:%.*]] = copy_value [[INVAL]] : $@sil_unowned C
 // CHECK:   assign [[INVAL_COPY]] to [[FIELDPTR]] : $*@sil_unowned C
 // CHECK:   destroy_value [[ARG1_COPY]] : $C
-// CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
-// CHECK:   end_borrow [[BORROWED_SELF]] from [[SELF]]
+// CHECK:   end_borrow [[BORROWED_ARG1]]
+// CHECK:   end_borrow [[BORROWED_SELF]]
 // CHECK:   [[RET_SELF:%.*]] = copy_value [[SELF]]
 // CHECK:   destroy_value [[SELF]]
 // CHECK:   destroy_value [[ARG1]]
