@@ -368,7 +368,7 @@ sil @dead_use : $@convention(thin) () -> () {
 
 // CHECK-LABEL: sil @dont_crash_on_dead_arg_use
 // CHECK: bb0{{.*}}:
-// CHECK-NEXT: tuple ()
+// CHECK:      tuple ()
 // CHECK-NEXT: return
 sil @dont_crash_on_dead_arg_use : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):
@@ -412,3 +412,40 @@ bb0(%0 : $SmallCodesizeStruct):
   %7 = tuple ()
   return %7 : $()
 }
+
+// CHECK-LABEL: sil @dead_address_projections
+// CHECK-NOT: alloc_stack
+// CHECK: } // end sil function 'dead_address_projections'
+sil @dead_address_projections : $@convention(thin) (((), ())) -> ((), ()) {
+bb0(%0 : $((), ())):
+  %1 = alloc_stack $((), ())
+  %200 = tuple_element_addr %1 : $*((), ()), 0
+  %300 = tuple_element_addr %1 : $*((), ()), 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %0 to %1 : $*((), ())
+  %16 = load %1 : $*((), ())
+  dealloc_stack %1 : $*((), ())
+  br bb3(%16 : $((), ()))
+
+bb2:
+  dealloc_stack %1 : $*((), ())
+  br bb3(%0 : $((), ()))
+
+bb3(%20 : $((), ())):
+  return %20 : $((), ())
+}
+
+// CHECK-LABEL: sil @load_tuple_of_void
+// CHECK-NOT: alloc_stack
+// CHECK:   return undef : $((), ())
+// CHECK: } // end sil function 'load_tuple_of_void'
+sil @load_tuple_of_void : $@convention(thin) () -> ((), ()) {
+bb0:
+  %1 = alloc_stack $((), ())
+  %16 = load %1 : $*((), ())
+  dealloc_stack %1 : $*((), ())
+  return %16 : $((), ())
+}
+
