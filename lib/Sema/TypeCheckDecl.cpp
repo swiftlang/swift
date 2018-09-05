@@ -945,6 +945,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
 /// Does the context allow pattern bindings that don't bind any variables?
 static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
+  
+  // Property decls in type context must bind variables.
   if (dc->isTypeContext())
     return false;
   

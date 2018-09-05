@@ -994,6 +994,11 @@ static void addOpaqueAccessorToStorage(TypeChecker &TC,
 
 static void addExpectedOpaqueAccessorsToStorage(TypeChecker &TC,
                                                 AbstractStorageDecl *storage) {
+  // Nameless vars from interface files should not have any accessors.
+  // TODO: Replace this check with a broader check that all storage decls
+  //       from interface files have all their accessors up front.
+  if (storage->getBaseName().empty())
+    return;
   storage->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
     // If the accessor is already present, there's nothing to do.
     if (storage->getAccessor(kind))
