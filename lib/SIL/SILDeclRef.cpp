@@ -49,8 +49,15 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
       return MethodDispatch::Static;
 
     // Members defined directly inside a class are dynamically dispatched.
-    if (isa<ClassDecl>(dc))
+    if (isa<ClassDecl>(dc)) {
+      // Convenience initializers are not dynamically dispatched unless
+      // required.
+      if (auto ctor = dyn_cast<ConstructorDecl>(method)) {
+        if (!ctor->isRequired() && ctor->isConvenienceInit())
+          return MethodDispatch::Static;
+      }
       return MethodDispatch::Class;
+    }
 
     // Imported class methods are dynamically dispatched.
     if (method->isObjC() && method->hasClangNode())
