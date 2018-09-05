@@ -910,8 +910,6 @@ struct MemberLookupResult {
 
 /// \brief Stores the required methods for @dynamicCallable types.
 struct DynamicCallableMethods {
-  // FuncDecl *argumentsMethod = nullptr;
-  // FuncDecl *keywordArgumentsMethod = nullptr;
   llvm::DenseSet<FuncDecl *> argumentsMethods;
   llvm::DenseSet<FuncDecl *> keywordArgumentsMethods;
 
@@ -927,8 +925,22 @@ struct DynamicCallableMethods {
   /// required methods. Returns false iff type does not satisfy @dynamicCallable
   /// requirements.
   bool isValid() const {
-    // return argumentsMethod || keywordArgumentsMethod;
     return !argumentsMethods.empty() || !keywordArgumentsMethods.empty();
+  }
+
+  void dump() {
+    if (!argumentsMethods.empty()) {
+      llvm::errs() << "Arguments methods:\n";
+      for (auto method : argumentsMethods) {
+        method->dump();
+      }
+    }
+    if (!keywordArgumentsMethods.empty()) {
+      llvm::errs() << "Keyword arguments methods:\n";
+      for (auto method : keywordArgumentsMethods) {
+        method->dump();
+      }
+    }
   }
 };
 

@@ -4346,11 +4346,12 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
 /// Returns the function declaration corresponding to a @dynamicCallable
 /// attribute required method (if it exists) implemented by a type. Otherwise,
 /// return nullptr.
-static FuncDecl *
-lookupDynamicCallableMethod(Type type, ConstraintSystem &CS,
-                            const ConstraintLocatorBuilder &locator,
-                            Identifier argumentName, bool hasKeywordArgs,
-                            bool &error) {
+// static FuncDecl *
+static llvm::SmallVector<FuncDecl *, 4>
+lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
+                             const ConstraintLocatorBuilder &locator,
+                             Identifier argumentName, bool hasKeywordArgs,
+                             bool &error) {
   auto &ctx = CS.getASTContext();
   auto decl = type->getAnyNominal();
   auto methodName = DeclName(ctx, ctx.Id_dynamicallyCall, { argumentName });
@@ -4368,12 +4369,21 @@ lookupDynamicCallableMethod(Type type, ConstraintSystem &CS,
   candidates.erase(std::remove_if(candidates.begin(), candidates.end(), filter),
                    candidates.end());
 
+  SmallVector<FuncDecl *, 4> methods;
+  for (auto candidate : candidates) {
+    auto funcDecl = dyn_cast_or_null<FuncDecl>(candidate.getDecl());
+    if (!funcDecl) continue;
+    methods.push_back(funcDecl);
+  }
+  return methods;
+  /*
   // If there is one candidate, return it. Otherwise, return nullptr.
   auto size = candidates.size();
   if (size == 1) return cast<FuncDecl>(candidates.front().getDecl());
   // If there are >1 candidates, it is an overload error.
   else if (size > 1) error = true;
   return nullptr;
+  */
 }
 
 /// Looks up and returns the @dynamicCallable required methods (if they exist)
@@ -4391,12 +4401,22 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
   // methods.keywordArgumentsMethod =
   //   lookupDynamicCallableMethod(type, CS, locator, ctx.Id_withKeywordArguments,
   //                               /*hasKeywordArgs*/ true, error);
-  methods.addArgumentsMethod(
-    lookupDynamicCallableMethod(type, CS, locator, ctx.Id_withArguments,
-                                /*hasKeywordArgs*/ false, error));
-  methods.addKeywordArgumentsMethod(
-    lookupDynamicCallableMethod(type, CS, locator, ctx.Id_withKeywordArguments,
-                                /*hasKeywordArgs*/ true, error));
+
+  auto argMethods =
+    lookupDynamicCallableMethods(type, CS, locator, ctx.Id_withArguments,
+                                 /*hasKeywordArgs*/ false, error);
+  auto kwargMethods =
+    lookupDynamicCallableMethods(type, CS, locator, ctx.Id_withKeywordArguments,
+                                 /*hasKeywordArgs*/ true, error);
+  methods.argumentsMethods.insert(argMethods.begin(), argMethods.end());
+  methods.keywordArgumentsMethods.insert(kwargMethods.begin(),
+                                         kwargMethods.end());
+  // methods.addArgumentsMethod(
+  //   lookupDynamicCallableMethod(type, CS, locator, ctx.Id_withArguments,
+  //                               /*hasKeywordArgs*/ false, error));
+  // methods.addKeywordArgumentsMethod(
+  //   lookupDynamicCallableMethod(type, CS, locator, ctx.Id_withKeywordArguments,
+  //                               /*hasKeywordArgs*/ true, error));
   return methods;
 }
 
@@ -4545,6 +4565,7 @@ simplifyDynamicCallableApplicableFnConstraint(
     }
   }
 
+  methods.dump();
   auto method = useKwargsMethod
     ? *methods.keywordArgumentsMethods.begin()
     : *methods.argumentsMethods.begin();
