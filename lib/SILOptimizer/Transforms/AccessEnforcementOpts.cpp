@@ -142,13 +142,13 @@ namespace {
 /// Reachability results are stored here because very few accesses are
 /// typically in-progress at a particular program point,
 /// particularly at block boundaries.
-using DenseAccessVec = llvm::SmallSetVector<BeginAccessInst *, 4>;
+using DenseAccessSet = llvm::SmallSetVector<BeginAccessInst *, 4>;
 
 // Tracks the local data flow result for a basic block
 struct RegionInfo {
   struct AccessSummary {
     // The actual begin_access instructions
-    DenseAccessVec conflictFreeAccesses;
+    DenseAccessSet conflictFreeAccesses;
     // Flag to Indicate if we started a merging process
     bool merged;
     AccessSummary(unsigned size) : merged(false) {}
@@ -170,11 +170,11 @@ public:
     unidentifiedAccess = false;
   }
 
-  const DenseAccessVec &getInScopeAccesses() {
+  const DenseAccessSet &getInScopeAccesses() {
     return inScopeConflictFreeAccesses.conflictFreeAccesses;
   }
 
-  const DenseAccessVec &getOutOfScopeAccesses() {
+  const DenseAccessSet &getOutOfScopeAccesses() {
     return outOfScopeConflictFreeAccesses.conflictFreeAccesses;
   }
 };
@@ -321,26 +321,23 @@ private:
                                 RegionInfo::AccessSummary &accessStruct,
                                 const AccessedStorage &storage, bool isInScope);
   void visitSetForConflicts(
-      const DenseAccessVec &accessSet, RegionInfo &info,
+      const DenseAccessSet &accessSet, RegionInfo &info,
       AccessConflictAndMergeAnalysis::AccessedStorageSet &loopStorage);
   void
   detectApplyConflicts(const swift::FunctionAccessedStorage &callSiteAccesses,
-                       const DenseAccessVec &conflictFreeSet,
+                       const DenseAccessSet &conflictFreeSet,
                        const swift::FullApplySite &fullApply, RegionInfo &info);
 
-  void detectMayReleaseConflicts(const DenseAccessVec &conflictFreeSet,
+  void detectMayReleaseConflicts(const DenseAccessSet &conflictFreeSet,
                                  SILInstruction *instr, RegionInfo &info);
 };
 } // namespace
 
 void AccessConflictAndMergeAnalysis::addInScopeAccess(
     RegionInfo &info, BeginAccessInst *beginAccess) {
-  assert(
-      std::find(info.inScopeConflictFreeAccesses.conflictFreeAccesses.begin(),
-                info.inScopeConflictFreeAccesses.conflictFreeAccesses.end(),
-                beginAccess) ==
-          info.inScopeConflictFreeAccesses.conflictFreeAccesses.end() &&
-      "the begin_access should not have been in Vec.");
+  assert(info.inScopeConflictFreeAccesses.conflictFreeAccesses.count(
+             beginAccess) == 0 &&
+         "the begin_access should not have been in Vec.");
   info.inScopeConflictFreeAccesses.conflictFreeAccesses.insert(beginAccess);
 }
 
@@ -451,9 +448,7 @@ void AccessConflictAndMergeAnalysis::mergeAccessStruct(
   }
 
   auto pred = [&](BeginAccessInst *it) {
-    auto rhsIt = std::find(RHSAccessStruct.conflictFreeAccesses.begin(),
-                           RHSAccessStruct.conflictFreeAccesses.end(), it);
-    return rhsIt == RHSAccessStruct.conflictFreeAccesses.end();
+    return RHSAccessStruct.conflictFreeAccesses.count(it) == 0;
   };
   accessStruct.conflictFreeAccesses.remove_if(pred);
 }
@@ -630,23 +625,30 @@ void AccessConflictAndMergeAnalysis::visitBeginAccess(
   }
   SILAccessKind beginAccessKind = beginAccess->getAccessKind();
   // check the current in-scope accesses for conflicts:
-  for (auto *outerBeginAccess : info.getInScopeAccesses()) {
-    // If both are reads, keep the mapped access.
-    if (!accessKindMayConflict(beginAccessKind,
-                               outerBeginAccess->getAccessKind())) {
-      continue;
+  bool changed = false;
+  do {
+    changed = false;
+    for (auto *outerBeginAccess : info.getInScopeAccesses()) {
+      // If both are reads, keep the mapped access.
+      if (!accessKindMayConflict(beginAccessKind,
+                                 outerBeginAccess->getAccessKind())) {
+        continue;
+      }
+
+      auto &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
+      // If there is no potential conflict, leave the outer access mapped.
+      if (!outerAccessInfo.isDistinctFrom(beginAccessInfo))
+        continue;
+
+      LLVM_DEBUG(beginAccessInfo.dump();
+                 llvm::dbgs() << "  may conflict with:\n";
+                 outerAccessInfo.dump());
+
+      recordConflict(info, outerAccessInfo);
+      changed = true;
+      break;
     }
-
-    auto &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
-    // If there is no potential conflict, leave the outer access mapped.
-    if (!outerAccessInfo.isDistinctFrom(beginAccessInfo))
-      continue;
-
-    LLVM_DEBUG(beginAccessInfo.dump(); llvm::dbgs() << "  may conflict with:\n";
-               outerAccessInfo.dump());
-
-    recordConflict(info, outerAccessInfo);
-  }
+  } while (changed);
 
   // Record the current access to InScopeAccesses.
   // It can potentially be folded
@@ -679,22 +681,28 @@ void AccessConflictAndMergeAnalysis::visitEndAccess(EndAccessInst *endAccess,
 
 void AccessConflictAndMergeAnalysis::detectApplyConflicts(
     const swift::FunctionAccessedStorage &callSiteAccesses,
-    const DenseAccessVec &conflictFreeSet,
+    const DenseAccessSet &conflictFreeSet,
     const swift::FullApplySite &fullApply, RegionInfo &info) {
-  for (auto *outerBeginAccess : conflictFreeSet) {
-    // If there is no potential conflict, leave the outer access mapped.
-    SILAccessKind accessKind = outerBeginAccess->getAccessKind();
-    AccessInfo &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
-    if (!callSiteAccesses.mayConflictWith(accessKind, outerAccessInfo))
-      continue;
+  bool changed = false;
+  do {
+    changed = false;
+    for (auto *outerBeginAccess : conflictFreeSet) {
+      // If there is no potential conflict, leave the outer access mapped.
+      SILAccessKind accessKind = outerBeginAccess->getAccessKind();
+      AccessInfo &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
+      if (!callSiteAccesses.mayConflictWith(accessKind, outerAccessInfo))
+        continue;
 
-    LLVM_DEBUG(
-        llvm::dbgs() << *fullApply.getInstruction() << "  call site access: ";
-        callSiteAccesses.dump(); llvm::dbgs() << "  may conflict with:\n";
-        outerAccessInfo.dump());
+      LLVM_DEBUG(
+          llvm::dbgs() << *fullApply.getInstruction() << "  call site access: ";
+          callSiteAccesses.dump(); llvm::dbgs() << "  may conflict with:\n";
+          outerAccessInfo.dump());
 
-    recordConflict(info, outerAccessInfo);
-  }
+      recordConflict(info, outerAccessInfo);
+      changed = true;
+      break;
+    }
+  } while (changed);
 }
 
 void AccessConflictAndMergeAnalysis::visitFullApply(FullApplySite fullApply,
@@ -709,26 +717,32 @@ void AccessConflictAndMergeAnalysis::visitFullApply(FullApplySite fullApply,
 }
 
 void AccessConflictAndMergeAnalysis::detectMayReleaseConflicts(
-    const DenseAccessVec &conflictFreeSet, SILInstruction *instr,
+    const DenseAccessSet &conflictFreeSet, SILInstruction *instr,
     RegionInfo &info) {
   // TODO Introduce "Pure Swift" deinitializers
   // We can then make use of alias information for instr's operands
   // If they don't alias - we might get away with not recording a conflict
-  for (auto *outerBeginAccess : conflictFreeSet) {
-    // Only class and global access that may alias would conflict
-    AccessInfo &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
-    const AccessedStorage::Kind outerKind = outerAccessInfo.getKind();
-    if (outerKind != AccessedStorage::Class &&
-        outerKind != AccessedStorage::Global) {
-      continue;
+  bool changed = false;
+  do {
+    changed = false;
+    for (auto *outerBeginAccess : conflictFreeSet) {
+      // Only class and global access that may alias would conflict
+      AccessInfo &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
+      const AccessedStorage::Kind outerKind = outerAccessInfo.getKind();
+      if (outerKind != AccessedStorage::Class &&
+          outerKind != AccessedStorage::Global) {
+        continue;
+      }
+      // We can't prove what the deinitializer might do
+      // TODO Introduce "Pure Swift" deinitializers
+      LLVM_DEBUG(llvm::dbgs() << "MayRelease Instruction: " << *instr
+                              << "  may conflict with:\n";
+                 outerAccessInfo.dump());
+      recordConflict(info, outerAccessInfo);
+      changed = true;
+      break;
     }
-    // We can't prove what the deinitializer might do
-    // TODO Introduce "Pure Swift" deinitializers
-    LLVM_DEBUG(llvm::dbgs() << "MayRelease Instruction: " << *instr
-                            << "  may conflict with:\n";
-               outerAccessInfo.dump());
-    recordConflict(info, outerAccessInfo);
-  }
+  } while (changed);
 }
 
 void AccessConflictAndMergeAnalysis::visitMayRelease(SILInstruction *instr,
@@ -776,7 +790,7 @@ void AccessConflictAndMergeAnalysis::mergePredAccesses(
 }
 
 void AccessConflictAndMergeAnalysis::visitSetForConflicts(
-    const DenseAccessVec &accessSet, RegionInfo &info,
+    const DenseAccessSet &accessSet, RegionInfo &info,
     AccessConflictAndMergeAnalysis::AccessedStorageSet &loopStorage) {
   bool changed = false;
   do {
