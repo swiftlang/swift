@@ -53,8 +53,9 @@ class ConstraintGraph;
 class ConstraintGraphNode;
 class ConstraintSystem;
 class DisjunctionChoiceProducer;
-class TypeVarBindingProducer;
+class TypeBinding;
 class TypeVariableBinding;
+class TypeVarBindingProducer;
 
 } // end namespace constraints
 
@@ -2985,8 +2986,19 @@ private:
   ///        the best solution to the constraint system.
   ///
   /// \returns true if we failed to find any solutions, false otherwise.
-  bool solveForDisjunctionChoices(DisjunctionChoiceProducer &disjunction,
+  bool solveForDisjunctionChoices(ArrayRef<Constraint *> choices,
+                                  ConstraintLocator *disjunctionLocator,
+                                  bool isExplicitConversion,
                                   SmallVectorImpl<Solution> &solutions);
+
+  /// \brief Attempt to solve constraint system after
+  ///        attempting given disjunction choice.
+  ///
+  /// \returns If solution(s) could be reached, return best score.
+  Optional<Score>
+  solveForDisjunctionChoice(const TypeBinding &choice,
+                            ConstraintLocator *disjunctionLocator,
+                            SmallVectorImpl<Solution> &solutions);
 
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
@@ -3398,19 +3410,13 @@ public:
 };
 
 class DisjunctionChoice : public TypeBinding {
-  ConstraintSystem *CS;
   Constraint *Choice;
   bool ExplicitConversion;
 
 public:
-  DisjunctionChoice(ConstraintSystem *const cs, unsigned index,
-                    Constraint *choice, bool explicitConversion)
-      : TypeBinding(index), CS(cs), Choice(choice),
+  DisjunctionChoice(unsigned index, Constraint *choice, bool explicitConversion)
+      : TypeBinding(index), Choice(choice),
         ExplicitConversion(explicitConversion) {}
-
-  ConstraintSystem &getCS() const { return *CS; }
-
-  Constraint *operator->() const { return Choice; }
 
   bool isDisabled() const override { return Choice->isDisabled(); }
 
@@ -3428,11 +3434,6 @@ public:
 
   void attempt(ConstraintSystem &cs) const override;
 
-  /// \brief Apply given choice to the system and try to solve it.
-  Optional<Score> attempt(SmallVectorImpl<Solution> &solutions);
-
-  operator Constraint *() { return Choice; }
-
   void print(llvm::raw_ostream &Out, SourceManager *SM) const override {
     Choice->print(Out, SM);
   }
@@ -3440,7 +3441,7 @@ public:
 private:
   /// \brief If associated disjunction is an explicit conversion,
   /// let's try to propagate its type early to prune search space.
-  void propagateConversionInfo() const;
+  void propagateConversionInfo(ConstraintSystem &cs) const;
 
   ValueDecl *getOperatorDecl() const {
     auto *decl = getDecl(Choice);
@@ -3539,7 +3540,6 @@ private:
 /// easy to work with disjunction and encapsulates
 /// some other important information such as locator.
 class DisjunctionChoiceProducer {
-  ConstraintSystem &CS;
   ArrayRef<Constraint *> Choices;
   ConstraintLocator *Locator;
   bool IsExplicitConversion;
@@ -3547,10 +3547,9 @@ class DisjunctionChoiceProducer {
   unsigned Index = 0;
 
 public:
-  DisjunctionChoiceProducer(ConstraintSystem &cs,
-                            ArrayRef<Constraint *> choices,
+  DisjunctionChoiceProducer(ArrayRef<Constraint *> choices,
                             ConstraintLocator *locator, bool explicitConversion)
-      : CS(cs), Choices(choices), Locator(locator),
+      : Choices(choices), Locator(locator),
         IsExplicitConversion(explicitConversion) {}
 
   Optional<DisjunctionChoice> operator()() {
@@ -3559,7 +3558,7 @@ public:
       return None;
 
     ++Index;
-    return DisjunctionChoice(&CS, currIndex, Choices[currIndex],
+    return DisjunctionChoice(currIndex, Choices[currIndex],
                              IsExplicitConversion);
   }
 
