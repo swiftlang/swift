@@ -1,6 +1,8 @@
 // RUN: %target-swift-emit-silgen -enable-sil-ownership %s -o /dev/null -verify
 // RUN: %target-swift-emit-silgen -enable-sil-ownership -enforce-exclusivity=checked %s -o /dev/null -verify
 
+func takeInOut<T>(_: inout T) {}
+
 struct MutatorStruct {
   mutating func f(_ x : inout MutatorStruct) {}
 }
@@ -126,4 +128,10 @@ func testArrayWithReadModify<T>(array: ArrayWithReadModify<T>) {
   swap(&copy[0], &copy[1])
   swap(&copy[0], // expected-note {{concurrent writeback occurred here}}
        &copy[0]) // expected-error {{inout writeback through subscript occurs in multiple arguments to call}}
+}
+
+// rdar://44147745
+func testNestedArrayWithReadModify<T>(array: ArrayWithReadModify<ArrayWithReadModify<T>>) {
+  var copy = array
+  takeInOut(&copy[0][0])
 }
