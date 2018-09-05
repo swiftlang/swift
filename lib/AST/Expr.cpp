@@ -2168,20 +2168,23 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   }
 }
 
-// See swift/Basic/Statistic.h for declaration: this enables tracing Decls, is
+// See swift/Basic/Statistic.h for declaration: this enables tracing Exprs, is
 // defined here to avoid too much layering violation / circular linkage
 // dependency.
 
 struct ExprTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
   void traceName(const void *Entity, raw_ostream &OS) const {
-    // Exprs don't have names.
+    if (!Entity)
+      return;
+    const Expr *E = static_cast<const Expr *>(Entity);
+    OS << Expr::getKindName(E->getKind());
   }
   void traceLoc(const void *Entity, SourceManager *SM,
                 clang::SourceManager *CSM, raw_ostream &OS) const {
     if (!Entity)
       return;
-    const Expr *D = static_cast<const Expr *>(Entity);
-    D->getSourceRange().print(OS, *SM, false);
+    const Expr *E = static_cast<const Expr *>(Entity);
+    E->getSourceRange().print(OS, *SM, false);
   }
 };
 
