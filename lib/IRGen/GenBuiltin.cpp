@@ -380,7 +380,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     IGF.IGM.addSwiftSelfAttributes(attrs, 0);
     IGF.IGM.addSwiftErrorAttributes(attrs, 1);
     call->setAttributes(attrs);
-    
+
+    IGF.Builder.CreateStore(llvm::ConstantPointerNull::get(IGF.IGM.ErrorPtrTy),
+                            errorBuffer);
+
     return out.add(call);
   }
   
