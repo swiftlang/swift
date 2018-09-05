@@ -19,6 +19,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/PointerUnion.h"
 
 using namespace swift;
@@ -430,4 +431,32 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
   std::uninitialized_copy(Cases.begin(), Cases.end(),
                           theSwitch->getTrailingObjects<ASTNode>());
   return theSwitch;
+}
+
+// See swift/Basic/Statistic.h for declaration: this enables tracing Stmts, is
+// defined here to avoid too much layering violation / circular linkage
+// dependency.
+
+struct StmtTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const Stmt *S = static_cast<const Stmt *>(Entity);
+    OS << Stmt::getKindName(S->getKind());
+  }
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const Stmt *S = static_cast<const Stmt *>(Entity);
+    S->getSourceRange().print(OS, *SM, false);
+  }
+};
+
+static StmtTraceFormatter TF;
+
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Stmt *>() {
+  return &TF;
 }
