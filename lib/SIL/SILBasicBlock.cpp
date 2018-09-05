@@ -298,7 +298,7 @@ ScopeCloner::ScopeCloner(SILFunction &NewFn) : NewFn(NewFn) {
   // debug scope. Create a new one here.
   // FIXME: Audit all call sites and make them create the function
   // debug scope.
-  auto *SILFn = NewFn.getDebugScope()->Parent.get<SILFunction *>();
+  auto *SILFn = NewFn.getDebugScope()->getParent().get<SILFunction *>();
   if (SILFn != &NewFn) {
     SILFn->setInlined();
     NewFn.setDebugScope(getOrCreateClonedScope(NewFn.getDebugScope()));
@@ -314,17 +314,34 @@ ScopeCloner::getOrCreateClonedScope(const SILDebugScope *OrigScope) {
   if (it != ClonedScopeCache.end())
     return it->second;
 
-  auto ClonedScope = new (NewFn.getModule()) SILDebugScope(*OrigScope);
-  if (OrigScope->InlinedCallSite) {
+  const SILDebugScope *ClonedInlinedCallSite = nullptr;
+  SILFunction *ClonedFn;
+  const SILDebugScope *ClonedParentScope = nullptr;
+  if (auto *InlinedCallSite = OrigScope->getInlinedCallSite()) {
     // For inlined functions, we need to rewrite the inlined call site.
-    ClonedScope->InlinedCallSite =
-        getOrCreateClonedScope(OrigScope->InlinedCallSite);
+    ClonedInlinedCallSite =
+        getOrCreateClonedScope(OrigScope->getInlinedCallSite());
+    if (auto *ParentScope =
+            OrigScope->getParent().dyn_cast<const SILDebugScope *>()) {
+      ClonedParentScope = ParentScope;
+      ClonedFn = nullptr;
+    } else {
+      ClonedFn = OrigScope->getParent().get<SILFunction *>();
+    }
   } else {
-    if (auto *ParentScope = OrigScope->Parent.dyn_cast<const SILDebugScope *>())
-      ClonedScope->Parent = getOrCreateClonedScope(ParentScope);
-    else
-      ClonedScope->Parent = &NewFn;
+    if (auto *ParentScope =
+            OrigScope->getParent().dyn_cast<const SILDebugScope *>()) {
+      ClonedParentScope = getOrCreateClonedScope(ParentScope);
+      ClonedFn = nullptr;
+    } else {
+      ClonedFn = &NewFn;
+    }
   }
+
+  auto ClonedScope = new (NewFn.getModule(), ClonedInlinedCallSite)
+      SILDebugScope(OrigScope->Loc, ClonedFn, ClonedParentScope,
+                    ClonedInlinedCallSite);
+
   // Create an inline scope for the cloned instruction.
   assert(ClonedScopeCache.find(OrigScope) == ClonedScopeCache.end());
   ClonedScopeCache.insert({OrigScope, ClonedScope});

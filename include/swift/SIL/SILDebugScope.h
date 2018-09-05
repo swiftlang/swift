@@ -22,6 +22,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/TrailingObjects.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILLocation.h"
 
@@ -36,18 +37,20 @@ class SILInstruction;
 /// debug info. In contrast to LLVM IR, SILDebugScope also holds all
 /// the inlining information. In LLVM IR the inline info is part of
 /// DILocation.
-class SILDebugScope : public SILAllocated<SILDebugScope> {
+class SILDebugScope final
+    : public SILAllocated<SILDebugScope>,
+      private llvm::TrailingObjects<SILDebugScope, const SILDebugScope *> {
+  friend TrailingObjects;
+
+public:
+  using ParentType = PointerUnion<const SILDebugScope *, SILFunction *>;
+
+private:
+  llvm::PointerIntPair<ParentType, 1, bool> ParentAndHasInlinedCallSite;
+
 public:
   /// The AST node this lexical scope represents.
   SILLocation Loc;
-  /// Always points to the parent lexical scope.
-  /// For top-level scopes, this is the SILFunction.
-  PointerUnion<const SILDebugScope *, SILFunction *> Parent;
-  /// An optional chain of inlined call sites.
-  ///
-  /// If this scope is inlined, this points to a special "scope" that
-  /// holds the location of the call site.
-  const SILDebugScope *InlinedCallSite;
 
   SILDebugScope(SILLocation Loc, SILFunction *SILFn,
                 const SILDebugScope *ParentScope = nullptr,
@@ -56,6 +59,21 @@ public:
   /// Create a scope for an artificial function.
   SILDebugScope(SILLocation Loc);
 
+  /// Handle allocation with the possible trailing object.
+  template <typename ContextTy>
+  void *operator new(size_t Bytes, const ContextTy &C,
+                     const SILDebugScope *InlinedCallSite = nullptr) {
+    size_t TrailingCount = InlinedCallSite ? 1 : 0;
+    return C.allocate(totalSizeToAlloc<const SILDebugScope *>(TrailingCount),
+                      alignof(SILDebugScope));
+  }
+
+  /// Always points to the parent lexical scope.
+  /// For top-level scopes, this is the SILFunction.
+  ParentType getParent() const {
+    return ParentAndHasInlinedCallSite.getPointer();
+  }
+
   /// Return the function this scope originated from before being inlined.
   SILFunction *getInlinedFunction() const;
 
@@ -63,6 +81,16 @@ public:
   /// inlined this recursively returns the function it was inlined
   /// into.
   SILFunction *getParentFunction() const;
+
+  /// An optional chain of inlined call sites.
+  ///
+  /// If this scope is inlined, this points to a special "scope" that
+  /// holds the location of the call site.
+  const SILDebugScope *getInlinedCallSite() const {
+    if (!ParentAndHasInlinedCallSite.getInt())
+      return nullptr;
+    return *this->getTrailingObjects<const SILDebugScope *>();
+  }
 
 #ifndef NDEBUG
   void dump(SourceManager &SM, llvm::raw_ostream &OS = llvm::errs(),

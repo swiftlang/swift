@@ -275,8 +275,9 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   } else {
     // Performance inlining. Construct a proper inline scope pointing
     // back to the call site.
-    CallSiteScope = new (F.getModule())
-        SILDebugScope(AI.getLoc(), nullptr, AIScope, AIScope->InlinedCallSite);
+    CallSiteScope = new (F.getModule(), AIScope->getInlinedCallSite())
+        SILDebugScope(AI.getLoc(), nullptr, AIScope,
+                      AIScope->getInlinedCallSite());
   }
   assert(CallSiteScope && "call site has no scope");
   assert(CallSiteScope->getParentFunction() == &F);
@@ -461,17 +462,18 @@ SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
 
   auto &M = getBuilder().getModule();
   auto InlinedAt =
-      getOrCreateInlineScope(CalleeScope->InlinedCallSite);
+      getOrCreateInlineScope(CalleeScope->getInlinedCallSite());
 
-  auto *ParentFunction = CalleeScope->Parent.dyn_cast<SILFunction *>();
+  auto *ParentFunction = CalleeScope->getParent().dyn_cast<SILFunction *>();
   if (ParentFunction)
     ParentFunction = remapParentFunction(
         FuncBuilder, M, ParentFunction, SubsMap,
         CalleeFunction->getLoweredFunctionType()->getGenericSignature(),
         ForInlining);
 
-  auto *ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();
-  auto *InlinedScope = new (M) SILDebugScope(
+  auto *ParentScope =
+      CalleeScope->getParent().dyn_cast<const SILDebugScope *>();
+  auto *InlinedScope = new (M, InlinedAt) SILDebugScope(
       CalleeScope->Loc, ParentFunction,
       ParentScope ? getOrCreateInlineScope(ParentScope) : nullptr, InlinedAt);
   InlinedScopeCache.insert({CalleeScope, InlinedScope});
