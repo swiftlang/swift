@@ -5,7 +5,7 @@ import TensorFlow
 
 public func test1() {
   func addSelf(_ x: Tensor<Float>) -> Tensor<Float> {
-    return x + log(x)
+    return log(x)
   }
   _ = #gradient(addSelf)
 }

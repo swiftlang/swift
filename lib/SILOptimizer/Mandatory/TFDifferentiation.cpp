@@ -31,6 +31,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1126,10 +1127,22 @@ public:
   /// that a `[reverse_differentiable]` attribute will be generated for the
   /// specified indices, and that primal/adjoint synthesis will be run in the
   /// Differentiation pass.
+  ///
+  /// The function must either be a definition or be serialized.
   DifferentiationTask *
   registerDifferentiationTask(SILFunction *original,
                               const SILReverseAutoDiffIndices &indices,
                               DifferentiationInvoker invoker) {
+    // Make sure this function either has a body or has a
+    // `[reverse_differentiable]` attribute that is a superset of all the
+    if (original->isExternalDeclaration()) {
+      // If it's serialized, deserialize it.
+      assert(original->isSerialized() &&
+             "Differentiation task cannot be on a function without a body");
+      auto *deserializedFn = silLoader->lookupSILFunction(original);
+      assert(deserializedFn && "Cannot deserialize original function");
+      (void)deserializedFn;
+    }
     auto *attr = getOrCreateReverseDifferentiableAttr(original, indices);
     std::unique_ptr<DifferentiationTask> task(
         new DifferentiationTask(original, std::move(attr), module, invoker));
@@ -2701,6 +2714,9 @@ public:
 } // end anonymous namespace
 
 bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
+  LLVM_DEBUG(getADDebugStream() << "Performing primal synthesis for original"
+             << item.original->getName() << " and its corresponding adjoint "
+             << item.target->getName() << '\n');
   // FIXME: If the original function has multiple basic blocks, bail out since
   // AD does not support control flow yet.
   if (diagnoseUnsupportedControlFlow(context, item.task)) {
@@ -4091,6 +4107,9 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
 }
 
 bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
+  LLVM_DEBUG(getADDebugStream() << "Performing adjoint synthesis for original"
+             << item.original->getName() << " and its corresponding adjoint "
+             << item.target->getName() << '\n');
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
       passManager.getAnalysis<DifferentiableActivityAnalysis>();
