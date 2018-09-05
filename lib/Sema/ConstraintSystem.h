@@ -3371,32 +3371,50 @@ Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 /// Common interface to encapsulate attempting choices of
 /// different entities, such as type variables (types)
 /// or disjunctions (their choices).
-struct TypeBinding {
+class TypeBinding {
+  unsigned Index;
+
+public:
+  TypeBinding(unsigned index) : Index(index) {}
+
   virtual ~TypeBinding() {}
   virtual void attempt(ConstraintSystem &cs) const = 0;
+
+  /// Position of this binding in the chain.
+  unsigned getIndex() const { return Index; }
+
+  virtual bool isDisabled() const { return false; }
+  virtual bool isUnavailable() const { return false; }
+  virtual bool isDefaultable() const { return false; }
+  virtual bool hasDefaultedProtocol() const { return false; }
+
+  // FIXME: Both of the accessors below are required to support
+  //        performance optimization hacks in constraint solver.
+
+  virtual bool isGenericOperator() const { return false; }
+  virtual bool isSymmetricOperator() const { return false; }
+
+  virtual void print(llvm::raw_ostream &Out, SourceManager *SM) const = 0;
 };
 
 class DisjunctionChoice : public TypeBinding {
   ConstraintSystem *CS;
-  unsigned Index;
   Constraint *Choice;
   bool ExplicitConversion;
 
 public:
   DisjunctionChoice(ConstraintSystem *const cs, unsigned index,
                     Constraint *choice, bool explicitConversion)
-      : CS(cs), Index(index), Choice(choice),
+      : TypeBinding(index), CS(cs), Choice(choice),
         ExplicitConversion(explicitConversion) {}
 
   ConstraintSystem &getCS() const { return *CS; }
 
   Constraint *operator->() const { return Choice; }
 
-  unsigned getIndex() const { return Index; }
+  bool isDisabled() const override { return Choice->isDisabled(); }
 
-  bool isDisabled() const { return Choice->isDisabled(); }
-
-  bool isUnavailable() const {
+  bool isUnavailable() const override {
     if (auto *decl = getDecl(Choice))
       return decl->getAttrs().isUnavailable(decl->getASTContext());
     return false;
@@ -3405,8 +3423,8 @@ public:
   // FIXME: Both of the accessors below are required to support
   //        performance optimization hacks in constraint solver.
 
-  bool isGenericOperator() const;
-  bool isSymmetricOperator() const;
+  bool isGenericOperator() const override;
+  bool isSymmetricOperator() const override;
 
   void attempt(ConstraintSystem &cs) const override;
 
@@ -3414,6 +3432,10 @@ public:
   Optional<Score> attempt(SmallVectorImpl<Solution> &solutions);
 
   operator Constraint *() { return Choice; }
+
+  void print(llvm::raw_ostream &Out, SourceManager *SM) const override {
+    Choice->print(Out, SM);
+  }
 
 private:
   /// \brief If associated disjunction is an explicit conversion,
@@ -3445,17 +3467,21 @@ class TypeVariableBinding : public TypeBinding {
   ConstraintSystem::PotentialBinding Binding;
 
 public:
-  TypeVariableBinding(TypeVariableType *typeVar,
+  TypeVariableBinding(unsigned index, TypeVariableType *typeVar,
                       ConstraintSystem::PotentialBinding &binding)
-      : TypeVar(typeVar), Binding(binding) {}
-
-  Type getType() const { return Binding.BindingType; }
+      : TypeBinding(index), TypeVar(typeVar), Binding(binding) {}
 
   void attempt(ConstraintSystem &cs) const override;
 
-  bool isDefaultableBinding() const { return Binding.isDefaultableBinding(); }
+  bool isDefaultable() const override { return Binding.isDefaultableBinding(); }
 
-  bool hasDefaultedProtocol() const { return Binding.DefaultedProtocol; }
+  bool hasDefaultedProtocol() const override {
+    return Binding.DefaultedProtocol;
+  }
+
+  void print(llvm::raw_ostream &Out, SourceManager *) const override {
+    Out << TypeVar->getString() << " := " << Binding.BindingType->getString();
+  }
 };
 
 class TypeVarBindingProducer {
@@ -3488,7 +3514,8 @@ public:
     if (needsToComputeNext() && !computeNext())
       return None;
 
-    return TypeVariableBinding(TypeVar, Bindings[Index++]);
+    unsigned currIndex = Index++;
+    return TypeVariableBinding(currIndex, TypeVar, Bindings[currIndex]);
   }
 
   /// Check whether generator would have to compute next

@@ -556,7 +556,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
     if (anySolved) {
       // If this is a defaultable binding and we have found solutions,
       // don't explore the default binding.
-      if (binding->isDefaultableBinding())
+      if (binding->isDefaultable())
         continue;
 
       // If we were able to solve this without considering
@@ -567,9 +567,9 @@ bool ConstraintSystem::tryTypeVariableBindings(
 
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth * 2)
-          << "(trying " << typeVar->getString()
-          << " := " << binding->getType()->getString() << '\n';
+      log.indent(solverState->depth * 2) << "(trying ";
+      binding->print(log, &getASTContext().SourceMgr);
+      log << '\n';
     }
 
     if (binding->hasDefaultedProtocol())
@@ -1617,17 +1617,17 @@ void ConstraintSystem::collectDisjunctions(
 }
 
 /// \brief Check if the given disjunction choice should be attempted by solver.
-static bool shouldSkipDisjunctionChoice(DisjunctionChoice &choice,
+static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
+                                        const TypeBinding &choice,
                                         Optional<Score> &bestNonGenericScore) {
-  auto &cs = choice.getCS();
   auto &TC = cs.TC;
 
-  if (choice->isDisabled()) {
+  if (choice.isDisabled()) {
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
       log.indent(cs.solverState->depth)
       << "(skipping ";
-      choice->print(log, &TC.Context.SourceMgr);
+      choice.print(log, &TC.Context.SourceMgr);
       log << '\n';
     }
 
@@ -1753,9 +1753,8 @@ bool ConstraintSystem::solveForDisjunctionChoices(
   Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
 
   // Try each of the constraints within the disjunction.
-  while (auto binding = disjunction()) {
-    auto &currentChoice = *binding;
-    if (shouldSkipDisjunctionChoice(currentChoice, bestNonGenericScore))
+  while (auto currentChoice = disjunction()) {
+    if (shouldSkipDisjunctionChoice(*this, *currentChoice, bestNonGenericScore))
       continue;
 
     // We already have a solution; check whether we should
@@ -1771,7 +1770,8 @@ bool ConstraintSystem::solveForDisjunctionChoices(
       // selecting unavailable overloads or result in fixes being
       // applied to reach a solution.
       if (!hasUnavailableOverloads && !hasFixes &&
-          shortCircuitDisjunctionAt(currentChoice, lastChoice, getASTContext()))
+          shortCircuitDisjunctionAt(*currentChoice, lastChoice,
+                                    getASTContext()))
         break;
     }
 
@@ -1790,7 +1790,7 @@ bool ConstraintSystem::solveForDisjunctionChoices(
     // took for it.
 
     if (auto *disjunctionLocator = disjunction.getLocator()) {
-      auto index = currentChoice.getIndex();
+      auto index = currentChoice->getIndex();
       DisjunctionChoices.push_back({disjunctionLocator, index});
 
       // Implicit unwraps of optionals are worse solutions than those
@@ -1806,14 +1806,14 @@ bool ConstraintSystem::solveForDisjunctionChoices(
       }
     }
 
-    if (auto score = binding->attempt(solutions)) {
-      if (!currentChoice.isGenericOperator() &&
-          currentChoice.isSymmetricOperator()) {
+    if (auto score = currentChoice->attempt(solutions)) {
+      if (!currentChoice->isGenericOperator() &&
+          currentChoice->isSymmetricOperator()) {
         if (!bestNonGenericScore || score < bestNonGenericScore)
           bestNonGenericScore = score;
       }
 
-      lastSolvedChoice = {currentChoice, *score};
+      lastSolvedChoice = {*currentChoice, *score};
     }
 
     if (TC.getLangOpts().DebugConstraintSolver) {
