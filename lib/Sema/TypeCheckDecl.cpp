@@ -3749,8 +3749,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   if (hasEnabledForbiddenTypecheckPrefix())
     checkForForbiddenPrefix(D);
 
-  (void) D->getFormalAccess();
-
   // Validate the context.
   auto dc = D->getDeclContext();
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
@@ -4652,6 +4650,9 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     finalizeAbstractStorageDecl(*this, storage);
   }
+
+  // Compute access level.
+  (void)decl->getFormalAccess();
 
   // Compute overrides.
   (void)decl->getOverriddenDecls();

@@ -2282,12 +2282,6 @@ public:
             abort();
           }
         }
-      } else {
-        if (!isa<GenericTypeParamDecl>(VD) && !isa<VarDecl>(VD)) {
-          dumpRef(VD);
-          Out << " does not have access\n";
-          abort();
-        }
       }
 
       verifyCheckedBase(VD);
