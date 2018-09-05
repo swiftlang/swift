@@ -1595,7 +1595,7 @@ namespace {
                                               Storage, IsSuper,
                                               std::move(peekedIndices),
                                               IndexExprForDiagnostics));
-      pushWriteback(SGF, loc, std::move(component), ManagedValue(),
+      pushWriteback(SGF, loc, std::move(component), /*for diagnostics*/ base,
                     MaterializedLValue());
 
       auto decl = cast<AccessorDecl>(Accessor.getFuncDecl());
