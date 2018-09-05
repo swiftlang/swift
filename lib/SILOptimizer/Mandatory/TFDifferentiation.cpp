@@ -1955,19 +1955,24 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
       reqr->print(s);
       s << '\n' << reqrRef << " : " << silInitTy << '\n';
     });
+
     // Get the target type's conformance to `VectorNumeric`.
-    
-    auto *conf = astCtx.getConformance(
-        type, vecNumProto,
-        targetTypeDecl->getLoc(), targetTypeDecl,
-        ProtocolConformanceState::Complete);
-    assert(conf);
+    llvm::SmallVector<ProtocolConformance*, 1> confs;
+    targetTypeDecl->lookupConformance(module.getSwiftModule(), vecNumProto,
+                                      confs);
+    assert(confs.size() == 1);
+    auto *genericConf = confs[0];
+    auto typeSubMap = type->getContextSubstitutionMap(
+        module.getSwiftModule(), genericConf->getDeclContext());
+    auto *conf = astCtx.getSpecializedConformance(type, genericConf,
+                                                  typeSubMap);
     LLVM_DEBUG({
       auto &s = getADDebugStream() << "Found conformance ";
       conf->dump(s);
       s << '\n';
     });
     ProtocolConformanceRef confRef(conf);
+
     // Make sure the witness table is linked.
     module.lookUpFunctionInWitnessTable(confRef, reqrRef);
     // $4 = witness_method ...
