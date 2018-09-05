@@ -590,21 +590,6 @@ public:
         getSILDebugLocation(Loc), text.toStringRef(Out), encoding, getModule()));
   }
 
-  ConstStringLiteralInst *
-  createConstStringLiteral(SILLocation Loc, StringRef text,
-                           ConstStringLiteralInst::Encoding encoding) {
-    return insert(ConstStringLiteralInst::create(getSILDebugLocation(Loc), text,
-                                                 encoding, getModule()));
-  }
-
-  ConstStringLiteralInst *
-  createConstStringLiteral(SILLocation Loc, const Twine &text,
-                           ConstStringLiteralInst::Encoding encoding) {
-    SmallVector<char, 256> Out;
-    return insert(ConstStringLiteralInst::create(
-        getSILDebugLocation(Loc), text.toStringRef(Out), encoding, getModule()));
-  }
-
   /// If \p LV is non-trivial, return a \p Qualifier load of \p LV. If \p LV is
   /// trivial, use trivial instead.
   ///

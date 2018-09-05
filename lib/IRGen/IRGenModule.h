@@ -799,8 +799,6 @@ public:
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
                                         bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
-  llvm::Constant *getAddrOfGlobalConstantString(StringRef utf8);
-  llvm::Constant *getAddrOfGlobalUTF16ConstantString(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCSelectorRef(SILDeclRef method);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);

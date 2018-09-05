@@ -946,7 +946,6 @@ public:
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);
   void visitStringLiteralInst(StringLiteralInst *i);
-  void visitConstStringLiteralInst(ConstStringLiteralInst *i);
 
   void visitLoadInst(LoadInst *i);
   void visitStoreInst(StoreInst *i);
@@ -2576,22 +2575,6 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
     addr = emitObjCSelectorRefLoad(i->getValue());
   else
     addr = emitAddrOfConstantString(IGM, i);
-
-  Explosion e;
-  e.add(addr);
-  setLoweredExplosion(i, e);
-}
-
-void IRGenSILFunction::visitConstStringLiteralInst(
-    swift::ConstStringLiteralInst *i) {
-
-  llvm::Constant *addr;
-  if (i->getEncoding() == ConstStringLiteralInst::Encoding::UTF8)
-    addr = IGM.getAddrOfGlobalConstantString(i->getValue());
-  else
-    addr = IGM.getAddrOfGlobalUTF16ConstantString(i->getValue());
-
-  addr = llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);
 
   Explosion e;
   e.add(addr);

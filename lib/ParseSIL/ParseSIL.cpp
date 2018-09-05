@@ -2416,41 +2416,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
 
-  case SILInstructionKind::ConstStringLiteralInst: {
-    if (P.Tok.getKind() != tok::identifier) {
-      P.diagnose(P.Tok, diag::sil_string_no_encoding);
-      return true;
-    }
-
-    ConstStringLiteralInst::Encoding encoding;
-    if (P.Tok.getText() == "utf8") {
-      encoding = ConstStringLiteralInst::Encoding::UTF8;
-    } else if (P.Tok.getText() == "utf16") {
-      encoding = ConstStringLiteralInst::Encoding::UTF16;
-    } else {
-      P.diagnose(P.Tok, diag::sil_string_invalid_encoding, P.Tok.getText());
-      return true;
-    }
-    P.consumeToken(tok::identifier);
-
-    if (P.Tok.getKind() != tok::string_literal) {
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
-      return true;
-    }
-
-    // Drop the double quotes.
-    StringRef rawString = P.Tok.getText().drop_front().drop_back();
-
-    // Ask the lexer to interpret the entire string as a literal segment.
-    SmallVector<char, 128> stringBuffer;
-    StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
-    P.consumeToken(tok::string_literal);
-    if (parseSILDebugLocation(InstLoc, B))
-      return true;
-    ResultVal = B.createConstStringLiteral(InstLoc, string, encoding);
-    break;
-  }
-
   case SILInstructionKind::AllocValueBufferInst: {
     SILType Ty;
     if (parseSILType(Ty) ||

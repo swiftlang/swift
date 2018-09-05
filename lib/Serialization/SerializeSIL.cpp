@@ -53,17 +53,6 @@ static unsigned toStableStringEncoding(StringLiteralInst::Encoding encoding) {
   llvm_unreachable("bad string encoding");
 }
 
-static unsigned
-toStableConstStringEncoding(ConstStringLiteralInst::Encoding encoding) {
-  switch (encoding) {
-  case ConstStringLiteralInst::Encoding::UTF8:
-    return SIL_UTF8;
-  case ConstStringLiteralInst::Encoding::UTF16:
-    return SIL_UTF16;
-  }
-  llvm_unreachable("bad string encoding");
-}
-
 static unsigned toStableSILLinkage(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Public: return SIL_LINKAGE_PUBLIC;
@@ -1356,16 +1345,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     StringRef Str = SLI->getValue();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     unsigned encoding = toStableStringEncoding(SLI->getEncoding());
-    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    (unsigned)SI.getKind(), encoding, 0, 0,
-                                    S.addDeclBaseNameRef(Ctx.getIdentifier(Str)));
-    break;
-  }
-  case SILInstructionKind::ConstStringLiteralInst: {
-    auto SLI = cast<ConstStringLiteralInst>(&SI);
-    StringRef Str = SLI->getValue();
-    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
-    unsigned encoding = toStableConstStringEncoding(SLI->getEncoding());
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     (unsigned)SI.getKind(), encoding, 0, 0,
                                     S.addDeclBaseNameRef(Ctx.getIdentifier(Str)));
