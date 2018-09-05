@@ -945,16 +945,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
 /// Does the context allow pattern bindings that don't bind any variables?
 static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
-  
-  // Property decls in type context must bind variables unless in a module
-  // interface, where private members don't bind variables but contribute
-  // to storage.
-  if (dc->isTypeContext()) {
-    if (auto SF = dc->getParentSourceFile())
-      if (SF->Kind == SourceFileKind::Interface)
-        return true;
+  if (dc->isTypeContext())
     return false;
-  }
   
   // Global variable decls must bind variables, except in scripts.
   if (dc->isModuleScopeContext()) {

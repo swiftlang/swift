@@ -65,8 +65,11 @@ void PrintOptions::clearSynthesizedExtension() {
 }
 
 static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
-  return ASD->getDeclContext()->isTypeContext() && ASD->hasStorage() &&
-         !ASD->isStatic();
+  auto *DC = ASD->getDeclContext()->getAsDecl();
+  if (!DC) return false;
+  auto *ND = dyn_cast<NominalTypeDecl>(DC);
+  if (!ND) return false;
+  return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
 PrintOptions PrintOptions::printTextualInterfaceFile() {

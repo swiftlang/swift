@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// R UN: %target-swift-frontend -emit-module -o %t/Test~partial.swiftmodule -module-name Test -primary-file %s
-// R UN: %target-swift-frontend -merge-modules -emit-module -o %t/Test.swiftmodule %t/Test~partial.swiftmodule
-// R UN: %target-swift-ide-test -print-module -module-to-print=Test -source-filename=x -I %t | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t/Test~partial.swiftmodule -module-name Test -primary-file %s
+// RUN: %target-swift-frontend -merge-modules -emit-module -o %t/Test.swiftmodule %t/Test~partial.swiftmodule
+// RUN: %target-swift-ide-test -print-module -module-to-print=Test -source-filename=x -I %t | %FileCheck %s
 
 // RUN: %target-swift-frontend -emit-interface-path %t.swiftinterface -enable-resilience -emit-module -o /dev/null %s
 // RUN: %FileCheck %s < %t.swiftinterface
