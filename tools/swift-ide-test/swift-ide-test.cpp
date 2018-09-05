@@ -1627,6 +1627,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       case NodeKind::Class:
       case NodeKind::Enum:
       case NodeKind::OtherNominalType:
+      case NodeKind::TypeAlias:
         break;
 
       case NodeKind::BoundGenericStructure:
