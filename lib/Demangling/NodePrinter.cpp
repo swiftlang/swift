@@ -1821,6 +1821,13 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       for (unsigned index = 0; index < count; ++index) {
         if (index != 0)
           Printer << ", ";
+        // Limit the number of printed generic parameters. In practice this
+        // it will never be exceeded. The limit is only imporant for malformed
+        // symbols where count can be really huge.
+        if (index >= 128) {
+          Printer << "...";
+          break;
+        }
         // FIXME: Depth won't match when a generic signature applies to a
         // method in generic type context.
         Printer << archetypeName(index, depth);
