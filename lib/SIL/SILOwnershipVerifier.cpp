@@ -611,21 +611,6 @@ OwnershipCompatibilityUseChecker::visitDeallocPartialRefInst(
 }
 
 OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitEndBorrowArgumentInst(
-    EndBorrowArgumentInst *I) {
-  // If we are currently checking an end_borrow_argument as a subobject, then we
-  // treat this as just a use.
-  if (isCheckingSubObject())
-    return {true, UseLifetimeConstraint::MustBeLive};
-
-  // Otherwise, we must be checking an actual argument. Make sure it is guaranteed!
-  auto lifetimeConstraint = hasExactOwnership(ValueOwnershipKind::Guaranteed)
-                                ? UseLifetimeConstraint::MustBeInvalidated
-                                : UseLifetimeConstraint::MustBeLive;
-  return {true, lifetimeConstraint};
-}
-
-OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitSelectEnumInst(SelectEnumInst *I) {
   if (getValue() == I->getEnumOperand()) {
     return {true, UseLifetimeConstraint::MustBeLive};
@@ -1551,10 +1536,10 @@ void SILValueOwnershipChecker::gatherUsers(
       continue;
     }
 
-    // Otherwise if we have a terminator, add any as uses any
-    // end_borrow_argument to ensure that the subscope is completely enclsed
-    // within the super scope. all of the arguments to the work list. We require
-    // all of our arguments to be either trivial or guaranteed.
+    // Otherwise if we have a terminator, add any as uses any end_borrow to
+    // ensure that the subscope is completely enclsed within the super
+    // scope. all of the arguments to the work list. We require all of our
+    // arguments to be either trivial or guaranteed.
     for (auto &Succ : TI->getSuccessors()) {
       auto *BB = Succ.getBB();
 
