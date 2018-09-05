@@ -1,14 +1,13 @@
-// RUN: %target-swift-frontend -O -emit-llvm %s | %FileCheck %s
-// XFAIL: *
+// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 
 import TensorFlow
 
 @differentiable(reverse, adjoint: dConcreteTanh)
-func concreteTanh(_ x: Tensor<Float>) -> Tensor<Float> {
+public func concreteTanh(_ x: Tensor<Float>) -> Tensor<Float> {
   return tanh(x)
 }
 
-func dConcreteTanh(_ x: Tensor<Float>, tanhx: Tensor<Float>, seed: Tensor<Float>) -> Tensor<Float> {
+public func dConcreteTanh(_ x: Tensor<Float>, tanhx: Tensor<Float>, seed: Tensor<Float>) -> Tensor<Float> {
   return seed * (1 - tanhx * tanhx)
 }
 

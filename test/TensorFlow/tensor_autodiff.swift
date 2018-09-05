@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-llvm %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 // XFAIL: *
 
 import TensorFlow
