@@ -527,38 +527,10 @@ bool ConstraintSystem::tryTypeVariableBindings(
   bool anySolved = false;
   bool sawFirstLiteralConstraint = false;
 
-  auto attemptTypeVarBinding = [&](PotentialBinding &binding) -> bool {
-    auto type = binding.BindingType;
-
+  auto attemptTypeVarBinding = [&](TypeVariableBinding &binding) -> bool {
     // Try to solve the system with typeVar := type
     ConstraintSystem::SolverScope scope(*this);
-    if (binding.DefaultedProtocol) {
-      type = openUnboundGenericType(type, typeVar->getImpl().getLocator());
-      type = type->reconstituteSugar(/*recursive=*/false);
-    } else if (binding.BindingSource == ConstraintKind::ArgumentConversion &&
-               !type->hasTypeVariable() && isCollectionType(type)) {
-      // If the type binding comes from the argument conversion, let's
-      // instead of binding collection types directly, try to bind
-      // using temporary type variables substituted for element
-      // types, that's going to ensure that subtype relationship is
-      // always preserved.
-      auto *BGT = type->castTo<BoundGenericType>();
-      auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
-                                         BGT->getASTContext());
-
-      type = openUnboundGenericType(UGT, typeVar->getImpl().getLocator());
-      type = type->reconstituteSugar(/*recursive=*/false);
-    }
-
-    // FIXME: We want the locator that indicates where the binding came
-    // from.
-    addConstraint(ConstraintKind::Bind, typeVar, type,
-                  typeVar->getImpl().getLocator());
-
-    // If this was from a defaultable binding note that.
-    if (binding.isDefaultableBinding())
-      DefaultedConstraints.push_back(binding.DefaultableBinding);
-
+    binding.attempt(*this);
     return !solveRec(solutions);
   };
 
@@ -576,7 +548,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
   }
 
   ++solverState->NumTypeVariablesBound;
-  TypeVarBindingGenerator bindings(*this, typeVar, initialBindings);
+  TypeVarBindingProducer bindings(*this, typeVar, initialBindings);
   while (auto binding = bindings()) {
     // Try each of the bindings in turn.
     ++solverState->NumTypeVariableBindings;
@@ -589,7 +561,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
 
       // If we were able to solve this without considering
       // default literals, don't bother looking at default literals.
-      if (binding->DefaultedProtocol && !sawFirstLiteralConstraint)
+      if (binding->hasDefaultedProtocol() && !sawFirstLiteralConstraint)
         break;
     }
 
@@ -597,10 +569,10 @@ bool ConstraintSystem::tryTypeVariableBindings(
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       log.indent(solverState->depth * 2)
           << "(trying " << typeVar->getString()
-          << " := " << binding->BindingType->getString() << '\n';
+          << " := " << binding->getType()->getString() << '\n';
     }
 
-    if (binding->DefaultedProtocol)
+    if (binding->hasDefaultedProtocol())
       sawFirstLiteralConstraint = true;
 
     if (attemptTypeVarBinding(*binding))
@@ -1775,12 +1747,14 @@ Constraint *ConstraintSystem::selectDisjunction() {
 }
 
 bool ConstraintSystem::solveForDisjunctionChoices(
-    Disjunction &disjunction, SmallVectorImpl<Solution> &solutions) {
+    DisjunctionChoiceProducer &disjunction,
+    SmallVectorImpl<Solution> &solutions) {
   Optional<Score> bestNonGenericScore;
   Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
 
   // Try each of the constraints within the disjunction.
-  for (auto currentChoice : disjunction) {
+  while (auto binding = disjunction()) {
+    auto &currentChoice = *binding;
     if (shouldSkipDisjunctionChoice(currentChoice, bestNonGenericScore))
       continue;
 
@@ -1832,7 +1806,7 @@ bool ConstraintSystem::solveForDisjunctionChoices(
       }
     }
 
-    if (auto score = currentChoice.solve(solutions)) {
+    if (auto score = binding->attempt(solutions)) {
       if (!currentChoice.isGenericOperator() &&
           currentChoice.isSymmetricOperator()) {
         if (!bestNonGenericScore || score < bestNonGenericScore)
@@ -1908,8 +1882,9 @@ bool ConstraintSystem::solveForDisjunction(
       disjunction->shouldRememberChoice() ? disjunction->getLocator() : nullptr;
   assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
 
-  auto choices = Disjunction(*this, disjunction->getNestedConstraints(),
-                             locator, disjunction->isExplicitConversion());
+  auto choices =
+      DisjunctionChoiceProducer(*this, disjunction->getNestedConstraints(),
+                                locator, disjunction->isExplicitConversion());
 
   auto noSolutions = solveForDisjunctionChoices(choices, solutions);
 
@@ -1980,11 +1955,16 @@ bool ConstraintSystem::solveSimplified(SmallVectorImpl<Solution> &solutions) {
   return false;
 }
 
-Optional<Score> DisjunctionChoice::solve(SmallVectorImpl<Solution> &solutions) {
+void DisjunctionChoice::attempt(ConstraintSystem &cs) const {
   CS->simplifyDisjunctionChoice(Choice);
 
   if (ExplicitConversion)
     propagateConversionInfo();
+}
+
+Optional<Score>
+DisjunctionChoice::attempt(SmallVectorImpl<Solution> &solutions) {
+  attempt(*CS);
 
   if (CS->solveRec(solutions))
     return None;
