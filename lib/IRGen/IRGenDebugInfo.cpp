@@ -311,7 +311,7 @@ private:
 
   llvm::DIFile *getOrCreateFile(StringRef Filename) {
     if (Filename.empty())
-      return MainFile;
+      Filename = SILLocation::getCompilerGeneratedDebugLoc().Filename;
 
     // Look in the cache first.
     auto CachedFile = DIFileCache.find(Filename);

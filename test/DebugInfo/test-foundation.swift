@@ -1,9 +1,10 @@
 // RUN: %target-swift-frontend -emit-ir -g %s -o %t.ll
 // RUN: %FileCheck %s --check-prefix IMPORT-CHECK < %t.ll
 // RUN: %FileCheck %s --check-prefix LOC-CHECK < %t.ll
+// RUN: %FileCheck %s --check-prefix ALLOCCTOR-CHECK < %t.ll
 // RUN: llc %t.ll -filetype=obj -o %t.o
 // RUN: %llvm-dwarfdump %t.o | %FileCheck %s --check-prefix DWARF-CHECK
-// DISABLED <rdar://problem/28232630>: %llvm-dwarfdump --verify %t.o
+// RUN: %llvm-dwarfdump --verify %t.o
 
 // REQUIRES: OS=macosx
 
@@ -16,12 +17,16 @@ class MyObject : NSObject {
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
   // LOC-CHECK: ret
   @objc var MyArr = NSArray()
-// IMPORT-CHECK: filename: "test-foundation.swift"
-// IMPORT-CHECK-DAG: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath:
+  // IMPORT-CHECK: filename: "test-foundation.swift"
+  // IMPORT-CHECK-DAG: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath:
   // IMPORT-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[NSARRAY:[0-9]+]]
   //  IMPORT-CHECK-DAG: ![[NSARRAY]] = !DIModule(scope: ![[FOUNDATION:[0-9]+]], name: "NSArray"
   // IMPORT-CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
 
+  // ALLOCCTOR-CHECK: ![[F:.*]] = !DIFile(filename: "<compiler-generated>",
+  // ALLOCCTOR-CHECK: distinct !DISubprogram(name: "init",
+  // ALLOCCTOR-CHECK-SAME:                   linkageName: "$SSo7NSArrayCABycfC",
+  // ALLOCCTOR-CHECK-SAME:                   file: ![[F]],
   @objc func foo(_ obj: MyObject) {
     return obj.foo(obj)
   }
