@@ -949,6 +949,38 @@ bb0:
   return %10 : $()
 }
 
+
+// public func testOldToNewMapReadMayRelease() {
+// Checks merging 2 out of 3 scopes resulting in a larger read scope
+// Due to a MayRelease instruction before the 3rd scope
+//
+// CHECK-LABEL: sil @testOldToNewMapReadMayRelease : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-LABEL: } // end sil function 'testOldToNewMapReadMayRelease'
+sil @testOldToNewMapReadMayRelease : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_box ${ var Int32 }, var, name "y"
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  strong_release %alloc : ${ var Int32 }
+  %7 = begin_access [read] [dynamic] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
 // public func testOldToNewMapWrite) {
 // Checks merging of 3 scopes resulting in a larger modify scope
 //
