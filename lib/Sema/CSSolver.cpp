@@ -1982,8 +1982,8 @@ void DisjunctionChoice::attempt(ConstraintSystem &cs) const {
     propagateConversionInfo(cs);
 }
 
-bool DisjunctionChoice::isGenericOperator() const {
-  auto *decl = getOperatorDecl();
+bool DisjunctionChoice::isGenericOp(Constraint *choice) {
+  auto *decl = getOperatorDecl(choice);
   if (!decl)
     return false;
 
@@ -1991,8 +1991,8 @@ bool DisjunctionChoice::isGenericOperator() const {
   return interfaceType->is<GenericFunctionType>();
 }
 
-bool DisjunctionChoice::isSymmetricOperator() const {
-  auto *decl = getOperatorDecl();
+bool DisjunctionChoice::isSymmetricOp(Constraint *choice) {
+  auto *decl = getOperatorDecl(choice);
   if (!decl)
     return false;
 

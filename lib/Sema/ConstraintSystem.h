@@ -3381,14 +3381,35 @@ void simplifyLocator(Expr *&anchor,
 /// null otherwise.
 Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 
+enum class TypeBindingFlag {
+  /// The constraint represented by this choice has been
+  /// marked as disabled by the solver.
+  Disabled = 0x01,
+  /// The declaration behind this binding is marked as `@unavailable`
+  Unavailable = 0x02,
+  /// This binding comes from the "defaults to" constraint.
+  Defaultable = 0x04,
+  /// This binding comes from the "defaults to" constraint
+  /// which has associated protocol.
+  HasDefaultedProtocol = 0x08,
+  /// Type of the binding comes from generic operator declaration.
+  GenericOperator = 0x10,
+  /// Type of the binding comes from symmetric operator declaration.
+  SymmetricOperator = 0x20,
+};
+
+using TypeBindingFlags = OptionSet<TypeBindingFlag>;
+
 /// Common interface to encapsulate attempting choices of
 /// different entities, such as type variables (types)
 /// or disjunctions (their choices).
 class TypeBinding {
   unsigned Index;
+  TypeBindingFlags Flags;
 
 public:
-  TypeBinding(unsigned index) : Index(index) {}
+  TypeBinding(unsigned index, TypeBindingFlags flags)
+      : Index(index), Flags(flags) {}
 
   virtual ~TypeBinding() {}
   virtual void attempt(ConstraintSystem &cs) const = 0;
@@ -3396,16 +3417,30 @@ public:
   /// Position of this binding in the chain.
   unsigned getIndex() const { return Index; }
 
-  virtual bool isDisabled() const { return false; }
-  virtual bool isUnavailable() const { return false; }
-  virtual bool isDefaultable() const { return false; }
-  virtual bool hasDefaultedProtocol() const { return false; }
+  bool isDisabled() const { return Flags.contains(TypeBindingFlag::Disabled); }
+
+  bool isUnavailable() const {
+    return Flags.contains(TypeBindingFlag::Unavailable);
+  }
+
+  bool isDefaultable() const {
+    return Flags.contains(TypeBindingFlag::Defaultable);
+  }
+
+  bool hasDefaultedProtocol() const {
+    return Flags.contains(TypeBindingFlag::HasDefaultedProtocol);
+  }
 
   // FIXME: Both of the accessors below are required to support
   //        performance optimization hacks in constraint solver.
 
-  virtual bool isGenericOperator() const { return false; }
-  virtual bool isSymmetricOperator() const { return false; }
+  bool isGenericOperator() const {
+    return Flags.contains(TypeBindingFlag::GenericOperator);
+  }
+
+  bool isSymmetricOperator() const {
+    return Flags.contains(TypeBindingFlag::SymmetricOperator);
+  }
 
   virtual void print(llvm::raw_ostream &Out, SourceManager *SM) const = 0;
 };
@@ -3416,22 +3451,8 @@ class DisjunctionChoice : public TypeBinding {
 
 public:
   DisjunctionChoice(unsigned index, Constraint *choice, bool explicitConversion)
-      : TypeBinding(index), Choice(choice),
+      : TypeBinding(index, computeFlags(choice)), Choice(choice),
         ExplicitConversion(explicitConversion) {}
-
-  bool isDisabled() const override { return Choice->isDisabled(); }
-
-  bool isUnavailable() const override {
-    if (auto *decl = getDecl(Choice))
-      return decl->getAttrs().isUnavailable(decl->getASTContext());
-    return false;
-  }
-
-  // FIXME: Both of the accessors below are required to support
-  //        performance optimization hacks in constraint solver.
-
-  bool isGenericOperator() const override;
-  bool isSymmetricOperator() const override;
 
   void attempt(ConstraintSystem &cs) const override;
 
@@ -3444,8 +3465,17 @@ private:
   /// let's try to propagate its type early to prune search space.
   void propagateConversionInfo(ConstraintSystem &cs) const;
 
-  ValueDecl *getOperatorDecl() const {
-    auto *decl = getDecl(Choice);
+  static bool isUnavailable(Constraint *choice) {
+    if (auto *decl = getDecl(choice))
+      return decl->getAttrs().isUnavailable(decl->getASTContext());
+    return false;
+  }
+
+  static bool isGenericOp(Constraint *choice);
+  static bool isSymmetricOp(Constraint *choice);
+
+  static ValueDecl *getOperatorDecl(Constraint *choice) {
+    auto *decl = getDecl(choice);
     if (!decl)
       return nullptr;
 
@@ -3462,6 +3492,19 @@ private:
 
     return choice.getDecl();
   }
+
+  static TypeBindingFlags computeFlags(Constraint *choice) {
+    TypeBindingFlags flags;
+    if (choice->isDisabled())
+      flags |= TypeBindingFlag::Disabled;
+    if (isUnavailable(choice))
+      flags |= TypeBindingFlag::Unavailable;
+    if (isGenericOp(choice))
+      flags |= TypeBindingFlag::GenericOperator;
+    if (isSymmetricOp(choice))
+      flags |= TypeBindingFlag::SymmetricOperator;
+    return flags;
+  }
 };
 
 class TypeVariableBinding : public TypeBinding {
@@ -3471,18 +3514,24 @@ class TypeVariableBinding : public TypeBinding {
 public:
   TypeVariableBinding(unsigned index, TypeVariableType *typeVar,
                       ConstraintSystem::PotentialBinding &binding)
-      : TypeBinding(index), TypeVar(typeVar), Binding(binding) {}
+      : TypeBinding(index, computeFlags(binding)), TypeVar(typeVar),
+        Binding(binding) {}
 
   void attempt(ConstraintSystem &cs) const override;
 
-  bool isDefaultable() const override { return Binding.isDefaultableBinding(); }
-
-  bool hasDefaultedProtocol() const override {
-    return Binding.DefaultedProtocol;
-  }
-
   void print(llvm::raw_ostream &Out, SourceManager *) const override {
     Out << TypeVar->getString() << " := " << Binding.BindingType->getString();
+  }
+
+private:
+  static TypeBindingFlags
+  computeFlags(ConstraintSystem::PotentialBinding &binding) {
+    TypeBindingFlags flags;
+    if (binding.isDefaultableBinding())
+      flags |= TypeBindingFlag::Defaultable;
+    if (binding.DefaultedProtocol)
+      flags |= TypeBindingFlag::HasDefaultedProtocol;
+    return flags;
   }
 };
 
