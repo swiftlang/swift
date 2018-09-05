@@ -94,7 +94,7 @@ swift::swift_allocError(const swift::Metadata *type,
 void
 swift::swift_deallocError(SwiftError *error, const Metadata *type) {
   auto sizeAndAlign = _getErrorAllocatedSizeAndAlignmentMask(type);
-  swift_deallocObject(error, sizeAndAlign.first, sizeAndAlign.second);
+  swift_deallocUninitializedObject(error, sizeAndAlign.first, sizeAndAlign.second);
 }
 
 void
