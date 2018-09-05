@@ -1249,8 +1249,7 @@ NodePointer Demangler::demangleBoundGenericType() {
   }
   NodePointer Nominal = popTypeAndGetAnyGeneric();
   NodePointer BoundNode = demangleBoundGenericArgs(Nominal, TypeListList, 0);
-  if (RetroactiveConformances)
-    BoundNode->addChild(RetroactiveConformances, *this);
+  addChild(BoundNode, RetroactiveConformances);
   NodePointer NTy = createType(BoundNode);
   addSubstitution(NTy);
   return NTy;
