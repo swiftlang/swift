@@ -332,11 +332,6 @@ protected:
   /// Gets the base implementation of a method.
   /// We always use the most overridden function to describe a method.
   AbstractFunctionDecl *getBase(AbstractFunctionDecl *FD) {
-    // FIXME: We currently don't use the most overridden function in
-    // witness tables.
-    if (isa<ProtocolDecl>(FD->getDeclContext()))
-      return FD;
-
     while (FD->getOverriddenDecl()) {
       FD = FD->getOverriddenDecl();
     }
@@ -352,8 +347,8 @@ protected:
     for (SILBasicBlock &BB : *F) {
       for (SILInstruction &I : BB) {
         if (auto *WMI = dyn_cast<WitnessMethodInst>(&I)) {
-          auto *funcDecl = cast<AbstractFunctionDecl>(WMI->getMember().getDecl());
-          assert(funcDecl == getBase(funcDecl));
+          auto *funcDecl = getBase(
+              cast<AbstractFunctionDecl>(WMI->getMember().getDecl()));
           MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ true);
           ensureAliveProtocolMethod(mi);
         } else if (auto *MI = dyn_cast<MethodInst>(&I)) {

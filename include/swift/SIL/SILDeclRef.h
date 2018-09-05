@@ -338,6 +338,9 @@ struct SILDeclRef {
   /// table entry.
   bool requiresNewWitnessTableEntry() const;
 
+  /// True if the decl is a method which introduces a new witness table entry.
+  static bool requiresNewWitnessTableEntry(AbstractFunctionDecl *func);
+
   /// Return a SILDeclRef to the declaration overridden by this one, or
   /// a null SILDeclRef if there is no override.
   SILDeclRef getOverridden() const;
