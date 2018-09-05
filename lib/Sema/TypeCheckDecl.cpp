@@ -720,9 +720,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     return;
 
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
-  bool isCascading = true;
-  if (current->hasAccess())
-    isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
+  bool isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitions;
