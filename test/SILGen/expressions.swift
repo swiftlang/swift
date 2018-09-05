@@ -631,7 +631,7 @@ func loadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct) -> NonTrivialStru
 // CHECK-NEXT: // function_ref NonTrivialStruct.x.getter
 // CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$S{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>
 // CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
-// CHECK-NEXT: end_borrow [[BORROW]] from [[READ]]
+// CHECK-NEXT: end_borrow [[BORROW]]
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
@@ -657,7 +657,7 @@ func loadIgnoredLValueThroughForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTri
 // CHECK-NEXT: // function_ref NonTrivialStruct.x.getter
 // CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$S{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>
 // CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
-// CHECK-NEXT: end_borrow [[BORROW]] from [[UNWRAPPED]]
+// CHECK-NEXT: end_borrow [[BORROW]]
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb3
 // CHECK: bb3:

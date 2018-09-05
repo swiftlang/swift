@@ -28,7 +28,7 @@ struct Witness: OwnershipProto {
 // CHECK:         [[WITNESS_FUNC:%.*]] = function_ref @$S15value_ownership7WitnessV6elidedyySS_S2StF
 // CHECK:         [[BORROWOWNED2DEFAULT:%.*]] = begin_borrow [[OWNED2DEFAULT]] : $String
 // CHECK:         apply [[WITNESS_FUNC]]([[DEFAULT2DEFAULT]], [[SHARED2DEFAULT]], [[BORROWOWNED2DEFAULT]], [[LOAD_WITNESS]])
-// CHECK:         end_borrow [[BORROWOWNED2DEFAULT]] from [[OWNED2DEFAULT]] : $String, $String
+// CHECK:         end_borrow [[BORROWOWNED2DEFAULT]] : $String
 // CHECK:       } // end sil function '$S15value_ownership7WitnessVAA14OwnershipProtoA2aDP6elidedyySS_SShSSntFTW'
 
 // Check that the explicit witness' thunk doesn't copy or borrow

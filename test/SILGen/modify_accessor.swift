@@ -68,7 +68,7 @@ class SetterSynthesisFromModify {
 // CHECK-NEXT:    ([[FIELD:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFYFN]](%1)
 // CHECK-NEXT:    assign [[VALUE]] to [[FIELD]] : $*String
 // CHECK-NEXT:    end_apply [[TOKEN]]
-// CHECK-NEXT:    end_borrow [[VALUE_BORROW]] from %0 : $String
+// CHECK-NEXT:    end_borrow [[VALUE_BORROW]]
 // CHECK-NEXT:    destroy_value %0 : $String
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()

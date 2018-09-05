@@ -1642,6 +1642,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(DeinitExistentialAddr)
   UNARY_INSTRUCTION(DeinitExistentialValue)
   UNARY_INSTRUCTION(EndBorrowArgument)
+  UNARY_INSTRUCTION(EndBorrow)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(Return)
   UNARY_INSTRUCTION(Throw)
@@ -1747,15 +1748,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType ValType = addrType.getObjectType();
     ResultVal = Builder.createStoreBorrow(Loc, getLocalValue(ValID, ValType),
                                           getLocalValue(ValID2, addrType));
-    break;
-  }
-  case SILInstructionKind::EndBorrowInst: {
-    SILValue BorrowSource, BorrowDest;
-    BorrowSource = getLocalValue(
-        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
-    BorrowDest = getLocalValue(
-        ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
-    ResultVal = Builder.createEndBorrow(Loc, BorrowSource, BorrowDest);
     break;
   }
   case SILInstructionKind::BeginAccessInst: {

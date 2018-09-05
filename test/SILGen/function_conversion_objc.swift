@@ -63,7 +63,7 @@ func funcToBlock(_ x: @escaping () -> ()) -> @convention(block) () -> () {
 // CHECK:   [[COPIED_2:%.*]] = copy_value [[BORROWED_COPIED]]
 // CHECK:   [[THUNK:%.*]] = function_ref @$SIeyB_Ieg_TR
 // CHECK:   [[FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[COPIED_2]])
-// CHECK:   end_borrow [[BORROWED_COPIED]] from [[COPIED]]
+// CHECK:   end_borrow [[BORROWED_COPIED]]
 // CHECK:   destroy_value [[COPIED]]
 // CHECK-NOT:   destroy_value [[ARG]]
 // CHECK:   return [[FUNC]]

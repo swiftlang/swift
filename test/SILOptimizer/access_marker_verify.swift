@@ -95,7 +95,7 @@ class SubHasInt : SuperHasInt {
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADR]] : $*Int
 // CHECK:   assign %{{.*}} to [[ACCESS]] : $*Int
 // CHECK:   end_access [[ACCESS]] : $*Int
-// CHECK:   end_borrow [[BORROW]] from [[UNINIT]] : $SuperHasInt, $SuperHasInt
+// CHECK:   end_borrow [[BORROW]] : $SuperHasInt
 // CHECK-NOT: begin_access
 // CHECK:   [[VAL:%.*]] = copy_value [[UNINIT]] : $SuperHasInt
 // CHECK:   destroy_value [[UNINIT]] : $SuperHasInt
@@ -115,7 +115,7 @@ class SubHasInt : SuperHasInt {
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADR]] : $*Int
 // CHECK:   assign %{{.*}} to [[ACCESS]] : $*Int
 // CHECK:   end_access [[ACCESS]] : $*Int
-// CHECK:   end_borrow [[BORROW]] from [[PROJ]] : $SubHasInt, $*SubHasInt
+// CHECK:   end_borrow [[BORROW]] : $SubHasInt
 // CHECK-NOT: begin_access
 // CHECK:   load [take] [[PROJ]] : $*SubHasInt
 // CHECK:   upcast %{{.*}} : $SubHasInt to $SuperHasInt
@@ -142,7 +142,7 @@ class SubHasInt : SuperHasInt {
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADR]] : $*Int
 // CHECK:   assign %0 to [[ACCESS]] : $*Int
 // CHECK:   end_access [[ACCESS]] : $*Int
-// CHECK:   end_borrow [[BORROW]] from [[PROJ]] : $SubHasInt, $*SubHasInt
+// CHECK:   end_borrow [[BORROW]] : $SubHasInt
 // CHECK-NOT: begin_access
 // CHECK:   load [take] [[PROJ]] : $*SubHasInt
 // CHECK:   upcast %{{.*}} : $SubHasInt to $SuperHasInt
@@ -761,7 +761,7 @@ class C : Abstractable {
 // CHECK-NEXT:   dealloc_stack [[TEMP]]
 // CHECK-NEXT:   end_apply [[TOKEN]]
 // CHECK-NEXT:   [[TUPLE:%.*]] = tuple ()
-// CHECK-NEXT:   end_borrow [[SELF]] from %0 : $C
+// CHECK-NEXT:   end_borrow [[SELF]] : $C
 // CHECK-NEXT:   return [[TUPLE]]
 
 // CHECK:      bb2:
@@ -772,7 +772,7 @@ class C : Abstractable {
 // CHECK-NEXT:   store [[THUNKED_NEW_FN]] to [init] [[ADDR]] :
 // CHECK-NEXT:   dealloc_stack [[TEMP]]
 // CHECK-NEXT:   abort_apply [[TOKEN]]
-// CHECK-NEXT:   end_borrow [[SELF]] from %0 : $C
+// CHECK-NEXT:   end_borrow [[SELF]] : $C
 // CHECK-NEXT:   unwind
 
 // --- writeback address-only.

@@ -32,7 +32,7 @@ class Box<T> {
 // CHECK:   [[THUNK2:%.*]] = function_ref @$SytytIegnr_Ieg_TR : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed ()) -> @out ()) -> ()
 // CHECK:   [[PA2:%.*]] = partial_apply [callee_guaranteed] [[THUNK2]]([[TUPLEC_1]]) : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed ()) -> @out ()) -> ()
 // CHECK:   destroy_value [[PA2]] : $@callee_guaranteed () -> ()    
-// CHECK:   end_borrow [[BORROW_CALL]] from %{{.*}} : $Box<(Int, () -> ())>, $Box<(Int, () -> ())>
+// CHECK:   end_borrow [[BORROW_CALL]] : $Box<(Int, () -> ())>
 // CHECK-LABEL: } // end sil function '$S4main7testBoxyyF'
 public func testBox() {
   let box = Box((22, { () in }))

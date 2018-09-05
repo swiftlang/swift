@@ -409,7 +409,7 @@ class Foo<T> {
     // CHECK: [[THIS_Y_1:%.*]] = tuple_element_addr [[WRITE]] : $*(Int, Ref), 1
     // CHECK: assign [[Y_EXTRACTED_1]] to [[THIS_Y_1]]
     // CHECK: end_access [[WRITE]] : $*(Int, Ref)
-    // CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
+    // CHECK: end_borrow [[BORROWED_THIS]]
 
     // -- Initialization for w
     // CHECK: [[Z_FUNC:%.*]] = function_ref @$S{{.*}}8lifetime3FooC1wAA3RefCvpfi : $@convention(thin) <τ_0_0> () -> @owned Ref
@@ -418,14 +418,14 @@ class Foo<T> {
     // CHECK: [[THIS_Z:%.*]] = ref_element_addr [[BORROWED_THIS]]
     // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[THIS_Z]] : $*Ref
     // CHECK: assign [[Z_RESULT]] to [[WRITE]]
-    // CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
+    // CHECK: end_borrow [[BORROWED_THIS]]
 
     // -- Initialization for x
     // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
     // CHECK: [[THIS_X:%[0-9]+]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.x
     // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[THIS_X]] : $*Int
     // CHECK: assign {{.*}} to [[WRITE]]
-    // CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
+    // CHECK: end_borrow [[BORROWED_THIS]]
 
     x = bar()
 
@@ -467,7 +467,7 @@ class Foo<T> {
     // CHECK:   assign {{.*}} to [[THIS_Y_1]] : $*Int
     // CHECK:   [[THIS_Y_2:%.*]] = tuple_element_addr [[WRITE]] : $*(Int, Ref), 1
     // CHECK:   assign {{.*}} to [[THIS_Y_2]] : $*Ref
-    // CHECK:   end_borrow [[BORROWED_THIS]] from [[THIS]]
+    // CHECK:   end_borrow [[BORROWED_THIS]]
 
     // -- Then we create a box that we will use to perform a copy_addr into #Foo.x a bit later.
     // CHECK:   [[CHIADDR:%[0-9]+]] = alloc_box ${ var Int }, var, name "chi"
@@ -479,7 +479,7 @@ class Foo<T> {
     // CHECK:   [[THIS_Z:%.*]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.z
     // CHECK:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[THIS_Z]] : $*T
     // CHECK:   copy_addr [take] {{.*}} to [[WRITE]]
-    // CHECK:   end_borrow [[BORROWED_THIS]] from [[THIS]]
+    // CHECK:   end_borrow [[BORROWED_THIS]]
 
     // -- Then initialize #Foo.x using the earlier stored value of CHI to THIS_Z.
     x = chi
@@ -489,7 +489,7 @@ class Foo<T> {
     // CHECK:   [[THIS_X:%[0-9]+]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.x
     // CHECK:   [[WRITE:%.*]] = begin_access [modify] [dynamic] [[THIS_X]] : $*Int
     // CHECK:   assign [[X]] to [[WRITE]]
-    // CHECK:   end_borrow [[BORROWED_THIS]] from [[THIS]]
+    // CHECK:   end_borrow [[BORROWED_THIS]]
 
     // -- cleanup chi
     // CHECK: destroy_value [[CHIADDR]]
@@ -546,7 +546,7 @@ class Foo<T> {
   // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @$S8lifetime3FooCfd : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
   // CHECK-NEXT:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
   // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[BORROWED_SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
-  // CHECK-NEXT:   end_borrow [[BORROWED_SELF]] from [[SELF]]
+  // CHECK-NEXT:   end_borrow [[BORROWED_SELF]]
   // CHECK-NEXT:   end_lifetime [[SELF]]
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = unchecked_ref_cast [[RESULT_SELF]] : $Builtin.NativeObject to $Foo<T>
   // CHECK-NEXT:   dealloc_ref [[SELF]] : $Foo<T>
@@ -565,7 +565,7 @@ class FooSubclass<T> : Foo<T> {
   // CHECK: [[BASE_DTOR:%[0-9]+]] = function_ref @$S8lifetime3FooCfd : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
   // CHECK: [[PTR:%.*]] = apply [[BASE_DTOR]]<T>([[BASE]])
   // CHECK: [[BORROWED_PTR:%.*]] = begin_borrow [[PTR]]
-  // CHECK: end_borrow [[BORROWED_PTR]] from [[PTR]]
+  // CHECK: end_borrow [[BORROWED_PTR]]
   // CHECK: return [[PTR]]
   
 
@@ -612,7 +612,7 @@ class ImplicitDtorDerived<T> : ImplicitDtor {
   // CHECK: [[CAST_BORROWED_PTR:%.*]] = unchecked_ref_cast [[BORROWED_PTR]] : $Builtin.NativeObject to $ImplicitDtorDerived<T>
   // CHECK: [[ZADDR:%[0-9]+]] = ref_element_addr [[CAST_BORROWED_PTR]] : {{.*}}, #ImplicitDtorDerived.z
   // CHECK: destroy_addr [[ZADDR]]
-  // CHECK: end_borrow [[BORROWED_PTR]] from [[PTR]]
+  // CHECK: end_borrow [[BORROWED_PTR]]
   // -- epilog
   // CHECK-NOT: unchecked_ref_cast
   // CHECK-NOT: unchecked_ownership_conversion

@@ -28,7 +28,7 @@ class Phoûx : NSObject, Fooable {
 // CHECK:         [[VALUE:%.*]] = load_borrow [[IN_ADDR]]
 // CHECK:         [[CLS_METHOD:%.*]] = class_method [[VALUE]] : $Phoûx, #Phoûx.foo!1
 // CHECK:         apply [[CLS_METHOD]]([[VALUE]])
-// CHECK:         end_borrow [[VALUE]] from [[IN_ADDR]]
+// CHECK:         end_borrow [[VALUE]]
 
 protocol Bells {
   init(bellsOn: Int)

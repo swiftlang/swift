@@ -790,11 +790,6 @@ StoreBorrowInst::StoreBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
     : InstructionBase(DebugLoc, Dest->getType()),
       Operands(this, Src, Dest) {}
 
-EndBorrowInst::EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
-                             SILValue Dest)
-    : InstructionBase(DebugLoc),
-      Operands(this, Src, Dest) {}
-
 EndBorrowArgumentInst::EndBorrowArgumentInst(SILDebugLocation DebugLoc,
                                              SILArgument *Arg)
     : UnaryInstructionBase(DebugLoc, SILValue(Arg)) {}

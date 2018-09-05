@@ -2681,6 +2681,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(CondFail)
     UNARY_INSTRUCTION(EndBorrowArgument)
+    UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
     UNARY_INSTRUCTION(DestructureTuple)
     REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
@@ -3392,36 +3393,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
     ResultVal = B.createStore(InstLoc, getLocalValue(From, ValType, InstLoc, B),
                               AddrVal, Qualifier);
-    break;
-  }
-
-  case SILInstructionKind::EndBorrowInst: {
-    UnresolvedValueName BorrowedFromName, BorrowedValueName;
-    SourceLoc ToLoc;
-    Identifier ToToken;
-    SILType BorrowedFromTy, BorrowedValueTy;
-
-    if (parseValueName(BorrowedValueName) ||
-        parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
-                           "from") ||
-        parseValueName(BorrowedFromName) ||
-        P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-        parseSILType(BorrowedValueTy) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(BorrowedFromTy) || parseSILDebugLocation(InstLoc, B))
-      return true;
-
-    if (ToToken.str() != "from") {
-      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "from");
-      return true;
-    }
-
-    SILValue BorrowedValue =
-        getLocalValue(BorrowedValueName, BorrowedValueTy, InstLoc, B);
-    SILValue BorrowedFrom =
-        getLocalValue(BorrowedFromName, BorrowedFromTy, InstLoc, B);
-
-    ResultVal = B.createEndBorrow(InstLoc, BorrowedValue, BorrowedFrom);
     break;
   }
 

@@ -702,7 +702,7 @@ extension InitRequirement {
     // CHECK-NEXT: [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
     // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : {{.*}} : $@convention(witness_method: InitRequirement) <τ_0_0 where τ_0_0 : InitRequirement> (@owned C, @thick τ_0_0.Type) -> @out τ_0_0
     // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY_CAST]], [[SELF_TYPE]])
-    // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
     // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [initialization] [[OUT]]
@@ -723,7 +723,7 @@ extension InitRequirement {
     // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
     // CHECK:      [[DELEGATEE:%.*]] = function_ref @$S19protocol_extensions15InitRequirementPAAE1dxAA1DC_tcfC
     // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY]], [[SELF_TYPE]])
-    // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[SELF_BOX_ADDR]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
     // CHECK-NEXT: copy_addr [[SELF_BOX_ADDR]] to [initialization] [[OUT]]
@@ -745,7 +745,7 @@ extension InitRequirement {
     // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
     // CHECK:      [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1
     // CHECK-NEXT: apply [[DELEGATEE]]<Self>([[SELF_BOX]], [[ARG_COPY]], [[SELF_TYPE]])
-    // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK-NEXT: end_borrow [[BORROWED_ARG]]
     // CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF_BOX_ADDR]]
     // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [[ACCESS]]
     // CHECK-NEXT: end_access [[ACCESS]]
@@ -770,7 +770,7 @@ extension ClassInitRequirement {
   // CHECK:         [[ARG_COPY_CAST:%.*]] = upcast [[ARG_COPY]]
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator.1 : {{.*}} : $@convention(witness_method: ClassInitRequirement) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
   // CHECK:         apply [[DELEGATEE]]<Self>([[ARG_COPY_CAST]], [[SELF_TYPE]])
-  // CHECK:         end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK:         end_borrow [[BORROWED_ARG]]
   
   // CHECK: } // end sil function '$S19protocol_extensions20ClassInitRequirementPAAE{{[_0-9a-zA-Z]*}}fC'
   init(d: D) {
@@ -800,8 +800,8 @@ extension ObjCInitRequirement {
   // CHECK:         [[BORROWED_ARG_2_UPCAST:%.*]] = upcast [[BORROWED_ARG_2]]
   // CHECK:         [[WITNESS:%.*]] = objc_method [[SELF]] : $Self, #ObjCInitRequirement.init!initializer.1.foreign : {{.*}}, $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjCInitRequirement> (OC, OC, @owned τ_0_0) -> @owned τ_0_0
   // CHECK:         apply [[WITNESS]]<Self>([[BORROWED_ARG_1_UPCAST]], [[BORROWED_ARG_2_UPCAST]], [[SELF]])
-  // CHECK:         end_borrow [[BORROWED_ARG_2]] from [[ARG]]
-  // CHECK:         end_borrow [[BORROWED_ARG_1]] from [[ARG]]
+  // CHECK:         end_borrow [[BORROWED_ARG_2]]
+  // CHECK:         end_borrow [[BORROWED_ARG_1]]
   // CHECK: } // end sil function '$S19protocol_extensions19ObjCInitRequirementPAAE{{[_0-9a-zA-Z]*}}fC'
   init(d: OD) {
     self.init(c: d, d: d)

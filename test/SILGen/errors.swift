@@ -122,13 +122,13 @@ func dont_return<T>(_ argument: T) throws -> T {
 // CHECK-NEXT: debug_value
 // CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
-// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
+// CHECK-NEXT: end_borrow [[BORROWED_T0]]
 // CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: destroy_value [[T0_ORIG]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
-// CHECK-NEXT: end_borrow [[BORROWED_ERROR]] from [[ERROR]]
+// CHECK-NEXT: end_borrow [[BORROWED_ERROR]]
 // CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: br [[RETURN]]([[T0_COPY]] : $Cat)
 
@@ -153,7 +153,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type
 // CHECK:      [[T0:%.*]] = function_ref @$S6errors3Cat{{.*}} : $@convention(method) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
-// CHECK-NEXT: end_borrow [[BORROWED_ERROR]] from [[ERROR]]
+// CHECK-NEXT: end_borrow [[BORROWED_ERROR]]
 // CHECK-NEXT: destroy_value [[ERROR]] : $Error
 // CHECK-NEXT: br [[RETURN]]([[T2]] : $Cat)
 
@@ -217,7 +217,7 @@ class HasThrowingInit {
 // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[T1]] : $*Int
 // CHECK-NEXT: assign %0 to [[WRITE]] : $*Int
 // CHECK-NEXT: end_access [[WRITE]]
-// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
+// CHECK-NEXT: end_borrow [[BORROWED_T0]]
 // CHECK-NEXT: [[T0_RET:%.*]] = copy_value [[T0]]
 // CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: return [[T0_RET]] : $HasThrowingInit
@@ -270,11 +270,11 @@ struct DoomedStruct : Doomed {
 // CHECK-NEXT: try_apply [[T0]]([[BORROWED_SELF]])
 // CHECK:    bb1([[T0:%.*]] : @trivial $()):
 // CHECK:      [[T0:%.*]] = tuple ()
-// CHECK:      end_borrow [[BORROWED_SELF]] from %0
+// CHECK:      end_borrow [[BORROWED_SELF]]
 // CHECK:      return [[T0]] : $()
 // CHECK:    bb2([[T0:%.*]] : @owned $Error):
 // CHECK:      builtin "willThrow"([[T0]] : $Error)
-// CHECK:      end_borrow [[BORROWED_SELF]] from %0
+// CHECK:      end_borrow [[BORROWED_SELF]]
 // CHECK:      throw [[T0]] : $Error
 class DoomedClass : Doomed {
   func check() throws {}
@@ -294,7 +294,7 @@ struct HappyStruct : Doomed {
 // CHECK:      [[T0:%.*]] = class_method [[SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> (), $@convention(method) (@guaranteed HappyClass) -> ()
 // CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
 // CHECK:      [[T1:%.*]] = tuple ()
-// CHECK:      end_borrow [[SELF]] from %0
+// CHECK:      end_borrow [[SELF]]
 // CHECK:      return [[T1]] : $()
 class HappyClass : Doomed {
   func check() {}
@@ -455,7 +455,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:         [[TAKE_FN:%.*]] = function_ref @$S6errors14take_many_catsyyAA3CatCd_tKF : $@convention(thin) (@guaranteed Array<Cat>) -> @error Error
 // CHECK-NEXT:    try_apply [[TAKE_FN]]([[BORROWED_ARRAY]]) : $@convention(thin) (@guaranteed Array<Cat>) -> @error Error, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
 // CHECK:       [[NORM_CALL]]([[T0:%.*]] : @trivial $()):
-// CHECK-NEXT:    end_borrow [[BORROWED_ARRAY]] from [[ARRAY]]
+// CHECK-NEXT:    end_borrow [[BORROWED_ARRAY]]
 // CHECK-NEXT:    destroy_value [[ARRAY]]
 // CHECK-NEXT:    [[T0:%.*]] = tuple ()
 // CHECK-NEXT:    return
@@ -512,7 +512,7 @@ class BaseThrowingInit : HasThrowingInit {
 // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[T1]] : $*Int
 // CHECK-NEXT: assign %1 to [[WRITE]]
 // CHECK-NEXT: end_access [[WRITE]]
-// CHECK-NEXT: end_borrow [[T0]] from [[PB]]
+// CHECK-NEXT: end_borrow [[T0]]
 //   Super delegation.
 // CHECK-NEXT: [[T0:%.*]] = load [take] [[PB]]
 // CHECK-NEXT: [[T2:%.*]] = upcast [[T0]] : $BaseThrowingInit to $HasThrowingInit
@@ -563,13 +563,13 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
 
 // CHECK: [[BB_NORMAL]]
 // CHECK:   end_apply [[TOKEN]]
-// CHECK:   end_borrow [[BORROWED_INDEX_COPY]] from [[INDEX_COPY]]
+// CHECK:   end_borrow [[BORROWED_INDEX_COPY]]
 // CHECK:   destroy_value [[INDEX_COPY]] : $String
 // CHECK:   return
 
 // CHECK: [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
 // CHECK:   abort_apply [[TOKEN]]
-// CHECK:   end_borrow [[BORROWED_INDEX_COPY]] from [[INDEX_COPY]]
+// CHECK:   end_borrow [[BORROWED_INDEX_COPY]]
 // CHECK:   destroy_value [[INDEX_COPY]] : $String
 // CHECK:   throw [[ERROR]]
 
@@ -604,7 +604,7 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: [[T0:%.*]] = apply [[GETTER]]([[BORROWED_INDEX_COPY_1]], [[BASE]])
 // CHECK-NEXT: end_borrow [[BORROWED_INDEX_COPY_1]]
 // CHECK-NEXT: store [[T0]] to [init] [[TEMP]]
-// CHECK-NEXT: end_borrow [[BASE]] from [[WRITE]]
+// CHECK-NEXT: end_borrow [[BASE]]
 // CHECK:      [[SUPPORT:%.*]] = function_ref @$S6errors5PylonV7supportyyKF
 // CHECK-NEXT: try_apply [[SUPPORT]]([[TEMP]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 

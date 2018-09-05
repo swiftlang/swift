@@ -80,7 +80,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
 // CHECK-NEXT: end_apply [[TOKEN]]
 // CHECK-NEXT: tuple ()
-// CHECK-NEXT: end_borrow [[T0]] from %0
+// CHECK-NEXT: end_borrow [[T0]]
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$S6modify7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycvMTW
@@ -106,7 +106,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: dealloc_stack [[SUB_ADDR]]
 // CHECK-NEXT: end_apply [[TOKEN]]
 // CHECK-NEXT: tuple ()
-// CHECK-NEXT: end_borrow [[T0]] from %0
+// CHECK-NEXT: end_borrow [[T0]]
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$S6modify7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycvMZTW

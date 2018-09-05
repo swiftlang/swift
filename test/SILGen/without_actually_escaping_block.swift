@@ -17,9 +17,9 @@ typealias Callback = @convention(block) () -> Void
 // CHECK:  [[B2:%.*]] = begin_borrow [[CVT]]
 // CHECK:  [[FN:%.*]] = function_ref @$S25without_actually_escaping9testBlock5blockyyyXB_tFyyyXBXEfU_
 // CHECK:  apply [[FN]]([[B2]])
-// CHECK:  end_borrow [[B2]] from [[CVT]]
+// CHECK:  end_borrow [[B2]]
 // CHECK:  destroy_value [[CVT]]
-// CHECK:  end_borrow [[B1]] from [[C1]]
+// CHECK:  end_borrow [[B1]]
 // CHECK:  destroy_value [[C1]]
 // CHECK:  return
 
