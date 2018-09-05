@@ -306,7 +306,7 @@ public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _Mutabl
     
     // MARK: - Bridging
     
-    fileprivate init(reference: NSURLComponents) {
+    fileprivate init(reference: __shared NSURLComponents) {
         _handle = _MutableHandle(reference: reference)
     }
     
@@ -398,7 +398,7 @@ public struct URLQueryItem : ReferenceConvertible, Hashable, Equatable {
         _queryItem = NSURLQueryItem(name: name, value: value)
     }
     
-    fileprivate init(reference: NSURLQueryItem) { _queryItem = reference.copy() as! NSURLQueryItem }
+    fileprivate init(reference: __shared NSURLQueryItem) { _queryItem = reference.copy() as! NSURLQueryItem }
     fileprivate var reference : NSURLQueryItem { return _queryItem }
     
     public var name : String {

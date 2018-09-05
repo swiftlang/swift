@@ -398,7 +398,7 @@ extension _BridgedNSError {
 extension _BridgedNSError where Self.RawValue: FixedWidthInteger {
   public var _code: Int { return Int(rawValue) }
 
-  public init?(_bridgedNSError: NSError) {
+  public init?(_bridgedNSError: __shared NSError) {
     if _bridgedNSError.domain != Self._nsErrorDomain {
       return nil
     }

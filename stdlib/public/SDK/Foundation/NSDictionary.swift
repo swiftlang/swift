@@ -34,7 +34,7 @@ extension Dictionary {
   ///
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  public init(_cocoaDictionary: _NSDictionary) {
+  public init(_cocoaDictionary: __shared _NSDictionary) {
     assert(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
@@ -165,7 +165,7 @@ extension NSDictionary : Sequence {
       return nil
     }
 
-    internal init(_ _dict: NSDictionary) {
+    internal init(_ _dict: __shared NSDictionary) {
       _fastIterator = NSFastEnumerationIterator(_dict)
     }
   }
@@ -219,7 +219,7 @@ extension NSDictionary {
   ///   than the original receiver--containing the keys and values
   ///   found in `otherDictionary`.
   @objc(_swiftInitWithDictionary_NSDictionary:)
-  public convenience init(dictionary otherDictionary: NSDictionary) {
+  public convenience init(dictionary otherDictionary: __shared NSDictionary) {
     // FIXME(performance)(compiler limitation): we actually want to do just
     // `self = otherDictionary.copy()`, but Swift does not have factory
     // initializers right now.

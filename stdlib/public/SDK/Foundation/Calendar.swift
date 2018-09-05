@@ -106,7 +106,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     // MARK: -
     // MARK: Bridging
     
-    fileprivate init(reference : NSCalendar) {
+    fileprivate init(reference : __shared NSCalendar) {
         _handle = _MutableHandle(reference: reference)
         if __NSCalendarIsAutoupdating(reference) {
             _autoupdating = true

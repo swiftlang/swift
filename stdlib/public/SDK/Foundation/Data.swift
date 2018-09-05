@@ -1220,7 +1220,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// If the resulting value is mutated, then `Data` will invoke the `mutableCopy()` function on the reference to copy the contents. You may customize the behavior of that function if you wish to return a specialized mutable subclass.
     ///
     /// - parameter reference: The instance of `NSData` that you wish to wrap. This instance will be copied by `struct Data`.
-    public init(referencing reference: NSData) {
+    public init(referencing reference: __shared NSData) {
 #if DEPLOYMENT_RUNTIME_SWIFT
         let providesConcreteBacking = reference._providesConcreteBacking()
 #else

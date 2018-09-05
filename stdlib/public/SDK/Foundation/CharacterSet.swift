@@ -415,7 +415,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
         }
     }
 
-    fileprivate init(_bridged characterSet: NSCharacterSet) {
+    fileprivate init(_bridged characterSet: __shared NSCharacterSet) {
         _storage = _CharacterSetStorage(immutableReference: characterSet.copy() as! CFCharacterSet)
     }
     

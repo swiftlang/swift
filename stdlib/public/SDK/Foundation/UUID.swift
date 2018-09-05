@@ -30,7 +30,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
         }
     }
     
-    fileprivate init(reference: NSUUID) {
+    fileprivate init(reference: __shared NSUUID) {
         var bytes: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         withUnsafeMutablePointer(to: &bytes) {
             $0.withMemoryRebound(to: UInt8.self, capacity: 16) {

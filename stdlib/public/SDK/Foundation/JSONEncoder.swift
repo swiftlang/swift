@@ -387,7 +387,7 @@ fileprivate struct _JSONEncodingStorage {
         return array
     }
 
-    fileprivate mutating func push(container: NSObject) {
+    fileprivate mutating func push(container: __owned NSObject) {
         self.containers.append(container)
     }
 
@@ -961,7 +961,7 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
 
     /// Initializes `self` by referencing the given dictionary container in the given encoder.
     fileprivate init(referencing encoder: _JSONEncoder,
-                     key: CodingKey, convertedKey: CodingKey, wrapping dictionary: NSMutableDictionary) {
+                     key: CodingKey, convertedKey: __shared CodingKey, wrapping dictionary: NSMutableDictionary) {
         self.encoder = encoder
         self.reference = .dictionary(dictionary, convertedKey.stringValue)
         super.init(options: encoder.options, codingPath: encoder.codingPath)
@@ -1273,7 +1273,7 @@ fileprivate struct _JSONDecodingStorage {
         return self.containers.last!
     }
 
-    fileprivate mutating func push(container: Any) {
+    fileprivate mutating func push(container: __owned Any) {
         self.containers.append(container)
     }
 
@@ -1616,7 +1616,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
         return _JSONUnkeyedDecodingContainer(referencing: self.decoder, wrapping: array)
     }
 
-    private func _superDecoder(forKey key: CodingKey) throws -> Decoder {
+    private func _superDecoder(forKey key: __owned CodingKey) throws -> Decoder {
         self.decoder.codingPath.append(key)
         defer { self.decoder.codingPath.removeLast() }
 

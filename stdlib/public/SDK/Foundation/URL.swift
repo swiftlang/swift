@@ -47,7 +47,7 @@ public struct URLResourceValues {
         return (_values[key] as? NSNumber)?.intValue
     }
     
-    private mutating func _set(_ key : URLResourceKey, newValue : Any?) {
+    private mutating func _set(_ key : URLResourceKey, newValue : __owned Any?) {
         _keys.insert(key)
         _values[key] = newValue
     }
@@ -1175,7 +1175,7 @@ public struct URL : ReferenceConvertible, Equatable {
         }
     }
     
-    fileprivate init(reference: NSURL) {
+    fileprivate init(reference: __shared NSURL) {
         _url = URL._converted(from: reference).copy() as! NSURL
     }
     

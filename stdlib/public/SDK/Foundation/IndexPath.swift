@@ -684,7 +684,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     
     // MARK: - Bridging Helpers
     
-    fileprivate init(nsIndexPath: ReferenceType) {
+    fileprivate init(nsIndexPath: __shared ReferenceType) {
         let count = nsIndexPath.length
         if count == 0 {
             _indexes = []
