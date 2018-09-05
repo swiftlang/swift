@@ -1675,7 +1675,7 @@ void AbstractStorageDecl::visitOpaqueAccessors(
 }
 
 static bool hasPrivateOrFilePrivateFormalAccess(const ValueDecl *D) {
-  return D->hasAccess() && D->getFormalAccess() <= AccessLevel::FilePrivate;
+  return D->getFormalAccess() <= AccessLevel::FilePrivate;
 }
 
 /// Returns true if one of the ancestor DeclContexts of this ValueDecl is either
@@ -2646,23 +2646,23 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
 
 void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
                                      bool sourceIsParentContext) {
-  if (!hasAccess()) {
-    AccessLevel access = source->getFormalAccess();
+  assert(!hasAccess());
 
-    // To make something have the same access as a 'private' parent, it has to
-    // be 'fileprivate' or greater.
-    if (sourceIsParentContext && access == AccessLevel::Private)
-      access = AccessLevel::FilePrivate;
+  AccessLevel access = source->getFormalAccess();
 
-    // Only certain declarations can be 'open'.
-    if (access == AccessLevel::Open && !isPotentiallyOverridable()) {
-      assert(!isa<ClassDecl>(this) &&
-             "copying 'open' onto a class has complications");
-      access = AccessLevel::Public;
-    }
+  // To make something have the same access as a 'private' parent, it has to
+  // be 'fileprivate' or greater.
+  if (sourceIsParentContext && access == AccessLevel::Private)
+    access = AccessLevel::FilePrivate;
 
-    setAccess(access);
+  // Only certain declarations can be 'open'.
+  if (access == AccessLevel::Open && !isPotentiallyOverridable()) {
+    assert(!isa<ClassDecl>(this) &&
+           "copying 'open' onto a class has complications");
+    access = AccessLevel::Public;
   }
+
+  setAccess(access);
 
   // Inherit the @usableFromInline attribute.
   if (source->getAttrs().hasAttribute<UsableFromInlineAttr>() &&

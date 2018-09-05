@@ -512,8 +512,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printAccess(const ValueDecl *D) {
-    if (!Options.PrintAccess || !D->hasAccess() ||
-        isa<ProtocolDecl>(D->getDeclContext()))
+    if (!Options.PrintAccess || isa<ProtocolDecl>(D->getDeclContext()))
       return;
     if (D->getAttrs().hasAttribute<AccessControlAttr>() &&
         !llvm::is_contained(Options.ExcludeAttrList, DAK_AccessControl))
@@ -1365,7 +1364,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (Options.AccessFilter > AccessLevel::Private &&
-        VD->hasAccess() && VD->getFormalAccess() < Options.AccessFilter)
+        VD->getFormalAccess() < Options.AccessFilter)
       return false;
   }
 
