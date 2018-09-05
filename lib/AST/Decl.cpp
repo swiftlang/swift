@@ -4051,41 +4051,6 @@ void ProtocolDecl::setDefaultWitness(ValueDecl *requirement, Witness witness) {
   (void) pair;
 }
 
-#ifndef NDEBUG
-static bool isAccessor(AccessorDecl *accessor, AccessorKind kind,
-                       AbstractStorageDecl *storage) {
-  // TODO: this should check that the accessor belongs to this storage, but
-  // the Clang importer currently likes to violate that condition.
-  return (accessor && accessor->getAccessorKind() == kind);
-}
-#endif
-
-void AbstractStorageDecl::configureAccessor(AccessorDecl *accessor) {
-  assert(isAccessor(accessor, accessor->getAccessorKind(), this));
-
-  switch (accessor->getAccessorKind()) {
-  case AccessorKind::Get:
-  case AccessorKind::Address:
-  case AccessorKind::Read:
-    // Nothing to do.
-    return;
-
-  case AccessorKind::Set:
-  case AccessorKind::WillSet:
-  case AccessorKind::DidSet:
-  case AccessorKind::MutableAddress:
-  case AccessorKind::Modify:
-    // Propagate the setter access.
-    if (auto setterAccess = Accessors.getInt()) {
-      assert(!accessor->hasAccess() ||
-             accessor->getFormalAccess() == setterAccess.getValue());
-      accessor->overwriteAccess(setterAccess.getValue());
-    }
-    return;
-  }
-  llvm_unreachable("bad accessor kind");
-}
-
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
   setFieldsFromImplInfo(implInfo);
   Accessors.getPointer()->overwriteImplInfo(implInfo);
@@ -4111,9 +4076,6 @@ void AbstractStorageDecl::setAccessors(StorageImplInfo implInfo,
                                     implInfo, accessors);
     Accessors.setPointer(record);
   }
-
-  for (auto accessor : accessors)
-    configureAccessor(accessor);
 }
 
 // Compute the number of opaque accessors.
@@ -4226,6 +4188,15 @@ AbstractStorageDecl::getSetterFormalAccess() const {
         AccessLevel::Private);
 }
 
+#ifndef NDEBUG
+static bool isAccessor(AccessorDecl *accessor, AccessorKind kind,
+                       AbstractStorageDecl *storage) {
+  // TODO: this should check that the accessor belongs to this storage, but
+  // the Clang importer currently likes to violate that condition.
+  return (accessor && accessor->getAccessorKind() == kind);
+}
+#endif
+
 void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
   assert(getImplInfo().getReadImpl() == ReadImplKind::Get);
   assert(!getImplInfo().supportsMutation());
@@ -4237,7 +4208,6 @@ void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
 
   overwriteImplInfo(StorageImplInfo::getMutableComputed());
   Accessors.getPointer()->addOpaqueAccessor(setter);
-  configureAccessor(setter);
 }
 
 void
@@ -4253,7 +4223,6 @@ AbstractStorageDecl::setSynthesizedGetter(AccessorDecl *accessor) {
   }
 
   accessors->addOpaqueAccessor(accessor);
-  configureAccessor(accessor);
 }
 
 void
@@ -4269,7 +4238,6 @@ AbstractStorageDecl::setSynthesizedReadCoroutine(AccessorDecl *accessor) {
   }
 
   accessors->addOpaqueAccessor(accessor);
-  configureAccessor(accessor);
 }
 
 void
@@ -4279,7 +4247,6 @@ AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
   assert(isAccessor(accessor, AccessorKind::Set, this));
 
   Accessors.getPointer()->addOpaqueAccessor(accessor);
-  configureAccessor(accessor);
 }
 
 void
@@ -4291,7 +4258,6 @@ AbstractStorageDecl::setSynthesizedModifyCoroutine(AccessorDecl *accessor) {
   assert(isAccessor(accessor, AccessorKind::Modify, this));
 
   Accessors.getPointer()->addOpaqueAccessor(accessor);
-  configureAccessor(accessor);
 }
 
 void AbstractStorageDecl::addBehavior(TypeRepr *Type,

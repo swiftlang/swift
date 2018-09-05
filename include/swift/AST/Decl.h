@@ -4130,7 +4130,6 @@ private:
   llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<AccessLevel>>
     BehaviorInfo;
 
-  void configureAccessor(AccessorDecl *accessor);
   void setFieldsFromImplInfo(StorageImplInfo implInfo) {
     Bits.AbstractStorageDecl.HasStorage = implInfo.hasStorage();
     Bits.AbstractStorageDecl.SupportsMutation = implInfo.supportsMutation();
