@@ -726,7 +726,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
     COMMAND "xcodebuild" "-version"
     OUTPUT_VARIABLE xcode_version
     OUTPUT_STRIP_TRAILING_WHITESPACE)
-  string(REPLACE "\n" ", " xcode_version ${xcode_version})
+  string(REPLACE "\n" ", " xcode_version "${xcode_version}")
   message(STATUS "${xcode_version}")
   message(STATUS "")
 
