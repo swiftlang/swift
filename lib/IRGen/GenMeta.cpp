@@ -1314,6 +1314,11 @@ namespace {
       if (VTableEntries.empty())
         return;
 
+      // Only emit a method lookup function if the class is resilient
+      // and has a non-empty vtable.
+      if (IGM.isResilient(getType(), ResilienceExpansion::Minimal))
+        IGM.emitMethodLookupFunction(getType());
+
       auto offset = MetadataLayout->hasResilientSuperclass()
                       ? MetadataLayout->getRelativeVTableOffset()
                       : MetadataLayout->getStaticVTableOffset();
