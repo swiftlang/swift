@@ -1180,9 +1180,19 @@ ERROR(access_control_setter_more,none,
       "%select{variable|property|subscript}1 cannot have "
       "%select{%error|a fileprivate|an internal|a public|an open}2 setter",
       (AccessLevel, unsigned, AccessLevel))
+WARNING(access_control_setter_redundant,none,
+      "'%select{private|fileprivate|internal|public|open}0(set)' modifier is "
+      "redundant for %select{a private|a fileprivate|an internal|a public|an open}2 "
+      "%1",
+      (AccessLevel, DescriptiveDeclKind, AccessLevel))
 WARNING(access_control_ext_member_more,none,
     "declaring %select{%error|a fileprivate|an internal|a public|open}0 %1 in "
-    "%select{a private|a fileprivate|an internal|public|%error}2 extension",
+    "%select{a private|a fileprivate|an internal|a public|%error}2 extension",
+    (AccessLevel, DescriptiveDeclKind, AccessLevel))
+WARNING(access_control_ext_member_redundant,none,
+    "'%select{%error|fileprivate|internal|public|%error}0' modifier is redundant "
+    "for %1 declared in %select{a private (equivalent to fileprivate)|a fileprivate"
+    "|an internal|a public|%error}2 extension",
     (AccessLevel, DescriptiveDeclKind, AccessLevel))
 ERROR(access_control_ext_requirement_member_more,none,
     "cannot declare %select{%error|a fileprivate|an internal|a public|an open}0 %1 "
