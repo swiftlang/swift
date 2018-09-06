@@ -3,6 +3,15 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
 add_swift_library(swiftXPC ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   XPC.swift
+  XPCCodingKey.swift
+  XPCDecoder.swift
+  XPCEncoder.swift
+  XPCKeyedDecodingContainer.swift
+  XPCKeyedEncodingContainer.swift
+  XPCSingleValueDecodingContainer.swift
+  XPCSingleValueEncodingContainer.swift
+  XPCUnkeyedDecodingContainer.swift
+  XPCUnkeyedEncodingContainer.swift
 
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
