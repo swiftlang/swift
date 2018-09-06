@@ -117,7 +117,7 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
   Pattern *P = new (Ctx) NamedPattern(decl);
   P->setType(ty);
   P->setImplicit();
-  P = new (Ctx) TypedPattern(P, TypeLoc::withoutLoc(ty));
+  P = TypedPattern::createImplicit(Ctx, P, ty);
   P->setType(ty);
   P->setImplicit();
   return P;

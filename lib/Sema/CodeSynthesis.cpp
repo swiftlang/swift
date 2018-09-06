@@ -1310,6 +1310,7 @@ static void synthesizeLazyGetterBody(TypeChecker &TC, AccessorDecl *Get,
                                    Ctx.getIdentifier("tmp2"),
                                    Get);
   Tmp2VD->setType(VD->getType());
+  Tmp2VD->setInterfaceType(VD->getInterfaceType());
   Tmp2VD->setImplicit();
 
 
@@ -1336,9 +1337,8 @@ static void synthesizeLazyGetterBody(TypeChecker &TC, AccessorDecl *Get,
   }
 
   Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
-  Tmp2PBDPattern = new (Ctx) TypedPattern(Tmp2PBDPattern,
-                                          TypeLoc::withoutLoc(VD->getType()),
-                                          /*implicit*/true);
+  Tmp2PBDPattern =
+    TypedPattern::createImplicit(Ctx, Tmp2PBDPattern, VD->getType());
 
   auto *Tmp2PBD = PatternBindingDecl::createImplicit(
       Ctx, StaticSpellingKind::None, Tmp2PBDPattern, InitValue, Get,
@@ -1486,9 +1486,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized using the protocol's initStorage() method.
   Pattern *PBDPattern = new (Context) NamedPattern(Storage, /*implicit*/true);
-  PBDPattern = new (Context) TypedPattern(PBDPattern,
-                                  TypeLoc::withoutLoc(SubstStorageContextTy),
-                                  /*implicit*/true);
+  PBDPattern = TypedPattern::createImplicit(Context, PBDPattern,
+                                            SubstStorageContextTy);
   auto *PBD = PatternBindingDecl::createImplicit(
       Context, VD->getParentPatternBinding()->getStaticSpelling(), PBDPattern,
       InitStorageExpr, VD->getDeclContext(), /*VarLoc*/ VD->getLoc());
@@ -1779,9 +1778,7 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized to nil.
   Pattern *PBDPattern = new (Context) NamedPattern(Storage, /*implicit*/true);
-  PBDPattern = new (Context) TypedPattern(PBDPattern,
-                                          TypeLoc::withoutLoc(StorageTy),
-                                          /*implicit*/true);
+  PBDPattern = TypedPattern::createImplicit(Context, PBDPattern, StorageTy);
   auto *PBD = PatternBindingDecl::createImplicit(
       Context, StaticSpellingKind::None, PBDPattern, /*init*/ nullptr,
       VD->getDeclContext(), /*VarLoc*/ VD->getLoc());
