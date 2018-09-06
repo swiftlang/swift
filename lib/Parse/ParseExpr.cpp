@@ -1923,7 +1923,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   LocalContext.setCreateSyntax(SyntaxKind::StringInterpolationExpr);
   StringRef Quote;
   tok QuoteKind;
-  std::tie(Quote, QuoteKind) = Tok.IsMultilineString() ?
+  std::tie(Quote, QuoteKind) = Tok.isMultilineString() ?
     std::make_tuple("\"\"\"", tok::multiline_string_quote) :
     std::make_tuple("\"", tok::string_quote);
 
