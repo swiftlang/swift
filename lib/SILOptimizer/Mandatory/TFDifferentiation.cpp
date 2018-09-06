@@ -1041,7 +1041,7 @@ public:
   /// Creates a struct declaration (without contents) for storing primal values
   /// of a function. The newly created struct will have the same generic
   /// parameters as the function.
-  StructDecl *createPrimalValueStructForFunction(SILFunction *function);
+  StructDecl *createPrimalValueStruct(const DifferentiationTask *task);
 
   void insertGradient(const GradientLookupKey &key, SILFunction *gradient) {
     gradientMap.insert({key, gradient});
@@ -2157,14 +2157,16 @@ private:
 } // end anonymous namespace
 
 StructDecl *
-ADContext::createPrimalValueStructForFunction(SILFunction *function) {
+ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
+  auto *function = task->getOriginal();
   assert(&function->getModule() == &module &&
          "The function must be in the same module");
   auto &file = getPrimalValueDeclContainer();
   // Create a `<fn_name>__Type` struct.
   std::string pvStructName;
   pvStructName += function->getName();
-  pvStructName += "__Type";
+  pvStructName += "__Type__";
+  pvStructName += mangleADIndices(task->getIndices());
   auto structId = astCtx.getIdentifier(pvStructName);
   SourceLoc loc = function->getLocation().getSourceLoc();
   auto pvStruct =
@@ -2196,12 +2198,16 @@ ADContext::createPrimalValueStructForFunction(SILFunction *function) {
   return pvStruct;
 }
 
-static bool isDifferentiationParameter(SILValue value,
+/// Given an parameter argument (not indirect result) and some differentiation
+/// indices, figure out whether the parent function is being differentiated with
+/// respect to this parameter, according to the indices.
+static bool isDifferentiationParameter(SILArgument *argument,
                                        llvm::SmallBitVector indices) {
-  auto *function = value->getFunction();
+  if (!argument) return false;
+  auto *function = argument->getFunction();
   auto paramArgs = function->getArgumentsWithoutIndirectResults();
   for (unsigned i : indices.set_bits())
-    if (paramArgs[i] == value)
+    if (paramArgs[i] == argument)
       return true;
   return false;
 }
@@ -2222,9 +2228,10 @@ static void collectMinimalIndicesForFunctionCall(
   // Parameter indices are indices (in the type signature) of parameter
   // arguments that are varied or are arguments.
   unsigned currentParamIdx = 0;
-  for (auto arg : ai->getArgumentsWithoutIndirectResults())
-    if (activityInfo.isVaried(arg, parentIndices.parameters) ||
-        isDifferentiationParameter(arg, parentIndices.parameters))
+  for (auto applyArg : ai->getArgumentsWithoutIndirectResults())
+    if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
+        isDifferentiationParameter(dyn_cast<SILArgument>(applyArg),
+                                   parentIndices.parameters))
       paramIndices.push_back(currentParamIdx++);
   // Result indices are indices (in the type signature) of results that are
   // useful.
@@ -2764,8 +2771,7 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
   auto &module = context.getModule();
   std::string primalName =
       original->getName().str() + "__primal_" + mangleADIndices(indices);
-  StructDecl *primalValueStructDecl =
-      context.createPrimalValueStructForFunction(original);
+  StructDecl *primalValueStructDecl = context.createPrimalValueStruct(task);
   task->initializePrimalInfo(primalValueStructDecl, module);
   auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
   auto objTy = SILType::getPrimitiveObjectType(pvType);
@@ -4156,7 +4162,7 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
   auto &module = original->getModule();
   auto &astCtx = module.getASTContext();
   auto origTy = original->getLoweredFunctionType();
-  auto config = gradInst->getConfig();
+  auto &config = gradInst->getConfig();
 
   // Creates a gradient function based on the configuration.
   auto createGradFunction = [&](const SILReverseAutoDiffConfig &config) {

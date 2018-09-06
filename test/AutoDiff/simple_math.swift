@@ -49,6 +49,8 @@ SimpleMathTests.test("FunctionCall") {
   }
   let dfoo = #gradient(foo)
   expectEqual((3, 9), dfoo(3, 4))
+  let dfoo_dx = #gradient(foo, wrt: .0)
+  expectEqual(3, dfoo_dx(3, 4))
 }
 
 runAllTests()
