@@ -341,11 +341,6 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging
 
-@usableFromInline @_transparent
-internal var _nilNativeObject: AnyObject? {
-  return nil
-}
-
 /// A mutable pointer-to-ObjC-pointer argument.
 ///
 /// This type has implicit conversions to allow passing any of the following
