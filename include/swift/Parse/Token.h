@@ -45,10 +45,7 @@ class Token {
   /// Modifiers for string literals
   unsigned MultilineString : 1;
 
-  /// Length of custom delimiter of "raw" string literals
-  unsigned CustomDelimiterLen : 8;
-
-  // Padding bits == 32 - 11;
+  // Padding bits == 32 - sizeof(Kind) * 8 - 3;
 
   /// \brief The length of the comment that precedes the token.
   unsigned CommentLength;
@@ -65,8 +62,8 @@ class Token {
 public:
   Token(tok Kind, StringRef Text, unsigned CommentLength = 0)
           : Kind(Kind), AtStartOfLine(false), EscapedIdentifier(false),
-            MultilineString(false), CustomDelimiterLen(0),
-            CommentLength(CommentLength), Text(Text) {}
+            MultilineString(false), CommentLength(CommentLength),
+            Text(Text) {}
 
   Token() : Token(tok::NUM_TOKENS, {}, 0) {}
 
@@ -269,23 +266,16 @@ public:
 
   /// \brief Set the token to the specified kind and source range.
   void setToken(tok K, StringRef T, unsigned CommentLength = 0,
-                bool IsMultilineString = false, unsigned CustomDelimiterLen = 0) {
+                bool MultilineString = false) {
     Kind = K;
     Text = T;
     this->CommentLength = CommentLength;
     EscapedIdentifier = false;
-    this->MultilineString = IsMultilineString;
-    this->CustomDelimiterLen = CustomDelimiterLen;
-    assert(this->CustomDelimiterLen == CustomDelimiterLen &&
-           "custom string delimiter length > 255");
+    this->MultilineString = MultilineString;
   }
 
-  bool isMultilineString() const {
+  bool IsMultilineString() const {
     return MultilineString;
-  }
-
-  unsigned getCustomDelimiterLen() const {
-    return CustomDelimiterLen;
   }
 };
   
