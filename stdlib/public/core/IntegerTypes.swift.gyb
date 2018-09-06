@@ -1399,10 +1399,9 @@ ${assignmentOperatorComment(x.operator, True)}
       )._lowWord._value)
   }
 
-  // FIXME should be RandomAccessCollection
   /// A type that represents the words of this integer.
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Words : BidirectionalCollection {
+  public struct Words : RandomAccessCollection {
     public typealias Indices = Range<Int>
     public typealias SubSequence = Slice<${Self}.Words>
 

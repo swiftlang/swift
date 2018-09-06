@@ -630,13 +630,12 @@ public protocol BinaryInteger :
   /// - Parameter source: An integer to convert to this type.
   init<T : BinaryInteger>(clamping source: T)
 
-  // FIXME: Should be `Words : Collection where Words.Element == UInt`
-  // See <rdar://problem/31798916> for why it isn't.
   /// A type that represents the words of a binary integer.
   ///
-  /// The `Words` type must conform to the `Collection` protocol with an
-  /// `Element` type of `UInt`.
-  associatedtype Words : Sequence where Words.Element == UInt
+  /// The `Words` type must conform to the `RandomAccessCollection` protocol
+  /// with an `Element` type of `UInt` and `Index` type of `Int.
+  associatedtype Words : RandomAccessCollection
+      where Words.Element == UInt, Words.Index == Int
 
   /// A collection containing the words of this value's binary
   /// representation, in order from the least significant to most significant.
