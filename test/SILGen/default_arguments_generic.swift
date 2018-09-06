@@ -41,6 +41,7 @@ struct InitializableImpl: Initializable {
 // CHECK-LABEL: sil hidden @$S25default_arguments_generic17testInitializableyyF
 func testInitializable() {
   // The ".init" is required to trigger the crash that used to happen.
+  _ = Generic<InitializableImpl>()
   _ = Generic<InitializableImpl>.init()
   // CHECK: function_ref @$S25default_arguments_generic7GenericVyACyxGxcfcfA_ : $@convention(thin) <τ_0_0 where τ_0_0 : Initializable> () -> @out τ_0_0
   // CHECK: [[INIT:%.+]] = function_ref @$S25default_arguments_generic7GenericVyACyxGxcfC
