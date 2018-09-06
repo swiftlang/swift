@@ -3,6 +3,11 @@ RUN: %utils/remote-run -n --remote-dir /xyz-REMOTE -i spiderman --output-prefix 
 CHECK: /usr/bin/ssh -n
 CHECK-DAG: -p 12345
 CHECK-DAG: -i spiderman
+CHECK-SAME: some_user@some_host -- '/usr/bin/env' '/bin/rm' '-rf' '{{.+}}-REMOTE/output'
+
+CHECK-NEXT: /usr/bin/ssh -n
+CHECK-DAG: -p 12345
+CHECK-DAG: -i spiderman
 CHECK-SAME: some_user@some_host -- '/usr/bin/env' '/bin/mkdir' '-p' '{{.+}}-REMOTE/output/nested'
 
 CHECK-NEXT: /usr/bin/sftp

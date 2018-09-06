@@ -28,7 +28,7 @@ class CommandRunner(object):
 
     @staticmethod
     def _dirnames(files):
-        return list(set(os.path.dirname(f) for f in files))
+        return sorted(set(os.path.dirname(f) for f in files))
 
     def popen(self, command, **kwargs):
         if self.verbose:
@@ -195,15 +195,20 @@ def main():
     runner.dry_run = args.dry_run
     runner.verbose = args.verbose or args.dry_run
 
+    assert not args.remote_dir == '/'
+
     upload_files = dict()
     download_files = dict()
+    remote_test_specific_dir = None
     if args.input_prefix:
+        assert not args.remote_input_prefix.startswith("..")
         remote_dir = os.path.join(args.remote_dir, args.remote_input_prefix)
         input_files = find_transfers(args.command, args.input_prefix, 
                                      remote_dir)
         assert not any(upload_files.has_key(f) for f in input_files)
         upload_files.update(input_files)
     if args.output_prefix:
+        assert not args.remote_output_prefix.startswith("..")
         remote_dir = os.path.join(args.remote_dir, args.remote_output_prefix)
         test_files = find_transfers(args.command, args.output_prefix, 
                                     remote_dir)
@@ -211,7 +216,11 @@ def main():
         upload_files.update(test_files)
         assert not any(download_files.has_key(f) for f in test_files)
         download_files.update(test_files)
+        remote_test_specific_dir = remote_dir
 
+    if remote_test_specific_dir:
+        assert remote_test_specific_dir.startswith(args.remote_dir)
+        runner.run_remote(['/bin/rm', '-rf', remote_test_specific_dir])
     if upload_files:
         runner.send(upload_files)
 
