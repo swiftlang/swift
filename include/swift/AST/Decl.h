@@ -6283,6 +6283,12 @@ public:
         DesignatedProtocolName(DesignatedProtocolName),
         DesignatedProtocolNameLoc(DesignatedProtocolNameLoc) {}
 
+  OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
+               Identifier Name, SourceLoc NameLoc,
+               ProtocolDecl *DesignatedProtocol)
+      : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
+        DesignatedProtocol(DesignatedProtocol) {}
+
   SourceLoc getLoc() const { return NameLoc; }
 
   SourceLoc getOperatorLoc() const { return OperatorLoc; }
@@ -6333,6 +6339,15 @@ public:
         SecondIdentifierLoc(secondIdentifierLoc),
         FirstIdentifier(firstIdentifier), SecondIdentifier(secondIdentifier) {}
 
+  InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
+                    SourceLoc nameLoc, SourceLoc colonLoc,
+                    Identifier firstIdentifier, SourceLoc firstIdentifierLoc,
+                    ProtocolDecl *designatedProtocol)
+      : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
+                     designatedProtocol),
+        ColonLoc(colonLoc), FirstIdentifierLoc(firstIdentifierLoc),
+        FirstIdentifier(firstIdentifier) {}
+
   SourceLoc getEndLoc() const {
     if (!SecondIdentifier.empty())
       return SecondIdentifierLoc;
@@ -6381,6 +6396,11 @@ public:
       : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
                      DesignatedProtocolName, DesignatedProtocolNameLoc) {}
 
+  PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
+                     SourceLoc NameLoc, ProtocolDecl *DesignatedProtocol)
+      : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
+                     DesignatedProtocol) {}
+
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
   }
@@ -6409,6 +6429,11 @@ public:
                       SourceLoc DesignatedProtocolNameLoc = SourceLoc())
       : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
                      DesignatedProtocolName, DesignatedProtocolNameLoc) {}
+
+  PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
+                      SourceLoc NameLoc, ProtocolDecl *DesignatedProtocol)
+      : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
+                     DesignatedProtocol) {}
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 441; // Last change: remove end_borrow src arg
+const uint16_t VERSION_MINOR = 442; // Last change: operator protocol
 
 using DeclIDField = BCFixed<31>;
 
@@ -1089,8 +1089,9 @@ namespace decls_block {
   template <unsigned Code>
   using UnaryOperatorLayout = BCRecordLayout<
     Code, // ID field
-    IdentifierIDField, // name
-    DeclContextIDField // context decl
+    IdentifierIDField,  // name
+    DeclContextIDField, // context decl
+    DeclIDField         // protocol
   >;
 
   using PrefixOperatorLayout = UnaryOperatorLayout<PREFIX_OPERATOR_DECL>;
@@ -1100,7 +1101,8 @@ namespace decls_block {
     INFIX_OPERATOR_DECL,
     IdentifierIDField, // name
     DeclContextIDField,// context decl
-    DeclIDField        // precedence group
+    DeclIDField,       // precedence group
+    DeclIDField        // protocol
   >;
 
   using PrecedenceGroupLayout = BCRecordLayout<
