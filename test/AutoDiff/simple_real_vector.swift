@@ -56,9 +56,9 @@ public func test1() -> Vector {
 // CHECK:   apply [[CAN_GRAD]]({{.*}}, {{.*}})
 
 // CHECK-LABEL: sil private @{{.*}}test1{{.*}}foo{{.*}}__adjoint_src_0_wrt_0
-// CHECK: bb0(%0 : $Vector, %1 : ${{.*}}test1{{.*}}foo{{.*}}__Type, %2 : $Vector, %3 : $Vector):
-// CHECK:   %4 = struct_extract %1 : ${{.*}}test1{{.*}}foo{{.*}}__Type, #{{.*}}.pv_0
-// CHECK:   %5 = struct_extract %1 : ${{.*}}test1{{.*}}foo{{.*}}__Type, #{{.*}}.v_0
+// CHECK: bb0(%0 : $Vector, %1 : ${{.*}}test1{{.*}}foo{{.*}}__Type{{.*}}, %2 : $Vector, %3 : $Vector):
+// CHECK:   %4 = struct_extract %1 : ${{.*}}test1{{.*}}foo{{.*}}__Type{{.*}}, #{{.*}}.pv_0
+// CHECK:   %5 = struct_extract %1 : ${{.*}}test1{{.*}}foo{{.*}}__Type{{.*}}, #{{.*}}.v_0
 // CHECK:   %6 = alloc_stack $Vector
 // CHECK:   %7 = begin_access [init] [static] [no_nested_conflict] %6 : $*Vector
 // CHECK:   %8 = begin_access [init] [static] [no_nested_conflict] %7 : $*Vector

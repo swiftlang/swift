@@ -1041,7 +1041,7 @@ public:
   /// Creates a struct declaration (without contents) for storing primal values
   /// of a function. The newly created struct will have the same generic
   /// parameters as the function.
-  StructDecl *createPrimalValueStructForFunction(SILFunction *function);
+  StructDecl *createPrimalValueStruct(const DifferentiationTask *task);
 
   void insertGradient(const GradientLookupKey &key, SILFunction *gradient) {
     gradientMap.insert({key, gradient});
@@ -1094,7 +1094,7 @@ public:
   /// Finds a differentiation task on a function such that the task produces
   /// adjoints for the specified indices.
   DifferentiationTask *
-  lookupDifferentiationTask(SILFunction *original,
+  lookUpDifferentiationTask(SILFunction *original,
                             const SILReverseAutoDiffIndices &indices) {
     auto *attr = lookupReverseDifferentiableAttr(original, indices);
     if (!attr)
@@ -1133,6 +1133,8 @@ public:
   registerDifferentiationTask(SILFunction *original,
                               const SILReverseAutoDiffIndices &indices,
                               DifferentiationInvoker invoker) {
+    // Make sure this pair of original and indices is unique.
+    assert(!lookUpDifferentiationTask(original, indices));
     // Make sure this function either has a body or has a
     // `[reverse_differentiable]` attribute that is a superset of all the
     if (original->isExternalDeclaration()) {
@@ -1154,7 +1156,7 @@ public:
   lookUpOrRegisterDifferentiationTask(SILFunction *original,
                                       const SILReverseAutoDiffIndices &indices,
                                       DifferentiationInvoker invoker) {
-    if (auto *existingTask = lookupDifferentiationTask(original, indices))
+    if (auto *existingTask = lookUpDifferentiationTask(original, indices))
       return existingTask;
     return registerDifferentiationTask(original, indices, invoker);
   }
@@ -2155,14 +2157,16 @@ private:
 } // end anonymous namespace
 
 StructDecl *
-ADContext::createPrimalValueStructForFunction(SILFunction *function) {
+ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
+  auto *function = task->getOriginal();
   assert(&function->getModule() == &module &&
          "The function must be in the same module");
   auto &file = getPrimalValueDeclContainer();
   // Create a `<fn_name>__Type` struct.
   std::string pvStructName;
   pvStructName += function->getName();
-  pvStructName += "__Type";
+  pvStructName += "__Type__";
+  pvStructName += mangleADIndices(task->getIndices());
   auto structId = astCtx.getIdentifier(pvStructName);
   SourceLoc loc = function->getLocation().getSourceLoc();
   auto pvStruct =
@@ -2194,11 +2198,25 @@ ADContext::createPrimalValueStructForFunction(SILFunction *function) {
   return pvStruct;
 }
 
+/// Given an parameter argument (not indirect result) and some differentiation
+/// indices, figure out whether the parent function is being differentiated with
+/// respect to this parameter, according to the indices.
+static bool isDifferentiationParameter(SILArgument *argument,
+                                       llvm::SmallBitVector indices) {
+  if (!argument) return false;
+  auto *function = argument->getFunction();
+  auto paramArgs = function->getArgumentsWithoutIndirectResults();
+  for (unsigned i : indices.set_bits())
+    if (paramArgs[i] == argument)
+      return true;
+  return false;
+}
+
 /// For a nested function call whose result tuple is active on the
 /// differentiation path, compute the set of minimal indices for differentiating
 /// this function as required by the data flow.
 static void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, SILReverseAutoDiffIndices parentIndices,
+    ApplyInst *ai, const SILReverseAutoDiffIndices &parentIndices,
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices) {
@@ -2208,13 +2226,13 @@ static void collectMinimalIndicesForFunctionCall(
   SILFunctionConventions convs(fnTy, ai->getModule());
   auto arguments = ai->getArgumentOperands();
   // Parameter indices are indices (in the type signature) of parameter
-  // arguments that are useful.
+  // arguments that are varied or are arguments.
   unsigned currentParamIdx = 0;
-  for (auto arg : ai->getArgumentsWithoutIndirectResults()) {
-    if (activityInfo.isUseful(arg, parentIndices.source))
-      paramIndices.push_back(currentParamIdx);
-    ++currentParamIdx;
-  }
+  for (auto applyArg : ai->getArgumentsWithoutIndirectResults())
+    if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
+        isDifferentiationParameter(dyn_cast<SILArgument>(applyArg),
+                                   parentIndices.parameters))
+      paramIndices.push_back(currentParamIdx++);
   // Result indices are indices (in the type signature) of results that are
   // useful.
   //
@@ -2753,8 +2771,7 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
   auto &module = context.getModule();
   std::string primalName =
       original->getName().str() + "__primal_" + mangleADIndices(indices);
-  StructDecl *primalValueStructDecl =
-      context.createPrimalValueStructForFunction(original);
+  StructDecl *primalValueStructDecl = context.createPrimalValueStruct(task);
   task->initializePrimalInfo(primalValueStructDecl, module);
   auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
   auto objTy = SILType::getPrimitiveObjectType(pvType);
@@ -2862,10 +2879,11 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
   SmallVector<SILParameterInfo, 8> adjParams;
   SmallVector<SILResultInfo, 8> adjResults;
   auto origTy = original->getLoweredFunctionType();
-  for (auto &param : origTy->getParameters()) {
+  auto origParams = origTy->getParameters();
+  for (auto &param : origParams)
     adjParams.push_back(param);
-    adjResults.push_back(getFormalResultInfo(param.getType(), module));
-  }
+  for (auto i : task->getIndices().parameters.set_bits())
+    adjResults.push_back(getFormalResultInfo(origParams[i].getType(), module));
   // If there's a generated primal, accept a primal value struct in the adjoint
   // parameter list.
   if (auto *pi = task->getPrimalInfo()) {
@@ -3048,18 +3066,18 @@ public:
       s << "Zero";
       break;
     case Kind::Aggregate:
-      s << "Aggregate";
+      s << "Aggregate<";
       if (auto *decl = dyn_cast_or_null<StructDecl>(
               type.getASTType()->getAnyNominal())) {
-        s << "<Struct>(";
+        s << "Struct>(";
         interleave(llvm::zip(decl->getStoredProperties(),
                              getAggregateElements()),
                    [&s](std::tuple<VarDecl *, AdjointValue> elt) {
-                     s << std::get<0>(elt) << ": ";
+                     s << std::get<0>(elt)->getName() << ": ";
                      std::get<1>(elt).print(s);
                    }, [&s] { s << ", "; });
       } else if (auto tupleType = type.getAs<TupleType>()) {
-        s << "<Tuple>(";
+        s << "Tuple>(";
         interleave(getAggregateElements(),
                    [&s](AdjointValue elt) { elt.print(s); },
                    [&s] { s << ", "; });
@@ -3258,6 +3276,7 @@ public:
     auto &original = getOriginal();
     auto &adjoint = getAdjoint();
     auto adjLoc = getAdjoint().getLocation();
+    auto *task = getDifferentiationTask();
     LLVM_DEBUG(getADDebugStream() << "Running AdjointGen on\n" << original);
     auto origTy = original.getLoweredFunctionType();
     // Create entry BB and arguments.
@@ -3299,7 +3318,7 @@ public:
     //     else zeros
     SmallVector<SILValue, 8> formalResults;
     collectAllFormalResultsInTypeOrder(original, formalResults);
-    auto srcIdx = getDifferentiationTask()->getIndices().source;
+    auto srcIdx = task->getIndices().source;
     addAdjointValue(formalResults[srcIdx], AdjointValue::getMaterialized(seed));
     LLVM_DEBUG(getADDebugStream()
                << "Assigned seed " << *seed << " as the adjoint of "
@@ -3322,10 +3341,10 @@ public:
     getBuilder().setInsertionPoint(adjointEntry);
 
     SmallVector<SILValue, 8> retElts;
-    for (auto paramPair : zip(original.getArgumentsWithoutIndirectResults(),
-                              originalParametersInAdj)) {
-      auto origParam = std::get<0>(paramPair);
-      auto adjParam = std::get<1>(paramPair);
+    auto origParamArgs = original.getArgumentsWithoutIndirectResults();
+    for (auto i : task->getIndices().parameters.set_bits()) {
+      auto origParam = origParamArgs[i];
+      auto adjParam = originalParametersInAdj[i];
       auto adjVal = getAdjointValue(origParam);
       if (adjParam->getType().isObject())
         retElts.push_back(materializeAdjointDirect(adjVal, adjLoc));
@@ -4143,7 +4162,7 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
   auto &module = original->getModule();
   auto &astCtx = module.getASTContext();
   auto origTy = original->getLoweredFunctionType();
-  auto config = gradInst->getConfig();
+  auto &config = gradInst->getConfig();
 
   // Creates a gradient function based on the configuration.
   auto createGradFunction = [&](const SILReverseAutoDiffConfig &config) {
@@ -4178,9 +4197,11 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
     context.insertGradient({original, masterConfig}, canonicalGrad);
     // Enqueue a new differentiation task in the global context.
     if (auto *diffOp = findDifferentialOperator(gradInst))
-      context.registerDifferentiationTask(original, config.indices, diffOp);
+      context.lookUpOrRegisterDifferentiationTask(
+          original, config.indices, diffOp);
     else
-      context.registerDifferentiationTask(original, config.indices, gradInst);
+      context.lookUpOrRegisterDifferentiationTask(
+          original, config.indices, gradInst);
   }
 
   // If the requested gradient is not *both seedable and result-preserving*,
