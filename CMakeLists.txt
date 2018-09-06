@@ -866,11 +866,13 @@ endfunction()
 # package lookup.  Otherwise, rely on the paths specified by the user.  These
 # need to be defined when cross-compiling.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  swift_icu_variables_set("${SWIFT_HOST_VARIANT_SDK_default}"
-                          "${SWIFT_HOST_VARIANT_ARCH_default}"
-                          ICU_CONFIGURED)
-  if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND NOT ${ICU_CONFIGURED})
-    find_package(ICU REQUIRED COMPONENTS uc i18n)
+  if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
+    swift_icu_variables_set("${SWIFT_HOST_VARIANT_SDK_default}"
+                            "${SWIFT_HOST_VARIANT_ARCH_default}"
+                            ICU_CONFIGURED)
+    if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND NOT ${ICU_CONFIGURED})
+      find_package(ICU REQUIRED COMPONENTS uc i18n)
+    endif()
   endif()
 endif()
 
