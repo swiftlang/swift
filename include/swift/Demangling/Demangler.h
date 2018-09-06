@@ -296,7 +296,6 @@ protected:
 
   Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
-  Vector<unsigned> PendingSubstitutions;
 
   static const int MaxNumWords = 26;
   StringRef Words[MaxNumWords];
