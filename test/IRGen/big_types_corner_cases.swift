@@ -335,11 +335,11 @@ public extension sr8076_QueryHandler {
     }
 
 // CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself, %swift.error** swifterror)
-// CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture swifterror {{.*}})
+// CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** noalias nocapture swifterror {{.*}})
 // CHECK-64: ret { i64, i64 }
 
 // CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself, %swift.error** swifterror)
-// CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture {{.*}})
+// CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** noalias nocapture {{.*}})
 // CHECK-32: ret { i32, i32 }
     func forceHandle_4<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?) {
         guard let body = handle_4 as? (Q) throws -> (Q.Returned, sr8076_Filter?) else {

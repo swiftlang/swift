@@ -353,6 +353,40 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 #define BUILTIN(ID, Name, Attrs)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
 
+  if (Builtin.ID == BuiltinValueKind::WillThrow) {
+    // willThrow is emitted like a Swift function call with the error in
+    // the error return register. We also have to pass a fake context
+    // argument due to how swiftcc works in clang.
+  
+    auto *fn = cast<llvm::Function>(IGF.IGM.getWillThrowFn());
+    auto error = args.claimNext();
+    auto errorBuffer = IGF.getErrorResultSlot(
+               SILType::getPrimitiveObjectType(IGF.IGM.Context.getErrorDecl()
+                                                  ->getDeclaredType()
+                                                  ->getCanonicalType()));
+    IGF.Builder.CreateStore(error, errorBuffer);
+    
+    auto context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+
+    llvm::CallInst *call = IGF.Builder.CreateCall(fn,
+                                        {context, errorBuffer.getAddress()});
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    call->addAttribute(llvm::AttributeList::FunctionIndex,
+                       llvm::Attribute::NoUnwind);
+    call->addAttribute(llvm::AttributeList::FirstArgIndex + 1,
+                       llvm::Attribute::ReadOnly);
+
+    auto attrs = call->getAttributes();
+    IGF.IGM.addSwiftSelfAttributes(attrs, 0);
+    IGF.IGM.addSwiftErrorAttributes(attrs, 1);
+    call->setAttributes(attrs);
+
+    IGF.Builder.CreateStore(llvm::ConstantPointerNull::get(IGF.IGM.ErrorPtrTy),
+                            errorBuffer);
+
+    return out.add(call);
+  }
+  
   if (Builtin.ID == BuiltinValueKind::FNeg) {
     llvm::Value *rhs = args.claimNext();
     llvm::Value *lhs = llvm::ConstantFP::get(rhs->getType(), "-0.0");

@@ -182,17 +182,22 @@ void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
 
 void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
                                           unsigned argIndex) {
-  // Don't add the swifterror attribute on ABI that don't pass it in a register.
+  llvm::AttrBuilder b;
+  // Don't add the swifterror attribute on ABIs that don't pass it in a register.
   // We create a shadow stack location of the swifterror parameter for the
   // debugger on such platforms and so we can't mark the parameter with a
   // swifterror attribute.
-  if (!this->IsSwiftErrorInRegister)
-    return;
-
-  llvm::AttrBuilder b;
-  b.addAttribute(llvm::Attribute::SwiftError);
-  attrs = attrs.addAttributes(this->LLVMContext,
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  if (IsSwiftErrorInRegister)
+    b.addAttribute(llvm::Attribute::SwiftError);
+  
+  // The error result should not be aliased, captured, or pointed at invalid
+  // addresses regardless.
+  b.addAttribute(llvm::Attribute::NoAlias);
+  b.addAttribute(llvm::Attribute::NoCapture);
+  b.addDereferenceableAttr(getPointerSize().getValue());
+  
+  auto attrIndex = argIndex + llvm::AttributeList::FirstArgIndex;
+  attrs = attrs.addAttributes(this->LLVMContext, attrIndex, b);
 }
 
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,

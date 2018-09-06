@@ -527,6 +527,10 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       builtin->dump();
       llvm_unreachable("unexpected bulitin memory access.");
 
+      // WillThrow exists for the debugger, does nothing.
+    case BuiltinValueKind::WillThrow:
+      return;
+
       // Buitins that affect memory but can't be formal accesses.
     case BuiltinValueKind::UnexpectedError:
     case BuiltinValueKind::ErrorInMain:
@@ -695,7 +699,6 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::EndApplyInst:
-  case SILInstructionKind::EndBorrowArgumentInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::EndUnpairedAccessInst:
   case SILInstructionKind::EndLifetimeInst:

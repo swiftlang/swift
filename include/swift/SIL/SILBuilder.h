@@ -727,12 +727,6 @@ public:
                       EndBorrowInst(getSILDebugLocation(Loc), BorrowedValue));
   }
 
-  EndBorrowArgumentInst *createEndBorrowArgument(SILLocation Loc,
-                                                 SILValue Arg) {
-    return insert(new (getModule()) EndBorrowArgumentInst(
-        getSILDebugLocation(Loc), cast<SILArgument>(Arg)));
-  }
-
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
                                      SILAccessKind accessKind,
                                      SILAccessEnforcement enforcement,

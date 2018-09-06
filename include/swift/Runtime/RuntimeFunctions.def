@@ -130,9 +130,9 @@ FUNCTION(SlowDealloc, swift_slowDealloc, C_CC,
          ATTRS(NoUnwind))
 
 // void swift_willThrow(error *ptr);
-FUNCTION(WillThrow, swift_willThrow, C_CC,
+FUNCTION(WillThrow, swift_willThrow, SwiftCC,
          RETURNS(VoidTy),
-         ARGS(ErrorPtrTy),
+         ARGS(Int8PtrTy, ErrorPtrTy->getPointerTo()),
          ATTRS(NoUnwind))
 
 // void swift_errorInMain(error *ptr);
