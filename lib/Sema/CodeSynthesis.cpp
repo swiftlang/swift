@@ -337,6 +337,10 @@ static void maybeMarkTransparent(TypeChecker &TC, AccessorDecl *accessor) {
     if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
       return;
 
+  // Accessors synthesized on-demand are never transaprent.
+  if (accessor->hasForcedStaticDispatch())
+    return;
+
   accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
 }
 
