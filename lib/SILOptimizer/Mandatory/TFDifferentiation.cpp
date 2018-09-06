@@ -2228,11 +2228,13 @@ static void collectMinimalIndicesForFunctionCall(
   // Parameter indices are indices (in the type signature) of parameter
   // arguments that are varied or are arguments.
   unsigned currentParamIdx = 0;
-  for (auto applyArg : ai->getArgumentsWithoutIndirectResults())
+  for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
     if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
         isDifferentiationParameter(dyn_cast<SILArgument>(applyArg),
                                    parentIndices.parameters))
-      paramIndices.push_back(currentParamIdx++);
+      paramIndices.push_back(currentParamIdx);
+    ++currentParamIdx;
+  }
   // Result indices are indices (in the type signature) of results that are
   // useful.
   //
