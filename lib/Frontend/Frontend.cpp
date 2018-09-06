@@ -666,7 +666,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   std::unique_ptr<DelayedParsingCallbacks> SecondaryDelayedCB{
       computeDelayedParsingCallback(false)};
 
-  PersistentParserState PersistentState;
+  PersistentParserState PersistentState(getASTContext());
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
       implicitImports, PersistentState,
@@ -945,7 +945,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
                                   MainBufferID);
   }
 
-  PersistentParserState PersistentState;
+  PersistentParserState PersistentState(getASTContext());
   PersistentState.PerformConditionEvaluation = EvaluateConditionals;
   // Parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {

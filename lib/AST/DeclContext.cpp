@@ -759,6 +759,8 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 }
 
 void IterableDeclContext::loadAllMembers() const {
+  // Lazily parse members.
+  getASTContext().parseMembers(const_cast<IterableDeclContext*>(this));
   if (!hasLazyMembers())
     return;
 

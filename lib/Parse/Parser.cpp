@@ -481,7 +481,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                                            L->getBufferID())) {
   State = PersistentState;
   if (!State) {
-    OwnedState.reset(new PersistentParserState());
+    OwnedState.reset(new PersistentParserState(Context));
     State = OwnedState.get();
   }
 
@@ -1005,14 +1005,14 @@ struct ParserUnit::Implementation {
   SourceFile *SF;
   std::unique_ptr<Parser> TheParser;
 
-  Implementation(SourceManager &SM, unsigned BufferID,
+  Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                  const LangOptions &Opts, StringRef ModuleName)
     : LangOpts(Opts),
       Diags(SM),
       Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SM, Diags)),
       SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
-            SourceFileKind::Main, BufferID,
+            SFKind, BufferID,
             SourceFile::ImplicitModuleImportKind::None,
             Opts.CollectParsedToken,
             Opts.BuildSyntaxTree)) {
@@ -1026,22 +1026,22 @@ struct ParserUnit::Implementation {
   }
 };
 
-ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID)
-  : ParserUnit(SM, BufferID, LangOptions(), "input") {
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID)
+  : ParserUnit(SM, SFKind, BufferID, LangOptions(), "input") {
 }
 
-ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                        const LangOptions &LangOpts, StringRef ModuleName,
                        SyntaxParsingCache *SyntaxCache)
-    : Impl(*new Implementation(SM, BufferID, LangOpts, ModuleName)) {
+    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, ModuleName)) {
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, nullptr));
 }
 
-ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                        unsigned Offset, unsigned EndOffset)
-  : Impl(*new Implementation(SM, BufferID, LangOptions(), "input")) {
+  : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input")) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,
