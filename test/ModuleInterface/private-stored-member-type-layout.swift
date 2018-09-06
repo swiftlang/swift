@@ -26,7 +26,7 @@
 import PrivateStoredMembers
 #endif
 
-// CHECK-EXEC: define swiftcc void @"$S{{[^ ]+}}8makeUseryyF"() #0 {
+// CHECK-EXEC: swiftcc void @"$S{{[^ ]+}}8makeUseryyF"() #0 {
 public func makeUser() {
   let ptr = UnsafeMutablePointer<MyStruct>.allocate(capacity: 1)
   // CHECK-EXEC: %.publicEndVar = getelementptr inbounds [[MYSTRUCT]], [[MYSTRUCT]]* %{{[0-9]+}}, i32 0, i32 [[PUBLIC_END_VAR_IDX:9]]
