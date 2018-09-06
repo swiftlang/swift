@@ -3853,18 +3853,31 @@ static void materializeAdjointIndirectHelper(AdjointValue val,
                                 destBufferAccess, loc, builder, context);
     }
     break;
-  /// Given a `%buf : *(T0, T1, T2, ...)`, recursively emit instructions to
-  /// materialize the symbolic tuple, filling the buffer.
+  /// Given a `%buf : *(T0, T1, T2, ...)` or `%buf : *Struct` recursively emit
+  /// instructions to materialize the symbolic tuple or struct, filling the
+  /// buffer.
   case AdjointValue::Kind::Aggregate: {
-    SmallVector<SILValue, 8> elements;
-    for (auto eltAndIdx : enumerate(val.getAggregateElements())) {
-      auto idx = eltAndIdx.index();
-      auto *tupTy = val.getSwiftType()->castTo<TupleType>();
-      auto eltTy = SILType::getPrimitiveObjectType(tupTy->getCanonicalType());
-      auto *eltBuf =
-          builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy);
-      materializeAdjointIndirectHelper(
-          eltAndIdx.value(), eltBuf, builder, context);
+    if (auto *tupTy = val.getSwiftType()->getAs<TupleType>()) {
+      for (auto eltAndIdx : enumerate(val.getAggregateElements())) {
+        auto idx = eltAndIdx.index();
+        auto eltTy = SILType::getPrimitiveObjectType(tupTy->getCanonicalType());
+        auto *eltBuf =
+            builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy);
+        materializeAdjointIndirectHelper(
+            eltAndIdx.value(), eltBuf, builder, context);
+      }
+    } else if (auto *structDecl = dyn_cast_or_null<StructDecl>(
+                  val.getSwiftType()->getAnyNominal())) {
+      for (auto eltAndField : zip(val.getAggregateElements(),
+                                  structDecl->getStoredProperties())) {
+        auto elt = std::get<0>(eltAndField);
+        auto field = std::get<1>(eltAndField);
+        auto *eltBuf = builder.createStructElementAddr(loc, destBufferAccess,
+                                                       field);
+        materializeAdjointIndirectHelper(elt, eltBuf, builder, context);
+      }
+    } else {
+      llvm_unreachable("Not an aggregate type");
     }
     break;
   }
