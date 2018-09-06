@@ -1,11 +1,12 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
-// XFAIL: *
 
 import TensorFlow
 
 public func test1() {
-  func addSelf(_ x: Tensor<Float>) -> Tensor<Float> {
-    return log(x)
+  func matsquare(_ x: Tensor<Float>) -> Tensor<Float> {
+    return matmul(x, x)
   }
-  _ = #gradient(addSelf)
+  _ = #gradient(matsquare)
 }
+
+// CHECK: @{{.*}}matsquare{{.*}}__grad_src_0_wrt_0

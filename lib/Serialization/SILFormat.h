@@ -171,6 +171,7 @@ namespace sil_block {
     SIL_PROPERTY,
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SIL_TWO_OPERANDS_EXTRA_ATTR,
+    SIL_REVERSE_DIFFERENTIABLE_ATTR,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -293,6 +294,7 @@ namespace sil_block {
                      BCFixed<2>,  // optimizationMode
                      BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
+                     BCVBR<8>,    // number of reverse differentiable attributes
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // must be weakly referenced
                      TypeIDField, // SILFunctionType
@@ -300,6 +302,7 @@ namespace sil_block {
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
                      // followed by specialize attributes
+                     // followed by reverse differentiable attributes
                      // followed by generic param list, if any
                      >;
 
@@ -308,6 +311,14 @@ namespace sil_block {
                      BCFixed<1>, // exported
                      BCFixed<1> // specialization kind
                      >;
+
+  using SILReverseDifferentiableAttrLayout = BCRecordLayout<
+    SIL_REVERSE_DIFFERENTIABLE_ATTR,
+    IdentifierIDField,  // Primal name.
+    IdentifierIDField,  // Adjoint name.
+    BCFixed<32>,        // Indices' source.
+    BCArray<BCFixed<1>> // Indices' parameters bitvector.
+  >;
 
   // Has an optional argument list where each argument is a typed valueref.
   using SILBasicBlockLayout = BCRecordLayout<

@@ -3488,7 +3488,6 @@ public:
     // Parameters: (orig_args..., prim_val_struct?, orig_res..., seed...)
     // Results: (derivatives...)
     SmallVector<SILValue, 8> args;
-    args.reserve(adjoint->getArguments().size());
     // For each indirect result, allocate a local buffer and add it to the
     // argument list.
     SmallVector<SILValue, 8> allocsToCleanUp;
@@ -3535,7 +3534,8 @@ public:
     auto convertedAdjFn = reapplyFunctionConversion(
         adjointRef, origFnRef, ai->getCallee(), getBuilder(), ai->getLoc());
     auto *applyAdj = getBuilder().createApply(ai->getLoc(), convertedAdjFn,
-                                              args, /*isNonThrowing*/ false);
+                                              ai->getSubstitutionMap(), args,
+                                              /*isNonThrowing*/ false);
     // Clean up seed allocation.
     getBuilder().createDeallocStack(loc, seedBuf);
     // If `applyAdj` is a tuple, extract all results.

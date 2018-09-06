@@ -463,13 +463,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
       inlineStrategy, optimizationMode, effect, numSpecAttrs,
-      hasQualifiedOwnership, isWeakLinked;
+      numReverseDifferentiableAttrs, hasQualifiedOwnership, isWeakLinked;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
                                 isThunk, isGlobal, inlineStrategy,
                                 optimizationMode, effect, numSpecAttrs,
-                                hasQualifiedOwnership, isWeakLinked, funcTyID,
-                                genericEnvID, clangNodeOwnerID, SemanticsIDs);
+                                numReverseDifferentiableAttrs, hasQualifiedOwnership,
+                                isWeakLinked, funcTyID, genericEnvID,
+                                clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -605,6 +606,36 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     // Read the substitution list and construct a SILSpecializeAttr.
     fn->addSpecializeAttr(SILSpecializeAttr::create(
         SILMod, requirements, exported != 0, specializationKind));
+  }
+
+  // Read and instantiate the differentiable attributes.
+  while (numReverseDifferentiableAttrs--) {
+    auto next = SILCursor.advance(AF_DontPopBlockAtEnd);
+    assert(next.Kind == llvm::BitstreamEntry::Record);
+
+    scratch.clear();
+    kind = SILCursor.readRecord(next.ID, scratch);
+    assert(kind == SIL_REVERSE_DIFFERENTIABLE_ATTR &&
+           "Missing reverse differentiable attribute");
+
+    uint64_t primalNameId;
+    uint64_t adjointNameId;
+    uint64_t source;
+    ArrayRef<uint64_t> parameters;
+    SILReverseDifferentiableAttrLayout::readRecord(scratch, primalNameId,
+                                                   adjointNameId, source,
+                                                   parameters);
+
+    StringRef primalName = MF->getIdentifier(primalNameId).str();
+    StringRef adjointName = MF->getIdentifier(adjointNameId).str();
+    llvm::SmallBitVector parametersBitVector(parameters.size());
+    for (unsigned i = 0; i < parameters.size(); i++)
+      parametersBitVector[i] = parameters[i];
+    SILReverseAutoDiffIndices indices(source, parametersBitVector);
+
+    auto *attr = SILReverseDifferentiableAttr::create(SILMod, indices,
+                                                      primalName, adjointName);
+    fn->addReverseDifferentiableAttr(attr);
   }
 
   GenericEnvironment *genericEnv = nullptr;
@@ -2490,13 +2521,14 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
     inlineStrategy, optimizationMode, effect, numSpecAttrs,
-    hasQualifiedOwnership, isWeakLinked;
+    numReverseDifferentiableAttrs, hasQualifiedOwnership, isWeakLinked;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
                                 isThunk, isGlobal, inlineStrategy,
                                 optimizationMode, effect, numSpecAttrs,
-                                hasQualifiedOwnership, isWeakLinked, funcTyID,
-                                genericEnvID, clangOwnerID, SemanticsIDs);
+                                numReverseDifferentiableAttrs, hasQualifiedOwnership,
+                                isWeakLinked, funcTyID, genericEnvID,
+                                clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage

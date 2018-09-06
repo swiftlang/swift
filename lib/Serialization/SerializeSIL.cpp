@@ -400,7 +400,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
       (unsigned)F.getInlineStrategy(), (unsigned)F.getOptimizationMode(),
       (unsigned)F.getEffectsKind(),
-      (unsigned)numSpecAttrs, (unsigned)F.hasQualifiedOwnership(),
+      (unsigned)numSpecAttrs,
+      (unsigned)F.getReverseDifferentiableAttrs().size(),
+      (unsigned)F.hasQualifiedOwnership(),
       F.isWeakLinked(), FnID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
@@ -412,6 +414,20 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
                                         (unsigned)SA->isExported(),
                                         (unsigned)SA->getSpecializationKind());
     S.writeGenericRequirements(SA->getRequirements(), SILAbbrCodes);
+  }
+
+  for (auto *DA : F.getReverseDifferentiableAttrs()) {
+    unsigned differentiableAttrAbbrCode =
+        SILAbbrCodes[SILReverseDifferentiableAttrLayout::Code];
+    auto indices = DA->getIndices();
+    llvm::SmallVector<bool, 4> parameters;
+    for (unsigned i = 0; i < indices.parameters.size(); i++)
+      parameters.push_back(indices.parameters[i]);
+    SILReverseDifferentiableAttrLayout::emitRecord(
+        Out, ScratchRecord, differentiableAttrAbbrCode,
+        S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getPrimalName())),
+        S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getAdjointName())),
+        indices.source, parameters);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -2423,6 +2439,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstCastLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();
   registerSILAbbr<SILSpecializeAttrLayout>();
+  registerSILAbbr<SILReverseDifferentiableAttrLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.
