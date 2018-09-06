@@ -614,7 +614,7 @@ GenericParamList::clone(DeclContext *dc) const {
       auto second = reqt.getConstraintLoc();
       reqt = RequirementRepr::getTypeConstraint(
           first.clone(ctx),
-          reqt.getColonLoc(),
+          reqt.getSeparatorLoc(),
           second.clone(ctx));
       break;
     }
@@ -623,7 +623,7 @@ GenericParamList::clone(DeclContext *dc) const {
       auto second = reqt.getSecondTypeLoc();
       reqt = RequirementRepr::getSameType(
           first.clone(ctx),
-          reqt.getEqualLoc(),
+          reqt.getSeparatorLoc(),
           second.clone(ctx));
       break;
     }
@@ -632,7 +632,7 @@ GenericParamList::clone(DeclContext *dc) const {
       auto layout = reqt.getLayoutConstraintLoc();
       reqt = RequirementRepr::getLayoutConstraint(
           first.clone(ctx),
-          reqt.getColonLoc(),
+          reqt.getSeparatorLoc(),
           layout);
       break;
     }
