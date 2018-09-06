@@ -96,6 +96,11 @@ std::string LinkEntity::mangleAsString() const {
                                                      /*isAllocating=*/true);
   }
 
+  case Kind::MethodLookupFunction: {
+    auto *classDecl = cast<ClassDecl>(getDecl());
+    return mangler.mangleMethodLookupFunction(classDecl);
+  }
+
   case Kind::ValueWitness:
     return mangler.mangleValueWitness(getType(), getValueWitness());
 
@@ -438,6 +443,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::NominalTypeDescriptor:
   case Kind::ClassMetadataBaseOffset:
   case Kind::ProtocolDescriptor:
+  case Kind::MethodLookupFunction:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
   case Kind::DirectProtocolWitnessTable:
@@ -567,6 +573,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
+  case Kind::MethodLookupFunction:
     return ::isAvailableExternally(IGM, getDecl());
 
   case Kind::EnumCase:

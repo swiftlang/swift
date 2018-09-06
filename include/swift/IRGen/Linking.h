@@ -129,6 +129,9 @@ class LinkEntity {
     /// ConstructorDecl* inside a protocol or a class.
     MethodDescriptorAllocator,
 
+    /// A method lookup function for a class.  The pointer is a ClassDecl*.
+    MethodLookupFunction,
+
     /// A resilient enum tag index. The pointer is a EnumElementDecl*.
     EnumCase,
 
@@ -479,6 +482,12 @@ public:
 
     LinkEntity entity;
     entity.setForDecl(kind, declRef.getDecl());
+    return entity;
+  }
+
+  static LinkEntity forMethodLookupFunction(ClassDecl *classDecl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::MethodLookupFunction, classDecl);
     return entity;
   }
 
