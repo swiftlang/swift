@@ -476,10 +476,10 @@ class TestBenchmarkDoctor(unittest.TestCase):
             # 5x i1 series, with 300 μs runtime its possible to take 4098
             # samples/s, but it should be capped at 2k
             ([(_run('B1', num_samples=2048, num_iters=1,
-                    verbose=True), _PTR(min=300))] * 5) +
+                    verbose=True, measure_memory=True), _PTR(min=300))] * 5) +
             # 5x i2 series
             ([(_run('B1', num_samples=2048, num_iters=2,
-                    verbose=True), _PTR(min=300))] * 5)
+                    verbose=True, measure_memory=True), _PTR(min=300))] * 5)
         ))
         doctor = BenchmarkDoctor(self.args, driver)
         with captured_output() as (out, _):
