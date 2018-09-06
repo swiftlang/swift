@@ -67,26 +67,26 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
   return %ret : $()
 }
 
-// CHECK-LABEL: struct simple_mul__Type {
+// CHECK-LABEL: struct simple_mul__Type__src_0_wrt_0_1 {
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
 // CHECK: }
 
-// CHECK-LABEL: struct simple_div__Type {
+// CHECK-LABEL: struct simple_div__Type__src_0_wrt_0_1 {
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
 // CHECK: }
 
-// CHECK-LABEL: struct chain_rule__Type {
+// CHECK-LABEL: struct chain_rule__Type__src_0_wrt_0_1 {
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
 // CHECK:   @sil_stored var v_1: Builtin.FPIEEE32
 // CHECK: }
 
-// CHECK-LABEL: struct add_literals__Type {
+// CHECK-LABEL: struct add_literals__Type__src_0_wrt_0_1 {
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
 // CHECK:   @sil_stored var v_1: Builtin.FPIEEE32
 // CHECK:   @sil_stored var v_2: Builtin.FPIEEE32
 // CHECK: }
 
-// CHECK-LABEL: struct fanout__Type {
+// CHECK-LABEL: struct fanout__Type__src_0_wrt_0_1 {
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
 // CHECK:   @sil_stored var v_1: Builtin.FPIEEE32
 // CHECK:   @sil_stored var v_2: Builtin.FPIEEE32
@@ -100,18 +100,18 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK-LABEL: @simple_mul__primal_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
 // CHECK:   %2 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %3 = struct $simple_mul__Type (%2 : $Builtin.FPIEEE32)
-// CHECK:   %4 = tuple (%3 : $simple_mul__Type, %2 : $Builtin.FPIEEE32)
-// CHECK:   return %4 : $(simple_mul__Type, Builtin.FPIEEE32)
+// CHECK:   %3 = struct $simple_mul__Type__src_0_wrt_0_1 (%2 : $Builtin.FPIEEE32)
+// CHECK:   %4 = tuple (%3 : $simple_mul__Type__src_0_wrt_0_1, %2 : $Builtin.FPIEEE32)
+// CHECK:   return %4 : $(simple_mul__Type__src_0_wrt_0_1, Builtin.FPIEEE32)
 // CHECK: }
 
 // CHECK-LABEL: sil @chain_rule__primal_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
 // CHECK:   %2 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %4 = struct $chain_rule__Type (%2 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32)
-// CHECK:   %5 = tuple (%4 : $chain_rule__Type, %3 : $Builtin.FPIEEE32)
-// CHECK:   return %5 : $(chain_rule__Type, Builtin.FPIEEE32)
+// CHECK:   %4 = struct $chain_rule__Type__src_0_wrt_0_1 (%2 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32)
+// CHECK:   %5 = tuple (%4 : $chain_rule__Type__src_0_wrt_0_1, %3 : $Builtin.FPIEEE32)
+// CHECK:   return %5 : $(chain_rule__Type__src_0_wrt_0_1, Builtin.FPIEEE32)
 // CHECK: }
 
 // CHECK-LABEL: @add_literals__primal_src_0_wrt_0_1
@@ -120,9 +120,9 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK:   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %4 = float_literal $Builtin.FPIEEE32, 0x64
 // CHECK:   %5 = builtin "fsub_FPIEEE32"(%4 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %6 = struct $add_literals__Type (%2 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32, %5 : $Builtin.FPIEEE32)
-// CHECK:   %7 = tuple (%6 : $add_literals__Type, %5 : $Builtin.FPIEEE32)
-// CHECK:   return %7 : $(add_literals__Type, Builtin.FPIEEE32)
+// CHECK:   %6 = struct $add_literals__Type__src_0_wrt_0_1 (%2 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32, %5 : $Builtin.FPIEEE32)
+// CHECK:   %7 = tuple (%6 : $add_literals__Type__src_0_wrt_0_1, %5 : $Builtin.FPIEEE32)
+// CHECK:   return %7 : $(add_literals__Type__src_0_wrt_0_1, Builtin.FPIEEE32)
 // CHECK: }
 
 // CHECK-LABEL: @fanout__primal_src_0_wrt_0_1
@@ -130,13 +130,13 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK:   %2 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %4 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %5 = struct $fanout__Type (%2 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32)
-// CHECK:   %6 = tuple (%5 : $fanout__Type, %4 : $Builtin.FPIEEE32)
-// CHECK:   return %6 : $(fanout__Type, Builtin.FPIEEE32)
+// CHECK:   %5 = struct $fanout__Type__src_0_wrt_0_1 (%2 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32)
+// CHECK:   %6 = tuple (%5 : $fanout__Type__src_0_wrt_0_1, %4 : $Builtin.FPIEEE32)
+// CHECK:   return %6 : $(fanout__Type__src_0_wrt_0_1, Builtin.FPIEEE32)
 // CHECK: }
 
 // CHECK-LABEL: @simple_mul__adjoint_src_0_wrt_0_1
-// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $simple_mul__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
+// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $simple_mul__Type__src_0_wrt_0_1, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
 // CHECK:   %5 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %6 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %7 = tuple (%5 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32)
@@ -144,7 +144,7 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK: }
 
 // CHECK-LABEL: @simple_div__adjoint_src_0_wrt_0_1
-// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $simple_div__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
+// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $simple_div__Type__src_0_wrt_0_1, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
 // CHECK:   %5 = builtin "fdiv_FPIEEE32"(%4 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %6 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %7 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
@@ -155,8 +155,8 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK: }
 
 // CHECK-LABEL: @chain_rule__adjoint_src_0_wrt_0_1
-// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $chain_rule__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
-// CHECK:   %5 = struct_extract %2 : $chain_rule__Type, #chain_rule__Type.v_0
+// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $chain_rule__Type__src_0_wrt_0_1, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
+// CHECK:   %5 = struct_extract %2 : $chain_rule__Type__src_0_wrt_0_1, #chain_rule__Type__src_0_wrt_0_1.v_0
 // CHECK:   %6 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %5 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %7 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %8 = builtin "fneg_FPIEEE32"(%7 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
@@ -165,9 +165,9 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK: }
 
 // CHECK-LABEL: @add_literals__adjoint_src_0_wrt_0_1
-// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $add_literals__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
+// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $add_literals__Type__src_0_wrt_0_1, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
 // CHECK:   %5 = builtin "fneg_FPIEEE32"(%4 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %6 = struct_extract %2 : $add_literals__Type, #add_literals__Type.v_0
+// CHECK:   %6 = struct_extract %2 : $add_literals__Type__src_0_wrt_0_1, #add_literals__Type__src_0_wrt_0_1.v_0
 // CHECK:   %7 = builtin "fmul_FPIEEE32"(%5 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %8 = builtin "fmul_FPIEEE32"(%5 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %9 = builtin "fneg_FPIEEE32"(%8 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
@@ -176,8 +176,8 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK: }
 
 // CHECK-LABEL: @fanout__adjoint_src_0_wrt_0_1
-// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $fanout__Type, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
-// CHECK:   %5 = struct_extract %2 : $fanout__Type, #fanout__Type.v_0
+// CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32, %2 : $fanout__Type__src_0_wrt_0_1, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):
+// CHECK:   %5 = struct_extract %2 : $fanout__Type__src_0_wrt_0_1, #fanout__Type__src_0_wrt_0_1.v_0
 // CHECK:   %6 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %5 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %7 = builtin "fmul_FPIEEE32"(%4 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %8 = builtin "fmul_FPIEEE32"(%7 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32

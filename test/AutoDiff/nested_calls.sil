@@ -41,12 +41,12 @@ bb0(%0 : @trivial $Float):
   return %6 : $Float
 }
 
-// CHECK-LABEL: struct func_to_diff__Type {
-// CHECK-NEXT:   @sil_stored var pv_0: nested_func_without_diffattr__Type
+// CHECK-LABEL: struct func_to_diff__Type__src_0_wrt_0 {
+// CHECK-NEXT:   @sil_stored var pv_0: nested_func_without_diffattr__Type__src_0_wrt_0
 // CHECK-NEXT:   @sil_stored var v_0: Float
 // CHECK-NEXT: }
 
-// CHECK-LABEL: struct nested_func_without_diffattr__Type {
+// CHECK-LABEL: struct nested_func_without_diffattr__Type__src_0_wrt_0 {
 // CHECK-NEXT:   @sil_stored var pv_0: Float
 // CHECK-NEXT:   @sil_stored var v_0: Float
 // CHECK-NEXT: }
@@ -77,27 +77,27 @@ bb0(%0 : @trivial $Float):
 // CHECK:   return %0 : $Float
 // CHECK: }
 
-// CHECK-LABEL: @func_to_diff__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned func_to_diff__Type, Float) {
+// CHECK-LABEL: @func_to_diff__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned func_to_diff__Type__src_0_wrt_0, Float) {
 // CHECK: bb0(%0 : $Float):
-// CHECK:   %1 = struct $nested_func_without_diffattr__Type (%0 : $Float, %0 : $Float)
-// CHECK:   %2 = struct $func_to_diff__Type (%1 : $nested_func_without_diffattr__Type, %0 : $Float)
-// CHECK:   %3 = tuple (%2 : $func_to_diff__Type, %0 : $Float)
-// CHECK:   return %3 : $(func_to_diff__Type, Float)
+// CHECK:   %1 = struct $nested_func_without_diffattr__Type__src_0_wrt_0 (%0 : $Float, %0 : $Float)
+// CHECK:   %2 = struct $func_to_diff__Type__src_0_wrt_0 (%1 : $nested_func_without_diffattr__Type__src_0_wrt_0, %0 : $Float)
+// CHECK:   %3 = tuple (%2 : $func_to_diff__Type__src_0_wrt_0, %0 : $Float)
+// CHECK:   return %3 : $(func_to_diff__Type__src_0_wrt_0, Float)
 // CHECK: }
 
-// CHECK-LABEL: @nested_func_without_diffattr__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned nested_func_without_diffattr__Type, Float) {
+// CHECK-LABEL: @nested_func_without_diffattr__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned nested_func_without_diffattr__Type__src_0_wrt_0, Float) {
 // CHECK: bb0(%0 : $Float):
-// CHECK:   %1 = struct $nested_func_without_diffattr__Type (%0 : $Float, %0 : $Float)
-// CHECK:   %2 = tuple (%1 : $nested_func_without_diffattr__Type, %0 : $Float)
-// CHECK:   return %2 : $(nested_func_without_diffattr__Type, Float)
+// CHECK:   %1 = struct $nested_func_without_diffattr__Type__src_0_wrt_0 (%0 : $Float, %0 : $Float)
+// CHECK:   %2 = tuple (%1 : $nested_func_without_diffattr__Type__src_0_wrt_0, %0 : $Float)
+// CHECK:   return %2 : $(nested_func_without_diffattr__Type__src_0_wrt_0, Float)
 // CHECK: }
 
-// CHECK-LABEL: @func_to_diff__adjoint_src_0_wrt_0 : $@convention(thin) (Float, func_to_diff__Type, Float, Float) -> Float {
-// CHECK: bb0(%0 : $Float, %1 : $func_to_diff__Type, %2 : $Float, %3 : $Float):
+// CHECK-LABEL: @func_to_diff__adjoint_src_0_wrt_0 : $@convention(thin) (Float, func_to_diff__Type__src_0_wrt_0, Float, Float) -> Float {
+// CHECK: bb0(%0 : $Float, %1 : $func_to_diff__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
 // CHECK:   return %3 : $Float
 // CHECK: }
 
-// CHECK-LABEL: @nested_func_without_diffattr__adjoint_src_0_wrt_0 : $@convention(thin) (Float, nested_func_without_diffattr__Type, Float, Float) -> Float {
-// CHECK: bb0(%0 : $Float, %1 : $nested_func_without_diffattr__Type, %2 : $Float, %3 : $Float):
+// CHECK-LABEL: @nested_func_without_diffattr__adjoint_src_0_wrt_0 : $@convention(thin) (Float, nested_func_without_diffattr__Type__src_0_wrt_0, Float, Float) -> Float {
+// CHECK: bb0(%0 : $Float, %1 : $nested_func_without_diffattr__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
 // CHECK:   return %3 : $Float
 // CHECK: }
