@@ -1943,6 +1943,10 @@ void Remangler::mangleMethodDescriptor(Node *node) {
   Out << "<method-descriptor>";
 }
 
+void Remangler::mangleMethodLookupFunction(Node *node) {
+  Out << "<method-lookup-function>";
+}
+
 void Remangler::mangleEmptyList(Node *node) {
   Out << "<empty>";
 }

@@ -1892,6 +1892,11 @@ void Remangler::mangleMethodDescriptor(Node *node) {
   Buffer << "Tq";
 }
 
+void Remangler::mangleMethodLookupFunction(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mu";
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << 'K';
 }
