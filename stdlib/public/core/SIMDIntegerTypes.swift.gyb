@@ -1,0 +1,194 @@
+/*
+%{
+eltsizes = [8,16,32,64]
+counts = [2,3,4,8,16,32,64]
+}%
+
+%for bits in eltsizes:
+% for signed in [True, False]:
+%  Element = ('' if signed else 'U') + 'Int' + str(bits)
+public extension ${Element} {
+%  for N in counts:
+%   # In theory, LLVM should handle padding 3-element vectors out to 4-element
+%   # for us. And it does, but we end up triggering asserts for some operations,
+%   # so it seems simpler to just handle this padding at the Swift level.
+%   llvmN = N if N != 3 else 4
+%   if bits*llvmN <= 512:
+%    LLVM = 'Vec' + str(llvmN) + 'xInt' + str(bits)
+%    Self = 'Vector' + str(N)
+  @_fixed_layout
+  public struct Vector${N} : SIMDIntegerVector, SIMDVector${N} {
+
+    public var _value: Builtin.${LLVM}
+
+    @_transparent
+    public init( ) {
+      self._value = Builtin.zeroInitializer()
+    }
+
+    @_transparent
+    public init(_ _value: Builtin.${LLVM}) {
+      self._value = _value
+    }
+
+    public subscript(index: Int) -> ${Element} {
+      @_transparent
+      get {
+        _precondition(index >= 0 && index < ${N})
+        return ${Element}(Builtin.extractelement_${LLVM}_Int32(
+          _value, Int32(index)._value
+        ))
+      }
+      @_transparent
+      set {
+        _precondition(index >= 0 && index < ${N})
+        _value = Builtin.insertelement_${LLVM}_Int${bits}_Int32(
+          _value, newValue._value, Int32(index)._value
+        )
+      }
+    }
+
+    // MARK: Comparison operators
+    public typealias Predicate = SIMDPredicate${bits}x${N}
+
+%{
+sextI1 = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + LLVM
+cmps = [('==','eq'), ('!=','ne')]
+scmps = [('<','slt'), ('<=','sle'), ('>','sgt'), ('>=','sge')]
+ucmps = [('<','ult'), ('<=','ule'), ('>','ugt'), ('>=','uge')]
+}%
+%    for (op, inst) in cmps + (scmps if signed else ucmps):
+    @_transparent
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Predicate {
+      return Predicate(${sextI1}(Builtin.cmp_${inst}_${LLVM}(lhs._value, rhs._value)))
+    }
+
+%    end
+    // MARK: Bitwise operators
+%    for (op, inst) in [('&','and'), ('|','or'), ('^','xor')]:
+    @_transparent
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      return ${Self}(Builtin.${inst}_${LLVM}(lhs._value, rhs._value))
+    }
+
+%    end
+    @_transparent
+    public static func &>>(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      let masked = rhs & ${Self}(repeating: ${bits-1})
+%    if signed:
+      return ${Self}(Builtin.ashr_${LLVM}(lhs._value, masked._value))
+%    else:
+      return ${Self}(Builtin.lshr_${LLVM}(lhs._value, masked._value))
+%    end
+    }
+
+    @_transparent
+    public static func &<<(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      let masked = rhs & ${Self}(repeating: ${bits-1})
+      return ${Self}(Builtin.shl_${LLVM}(lhs._value, masked._value))
+    }
+
+    // MARK: Arithmetic operators
+%    for (op, inst) in [('&+','add'), ('&-','sub'), ('&*','mul')]:
+    @_transparent
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      return ${Self}(Builtin.${inst}_${LLVM}(lhs._value, rhs._value))
+    }
+
+%    end
+    @_transparent
+    public static func /(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+%    if signed:
+      return ${Self}(Builtin.sdiv_${LLVM}(lhs._value, rhs._value))
+%    else:
+      return ${Self}(Builtin.udiv_${LLVM}(lhs._value, rhs._value))
+%    end
+    }
+
+%    if N >= 4:
+    public typealias HalfVector = Vector${N/2}
+
+%    end
+
+    // MARK: Conversion from other integer vector types.
+%    Other = ('U' if signed else '') + 'Int' + str(bits) + '.Vector' + str(N)
+    /// A vector with the same bit pattern as `other`.
+    @_transparent
+    public init(bitPattern other: ${Other}) {
+      self.init(other._value)
+    }
+
+%    if bits in [32,64]:
+%     Other = {32:'Float', 64:'Double'}[bits] + '.Vector' + str(N)
+    /// A vector with the same bit pattern as `other`.
+    @_transparent
+    public init(bitPattern other: ${Other}) {
+      self.init(Builtin.bitcast_Vec${llvmN}xFPIEEE${bits}_${LLVM}(other._value))
+    }
+
+%    end
+
+    @_transparent
+    public init<Other>(truncatingIfNeeded other: Other)
+      where Other : SIMDVector${N} & SIMDIntegerVector {
+      self.init()
+      for i in 0..<${N} {
+        self[i] = Element(truncatingIfNeeded: other[i])
+      }
+    }
+
+    @_transparent
+    public init<Other>(clamping other: Other)
+      where Other : SIMDVector${N} & SIMDIntegerVector {
+      let lowerBound = Other.Element(clamping: Element.min)
+      let upperBound = Other.Element(clamping: Element.max)
+      self.init(truncatingIfNeeded: clamp(other,
+                                          min: Other(repeating: lowerBound),
+                                          max: Other(repeating: upperBound)))
+    }
+
+    // TODO: we shouldn't need any of the concrete conversions that follow;
+    // we should be able to vectorize the for-loop in the generic
+    // `truncatingIfNeeded` init to a single vector sext, zext, nop, or trunc
+    // (or possibly one per Swift-ABI legalized result vector). However, the
+    // optimizer can't yet do this for all cases, which we should fix, but
+    // as a short-term workaround we also have these concrete conversions.
+%    for otherBits in eltsizes:
+%     if otherBits*llvmN <= 512:
+%      for otherSigned in [True,False]:
+%       OtherElement = ('' if otherSigned else 'U') + 'Int' + str(otherBits)
+%       Other = OtherElement + '.Vector' + str(N)
+%       OtherLLVM = 'Vec' + str(llvmN) + 'xInt' + str(otherBits)
+    @_transparent
+    public init(truncatingIfNeeded other: ${Other}) {
+%       if otherBits > bits:
+      self.init(Builtin.trunc_${OtherLLVM}_${LLVM}(other._value))
+%       elif otherBits == bits:
+      self.init(other._value)
+%       elif otherSigned:
+      self.init(Builtin.sext_${OtherLLVM}_${LLVM}(other._value))
+%       else:
+      self.init(Builtin.zext_${OtherLLVM}_${LLVM}(other._value))
+%       end
+    }
+
+%      end
+%     end
+%    end
+
+    /// A vector where each lane is all `1`s if the corresponding lane of
+    /// `predicate` is `true`, and all `0`s otherwise.
+    @_transparent
+    public init(bitMaskFrom predicate: Predicate) {
+      self._value = predicate._value
+    }
+
+  }
+
+%   end
+%  end
+}
+
+% end
+%end
+*/

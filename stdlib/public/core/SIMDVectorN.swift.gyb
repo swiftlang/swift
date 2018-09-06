@@ -1,0 +1,105 @@
+/*
+%for N in [2,3,4,8,16,32,64]:
+public protocol SIMDVector${N} : SIMDVector {
+  init(${', '.join(['_ v' + str(n) + ': Element' for n in range(N)])})
+
+% if N >= 4:
+  associatedtype HalfVector: SIMDVector${N/2} where HalfVector.Element == Element
+
+  init(lowHalf: HalfVector, highHalf: HalfVector)
+
+  var lowHalf: HalfVector { get set }
+
+  var highHalf: HalfVector { get set }
+
+  var evenHalf: HalfVector { get set }
+
+  var oddHalf: HalfVector { get set }
+
+% end
+}
+
+public extension SIMDVector${N} {
+
+  @_transparent
+  public var endIndex: Int { return ${N} }
+
+  @_transparent
+  init(repeating x: Element) {
+    self.init(${', '.join('x'*N)})
+  }
+
+  @_transparent
+  init(${', '.join(['_ v' + str(n) + ': Element' for n in range(N)])}) {
+    self.init()
+% for n in range(N):
+    self[${n}] = v${n}
+% end
+  }
+
+  @_transparent
+  public init(arrayLiteral elements: Element...) {
+    self.init(elements)
+  }
+
+  @available(swift, deprecated: 4.2, message: "Use Vector4(fromArray: array).")
+  @_transparent
+  public init(_ array: [Element]) {
+    self.init(fromArray: array)
+  }
+
+  @_transparent
+  public init(fromArray array: [Element]) {
+    _precondition(array.count == 4)
+    self.init()
+    for i in indices { self[i] = array[i] }
+  }
+
+% if N <= 4:
+  @_transparent
+  init(${', '.join([c + ': Element' for c in 'xyzw'[:N]])}) {
+    self.init(${', '.join('xyzw'[:N])})
+  }
+
+%  for n in range(N):
+  @_transparent
+  var ${'xyzw'[n]}: Element {
+    @_transparent get { return self[${n}]}
+    @_transparent set { self[${n}] = newValue }
+  }
+
+%  end
+% end
+% if N >= 4:
+  @_transparent
+  init(lowHalf: HalfVector, highHalf: HalfVector) {
+    self.init()
+    self.lowHalf = lowHalf
+    self.highHalf = highHalf
+  }
+
+  // Implementing these via for-loop looks inefficient, but the optimizer
+  // is generally pretty good at recognizing the idiom and mapping this to
+  // a single shuffle-vector operation. For any outstanding cases we find,
+  // we can either work on the optimizer, or add a header-inline C shim
+  // that just wraps the shufflevector operation that we want to generate.
+%  for (half,indx) in [('low','i'), ('high',str(N/2)+'+i'), ('even','2*i'), ('odd','2*i+1')]:
+  public var ${half}Half: HalfVector {
+
+    @_transparent
+    get {
+      var result = HalfVector()
+      for i in 0 ..< ${N/2} { result[i] = self[${indx}] }
+      return result
+    }
+
+    @_transparent
+    set {
+      for i in 0 ..< ${N/2} { self[${indx}] = newValue[i] }
+    }
+  }
+%  end
+% end
+}
+%end
+*/
