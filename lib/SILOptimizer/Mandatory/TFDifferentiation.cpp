@@ -1094,7 +1094,7 @@ public:
   /// Finds a differentiation task on a function such that the task produces
   /// adjoints for the specified indices.
   DifferentiationTask *
-  lookupDifferentiationTask(SILFunction *original,
+  lookUpDifferentiationTask(SILFunction *original,
                             const SILReverseAutoDiffIndices &indices) {
     auto *attr = lookupReverseDifferentiableAttr(original, indices);
     if (!attr)
@@ -1133,6 +1133,8 @@ public:
   registerDifferentiationTask(SILFunction *original,
                               const SILReverseAutoDiffIndices &indices,
                               DifferentiationInvoker invoker) {
+    // Make sure this pair of original and indices is unique.
+    assert(!lookUpDifferentiationTask(original, indices));
     // Make sure this function either has a body or has a
     // `[reverse_differentiable]` attribute that is a superset of all the
     if (original->isExternalDeclaration()) {
@@ -1154,7 +1156,7 @@ public:
   lookUpOrRegisterDifferentiationTask(SILFunction *original,
                                       const SILReverseAutoDiffIndices &indices,
                                       DifferentiationInvoker invoker) {
-    if (auto *existingTask = lookupDifferentiationTask(original, indices))
+    if (auto *existingTask = lookUpDifferentiationTask(original, indices))
       return existingTask;
     return registerDifferentiationTask(original, indices, invoker);
   }
@@ -2871,10 +2873,11 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
   SmallVector<SILParameterInfo, 8> adjParams;
   SmallVector<SILResultInfo, 8> adjResults;
   auto origTy = original->getLoweredFunctionType();
-  for (auto &param : origTy->getParameters()) {
+  auto origParams = origTy->getParameters();
+  for (auto &param : origParams)
     adjParams.push_back(param);
-    adjResults.push_back(getFormalResultInfo(param.getType(), module));
-  }
+  for (auto i : task->getIndices().parameters.set_bits())
+    adjResults.push_back(getFormalResultInfo(origParams[i].getType(), module));
   // If there's a generated primal, accept a primal value struct in the adjoint
   // parameter list.
   if (auto *pi = task->getPrimalInfo()) {
@@ -3057,18 +3060,18 @@ public:
       s << "Zero";
       break;
     case Kind::Aggregate:
-      s << "Aggregate";
+      s << "Aggregate<";
       if (auto *decl = dyn_cast_or_null<StructDecl>(
               type.getASTType()->getAnyNominal())) {
-        s << "<Struct>(";
+        s << "Struct>(";
         interleave(llvm::zip(decl->getStoredProperties(),
                              getAggregateElements()),
                    [&s](std::tuple<VarDecl *, AdjointValue> elt) {
-                     s << std::get<0>(elt) << ": ";
+                     s << std::get<0>(elt)->getName() << ": ";
                      std::get<1>(elt).print(s);
                    }, [&s] { s << ", "; });
       } else if (auto tupleType = type.getAs<TupleType>()) {
-        s << "<Tuple>(";
+        s << "Tuple>(";
         interleave(getAggregateElements(),
                    [&s](AdjointValue elt) { elt.print(s); },
                    [&s] { s << ", "; });
@@ -3267,6 +3270,7 @@ public:
     auto &original = getOriginal();
     auto &adjoint = getAdjoint();
     auto adjLoc = getAdjoint().getLocation();
+    auto *task = getDifferentiationTask();
     LLVM_DEBUG(getADDebugStream() << "Running AdjointGen on\n" << original);
     auto origTy = original.getLoweredFunctionType();
     // Create entry BB and arguments.
@@ -3308,7 +3312,7 @@ public:
     //     else zeros
     SmallVector<SILValue, 8> formalResults;
     collectAllFormalResultsInTypeOrder(original, formalResults);
-    auto srcIdx = getDifferentiationTask()->getIndices().source;
+    auto srcIdx = task->getIndices().source;
     addAdjointValue(formalResults[srcIdx], AdjointValue::getMaterialized(seed));
     LLVM_DEBUG(getADDebugStream()
                << "Assigned seed " << *seed << " as the adjoint of "
@@ -3331,10 +3335,10 @@ public:
     getBuilder().setInsertionPoint(adjointEntry);
 
     SmallVector<SILValue, 8> retElts;
-    for (auto paramPair : zip(original.getArgumentsWithoutIndirectResults(),
-                              originalParametersInAdj)) {
-      auto origParam = std::get<0>(paramPair);
-      auto adjParam = std::get<1>(paramPair);
+    auto origParamArgs = original.getArgumentsWithoutIndirectResults();
+    for (auto i : task->getIndices().parameters.set_bits()) {
+      auto origParam = origParamArgs[i];
+      auto adjParam = originalParametersInAdj[i];
       auto adjVal = getAdjointValue(origParam);
       if (adjParam->getType().isObject())
         retElts.push_back(materializeAdjointDirect(adjVal, adjLoc));
@@ -4187,9 +4191,11 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
     context.insertGradient({original, masterConfig}, canonicalGrad);
     // Enqueue a new differentiation task in the global context.
     if (auto *diffOp = findDifferentialOperator(gradInst))
-      context.registerDifferentiationTask(original, config.indices, diffOp);
+      context.lookUpOrRegisterDifferentiationTask(
+          original, config.indices, diffOp);
     else
-      context.registerDifferentiationTask(original, config.indices, gradInst);
+      context.lookUpOrRegisterDifferentiationTask(
+          original, config.indices, gradInst);
   }
 
   // If the requested gradient is not *both seedable and result-preserving*,
