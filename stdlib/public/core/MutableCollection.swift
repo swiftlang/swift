@@ -61,13 +61,13 @@ public protocol MutableCollection: Collection
 where SubSequence: MutableCollection
 {
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
+  override associatedtype Element
 
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype Index
+  override associatedtype Index
 
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
+  override associatedtype SubSequence
 
   /// Accesses the element at the specified position.
   ///
@@ -89,7 +89,7 @@ where SubSequence: MutableCollection
   ///   `endIndex` property.
   ///
   /// - Complexity: O(1)
-  subscript(position: Index) -> Element { get set }
+  override subscript(position: Index) -> Element { get set }
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///
@@ -115,7 +115,7 @@ where SubSequence: MutableCollection
   ///   the range must be valid indices of the collection.
   ///
   /// - Complexity: O(1)
-  subscript(bounds: Range<Index>) -> SubSequence { get set }
+  override subscript(bounds: Range<Index>) -> SubSequence { get set }
 
   /// Reorders the elements of the collection such that all the elements
   /// that match the given predicate are after all the elements that don't

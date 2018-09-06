@@ -3265,7 +3265,8 @@ public:
           attr->setInvalid();
         } else if (attr->isImplicit()) {
           // Don't diagnose implicit attributes.
-        } else if (!overrideRequiresKeyword(CD->getOverriddenDecl())) {
+        } else if (overrideRequiresKeyword(CD->getOverriddenDecl())
+                     == OverrideRequiresKeyword::Never) {
           // Special case: we are overriding a 'required' initializer, so we
           // need (only) the 'required' keyword.
           if (cast<ConstructorDecl>(CD->getOverriddenDecl())->isRequired()) {

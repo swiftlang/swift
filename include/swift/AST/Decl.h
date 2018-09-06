@@ -6579,7 +6579,8 @@ inline bool Decl::isPotentiallyOverridable() const {
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
-    return getDeclContext()->getSelfClassDecl();
+    return getDeclContext()->getSelfClassDecl() ||
+           isa<ProtocolDecl>(getDeclContext());
   } else {
     return false;
   }

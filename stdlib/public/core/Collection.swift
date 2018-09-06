@@ -339,7 +339,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   typealias IndexDistance = Int  
 
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
+  override associatedtype Element
 
   /// A type that represents a position in the collection.
   ///
@@ -382,7 +382,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   // a custom `makeIterator()` function.  Otherwise we get an
   // `IndexingIterator`. <rdar://problem/21539115>
   /// Returns an iterator over the elements of the collection.
-  func makeIterator() -> Iterator
+  override func makeIterator() -> Iterator
 
   /// A sequence that represents a contiguous subrange of the collection's
   /// elements.

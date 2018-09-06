@@ -321,6 +321,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.WarnImplicitOverrides =
+    Args.hasArg(OPT_warn_implicit_overrides);
+
   Opts.EnableNSKeyedArchiverDiagnostics =
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
                    OPT_disable_nskeyedarchiver_diagnostics,
