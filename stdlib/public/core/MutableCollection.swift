@@ -60,13 +60,9 @@
 public protocol MutableCollection: Collection
 where SubSequence: MutableCollection
 {
-  // FIXME(ABI): Associated type inference requires this.
+  // FIXME: Associated type inference requires these.
   override associatedtype Element
-
-  // FIXME(ABI): Associated type inference requires this.
   override associatedtype Index
-
-  // FIXME(ABI): Associated type inference requires this.
   override associatedtype SubSequence
 
   /// Accesses the element at the specified position.
