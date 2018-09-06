@@ -400,8 +400,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isThunk(), (unsigned)F.isGlobalInit(),
       (unsigned)F.getInlineStrategy(), (unsigned)F.getOptimizationMode(),
       (unsigned)F.getEffectsKind(),
-      (unsigned)numSpecAttrs,
       // SWIFT_ENABLE_TENSORFLOW
+      (unsigned)numSpecAttrs,
       (unsigned)F.getReverseDifferentiableAttrs().size(),
       (unsigned)F.hasQualifiedOwnership(),
       F.isWeakLinked(), FnID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
