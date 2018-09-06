@@ -36,6 +36,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Token.h"
+#include "swift/Strings.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1032,6 +1033,10 @@ bool ModuleDecl::isStdlibModule() const {
 
 bool ModuleDecl::isSwiftShimsModule() const {
   return !getParent() && getName() == getASTContext().SwiftShimsModuleName;
+}
+
+bool ModuleDecl::isOnoneSupportModule() const {
+  return !getParent() && getName().str() == SWIFT_ONONE_SUPPORT;
 }
 
 bool ModuleDecl::isBuiltinModule() const {

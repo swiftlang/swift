@@ -460,6 +460,9 @@ public:
   /// \returns true if this module is the "builtin" module.
   bool isBuiltinModule() const;
 
+  /// \returns true if this module is the "SwiftOnoneSupport" module;
+  bool isOnoneSupportModule() const;
+
   /// \returns true if this module is a system module; note that the StdLib is
   /// considered a system module.
   bool isSystemModule() const;

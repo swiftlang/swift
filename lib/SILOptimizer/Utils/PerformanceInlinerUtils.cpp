@@ -10,9 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Module.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
-#include "swift/Strings.h"
+#include "swift/AST/Module.h"
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -666,8 +665,9 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   if (!SILInliner::canInline(AI))
     return nullptr;
 
-  auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();
-  bool IsInStdlib = (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT);
+  ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();
+  bool IsInStdlib = (SwiftModule->isStdlibModule() ||
+                     SwiftModule->isOnoneSupportModule());
 
   // Don't inline functions that are marked with the @_semantics or @_effects
   // attribute if the inliner is asked not to inline them.
