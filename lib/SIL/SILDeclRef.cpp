@@ -451,6 +451,14 @@ IsSerialized_t SILDeclRef::isSerialized() const {
       }
     }
 
+    // 'read' and 'modify' accessors synthesized on-demand are serialized if
+    // visible outside the module.
+    if (auto fn = dyn_cast<FuncDecl>(d))
+      if (!isClangImported() &&
+          fn->hasForcedStaticDispatch() &&
+          fn->getEffectiveAccess() >= AccessLevel::Public)
+        return IsSerialized;
+
     dc = getDecl()->getInnermostDeclContext();
 
     // Enum element constructors are serialized if the enum is
