@@ -787,6 +787,8 @@ struct TargetMethodDescriptor {
   // TODO: add method types or anything else needed for reflection.
 };
 
+using MethodDescriptor = TargetMethodDescriptor<InProcess>;
+
 /// Header for a class vtable descriptor. This is a variable-sized
 /// structure that describes how to find and parse a vtable
 /// within the type metadata for a class.

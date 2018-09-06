@@ -2453,6 +2453,40 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 #endif
 }
 
+#ifndef NDEBUG
+static bool isAncestorOf(const ClassMetadata *metadata,
+                         ClassDescriptor *description) {
+  auto ancestor = metadata;
+  while (ancestor && ancestor->isTypeMetadata()) {
+    if (ancestor->getDescription() == description)
+      return true;
+    ancestor = ancestor->Superclass;
+  }
+  return false;
+}
+#endif
+
+void *
+swift::swift_lookUpClassMethod(ClassMetadata *metadata,
+                               MethodDescriptor *method,
+                               ClassDescriptor *description) {
+  assert(metadata->isTypeMetadata());
+
+  assert(isAncestorOf(metadata, description));
+
+  auto *vtable = description->getVTableDescriptor();
+  assert(vtable != nullptr);
+
+  auto methods = description->getMethodDescriptors();
+  unsigned index = method - methods.data();
+  assert(index < methods.size());
+
+  auto vtableOffset = vtable->getVTableOffset(description) + index;
+  auto *words = reinterpret_cast<void **>(metadata);
+
+  return *(words + vtableOffset);
+}
+
 /***************************************************************************/
 /*** Metatypes *************************************************************/
 /***************************************************************************/
