@@ -1392,22 +1392,42 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
   return false;
 }
 
+static bool isDirectToStorageAccess(const AccessorDecl *accessor,
+                                    const VarDecl *var, bool isAccessOnSelf) {
+  // All accesses have ordinary semantics except those to variables
+  // with storage from within their own accessors.
+  if (accessor->getStorage() != var)
+    return false;
+
+  if (!var->hasStorage())
+    return false;
+
+  // In Swift 5 and later, the access must also be a member access on 'self'.
+  if (!isAccessOnSelf &&
+      var->getDeclContext()->isTypeContext() &&
+      var->getASTContext().isSwiftVersionAtLeast(5))
+    return false;
+
+  // As a special case, 'read' and 'modify' coroutines with forced static
+  // dispatch must use ordinary semantics, so that the 'modify' coroutine for a
+  // 'dynamic' property uses Objective-C message sends and not direct access to
+  // storage.
+  if (accessor->hasForcedStaticDispatch())
+    return false;
+
+  return true;
+}
+
 /// Determines the access semantics to use in a DeclRefExpr or
 /// MemberRefExpr use of this value in the specified context.
 AccessSemantics
 ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC,
                                          bool isAccessOnSelf) const {
-  // All accesses have ordinary semantics except those to variables
-  // with storage from within their own accessors.  In Swift 5 and later,
-  // the access must also be a member access on 'self'.
-
   // The condition most likely to fast-path us is not being in an accessor,
   // so we check that first.
   if (auto *accessor = dyn_cast<AccessorDecl>(UseDC)) {
     if (auto *var = dyn_cast<VarDecl>(this)) {
-      if (accessor->getStorage() == var && var->hasStorage() &&
-          (isAccessOnSelf || !var->getDeclContext()->isTypeContext() ||
-           !var->getASTContext().isSwiftVersionAtLeast(5)))
+      if (isDirectToStorageAccess(accessor, var, isAccessOnSelf))
         return AccessSemantics::DirectToStorage;
     }
   }
