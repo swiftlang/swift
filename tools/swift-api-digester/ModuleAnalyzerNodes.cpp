@@ -1068,9 +1068,6 @@ static bool shouldIgnore(Decl *D, const Decl* Parent) {
       return true;
     if (VD->getBaseName().empty())
       return true;
-    // This shouldn't happen, being forgiving here.
-    if (!VD->hasAccess())
-      return true;
     switch (VD->getFormalAccess()) {
     case AccessLevel::Internal:
     case AccessLevel::Private:

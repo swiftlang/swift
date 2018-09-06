@@ -4691,7 +4691,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
-            key.accessibility: source.lang.swift.accessibility.internal,
+            key.accessibility: source.lang.swift.accessibility.public,
             key.name: "orderedAscending",
             key.offset: 1036,
             key.length: 16,
@@ -4709,7 +4709,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
-            key.accessibility: source.lang.swift.accessibility.internal,
+            key.accessibility: source.lang.swift.accessibility.public,
             key.name: "orderedSame",
             key.offset: 1063,
             key.length: 11,
@@ -4727,7 +4727,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
-            key.accessibility: source.lang.swift.accessibility.internal,
+            key.accessibility: source.lang.swift.accessibility.public,
             key.name: "orderedDescending",
             key.offset: 1110,
             key.length: 17,
@@ -6491,6 +6491,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   },
   {
     key.kind: source.lang.swift.decl.extension,
+    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "FooClassBase",
     key.offset: 5574,
     key.length: 66,
@@ -6520,6 +6521,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   },
   {
     key.kind: source.lang.swift.decl.extension,
+    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "FooClassBase",
     key.offset: 5687,
     key.length: 107,
@@ -6566,6 +6568,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   },
   {
     key.kind: source.lang.swift.decl.extension,
+    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "FooClassBase",
     key.offset: 5796,
     key.length: 66,
@@ -7008,7 +7011,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
-            key.accessibility: source.lang.swift.accessibility.internal,
+            key.accessibility: source.lang.swift.accessibility.public,
             key.name: "notDetermined",
             key.offset: 6775,
             key.length: 13,
@@ -7026,7 +7029,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
-            key.accessibility: source.lang.swift.accessibility.internal,
+            key.accessibility: source.lang.swift.accessibility.public,
             key.name: "restricted",
             key.offset: 6853,
             key.length: 10,
