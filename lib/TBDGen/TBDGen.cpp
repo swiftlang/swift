@@ -301,17 +301,28 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
     TBDGenVisitor &TBD;
     ClassDecl *CD;
+    bool FirstTime = true;
 
   public:
     VTableVisitor(TBDGenVisitor &TBD, ClassDecl *CD)
         : TBD(TBD), CD(CD) {}
 
     void addMethod(SILDeclRef method) {
-      if (method.getDecl()->getDeclContext() == CD) {
-        if (CD->isResilient())
-          TBD.addDispatchThunk(method);
-        TBD.addMethodDescriptor(method);
+      assert(method.getDecl()->getDeclContext() == CD);
+
+      if (CD->isResilient()) {
+        if (FirstTime) {
+          FirstTime = false;
+
+          // If the class is itself resilient and has at least one vtable entry,
+          // it has a method lookup function.
+          TBD.addSymbol(LinkEntity::forMethodLookupFunction(CD));
+        }
+
+        TBD.addDispatchThunk(method);
       }
+
+      TBD.addMethodDescriptor(method);
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
