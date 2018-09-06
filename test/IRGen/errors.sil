@@ -28,6 +28,7 @@ sil @does_throw : $@convention(thin) () -> @error Error {
 
   // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1,
   // CHECK-NEXT: call swiftcc void @swift_willThrow
+  // CHECK-NEXT: store %swift.error* null, %swift.error** %1,
   // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1,
   // CHECK-NEXT: ret void
   builtin "willThrow"(%1 : $Error) : $()
