@@ -720,6 +720,14 @@ bool SILDeclRef::requiresNewVTableEntry() const {
   return false;
 }
 
+bool SILDeclRef::requiresNewWitnessTableEntry() const {
+  return requiresNewWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
+}
+
+bool SILDeclRef::requiresNewWitnessTableEntry(AbstractFunctionDecl *func) {
+  return func->getOverriddenDecls().empty();
+}
+
 SILDeclRef SILDeclRef::getOverridden() const {
   if (!hasDecl())
     return SILDeclRef();
@@ -763,6 +771,43 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     return overridden;
   }
   return SILDeclRef();
+}
+
+SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
+  ValueDecl *bestOverridden = nullptr;
+
+  SmallVector<ValueDecl *, 4> stack;
+  SmallPtrSet<ValueDecl *, 4> visited;
+  stack.push_back(getDecl());
+  visited.insert(getDecl());
+
+  while (!stack.empty()) {
+    auto current = stack.back();
+    stack.pop_back();
+
+    auto overriddenDecls = current->getOverriddenDecls();
+    if (overriddenDecls.empty()) {
+      // This entry introduced a witness table entry. Determine whether it is
+      // better than the best entry we've seen thus far.
+      if (!bestOverridden ||
+          ProtocolDecl::compare(
+                        cast<ProtocolDecl>(current->getDeclContext()),
+                        cast<ProtocolDecl>(bestOverridden->getDeclContext()))
+            < 0) {
+        bestOverridden = current;
+      }
+
+      continue;
+    }
+
+    // Add overridden declarations to the stack.
+    for (auto overridden : overriddenDecls) {
+      if (visited.insert(overridden).second)
+        stack.push_back(overridden);
+    }
+  }
+
+  return SILDeclRef(bestOverridden, kind, isCurried);
 }
 
 SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {

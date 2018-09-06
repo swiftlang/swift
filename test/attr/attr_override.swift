@@ -155,7 +155,7 @@ enum E {
 }
 
 protocol P {
-  override func f() // expected-error{{'override' can only be specified on class members}} {{3-12=}}
+  override func f() // FIXME wording: expected-error{{method does not override any method from its superclass}}
 }
 
 override func f() { } // expected-error{{'override' can only be specified on class members}} {{1-10=}}

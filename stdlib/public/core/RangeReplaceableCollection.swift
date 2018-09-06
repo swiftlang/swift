@@ -64,7 +64,7 @@
 public protocol RangeReplaceableCollection : Collection
   where SubSequence : RangeReplaceableCollection {
   // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
+  override associatedtype SubSequence
 
   //===--- Fundamental Requirements ---------------------------------------===//
 
@@ -363,10 +363,10 @@ public protocol RangeReplaceableCollection : Collection
     where shouldBeRemoved: (Element) throws -> Bool) rethrows
 
   // FIXME(ABI): Associated type inference requires this.
-  subscript(bounds: Index) -> Element { get }
+  override subscript(bounds: Index) -> Element { get }
 
   // FIXME(ABI): Associated type inference requires this.
-  subscript(bounds: Range<Index>) -> SubSequence { get }
+  override subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 
 //===----------------------------------------------------------------------===//
