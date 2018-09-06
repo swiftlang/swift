@@ -3125,6 +3125,13 @@ public:
     assert(insertion.second && "The original value was mapped before");
   }
 
+  SILValue lookUpValue(SILValue valueInOriginal) {
+    auto lookup = ValueMap.find(valueInOriginal);
+    if (lookup == ValueMap.end())
+      return nullptr;
+    return lookup->getSecond();
+  }
+
   void setInsertionPointBeforeAnyTerminator(SILBasicBlock *bb) {
     if (!bb->empty())
       if (auto *ti = dyn_cast<TermInst>(&bb->back()))
@@ -3411,6 +3418,11 @@ public:
   // original results. When `nested` is true, `value` must be an `apply`
   // instruction.
   SILValue extractPrimalValueIfAny(SILValue value, bool nested = false) {
+    // If the non-nested primal value has been extracted before, use that.
+    if (!nested)
+      if (auto val = rematCloner.lookUpValue(value))
+        return val;
+    // Do primal value extraction.
     auto &pi = getPrimalInfo();
     VarDecl *field = nullptr;
     SILValue extracted;
@@ -3440,10 +3452,9 @@ public:
             loc, primalValueAggregateInAdj, field);
       // Otherwise, the primal value struct is a normal SSA value. Emit a
       // `struct_extract`.
-      else {
+      else
         extracted = getBuilder().createStructExtract(
             remapLocation(value.getLoc()), primalValueAggregateInAdj, field);
-      }
     }
     // Memorize this value mapping in the remat cloner, when we are not
     // extracting a nested primal value aggregate.
