@@ -535,40 +535,6 @@ static Expr *buildSelfReference(VarDecl *selfDecl,
 }
 
 namespace {
-  /// A simple helper interface for buildStorageReference.
-  class StorageReferenceContext {
-    StorageReferenceContext(const StorageReferenceContext &) = delete;
-  public:
-    StorageReferenceContext() = default;
-    virtual ~StorageReferenceContext() = default;
-
-    /// Returns the declaration of the entity to use as the base of
-    /// the access, or nil if no base is required.
-    virtual VarDecl *getSelfDecl() const = 0;
-
-    /// Returns an expression producing the index value, assuming that
-    /// the storage is a subscript declaration.
-    virtual Expr *getIndexRefExpr(ASTContext &ctx,
-                                  SubscriptDecl *subscript) const = 0;
-  };
-
-  /// A reference to storage from within an accessor.
-  class AccessorStorageReferenceContext : public StorageReferenceContext {
-    AccessorDecl *Accessor;
-  public:
-    AccessorStorageReferenceContext(AccessorDecl *accessor)
-      : Accessor(accessor) {}
-    ~AccessorStorageReferenceContext() override = default;
-
-    VarDecl *getSelfDecl() const override {
-      return Accessor->getImplicitSelfDecl();
-    }
-    Expr *getIndexRefExpr(ASTContext &ctx,
-                          SubscriptDecl *subscript) const override {
-      return buildSubscriptIndexReference(ctx, Accessor);
-    }
-  };
-
   enum class TargetImpl {
     /// We're doing an ordinary storage reference.
     Ordinary,
@@ -583,8 +549,7 @@ namespace {
 } // end anonymous namespace
 
 /// Build an l-value for the storage of a declaration.
-static Expr *buildStorageReference(
-                             const StorageReferenceContext &referenceContext,
+static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,
                                    TypeChecker &TC) {
@@ -625,7 +590,7 @@ static Expr *buildStorageReference(
     break;
   }
 
-  VarDecl *selfDecl = referenceContext.getSelfDecl();
+  VarDecl *selfDecl = accessor->getImplicitSelfDecl();
   if (!selfDecl) {
     assert(target != TargetImpl::Super);
     return new (ctx) DeclRefExpr(storage, DeclNameLoc(), IsImplicit, semantics);
@@ -635,21 +600,13 @@ static Expr *buildStorageReference(
     buildSelfReference(selfDecl, selfAccessKind, TC);
 
   if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
-    Expr *indices = referenceContext.getIndexRefExpr(ctx, subscript);
+    Expr *indices = buildSubscriptIndexReference(ctx, accessor);
     return SubscriptExpr::create(ctx, selfDRE, indices, storage,
                                  IsImplicit, semantics);
   }
 
   return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
                                  DeclNameLoc(), IsImplicit, semantics);
-}
-
-static Expr *buildStorageReference(AccessorDecl *accessor,
-                                   AbstractStorageDecl *storage,
-                                   TargetImpl target,
-                                   TypeChecker &TC) {
-  return buildStorageReference(AccessorStorageReferenceContext(accessor),
-                               storage, target, TC);
 }
 
 /// Load the value of VD.  If VD is an @override of another value, we call the
