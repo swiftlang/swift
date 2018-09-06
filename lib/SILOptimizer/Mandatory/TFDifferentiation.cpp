@@ -2194,11 +2194,21 @@ ADContext::createPrimalValueStructForFunction(SILFunction *function) {
   return pvStruct;
 }
 
+static bool isDifferentiationParameter(SILValue value,
+                                       llvm::SmallBitVector indices) {
+  auto *function = value->getFunction();
+  auto paramArgs = function->getArgumentsWithoutIndirectResults();
+  for (unsigned i : indices.set_bits())
+    if (paramArgs[i] == value)
+      return true;
+  return false;
+}
+
 /// For a nested function call whose result tuple is active on the
 /// differentiation path, compute the set of minimal indices for differentiating
 /// this function as required by the data flow.
 static void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, SILReverseAutoDiffIndices parentIndices,
+    ApplyInst *ai, const SILReverseAutoDiffIndices &parentIndices,
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices) {
@@ -2208,13 +2218,12 @@ static void collectMinimalIndicesForFunctionCall(
   SILFunctionConventions convs(fnTy, ai->getModule());
   auto arguments = ai->getArgumentOperands();
   // Parameter indices are indices (in the type signature) of parameter
-  // arguments that are useful.
+  // arguments that are varied or are arguments.
   unsigned currentParamIdx = 0;
-  for (auto arg : ai->getArgumentsWithoutIndirectResults()) {
-    if (activityInfo.isUseful(arg, parentIndices.source))
-      paramIndices.push_back(currentParamIdx);
-    ++currentParamIdx;
-  }
+  for (auto arg : ai->getArgumentsWithoutIndirectResults())
+    if (activityInfo.isVaried(arg, parentIndices.parameters) ||
+        isDifferentiationParameter(arg, parentIndices.parameters))
+      paramIndices.push_back(currentParamIdx++);
   // Result indices are indices (in the type signature) of results that are
   // useful.
   //
