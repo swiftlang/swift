@@ -138,6 +138,10 @@ ERROR(lex_invalid_u_escape,none,
       "\\u{...} escape sequence expects between 1 and 8 hex digits", ())
 ERROR(lex_invalid_u_escape_rbrace,none,
       "expected '}' in \\u{...} escape sequence", ())
+ERROR(lex_invalid_escape_delimiter,none,
+      "too many '#' characters in delimited escape", ())
+ERROR(lex_invalid_closing_delimiter,none,
+      "too many '#' characters in closing delimiter", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
       "invalid unicode scalar", ())
