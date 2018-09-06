@@ -1065,9 +1065,6 @@ private:
       os << ", readonly";
 
     // Print the ownership semantics, if relevant.
-    // We treat "unowned" as "assign" (even though it's more like
-    // "safe_unretained") because we want people to think twice about
-    // allowing that object to disappear.
     Type ty = VD->getInterfaceType();
     if (auto weakTy = ty->getAs<WeakStorageType>()) {
       auto innerTy = weakTy->getReferentType()->getOptionalObjectType();
@@ -1077,9 +1074,11 @@ private:
           (innerTy->isObjCExistentialType() && !isCFTypeRef(innerTy))) {
         os << ", weak";
       }
-    } else if (ty->is<UnownedStorageType>()) {
-      os << ", assign";
-    } else if (ty->is<UnmanagedStorageType>()) {
+    } else if (ty->is<UnownedStorageType>()|| ty->is<UnmanagedStorageType>()) {
+      // We treat "unowned" as "unsafe_unretained" (even though it's more like
+      // "safe_unretained") because we want people to think twice about
+      // allowing that object to disappear. "unowned(unsafe)" (and Unmanaged,
+      // handled below) really are "unsafe_unretained".
       os << ", unsafe_unretained";
     } else {
       Type copyTy = ty;

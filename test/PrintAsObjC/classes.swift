@@ -503,7 +503,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, strong) Properties * _Nonnull sharedRO;)
 // CHECK-NEXT: + (Properties * _Nonnull)sharedRO SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: @property (nonatomic, weak) Properties * _Nullable weakOther;
-// CHECK-NEXT: @property (nonatomic, assign) Properties * _Nonnull unownedOther;
+// CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * _Nonnull unownedOther;
 // CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * _Nonnull unmanagedOther;
 // CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * _Nullable unmanagedByDecl;
 // CHECK-NEXT: @property (nonatomic, weak) id <MyProtocol> _Nullable weakProto;
