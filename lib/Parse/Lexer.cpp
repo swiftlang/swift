@@ -1206,12 +1206,13 @@ static bool maybeConsumeNewlineEscape(const char *&CurPtr, ssize_t Offset) {
   }
 }
 
-/// diagnoseZeroWidthMatchAndAdvance - Error zerowidth characters in delimiters.
-/// A non visible character in the middle of a delimter can be used to extend
+/// diagnoseZeroWidthMatchAndAdvance - Error invisible characters in delimiters.
+/// An invisible character in the middle of a delimiter can be used to extend
 /// the literal beyond what it would appear creating potential security bugs.
 static bool diagnoseZeroWidthMatchAndAdvance(char Target, const char *&CurPtr,
                                              DiagnosticEngine *Diags) {
-  // Detect, diagnose and skip over zero-width characters here if required.
+  // TODO: Detect, diagnose and skip over zero-width characters if required.
+  // See https://github.com/apple/swift/pull/17668 for possible implementation.
   return *CurPtr == Target && CurPtr++;
 }
 
@@ -1244,10 +1245,10 @@ static unsigned advanceIfCustomDelimiter(const char *&CurPtr,
   return 0;
 }
 
-/// delimiterMatches - Does custom delimiter (# characters surrounding quotes)
-/// match the number of # characters after \ inside the string? This allows
+/// delimiterMatches - Does custom delimiter ('#' characters surrounding quotes)
+/// match the number of '#' characters after '\' inside the string? This allows
 /// interpolation inside a "raw" string. Normal/cooked string processing is
-/// the degenerate case of there being no # characters surrounding the quotes.
+/// the degenerate case of there being no '#' characters surrounding the quotes.
 /// If delimiter matches, advances byte pointer passed in and returns true.
 /// Also used to detect the final delimiter of a string when IsClosing == true.
 static bool delimiterMatches(unsigned CustomDelimiterLen, const char *&BytesPtr,
@@ -2106,7 +2107,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
   if (IndentToStrip == ~0u && CustomDelimiterLen == ~0u) {
     IndentToStrip = CustomDelimiterLen = 0;
 
-    // restore trailing indent removal for multiline
+    // Restore trailing indent removal for multiline.
     const char *Backtrack = BytesPtr - 1;
     if (Backtrack[-1] == '"' && Backtrack[-2] == '"') {
       Backtrack -= 2;
@@ -2115,7 +2116,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
         IndentToStrip++;
     }
 
-    // restore delimiter if any
+    // Restore delimiter if any.
     while (*--Backtrack == '#')
       CustomDelimiterLen++;
   }
