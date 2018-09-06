@@ -2991,6 +2991,25 @@ public:
     void verifyChecked(FuncDecl *FD) {
       PrettyStackTraceDecl debugStack("verifying FuncDecl", FD);
 
+      // Note that there's nothing inherently wrong with wanting to use this on
+      // non-accessors in the future, but you should visit all call sites and
+      // make sure we do the right thing, because this flag conflates several
+      // different behaviors.
+      if (FD->hasForcedStaticDispatch()) {
+        auto *AD = dyn_cast<AccessorDecl>(FD);
+        if (AD == nullptr) {
+          Out << "hasForcedStaticDispatch() set on non-accessor\n";
+          abort();
+        }
+
+        if (AD->getAccessorKind() != AccessorKind::Read &&
+            AD->getAccessorKind() != AccessorKind::Modify) {
+          Out << "hasForcedStaticDispatch() set on accessor other than "
+                 "read or modify\n";
+          abort();
+        }
+      }
+
       if (FD->isMutating()) {
         if (!FD->isInstanceMember()) {
           Out << "mutating function is not an instance member\n";
