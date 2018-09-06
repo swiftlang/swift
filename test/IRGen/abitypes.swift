@@ -446,17 +446,17 @@ class Foo {
     return g.invert(b)
   }
 
-  // x86_64-macosx: define hidden swiftcc void @"$S8abitypes3FooC10throwsTestyySbKF"(i1, %T8abitypes3FooC* swiftself, %swift.error** swifterror) {{.*}} {
+  // x86_64-macosx: define hidden swiftcc void @"$S8abitypes3FooC10throwsTestyySbKF"(i1, %T8abitypes3FooC* swiftself, %swift.error** noalias nocapture swifterror dereferenceable(8)) {{.*}} {
   // x86_64-macosx: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negateThrowing:error:)", align 8
   // x86_64-macosx: call signext i8 bitcast (void ()* @objc_msgSend to i8 (%1*, i8*, i8, %2**)*)(%1* {{%[0-9]+}}, i8* [[SEL]], i8 signext {{%[0-9]+}}, %2** {{%[0-9]+}})
   // x86_64-macosx: }
 
-  // x86_64-ios: define hidden swiftcc void @"$S8abitypes3FooC10throwsTestyySbKF"(i1, %T8abitypes3FooC* swiftself, %swift.error** swifterror) {{.*}} {
+  // x86_64-ios: define hidden swiftcc void @"$S8abitypes3FooC10throwsTestyySbKF"(i1, %T8abitypes3FooC* swiftself, %swift.error** noalias nocapture swifterror dereferenceable(8)) {{.*}} {
   // x86_64-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negateThrowing:error:)", align 8
   // x86_64-ios: call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1, %2**)*)(%1* {{%[0-9]+}}, i8* [[SEL]], i1 zeroext {{%[0-9]+}}, %2** {{%[0-9]+}})
   // x86_64-ios: }
 
-  // i386-ios: define hidden swiftcc void @"$S8abitypes3FooC10throwsTestyySbKF"(i1, %T8abitypes3FooC* swiftself, %swift.error**) {{.*}} {
+  // i386-ios: define hidden swiftcc void @"$S8abitypes3FooC10throwsTestyySbKF"(i1, %T8abitypes3FooC* swiftself, %swift.error** noalias nocapture dereferenceable(4)) {{.*}} {
   // i386-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negateThrowing:error:)", align 4
   // i386-ios: call signext i8 bitcast (void ()* @objc_msgSend to i8 (%1*, i8*, i8, %2**)*)(%1* {{%[0-9]+}}, i8* [[SEL]], i8 signext {{%[0-9]+}}, %2** {{%[0-9]+}})
   // i386-ios: }
