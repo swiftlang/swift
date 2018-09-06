@@ -699,7 +699,6 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::EndApplyInst:
-  case SILInstructionKind::EndBorrowArgumentInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::EndUnpairedAccessInst:
   case SILInstructionKind::EndLifetimeInst:

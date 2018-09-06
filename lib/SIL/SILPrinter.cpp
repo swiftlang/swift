@@ -1278,10 +1278,6 @@ public:
     *this << getIDAndType(EBI->getOperand());
   }
 
-  void visitEndBorrowArgumentInst(EndBorrowArgumentInst *EBAI) {
-    *this << getIDAndType(EBAI->getOperand());
-  }
-
   void visitAssignInst(AssignInst *AI) {
     *this << Ctx.getID(AI->getSrc()) << " to " << getIDAndType(AI->getDest());
   }

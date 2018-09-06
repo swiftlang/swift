@@ -3221,18 +3221,6 @@ public:
   }
 };
 
-/// Represents the end of a borrow scope for an argument. The reason why this is
-/// separate from end_borrow is that an argument is not borrowed from a
-/// specific SSA value. Instead it is borrowed from potentially many different
-/// incoming values.
-class EndBorrowArgumentInst
-    : public UnaryInstructionBase<SILInstructionKind::EndBorrowArgumentInst,
-                                  NonValueInstruction> {
-  friend class SILBuilder;
-
-  EndBorrowArgumentInst(SILDebugLocation DebugLoc, SILArgument *Arg);
-};
-
 /// Different kinds of access.
 enum class SILAccessKind : uint8_t {
   /// An access which takes uninitialized memory and initializes it.
