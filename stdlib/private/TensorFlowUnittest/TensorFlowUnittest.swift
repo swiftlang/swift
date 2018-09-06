@@ -68,6 +68,7 @@ extension TestSuite {
 #if !TPU
     test(name + "_CPU_OR_GPU") {
       _RuntimeConfig.executionMode = .auto
+      _RuntimeConfig.usesTFEagerAPI = true
       _RuntimeConfig.gpuMemoryAllowGrowth = true
       _RuntimeConfig.printsDebugLog = false
       body()

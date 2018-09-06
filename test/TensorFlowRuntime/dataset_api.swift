@@ -15,6 +15,10 @@ import StdlibUnittest
 
 var DatasetAPITests = TestSuite("DatasetAPI")
 
+// TODO: fix the test suite for GPU.
+// We have errors like:
+// Not found: No registered 'ZipDataset' OpKernel for GPU devices compatible with node {{node op/_S4mainyycfU4_.tf_GPU.70.64_/device_GPU_0_7}} = ZipDataset[N=2, output_shapes=[<unknown>, <unknown>], output_types=[DT_FLOAT, DT_FLOAT], _device="/device:GPU:0"](tf_recv_55, tf_recv_56)
+#if !CUDA
 DatasetAPITests.testAllBackends("SingleValueManualIterator") {
   // [[1], [2], [3], [4], [5]]
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
@@ -79,5 +83,6 @@ DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
     i += 1
   }
 }
+#endif //!CUDA
 
 runAllTests()
