@@ -401,6 +401,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getInlineStrategy(), (unsigned)F.getOptimizationMode(),
       (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs,
+      // SWIFT_ENABLE_TENSORFLOW
       (unsigned)F.getReverseDifferentiableAttrs().size(),
       (unsigned)F.hasQualifiedOwnership(),
       F.isWeakLinked(), FnID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
@@ -416,11 +417,12 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     S.writeGenericRequirements(SA->getRequirements(), SILAbbrCodes);
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
   for (auto *DA : F.getReverseDifferentiableAttrs()) {
     unsigned differentiableAttrAbbrCode =
         SILAbbrCodes[SILReverseDifferentiableAttrLayout::Code];
-    auto indices = DA->getIndices();
-    llvm::SmallVector<bool, 4> parameters;
+    auto &indices = DA->getIndices();
+    SmallVector<bool, 4> parameters;
     for (unsigned i = 0; i < indices.parameters.size(); i++)
       parameters.push_back(indices.parameters[i]);
     SILReverseDifferentiableAttrLayout::emitRecord(
@@ -2439,6 +2441,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstCastLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();
   registerSILAbbr<SILSpecializeAttrLayout>();
+  // SWIFT_ENABLE_TENSORFLOW
   registerSILAbbr<SILReverseDifferentiableAttrLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both

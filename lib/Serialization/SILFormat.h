@@ -171,6 +171,7 @@ namespace sil_block {
     SIL_PROPERTY,
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SIL_TWO_OPERANDS_EXTRA_ATTR,
+    // SWIFT_ENABLE_TENSORFLOW
     SIL_REVERSE_DIFFERENTIABLE_ATTR,
 
     // We also share these layouts from the decls block. Their enumerators must
@@ -294,6 +295,7 @@ namespace sil_block {
                      BCFixed<2>,  // optimizationMode
                      BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
+                     // SWIFT_ENABLE_TENSORFLOW
                      BCVBR<8>,    // number of reverse differentiable attributes
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // must be weakly referenced
@@ -302,6 +304,7 @@ namespace sil_block {
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
                      // followed by specialize attributes
+                     // SWIFT_ENABLE_TENSORFLOW
                      // followed by reverse differentiable attributes
                      // followed by generic param list, if any
                      >;
@@ -312,6 +315,7 @@ namespace sil_block {
                      BCFixed<1> // specialization kind
                      >;
 
+  // SWIFT_ENABLE_TENSORFLOW
   using SILReverseDifferentiableAttrLayout = BCRecordLayout<
     SIL_REVERSE_DIFFERENTIABLE_ATTR,
     IdentifierIDField,  // Primal name.

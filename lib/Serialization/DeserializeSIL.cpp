@@ -463,11 +463,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
       inlineStrategy, optimizationMode, effect, numSpecAttrs,
+      // SWIFT_ENABLE_TENSORFLOW
       numReverseDifferentiableAttrs, hasQualifiedOwnership, isWeakLinked;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
                                 isThunk, isGlobal, inlineStrategy,
                                 optimizationMode, effect, numSpecAttrs,
+                                // SWIFT_ENABLE_TENSORFLOW
                                 numReverseDifferentiableAttrs, hasQualifiedOwnership,
                                 isWeakLinked, funcTyID, genericEnvID,
                                 clangNodeOwnerID, SemanticsIDs);
@@ -584,6 +586,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setDebugScope(DS);
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
   // Read and instantiate the specialize attributes.
   while (numSpecAttrs--) {
     auto next = SILCursor.advance(AF_DontPopBlockAtEnd);
@@ -2521,11 +2524,13 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
     inlineStrategy, optimizationMode, effect, numSpecAttrs,
+    // SWIFT_ENABLE_TENSORFLOW
     numReverseDifferentiableAttrs, hasQualifiedOwnership, isWeakLinked;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
                                 isThunk, isGlobal, inlineStrategy,
                                 optimizationMode, effect, numSpecAttrs,
+                                // SWIFT_ENABLE_TENSORFLOW
                                 numReverseDifferentiableAttrs, hasQualifiedOwnership,
                                 isWeakLinked, funcTyID, genericEnvID,
                                 clangOwnerID, SemanticsIDs);
