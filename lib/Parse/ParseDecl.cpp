@@ -23,6 +23,7 @@
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Initializer.h"
@@ -178,6 +179,17 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
+  if (!hasDelayedDeclList(IDC))
+    return;
+  SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
+  unsigned BufferID = *SF.getBufferID();
+  Parser TheParser(BufferID, SF, nullptr, this);
+  // Disable libSyntax creation in the delayed parsing.
+  TheParser.SyntaxContext->disable();
+  TheParser.parseDeclListDelayed(IDC);
+}
 
 /// \brief Main entrypoint for the parser.
 ///
@@ -2253,6 +2265,32 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
   }
 }
 
+static unsigned skipUntilMatchingRBrace(Parser &P, bool &HasPoundDirective,
+                                        SyntaxParsingContext *&SyntaxContext) {
+  HasPoundDirective = false;
+  SyntaxParsingContext BlockItemListContext(SyntaxContext,
+                                            SyntaxKind::CodeBlockItemList);
+  SyntaxParsingContext BlockItemContext(SyntaxContext,
+                                        SyntaxKind::CodeBlockItem);
+  SyntaxParsingContext BodyContext(SyntaxContext, SyntaxKind::TokenList);
+  unsigned OpenBraces = 1;
+  while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
+    HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line);
+    if (P.consumeIf(tok::l_brace)) {
+      OpenBraces++;
+      continue;
+    }
+    if (OpenBraces == 1 && P.Tok.is(tok::r_brace))
+      break;
+    if (P.consumeIf(tok::r_brace)) {
+      OpenBraces--;
+      continue;
+    }
+    P.consumeToken();
+  }
+  return OpenBraces;
+}
+
 bool swift::isKeywordPossibleDeclStart(const Token &Tok) {
   switch (Tok.getKind()) {
   case tok::at_sign:
@@ -2803,6 +2841,41 @@ Parser::parseDecl(ParseDeclOptions Flags,
   return DeclResult;
 }
 
+void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
+  auto DelayedState = State->takeDelayedDeclListState(IDC);
+  assert(DelayedState.get() && "should have delayed state");
+
+  auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
+  auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
+
+  // ParserPositionRAII needs a primed parser to restore to.
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeTokenWithoutFeedingReceiver();
+
+  // Ensure that we restore the parser state at exit.
+  ParserPositionRAII PPR(*this);
+
+  // Create a lexer that cannot go past the end state.
+  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
+
+  // Temporarily swap out the parser's current lexer with our new one.
+  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
+
+  // Rewind to the beginning of the decl.
+  restoreParserPosition(BeginParserPosition);
+
+  // Re-enter the lexical scope.
+  Scope S(this, DelayedState->takeScope());
+  ContextChange CC(*this, DelayedState->ParentContext);
+  auto *ext = cast<ExtensionDecl>(IDC);
+  SourceLoc LBLoc = consumeToken(tok::l_brace);
+  SourceLoc RBLoc;
+  parseDeclList(ext->getBraces().Start, RBLoc, diag::expected_rbrace_extension,
+                ParseDeclOptions(DelayedState->Flags),
+                [&] (Decl *D) { ext->addMember(D); });
+  ext->setBraces({LBLoc, RBLoc});
+}
+
 void Parser::parseDeclDelayed() {
   auto DelayedState = State->takeDelayedDeclState();
   assert(DelayedState.get() && "should have delayed state");
@@ -3231,9 +3304,37 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
   }
   parseMatchingToken(tok::r_brace, RBLoc, ErrorDiag, LBLoc);
 
+  // Increase counter.
+  if (auto *stat = Context.Stats) {
+    stat->getFrontendCounters().NumIterableDeclContextParsed ++;
+  }
   // If we found the closing brace, then the caller should not care if there
   // were errors while parsing inner decls, because we recovered.
   return !RBLoc.isValid();
+}
+
+bool Parser::canDelayBodyParsing() {
+  if (SF.Kind == SourceFileKind::REPL)
+    return false;
+  // We always collect the entire syntax tree for IDE uses.
+  if (SF.shouldCollectToken())
+    return false;
+  if (SF.shouldBuildSyntaxTree())
+    return false;
+  // Recovering parser status later for #sourceLocaion is not-trivial and
+  // it may not worth it.
+  if (InPoundLineEnvironment)
+    return false;
+  // The firt code completion pass looks for code completion tokens extensively,
+  // so we cannot lazily parse members.
+  if (isCodeCompletionFirstPass())
+    return false;
+  BacktrackingScope BackTrack(*this);
+  bool HasPoundDirective;
+  skipUntilMatchingRBrace(*this, HasPoundDirective, SyntaxContext);
+  if (!HasPoundDirective)
+    BackTrack.cancelBacktrack();
+  return !BackTrack.willBacktrack();
 }
 
 /// \brief Parse an 'extension' declaration.
@@ -3289,28 +3390,36 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
+
+  auto PosBeforeLB = Tok.getLoc();
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
     LBLoc = PreviousLoc;
     RBLoc = LBLoc;
     status.setIsParseError();
   } else {
-    // Parse the body.
     ContextChange CC(*this, ext);
     Scope S(this, ScopeKind::Extension);
-
     ParseDeclOptions Options(PD_HasContainerType | PD_InExtension);
-
-    if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_extension,
-                      Options, [&] (Decl *D) {ext->addMember(D);}))
-      status.setIsParseError();
+    if (canDelayBodyParsing()) {
+      if (Tok.is(tok::r_brace)) {
+        RBLoc = consumeToken();
+      } else {
+        RBLoc = Tok.getLoc();
+        status.setIsParseError();
+      }
+      State->delayDeclList(ext, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
+                           PosBeforeLB);
+    } else {
+      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_extension,
+                        Options, [&] (Decl *D) { ext->addMember(D); }))
+        status.setIsParseError();
+    }
 
     // Don't propagate the code completion bit from members: we cannot help
     // code completion inside a member decl, and our callers cannot do
     // anything about it either.  But propagate the error bit.
   }
-
   ext->setBraces({LBLoc, RBLoc});
-
   if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
     diagnose(ExtensionLoc, diag::decl_inner_scope);
     status.setIsParseError();
@@ -3938,35 +4047,13 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   return ParameterList::create(P.Context, StartLoc, param, EndLoc);
 }
 
-static unsigned skipUntilMatchingRBrace(Parser &P,
-                                        SyntaxParsingContext *&SyntaxContext) {
-  SyntaxParsingContext BlockItemListContext(SyntaxContext,
-                                            SyntaxKind::CodeBlockItemList);
-  SyntaxParsingContext BlockItemContext(SyntaxContext,
-                                        SyntaxKind::CodeBlockItem);
-  SyntaxParsingContext BodyContext(SyntaxContext, SyntaxKind::TokenList);
-  unsigned OpenBraces = 1;
-  while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
-    if (P.consumeIf(tok::l_brace)) {
-      OpenBraces++;
-      continue;
-    }
-    if (OpenBraces == 1 && P.Tok.is(tok::r_brace))
-      break;
-    if (P.consumeIf(tok::r_brace)) {
-      OpenBraces--;
-      continue;
-    }
-    P.consumeToken();
-  }
-  return OpenBraces;
-}
-
 static unsigned skipBracedBlock(Parser &P,
                                 SyntaxParsingContext *&SyntaxContext) {
   SyntaxParsingContext CodeBlockContext(SyntaxContext, SyntaxKind::CodeBlock);
   P.consumeToken(tok::l_brace);
-  unsigned OpenBraces = skipUntilMatchingRBrace(P, SyntaxContext);
+  bool HasPoundDirectives;
+  unsigned OpenBraces = skipUntilMatchingRBrace(P, HasPoundDirectives,
+                                                SyntaxContext);
   if (P.consumeIf(tok::r_brace))
     OpenBraces--;
   return OpenBraces;
