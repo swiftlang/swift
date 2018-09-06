@@ -322,6 +322,9 @@ struct PrintOptions {
   /// for optionals that are nested within other optionals.
   bool PrintOptionalAsImplicitlyUnwrapped = false;
 
+  /// Replaces the name of private and internal properties of types with '_'.
+  bool OmitNameOfInaccessibleProperties = false;
+
   /// \brief Print dependent types as references into this generic environment.
   GenericEnvironment *GenericEnv = nullptr;
 
