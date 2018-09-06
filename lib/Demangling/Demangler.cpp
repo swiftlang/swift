@@ -377,14 +377,12 @@ void CharVector::append(int Number, NodeFactory &Factory) {
 void Demangler::clear() {
   NodeStack.free();
   Substitutions.free();
-  PendingSubstitutions.free();
   NodeFactory::clear();
 }
 
 void Demangler::init(StringRef MangledName) {
   NodeStack.init(*this, 16);
   Substitutions.init(*this, 16);
-  PendingSubstitutions.init(*this, 4);
   NumWords = 0;
   Text = MangledName;
   Pos = 0;
