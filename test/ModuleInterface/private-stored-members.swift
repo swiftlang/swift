@@ -16,25 +16,25 @@
 // CHECK: struct MyStruct {{{$}}
 // RESILIENT: struct MyStruct {{{$}}
 public struct MyStruct {
-// CHECK-NEXT: var publicVar: Int{{$}}
-// RESILIENT-NEXT: var publicVar: Int{{$}}
-  public var publicVar: Int
+// CHECK-NEXT: var publicVar: Int64{{$}}
+// RESILIENT-NEXT: var publicVar: Int64{{$}}
+  public var publicVar: Int64
 
 // CHECK-NEXT: let publicLet: Bool{{$}}
 // RESILIENT-NEXT: let publicLet: Bool{{$}}
   public let publicLet: Bool
 
-// CHECK-NEXT: internal var _: String{{$}}
-// RESILIENT-NOT: internal var _: String{{$}}
-  var internalVar: String
+// CHECK-NEXT: internal var _: Int64{{$}}
+// RESILIENT-NOT: internal var _: Int64{{$}}
+  var internalVar: Int64
 
 // CHECK-NEXT: internal let _: Bool{{$}}
 // RESILIENT-NOT: internal let _: Bool{{$}}
   let internalLet: Bool
 
-// CHECK-NEXT: private var _: String{{$}}
-// RESILIENT-NOT: private var _: String{{$}}
-  private var privateVar: String
+// CHECK-NEXT: private var _: Int64{{$}}
+// RESILIENT-NOT: private var _: Int64{{$}}
+  private var privateVar: Int64
 
 // CHECK-NEXT: private let _: Bool{{$}}
 // RESILIENT-NOT: private let _: Bool{{$}}
@@ -42,13 +42,17 @@ public struct MyStruct {
 
 // CHECK-NOT: private var
 // RESILIENT-NOT: private var
-  private var computedPrivateVar: String {
-    return "computedPrivateVar"
+  private var computedPrivateVar: Int64 {
+    return 0
   }
 
 // CHECK-NOT: private static var
 // RESILIENT-NOT: private static var
-  private static var staticPrivateVar: String = ""
+  private static var staticPrivateVar: Int64 = 0
+
+// CHECK-NEXT: var publicEndVar: Int64{{$}}
+// RESILIENT-NEXT: var publicEndVar: Int64{{$}}
+  public var publicEndVar: Int64 = 0
 
 // CHECK: }{{$}}
 // RESILIENT: }{{$}}
@@ -57,25 +61,25 @@ public struct MyStruct {
 // CHECK: class MyClass {{{$}}
 // RESILIENT: class MyClass {{{$}}
 public class MyClass {
-// CHECK-NEXT: var publicVar: Int{{$}}
-// RESILIENT-NEXT: var publicVar: Int{{$}}
-  public var publicVar: Int = 0
+// CHECK-NEXT: var publicVar: Int64{{$}}
+// RESILIENT-NEXT: var publicVar: Int64{{$}}
+  public var publicVar: Int64 = 0
 
 // CHECK-NEXT: let publicLet: Bool{{$}}
 // RESILIENT-NEXT: let publicLet: Bool{{$}}
   public let publicLet: Bool = true
 
-// CHECK-NEXT: internal var _: String{{$}}
-// RESILIENT-NOT: internal var _: String{{$}}
-  var internalVar: String = ""
+// CHECK-NEXT: internal var _: Int64{{$}}
+// RESILIENT-NOT: internal var _: Int64{{$}}
+  var internalVar: Int64 = 0
 
 // CHECK-NEXT: internal let _: Bool{{$}}
 // RESILIENT-NOT: internal let _: Bool{{$}}
   let internalLet: Bool = true
 
-// CHECK-NEXT: private var _: String{{$}}
-// RESILIENT-NOT: private var _: String{{$}}
-  private var privateVar: String = ""
+// CHECK-NEXT: private var _: Int64{{$}}
+// RESILIENT-NOT: private var _: Int64{{$}}
+  private var privateVar: Int64 = 0
 
 // CHECK-NEXT: private let _: Bool{{$}}
 // RESILIENT-NOT: private let _: Bool{{$}}
@@ -83,13 +87,19 @@ public class MyClass {
 
 // CHECK-NOT: private var
 // RESILIENT-NOT: private var
-  private var computedPrivateVar: String {
-    return "computedPrivateVar"
+  private var computedPrivateVar: Int64 {
+    return 0
   }
 
 // CHECK-NOT: private static var
 // RESILIENT-NOT: private static var
-  private static var staticPrivateVar: String = ""
+  private static var staticPrivateVar: Int64 = 0
+
+// CHECK-NEXT: var publicEndVar: Int64{{$}}
+// RESILIENT-NEXT: var publicEndVar: Int64{{$}}
+  public var publicEndVar: Int64 = 0
+
+  public init() {}
 
 // CHECK: }{{$}}
 // RESILIENT: }{{$}}
