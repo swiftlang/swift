@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/inherits_Swift
 // RUN: %target-codesign %t/inherits_Swift
 
-// RUN: %target-run-reflection-test %t/inherits_Swift | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/inherits_Swift | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 
 // REQUIRES: objc_interop
