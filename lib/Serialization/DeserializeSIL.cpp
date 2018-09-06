@@ -586,7 +586,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setDebugScope(DS);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   // Read and instantiate the specialize attributes.
   while (numSpecAttrs--) {
     auto next = SILCursor.advance(AF_DontPopBlockAtEnd);
@@ -611,6 +610,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         SILMod, requirements, exported != 0, specializationKind));
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
   // Read and instantiate the differentiable attributes.
   while (numReverseDifferentiableAttrs--) {
     auto next = SILCursor.advance(AF_DontPopBlockAtEnd);
