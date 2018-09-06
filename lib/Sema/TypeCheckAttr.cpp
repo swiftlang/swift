@@ -1509,17 +1509,23 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
 
     if (auto extAttr =
         extension->getAttrs().getAttribute<AccessControlAttr>()) {
-      // Extensions are top level declarations, for which the literally lowest
-      // access level `private` is equivalent to `fileprivate`.
-      AccessLevel extAccess = std::max(extAttr->getAccess(),
-                                       AccessLevel::FilePrivate);
-      if (attr->getAccess() > extAccess) {
+      AccessLevel defaultAccess = extension->getDefaultAccessLevel();
+      if (attr->getAccess() > defaultAccess) {
         auto diag = TC.diagnose(attr->getLocation(),
                                 diag::access_control_ext_member_more,
                                 attr->getAccess(),
                                 D->getDescriptiveKind(),
                                 extAttr->getAccess());
-        swift::fixItAccess(diag, cast<ValueDecl>(D), extAccess);
+        swift::fixItAccess(diag, cast<ValueDecl>(D), defaultAccess, false,
+                           true);
+        return;
+      } else if (attr->getAccess() == defaultAccess) {
+        TC.diagnose(attr->getLocation(),
+                    diag::access_control_ext_member_redundant,
+                    attr->getAccess(),
+                    D->getDescriptiveKind(),
+                    extAttr->getAccess())
+          .fixItRemove(attr->getRange());
         return;
       }
     }
@@ -1554,6 +1560,15 @@ AttributeChecker::visitSetterAccessAttr(SetterAccessAttr *attr) {
     TC.diagnose(attr->getLocation(), diag::access_control_setter_more,
                 getterAccess, storageKind, attr->getAccess());
     attr->setInvalid();
+    return;
+
+  } else if (attr->getAccess() == getterAccess) {
+    TC.diagnose(attr->getLocation(),
+                diag::access_control_setter_redundant,
+                attr->getAccess(),
+                D->getDescriptiveKind(),
+                getterAccess)
+      .fixItRemove(attr->getRange());
     return;
   }
 }

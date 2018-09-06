@@ -3917,7 +3917,8 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
 //===----------------------------------------------------------------------===//
 
 void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
-                        AccessLevel desiredAccess, bool isForSetter) {
+                        AccessLevel desiredAccess, bool isForSetter,
+                        bool shouldUseDefaultAccess) {
   StringRef fixItString;
   switch (desiredAccess) {
   case AccessLevel::Private:      fixItString = "private ";      break;
@@ -3963,9 +3964,14 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
     // this function is sometimes called to make access narrower, so assuming
     // that a broader scope is acceptable breaks some diagnostics.
     if (attr->getAccess() != desiredAccess) {
-      // This uses getLocation() instead of getRange() because we don't want to
-      // replace the "(set)" part of a setter attribute.
-      diag.fixItReplace(attr->getLocation(), fixItString.drop_back());
+      if (shouldUseDefaultAccess) {
+        // Remove the attribute if replacement is not preferred.
+        diag.fixItRemove(attr->getRange());
+      } else {
+        // This uses getLocation() instead of getRange() because we don't want to
+        // replace the "(set)" part of a setter attribute.
+        diag.fixItReplace(attr->getLocation(), fixItString.drop_back());
+      }
       attr->setInvalid();
     }
 

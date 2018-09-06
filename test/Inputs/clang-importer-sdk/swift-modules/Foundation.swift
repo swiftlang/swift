@@ -312,7 +312,7 @@ public protocol _ErrorCodeProtocol {
 }
 
 public extension _BridgedStoredNSError {
-  public init?(_bridgedNSError error: NSError) {
+  init?(_bridgedNSError error: NSError) {
     self.init(_nsError: error)
   }
 }
@@ -321,13 +321,13 @@ public extension _BridgedStoredNSError {
 public extension _BridgedStoredNSError
     where Code: RawRepresentable, Code.RawValue: SignedInteger {
   // FIXME: Generalize to Integer.
-  public var code: Code {
+  var code: Code {
     return Code(rawValue: numericCast(_nsError.code))!
   }
 
   /// Initialize an error within this domain with the given ``code``
   /// and ``userInfo``.
-  public init(_ code: Code, userInfo: [String : Any] = [:]) {
+  init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: "", code: 0, userInfo: [:]))
   }
 
@@ -340,13 +340,13 @@ public extension _BridgedStoredNSError
 public extension _BridgedStoredNSError
     where Code: RawRepresentable, Code.RawValue: UnsignedInteger {
   // FIXME: Generalize to Integer.
-  public var code: Code {
+  var code: Code {
     return Code(rawValue: numericCast(_nsError.code))!
   }
 
   /// Initialize an error within this domain with the given ``code``
   /// and ``userInfo``.
-  public init(_ code: Code, userInfo: [String : Any] = [:]) {
+  init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: "", code: 0, userInfo: [:]))
   }
 }
