@@ -12,6 +12,11 @@ import StdlibUnittest
 
 var TensorNonTPUTests = TestSuite("TensorNonTPU")
 
+TensorNonTPUTests.testAllBackends("RandomInitializer") {
+  let _ = Tensor<Float>(randomUniform: [3, 4])
+  let _ = Tensor<Float>(randomNormal: [3, 4])
+}
+
 TensorNonTPUTests.testAllBackends("SliceUpdate") {
   var t1 = Tensor<Float>([[1, 2, 3], [4, 5, 6]])
   t1[0] = Tensor(zeros: [3])
