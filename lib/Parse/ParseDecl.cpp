@@ -3304,6 +3304,10 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
   }
   parseMatchingToken(tok::r_brace, RBLoc, ErrorDiag, LBLoc);
 
+  // Increase counter.
+  if (auto *stat = Context.Stats) {
+    stat->getFrontendCounters().NumIterableDeclContextParsed ++;
+  }
   // If we found the closing brace, then the caller should not care if there
   // were errors while parsing inner decls, because we recovered.
   return !RBLoc.isValid();
