@@ -153,14 +153,25 @@
     "SetAlgebra.swift",
     "BuiltinMath.swift",
     {
-    "Integers": [
-      "Integers.swift",
-      "IntegerTypes.swift",
-      "IntegerParsing.swift"],
-    "Floating": [
-      "FloatingPoint.swift",
-      "FloatingPointParsing.swift",
-      "FloatingPointTypes.swift"]}
+      "Integers": [
+        "Integers.swift",
+        "IntegerTypes.swift",
+        "IntegerParsing.swift"],
+      "Floating": [
+        "FloatingPoint.swift",
+        "FloatingPointParsing.swift",
+        "FloatingPointTypes.swift"],
+      "SIMD": [
+        "SIMDVector.swift",
+        "SIMDVectorN.swift.gyb",
+        "SIMDPredicate.swift",
+        "SIMDPredicateTypes.swift",
+        "SIMDInteger.swift",
+        "SIMDIntegerTypes.swift",
+        "SIMDFloatingPoint.swift",
+        "SIMDFloatingPointTypes.swift"
+      ]
+    }
   ],
   "Optional": [
     "Optional.swift"

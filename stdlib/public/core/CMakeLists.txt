@@ -199,6 +199,14 @@ set(SWIFTLIB_SOURCES
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
+  SIMDVector.swift
+  SIMDVectorN.swift.gyb
+  SIMDPredicate.swift
+  SIMDPredicateTypes.swift.gyb
+  SIMDInteger.swift
+  SIMDIntegerTypes.swift.gyb
+  SIMDFloatingPoint.swift
+  SIMDFloatingPointTypes.swift.gyb
   SliceBuffer.swift
   Tuple.swift.gyb
   UnfoldSequence.swift
