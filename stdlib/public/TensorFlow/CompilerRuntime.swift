@@ -786,7 +786,7 @@ public final class _TensorComputation {
   /// The data structure to pass into pthread creation API.
   /// We cannot have the ThreadBody closure below close over on `threadIndex`,
   /// because ThreadBody is of C convention.
-  class FuncHandle {
+  class ThreadParam {
     public let computation: _TensorComputation
     public let threadIndex: Int
     
@@ -901,10 +901,10 @@ public final class _TensorComputation {
 #if !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))
           let arg = arg!
 #endif
-          let funcHandle: FuncHandle =
+          let param: ThreadParam =
             Unmanaged.fromOpaque(arg).takeRetainedValue()
-          funcHandle.computation.execute(threadIndex: funcHandle.threadIndex)
-          checkOk(funcHandle.computation.status)
+          param.computation.execute(threadIndex: param.threadIndex)
+          checkOk(param.computation.status)
           return nil
         }
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -915,8 +915,8 @@ public final class _TensorComputation {
         let creationStatus = pthread_create(
           &newThread, nil, body,
           Unmanaged.passRetained(
-            FuncHandle(computation: self,
-                       threadIndex: threadIndex)).toOpaque()
+            ThreadParam(computation: self,
+                        threadIndex: threadIndex)).toOpaque()
         )
         // TODO(hongm): do error handling.
         internalConsistencyCheck(creationStatus == 0)

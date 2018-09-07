@@ -106,15 +106,15 @@ extension TensorHandle : TensorSendableReceivable {
       checkOk(status)
       tensorHandle = TensorHandle<Scalar>(owning: cTensorHandle!)
     } else {
-      let cTensor: CTensor? = TF_DequeueNamedTensor(
+      let cTensor: CTensor! = TF_DequeueNamedTensor(
         computation.cSession, Int32(tensorID), status)
       checkOk(status)
       internalConsistencyCheck(
         cTensor != nil,
         "TF_DequeueNamedTensor() cannot return nil when the status is OK.")
       TF_DeleteStatus(status)
-      tensorHandle = TensorHandle<Scalar>(copyingFromCTensor: cTensor!)
-      TF_DeleteTensor(cTensor!)
+      tensorHandle = TensorHandle<Scalar>(copyingFromCTensor: cTensor)
+      TF_DeleteTensor(cTensor)
     }
     if _RuntimeConfig.printsDebugLog {
       debugLog("The received tensor of id \(tensorID) has content:")
@@ -166,7 +166,7 @@ internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
     // NOTE: This will not perform a copy if the handle is already on the host.
     let context = _ExecutionContext.global
     debugLog("Calling TFE_TensorHandleCopyToDevice().")
-    let hostHandle: CTensorHandle? = TFE_TensorHandleCopyToDevice(
+    let hostHandle: CTensorHandle! = TFE_TensorHandleCopyToDevice(
       cTensorHandle, context.eagerContext, context.cpuDeviceName, status)
     checkOk(status)
     internalConsistencyCheck(hostHandle != nil,
