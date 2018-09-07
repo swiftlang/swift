@@ -6,11 +6,17 @@
 % #   - ArrayType -- the type being tested.
 
 
-extension ${ArrayType} {
-  typealias _BufferID = UnsafeRawPointer?
-  var _bufferID: _BufferID {
-    return unsafeBitCast(_owner, to: _BufferID.self)
+func bufferID<T>(_ of: ${ArrayType}) -> UnsafeRawPointer? {
+%if ArrayType == 'ArraySlice':
+	return unsafeBitCast(of.base._owner, to: _BufferID.self)
+%else:
+    return unsafeBitCast(of._owner, to: _BufferID.self)
+%end
   }
+}
+
+extension ArraySlice {
+	var capacity: Int { return count }
 }
 
 protocol TestProtocol1 {}
@@ -131,10 +137,10 @@ ${Suite}.test("${ArrayType}/emptyAllocation") {
   let arr0 = ${ArrayType}<Int>()
   let arr1 = ${ArrayType}<LifetimeTracked>(repeating: LifetimeTracked(0), count: 0)
   // Empty arrays all use the same buffer
-  expectEqual(arr0._bufferID, arr1._bufferID)
+  expectEqual(bufferID(arr0), bufferID(arr1))
 
   let arr2: ${ArrayType}<LifetimeTracked> = []
-  let emptyLiteralsShareBuffer = arr0._bufferID == arr2._bufferID
+  let emptyLiteralsShareBuffer = bufferID(arr0) == bufferID(arr2)
   expectTrue(emptyLiteralsShareBuffer)
 }
 

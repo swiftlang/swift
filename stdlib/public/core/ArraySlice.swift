@@ -20,6 +20,11 @@
 @available(swift, deprecated: 5.0, renamed: "Slice")
 public typealias ArraySlice<T> = Slice<[T]>
 
+extension ArraySlice {
+	@available(swift, deprecated: 5.0, renamed: "Slice")
+	var capacity: Int { return count }
+}
+
 public protocol _ContiguouslyStored {
   associatedtype Element
   func withUnsafeBufferPointer<R>(
