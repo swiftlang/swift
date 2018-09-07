@@ -159,22 +159,19 @@ extension P {
 
 // CHECK-LABEL: sil @$S6tuples15testTupleAssign1xySaySiGz_tF : $@convention(thin) (@inout Array<Int>) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] %0 : $*Array<Int>
-// function_ref Array.subscript.nativeOwningMutableAddressor
-// CHECK: [[ADDRESSOR:%.*]] = function_ref @$SSayxSiciao : $@convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> (UnsafeMutablePointer<τ_0_0>, @owned Builtin.NativeObject)
-// CHECK: [[TUPLE:%.*]] = apply [[ADDRESSOR]]<Int>(%{{.*}}, [[ACCESS]]) : $@convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> (UnsafeMutablePointer<τ_0_0>, @owned Builtin.NativeObject)
-// CHECK: ([[PTR:%.*]], [[OBJ:%.*]]) = destructure_tuple [[TUPLE]] : $(UnsafeMutablePointer<Int>, Builtin.NativeObject)
+// function_ref Array.subscript.modify
+// CHECK: [[ACCESSOR:%.*]] = function_ref @$SSayxSiciM : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0
+// CHECK: ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[ACCESSOR]]<Int>(%{{.*}}, [[ACCESS]]) : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0
 // CHECK: assign %{{.*}} to %{{.*}} : $*Int
+// CHECK: end_apply [[TOKEN]]
 // CHECK: end_access [[ACCESS]] : $*Array<Int>
-// CHECK: destroy_value [[OBJ]] : $Builtin.NativeObject
-//
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] %0 : $*Array<Int>
-// function_ref Array.subscript.nativeOwningMutableAddressor
-// CHECK: [[ADDRESSOR:%.*]] = function_ref @$SSayxSiciao : $@convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> (UnsafeMutablePointer<τ_0_0>, @owned Builtin.NativeObject)
-// CHECK: [[TUPLE:%.*]] = apply [[ADDRESSOR]]<Int>(%{{.*}}, [[ACCESS]]) : $@convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> (UnsafeMutablePointer<τ_0_0>, @owned Builtin.NativeObject)
-// CHECK: ([[PTR:%.*]], [[OBJ:%.*]]) = destructure_tuple [[TUPLE]] : $(UnsafeMutablePointer<Int>, Builtin.NativeObject)
+// function_ref Array.subscript.modify
+// CHECK: [[ACCESSOR:%.*]] = function_ref @$SSayxSiciM : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0
+// CHECK: ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[ACCESSOR]]<Int>(%{{.*}}, [[ACCESS]]) : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0
 // CHECK: assign %{{.*}} to %{{.*}} : $*Int
+// CHECK: end_apply [[TOKEN]]
 // CHECK: end_access [[ACCESS]] : $*Array<Int>
-// CHECK: destroy_value [[OBJ]] : $Builtin.NativeObject
 // CHECK-LABEL: } // end sil function '$S6tuples15testTupleAssign1xySaySiGz_tF'
 public func testTupleAssign(x: inout [Int]) {
   (x[0], x[1]) = (0, 1)
