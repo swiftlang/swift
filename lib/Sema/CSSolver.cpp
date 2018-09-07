@@ -2041,11 +2041,15 @@ bool ConstraintSystem::solveSimplified(SmallVectorImpl<Solution> &solutions) {
   return false;
 }
 
-void DisjunctionChoice::attempt(ConstraintSystem &cs) const {
+bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
   cs.simplifyDisjunctionChoice(Choice);
 
   if (ExplicitConversion)
     propagateConversionInfo(cs);
+
+  // Attempt to simplify current choice might result in
+  // immediate failure, which is recorded in constraint system.
+  return !cs.failedConstraint && !cs.simplify();
 }
 
 bool DisjunctionChoice::isGenericOp(Constraint *choice) {
