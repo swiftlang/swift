@@ -66,6 +66,12 @@ class TestXPCEncoder {
         _testRoundTrip(of: mapping)
     }
 
+    func testEncodingClassWhichSharesEncoderWithSuper() {
+        // Employee is a type which shares its encoder & decoder with its superclass, Person.
+        let employee = Employee.testValue
+        _testRoundTrip(of: employee)
+    }
+
     // MARK: - Testing helpers
     private func _testRoundTrip<T>(of value: T) where T : Codable, T: Equatable {
         var payload: xpc_object_t! = nil
@@ -296,6 +302,44 @@ fileprivate final class Mapping : Codable, Equatable {
   }
 }
 
+/// A class which shares its encoder and decoder with its superclass.
+fileprivate class Employee : Person {
+  let id: Int
+
+  init(name: String, email: String, website: URL? = nil, id: Int) {
+    self.id = id
+    super.init(name: name, email: email, website: website)
+  }
+
+  enum CodingKeys : String, CodingKey {
+    case id
+  }
+
+  required init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(Int.self, forKey: .id)
+    try super.init(from: decoder)
+  }
+
+  override func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(id, forKey: .id)
+    try super.encode(to: encoder)
+  }
+
+  override func isEqual(_ other: Person) -> Bool {
+    if let employee = other as? Employee {
+      guard self.id == employee.id else { return false }
+    }
+
+    return super.isEqual(other)
+  }
+
+  override class var testValue: Employee {
+    return Employee(name: "Johnny Appleseed", email: "appleseed@apple.com", id: 42)
+  }
+}
+
 // MARK: - Run the the tests!
 var XPCEncoderTests = TestSuite("TestXPCEncoder")
 XPCEncoderTests.test("testEncodingTopLevelEmptyStruct") { TestXPCEncoder().testEncodingTopLevelEmptyStruct() }
@@ -307,4 +351,5 @@ XPCEncoderTests.test("testEncodingTopLevelStructuredStruct") { TestXPCEncoder().
 XPCEncoderTests.test("testEncodingTopLevelStructuredClass") { TestXPCEncoder().testEncodingTopLevelStructuredClass() }
 XPCEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") { TestXPCEncoder().testEncodingTopLevelStructuredSingleStruct() }
 XPCEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestXPCEncoder().testEncodingTopLevelStructuredSingleClass() }
+XPCEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestXPCEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
 runAllTests()
