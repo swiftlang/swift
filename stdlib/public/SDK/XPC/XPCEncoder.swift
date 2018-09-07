@@ -22,19 +22,36 @@ public enum XPCSerializationError: Error {
     case notYetImplemented
 }
 
-open class XPCEncoder: Encoder {
+public class XPCEncoder: Encoder {
+    private enum ContainerKind: String {
+        case Keyed
+        case Unkeyed
+        case SingleValue
+        case None
+    }
+
     public var codingPath: [CodingKey]
 
     public var userInfo: [CodingUserInfoKey : Any] = [:]
 
     var topLevelContainer: xpc_object_t?
 
+    private var containerKind: ContainerKind = .None
+
     public init(at codingPath: [CodingKey] = []) {
         self.codingPath = codingPath
     }
 
     public func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
-        self.topLevelContainer = xpc_dictionary_create(nil, nil, 0)
+        switch self.containerKind {
+        case .None:
+            self.topLevelContainer = xpc_dictionary_create(nil, nil, 0)
+            self.containerKind = .Keyed
+        case .Keyed:
+            break
+        default:
+            preconditionFailure("This encoder already has a container of kind \(self.containerKind)")
+        }
 
         // It is OK to force this because we are explicitly passing a dictionary
         let container = try! XPCKeyedEncodingContainer<Key>(referencing: self, wrapping: self.topLevelContainer!)
@@ -42,13 +59,28 @@ open class XPCEncoder: Encoder {
     }
 
     public func unkeyedContainer() -> UnkeyedEncodingContainer {
-        self.topLevelContainer = xpc_array_create(nil, 0)
+        switch self.containerKind {
+        case .None:
+            self.topLevelContainer = xpc_array_create(nil, 0)
+            self.containerKind = .Unkeyed
+        case .Unkeyed:
+            break
+        default:
+            preconditionFailure("This encoder already has a container of kind \(self.containerKind)")
+        }
 
         //It is OK to force this through becasue we are explicitly passing an array
         return try! XPCUnkeyedEncodingContainer(referencing: self, wrapping: self.topLevelContainer!)
     }
 
     public func singleValueContainer() -> SingleValueEncodingContainer {
+        switch self.containerKind {
+        case .None:
+            self.containerKind = .SingleValue
+        default:
+            preconditionFailure("This encoder already has a container of kind \(self.containerKind)")
+        }
+
         let inserter = XPCSingleValueEncoderInserter(into: self)
 
         return XPCSingleValueEncodingContainer(referencing: self, inserter: inserter)
