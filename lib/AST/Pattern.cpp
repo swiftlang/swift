@@ -403,7 +403,7 @@ SourceRange TuplePattern::getSourceRange() const {
 TypedPattern::TypedPattern(Pattern *pattern, TypeRepr *tr,
                            Optional<bool> implicit)
   : Pattern(PatternKind::Typed), SubPattern(pattern), PatTypeRepr(tr) {
-  if (implicit.getValueOr(false) || !tr || !tr->getSourceRange().isValid())
+  if (implicit ? *implicit : tr && !tr->getSourceRange().isValid())
     setImplicit();
   Bits.TypedPattern.IsPropagatedType = false;
 }
@@ -431,6 +431,9 @@ SourceRange TypedPattern::getSourceRange() const {
     // be explicit or implicit.
     return SubPattern->getSourceRange();
   }
+
+  if (!PatTypeRepr)
+    return SourceRange();
 
   if (SubPattern->isImplicit())
     return PatTypeRepr->getSourceRange();

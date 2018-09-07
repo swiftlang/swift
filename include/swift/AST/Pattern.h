@@ -383,11 +383,18 @@ public:
 /// dynamic type match.
 class TypedPattern : public Pattern {
   Pattern *SubPattern;
-  mutable TypeRepr *PatTypeRepr;
+  TypeRepr *PatTypeRepr;
 
 public:
+  /// Creates a new TypedPattern which annotates the provided sub-pattern with
+  /// the provided TypeRepr. If 'implicit' is true, the pattern will be
+  /// set to implicit. If false, it will not. If 'implicit' is not provided,
+  /// then the pattern will be set to 'implicit' if there is a provided TypeRepr
+  /// which has a valid SourceRange.
   TypedPattern(Pattern *pattern, TypeRepr *tr, Optional<bool> implicit = None);
 
+  /// Creates an implicit typed pattern annotating the provided sub-pattern
+  /// with a given type.
   static TypedPattern *
   createImplicit(ASTContext &ctx, Pattern *pattern, Type type) {
     auto tp = new (ctx) TypedPattern(pattern, /*typeRepr*/nullptr,
