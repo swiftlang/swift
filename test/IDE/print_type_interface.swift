@@ -77,9 +77,9 @@ extension D {
 // TYPE4-NOT: public func joined
 
 // RUN: %target-swift-ide-test -print-type-interface -usr=_TtGSaSS_ -module-name print_type_interface -source-filename %s | %FileCheck %s -check-prefix=TYPE5
-// TYPE5-DAG: public __consuming func prefix(_ maxLength: Int) -> ArraySlice<String>
-// TYPE5-DAG: public __consuming func suffix(_ maxLength: Int) -> ArraySlice<String>
-// TYPE5-DAG: public __consuming func split(separator: String, maxSplits: Int = Int.max, omittingEmptySubsequences: Bool = true) -> [ArraySlice<String>]
+// TYPE5-DAG: public __consuming func prefix(_ maxLength: Int) -> Slice<Array<String>>
+// TYPE5-DAG: public __consuming func suffix(_ maxLength: Int) -> Slice<Array<String>>
+// TYPE5-DAG: public __consuming func split(separator: String, maxSplits: Int = Int.max, omittingEmptySubsequences: Bool = true) -> [Slice<Array<String>>]
 // TYPE5-DAG: public func formIndex(_ i: inout Int, offsetBy distance: Int)
 // TYPE5-DAG: public func distance(from start: Int, to end: Int) -> Int
 // TYPE5-DAG: public func joined(separator: String = "") -> String
