@@ -117,8 +117,8 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr, PersistentState);
   PrettyStackTraceParser StackTrace(P);
 
-  llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens, true);
-
+  llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
+                               SF.hasInterfaceHash());
   if (DelayedParseCB)
     P.setDelayedParsingCallbacks(DelayedParseCB);
 
