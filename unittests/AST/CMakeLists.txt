@@ -1,7 +1,7 @@
 add_swift_unittest(SwiftASTTests
   ArithmeticEvaluator.cpp
-  SILReverseAutoDiffIndices.cpp
   DiagnosticConsumerTests.cpp
+  SILReverseAutoDiffIndices.cpp
   SourceLocTests.cpp
   TestContext.cpp
   TypeMatchTests.cpp

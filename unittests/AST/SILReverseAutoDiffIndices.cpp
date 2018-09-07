@@ -12,7 +12,6 @@
 
 #include "swift/AST/AutoDiff.h"
 #include "gtest/gtest.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
