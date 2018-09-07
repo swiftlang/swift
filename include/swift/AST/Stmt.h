@@ -798,6 +798,7 @@ class ForEachStmt : public LabeledStmt {
   Expr *Sequence;
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
+  bool isOptional;
   
   /// The iterator variable along with its initializer.
   PatternBindingDecl *Iterator = nullptr;
@@ -808,11 +809,11 @@ class ForEachStmt : public LabeledStmt {
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, Pattern *Pat,
               SourceLoc InLoc, Expr *Sequence, Expr *WhereExpr, BraceStmt *Body,
-              Optional<bool> implicit = None)
+              bool isOptional, Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                   LabelInfo),
       ForLoc(ForLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
-      WhereExpr(WhereExpr), Body(Body) {
+      WhereExpr(WhereExpr), Body(Body), isOptional(isOptional) {
     setPattern(Pat);
   }
   
@@ -821,7 +822,15 @@ public:
 
   /// getInLoc - Retrieve the location of the 'in' keyword.
   SourceLoc getInLoc() const { return InLoc; }
-  
+
+  /// Retrieve the location of '?' in 'for?', present when the iteration
+  /// is optional.
+  SourceLoc getQuestionLoc() const {
+    return ForLoc.isInvalid() ? ForLoc : ForLoc.getAdvancedLoc(3);
+  }
+
+  bool getIsOptional() const { return isOptional; }
+
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.
   Pattern *getPattern() const { return Pat; }

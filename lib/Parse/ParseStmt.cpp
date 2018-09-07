@@ -2003,7 +2003,7 @@ static bool isStmtForCStyle(Parser &P) {
 
 /// 
 ///   stmt-for-each:
-///     (identifier ':')? 'for' pattern 'in' expr-basic \
+///     (identifier ':')? 'for'(?)? pattern 'in' expr-basic \
 ///             ('where' expr-basic)? stmt-brace
 ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   SyntaxContext->setCreateSyntax(SyntaxKind::ForInStmt);
@@ -2011,12 +2011,16 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   ParserStatus Status;
   ParserResult<Pattern> pattern;
   ParserResult<Expr> Container;
+  bool isOptional = false;
 
   // The C-style for loop which was supported in Swift2 and foreach-style-for
   // loop are conflated together into a single keyword, so we have to do some
   // lookahead to resolve what is going on.
   bool IsCStyleFor = isStmtForCStyle(*this);
   auto StartOfControl = Tok.getLoc();
+
+  if (consumeIf(tok::question_postfix))
+    isOptional = true;
 
   // Parse the pattern.  This is either 'case <refutable pattern>' or just a
   // normal pattern.
@@ -2122,9 +2126,9 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
 
   return makeParserResult(
       Status,
-      new (Context) ForEachStmt(LabelInfo, ForLoc, pattern.get(), InLoc,
-                                Container.get(), Where.getPtrOrNull(),
-                                Body.get()));
+      new (Context) ForEachStmt(LabelInfo, ForLoc, pattern.get(),
+                                InLoc, Container.get(), Where.getPtrOrNull(),
+                                Body.get(), isOptional));
 }
 
 ///
