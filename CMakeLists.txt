@@ -354,7 +354,7 @@ endfunction()
 # Print out path and version of any installed commands.
 # We migth be using the wrong version of a command, so record them all.
 function(print_versions)
-  find_version("cmake" "--version" TRUE)
+  find_version("${CMAKE_COMMAND}" "--version" TRUE)
 
   message(STATUS "Finding version for: ${CMAKE_COMMAND}")
   message(STATUS "Found version: ${CMAKE_VERSION}")
@@ -726,7 +726,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
     COMMAND "xcodebuild" "-version"
     OUTPUT_VARIABLE xcode_version
     OUTPUT_STRIP_TRAILING_WHITESPACE)
-  string(REPLACE "\n" ", " xcode_version ${xcode_version})
+  string(REPLACE "\n" ", " xcode_version "${xcode_version}")
   message(STATUS "${xcode_version}")
   message(STATUS "")
 
