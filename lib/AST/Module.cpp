@@ -36,6 +36,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Token.h"
+#include "swift/Strings.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1004,6 +1005,33 @@ bool ModuleDecl::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
   });
 }
 
+void
+ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
+  std::sort(imports.begin(), imports.end(),
+            [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
+    // Arbitrarily sort by name to get a deterministic order.
+    // FIXME: Submodules don't get sorted properly here.
+    if (lhs.second != rhs.second)
+      return lhs.second->getName().str() < rhs.second->getName().str();
+    using AccessPathElem = std::pair<Identifier, SourceLoc>;
+    return std::lexicographical_compare(lhs.first.begin(), lhs.first.end(),
+                                        rhs.first.begin(), rhs.first.end(),
+                                        [](const AccessPathElem &lElem,
+                                           const AccessPathElem &rElem) {
+      return lElem.first.str() < rElem.first.str();
+    });
+  });
+  auto last = std::unique(imports.begin(), imports.end(),
+                          [](const ImportedModule &lhs,
+                             const ImportedModule &rhs) -> bool {
+    if (lhs.second != rhs.second)
+      return false;
+    return ModuleDecl::isSameAccessPath(lhs.first, rhs.first);
+  });
+  imports.erase(last, imports.end());
+}
+
+
 StringRef ModuleDecl::getModuleFilename() const {
   // FIXME: Audit uses of this function and figure out how to migrate them to
   // per-file names. Modules can consist of more than one file.
@@ -1032,6 +1060,10 @@ bool ModuleDecl::isStdlibModule() const {
 
 bool ModuleDecl::isSwiftShimsModule() const {
   return !getParent() && getName() == getASTContext().SwiftShimsModuleName;
+}
+
+bool ModuleDecl::isOnoneSupportModule() const {
+  return !getParent() && getName().str() == SWIFT_ONONE_SUPPORT;
 }
 
 bool ModuleDecl::isBuiltinModule() const {

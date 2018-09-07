@@ -373,6 +373,12 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
+  /// Uniques the items in \p imports, ignoring the source locations of the
+  /// access paths.
+  ///
+  /// The order of items in \p imports is \e not preserved.
+  static void removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports);
+
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -459,6 +465,9 @@ public:
 
   /// \returns true if this module is the "builtin" module.
   bool isBuiltinModule() const;
+
+  /// \returns true if this module is the "SwiftOnoneSupport" module;
+  bool isOnoneSupportModule() const;
 
   /// \returns true if this module is a system module; note that the StdLib is
   /// considered a system module.
