@@ -29,21 +29,19 @@ ComponentStep::ComponentScope::ComponentScope(ComponentStep &component)
   CS.solverState->PartialSolutionScope = SolverScope;
 }
 
-SolverStep::StepResult SplitterStep::advance() {
+StepResult SplitterStep::advance() {
   switch (State) {
   case StepState::Split: {
     SmallVector<SolverStep *, 4> nextSteps;
     computeFollowupSteps(nextSteps);
 
     State = StepState::Merge;
-    return {ConstraintSystem::SolutionKind::Unsolved, std::move(nextSteps)};
+    return StepResult::unsolved(nextSteps);
   }
 
   case StepState::Merge: {
-    auto result = mergePartialSolutions()
-                      ? ConstraintSystem::SolutionKind::Solved
-                      : ConstraintSystem::SolutionKind::Error;
-    return {result, {}};
+    return mergePartialSolutions() ? StepResult::success()
+                                   : StepResult::failure();
   }
   }
 }
@@ -168,7 +166,7 @@ bool SplitterStep::mergePartialSolutions() const {
   return anySolutions;
 }
 
-SolverStep::StepResult ComponentStep::advance() {
+StepResult ComponentStep::advance() {
   if (!Scope) {
     Scope = new (CS.getAllocator()) ComponentScope(*this);
 
@@ -187,12 +185,12 @@ SolverStep::StepResult ComponentStep::advance() {
         (!disjunction ||
          (!bestBindings->InvolvesTypeVariables && !bestBindings->FullyBound))) {
       // Produce a type variable step.
-      auto *step = TypeVariableStep::create(CS, *bestBindings, Solutions);
-      return {ConstraintSystem::SolutionKind::Unsolved, {step}};
+      return StepResult::unsolved(
+          TypeVariableStep::create(CS, *bestBindings, Solutions));
     } else if (disjunction) {
       // Produce a disjunction step.
-      auto *step = DisjunctionStep::create(CS, disjunction, Solutions);
-      return {ConstraintSystem::SolutionKind::Unsolved, {step}};
+      return StepResult::unsolved(
+          DisjunctionStep::create(CS, disjunction, Solutions));
     }
 
     // If there are no disjunctions or type variables to bind
@@ -200,12 +198,12 @@ SolverStep::StepResult ComponentStep::advance() {
     // allowed in the solution.
     if (!CS.solverState->allowsFreeTypeVariables() ||
         !CS.hasFreeTypeVariables())
-      return {ConstraintSystem::SolutionKind::Error, {}};
+      return StepResult::failure();
 
     // If this solution is worse than the best solution we've seen so far,
     // skip it.
     if (CS.worseThanBestSolution())
-      return {ConstraintSystem::SolutionKind::Error, {}};
+      return StepResult::failure();
 
     // If we only have relational or member constraints and are allowing
     // free type variables, save the solution.
@@ -215,7 +213,7 @@ SolverStep::StepResult ComponentStep::advance() {
       case ConstraintClassification::Member:
         continue;
       default:
-        return {ConstraintSystem::SolutionKind::Error, {}};
+        return StepResult::failure();
       }
     }
 
@@ -226,7 +224,7 @@ SolverStep::StepResult ComponentStep::advance() {
     }
 
     Solutions.push_back(std::move(solution));
-    return {ConstraintSystem::SolutionKind::Solved, {}};
+    return StepResult::success();
   }
 
   // For each of the partial solutions, subtract off the current score.
@@ -239,16 +237,12 @@ SolverStep::StepResult ComponentStep::advance() {
   // combinations we need to produce; in the common case, down to a single
   // combination.
   filterSolutions(Solutions, /*minimize=*/true);
-  return {ConstraintSystem::SolutionKind::Solved, {}};
+  return StepResult::success();
 }
 
-SolverStep::StepResult TypeVariableStep::advance() {
-  return {ConstraintSystem::SolutionKind::Error, {}};
-}
+StepResult TypeVariableStep::advance() { return StepResult::failure(); }
 
-SolverStep::StepResult DisjunctionStep::advance() {
-  return {ConstraintSystem::SolutionKind::Error, {}};
-}
+StepResult DisjunctionStep::advance() { return StepResult::failure(); }
 
 bool DisjunctionStep::shouldSkipChoice(DisjunctionChoice &choice) const {
   return false;

@@ -31,6 +31,44 @@ using namespace llvm;
 namespace swift {
 namespace constraints {
 
+struct StepResult {
+  using Kind = ConstraintSystem::SolutionKind;
+
+private:
+  Kind ResultKind;
+  SmallVector<SolverStep *, 4> NextSteps;
+
+  StepResult(Kind kind) : ResultKind(kind) {}
+
+  StepResult(Kind kind, SolverStep *step) : ResultKind(kind) {
+    NextSteps.push_back(step);
+  }
+
+  StepResult(Kind kind, SmallVectorImpl<SolverStep *> &followup)
+      : ResultKind(kind), NextSteps(std::move(followup)) {}
+
+public:
+  StepResult() = delete;
+
+  Kind getKind() const { return ResultKind; }
+
+  void transfer(SmallVectorImpl<SolverStep *> &workList) {
+    workList.reserve(NextSteps.size());
+    workList.append(NextSteps.begin(), NextSteps.end());
+  }
+
+  static StepResult success() { return StepResult(Kind::Solved); }
+  static StepResult failure() { return StepResult(Kind::Error); }
+
+  static StepResult unsolved(SolverStep *singleStep) {
+    return StepResult(Kind::Unsolved, singleStep);
+  }
+
+  static StepResult unsolved(SmallVectorImpl<SolverStep *> &followup) {
+    return StepResult(Kind::Unsolved, followup);
+  }
+};
+
 /// Represents a single independently solveable part of
 /// the constraint system.
 class SolverStep {
@@ -41,9 +79,6 @@ protected:
   SmallVectorImpl<Solution> &Solutions;
 
 public:
-  using StepResult =
-      std::pair<ConstraintSystem::SolutionKind, SmallVector<SolverStep *, 4>>;
-
   explicit SolverStep(ConstraintSystem &cs,
                       SmallVectorImpl<Solution> &solutions)
       : CS(cs), Solutions(solutions) {}

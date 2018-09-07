@@ -1577,16 +1577,19 @@ bool ConstraintSystem::solveIteratively(
     // which should produce another steps to follow,
     // or error, which means that we'll have to stop.
     {
-      SolutionKind result;
-      SmallVector<SolverStep *, 4> followupSteps;
+      auto result = step->advance();
+      switch (result.getKind()) {
+      // It was impossible to solve this step, let's note that
+      // for followup steps, to propogate the error.
+      case SolutionKind::Error:
+        LLVM_FALLTHROUGH;
 
-      std::tie(result, followupSteps) = step->advance();
-      switch (result) {
       // Step has been solved successfully by either
       // producing a partial solution, or more steps
       // toward that solution.
       case SolutionKind::Solved: {
         workList.pop_back();
+        delete step;
         break;
       }
 
@@ -1597,15 +1600,9 @@ bool ConstraintSystem::solveIteratively(
       // binding.
       case SolutionKind::Unsolved:
         break;
-
-      // It was impossible to produce a solution for this step,
-      // let's terminate the solver loop.
-      case SolutionKind::Error:
-        return true;
       }
 
-      workList.reserve(followupSteps.size());
-      workList.append(followupSteps.begin(), followupSteps.end());
+      result.transfer(workList);
     }
   }
 
