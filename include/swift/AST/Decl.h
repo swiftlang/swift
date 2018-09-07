@@ -5155,7 +5155,7 @@ public:
       setBodyKind(BodyKind::TypeChecked);
   }
 
-  StringRef getBodyStringRepresentation(SmallVectorImpl<char> &scratch);
+  StringRef getBodyStringRepresentation(SmallVectorImpl<char> &scratch) const;
   void setBodyStringRepresentation(StringRef body) {
     BodyStringRepresentation = body;
   }

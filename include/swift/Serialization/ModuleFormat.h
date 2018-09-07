@@ -977,7 +977,6 @@ namespace decls_block {
     BCFixed<1>,   // default argument resilience expansion
     BCFixed<1>,   // 'required' but overridden is not (used for recovery)
     BCVBR<5>,     // number of parameter name components
-    BCBlob,       // inlinable body text
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // Trailed by its generic parameters, if any, followed by the parameter
@@ -1039,7 +1038,6 @@ namespace decls_block {
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // default argument resilience expansion
-    BCBlob,       // inlinable body text
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1151,7 +1149,6 @@ namespace decls_block {
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     BCVBR<5>,    // number of parameter name components
-    BCBlob,      // inlinable body text
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
                                // followed by TypeID dependencies
@@ -1178,8 +1175,7 @@ namespace decls_block {
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
-    GenericEnvironmentIDField, // generic environment
-    BCBlob       // inlinable body text
+    GenericEnvironmentIDField // generic environment
   >;
 
   using ParameterListLayout = BCRecordLayout<

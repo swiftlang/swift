@@ -5420,7 +5420,7 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
 }
 
 StringRef AbstractFunctionDecl::getBodyStringRepresentation(
-  SmallVectorImpl<char> &scratch) {
+  SmallVectorImpl<char> &scratch) const {
   if (!BodyStringRepresentation.empty())
     return BodyStringRepresentation;
 
