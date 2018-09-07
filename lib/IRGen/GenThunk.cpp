@@ -120,3 +120,13 @@ llvm::GlobalValue *IRGenModule::defineMethodDescriptor(SILDeclRef declRef,
   auto entity = LinkEntity::forMethodDescriptor(declRef);
   return defineAlias(entity, definition);
 }
+
+/// Get or create a method descriptor variable.
+llvm::Constant *
+IRGenModule::getAddrOfMethodDescriptor(SILDeclRef declRef,
+                                       ForDefinition_t forDefinition) {
+  assert(forDefinition == NotForDefinition);
+  LinkEntity entity = LinkEntity::forMethodDescriptor(declRef);
+  return getAddrOfLLVMVariable(entity, Alignment(4), forDefinition,
+                               MethodDescriptorStructTy, DebugTypeInfo());
+}
