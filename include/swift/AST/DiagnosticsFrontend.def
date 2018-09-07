@@ -260,6 +260,10 @@ ERROR(error_invalid_debug_prefix_map, none,
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))
 
+WARNING(textual_interface_scoped_import_unsupported,none,
+        "scoped imports are not yet supported in textual module interfaces",
+        ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
