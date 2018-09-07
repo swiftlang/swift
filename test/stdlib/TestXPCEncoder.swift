@@ -54,6 +54,18 @@ class TestXPCEncoder {
         _testRoundTrip(of: person)
     }
 
+    func testEncodingTopLevelStructuredSingleStruct() {
+        // Numbers is a struct which encodes as an array through a single value container.
+        let numbers = Numbers.testValue
+        _testRoundTrip(of: numbers)
+    }
+
+    func testEncodingTopLevelStructuredSingleClass() {
+        // Mapping is a class which encodes as a dictionary through a single value container.
+        let mapping = Mapping.testValue
+        _testRoundTrip(of: mapping)
+    }
+
     // MARK: - Testing helpers
     private func _testRoundTrip<T>(of value: T) where T : Codable, T: Equatable {
         var payload: xpc_object_t! = nil
@@ -228,6 +240,62 @@ fileprivate class Person : Codable, Equatable {
   }
 }
 
+/// A type which encodes as an array directly through a single value container.
+struct Numbers : Codable, Equatable {
+  let values = [4, 8, 15, 16, 23, 42]
+
+  init() {}
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let decodedValues = try container.decode([Int].self)
+    guard decodedValues == values else {
+      throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "The Numbers are wrong!"))
+    }
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(values)
+  }
+
+  static func ==(_ lhs: Numbers, _ rhs: Numbers) -> Bool {
+    return lhs.values == rhs.values
+  }
+
+  static var testValue: Numbers {
+    return Numbers()
+  }
+}
+
+/// A type which encodes as a dictionary directly through a single value container.
+fileprivate final class Mapping : Codable, Equatable {
+  let values: [String : URL]
+
+  init(values: [String : URL]) {
+    self.values = values
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    values = try container.decode([String : URL].self)
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(values)
+  }
+
+  static func ==(_ lhs: Mapping, _ rhs: Mapping) -> Bool {
+    return lhs === rhs || lhs.values == rhs.values
+  }
+
+  static var testValue: Mapping {
+    return Mapping(values: ["Apple": URL(string: "http://apple.com")!,
+                            "localhost": URL(string: "http://127.0.0.1")!])
+  }
+}
+
 // MARK: - Run the the tests!
 var XPCEncoderTests = TestSuite("TestXPCEncoder")
 XPCEncoderTests.test("testEncodingTopLevelEmptyStruct") { TestXPCEncoder().testEncodingTopLevelEmptyStruct() }
@@ -237,4 +305,6 @@ XPCEncoderTests.test("testEncodingTopLevelSingleValueStruct") { TestXPCEncoder()
 XPCEncoderTests.test("testEncodingTopLevelSingleValueClass") { TestXPCEncoder().testEncodingTopLevelSingleValueClass() }
 XPCEncoderTests.test("testEncodingTopLevelStructuredStruct") { TestXPCEncoder().testEncodingTopLevelStructuredStruct() }
 XPCEncoderTests.test("testEncodingTopLevelStructuredClass") { TestXPCEncoder().testEncodingTopLevelStructuredClass() }
+XPCEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") { TestXPCEncoder().testEncodingTopLevelStructuredSingleStruct() }
+XPCEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestXPCEncoder().testEncodingTopLevelStructuredSingleClass() }
 runAllTests()
