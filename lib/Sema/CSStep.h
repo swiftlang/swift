@@ -173,14 +173,53 @@ private:
 };
 
 class ComponentStep final : public SolverStep {
-  class ComponentScope;
+  enum class State { Setup, Filter, Done };
 
+  class Scope {
+    ConstraintSystem &CS;
+    ConstraintSystem::SolverScope *SolverScope;
+
+    SmallVector<TypeVariableType *, 16> TypeVars;
+    ConstraintList Constraints;
+
+    ConstraintSystem::SolverScope *PrevPartialScope = nullptr;
+
+  public:
+    Scope(const ComponentStep &component);
+
+    ~Scope() {
+      delete SolverScope; // rewind back all of the changes.
+      CS.solverState->PartialSolutionScope = PrevPartialScope;
+
+      // return all of the saved type variables back to the system.
+      CS.TypeVariables = std::move(TypeVars);
+      // return all of the saved constraints back to the system.
+      CS.InactiveConstraints.splice(CS.InactiveConstraints.end(), Constraints);
+    }
+  };
+
+  /// The position of the component in the set of
+  /// components produced by "split" step.
   unsigned Index;
+
+  /// Indicates whether this is only component produced
+  /// by "split" step. This information opens optimization
+  /// opportunity, because if there are no other components,
+  /// constraint system doesn't have to pruned from
+  /// unrelated type variables and their constraints.
+  bool IsSingleComponent;
+
+  /// The score associated with constraint system before
+  /// the component step is taken.
   Score OriginalScore;
 
-  // If this step depends on other smaller steps to be solved first
-  // we need to keep active scope until all of the work is done.
-  ComponentScope *Scope;
+  /// If this step depends on other smaller steps to be solved first
+  /// we need to keep active scope until all of the work is done.
+  std::unique_ptr<Scope> ComponentScope;
+
+  /// The current state of the component, since it depends on other
+  /// steps to be complete first, it makes it easier what is going on.
+  State ComponentState = State::Setup;
 
   // Type variables and constraints "in scope" of this step.
   SmallVector<TypeVariableType *, 16> TypeVars;
@@ -190,21 +229,12 @@ class ComponentStep final : public SolverStep {
   /// with it, which makes it disconnected in the graph.
   Constraint *OrphanedConstraint;
 
-  ComponentStep(ConstraintSystem &cs, unsigned index,
+  ComponentStep(ConstraintSystem &cs, unsigned index, bool singleComponent,
                 SmallVectorImpl<Solution> &solutions)
       : SolverStep(cs, solutions), Index(index),
         OriginalScore(getCurrentScore()) {}
 
 public:
-  ~ComponentStep() {
-    if (!Scope)
-      return;
-
-    // Since the step is no longer needed, it's same to rewind active scope.
-    delete Scope;
-    Scope = nullptr;
-  }
-
   /// Record a type variable as associated with this step.
   void record(TypeVariableType *typeVar) { TypeVars.push_back(typeVar); }
 
@@ -221,35 +251,22 @@ public:
   StepResult take(bool prevFailed) override;
 
   static ComponentStep *create(ConstraintSystem &cs, unsigned index,
+                               bool singleComponent,
                                SmallVectorImpl<Solution> &solutions) {
-    return new (cs.getAllocator()) ComponentStep(cs, index, solutions);
+    return new (cs.getAllocator())
+        ComponentStep(cs, index, singleComponent, solutions);
   }
 
 private:
-  class ComponentScope {
-    friend class SolverStep;
+  StepResult markAsDone(bool success = true) {
+    ComponentState = State::Done;
+    return success ? StepResult::success() : StepResult::failure();
+  }
 
-    ConstraintSystem &CS;
-    ConstraintSystem::SolverScope *SolverScope;
-
-    SmallVector<TypeVariableType *, 16> TypeVars;
-    ConstraintList Constraints;
-
-    ConstraintSystem::SolverScope *PrevPartialScope = nullptr;
-
-  public:
-    ComponentScope(ComponentStep &component);
-
-    ~ComponentScope() {
-      delete SolverScope; // rewind back all of the changes.
-      CS.solverState->PartialSolutionScope = PrevPartialScope;
-
-      // return all of the saved type variables back to the system.
-      CS.TypeVariables = std::move(TypeVars);
-      // return all of the saved constraints back to the system.
-      CS.InactiveConstraints.splice(CS.InactiveConstraints.end(), Constraints);
-    }
-  };
+  StepResult dispatchFollowup(SolverStep *step) {
+    ComponentState = State::Filter;
+    return StepResult::unsolved(step);
+  }
 };
 
 class TypeVariableStep final : public SolverStep {
