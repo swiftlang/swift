@@ -118,6 +118,11 @@ private:
     // This must always be the first item in the immediate members.
     asImpl().addGenericFields(theClass, theClass);
 
+    // If the class is resilient, we cannot make any assumptions about its
+    // member layout at all, so skip the rest of this method.
+    if (IGM.isResilient(theClass, ResilienceExpansion::Maximal))
+      return;
+
     // Add vtable entries.
     asImpl().addVTableEntries(theClass);
 
