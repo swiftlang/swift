@@ -3332,6 +3332,8 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
 }
 
 bool Parser::canDelayBodyParsing() {
+  if (IsParsingInterfaceTokens)
+    return false;
   if (SF.Kind == SourceFileKind::REPL)
     return false;
   // We always collect the entire syntax tree for IDE uses.
