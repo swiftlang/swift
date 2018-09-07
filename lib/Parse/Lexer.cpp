@@ -272,8 +272,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
   return Result;
 }
 
-void Lexer::formToken(tok Kind, const char *TokStart,
-                      bool IsMultilineString, unsigned CustomDelimiterLen) {
+void Lexer::formToken(tok Kind, const char *TokStart) {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
@@ -305,8 +304,7 @@ void Lexer::formToken(tok Kind, const char *TokStart,
     lexTrivia(TrailingTrivia, /* IsForTrailingTrivia */ true);
   }
 
-  NextToken.setToken(Kind, TokenText, CommentLength,
-                     IsMultilineString, CustomDelimiterLen);
+  NextToken.setToken(Kind, TokenText, CommentLength);
 }
 
 void Lexer::formEscapedIdentifierToken(const char *TokStart) {
@@ -324,6 +322,20 @@ void Lexer::formEscapedIdentifierToken(const char *TokStart) {
   if (NextToken.is(tok::eof))
     return;
   NextToken.setEscapedIdentifier(true);
+}
+
+static void validateMultilineIndents(const Token &Str, DiagnosticEngine *Diags);
+
+void Lexer::formStringLiteralToken(const char *TokStart,
+                                   bool IsMultilineString,
+                                   unsigned CustomDelimiterLen) {
+  formToken(tok::string_literal, TokStart);
+  if (NextToken.is(tok::eof))
+    return;
+  NextToken.setStringLiteral(IsMultilineString, CustomDelimiterLen);
+
+  if (IsMultilineString && Diags)
+    validateMultilineIndents(NextToken, Diags);
 }
 
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
@@ -1827,11 +1839,8 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         if (wasErroneous)
           return formToken(tok::unknown, TokStart);
 
-        formToken(tok::string_literal, TokStart,
-                  IsMultilineString, CustomDelimiterLen);
-        if (IsMultilineString && Diags)
-          validateMultilineIndents(NextToken, Diags);
-        return;
+        return formStringLiteralToken(TokStart, IsMultilineString,
+                                      CustomDelimiterLen);
       }
     }
   }
