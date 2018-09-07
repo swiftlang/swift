@@ -1106,7 +1106,7 @@ bool swift::checkOverrides(ValueDecl *decl) {
       return false;
     }
 
-    // Try to match with the
+    // Try to match with this attempt kind.
     matches = matcher.match(attempt);
     if (!matches.empty())
       break;
