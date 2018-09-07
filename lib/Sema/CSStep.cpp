@@ -29,7 +29,12 @@ ComponentStep::ComponentScope::ComponentScope(ComponentStep &component)
   CS.solverState->PartialSolutionScope = SolverScope;
 }
 
-StepResult SplitterStep::advance() {
+StepResult SplitterStep::take(bool prevFailed) {
+  // If we came back to this step and previous (one of the components)
+  // failed, it means that we can't solve this step either.
+  if (prevFailed)
+    return StepResult::failure();
+
   switch (State) {
   case StepState::Split: {
     SmallVector<SolverStep *, 4> nextSteps;
@@ -166,7 +171,14 @@ bool SplitterStep::mergePartialSolutions() const {
   return anySolutions;
 }
 
-StepResult ComponentStep::advance() {
+StepResult ComponentStep::take(bool prevFailed) {
+  // If we came either back to this step and previous
+  // (either disjunction or type var) failed, or
+  // one of the previous components created by "split"
+  // failed, it means that we can't solve this component.
+  if (prevFailed)
+    return StepResult::failure();
+
   if (!Scope) {
     Scope = new (CS.getAllocator()) ComponentScope(*this);
 
@@ -240,9 +252,13 @@ StepResult ComponentStep::advance() {
   return StepResult::success();
 }
 
-StepResult TypeVariableStep::advance() { return StepResult::failure(); }
+StepResult TypeVariableStep::take(bool prevFailed) {
+  return StepResult::failure();
+}
 
-StepResult DisjunctionStep::advance() { return StepResult::failure(); }
+StepResult DisjunctionStep::take(bool prevFailed) {
+  return StepResult::failure();
+}
 
 bool DisjunctionStep::shouldSkipChoice(DisjunctionChoice &choice) const {
   return false;
