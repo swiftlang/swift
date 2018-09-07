@@ -414,6 +414,43 @@ void SingleExitLoopTransformer::computeEscapingValues() {
       llvm::for_each(inst.getResults(), saveEscaping);
     }
   }
+
+  // Find a def-free path from the common exit to the preheader for each
+  // escaping value. If no such path is found, set the escaping value at header
+  // to undef.
+  for (auto &kv : escapingValueSubstMap) {
+    const SILValue &escapingValue = kv.first;
+    // FIXME: We should explore the data dependencies in DFS order. Currently,
+    // the order of iteration is arbitrary. DFS should be more efficient.
+    SmallPtrSet<SILValue, 8> worklist;
+    SmallPtrSet<SILValue, 8> visited;
+    worklist.insert(escapingValue);
+    while (!worklist.empty()) {
+      SILValue current = *worklist.begin();
+      visited.insert(current);
+      worklist.erase(current);
+      if (auto *inst = current->getDefiningInstruction()) {
+        if (DI->dominates(inst->getParent(), preheader)) {
+          // Found a definition that we could use.
+          kv.second = current;
+          break;
+        }
+      } else if (auto *arg = dyn_cast<SILArgument>(current)) {
+        if (DI->dominates(arg->getParent(), preheader)) {
+          // Found an argument that we could use.
+          kv.second = current;
+          break;
+        }
+        // This is not usable. Add incoming values to worklist.
+        SmallVector<SILValue, 8> incomingValues;
+        arg->getIncomingValues(incomingValues);
+        for (const SILValue &incomingValue : incomingValues) {
+          if (visited.count(incomingValue) > 0) continue;
+          worklist.insert(incomingValue);
+        }
+      }
+    }
+  }
 }
 
 /// Appends the given arguments to the given edge. Deletes the old TermInst
