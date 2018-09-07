@@ -700,11 +700,11 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       if (!inferredType->isMaterializable())
         return true;
 
-      // If the type contains both a type parameter and an archetype,
-      // there is nothing we can infer from it.
+      // If the type contains a type parameter, there is nothing we can infer
+      // from it.
       // FIXME: This is a weird state introduced by associated type inference
       // that should not exist.
-      if (inferredType->hasTypeParameter() && inferredType->hasArchetype())
+      if (inferredType->hasTypeParameter())
         return true;
 
       auto proto = Conformance->getProtocol();
