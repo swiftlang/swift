@@ -167,11 +167,23 @@ func testMatchingPatterns() {
 
 // <rdar://problem/21662365> QoI: diagnostic for for-each over an optional sequence isn't great
 func testOptionalSequence() {
-  let array : [Int]?
-  for x in array {  // expected-error {{value of optional type '[Int]?' must be unwrapped}}
-    // expected-note@-1{{coalesce}}
-    // expected-note@-2{{force-unwrap}}
-  }
+  let array : [Int]? = nil
+  for x in array { } // expected-warning {{immutable value}}
+  // expected-error@-1 {{value of optional type '[Int]?' must be unwrapped}}
+  // expected-note@-2 {{use 'for?'}} {{6-6=?}}
+  // expected-note@-3 {{coalesce}}
+  // expected-note@-4 {{force-unwrap}}
+
+  let array1 : [Int] = []
+  let array2 : [Int?]? = nil
+
+  for? x in array1 { } // expected-warning {{immutable value}}
+  // expected-error@-1{{optional for-in loop must not be used on non-optional sequence of type '[Int]'}} {{6-7=}}
+
+  for? _ in array { }                  // Ok
+  for? x in array where x > 0 { }      // Ok
+  for? case .some(let x) in array2 { } // expected-warning {{immutable value}}
+  for? x in Optional.some(0...10) { }  // expected-warning {{immutable value}}
 }
 
 // Crash with (invalid) for each over an existential
