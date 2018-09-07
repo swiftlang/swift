@@ -1096,9 +1096,6 @@ public:
   DifferentiationTask *
   lookUpDifferentiationTask(SILFunction *original,
                             const SILReverseAutoDiffIndices &indices) {
-    auto *attr = lookupReverseDifferentiableAttr(original, indices);
-    if (!attr)
-      return nullptr;
     auto existing = enqueuedTaskIndices.find({original, indices});
     if (existing == enqueuedTaskIndices.end())
       return nullptr;
@@ -1149,6 +1146,7 @@ public:
     std::unique_ptr<DifferentiationTask> task(
         new DifferentiationTask(original, std::move(attr), module, invoker));
     differentiationTasks.push_back(std::move(task));
+    enqueuedTaskIndices.insert({{original, indices}, differentiationTasks.size() - 1});
     return differentiationTasks.back().get();
   }
 
@@ -2920,10 +2918,10 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
 
 SILFunction *
 AdjointGen::lookupAdjointOrScheduleSynthesis(DifferentiationTask *task) {
-  // If the original function already has a primal, skip this task.
+  // If the original function already has an adjoint, skip this task.
   if (auto *existingAdjoint = task->getAdjoint())
     return existingAdjoint;
-  // Create a primal function.
+  // Create an adjoint function.
   SILFunction *newAdjoint = createEmptyAdjoint(task);
   // Create a synthesis item and push it to the worklist.
   FunctionSynthesisItem synthesis{task->getOriginal(), newAdjoint,

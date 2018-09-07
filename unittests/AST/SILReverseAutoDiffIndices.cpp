@@ -16,7 +16,9 @@
 
 using namespace swift;
 
-TEST(SILReverseAutoDiffIndices, Equality) {
+TEST(SILReverseAutoDiffIndices, EqualityAndHash) {
+  using IndicesDenseMapInfo = llvm::DenseMapInfo<SILReverseAutoDiffIndices>;
+
   std::array<unsigned, 0> empty;
   // Each example is distinct.
   SILReverseAutoDiffIndices examples[] = {
@@ -40,10 +42,17 @@ TEST(SILReverseAutoDiffIndices, Equality) {
     EXPECT_TRUE(example1.parameters.size() < grownExample1.parameters.size());
 
     // Test that the example is equal to itself and to the grown version of
-    // itself.
+    // itself, using both operator== and IndicesDenseMapInfo::isEqual.
     EXPECT_TRUE(example1 == example1);
     EXPECT_TRUE(example1 == grownExample1);
     EXPECT_TRUE(grownExample1 == example1);
+    EXPECT_TRUE(IndicesDenseMapInfo::isEqual(example1, example1));
+    EXPECT_TRUE(IndicesDenseMapInfo::isEqual(example1, grownExample1));
+    EXPECT_TRUE(IndicesDenseMapInfo::isEqual(grownExample1, example1));
+
+    // Test that the grown version has the same hash as the original.
+    EXPECT_EQ(IndicesDenseMapInfo::getHashValue(example1),
+              IndicesDenseMapInfo::getHashValue(grownExample1));
 
     // Test that the example is not equal to any of the others.
     for (size_t j = i + 1; j < exampleCount; ++j) {
@@ -56,12 +65,18 @@ TEST(SILReverseAutoDiffIndices, Equality) {
 
       EXPECT_FALSE(example1 == example2);
       EXPECT_FALSE(example2 == example1);
+      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(example1, example2));
+      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(example2, example1));
 
       EXPECT_FALSE(example1 == grownExample2);
       EXPECT_FALSE(grownExample2 == example1);
+      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(example1, grownExample2));
+      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(grownExample2, example1));
 
       EXPECT_FALSE(example2 == grownExample1);
       EXPECT_FALSE(grownExample1 == example2);
+      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(example2, grownExample1));
+      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(grownExample1, example2));
     }
   }
 }
