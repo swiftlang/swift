@@ -2902,6 +2902,15 @@ void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
                   ParseDeclOptions(DelayedState->Flags),
                   [&] (Decl *D) { ext->addMember(D); });
     ext->setBraces({LBLoc, RBLoc});
+  } else if (auto *cd = dyn_cast<ClassDecl>(D)) {
+    auto handler = [&] (Decl *D) {
+      cd->addMember(D);
+      if (isa<DestructorDecl>(D))
+        cd->setHasDestructor();
+    };
+    parseDeclList(cd->getBraces().Start, RBLoc, Id,
+                  ParseDeclOptions(DelayedState->Flags), handler);
+    cd->setBraces({LBLoc, RBLoc});
   } else {
     auto *ntd = cast<NominalTypeDecl>(D);
     parseDeclList(ntd->getBraces().Start, RBLoc, Id,
@@ -5942,6 +5951,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
+  auto PosBeforeLB = Tok.getLoc();
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
     LBLoc = PreviousLoc;
     RBLoc = LBLoc;
@@ -5951,14 +5961,25 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor |
                              PD_InClass);
-    auto Handler = [&] (Decl *D) {
-      CD->addMember(D);
-      if (isa<DestructorDecl>(D))
-        CD->setHasDestructor();
-    };
-    if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_class,
-                      Options, Handler))
-      Status.setIsParseError();
+    if (canDelayMemberDeclParsing()) {
+      if (Tok.is(tok::r_brace)) {
+        RBLoc = consumeToken();
+      } else {
+        RBLoc = Tok.getLoc();
+        Status.setIsParseError();
+      }
+      State->delayDeclList(CD, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
+                           PosBeforeLB);
+    } else {
+      auto Handler = [&] (Decl *D) {
+        CD->addMember(D);
+        if (isa<DestructorDecl>(D))
+          CD->setHasDestructor();
+      };
+      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_class,
+                        Options, Handler))
+        Status.setIsParseError();
+    }
   }
 
   CD->setBraces({LBLoc, RBLoc});
