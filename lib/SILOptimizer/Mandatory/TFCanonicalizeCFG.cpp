@@ -422,9 +422,9 @@ void SingleExitLoopTransformer::computeEscapingValues() {
   // Do not eliminate undefs unless requested for.
   if (!TFNoUndefsInSESE)  return;
 
-  // Find a def-free path from the common exit to the preheader for each
-  // escaping value. If no such path is found, set the escaping value at header
-  // to undef.
+  // Find a def-free path from the escaping value to the preheader for each
+  // escaping value. If no such path is found, set the escaping value at
+  // preheader to undef.
   for (auto &kv : escapingValueSubstMap) {
     const SILValue &escapingValue = kv.first;
     // FIXME: We should explore the data dependencies in DFS order. Currently,
