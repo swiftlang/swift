@@ -476,9 +476,23 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
     case Node::Kind::Enum:
     case Node::Kind::Class:
     case Node::Kind::TypeAlias:
+    case Node::Kind::Function:
+    case Node::Kind::Getter:
+    case Node::Kind::Setter:
+    case Node::Kind::WillSet:
+    case Node::Kind::DidSet:
+    case Node::Kind::Constructor:
+    case Node::Kind::Destructor:
       mangleGenericArgs(node->getChild(0), Separator);
       Buffer << Separator;
       Separator = '_';
+      break;
+
+    case Node::Kind::Variable:
+    case Node::Kind::Subscript:
+    case Node::Kind::ExplicitClosure:
+    case Node::Kind::ImplicitClosure:
+      mangleGenericArgs(node->getChild(0), Separator);
       break;
 
     case Node::Kind::BoundGenericOtherNominalType:
@@ -498,6 +512,18 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
       break;
     }
       
+    case Node::Kind::BoundGenericFunction: {
+      NodePointer unboundFunction = node->getChild(0);
+      assert(unboundFunction->getKind() == Node::Kind::Function ||
+             unboundFunction->getKind() == Node::Kind::Constructor);
+      NodePointer parentOrModule = unboundFunction->getChild(0);
+      mangleGenericArgs(parentOrModule, Separator);
+      Buffer << Separator;
+      Separator = '_';
+      mangleChildNodes(node->getChild(1));
+      break;
+    }
+
     case Node::Kind::Extension:
       mangleGenericArgs(node->getChild(1), Separator);
       break;
@@ -604,6 +630,19 @@ void Remangler::mangleBoundGenericProtocol(Node *node) {
 
 void Remangler::mangleBoundGenericTypeAlias(Node *node) {
   mangleAnyNominalType(node);
+}
+
+void Remangler::mangleBoundGenericFunction(Node *node) {
+  SubstitutionEntry entry;
+  if (trySubstitution(node, entry))
+    return;
+
+  NodePointer unboundFunction = getUnspecialized(node, Factory);
+  mangleFunction(unboundFunction);
+  char Separator = 'y';
+  mangleGenericArgs(node, Separator);
+  Buffer << 'G';
+  addSubstitution(entry);
 }
 
 void Remangler::mangleBuiltinTypeName(Node *node) {
@@ -2091,6 +2130,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BoundGenericProtocol:
+    case Node::Kind::BoundGenericFunction:
       return true;
 
     case Node::Kind::Structure:
@@ -2099,6 +2139,17 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::TypeAlias:
     case Node::Kind::OtherNominalType:
     case Node::Kind::Protocol:
+    case Node::Kind::Function:
+    case Node::Kind::Constructor:
+    case Node::Kind::Destructor:
+    case Node::Kind::Variable:
+    case Node::Kind::Subscript:
+    case Node::Kind::ExplicitClosure:
+    case Node::Kind::ImplicitClosure:
+    case Node::Kind::Getter:
+    case Node::Kind::Setter:
+    case Node::Kind::WillSet:
+    case Node::Kind::DidSet:
       return isSpecialized(node->getChild(0));
 
     case Node::Kind::Extension:
@@ -2110,7 +2161,21 @@ bool Demangle::isSpecialized(Node *node) {
 }
 
 NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
+  unsigned NumToCopy = 2;
   switch (node->getKind()) {
+    case Node::Kind::Function:
+    case Node::Kind::Getter:
+    case Node::Kind::Setter:
+    case Node::Kind::WillSet:
+    case Node::Kind::DidSet:
+    case Node::Kind::Constructor:
+    case Node::Kind::Destructor:
+    case Node::Kind::Variable:
+    case Node::Kind::Subscript:
+    case Node::Kind::ExplicitClosure:
+    case Node::Kind::ImplicitClosure:
+      NumToCopy = node->getNumChildren();
+      LLVM_FALLTHROUGH;
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:
@@ -2119,10 +2184,11 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
       NodePointer result = Factory.createNode(node->getKind());
       NodePointer parentOrModule = node->getChild(0);
       if (isSpecialized(parentOrModule))
-        result->addChild(getUnspecialized(parentOrModule, Factory), Factory);
-      else
-        result->addChild(parentOrModule, Factory);
-      result->addChild(node->getChild(1), Factory);
+        parentOrModule = getUnspecialized(parentOrModule, Factory);
+      result->addChild(parentOrModule, Factory);
+      for (unsigned Idx = 1; Idx < NumToCopy; ++Idx) {
+        result->addChild(node->getChild(Idx), Factory);
+      }
       return result;
     }
 
@@ -2131,17 +2197,24 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::BoundGenericClass:
     case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericOtherNominalType:
-    case Node::Kind::BoundGenericTypeAlias:
-    {
+    case Node::Kind::BoundGenericTypeAlias: {
       NodePointer unboundType = node->getChild(0);
       assert(unboundType->getKind() == Node::Kind::Type);
       NodePointer nominalType = unboundType->getChild(0);
       if (isSpecialized(nominalType))
         return getUnspecialized(nominalType, Factory);
-      else
-        return nominalType;
+      return nominalType;
     }
-      
+
+    case Node::Kind::BoundGenericFunction: {
+      NodePointer unboundFunction = node->getChild(0);
+      assert(unboundFunction->getKind() == Node::Kind::Function ||
+             unboundFunction->getKind() == Node::Kind::Constructor);
+      if (isSpecialized(unboundFunction))
+        return getUnspecialized(unboundFunction, Factory);
+      return unboundFunction;
+    }
+
     case Node::Kind::Extension: {
       NodePointer parent = node->getChild(1);
       if (!isSpecialized(parent))
