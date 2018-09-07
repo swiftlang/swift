@@ -3,6 +3,7 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace llvm;
 using namespace swift;
@@ -257,9 +258,177 @@ StepResult TypeVariableStep::take(bool prevFailed) {
 }
 
 StepResult DisjunctionStep::take(bool prevFailed) {
-  return StepResult::failure();
+  // If disjunction step is re-taken and there is
+  // an active choice, let's see if it has be solved or not.
+  if (ActiveChoice) {
+    if (CS.TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+      log.indent(CS.solverState->depth) << ")\n";
+    }
+
+    // If choice (sub-path) has failed, it's okay, other
+    // choices have to be attempted regardless, since final
+    // decision could be made only after attempting all
+    // of the choices, so let's just ignore failed ones.
+    if (!prevFailed) {
+      auto &choice = ActiveChoice->second;
+      auto score = getBestScore(Solutions);
+
+      if (!choice.isGenericOperator() && choice.isSymmetricOperator()) {
+        if (!BestNonGenericScore || score < BestNonGenericScore)
+          BestNonGenericScore = score;
+      }
+
+      // Remember the last successfully solved choice,
+      // it would be useful when disjunction is exhausted.
+      LastSolvedChoice = {choice, *score};
+    }
+
+    // Rewind back the constraint system information.
+    ActiveChoice.reset();
+  }
+
+  while (auto binding = Producer()) {
+    auto &currentChoice = *binding;
+
+    if (shouldSkipChoice(currentChoice))
+      continue;
+
+    if (shouldShortCircuitAt(currentChoice))
+      break;
+
+    if (CS.TC.getLangOpts().DebugConstraintSolver) {
+      auto &ctx = CS.getASTContext();
+      auto &log = ctx.TypeCheckerDebug->getStream();
+      log.indent(CS.solverState->depth) << "(assuming ";
+      currentChoice.print(log, &ctx.SourceMgr);
+      log << '\n';
+    }
+
+    {
+      auto scope = llvm::make_unique<Scope>(CS);
+      // Attempt current disjunction choice, which is going to simplify
+      // constraint system by binding some of the type variables. Since
+      // the system has been simplified and is splittable, we simplify
+      // have to return "split" step which is going to take care of the rest.
+      if (!currentChoice.attempt(CS))
+        continue;
+
+      // Establish the "active" choice which maintains new scope in the
+      // constraint system, be be able to rollback all of the changes later.
+      ActiveChoice.emplace(std::move(scope), currentChoice);
+      return StepResult::unsolved(SplitterStep::create(CS, Solutions));
+    }
+  }
+
+  return LastSolvedChoice ? StepResult::success() : StepResult::failure();
 }
 
-bool DisjunctionStep::shouldSkipChoice(DisjunctionChoice &choice) const {
+bool DisjunctionStep::shouldSkipChoice(const TypeBinding &choice) const {
+  auto &TC = CS.TC;
+
+  if (choice.isDisabled()) {
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+      log.indent(CS.solverState->depth) << "(skipping ";
+      choice.print(log, &TC.Context.SourceMgr);
+      log << '\n';
+    }
+
+    return true;
+  }
+
+  // Skip unavailable overloads unless solver is in the "diagnostic" mode.
+  if (!CS.shouldAttemptFixes() && choice.isUnavailable())
+    return true;
+
+  if (TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+    return false;
+
+  // Don't attempt to solve for generic operators if we already have
+  // a non-generic solution.
+
+  // FIXME: Less-horrible but still horrible hack to attempt to
+  //        speed things up. Skip the generic operators if we
+  //        already have a solution involving non-generic operators,
+  //        but continue looking for a better non-generic operator
+  //        solution.
+  if (BestNonGenericScore && choice.isGenericOperator()) {
+    auto &score = BestNonGenericScore->Data;
+    // Let's skip generic overload choices only in case if
+    // non-generic score indicates that there were no forced
+    // unwrappings of optional(s), no unavailable overload
+    // choices present in the solution, no fixes required,
+    // and there are no non-trivial function conversions.
+    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
+        score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0)
+      return true;
+  }
+
+  return false;
+}
+
+bool DisjunctionStep::shouldShortCircuitAt(
+    const DisjunctionChoice &choice) const {
+  if (!LastSolvedChoice)
+    return false;
+
+  auto *lastChoice = LastSolvedChoice->first;
+  auto delta = LastSolvedChoice->second - getCurrentScore();
+  bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
+  bool hasFixes = delta.Data[SK_Fix] > 0;
+
+  // Attempt to short-circuit evaluation of this disjunction only
+  // if the disjunction choice we are comparing to did not involve
+  // selecting unavailable overloads or result in fixes being
+  // applied to reach a solution.
+  return !hasUnavailableOverloads && !hasFixes &&
+         shortCircuitDisjunctionAt(choice, lastChoice);
+}
+
+bool DisjunctionStep::shortCircuitDisjunctionAt(
+    Constraint *currentChoice, Constraint *lastSuccessfulChoice) const {
+  auto &ctx = CS.getASTContext();
+  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
+    return false;
+
+  // If the successfully applied constraint is favored, we'll consider that to
+  // be the "best".
+  if (lastSuccessfulChoice->isFavored() && !currentChoice->isFavored()) {
+#if !defined(NDEBUG)
+    if (lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload) {
+      auto overloadChoice = lastSuccessfulChoice->getOverloadChoice();
+      assert((!overloadChoice.isDecl() ||
+              !overloadChoice.getDecl()->getAttrs().isUnavailable(ctx)) &&
+             "Unavailable decl should not be favored!");
+    }
+#endif
+
+    return true;
+  }
+
+  // Anything without a fix is better than anything with a fix.
+  if (currentChoice->getFix() && !lastSuccessfulChoice->getFix())
+    return true;
+
+  if (auto restriction = currentChoice->getRestriction()) {
+    // Non-optional conversions are better than optional-to-optional
+    // conversions.
+    if (*restriction == ConversionRestrictionKind::OptionalToOptional)
+      return true;
+
+    // Array-to-pointer conversions are better than inout-to-pointer
+    // conversions.
+    if (auto successfulRestriction = lastSuccessfulChoice->getRestriction()) {
+      if (*successfulRestriction == ConversionRestrictionKind::ArrayToPointer &&
+          *restriction == ConversionRestrictionKind::InoutToPointer)
+        return true;
+    }
+  }
+
+  // Implicit conversions are better than checked casts.
+  if (currentChoice->getKind() == ConstraintKind::CheckedCast)
+    return true;
+
   return false;
 }

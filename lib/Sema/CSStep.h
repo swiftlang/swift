@@ -1,4 +1,4 @@
-//===--- CSFix.cpp - Constraint Fixes -------------------------------------===//
+//===--- CSStep.h - Constraint Solver Steps -------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file implements the \c SolverStep class and its related types,
-// which is used by constraint solver to do iterative constraint solving.
+// which is used by constraint solver to do iterative solving.
 //
 //===----------------------------------------------------------------------===//
 
@@ -275,6 +275,8 @@ public:
 };
 
 class DisjunctionStep final : public SolverStep {
+  using Scope = ConstraintSystem::SolverScope;
+
   Constraint *Disjunction;
   SmallVector<Constraint *, 4> DisabledChoices;
   ConstraintList::iterator AfterDisjunction;
@@ -282,10 +284,10 @@ class DisjunctionStep final : public SolverStep {
   DisjunctionChoiceProducer Producer;
 
   Optional<Score> BestNonGenericScore;
-  Optional<std::pair<DisjunctionChoice, Score>> LastSolvedChoice;
+  Optional<std::pair<Constraint *, Score>> LastSolvedChoice;
 
   /// Scope initialized when attempting each disjunction choice.
-  ConstraintSystem::SolverScope *ActiveScope = nullptr;
+  Optional<std::pair<std::unique_ptr<Scope>, DisjunctionChoice>> ActiveChoice;
 
 public:
   DisjunctionStep(ConstraintSystem &cs, Constraint *disjunction,
@@ -298,6 +300,9 @@ public:
   }
 
   ~DisjunctionStep() override {
+    // Rewind back any changes left after attempting last choice.
+    ActiveChoice.reset();
+    // Return disjunction constraint back to the system.
     restore(AfterDisjunction, Disjunction);
     // Re-enable previously disabled overload choices.
     for (auto *choice : DisabledChoices)
@@ -312,7 +317,20 @@ public:
   }
 
 private:
-  bool shouldSkipChoice(DisjunctionChoice &choice) const;
+  bool shouldSkipChoice(const TypeBinding &choice) const;
+
+  /// Whether we should short-circuit a disjunction that already has a
+  /// solution when we encounter the given choice.
+  ///
+  /// FIXME: This is performance hack, which should go away.
+  ///
+  /// \params choice The disjunction choice we are about to attempt.
+  ///
+  /// \returns true if disjunction step should be considered complete,
+  ///          false otherwise.
+  bool shouldShortCircuitAt(const DisjunctionChoice &choice) const;
+  bool shortCircuitDisjunctionAt(Constraint *currentChoice,
+                                 Constraint *lastSuccessfulChoice) const;
 
   // Check if selected disjunction has a representative
   // this might happen when there are multiple binary operators
@@ -350,6 +368,21 @@ private:
       break;
     }
   };
+
+  // Figure out which of the solutions has the smallest score.
+  static Optional<Score> getBestScore(SmallVectorImpl<Solution> &solutions) {
+    assert(!solutions.empty());
+    Score bestScore = solutions.front().getFixedScore();
+    if (solutions.size() == 1)
+      return bestScore;
+
+    for (unsigned i = 1, n = solutions.size(); i != n; ++i) {
+      auto &score = solutions[i].getFixedScore();
+      if (score < bestScore)
+        bestScore = score;
+    }
+    return bestScore;
+  }
 };
 
 } // end namespace constraints

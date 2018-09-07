@@ -3419,7 +3419,14 @@ public:
       : Index(index), Flags(flags) {}
 
   virtual ~TypeBinding() {}
-  virtual void attempt(ConstraintSystem &cs) const = 0;
+
+  /// Attempt given binding in the constraint system, this is going to
+  /// introduce some new constraints (potentially "bind" constraints)
+  /// to try and associate some type variables with new types.
+  ///
+  /// \returns true if attempt has been accepted by the constraint system,
+  ///          which means that new constraints have been successfully solved.
+  virtual bool attempt(ConstraintSystem &cs) const = 0;
 
   /// Position of this binding in the chain.
   unsigned getIndex() const { return Index; }
@@ -3461,11 +3468,14 @@ public:
       : TypeBinding(index, computeFlags(choice)), Choice(choice),
         ExplicitConversion(explicitConversion) {}
 
-  void attempt(ConstraintSystem &cs) const override;
+  bool attempt(ConstraintSystem &cs) const override;
 
   void print(llvm::raw_ostream &Out, SourceManager *SM) const override {
     Choice->print(Out, SM);
   }
+
+  operator Constraint *() { return Choice; }
+  operator Constraint *() const { return Choice; }
 
 private:
   /// \brief If associated disjunction is an explicit conversion,
@@ -3524,7 +3534,7 @@ public:
       : TypeBinding(index, computeFlags(binding)), TypeVar(typeVar),
         Binding(binding) {}
 
-  void attempt(ConstraintSystem &cs) const override;
+  bool attempt(ConstraintSystem &cs) const override;
 
   void print(llvm::raw_ostream &Out, SourceManager *) const override {
     Out << TypeVar->getString() << " := " << Binding.BindingType->getString();
