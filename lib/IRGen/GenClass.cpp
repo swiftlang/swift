@@ -2364,9 +2364,6 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                               SILDeclRef method,
                                               CanSILFunctionType methodType,
                                               bool useSuperVTable) {
-  // Find the vtable entry for this method.
-  SILDeclRef overridden = method.getOverriddenVTableEntry();
-
   // Find the metadata.
   llvm::Value *metadata;
   if (useSuperVTable) {
@@ -2389,5 +2386,5 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     }
   }
 
-  return emitVirtualMethodValue(IGF, metadata, overridden, methodType);
+  return emitVirtualMethodValue(IGF, metadata, method, methodType);
 }
