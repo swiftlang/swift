@@ -89,6 +89,72 @@ class TestXPCEncoder {
         _testRoundTrip(of: EnhancedBool.fileNotFound)
     }
 
+    func testEncodingDictionaryFailureKeyPath() {
+        let toEncode: [String: EncodeFailure] = ["key": EncodeFailure(someValue: 3.14)]
+
+        do {
+            _ = try XPCEncoder.encode(toEncode)
+        } catch EncodingError.invalidValue(let (_, context)) {
+            expectEqual(1, context.codingPath.count)
+            expectEqual("key", context.codingPath[0].stringValue)
+        } catch {
+            expectUnreachable("Unexpected error: \(String(describing: error))")
+        }
+    }
+
+    func testEncodingDictionaryFailureKeyPathNested() {
+        let toEncode: [String: [String: EncodeFailureNested]] = ["key": ["sub_key": EncodeFailureNested(nestedValue: EncodeFailure(someValue: 3.14))]]
+
+        do {
+            _ = try XPCEncoder.encode(toEncode)
+        } catch EncodingError.invalidValue(let (_, context)) {
+            expectEqual(3, context.codingPath.count)
+            expectEqual("key", context.codingPath[0].stringValue)
+            expectEqual("sub_key", context.codingPath[1].stringValue)
+            expectEqual("nestedValue", context.codingPath[2].stringValue)
+        } catch {
+            expectUnreachable("Unexpected error: \(String(describing: error))")
+        }
+    }
+
+    func testDecodingDictionaryFailureKeyPath() {
+        let input = xpc_dictionary_create(nil, nil, 0)
+        let key = "intValue"
+        let value = "not an integer"
+        var xpcValue: xpc_object_t!
+        value.withCString({ xpcValue = xpc_string_create($0) })
+        key.withCString({ xpc_dictionary_set_value(input, $0, xpcValue) })
+
+        do {
+            _ = try XPCDecoder.decode(DecodeFailure.self, message: input)
+        } catch DecodingError.typeMismatch(let (_, context)) {
+            expectEqual(1, context.codingPath.count)
+            expectEqual("intValue", context.codingPath[0].stringValue)
+        } catch {
+            expectUnreachable("Unexpected error: \(String(describing: error))")
+        }
+    }
+
+    func testDecodingDictionaryFailureKeyPathNested() {
+        let input = xpc_dictionary_create(nil, nil, 0)
+        let subInput = xpc_dictionary_create(nil, nil, 0)
+        let nestedKey = "nestedValue"
+        let intKey = "intValue"
+        let value = "not an integer"
+        var xpcValue: xpc_object_t!
+        value.withCString({ xpcValue = xpc_string_create($0) })
+        intKey.withCString({ xpc_dictionary_set_value(subInput, $0, xpcValue) })
+        nestedKey.withCString({ xpc_dictionary_set_value(input, $0, subInput) })
+
+        do {
+            _ = try XPCDecoder.decode(DecodeFailureNested.self, message: input)
+        } catch DecodingError.typeMismatch(let (_, context)) {
+            expectEqual(4, context.codingPath.count)
+            expectEqual("intValue", context.codingPath[3].stringValue)
+        } catch {
+            expectUnreachable("Unexpected error: \(String(describing: error))")
+        }
+    }
 
     // MARK: - Testing helpers
     private func _testRoundTrip<T>(of value: T) where T : Codable, T: Equatable {
@@ -441,6 +507,29 @@ fileprivate enum EnhancedBool : Codable {
     }
 }
 
+fileprivate struct EncodeFailure : Encodable {
+    enum Failure: Error {
+        case Failure
+    }
+
+    var someValue: Double
+    func encode(to encoder: Encoder) throws {
+        throw Failure.Failure
+    }
+}
+
+fileprivate struct EncodeFailureNested : Encodable {
+    var nestedValue: EncodeFailure
+}
+
+private struct DecodeFailure : Decodable {
+    var intValue: Int
+}
+
+private struct DecodeFailureNested : Decodable {
+    var nestedValue: DecodeFailure
+}
+
 // MARK: - Run the the tests!
 var XPCEncoderTests = TestSuite("TestXPCEncoder")
 XPCEncoderTests.test("testEncodingTopLevelEmptyStruct") { TestXPCEncoder().testEncodingTopLevelEmptyStruct() }
@@ -456,4 +545,8 @@ XPCEncoderTests.test("testEncodingDerivedClass") { TestXPCEncoder().testEncoding
 XPCEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestXPCEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
 XPCEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestXPCEncoder().testEncodingTopLevelDeepStructuredType() }
 XPCEncoderTests.test("testEncodingTopLevelNullableType") { TestXPCEncoder().testEncodingTopLevelNullableType() }
+XPCEncoderTests.test("testEncodingDictionaryFailureKeyPath") { TestXPCEncoder().testEncodingDictionaryFailureKeyPath() }
+XPCEncoderTests.test("testEncodingDictionaryFailureKeyPathNested") { TestXPCEncoder().testEncodingDictionaryFailureKeyPathNested() }
+XPCEncoderTests.test("testDecodingDictionaryFailureKeyPath") { TestXPCEncoder().testDecodingDictionaryFailureKeyPath() }
+XPCEncoderTests.test("testDecodingDictionaryFailureKeyPathNested") { TestXPCEncoder().testDecodingDictionaryFailureKeyPathNested() }
 runAllTests()
