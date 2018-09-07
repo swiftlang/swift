@@ -5507,11 +5507,10 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   auto baseType = i->getOperand()->getType();
   llvm::Value *baseValue = base.claimNext();
 
-  auto method = i->getMember();
+  auto method = i->getMember().getOverriddenVTableEntry();
   auto methodType = i->getType().castTo<SILFunctionType>();
 
-  auto baseMethod = method.getOverriddenVTableEntry();
-  auto *classDecl = cast<ClassDecl>(baseMethod.getDecl()->getDeclContext());
+  auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
 
   // If the class defining the vtable entry is resilient, we cannot assume
   // its offset since methods can be re-ordered resiliently. Instead, we call
@@ -5555,7 +5554,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
 
     // Get the method descriptor.
     auto *methodDescriptor =
-      IGM.getAddrOfMethodDescriptor(baseMethod, NotForDefinition);
+      IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
 
     // Get the method lookup function for the class defining the method.
     auto *lookupFn = IGM.getAddrOfMethodLookupFunction(classDecl,
@@ -5597,14 +5596,12 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *baseValue = base.claimNext();
 
-  SILDeclRef method = i->getMember();
+  SILDeclRef method = i->getMember().getOverriddenVTableEntry();
   auto methodType = i->getType().castTo<SILFunctionType>();
 
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
-
   if (IGM.isResilient(classDecl,
                       ResilienceExpansion::Maximal)) {
-    method = method.getOverriddenVTableEntry();
     auto *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
     auto sig = IGM.getSignature(methodType);
     FunctionPointer fn(fnPtr, sig);
