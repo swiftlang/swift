@@ -1564,8 +1564,7 @@ bool ConstraintSystem::solveIteratively(
 
   SmallVector<SolverStep *, 16> workList;
   // First step is always wraps whole constraint system.
-  workList.push_back(
-      SolverStep::create(*this, TypeVariables, InactiveConstraints, solutions));
+  workList.push_back(SplitterStep::create(*this, solutions));
 
   // Execute steps in LIFO order, which means that
   // each individual step would either end up producing

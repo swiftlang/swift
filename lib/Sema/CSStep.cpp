@@ -8,67 +8,49 @@ using namespace llvm;
 using namespace swift;
 using namespace constraints;
 
-SolverStep *SolverStep::create(ConstraintSystem &cs,
-                               SmallVectorImpl<Solution> &solutions) {
-  return new (cs.getAllocator()) SolverStep(cs, solutions);
+ComponentStep::ComponentScope::ComponentScope(ComponentStep &component)
+    : CS(component.CS) {
+  TypeVars = std::move(CS.TypeVariables);
+
+  for (auto *typeVar : component.TypeVars)
+    CS.TypeVariables.push_back(typeVar);
+
+  Constraints.splice(Constraints.end(), CS.InactiveConstraints);
+
+  for (auto *constraint : component.Constraints)
+    CS.InactiveConstraints.push_back(constraint);
+
+  auto &CG = CS.getConstraintGraph();
+  if (component.OrphanedConstraint)
+    CG.setOrphanedConstraint(component.OrphanedConstraint);
+
+  SolverScope = new ConstraintSystem::SolverScope(CS);
+  PrevPartialScope = CS.solverState->PartialSolutionScope;
+  CS.solverState->PartialSolutionScope = SolverScope;
 }
 
-SolverStep *SolverStep::create(ConstraintSystem &cs,
-                               ArrayRef<TypeVariableType *> typeVars,
-                               ConstraintList &constraints,
-                               SmallVectorImpl<Solution> &solutions) {
-  auto *step = SolverStep::create(cs, solutions);
+SolverStep::StepResult SplitterStep::advance() {
+  switch (State) {
+  case StepState::Split: {
+    SmallVector<SolverStep *, 4> nextSteps;
+    computeFollowupSteps(nextSteps);
 
-  for (auto *typeVar : typeVars)
-    step->record(typeVar);
-
-  for (auto &constraint : constraints)
-    step->record(&constraint);
-
-  return step;
-}
-
-SolverStep::StepResult SolverStep::advance() {
-  if (!ActiveScope)
-    ActiveScope = new (CS.getAllocator()) Scope(*this);
-
-  auto *disjunction = CS.selectDisjunction();
-  auto bestBindings = CS.determineBestBindings();
-
-  // TODO: Add expression too complex into the mix
-  // TODO: This is where the generator comes in.
-
-  if (bestBindings && (!disjunction || (!bestBindings->InvolvesTypeVariables &&
-                                        !bestBindings->FullyBound))) {
-    // Attempt given "best" binding and record the current scope,
-    // we'll have to come back to this step later on when follow-up
-    // steps are solved.
-    return computeFollowupSteps();
+    State = StepState::Merge;
+    return {ConstraintSystem::SolutionKind::Unsolved, std::move(nextSteps)};
   }
 
-  // For disjunctions we need to figure out what all of the already
-  // attempted choices are, and try the next one.
-  auto choices = disjunction->getNestedConstraints();
-  for (unsigned i = ActiveScope->CurrChoice, n = choices.size(); i != n; ++i) {
-    auto *choice = choices[i];
-    if (choice->isDisabled())
-      continue;
-
-    // Attempt the choice and record it in the scope.
-    ActiveScope->CurrChoice = i;
-    return computeFollowupSteps();
+  case StepState::Merge: {
+    auto result = mergePartialSolutions()
+                      ? ConstraintSystem::SolutionKind::Solved
+                      : ConstraintSystem::SolutionKind::Error;
+    return {result, {}};
   }
-
-  // Since we are done with this step, it's a good time to
-  // roll-up all of the solutions produced by follow-up steps.
-  auto result = mergePartialSolutions() ? ConstraintSystem::SolutionKind::Solved
-                                        : ConstraintSystem::SolutionKind::Error;
-
-  return {result, {}};
+  }
 }
 
-SolverStep::StepResult SolverStep::computeFollowupSteps() const {
-  SmallVector<SolverStep *, 4> nextSteps;
+void SplitterStep::computeFollowupSteps(
+    SmallVectorImpl<SolverStep *> &nextSteps) {
+  SmallVector<ComponentStep *, 4> componentSteps;
 
   // Compute next steps based on that connected components
   // algorithm tells us is splittable.
@@ -83,16 +65,13 @@ SolverStep::StepResult SolverStep::computeFollowupSteps() const {
   // our component. There are clearly better ways to do this.
   SmallVector<TypeVariableType *, 16> typeVars(CS.TypeVariables);
   SmallVector<unsigned, 16> components;
-  unsigned numComponents = CG.computeConnectedComponents(typeVars, components);
 
-  std::unique_ptr<SmallVector<Solution, 4>[]> partialSolutions(
-      new SmallVector<Solution, 4>[numComponents]);
+  NumComponents = CG.computeConnectedComponents(typeVars, components);
+  PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
+      new SmallVector<Solution, 4>[NumComponents]);
 
-  ActiveScope->NumComponents = numComponents;
-  ActiveScope->PartialSolutions = std::move(partialSolutions);
-
-  for (unsigned i = 0, n = numComponents; i != n; ++i)
-    nextSteps.push_back(SolverStep::create(CS, partialSolutions[i]));
+  for (unsigned i = 0, n = NumComponents; i != n; ++i)
+    componentSteps.push_back(ComponentStep::create(CS, i, PartialSolutions[i]));
 
   if (CS.getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
@@ -110,7 +89,7 @@ SolverStep::StepResult SolverStep::computeFollowupSteps() const {
   // Map type variables and constraints into appropriate steps.
   for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
     auto *typeVar = typeVars[i];
-    auto &step = *nextSteps[components[i]];
+    auto &step = *componentSteps[components[i]];
 
     step.record(typeVar);
     for (auto *constraint : CG[typeVar].getConstraints())
@@ -119,36 +98,36 @@ SolverStep::StepResult SolverStep::computeFollowupSteps() const {
 
   // Add the orphaned components to the mapping from constraints to components.
   unsigned firstOrphanedConstraint =
-      numComponents - CG.getOrphanedConstraints().size();
+      NumComponents - CG.getOrphanedConstraints().size();
   {
     unsigned component = firstOrphanedConstraint;
     for (auto constraint : CG.getOrphanedConstraints())
-      nextSteps[component++]->record(constraint);
+      componentSteps[component++]->recordOrphan(constraint);
   }
 
-  return {ConstraintSystem::SolutionKind::Unsolved, std::move(nextSteps)};
+  // Remove all of the orphaned constraints; they'll be re-introduced
+  // by each component independently.
+  OrphanedConstraints = CG.takeOrphanedConstraints();
+
+  for (auto *step : componentSteps)
+    nextSteps.push_back(step);
 }
 
-bool SolverStep::mergePartialSolutions() const {
-  assert(ActiveScope);
-
-  auto numComponents = ActiveScope->NumComponents;
-  auto &partialSolutions = ActiveScope->PartialSolutions;
-
+bool SplitterStep::mergePartialSolutions() const {
   // TODO: Optimize when there is only one component
   //       because it would be inefficient to create all
   //       these data structures and do nothing.
 
   // Produce all combinations of partial solutions.
-  SmallVector<unsigned, 2> indices(numComponents, 0);
+  SmallVector<unsigned, 2> indices(NumComponents, 0);
   bool done = false;
   bool anySolutions = false;
   do {
     // Create a new solver scope in which we apply all of the partial
     // solutions.
     ConstraintSystem::SolverScope scope(CS);
-    for (unsigned i = 0; i != numComponents; ++i)
-      CS.applySolution(partialSolutions[i][indices[i]]);
+    for (unsigned i = 0; i != NumComponents; ++i)
+      CS.applySolution(PartialSolutions[i][indices[i]]);
 
     // This solution might be worse than the best solution found so far.
     // If so, skip it.
@@ -167,11 +146,11 @@ bool SolverStep::mergePartialSolutions() const {
     }
 
     // Find the next combination.
-    for (unsigned n = numComponents; n > 0; --n) {
+    for (unsigned n = NumComponents; n > 0; --n) {
       ++indices[n - 1];
 
       // If we haven't run out of solutions yet, we're done.
-      if (indices[n - 1] < partialSolutions[n - 1].size())
+      if (indices[n - 1] < PartialSolutions[n - 1].size())
         break;
 
       // If we ran out of solutions at the first position, we're done.
@@ -181,10 +160,96 @@ bool SolverStep::mergePartialSolutions() const {
       }
 
       // Zero out the indices from here to the end.
-      for (unsigned i = n - 1; i != numComponents; ++i)
+      for (unsigned i = n - 1; i != NumComponents; ++i)
         indices[i] = 0;
     }
   } while (!done);
 
   return anySolutions;
+}
+
+SolverStep::StepResult ComponentStep::advance() {
+  if (!Scope) {
+    Scope = new (CS.getAllocator()) ComponentScope(*this);
+
+    if (CS.TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+      log.indent(CS.solverState->depth * 2)
+          << "(solving component #" << Index << "\n";
+    }
+
+    /// Try to figure out what this step is going to be,
+    /// after the scope has been established.
+    auto *disjunction = CS.selectDisjunction();
+    auto bestBindings = CS.determineBestBindings();
+
+    if (bestBindings &&
+        (!disjunction ||
+         (!bestBindings->InvolvesTypeVariables && !bestBindings->FullyBound))) {
+      // Produce a type variable step.
+      auto *step = TypeVariableStep::create(CS, *bestBindings, Solutions);
+      return {ConstraintSystem::SolutionKind::Unsolved, {step}};
+    } else if (disjunction) {
+      // Produce a disjunction step.
+      auto *step = DisjunctionStep::create(CS, disjunction, Solutions);
+      return {ConstraintSystem::SolutionKind::Unsolved, {step}};
+    }
+
+    // If there are no disjunctions or type variables to bind
+    // we can't solve this system unless we have free type variables
+    // allowed in the solution.
+    if (!CS.solverState->allowsFreeTypeVariables() ||
+        !CS.hasFreeTypeVariables())
+      return {ConstraintSystem::SolutionKind::Error, {}};
+
+    // If this solution is worse than the best solution we've seen so far,
+    // skip it.
+    if (CS.worseThanBestSolution())
+      return {ConstraintSystem::SolutionKind::Error, {}};
+
+    // If we only have relational or member constraints and are allowing
+    // free type variables, save the solution.
+    for (auto &constraint : CS.InactiveConstraints) {
+      switch (constraint.getClassification()) {
+      case ConstraintClassification::Relational:
+      case ConstraintClassification::Member:
+        continue;
+      default:
+        return {ConstraintSystem::SolutionKind::Error, {}};
+      }
+    }
+
+    auto solution = CS.finalize();
+    if (CS.TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+      log.indent(CS.solverState->depth * 2) << "(found solution)\n";
+    }
+
+    Solutions.push_back(std::move(solution));
+    return {ConstraintSystem::SolutionKind::Solved, {}};
+  }
+
+  // For each of the partial solutions, subtract off the current score.
+  // It doesn't contribute.
+  for (auto &solution : Solutions)
+    solution.getFixedScore() -= OriginalScore;
+
+  // When there are multiple partial solutions for a given connected component,
+  // rank those solutions to pick the best ones. This limits the number of
+  // combinations we need to produce; in the common case, down to a single
+  // combination.
+  filterSolutions(Solutions, /*minimize=*/true);
+  return {ConstraintSystem::SolutionKind::Solved, {}};
+}
+
+SolverStep::StepResult TypeVariableStep::advance() {
+  return {ConstraintSystem::SolutionKind::Error, {}};
+}
+
+SolverStep::StepResult DisjunctionStep::advance() {
+  return {ConstraintSystem::SolutionKind::Error, {}};
+}
+
+bool DisjunctionStep::shouldSkipChoice(DisjunctionChoice &choice) const {
+  return false;
 }
