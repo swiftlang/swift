@@ -99,12 +99,7 @@ struct SILReverseAutoDiffIndices {
   /*implicit*/ SILReverseAutoDiffIndices(unsigned source,
                                          ArrayRef<unsigned> parameters);
 
-  bool operator==(const SILReverseAutoDiffIndices &other) const {
-    return source == other.source &&
-        (parameters.size() >= other.parameters.size() ?
-            !parameters.test(other.parameters) :
-            !other.parameters.test(parameters));
-  }
+  bool operator==(const SILReverseAutoDiffIndices &other) const;
 
   void print(llvm::raw_ostream &s = llvm::outs()) const {
     s << "(source=" << source << " parameters=(";
