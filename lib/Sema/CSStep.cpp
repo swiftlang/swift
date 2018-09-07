@@ -271,7 +271,74 @@ StepResult ComponentStep::take(bool prevFailed) {
 }
 
 StepResult TypeVariableStep::take(bool prevFailed) {
-  return StepResult::failure();
+  auto &TC = CS.TC;
+
+  if (ActiveChoice) {
+    AnySolved |= !prevFailed;
+
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = TC.Context.TypeCheckerDebug->getStream();
+      log.indent(CS.solverState->depth * 2) << ")\n";
+    }
+
+    // Rewind back all of the changes made to constraint system.
+    ActiveChoice.reset();
+  } else { // FIXME: I think all this logic can be extracted into setup.
+    ++CS.solverState->NumTypeVariablesBound;
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = TC.Context.TypeCheckerDebug->getStream();
+      log.indent(CS.solverState->depth * 2) << "Initial bindings: ";
+      interleave(InitialBindings.begin(), InitialBindings.end(),
+                 [&](const Binding &binding) {
+                   log << TypeVar->getString()
+                       << " := " << binding.BindingType->getString();
+                 },
+                 [&log] { log << ", "; });
+
+      log << '\n';
+    }
+  }
+
+  if (AnySolved && Producer.needsToComputeNext())
+    return StepResult::success();
+
+  while (auto binding = Producer()) {
+    // Try each of the bindings in turn.
+    ++CS.solverState->NumTypeVariableBindings;
+
+    if (AnySolved) {
+      // If this is a defaultable binding and we have found solutions,
+      // don't explore the default binding.
+      if (binding->isDefaultable())
+        continue;
+
+      // If we were able to solve this without considering
+      // default literals, don't bother looking at default literals.
+      if (binding->hasDefaultedProtocol() && !SawFirstLiteralConstraint)
+        break;
+    }
+
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = TC.Context.TypeCheckerDebug->getStream();
+      log.indent(CS.solverState->depth * 2) << "(trying ";
+      binding->print(log, &TC.Context.SourceMgr);
+      log << '\n';
+    }
+
+    if (binding->hasDefaultedProtocol())
+      SawFirstLiteralConstraint = true;
+
+    {
+      // Try to solve the system with typeVar := type
+      auto scope = llvm::make_unique<Scope>(CS);
+      if (binding->attempt(CS)) {
+        ActiveChoice = std::move(scope);
+        return StepResult::unsolved(SplitterStep::create(CS, Solutions));
+      }
+    }
+  }
+
+  return AnySolved ? StepResult::success() : StepResult::failure();
 }
 
 StepResult DisjunctionStep::take(bool prevFailed) {
