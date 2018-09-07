@@ -13,7 +13,7 @@
 // RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TEST13
 // REQUIRES: asserts,swift_stdlib_no_asserts,optimized_stdlib
 
-// XFAIL: linux
+// XFAIL: *
 
 // TEST1-LABEL: COW Array Opts in Func {{.*}}inoutarr{{.*}}
 // TEST1: Hoisting make_mutable
