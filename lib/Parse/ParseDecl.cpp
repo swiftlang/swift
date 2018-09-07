@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -6426,21 +6426,41 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   bool isPrefix = Attributes.hasAttribute<PrefixAttr>();
   bool isInfix = Attributes.hasAttribute<InfixAttr>();
   bool isPostfix = Attributes.hasAttribute<PostfixAttr>();
-  
-  // Parse (or diagnose) a specified precedence group.
+
+  // Parse (or diagnose) a specified precedence group and/or
+  // designated protocol. These both look like identifiers, so we
+  // parse them both as identifiers here and sort it out in type
+  // checking.
   SourceLoc colonLoc;
-  Identifier precedenceGroupName;
-  SourceLoc precedenceGroupNameLoc;
+  Identifier firstIdentifierName;
+  SourceLoc firstIdentifierNameLoc;
+  Identifier secondIdentifierName;
+  SourceLoc secondIdentifierNameLoc;
   if (Tok.is(tok::colon)) {
     SyntaxParsingContext GroupCtxt(SyntaxContext, SyntaxKind::InfixOperatorGroup);
     colonLoc = consumeToken();
     if (Tok.is(tok::identifier)) {
-      precedenceGroupName = Context.getIdentifier(Tok.getText());
-      precedenceGroupNameLoc = consumeToken(tok::identifier);
-      
-      if (isPrefix || isPostfix)
+      firstIdentifierName = Context.getIdentifier(Tok.getText());
+      firstIdentifierNameLoc = consumeToken(tok::identifier);
+
+      if (Context.LangOpts.EnableOperatorDesignatedProtocols) {
+        if (consumeIf(tok::comma)) {
+          if (isPrefix || isPostfix)
+            diagnose(colonLoc, diag::precedencegroup_not_infix)
+                .fixItRemove({colonLoc, firstIdentifierNameLoc});
+
+          if (Tok.is(tok::identifier)) {
+            secondIdentifierName = Context.getIdentifier(Tok.getText());
+            secondIdentifierNameLoc = consumeToken(tok::identifier);
+          } else {
+            auto otherTokLoc = consumeToken();
+            diagnose(otherTokLoc, diag::operator_decl_trailing_comma);
+          }
+        }
+      } else if (isPrefix || isPostfix) {
         diagnose(colonLoc, diag::precedencegroup_not_infix)
-          .fixItRemove({colonLoc, precedenceGroupNameLoc});
+            .fixItRemove({colonLoc, firstIdentifierNameLoc});
+      }
     }
   }
   
@@ -6452,7 +6472,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
     } else {
       auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
       if (Tok.is(tok::r_brace)) {
-        SourceLoc lastGoodLoc = precedenceGroupNameLoc;
+        SourceLoc lastGoodLoc = firstIdentifierNameLoc;
         if (lastGoodLoc.isInvalid())
           lastGoodLoc = NameLoc;
         SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
@@ -6468,17 +6488,19 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   
   OperatorDecl *res;
   if (Attributes.hasAttribute<PrefixAttr>())
-    res = new (Context) PrefixOperatorDecl(CurDeclContext, OperatorLoc,
-                                           Name, NameLoc);
+    res = new (Context)
+        PrefixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc,
+                           firstIdentifierName, firstIdentifierNameLoc);
   else if (Attributes.hasAttribute<PostfixAttr>())
-    res = new (Context) PostfixOperatorDecl(CurDeclContext, OperatorLoc,
-                                            Name, NameLoc);
+    res = new (Context)
+        PostfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc,
+                            firstIdentifierName, firstIdentifierNameLoc);
   else
-    res = new (Context) InfixOperatorDecl(CurDeclContext, OperatorLoc,
-                                          Name, NameLoc, colonLoc,
-                                          precedenceGroupName,
-                                          precedenceGroupNameLoc);
-  
+    res = new (Context)
+        InfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc, colonLoc,
+                          firstIdentifierName, firstIdentifierNameLoc,
+                          secondIdentifierName, secondIdentifierNameLoc);
+
   diagnoseOperatorFixityAttributes(*this, Attributes, res);
   
   res->getAttrs() = Attributes;
