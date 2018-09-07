@@ -1451,12 +1451,8 @@ void ClangImporter::collectSubModuleNames(
     if (!submodule)
       return;
   }
-  auto submoduleNameLength = submodule->getFullModuleName().length();
-  for (auto sub : submodule->submodules()) {
-    std::string full = sub->getFullModuleName();
-    full.erase(0, submoduleNameLength + 1);
-    names.push_back(std::move(full));
-  }
+  for (auto sub : submodule->submodules())
+    names.push_back(sub->Name);
 }
 
 bool ClangImporter::isModuleImported(const clang::Module *M) {

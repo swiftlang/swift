@@ -64,10 +64,7 @@ static void printImports(raw_ostream &out, ModuleDecl *M) {
     if (publicImportSet.count(import))
       out << "@_exported ";
     out << "import ";
-    if (auto *clangModule = import.second->findUnderlyingClangModule())
-      out << clangModule->getFullModuleName();
-    else
-      out << import.second->getName();
+    import.second->getReverseFullModuleName().printForward(out);
 
     // Write the access path we should be honoring but aren't.
     // (See diagnoseScopedImports above.)
