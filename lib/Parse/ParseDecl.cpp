@@ -3325,7 +3325,7 @@ bool Parser::canDelayBodyParsing() {
   // it may not worth it.
   if (InPoundLineEnvironment)
     return false;
-  // The firt code completion pass looks for code completion tokens extensively,
+  // The first code completion pass looks for code completion tokens extensively,
   // so we cannot lazily parse members.
   if (isCodeCompletionFirstPass())
     return false;
