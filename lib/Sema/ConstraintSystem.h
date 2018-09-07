@@ -57,7 +57,11 @@ class DisjunctionChoiceProducer;
 class TypeBinding;
 class TypeVariableBinding;
 class TypeVarBindingProducer;
+class StepScope;
 class SolverStep;
+class SplitterStep;
+class ComponentStep;
+class TypeVariableStep;
 
 } // end namespace constraints
 
@@ -931,7 +935,11 @@ public:
   friend class FailureDiagnostic;
   friend class TypeVarBindingProducer;
   friend class TypeVariableBinding;
+  friend class StepScope;
   friend class SolverStep;
+  friend class SplitterStep;
+  friend class ComponentStep;
+  friend class TypeVariableStep;
 
   class SolverScope;
 
@@ -3612,6 +3620,16 @@ class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
   unsigned Index = 0;
 
 public:
+  DisjunctionChoiceProducer(ConstraintSystem &cs, Constraint *disjunction)
+      : BindingProducer(cs, disjunction->shouldRememberChoice()
+                                ? disjunction->getLocator()
+                                : nullptr),
+        Choices(disjunction->getNestedConstraints()),
+        IsExplicitConversion(disjunction->isExplicitConversion()) {
+    assert(disjunction->getKind() == ConstraintKind::Disjunction);
+    assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
+  }
+
   DisjunctionChoiceProducer(ConstraintSystem &cs,
                             ArrayRef<Constraint *> choices,
                             ConstraintLocator *locator, bool explicitConversion)
