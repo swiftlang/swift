@@ -6073,6 +6073,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
     SourceLoc LBraceLoc;
     SourceLoc RBraceLoc;
+    SourceLoc PosBeforeLB = Tok.getLoc();
     if (parseToken(tok::l_brace, LBraceLoc, diag::expected_lbrace_protocol)) {
       LBraceLoc = PreviousLoc;
       RBraceLoc = LBraceLoc;
@@ -6082,9 +6083,21 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       ParseDeclOptions Options(PD_HasContainerType |
                                PD_DisallowInit |
                                PD_InProtocol);
-      if (parseDeclList(LBraceLoc, RBraceLoc, diag::expected_rbrace_protocol,
-                        Options, [&](Decl *D) {Proto->addMember(D);}))
-        Status.setIsParseError();
+      if (canDelayMemberDeclParsing()) {
+        if (Tok.is(tok::r_brace)) {
+          RBraceLoc = consumeToken();
+        } else {
+          RBraceLoc = Tok.getLoc();
+          Status.setIsParseError();
+        }
+        State->delayDeclList(Proto, Options.toRaw(), CurDeclContext,
+                             { LBraceLoc, RBraceLoc },
+                             PosBeforeLB);
+      } else {
+        if (parseDeclList(LBraceLoc, RBraceLoc, diag::expected_rbrace_protocol,
+                          Options, [&](Decl *D) {Proto->addMember(D);}))
+          Status.setIsParseError();
+      }
     }
 
     // Install the protocol elements.
