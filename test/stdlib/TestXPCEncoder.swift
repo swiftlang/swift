@@ -12,6 +12,7 @@
 
 import Swift
 import XPC
+import Foundation
 import StdlibUnittest
 
 class TestXPCEncoder {
@@ -38,7 +39,19 @@ class TestXPCEncoder {
 
     func testEncodingTopLevelSingleValueClass() {
         _testRoundTrip(of: Counter())
-        expectEqual(true, false, "Test")
+    }
+
+    // MARK: - Ecoding Top-Level Structured Types
+    func testEncodingTopLevelStructuredStruct() {
+        // Address is a struct type with multiple fields.
+        let address = Address.testValue
+        _testRoundTrip(of: address)
+    }
+
+    func testEncodingTopLevelStructuredClass() {
+        // Person is a class with multiple fields.
+        let person = Person.testValue
+        _testRoundTrip(of: person)
     }
 
     // MARK: - Testing helpers
@@ -133,6 +146,88 @@ fileprivate final class Counter : Codable, Equatable {
   }
 }
 
+// MARK: - Structured Types
+/// A simple address type that encodes as a dictionary of values.
+fileprivate struct Address : Codable, Equatable {
+    let street: String
+    let city: String
+    let state: String
+    let zipCode: Int
+    let country: String
+
+    init(street: String, city: String, state: String, zipCode: Int, country: String) {
+        self.street = street
+        self.city = city
+        self.state = state
+        self.zipCode = zipCode
+        self.country = country
+    }
+
+    static func ==(_ lhs: Address, _ rhs: Address) -> Bool {
+        return lhs.street == rhs.street &&
+          lhs.city == rhs.city &&
+          lhs.state == rhs.state &&
+          lhs.zipCode == rhs.zipCode &&
+          lhs.country == rhs.country
+    }
+
+    static var testValue: Address {
+        return Address(street: "1 Infinite Loop",
+                       city: "Cupertino",
+                       state: "CA",
+                       zipCode: 95014,
+                       country: "United States")
+    }
+}
+
+/// A simple person class that encodes as a dictionary of values.
+fileprivate class Person : Codable, Equatable {
+  let name: String
+  let email: String
+  let website: URL?
+
+  init(name: String, email: String, website: URL? = nil) {
+    self.name = name
+    self.email = email
+    self.website = website
+  }
+
+  private enum CodingKeys : String, CodingKey {
+    case name
+    case email
+    case website
+  }
+
+  // FIXME: Remove when subclasses (Employee) are able to override synthesized conformance.
+  required init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    name = try container.decode(String.self, forKey: .name)
+    email = try container.decode(String.self, forKey: .email)
+    website = try container.decodeIfPresent(URL.self, forKey: .website)
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(name, forKey: .name)
+    try container.encode(email, forKey: .email)
+    try container.encodeIfPresent(website, forKey: .website)
+  }
+
+  func isEqual(_ other: Person) -> Bool {
+    return self.name == other.name &&
+           self.email == other.email &&
+           self.website == other.website
+  }
+
+  static func ==(_ lhs: Person, _ rhs: Person) -> Bool {
+    return lhs.isEqual(rhs)
+  }
+
+  class var testValue: Person {
+    return Person(name: "Johnny Appleseed", email: "appleseed@apple.com")
+  }
+}
+
 // MARK: - Run the the tests!
 var XPCEncoderTests = TestSuite("TestXPCEncoder")
 XPCEncoderTests.test("testEncodingTopLevelEmptyStruct") { TestXPCEncoder().testEncodingTopLevelEmptyStruct() }
@@ -140,4 +235,6 @@ XPCEncoderTests.test("testEncodingTopLevelEmptyClass") { TestXPCEncoder().testEn
 XPCEncoderTests.test("testEncodingTopLevelSingleValueEnum") { TestXPCEncoder().testEncodingTopLevelSingleValueEnum() }
 XPCEncoderTests.test("testEncodingTopLevelSingleValueStruct") { TestXPCEncoder().testEncodingTopLevelSingleValueStruct() }
 XPCEncoderTests.test("testEncodingTopLevelSingleValueClass") { TestXPCEncoder().testEncodingTopLevelSingleValueClass() }
+XPCEncoderTests.test("testEncodingTopLevelStructuredStruct") { TestXPCEncoder().testEncodingTopLevelStructuredStruct() }
+XPCEncoderTests.test("testEncodingTopLevelStructuredClass") { TestXPCEncoder().testEncodingTopLevelStructuredClass() }
 runAllTests()
