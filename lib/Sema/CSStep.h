@@ -253,16 +253,37 @@ private:
 };
 
 class TypeVariableStep final : public SolverStep {
+  using Scope = ConstraintSystem::SolverScope;
   using BindingContainer = ConstraintSystem::PotentialBindings;
   using Binding = ConstraintSystem::PotentialBinding;
 
   TypeVariableType *TypeVar;
-  SmallVector<Binding, 4> Bindings;
+  TypeVarBindingProducer Producer;
+
+  // A set of the initial bindings to consider, which is
+  // also a source of follow-up "computed" bindings such
+  // as supertypes, defaults etc.
+  SmallVector<Binding, 4> InitialBindings;
+
+  /// Indicates whether any of the attempted bindings
+  /// produced a solution.
+  bool AnySolved = false;
+  /// Indicates whether source of one of the previously
+  /// attempted bindings was a literal constraint. This
+  /// is useful for a performance optimization to stop
+  /// attempting other bindings in certain conditions.
+  bool SawFirstLiteralConstraint = false;
+
+  /// Solver scope associated with the binding which is
+  /// currently being attempted, helps to rewind state
+  /// of the constraint system back to original.
+  std::unique_ptr<Scope> ActiveChoice;
 
   TypeVariableStep(ConstraintSystem &cs, BindingContainer &bindings,
                    SmallVectorImpl<Solution> &solutions)
       : SolverStep(cs, solutions), TypeVar(bindings.TypeVar),
-        Bindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
+        Producer(cs, bindings.TypeVar, bindings.Bindings),
+        InitialBindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
 
 public:
   StepResult take(bool prevFailed) override;
