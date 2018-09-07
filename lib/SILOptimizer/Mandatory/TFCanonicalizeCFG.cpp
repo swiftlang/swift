@@ -32,6 +32,7 @@
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/iterator_range.h"
+#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace tf;
@@ -309,6 +310,9 @@ private:
 
   void initialize();
 
+  /// Compute escaping values and what values to use as arguments at preheader.
+  void computeEscapingValues();
+
   /// Create a new header for the loop and return a pair consisting of
   /// the new block and the phi argument corresponding to the exitIndex.
   std::pair<SILBasicBlock *, SILValue> createNewHeader();
@@ -361,8 +365,10 @@ private:
   // the new latchBlock as appropriate.
   SmallVector<std::pair<const SILBasicBlock *, const SILBasicBlock *>, 8>
       edgesToFix;
-  /// Identify the set of values that escape the loop.
-  llvm::SmallPtrSet<SILValue, 8> escapingValues;
+  /// Identify the set of values that escape the loop. The keys represent the
+  /// escaping value and the associated value will be used as the argument at
+  /// the preheader.
+  llvm::DenseMap<SILValue, SILValue> escapingValueSubstMap;
 };
 
 void SingleExitLoopTransformer::initialize() {
@@ -386,13 +392,17 @@ void SingleExitLoopTransformer::initialize() {
     }
   }
 
+  computeEscapingValues();
+}
+
+void SingleExitLoopTransformer::computeEscapingValues() {
   for (const SILBasicBlock *bb : loop->getBlocks()) {
-    // Save the values that are escaping this loop in escapingValues set.
+    // Save the values that are escaping this loop in escapingValueSubstMap set.
     auto saveEscaping = [this](SILValue value) {
       for (const auto *use : value->getUses()) {
         const SILInstruction *useInst = use->getUser();
         if (!loop->contains(useInst->getParent())) {
-          escapingValues.insert(value);
+          escapingValueSubstMap[value] = getUndef(value->getType());
           break;
         }
       }
@@ -470,7 +480,8 @@ SingleExitLoopTransformer::createNewHeader() {
   }
   header->dropAllArguments();
   // Add phi arguments in the new header corresponding to the escaping values.
-  for (const auto &escapingValue : escapingValues) {
+  for (const auto &kv : escapingValueSubstMap) {
+    const SILValue& escapingValue = kv.first;
     SILValue newValue = newHeader->createPHIArgument(
         escapingValue->getType(), escapingValue.getOwnershipKind());
     // Replace uses *outside* of the loop with the new value.
@@ -526,8 +537,8 @@ void SingleExitLoopTransformer::patchPreheader(SILBasicBlock *newHeader) {
   // State from within the loop is not available in the preheader.
   // Simply pass in an undef. This will never be accessed at runtime.
   SmallVector<SILValue, 8> newArgs;
-  for (const SILValue &escapingValue : escapingValues) {
-    newArgs.push_back(getUndef(escapingValue->getType()));
+  for (const auto &kv : escapingValueSubstMap) {
+    newArgs.push_back(kv.second);
   }
   // `exitIndex` to identify the block to which we exit from the loop.
   newArgs.push_back(createTFIntegerConst(*deviceInfo, builder, location,
@@ -547,7 +558,7 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
 
   unsigned oldHeaderNumArgs =
       newHeader->getNumArguments() -
-      (escapingValues.size() + /* exitIndex, stayInLoop*/ 2);
+      (escapingValueSubstMap.size() + /* exitIndex, stayInLoop*/ 2);
 
   // Identify the exit from the header (if any) and assign '0' as its index.
   SILBasicBlock *headerExit = nullptr;
@@ -591,7 +602,8 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
         getUserSourceLocation(src->getTerminator()->getDebugLocation()));
     // Find an appropriate value to use for each escaping value.
     unsigned argIndex = oldHeaderNumArgs;
-    for (const SILValue &escapingValue : escapingValues) {
+    for (const auto &kv : escapingValueSubstMap) {
+      const SILValue &escapingValue = kv.first;
       if (DI->properlyDominates(escapingValue, src->getTerminator())) {
         newArgs.push_back(escapingValue);
       } else {
