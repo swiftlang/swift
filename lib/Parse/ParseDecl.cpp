@@ -5840,6 +5840,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Make the entities of the struct as a code block.
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
+  SourceLoc PosBeforeLB = Tok.getLoc();
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
     LBLoc = PreviousLoc;
     RBLoc = LBLoc;
@@ -5848,9 +5849,20 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     // Parse the body.
     Scope S(this, ScopeKind::StructBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_InStruct);
-    if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
-                      Options, [&](Decl *D) {SD->addMember(D);}))
-      Status.setIsParseError();
+    if (canDelayMemberDeclParsing()) {
+      if (Tok.is(tok::r_brace)) {
+        RBLoc = consumeToken();
+      } else {
+        RBLoc = Tok.getLoc();
+        Status.setIsParseError();
+      }
+      State->delayDeclList(SD, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
+                           PosBeforeLB);
+    } else {
+      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
+                        Options, [&](Decl *D) {SD->addMember(D);}))
+        Status.setIsParseError();
+    }
   }
 
   SD->setBraces({LBLoc, RBLoc});
