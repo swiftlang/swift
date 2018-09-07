@@ -5419,6 +5419,18 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
     computeSelfDeclType();
 }
 
+StringRef AbstractFunctionDecl::getBodyStringRepresentation(
+  SmallVectorImpl<char> &scratch) {
+  if (!BodyStringRepresentation.empty())
+    return BodyStringRepresentation;
+
+  auto body = getBody();
+  assert(body && !body->isImplicit() &&
+         "can't get string representation of function with implicit body");
+
+  return extractInlinableText(getASTContext().SourceMgr, body, scratch);
+}
+
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,

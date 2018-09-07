@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 443; // Last change: serialize unsubstituted type alias type
+const uint16_t VERSION_MINOR = 444; // Last change: inlinable bodies
 
 using DeclIDField = BCFixed<31>;
 
@@ -977,6 +977,7 @@ namespace decls_block {
     BCFixed<1>,   // default argument resilience expansion
     BCFixed<1>,   // 'required' but overridden is not (used for recovery)
     BCVBR<5>,     // number of parameter name components
+    BCBlob,       // inlinable body text
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // Trailed by its generic parameters, if any, followed by the parameter
@@ -1038,6 +1039,7 @@ namespace decls_block {
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // default argument resilience expansion
+    BCBlob,       // inlinable body text
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1149,6 +1151,7 @@ namespace decls_block {
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     BCVBR<5>,    // number of parameter name components
+    BCBlob,      // inlinable body text
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
                                // followed by TypeID dependencies
@@ -1175,7 +1178,8 @@ namespace decls_block {
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
-    GenericEnvironmentIDField // generic environment
+    GenericEnvironmentIDField, // generic environment
+    BCBlob       // inlinable body text
   >;
 
   using ParameterListLayout = BCRecordLayout<

@@ -2751,6 +2751,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     uint8_t rawDefaultArgumentResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
+    StringRef bodyText;
 
     decls_block::ConstructorLayout::readRecord(scratch, contextID,
                                                rawFailability, isImplicit, 
@@ -2762,7 +2763,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                                needsNewVTableEntry,
                                                rawDefaultArgumentResilienceExpansion,
                                                firstTimeRequired,
-                                               numArgNames,
+                                               numArgNames, &bodyText,
                                                argNameAndDependencyIDs);
 
     // Resolve the name ids.
@@ -2846,6 +2847,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       ctor->setInitKind(initKind.getValue());
     ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
     ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
+    ctor->setBodyStringRepresentation(bodyText);
 
     if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
             rawDefaultArgumentResilienceExpansion)) {
@@ -3047,6 +3049,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     bool needsNewVTableEntry;
     uint8_t rawDefaultArgumentResilienceExpansion;
     ArrayRef<uint64_t> nameAndDependencyIDs;
+    StringRef bodyText;
 
     if (!isAccessor) {
       decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
@@ -3060,7 +3063,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           rawDefaultArgumentResilienceExpansion,
-                                          nameAndDependencyIDs);
+                                          &bodyText, nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
                                           isStatic, rawStaticSpelling, isObjC,
@@ -3074,7 +3077,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           rawDefaultArgumentResilienceExpansion,
-                                          nameAndDependencyIDs);
+                                          &bodyText, nameAndDependencyIDs);
     }
 
     DeclDeserializationError::Flags errorFlags;
@@ -3239,6 +3242,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     fn->setDynamicSelf(hasDynamicSelf);
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     fn->setNeedsNewVTableEntry(needsNewVTableEntry);
+    fn->setBodyStringRepresentation(bodyText);
 
     if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
             rawDefaultArgumentResilienceExpansion)) {

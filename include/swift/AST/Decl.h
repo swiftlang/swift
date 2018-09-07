@@ -4988,6 +4988,7 @@ public:
 
 private:
   ParameterList *Params;
+  StringRef BodyStringRepresentation;
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
@@ -5152,6 +5153,11 @@ public:
   void setBodyTypeCheckedIfPresent() {
     if (getBodyKind() == BodyKind::Parsed)
       setBodyKind(BodyKind::TypeChecked);
+  }
+
+  StringRef getBodyStringRepresentation(SmallVectorImpl<char> &scratch);
+  void setBodyStringRepresentation(StringRef body) {
+    BodyStringRepresentation = body;
   }
 
   bool isBodyTypeChecked() const {
