@@ -72,6 +72,19 @@ class TestXPCEncoder {
         _testRoundTrip(of: employee)
     }
 
+    func testEncodingTopLevelDeepStructuredType() {
+        // Company is a type with fields which are Codable themselves.
+        let company = Company.testValue
+        _testRoundTrip(of: company)
+    }
+
+    func testEncodingTopLevelNullableType() {
+        _testRoundTrip(of: EnhancedBool.true)
+        _testRoundTrip(of: EnhancedBool.false)
+        _testRoundTrip(of: EnhancedBool.fileNotFound)
+    }
+
+
     // MARK: - Testing helpers
     private func _testRoundTrip<T>(of value: T) where T : Codable, T: Equatable {
         var payload: xpc_object_t! = nil
@@ -340,6 +353,51 @@ fileprivate class Employee : Person {
   }
 }
 
+/// A simple company struct which encodes as a dictionary of nested values.
+fileprivate struct Company : Codable, Equatable {
+    let address: Address
+    var employees: [Employee]
+
+    init(address: Address, employees: [Employee]) {
+        self.address = address
+        self.employees = employees
+    }
+
+    static func ==(_ lhs: Company, _ rhs: Company) -> Bool {
+        return lhs.address == rhs.address && lhs.employees == rhs.employees
+    }
+
+    static var testValue: Company {
+        return Company(address: Address.testValue, employees: [Employee.testValue])
+    }
+}
+
+/// An enum type which decodes from Bool?.
+fileprivate enum EnhancedBool : Codable {
+    case `true`
+    case `false`
+    case fileNotFound
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .fileNotFound
+        } else {
+            let value = try container.decode(Bool.self)
+            self = value ? .true : .false
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .true: try container.encode(true)
+        case .false: try container.encode(false)
+        case .fileNotFound: try container.encodeNil()
+        }
+    }
+}
+
 // MARK: - Run the the tests!
 var XPCEncoderTests = TestSuite("TestXPCEncoder")
 XPCEncoderTests.test("testEncodingTopLevelEmptyStruct") { TestXPCEncoder().testEncodingTopLevelEmptyStruct() }
@@ -352,4 +410,7 @@ XPCEncoderTests.test("testEncodingTopLevelStructuredClass") { TestXPCEncoder().t
 XPCEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") { TestXPCEncoder().testEncodingTopLevelStructuredSingleStruct() }
 XPCEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestXPCEncoder().testEncodingTopLevelStructuredSingleClass() }
 XPCEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestXPCEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
+XPCEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestXPCEncoder().testEncodingTopLevelDeepStructuredType() }
+XPCEncoderTests.test("testEncodingTopLevelNullableType") { TestXPCEncoder().testEncodingTopLevelNullableType() }
+
 runAllTests()
