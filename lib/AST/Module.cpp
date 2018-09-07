@@ -1005,6 +1005,55 @@ bool ModuleDecl::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
   });
 }
 
+ModuleDecl::ReverseFullNameIterator::ReverseFullNameIterator(
+    const ModuleDecl *M) {
+  assert(M);
+  // Note: This will look through overlays as well, but that's fine for name
+  // generation purposes. The point of an overlay is to
+  if (auto *clangModule = M->findUnderlyingClangModule())
+    current = clangModule;
+  else
+    current = M;
+}
+
+StringRef ModuleDecl::ReverseFullNameIterator::operator*() const {
+  assert(current && "all name components exhausted");
+
+  if (auto *swiftModule = current.dyn_cast<const ModuleDecl *>())
+    return swiftModule->getName().str();
+
+  auto *clangModule =
+      static_cast<const clang::Module *>(current.get<const void *>());
+  return clangModule->Name;
+}
+
+ModuleDecl::ReverseFullNameIterator &
+ModuleDecl::ReverseFullNameIterator::operator++() {
+  if (!current)
+    return *this;
+
+  if (auto *swiftModule = current.dyn_cast<const ModuleDecl *>()) {
+    current = nullptr;
+    return *this;
+  }
+
+  auto *clangModule =
+      static_cast<const clang::Module *>(current.get<const void *>());
+  if (clangModule->Parent)
+    current = clangModule->Parent;
+  else
+    current = nullptr;
+  return *this;
+}
+
+void
+ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out) const {
+  SmallVector<StringRef, 8> elements(*this, {});
+  swift::interleave(swift::reversed(elements),
+                    [&out](StringRef next) { out << next; },
+                    [&out] { out << '.'; });
+}
+
 void
 ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
   std::sort(imports.begin(), imports.end(),

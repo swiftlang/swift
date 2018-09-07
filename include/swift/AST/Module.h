@@ -151,6 +151,45 @@ public:
     }
   };
 
+  /// Produces the components of a given module's full name in reverse order.
+  ///
+  /// For a Swift module, this will only ever have one component, but an
+  /// imported Clang module might actually be a submodule.
+  class ReverseFullNameIterator {
+  public:
+    // Make this look like a valid STL iterator.
+    using difference_type = int;
+    using value_type = StringRef;
+    using pointer = StringRef *;
+    using reference = StringRef;
+    using iterator_category = std::forward_iterator_tag;
+
+  private:
+    PointerUnion<const ModuleDecl *, const /* clang::Module */ void *> current;
+  public:
+    ReverseFullNameIterator() = default;
+    explicit ReverseFullNameIterator(const ModuleDecl *M);
+    explicit ReverseFullNameIterator(const clang::Module *clangModule) {
+      current = clangModule;
+    }
+
+    StringRef operator*() const;
+    ReverseFullNameIterator &operator++();
+
+    friend bool operator==(ReverseFullNameIterator left,
+                           ReverseFullNameIterator right) {
+      return left.current == right.current;
+    }
+    friend bool operator!=(ReverseFullNameIterator left,
+                           ReverseFullNameIterator right) {
+      return !(left == right);
+    }
+
+    /// This is a convenience function that writes the entire name, in forward
+    /// order, to \p out.
+    void printForward(raw_ostream &out) const;
+  };
+
 private:
   /// If non-NULL, a plug-in that should be used when performing external
   /// lookups.
@@ -489,6 +528,15 @@ public:
 
   /// Returns the associated clang module if one exists.
   const clang::Module *findUnderlyingClangModule() const;
+
+  /// Returns a generator with the components of this module's full,
+  /// hierarchical name.
+  ///
+  /// For a Swift module, this will only ever have one component, but an
+  /// imported Clang module might actually be a submodule.
+  ReverseFullNameIterator getReverseFullModuleName() const {
+    return ReverseFullNameIterator(this);
+  }
 
   SourceRange getSourceRange() const { return SourceRange(); }
 
