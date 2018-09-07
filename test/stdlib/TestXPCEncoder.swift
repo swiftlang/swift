@@ -66,6 +66,11 @@ class TestXPCEncoder {
         _testRoundTrip(of: mapping)
     }
 
+    func testEncodingDerivedClass() {
+        let programmer = Programmer.testValue
+        _testRoundTrip(of: programmer)
+    }
+
     func testEncodingClassWhichSharesEncoderWithSuper() {
         // Employee is a type which shares its encoder & decoder with its superclass, Person.
         let employee = Employee.testValue
@@ -315,6 +320,44 @@ fileprivate final class Mapping : Codable, Equatable {
   }
 }
 
+/// A derived class
+fileprivate class Programmer : Person {
+    let favoriteIDE: String
+
+    init(name: String, email: String, website: URL? = nil, favoriteIDE: String) {
+        self.favoriteIDE = favoriteIDE
+        super.init(name: name, email: email, website: website)
+    }
+
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        favoriteIDE = try container.decode(String.self, forKey: .favoriteIDE)
+        try super.init(from: container.superDecoder())
+    }
+
+    override func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(favoriteIDE, forKey: .favoriteIDE)
+        try super.encode(to: container.superEncoder())
+    }
+
+    enum CodingKeys : String, CodingKey {
+        case favoriteIDE
+    }
+
+    override func isEqual(_ other: Person) -> Bool {
+        if let programmer = other as? Programmer {
+            guard self.favoriteIDE == programmer.favoriteIDE else { return false }
+        }
+
+        return super.isEqual(other)
+    }
+
+    override class var testValue: Programmer {
+        return Programmer(name: "Johnny Appleseed", email: "appleseed@apple.com", favoriteIDE: "XCode")
+    }
+}
+
 /// A class which shares its encoder and decoder with its superclass.
 fileprivate class Employee : Person {
   let id: Int
@@ -409,8 +452,8 @@ XPCEncoderTests.test("testEncodingTopLevelStructuredStruct") { TestXPCEncoder().
 XPCEncoderTests.test("testEncodingTopLevelStructuredClass") { TestXPCEncoder().testEncodingTopLevelStructuredClass() }
 XPCEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") { TestXPCEncoder().testEncodingTopLevelStructuredSingleStruct() }
 XPCEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestXPCEncoder().testEncodingTopLevelStructuredSingleClass() }
+XPCEncoderTests.test("testEncodingDerivedClass") { TestXPCEncoder().testEncodingDerivedClass() }
 XPCEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestXPCEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
 XPCEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestXPCEncoder().testEncodingTopLevelDeepStructuredType() }
 XPCEncoderTests.test("testEncodingTopLevelNullableType") { TestXPCEncoder().testEncodingTopLevelNullableType() }
-
 runAllTests()
