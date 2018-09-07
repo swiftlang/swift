@@ -2867,13 +2867,31 @@ void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   // Re-enter the lexical scope.
   Scope S(this, DelayedState->takeScope());
   ContextChange CC(*this, DelayedState->ParentContext);
-  auto *ext = cast<ExtensionDecl>(IDC);
+  Decl *D = const_cast<Decl*>(IDC->getDecl());
   SourceLoc LBLoc = consumeToken(tok::l_brace);
   SourceLoc RBLoc;
-  parseDeclList(ext->getBraces().Start, RBLoc, diag::expected_rbrace_extension,
-                ParseDeclOptions(DelayedState->Flags),
-                [&] (Decl *D) { ext->addMember(D); });
-  ext->setBraces({LBLoc, RBLoc});
+  Diag<> Id;
+  switch (D->getKind()) {
+  case DeclKind::Extension: Id = diag::expected_rbrace_extension; break;
+  case DeclKind::Enum: Id = diag::expected_rbrace_enum; break;
+  case DeclKind::Protocol: Id = diag::expected_rbrace_protocol; break;
+  case DeclKind::Class: Id = diag::expected_rbrace_class; break;
+  case DeclKind::Struct: Id = diag::expected_rbrace_struct; break;
+  default:
+    llvm_unreachable("Bad iterable decl context kinds.");
+  }
+  if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
+    parseDeclList(ext->getBraces().Start, RBLoc, Id,
+                  ParseDeclOptions(DelayedState->Flags),
+                  [&] (Decl *D) { ext->addMember(D); });
+    ext->setBraces({LBLoc, RBLoc});
+  } else {
+    auto *ntd = cast<NominalTypeDecl>(D);
+    parseDeclList(ntd->getBraces().Start, RBLoc, Id,
+                  ParseDeclOptions(DelayedState->Flags),
+                  [&] (Decl *D) { ntd->addMember(D); });
+    ntd->setBraces({LBLoc, RBLoc});
+  }
 }
 
 void Parser::parseDeclDelayed() {
@@ -5509,6 +5527,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
+  SourceLoc PosBeforeLB = Tok.getLoc();
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
     LBLoc = PreviousLoc;
     RBLoc = LBLoc;
@@ -5516,9 +5535,20 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   } else {
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement | PD_InEnum);
-    if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_enum,
-                      Options, [&] (Decl *D) { ED->addMember(D); }))
-      Status.setIsParseError();
+    if (canDelayBodyParsing()) {
+      if (Tok.is(tok::r_brace)) {
+        RBLoc = consumeToken();
+      } else {
+        RBLoc = Tok.getLoc();
+        Status.setIsParseError();
+      }
+      State->delayDeclList(ED, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
+                           PosBeforeLB);
+    } else {
+      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_enum,
+                        Options, [&] (Decl *D) { ED->addMember(D); }))
+        Status.setIsParseError();
+    }
   }
 
   ED->setBraces({LBLoc, RBLoc});
