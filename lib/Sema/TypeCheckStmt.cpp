@@ -391,7 +391,7 @@ public:
     if (S2 == nullptr)
       return true;
     S = S2;
-    performStmtDiagnostics(TC, S);
+    performStmtDiagnostics(TC, DC, S);
     return false;
   }
 

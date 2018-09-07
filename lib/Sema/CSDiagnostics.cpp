@@ -407,62 +407,6 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
                                            resultIsOptional, SourceRange());
 }
 
-// Suggest a default value via ?? <default value>
-static void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr *expr) {
-  auto diag =
-  TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
-
-  // Figure out what we need to parenthesize.
-  bool needsParensInside =
-  exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
-  bool needsParensOutside =
-  exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, expr);
-
-  llvm::SmallString<2> insertBefore;
-  llvm::SmallString<32> insertAfter;
-  if (needsParensOutside) {
-    insertBefore += "(";
-  }
-  if (needsParensInside) {
-    insertBefore += "(";
-    insertAfter += ")";
-  }
-  insertAfter += " ?? <" "#default value#" ">";
-  if (needsParensOutside)
-    insertAfter += ")";
-
-  if (!insertBefore.empty()) {
-    diag.fixItInsert(expr->getStartLoc(), insertBefore);
-  }
-  diag.fixItInsertAfter(expr->getEndLoc(), insertAfter);
-}
-
-// Suggest a force-unwrap.
-static void offerForceUnwrapFixit(ConstraintSystem &CS, Expr *expr) {
-  auto diag = CS.TC.diagnose(expr->getLoc(), diag::unwrap_with_force_value);
-
-  // If expr is optional as the result of an optional chain and this last
-  // dot isn't a member returning optional, then offer to force the last
-  // link in the chain, rather than an ugly parenthesized postfix force.
-  if (auto optionalChain = dyn_cast<OptionalEvaluationExpr>(expr)) {
-    if (auto dotExpr =
-        dyn_cast<UnresolvedDotExpr>(optionalChain->getSubExpr())) {
-      auto bind = dyn_cast<BindOptionalExpr>(dotExpr->getBase());
-      if (bind && !CS.getType(dotExpr)->getOptionalObjectType()) {
-        diag.fixItReplace(SourceRange(bind->getLoc()), "!");
-        return;
-      }
-    }
-  }
-
-  if (expr->canAppendPostfixExpression(true)) {
-    diag.fixItInsertAfter(expr->getEndLoc(), "!");
-  } else {
-    diag.fixItInsert(expr->getStartLoc(), "(")
-    .fixItInsertAfter(expr->getEndLoc(), ")!");
-  }
-}
-
 class VarDeclMultipleReferencesChecker : public ASTWalker {
   VarDecl *varDecl;
   int count;
@@ -487,6 +431,10 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
 
   CS.TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
                  unwrappedType);
+
+  auto getType = [&](const Expr *E) -> Type {
+    return CS.getType(E);
+  };
 
   // If the expression we're unwrapping is the only reference to a
   // local variable whose type isn't explicit in the source, then
@@ -530,13 +478,13 @@ static bool diagnoseUnwrap(ConstraintSystem &CS, Expr *expr, Type type) {
 
         offerDefaultValueUnwrapFixit(CS.TC, varDecl->getDeclContext(),
                                      initializer);
-        offerForceUnwrapFixit(CS, initializer);
+        offerForceUnwrapFixit(initializer, CS.TC, getType);
       }
     }
   }
 
   offerDefaultValueUnwrapFixit(CS.TC, CS.DC, expr);
-  offerForceUnwrapFixit(CS, expr);
+  offerForceUnwrapFixit(expr, CS.TC, getType);
   return true;
 }
 

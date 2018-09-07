@@ -40,7 +40,7 @@ void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
                                      bool isExprStmt);
 
 /// \brief Emit diagnostics for a given statement.
-void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
+void performStmtDiagnostics(TypeChecker &TC, DeclContext *DC, const Stmt *S);
 
 void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
                                         AbstractFunctionDecl *AFD);
@@ -97,6 +97,15 @@ void fixItEncloseTrailingClosure(TypeChecker &TC,
                                  const CallExpr *call,
                                  Identifier closureLabel);
 
+// Suggest a default value via ?? <default value>
+void offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC, Expr *expr);
+
+// Suggest a force-unwrap.
+void offerForceUnwrapFixit(Expr *expr, TypeChecker &TC,
+                           llvm::function_ref<Type(const Expr *)> getType =
+                             [](const Expr *E) -> Type {
+                               return E->getType();
+                             });
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

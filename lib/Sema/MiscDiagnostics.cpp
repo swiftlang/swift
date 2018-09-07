@@ -16,6 +16,7 @@
 
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
+#include "ConstraintSystem.h"
 #include "TypeCheckAvailability.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
@@ -2979,6 +2980,33 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
   }
 }
 
+static void checkForEach(TypeChecker &TC, DeclContext *DC,
+                         const ForEachStmt *stmt) {
+  const auto seq = stmt->getSequence();
+  const auto seqTy = seq->getType();
+
+  auto unwrappedTy = seqTy->getOptionalObjectType();
+
+  if (unwrappedTy) {
+    if (!stmt->getIsOptional()) {
+      TC.diagnose(seq->getLoc(), diag::optional_not_unwrapped, seqTy,
+                  unwrappedTy);
+
+      TC.diagnose(seq->getLoc(), diag::to_optional_foreach_fixit)
+        .fixItInsert(stmt->getQuestionLoc(),
+                     getTokenText(tok::question_postfix));
+
+      offerDefaultValueUnwrapFixit(TC, DC, seq);
+      offerForceUnwrapFixit(seq, TC);
+    }
+  } else if (stmt->getIsOptional()) {
+    TC.diagnose(stmt->getForLoc(), diag::foreach_sequence_not_optional,
+                seqTy)
+      .highlight(seq->getSourceRange())
+      .fixItRemove(stmt->getQuestionLoc());
+  }
+}
+
 void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
                                         InFlightDiagnostic &diag,
                                         const CallExpr *call,
@@ -3882,6 +3910,62 @@ static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+void swift::offerDefaultValueUnwrapFixit(TypeChecker &TC, DeclContext *DC,
+                                         Expr *expr) {
+  auto diag =
+  TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
+
+  // Figure out what we need to parenthesize.
+  bool needsParensInside =
+    exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
+  bool needsParensOutside =
+    exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, expr);
+
+  llvm::SmallString<2> insertBefore;
+  llvm::SmallString<32> insertAfter;
+  if (needsParensOutside) {
+    insertBefore += "(";
+  }
+  if (needsParensInside) {
+    insertBefore += "(";
+    insertAfter += ")";
+  }
+  insertAfter += " ?? <" "#default value#" ">";
+  if (needsParensOutside)
+    insertAfter += ")";
+  
+  if (!insertBefore.empty()) {
+    diag.fixItInsert(expr->getStartLoc(), insertBefore);
+  }
+  diag.fixItInsertAfter(expr->getEndLoc(), insertAfter);
+}
+
+void swift::offerForceUnwrapFixit(Expr *expr, TypeChecker &TC,
+                           llvm::function_ref<Type(const Expr *)> getType) {
+  auto diag = TC.diagnose(expr->getLoc(), diag::unwrap_with_force_value);
+
+  // If expr is optional as the result of an optional chain and this last
+  // dot isn't a member returning optional, then offer to force the last
+  // link in the chain, rather than an ugly parenthesized postfix force.
+  if (auto optionalChain = dyn_cast<OptionalEvaluationExpr>(expr)) {
+    if (auto dotExpr =
+        dyn_cast<UnresolvedDotExpr>(optionalChain->getSubExpr())) {
+      auto bind = dyn_cast<BindOptionalExpr>(dotExpr->getBase());
+      if (bind && !getType(dotExpr)->getOptionalObjectType()) {
+        diag.fixItReplace(SourceRange(bind->getLoc()), "!");
+        return;
+      }
+    }
+  }
+
+  if (expr->canAppendPostfixExpression(true)) {
+    diag.fixItInsertAfter(expr->getEndLoc(), "!");
+  } else {
+    diag.fixItInsert(expr->getStartLoc(), "(")
+    .fixItInsertAfter(expr->getEndLoc(), ")!");
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -3903,11 +3987,14 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
     diagDeprecatedObjCSelectors(TC, DC, E);
 }
 
-void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
+void swift::performStmtDiagnostics(TypeChecker &TC, DeclContext *DC, const Stmt *S) {
   TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
     
-  if (auto switchStmt = dyn_cast<SwitchStmt>(S))
+  if (auto switchStmt = dyn_cast<SwitchStmt>(S)) {
     checkSwitch(TC, switchStmt);
+  } else if (auto forEachStmt = dyn_cast<ForEachStmt>(S)) {
+    checkForEach(TC, DC, forEachStmt);
+  }
 
   checkStmtConditionTrailingClosure(TC, S);
   

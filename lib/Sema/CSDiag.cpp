@@ -8110,6 +8110,7 @@ bool FailureDiagnosis::diagnoseExprFailure() {
   // be type checked on its own (even to an incomplete type) then that is where
   // we focus our attention.  If we do find a type, we use it to check for
   // contextual type mismatches.
+  expr->print(llvm::outs());llvm::outs()<<" ±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±±\n";
   return visit(expr);
 }
 

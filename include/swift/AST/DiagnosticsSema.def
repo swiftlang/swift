@@ -3142,6 +3142,13 @@ ERROR(continue_outside_loop,none,
 ERROR(continue_not_in_this_stmt,none,
       "'continue' cannot be used with %0 statements", (StringRef))
 
+ERROR(foreach_sequence_not_optional,none,
+      "optional for-in loop must not be used on non-optional sequence of type %0",
+      (Type))
+NOTE(to_optional_foreach_fixit,none,
+     "use 'for?' to ignore the loop when the optional value contains 'nil'", ())
+NOTE(to_nonoptional_foreach_fixit,none, "", ())
+
 // Switch Stmt
 ERROR(no_match_operator,none,
       "no binary '~=' operator available for 'switch' statement", ())
