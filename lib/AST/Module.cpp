@@ -1059,9 +1059,11 @@ ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
   std::sort(imports.begin(), imports.end(),
             [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
     // Arbitrarily sort by name to get a deterministic order.
-    // FIXME: Submodules don't get sorted properly here.
-    if (lhs.second != rhs.second)
-      return lhs.second->getName().str() < rhs.second->getName().str();
+    if (lhs.second != rhs.second) {
+      return std::lexicographical_compare(
+          lhs.second->getReverseFullModuleName(), {},
+          rhs.second->getReverseFullModuleName(), {});
+    }
     using AccessPathElem = std::pair<Identifier, SourceLoc>;
     return std::lexicographical_compare(lhs.first.begin(), lhs.first.end(),
                                         rhs.first.begin(), rhs.first.end(),
