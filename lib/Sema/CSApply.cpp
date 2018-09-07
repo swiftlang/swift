@@ -7868,7 +7868,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   if (auto metaType = type->getAs<AnyMetatypeType>())
     type = metaType->getInstanceType();
-  
+
   auto witness = findNamedWitnessImpl(
                    *this, dc, type->getRValueType(), protocol,
                    name, brokenProtocolDiag);
@@ -7971,6 +7971,26 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                       cs.getConstraintLocator(call));
   if (!result)
     return nullptr;
+
+  if (dyn_cast<BindOptionalExpr>(base)) {
+    Expr *OEE = nullptr;
+    if (cs.getType(call)->getOptionalObjectType()) {
+      OEE = new (Context) OptionalEvaluationExpr(call);
+      OEE->setType(cs.getType(call));
+    } else {
+      Expr *IIO = new (Context) InjectIntoOptionalExpr(
+          call, OptionalType::get(cs.getType(call)));
+      OEE = new (Context) OptionalEvaluationExpr(IIO);
+      OEE->setType(IIO->getType());
+    }
+    OEE->print(llvm::outs());llvm::outs()<<"\n\n&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n\n";
+//    auto result = rewriter.visitOptionalEvaluationExpr(oee);
+    
+//    if (!OEE)
+//      return nullptr;
+//    rewriter.finalize(oee);
+    return OEE;
+  }
 
   rewriter.finalize(result);
   return result;

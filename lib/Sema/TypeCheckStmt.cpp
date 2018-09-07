@@ -673,11 +673,19 @@ public:
     }
     
     Expr *sequence = S->getSequence();
+    auto seqOptObjTy = sequence->getType()->getOptionalObjectType();
+    if (seqOptObjTy) {
+      sequence = new (TC.Context) BindOptionalExpr(sequence,
+                                                   sequence->getEndLoc(), 0);
+      sequence->setType(seqOptObjTy);
+    }
 
     // Invoke iterator() to get an iterator from the sequence.
     Type generatorTy;
     VarDecl *generator;
     {
+      // If the sequence is optional, check the object type for conformance
+      // instead.
       Type sequenceType = sequence->getType();
       auto conformance =
         TC.conformsToProtocol(sequenceType, sequenceProto, DC,
@@ -693,23 +701,29 @@ public:
 
       if (!generatorTy)
         return nullptr;
-      
+
       Expr *getIterator
         = TC.callWitness(sequence, DC, sequenceProto, *conformance,
                          TC.Context.Id_makeIterator,
                          {}, diag::sequence_protocol_broken);
       if (!getIterator) return nullptr;
-
+llvm::outs()<<"=============================================1-5\n";
       // Create a local variable to capture the generator.
       std::string name;
       if (auto np = dyn_cast_or_null<NamedPattern>(S->getPattern()))
         name = "$"+np->getBoundName().str().str();
       name += "$generator";
+
+      // If the sequence is optional, the actual generator type will be
+      // optional as well.
+      auto actualGeneratorTy = seqOptObjTy
+        ? TC.getOptionalType(sequence->getStartLoc(), generatorTy)
+        : generatorTy;
       generator = new (TC.Context)
         VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var, /*IsCaptureList*/false,
                 S->getInLoc(), TC.Context.getIdentifier(name), DC);
-      generator->setType(generatorTy);
-      generator->setInterfaceType(generatorTy->mapTypeOutOfContext());
+      generator->setType(actualGeneratorTy);
+      generator->setInterfaceType(actualGeneratorTy->mapTypeOutOfContext());
       generator->setImplicit();
 
       // Create a pattern binding to initialize the generator.
@@ -741,15 +755,21 @@ public:
                                        diag::iterator_protocol_broken);
     if (!elementTy)
       return nullptr;
-    
+
     // Compute the expression that advances the generator.
+    auto generatorExpr = TC.buildCheckedRefExpr(
+        generator, DC, DeclNameLoc(S->getInLoc()), /*implicit*/true);
+    if (seqOptObjTy) {
+      generatorExpr = new (TC.Context) BindOptionalExpr(
+          generatorExpr, generatorExpr->getEndLoc(), 0);
+      generatorExpr->setType(LValueType::get(generatorTy));
+    }
     Expr *iteratorNext
-      = TC.callWitness(TC.buildCheckedRefExpr(generator, DC,
-                                              DeclNameLoc(S->getInLoc()),
-                                              /*implicit*/true),
-                       DC, generatorProto, *genConformance,
+      = TC.callWitness(generatorExpr, DC, generatorProto, *genConformance,
                        TC.Context.Id_next, {}, diag::iterator_protocol_broken);
+
     if (!iteratorNext) return nullptr;
+    llvm::outs()<<"=============================================1-7\n";
     // Check that next() produces an Optional<T> value.
     if (iteratorNext->getType()->getAnyNominal()
           != TC.Context.getOptionalDecl()) {
@@ -771,7 +791,7 @@ public:
     BraceStmt *Body = S->getBody();
     typeCheckStmt(Body);
     S->setBody(Body);
-    
+
     return S;
   }
 

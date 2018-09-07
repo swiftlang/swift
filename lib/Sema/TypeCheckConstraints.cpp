@@ -2544,11 +2544,22 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       }
 
       SequenceType = cs.createTypeVariable(Locator);
-      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       SequenceType, Locator);
-      cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
-                       sequenceProto->getDeclaredType(), Locator);
+      auto exprTy = cs.getType(expr);
 
+      cs.addConstraint(ConstraintKind::Conversion, exprTy,
+                       SequenceType, Locator);
+
+      if (exprTy->getOptionalObjectType()) {
+        auto T2 = cs.createTypeVariable(Locator);
+
+        cs.addConstraint(ConstraintKind::OptionalObject, SequenceType,
+                         T2, Locator);
+        cs.addConstraint(ConstraintKind::ConformsTo, T2,
+                         sequenceProto->getDeclaredType(), Locator);
+      } else {
+        cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
+                         sequenceProto->getDeclaredType(), Locator);
+      }
       auto iteratorLocator =
         cs.getConstraintLocator(Locator,
                                 ConstraintLocator::SequenceIteratorProtocol);
