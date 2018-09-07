@@ -40,6 +40,10 @@ using namespace tf;
 static llvm::cl::opt<bool> TFEnsureSingleLoopExit(
     "tf-ensure-single-loop-exit", llvm::cl::init(true),
     llvm::cl::desc("Transform loops to have a single exit from header."));
+static llvm::cl::opt<bool> TFNoUndefsInSESE(
+    "tf-no-undefs-in-sese", llvm::cl::init(true),
+    llvm::cl::desc("Try to eliminate undefs in when performing "
+                   "sese canonicalization of loops."));
 
 //===----------------------------------------------------------------------===//
 // SESERegionTree Implementation
@@ -414,6 +418,9 @@ void SingleExitLoopTransformer::computeEscapingValues() {
       llvm::for_each(inst.getResults(), saveEscaping);
     }
   }
+
+  // Do not eliminate undefs unless requested for.
+  if (!TFNoUndefsInSESE)  return;
 
   // Find a def-free path from the common exit to the preheader for each
   // escaping value. If no such path is found, set the escaping value at header
