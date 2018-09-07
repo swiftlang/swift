@@ -1566,6 +1566,11 @@ bool ConstraintSystem::solveIteratively(
   // First step is always wraps whole constraint system.
   workList.push_back(SplitterStep::create(*this, solutions));
 
+  // Indicate whether previous step in the stack has failed
+  // (returned StepResult::Kind = Error), this is useful to
+  // propagate failures when unsolved steps are re-taken.
+  bool prevFailed = false;
+
   // Execute steps in LIFO order, which means that
   // each individual step would either end up producing
   // a solution, or producing another set of mergeable
@@ -1573,11 +1578,11 @@ bool ConstraintSystem::solveIteratively(
   while (!workList.empty()) {
     auto *step = workList.back();
 
-    // Now let's try to advance to the next step,
+    // Now let's try to advance to the next step or re-take previous,
     // which should produce another steps to follow,
-    // or error, which means that we'll have to stop.
+    // or error, which means that current path is inconsistent.
     {
-      auto result = step->advance();
+      auto result = step->take(prevFailed);
       switch (result.getKind()) {
       // It was impossible to solve this step, let's note that
       // for followup steps, to propogate the error.
@@ -1602,6 +1607,7 @@ bool ConstraintSystem::solveIteratively(
         break;
       }
 
+      prevFailed = result.getKind() == SolutionKind::Error;
       result.transfer(workList);
     }
   }

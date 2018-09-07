@@ -85,10 +85,18 @@ public:
 
   virtual ~SolverStep() {}
 
-  /// Try to move solver forward by simplifying constraints if possible.
-  /// Such simplication might lead to either producing a solution, or
-  /// creating a set of "follow-up" more granular steps to execute.
-  virtual StepResult advance() = 0;
+  /// \brief Try to move solver forward by simplifying constraints if possible.
+  ///        Such simplication might lead to either producing a solution, or
+  ///        creating a set of "follow-up" more granular steps to execute.
+  ///
+  /// \param prevFailed Indicate whether previous step
+  ///        in the stack has failed (returned StepResult::Kind = Error),
+  ///        this is useful to propagate failures when
+  ///        unsolved steps are re-taken.
+  ///
+  /// \returns status and any follow-up steps to take before considering
+  ///          this step solved or failed.
+  virtual StepResult take(bool prevFailed) = 0;
 
 protected:
   /// Erase constraint from the constraint system (include constraint graph)
@@ -144,7 +152,7 @@ public:
     CG.setOrphanedConstraints(std::move(OrphanedConstraints));
   }
 
-  StepResult advance() override;
+  StepResult take(bool prevFailed) override;
 
   static SplitterStep *create(ConstraintSystem &cs,
                               SmallVectorImpl<Solution> &solutions) {
@@ -210,7 +218,7 @@ public:
     OrphanedConstraint = constraint;
   }
 
-  StepResult advance() override;
+  StepResult take(bool prevFailed) override;
 
   static ComponentStep *create(ConstraintSystem &cs, unsigned index,
                                SmallVectorImpl<Solution> &solutions) {
@@ -257,7 +265,7 @@ class TypeVariableStep final : public SolverStep {
         Bindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
 
 public:
-  StepResult advance() override;
+  StepResult take(bool prevFailed) override;
 
   static TypeVariableStep *create(ConstraintSystem &cs,
                                   BindingContainer &bindings,
@@ -296,7 +304,7 @@ public:
       choice->setEnabled();
   }
 
-  StepResult advance() override;
+  StepResult take(bool prevFailed) override;
 
   static DisjunctionStep *create(ConstraintSystem &cs, Constraint *disjunction,
                                  SmallVectorImpl<Solution> &solutions) {
