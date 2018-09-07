@@ -26,8 +26,7 @@ using namespace llvm;
 using namespace swift;
 using namespace constraints;
 
-ComponentStep::ComponentScope::ComponentScope(ComponentStep &component)
-    : CS(component.CS) {
+ComponentStep::Scope::Scope(const ComponentStep &component) : CS(component.CS) {
   TypeVars = std::move(CS.TypeVariables);
 
   for (auto *typeVar : component.TypeVars)
@@ -91,8 +90,10 @@ void SplitterStep::computeFollowupSteps(
   PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
       new SmallVector<Solution, 4>[NumComponents]);
 
-  for (unsigned i = 0, n = NumComponents; i != n; ++i)
-    componentSteps.push_back(ComponentStep::create(CS, i, PartialSolutions[i]));
+  for (unsigned i = 0, n = NumComponents; i != n; ++i) {
+    componentSteps.push_back(
+        ComponentStep::create(CS, i, NumComponents == 1, PartialSolutions[i]));
+  }
 
   if (CS.getASTContext().LangOpts.DebugConstraintSolver) {
     auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
@@ -197,8 +198,11 @@ StepResult ComponentStep::take(bool prevFailed) {
   if (prevFailed)
     return StepResult::failure();
 
-  if (!Scope) {
-    Scope = new (CS.getAllocator()) ComponentScope(*this);
+  if (ComponentState == State::Setup) {
+    // If this is a single component, there is
+    // no need to preliminary modify constraint system.
+    if (!IsSingleComponent)
+      ComponentScope = llvm::make_unique<Scope>(*this);
 
     if (CS.TC.getLangOpts().DebugConstraintSolver) {
       auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
@@ -215,11 +219,11 @@ StepResult ComponentStep::take(bool prevFailed) {
         (!disjunction ||
          (!bestBindings->InvolvesTypeVariables && !bestBindings->FullyBound))) {
       // Produce a type variable step.
-      return StepResult::unsolved(
+      return dispatchFollowup(
           TypeVariableStep::create(CS, *bestBindings, Solutions));
     } else if (disjunction) {
       // Produce a disjunction step.
-      return StepResult::unsolved(
+      return dispatchFollowup(
           DisjunctionStep::create(CS, disjunction, Solutions));
     }
 
@@ -228,12 +232,12 @@ StepResult ComponentStep::take(bool prevFailed) {
     // allowed in the solution.
     if (!CS.solverState->allowsFreeTypeVariables() ||
         !CS.hasFreeTypeVariables())
-      return StepResult::failure();
+      return markAsDone(/* success */ false);
 
     // If this solution is worse than the best solution we've seen so far,
     // skip it.
     if (CS.worseThanBestSolution())
-      return StepResult::failure();
+      return markAsDone(/* success */ false);
 
     // If we only have relational or member constraints and are allowing
     // free type variables, save the solution.
@@ -243,7 +247,7 @@ StepResult ComponentStep::take(bool prevFailed) {
       case ConstraintClassification::Member:
         continue;
       default:
-        return StepResult::failure();
+        return markAsDone(/* success */ false);
       }
     }
 
@@ -254,8 +258,10 @@ StepResult ComponentStep::take(bool prevFailed) {
     }
 
     Solutions.push_back(std::move(solution));
-    return StepResult::success();
+    return markAsDone();
   }
+
+  assert(ComponentState == State::Filter);
 
   // For each of the partial solutions, subtract off the current score.
   // It doesn't contribute.
@@ -267,7 +273,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   // combinations we need to produce; in the common case, down to a single
   // combination.
   filterSolutions(Solutions, /*minimize=*/true);
-  return StepResult::success();
+  return markAsDone();
 }
 
 StepResult TypeVariableStep::take(bool prevFailed) {
