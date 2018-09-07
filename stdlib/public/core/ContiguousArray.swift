@@ -286,24 +286,14 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
   @inlinable
   public subscript(index: Int) -> Element {
     get {
-      // This call may be hoisted or eliminated by the optimizer.  If
-      // there is an inout violation, this value may be stale so needs to be
-      // checked again below.
-      let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
-
-      // Make sure the index is in range and wasNativeTypeChecked is
-      // still valid.
-      let token = _checkSubscript(
-        index, wasNativeTypeChecked: wasNativeTypeChecked)
-
-      return _getElement(
-        index, wasNativeTypeChecked: wasNativeTypeChecked,
-        matchingSubscriptCheck: token)
-    }
-    mutableAddressWithNativeOwner {
-      _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_native(index)
-      return (_getElementAddress(index), _getOwner_native())
+      return _buffer.getElement(index)
+    }
+    _modify {
+      _makeMutableAndUnique()
+      _checkSubscript_native(index)
+      let address = _buffer.subscriptBaseAddress + index
+      yield &address.pointee
     }
   }
 
@@ -353,17 +343,6 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
 
 //===--- private helpers---------------------------------------------------===//
 extension ContiguousArray {
-  /// Returns `true` if the array is native and does not need a deferred
-  /// type check.  May be hoisted by the optimizer, which means its
-  /// results may be stale by the time they are used if there is an
-  /// inout violation in user code.
-  @inlinable
-  @_semantics("array.props.isNativeTypeChecked")
-  public // @testable
-  func _hoistableIsNativeTypeChecked() -> Bool {
-   return _buffer.arrayPropertyIsNativeTypeChecked
-  }
-
   @inlinable
   @_semantics("array.get_count")
   internal func _getCount() -> Int {
@@ -374,31 +353,6 @@ extension ContiguousArray {
   @_semantics("array.get_capacity")
   internal func _getCapacity() -> Int {
     return _buffer.capacity
-  }
-
-  /// - Precondition: The array has a native buffer.
-  @inlinable
-  @_semantics("array.owner")
-  internal func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
-    return Builtin.unsafeCastToNativeObject(_buffer.nativeOwner)
-  }
-
-  /// - Precondition: The array has a native buffer.
-  @inlinable
-  @inline(__always)
-  internal func _getOwner_native() -> Builtin.NativeObject {
-#if _runtime(_ObjC)
-    if _isClassOrObjCExistential(Element.self) {
-      // We are hiding the access to '_buffer.owner' behind
-      // _getOwner() to help the compiler hoist uniqueness checks in
-      // the case of class or Objective-C existential typed array
-      // elements.
-      return _getOwnerWithSemanticLabel_native()
-    }
-#endif
-    // In the value typed case the extra call to
-    // _getOwnerWithSemanticLabel_native hinders optimization.
-    return Builtin.unsafeCastToNativeObject(_buffer.owner)
   }
 
   @inlinable
@@ -417,43 +371,12 @@ extension ContiguousArray {
     _buffer._checkValidSubscript(index)
   }
 
-  /// Check that the given `index` is valid for subscripting, i.e.
-  /// `0 ≤ index < count`.
-  @inlinable
-  @_semantics("array.check_subscript")
-  public // @testable
-  func _checkSubscript(
-    _ index: Int, wasNativeTypeChecked: Bool
-  ) -> _DependenceToken {
-#if _runtime(_ObjC)
-    _buffer._checkValidSubscript(index)
-#else
-    _buffer._checkValidSubscript(index)
-#endif
-    return _DependenceToken()
-  }
-
   /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`.
   @inlinable
   @_semantics("array.check_index")
   internal func _checkIndex(_ index: Int) {
     _precondition(index <= endIndex, "ContiguousArray index is out of range")
     _precondition(index >= startIndex, "Negative ContiguousArray index is out of range")
-  }
-
-  @_semantics("array.get_element")
-  @inline(__always)
-  public // @testable
-  func _getElement(
-    _ index: Int,
-    wasNativeTypeChecked: Bool,
-    matchingSubscriptCheck: _DependenceToken
-  ) -> Element {
-#if false
-    return _buffer.getElement(index, wasNativeTypeChecked: wasNativeTypeChecked)
-#else
-    return _buffer.getElement(index)
-#endif
   }
 
   @inlinable
