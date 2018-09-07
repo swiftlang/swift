@@ -91,9 +91,9 @@ let samples: [rrggbb_t] = [
 ]
 
 func isCorrectHistogram(_ histogram: [(key: rrggbb_t, value: Int)]) -> Bool {
-    return histogram.count  == 157 &&
-           histogram[0].0   == 0x00808080 && histogram[0].1   == 54 &&
-           histogram[156].0 == 0x003B8D96 && histogram[156].1 == 1
+    return histogram.count  == 157 as Int &&
+           histogram[0].0   == 0x00808080 && histogram[0].1   == 54 as Int &&
+           histogram[156].0 == 0x003B8D96 && histogram[156].1 == 1 as Int
 }
 
 func createSortedSparseRGBHistogram<S : Sequence>(
@@ -135,8 +135,8 @@ class Box<T : Hashable> : Hashable {
 
 func isCorrectHistogramOfObjects(_ histogram: [(key: Box<rrggbb_t>, value: Box<Int>)]) -> Bool {
     return histogram.count  == 157 &&
-           histogram[0].0.value   == 0x00808080 && histogram[0].1.value   == 54 &&
-           histogram[156].0.value == 0x003B8D96 && histogram[156].1.value == 1
+           histogram[0].0.value   == 0x00808080 as rrggbb_t && histogram[0].1.value   == 54 &&
+           histogram[156].0.value == 0x003B8D96 as rrggbb_t && histogram[156].1.value == 1
 }
 
 func createSortedSparseRGBHistogramOfObjects<S : Sequence>(

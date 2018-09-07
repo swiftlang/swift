@@ -163,7 +163,7 @@
         "FloatingPointTypes.swift"],
       "SIMD": [
         "SIMDVector.swift",
-        "SIMDVectorN.swift.gyb",
+        "SIMDVectorN.swift",
         "SIMDPredicate.swift",
         "SIMDPredicateTypes.swift",
         "SIMDInteger.swift",

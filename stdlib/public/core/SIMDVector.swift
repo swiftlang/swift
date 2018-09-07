@@ -1,7 +1,7 @@
-/*
+/// A computational vector type.
 public protocol SIMDVector : MutableCollection,
-                             ExpressibleByArrayLiteral,
                              CustomStringConvertible,
+                             ExpressibleByArrayLiteral,
                              Equatable
                        where Index == Int {
   
@@ -9,7 +9,17 @@ public protocol SIMDVector : MutableCollection,
   init()
   
   /// A vector with value in all lanes.
+  ///
+  /// A default implementation is provided by SIMDVectorN.
   init(repeating value: Element)
+  
+  /// A vector constructed from the contents of `array`.
+  ///
+  /// `array` must have the correct number of elements for the vector type.
+  /// If it does not, a runtime error occurs.
+  ///
+  /// A default implementation is provided by SIMDVectorN.
+  init(fromArray array: [Element])
   
   /// A type representing the result of lanewise comparison.
   ///
@@ -27,37 +37,52 @@ public protocol SIMDVector : MutableCollection,
   
   static func ==(lhs: Self, rhs: Self) -> Predicate
   
-  static func !=(lhs: Self, rhs: Self) -> Predicate
-  
-  func replacing(with other: Self, where predicate: Predicate) -> Self
+  // func replacing(with other: Self, where predicate: Predicate) -> Self
 }
 
+//  Non-customizable operations on SIMDVector
 public extension SIMDVector {
-  
+
   @_transparent
-  var startIndex: Int { return 0 }
-  
-  @_transparent
-  func index(after i: Int) -> Int { return i + 1 }
-  
-  @_transparent
-  static func !=(lhs: Self, rhs: Self) -> Predicate { return !(lhs == rhs) }
-  
-  @_transparent
+  static func !=(lhs: Self, rhs: Self) -> Predicate {
+    return !(lhs == rhs)
+  }
+  /*
+  @inlinable
   mutating func replace(with other: Self, where predicate: Predicate) {
     self = self.replacing(with: other, where: predicate)
   }
-  
-  @_transparent
-  var description: String {
-    get {
-      return "\(Self.self)(" + self.map({"\($0)"}).joined(separator: ", ") + ")"
-    }
+  */
+}
+
+//  Defaulted conformance to Collection. endIndex is defined on SIMDVectorN.
+public extension SIMDVector {
+  @inlinable
+  var startIndex: Int {
+    return 0
   }
   
+  @inlinable
+  func index(after i: Int) -> Int {
+    return i + 1
+  }
+}
+
+//  Defaulted conformance to Equatable.
+public extension SIMDVector {
   @_transparent
   static func ==(lhs: Self, rhs: Self) -> Bool {
     return all(lhs == rhs)
   }
 }
-*/
+
+//  Defaulted conformance to CustomStringConvertible
+public extension SIMDVector {
+  @inlinable
+  var description: String {
+    get {
+      return "\(Self.self)(" + self.map({"\($0)"}).joined(separator: ", ") + ")"
+    }
+  }
+}
+

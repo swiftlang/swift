@@ -1,9 +1,8 @@
-/*
 %for N in [2,3,4,8,16,32,64]:
-public protocol SIMDVector${N} : SIMDVector {
-  init(${', '.join(['_ v' + str(n) + ': Element' for n in range(N)])})
-
+/// A computational vector with ${N} elements.
+public protocol SIMDVector${N} : SIMDVector where Predicate : SIMDVector${N} {
 % if N >= 4:
+  /// A type representing half of the vector.
   associatedtype HalfVector: SIMDVector${N/2} where HalfVector.Element == Element
 
   init(lowHalf: HalfVector, highHalf: HalfVector)
@@ -15,21 +14,13 @@ public protocol SIMDVector${N} : SIMDVector {
   var evenHalf: HalfVector { get set }
 
   var oddHalf: HalfVector { get set }
-
 % end
 }
 
+//  Non-customizable operations on SIMDVector${N}
 public extension SIMDVector${N} {
 
-  @_transparent
-  public var endIndex: Int { return ${N} }
-
-  @_transparent
-  init(repeating x: Element) {
-    self.init(${', '.join('x'*N)})
-  }
-
-  @_transparent
+  @inlinable
   init(${', '.join(['_ v' + str(n) + ': Element' for n in range(N)])}) {
     self.init()
 % for n in range(N):
@@ -37,26 +28,8 @@ public extension SIMDVector${N} {
 % end
   }
 
-  @_transparent
-  public init(arrayLiteral elements: Element...) {
-    self.init(elements)
-  }
-
-  @available(swift, deprecated: 4.2, message: "Use Vector4(fromArray: array).")
-  @_transparent
-  public init(_ array: [Element]) {
-    self.init(fromArray: array)
-  }
-
-  @_transparent
-  public init(fromArray array: [Element]) {
-    _precondition(array.count == 4)
-    self.init()
-    for i in indices { self[i] = array[i] }
-  }
-
 % if N <= 4:
-  @_transparent
+  @inlinable
   init(${', '.join([c + ': Element' for c in 'xyzw'[:N]])}) {
     self.init(${', '.join('xyzw'[:N])})
   }
@@ -70,7 +43,39 @@ public extension SIMDVector${N} {
 
 %  end
 % end
+}
+
+//  Defaulted conformance to Collection.
+public extension SIMDVector${N} {
+  @inlinable
+  var endIndex: Int {
+    return ${N}
+  }
+}
+
+//  Defaulted conformance to SIMDVector.
+public extension SIMDVector${N} {
+  @inlinable
+  init(repeating x: Element) {
+    self.init(${', '.join('x'*N)})
+  }
+
+  @inlinable
+  init(arrayLiteral elements: Element...) {
+    self.init(fromArray: elements)
+  }
+
+  @inlinable
+  init(fromArray array: [Element]) {
+    _precondition(array.count == ${N})
+    self.init()
+    for i in indices { self[i] = array[i] }
+  }
+}
 % if N >= 4:
+
+//  Defaulted conformance to SIMDVectorN, providing the half-vector accessors.
+public extension SIMDVector${N} {
   @_transparent
   init(lowHalf: HalfVector, highHalf: HalfVector) {
     self.init()
@@ -81,25 +86,25 @@ public extension SIMDVector${N} {
   // Implementing these via for-loop looks inefficient, but the optimizer
   // is generally pretty good at recognizing the idiom and mapping this to
   // a single shuffle-vector operation. For any outstanding cases we find,
-  // we can either work on the optimizer, or add a header-inline C shim
-  // that just wraps the shufflevector operation that we want to generate.
+  // we can either work on the optimizer, specialize for the types where the
+  // codegen is bad, or add a header-inline C shim that just wraps the
+  // shufflevector operation that we want to generate if necessary.
 %  for (half,indx) in [('low','i'), ('high',str(N/2)+'+i'), ('even','2*i'), ('odd','2*i+1')]:
-  public var ${half}Half: HalfVector {
-
-    @_transparent
+  var ${half}Half: HalfVector {
+    @inlinable
     get {
       var result = HalfVector()
-      for i in 0 ..< ${N/2} { result[i] = self[${indx}] }
+      for i in result.indices { result[i] = self[${indx}] }
       return result
     }
 
-    @_transparent
+    @inlinable
     set {
-      for i in 0 ..< ${N/2} { self[${indx}] = newValue[i] }
+      for i in newValue.indices { self[${indx}] = newValue[i] }
     }
   }
 %  end
-% end
 }
+
+% end
 %end
-*/

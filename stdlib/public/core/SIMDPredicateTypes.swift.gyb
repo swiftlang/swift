@@ -1,62 +1,43 @@
-/*
 %for bits in [8,16,32,64]:
 % for N in [2,3,4,8,16,32,64]:
-%  llvmN = N if N != 3 else 4
 %  if bits*N <= 512:
-%   LLVM = 'Vec' + str(llvmN) + 'xInt' + str(bits)
 %   Self = 'SIMDPredicate' + str(bits) + 'x' + str(N)
+%   Value = 'Int' + str(bits) + '.Vector' + str(N)
 @_fixed_layout
 public struct ${Self} : SIMDPredicate, SIMDVector${N} {
 
-  public var _value: Builtin.${LLVM}
+  public var _value: ${Value}
+
+  // SIMDVector conformance --------------------------------------------------
+  public typealias Predicate = ${Self}
 
   @_transparent
   public init( ) {
-    self._value = Builtin.zeroInitializer()
+    _value = ${Value}( )
   }
 
   @_transparent
-  public init(_ _value: Builtin.${LLVM}) {
+  public init(_ _value: ${Value}) {
     self._value = _value
   }
 
   public subscript(index: Int) -> Bool {
     @_transparent
     get {
-      _precondition(index >= 0 && index < ${N})
-      return Int${bits}(Builtin.extractelement_${LLVM}_Int32(
-        _value, Int32(index)._value
-      )) < 0
+      return _value[index] < 0
     }
     @_transparent
     set {
-      _precondition(index >= 0 && index < ${N})
-      let newInt: Int${bits} = newValue ? -1 : 0
-      _value = Builtin.insertelement_${LLVM}_Int${bits}_Int32(
-        _value, newInt._value, Int32(index)._value
-      )
+      _value[index] = newValue ? -1 : 0
     }
   }
 
-  // MARK: Comparison operators
-  public typealias Predicate = ${Self}
-
-%   sextI1 = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + LLVM
-%   for (op,inst) in [('==','eq'), ('!=','ne')]:
   @_transparent
-  public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-    return ${Self}(${sextI1}(Builtin.cmp_${inst}_${LLVM}(lhs._value, rhs._value)))
+  public static func ==(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    return lhs._value == rhs._value
   }
 
-%   end
-  // MARK: Logical operators
-%   for (op,inst) in [('&&','and'), ('||','or')]:
-  @_transparent
-  public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-    return ${Self}(Builtin.${inst}_${LLVM}(lhs._value, rhs._value))
-  }
-
-%   end
+  // SIMDVector${N} conformance ----------------------------------------------
 %   if N >= 4:
   public typealias HalfVector = SIMDPredicate${bits}x${N/2}
 
@@ -67,24 +48,49 @@ public struct ${Self} : SIMDPredicate, SIMDVector${N} {
   //  on the corresponding integer vector type.
 %    for half in ['low','high','even','odd']:
   public var ${half}Half: HalfVector {
-
     @_transparent
     get {
-      return HalfVector(Int${bits}.Vector${N}(_value).${half}Half._value)
+      return HalfVector(_value.${half}Half)
     }
-
     @_transparent
     set {
-      var intVec = Int${bits}.Vector${N}(_value)
-      intVec.${half}Half = Int${bits}.Vector${N/2}(newValue._value)
-      _value = intVec._value
+      _value.${half}Half = newValue._value
     }
   }
 
 %    end
 %   end
+
+  // SIMDPredicateVector conformance -----------------------------------------
+%   for op in ['&','|','^']:
+  @_transparent
+  public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    return ${Self}(lhs._value ${op} rhs._value)
+  }
+
+%   end
+
+  // Operations not required for protocol conformance ------------------------
+  @inlinable
+  public init<Other>(_ other: Other) where Other : SIMDVector${N} & SIMDPredicate {
+    self.init()
+    for i in indices { self[i] = other[i] }
+  }
+
+  // TODO: we shouldn't need the concrete conversions that follow; we should
+  // be able to vectorize the for-loop in the generic init above, but it doesn't
+  // always happen in practice, so we have this as a short-term workaround.
+%   for otherBits in [8,16,32,64]:
+%    if otherBits*N <= 512 and otherBits != bits:
+  @inlinable
+  public init(_ other: SIMDPredicate${otherBits}x${N}) {
+    _value = Int${bits}.Vector${N}(truncatingIfNeeded: other._value)
+  }
+
+%    end
+%   end
 }
+
 %  end
 % end
 %end
-*/
