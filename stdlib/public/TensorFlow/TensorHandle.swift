@@ -93,21 +93,21 @@ internal extension TensorHandle {
 extension TensorHandle : TensorSendableReceivable {
   @inlinable
   static func receiveFromAccelerator(_ computation: _TensorComputation,
-                                     _ tensorId: Int
+                                     _ tensorID: Int
   ) -> TensorHandle<Scalar> {
-    debugLog("Receiving tensor of id \(tensorId) and type \(Scalar.self).")
+    debugLog("Receiving tensor of id \(tensorID) and type \(Scalar.self).")
     let status = TF_NewStatus()
     internalConsistencyCheck(status != nil)
     let tensorHandle: TensorHandle<Scalar>
     if _RuntimeConfig.usesTFEagerAPI {
       let context = _ExecutionContext.global
       let cTensorHandle = TFE_DequeueNamedTensorFromCtx(
-        context.eagerCtx, Int32(tensorId), Scalar.cDataType, status)
+        context.eagerContext, Int32(tensorID), Scalar.cDataType, status)
       checkOk(status)
       tensorHandle = TensorHandle<Scalar>(owning: cTensorHandle!)
     } else {
       let cTensor: CTensor? = TF_DequeueNamedTensor(
-        computation.cSession, Int32(tensorId), status)
+        computation.cSession, Int32(tensorID), status)
       checkOk(status)
       internalConsistencyCheck(
         cTensor != nil,
@@ -117,7 +117,7 @@ extension TensorHandle : TensorSendableReceivable {
       TF_DeleteTensor(cTensor!)
     }
     if _RuntimeConfig.printsDebugLog {
-      debugLog("The received tensor of id \(tensorId) has content:")
+      debugLog("The received tensor of id \(tensorID) has content:")
       dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
     }
     return tensorHandle
@@ -125,22 +125,22 @@ extension TensorHandle : TensorSendableReceivable {
 
   @inlinable
   func sendToAccelerator(_ computation: _TensorComputation,
-                         _ tensorId: Int) {
+                         _ tensorID: Int) {
     if _RuntimeConfig.printsDebugLog {
-      debugLog("Sending tensor of id \(tensorId) and type \(Scalar.self) with:")
-      dumpTensorContent(self.cTensorHandle, Scalar.self)
+      debugLog("Sending tensor of id \(tensorID) and type \(Scalar.self) with:")
+      dumpTensorContent(cTensorHandle, Scalar.self)
     }
     let status = TF_NewStatus()
     internalConsistencyCheck(status != nil)
     if _RuntimeConfig.usesTFEagerAPI {
       let context = _ExecutionContext.global
       TFE_EnqueueNamedTensorFromCtx(
-        context.eagerCtx, Int32(tensorId), self.cTensorHandle, status)
+        context.eagerContext, Int32(tensorID), cTensorHandle, status)
     } else {
-      let cTensor = TFE_TensorHandleResolve(self.cTensorHandle, status)
+      let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
       checkOk(status)
       TF_EnqueueNamedTensor(
-        computation.cSession, Int32(tensorId), cTensor, status)
+        computation.cSession, Int32(tensorID), cTensor, status)
       TF_DeleteTensor(cTensor)
     }
     debugLog("Tensor is sent.")
@@ -167,7 +167,7 @@ internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
     let context = _ExecutionContext.global
     debugLog("Calling TFE_TensorHandleCopyToDevice().")
     let hostHandle: CTensorHandle? = TFE_TensorHandleCopyToDevice(
-      cTensorHandle, context.eagerCtx, context.cpuDeviceName, status)
+      cTensorHandle, context.eagerContext, context.cpuDeviceName, status)
     checkOk(status)
     internalConsistencyCheck(hostHandle != nil,
                              "TFE_TensorHandleCopyToDevice() returned nil.")

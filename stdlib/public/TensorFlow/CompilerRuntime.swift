@@ -241,7 +241,7 @@ public final class _ExecutionContext {
   public let tensorFlowConfig: UnsafeMutablePointer<TF_Buffer>
 
   /// The TFE_Context object.
-  @usableFromInline let eagerCtx: CTFEContext
+  @usableFromInline let eagerContext: CTFEContext
 
   // NOTE: the following properties are intentionally not implemented as an enum
   // due to high churn, *please do not refactor for Swiftiness*.
@@ -296,7 +296,7 @@ public final class _ExecutionContext {
 
     let ctx = TFE_NewContext(opts, status)
     checkOk(status)
-    self.eagerCtx = ctx!
+    self.eagerContext = ctx!
     TFE_DeleteContextOptions(opts)
     checkOk(status)
 
@@ -304,7 +304,7 @@ public final class _ExecutionContext {
     // While the code here is only needed when _RuntimeConfig.executionMode is
     // set to .gpu, running it in all code paths helps keep things simple
     // (e.g. so that the cpuDeviceName property is always set.)
-    let devices = TFE_ContextListDevices(eagerCtx, status)
+    let devices = TFE_ContextListDevices(eagerContext, status)
     checkOk(status)
     defer { TF_DeleteDeviceList(devices!) }
 
@@ -342,7 +342,7 @@ public final class _ExecutionContext {
       checkOk(status)
       TF_DeleteGraph(graph)
     }
-    TFE_DeleteContext(eagerCtx)
+    TFE_DeleteContext(eagerContext)
     TF_DeleteBuffer(tensorFlowConfig)
     TF_DeleteStatus(status)
     pthread_mutex_destroy(&mutex)
@@ -405,7 +405,7 @@ fileprivate extension _ExecutionContext {
       // Add functions to the context.
       debugLog("Adding \(funcCount) functions to context.")
       for function in UnsafeBufferPointer(start: funcs, count: Int(funcCount)) {
-        TFE_ContextAddFunction(self.eagerCtx, function, self.status)
+        TFE_ContextAddFunction(self.eagerContext, function, self.status)
         checkOk(self.status)
         debugLog("Added func \(String(cString: TF_FunctionName(function))).")
         TF_DeleteFunction(function)
@@ -551,7 +551,7 @@ private class TFEState {
 
       let opType = String(cString: TF_OperationOpType(funcNode))
       debugLog("Creating a new op based on type \(opType).")
-      let op: CTFEOp? = TFE_NewOp(context.eagerCtx, opType, status)
+      let op: CTFEOp? = TFE_NewOp(context.eagerContext, opType, status)
       checkOk(status)
       if opType.hasSuffix("_CPU.device_partition") {
         TFE_OpSetDevice(op, context.cpuDeviceName, status)
@@ -777,20 +777,22 @@ public final class _TensorComputation {
   ///
   /// The global config flag '_RuntimeConfig.usesSynchronousExecution' decides
   /// whether tensor computation should be synchronous: if true, this property
-  /// will always be nil. Otherwise, this property is non-nil only when the
+  /// will always be empty. Otherwise, this property is non-empty only when the
   /// tensor computation is on-going.
-  /// TODO: Remove the `usesSynchronousExecution`mode as it is very limiting
+  /// TODO: Remove the `usesSynchronousExecution` mode as it is very limiting
   /// (e.g. does not support running multiple device functions).
   private var pthreads: [pthread_t] = []
 
-  /// The data structure to pass into pthread creation API. 
+  /// The data structure to pass into pthread creation API.
+  /// We cannot have the ThreadBody closure below close over on `threadIndex`,
+  /// because ThreadBody is of C convention.
   class FuncHandle {
     public let computation: _TensorComputation
-    public let threadIdx: Int
+    public let threadIndex: Int
     
-    public init(computation: _TensorComputation, threadIdx: Int) {
+    public init(computation: _TensorComputation, threadIndex: Int) {
       self.computation = computation
-      self.threadIdx = threadIdx
+      self.threadIndex = threadIndex
     }
   }
 
@@ -883,7 +885,7 @@ public final class _TensorComputation {
     if !_RuntimeConfig.usesSynchronousExecution {
       let threadCount =
         _RuntimeConfig.usesTFEagerAPI ? helperFunctionCount + 1 : 1
-      for threadIdx in 0..<threadCount {
+      for threadIndex in 0..<threadCount {
         // The function to launch in the parallel thread.
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
         typealias ThreadBody = @convention(c)
@@ -901,7 +903,7 @@ public final class _TensorComputation {
 #endif
           let funcHandle: FuncHandle =
             Unmanaged.fromOpaque(arg).takeRetainedValue()
-          funcHandle.computation.execute(threadIdx: funcHandle.threadIdx)
+          funcHandle.computation.execute(threadIndex: funcHandle.threadIndex)
           checkOk(funcHandle.computation.status)
           return nil
         }
@@ -914,7 +916,7 @@ public final class _TensorComputation {
           &newThread, nil, body,
           Unmanaged.passRetained(
             FuncHandle(computation: self,
-                       threadIdx: threadIdx)).toOpaque()
+                       threadIndex: threadIndex)).toOpaque()
         )
         // TODO(hongm): do error handling.
         internalConsistencyCheck(creationStatus == 0)
@@ -925,7 +927,7 @@ public final class _TensorComputation {
     else {
       // Log a debug message to differentiate from async computation.
       debugLog("Running tensor computation synchronously.")
-      execute(threadIdx: 0)
+      execute(threadIndex: 0)
     }
     debugLog("Exiting _TensorComputation.init().")
   }
@@ -938,24 +940,24 @@ public final class _TensorComputation {
 
 private extension _TensorComputation {
   /// In eager mode, runs a device function in a corresponding thread given by
-  /// `threadIdx`. Otherwise, runs all devices functions of the tensor
+  /// `threadIndex`. Otherwise, runs all devices functions of the tensor
   /// program. Aborts the process on error, and emits an error string to STDERR.
   // NOTE: This is to be called by the initializer. The computation gets
   // executed on initialization, thus this method will not be exposed to users.
-  private func execute(threadIdx: Int) {
-    debugLog("Executing thread \(threadIdx).")
+  private func execute(threadIndex: Int) {
+    debugLog("Executing thread \(threadIndex).")
     if let stateTFE = stateTFE {
       internalConsistencyCheck(_RuntimeConfig.usesTFEagerAPI)
-      internalConsistencyCheck(threadIdx <= helperFunctionCount)
-      let op = stateTFE.ops[threadIdx]
-      if threadIdx == 0 {
+      internalConsistencyCheck(threadIndex <= helperFunctionCount)
+      let op = stateTFE.ops[threadIndex]
+      if threadIndex == 0 {
         var returnValueCount = Int32(returnValues.count)
         TFE_Execute(op, &returnValues, &returnValueCount, status)
         debugLog("""
-                   returnValues.count=\(returnValues.count), \
-                   returnValueCount=\(returnValueCount).
-                   """)
-        assert(returnValueCount == returnValues.count)
+          returnValues.count=\(returnValues.count), \
+          returnValueCount=\(returnValueCount).
+          """)
+        internalConsistencyCheck(returnValueCount == returnValues.count)
       } else {
         var returnValueCountForHelper: Int32 = 0
         TFE_Execute(op, /*returnValues*/nil, &returnValueCountForHelper, status)
@@ -968,7 +970,7 @@ private extension _TensorComputation {
     }
     // Non-eager based execution.
     internalConsistencyCheck(!_RuntimeConfig.usesTFEagerAPI)
-    internalConsistencyCheck(threadIdx == 0)
+    internalConsistencyCheck(threadIndex == 0)
     debugLog("Executing TF function \(entryFunctionBaseName).")
     guard let stateTF = stateTF else {
       fatalError("stateTF must be defined in non-eager mode.")
