@@ -31,8 +31,18 @@ using namespace llvm;
 namespace swift {
 namespace constraints {
 
+class SolverStep;
+
+/// Represents available states which every
+/// given step could be in during it's lifetime.
+enum class StepState { Setup, Ready, Running, Suspended, Done };
+
+/// Represents result of the step execution,
+/// and can only be constructed by `SolverStep`.
 struct StepResult {
   using Kind = ConstraintSystem::SolutionKind;
+
+  friend class SolverStep;
 
 private:
   Kind ResultKind;
@@ -57,6 +67,7 @@ public:
     workList.append(NextSteps.begin(), NextSteps.end());
   }
 
+private:
   static StepResult success() { return StepResult(Kind::Solved); }
   static StepResult failure() { return StepResult(Kind::Error); }
 
@@ -72,8 +83,12 @@ public:
 /// Represents a single independently solveable part of
 /// the constraint system.
 class SolverStep {
+  friend class ConstraintSystem;
+
 protected:
   ConstraintSystem &CS;
+
+  StepState State = StepState::Setup;
 
   /// Once step is complete this is a container to hold finalized solutions.
   SmallVectorImpl<Solution> &Solutions;
@@ -85,12 +100,19 @@ public:
 
   virtual ~SolverStep() {}
 
-  /// \brief Try to move solver forward by simplifying constraints if possible.
-  ///        Such simplication might lead to either producing a solution, or
-  ///        creating a set of "follow-up" more granular steps to execute.
+  /// \returns The current state of this step.
+  StepState getState() const { return State; }
+
+  /// Run preliminary setup (if needed) right
+  /// before taking this step for the first time.
+  virtual void setup() { transitionTo(StepState::Ready); }
+
+  /// Try to move solver forward by simplifying constraints if possible.
+  /// Such simplication might lead to either producing a solution, or
+  /// creating a set of "follow-up" more granular steps to execute.
   ///
   /// \param prevFailed Indicate whether previous step
-  ///        in the stack has failed (returned StepResult::Kind = Error),
+  ///        has failed (returned StepResult::Kind = Error),
   ///        this is useful to propagate failures when
   ///        unsolved steps are re-taken.
   ///
@@ -98,7 +120,50 @@ public:
   ///          this step solved or failed.
   virtual StepResult take(bool prevFailed) = 0;
 
+  /// \brief Try to resume previously suspended step.
+  ///
+  /// This happens after "follow-up" steps are done
+  /// and all of the required information should be
+  /// available to re-take this step.
+  ///
+  /// \param prevFailed Indicate whether previous step
+  ///        has failed (returned StepResult::Kind = Error),
+  ///        this is useful to propagate failures when
+  ///        unsolved steps are re-taken.
+  ///
+  /// \returns status and any follow-up steps to take before considering
+  ///          this step solved or failed.
+  virtual StepResult resume(bool prevFailed) = 0;
+
 protected:
+  /// \brief Transition this step into one of the available states.
+  ///
+  /// This is primarily driven by execution of the step itself and
+  /// the solver, while it executes the work list.
+  ///
+  /// \param newState The new state this step should be in.
+  void transitionTo(StepState newState) {
+    // TODO: Make sure that ordering of the state transitions is correct,
+    //       because `setup -> ready -> running [-> suspended]* -> done`
+    //       is the only reasonable state transition path.
+    State = newState;
+  }
+
+  StepResult done(bool isSuccess) {
+    transitionTo(StepState::Done);
+    return isSuccess ? StepResult::success() : StepResult::failure();
+  }
+
+  StepResult suspend(SolverStep *followup) {
+    transitionTo(StepState::Suspended);
+    return StepResult::unsolved(followup);
+  }
+
+  StepResult suspend(SmallVectorImpl<SolverStep *> &followup) {
+    transitionTo(StepState::Suspended);
+    return StepResult::unsolved(followup);
+  }
+
   /// Erase constraint from the constraint system (include constraint graph)
   /// and return the constraint which follows it.
   ConstraintList::iterator erase(Constraint *constraint) {
@@ -124,17 +189,6 @@ protected:
 };
 
 class SplitterStep final : public SolverStep {
-  enum class StepState {
-    /// Split the system into independently solvable
-    /// component steps.
-    Split,
-    /// Try to merge solutions produced by each component
-    /// to form overall partial or final solution(s).
-    Merge
-  };
-
-  StepState State = StepState::Split;
-
   // Partial solutions associated with given step, each element
   // of the array presents a disjoint component (or follow-up step)
   // that current step has been split into.
@@ -153,6 +207,7 @@ public:
   }
 
   StepResult take(bool prevFailed) override;
+  StepResult resume(bool prevFailed) override;
 
   static SplitterStep *create(ConstraintSystem &cs,
                               SmallVectorImpl<Solution> &solutions) {
@@ -173,8 +228,6 @@ private:
 };
 
 class ComponentStep final : public SolverStep {
-  enum class State { Setup, Filter, Done };
-
   class Scope {
     ConstraintSystem &CS;
     ConstraintSystem::SolverScope *SolverScope;
@@ -217,10 +270,6 @@ class ComponentStep final : public SolverStep {
   /// we need to keep active scope until all of the work is done.
   std::unique_ptr<Scope> ComponentScope;
 
-  /// The current state of the component, since it depends on other
-  /// steps to be complete first, it makes it easier what is going on.
-  State ComponentState = State::Setup;
-
   // Type variables and constraints "in scope" of this step.
   SmallVector<TypeVariableType *, 16> TypeVars;
   SmallVector<Constraint *, 16> Constraints;
@@ -248,24 +297,15 @@ public:
     OrphanedConstraint = constraint;
   }
 
+  void setup() override;
   StepResult take(bool prevFailed) override;
+  StepResult resume(bool prevFailed) override;
 
   static ComponentStep *create(ConstraintSystem &cs, unsigned index,
                                bool singleComponent,
                                SmallVectorImpl<Solution> &solutions) {
     return new (cs.getAllocator())
         ComponentStep(cs, index, singleComponent, solutions);
-  }
-
-private:
-  StepResult markAsDone(bool success = true) {
-    ComponentState = State::Done;
-    return success ? StepResult::success() : StepResult::failure();
-  }
-
-  StepResult dispatchFollowup(SolverStep *step) {
-    ComponentState = State::Filter;
-    return StepResult::unsolved(step);
   }
 };
 
@@ -303,7 +343,10 @@ class TypeVariableStep final : public SolverStep {
         InitialBindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
 
 public:
+  void setup() override;
+
   StepResult take(bool prevFailed) override;
+  StepResult resume(bool prevFailed) override;
 
   static TypeVariableStep *create(ConstraintSystem &cs,
                                   BindingContainer &bindings,
@@ -348,6 +391,7 @@ public:
   }
 
   StepResult take(bool prevFailed) override;
+  StepResult resume(bool prevFailed) override;
 
   static DisjunctionStep *create(ConstraintSystem &cs, Constraint *disjunction,
                                  SmallVectorImpl<Solution> &solutions) {

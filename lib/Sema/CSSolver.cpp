@@ -1571,6 +1571,24 @@ bool ConstraintSystem::solveIteratively(
   // propagate failures when unsolved steps are re-taken.
   bool prevFailed = false;
 
+  // Advance the solver by taking a given step, which might involve
+  // a prelimilary "setup", if this is the first time this step is taken.
+  auto advance = [](SolverStep *step, bool prevFailed) -> StepResult {
+    auto currentState = step->getState();
+    if (currentState == StepState::Setup) {
+      step->setup();
+      step->transitionTo(StepState::Ready);
+    }
+
+    currentState = step->getState();
+    assert(currentState == StepState::Ready ||
+           currentState == StepState::Suspended);
+
+    step->transitionTo(StepState::Running);
+    return currentState == StepState::Ready ? step->take(prevFailed)
+                                            : step->resume(prevFailed);
+  };
+
   // Execute steps in LIFO order, which means that
   // each individual step would either end up producing
   // a solution, or producing another set of mergeable
@@ -1582,7 +1600,12 @@ bool ConstraintSystem::solveIteratively(
     // which should produce another steps to follow,
     // or error, which means that current path is inconsistent.
     {
-      auto result = step->take(prevFailed);
+      auto currentState = step->getState();
+      assert(!(currentState == StepState::Running ||
+               currentState == StepState::Done) &&
+             "Cannot re-take already running/done step.");
+
+      auto result = advance(step, prevFailed);
       switch (result.getKind()) {
       // It was impossible to solve this step, let's note that
       // for followup steps, to propogate the error.
