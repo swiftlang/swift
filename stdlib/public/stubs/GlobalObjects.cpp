@@ -32,9 +32,9 @@ ClassMetadata CLASS_METADATA_SYM(s18_EmptyArrayStorage);
 SWIFT_RUNTIME_STDLIB_API
 ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);
 
-// _direct type metadata for Swift._RawNativeSetStorage
+// _direct type metadata for Swift._SwiftEmptySetStorage
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s20_RawNativeSetStorage);
+ClassMetadata CLASS_METADATA_SYM(s21_SwiftEmptySetStorage);
 } // namespace swift
 
 SWIFT_RUNTIME_STDLIB_API
@@ -83,27 +83,23 @@ SWIFT_RUNTIME_STDLIB_API
 swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
   // HeapObject header;
   {
-    &swift::CLASS_METADATA_SYM(s20_RawNativeSetStorage), // isa pointer
+    &swift::CLASS_METADATA_SYM(s21_SwiftEmptySetStorage), // isa pointer
   },
   
-  // _SwiftDictionaryBodyStorage body;
+  // _SwiftSetBodyStorage body;
   {
-    // We set the capacity to 1 so that there's an empty hole to search.
-    // Any insertion will lead to a real storage being allocated, because 
-    // Dictionary guarantees there's always another empty hole after insertion.
-    1, // int capacity;                                    
+    // Setting the scale to 0 makes for a bucketCount of 1 -- so that the
+    // storage consists of a single unoccupied bucket. The capacity is set to
+    // 0 so that any insertion will lead to real storage being allocated.
     0, // int count;
-    
-    // _SwiftUnsafeBitMap initializedEntries
-    {
-      &swift::_swiftEmptySetStorage.entries, // unsigned int* values;
-      1 // int bitCount; (1 so there's something for iterators to read)
-    },
-    
-    (void*)1 // void* keys; (non-null garbage)
+    0, // int capacity;
+    0, // int scale;
+    0, // uint64 seed0;
+    0, // uint64 seed1;
+    (void *)1, // void *rawElements; (non-null garbage)
   },
 
-  0 // int entries; (zero'd bits)
+  0 // int buckets; (zeroed bytes)
 };
 
 static swift::_SwiftHashingParameters initializeHashingParameters() {

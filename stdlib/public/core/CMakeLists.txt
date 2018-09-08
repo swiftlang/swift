@@ -31,6 +31,7 @@ set(SWIFTLIB_ESSENTIAL
   Assert.swift
   AssertCommon.swift
   BidirectionalCollection.swift
+  Bitmap.swift
   Bool.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
@@ -71,6 +72,7 @@ set(SWIFTLIB_ESSENTIAL
   HashedCollectionsAnyHashableExtensions.swift
   Hasher.swift
   Hashing.swift
+  HashTable.swift
   HeapBuffer.swift
   ICU.swift
   Indices.swift

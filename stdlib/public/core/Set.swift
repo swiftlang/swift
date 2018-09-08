@@ -169,7 +169,7 @@ extension Set {
   ///   storage buffer.
   @inlinable
   public init(minimumCapacity: Int) {
-    _variant = .native(_NativeSet(minimumCapacity: minimumCapacity))
+    _variant = .native(_NativeSet(capacity: minimumCapacity))
   }
 
   /// Private initializer.
@@ -178,10 +178,12 @@ extension Set {
     _variant = .native(_native)
   }
 
-  //
-  // All APIs below should dispatch to `_variant`, without doing any
-  // additional processing.
-  //
+#if _runtime(_ObjC)
+  @inlinable
+  internal init(_cocoa: _CocoaSet) {
+    _variant = .cocoa(_cocoa)
+  }
+#endif
 
 #if _runtime(_ObjC)
   /// Private initializer used for bridging.
@@ -192,16 +194,16 @@ extension Set {
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
   @inlinable
-  public init(_immutableCocoaSet: _NSSet) {
+  public // SPI(Foundation)
+  init(_immutableCocoaSet: _NSSet) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
-      "Set can be backed by NSSet _variant only when the member type can be bridged verbatim to Objective-C")
-    _variant = _Variant.cocoa(_CocoaSet(_immutableCocoaSet))
+      "Set can be backed by NSSet only when the member type can be bridged verbatim to Objective-C")
+    self.init(_cocoa: _CocoaSet(_immutableCocoaSet))
   }
 #endif
 }
 
 extension Set: ExpressibleByArrayLiteral {
-
   //
   // `ExpressibleByArrayLiteral` conformance
   //
@@ -225,7 +227,18 @@ extension Set: ExpressibleByArrayLiteral {
   /// - Parameter elements: A variadic list of elements of the new set.
   @inlinable
   public init(arrayLiteral elements: Element...) {
-    self.init(_native: _NativeSet.fromArray(elements))
+    if elements.isEmpty {
+      self.init()
+      return
+    }
+    var native = _NativeSet<Element>(capacity: elements.count)
+    for element in elements {
+      let inserted = native._insert(element, isUnique: true).inserted
+      if !inserted {
+        // FIXME: Shouldn't this trap?
+      }
+    }
+    self.init(_native: native)
   }
 }
 
@@ -258,11 +271,13 @@ extension Set: Sequence {
   /// - Complexity: O(1)
   @inlinable
   public func contains(_ member: Element) -> Bool {
+    defer { _fixLifetime(self) }
     return _variant.contains(member)
   }
 
   @inlinable
   public func _customContainsEquatableElement(_ member: Element) -> Bool? {
+    defer { _fixLifetime(self) }
     return contains(member)
   }
 }
@@ -293,13 +308,13 @@ extension Set {
   public func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> Set {
-    var result = Set()
+    var result = _NativeSet<Element>()
     for element in self {
       if try isIncluded(element) {
-        result.insert(element)
+        result.insertNew(element)
       }
     }
-    return result
+    return Set(_native: result)
   }
 }
 
@@ -309,6 +324,7 @@ extension Set: Collection {
   /// If the set is empty, `startIndex` is equal to `endIndex`.
   @inlinable
   public var startIndex: Index {
+    defer { _fixLifetime(self) }
     return _variant.startIndex
   }
 
@@ -318,17 +334,20 @@ extension Set: Collection {
   /// If the set is empty, `endIndex` is equal to `startIndex`.
   @inlinable
   public var endIndex: Index {
+    defer { _fixLifetime(self) }
     return _variant.endIndex
   }
 
   /// Accesses the member at the given position.
   @inlinable
   public subscript(position: Index) -> Element {
-    return _variant.assertingGet(at: position)
+    defer { _fixLifetime(self) }
+    return _variant.element(at: position)
   }
 
   @inlinable
   public func index(after i: Index) -> Index {
+    defer { _fixLifetime(self) }
     return _variant.index(after: i)
   }
 
@@ -344,13 +363,15 @@ extension Set: Collection {
   /// - Complexity: O(1)
   @inlinable
   public func firstIndex(of member: Element) -> Index? {
-    return _variant.index(forKey: member)
+    defer { _fixLifetime(self) }
+    return _variant.index(for: member)
   }
 
   @inlinable
   public func _customIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
+    defer { _fixLifetime(self) }
     return Optional(firstIndex(of: member))
   }
 
@@ -358,6 +379,7 @@ extension Set: Collection {
   public func _customLastIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
+    defer { _fixLifetime(self) }
     // The first and last elements are the same because each element is unique.
     return _customIndexOfEquatableElement(member)
   }
@@ -384,6 +406,7 @@ extension Set: Collection {
   /// If the set is empty, the value of this property is `nil`.
   @inlinable
   public var first: Element? {
+    defer { _fixLifetime(self) }
     // FIXME: It'd better to use an iterator than to subscript with startIndex,
     // because startIndex is currently O(n) in bridged sets. However,
     // enumerators aren't guaranteed to have the same element order as allKeys.
@@ -418,10 +441,8 @@ extension Set: Equatable {
         return false
       }
 
-      for member in lhs {
-        let (_, found) =
-          rhsNative._find(member)
-        if !found {
+      for member in lhsNative {
+        guard rhsNative.find(member).found else {
           return false
         }
       }
@@ -429,26 +450,19 @@ extension Set: Equatable {
 
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
-      return _stdlib_NSObject_isEqual(lhsCocoa.object, rhsCocoa.object)
+      return lhsCocoa == rhsCocoa
 
     case (.native(let lhsNative), .cocoa(let rhsCocoa)):
       if lhsNative.count != rhsCocoa.count {
         return false
       }
 
-      let endIndex = lhsNative.endIndex
-      var i = lhsNative.startIndex
-      while i != endIndex {
-        let key = lhsNative.assertingGet(at: i)
-        let bridgedKey: AnyObject = _bridgeAnythingToObjectiveC(key)
-        let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
-        if let rhsValue = optRhsValue {
-          if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
-            i = lhsNative.index(after: i)
-            continue
-          }
+      for i in lhsNative.indices {
+        let key = lhsNative.element(at: i)
+        let bridgedKey = _bridgeAnythingToObjectiveC(key)
+        if rhsCocoa.contains(bridgedKey) {
+          continue
         }
-        i = lhsNative.index(after: i)
         return false
       }
       return true
@@ -468,7 +482,7 @@ extension Set: Hashable {
   ///   of this instance.
   @inlinable
   public func hash(into hasher: inout Hasher) {
-    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
+    // FIXME: <rdar://problem/18915294> Cache Set<T> hashValue
     var hash = 0
     let seed = hasher._generateSeed()
     for member in self {
@@ -570,6 +584,7 @@ extension Set: SetAlgebra {
   public mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
+    defer { _fixLifetime(self) }
     return _variant.insert(newMember)
   }
 
@@ -596,6 +611,7 @@ extension Set: SetAlgebra {
   @inlinable
   @discardableResult
   public mutating func update(with newMember: Element) -> Element? {
+    defer { _fixLifetime(self) }
     return _variant.update(with: newMember)
   }
 
@@ -616,6 +632,7 @@ extension Set: SetAlgebra {
   @inlinable
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
+    defer { _fixLifetime(self) }
     return _variant.remove(member)
   }
 
@@ -628,6 +645,7 @@ extension Set: SetAlgebra {
   @inlinable
   @discardableResult
   public mutating func remove(at position: Index) -> Element {
+    defer { _fixLifetime(self) }
     return _variant.remove(at: position)
   }
 
@@ -638,6 +656,7 @@ extension Set: SetAlgebra {
   ///   default is `false`.
   @inlinable
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
+    defer { _fixLifetime(self) }
     _variant.removeAll(keepingCapacity: keepCapacity)
   }
 
@@ -654,6 +673,7 @@ extension Set: SetAlgebra {
   @inlinable
   @discardableResult
   public mutating func removeFirst() -> Element {
+    defer { _fixLifetime(self) }
     _precondition(!isEmpty, "Can't removeFirst from an empty Set")
     return remove(at: startIndex)
   }
@@ -708,17 +728,18 @@ extension Set: SetAlgebra {
   @inlinable
   public init<Source: Sequence>(_ sequence: Source)
     where Source.Element == Element {
-    self.init(minimumCapacity: sequence.underestimatedCount)
     if let s = sequence as? Set<Element> {
       // If this sequence is actually a native `Set`, then we can quickly
       // adopt its native buffer and let COW handle uniquing only
       // if necessary.
       self._variant = s._variant
-    } else {
-      for item in sequence {
-        insert(item)
-      }
+      return
     }
+    var native = _NativeSet<Element>(capacity: sequence.underestimatedCount)
+    for element in sequence {
+      native._insert(element, isUnique: true)
+    }
+    self._variant = .native(native)
   }
 
   /// Returns a Boolean value that indicates whether the set is a subset of the
@@ -739,9 +760,20 @@ extension Set: SetAlgebra {
   @inlinable
   public func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
     where S.Element == Element {
-    // FIXME(performance): isEmpty fast path, here and elsewhere.
-    let other = Set(possibleSuperset)
-    return isSubset(of: other)
+    defer { _fixLifetime(self) }
+    if self.isEmpty { return true }
+    if self.count == 1 { return possibleSuperset.contains(self.first!) }
+    if let s = possibleSuperset as? Set<Element> {
+      return isSubset(of: s)
+    }
+    switch self._variant {
+    case .native(let native):
+      return native.isSubset(of: possibleSuperset)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      return _NativeSet<Element>(cocoa).isSubset(of: possibleSuperset)
+#endif
+    }
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict subset
@@ -767,9 +799,19 @@ extension Set: SetAlgebra {
   @inlinable
   public func isStrictSubset<S: Sequence>(of possibleStrictSuperset: S) -> Bool
     where S.Element == Element {
-    // FIXME: code duplication.
-    let other = Set(possibleStrictSuperset)
-    return isStrictSubset(of: other)
+    defer { _fixLifetime(self) }
+    if let s = possibleStrictSuperset as? Set<Element> {
+      return isStrictSubset(of: s)
+    }
+    switch self._variant {
+    case .native(let native):
+      return native.isStrictSubset(of: possibleStrictSuperset)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      return _NativeSet<Element>(cocoa)
+        .isStrictSubset(of: possibleStrictSuperset)
+#endif
+    }
   }
 
   /// Returns a Boolean value that indicates whether the set is a superset of
@@ -790,10 +832,17 @@ extension Set: SetAlgebra {
   @inlinable
   public func isSuperset<S: Sequence>(of possibleSubset: S) -> Bool
     where S.Element == Element {
-    // FIXME(performance): Don't build a set; just ask if every element is in
-    // `self`.
-    let other = Set(possibleSubset)
-    return other.isSubset(of: self)
+    defer { _fixLifetime(self) }
+    if possibleSubset.underestimatedCount > self.count {
+      return false
+    }
+    if let s = possibleSubset as? Set<Element> {
+      return isSuperset(of: s)
+    }
+    for element in possibleSubset {
+      guard self.contains(element) else { return false }
+    }
+    return true
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict
@@ -817,8 +866,15 @@ extension Set: SetAlgebra {
   @inlinable
   public func isStrictSuperset<S: Sequence>(of possibleStrictSubset: S) -> Bool
     where S.Element == Element {
-    let other = Set(possibleStrictSubset)
-    return other.isStrictSubset(of: self)
+    defer { _fixLifetime(self) }
+    if isEmpty { return false }
+    if let s = possibleStrictSubset as? Set<Element> {
+      return isStrictSuperset(of: s)
+    }
+    guard case .native(let native) = self._variant else {
+      return isStrictSuperset(of: Set(possibleStrictSubset))
+    }
+    return native.isStrictSuperset(of: possibleStrictSubset)
   }
 
   /// Returns a Boolean value that indicates whether the set has no members in
@@ -838,9 +894,17 @@ extension Set: SetAlgebra {
   @inlinable
   public func isDisjoint<S: Sequence>(with other: S) -> Bool
     where S.Element == Element {
-    // FIXME(performance): Don't need to build a set.
-    let otherSet = Set(other)
-    return isDisjoint(with: otherSet)
+    return _isDisjoint(with: other)
+  }
+
+  @inlinable
+  internal func _isDisjoint<S: Sequence>(with other: S) -> Bool
+    where S.Element == Element {
+    defer { _fixLifetime(self) }
+    for element in other {
+      if self.contains(element) { return false }
+    }
+    return true
   }
 
   /// Returns a new set with the elements of both this set and the given
@@ -890,9 +954,8 @@ extension Set: SetAlgebra {
   @inlinable
   public mutating func formUnion<S: Sequence>(_ other: S)
     where S.Element == Element {
-    for item in other {
-      insert(item)
-    }
+    defer { _fixLifetime(self) }
+    _variant.formUnion(other)
   }
 
   /// Returns a new set containing the elements of this set that do not occur
@@ -912,15 +975,8 @@ extension Set: SetAlgebra {
   @inlinable
   public func subtracting<S: Sequence>(_ other: S) -> Set<Element>
     where S.Element == Element {
-    return self._subtracting(other)
-  }
-
-  @inlinable
-  internal func _subtracting<S: Sequence>(_ other: S) -> Set<Element>
-    where S.Element == Element {
-    var newSet = self
-    newSet.subtract(other)
-    return newSet
+    defer { _fixLifetime(self) }
+    return Set(_native: _variant.subtracting(other))
   }
 
   /// Removes the elements of the given sequence from the set.
@@ -939,12 +995,18 @@ extension Set: SetAlgebra {
   @inlinable
   public mutating func subtract<S: Sequence>(_ other: S)
     where S.Element == Element {
+    defer { _fixLifetime(self) }
     _subtract(other)
   }
 
   @inlinable
   internal mutating func _subtract<S: Sequence>(_ other: S)
-    where S.Element == Element {
+  where S.Element == Element {
+    defer { _fixLifetime(self) }
+    guard _variant.isUniquelyReferenced() else {
+      self = Set(_native: _variant.subtracting(other))
+      return
+    }
     for item in other {
       remove(item)
     }
@@ -969,8 +1031,8 @@ extension Set: SetAlgebra {
   @inlinable
   public func intersection<S: Sequence>(_ other: S) -> Set<Element>
     where S.Element == Element {
-    let otherSet = Set(other)
-    return intersection(otherSet)
+    defer { _fixLifetime(self) }
+    return Set(_native: _variant.intersection(other))
   }
 
   /// Removes the elements of the set that aren't also in the given sequence.
@@ -989,20 +1051,7 @@ extension Set: SetAlgebra {
   @inlinable
   public mutating func formIntersection<S: Sequence>(_ other: S)
     where S.Element == Element {
-    // Because `intersect` needs to both modify and iterate over
-    // the left-hand side, the index may become invalidated during
-    // traversal so an intermediate set must be created.
-    //
-    // FIXME(performance): perform this operation at a lower level
-    // to avoid invalidating the index and avoiding a copy.
-    let result = self.intersection(other)
-
-    // The result can only have fewer or the same number of elements.
-    // If no elements were removed, don't perform a reassignment
-    // as this may cause an unnecessary uniquing COW.
-    if result.count != count {
-      self = result
-    }
+    self = self.intersection(other)
   }
 
   /// Returns a new set with the elements that are either in this set or in the
@@ -1024,9 +1073,11 @@ extension Set: SetAlgebra {
   @inlinable
   public func symmetricDifference<S: Sequence>(_ other: S) -> Set<Element>
     where S.Element == Element {
-    var newSet = self
-    newSet.formSymmetricDifference(other)
-    return newSet
+    defer { _fixLifetime(self) }
+    if let other = other as? Set<Element> {
+      return Set(_native: _variant.symmetricDifference(other))
+    }
+    return Set(_native: _variant.symmetricDifference(other))
   }
 
   /// Replace this set with the elements contained in this set or the given
@@ -1048,14 +1099,12 @@ extension Set: SetAlgebra {
   @inlinable
   public mutating func formSymmetricDifference<S: Sequence>(_ other: S)
     where S.Element == Element {
-    let otherSet = Set(other)
-    formSymmetricDifference(otherSet)
+    self = self.symmetricDifference(other)
   }
 }
 
 extension Set: CustomStringConvertible, CustomDebugStringConvertible {
   /// A string that represents the contents of the set.
-  @inlinable
   public var description: String {
     return _makeCollectionDescription(for: self, withTypeName: nil)
   }
@@ -1126,9 +1175,9 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
   && _isClassOrObjCExistential(DerivedValue.self) {
     switch source._variant {
     case .native(let nativeSet):
-      return Set(_immutableCocoaSet: nativeSet.bridged())
+      return Set(_cocoa: _CocoaSet(nativeSet.bridged()))
     case .cocoa(let cocoaSet):
-      return Set(_immutableCocoaSet: cocoaSet.object)
+      return Set(_cocoa: cocoaSet)
     }
   }
 #endif
@@ -1159,15 +1208,14 @@ internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
 public func _setDownCastConditional<BaseValue, DerivedValue>(
   _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {
-  var result = Set<DerivedValue>(minimumCapacity: source.count)
+  var result = _NativeSet<DerivedValue>(capacity: source.count)
   for member in source {
-    if let derivedMember = member as? DerivedValue {
-      result.insert(derivedMember)
-      continue
+    guard let derivedMember = member as? DerivedValue else {
+      return nil
     }
-    return nil
+    result.insertNew(derivedMember)
   }
-  return result
+  return Set(_native: result)
 }
 
 extension Set {
@@ -1186,6 +1234,7 @@ extension Set {
   /// - Parameter other: Another set.
   @inlinable
   public mutating func subtract(_ other: Set<Element>) {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     _subtract(other)
   }
 
@@ -1204,6 +1253,8 @@ extension Set {
   /// - Returns: `true` if the set is a subset of `other`; otherwise, `false`.
   @inlinable
   public func isSubset(of other: Set<Element>) -> Bool {
+    defer { _fixLifetime(self); _fixLifetime(other) }
+    guard self.count > 0 else { return true }
     guard self.count <= other.count else { return false }
     for member in self {
       if !other.contains(member) {
@@ -1229,6 +1280,7 @@ extension Set {
   ///   `false`.
   @inlinable
   public func isSuperset(of other: Set<Element>) -> Bool {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     return other.isSubset(of: self)
   }
 
@@ -1248,12 +1300,8 @@ extension Set {
   ///   otherwise, `false`.
   @inlinable
   public func isDisjoint(with other: Set<Element>) -> Bool {
-    for member in self {
-      if other.contains(member) {
-        return false
-      }
-    }
-    return true
+    defer { _fixLifetime(self); _fixLifetime(other) }
+    return _isDisjoint(with: other)
   }
 
   /// Returns a new set containing the elements of this set that do not occur
@@ -1272,7 +1320,8 @@ extension Set {
   /// - Returns: A new set.
   @inlinable
   public func subtracting(_ other: Set<Element>) -> Set<Element> {
-    return self._subtracting(other)
+    defer { _fixLifetime(self); _fixLifetime(other) }
+    return Set(_native: _variant.subtracting(other))
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict
@@ -1294,7 +1343,8 @@ extension Set {
   ///   `other`; otherwise, `false`.
   @inlinable
   public func isStrictSuperset(of other: Set<Element>) -> Bool {
-    return self.isSuperset(of: other) && self != other
+    defer { _fixLifetime(self); _fixLifetime(other) }
+    return self.count > other.count && self.isSuperset(of: other)
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict subset
@@ -1318,6 +1368,7 @@ extension Set {
   ///   `other`; otherwise, `false`.
   @inlinable
   public func isStrictSubset(of other: Set<Element>) -> Bool {
+    defer { _fixLifetime(self); _fixLifetime(other) }
     return other.isStrictSuperset(of: self)
   }
 
@@ -1339,13 +1390,8 @@ extension Set {
   /// - Returns: A new set.
   @inlinable
   public func intersection(_ other: Set<Element>) -> Set<Element> {
-    var newSet = Set<Element>()
-    for member in self {
-      if other.contains(member) {
-        newSet.insert(member)
-      }
-    }
-    return newSet
+    defer { _fixLifetime(self); _fixLifetime(other) }
+    return Set(_native: _variant.intersection(other))
   }
 
   /// Removes the elements of the set that are also in the given sequence and
@@ -1367,21 +1413,14 @@ extension Set {
   /// - Parameter other: Another set.
   @inlinable
   public mutating func formSymmetricDifference(_ other: Set<Element>) {
-    for member in other {
-      if contains(member) {
-        remove(member)
-      } else {
-        insert(member)
-      }
-    }
+    defer { _fixLifetime(self); _fixLifetime(other) }
+    self = self.symmetricDifference(other)
   }
 }
 
-//===--- APIs templated for Dictionary and Set ----------------------------===//
-
 /// This protocol is only used for compile-time checks that
-/// every buffer type implements all required operations.
-internal protocol _SetBuffer { // FIXME: Remove or refactor for Set.
+/// every Set type implements all required operations.
+internal protocol _SetBuffer {
   associatedtype Element
   associatedtype Index
 
@@ -1389,110 +1428,131 @@ internal protocol _SetBuffer { // FIXME: Remove or refactor for Set.
   var endIndex: Index { get }
   func index(after i: Index) -> Index
   func formIndex(after i: inout Index)
-  func index(forKey key: Element) -> Index?
+  func index(for element: Element) -> Index?
   var count: Int { get }
 
   func contains(_ member: Element) -> Bool
-  func assertingGet(at i: Index) -> Element
-  func maybeGet(_ key: Element) -> Element?
+  func element(at i: Index) -> Element
 }
 
-/// An instance of this class has all `Set` data tail-allocated.
-/// Enough bytes are allocated to hold the bitmap for marking valid entries,
-/// keys, and values. The data layout starts with the bitmap, followed by the
-/// keys, followed by the values.
-//
-// See the docs at the top of the file for more details on this type
-//
-// NOTE: The precise layout of this type is relied on in the runtime
-// to provide a statically allocated empty singleton.
-// See stdlib/public/stubs/GlobalObjects.cpp for details.
+/// An instance of this class has all `Set` data tail-allocated, starting with
+/// hash table metadata, followed by element storage.
+///
+/// **Note:** The precise layout of this type is relied on in the runtime
+/// to provide a statically allocated empty singleton.
+/// See stdlib/public/stubs/GlobalObjects.cpp for details.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
-internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
-  @usableFromInline // FIXME(sil-serialize-all)
+internal class _SwiftRawSetStorage: _SwiftNativeNSSet {
+  /// The current number of occupied entries in this hash table.
+  @usableFromInline
   @nonobjc
-  internal final var bucketCount: Int
+  internal final var _count: Int
 
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal final var count: Int
-
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal final var initializedEntries: _UnsafeBitMap
-
-  @usableFromInline // FIXME(sil-serialize-all)
+  /// The maximum number of entries that can be inserted into this hash table
+  /// without exceeding its maximum load factor.
+  @usableFromInline
   @nonobjc
-  internal final var keys: UnsafeMutableRawPointer
+  internal final var _capacity: Int
 
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal final var seed: (UInt64, UInt64)
-
-  // This API is unsafe and needs a `_fixLifetime` in the caller.
-  @inlinable // FIXME(sil-serialize-all)
+  /// The scale of this hash table. The number of buckets is 2 raised to the
+  /// power of `scale`.
+  @usableFromInline
   @nonobjc
-  internal final
-  var _initializedHashtableEntriesBitMapBuffer: UnsafeMutablePointer<UInt> {
-    return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt.self))
-  }
+  internal final var _scale: Int
 
-  /// The empty singleton that is used for every single Dictionary that is
-  /// created without any elements. The contents of the storage should never
-  /// be mutated.
-  @inlinable
+  @usableFromInline
+  internal final var _seed: Hasher._Seed
+
+  @usableFromInline
   @nonobjc
-  internal static var empty: _RawNativeSetStorage {
-    return Builtin.bridgeFromRawPointer(
-      Builtin.addressof(&_swiftEmptySetStorage))
-  }
+  internal final var _rawElements: UnsafeMutableRawPointer
 
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   internal init(_doNotCallMe: ()) {
+    _sanityCheckFailure("This class cannot be directly initialized")
+  }
+
+  @usableFromInline
+  internal func invalidate() {}
+
+  @inlinable
+  @nonobjc
+  internal final var _bucketCount: Int {
+    @inline(__always) get { return 1 &<< _scale }
+  }
+
+  @inlinable
+  @nonobjc
+  internal final var _entryCount: Int {
+    @inline(__always) get { return 1 &<< (_scale &+ 3) }
+  }
+
+  @inlinable
+  @nonobjc
+  internal final var _buckets: UnsafeMutablePointer<_HashTable.Bucket> {
+    @inline(__always) get {
+      let bucketsAddr = Builtin.projectTailElems(self, _HashTable.Bucket.self)
+      return UnsafeMutablePointer(bucketsAddr)
+    }
+  }
+
+  // The _HashTable struct contains pointers into tail-allocated storage, so
+  // this is unsafe and needs `_fixLifetime` calls in the caller.
+  @inlinable
+  @nonobjc
+  internal final var _hashTable: _HashTable {
+    @inline(__always) get {
+      return _HashTable(buckets: _buckets, bucketCount: _bucketCount)
+    }
+  }
+}
+
+/// The storage class for the singleton empty set.
+/// The single instance of this class is created by the runtime.
+@_fixed_layout
+@usableFromInline
+internal class _SwiftEmptySetStorage: _SwiftRawSetStorage {
+  override internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only create this by using the `empty` singleton")
   }
 
 #if _runtime(_ObjC)
+  @objc
+  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
+    _sanityCheckFailure("Don't call this designated initializer")
+  }
+#endif
+}
+
+extension _SwiftRawSetStorage {
+  /// The empty singleton that is used for every single Set that is created
+  /// without any elements. The contents of the storage must never be mutated.
+  @inlinable
+  @nonobjc
+  internal static var empty: _SwiftEmptySetStorage {
+    return Builtin.bridgeFromRawPointer(
+      Builtin.addressof(&_swiftEmptySetStorage))
+  }
+}
+
+
+extension _SwiftEmptySetStorage: _NSSetCore {
+#if _runtime(_ObjC)
   //
   // NSSet implementation, assuming Self is the empty singleton
   //
-
-  /// Get the NSEnumerator implementation for self.
-  /// _HashableTypedNativeSetStorage overloads this to give
-  /// _NativeSelfNSEnumerator proper type parameters.
   @objc
-  internal func enumerator() -> _NSEnumerator {
-    return _SwiftSetNSEnumerator<AnyObject>(_NativeSet(_storage: self))
+  internal var count: Int {
+    return 0
   }
 
   @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     return self
-  }
-
-  @objc(countByEnumeratingWithState:objects:count:)
-  internal func countByEnumerating(
-    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>?, count: Int
-  ) -> Int {
-    // Even though we never do anything in here, we need to update the
-    // state so that callers know we actually ran.
-
-    var theState = state.pointee
-    if theState.state == 0 {
-      theState.state = 1 // Arbitrary non-zero value.
-      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
-      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-    }
-    state.pointee = theState
-
-    return 0
-  }
-
-  @objc
-  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("don't call this designated initializer")
   }
 
   @objc
@@ -1502,71 +1562,126 @@ internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
 
   @objc
   internal func objectEnumerator() -> _NSEnumerator {
-    return enumerator()
-  }
-#endif
-}
-
-// See the docs at the top of this file for a description of this type
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline
-internal class _TypedNativeSetStorage<Element>: _RawNativeSetStorage {
-
-  deinit {
-    let keys = self.keys.assumingMemoryBound(to: Element.self)
-
-    if !_isPOD(Element.self) {
-      for i in 0 ..< bucketCount {
-        if initializedEntries[i] {
-          (keys+i).deinitialize(count: 1)
-        }
-      }
-    }
-
-    _fixLifetime(self)
-  }
-
-  // This type is made with allocWithTailElems, so no init is ever called.
-  // But we still need to have an init to satisfy the compiler.
-  @nonobjc
-  override internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Only create this by calling Buffer's inits")
-  }
-
-#if _runtime(_ObjC)
-  @objc
-  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("don't call this designated initializer")
-  }
-#endif
-}
-
-// See the docs at the top of this file for a description of this type
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline
-final internal class _HashableTypedNativeSetStorage<Element: Hashable>
-  : _TypedNativeSetStorage<Element> {
-  // This type is made with allocWithTailElems, so no init is ever called.
-  // But we still need to have an init to satisfy the compiler.
-  @nonobjc
-  override internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Only create this by calling Buffer's inits'")
-  }
-
-#if _runtime(_ObjC)
-  // NSSet bridging:
-
-  internal var asNative: _NativeSet<Element> {
-    return _NativeSet(_storage: self)
-  }
-
-  @objc
-  internal override func enumerator() -> _NSEnumerator {
-    return _SwiftSetNSEnumerator<Element>(_NativeSet(_storage: self))
+    return _SwiftEmptyNSEnumerator()
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
-  internal override func countByEnumerating(
+  internal func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
+  ) -> Int {
+    // Even though we never do anything in here, we need to update the
+    // state so that callers know we actually ran.
+    var theState = state.pointee
+    if theState.state == 0 {
+      theState.state = 1 // Arbitrary non-zero value.
+      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
+      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+    }
+    state.pointee = theState
+    return 0
+  }
+#endif
+}
+
+@_fixed_layout
+@usableFromInline
+internal final class _SwiftNativeSetStorage<
+  Element: Hashable
+>: _SwiftRawSetStorage, _NSSetCore {
+
+  // This type is made with allocWithTailElems, so no init is ever called.
+  // But we still need to have an init to satisfy the compiler.
+  @nonobjc
+  override internal init(_doNotCallMe: ()) {
+    _sanityCheckFailure("This class cannot be directly initialized")
+  }
+
+  deinit {
+    if !_isPOD(Element.self) && _count > 0 {
+      for index in _hashTable.indices {
+        (_elements + index.offset).deinitialize(count: 1)
+      }
+      _count = -1
+    }
+    _fixLifetime(self)
+  }
+
+  @usableFromInline
+  internal override func invalidate() {
+    _count = -1
+  }
+
+  @usableFromInline
+  @_effects(releasenone)
+  static internal func allocate(
+    scale: Int,
+    seed: Hasher._Seed
+  ) -> _SwiftNativeSetStorage {
+    // The entry count must be representable by an Int value; hence the scale's
+    // weird upper bound.
+    _sanityCheck(scale >= 0 && scale < Int.bitWidth - 4)
+
+    let bucketCount = 1 &<< scale
+    let entryCount = 1 &<< (scale + 3)
+    let storage = Builtin.allocWithTailElems_2(
+      _SwiftNativeSetStorage<Element>.self,
+      bucketCount._builtinWordValue, _HashTable.Bucket.self,
+      entryCount._builtinWordValue, Element.self)
+
+    let bucketsAddr = Builtin.projectTailElems(storage, _HashTable.Bucket.self)
+    let elementsAddr = Builtin.getTailAddr_Word(
+      bucketsAddr, bucketCount._builtinWordValue, _HashTable.Bucket.self,
+      Element.self)
+    storage._count = 0
+    storage._capacity = _HashTable.capacity(forScale: scale)
+    storage._scale = scale
+    storage._rawElements = UnsafeMutableRawPointer(elementsAddr)
+    storage._seed = seed
+    storage._buckets.assign(repeating: _HashTable.Bucket(0), count: bucketCount)
+    return storage
+  }
+
+  @inlinable
+  final var _elements: UnsafeMutablePointer<Element> {
+    @inline(__always)
+    get {
+      return self._rawElements.assumingMemoryBound(to: Element.self)
+    }
+  }
+
+  internal var asNative: _NativeSet<Element> {
+    return _NativeSet(self)
+  }
+
+#if _runtime(_ObjC)
+  // _NSSetCore implementation
+  //
+  // FIXME: These should be moved to an extension, but @objc members aren't
+  // supported in extensions of generic classes.
+
+  @objc
+  internal init(objects: UnsafePointer<AnyObject?>, count: Int) {
+    _sanityCheckFailure("Don't call this designated initializer")
+  }
+
+  @objc(copyWithZone:)
+  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
+    return self
+  }
+
+  @objc
+  internal var count: Int {
+    return _count
+  }
+
+  @objc
+  internal func objectEnumerator() -> _NSEnumerator {
+    return _SwiftSetNSEnumerator(asNative)
+  }
+
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int {
@@ -1575,7 +1690,7 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(asNative.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(asNative.startIndex.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -1585,50 +1700,41 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
       return 0
     }
 
+    let hashTable = _hashTable
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var currIndex = _NativeSet<Element>.Index(bucket: Int(theState.extra.0))
-    let endIndex = asNative.endIndex
+    var index = _HashTable.Index(offset: Int(theState.extra.0))
+    let endIndex = hashTable.endIndex
+    if index != endIndex {
+      hashTable.checkOccupied(index)
+    }
     var stored = 0
     for i in 0..<count {
-      if (currIndex == endIndex) {
-        break
-      }
+      guard index < endIndex else { break }
 
-      unmanagedObjects[i] = asNative.bridgedKey(at: currIndex)
+      let element = _elements[index.offset]
+      unmanagedObjects[i] = _bridgeAnythingToObjectiveC(element)
 
       stored += 1
-      asNative.formIndex(after: &currIndex)
+      hashTable.formIndex(after: &index)
     }
-    theState.extra.0 = CUnsignedLong(currIndex.bucket)
+    theState.extra.0 = CUnsignedLong(index.offset)
     state.pointee = theState
     return stored
   }
 
-  @nonobjc
-  internal func getObjectFor(_ aKey: AnyObject) -> AnyObject? {
-    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Element.self)
+  @objc
+  internal func member(_ object: AnyObject) -> AnyObject? {
+    guard let native = _conditionallyBridgeFromObjectiveC(object, Element.self)
     else { return nil }
 
-    let (i, found) = asNative._find(nativeKey)
-    if found {
-      return asNative.bridgedValue(at: i)
-    }
-    return nil
-  }
-
-  @objc
-  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("don't call this designated initializer")
-  }
-
-  @objc
-  override internal func member(_ object: AnyObject) -> AnyObject? {
-    return getObjectFor(object)
+    let (index, found) = asNative.find(native)
+    guard found else { return nil }
+    return _bridgeAnythingToObjectiveC(_elements[index.offset])
   }
 #endif
 }
 
-/// A wrapper around _RawNativeSetStorage that provides most of the
+/// A wrapper around _SwiftRawSetStorage that provides most of the
 /// implementation of Set.
 ///
 /// This type and most of its functionality doesn't require Hashable at all.
@@ -1637,267 +1743,243 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
 /// Hashable can be found in an extension.
 @usableFromInline
 @_fixed_layout
-internal struct _NativeSet<Element> {
-  /// See this comments on _RawNativeSetStorage and its subclasses to
+internal struct _NativeSet<Element: Hashable> {
+  /// See this comments on _SwiftRawSetStorage and its subclasses to
   /// understand why we store an untyped storage here.
   @usableFromInline
-  internal var _storage: _RawNativeSetStorage
+  internal var _storage: _SwiftRawSetStorage
 
   /// Constructs an instance from the empty singleton.
   @inlinable
   internal init() {
-    self._storage = _RawNativeSetStorage.empty
+    self._storage = _SwiftRawSetStorage.empty
   }
 
   /// Constructs a native set adopting the given storage.
   @inlinable
-  internal init(_storage: _RawNativeSetStorage) {
-    self._storage = _storage
+  internal init(_ storage: _SwiftRawSetStorage) {
+    self._storage = storage
   }
 
-  /// Creates a Buffer with a storage that is typed, but doesn't understand
-  /// Hashing. Mostly for bridging; prefer `init(minimumCapacity:)`.
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(_exactBucketCount bucketCount: Int, unhashable: ()) {
-    let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
-    let storage = Builtin.allocWithTailElems_2(
-      _TypedNativeSetStorage<Element>.self,
-      bitmapWordCount._builtinWordValue, UInt.self,
-      bucketCount._builtinWordValue, Element.self)
-    self.init(_exactBucketCount: bucketCount, storage: storage)
-  }
-
-  /// Given a bucket count and uninitialized _RawNativeSetStorage, completes the
-  /// initialization and returns a Buffer.
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(
-    _exactBucketCount bucketCount: Int,
-    storage: _RawNativeSetStorage
-  ) {
-    storage.bucketCount = bucketCount
-    storage.count = 0
-
-    self.init(_storage: storage)
-
-    let initializedEntries = _UnsafeBitMap(
-        storage: _initializedHashtableEntriesBitMapBuffer,
-        bitCount: bucketCount)
-    initializedEntries.initializeToZero()
-
-    // Compute all the array offsets now, so we don't have to later
-    let bitmapAddr = Builtin.projectTailElems(_storage, UInt.self)
-    let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
-    let keysAddr = Builtin.getTailAddr_Word(bitmapAddr,
-           bitmapWordCount._builtinWordValue, UInt.self, Element.self)
-
-    // Initialize header
-    _storage.initializedEntries = initializedEntries
-    _storage.keys = UnsafeMutableRawPointer(keysAddr)
-    // We assign a unique hash seed to each distinct hash table size, so that we
-    // avoid certain copy operations becoming quadratic, without breaking value
-    // semantics. (See https://bugs.swift.org/browse/SR-3268)
-    //
-    // We don't need to generate a brand new seed for each table size: it's
-    // enough to change a single bit in the global seed by XORing the bucket
-    // count to it. (The bucket count is always a power of two.)
-    //
-    // FIXME: Use an approximation of true per-instance seeding. We can't just
-    // use the base address, because COW copies need to share the same seed.
-    let seed = Hasher._seed
-    let perturbation = bucketCount
-    _storage.seed = (seed.0 ^ UInt64(truncatingIfNeeded: perturbation), seed.1)
-  }
-
-  // Forwarding the individual fields of the storage in various forms
-
-  @inlinable
-  internal var bucketCount: Int {
-    return _assumeNonNegative(_storage.bucketCount)
-  }
-
-  @inlinable
-  internal var count: Int {
-    set {
-      _storage.count = newValue
-    }
-    get {
-      return _assumeNonNegative(_storage.count)
-    }
-  }
-
-  @inlinable
-  internal
-  var _initializedHashtableEntriesBitMapBuffer: UnsafeMutablePointer<UInt> {
-    return _storage._initializedHashtableEntriesBitMapBuffer
-  }
-
-  // This API is unsafe and needs a `_fixLifetime` in the caller.
-  @inlinable
-  internal var keys: UnsafeMutablePointer<Element> {
-    return _storage.keys.assumingMemoryBound(to: Element.self)
-  }
-
-  // Most of the implementation of the _SetBuffer protocol,
-  // but only the parts that don't actually rely on hashing.
-
-  @inlinable
-  @inline(__always)
-  internal func key(at i: Int) -> Element {
-    _sanityCheck(i >= 0 && i < bucketCount)
-    _sanityCheck(isInitializedEntry(at: i))
-    defer { _fixLifetime(self) }
-
-    let res = (keys + i).pointee
-    return res
+  @usableFromInline
+  @_effects(releasenone)
+  internal init(capacity: Int) {
+    let scale = _HashTable.scale(forCapacity: capacity)
+    let seed = _HashTable.newSeed(forScale: scale)
+    self._storage =
+      _SwiftNativeSetStorage<Element>.allocate(scale: scale, seed: seed)
   }
 
 #if _runtime(_ObjC)
-  /// Returns the key at the given Index, bridged.
-  ///
-  /// Intended for use with verbatim bridgeable keys.
   @inlinable
-  internal func bridgedKey(at index: Index) -> AnyObject {
-    let k = key(at: index.bucket)
-    return _bridgeAnythingToObjectiveC(k)
+  internal init(_ cocoa: _CocoaSet) {
+    self.init(cocoa, capacity: cocoa.count)
   }
 
-  /// Returns the value at the given Index, bridged.
-  ///
-  /// Intended for use with verbatim bridgeable keys.
   @inlinable
-  internal func bridgedValue(at index: Index) -> AnyObject {
-    let v = value(at: index.bucket)
-    return _bridgeAnythingToObjectiveC(v)
+  internal init(_ cocoa: _CocoaSet, capacity: Int) {
+    _sanityCheck(cocoa.count <= capacity)
+    self.init(capacity: capacity)
+    for element in cocoa {
+      insertNew(_forceBridgeFromObjectiveC(element, Element.self))
+    }
   }
 #endif
+}
 
+extension _NativeSet {
   @inlinable
-  internal func isInitializedEntry(at i: Int) -> Bool {
-    _sanityCheck(i >= 0 && i < bucketCount)
-    defer { _fixLifetime(self) }
-
-    return _storage.initializedEntries[i]
-  }
-
-  @usableFromInline @_transparent
-  internal func destroyEntry(at i: Int) {
-    _sanityCheck(isInitializedEntry(at: i))
-    defer { _fixLifetime(self) }
-
-    (keys + i).deinitialize(count: 1)
-    _storage.initializedEntries[i] = false
-  }
-
-  @usableFromInline @_transparent
-  internal func initializeKey(_ k: Element, at i: Int) {
-    _sanityCheck(!isInitializedEntry(at: i))
-    defer { _fixLifetime(self) }
-
-    (keys + i).initialize(to: k)
-    _storage.initializedEntries[i] = true
-  }
-
-  @usableFromInline @_transparent
-  internal func moveInitializeEntry(
-    from: _NativeSet,
-    at: Int,
-    toEntryAt: Int
-  ) {
-    _sanityCheck(!isInitializedEntry(at: toEntryAt))
-
-    defer { _fixLifetime(self) }
-
-    (keys + toEntryAt).initialize(to: (from.keys + at).move())
-    from._storage.initializedEntries[at] = false
-    _storage.initializedEntries[toEntryAt] = true
-  }
-
-  /// Alias for key(at:) in Sets for better code reuse
-  @usableFromInline @_transparent
-  internal func value(at i: Int) -> Element {
-    return key(at: i)
+  internal var entryCount: Int {
+    @inline(__always)
+    get {
+      return _assumeNonNegative(_storage._entryCount)
+    }
   }
 
   @inlinable
-  internal func setKey(_ key: Element, at i: Int) {
-    _sanityCheck(i >= 0 && i < bucketCount)
-    _sanityCheck(isInitializedEntry(at: i))
-    defer { _fixLifetime(self) }
-
-    (keys + i).pointee = key
+  internal var capacity: Int {
+    @inline(__always)
+    get {
+      return _assumeNonNegative(_storage._capacity)
+    }
   }
+
+  @usableFromInline @_transparent
+  internal var elements: UnsafeMutablePointer<Element> {
+    @inline(__always)
+    get {
+      return _storage._rawElements.assumingMemoryBound(to: Element.self)
+    }
+  }
+
+  @inlinable
+  internal var hashTable: _HashTable {
+    @inline(__always) get {
+      return _storage._hashTable
+    }
+  }
+
+  @usableFromInline @_transparent
+  internal func uncheckedElement(at index: Index) -> Element {
+    _sanityCheck(hashTable.isOccupied(index))
+    return elements[index.offset]
+  }
+
+  @usableFromInline @_transparent
+  internal func uncheckedDestroy(at index: Index) {
+    _sanityCheck(hashTable.isValid(index))
+    (elements + index.offset).deinitialize(count: 1)
+  }
+
+  @usableFromInline @_transparent
+  internal func uncheckedInitialize(at index: Index, to element: Element) {
+    _sanityCheck(hashTable.isValid(index))
+    (elements + index.offset).initialize(to: element)
+  }
+}
+
+extension _NativeSet {
+  @inlinable
+  internal mutating func reallocate(
+    movingElements move: Bool,
+    capacity: Int
+  ) -> Bool {
+    let scale = _HashTable.scale(forCapacity: capacity)
+    let rehash = (scale != _storage._scale)
+
+    // We generate a unique hash seed whenever we change the size of the hash
+    // table, so that we avoid certain copy operations becoming quadratic,
+    // without breaking value semantics. (For background details, see
+    // https://bugs.swift.org/browse/SR-3268)
+    let seed = rehash ? _HashTable.newSeed(forScale: scale) : _storage._seed
+
+    var result = _NativeSet(
+      _SwiftNativeSetStorage<Element>.allocate(scale: scale, seed: seed))
+    let hashTable = self.hashTable
+    switch (move, rehash) {
+    case (true, _): // Move & rehash elements
+      for index in hashTable.indices {
+        result._unsafeMoveNew(from: self.elements + index.offset)
+      }
+      _storage.invalidate()
+    case (false, true): // Copy & rehash elements
+      for index in hashTable.indices {
+        result._unsafeInsertNew(self.uncheckedElement(at: index))
+      }
+    case (false, false): // Copy elements to same entries in new storage
+      result.hashTable.copyContents(of: hashTable)
+      result._storage._count = self.count
+      for index in hashTable.indices {
+        let element = uncheckedElement(at: index)
+        result.uncheckedInitialize(at: index, to: element)
+      }
+    }
+    _storage = result._storage
+    return rehash
+  }
+
+  @inlinable
+  @inline(__always)
+  internal mutating func ensureUnique(
+    isUnique: Bool,
+    capacity: Int
+  ) -> (reallocated: Bool, rehashed: Bool) {
+    if isUnique && capacity <= self.capacity {
+      return (false, false)
+    }
+    return (true, reallocate(movingElements: isUnique, capacity: capacity))
+  }
+}
+
+extension _NativeSet: _SetBuffer {
+  @usableFromInline
+  internal typealias Index = _HashTable.Index
+  @usableFromInline
+  internal typealias Indices = _HashTable.Indices
 
   @inlinable
   internal var startIndex: Index {
-    // We start at "index after -1" instead of "0" because we need to find the
-    // first occupied slot.
-    return index(after: Index(bucket: -1))
+    return hashTable.startIndex
   }
 
   @inlinable
   internal var endIndex: Index {
-    return Index(bucket: bucketCount)
+    return hashTable.endIndex
   }
 
   @inlinable
-  internal func index(after i: Index) -> Index {
-    _precondition(i != endIndex)
-    var idx = i.bucket + 1
-    while idx < bucketCount && !isInitializedEntry(at: idx) {
-      idx += 1
+  internal func index(after index: Index) -> Index {
+    return hashTable.index(after: index)
+  }
+
+  @inlinable
+  internal func formIndex(after index: inout Index) {
+    hashTable.formIndex(after: &index)
+  }
+
+  @inlinable
+  internal var indices: _HashTable.Indices {
+    @inline(__always)
+    get {
+      // Note: _HashTable.Indices does not include a storage reference, so all
+      // callers must manually ensure self survives all usages of the returned
+      // struct.  (Top-level Set operations already include a _fixLifetime for
+      // this.)
+      return hashTable.indices
     }
-
-    return Index(bucket: idx)
   }
 
   @inlinable
-  internal func formIndex(after i: inout Index) {
-    i = index(after: i)
+  @inline(__always)
+  internal func index(for element: Element) -> Index? {
+    if count == 0 {
+      // Fast path that avoids computing the hash of the key.
+      return nil
+    }
+    let (i, found) = find(element)
+    return found ? i : nil
   }
 
   @inlinable
-  internal func assertingGet(at i: Index) -> Element {
-    _precondition(i.bucket >= 0 && i.bucket < bucketCount)
-    _precondition(
-      isInitializedEntry(at: i.bucket),
-      "Attempting to access Set elements using an invalid Index")
-    let key = self.key(at: i.bucket)
-    return key
+  internal var count: Int {
+    get {
+      return _assumeNonNegative(_storage._count)
+    }
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func contains(_ member: Element) -> Bool {
+    // if count == 0 {
+    //   // Fast path that avoids computing the hash of the key.
+    //   return false
+    // }
+    return hashTable.contains(
+      hashValue: hashValue(for: member),
+      element: member,
+      elements: elements)
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func element(at index: Index) -> Element {
+    hashTable.checkOccupied(index)
+    return elements[index.offset]
   }
 }
 
-extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  internal init(minimumCapacity: Int) {
-    let bucketCount = _NativeSet.bucketCount(
-      forCapacity: minimumCapacity,
-      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
-    self.init(bucketCount: bucketCount)
+extension _NativeSet: _HashTableDelegate {
+  internal func hashValue(at index: Index) -> Int {
+    return uncheckedElement(at: index)._rawHashValue(seed: _storage._seed)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  internal init(bucketCount: Int) {
-    // Actual bucket count is the next power of 2 greater than or equal to
-    // bucketCount. Make sure that is representable.
-    _sanityCheck(bucketCount <= (Int.max >> 1) + 1)
-    let buckets = 1 &<< ((Swift.max(bucketCount, 2) - 1)._binaryLogarithm() + 1)
-    self.init(_exactBucketCount: buckets)
+  internal func moveEntry(from source: Index, to target: Index) {
+    (elements + target.offset)
+      .moveInitialize(from: elements + source.offset, count: 1)
   }
+}
 
-  /// Create a buffer instance with room for at least 'bucketCount' entries,
-  /// marking all entries invalid.
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(_exactBucketCount bucketCount: Int) {
-    let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
-    let storage = Builtin.allocWithTailElems_2(
-      _HashableTypedNativeSetStorage<Element>.self,
-      bitmapWordCount._builtinWordValue, UInt.self,
-      bucketCount._builtinWordValue, Element.self)
-    self.init(_exactBucketCount: bucketCount, storage: storage)
-  }
-
+extension _NativeSet {
 #if _runtime(_ObjC)
   @usableFromInline
   internal func bridged() -> _NSSet {
@@ -1907,9 +1989,10 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
     // Temporary var for SOME type safety before a cast.
     let nsSet: _NSSetCore
 
-    if _isBridgedVerbatimToObjectiveC(Element.self) ||
-      self._storage === _RawNativeSetStorage.empty {
-      nsSet = self._storage
+    if _storage === _SwiftRawSetStorage.empty {
+      nsSet = _SwiftRawSetStorage.empty
+    } else if _isBridgedVerbatimToObjectiveC(Element.self) {
+      nsSet = unsafeDowncast(_storage, to: _SwiftNativeSetStorage<Element>.self)
     } else {
       nsSet = _SwiftDeferredNSSet(self)
     }
@@ -1920,259 +2003,484 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
     return unsafeBitCast(nsSet, to: _NSSet.self)
   }
 #endif
-
-  /// A textual representation of `self`.
-  @inlinable // FIXME(sil-serialize-all)
-  internal var description: String {
-    var result = ""
-#if INTERNAL_CHECKS_ENABLED
-    for i in 0..<bucketCount {
-      if isInitializedEntry(at: i) {
-        let key = self.key(at: i)
-        result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
-      } else {
-        result += "bucket \(i), empty\n"
-      }
-    }
-#endif
-    return result
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _bucketMask: Int {
-    // The bucket count is not negative, therefore subtracting 1 will not
-    // overflow.
-    return bucketCount &- 1
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always) // For performance reasons.
-  internal func _bucket(_ k: Element) -> Int {
-    return k._rawHashValue(seed: _storage.seed) & _bucketMask
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal func _index(after bucket: Int) -> Int {
-    // Bucket is within 0 and bucketCount. Therefore adding 1 does not overflow.
-    return (bucket &+ 1) & _bucketMask
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal func _prev(_ bucket: Int) -> Int {
-    // Bucket is not negative. Therefore subtracting 1 does not overflow.
-    return (bucket &- 1) & _bucketMask
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  internal func _find(_ key: Element) -> (pos: Index, found: Bool) {
-    return _find(key, startBucket: _bucket(key))
-  }
-
-  /// Search for a given key starting from the specified bucket.
-  ///
-  /// If the key is not present, returns the position where it could be
-  /// inserted.
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  internal func _find(_ key: Element, startBucket: Int)
-    -> (pos: Index, found: Bool) {
-
-    var bucket = startBucket
-
-    // The invariant guarantees there's always a hole, so we just loop
-    // until we find one
-    while true {
-      let isHole = !isInitializedEntry(at: bucket)
-      if isHole {
-        return (Index(bucket: bucket), false)
-      }
-      if self.key(at: bucket) == key {
-        return (Index(bucket: bucket), true)
-      }
-      bucket = _index(after: bucket)
-    }
-  }
-
-  @usableFromInline @_transparent
-  internal static func bucketCount(
-    forCapacity capacity: Int,
-    maxLoadFactorInverse: Double
-  ) -> Int {
-    // `capacity + 1` below ensures that we don't fill in the last hole
-    return Swift.max(
-      Int((Double(capacity) * maxLoadFactorInverse).rounded(.up)),
-      capacity + 1)
-  }
-
-  /// Buffer should be uniquely referenced.
-  /// The `key` should not be present in the Set.
-  /// This function does *not* update `count`.
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal func unsafeAddNew(key newKey: Element) {
-    let (i, found) = _find(newKey)
-    _precondition(
-      !found, "Duplicate element found in Set. Elements may have been mutated after insertion")
-    initializeKey(newKey, at: i.bucket)
-  }
-
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func fromArray(_ elements: [Element]) -> _NativeSet<Element> {
-    if elements.isEmpty {
-      return _NativeSet()
-    }
-
-    var native = _NativeSet<Element>(minimumCapacity: elements.count)
-
-    var count = 0
-    for key in elements {
-      let (i, found) = native._find(key)
-      if found {
-        continue
-      }
-      native.initializeKey(key, at: i.bucket)
-      count += 1
-    }
-    native.count = count
-
-    return native
-  }
 }
 
-extension _NativeSet where Element: Hashable {
-  /// - parameter idealBucket: The ideal bucket for the element being deleted.
-  /// - parameter bucket: The bucket containing the element to be deleted.
-  /// Precondition: there should be an initialized entry in the specified
-  /// bucket.
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func _delete(idealBucket: Int, bucket: Int) {
-    _sanityCheck(isInitializedEntry(at: bucket), "expected initialized entry")
-
-    // remove the element
-    destroyEntry(at: bucket)
-    self.count -= 1
-
-    // If we've put a hole in a chain of contiguous elements, some
-    // element after the hole may belong where the new hole is.
-    var hole = bucket
-
-    // Find the first bucket in the contiguous chain
-    var start = idealBucket
-    while isInitializedEntry(at: _prev(start)) {
-      start = _prev(start)
-    }
-
-    // Find the last bucket in the contiguous chain
-    var lastInChain = hole
-    var b = _index(after: lastInChain)
-    while isInitializedEntry(at: b) {
-      lastInChain = b
-      b = _index(after: b)
-    }
-
-    // Relocate out-of-place elements in the chain, repeating until
-    // none are found.
-    while hole != lastInChain {
-      // Walk backwards from the end of the chain looking for
-      // something out-of-place.
-      var b = lastInChain
-      while b != hole {
-        let idealBucket = _bucket(self.key(at: b))
-
-        // Does this element belong between start and hole?  We need
-        // two separate tests depending on whether [start, hole] wraps
-        // around the end of the storage
-        let c0 = idealBucket >= start
-        let c1 = idealBucket <= hole
-        if start <= hole ? (c0 && c1) : (c0 || c1) {
-          break // Found it
-        }
-        b = _prev(b)
-      }
-
-      if b == hole { // No out-of-place elements found; we're done adjusting
-        break
-      }
-
-      // Move the found element into the hole
-      moveInitializeEntry(from: self, at: b, toEntryAt: hole)
-      hole = b
-    }
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  mutating func _removeAll() {
-    for b in 0 ..< bucketCount {
-      if isInitializedEntry(at: b) {
-        destroyEntry(at: b)
-      }
-    }
-    count = 0
-  }
-}
-
-extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
-  //
-  // _SetBuffer conformance
-  //
-
-  @inlinable // FIXME(sil-serialize-all)
+extension _NativeSet {
+  @inlinable
   @inline(__always)
-  internal func index(forKey key: Element) -> Index? {
-    if count == 0 {
-      // Fast path that avoids computing the hash of the key.
-      return nil
-    }
-    let (i, found) = _find(key)
-    return found ? i : nil
+  internal func hashValue(for element: Element) -> Int {
+    return element._rawHashValue(seed: _storage._seed)
   }
 
   @inlinable
   @inline(__always)
-  internal func contains(_ member: Element) -> Bool {
-    if count == 0 {
-      // Fast path that avoids computing the hash of the key.
-      return false
-    }
-    return _find(member).found
+  internal func find(_ element: Element) -> (index: Index, found: Bool) {
+    return find(element, hashValue: self.hashValue(for: element))
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  internal func maybeGet(_ key: Element) -> Element? {
-    if count == 0 {
-      // Fast path that avoids computing the hash of the key.
+  /// Search for a given element, assuming it has the specified hash value.
+  ///
+  /// If the element is not present in this set, return the position where it
+  /// could be inserted.
+  @inlinable
+  internal func find(
+    _ element: Element,
+    hashValue: Int
+  ) -> (index: Index, found: Bool) {
+    var candidates = hashTable.lookup(hashValue: hashValue)
+    while true {
+      let (index, found) = candidates.next()
+      if !found || uncheckedElement(at: index) == element {
+        return (index, found)
+      }
+    }
+  }
+}
+
+extension _NativeSet {
+  @inlinable
+  internal func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
+    where S.Element == Element {
+    // Allocate a temporary bitmap to mark elements in self that we've seen in
+    // possibleSuperset.
+    var bitmap = _Bitmap(bitCount: self.entryCount)
+    var seen = 0
+    for element in possibleSuperset {
+      // Found a new element of self in possibleSuperset.
+      let (index, found) = find(element)
+      guard found else { continue }
+      if bitmap._uncheckedInsert(index.offset) {
+        seen += 1
+        if seen == self.count {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  @inlinable
+  internal func isStrictSubset<S: Sequence>(of possibleSuperset: S) -> Bool
+    where S.Element == Element {
+    // Allocate a temporary bitmap to mark elements in self that we've seen in
+    // possibleSuperset.
+    var bitmap = _Bitmap(bitCount: self.entryCount)
+    var seen = 0
+    var isStrict = false
+    for element in possibleSuperset {
+      let (index, found) = find(element)
+      guard found else {
+        if !isStrict {
+          isStrict = true
+          if seen == self.count { return true }
+        }
+        continue
+      }
+      if bitmap._uncheckedInsert(index.offset) {
+        // Found a new element of self in possibleSuperset.
+        seen += 1
+        if seen == self.count && isStrict {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  @inlinable
+  internal func isStrictSuperset<S: Sequence>(of possibleSubset: S) -> Bool
+    where S.Element == Element {
+    // Allocate a temporary bitmap to mark elements in self that we've seen in
+    // possibleStrictSubset.
+    var bitmap = _Bitmap(bitCount: self.entryCount)
+    var seen = 0
+    for element in possibleSubset {
+      let (index, found) = find(element)
+      guard found else { return false }
+      if bitmap._uncheckedInsert(index.offset) {
+        // Found a new element of possibleSubset in self.
+        seen += 1
+        if seen == self.count {
+          return false
+        }
+      }
+    }
+    return true
+  }
+
+  @inlinable
+  internal func bitmap<S: Sequence>(
+    markingElementsIn other: S
+  ) -> (bitmap: _Bitmap, count: Int)
+  where S.Element == Element {
+    var bitmap = _Bitmap(bitCount: self.entryCount)
+    var count = 0
+    for element in other {
+      let (index, found) = find(element)
+      if found, bitmap._uncheckedInsert(index.offset) {
+        count += 1
+      }
+    }
+    return (bitmap, count)
+  }
+
+  @inlinable
+  internal mutating func formUnion<S: Sequence>(_ other: S, isUnique: Bool)
+    where S.Element == Element {
+    var isUnique = isUnique
+    if other is Set<Element> {
+      // When `other` is also a set, then max(count, other.count) is a lower
+      // bound on the result's element count.
+      let c = other.underestimatedCount
+      if c > count {
+        isUnique = ensureUnique(isUnique: isUnique, capacity: c).reallocated
+      }
+    }
+    for element in other {
+      let (inserted, _) = _insert(element, isUnique: isUnique)
+      isUnique = isUnique || inserted
+    }
+  }
+
+  @inlinable
+  internal func subtracting<S: Sequence>(_ other: S) -> _NativeSet
+    where S.Element == Element {
+    // Rather than directly creating a new set, mark common elements in a bitmap
+    // first. This ensures we hash each element (in both sets) only once, and
+    // that we'll have an exact count for the result set, preventing rehashings
+    // during insertions.
+    let (dupes, dupeCount) = bitmap(markingElementsIn: other)
+    if dupeCount == 0 { return self }
+    if dupeCount == self.count { return _NativeSet() }
+    var result = _NativeSet(capacity: self.count - dupeCount)
+    for index in self.indices where !dupes._uncheckedContains(index.offset) {
+      result.insertNew(self.uncheckedElement(at: index))
+    }
+    return result
+  }
+
+  @inlinable
+  internal func intersection<S: Sequence>(_ other: S) -> _NativeSet<Element>
+    where S.Element == Element {
+    // Rather than directly creating a new set, mark common elements in a bitmap
+    // first. This minimizes hashing, and ensures that we'll have an exact count
+    // for the result set, preventing rehashings during insertions.
+    let (dupes, dupeCount) = bitmap(markingElementsIn: other)
+    if dupeCount == 0 { return _NativeSet() }
+    if dupeCount == self.count { return self }
+    if let other = other as? _NativeSet<Element>, dupeCount == other.count {
+      return other
+    }
+    var result = _NativeSet(capacity: dupeCount)
+    for offset in dupes {
+      result.insertNew(self.uncheckedElement(at: Index(offset: offset)))
+    }
+    _sanityCheck(result.count == dupeCount)
+    return result
+  }
+
+  @inlinable
+  internal func symmetricDifference<S: Sequence>(_ other: S) -> _NativeSet
+    where S.Element == Element {
+    // Rather than directly creating a new set, mark common elements from `self`
+    // in a bitmap, and collect distinct elements from `other` in an array.
+    // This minimizes hashing, and ensures that we'll have an exact count for
+    // the result set, preventing rehashings during insertions.
+    var dupes = _Bitmap(bitCount: self.entryCount)
+    var dupeCount = 0
+    var distinctsInOther: [Element] = []
+    for element in other {
+      let (index, found) = find(element)
+      if found {
+        if dupes._uncheckedInsert(index.offset) {
+          dupeCount += 1
+        }
+      } else {
+        distinctsInOther.append(element)
+      }
+    }
+    var result = _NativeSet<Element>(
+      capacity: count - dupeCount + distinctsInOther.count)
+    for index in self.indices where !dupes._uncheckedContains(index.offset) {
+      result.insertNew(self.uncheckedElement(at: index))
+    }
+    for element in distinctsInOther {
+      result.insertNew(element)
+    }
+    return result
+  }
+
+  @inlinable
+  internal func symmetricDifference(_ other: _NativeSet) -> _NativeSet {
+    if self.count < other.count {
+      // Prefer to iterate over the smaller set.
+      return other.symmetricDifference(self)
+    }
+    // Rather than directly creating a new set, mark common elements from `self`
+    // and `other` in two bitmaps.  This minimizes hashing, and ensures that
+    // we'll have an exact count for the result set, preventing rehashings
+    // during insertions.
+    var selfDupes = _Bitmap(bitCount: self.entryCount)
+    var otherDupes = _Bitmap(bitCount: other.entryCount)
+    var dupeCount = 0
+    for otherIndex in other.indices {
+      let (selfIndex, found) = self.find(other.uncheckedElement(at: otherIndex))
+      if found {
+        if !selfDupes._uncheckedInsert(selfIndex.offset) ||
+          !otherDupes._uncheckedInsert(otherIndex.offset) {
+          ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
+        }
+        dupeCount += 1
+      }
+    }
+    var result = _NativeSet<Element>(
+      capacity: self.count + other.count - 2 * dupeCount)
+    for i in self.indices where !selfDupes._uncheckedContains(i.offset) {
+      result.insertNew(self.uncheckedElement(at: i))
+    }
+    for i in other.indices where !otherDupes._uncheckedContains(i.offset) {
+      result.insertNew(other.uncheckedElement(at: i))
+    }
+    return result
+  }
+}
+
+// This function has a highly visible name to make it stand out in stack traces.
+@usableFromInline
+@inline(never)
+internal func ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(
+  _ elementType: Any.Type
+) -> Never {
+  _assertionFailure(
+    "Fatal error",
+    """
+    Duplicate elements of type '\(elementType)' were found in a Set.
+    This usually means either that the type violates Hashable's requirements, or
+    that members of such a set were mutated after insertion.
+    """,
+    flags: _fatalErrorFlags())
+}
+
+extension _NativeSet {
+  @inlinable
+  internal func _unsafeMoveNew(from source: UnsafeMutablePointer<Element>) {
+    _sanityCheck(count + 1 <= capacity)
+    let hashValue = self.hashValue(for: source.pointee)
+    if _isDebugAssertConfiguration() {
+      // In debug builds, perform a full lookup and trap if we detect duplicate
+      // elements -- these imply that the Element type violates Hashable
+      // requirements. This is generally more costly than a direct insertion,
+      // because we'll need to compare elements in case of hash collisions.
+      let (index, found) = find(source.pointee, hashValue: hashValue)
+      guard !found else {
+        ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
+      }
+      hashTable.insert(hashValue: hashValue, at: index)
+      uncheckedInitialize(at: index, to: source.move())
+    } else {
+      let index = hashTable.insertNew(hashValue: hashValue)
+      uncheckedInitialize(at: index, to: source.move())
+    }
+    _storage._count += 1
+  }
+
+  /// Insert a new element into uniquely held storage.
+  /// Storage must be uniquely referenced with adequate capacity.
+  /// The `element` must not be already present in the Set.
+  @inlinable
+  internal mutating func _unsafeInsertNew(_ element: Element) {
+    _sanityCheck(count + 1 <= capacity)
+    let hashValue = self.hashValue(for: element)
+    if _isDebugAssertConfiguration() {
+      // In debug builds, perform a full lookup and trap if we detect duplicate
+      // elements -- these imply that the Element type violates Hashable
+      // requirements. This is generally more costly than a direct insertion,
+      // because we'll need to compare elements in case of hash collisions.
+      let (index, found) = find(element, hashValue: hashValue)
+      guard !found else {
+        ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
+      }
+      hashTable.insert(hashValue: hashValue, at: index)
+      uncheckedInitialize(at: index, to: element)
+    } else {
+      let index = hashTable.insertNew(hashValue: hashValue)
+      uncheckedInitialize(at: index, to: element)
+    }
+    _storage._count += 1
+  }
+
+  /// Insert a new element into uniquely held storage.
+  /// Storage must be uniquely referenced.
+  /// The `element` must not be already present in the Set.
+  @inlinable
+  internal mutating func insertNew(_ element: Element) {
+    _ = ensureUnique(isUnique: true, capacity: count + 1)
+    _unsafeInsertNew(element)
+  }
+}
+
+extension _NativeSet {
+  @inlinable
+  internal mutating func reserveCapacity(_ capacity: Int, isUnique: Bool) {
+    _ = ensureUnique(isUnique: isUnique, capacity: capacity)
+  }
+
+  @inlinable
+  internal mutating func update(
+    with element: Element,
+    isUnique: Bool
+  ) -> Element? {
+    var hashValue = self.hashValue(for: element)
+    var (index, found) = find(element, hashValue: hashValue)
+    let (_, rehashed) = ensureUnique(
+      isUnique: isUnique,
+      capacity: count + (found ? 0 : 1))
+    if rehashed {
+      hashValue = self.hashValue(for: element)
+      (index, found) = find(element, hashValue: hashValue)
+    }
+    if found {
+      let old = (elements + index.offset).move()
+      uncheckedInitialize(at: index, to: element)
+      return old
+    }
+    hashTable.insert(hashValue: hashValue, at: index)
+    uncheckedInitialize(at: index, to: element)
+    _storage._count += 1
+    return nil
+  }
+
+  /// A variant of insert that returns the inserted index rather than the
+  /// corresponding member.
+  @inlinable
+  @discardableResult
+  internal mutating func _insert(
+    _ element: Element,
+    isUnique: Bool
+  ) -> (inserted: Bool, index: Index) {
+    var hashValue = self.hashValue(for: element)
+    var (index, found) = find(element, hashValue: hashValue)
+    if found { return (false, index) }
+    if ensureUnique(isUnique: isUnique, capacity: count + 1).rehashed {
+      hashValue = self.hashValue(for: element)
+      (index, found) = find(element, hashValue: hashValue)
+      guard !found else {
+        ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
+      }
+    }
+    hashTable.insert(hashValue: hashValue, at: index)
+    _storage._count += 1
+    uncheckedInitialize(at: index, to: element)
+    return (true, index)
+  }
+
+  @inlinable
+  internal mutating func insert(
+    _ element: Element,
+    isUnique: Bool
+  ) -> (inserted: Bool, memberAfterInsert: Element) {
+    let (inserted, index) = _insert(element, isUnique: isUnique)
+    if inserted {
+      return (true, element)
+    }
+    return (false, uncheckedElement(at: index))
+  }
+
+  @usableFromInline
+  @_effects(releasenone)
+  internal mutating func _delete(at index: Index, hashValue: Int) {
+    hashTable.delete(hashValue: hashValue, at: index, with: self)
+    _storage._count -= 1
+  }
+
+  @inlinable
+  internal mutating func remove(_ member: Element, isUnique: Bool) -> Element? {
+    var hashValue = self.hashValue(for: member)
+    var (index, found) = find(member, hashValue: hashValue)
+
+    // Fast path: if the key is not present, we will not mutate the set, so
+    // don't force unique buffer.
+    if !found {
       return nil
     }
 
-    let (i, found) = _find(key)
-    if found {
-      return self.key(at: i.bucket)
+    if ensureUnique(isUnique: isUnique, capacity: capacity).rehashed {
+      hashValue = self.hashValue(for: member)
+      (index, found) = find(member, hashValue: hashValue)
+      guard found else {
+        ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
+      }
     }
-    return nil
+
+    let old = (elements + index.offset).move()
+    _delete(at: index, hashValue: hashValue)
+    return old
+  }
+
+  @inlinable
+  internal mutating func remove(at index: Index, isUnique: Bool) -> Element {
+    _precondition(hashTable.isOccupied(index), "Invalid index")
+    let (_, rehashed) = ensureUnique(isUnique: isUnique, capacity: capacity)
+    _sanityCheck(!rehashed)
+
+    let old = (elements + index.offset).move()
+    _delete(at: index, hashValue: self.hashValue(for: old))
+    return old
+  }
+
+  @usableFromInline
+  internal mutating func removeAll(isUnique: Bool) {
+    guard isUnique else {
+      let scale = self._storage._scale
+      let seed = _HashTable.newSeed(forScale: scale)
+      _storage =
+        _SwiftNativeSetStorage<Element>.allocate(scale: scale, seed: seed)
+      return
+    }
+    for index in indices {
+      uncheckedDestroy(at: index)
+    }
+    hashTable.removeAll()
+    _storage._count = 0
   }
 }
 
 #if _runtime(_ObjC)
-/// An NSEnumerator that works with any _NativeSet of verbatim bridgeable
-/// elements. Used by the various NSSet impls.
-final internal class _SwiftSetNSEnumerator<Element>
+/// An NSEnumerator that works with any native Set. Non-verbatim bridged sets
+/// need to supply a _SwiftDeferredNSSet instance to provide access to bridged
+/// values. Used by the various NSSet implementations.
+final internal class _SwiftSetNSEnumerator<Element: Hashable>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
-
   internal var base: _NativeSet<Element>
-  internal var nextIndex: _NativeSet<Element>.Index
-  internal var endIndex: _NativeSet<Element>.Index
+  internal var deferred: _SwiftDeferredNSSet<Element>?
+  internal var nextIndex: _HashTable.Index
+  internal var endIndex: _HashTable.Index
 
   internal override required init() {
     _sanityCheckFailure("don't call this designated initializer")
   }
 
   internal init(_ base: _NativeSet<Element>) {
+    _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = base
-    nextIndex = base.startIndex
-    endIndex = base.endIndex
+    self.deferred = nil
+    self.nextIndex = base.startIndex
+    self.endIndex = base.endIndex
+  }
+
+  internal init(_ deferred: _SwiftDeferredNSSet<Element>) {
+    _sanityCheck(!_isBridgedVerbatimToObjectiveC(Element.self))
+    self.base = deferred.native
+    self.deferred = deferred
+    self.nextIndex = base.startIndex
+    self.endIndex = base.endIndex
+  }
+
+  private func bridgedElement(at index: _HashTable.Index) -> AnyObject {
+    if let deferred = self.deferred {
+      return deferred.bridgedElements[index]
+    }
+    return _bridgeAnythingToObjectiveC(base.uncheckedElement(at: index))
   }
 
   //
@@ -2186,9 +2494,9 @@ final internal class _SwiftSetNSEnumerator<Element>
     if nextIndex == endIndex {
       return nil
     }
-    let key = base.bridgedKey(at: nextIndex)
+    let index = nextIndex
     base.formIndex(after: &nextIndex)
-    return key
+    return self.bridgedElement(at: index)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -2211,11 +2519,9 @@ final internal class _SwiftSetNSEnumerator<Element>
 
     // Return only a single element so that code can start iterating via fast
     // enumeration, terminate it, and continue via NSEnumerator.
-    let key = base.bridgedKey(at: nextIndex)
-    base.formIndex(after: &nextIndex)
-
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
-    unmanagedObjects[0] = key
+    unmanagedObjects[0] = self.bridgedElement(at: nextIndex)
+    base.formIndex(after: &nextIndex)
     state.pointee = theState
     return 1
   }
@@ -2236,7 +2542,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   //
   // Do not access this property directly.
   @nonobjc
-  private var _heapStorageBridged_DoNotUse: AnyObject?
+  private var _bridgedElements_DoNotUse: AnyObject? = nil
 
   /// The unbridged elements.
   internal var native: _NativeSet<Element>
@@ -2246,62 +2552,64 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     super.init()
   }
 
+  deinit {
+    if native.count > 0, let bridged = _bridgedElements {
+      bridged.invalidate(with: native.indices)
+    }
+  }
+
   /// Returns the pointer to the stored property, which contains bridged
   /// Set elements.
   @nonobjc
-  private var _bridgedStoragePtr: UnsafeMutablePointer<AnyObject?> {
-    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
-      to: Optional<AnyObject>.self)
+  private var _bridgedElementsPtr: UnsafeMutablePointer<AnyObject?>
+  {
+    return _getUnsafePointerToStoredProperties(self)
+      .assumingMemoryBound(to: Optional<AnyObject>.self)
   }
 
   /// The buffer for bridged Set elements, if present.
   @nonobjc
-  private var _bridgedStorage: _RawNativeSetStorage? {
-    get {
-      if let ref = _stdlib_atomicLoadARCRef(object: _bridgedStoragePtr) {
-        return unsafeDowncast(ref, to: _RawNativeSetStorage.self)
-      }
-      return nil
+  private var _bridgedElements: _BridgingHashBuffer? {
+    if let ref = _stdlib_atomicLoadARCRef(object: _bridgedElementsPtr) {
+      return unsafeDowncast(ref, to: _BridgingHashBuffer.self)
     }
+    return nil
   }
 
   /// Attach a buffer for bridged Set elements.
   @nonobjc
-  private func _initializeBridgedStorage(_ storage: AnyObject) {
-    _stdlib_atomicInitializeARCRef(object: _bridgedStoragePtr, desired: storage)
+  private func _initializeBridgedElements(
+    _ storage: _BridgingHashBuffer
+  ) -> Bool {
+    return _stdlib_atomicInitializeARCRef(
+      object: _bridgedElementsPtr,
+      desired: storage)
   }
 
   /// Returns the bridged Set values.
-  internal var bridged: _NativeSet<AnyObject> {
-    return _NativeSet(_storage: _bridgedStorage!)
+  @nonobjc
+  internal var bridgedElements: _BridgingHashBuffer {
+    return _bridgedElements!
   }
 
   @nonobjc
   internal func bridgeEverything() {
-    if _fastPath(_bridgedStorage != nil) {
+    if _fastPath(_bridgedElements != nil) {
       return
     }
 
-    // FIXME: rdar://problem/19486139 (split bridged buffers for keys and values)
-    // We bridge keys and values unconditionally here, even if one of them
-    // actually is verbatim bridgeable (e.g. Dictionary<Int, AnyObject>).
-    // Investigate only allocating the buffer for a Set in this case.
-
-    // Create native set for bridged data.
-    let bridged = _NativeSet<AnyObject>(
-      _exactBucketCount: native.bucketCount,
-      unhashable: ())
-
-    // Bridge everything.
-    for i in 0..<native.bucketCount {
-      if native.isInitializedEntry(at: i) {
-        let key = _bridgeAnythingToObjectiveC(native.key(at: i))
-        bridged.initializeKey(key, at: i)
-      }
+    // Allocate and initialize heap storage for bridged objects.
+    let bridged = _BridgingHashBuffer.create(entryCount: native.entryCount)
+    for index in native.indices {
+      let object = _bridgeAnythingToObjectiveC(native.element(at: index))
+      bridged.initialize(at: index, to: object)
     }
 
     // Atomically put the bridged elements in place.
-    _initializeBridgedStorage(bridged._storage)
+    if !_initializeBridgedElements(bridged) {
+      // Lost the race.
+      bridged.invalidate(with: native.indices)
+    }
   }
 
   //
@@ -2324,33 +2632,26 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   }
 
   @objc
-  internal func member(_ object: AnyObject) -> AnyObject? {
-    guard let element =
-      _conditionallyBridgeFromObjectiveC(object, Element.self)
-    else { return nil }
-
-    let (i, found) = native._find(element)
-    if found {
-      bridgeEverything()
-      return bridged.value(at: i.bucket)
-    }
-    return nil
-  }
-
-  @objc
-  internal func objectEnumerator() -> _NSEnumerator {
-    return enumerator()
-  }
-
-  @objc
   internal var count: Int {
     return native.count
   }
 
   @objc
-  internal func enumerator() -> _NSEnumerator {
+  internal func member(_ object: AnyObject) -> AnyObject? {
+    guard let element =
+      _conditionallyBridgeFromObjectiveC(object, Element.self)
+    else { return nil }
+
+    let (index, found) = native.find(element)
+    guard found else { return nil }
     bridgeEverything()
-    return _SwiftSetNSEnumerator<AnyObject>(bridged)
+    return bridgedElements[index]
+  }
+
+  @objc
+  internal func objectEnumerator() -> _NSEnumerator {
+    bridgeEverything()
+    return _SwiftSetNSEnumerator(self)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -2364,7 +2665,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(native.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(native.startIndex.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -2375,7 +2676,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var currIndex = _NativeSet<Element>.Index(bucket: Int(theState.extra.0))
+    var currIndex = _NativeSet<Element>.Index(offset: Int(theState.extra.0))
     let endIndex = native.endIndex
     var stored = 0
 
@@ -2389,24 +2690,22 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
         break
       }
 
-      let bridgedKey = bridged.key(at: currIndex.bucket)
+      let bridgedKey = bridgedElements[currIndex]
       unmanagedObjects[i] = bridgedKey
       stored += 1
       native.formIndex(after: &currIndex)
     }
-    theState.extra.0 = CUnsignedLong(currIndex.bucket)
+    theState.extra.0 = CUnsignedLong(currIndex.offset)
     state.pointee = theState
     return stored
   }
 }
-#else
-final internal class _SwiftDeferredNSSet<Element: Hashable> { }
 #endif
 
 #if _runtime(_ObjC)
 @usableFromInline
 @_fixed_layout
-internal struct _CocoaSet: _SetBuffer {
+internal struct _CocoaSet {
   @usableFromInline
   internal let object: _NSSet
 
@@ -2414,6 +2713,18 @@ internal struct _CocoaSet: _SetBuffer {
   internal init(_ object: _NSSet) {
     self.object = object
   }
+}
+
+extension _CocoaSet: Equatable {
+  @usableFromInline
+  internal static func ==(lhs: _CocoaSet, rhs: _CocoaSet) -> Bool {
+    return _stdlib_NSObject_isEqual(lhs.object, rhs.object)
+  }
+}
+
+extension _CocoaSet: _SetBuffer {
+  @usableFromInline
+  internal typealias Element = AnyObject
 
   @inlinable
   internal var startIndex: Index {
@@ -2427,39 +2738,44 @@ internal struct _CocoaSet: _SetBuffer {
 
   @inlinable
   internal func index(after i: Index) -> Index {
-    return i.successor()
+    var i = i
+    formIndex(after: &i)
+    return i
   }
 
-  @inlinable
+  @usableFromInline
+  @_effects(releasenone)
   internal func formIndex(after i: inout Index) {
-    // FIXME: swift-3-indexing-model: optimize if possible.
-    i = i.successor()
+    _precondition(i.base.object === self.object, "Invalid index")
+    _precondition(i.currentKeyIndex < i.allKeys.value,
+      "Cannot increment endIndex")
+    i.currentKeyIndex += 1
   }
 
-  @inlinable
-  internal func index(forKey key: AnyObject) -> Index? {
+  @usableFromInline
+  internal func index(for element: AnyObject) -> Index? {
     // Fast path that does not involve creating an array of all keys.  In case
     // the key is present, this lookup is a penalty for the slow path, but the
     // potential savings are significant: we could skip a memory allocation and
     // a linear search.
-    if maybeGet(key) == nil {
+    if !contains(element) {
       return nil
     }
 
     let allKeys = _stdlib_NSSet_allObjects(object)
-    var keyIndex = -1
+    var index = -1
     for i in 0..<allKeys.value {
-      if _stdlib_NSObject_isEqual(key, allKeys[i]) {
-        keyIndex = i
+      if _stdlib_NSObject_isEqual(element, allKeys[i]) {
+        index = i
         break
       }
     }
-    _sanityCheck(keyIndex >= 0,
-        "Key was found in fast path, but not found later?")
-    return Index(self, allKeys, keyIndex)
+    _sanityCheck(index >= 0,
+      "Element was found in fast path, but not found later?")
+    return Index(self, allKeys, index)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var count: Int {
     return object.count
   }
@@ -2469,31 +2785,11 @@ internal struct _CocoaSet: _SetBuffer {
     return object.member(element) != nil
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal func assertingGet(at i: Index) -> AnyObject {
+  @usableFromInline
+  internal func element(at i: Index) -> AnyObject {
     let value: AnyObject? = i.allKeys[i.currentKeyIndex]
     _sanityCheck(value != nil, "Item not found in underlying NSSet")
     return value!
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  internal func maybeGet(_ key: AnyObject) -> AnyObject? {
-    return object.member(key)
-  }
-
-  @usableFromInline
-  internal func _toNative<Element: Hashable>(
-    bucketCount: Int
-  ) -> _NativeSet<Element> {
-    var newNativeSet = _NativeSet<Element>(bucketCount: bucketCount)
-    let oldCocoaIterator = _CocoaSet.Iterator(self)
-    while let element = oldCocoaIterator.next() {
-      newNativeSet.unsafeAddNew(
-        key: _forceBridgeFromObjectiveC(element, Element.self))
-      newNativeSet.count += 1
-    }
-    return newNativeSet
   }
 }
 #endif
@@ -2509,22 +2805,14 @@ extension Set {
   }
 }
 
-extension Set._Variant: _SetBuffer {
-  @usableFromInline @_transparent
-  internal var guaranteedNative: Bool {
-    return _canBeClass(Element.self) == 0
-  }
-
+extension Set._Variant {
   @inlinable
+  @inline(__always)
   internal mutating func isUniquelyReferenced() -> Bool {
-    // Note that &self drills down through .native(_NativeSet) to the first
-    // property in _NativeSet, which is the reference to the storage.
-    if _fastPath(guaranteedNative) {
-      return _isUnique_native(&self)
-    }
-
     switch self {
     case .native:
+      // Note that `&self` drills down through `.native(_NativeSet)` to the
+      // first property in `_NativeSet`, which is the reference to the storage.
       return _isUnique_native(&self)
 #if _runtime(_ObjC)
     case .cocoa:
@@ -2537,6 +2825,7 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   internal var asNative: _NativeSet<Element> {
+    @inline(__always)
     get {
       switch self {
       case .native(let nativeSet):
@@ -2547,19 +2836,10 @@ extension Set._Variant: _SetBuffer {
 #endif
       }
     }
+    @inline(__always)
     set {
       self = .native(newValue)
     }
-  }
-
-  @inlinable
-  internal mutating func ensureNative() {
-#if _runtime(_ObjC)
-    if _fastPath(guaranteedNative) { return }
-    if case .cocoa(let cocoaSet) = self {
-      migrateToNative(cocoaSet)
-    }
-#endif
   }
 
 #if _runtime(_ObjC)
@@ -2574,103 +2854,19 @@ extension Set._Variant: _SetBuffer {
   }
 #endif
 
-  /// Return true if self is native.
-  @inlinable
-  internal var _isNative: Bool {
-#if _runtime(_ObjC)
-    switch self {
-    case .native:
-      return true
-    case .cocoa:
-      return false
-    }
-#else
-    return true
-#endif
-  }
-
-  @inline(__always)
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func _ensureUniqueNative(
-    withBucketCount desiredBucketCount: Int
-  ) -> (reallocated: Bool, capacityChanged: Bool) {
-    let oldBucketCount = asNative.bucketCount
-    if oldBucketCount >= desiredBucketCount && isUniquelyReferenced() {
-      return (reallocated: false, capacityChanged: false)
-    }
-
-    let oldNativeSet = asNative
-    var newNativeSet = _NativeSet<Element>(bucketCount: desiredBucketCount)
-    let newBucketCount = newNativeSet.bucketCount
-    for i in 0..<oldBucketCount {
-      if oldNativeSet.isInitializedEntry(at: i) {
-        if oldBucketCount == newBucketCount {
-          let key = oldNativeSet.key(at: i)
-          newNativeSet.initializeKey(key, at: i)
-        } else {
-          let key = oldNativeSet.key(at: i)
-          newNativeSet.unsafeAddNew(key: key)
-        }
-      }
-    }
-    newNativeSet.count = oldNativeSet.count
-
-    self = .native(newNativeSet)
-    return (reallocated: true,
-      capacityChanged: oldBucketCount != newBucketCount)
-  }
-
-  @inline(__always)
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func ensureUniqueNative(
-    withCapacity minimumCapacity: Int
-  ) -> (reallocated: Bool, capacityChanged: Bool) {
-    let bucketCount = _NativeSet<Element>.bucketCount(
-      forCapacity: minimumCapacity,
-      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
-    return ensureUniqueNative(withBucketCount: bucketCount)
-  }
-
-  /// Ensure this we hold a unique reference to a native buffer
-  /// having at least `minimumCapacity` elements.
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func ensureUniqueNative(
-    withBucketCount desiredBucketCount: Int
-  ) -> (reallocated: Bool, capacityChanged: Bool) {
-#if _runtime(_ObjC)
-    // This is in a separate variable to make the uniqueness check work in
-    // unoptimized builds; see https://bugs.swift.org/browse/SR-6437
-    let n = _isNative
-    if n {
-      return _ensureUniqueNative(withBucketCount: desiredBucketCount)
-    }
-
-    switch self {
-    case .native:
-      fatalError("This should have been handled earlier")
-    case .cocoa(let cocoaSet):
-      self = .native(cocoaSet._toNative(bucketCount: desiredBucketCount))
-      return (reallocated: true, capacityChanged: true)
-    }
-#else
-    return _ensureUniqueNative(withBucketCount: desiredBucketCount)
-#endif
-  }
-
-#if _runtime(_ObjC)
-  @usableFromInline
-  internal mutating func migrateToNative(_ cocoaSet: _CocoaSet) {
-    let allocated = ensureUniqueNative(
-      withCapacity: cocoaSet.count).reallocated
-    _sanityCheck(allocated, "failed to allocate native Set buffer")
-  }
-#endif
-
   /// Reserves enough space for the specified number of elements to be stored
   /// without reallocating additional storage.
   @inlinable
   internal mutating func reserveCapacity(_ capacity: Int) {
-    _ = ensureUniqueNative(withCapacity: capacity)
+    switch self {
+    case .native:
+      let isUnique = isUniquelyReferenced()
+      asNative.reserveCapacity(capacity, isUnique: isUnique)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      self = .native(_NativeSet(cocoa, capacity: capacity))
+#endif
+    }
   }
 
   /// The number of elements that can be stored without expanding the current
@@ -2680,12 +2876,89 @@ extension Set._Variant: _SetBuffer {
   /// collection, since any addition will trigger a copy of the elements into
   /// newly allocated storage. For native storage, this is the element count
   /// at which adding any more elements will exceed the load factor.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var capacity: Int {
     switch self {
     case .native:
-      return Int(Double(asNative.bucketCount) /
-        _hashContainerDefaultMaxLoadFactorInverse)
+      return asNative.capacity
+#if _runtime(_ObjC)
+    case .cocoa(let cocoaSet):
+      return cocoaSet.count
+#endif
+    }
+  }
+}
+
+extension Set._Variant: _SetBuffer {
+  @usableFromInline
+  internal typealias Index = Set<Element>.Index
+
+  @inlinable
+  internal var startIndex: Index {
+    switch self {
+    case .native:
+      return Index(_native: asNative.startIndex)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoaSet):
+      return Index(_cocoa: cocoaSet.startIndex)
+#endif
+    }
+  }
+
+  @inlinable
+  internal var endIndex: Index {
+    switch self {
+    case .native:
+      return Index(_native: asNative.endIndex)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoaSet):
+      return Index(_cocoa: cocoaSet.endIndex)
+#endif
+    }
+  }
+
+  @inlinable
+  internal func index(after i: Index) -> Index {
+    switch self {
+    case .native:
+      return Index(_native: asNative.index(after: i._asNative))
+#if _runtime(_ObjC)
+    case .cocoa(let cocoaSet):
+      return Index(_cocoa: cocoaSet.index(after: i._asCocoa))
+#endif
+    }
+  }
+
+  @inlinable
+  internal func formIndex(after i: inout Index) {
+    i = index(after: i)
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func index(for element: Element) -> Index? {
+    switch self {
+    case .native:
+      if let index = asNative.index(for: element) {
+        return Index(_native: index)
+      }
+      return nil
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      let cocoaElement = _bridgeAnythingToObjectiveC(element)
+      if let index = cocoa.index(for: cocoaElement) {
+        return Index(_cocoa: index)
+      }
+      return nil
+#endif
+    }
+  }
+
+  @inlinable
+  internal var count: Int {
+    switch self {
+    case .native:
+      return asNative.count
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
       return cocoaSet.count
@@ -2693,287 +2966,85 @@ extension Set._Variant: _SetBuffer {
     }
   }
 
-  //
-  // _SetBuffer conformance
-  //
-
-  @usableFromInline
-  internal typealias Index = Set<Element>.Index
-
-  @inlinable
-  internal var startIndex: Index {
-    if _fastPath(guaranteedNative) {
-      return ._native(asNative.startIndex)
-    }
-
-    switch self {
-    case .native:
-      return ._native(asNative.startIndex)
-#if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
-      return ._cocoa(cocoaSet.startIndex)
-#endif
-    }
-  }
-
-  @inlinable
-  internal var endIndex: Index {
-    if _fastPath(guaranteedNative) {
-      return ._native(asNative.endIndex)
-    }
-
-    switch self {
-    case .native:
-      return ._native(asNative.endIndex)
-#if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
-      return ._cocoa(cocoaSet.endIndex)
-#endif
-    }
-  }
-
-  @inlinable
-  internal func index(after i: Index) -> Index {
-    if _fastPath(guaranteedNative) {
-      return ._native(asNative.index(after: i._asNative))
-    }
-
-    switch self {
-    case .native:
-      return ._native(asNative.index(after: i._asNative))
-#if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
-      return ._cocoa(cocoaSet.index(after: i._asCocoa))
-#endif
-    }
-  }
-
-  @inlinable
-  internal func formIndex(after i: inout Index) {
-    // FIXME: swift-3-indexing-model: optimize if possible.
-    i = index(after: i)
-  }
-
-  @inlinable
-  @inline(__always)
-  internal func index(forKey key: Element) -> Index? {
-    if _fastPath(guaranteedNative) {
-      if let nativeIndex = asNative.index(forKey: key) {
-        return ._native(nativeIndex)
-      }
-      return nil
-    }
-
-    switch self {
-    case .native:
-      if let nativeIndex = asNative.index(forKey: key) {
-        return ._native(nativeIndex)
-      }
-      return nil
-#if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
-      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
-      if let cocoaIndex = cocoaSet.index(forKey: anyObjectKey) {
-        return ._cocoa(cocoaIndex)
-      }
-      return nil
-#endif
-    }
-  }
-
-  @inlinable
-  internal func assertingGet(at i: Index) -> Element {
-    if _fastPath(guaranteedNative) {
-      return asNative.assertingGet(at: i._asNative)
-    }
-
-    switch self {
-    case .native:
-      return asNative.assertingGet(at: i._asNative)
-#if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
-      let anyObjectValue = cocoaSet.assertingGet(at: i._asCocoa)
-      let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Element.self)
-      return nativeValue
-#endif
-    }
+  @usableFromInline @_transparent
+  internal var guaranteedNative: Bool {
+    return _canBeClass(Element.self) == 0
   }
 
   @inlinable
   @inline(__always)
   internal func contains(_ member: Element) -> Bool {
-    if _fastPath(guaranteedNative) {
+    if guaranteedNative {
       return asNative.contains(member)
     }
     switch self {
-    case .native(let native):
-      return native.contains(member)
+    case .native:
+      return asNative.contains(member)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
-      let cocoaKey = _bridgeAnythingToObjectiveC(member)
-      return cocoa.contains(cocoaKey)
+      return cocoa.contains(_bridgeAnythingToObjectiveC(member))
 #endif
     }
   }
-
-#if _runtime(_ObjC)
-  @inline(never)
-  @usableFromInline
-  internal static func maybeGetFromCocoa(
-    _ cocoaSet: _CocoaSet, forKey key: Element
-  ) -> Element? {
-    let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
-    if let anyObjectValue = cocoaSet.maybeGet(anyObjectKey) {
-      return _forceBridgeFromObjectiveC(anyObjectValue, Element.self)
-    }
-    return nil
-  }
-#endif
 
   @inlinable
-  @inline(__always)
-  internal func maybeGet(_ key: Element) -> Element? {
-    if _fastPath(guaranteedNative) {
-      return asNative.maybeGet(key)
-    }
-
+  internal func element(at i: Index) -> Element {
     switch self {
     case .native:
-      return asNative.maybeGet(key)
+      return asNative.element(at: i._asNative)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
-      return Set._Variant.maybeGetFromCocoa(cocoaSet, forKey: key)
+    case .cocoa(let cocoa):
+      let cocoaMember = cocoa.element(at: i._asCocoa)
+      return _forceBridgeFromObjectiveC(cocoaMember, Element.self)
 #endif
     }
   }
+}
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeUpdate(
-    with key: Element
-  ) -> Element? {
-    var (i, found) = asNative._find(key)
-
-    let minBuckets = found
-      ? asNative.bucketCount
-      : _NativeSet<Element>.bucketCount(
-          forCapacity: asNative.count + 1,
-          maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
-
-    let (_, capacityChanged) = ensureUniqueNative(withBucketCount: minBuckets)
-    if capacityChanged {
-      i = asNative._find(key).pos
-    }
-
-    let old: Element? = found ? asNative.key(at: i.bucket) : nil
-    if found {
-      asNative.setKey(key, at: i.bucket)
-    } else {
-      asNative.initializeKey(key, at: i.bucket)
-      asNative.count += 1
-    }
-
-    return old
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
+extension Set._Variant {
+  @inlinable
   internal mutating func update(with value: Element) -> Element? {
-    if _fastPath(guaranteedNative) {
-      return nativeUpdate(with: value)
-    }
-
     switch self {
     case .native:
-      return nativeUpdate(with: value)
+      let isUnique = self.isUniquelyReferenced()
+      return asNative.update(with: value, isUnique: isUnique)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
-      migrateToNative(cocoaSet)
-      return nativeUpdate(with: value)
+    case .cocoa(let cocoa):
+      // Make sure we have space for an extra element.
+      var native = _NativeSet<Element>(cocoa, capacity: cocoa.count + 1)
+      let old = native.update(with: value, isUnique: true)
+      self = .native(native)
+      return old
 #endif
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
+  @inlinable
   internal mutating func insert(
-    _ key: Element
+    _ element: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
-    ensureNative()
-
-    var (i, found) = asNative._find(key)
-    if found {
-      return (inserted: false, memberAfterInsert: asNative.key(at: i.bucket))
+    switch self {
+    case .native:
+      let isUnique = self.isUniquelyReferenced()
+      return asNative.insert(element, isUnique: isUnique)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      // Make sure we have space for an extra element.
+      var native = _NativeSet<Element>(cocoa, capacity: cocoa.count + 1)
+      let result = native.insert(element, isUnique: true)
+      self = .native(native)
+      return result
+#endif
     }
-
-    let minCapacity = asNative.count + 1
-    let (_, capacityChanged) = ensureUniqueNative(withCapacity: minCapacity)
-
-    if capacityChanged {
-      i = asNative._find(key).pos
-    }
-
-    asNative.initializeKey(key, at: i.bucket)
-    asNative.count += 1
-
-    return (inserted: true, memberAfterInsert: key)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeRemove(_ member: Element) -> Element? {
-    var idealBucket = asNative._bucket(member)
-    var (index, found) = asNative._find(member, startBucket: idealBucket)
-
-    // Fast path: if the key is not present, we will not mutate the set,
-    // so don't force unique buffer.
-    if !found {
-      return nil
-    }
-
-    // This is in a separate variable to make the uniqueness check work in
-    // unoptimized builds; see https://bugs.swift.org/browse/SR-6437
-    let bucketCount = asNative.bucketCount
-    let (_, capacityChanged) = ensureUniqueNative(withBucketCount: bucketCount)
-    var native = asNative
-    if capacityChanged {
-      idealBucket = native._bucket(member)
-      (index, found) = native._find(member, startBucket: idealBucket)
-      _sanityCheck(found, "key was lost during buffer migration")
-    }
-    let old = native.key(at: index.bucket)
-    native._delete(idealBucket: idealBucket, bucket: index.bucket)
-    return old
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeRemove(
-    at nativeIndex: _NativeSet<Element>.Index
-  ) -> Element {
-    // This is in a separate variable to make the uniqueness check work in
-    // unoptimized builds; see https://bugs.swift.org/browse/SR-6437
-    let bucketCount = asNative.bucketCount
-    // The provided index should be valid, so we will always mutating the
-    // set buffer.  Request unique buffer.
-    _ = ensureUniqueNative(withBucketCount: bucketCount)
-    var native = asNative
-
-    let result = native.assertingGet(at: nativeIndex)
-    let key = result
-
-    let idealBucket = native._bucket(key)
-    native._delete(idealBucket: idealBucket, bucket: nativeIndex.bucket)
-    return result
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @discardableResult
   internal mutating func remove(at index: Index) -> Element {
-    if _fastPath(guaranteedNative) {
-      return nativeRemove(at: index._asNative)
-    }
-
     switch self {
     case .native:
-      return nativeRemove(at: index._asNative)
+      let isUnique = isUniquelyReferenced()
+      return asNative.remove(at: index._asNative, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
       // We have to migrate the data first.  But after we do so, the Cocoa
@@ -2982,97 +3053,173 @@ extension Set._Variant: _SetBuffer {
       // FIXME(performance): fuse data migration and element deletion into one
       // operation.
       let index = index._asCocoa
-      let cocoaMember: AnyObject = index.allKeys[index.currentKeyIndex]
-      migrateToNative(cocoaSet)
-      let member = _forceBridgeFromObjectiveC(cocoaMember, Element.self)
-      let old = nativeRemove(member)
-      _sanityCheck(member == old, "bridging did not preserve equality")
-      return member
+      let cocoaMember = index.allKeys[index.currentKeyIndex]
+      var native = _NativeSet<Element>(cocoaSet)
+      let nativeMember = _forceBridgeFromObjectiveC(cocoaMember, Element.self)
+      let old = native.remove(nativeMember, isUnique: true)
+      _sanityCheck(nativeMember == old, "bridging did not preserve equality")
+      self = .native(native)
+      return nativeMember
 #endif
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @discardableResult
   internal mutating func remove(_ member: Element) -> Element? {
-    if _fastPath(guaranteedNative) {
-      return nativeRemove(member)
-    }
-
     switch self {
     case .native:
-      return nativeRemove(member)
+      let isUnique = isUniquelyReferenced()
+      return asNative.remove(member, isUnique: isUnique)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
+    case .cocoa(let cocoa):
       let cocoaMember = _bridgeAnythingToObjectiveC(member)
-      if cocoaSet.maybeGet(cocoaMember) == nil {
+      if !cocoa.contains(cocoaMember) {
         return nil
       }
-      migrateToNative(cocoaSet)
-      return nativeRemove(member)
+      var native = _NativeSet<Element>(cocoa)
+      let old = native.remove(member, isUnique: true)
+      self = .native(native)
+      _sanityCheck(old != nil, "bridging did not preserve equality")
+      return old
 #endif
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeRemoveAll() {
-    if !isUniquelyReferenced() {
-        asNative = _NativeSet<Element>(_exactBucketCount: asNative.bucketCount)
-        return
-    }
-
-    // We have already checked for the empty dictionary case and unique
-    // reference, so we will always mutate the dictionary buffer.
-    var native = asNative
-    native._removeAll()
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
-    if count == 0 {
-      return
-    }
-
     if !keepCapacity {
       self = .native(_NativeSet<Element>())
       return
     }
-
-    if _fastPath(guaranteedNative) {
-      nativeRemoveAll()
+    if count == 0 {
       return
     }
 
     switch self {
     case .native:
-      nativeRemoveAll()
+      let isUnique = isUniquelyReferenced()
+      asNative.removeAll(isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
-      self = .native(_NativeSet(minimumCapacity: cocoaSet.count))
+      self = .native(_NativeSet(capacity: cocoaSet.count))
 #endif
     }
   }
+}
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal var count: Int {
-    if _fastPath(guaranteedNative) {
-      return asNative.count
-    }
-
+extension Set._Variant {
+  @inlinable
+  internal mutating func formUnion<S: Sequence>(_ other: S)
+    where S.Element == Element {
     switch self {
     case .native:
-      return asNative.count
+      let isUnique = isUniquelyReferenced()
+      asNative.formUnion(other, isUnique: isUnique)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
-      return cocoaSet.count
+    case .cocoa(let this):
+      if let other = other as? Set<Element>,
+        case .native(var that) = other._variant {
+        // When given a choice, form the union on the native set.
+        that.formUnion(Set(_cocoa: this), isUnique: false)
+        self = .native(that)
+        return
+      }
+      var native = _NativeSet<Element>(this)
+      native.formUnion(other, isUnique: true)
+      self = .native(native)
 #endif
     }
   }
 
+  @inlinable
+  internal func subtracting<S: Sequence>(_ other: S) -> _NativeSet<Element>
+  where S.Element == Element {
+    switch self {
+    case .native(let native):
+      return native.subtracting(other)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      return _NativeSet(cocoa).subtracting(other)
+#endif
+    }
+  }
+
+  @inlinable
+  internal func intersection<S: Sequence>(_ other: S) -> _NativeSet<Element>
+    where S.Element == Element {
+    if let other = other as? Set<Element> {
+      return self.intersection(other)
+    }
+    switch self {
+    case .native(let native):
+      return native.intersection(other)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      return _NativeSet(cocoa).intersection(other)
+#endif
+    }
+  }
+
+  @inlinable
+  internal func intersection(_ other: Set<Element>) -> _NativeSet<Element> {
+    switch (self, other._variant) {
+    case (.native(let this), .native(let that)):
+      // Prefer to iterate over the smaller set.
+      if this.count < that.count {
+        return that.intersection(this)
+      } else {
+        return this.intersection(that)
+      }
+#if _runtime(_ObjC)
+    case (.cocoa(let this), .native(let that)):
+      return that.intersection(Set<Element>(_cocoa: this))
+    case (.native(let this), .cocoa(_)):
+      return this.intersection(other)
+    case (.cocoa(let this), .cocoa(_)):
+      return _NativeSet<Element>(this).intersection(other)
+#endif
+    }
+  }
+
+  @inlinable
+  internal func symmetricDifference<S: Sequence>(
+    _ other: S
+  ) -> _NativeSet<Element> where S.Element == Element {
+    switch self {
+    case .native(let native):
+      return native.symmetricDifference(other)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      return _NativeSet<Element>(cocoa).symmetricDifference(other)
+#endif
+    }
+  }
+
+  @inlinable
+  internal func symmetricDifference(
+    _ other: Set<Element>
+  ) -> _NativeSet<Element> {
+    switch (self, other._variant) {
+    case (.native(let this), .native(let that)):
+      return this.symmetricDifference(that)
+#if _runtime(_ObjC)
+    case (.native(let this), .cocoa(_)):
+      return this.symmetricDifference(other)
+    case (.cocoa(let this), .native(let that)):
+      return that.symmetricDifference(Set<Element>(_cocoa: this))
+    case (.cocoa(let this), .cocoa(_)):
+      return _NativeSet<Element>(this).symmetricDifference(other)
+#endif
+    }
+  }
+}
+
+extension Set._Variant {
   /// Returns an iterator over the elements.
   ///
   /// - Complexity: O(1).
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   internal func makeIterator() -> Set<Element>.Iterator {
     switch self {
@@ -3083,40 +3230,6 @@ extension Set._Variant: _SetBuffer {
       return ._cocoa(cocoaSet.makeIterator())
 #endif
     }
-  }
-}
-
-extension _NativeSet {
-  @_fixed_layout // FIXME(sil-serialize-all)
-  @usableFromInline
-  internal struct Index {
-    @usableFromInline
-    internal var bucket: Int
-
-    @inlinable // FIXME(sil-serialize-all)
-    internal init(bucket: Int) {
-      self.bucket = bucket
-    }
-  }
-}
-
-extension _NativeSet.Index: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func == (
-    lhs: _NativeSet.Index,
-    rhs: _NativeSet.Index
-  ) -> Bool {
-    return lhs.bucket == rhs.bucket
-  }
-}
-
-extension _NativeSet.Index: Comparable {
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func < (
-    lhs: _NativeSet.Index,
-    rhs: _NativeSet.Index
-  ) -> Bool {
-    return lhs.bucket < rhs.bucket
   }
 }
 
@@ -3169,17 +3282,6 @@ extension _CocoaSet {
       self.allKeys = allKeys
       self.currentKeyIndex = currentKeyIndex
     }
-
-    /// Returns the next consecutive value after `self`.
-    ///
-    /// - Precondition: The next value is representable.
-    @inlinable // FIXME(sil-serialize-all)
-    internal func successor() -> Index {
-      // FIXME: swift-3-indexing-model: remove this method.
-      _precondition(
-        currentKeyIndex < allKeys.value, "Cannot increment endIndex")
-      return Index(base, allKeys, currentKeyIndex + 1)
-    }
   }
 }
 
@@ -3218,10 +3320,10 @@ extension Set {
 #endif
     }
 
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline
     internal var _variant: _Variant
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     internal init(_variant: _Variant) {
       self._variant = _variant
     }
@@ -3230,23 +3332,16 @@ extension Set {
 
 extension Set.Index {
   @inlinable
-  internal static func _native(
-    _ index: _NativeSet<Element>.Index
-  ) -> Set.Index {
-    return Set.Index(_variant: .native(index))
+  internal init(_native index: _NativeSet<Element>.Index) {
+    self.init(_variant: .native(index))
   }
 
 #if _runtime(_ObjC)
   @inlinable
-  internal static func _cocoa(_ index: _CocoaSet.Index) -> Set.Index {
-    return Set.Index(_variant: .cocoa(index))
+  internal init(_cocoa index: _CocoaSet.Index) {
+    self.init(_variant: .cocoa(index))
   }
 #endif
-
-  @usableFromInline @_transparent
-  internal var _guaranteedNative: Bool {
-    return _canBeClass(Element.self) == 0
-  }
 
   @usableFromInline @_transparent
   internal var _asNative: _NativeSet<Element>.Index {
@@ -3279,10 +3374,6 @@ extension Set.Index: Equatable {
     lhs: Set<Element>.Index,
     rhs: Set<Element>.Index
   ) -> Bool {
-    if _fastPath(lhs._guaranteedNative) {
-      return lhs._asNative == rhs._asNative
-    }
-
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
       return lhsNative == rhsNative
@@ -3302,10 +3393,6 @@ extension Set.Index: Comparable {
     lhs: Set<Element>.Index,
     rhs: Set<Element>.Index
   ) -> Bool {
-    if _fastPath(lhs._guaranteedNative) {
-      return lhs._asNative < rhs._asNative
-    }
-
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
       return lhsNative < rhsNative
@@ -3328,21 +3415,16 @@ extension Set.Index: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
-    if _fastPath(_guaranteedNative) {
-      hasher.combine(0 as UInt8)
-      hasher.combine(_asNative.bucket)
-      return
-    }
     switch _variant {
     case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.bucket)
+      hasher.combine(nativeIndex.offset)
     case .cocoa(let cocoaIndex):
       hasher.combine(1 as UInt8)
       hasher.combine(cocoaIndex.currentKeyIndex)
     }
   #else
-    hasher.combine(_asNative.bucket)
+    hasher.combine(_asNative.offset)
   #endif
   }
 }
@@ -3351,10 +3433,6 @@ extension _NativeSet: Sequence {
   @usableFromInline
   @_fixed_layout
   internal struct Iterator {
-    // For native buffer, we keep two indices to keep track of the iteration
-    // progress and the buffer owner to make the buffer non-uniquely
-    // referenced.
-    //
     // Iterator is iterating over a frozen view of the collection
     // state, so it should keep its own reference to the buffer.
     @usableFromInline
@@ -3382,7 +3460,7 @@ extension _NativeSet.Iterator: IteratorProtocol {
   @inlinable
   internal mutating func next() -> Element? {
     guard index != endIndex else { return nil }
-    let result = base.assertingGet(at: index)
+    let result = base.uncheckedElement(at: index)
     base.formIndex(after: &index)
     return result
   }
@@ -3432,6 +3510,7 @@ extension _CocoaSet: Sequence {
   }
 
   @usableFromInline
+  @_effects(releasenone)
   internal func makeIterator() -> Iterator {
     return Iterator(self)
   }
@@ -3523,11 +3602,6 @@ extension Set.Iterator {
 #endif
 
   @usableFromInline @_transparent
-  internal var _guaranteedNative: Bool {
-    return _canBeClass(Element.self) == 0
-  }
-
-  @usableFromInline @_transparent
   internal var _asNative: _NativeSet<Element>.Iterator {
     get {
       switch _variant {
@@ -3553,10 +3627,6 @@ extension Set.Iterator: IteratorProtocol {
   @inlinable
   @inline(__always)
   public mutating func next() -> Element? {
-    if _fastPath(_guaranteedNative) {
-      return _asNative.next()
-    }
-
     switch _variant {
     case .native:
       return _asNative.next()
@@ -3598,34 +3668,28 @@ public struct _SetBuilder<Element: Hashable> {
   internal var _target: _NativeSet<Element>
   @usableFromInline
   internal let _requestedCount: Int
-  @usableFromInline
-  internal var _actualCount: Int
 
   @inlinable
   public init(count: Int) {
-    _target = _NativeSet(minimumCapacity: count)
+    _target = _NativeSet(capacity: count)
     _requestedCount = count
-    _actualCount = 0
   }
 
   @inlinable
   public mutating func add(member: Element) {
-    _target.unsafeAddNew(key: member)
-    _actualCount += 1
+    _precondition(_target.count < _requestedCount,
+      "Can't add more members than promised")
+    _target.insertNew(member)
   }
 
   @inlinable
   public mutating func take() -> Set<Element> {
-    _precondition(_actualCount >= 0,
+    _precondition(_target.capacity > 0 || _requestedCount == 0,
       "Cannot take the result twice")
-    _precondition(_actualCount == _requestedCount,
+    _precondition(_target.count == _requestedCount,
       "The number of members added does not match the promised count")
 
-    // Finish building the `Set`.
-    _target.count = _actualCount
-
     // Prevent taking the result twice.
-    _actualCount = -1
     var result = _NativeSet<Element>()
     swap(&result, &_target)
     return Set(_native: result)
@@ -3647,7 +3711,7 @@ extension Set {
 
   /// The total number of elements that the set can contain without
   /// allocating new storage.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var capacity: Int {
     return _variant.capacity
   }
@@ -3686,27 +3750,22 @@ extension Set {
     }
   }
 
-  /// Returns the native Dictionary hidden inside this NSDictionary;
-  /// returns nil otherwise.
+  /// Returns the native `Set` hidden inside the given `NSSet` instance; returns
+  /// `nil` otherwise.
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ s: AnyObject
   ) -> Set<Element>? {
-
     // Try all three NSSet impls that we currently provide.
-
     if let deferred = s as? _SwiftDeferredNSSet<Element> {
       return Set(_native: deferred.native)
     }
-
-    if let nativeStorage = s as? _HashableTypedNativeSetStorage<Element> {
-      return Set(_native: _NativeSet(_storage: nativeStorage))
+    if let nativeStorage = s as? _SwiftNativeSetStorage<Element> {
+      return Set(_native: _NativeSet(nativeStorage))
     }
-
-    if s === _RawNativeSetStorage.empty {
+    if s === _SwiftRawSetStorage.empty {
       return Set()
     }
-
-    // FIXME: what if `s` is native storage, but for different key/value type?
+    // FIXME: what if `s` is native storage, but for different element type?
     return nil
   }
 }
@@ -3714,3 +3773,143 @@ extension Set {
 
 public typealias SetIndex<Element: Hashable> = Set<Element>.Index
 public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
+
+extension Set {
+  // FIXME: Remove
+  public // @testable performance metrics
+  var _stats: (maxLookups: Int, averageLookups: Double, maxCollisions: Int, averageCollisions: Double)? {
+    guard case .native(let native) = _variant else { return nil }
+    guard native.count > 0 else { return (0, 0, 0, 0) }
+    defer { _fixLifetime(self) }
+    var maxLookups = 0
+    var sumLookups = 0
+    var maxCollisions = 0
+    var sumCollisions = 0
+    for i in native.indices {
+      let stats = native.stats(ofElementAt: i)
+      maxLookups = Swift.max(maxLookups, stats.displacement + 1)
+      sumLookups += stats.displacement + 1
+      maxCollisions = Swift.max(maxCollisions, stats.collisions)
+      sumCollisions += stats.collisions
+    }
+    return (
+      maxLookups,
+      Double(sumLookups) / Double(count),
+      maxCollisions,
+      Double(sumCollisions) / Double(count))
+  }
+}
+
+extension _NativeSet {
+  internal func stats(
+    ofElementAt index: Index
+  ) -> (displacement: Int, collisions: Int) {
+    let element = uncheckedElement(at: index)
+    let hashValue = self.hashValue(for: element)
+    let ideal = hashTable._idealBucket(forHashValue: hashValue)
+    let delta = ideal <= index.bucket
+      ? index.bucket - ideal
+      : index.bucket + _storage._bucketCount - ideal
+    var i = Index(bucket: ideal, slot: .start)
+    var collisions = 0
+    while i != index {
+      if hashTable[i] == _HashTable.Entry(forHashValue: hashValue) {
+        collisions += 1
+      }
+      i.offset = (i.offset + 1) & (entryCount - 1)
+    }
+    return (delta, collisions)
+  }
+}
+
+extension _NativeSet {
+  // FIXME: Remove
+  @usableFromInline
+  internal func _dump() -> String {
+    var result = ""
+    defer { _fixLifetime(self) }
+    let bitPattern = String(unsafeBitCast(self, to: UInt.self), radix: 16)
+    result += "Native set of \(Element.self) at 0x\(bitPattern)\n"
+    result += "  count: \(self.count)\n"
+    result += "  capacity: \(self.capacity)\n"
+    result += "  entryCount: \(self.entryCount)\n"
+    result += "  scale: \(self._storage._scale)\n"
+    result += "  bucketCount: \(hashTable.bucketCount)\n"
+    for b in 0 ..< hashTable.bucketCount {
+      result += "  (\(b)): \(String(hashTable.buckets[b]._value, radix: 16))\n"
+    }
+    for i in indices {
+      let element = uncheckedElement(at: i)
+      let hashValue = self.hashValue(for: element)
+      let stats = self.stats(ofElementAt: i)
+      let h = String(UInt(bitPattern: hashValue), radix: 16)
+      let hl = String(hashTable[i].payload, radix: 16)
+      result += "  <\(i.offset)> "
+      result += "delta: \(stats.displacement) (\(stats.collisions) coll) "
+      result += "hash: \(hl)/\(h): "
+      result += "\(element)\n"
+    }
+    return result
+  }
+}
+
+#if _runtime(_ObjC)
+extension _CocoaSet {
+  // FIXME: Remove
+  internal func _dump() -> String {
+    let bits = String(unsafeBitCast(self, to: UInt.self), radix: 16)
+    return "Cocoa set of \(Element.self) at 0x\(bits)\n"
+  }
+}
+#endif
+
+extension Set {
+  // FIXME: Remove
+  public func _dump() {
+    switch _variant {
+    case .native(let native):
+      print("\(native._dump())")
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      print("\(cocoa._dump())")
+#endif
+    }
+  }
+}
+
+extension Set {
+  // FIXME: Remove
+  public // @testable
+  func _invariantCheck() {
+#if INTERNAL_CHECKS_ENABLED
+    guard case .native(let native) = self._variant else {
+      return
+    }
+    native._invariantCheck()
+#endif
+  }
+}
+
+extension _NativeSet {
+  // FIXME: Remove
+  @usableFromInline // @testable
+  internal func _invariantCheck() {
+#if INTERNAL_CHECKS_ENABLED
+    _sanityCheck(
+      _storage === _SwiftRawSetStorage.empty ||
+      _isValidAddress(UInt(bitPattern: _storage._rawElements)),
+      "Invalid rawElements pointer")
+    _sanityCheck(count >= 0 && count < entryCount,
+      "Invalid Set count")
+    _sanityCheck(capacity == _HashTable.capacity(forScale: _storage._scale),
+      "Invalid Set capacity")
+    _sanityCheck(capacity >= 0 && capacity < entryCount,
+      "Set's capacity is inconsistent with its entryCount")
+    _sanityCheck(count <= capacity,
+      "Set count exceeds its capacity")
+    let observedCount = hashTable._invariantCheck(with: self)
+    _sanityCheck(observedCount == count,
+      "Hash table count doesn't match the number of occupied entries")
+#endif
+  }
+}

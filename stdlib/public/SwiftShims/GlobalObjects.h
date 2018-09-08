@@ -54,10 +54,12 @@ struct _SwiftDictionaryBodyStorage {
 };
 
 struct _SwiftSetBodyStorage {
-  __swift_intptr_t capacity;
-  __swift_intptr_t count;
-  struct _SwiftUnsafeBitMap initializedEntries;
-  void *keys;
+  __swift_uint64_t count;
+  __swift_uint64_t capacity;
+  __swift_uint64_t scale;
+  __swift_uint64_t seed0;
+  __swift_uint64_t seed1;
+  void *rawElements;
 };
 
 struct _SwiftEmptyDictionaryStorage {

@@ -61,7 +61,6 @@ func _deallocateUninitializedArray<Element>(
 // Utility method for collections that wish to implement CustomStringConvertible
 // and CustomDebugStringConvertible using a bracketed list of elements,
 // like an array.
-@inlinable // FIXME(sil-serialize-all)
 internal func _makeCollectionDescription<C: Collection>
   (for items: C, withTypeName type: String?) -> String {
   var result = ""
