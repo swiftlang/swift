@@ -354,16 +354,14 @@ function(_compile_swift_files
   set(apinote_files)
 
   foreach(apinote_module ${SWIFTFILE_API_NOTES})
-    set(apinote_file "${module_dir}/${apinote_module}.apinotesc")
+    set(apinote_file "${module_dir}/${apinote_module}.apinotes")
     set(apinote_input_file
       "${SWIFT_API_NOTES_PATH}/${apinote_module}.apinotes")
 
     list(APPEND command_create_apinotes
       COMMAND
-      "${swift_compiler_tool}" "-apinotes" "-yaml-to-binary"
-      "-o" "${apinote_file}"
-      "-target" "${SWIFT_SDK_${SWIFTFILE_SDK}_ARCH_${SWIFTFILE_ARCHITECTURE}_TRIPLE}"
-      "${apinote_input_file}")
+      "${CMAKE_COMMAND}" "-E" "copy_if_different"
+      "${apinote_input_file}" "${apinote_file}")
     list(APPEND depends_create_apinotes "${apinote_input_file}")
 
     list(APPEND apinote_files "${apinote_file}")
@@ -447,10 +445,9 @@ function(_compile_swift_files
         COMMAND ""
         OUTPUT ${apinotes_outputs}
         DEPENDS
-          ${swift_compiler_tool_dep}
           ${depends_create_apinotes}
           ${obj_dirs_dependency_target}
-        COMMENT "Generating API notes ${first_output}")
+        COMMENT "Copying API notes for ${first_output}")
   endif()
 
   # Then we can compile both the object files and the swiftmodule files
