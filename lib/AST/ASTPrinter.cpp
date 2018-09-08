@@ -81,6 +81,15 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.SkipImports = true;
   result.OmitNameOfInaccessibleProperties = true;
 
+  result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
+    auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
+    if (!AFD) return;
+    if (!AFD->getAttrs().hasAttribute<InlinableAttr>())
+      return;
+    SmallString<128> scratch;
+    printer << " " << AFD->getBodyStringRepresentation(scratch);
+  };
+
   class ShouldPrintForTextualInterface : public ShouldPrintChecker {
     bool shouldPrint(const Decl *D, const PrintOptions &options) override {
       // Skip anything that isn't 'public' or '@usableFromInline'.
@@ -1630,26 +1639,32 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       Printer << " ";
       Printer.printKeyword(getAccessorLabel(Accessor));
     } else {
-      Printer.printNewline();
-      IndentRAII IndentMore(*this);
+      {
+        IndentRAII IndentMore(*this);
+        indent();
+        visit(Accessor);
+      }
       indent();
-      visit(Accessor);
+      Printer.printNewline();
     }
   };
 
-  Printer << " {";
   if ((PrintAbstract ||
        (impl.getReadImpl() == ReadImplKind::Get && ASD->getGetter())) &&
       !ASD->supportsMutation() && !ASD->isGetterMutating() &&
       PrintAccessorBody && !Options.FunctionDefinitions) {
     // Omit the 'get' keyword. Directly print getter
     if (auto BodyFunc = Options.FunctionBody) {
-      Printer.printNewline();
-      IndentRAII IndentBody(*this);
-      indent();
-      Printer << BodyFunc(ASD->getGetter());
+      BodyFunc(ASD->getGetter(), Printer);
     }
-  } else if (PrintAbstract) {
+    Printer.printNewline();
+    indent();
+    return;
+  }
+
+  Printer << " {";
+  Printer.printNewline();
+  if (PrintAbstract) {
     PrintAccessor(ASD->getGetter());
     if (ASD->supportsMutation())
       PrintAccessor(ASD->getSetter());
@@ -1693,12 +1708,13 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       break;
     }
   }
-  if (PrintAccessorBody) {
-    Printer.printNewline();
-    indent();
-  } else
+
+  if (!PrintAccessorBody)
     Printer << " ";
+
   Printer << "}";
+  Printer.printNewline();
+  indent();
 }
 
 void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
@@ -2497,7 +2513,6 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
       [&]{
         Printer << getAccessorLabel(decl);
       });
-    Printer << " {";
     break;
   case AccessorKind::Set:
   case AccessorKind::WillSet:
@@ -2515,24 +2530,16 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
           }
         }
       });
-    Printer << " {";
   }
   if (auto BodyFunc = Options.FunctionBody) {
-    {
-      IndentRAII IndentBody(*this);
-      indent();
-      Printer.printNewline();
-      Printer << BodyFunc(decl);
-    }
+    BodyFunc(decl, Printer);
     indent();
-    Printer.printNewline();
   } else if (Options.FunctionDefinitions && decl->getBody()) {
     if (printASTNodes(decl->getBody()->getElements())) {
       Printer.printNewline();
       indent();
     }
   }
-  Printer << "}";
 }
 
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
@@ -2605,17 +2612,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   }
 
   if (auto BodyFunc = Options.FunctionBody) {
-    Printer << " {";
-    Printer.printNewline();
-    {
-      IndentRAII IndentBody(*this);
-      indent();
-      Printer << BodyFunc(decl);
-    }
+    BodyFunc(decl, Printer);
     indent();
-    Printer.printNewline();
-    Printer << "}";
-
   } else if (Options.FunctionDefinitions && decl->getBody()) {
     Printer << " ";
     visit(decl->getBody());
@@ -2789,16 +2787,8 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   printGenericDeclGenericRequirements(decl);
 
   if (auto BodyFunc = Options.FunctionBody) {
-    Printer << " {";
-    {
-      Printer.printNewline();
-      IndentRAII IndentBody(*this);
-      indent();
-      Printer << BodyFunc(decl);
-    }
+    BodyFunc(decl, Printer);
     indent();
-    Printer.printNewline();
-    Printer << "}";
   } else if (Options.FunctionDefinitions && decl->getBody()) {
     Printer << " ";
     visit(decl->getBody());

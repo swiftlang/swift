@@ -14,6 +14,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Stmt.h"
 #include "swift/Parse/Lexer.h"
 
 #include "llvm/ADT/SmallVector.h"
@@ -121,26 +122,33 @@ struct ExtractInactiveRanges : public ASTWalker {
 };
 } // end anonymous namespace
 
-StringRef swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
-                                      SmallVectorImpl<char> &scratch) {
+StringRef swift::extractInlinableBodyText(const AbstractFunctionDecl *func,
+                                          SmallVectorImpl<char> &scratch) {
+  auto &sm = func->getASTContext().SourceMgr;
+  return extractInlinableText(sm, func->getBody(), scratch);
+}
+
+StringRef
+swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
+                            SmallVectorImpl<char> &scratch) {
   // Extract inactive ranges from the text of the node.
   ExtractInactiveRanges extractor(sourceMgr);
   node.walk(extractor);
 
+  SourceRange fullRange = node.getSourceRange();
+
   // If there were no inactive ranges, then there were no #if configs.
   // Return an unowned buffer directly into the source file.
   if (extractor.ranges.empty()) {
-    auto range =
-      Lexer::getCharSourceRangeFromSourceRange(
-        sourceMgr, node.getSourceRange());
+    auto range = Lexer::getCharSourceRangeFromSourceRange(sourceMgr, fullRange);
     return sourceMgr.extractText(range);
   }
 
   // Begin piecing together active code ranges.
 
   // Get the full start and end of the provided node, as character locations.
-  SourceLoc start = node.getStartLoc();
-  SourceLoc end = Lexer::getLocForEndOfToken(sourceMgr, node.getEndLoc());
+  SourceLoc start = fullRange.Start;
+  SourceLoc end = Lexer::getLocForEndOfToken(sourceMgr, fullRange.End);
   for (auto &range : extractor.getSortedRanges()) {
     // Add the text from the current 'start' to this ignored range's start.
     auto charRange = CharSourceRange(sourceMgr, start, range.getStart());

@@ -5428,7 +5428,7 @@ StringRef AbstractFunctionDecl::getBodyStringRepresentation(
   assert(body && !body->isImplicit() &&
          "can't get string representation of function with implicit body");
 
-  return extractInlinableText(getASTContext().SourceMgr, body, scratch);
+  return extractInlinableBodyText(this, scratch);
 }
 
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,

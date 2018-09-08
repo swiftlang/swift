@@ -2394,7 +2394,13 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.AccessFilter = AccessLevel::Private;
     Options.PrintAccess = false;
     Options.SkipAttributes = true;
-    Options.FunctionBody = [](const ValueDecl *VD) { return getCodePlaceholder(); };
+    Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
+      Printer << " {";
+      Printer.printNewline();
+      Printer << getCodePlaceholder();
+      Printer.printNewline();
+      Printer << "}";
+    };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
     if (!Adopter->isExtensionContext()) {

@@ -14,12 +14,17 @@
 #define SWIFT_AST_INLINABLETEXT_H
 
 #include "swift/AST/ASTNode.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 class SourceManager;
+class AbstractFunctionDecl;
+
+StringRef extractInlinableBodyText(const AbstractFunctionDecl *func,
+                                   SmallVectorImpl<char> &scratch);
 
 /// Extracts the text of this ASTNode from the source buffer, ignoring
 /// all #if declarations and clauses except the elements that are active.
