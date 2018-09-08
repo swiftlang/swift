@@ -908,7 +908,7 @@ public final class _TensorComputation {
           return nil
         }
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-        var newThread: pthread_t?
+        var newThread: pthread_t!
 #else
         var newThread = pthread_t()
 #endif
