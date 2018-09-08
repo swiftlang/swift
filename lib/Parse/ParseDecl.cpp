@@ -4504,8 +4504,8 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
     storage->setInvalid(true);
 
     Pattern *pattern =
-      new (Context) TypedPattern(new (Context) NamedPattern(storage),
-                                 TypeLoc::withoutLoc(ErrorType::get(Context)));
+      TypedPattern::createImplicit(Context, new (Context) NamedPattern(storage),
+                                   ErrorType::get(Context));
     PatternBindingEntry entry(pattern, /*EqualLoc*/ SourceLoc(),
                               /*Init*/ nullptr, /*InitContext*/ nullptr);
     auto binding = PatternBindingDecl::create(Context, StaticLoc,
@@ -5137,7 +5137,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
           }
 
           TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
-                                                           TP->getTypeLoc());
+                                                           TP->getTypeRepr());
           NewTP->setPropagatedType();
           PBDEntries[i-1].setPattern(NewTP);
         }

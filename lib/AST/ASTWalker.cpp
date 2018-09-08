@@ -1571,8 +1571,9 @@ Pattern *Traversal::visitTypedPattern(TypedPattern *P) {
   else
     return nullptr;
   if (!P->isImplicit())
-    if (doIt(P->getTypeLoc()))
-      return nullptr;
+    if (auto *TR = P->getTypeRepr())
+      if (doIt(TR))
+        return nullptr;
   return P;
 }
 

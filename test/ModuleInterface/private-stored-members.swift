@@ -1,43 +1,40 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-interface-path %t.swiftinterface -emit-module -o /dev/null %s
-// RUN: %FileCheck %s < %t.swiftinterface
+// RUN: %FileCheck %s < %t.swiftinterface --check-prefix CHECK --check-prefix COMMON
 
 // RUN: %target-swift-frontend -emit-interface-path %t-resilient.swiftinterface -enable-resilience -emit-module -o /dev/null %s
-// RUN: %FileCheck %s --check-prefix RESILIENT < %t-resilient.swiftinterface
+// RUN: %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON < %t-resilient.swiftinterface
 
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule %t.swiftinterface -disable-objc-attr-requires-foundation-module
-// FIXME(rdar44144435): %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -emit-interface-path - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name Test -emit-interface-path - | %FileCheck %s --check-prefix CHECK --check-prefix COMMON
 
 // RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -enable-resilience %t.swiftinterface -disable-objc-attr-requires-foundation-module
-// FIXME(rdar44144435): %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -enable-resilience -emit-interface-path - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-resilience -emit-interface-path - | %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON
 
 
-// CHECK: struct MyStruct {{{$}}
-// RESILIENT: struct MyStruct {{{$}}
+// COMMON: struct MyStruct {{{$}}
 public struct MyStruct {
-// CHECK-NEXT: var publicVar: Int64{{$}}
-// RESILIENT-NEXT: var publicVar: Int64{{$}}
+// COMMON-NEXT: var publicVar: [[INT64:(Swift\.)?Int64]]{{$}}
   public var publicVar: Int64
 
-// CHECK-NEXT: let publicLet: Bool{{$}}
-// RESILIENT-NEXT: let publicLet: Bool{{$}}
+// COMMON-NEXT: let publicLet: [[BOOL:(Swift\.)?Bool]]{{$}}
   public let publicLet: Bool
 
-// CHECK-NEXT: internal var _: Int64{{$}}
-// RESILIENT-NOT: internal var _: Int64{{$}}
+// CHECK-NEXT: internal var _: [[INT64]]{{$}}
+// RESILIENT-NOT: internal var _: [[INT64]]{{$}}
   var internalVar: Int64
 
-// CHECK-NEXT: internal let _: Bool{{$}}
-// RESILIENT-NOT: internal let _: Bool{{$}}
+// CHECK-NEXT: internal let _: [[BOOL]]{{$}}
+// RESILIENT-NOT: internal let _: [[BOOL]]{{$}}
   let internalLet: Bool
 
-// CHECK-NEXT: private var _: Int64{{$}}
-// RESILIENT-NOT: private var _: Int64{{$}}
+// CHECK-NEXT: private var _: [[INT64]]{{$}}
+// RESILIENT-NOT: private var _: [[INT64]]{{$}}
   private var privateVar: Int64
 
-// CHECK-NEXT: private let _: Bool{{$}}
-// RESILIENT-NOT: private let _: Bool{{$}}
+// CHECK-NEXT: private let _: [[BOOL]]{{$}}
+// RESILIENT-NOT: private let _: [[BOOL]]{{$}}
   private let privateLet: Bool
 
 // CHECK-NOT: private var
@@ -50,39 +47,34 @@ public struct MyStruct {
 // RESILIENT-NOT: private static var
   private static var staticPrivateVar: Int64 = 0
 
-// CHECK-NEXT: var publicEndVar: Int64{{$}}
-// RESILIENT-NEXT: var publicEndVar: Int64{{$}}
+// COMMON: var publicEndVar: [[INT64]]{{$}}
   public var publicEndVar: Int64 = 0
 
-// CHECK: }{{$}}
-// RESILIENT: }{{$}}
+// COMMON: }{{$}}
 }
 
-// CHECK: class MyClass {{{$}}
-// RESILIENT: class MyClass {{{$}}
+// COMMON: class MyClass {{{$}}
 public class MyClass {
-// CHECK-NEXT: var publicVar: Int64{{$}}
-// RESILIENT-NEXT: var publicVar: Int64{{$}}
+// COMMON-NEXT: var publicVar: [[INT64]]{{$}}
   public var publicVar: Int64 = 0
 
-// CHECK-NEXT: let publicLet: Bool{{$}}
-// RESILIENT-NEXT: let publicLet: Bool{{$}}
+// COMMON-NEXT: let publicLet: [[BOOL]]{{$}}
   public let publicLet: Bool = true
 
-// CHECK-NEXT: internal var _: Int64{{$}}
-// RESILIENT-NOT: internal var _: Int64{{$}}
+// CHECK-NEXT: internal var _: [[INT64]]{{$}}
+// RESILIENT-NOT: internal var _: [[INT64]]{{$}}
   var internalVar: Int64 = 0
 
-// CHECK-NEXT: internal let _: Bool{{$}}
-// RESILIENT-NOT: internal let _: Bool{{$}}
+// CHECK-NEXT: internal let _: [[BOOL]]{{$}}
+// RESILIENT-NOT: internal let _: [[BOOL]]{{$}}
   let internalLet: Bool = true
 
-// CHECK-NEXT: private var _: Int64{{$}}
-// RESILIENT-NOT: private var _: Int64{{$}}
+// CHECK-NEXT: private var _: [[INT64]]{{$}}
+// RESILIENT-NOT: private var _: [[INT64]]{{$}}
   private var privateVar: Int64 = 0
 
-// CHECK-NEXT: private let _: Bool{{$}}
-// RESILIENT-NOT: private let _: Bool{{$}}
+// CHECK-NEXT: private let _: [[BOOL]]{{$}}
+// RESILIENT-NOT: private let _: [[BOOL]]{{$}}
   private let privateLet: Bool = true
 
 // CHECK-NOT: private var
@@ -95,12 +87,10 @@ public class MyClass {
 // RESILIENT-NOT: private static var
   private static var staticPrivateVar: Int64 = 0
 
-// CHECK-NEXT: var publicEndVar: Int64{{$}}
-// RESILIENT-NEXT: var publicEndVar: Int64{{$}}
+// COMMON: var publicEndVar: [[INT64]]{{$}}
   public var publicEndVar: Int64 = 0
 
   public init() {}
 
-// CHECK: }{{$}}
-// RESILIENT: }{{$}}
+// COMMON: }{{$}}
 }
