@@ -47,25 +47,21 @@ ComponentStep::Scope::Scope(const ComponentStep &component) : CS(component.CS) {
 }
 
 StepResult SplitterStep::take(bool prevFailed) {
+  SmallVector<SolverStep *, 4> components;
+  computeFollowupSteps(components);
+  /// Wait until all of the component steps are done.
+  return suspend(components);
+}
+
+StepResult SplitterStep::resume(bool prevFailed) {
   // If we came back to this step and previous (one of the components)
   // failed, it means that we can't solve this step either.
   if (prevFailed)
-    return StepResult::failure();
+    return done(/*isSuccess=*/false);
 
-  switch (State) {
-  case StepState::Split: {
-    SmallVector<SolverStep *, 4> nextSteps;
-    computeFollowupSteps(nextSteps);
-
-    State = StepState::Merge;
-    return StepResult::unsolved(nextSteps);
-  }
-
-  case StepState::Merge: {
-    return mergePartialSolutions() ? StepResult::success()
-                                   : StepResult::failure();
-  }
-  }
+  // Otherwise let's try to merge partial soltuions together
+  // and form a complete solution(s) for this split.
+  return done(mergePartialSolutions());
 }
 
 void SplitterStep::computeFollowupSteps(
@@ -190,78 +186,77 @@ bool SplitterStep::mergePartialSolutions() const {
   return anySolutions;
 }
 
+void ComponentStep::setup() {
+  // If this is a single component, there is
+  // no need to preliminary modify constraint system.
+  if (!IsSingleComponent)
+    ComponentScope = llvm::make_unique<Scope>(*this);
+}
+
 StepResult ComponentStep::take(bool prevFailed) {
   // If we came either back to this step and previous
   // (either disjunction or type var) failed, or
   // one of the previous components created by "split"
   // failed, it means that we can't solve this component.
   if (prevFailed)
-    return StepResult::failure();
+    return done(/*isSuccess=*/false);
 
-  if (ComponentState == State::Setup) {
-    // If this is a single component, there is
-    // no need to preliminary modify constraint system.
-    if (!IsSingleComponent)
-      ComponentScope = llvm::make_unique<Scope>(*this);
-
-    if (CS.TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-      log.indent(CS.solverState->depth * 2)
-          << "(solving component #" << Index << "\n";
-    }
-
-    /// Try to figure out what this step is going to be,
-    /// after the scope has been established.
-    auto *disjunction = CS.selectDisjunction();
-    auto bestBindings = CS.determineBestBindings();
-
-    if (bestBindings &&
-        (!disjunction ||
-         (!bestBindings->InvolvesTypeVariables && !bestBindings->FullyBound))) {
-      // Produce a type variable step.
-      return dispatchFollowup(
-          TypeVariableStep::create(CS, *bestBindings, Solutions));
-    } else if (disjunction) {
-      // Produce a disjunction step.
-      return dispatchFollowup(
-          DisjunctionStep::create(CS, disjunction, Solutions));
-    }
-
-    // If there are no disjunctions or type variables to bind
-    // we can't solve this system unless we have free type variables
-    // allowed in the solution.
-    if (!CS.solverState->allowsFreeTypeVariables() ||
-        !CS.hasFreeTypeVariables())
-      return markAsDone(/* success */ false);
-
-    // If this solution is worse than the best solution we've seen so far,
-    // skip it.
-    if (CS.worseThanBestSolution())
-      return markAsDone(/* success */ false);
-
-    // If we only have relational or member constraints and are allowing
-    // free type variables, save the solution.
-    for (auto &constraint : CS.InactiveConstraints) {
-      switch (constraint.getClassification()) {
-      case ConstraintClassification::Relational:
-      case ConstraintClassification::Member:
-        continue;
-      default:
-        return markAsDone(/* success */ false);
-      }
-    }
-
-    auto solution = CS.finalize();
-    if (CS.TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-      log.indent(CS.solverState->depth * 2) << "(found solution)\n";
-    }
-
-    Solutions.push_back(std::move(solution));
-    return markAsDone();
+  if (CS.TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+    log.indent(CS.solverState->depth * 2)
+        << "(solving component #" << Index << "\n";
   }
 
-  assert(ComponentState == State::Filter);
+  /// Try to figure out what this step is going to be,
+  /// after the scope has been established.
+  auto *disjunction = CS.selectDisjunction();
+  auto bestBindings = CS.determineBestBindings();
+
+  if (bestBindings && (!disjunction || (!bestBindings->InvolvesTypeVariables &&
+                                        !bestBindings->FullyBound))) {
+    // Produce a type variable step.
+    return suspend(TypeVariableStep::create(CS, *bestBindings, Solutions));
+  } else if (disjunction) {
+    // Produce a disjunction step.
+    return suspend(DisjunctionStep::create(CS, disjunction, Solutions));
+  }
+
+  // If there are no disjunctions or type variables to bind
+  // we can't solve this system unless we have free type variables
+  // allowed in the solution.
+  if (!CS.solverState->allowsFreeTypeVariables() || !CS.hasFreeTypeVariables())
+    return done(/*isSuccess=*/false);
+
+  // If this solution is worse than the best solution we've seen so far,
+  // skip it.
+  if (CS.worseThanBestSolution())
+    return done(/*isSuccess=*/false);
+
+  // If we only have relational or member constraints and are allowing
+  // free type variables, save the solution.
+  for (auto &constraint : CS.InactiveConstraints) {
+    switch (constraint.getClassification()) {
+    case ConstraintClassification::Relational:
+    case ConstraintClassification::Member:
+      continue;
+    default:
+      return done(/*isSuccess=*/false);
+    }
+  }
+
+  auto solution = CS.finalize();
+  if (CS.TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+    log.indent(CS.solverState->depth * 2) << "(found solution)\n";
+  }
+
+  Solutions.push_back(std::move(solution));
+  return done(/*isSuccess=*/true);
+}
+
+StepResult ComponentStep::resume(bool prevFailed) {
+  if (prevFailed)
+    return done(/*isSuccess=*/false);
 
   // For each of the partial solutions, subtract off the current score.
   // It doesn't contribute.
@@ -273,41 +268,28 @@ StepResult ComponentStep::take(bool prevFailed) {
   // combinations we need to produce; in the common case, down to a single
   // combination.
   filterSolutions(Solutions, /*minimize=*/true);
-  return markAsDone();
+  return done(/*isSuccess=*/true);
+}
+
+void TypeVariableStep::setup() {
+  auto &TC = CS.TC;
+  ++CS.solverState->NumTypeVariablesBound;
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = TC.Context.TypeCheckerDebug->getStream();
+    log.indent(CS.solverState->depth * 2) << "Initial bindings: ";
+    interleave(InitialBindings.begin(), InitialBindings.end(),
+               [&](const Binding &binding) {
+                 log << TypeVar->getString()
+                     << " := " << binding.BindingType->getString();
+               },
+               [&log] { log << ", "; });
+
+    log << '\n';
+  }
 }
 
 StepResult TypeVariableStep::take(bool prevFailed) {
   auto &TC = CS.TC;
-
-  if (ActiveChoice) {
-    AnySolved |= !prevFailed;
-
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = TC.Context.TypeCheckerDebug->getStream();
-      log.indent(CS.solverState->depth * 2) << ")\n";
-    }
-
-    // Rewind back all of the changes made to constraint system.
-    ActiveChoice.reset();
-  } else { // FIXME: I think all this logic can be extracted into setup.
-    ++CS.solverState->NumTypeVariablesBound;
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = TC.Context.TypeCheckerDebug->getStream();
-      log.indent(CS.solverState->depth * 2) << "Initial bindings: ";
-      interleave(InitialBindings.begin(), InitialBindings.end(),
-                 [&](const Binding &binding) {
-                   log << TypeVar->getString()
-                       << " := " << binding.BindingType->getString();
-                 },
-                 [&log] { log << ", "; });
-
-      log << '\n';
-    }
-  }
-
-  if (AnySolved && Producer.needsToComputeNext())
-    return StepResult::success();
-
   while (auto binding = Producer()) {
     // Try each of the bindings in turn.
     ++CS.solverState->NumTypeVariableBindings;
@@ -339,45 +321,45 @@ StepResult TypeVariableStep::take(bool prevFailed) {
       auto scope = llvm::make_unique<Scope>(CS);
       if (binding->attempt(CS)) {
         ActiveChoice = std::move(scope);
-        return StepResult::unsolved(SplitterStep::create(CS, Solutions));
+        // Looks like binding attempt has been successful,
+        // let's try to see if it leads to any solutions.
+        return suspend(SplitterStep::create(CS, Solutions));
       }
     }
   }
 
-  return AnySolved ? StepResult::success() : StepResult::failure();
+  // No more bindings to try, or producer has been short-circuited.
+  return done(/*isSuccess=*/AnySolved);
+}
+
+StepResult TypeVariableStep::resume(bool prevFailed) {
+  assert(ActiveChoice);
+
+  // Rewind back all of the changes made to constraint system.
+  ActiveChoice.reset();
+
+  // If there was no failure in the sub-path it means
+  // that active binding has a solution.
+  AnySolved |= !prevFailed;
+
+  auto &TC = CS.TC;
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = TC.Context.TypeCheckerDebug->getStream();
+    log.indent(CS.solverState->depth * 2) << ")\n";
+  }
+
+  // If there has been at least one solution so far
+  // at a current batch of bindings is done it's a
+  // success because each new batch would be less
+  // and less precise.
+  if (AnySolved && Producer.needsToComputeNext())
+    return done(/*isSuccess=*/true);
+
+  // Attempt next type variable binding.
+  return take(prevFailed);
 }
 
 StepResult DisjunctionStep::take(bool prevFailed) {
-  // If disjunction step is re-taken and there is
-  // an active choice, let's see if it has be solved or not.
-  if (ActiveChoice) {
-    if (CS.TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-      log.indent(CS.solverState->depth) << ")\n";
-    }
-
-    // If choice (sub-path) has failed, it's okay, other
-    // choices have to be attempted regardless, since final
-    // decision could be made only after attempting all
-    // of the choices, so let's just ignore failed ones.
-    if (!prevFailed) {
-      auto &choice = ActiveChoice->second;
-      auto score = getBestScore(Solutions);
-
-      if (!choice.isGenericOperator() && choice.isSymmetricOperator()) {
-        if (!BestNonGenericScore || score < BestNonGenericScore)
-          BestNonGenericScore = score;
-      }
-
-      // Remember the last successfully solved choice,
-      // it would be useful when disjunction is exhausted.
-      LastSolvedChoice = {choice, *score};
-    }
-
-    // Rewind back the constraint system information.
-    ActiveChoice.reset();
-  }
-
   while (auto binding = Producer()) {
     auto &currentChoice = *binding;
 
@@ -407,11 +389,46 @@ StepResult DisjunctionStep::take(bool prevFailed) {
       // Establish the "active" choice which maintains new scope in the
       // constraint system, be be able to rollback all of the changes later.
       ActiveChoice.emplace(std::move(scope), currentChoice);
-      return StepResult::unsolved(SplitterStep::create(CS, Solutions));
+      return suspend(SplitterStep::create(CS, Solutions));
     }
   }
 
-  return LastSolvedChoice ? StepResult::success() : StepResult::failure();
+  return done(/*isSuccess=*/bool(LastSolvedChoice));
+}
+
+StepResult DisjunctionStep::resume(bool prevFailed) {
+  // If disjunction step is re-taken and there should be
+  // active choice, let's see if it has be solved or not.
+  assert(ActiveChoice);
+
+  // Rewind back the constraint system information.
+  ActiveChoice.reset();
+
+  if (CS.TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+    log.indent(CS.solverState->depth) << ")\n";
+  }
+
+  // If choice (sub-path) has failed, it's okay, other
+  // choices have to be attempted regardless, since final
+  // decision could be made only after attempting all
+  // of the choices, so let's just ignore failed ones.
+  if (!prevFailed) {
+    auto &choice = ActiveChoice->second;
+    auto score = getBestScore(Solutions);
+
+    if (!choice.isGenericOperator() && choice.isSymmetricOperator()) {
+      if (!BestNonGenericScore || score < BestNonGenericScore)
+        BestNonGenericScore = score;
+    }
+
+    // Remember the last successfully solved choice,
+    // it would be useful when disjunction is exhausted.
+    LastSolvedChoice = {choice, *score};
+  }
+
+  // Attempt next disjunction choice (if any left).
+  return take(prevFailed);
 }
 
 bool DisjunctionStep::shouldSkipChoice(const TypeBinding &choice) const {
