@@ -699,7 +699,7 @@ static bool validateTypedPattern(TypeChecker &TC,
   if (TP->hasType())
     return TP->getType()->hasError();
 
-  TypeLoc &TL = TP->getTypeLoc();
+  TypeLoc TL = TP->getTypeLoc();
   bool hadError = TC.validateType(TL, resolution, options);
 
   if (hadError) {

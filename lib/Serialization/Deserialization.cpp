@@ -381,9 +381,11 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       return subPattern;
     }
 
-    auto result = new (getContext()) TypedPattern(subPattern.get(), TypeLoc(),
+    auto type = getType(typeID);
+    auto result = new (getContext()) TypedPattern(subPattern.get(),
+                                                  /*typeRepr*/nullptr,
                                                   isImplicit);
-    recordPatternType(result, getType(typeID));
+    recordPatternType(result, type);
     restoreOffset.reset();
     return result;
   }
