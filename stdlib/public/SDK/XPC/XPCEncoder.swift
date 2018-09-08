@@ -16,12 +16,6 @@
 ///
 // -----------------------------------------------------------------------------//
 
-public enum XPCSerializationError: Error {
-    case invalidXPCObjectType
-    case insertionPastEndOfArray
-    case notYetImplemented
-}
-
 public class XPCEncoder: Encoder {
     private enum ContainerKind: String {
         case Keyed
@@ -120,5 +114,12 @@ struct XPCEncodingHelpers {
 
     static func encodeString(_ value: String) -> xpc_object_t {
         return value.withCString({ return xpc_string_create($0) })
+    }
+
+    static func makeEncodingError(_ value: Any, _ codingPath: [CodingKey],
+                                  _ debugDescription: String) -> EncodingError {
+        return EncodingError.invalidValue(value,
+                                          EncodingError.Context(codingPath: codingPath,
+                                                                debugDescription: debugDescription))
     }
 }

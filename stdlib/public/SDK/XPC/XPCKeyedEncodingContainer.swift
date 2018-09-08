@@ -41,7 +41,7 @@ public struct XPCKeyedEncodingContainer<K: CodingKey>: KeyedEncodingContainerPro
     init(referencing encoder: XPCEncoder, wrapping dictionary: xpc_object_t) throws {
         self.encoder = encoder
         guard xpc_get_type(dictionary) == XPC_TYPE_DICTIONARY else {
-            throw XPCSerializationError.invalidXPCObjectType
+            throw XPCEncodingHelpers.makeEncodingError(dictionary, encoder.codingPath, "Internal error")
         }
         self.underlyingMesage = dictionary
     }
@@ -157,8 +157,14 @@ public struct XPCKeyedEncodingContainer<K: CodingKey>: KeyedEncodingContainerPro
         self.encoder.codingPath.append(key)
         defer { self.encoder.codingPath.removeLast() }
 
-        let xpcObject = try XPCEncoder.encode(value, at: self.encoder.codingPath)
-        key.stringValue.withCString({ xpc_dictionary_set_value(self.underlyingMesage, $0, xpcObject) })
+        do {
+            let xpcObject = try XPCEncoder.encode(value, at: self.encoder.codingPath)
+            key.stringValue.withCString({ xpc_dictionary_set_value(self.underlyingMesage, $0, xpcObject) })
+        } catch let error as EncodingError {
+            throw error
+        } catch {
+            throw XPCEncodingHelpers.makeEncodingError(value, self.codingPath, String(describing: error))
+        }
     }
 
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
@@ -173,7 +179,13 @@ public struct XPCKeyedEncodingContainer<K: CodingKey>: KeyedEncodingContainerPro
     }
 
     public mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        fatalError("NYP")
+        self.encoder.codingPath.append(key)
+        defer { self.encoder.codingPath.removeLast() }
+
+        let xpcArray = xpc_array_create(nil, 0)
+        key.stringValue.withCString({ xpc_dictionary_set_value(self.underlyingMesage, $0, xpcArray) })
+        let container = try! XPCUnkeyedEncodingContainer(referencing: self.encoder, wrapping: xpcArray)
+        return container
     }
 
     public mutating func superEncoder() -> Encoder {

@@ -26,7 +26,7 @@ struct XPCSingleValueDictionaryInserter: SingleValueEncodingContainerInsertion {
 
     init(into dictionary: xpc_object_t, at key: CodingKey) throws {
         guard xpc_get_type(dictionary) == XPC_TYPE_DICTIONARY else {
-            throw XPCSerializationError.invalidXPCObjectType
+            throw XPCEncodingHelpers.makeEncodingError(dictionary, [], "Internal error")
         }
         self.dictionary = dictionary
         self.key = key
@@ -43,7 +43,7 @@ struct XPCSingleValueArrayInserter: SingleValueEncodingContainerInsertion {
 
     init(into array: xpc_object_t, at index: Int) throws {
         guard xpc_get_type(array) == XPC_TYPE_ARRAY else {
-            throw XPCSerializationError.invalidXPCObjectType
+            throw XPCEncodingHelpers.makeEncodingError(array, [], "Internal error")
         }
         self.array = array
         self.index = index
@@ -51,7 +51,7 @@ struct XPCSingleValueArrayInserter: SingleValueEncodingContainerInsertion {
 
     mutating func insert(_ value: xpc_object_t) throws {
         guard self.index < xpc_array_get_count(self.array) else {
-            throw XPCSerializationError.insertionPastEndOfArray
+            throw XPCEncodingHelpers.makeEncodingError(value, [], "Internal Error")
         }
         xpc_array_set_value(self.array, self.index, value)
     }

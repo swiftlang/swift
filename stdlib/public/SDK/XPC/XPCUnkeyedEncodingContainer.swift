@@ -41,7 +41,7 @@ public struct XPCUnkeyedEncodingContainer: UnkeyedEncodingContainer {
         self.encoder = encoder
 
         guard xpc_get_type(underlyingMessage) == XPC_TYPE_ARRAY else {
-            throw XPCSerializationError.invalidXPCObjectType
+            throw XPCEncodingHelpers.makeEncodingError(underlyingMessage, encoder.codingPath, "Internal error")
         }
 
         self.underlyingMessage = underlyingMessage
@@ -172,8 +172,14 @@ public struct XPCUnkeyedEncodingContainer: UnkeyedEncodingContainer {
         self.encoder.codingPath.append(XPCCodingKey(intValue: self.count - 1)!)
         defer { self.encoder.codingPath.removeLast() }
 
-        let xpcObject = try XPCEncoder.encode(value, at: self.encoder.codingPath)
-        xpc_array_append_value(self.underlyingMessage, xpcObject)
+        do {
+            let xpcObject = try XPCEncoder.encode(value, at: self.encoder.codingPath)
+            xpc_array_append_value(self.underlyingMessage, xpcObject)
+        } catch let error as EncodingError {
+            throw error
+        } catch {
+            throw XPCEncodingHelpers.makeEncodingError(value, self.codingPath, String(describing: error))
+        }
     }
 
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
