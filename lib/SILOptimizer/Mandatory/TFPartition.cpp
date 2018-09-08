@@ -2717,9 +2717,8 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
   // %4 = apply %2<Float>(..., %1, %3)
   auto tensorId = createIntValue(idNumber, B, loc);
 
-  LLVM_DEBUG(llvm::dbgs() << "Creating host receive with valueTy: ");
-  LLVM_DEBUG(valueTy.print(llvm::dbgs()));
-  LLVM_DEBUG(llvm::dbgs() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Creating host receive with valueTy: " << valueTy
+                          << "\n");
 
   auto scalarType = getTensorHandleElementType(valueTy.getASTType());
   SubstitutionMap subMap;
@@ -2735,9 +2734,8 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
   // The type can also be VariantHandle.
   auto tensorflowValueType =
       convertElementTypeToTensorValueType(valueTy).getASTType();
-  LLVM_DEBUG(llvm::dbgs() << "The created tensor type is: ");
-  LLVM_DEBUG(tensorflowValueType.print(llvm::dbgs()));
-  LLVM_DEBUG(llvm::dbgs() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "The created tensor type is: "
+                          << tensorflowValueType << "\n");
 
   auto metatypeType =
       MetatypeType::get(tensorflowValueType, MetatypeRepresentation::Thick)
@@ -2855,23 +2853,19 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
   auto &ctx = B.getASTContext();
   SubstitutionMap subMap;
   if (isOpaqueHandle(value->getType().getASTType())) {
-    LLVM_DEBUG(llvm::dbgs() << "Sending a variant typed tensor: ");
-    LLVM_DEBUG(value->print(llvm::dbgs()));
-    LLVM_DEBUG(llvm::dbgs() << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Sending a variant typed tensor: " << value << "\n");
     // `subMap` should remain empty.
   } else if (isTensorHandle(value->getType().getASTType())) {
-    LLVM_DEBUG(llvm::dbgs() << "Sending a tensor handle typed tensor: ");
-    LLVM_DEBUG(value->print(llvm::dbgs()));
-    LLVM_DEBUG(llvm::dbgs() << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Sending a tensor handle typed tensor: " << value << "\n");
 
     auto tensorValueTy = value->getType().getASTType();
     auto scalarValueTy = getTensorHandleElementType(tensorValueTy);
     subMap = getSingleSubstitutionMapForElementType(scalarValueTy,
                                                     B.getASTContext());
   } else {
-    LLVM_DEBUG(llvm::dbgs() << "Sending a scalar tensor: ");
-    LLVM_DEBUG(value->print(llvm::dbgs()));
-    LLVM_DEBUG(llvm::dbgs() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Sending a scalar tensor: " << value << "\n");
 
     assert(createScalarTensorFn);
     // Here scalar type is something like $Builtin.FPIEEE32 -- convert it to an
@@ -2947,9 +2941,7 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
                                                         SILType type,
                                                         SILLocation loc) {
   LLVM_DEBUG(llvm::dbgs() << "Looking up send/recv func " << fnName
-                          << " with type ");
-  LLVM_DEBUG(type.print(llvm::dbgs()));
-  LLVM_DEBUG(llvm::dbgs() << "\n");
+                          << " with type " << type << "\n");
 
   auto &ctx = FP.hostFn.getASTContext();
   // If `value` is not receivable, reject the program with diagnostics.

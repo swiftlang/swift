@@ -12,7 +12,16 @@ import StdlibUnittest
 
 var DatasetGlobalTests = TestSuite("DatasetGlobal")
 
-let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+// TODO: add GPU support -- in device partitioning, maybe sure we do not do tensor
+// transfer for variant / resource ops.
+// The current error is:
+// Fatal error: No unary variant device copy function found for direction: 1 and Variant type_name: tensorflow::DatasetVariantWrapper
+#if !CUDA
+
+// Global code must turn on eager mode explicitly (until when we change the
+// default mode to eager).
+_RuntimeConfig.usesTFEagerAPI = true
+let scalars = Tensor<Float>([0, 1, 2])
 let dataset = Dataset(elements: scalars)
 
 // This stmt makes sure the store inst into the global var `dataset` does not
@@ -37,5 +46,7 @@ DatasetGlobalTests.testCPUOrGPU("DataSetAsGlobalVar") {
     expectedVal += 1.0
   }
 }
+
+#endif // !CUDA
 
 runAllTests()

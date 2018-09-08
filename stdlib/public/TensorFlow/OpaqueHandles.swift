@@ -52,8 +52,8 @@ extension VariantHandle : TensorSendableReceivable {
     debugLog("Receiving variant tensor of id \(tensorID).")
     let status = TF_NewStatus()
     let context = _ExecutionContext.global
-    let cTensorHandle! = TFE_DequeueVariantTensor(
-      context.eagerContext, Int32(tensorID), status)
+    let cTensorHandle: CTensorHandle! = TFE_DequeueNamedTensorFromCtx(
+      context.eagerContext, Int32(tensorID), TF_VARIANT, status)
     checkOk(status)
     TF_DeleteStatus(status)
     debugLog("Done receiving variant tensor of id \(tensorID).")
@@ -66,7 +66,7 @@ extension VariantHandle : TensorSendableReceivable {
     debugLog("Sending variant tensor of id \(tensorID).")
     let status = TF_NewStatus()
     let context = _ExecutionContext.global
-    TFE_EnqueueVariantTensor(
+    TFE_EnqueueNamedTensorFromCtx(
       context.eagerContext, Int32(tensorID), self.cTensorHandle, status)
     TF_DeleteStatus(status)
     debugLog("Done sending variant tensor of id \(tensorID).")
