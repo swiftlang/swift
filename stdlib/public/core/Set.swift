@@ -1513,6 +1513,7 @@ internal class _SwiftRawSetStorage: _SwiftNativeNSSet {
 
 /// The storage class for the singleton empty set.
 /// The single instance of this class is created by the runtime.
+@_fixed_layout
 @usableFromInline
 internal class _SwiftEmptySetStorage: _SwiftRawSetStorage {
   override internal init(_doNotCallMe: ()) {
@@ -1803,7 +1804,7 @@ extension _NativeSet {
     }
   }
 
-  @inlinable
+  @usableFromInline @_transparent
   internal var elements: UnsafeMutablePointer<Element> {
     @inline(__always)
     get {
@@ -1818,8 +1819,7 @@ extension _NativeSet {
     }
   }
 
-  @inlinable
-  @inline(__always)
+  @usableFromInline @_transparent
   internal func uncheckedElement(at index: Index) -> Element {
     _sanityCheck(hashTable.isOccupied(index))
     return elements[index.offset]
@@ -1954,7 +1954,10 @@ extension _NativeSet: _SetBuffer {
     //   // Fast path that avoids computing the hash of the key.
     //   return false
     // }
-    return find(member).found
+    return hashTable.contains(
+      hashValue: hashValue(for: member),
+      element: member,
+      elements: elements)
   }
 
   @inlinable
@@ -2963,9 +2966,17 @@ extension Set._Variant: _SetBuffer {
     }
   }
 
+  @usableFromInline @_transparent
+  internal var guaranteedNative: Bool {
+    return _canBeClass(Element.self) == 0
+  }
+
   @inlinable
   @inline(__always)
   internal func contains(_ member: Element) -> Bool {
+    if guaranteedNative {
+      return asNative.contains(member)
+    }
     switch self {
     case .native:
       return asNative.contains(member)
@@ -3766,20 +3777,26 @@ public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
 extension Set {
   // FIXME: Remove
   public // @testable performance metrics
-  var _stats: (maxLookups: Int, averageLookups: Double, maxCollisions: Int)? {
+  var _stats: (maxLookups: Int, averageLookups: Double, maxCollisions: Int, averageCollisions: Double)? {
     guard case .native(let native) = _variant else { return nil }
-    guard native.count > 0 else { return (0, 0, 0) }
+    guard native.count > 0 else { return (0, 0, 0, 0) }
     defer { _fixLifetime(self) }
     var maxLookups = 0
     var sumLookups = 0
     var maxCollisions = 0
+    var sumCollisions = 0
     for i in native.indices {
       let stats = native.stats(ofElementAt: i)
       maxLookups = Swift.max(maxLookups, stats.displacement + 1)
       sumLookups += stats.displacement + 1
       maxCollisions = Swift.max(maxCollisions, stats.collisions)
+      sumCollisions += stats.collisions
     }
-    return (maxLookups, Double(sumLookups) / Double(count), maxCollisions)
+    return (
+      maxLookups,
+      Double(sumLookups) / Double(count),
+      maxCollisions,
+      Double(sumCollisions) / Double(count))
   }
 }
 
@@ -3826,7 +3843,7 @@ extension _NativeSet {
       let hashValue = self.hashValue(for: element)
       let stats = self.stats(ofElementAt: i)
       let h = String(UInt(bitPattern: hashValue), radix: 16)
-      let hl = String(hashTable[i].payload << 1, radix: 16)
+      let hl = String(hashTable[i].payload, radix: 16)
       result += "  <\(i.offset)> "
       result += "delta: \(stats.displacement) (\(stats.collisions) coll) "
       result += "hash: \(hl)/\(h): "

@@ -24,13 +24,15 @@ internal struct _HashTable {
   internal let buckets: UnsafeMutablePointer<Bucket>
 
   @usableFromInline
-  internal let bucketCount: Int
+  internal let bucketMask: Int
 
   @inlinable
   @inline(__always)
   internal init(buckets: UnsafeMutablePointer<Bucket>, bucketCount: Int) {
     self.buckets = buckets
-    self.bucketCount = bucketCount
+    // The bucket count is a positive power of two, so subtracting 1 will
+    // never overflow and get us a nice mask.
+    self.bucketMask = bucketCount &- 1
   }
 
   @inlinable
@@ -41,11 +43,9 @@ internal struct _HashTable {
   }
 
   @inlinable
-  internal var bucketMask: Int {
+  internal var bucketCount: Int {
     @inline(__always) get {
-      // The bucket count is a positive power of two, so subtracting 1 will
-      // never overflow and get us a nice mask.
-      return bucketCount &- 1
+      return bucketMask &+ 1
     }
   }
 }
@@ -67,7 +67,7 @@ extension _HashTable {
 
   /// The inverse of the maximum hash table load factor.
   private static var maxLoadFactorInverse: Double {
-    @inline(__always) get { return 100 / 90 }
+    @inline(__always) get { return 100 / 75 }
   }
 
   internal static func capacity(forScale scale: Int) -> Int {
@@ -108,14 +108,6 @@ extension _HashTable {
   @_fixed_layout
   internal struct Entry {
     @inlinable
-    internal static var occupiedFlag: UInt8 {
-      @inline(__always) get { return 0x80 }
-    }
-    @inlinable
-    internal static var payloadMask: UInt8 {
-      @inline(__always) get { return 0x7F }
-    }
-    @inlinable
     internal static var unoccupied: Entry {
       @inline(__always) get { return Entry(_value: 0) }
     }
@@ -132,16 +124,15 @@ extension _HashTable {
     @inlinable
     @inline(__always)
     internal init(payload: UInt8) {
-      _sanityCheck(payload & ~Entry.payloadMask == 0)
-      self.init(_value: Entry.occupiedFlag | payload)
+      _sanityCheck(payload != 0)
+      self.init(_value: payload)
     }
 
     @inlinable
     @inline(__always)
     internal init(forHashValue hashValue: Int) {
-      // Use the highest seven bits of the hash value.
-      let payload = UInt(bitPattern: hashValue) &>> (Int.bitWidth &- 7)
-      self.init(payload: UInt8(truncatingIfNeeded: payload))
+      let payload = UInt(bitPattern: hashValue) &>> (Int.bitWidth &- 8)
+      self.init(payload: Swift.max(1, UInt8(truncatingIfNeeded: payload)))
     }
 
     @inlinable
@@ -152,8 +143,19 @@ extension _HashTable {
     @inlinable
     internal var payload: UInt8 {
       @inline(__always) get {
-        return _value & _HashTable.Entry.payloadMask
+        return _value
       }
+    }
+  }
+}
+
+extension _HashTable.Entry {
+  @inlinable
+  var pattern: UInt64 {
+    @inline(__always) get {
+      // Fill a 64-bit integer with 8 copies of this entry.
+      let p = UInt64(truncatingIfNeeded: _value)
+      return p &* 0x01010101_01010101
     }
   }
 }
@@ -270,7 +272,7 @@ extension _HashTable.Bucket {
     @inline(__always)
     get {
       // Holes are always at the end, so it's enough to check the highest byte.
-      return _value &>> (UInt64.bitWidth &- UInt8.bitWidth) != 0
+      return _value.leadingZeroBitCount < UInt8.bitWidth
     }
   }
 
@@ -295,7 +297,7 @@ extension _HashTable.Bucket {
     @inline(__always)
     get {
       // Holes are zero bytes at the most significant places.
-      let shift = UInt64.bitWidth - (_value.leadingZeroBitCount & ~7)
+      let shift = UInt64.bitWidth &- (_value.leadingZeroBitCount & ~7)
       return _HashTable.Slot(shift: shift)
     }
   }
@@ -363,14 +365,9 @@ extension _HashTable.Bucket {
 
   /// Returns a sequence of Slots matching the given entry.
   @inlinable
-  internal func slots(matching entry: _HashTable.Entry) -> SlotSet {
-    // Fill a 64-bit integer with 8 copies of the entry we're looking for.
-    var p = UInt64(entry._value)
-    p |= p &<< 8
-    p |= p &<< 16
-    p |= p &<< 32
-    // Xoring `p` to `self._value` turns matching bytes into zeroes.
-    p ^= self._value
+  @inline(__always)
+  internal func _slots(matching pattern: UInt64) -> SlotSet {
+    let p = self._value ^ pattern
     // The problem now reduces to finding zero bytes in `p`.  For every 8-bit
     // integer `b`, `x = ((b & 0x7F) + 0x7F) | b` has bit 7 set iff `b !=
     // 0`. Further, `~(x | 0x7F)` leaves bit 7 set to one iff `b == 0` and
@@ -383,6 +380,13 @@ extension _HashTable.Bucket {
     // other bits cleared. Shifting it seven places to the right moves the set
     // bits to the start of their corresponding bytes.
     return SlotSet(_shifts: y &>> 7)
+  }
+
+  /// Returns a sequence of Slots matching the given entry.
+  @inlinable
+  @inline(__always)
+  internal func slots(matching entry: _HashTable.Entry) -> SlotSet {
+    return _slots(matching: entry.pattern)
   }
 }
 
@@ -483,7 +487,6 @@ extension _HashTable: Collection {
   }
 
   @inlinable
-  @inline(__always)
   internal func formIndex(after index: inout Index) {
     index.offset += 1
     if index.bucket >= bucketCount { return }
@@ -560,7 +563,7 @@ extension _HashTable {
     @usableFromInline
     let _hashTable: _HashTable
     @usableFromInline
-    let _entry: Entry
+    let _pattern: UInt64
     @usableFromInline
     var _bucket: Int
     @usableFromInline
@@ -569,14 +572,15 @@ extension _HashTable {
     @inlinable
     internal init(hashTable: _HashTable, hashValue: Int) {
       self._hashTable = hashTable
-      self._entry = Entry(forHashValue: hashValue)
       self._bucket = hashTable._idealBucket(forHashValue: hashValue)
-      self._matches = hashTable.buckets[_bucket].slots(matching: _entry)
+      let b = hashTable.buckets[_bucket]
+      self._pattern = Entry(forHashValue: hashValue).pattern
+      self._matches = b._slots(matching: _pattern)
     }
 
     @inlinable
     internal mutating func next() -> (index: Index, found: Bool) {
-      repeat {
+      while true {
         if let slot = _matches.next() {
           return (Index(bucket: _bucket, slot: slot), true)
         }
@@ -586,8 +590,8 @@ extension _HashTable {
           return (Index(bucket: _bucket, slot: hole), false)
         }
         _bucket = _hashTable._succ(_bucket)
-        _matches = _hashTable.buckets[_bucket].slots(matching: _entry)
-      } while true
+        _matches = _hashTable.buckets[_bucket]._slots(matching: _pattern)
+      }
     }
   }
 
@@ -598,7 +602,37 @@ extension _HashTable {
 }
 
 extension _HashTable {
-  @usableFromInline
+  @inlinable
+  @inline(__always)
+  func contains<Element: Equatable>(
+    hashValue: Int,
+    element: Element,
+    elements: UnsafePointer<Element>
+  ) -> Bool {
+    var bucket = _idealBucket(forHashValue: hashValue)
+    var b = self.buckets[bucket]
+    let pattern = Entry(forHashValue: hashValue).pattern
+    var matches = b._slots(matching: pattern)._shifts
+    while true {
+      if _fastPath(matches != 0) {
+        let shift = matches.trailingZeroBitCount
+        let index = Index(bucket: bucket, slotOffset: shift &>> 3)
+        if elements[index.offset] == element { return true }
+        matches &= matches &- 1
+      } else if b.isFull {
+        bucket = _succ(bucket)
+        b = self.buckets[bucket]
+        matches = b._slots(matching: pattern)._shifts
+      } else {
+        return false
+      }
+    }
+  }
+}
+
+extension _HashTable {
+  @inlinable
+  @inline(__always)
   @_effects(releasenone)
   internal func copyContents(of other: _HashTable) {
     _sanityCheck(bucketCount == other.bucketCount)
@@ -607,7 +641,8 @@ extension _HashTable {
 
   /// Insert a new entry with the specified hash value into the table.
   /// The entry must not already exist in the table -- duplicates are ignored.
-  @usableFromInline
+  @inlinable
+  @inline(__always)
   @_effects(releasenone)
   internal func insertNew(hashValue: Int) -> Index {
     var bucket = _idealBucket(forHashValue: hashValue)
@@ -621,7 +656,7 @@ extension _HashTable {
   /// Insert a new entry for an element with the specified hash value at
   /// `bucket`. The bucket must have been returned by `lookupFirst` or
   /// `lookupNext` for the same hash value, with `found == false`.
-  @usableFromInline
+  @inlinable
   @inline(__always)
   @_effects(releasenone)
   internal func insert(hashValue: Int, at index: Index) {
@@ -629,6 +664,8 @@ extension _HashTable {
     self[index] = Entry(forHashValue: hashValue)
   }
 
+  @inlinable
+  @inline(__always)
   internal func removeAll() {
     buckets.assign(repeating: Bucket(0), count: bucketCount)
   }
