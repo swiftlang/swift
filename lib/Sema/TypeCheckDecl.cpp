@@ -2074,7 +2074,6 @@ static void checkDesignatedProtocol(OperatorDecl *OD, Identifier name,
   }
 
   if (!typeLoc.isError()) {
-    OD->setDesignatedProtocolTypeLoc(typeLoc);
     auto *decl = typeLoc.getType()->getNominalOrBoundGenericNominal();
     if (!decl || !isa<ProtocolDecl>(decl)) {
       tc.diagnose(typeLoc.getLoc(),
@@ -2082,6 +2081,7 @@ static void checkDesignatedProtocol(OperatorDecl *OD, Identifier name,
                   typeLoc.getType());
       OD->setInvalid();
     } else {
+      OD->setDesignatedProtocol(cast<ProtocolDecl>(decl));
       // FIXME: verify this operator has a declaration within this
       //        protocol with the same arity and fixity
     }
@@ -2104,9 +2104,9 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
 
   // Pre- or post-fix operator?
   if (!IOD) {
-    auto typeLoc = OD->getDesignatedProtocolTypeLoc();
+    auto *protocol = OD->getDesignatedProtocol();
     auto protocolId = OD->getDesignatedProtocolName();
-    if (typeLoc.isNull() && !protocolId.empty() &&
+    if (!protocol && !protocolId.empty() &&
         enableOperatorDesignatedProtocols) {
       auto protocolIdLoc = OD->getDesignatedProtocolNameLoc();
       checkDesignatedProtocol(OD, protocolId, protocolIdLoc, *this, Context);
@@ -2127,8 +2127,8 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
     }
 
     auto secondId = IOD->getSecondIdentifier();
-    auto typeLoc = IOD->getDesignatedProtocolTypeLoc();
-    if (typeLoc.isNull() && enableOperatorDesignatedProtocols) {
+    auto *protocol = IOD->getDesignatedProtocol();
+    if (!protocol && enableOperatorDesignatedProtocols) {
       auto secondIdLoc = IOD->getSecondIdentifierLoc();
       assert(secondId.empty() || !firstId.empty());
 
@@ -2140,7 +2140,7 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
 
     if (!group && !IOD->isInvalid()) {
       if (!firstId.empty() &&
-          (!secondId.empty() || IOD->getDesignatedProtocolTypeLoc().isNull())) {
+          (!secondId.empty() || !IOD->getDesignatedProtocol())) {
         diagnose(firstIdLoc, diag::unknown_precedence_group, firstId);
         IOD->setInvalid();
       }
