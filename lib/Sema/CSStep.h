@@ -80,8 +80,9 @@ private:
   }
 };
 
-/// Represents a single independently solveable part of
-/// the constraint system.
+/// Represents a single independently solvable part of
+/// the constraint system. And is a base class for all
+/// different types of steps there are.
 class SolverStep {
   friend class ConstraintSystem;
 
@@ -188,6 +189,11 @@ protected:
   }
 };
 
+/// `SplitterStep` is responsible for running connected components
+/// algorithm to determine how many independent sub-systems there are.
+/// Once that's done it would create one `ComponentStep` per such
+/// sub-system, and move to try to solve each and then merge partial
+/// solutions produced by components into complete solution(s).
 class SplitterStep final : public SolverStep {
   // Partial solutions associated with given step, each element
   // of the array presents a disjoint component (or follow-up step)
@@ -227,6 +233,10 @@ private:
   bool mergePartialSolutions() const;
 };
 
+/// `ComponentStep` represents a set of type variables and related
+/// constraints which could be solved independently. It's further
+/// simplified into "binding" steps which attempt type variable and
+/// disjunction choices.
 class ComponentStep final : public SolverStep {
   class Scope {
     ConstraintSystem &CS;
