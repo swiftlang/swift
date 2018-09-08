@@ -2108,26 +2108,6 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
   // range check subscripting on the StringRef.
   const char *BytesPtr = Bytes.begin();
 
-  // Special case when being called from EncodedDiagnosticMessage(...).
-  // This allows multiline and delimited strings to work in attributes.
-  // The string has already been validated by the initial parse.
-  if (IndentToStrip == ~0u && CustomDelimiterLen == ~0u) {
-    IndentToStrip = CustomDelimiterLen = 0;
-
-    // Restore trailing indent removal for multiline.
-    const char *Backtrack = BytesPtr - 1;
-    if (Backtrack[-1] == '"' && Backtrack[-2] == '"') {
-      Backtrack -= 2;
-      for (const char *Trailing = Bytes.end() - 1;
-           *Trailing == ' ' || *Trailing == '\t'; Trailing--)
-        IndentToStrip++;
-    }
-
-    // Restore delimiter if any.
-    while (*--Backtrack == '#')
-      CustomDelimiterLen++;
-  }
-
   bool IsEscapedNewline = false;
   while (BytesPtr < Bytes.end()) {
     char CurChar = *BytesPtr++;
