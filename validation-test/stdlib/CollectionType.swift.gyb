@@ -561,7 +561,7 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/Dispatch") {
   let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
   _ = tester[tester.startIndex..<tester.endIndex]
   let log = tester.log
-  let log2 = tester.log.subscriptRange
+  _ = tester.log.subscriptRange
   expectCustomizable(tester, tester.log.subscriptRange)
 }
 
@@ -575,22 +575,6 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/writeback") {
   collection[i..<j].sort()
   expectEqualSequence(
     [ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
-}
-
-CollectionTypeTests.test("subscript(_: Range<Index>)/defaultImplementation/sliceTooLarge")
-  .crashOutputMatches("Cannot replace a slice of a MutableCollection with a slice of a larger size")
-  .code {
-  var x = Slice(base: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], bounds: 0..<10)
-  expectCrashLater()
-  x[2..<4] = x[4..<8]
-}
-
-CollectionTypeTests.test("subscript(_: Range<Index>)/defaultImplementation/sliceTooSmall")
-  .crashOutputMatches("Cannot replace a slice of a MutableCollection with a slice of a smaller size")
-  .code {
-  var x = Slice(base: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], bounds: 0..<10)
-  expectCrashLater()
-  x[2..<6] = x[6..<8]
 }
 
 //===----------------------------------------------------------------------===//
