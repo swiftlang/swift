@@ -65,7 +65,7 @@ public extension Tensor where Scalar : Numeric {
 /// TODO(SR-8699): Move this back into the extension.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointAdd(_:_:originalValue:seed:))
-public func +<T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
+public func + <T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
   return Raw.add(lhs, rhs)
 }
 
@@ -74,7 +74,7 @@ public func +<T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
 /// TODO(SR-8699): Move this back into the extension.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointSubtract(_:_:originalValue:seed:))
-public func -<T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
+public func - <T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
   return Raw.sub(lhs, rhs)
 }
 
@@ -83,7 +83,7 @@ public func -<T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
 /// TODO(SR-8699): Move this back into the extension.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointMultiply(_:_:originalValue:seed:))
-public func *<T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
+public func * <T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
   return Raw.mul(lhs, rhs)
 }
 
@@ -148,7 +148,7 @@ extension Tensor : DifferentiableVectorNumeric
 /// TODO(SR-8699): Move this back into the extension.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointDivide(_:_:originalValue:seed:))
-public func /<T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
+public func / <T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
   return Raw.div(lhs, rhs)
 }
 
@@ -282,7 +282,7 @@ infix operator • : MultiplicationPrecedence
 /// TODO(SR-8699): Move this back into an extension of Tensor.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointMatmul(_:_:originalValue:seed:))
-public func •<T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
+public func • <T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
   return matmul(lhs, rhs)
 }
 
@@ -587,7 +587,7 @@ public extension Tensor {
 /// TODO(SR-8699): Move this back into an extension of Tensor.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointNegate(_:originalValue:seed:))
-public prefix func -<T: SignedNumeric> (rhs: Tensor<T>) -> Tensor<T> {
+public prefix func - <T: SignedNumeric> (rhs: Tensor<T>) -> Tensor<T> {
   return Raw.neg(rhs)
 }
 
