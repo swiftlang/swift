@@ -401,9 +401,6 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
   // active choice, let's see if it has be solved or not.
   assert(ActiveChoice);
 
-  // Rewind back the constraint system information.
-  ActiveChoice.reset();
-
   if (CS.TC.getLangOpts().DebugConstraintSolver) {
     auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
     log.indent(CS.solverState->depth) << ")\n";
@@ -426,6 +423,9 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
     // it would be useful when disjunction is exhausted.
     LastSolvedChoice = {choice, *score};
   }
+
+  // Rewind back the constraint system information.
+  ActiveChoice.reset();
 
   // Attempt next disjunction choice (if any left).
   return take(prevFailed);
