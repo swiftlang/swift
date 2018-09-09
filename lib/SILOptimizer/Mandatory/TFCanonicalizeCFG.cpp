@@ -42,8 +42,9 @@ static llvm::cl::opt<bool> TFEnsureSingleLoopExit(
     llvm::cl::desc("Transform loops to have a single exit from header."));
 static llvm::cl::opt<bool> TFNoUndefsInSESE(
     "tf-no-undefs-in-sese", llvm::cl::init(true),
-    llvm::cl::desc("Try to eliminate undefs in when performing "
-                   "sese canonicalization of loops."));
+    llvm::cl::desc(
+        "Try to eliminate undefs in when performing "
+        "sese canonicalization of loops (intended  for debugging)."));
 
 //===----------------------------------------------------------------------===//
 // SESERegionTree Implementation
@@ -315,7 +316,7 @@ private:
   void initialize();
 
   /// Compute escaping values and what values to use as arguments at preheader.
-  void computeEscapingValues();
+  llvm::DenseMap<SILValue, SILValue> computeEscapingValues() const;
 
   /// Create a new header for the loop and return a pair consisting of
   /// the new block and the phi argument corresponding to the exitIndex.
@@ -369,7 +370,7 @@ private:
   // the new latchBlock as appropriate.
   SmallVector<std::pair<const SILBasicBlock *, const SILBasicBlock *>, 8>
       edgesToFix;
-  /// Identify the set of values that escape the loop. The keys represent the
+  /// Identify the set of values that escape the loop. The key represents the
   /// escaping value and the associated value will be used as the argument at
   /// the preheader.
   llvm::DenseMap<SILValue, SILValue> escapingValueSubstMap;
@@ -396,17 +397,19 @@ void SingleExitLoopTransformer::initialize() {
     }
   }
 
-  computeEscapingValues();
+  escapingValueSubstMap = computeEscapingValues();
 }
 
-void SingleExitLoopTransformer::computeEscapingValues() {
+llvm::DenseMap<SILValue, SILValue>
+SingleExitLoopTransformer::computeEscapingValues() const {
+  llvm::DenseMap<SILValue, SILValue> result;
   for (const SILBasicBlock *bb : loop->getBlocks()) {
-    // Save the values that are escaping this loop in escapingValueSubstMap set.
-    auto saveEscaping = [this](SILValue value) {
+    // Save the values that are escaping this loop in result set.
+    auto saveEscaping = [this, &result](SILValue value) {
       for (const auto *use : value->getUses()) {
         const SILInstruction *useInst = use->getUser();
         if (!loop->contains(useInst->getParent())) {
-          escapingValueSubstMap[value] = getUndef(value->getType());
+          result[value] = getUndef(value->getType());
           break;
         }
       }
@@ -420,12 +423,12 @@ void SingleExitLoopTransformer::computeEscapingValues() {
   }
 
   // Do not eliminate undefs unless requested for.
-  if (!TFNoUndefsInSESE)  return;
+  if (!TFNoUndefsInSESE)  return result;
 
   // Find a def-free path from the escaping value to the preheader for each
   // escaping value. If no such path is found, set the escaping value at
   // preheader to undef.
-  for (auto &kv : escapingValueSubstMap) {
+  for (auto &kv : result) {
     const SILValue &escapingValue = kv.first;
     // FIXME: We should explore the data dependencies in DFS order. Currently,
     // the order of iteration is arbitrary. DFS should be more efficient.
@@ -458,6 +461,7 @@ void SingleExitLoopTransformer::computeEscapingValues() {
       }
     }
   }
+  return result;
 }
 
 /// Appends the given arguments to the given edge. Deletes the old TermInst
@@ -525,7 +529,7 @@ SingleExitLoopTransformer::createNewHeader() {
   header->dropAllArguments();
   // Add phi arguments in the new header corresponding to the escaping values.
   for (const auto &kv : escapingValueSubstMap) {
-    const SILValue& escapingValue = kv.first;
+    const SILValue escapingValue = kv.first;
     SILValue newValue = newHeader->createPHIArgument(
         escapingValue->getType(), escapingValue.getOwnershipKind());
     // Replace uses *outside* of the loop with the new value.
