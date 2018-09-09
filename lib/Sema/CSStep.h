@@ -143,6 +143,8 @@ public:
   ///          this step solved or failed.
   virtual StepResult resume(bool prevFailed) = 0;
 
+  virtual void print(llvm::raw_ostream &Out) = 0;
+
 protected:
   /// \brief Transition this step into one of the available states.
   ///
@@ -234,6 +236,10 @@ public:
 
   StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
+
+  void print(llvm::raw_ostream &Out) override {
+    Out << "SplitterStep with #" << Components.size() << " components\n";
+  }
 
   static SplitterStep *create(ConstraintSystem &cs,
                               SmallVectorImpl<Solution> &solutions) {
@@ -338,6 +344,10 @@ public:
   StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
 
+  void print(llvm::raw_ostream &Out) override {
+    Out << "ComponentStep with at #" << Index << '\n';
+  }
+
   static ComponentStep *create(ConstraintSystem &cs, unsigned index,
                                bool single, ConstraintList *constraints,
                                SmallVectorImpl<Solution> &solutions) {
@@ -384,6 +394,11 @@ public:
   StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
 
+  void print(llvm::raw_ostream &Out) override {
+    Out << "TypeVariableStep for " << TypeVar->getString() << " with #"
+        << InitialBindings.size() << " initial bindings\n";
+  }
+
   static TypeVariableStep *create(ConstraintSystem &cs,
                                   BindingContainer &bindings,
                                   SmallVectorImpl<Solution> &solutions) {
@@ -428,6 +443,12 @@ public:
 
   StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
+
+  void print(llvm::raw_ostream &Out) override {
+    Out << "DisjunctionStep for ";
+    Disjunction->print(Out, &CS.getASTContext().SourceMgr);
+    Out << '\n';
+  }
 
   static DisjunctionStep *create(ConstraintSystem &cs, Constraint *disjunction,
                                  SmallVectorImpl<Solution> &solutions) {
