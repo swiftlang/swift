@@ -26,16 +26,15 @@ using namespace llvm;
 using namespace swift;
 using namespace constraints;
 
-ComponentStep::Scope::Scope(const ComponentStep &component) : CS(component.CS) {
+ComponentStep::Scope::Scope(ComponentStep &component)
+    : CS(component.CS), Component(component) {
   TypeVars = std::move(CS.TypeVariables);
 
   for (auto *typeVar : component.TypeVars)
     CS.TypeVariables.push_back(typeVar);
 
-  Constraints.splice(Constraints.end(), CS.InactiveConstraints);
-
-  for (auto *constraint : component.Constraints)
-    CS.InactiveConstraints.push_back(constraint);
+  auto &workList = CS.InactiveConstraints;
+  workList.splice(workList.end(), *component.Constraints);
 
   auto &CG = CS.getConstraintGraph();
   if (component.OrphanedConstraint)
@@ -47,13 +46,29 @@ ComponentStep::Scope::Scope(const ComponentStep &component) : CS(component.CS) {
 }
 
 StepResult SplitterStep::take(bool prevFailed) {
-  SmallVector<SolverStep *, 4> components;
+  SmallVector<ComponentStep *, 4> components;
+  // Try to run "connected components" algorithm and split
+  // type variables and their constraints into independent
+  // sub-systems to solve.
   computeFollowupSteps(components);
+
+  // If there is only one component, there is no reason to
+  // try to merge solutions, "split" step should be considered
+  // done and replaced by a single component step.
+  if (components.size() < 2)
+    return replaceWith(components.front());
+
   /// Wait until all of the component steps are done.
-  return suspend(components);
+  return suspend<ComponentStep>(components);
 }
 
 StepResult SplitterStep::resume(bool prevFailed) {
+  // Restore the state of the constraint system to before split.
+  CS.CG.setOrphanedConstraints(std::move(OrphanedConstraints));
+  auto &workList = CS.InactiveConstraints;
+  for (auto &component : Components)
+    workList.splice(workList.end(), component);
+
   // If we came back to this step and previous (one of the components)
   // failed, it means that we can't solve this step either.
   if (prevFailed)
@@ -65,9 +80,7 @@ StepResult SplitterStep::resume(bool prevFailed) {
 }
 
 void SplitterStep::computeFollowupSteps(
-    SmallVectorImpl<SolverStep *> &nextSteps) {
-  SmallVector<ComponentStep *, 4> componentSteps;
-
+    SmallVectorImpl<ComponentStep *> &componentSteps) {
   // Compute next steps based on that connected components
   // algorithm tells us is splittable.
 
@@ -81,18 +94,25 @@ void SplitterStep::computeFollowupSteps(
   // our component. There are clearly better ways to do this.
   SmallVector<TypeVariableType *, 16> typeVars(CS.TypeVariables);
   SmallVector<unsigned, 16> components;
-
-  NumComponents = CG.computeConnectedComponents(typeVars, components);
-  PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
-      new SmallVector<Solution, 4>[NumComponents]);
-
-  for (unsigned i = 0, n = NumComponents; i != n; ++i) {
-    componentSteps.push_back(
-        ComponentStep::create(CS, i, NumComponents == 1, PartialSolutions[i]));
+  unsigned numComponents = CG.computeConnectedComponents(typeVars, components);
+  if (numComponents < 2) {
+    componentSteps.push_back(ComponentStep::create(
+        CS, 0, /*single=*/true, &CS.InactiveConstraints, Solutions));
+    return;
   }
 
-  if (CS.getASTContext().LangOpts.DebugConstraintSolver) {
-    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+  Components.resize(numComponents);
+  PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
+      new SmallVector<Solution, 4>[numComponents]);
+
+  for (unsigned i = 0, n = numComponents; i != n; ++i) {
+    componentSteps.push_back(ComponentStep::create(
+        CS, i, /*single=*/false, &Components[i], PartialSolutions[i]));
+  }
+
+  if (numComponents > 1 && CS.getASTContext().LangOpts.DebugConstraintSolver) {
+    auto &log = CS.getASTContext().TypeCheckerDebug->getStream().indent(
+        CS.solverState->depth * 2);
 
     // Verify that the constraint graph is valid.
     CG.verify();
@@ -105,46 +125,52 @@ void SplitterStep::computeFollowupSteps(
   }
 
   // Map type variables and constraints into appropriate steps.
+  llvm::DenseMap<Constraint *, unsigned> constraintComponent;
   for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
     auto *typeVar = typeVars[i];
-    auto &step = *componentSteps[components[i]];
+    auto *component = componentSteps[components[i]];
 
-    step.record(typeVar);
+    component->record(typeVar);
     for (auto *constraint : CG[typeVar].getConstraints())
-      step.record(constraint);
+      constraintComponent[constraint] = components[i];
   }
 
   // Add the orphaned components to the mapping from constraints to components.
   unsigned firstOrphanedConstraint =
-      NumComponents - CG.getOrphanedConstraints().size();
+      numComponents - CG.getOrphanedConstraints().size();
   {
     unsigned component = firstOrphanedConstraint;
     for (auto constraint : CG.getOrphanedConstraints())
       componentSteps[component++]->recordOrphan(constraint);
   }
 
+  // Transfer all of the constraints from the work list to
+  // the appropriate component.
+  auto &workList = CS.InactiveConstraints;
+  while (!workList.empty()) {
+    auto *constraint = &workList.front();
+    workList.pop_front();
+    Components[constraintComponent[constraint]].push_back(constraint);
+  }
+
   // Remove all of the orphaned constraints; they'll be re-introduced
   // by each component independently.
   OrphanedConstraints = CG.takeOrphanedConstraints();
-
-  for (auto *step : componentSteps)
-    nextSteps.push_back(step);
 }
 
 bool SplitterStep::mergePartialSolutions() const {
-  // TODO: Optimize when there is only one component
-  //       because it would be inefficient to create all
-  //       these data structures and do nothing.
+  assert(Components.size() >= 2);
 
+  auto numComponents = Components.size();
   // Produce all combinations of partial solutions.
-  SmallVector<unsigned, 2> indices(NumComponents, 0);
+  SmallVector<unsigned, 2> indices(numComponents, 0);
   bool done = false;
   bool anySolutions = false;
   do {
     // Create a new solver scope in which we apply all of the partial
     // solutions.
     ConstraintSystem::SolverScope scope(CS);
-    for (unsigned i = 0; i != NumComponents; ++i)
+    for (unsigned i = 0; i != numComponents; ++i)
       CS.applySolution(PartialSolutions[i][indices[i]]);
 
     // This solution might be worse than the best solution found so far.
@@ -164,7 +190,7 @@ bool SplitterStep::mergePartialSolutions() const {
     }
 
     // Find the next combination.
-    for (unsigned n = NumComponents; n > 0; --n) {
+    for (unsigned n = numComponents; n > 0; --n) {
       ++indices[n - 1];
 
       // If we haven't run out of solutions yet, we're done.
@@ -178,19 +204,12 @@ bool SplitterStep::mergePartialSolutions() const {
       }
 
       // Zero out the indices from here to the end.
-      for (unsigned i = n - 1; i != NumComponents; ++i)
+      for (unsigned i = n - 1; i != numComponents; ++i)
         indices[i] = 0;
     }
   } while (!done);
 
   return anySolutions;
-}
-
-void ComponentStep::setup() {
-  // If this is a single component, there is
-  // no need to preliminary modify constraint system.
-  if (!IsSingleComponent)
-    ComponentScope = llvm::make_unique<Scope>(*this);
 }
 
 StepResult ComponentStep::take(bool prevFailed) {
@@ -201,10 +220,10 @@ StepResult ComponentStep::take(bool prevFailed) {
   if (prevFailed)
     return done(/*isSuccess=*/false);
 
-  if (CS.TC.getLangOpts().DebugConstraintSolver) {
+  if (!IsSingle && CS.TC.getLangOpts().DebugConstraintSolver) {
     auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
     log.indent(CS.solverState->depth * 2)
-        << "(solving component #" << Index << "\n";
+        << "(solving component #" << Index << '\n';
   }
 
   /// Try to figure out what this step is going to be,
@@ -224,7 +243,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   // If there are no disjunctions or type variables to bind
   // we can't solve this system unless we have free type variables
   // allowed in the solution.
-  if (!CS.solverState->allowsFreeTypeVariables() || !CS.hasFreeTypeVariables())
+  if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables())
     return done(/*isSuccess=*/false);
 
   // If this solution is worse than the best solution we've seen so far,

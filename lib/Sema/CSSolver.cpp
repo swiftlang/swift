@@ -1566,6 +1566,12 @@ bool ConstraintSystem::solveIteratively(
   // First step is always wraps whole constraint system.
   workList.push_back(SplitterStep::create(*this, solutions));
 
+  SWIFT_DEFER {
+    // Delete all of the leftover steps from the work list.
+    while (!workList.empty())
+      delete workList.pop_back_val();
+  };
+
   // Indicate whether previous step in the stack has failed
   // (returned StepResult::Kind = Error), this is useful to
   // propagate failures when unsolved steps are re-taken.
