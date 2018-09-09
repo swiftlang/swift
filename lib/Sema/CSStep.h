@@ -78,6 +78,13 @@ private:
   static StepResult unsolved(SmallVectorImpl<SolverStep *> &followup) {
     return StepResult(Kind::Unsolved, followup);
   }
+
+  template <typename T> static StepResult unsolved(ArrayRef<T *> followup) {
+    auto result = StepResult(Kind::Unsolved);
+    for (auto *step : followup)
+      result.NextSteps.push_back(static_cast<SolverStep *>(step));
+    return result;
+  }
 };
 
 /// Represents a single independently solvable part of
@@ -106,7 +113,7 @@ public:
 
   /// Run preliminary setup (if needed) right
   /// before taking this step for the first time.
-  virtual void setup() { transitionTo(StepState::Ready); }
+  virtual void setup() {}
 
   /// Try to move solver forward by simplifying constraints if possible.
   /// Such simplication might lead to either producing a solution, or
@@ -155,12 +162,22 @@ protected:
     return isSuccess ? StepResult::success() : StepResult::failure();
   }
 
+  StepResult replaceWith(SolverStep *replacement) {
+    transitionTo(StepState::Done);
+    return StepResult(StepResult::Kind::Solved, replacement);
+  }
+
   StepResult suspend(SolverStep *followup) {
     transitionTo(StepState::Suspended);
     return StepResult::unsolved(followup);
   }
 
   StepResult suspend(SmallVectorImpl<SolverStep *> &followup) {
+    transitionTo(StepState::Suspended);
+    return StepResult::unsolved(followup);
+  }
+
+  template <typename T> StepResult suspend(ArrayRef<T *> followup) {
     transitionTo(StepState::Suspended);
     return StepResult::unsolved(followup);
   }
@@ -195,10 +212,13 @@ protected:
 /// sub-system, and move to try to solve each and then merge partial
 /// solutions produced by components into complete solution(s).
 class SplitterStep final : public SolverStep {
+  // Set of constraints associated with each component, after
+  // component steps are complete, all of the constraints are
+  // returned back to the work-list in their original order.
+  SmallVector<ConstraintList, 4> Components;
   // Partial solutions associated with given step, each element
   // of the array presents a disjoint component (or follow-up step)
   // that current step has been split into.
-  unsigned NumComponents = 0;
   std::unique_ptr<SmallVector<Solution, 4>[]> PartialSolutions = nullptr;
 
   SmallVector<Constraint *, 4> OrphanedConstraints;
@@ -217,13 +237,13 @@ public:
 
   static SplitterStep *create(ConstraintSystem &cs,
                               SmallVectorImpl<Solution> &solutions) {
-    return new (cs.getAllocator()) SplitterStep(cs, solutions);
+    return new SplitterStep(cs, solutions);
   }
 
 private:
   /// If current step needs follow-up steps to get completely solved,
   /// let's compute them using connected components algorithm.
-  void computeFollowupSteps(SmallVectorImpl<SolverStep *> &steps);
+  void computeFollowupSteps(SmallVectorImpl<ComponentStep *> &componentSteps);
 
   /// Once all of the follow-up steps are complete, let's try
   /// to merge resulting solutions together, to form final solution(s)
@@ -243,12 +263,13 @@ class ComponentStep final : public SolverStep {
     ConstraintSystem::SolverScope *SolverScope;
 
     SmallVector<TypeVariableType *, 16> TypeVars;
-    ConstraintList Constraints;
-
     ConstraintSystem::SolverScope *PrevPartialScope = nullptr;
 
+    // The component this scope is associated with.
+    ComponentStep &Component;
+
   public:
-    Scope(const ComponentStep &component);
+    Scope(ComponentStep &component);
 
     ~Scope() {
       delete SolverScope; // rewind back all of the changes.
@@ -256,8 +277,9 @@ class ComponentStep final : public SolverStep {
 
       // return all of the saved type variables back to the system.
       CS.TypeVariables = std::move(TypeVars);
-      // return all of the saved constraints back to the system.
-      CS.InactiveConstraints.splice(CS.InactiveConstraints.end(), Constraints);
+      // return all of the saved constraints back to the component.
+      auto &constraints = *Component.Constraints;
+      constraints.splice(constraints.end(), CS.InactiveConstraints);
     }
   };
 
@@ -270,7 +292,7 @@ class ComponentStep final : public SolverStep {
   /// opportunity, because if there are no other components,
   /// constraint system doesn't have to pruned from
   /// unrelated type variables and their constraints.
-  bool IsSingleComponent;
+  bool IsSingle;
 
   /// The score associated with constraint system before
   /// the component step is taken.
@@ -278,27 +300,26 @@ class ComponentStep final : public SolverStep {
 
   /// If this step depends on other smaller steps to be solved first
   /// we need to keep active scope until all of the work is done.
-  std::unique_ptr<Scope> ComponentScope;
+  std::unique_ptr<Scope> ComponentScope = nullptr;
 
   // Type variables and constraints "in scope" of this step.
   SmallVector<TypeVariableType *, 16> TypeVars;
-  SmallVector<Constraint *, 16> Constraints;
+  // Constraints "in scope" of this step.
+  ConstraintList *Constraints;
 
   /// Constraint which doesn't have any free type variables associated
   /// with it, which makes it disconnected in the graph.
-  Constraint *OrphanedConstraint;
+  Constraint *OrphanedConstraint = nullptr;
 
-  ComponentStep(ConstraintSystem &cs, unsigned index, bool singleComponent,
+  ComponentStep(ConstraintSystem &cs, unsigned index, bool single,
+                ConstraintList *constraints,
                 SmallVectorImpl<Solution> &solutions)
-      : SolverStep(cs, solutions), Index(index),
-        OriginalScore(getCurrentScore()) {}
+      : SolverStep(cs, solutions), Index(index), IsSingle(single),
+        OriginalScore(getCurrentScore()), Constraints(constraints) {}
 
 public:
   /// Record a type variable as associated with this step.
   void record(TypeVariableType *typeVar) { TypeVars.push_back(typeVar); }
-
-  /// Record a constraint as associated with this step.
-  void record(Constraint *constraint) { Constraints.push_back(constraint); }
 
   /// Record a constraint as associated with this step but which doesn't
   /// have any free type variables associated with it.
@@ -307,15 +328,20 @@ public:
     OrphanedConstraint = constraint;
   }
 
-  void setup() override;
+  void setup() override {
+    // If this is a single component, there is
+    // no need to preliminary modify constraint system.
+    if (!IsSingle)
+      ComponentScope = llvm::make_unique<Scope>(*this);
+  }
+
   StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
 
   static ComponentStep *create(ConstraintSystem &cs, unsigned index,
-                               bool singleComponent,
+                               bool single, ConstraintList *constraints,
                                SmallVectorImpl<Solution> &solutions) {
-    return new (cs.getAllocator())
-        ComponentStep(cs, index, singleComponent, solutions);
+    return new ComponentStep(cs, index, single, constraints, solutions);
   }
 };
 
@@ -361,7 +387,7 @@ public:
   static TypeVariableStep *create(ConstraintSystem &cs,
                                   BindingContainer &bindings,
                                   SmallVectorImpl<Solution> &solutions) {
-    return new (cs.getAllocator()) TypeVariableStep(cs, bindings, solutions);
+    return new TypeVariableStep(cs, bindings, solutions);
   }
 };
 
@@ -405,7 +431,7 @@ public:
 
   static DisjunctionStep *create(ConstraintSystem &cs, Constraint *disjunction,
                                  SmallVectorImpl<Solution> &solutions) {
-    return new (cs.getAllocator()) DisjunctionStep(cs, disjunction, solutions);
+    return new DisjunctionStep(cs, disjunction, solutions);
   }
 
 private:
