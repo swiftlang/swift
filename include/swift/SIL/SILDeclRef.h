@@ -359,6 +359,11 @@ struct SILDeclRef {
   /// entry overridden by this method.
   SILDeclRef getOverriddenWitnessTableEntry() const;
 
+  /// Return the original protocol requirement that introduced the witness table
+  /// entry overridden by this method.
+  static AbstractFunctionDecl *getOverriddenWitnessTableEntry(
+                                                    AbstractFunctionDecl *func);
+
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;
 
