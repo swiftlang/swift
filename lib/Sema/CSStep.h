@@ -308,10 +308,14 @@ class ComponentStep final : public SolverStep {
   /// we need to keep active scope until all of the work is done.
   std::unique_ptr<Scope> ComponentScope = nullptr;
 
-  // Type variables and constraints "in scope" of this step.
+  /// Type variables and constraints "in scope" of this step.
   SmallVector<TypeVariableType *, 16> TypeVars;
-  // Constraints "in scope" of this step.
+  /// Constraints "in scope" of this step.
   ConstraintList *Constraints;
+
+  /// Number of disjunction constraints associated with this step,
+  /// used to aid in ordering of the components.
+  unsigned NumDisjunctions = 0;
 
   /// Constraint which doesn't have any free type variables associated
   /// with it, which makes it disconnected in the graph.
@@ -326,6 +330,13 @@ class ComponentStep final : public SolverStep {
 public:
   /// Record a type variable as associated with this step.
   void record(TypeVariableType *typeVar) { TypeVars.push_back(typeVar); }
+
+  /// Record a constraint as associated with this step.
+  void record(Constraint *constraint) {
+    Constraints->push_back(constraint);
+    if (constraint->getKind() == ConstraintKind::Disjunction)
+      ++NumDisjunctions;
+  }
 
   /// Record a constraint as associated with this step but which doesn't
   /// have any free type variables associated with it.
@@ -343,6 +354,10 @@ public:
 
   StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
+
+  bool operator>(const ComponentStep *other) const {
+    return NumDisjunctions > other->NumDisjunctions;
+  }
 
   void print(llvm::raw_ostream &Out) override {
     Out << "ComponentStep with at #" << Index << '\n';
