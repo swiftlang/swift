@@ -150,12 +150,21 @@ void SplitterStep::computeFollowupSteps(
   while (!workList.empty()) {
     auto *constraint = &workList.front();
     workList.pop_front();
-    Components[constraintComponent[constraint]].push_back(constraint);
+    componentSteps[constraintComponent[constraint]]->record(constraint);
   }
 
   // Remove all of the orphaned constraints; they'll be re-introduced
   // by each component independently.
   OrphanedConstraints = CG.takeOrphanedConstraints();
+
+  // Create component ordering based on the information associated
+  // with constraints in each step - e.g. number of disjunctions,
+  // since components are going to be executed in LIFO order, we'd
+  // want to have smaller/faster components at the back of the list.
+  std::sort(componentSteps.begin(), componentSteps.end(),
+            [](const ComponentStep *lhs, const ComponentStep *rhs) {
+              return lhs > rhs;
+            });
 }
 
 bool SplitterStep::mergePartialSolutions() const {
