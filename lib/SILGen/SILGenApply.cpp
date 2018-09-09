@@ -44,6 +44,21 @@ using namespace Lowering;
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
 
+SubstitutionMap SILGenModule::mapSubstitutionsForWitnessOverride(
+                                              AbstractFunctionDecl *original,
+                                              AbstractFunctionDecl *overridden,
+                                              SubstitutionMap subs) {
+  // Substitute the 'Self' type of the base protocol.
+  auto origProto = cast<ProtocolDecl>(original->getDeclContext());
+  Type origProtoSelfType = origProto->getProtocolSelfType();
+  auto baseProto = cast<ProtocolDecl>(overridden->getDeclContext());
+  return SubstitutionMap::getProtocolSubstitutions(
+           baseProto,
+           origProtoSelfType.subst(subs),
+           *subs.lookupConformance(origProtoSelfType->getCanonicalType(),
+                                   baseProto));
+}
+
 /// Return the abstraction pattern to use when calling a function value.
 static AbstractionPattern
 getIndirectApplyAbstractionPattern(SILGenFunction &SGF,
@@ -390,23 +405,16 @@ public:
                                  SILLocation l) {
     // Find a witness that has an entry in the witness table.
     if (!c.requiresNewWitnessTableEntry()) {
-      auto origProto =
-        cast<ProtocolDecl>(c.getDecl()->getDeclContext());
-
       // Retrieve the constant that has an entry in the witness table.
+      auto original = cast<AbstractFunctionDecl>(c.getDecl());
       c = c.getOverriddenWitnessTableEntry();
       c = c.asForeign(c.getDecl()->isObjC());
+      auto overridden = cast<AbstractFunctionDecl>(c.getDecl());
 
       // Substitute the 'Self' type of the base protocol.
-      auto baseProto = cast<ProtocolDecl>(c.getDecl()->getDeclContext());
-      Type origProtoSelfType = origProto->getProtocolSelfType();
-      auto baseProtoSubs =
-          SubstitutionMap::getProtocolSubstitutions(
-            baseProto,
-            origProtoSelfType.subst(subs),
-            *subs.lookupConformance(origProtoSelfType->getCanonicalType(),
-                                    baseProto));
-      subs = baseProtoSubs;
+      subs = SILGenModule::mapSubstitutionsForWitnessOverride(original,
+                                                              overridden,
+                                                              subs);
     }
 
     auto &ci = SGF.getConstantInfo(c);

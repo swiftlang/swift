@@ -2852,6 +2852,23 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                          ArrayRef<IndexTypePair> indexes,
                          CanType baseType,
                          CanType propertyType) {
+  // If the storage declaration is from a protocol, chase the override chain
+  // back to the declaration whose getter introduced the witness table
+  // entry.
+  if (auto origProto = dyn_cast<ProtocolDecl>(property->getDeclContext())) {
+    auto getter = property->getGetter();
+    if (!SILDeclRef::requiresNewWitnessTableEntry(getter)) {
+      // Find the getter that does have a witness table entry.
+      auto wtableGetter =
+        cast<AccessorDecl>(SILDeclRef::getOverriddenWitnessTableEntry(getter));
+
+      // Substitute the 'Self' type of the base protocol.
+      subs = SILGenModule::mapSubstitutionsForWitnessOverride(
+              getter, wtableGetter, subs);
+      property = wtableGetter->getStorage();
+    }
+  }
+
   auto genericSig = genericEnv
     ? genericEnv->getGenericSignature()->getCanonicalSignature()
     : nullptr;
@@ -2966,6 +2983,23 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                           ArrayRef<IndexTypePair> indexes,
                           CanType baseType,
                           CanType propertyType) {
+  // If the storage declaration is from a protocol, chase the override chain
+  // back to the declaration whose setter introduced the witness table
+  // entry.
+  if (auto origProto = dyn_cast<ProtocolDecl>(property->getDeclContext())) {
+    auto setter = property->getSetter();
+    if (!SILDeclRef::requiresNewWitnessTableEntry(setter)) {
+      // Find the setter that does have a witness table entry.
+      auto wtableSetter =
+        cast<AccessorDecl>(SILDeclRef::getOverriddenWitnessTableEntry(setter));
+
+      // Substitute the 'Self' type of the base protocol.
+      subs = SILGenModule::mapSubstitutionsForWitnessOverride(
+              setter, wtableSetter, subs);
+      property = wtableSetter->getStorage();
+    }
+  }
+
   auto genericSig = genericEnv
     ? genericEnv->getGenericSignature()->getCanonicalSignature()
     : nullptr;
