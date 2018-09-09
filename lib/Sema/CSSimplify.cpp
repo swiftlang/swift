@@ -1251,9 +1251,9 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   auto classDecl2 = type2->getClassOrBoundGenericClass();
-  for (auto super1 = TC.getSuperClassOf(type1);
+  for (auto super1 = type1->getSuperclass();
        super1;
-       super1 = TC.getSuperClassOf(super1)) {
+       super1 = super1->getSuperclass()) {
     if (super1->getClassOrBoundGenericClass() != classDecl2)
       continue;
 
@@ -4607,7 +4607,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     auto instance1 = type1->castTo<ExistentialMetatypeType>()->getInstanceType();
     auto instance2 = type2->castTo<MetatypeType>()->getInstanceType();
-    auto superclass1 = TC.getSuperClassOf(instance1);
+    auto superclass1 = instance1->getSuperclass();
 
     if (!superclass1)
       return SolutionKind::Error;
