@@ -2800,8 +2800,11 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
       originalTy->getParameters(), originalTy->getYields(), results,
       originalTy->getOptionalErrorResult(), context.getASTContext());
   SILFunctionBuilder FB(module);
+  auto linkage = original->getLinkage();
+  if (linkage == SILLinkage::Public)
+    linkage = SILLinkage::PublicNonABI;
   auto *primal = FB.getOrCreateFunction(
-      original->getLocation(), primalName, original->getLinkage(), primalTy,
+      original->getLocation(), primalName, linkage, primalTy,
       original->isBare(), original->isTransparent(), original->isSerialized());
   primal->setUnqualifiedOwnership();
   LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
@@ -2916,8 +2919,10 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
       origTy->getCoroutineKind(), origTy->getCalleeConvention(), adjParams, {},
       adjResults, None, original->getASTContext());
   SILFunctionBuilder FB(module);
-  auto *adjoint = FB.createFunction(
-      original->getLinkage(), adjName, adjType,
+  auto linkage = original->getLinkage();
+  if (linkage == SILLinkage::Public)
+    linkage = SILLinkage::PublicNonABI;
+  auto *adjoint = FB.createFunction(linkage, adjName, adjType,
       original->getGenericEnvironment(), original->getLocation(),
       original->isBare(), original->isTransparent(), original->isSerialized());
   adjoint->setUnqualifiedOwnership();
@@ -4199,8 +4204,11 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
         "AD__" + original->getName().str() + "__" + mangleADConfig(config);
     auto gradNameId = astCtx.getIdentifier(gradName);
     SILFunctionBuilder FB(module);
+    auto linkage = original->getLinkage();
+    if (linkage == SILLinkage::Public)
+      linkage = SILLinkage::PublicNonABI;
     auto *gradFn =
-        FB.createFunction(original->getLinkage(), gradNameId.str(), gradType,
+        FB.createFunction(linkage, gradNameId.str(), gradType,
                           original->getGenericEnvironment(),
                           original->getLocation(), original->isBare(),
                           original->isTransparent(), original->isSerialized());
