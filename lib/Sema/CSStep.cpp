@@ -46,6 +46,9 @@ ComponentStep::Scope::Scope(ComponentStep &component)
 }
 
 StepResult SplitterStep::take(bool prevFailed) {
+  if (prevFailed || CS.failedConstraint)
+    return done(/*isSuccess=*/false);
+
   SmallVector<ComponentStep *, 4> components;
   // Try to run "connected components" algorithm and split
   // type variables and their constraints into independent
