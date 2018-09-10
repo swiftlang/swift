@@ -1009,12 +1009,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (!isCascadingUse.hasValue())
             isCascadingUse = ACE->isCascadingContextForLookup(false);
         } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-          auto ExtendedNominal = ED->getExtendedNominal();
-          if (!ExtendedNominal) {
-            DC = ED->getParent();
-            continue;
-          }
-
           if (shouldLookupMembers(ED, Loc))
             populateLookupDeclsFromContext(ED);
 
