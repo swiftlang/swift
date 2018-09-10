@@ -75,10 +75,10 @@ class TestPerformanceTestSamples(unittest.TestCase):
             self.samples, (1000, 1000, 1000, 1000, 1000))
         self.samples.add(Sample(2, 1, 1100))
         self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1000, 1100, 1100, 1100))
+            self.samples, (1000, 1000, 1000, 1100, 1100))
         self.samples.add(Sample(3, 1, 1050))
         self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1050, 1050, 1100, 1100))
+            self.samples, (1000, 1000, 1050, 1100, 1100))
         self.samples.add(Sample(4, 1, 1025))
         self.assertEqualFiveNumberSummary(
             self.samples, (1000, 1025, 1050, 1050, 1100))
