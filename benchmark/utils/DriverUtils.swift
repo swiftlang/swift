@@ -32,8 +32,14 @@ struct BenchResults {
   }
 
   /// Return sample at index nearest to the `quantile`.
+  ///
+  /// Explicitly uses round-half-to-even rounding algorithm to match the
+  /// behavior of numpy's quantile(interpolation='nearest') and quantile
+  /// estimate type R-3, SAS-2. See:
+  /// https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample
   subscript(_ quantile: Double) -> T {
-    let index = Int((Double(samples.count - 1) * quantile).rounded())
+    let index = Int(
+      (Double(samples.count - 1) * quantile).rounded(.toNearestOrEven))
     return samples[index]
   }
 
