@@ -6,7 +6,6 @@
 // table entry for a protocol requirement is introduced.
 import protocol_overrides
 
-
 // CHECK-LABEL: sil hidden @$S25keypath_witness_overrides18getWritableKeyPath_5indexs03AnyfG0Cx_5IndexQzt09protocol_C015OverridesSetterRzSHAGRQlF
 func getWritableKeyPath<OS: OverridesSetter>(_ c: OS, index: OS.Index) -> AnyKeyPath
 where OS.Index: Hashable {
@@ -15,7 +14,7 @@ where OS.Index: Hashable {
   // CHECK-SAME: getter @$S18protocol_overrides14OriginalGetterPy7ElementQz5IndexQzcipAA15OverridesSetterRzSHAGRQlxxTK
   // CHECK-SAME: setter @$S18protocol_overrides10AddsSetterPy7ElementQz5IndexQzcipAA09OverridesD0RzSHAGRQlxxTk
   // CHECK-SAME: indices_equals @$S5Index18protocol_overrides14OriginalGetterPQzAB15OverridesSetterRzSHAERQlTH
-  // CHECK-SAMEL :indices_hash @$S5Index18protocol_overrides14OriginalGetterPQzAB15OverridesSetterRzSHAERQlTh
+  // CHECK-SAME: indices_hash @$S5Index18protocol_overrides14OriginalGetterPQzAB15OverridesSetterRzSHAERQlTh
   let keypath = \OS.[index]
   return keypath
 }
