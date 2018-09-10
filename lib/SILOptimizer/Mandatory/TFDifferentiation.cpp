@@ -529,6 +529,11 @@ private:
     auto *varDecl = new (ctx) VarDecl(
         /*IsStatic*/ false, VarDecl::Specifier::Var,
         /*IsCaptureList*/ false, SourceLoc(), id, type, primalValueStruct);
+    if (primalValueStruct->getEffectiveAccess() < AccessLevel::Public)
+      varDecl->getAttrs().add(
+          new (ctx) UsableFromInlineAttr(/*implicit*/ true));
+    else
+      varDecl->setAccess(AccessLevel::Public);
     varDecl->setInterfaceType(type);
     primalValueStruct->addMember(varDecl);
     return varDecl;
@@ -2161,10 +2166,8 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
          "The function must be in the same module");
   auto &file = getPrimalValueDeclContainer();
   // Create a `<fn_name>__Type` struct.
-  std::string pvStructName;
-  pvStructName += function->getName();
-  pvStructName += "__Type__";
-  pvStructName += mangleADIndices(task->getIndices());
+  std::string pvStructName = "AD__" + function->getName().str() + "__Type__" +
+                             mangleADIndices(task->getIndices());
   auto structId = astCtx.getIdentifier(pvStructName);
   SourceLoc loc = function->getLocation().getSourceLoc();
   auto pvStruct =
@@ -2174,10 +2177,18 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
                               /*DC*/ &file);
   pvStruct->computeType();
   if (auto *dc = function->getDeclContext()) {
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(dc))
-      pvStruct->setAccess(afd->getEffectiveAccess());
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(dc)) {
+      auto funcAccess = afd->getEffectiveAccess();
+      if (funcAccess >= AccessLevel::Public) {
+        pvStruct->getAttrs().add(
+            new (astCtx) FixedLayoutAttr(/*implicit*/ true));
+      }
+      pvStruct->setAccess(funcAccess);
+    }
   } else {
     pvStruct->setAccess(AccessLevel::Internal);
+    pvStruct->getAttrs().add(
+        new (astCtx) UsableFromInlineAttr(/*implicit*/ true));
   }
   // If the original function has generic parameters, clone them.
   auto *genEnv = function->getGenericEnvironment();
@@ -2770,7 +2781,7 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
   auto *original = task->getOriginal();
   auto &module = context.getModule();
   std::string primalName =
-      original->getName().str() + "__primal_" + mangleADIndices(indices);
+      "AD__" + original->getName().str() + "__primal_" + mangleADIndices(indices);
   StructDecl *primalValueStructDecl = context.createPrimalValueStruct(task);
   task->initializePrimalInfo(primalValueStructDecl, module);
   auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
@@ -2898,7 +2909,7 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
   // Add seed type.
   adjParams.push_back(getFormalParameterInfo(
       origTy->getResults()[task->getIndices().source].getType(), module));
-  auto adjName = original->getName().str() + "__adjoint_" +
+  auto adjName = "AD__" + original->getName().str() + "__adjoint_" +
                  mangleADIndices(task->getIndices());
   auto adjType = SILFunctionType::get(
       origTy->getGenericSignature(), origTy->getExtInfo(),
@@ -3358,6 +3369,12 @@ public:
       else
         materializeAdjointIndirect(adjVal, adjParam);
     }
+
+    for (auto arg : adjoint.getArgumentsWithoutIndirectResults())
+      if (arg->getType().isObject() &&
+          arg->getOwnershipKind() == ValueOwnershipKind::Owned)
+        getBuilder().createDestroyValue(adjLoc, arg);
+
     getBuilder().createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
     return errorOccurred;
   }
@@ -4179,7 +4196,7 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
   auto createGradFunction = [&](const SILReverseAutoDiffConfig &config) {
     auto gradType = origTy->getGradientType(config, module);
     std::string gradName =
-        original->getName().str() + "__" + mangleADConfig(config);
+        "AD__" + original->getName().str() + "__" + mangleADConfig(config);
     auto gradNameId = astCtx.getIdentifier(gradName);
     SILFunctionBuilder FB(module);
     auto *gradFn =
