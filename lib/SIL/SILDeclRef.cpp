@@ -789,6 +789,9 @@ SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
 
 AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(
                                                  AbstractFunctionDecl *func) {
+  if (!isa<ProtocolDecl>(func->getDeclContext()))
+    return func;
+
   AbstractFunctionDecl *bestOverridden = nullptr;
 
   SmallVector<AbstractFunctionDecl *, 4> stack;
