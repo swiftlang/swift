@@ -184,6 +184,8 @@ void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
   if (!hasDelayedDeclList(IDC))
     return;
   SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
+  assert(!SF.hasInterfaceHash() &&
+    "Cannot delay parsing if we care about the interface hash.");
   unsigned BufferID = *SF.getBufferID();
   // MarkedPos is not useful for delayed parsing because we know where we should
   // jump the parser to. However, we should recover the MarkedPos here in case
@@ -3346,7 +3348,10 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
   return !RBLoc.isValid();
 }
 
-bool Parser::canDelayBodyParsing() {
+bool Parser::canDelayMemberDeclParsing() {
+  // Calculating interface hash requires tokens consumed in the original order.
+  if (SF.hasInterfaceHash())
+    return false;
   if (SF.Kind == SourceFileKind::REPL)
     return false;
   // We always collect the entire syntax tree for IDE uses.
@@ -3433,7 +3438,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     ContextChange CC(*this, ext);
     Scope S(this, ScopeKind::Extension);
     ParseDeclOptions Options(PD_HasContainerType | PD_InExtension);
-    if (canDelayBodyParsing()) {
+    if (canDelayMemberDeclParsing()) {
       if (Tok.is(tok::r_brace)) {
         RBLoc = consumeToken();
       } else {
@@ -5550,7 +5555,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   } else {
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement | PD_InEnum);
-    if (canDelayBodyParsing()) {
+    if (canDelayMemberDeclParsing()) {
       if (Tok.is(tok::r_brace)) {
         RBLoc = consumeToken();
       } else {

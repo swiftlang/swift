@@ -867,12 +867,6 @@ public:
     /// A UTF-16 string.
     UTF16,
 
-    /// A UTF-8 constant string.
-    UTF8ConstString,
-
-    /// A UTF-16 constant string.
-    UTF16ConstString,
-
     /// A single UnicodeScalar, passed as an integer.
     OneUnicodeScalar
   };

@@ -719,16 +719,6 @@ SILCloner<ImplClass>::visitStringLiteralInst(StringLiteralInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitConstStringLiteralInst(
-    ConstStringLiteralInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-                getBuilder().createConstStringLiteral(
-                    getOpLocation(Inst->getLoc()), Inst->getValue(),
-                    Inst->getEncoding()));
-}
-
-template <typename ImplClass>
 void SILCloner<ImplClass>::visitLoadInst(LoadInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createLoad(getOpLocation(Inst->getLoc()),

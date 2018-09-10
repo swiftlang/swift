@@ -1401,7 +1401,7 @@ public:
   ParserResult<LanguageVersionConstraintAvailabilitySpec>
   parseLanguageVersionConstraintSpec();
 
-  bool canDelayBodyParsing();
+  bool canDelayMemberDeclParsing();
 };
 
 /// Describes a parsed declaration name.
