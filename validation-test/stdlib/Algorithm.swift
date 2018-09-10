@@ -284,7 +284,7 @@ Algorithm.test("heapSort") {
   } // addOne end.
 
   // Test binary number size.
-  let numberLength = 21
+  let numberLength = 11
   var binaryNumber = [Int](repeating: 0, count: numberLength)
 
   // We are testing sort on all permutations off 0-1s of size `numberLength`
