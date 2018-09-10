@@ -3067,6 +3067,10 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   /// so that it can also be added to the lookup table (if needed).
   void addedMember(Decl *member);
 
+  /// Note that we have added an extension into the nominal type,
+  /// so that its members can eventually be added to the lookup table.
+  void addedExtension(ExtensionDecl *ext);
+
   /// \brief A lookup table used to find the protocol conformances of
   /// a given nominal type.
   mutable ConformanceLookupTable *ConformanceTable = nullptr;
