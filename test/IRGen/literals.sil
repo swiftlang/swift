@@ -6,12 +6,6 @@
 // CHECK: [[U8_1:@.*]] = private unnamed_addr constant [5 x i8] c"\00x\C6\AB\00"
 // CHECK: [[U16_0:@.*]] = private unnamed_addr constant [8 x i16] [i16 104, i16 101, i16 108, i16 112, i16 9, i16 109, i16 101, i16 0]
 // CHECK: [[U16_1:@.*]] = private unnamed_addr constant [4 x i16] [i16 0, i16 120, i16 427, i16 0]
-// CHECK: @"$Ss19_UTF16StringStorageCN" = external global %objc_class
-// CHECK: [[UTF16_CSTR_0:@.*]] = private unnamed_addr constant { %swift.refcounted, i32, i32, i8, i8, [8 x i16] } { %swift.refcounted { %swift.type* bitcast (%objc_class* @"$Ss19_UTF16StringStorageCN" to %swift.type*), i64 8589934594 }, i32 7, i32 8, i8 0, i8 0, [8 x i16] [i16 104, i16 101, i16 108, i16 112, i16 9, i16 109, i16 101, i16 0] }
-// CHECK: [[UTF16_CSTR_1:@.*]] = private unnamed_addr constant { %swift.refcounted, i32, i32, i8, i8, [9 x i16] } { %swift.refcounted { %swift.type* bitcast (%objc_class* @"$Ss19_UTF16StringStorageCN" to %swift.type*), i64 8589934594 }, i32 8, i32 9, i8 0, i8 0, [9 x i16] [i16 104, i16 101, i16 108, i16 112, i16 9, i16 109, i16 101, i16 0, i16 0] }
-// CHECK: @"$Ss20_Latin1StringStorageCN" = external global %objc_class
-// CHECK: [[CSTR_0:@.*]] = private unnamed_addr constant { %swift.refcounted, i32, i32, i8, [12 x i8] } { %swift.refcounted { %swift.type* bitcast (%objc_class* @"$Ss20_Latin1StringStorageCN" to %swift.type*), i64 8589934594 }, i32 11, i32 12, i8 0, [12 x i8] c"help\09me too\00" }
-// CHECK: [[CSTR_1:@.*]] = private unnamed_addr constant { %swift.refcounted, i32, i32, i8, [13 x i8] } { %swift.refcounted { %swift.type* bitcast (%objc_class* @"$Ss20_Latin1StringStorageCN" to %swift.type*), i64 8589934594 }, i32 12, i32 13, i8 0, [13 x i8] c"help\09me too\00\00" }
 
 sil_stage canonical
 
@@ -44,42 +38,5 @@ bb0:
 sil @utf16_literal_with_nul : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %0 = string_literal utf16 "\u{00}x\u{01ab}"
-  return %0 : $Builtin.RawPointer
-}
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @utf16_literal_with_nul() {{.*}} {
-// CHECK:   ret i8* bitcast ([4 x i16]* [[U16_1]] to i8*)
-
-// CHECK-LABEL: define{{.*}} swiftcc i8* @constant_string_literals_utf16
-// CHECK: ret i8* {{.*}}[[UTF16_CSTR_0]]
-sil @constant_string_literals_utf16 : $@convention(thin) () -> Builtin.RawPointer {
-bb0:
-  %0 = const_string_literal utf16 "help\tme"
-  %1 = const_string_literal utf16 "help\tme\0"
-  %2 = const_string_literal utf8 "help\tme too"
-  %3 = const_string_literal utf8 "help\tme too\0"
-  return %0 : $Builtin.RawPointer
-}
-
-// CHECK-LABEL: define{{.*}} swiftcc i8* @constant_string_literals_utf16_nul
-// CHECK: ret i8* {{.*}}[[UTF16_CSTR_1]]
-sil @constant_string_literals_utf16_nul : $@convention(thin) () -> Builtin.RawPointer {
-bb0:
-  %0 = const_string_literal utf16 "help\tme\0"
-  return %0 : $Builtin.RawPointer
-}
-
-// CHECK-LABEL: define{{.*}} swiftcc i8* @constant_string_literals_utf8
-// CHECK: ret i8* {{.*}}[[CSTR_0]]
-sil @constant_string_literals_utf8 : $@convention(thin) () -> Builtin.RawPointer {
-bb0:
-  %0 = const_string_literal utf8 "help\tme too"
-  return %0 : $Builtin.RawPointer
-}
-
-// CHECK-LABEL: define{{.*}} swiftcc i8* @constant_string_literals_utf8_nul
-// CHECK: ret i8* {{.*}}[[CSTR_1]]
-sil @constant_string_literals_utf8_nul : $@convention(thin) () -> Builtin.RawPointer {
-bb0:
-  %0 = const_string_literal utf8 "help\tme too\0"
   return %0 : $Builtin.RawPointer
 }

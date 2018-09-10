@@ -471,18 +471,6 @@ public protocol _ExpressibleByBuiltinUTF16StringLiteral
     utf16CodeUnitCount: Builtin.Word)
 }
 
-public protocol _ExpressibleByBuiltinConstStringLiteral
-  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
-
-  init(_builtinConstStringLiteral constantString: Builtin.RawPointer)
-}
-
-public protocol _ExpressibleByBuiltinConstUTF16StringLiteral
-  : _ExpressibleByBuiltinConstStringLiteral {
-
-  init(_builtinConstUTF16StringLiteral constantUTF16String: Builtin.RawPointer)
-}
-
 /// A type that can be initialized with a string literal.
 ///
 /// The `String` and `StaticString` types conform to the

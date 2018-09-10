@@ -751,33 +751,6 @@ uint64_t StringLiteralInst::getCodeUnitCount() {
   return SILInstruction::Bits.StringLiteralInst.Length;
 }
 
-ConstStringLiteralInst::ConstStringLiteralInst(SILDebugLocation Loc,
-                                               StringRef Text,
-                                               Encoding encoding, SILType Ty)
-    : InstructionBase(Loc, Ty) {
-  SILInstruction::Bits.ConstStringLiteralInst.TheEncoding = unsigned(encoding);
-  SILInstruction::Bits.ConstStringLiteralInst.Length = Text.size();
-  memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
-}
-
-ConstStringLiteralInst *ConstStringLiteralInst::create(SILDebugLocation Loc,
-                                                       StringRef text,
-                                                       Encoding encoding,
-                                                       SILModule &M) {
-  void *buf =
-      allocateLiteralInstWithTextSize<ConstStringLiteralInst>(M, text.size());
-
-  auto Ty = SILType::getRawPointerType(M.getASTContext());
-  return ::new (buf) ConstStringLiteralInst(Loc, text, encoding, Ty);
-}
-
-uint64_t ConstStringLiteralInst::getCodeUnitCount() {
-  auto E = unsigned(Encoding::UTF16);
-  if (SILInstruction::Bits.ConstStringLiteralInst.TheEncoding == E)
-    return unicode::getUTF16Length(getValue());
-  return SILInstruction::Bits.ConstStringLiteralInst.Length;
-}
-
 StoreInst::StoreInst(
     SILDebugLocation Loc, SILValue Src, SILValue Dest,
     StoreOwnershipQualifier Qualifier = StoreOwnershipQualifier::Unqualified)
