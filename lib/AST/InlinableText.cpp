@@ -122,12 +122,6 @@ struct ExtractInactiveRanges : public ASTWalker {
 };
 } // end anonymous namespace
 
-StringRef swift::extractInlinableBodyText(const AbstractFunctionDecl *func,
-                                          SmallVectorImpl<char> &scratch) {
-  auto &sm = func->getASTContext().SourceMgr;
-  return extractInlinableText(sm, func->getBody(), scratch);
-}
-
 StringRef
 swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
                             SmallVectorImpl<char> &scratch) {

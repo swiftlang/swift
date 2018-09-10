@@ -21,10 +21,6 @@
 
 namespace swift {
 class SourceManager;
-class AbstractFunctionDecl;
-
-StringRef extractInlinableBodyText(const AbstractFunctionDecl *func,
-                                   SmallVectorImpl<char> &scratch);
 
 /// Extracts the text of this ASTNode from the source buffer, ignoring
 /// all #if declarations and clauses except the elements that are active.

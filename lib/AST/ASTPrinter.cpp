@@ -83,8 +83,9 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
-    if (!AFD) return;
-    if (!AFD->getAttrs().hasAttribute<InlinableAttr>())
+    if (!AFD || AFD->isImplicit()) return;
+    if (!AFD->getBody() || AFD->getBody()->isImplicit()) return;
+    if (AFD->getResilienceExpansion() != ResilienceExpansion::Minimal)
       return;
     SmallString<128> scratch;
     printer << " " << AFD->getBodyStringRepresentation(scratch);
