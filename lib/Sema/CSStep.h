@@ -498,6 +498,16 @@ private:
   bool shortCircuitDisjunctionAt(Constraint *currentChoice,
                                  Constraint *lastSuccessfulChoice) const;
 
+  /// Attempt to apply given disjunction choice to constraint system.
+  /// This action is going to establish "active choice" of this disjunction
+  /// to point to a given choice.
+  ///
+  /// \param choice The choice to attempt.
+  ///
+  /// \return true if the choice has been accepted and system can be
+  /// simplified further, false otherwise.
+  bool attemptChoice(const DisjunctionChoice &choice);
+
   // Check if selected disjunction has a representative
   // this might happen when there are multiple binary operators
   // chained together. If so, disable choices which differ

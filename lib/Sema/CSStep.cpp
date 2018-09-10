@@ -409,20 +409,12 @@ StepResult DisjunctionStep::take(bool prevFailed) {
       log << '\n';
     }
 
-    {
-      auto scope = llvm::make_unique<Scope>(CS);
-      // Attempt current disjunction choice, which is going to simplify
-      // constraint system by binding some of the type variables. Since
-      // the system has been simplified and is splittable, we simplify
-      // have to return "split" step which is going to take care of the rest.
-      if (!currentChoice.attempt(CS))
-        continue;
-
-      // Establish the "active" choice which maintains new scope in the
-      // constraint system, be be able to rollback all of the changes later.
-      ActiveChoice.emplace(std::move(scope), currentChoice);
+    /// Attempt given disjunction choice, which is going to simplify
+    /// constraint system by binding some of the type variables. Since
+    /// the system has been simplified and is splittable, we simplify
+    /// have to return "split" step which is going to take care of the rest.
+    if (attemptChoice(currentChoice))
       return suspend(SplitterStep::create(CS, Solutions));
-    }
   }
 
   return done(/*isSuccess=*/bool(LastSolvedChoice));
@@ -570,4 +562,36 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
     return true;
 
   return false;
+}
+
+bool DisjunctionStep::attemptChoice(const DisjunctionChoice &choice) {
+  auto scope = llvm::make_unique<Scope>(CS);
+  ++CS.solverState->NumDisjunctionTerms;
+
+  // If the disjunction requested us to, remember which choice we
+  // took for it.
+  if (auto *disjunctionLocator = Producer.getLocator()) {
+    auto index = choice.getIndex();
+    CS.DisjunctionChoices.push_back({disjunctionLocator, index});
+
+    // Implicit unwraps of optionals are worse solutions than those
+    // not involving implicit unwraps.
+    if (!disjunctionLocator->getPath().empty()) {
+      auto kind = disjunctionLocator->getPath().back().getKind();
+      if (kind == ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice ||
+          kind == ConstraintLocator::DynamicLookupResult) {
+        assert(index == 0 || index == 1);
+        if (index == 1)
+          CS.increaseScore(SK_ForceUnchecked);
+      }
+    }
+  }
+
+  if (!choice.attempt(CS))
+    return false;
+
+  // Establish the "active" choice which maintains new scope in the
+  // constraint system, be be able to rollback all of the changes later.
+  ActiveChoice.emplace(std::move(scope), choice);
+  return true;
 }

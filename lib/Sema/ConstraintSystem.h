@@ -62,6 +62,7 @@ class SolverStep;
 class SplitterStep;
 class ComponentStep;
 class TypeVariableStep;
+class DisjunctionStep;
 
 } // end namespace constraints
 
@@ -940,6 +941,7 @@ public:
   friend class SplitterStep;
   friend class ComponentStep;
   friend class TypeVariableStep;
+  friend class DisjunctionStep;
 
   class SolverScope;
 
