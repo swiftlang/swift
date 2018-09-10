@@ -2274,10 +2274,6 @@ namespace {
       auto interpolationType =
         simplifyType(DependentMemberType::get(openedType, associatedTypeDecl));
 
-      // HACK: Without this, appendInterpolation() overloads in extensions are sometimes
-      // ignored by interpolations in TopLevelCodeDecls in the same file.
-      interpolationType->getAs<NominalOrBoundGenericNominalType>()->getDecl()->loadAllMembers();
-
       // interpolationInitCall = """
       //   StringInterpolationProtocol.init(
       //     literalCapacity: \(expr->getLiteralCapacity()), 

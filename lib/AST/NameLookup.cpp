@@ -1409,6 +1409,11 @@ void NominalTypeDecl::addedMember(Decl *member) {
   }
 }
 
+void NominalTypeDecl::addedExtension(ExtensionDecl * ext) {
+  if (hasLazyMembers())
+    setLookupTablePopulated(false);
+}
+
 void ExtensionDecl::addedMember(Decl *member) {
   if (NextExtension.getInt()) {
     auto nominal = getExtendedNominal();
@@ -1573,13 +1578,17 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
     if (!isLookupTablePopulated()) {
       setLookupTablePopulated(true);
       LookupTable.getPointer()->addMembers(getCurrentMembersWithoutLoading());
-      for (auto *m : getCurrentMembersWithoutLoading()) {
-        if (auto v = dyn_cast<ValueDecl>(m)) {
-          populateLookupTableEntryFromExtensions(getASTContext(),
-                                                 *LookupTable.getPointer(),
-                                                 this, v->getBaseName(),
-                                                 ignoreNewExtensions);
-        }
+
+      llvm::SetVector<DeclName> baseNamesPresent;
+      for (auto entry : *LookupTable.getPointer()) {
+        baseNamesPresent.insert(entry.getFirst().getBaseName());
+      }
+      
+      for (auto baseName : baseNamesPresent) {
+        populateLookupTableEntryFromExtensions(getASTContext(),
+                                               *LookupTable.getPointer(),
+                                               this, baseName,
+                                               ignoreNewExtensions);
       }
     }
 
