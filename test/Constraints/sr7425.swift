@@ -12,11 +12,6 @@ extension Y {
   var bar: Int { return foo }
 }
 
-protocol Z : Y {
-  var foo: Int { get }
-  var bar: Int { get }
-}
-
 class GenericClass<T> {
   var foo: T
   init(_ foo: T) { self.foo = foo }
@@ -33,16 +28,6 @@ func testGenericPropertyProtocolClass<T : X & Y>(_ t: T) {
 }
 
 func testExistentialPropertyProtocolClass(_ t: X & Y) {
-  _ = t.foo
-  _ = t.bar
-}
-
-func testGenericPropertySubclassConstrainedProtocol<T : Z>(_ t: T) {
-  _ = t.foo
-  _ = t.bar
-}
-
-func testExistentialPropertySubclassConstrainedProtocol(_ t: Z) {
   _ = t.foo
   _ = t.bar
 }

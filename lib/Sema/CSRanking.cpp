@@ -1002,8 +1002,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         choice1.getKind() != OverloadChoiceKind::DeclViaDynamic &&
         choice2.getKind() != OverloadChoiceKind::DeclViaDynamic &&
         isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
-      auto *nominal1 = dc1->getSelfNominalTypeDecl();
-      auto *nominal2 = dc2->getSelfNominalTypeDecl();
+      auto *nominal1 = dc1->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *nominal2 = dc2->getAsNominalTypeOrNominalTypeExtensionContext();
       if (nominal1 && nominal2 && nominal1 != nominal2) {
         isVarAndNotProtocol1 = !isa<ProtocolDecl>(nominal1);
         isVarAndNotProtocol2 = !isa<ProtocolDecl>(nominal2);
