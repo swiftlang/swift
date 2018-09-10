@@ -14,7 +14,6 @@
 #define SWIFT_AST_INLINABLETEXT_H
 
 #include "swift/AST/ASTNode.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallVector.h"
