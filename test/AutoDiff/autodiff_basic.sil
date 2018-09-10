@@ -29,14 +29,14 @@ bb0(%0 : @trivial $Float):
 
 // CHECK-LABEL: sil hidden @bar :
 // CHECK: bb0
-// CHECK:   %1 = function_ref @foo__grad_src_0_wrt_0 : $@convention(thin) (Float) -> Float
+// CHECK:   %1 = function_ref @AD__foo__grad_src_0_wrt_0 : $@convention(thin) (Float) -> Float
 // CHECK:   %2 = apply %1(%0) : $@convention(thin) (Float) -> Float
-// CHECK:   %3 = function_ref @foo__grad_src_0_wrt_0_p : $@convention(thin) (Float) -> (Float, Float)
+// CHECK:   %3 = function_ref @AD__foo__grad_src_0_wrt_0_p : $@convention(thin) (Float) -> (Float, Float)
 // CHECK:   %4 = apply %3(%2) : $@convention(thin) (Float) -> (Float, Float)
 // CHECK:   return %4 : $(Float, Float)
 // CHECK: }
 
-// CHECK-LABEL:sil hidden @foo__grad_src_0_wrt_0_s_p :
+// CHECK-LABEL:sil hidden @AD__foo__grad_src_0_wrt_0_s_p :
 // CHECK: bb0
 // CHECK:   %2 = function_ref @foo : $@convention(thin) (Float) -> Float
 // CHECK:   %3 = apply %2(%0) : $@convention(thin) (Float) -> Float
@@ -46,7 +46,7 @@ bb0(%0 : @trivial $Float):
 // CHECK:   return %6 : $(Float, Float)
 // CHECK: }
 
-// CHECK-LABEL: sil hidden @foo__grad_src_0_wrt_0 : $@convention(thin) (Float) -> Float {
+// CHECK-LABEL: sil hidden @AD__foo__grad_src_0_wrt_0 : $@convention(thin) (Float) -> Float {
 // CHECK: bb0(%0 : $Float):
 // CHECK:   %1 = alloc_stack $Float
 // CHECK:   %2 = integer_literal $Builtin.Int2048, 1
@@ -62,13 +62,13 @@ bb0(%0 : @trivial $Float):
 // CHECK:   %12 = load %11 : $*Float
 // CHECK:   end_access %11 : $*Float
 // CHECK:   dealloc_stack %1 : $*Float
-// CHECK:   %15 = function_ref @foo__grad_src_0_wrt_0_s_p : $@convention(thin) (Float, Float) -> (Float, Float)
+// CHECK:   %15 = function_ref @AD__foo__grad_src_0_wrt_0_s_p : $@convention(thin) (Float, Float) -> (Float, Float)
 // CHECK:   %16 = apply %15(%0, %12) : $@convention(thin) (Float, Float) -> (Float, Float)
 // CHECK:   %17 = tuple_extract %16 : $(Float, Float), 1
 // CHECK:   return %17 : $Float
 // CHECK: }
 
-// CHECK-LABEL: sil hidden @foo__grad_src_0_wrt_0_p : $@convention(thin) (Float) -> (Float, Float) {
+// CHECK-LABEL: sil hidden @AD__foo__grad_src_0_wrt_0_p : $@convention(thin) (Float) -> (Float, Float) {
 // CHECK: bb0(%0 : $Float):
 // CHECK:   %1 = alloc_stack $Float
 // CHECK:   %2 = integer_literal $Builtin.Int2048, 1
@@ -84,7 +84,7 @@ bb0(%0 : @trivial $Float):
 // CHECK:   %12 = load %11 : $*Float
 // CHECK:   end_access %11 : $*Float
 // CHECK:   dealloc_stack %1 : $*Float
-// CHECK:   %15 = function_ref @foo__grad_src_0_wrt_0_s_p : $@convention(thin) (Float, Float) -> (Float, Float)
+// CHECK:   %15 = function_ref @AD__foo__grad_src_0_wrt_0_s_p : $@convention(thin) (Float, Float) -> (Float, Float)
 // CHECK:   %16 = apply %15(%0, %12) : $@convention(thin) (Float, Float) -> (Float, Float)
 // CHECK:   return %16 : $(Float, Float)
 // CHECK: }
