@@ -1256,12 +1256,6 @@ public:
   /// \brief Add the given members to the lookup table.
   void addMembers(DeclRange members);
 
-  /// \brief The given extension has been extended with new members; add them
-  /// if appropriate.
-  void addExtensionMembers(NominalTypeDecl *nominal,
-                           ExtensionDecl *ext,
-                           DeclRange members);
-
   /// Iterator into the lookup table.
   typedef LookupTable::iterator iterator;
 
@@ -1395,26 +1389,6 @@ void MemberLookupTable::addMembers(DeclRange members) {
   for (auto member : members) {
     addMember(member);
   }
-}
-
-void MemberLookupTable::addExtensionMembers(NominalTypeDecl *nominal,
-                                            ExtensionDecl *ext,
-                                            DeclRange members) {
-  // We have not processed any extensions yet, so there's nothing to do.
-  if (!LastExtensionIncluded)
-    return;
-
-  // If this extension shows up in the list of extensions not yet included
-  // in the lookup table, there's nothing to do.
-  for (auto notIncluded = LastExtensionIncluded->NextExtension.getPointer();
-       notIncluded;
-       notIncluded = notIncluded->NextExtension.getPointer()) {
-    if (notIncluded == ext)
-      return;
-  }
-
-  // Add the new members to the lookup table.
-  addMembers(members);
 }
 
 void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
