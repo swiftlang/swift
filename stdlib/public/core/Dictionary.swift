@@ -785,6 +785,61 @@ extension Dictionary {
         removeValue(forKey: key)
       }
     }
+    _modify {
+      // FIXME: This code should be moved to _variant, with Dictionary.subscript
+      // yielding `&_variant[key]`.
+
+      // Look up (empty or occupied) bucket corresponding to the given key.
+      let isUnique = _variant.isUniquelyReferenced()
+      var idealBucket = _variant.asNative._bucket(key)
+      var (pos, found) = _variant.asNative._find(key, startBucket: idealBucket)
+
+      // Prepare storage.
+      // If `key` isn't in the dictionary yet, assume that this access will end
+      // up inserting it. (If we guess wrong, we might needlessly expand
+      // storage; that's fine.) Otherwise this can only be a removal or an
+      // in-place mutation.
+      let (_, rehashed) = _variant.ensureUniqueNative(
+        withCapacity: self.count + (found ? 0 : 1),
+        isUnique: isUnique)
+      // FIXME: we should be able to make this a let; however, some of the
+      // low-level operations below are (incorrectly) marked as mutating.
+      var native = _variant.asNative
+      if rehashed {
+        // Key needs to be hashed again if storage has been resized.
+        _sanityCheck(!found)
+        idealBucket = native._bucket(key)
+        (pos, found) = native._find(key, startBucket: idealBucket)
+        _sanityCheck(!found)
+      }
+      // FIXME: Mark this entry as being modified in hash table metadata
+      // so that lldb can recognize it's not valid.
+
+      // Move the old value (if any) out of storage, wrapping it into an
+      // optional before yielding it.
+      var value: Value? = found ? native.moveValue(at: pos.bucket) : nil
+      yield &value
+
+      // Value is now potentially different. Check which one of the four
+      // possible cases apply.
+      switch (found, value != nil) {
+      case (true, true): // Mutation
+        // Initialize storage to new value.
+        (native.values + pos.bucket).initialize(to: value!)
+      case (true, false): // Removal
+        // We've already removed the value; deinitialize and remove the key too.
+        native.destroyHalfEntry(at: pos.bucket)
+        native._deleteDestroyed(idealBucket: idealBucket, bucket: pos.bucket)
+      case (false, true): // Insertion
+        // Insert the new entry at the correct place.
+        // We've already ensured we have enough capacity.
+        native.initializeKey(key, value: value!, at: pos.bucket)
+        native.count += 1
+      case (false, false): // Noop
+        // Easy!
+        break
+      }
+    }
   }
 }
 
@@ -2224,6 +2279,21 @@ internal struct _NativeDictionary<Key, Value> {
     _storage.initializedEntries[i] = false
   }
 
+  @inlinable
+  internal func moveValue(at bucket: Int) -> Value {
+    defer { _fixLifetime(self) }
+    return (values + bucket).move()
+  }
+
+  // This assumes the value is already deinitialized.
+  @inlinable
+  internal func destroyHalfEntry(at bucket: Int) {
+    _sanityCheck(isInitializedEntry(at: bucket))
+    defer { _fixLifetime(self) }
+    (keys + bucket).deinitialize(count: 1)
+    _storage.initializedEntries[bucket] = false
+  }
+
   @usableFromInline @_transparent
   internal func initializeKey(_ k: Key, value v: Value, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
@@ -2488,6 +2558,13 @@ extension _NativeDictionary where Key: Hashable {
 
     // remove the element
     destroyEntry(at: bucket)
+    _deleteDestroyed(idealBucket: idealBucket, bucket: bucket)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  internal mutating func _deleteDestroyed(idealBucket: Int, bucket: Int) {
+    _sanityCheck(!isInitializedEntry(at: bucket), "expected initialized entry")
+
     self.count -= 1
 
     // If we've put a hole in a chain of contiguous elements, some
@@ -3138,14 +3215,26 @@ extension Dictionary._Variant: _DictionaryBuffer {
   internal mutating func _ensureUniqueNative(
     withBucketCount desiredBucketCount: Int
   ) -> (reallocated: Bool, capacityChanged: Bool) {
-    let oldBucketCount = asNative.bucketCount
     let isUnique = isUniquelyReferenced()
+    return _ensureUniqueNative(
+      withBucketCount: desiredBucketCount,
+      isUnique: isUnique)
+  }
+
+  @inline(__always)
+  @inlinable // FIXME(sil-serialize-all)
+  internal mutating func _ensureUniqueNative(
+    withBucketCount desiredBucketCount: Int,
+    isUnique: Bool
+  ) -> (reallocated: Bool, capacityChanged: Bool) {
+    let oldBucketCount = asNative.bucketCount
     if oldBucketCount >= desiredBucketCount && isUnique {
       return (reallocated: false, capacityChanged: false)
     }
 
     let oldDictionary = asNative
-    var newDictionary = _NativeDictionary<Key, Value>(bucketCount: desiredBucketCount)
+    var newDictionary = _NativeDictionary<Key, Value>(
+      bucketCount: desiredBucketCount)
     let newBucketCount = newDictionary.bucketCount
     for i in 0..<oldBucketCount {
       if oldDictionary.isInitializedEntry(at: i) {
@@ -3164,7 +3253,9 @@ extension Dictionary._Variant: _DictionaryBuffer {
     newDictionary.count = oldDictionary.count
 
     self = .native(newDictionary)
-    return (reallocated: true, capacityChanged: oldBucketCount != newBucketCount)
+    return (
+      reallocated: true,
+      capacityChanged: oldBucketCount != newBucketCount)
   }
 
   @inline(__always)
@@ -3176,6 +3267,18 @@ extension Dictionary._Variant: _DictionaryBuffer {
       forCapacity: minimumCapacity,
       maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
     return ensureUniqueNative(withBucketCount: bucketCount)
+  }
+
+  @inline(__always)
+  @inlinable // FIXME(sil-serialize-all)
+  internal mutating func ensureUniqueNative(
+    withCapacity minimumCapacity: Int,
+    isUnique: Bool
+  ) -> (reallocated: Bool, capacityChanged: Bool) {
+    let bucketCount = _NativeDictionary<Key, Value>.bucketCount(
+      forCapacity: minimumCapacity,
+      maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
+    return _ensureUniqueNative(withBucketCount: bucketCount, isUnique: isUnique)
   }
 
   /// Ensure this we hold a unique reference to a native dictionary

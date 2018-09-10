@@ -1144,8 +1144,11 @@ public:
 
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);
-
   void emitDispatchThunk(SILDeclRef declRef);
+
+  llvm::Function *getAddrOfMethodLookupFunction(ClassDecl *classDecl,
+                                                ForDefinition_t forDefinition);
+  void emitMethodLookupFunction(ClassDecl *classDecl);
 
   llvm::GlobalValue *defineAlias(LinkEntity entity,
                                  llvm::Constant *definition);
@@ -1153,7 +1156,8 @@ public:
   llvm::GlobalValue *defineMethodDescriptor(SILDeclRef declRef,
                                             NominalTypeDecl *nominalDecl,
                                             llvm::Constant *definition);
-
+  llvm::Constant *getAddrOfMethodDescriptor(SILDeclRef declRef,
+                                            ForDefinition_t forDefinition);
 
   Address getAddrOfEnumCase(EnumElementDecl *Case,
                             ForDefinition_t forDefinition);

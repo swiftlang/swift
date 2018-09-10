@@ -782,12 +782,22 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
 }
 
 SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
-  ValueDecl *bestOverridden = nullptr;
+  auto bestOverridden =
+    getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
+  return SILDeclRef(bestOverridden, kind, isCurried);
+}
 
-  SmallVector<ValueDecl *, 4> stack;
-  SmallPtrSet<ValueDecl *, 4> visited;
-  stack.push_back(getDecl());
-  visited.insert(getDecl());
+AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(
+                                                 AbstractFunctionDecl *func) {
+  if (!isa<ProtocolDecl>(func->getDeclContext()))
+    return func;
+
+  AbstractFunctionDecl *bestOverridden = nullptr;
+
+  SmallVector<AbstractFunctionDecl *, 4> stack;
+  SmallPtrSet<AbstractFunctionDecl *, 4> visited;
+  stack.push_back(func);
+  visited.insert(func);
 
   while (!stack.empty()) {
     auto current = stack.back();
@@ -802,7 +812,7 @@ SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
                         cast<ProtocolDecl>(current->getDeclContext()),
                         cast<ProtocolDecl>(bestOverridden->getDeclContext()))
             < 0) {
-        bestOverridden = current;
+        bestOverridden = cast<AbstractFunctionDecl>(current);
       }
 
       continue;
@@ -810,12 +820,13 @@ SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
 
     // Add overridden declarations to the stack.
     for (auto overridden : overriddenDecls) {
-      if (visited.insert(overridden).second)
-        stack.push_back(overridden);
+      auto overriddenFunc = cast<AbstractFunctionDecl>(overridden);
+      if (visited.insert(overriddenFunc).second)
+        stack.push_back(overriddenFunc);
     }
   }
 
-  return SILDeclRef(bestOverridden, kind, isCurried);
+  return bestOverridden;
 }
 
 SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {

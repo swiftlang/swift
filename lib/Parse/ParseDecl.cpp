@@ -185,6 +185,11 @@ void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
     return;
   SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
   unsigned BufferID = *SF.getBufferID();
+  // MarkedPos is not useful for delayed parsing because we know where we should
+  // jump the parser to. However, we should recover the MarkedPos here in case
+  // the PersistentParserState will be used to continuously parse the rest of
+  // the file linearly.
+  llvm::SaveAndRestore<ParserPosition> Pos(MarkedPos, ParserPosition());
   Parser TheParser(BufferID, SF, nullptr, this);
   // Disable libSyntax creation in the delayed parsing.
   TheParser.SyntaxContext->disable();
@@ -300,6 +305,16 @@ bool Parser::parseTopLevel() {
 static Optional<StringRef>
 getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
                                   StringRef DiagText) {
+  // FIXME: Support extended escaping / multiline string literal.
+  if (Tok.getCustomDelimiterLen()) {
+    P.diagnose(Loc, diag::attr_extended_escaping_string, DiagText);
+    return None;
+  }
+  if (Tok.isMultilineString()) {
+    P.diagnose(Loc, diag::attr_multiline_string, DiagText);
+    return None;
+  }
+
   SmallVector<Lexer::StringSegment, 1> Segments;
   P.L->getStringLiteralSegments(Tok, Segments);
   if (Segments.size() != 1 ||
@@ -4502,8 +4517,8 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
     storage->setInvalid(true);
 
     Pattern *pattern =
-      new (Context) TypedPattern(new (Context) NamedPattern(storage),
-                                 TypeLoc::withoutLoc(ErrorType::get(Context)));
+      TypedPattern::createImplicit(Context, new (Context) NamedPattern(storage),
+                                   ErrorType::get(Context));
     PatternBindingEntry entry(pattern, /*EqualLoc*/ SourceLoc(),
                               /*Init*/ nullptr, /*InitContext*/ nullptr);
     auto binding = PatternBindingDecl::create(Context, StaticLoc,
@@ -5135,7 +5150,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
           }
 
           TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
-                                                           TP->getTypeLoc());
+                                                           TP->getTypeRepr());
           NewTP->setPropagatedType();
           PBDEntries[i-1].setPattern(NewTP);
         }

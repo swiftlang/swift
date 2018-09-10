@@ -5536,6 +5536,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       // We have a designated initializer. Create an override of it.
+      // FIXME: Validation makes sure we get a generic signature here.
+      validateDecl(classDecl);
       if (auto ctor = createDesignatedInitOverride(
                         *this, classDecl, superclassCtor, kind)) {
         Context.addSynthesizedDecl(ctor);
