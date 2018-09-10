@@ -4,7 +4,7 @@
 // RUN:    | %FileCheck %s --check-prefix=SIL
 // IR.
 // RUN: %target-swift-frontend -parse-as-library -module-name A \
-// RUN:      -Xllvm -debug-info-inlined-generics %s -g -O -o - -emit-ir \
+// RUN:      %s -g -O -o - -emit-ir \
 // RUN:      | %FileCheck %s --check-prefix=IR
 
 import StdlibUnittest

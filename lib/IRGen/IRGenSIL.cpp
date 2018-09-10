@@ -80,11 +80,6 @@
 using namespace swift;
 using namespace irgen;
 
-// FIXME: Remove this option entirely and turn this on by default.
-llvm::cl::opt<bool> DebugInfoInlinedGenerics(
-    "debug-info-inlined-generics", llvm::cl::init(false),
-    llvm::cl::desc("Emit variable debug info for inlined generic functions"));
-
 namespace {
 
 class LoweredValue;
@@ -859,17 +854,6 @@ public:
     copy.push_back(Alloca.getAddressPointer());
   }
 
-  /// Determine whether a generic variable has been inlined.
-  static bool isInlinedGeneric(VarDecl *VarDecl, const SILDebugScope *DS) {
-    if (DebugInfoInlinedGenerics)
-      return false;
-    if (!DS->InlinedCallSite)
-      return false;
-    if (VarDecl->hasType())
-      return VarDecl->getType()->hasArchetype();
-    return VarDecl->getInterfaceType()->hasTypeParameter();
-  }
-
   /// Force all archetypes referenced by the type to be bound by this point.
   /// TODO: just make sure that we have a path to them that the debug info
   ///       can follow.
@@ -892,11 +876,6 @@ public:
                                     StringRef Name,
                                     unsigned ArgNo = 0,
                                     IndirectionKind Indirection = DirectValue) {
-    // FIXME: The debug info type of all inlined instances of a variable must be
-    // the same as the type of the abstract variable.
-    if (isInlinedGeneric(VarDecl, DS))
-      return;
-
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
@@ -4222,9 +4201,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
       RealType, type);
-
-  if (isInlinedGeneric(Decl, i->getDebugScope()))
-    return;
 
   auto Storage = emitShadowCopyIfNeeded(
       boxWithAddr.getAddress(), i->getDebugScope(), Name, 0, IsAnonymous);
