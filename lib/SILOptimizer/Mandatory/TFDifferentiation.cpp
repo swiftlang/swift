@@ -3374,12 +3374,6 @@ public:
       else
         materializeAdjointIndirect(adjVal, adjParam);
     }
-
-    for (auto arg : adjoint.getArgumentsWithoutIndirectResults())
-      if (arg->getType().isObject() &&
-          arg->getOwnershipKind() == ValueOwnershipKind::Owned)
-        getBuilder().createDestroyValue(adjLoc, arg);
-
     getBuilder().createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
     return errorOccurred;
   }
