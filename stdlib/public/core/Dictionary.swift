@@ -926,11 +926,11 @@ extension Dictionary {
     get {
       return _variant.maybeGet(key) ?? defaultValue()
     }
-    mutableAddressWithNativeOwner {
+    _modify {
       let (_, address) = _variant.pointerToValue(
         forKey: key,
         insertingDefault: defaultValue)
-      return (address, Builtin.castToNativeObject(_variant.asNative._storage))
+      yield &address.pointee
     }
   }
 
