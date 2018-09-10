@@ -65,6 +65,10 @@ public:
     return finalize();
   }
 
+  std::string mangleMethodLookupFunction(const ClassDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Mu");
+  }
+
   std::string mangleValueWitness(Type type, ValueWitness witness);
 
   std::string mangleValueWitnessTable(Type type) {

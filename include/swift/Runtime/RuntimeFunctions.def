@@ -773,6 +773,17 @@ FUNCTION(InitClassMetadata,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
+// void *swift_lookUpClassMethod(Metadata *metadata,
+//                               ClassDescriptor *description,
+//                               MethodDescriptor *method);
+FUNCTION(LookUpClassMethod,
+         swift_lookUpClassMethod, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(TypeMetadataPtrTy,
+              MethodDescriptorStructTy->getPointerTo(),
+              TypeContextDescriptorPtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_initStructMetadata(Metadata *structType,
 //                               StructLayoutFlags flags,
 //                               size_t numFields,

@@ -2364,49 +2364,27 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                               SILDeclRef method,
                                               CanSILFunctionType methodType,
                                               bool useSuperVTable) {
-  AbstractFunctionDecl *methodDecl
-    = cast<AbstractFunctionDecl>(method.getDecl());
-
-  // Find the vtable entry for this method.
-  SILDeclRef overridden = method.getOverriddenVTableEntry();
-
   // Find the metadata.
   llvm::Value *metadata;
   if (useSuperVTable) {
-    auto instanceTy = baseType;
-    if (auto metaTy = dyn_cast<MetatypeType>(baseType.getASTType()))
-      instanceTy = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
-
-    if (IGF.IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
-                            ResilienceExpansion::Maximal)) {
-      // The derived type that is making the super call is resilient,
-      // for example we may be in an extension of a class outside of our
-      // resilience domain. So, we need to load the superclass metadata
-      // dynamically.
-
-      metadata = emitClassHeapMetadataRef(IGF, instanceTy.getASTType(),
-                                          MetadataValueType::TypeMetadata,
-                                          MetadataState::Complete);
-      auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
-      metadata = IGF.Builder.CreateLoad(superField);
-    } else {
-      // Otherwise, we can directly load the statically known superclass's
-      // metadata.
-      auto superTy = instanceTy.getSuperclass();
-      metadata = emitClassHeapMetadataRef(IGF, superTy.getASTType(),
-                                          MetadataValueType::TypeMetadata,
-                                          MetadataState::Complete);
-    }
+    // For a non-resilient 'super' call, emit a reference to the superclass
+    // of the static type of the 'self' value.
+    auto instanceTy = baseType.getASTType()->getMetatypeInstanceType();
+    auto superTy = instanceTy->getSuperclass();
+    metadata = emitClassHeapMetadataRef(IGF,
+                                        superTy->getCanonicalType(),
+                                        MetadataValueType::TypeMetadata,
+                                        MetadataState::Complete);
   } else {
-    if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||
-        (isa<ConstructorDecl>(methodDecl) &&
-         method.kind == SILDeclRef::Kind::Allocator)) {
+    if (baseType.is<MetatypeType>()) {
+      // For a static method call, the 'self' value is already a class metadata.
       metadata = base;
     } else {
+      // Otherwise, load the class metadata from the 'self' value's isa pointer.
       metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
                                                   /*suppress cast*/ true);
     }
   }
 
-  return emitVirtualMethodValue(IGF, metadata, overridden, methodType);
+  return emitVirtualMethodValue(IGF, metadata, method, methodType);
 }

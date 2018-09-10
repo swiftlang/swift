@@ -382,6 +382,7 @@ private:
     case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
     case Node::Kind::MethodDescriptor:
+    case Node::Kind::MethodLookupFunction:
     case Node::Kind::ModifyAccessor:
     case Node::Kind::NativeOwningAddressor:
     case Node::Kind::NativeOwningMutableAddressor:
@@ -910,6 +911,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::MethodDescriptor:
     Printer << "method descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::MethodLookupFunction:
+    Printer << "method lookup function for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::OutlinedBridgedMethod:

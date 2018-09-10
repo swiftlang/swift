@@ -72,6 +72,7 @@
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenModule.h"
+#include "MetadataLayout.h"
 #include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
 #include "ReferenceTypeInfo.h"
@@ -5506,8 +5507,74 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   auto baseType = i->getOperand()->getType();
   llvm::Value *baseValue = base.claimNext();
 
-  auto method = i->getMember();
+  auto method = i->getMember().getOverriddenVTableEntry();
   auto methodType = i->getType().castTo<SILFunctionType>();
+
+  auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
+
+  // If the class defining the vtable entry is resilient, we cannot assume
+  // its offset since methods can be re-ordered resiliently. Instead, we call
+  // the class method lookup function, passing in a reference to the
+  // method descriptor.
+  if (IGM.isResilient(classDecl, ResilienceExpansion::Maximal)) {
+    // Load the superclass of the static type of the 'self' value.
+    llvm::Value *superMetadata;
+    auto instanceTy = CanType(baseType.getASTType()->getMetatypeInstanceType());
+    if (!IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
+                         ResilienceExpansion::Maximal)) {
+      // It's still possible that the static type of 'self' is not resilient, in
+      // which case we can assume its superclass.
+      //
+      // An example is the following hierarchy, where ModuleA is resilient and
+      // we're inside ModuleB:
+      //
+      // ModuleA.Base <-- defines method
+      // |
+      // \- ModuleB.Middle
+      //    |
+      //    \- ModuleB.Derived <-- static type of 'self'
+      //
+      // It's OK to know that the superclass of Derived is Middle, but the
+      // method requires using a resilient access pattern.
+      auto superTy = instanceTy->getSuperclass();
+      superMetadata = emitClassHeapMetadataRef(*this, superTy->getCanonicalType(),
+                                               MetadataValueType::TypeMetadata,
+                                               MetadataState::Complete);
+    } else {
+      // Otherwise, we're in the most general case; the superclass might change,
+      // so we have to load it dynamically from the metadata of the static type
+      // of 'self'.
+      auto *metadata = emitClassHeapMetadataRef(*this, instanceTy,
+                                                MetadataValueType::TypeMetadata,
+                                                MetadataState::Complete);
+
+      auto superField = emitAddressOfSuperclassRefInClassMetadata(*this, metadata);
+      superMetadata = Builder.CreateLoad(superField);
+    }
+
+    // Get the method descriptor.
+    auto *methodDescriptor =
+      IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
+
+    // Get the method lookup function for the class defining the method.
+    auto *lookupFn = IGM.getAddrOfMethodLookupFunction(classDecl,
+                                                       NotForDefinition);
+
+    // Call the lookup function.
+    llvm::Value *fnPtr = Builder.CreateCall(lookupFn,
+                                            {superMetadata, methodDescriptor});
+
+    // The function returns an i8*; cast it to the correct type.
+    auto sig = IGM.getSignature(methodType);
+    fnPtr = Builder.CreateBitCast(fnPtr, sig.getType()->getPointerTo());
+
+    FunctionPointer fn(fnPtr, sig);
+
+    setLoweredFunctionPointer(i, fn);
+    return;
+  }
+
+  // Non-resilient case.
 
   auto fn = emitVirtualMethodValue(*this, baseValue, baseType,
                                    method, methodType,
@@ -5529,14 +5596,12 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *baseValue = base.claimNext();
 
-  SILDeclRef method = i->getMember();
+  SILDeclRef method = i->getMember().getOverriddenVTableEntry();
   auto methodType = i->getType().castTo<SILFunctionType>();
 
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
-
   if (IGM.isResilient(classDecl,
                       ResilienceExpansion::Maximal)) {
-    method = method.getOverriddenVTableEntry();
     auto *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
     auto sig = IGM.getSignature(methodType);
     FunctionPointer fn(fnPtr, sig);

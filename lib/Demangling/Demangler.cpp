@@ -1479,6 +1479,8 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::ClassMetadataBaseOffset);
     case 'p':
       return createWithChild(Node::Kind::ProtocolDescriptor, popProtocol());
+    case 'u':
+      return createWithPoppedType(Node::Kind::MethodLookupFunction);
     case 'B':
       return createWithChild(Node::Kind::ReflectionMetadataBuiltinDescriptor,
                              popNode(Node::Kind::Type));
