@@ -202,6 +202,8 @@ protected:
 
   Score getCurrentScore() const { return CS.CurrentScore; }
 
+  Optional<Score> getBestScore() const { return CS.solverState->BestScore; }
+
   void filterSolutions(SmallVectorImpl<Solution> &solutions, bool minimize) {
     if (!CS.retainAllSolutions())
       CS.filterSolutions(solutions, CS.solverState->ExprWeights, minimize);
@@ -304,6 +306,10 @@ class ComponentStep final : public SolverStep {
   /// the component step is taken.
   Score OriginalScore;
 
+  /// The original best score computed before any of the
+  /// component steps belonging to the same "split" are taken.
+  Optional<Score> OriginalBestScore;
+
   /// If this step depends on other smaller steps to be solved first
   /// we need to keep active scope until all of the work is done.
   std::unique_ptr<Scope> ComponentScope = nullptr;
@@ -325,9 +331,15 @@ class ComponentStep final : public SolverStep {
                 ConstraintList *constraints,
                 SmallVectorImpl<Solution> &solutions)
       : SolverStep(cs, solutions), Index(index), IsSingle(single),
-        OriginalScore(getCurrentScore()), Constraints(constraints) {}
+        OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
+        Constraints(constraints) {}
 
 public:
+  ~ComponentStep() {
+    // Restore the original best score.
+    CS.solverState->BestScore = OriginalBestScore;
+  }
+
   /// Record a type variable as associated with this step.
   void record(TypeVariableType *typeVar) { TypeVars.push_back(typeVar); }
 
