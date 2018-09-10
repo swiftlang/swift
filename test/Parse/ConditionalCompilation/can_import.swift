@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library
-// RUN: %target-typecheck-verify-swift -D WITH_PERFORM -primary-file %s %S/Inputs/can_import_nonprimary_file.swift
+// RUN: %target-typecheck-verify-swift -D WITH_PERFORM -primary-file %S/Inputs/can_import_nonprimary_file.swift
 
 public struct LibraryDependentBool : ExpressibleByBooleanLiteral {
 #if canImport(Swift)

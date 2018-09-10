@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -typecheck -swift-version 4 %s -verify
-// RUN: %target-typecheck-verify-swift -typecheck -swift-version 4 -debug-generic-signatures %s > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4 -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P0 { }
