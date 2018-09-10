@@ -185,6 +185,11 @@ void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
     return;
   SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
   unsigned BufferID = *SF.getBufferID();
+  // MarkedPos is not useful for delayed parsing because we know where we should
+  // jump the parser to. However, we should recover the MarkedPos here in case
+  // the PersistentParserState will be used to continuously parse the rest of
+  // the file linearly.
+  llvm::SaveAndRestore<ParserPosition> Pos(MarkedPos, ParserPosition());
   Parser TheParser(BufferID, SF, nullptr, this);
   // Disable libSyntax creation in the delayed parsing.
   TheParser.SyntaxContext->disable();
