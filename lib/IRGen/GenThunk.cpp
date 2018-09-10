@@ -126,6 +126,8 @@ llvm::Constant *
 IRGenModule::getAddrOfMethodDescriptor(SILDeclRef declRef,
                                        ForDefinition_t forDefinition) {
   assert(forDefinition == NotForDefinition);
+  assert(declRef.getOverriddenWitnessTableEntry() == declRef &&
+         "Overriding protocol requirements do not have method descriptors");
   LinkEntity entity = LinkEntity::forMethodDescriptor(declRef);
   return getAddrOfLLVMVariable(entity, Alignment(4), forDefinition,
                                MethodDescriptorStructTy, DebugTypeInfo());
