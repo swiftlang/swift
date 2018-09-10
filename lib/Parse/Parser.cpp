@@ -216,9 +216,8 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
                                 const SourceManager &SM,
                                 int BufID, std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
-  bool IsMultiline = Tok.isMultilineString();
-  unsigned CustomDelimiterLen = Tok.getCustomDelimiterLen();
-  unsigned QuoteLen = (IsMultiline ? 3 : 1) + CustomDelimiterLen;
+  bool IsMultiline = Tok.IsMultilineString();
+  unsigned QuoteLen = IsMultiline ? 3 : 1;
   SmallVector<Lexer::StringSegment, 4> Segments;
   Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
   for (unsigned i = 0, e = Segments.size(); i != e; ++i) {
@@ -240,8 +239,7 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
 
       StringRef Text = SM.extractText({ Loc, Len });
       Token NewTok;
-      NewTok.setToken(tok::string_literal, Text,
-                      IsMultiline, CustomDelimiterLen);
+      NewTok.setToken(tok::string_literal, Text, IsMultiline);
       Toks.push_back(NewTok);
 
     } else {
@@ -374,7 +372,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
   }
 
   void relexComment(CharSourceRange CommentRange,
-                    llvm::SmallVectorImpl<Token> &Scratch) {
+                    llvm::SmallVectorImpl<Token> &Scracth) {
     Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
             HashbangMode::Disallowed,
             CommentRetentionMode::ReturnAsTokens,
@@ -387,7 +385,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
       if (Result.is(tok::eof))
         break;
       assert(Result.is(tok::comment));
-      Scratch.push_back(Result);
+      Scracth.push_back(Result);
     }
   }
 
