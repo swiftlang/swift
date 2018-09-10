@@ -128,6 +128,7 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
 void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
   assert(MainModule && "main module not created yet");
   PrimarySourceFiles.push_back(SF);
+  SF->enableInterfaceHash();
   SF->createReferencedNameTracker();
   if (SF->getBufferID().hasValue())
     recordPrimaryInputBuffer(SF->getBufferID().getValue());
