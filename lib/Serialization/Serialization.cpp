@@ -898,6 +898,8 @@ void Serializer::writeBlockInfoBlock() {
                               decls_block::GENERIC_REQUIREMENT);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::LAYOUT_REQUIREMENT);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::INLINABLE_BODY_TEXT);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -1359,6 +1361,19 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
           addTypeRef(req.getFirstType()), size, alignment);
     }
   }
+}
+
+void Serializer::writeInlinableBodyText(const AbstractFunctionDecl *AFD) {
+  using namespace decls_block;
+
+  if (AFD->getResilienceExpansion() != swift::ResilienceExpansion::Minimal)
+    return;
+  if (!AFD->hasInlinableBodyText()) return;
+  SmallString<128> scratch;
+  auto body = AFD->getBodyStringRepresentation(scratch);
+
+  unsigned abbrCode = DeclTypeAbbrCodes[InlinableBodyTextLayout::Code];
+  InlinableBodyTextLayout::emitRecord(Out, ScratchRecord, abbrCode, body);
 }
 
 bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
@@ -3235,6 +3250,8 @@ void Serializer::writeDecl(const Decl *D) {
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
 
+    writeInlinableBodyText(fn);
+
     break;
   }
 
@@ -3291,6 +3308,8 @@ void Serializer::writeDecl(const Decl *D) {
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
+
+    writeInlinableBodyText(fn);
 
     break;
   }
@@ -3444,6 +3463,9 @@ void Serializer::writeDecl(const Decl *D) {
 
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
+
+    writeInlinableBodyText(ctor);
+
     break;
   }
 
@@ -3460,6 +3482,7 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isObjC(),
                                  addGenericEnvironmentRef(
                                                 dtor->getGenericEnvironment()));
+    writeInlinableBodyText(dtor);
     break;
   }
 
@@ -4041,6 +4064,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<VarPatternLayout>();
   registerDeclTypeAbbr<AnyPatternLayout>();
   registerDeclTypeAbbr<TypedPatternLayout>();
+  registerDeclTypeAbbr<InlinableBodyTextLayout>();
   registerDeclTypeAbbr<GenericParamListLayout>();
   registerDeclTypeAbbr<GenericParamLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();

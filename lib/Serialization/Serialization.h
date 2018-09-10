@@ -324,6 +324,10 @@ private:
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams);
 
+  /// Writes the body text of the provided funciton, if the function is
+  /// inlinable and has body text.
+  void writeInlinableBodyText(const AbstractFunctionDecl *decl);
+
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
                          const std::array<unsigned, 256> &abbrCodes);

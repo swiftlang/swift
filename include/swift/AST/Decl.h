@@ -4988,7 +4988,6 @@ public:
 
 private:
   ParameterList *Params;
-  StringRef BodyStringRepresentation;
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
@@ -4996,7 +4995,13 @@ protected:
   union {
     /// This enum member is active if getBodyKind() is BodyKind::Parsed or
     /// BodyKind::TypeChecked.
-    BraceStmt *Body;
+    struct {
+      /// The AST node of the body.
+      BraceStmt *Node;
+
+      /// The string representation of the body, if anything.
+      StringRef StringRepresentation;
+    } Body;
 
     /// This enum member is active if getBodyKind() == BodyKind::Synthesize.
     BodySynthesizer Synthesizer;
@@ -5019,7 +5024,7 @@ protected:
                        GenericParamList *GenericParams)
       : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
         ValueDecl(Kind, Parent, Name, NameLoc),
-        Body(nullptr), ThrowsLoc(ThrowsLoc) {
+        Body({nullptr, {}}), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
@@ -5092,6 +5097,8 @@ public:
     return getBodyKind() != BodyKind::None;
   }
 
+  bool hasInlinableBodyText() const;
+
   /// Returns the function body, if it was parsed, or nullptr otherwise.
   ///
   /// Note that a null return value does not imply that the source code did not
@@ -5105,7 +5112,7 @@ public:
     }
     if (getBodyKind() == BodyKind::Parsed ||
         getBodyKind() == BodyKind::TypeChecked) {
-      return Body;
+      return Body.Node;
     }
     return nullptr;
   }
@@ -5113,7 +5120,7 @@ public:
     assert(getBodyKind() != BodyKind::Skipped &&
            "cannot set a body if it was skipped");
 
-    Body = S;
+    Body.Node = S;
     setBodyKind(NewBodyKind);
   }
 
@@ -5157,7 +5164,7 @@ public:
 
   StringRef getBodyStringRepresentation(SmallVectorImpl<char> &scratch) const;
   void setBodyStringRepresentation(StringRef body) {
-    BodyStringRepresentation = body;
+    Body.StringRepresentation = body;
   }
 
   bool isBodyTypeChecked() const {

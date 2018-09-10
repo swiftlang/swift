@@ -2397,7 +2397,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
       Printer << " {";
       Printer.printNewline();
-      Printer << getCodePlaceholder();
+      Printer << ExtraIndent << getCodePlaceholder();
       Printer.printNewline();
       Printer << "}";
     };

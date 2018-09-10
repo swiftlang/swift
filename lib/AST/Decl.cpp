@@ -5419,15 +5419,24 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
     computeSelfDeclType();
 }
 
+bool AbstractFunctionDecl::hasInlinableBodyText() const {
+  if (!Body.StringRepresentation.empty())
+    return true;
+  if (getBodyKind() != BodyKind::Parsed &&
+      getBodyKind() != BodyKind::TypeChecked)
+    return false;
+  auto body = getBody();
+  return body && !body->isImplicit();
+}
+
 StringRef AbstractFunctionDecl::getBodyStringRepresentation(
   SmallVectorImpl<char> &scratch) const {
-  if (!BodyStringRepresentation.empty())
-    return BodyStringRepresentation;
+  assert(hasInlinableBodyText() &&
+         "can't get string representation of function with no text");
+  if (!Body.StringRepresentation.empty())
+    return Body.StringRepresentation;
 
   auto body = getBody();
-  assert(body && !body->isImplicit() &&
-         "can't get string representation of function with implicit body");
-
   return extractInlinableText(getASTContext().SourceMgr, body, scratch);
 }
 
