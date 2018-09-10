@@ -275,7 +275,8 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto solution = CS.finalize();
   if (CS.TC.getLangOpts().DebugConstraintSolver) {
     auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-    log.indent(CS.solverState->depth * 2) << "(found solution)\n";
+    log.indent(CS.solverState->depth * 2)
+        << "(found solution " << getCurrentScore() << ")\n";
   }
 
   Solutions.push_back(std::move(solution));
