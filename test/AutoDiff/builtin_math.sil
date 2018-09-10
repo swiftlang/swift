@@ -105,7 +105,7 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK:   return %4 : $(AD__simple_mul__Type__src_0_wrt_0_1, Builtin.FPIEEE32)
 // CHECK: }
 
-// CHECK-LABEL: sil @AD__chain_rule__primal_src_0_wrt_0_1
+// CHECK-LABEL: @AD__chain_rule__primal_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
 // CHECK:   %2 = builtin "fneg_FPIEEE32"(%0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
