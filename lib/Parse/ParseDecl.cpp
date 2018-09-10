@@ -184,6 +184,8 @@ void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
   if (!hasDelayedDeclList(IDC))
     return;
   SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
+  assert(!SF.hasInterfaceHash() &&
+    "cannot perform delayed parsing while collecting inteface hash.");
   unsigned BufferID = *SF.getBufferID();
   // MarkedPos is not useful for delayed parsing because we know where we should
   // jump the parser to. However, we should recover the MarkedPos here in case
