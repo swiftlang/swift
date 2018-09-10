@@ -3026,11 +3026,11 @@ NOTE(force_optional_to_any,none,
 NOTE(silence_optional_to_any,none,
      "explicitly cast to %0 with '%1' to silence this warning",
      (Type, StringRef))
-WARNING(optional_in_string_interpolation_segment,none,
-        "string interpolation produces a debug description for an optional "
+WARNING(debug_description_in_string_interpolation_segment,none,
+        "string interpolation produces a debug description for %select{an optional|a function}0 "
         "value; did you mean to make this explicit?",
-        ())
-NOTE(silence_optional_in_interpolation_segment_call,none,
+        (bool))
+NOTE(silence_debug_description_in_interpolation_segment_call,none,
      "use 'String(describing:)' to silence this warning", ())
 
 ERROR(invalid_noescape_use,none,
