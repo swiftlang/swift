@@ -192,7 +192,10 @@ void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
   // the PersistentParserState will be used to continuously parse the rest of
   // the file linearly.
   llvm::SaveAndRestore<ParserPosition> Pos(MarkedPos, ParserPosition());
-  Parser TheParser(BufferID, SF, nullptr, this);
+
+  // Lexer diaganostics have been emitted during skipping, so we disable lexer's
+  // diagnostic engine here.
+  Parser TheParser(BufferID, SF, /*No Lexer Diags*/nullptr, nullptr, this);
   // Disable libSyntax creation in the delayed parsing.
   TheParser.SyntaxContext->disable();
   TheParser.parseDeclListDelayed(IDC);
@@ -2292,7 +2295,8 @@ static unsigned skipUntilMatchingRBrace(Parser &P, bool &HasPoundDirective,
   SyntaxParsingContext BodyContext(SyntaxContext, SyntaxKind::TokenList);
   unsigned OpenBraces = 1;
   while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
-    HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line);
+    HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line,
+      tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
     if (P.consumeIf(tok::l_brace)) {
       OpenBraces++;
       continue;
