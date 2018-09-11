@@ -4203,9 +4203,10 @@ struct Parser::ParsedAccessors {
   }
 };
 
-static bool parseAccessorIntroducer(Parser &P, bool parsingLimitedSyntax,
-                                    DeclAttributes &Attributes, AccessorKind &Kind,
-                                    AddressorKind &addressorKind, SourceLoc &Loc) {
+static bool parseAccessorIntroducer(Parser &P, DeclAttributes &Attributes,
+                                    AccessorKind &Kind,
+                                    AddressorKind &addressorKind,
+                                    SourceLoc &Loc) {
   bool FoundCCToken;
   P.parseDeclAttributeList(Attributes, FoundCCToken);
 
@@ -4260,20 +4261,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
   // SIL mode and textual interfaces use the same syntax.
   // Otherwise, we have a normal var or subscript declaration and we need
   // parse the full complement of specifiers, along with their bodies.
-  bool parsingLimitedSyntax = Flags.contains(PD_InProtocol);
-  if (!parsingLimitedSyntax) {
-    switch (SF.Kind) {
-    case SourceFileKind::Interface:
-      // FIXME: Textual interfaces /can/ have inlinable code but don't have to.
-    case SourceFileKind::SIL:
-      parsingLimitedSyntax = true;
-      break;
-    case SourceFileKind::Library:
-    case SourceFileKind::Main:
-    case SourceFileKind::REPL:
-      break;
-    }
-  }
+  bool parsingLimitedSyntax = Flags.contains(PD_InProtocol) ||
+                              SF.Kind == SourceFileKind::SIL;
 
   SyntaxParsingContext AccessorListCtx(SyntaxContext,
                                        SyntaxKind::AccessorBlock);
@@ -4328,7 +4317,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
     AddressorKind addressorKind = AddressorKind::NotAddressor;
     SourceLoc Loc;
     bool NotAccessor = parseAccessorIntroducer(
-        *this, parsingLimitedSyntax, Attributes, Kind, addressorKind, Loc);
+        *this, Attributes, Kind, addressorKind, Loc);
     if (NotAccessor) {
       AccessorCtx->setTransparent();
       AccessorCtx.reset();
@@ -4392,6 +4381,9 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
 
     // It's okay not to have a body if there's an external asm name.
     if (!Tok.is(tok::l_brace)) {
+      // Accessors don't need bodies in textual interfaces
+      if (SF.Kind == SourceFileKind::Interface)
+        continue;
       // _silgen_name'd accessors don't need bodies.
       if (!Attributes.hasAttribute<SILGenNameAttr>()) {
         diagnose(Tok, diag::expected_lbrace_accessor,
