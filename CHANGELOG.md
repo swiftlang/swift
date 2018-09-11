@@ -24,6 +24,28 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* [SR-4248][]:
+
+  In Swift 5 mode, when casting an optional value to a generic placeholder type,
+  the compiler will be more conservative with the unwrapping of the value. The 
+  result of such a cast now matches the result you would get in a non-generic
+  context.
+  
+  For example:
+  ```swift
+  func forceCast<U>(_ value: Any?, to type: U.Type) -> U {
+    return value as! U
+  }
+
+  let value: Any? = 42
+  print(forceCast(value, to: Any.self)) 
+  // prints: Optional(42)
+  // (prior to Swift 5, this would print: 42)
+  
+  print(value as! Any)                  
+  // prints: Optional(42)
+  ```
+
 * [SE-0214][]:
 
   Renamed the `DictionaryLiteral` type to `KeyValuePairs`.
@@ -7176,3 +7198,4 @@ Swift 1.0
 [SR-2388]: <https://bugs.swift.org/browse/SR-2388>
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
+[SR-4248]: <https://bugs.swift.org/browse/SR-4248>
