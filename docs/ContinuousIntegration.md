@@ -24,7 +24,21 @@ This page is designed to assist in the understanding of proper practices for tes
 
 In order for the Swift project to be able to advance quickly, it is important that we maintain a green build [[1]](#footnote-1). In order to help maintain this green build, the Swift project heavily uses pull request (PR) testing. Specifically, an important general rule is that **all** non-trivial checkins to any Swift Project repository should at least perform a [smoke test](#smoke-testing) if simulators will not be impacted *or* a full [validation test](#validation-testing) if simulators may be impacted. If in addition one is attempting to make a source breaking change across multiple repositories, one should follow the cross repo source breaking changes workflow. We now continue by describing the Swift system for Pull Request testing, @swift-ci:
 
-### @swift-ci
+### @swift-ci (Swift for TensorFlow)
+
+
+Platform     | Comment
+------------ | -------
+All supported platforms     | @swift-ci Please test tensorflow
+All supported platforms     | @swift-ci Please clean test tensorflow
+Linux                       | @swift-ci Please test tensorflow Linux
+Linux GPU                   | @swift-ci Please test tensorflow Linux GPU
+macOS                       | @swift-ci Please test tensorflow macOS
+
+Status can be checked at https://ci-external.swift.org/view/Pull%20Request/.
+
+
+### @swift-ci (general Swift)
 
 Users with [commit access](https://swift.org/contributing/#commit-access) can trigger pull request testing by writing a comment on a PR addressed to the GitHub user @swift-ci. Different tests will run depending on the specific comment used. The current test types are:
 
