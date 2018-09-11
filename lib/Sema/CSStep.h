@@ -23,6 +23,7 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
 
@@ -315,7 +316,7 @@ class ComponentStep final : public SolverStep {
   std::unique_ptr<Scope> ComponentScope = nullptr;
 
   /// Type variables and constraints "in scope" of this step.
-  SmallVector<TypeVariableType *, 16> TypeVars;
+  SmallPtrSet<TypeVariableType *, 16> TypeVars;
   /// Constraints "in scope" of this step.
   ConstraintList *Constraints;
 
@@ -341,7 +342,7 @@ public:
   }
 
   /// Record a type variable as associated with this step.
-  void record(TypeVariableType *typeVar) { TypeVars.push_back(typeVar); }
+  void record(TypeVariableType *typeVar) { TypeVars.insert(typeVar); }
 
   /// Record a constraint as associated with this step.
   void record(Constraint *constraint) {
