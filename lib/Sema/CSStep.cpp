@@ -47,7 +47,10 @@ ComponentStep::Scope::Scope(ComponentStep &component)
 }
 
 StepResult SplitterStep::take(bool prevFailed) {
-  if (prevFailed || CS.failedConstraint)
+  // "split" is considered a failure if previous step failed,
+  // or there is a failure recorded by constraint system, or
+  // system can't be simplified.
+  if (prevFailed || CS.failedConstraint || CS.simplify())
     return done(/*isSuccess=*/false);
 
   SmallVector<ComponentStep *, 4> components;
