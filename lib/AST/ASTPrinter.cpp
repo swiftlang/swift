@@ -125,7 +125,8 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
-  result.ExcludeAttrList = {DAK_ImplicitlyUnwrappedOptional, DAK_AccessControl};
+  result.ExcludeAttrList = {DAK_ImplicitlyUnwrappedOptional, DAK_AccessControl,
+                            DAK_SetterAccess};
 
   return result;
 }
@@ -527,6 +528,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printAccess(const ValueDecl *D) {
+    assert(!llvm::is_contained(Options.ExcludeAttrList, DAK_AccessControl) ||
+           llvm::is_contained(Options.ExcludeAttrList, DAK_SetterAccess));
+
     if (!Options.PrintAccess || isa<ProtocolDecl>(D->getDeclContext()))
       return;
     if (D->getAttrs().hasAttribute<AccessControlAttr>() &&

@@ -1282,13 +1282,26 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
                               createType(Nominal), remainingTypeList);
   }
 
-  if (Nominal->getNumChildren() < 2)
-    return nullptr;
-
-  NodePointer args = TypeLists[TypeListIdx++];
-
   // Generic arguments for the outermost type come first.
   NodePointer Context = Nominal->getFirstChild();
+
+  bool consumesGenericArgs = true;
+  switch (Nominal->getKind()) {
+    case Node::Kind::Variable:
+    case Node::Kind::ExplicitClosure:
+    case Node::Kind::Subscript:
+      // Those nodes can appear in the context but do not "consume" a generic
+      // argument type list.
+      consumesGenericArgs = false;
+      break;
+    default:
+      break;
+  }
+
+  NodePointer args = TypeLists[TypeListIdx];
+
+  if (consumesGenericArgs)
+    ++TypeListIdx;
 
   if (TypeListIdx < TypeLists.size()) {
     NodePointer BoundParent = nullptr;
@@ -1307,11 +1320,18 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
     }
     // Rebuild this type with the new parent type, which may have
     // had its generic arguments applied.
-    Nominal = createWithChildren(Nominal->getKind(), BoundParent,
-                                 Nominal->getChild(1));
-    if (!Nominal)
+    NodePointer NewNominal = createWithChild(Nominal->getKind(), BoundParent);
+    if (!NewNominal)
       return nullptr;
+
+    // Append remaining children of the origin nominal.
+    for (unsigned Idx = 1; Idx < Nominal->getNumChildren(); ++Idx) {
+      addChild(NewNominal, Nominal->getChild(Idx));
+    }
+    Nominal = NewNominal;
   }
+  if (!consumesGenericArgs)
+    return Nominal;
 
   // If there were no arguments at this level there is nothing left
   // to do.
@@ -1338,6 +1358,10 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
     case Node::Kind::TypeAlias:
       kind = Node::Kind::BoundGenericTypeAlias;
       break;
+    case Node::Kind::Function:
+    case Node::Kind::Constructor:
+      // Well, not really a nominal type.
+      return createWithChildren(Node::Kind::BoundGenericFunction, Nominal, args);
     default:
       return nullptr;
   }
