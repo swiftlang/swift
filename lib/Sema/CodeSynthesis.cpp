@@ -1786,6 +1786,7 @@ static bool wouldBeCircularSynthesis(AbstractStorageDecl *storage,
 void swift::triggerAccessorSynthesis(TypeChecker &TC,
                                      AbstractStorageDecl *storage) {
   auto VD = dyn_cast<VarDecl>(storage);
+  maybeAddAccessorsToStorage(TC, storage);
 
   // Synthesize accessors for lazy, all checking already been performed.
   bool lazy = false;

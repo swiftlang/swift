@@ -10,3 +10,16 @@
 class A {
   @objc func foo() { }
 }
+
+
+@objc class B {
+  @objc dynamic subscript(i: Int) -> B {
+    return self
+  }
+}
+
+class C: B {
+  override subscript(i: Int) -> B {
+    return super[i]
+  }
+}

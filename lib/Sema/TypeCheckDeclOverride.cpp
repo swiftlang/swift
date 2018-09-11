@@ -861,6 +861,13 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     if (!shouldDiagnose && baseDecl->isSettable(dc)){
       auto matchASD = cast<AbstractStorageDecl>(baseDecl);
       if (matchASD->isSetterAccessibleFrom(dc)) {
+        // Match sure we've created the setter.
+        if (!matchASD->getSetter()) {
+          maybeAddAccessorsToStorage(
+                           *static_cast<TypeChecker *>(ctx.getLazyResolver()),
+                           matchASD);
+        }
+
         auto matchSetterAccessScope = matchASD->getSetter()
           ->getFormalAccessScope(dc);
         auto requiredSetterAccessScope =
@@ -1753,8 +1760,14 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     // Check the various overridden storage declarations.
     SmallVector<OverrideMatch, 2> matches;
+    ASTContext &ctx = decl->getASTContext();
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
+      if (auto lazyResolver = ctx.getLazyResolver()) {
+        maybeAddAccessorsToStorage(*static_cast<TypeChecker *>(lazyResolver),
+                                   baseASD);
+      }
+
       auto kind = accessor->getAccessorKind();
 
       // If the base doesn't consider this an opaque accessor,

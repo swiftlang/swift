@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "CodeSynthesis.h"
 #include "CSDiagnostics.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckProtocol.h"
@@ -4112,6 +4113,7 @@ namespace {
         method = func;
       } else if (auto var = dyn_cast<VarDecl>(foundDecl)) {
         // Properties.
+        maybeAddAccessorsToStorage(tc, var);
 
         // If this isn't a property on a type, complain.
         if (!var->getDeclContext()->isTypeContext()) {
