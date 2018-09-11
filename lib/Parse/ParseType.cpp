@@ -438,8 +438,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
           .useArguments(TupleTypeNode->getElements())
           .useRightParen(TupleTypeNode->getRightParen());
       } else {
-        Builder
-          .addTupleTypeElement(SyntaxFactory::makeTupleTypeElement(InputNode));
+        Builder.addTupleTypeElement(SyntaxFactory::makeTupleTypeElement(
+            InputNode, /*TrailingComma=*/None, Context.getSyntaxArena()));
       }
       SyntaxContext->addSyntax(Builder.build());
     }
@@ -719,7 +719,8 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
 
   if (SyntaxContext->isEnabled() && Status.isSuccess()) {
     auto LastNode = SyntaxFactory::makeCompositionTypeElement(
-        SyntaxContext->popIf<TypeSyntax>().getValue(), None);
+        SyntaxContext->popIf<TypeSyntax>().getValue(), None,
+        SyntaxContext->getArena());
     SyntaxContext->addSyntax(LastNode);
   }
   SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
