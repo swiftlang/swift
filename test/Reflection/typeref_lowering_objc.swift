@@ -20,7 +20,7 @@
 // CHECK-NEXT: (reference kind=strong refcounting=unknown)
 
 12TypeLowering11HasObjCEnumV
-// CHECK: (struct size=24 alignment=8 stride=24 num_extra_inhabitants=0
+// CHECK: (struct size=24 alignment=8 stride=24 num_extra_inhabitants=2147483647
 // CHECK-NEXT:   (field name=optionalEnum offset=0
 // CHECK-NEXT:     (single_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0
 // CHECK-NEXT:       (field name=some offset=0
