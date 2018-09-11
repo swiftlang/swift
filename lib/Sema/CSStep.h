@@ -232,11 +232,6 @@ class SplitterStep final : public SolverStep {
       : SolverStep(cs, solutions) {}
 
 public:
-  ~SplitterStep() override {
-    auto &CG = CS.getConstraintGraph();
-    CG.setOrphanedConstraints(std::move(OrphanedConstraints));
-  }
-
   StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
 
@@ -359,6 +354,11 @@ public:
   }
 
   void setup() override {
+    // If this component has oprhaned constraint attached,
+    // let's return it ot the graph.
+    if (OrphanedConstraint)
+      CS.CG.setOrphanedConstraint(OrphanedConstraint);
+
     // If this is a single component, there is
     // no need to preliminary modify constraint system.
     if (!IsSingle)

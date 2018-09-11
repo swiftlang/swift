@@ -41,10 +41,6 @@ ComponentStep::Scope::Scope(ComponentStep &component)
   auto &workList = CS.InactiveConstraints;
   workList.splice(workList.end(), *component.Constraints);
 
-  auto &CG = CS.getConstraintGraph();
-  if (component.OrphanedConstraint)
-    CG.setOrphanedConstraint(component.OrphanedConstraint);
-
   SolverScope = new ConstraintSystem::SolverScope(CS);
   PrevPartialScope = CS.solverState->PartialSolutionScope;
   CS.solverState->PartialSolutionScope = SolverScope;
@@ -148,8 +144,14 @@ void SplitterStep::computeFollowupSteps(
       numComponents - CG.getOrphanedConstraints().size();
   {
     unsigned component = firstOrphanedConstraint;
-    for (auto constraint : CG.getOrphanedConstraints())
-      componentSteps[component++]->recordOrphan(constraint);
+    for (auto *constraint : CG.getOrphanedConstraints()) {
+      // Register this orphan constraint both as associated with
+      // a given component as a regular constrant, as well as an
+      // "orphan" constraint, so it can be proccessed correctly.
+      constraintComponent[constraint] = component;
+      componentSteps[component]->recordOrphan(constraint);
+      ++component;
+    }
   }
 
   // Transfer all of the constraints from the work list to
