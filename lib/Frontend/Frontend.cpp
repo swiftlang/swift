@@ -430,6 +430,10 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   return None;
 }
 
+std::unique_ptr<SILModule> CompilerInstance::takeSILModule() {
+  return std::move(TheSILModule);
+}
+
 ModuleDecl *CompilerInstance::getMainModule() {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
