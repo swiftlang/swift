@@ -3759,7 +3759,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
           if (isa<ExplicitCastExpr>(paren->getSubExpr()))
             continue;
 
-        bool isOptional = !!segment->getType()->getRValueType()->getOptionalObjectType();
+        bool isOptional = bool(segment->getType()->getRValueType()->getOptionalObjectType());
         bool isFunction = segment->getType()->getRValueType()->is<AnyFunctionType>();
 
         // Bail out if we don't have an optional and a function.
