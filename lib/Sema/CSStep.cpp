@@ -30,8 +30,13 @@ ComponentStep::Scope::Scope(ComponentStep &component)
     : CS(component.CS), Component(component) {
   TypeVars = std::move(CS.TypeVariables);
 
-  for (auto *typeVar : component.TypeVars)
-    CS.TypeVariables.push_back(typeVar);
+  for (auto *typeVar : component.TypeVars) {
+    // Include type variables that either belong to this
+    // component or have been bound.
+    if (component.TypeVars.count(typeVar) > 0 ||
+        typeVar->getImpl().getFixedType(nullptr))
+      CS.TypeVariables.push_back(typeVar);
+  }
 
   auto &workList = CS.InactiveConstraints;
   workList.splice(workList.end(), *component.Constraints);
