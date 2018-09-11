@@ -89,6 +89,11 @@ void TBDGenVisitor::addMethodDescriptor(SILDeclRef declRef) {
   addSymbol(entity);
 }
 
+void TBDGenVisitor::addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType) {
+  auto entity = LinkEntity::forAssociatedTypeDescriptor(assocType);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addConformances(DeclContext *DC) {
   for (auto conformance : DC->getLocalConformances()) {
     auto protocol = conformance->getProtocol();
@@ -376,8 +381,15 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
     if (PD->isResilient()) {
       for (auto *member : PD->getMembers()) {
         if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(member)) {
-          addDispatchThunk(SILDeclRef(funcDecl));
-          addMethodDescriptor(SILDeclRef(funcDecl));
+          if (SILDeclRef::requiresNewWitnessTableEntry(funcDecl)) {
+            addDispatchThunk(SILDeclRef(funcDecl));
+            addMethodDescriptor(SILDeclRef(funcDecl));
+          }
+        }
+
+        if (auto *assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+          if (assocType->getOverriddenDecls().empty())
+            addAssociatedTypeDescriptor(assocType);
         }
       }
     }

@@ -668,13 +668,22 @@ namespace {
                                pi.getNumWitnesses());
 
       for (auto &entry : pi.getWitnessEntries()) {
-        if (Resilient && entry.isFunction()) {
-          // Define the method descriptor.
-          SILDeclRef func(entry.getFunction());
-          auto *descriptor =
-            B.getAddrOfCurrentPosition(
-              IGM.ProtocolRequirementStructTy);
-          IGM.defineMethodDescriptor(func, Proto, descriptor);
+        if (Resilient) {
+          if (entry.isFunction()) {
+            // Define the method descriptor.
+            SILDeclRef func(entry.getFunction());
+            auto *descriptor =
+              B.getAddrOfCurrentPosition(
+                IGM.ProtocolRequirementStructTy);
+            IGM.defineMethodDescriptor(func, Proto, descriptor);
+          } else if (entry.isAssociatedType()) {
+            auto assocType = entry.getAssociatedType();
+            // Define the associated type descriptor to point to the current
+            // position in the protocol descriptor.
+            IGM.defineAssociatedTypeDescriptor(
+                assocType,
+                B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
+          }
         }
 
         auto reqt = B.beginStruct(IGM.ProtocolRequirementStructTy);
