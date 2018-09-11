@@ -2244,9 +2244,10 @@ bool ValueDecl::hasValidSignature() const {
   return getValidationState() != ValidationState::Checking;
 }
 
-Optional<ObjCSelector> ValueDecl::getObjCRuntimeName() const {
+Optional<ObjCSelector> ValueDecl::getObjCRuntimeName(
+                                              bool skipIsObjCResolution) const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
-    return func->getObjCSelector();
+    return func->getObjCSelector(DeclName(), skipIsObjCResolution);
 
   ASTContext &ctx = getASTContext();
   auto makeSelector = [&](Identifier name) -> ObjCSelector {
@@ -3257,8 +3258,9 @@ void ClassDecl::addImplicitDestructor() {
 
   // Mark DD as ObjC, as all dtors are.
   DD->setIsObjC(getASTContext().LangOpts.EnableObjCInterop);
-  if (getASTContext().LangOpts.EnableObjCInterop)
-    recordObjCMethod(DD);
+  if (getASTContext().LangOpts.EnableObjCInterop) {
+    recordObjCMethod(DD, DD->getObjCSelector());
+  }
 
   // Assign DD the interface type (Self) -> () -> ()
   DD->computeType();
@@ -5093,9 +5095,10 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
 }
 
 ObjCSelector
-AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
+AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
+                                      bool skipIsObjCResolution) const {
   // FIXME: Forces computation of the Objective-C selector.
-  if (getASTContext().getLazyResolver())
+  if (getASTContext().getLazyResolver() && !skipIsObjCResolution)
     (void)isObjC();
 
   // If there is an @objc attribute with a name, use that name.
@@ -5107,9 +5110,8 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
   auto &ctx = getASTContext();
 
   StringRef baseNameStr;
-  if (isa<DestructorDecl>(this)) {
-    // Deinitializers are always called "dealloc".
-    return ObjCSelector(ctx, 0, ctx.Id_dealloc);
+  if (auto destructor = dyn_cast<DestructorDecl>(this)) {
+    return destructor->getObjCSelector();
   } else if (auto func = dyn_cast<FuncDecl>(this)) {
     // Otherwise cast this to be able to access getName()
     baseNameStr = func->getName().str();
@@ -5645,6 +5647,12 @@ DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
                          /*GenericParams=*/nullptr),
     SelfDecl(nullptr) {
   setParameters(ParameterList::createEmpty(Parent->getASTContext()));
+}
+
+ObjCSelector DestructorDecl::getObjCSelector() const {
+  // Deinitializers are always called "dealloc".
+  auto &ctx = getASTContext();
+  return ObjCSelector(ctx, 0, ctx.Id_dealloc);
 }
 
 SourceRange FuncDecl::getSourceRange() const {

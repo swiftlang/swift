@@ -2499,7 +2499,7 @@ void ASTContext::recordObjCMethodConflict(ClassDecl *classDecl,
                                           ObjCSelector selector,
                                           bool isInstance) {
   getImpl().ObjCMethodConflicts.push_back(std::make_tuple(classDecl, selector,
-                                                     isInstance));
+                                                          isInstance));
 }
 
 /// Retrieve the source file for the given Objective-C member conflict.
