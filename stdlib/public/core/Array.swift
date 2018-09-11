@@ -527,16 +527,6 @@ extension Array: RandomAccessCollection, MutableCollection {
     return end - start
   }
 
-  // @inlinable
-  // public func _failEarlyRangeCheck(_ index: Int, bounds: Range<Int>) {
-  //   // NOTE: This method is a no-op for performance reasons.
-  // }
-  //
-  // @inlinable
-  // public func _failEarlyRangeCheck(_ range: Range<Int>, bounds: Range<Int>) {
-  //   // NOTE: This method is a no-op for performance reasons.
-  // }
-
   /// Accesses the element at the specified position.
   ///
   /// The following example uses indexed subscripting to update an array's
