@@ -13,6 +13,7 @@
     {
       key.kind: source.lang.swift.ref.module,
       key.name: "Foundation",
+      key.usr: "s:10Foundation",
       key.line: 4,
       key.column: 8
     },

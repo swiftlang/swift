@@ -497,7 +497,9 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
   Buffer << USRPrefix;
   bindGenericParameters(Decl->getDeclContext());
 
-  if (auto Ctor = dyn_cast<ConstructorDecl>(Decl)) {
+  if (auto MD = dyn_cast<ModuleDecl>(Decl)) {
+  	appendModule(MD);
+  } else if (auto Ctor = dyn_cast<ConstructorDecl>(Decl)) {
     appendConstructorEntity(Ctor, /*isAllocating=*/false);
   } else if (auto Dtor = dyn_cast<DestructorDecl>(Decl)) {
     appendDestructorEntity(Dtor, /*isDeallocating=*/false);

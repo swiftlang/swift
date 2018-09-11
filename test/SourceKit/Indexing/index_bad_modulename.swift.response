@@ -50,6 +50,7 @@
     {
       key.kind: source.lang.swift.ref.module,
       key.name: "ObjectiveC",
+      key.usr: "s:10ObjectiveC",
       key.line: 8,
       key.column: 8
     },

@@ -192,6 +192,17 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     return false;
   }
 
+  bool getModuleUSR(const ModuleDecl *D, StringRef &USR) {
+      SmallString<128> storage;
+      {
+          llvm::raw_svector_ostream OS(storage);
+          if (ide::printDeclUSR(D, OS))
+              return true;
+          USR = stringStorage.copyString(OS.str());
+      }
+      return false;
+  }
+
   bool getPseudoAccessorNameAndUSR(AbstractStorageDecl *D, AccessorKind AK, StringRef &Name, StringRef &USR) {
     assert(static_cast<int>(AK) < 0x111 && "AccessorKind too big for pair");
     DeclAccessorPair key(D, static_cast<int>(AK));
@@ -386,6 +397,8 @@ private:
 
     const ModuleDecl *D = Mod.getAsSwiftModule();
     Info.symInfo = getSymbolInfoForDecl(D);
+
+    getModuleUSR(D, Info.USR);
 
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;
