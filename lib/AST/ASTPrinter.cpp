@@ -2537,12 +2537,16 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   if (auto BodyFunc = Options.FunctionBody) {
     BodyFunc(decl, Printer);
     indent();
-  } else if (Options.FunctionDefinitions && decl->getBody()) {
+    return;
+  }
+
+  Printer << " {";
+  if (Options.FunctionDefinitions && decl->getBody())
     if (printASTNodes(decl->getBody()->getElements())) {
       Printer.printNewline();
       indent();
     }
-  }
+  Printer << "}";
 }
 
 void PrintAST::visitFuncDecl(FuncDecl *decl) {

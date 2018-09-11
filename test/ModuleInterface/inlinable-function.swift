@@ -14,7 +14,7 @@ public struct Foo: Hashable {
     get {
       return 3
     }
-    // CHECK-NEXT: set{{$}}
+    // CHECK-NEXT: set[[NEWVALUE:(\(newValue\))?]]{{$}}
     set {
       print("I am set to \(newValue)")
     }
@@ -26,7 +26,7 @@ public struct Foo: Hashable {
   // CHECK: public var hasDidSet: [[INT]] {
   public var hasDidSet: Int {
     // CHECK-NEXT: @_transparent get{{$}}
-    // CHECK-NEXT: set{{$}}
+    // CHECK-NEXT: set[[NEWVALUE]]{{$}}
     // CHECK-NOT: didSet
     didSet {
       print("b set to \(hasDidSet)")
@@ -49,7 +49,7 @@ public struct Foo: Hashable {
     get {
       return 34
     }
-    // CHECK-NEXT: @_transparent set {
+    // CHECK-NEXT: @_transparent set[[NEWVALUE]] {
     // CHECK-NOT:   #if false
     // CHECK-NOT:   print("I should not appear")
     // CHECK-NOT:   #else
@@ -83,7 +83,7 @@ public struct Foo: Hashable {
       return 32
     }
 
-    // CHECK: set {
+    // CHECK: set[[NEWVALUE]] {
     // CHECK-NOT: #if true
     // CHECK:     print("I am set to \(newValue)")
     // CHECK-NOT: #else
@@ -114,7 +114,7 @@ public struct Foo: Hashable {
   }
 
 
-  // CHECK: @_transparent mutating public func transparentMethod() {
+  // CHECK: @_transparent [[ATTRS:(mutating public|public mutating)]] func transparentMethod() {
   // CHECK-NEXT:   inlinableProperty = 4
   // CHECK-NEXT: }
   @_transparent
@@ -122,7 +122,7 @@ public struct Foo: Hashable {
     inlinableProperty = 4
   }
 
-  // CHECK: @inline(__always) mutating public func inlineAlwaysMethod() {
+  // CHECK: @inline(__always) [[ATTRS]] func inlineAlwaysMethod() {
   // CHECK-NEXT: inlinableProperty = 4
   // CHECK-NEXT: }
   @inline(__always)
