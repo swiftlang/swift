@@ -40,7 +40,7 @@ public func loopTest(breakCount:Int32) -> Int32 {
 // CHECK: [[CONST_ONE:%.*]] =  integer_literal $Builtin.Int32, 1
 // CHECK: [[PHDR_EXIT:%.*]] = graph_op "Const"() {dtype: $Builtin.Int32, value$tensor: i32 0, __device: "ALL_DEVICES"}
 // CHECK: [[PHDR_FLAG:%.*]] = graph_op "Const"() {dtype: $Builtin.Int1, value$tensor: i1 -1, __device: "ALL_DEVICES"}
-// CHECK: br bb9({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, undef : $Builtin.Int32, [[PHDR_EXIT]] : $TensorHandle<Builtin.Int32>, [[PHDR_FLAG]] : $TensorHandle<Builtin.Int1>)
+// CHECK: br bb9([[A:%.*]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[PHDR_EXIT]] : $TensorHandle<Builtin.Int32>, [[PHDR_FLAG]] : $TensorHandle<Builtin.Int1>)
 
 //- Sets up index to 0 and flag to false on the exit branch of the original header to latch.
 // CHECK: bb1:
@@ -182,7 +182,7 @@ public func nestedLoopWithBreak(breakCount:Int32) -> Int32 {
 // CHECK: br bb21([[A:%.*]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
 //-- Inner loop
 // CHECK: bb4:                                              // Preds: bb1
-// CHECK:  br bb17({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, undef : $Builtin.Int32, undef : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
+// CHECK:  br bb17({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, [[B:%[0-9]+]] : $Builtin.Int32, [[B]] : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
 
 sil @$nestedLoopWithBreak : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 // %0                                             // users: %27, %26, %19

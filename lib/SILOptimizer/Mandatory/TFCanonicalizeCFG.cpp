@@ -438,7 +438,7 @@ SingleExitLoopTransformer::computeEscapingValues() const {
     for (auto equivalentValue :
          make_range(equivalentValues->findLeader(escapingValue),
                     equivalentValues->member_end())) {
-      if (DI->properlyDominates(equivalentValue, &(header->front()))) {
+      if (DI->properlyDominates(equivalentValue, preheader->getTerminator())) {
         // Found a definition that we could use.
         kv.second = equivalentValue;
         break;
