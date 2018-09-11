@@ -1,5 +1,6 @@
 
 // RUN: %target-swift-emit-silgen -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -enable-sil-ownership -swift-version 5 | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -592,3 +593,12 @@ func testObjCNoescapeThunk() {
 // CHECK-NEXT:  [[T4:%.*]] = tuple ()
 // CHECK-NEXT:  end_borrow [[T2]]
 // CHECK-NEXT:  return [[T4]]
+
+// Call a convenience initializer
+func buildGizmo1() -> Gizmo {
+  return Gizmo(outBells: 10)
+}
+
+func buildGizmo2() -> Gizmo {
+  return Gizmo(whistles: 10)
+}
