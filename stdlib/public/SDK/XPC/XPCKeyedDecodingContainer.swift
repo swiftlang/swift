@@ -37,7 +37,8 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
     /// Initializes `self` by referencing the given decoder and container.
     init(referencing decoder: XPCDecoder, wrapping underlyingMessage: xpc_object_t) throws {
         guard xpc_get_type(underlyingMessage) == XPC_TYPE_DICTIONARY else {
-            throw XPCParsingError.invalidXPCObjectType
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath,
+                                                                    debugDescription: "Did not find xpc dictionary in keyed container"))
         }
         self.decoder = decoder
         self.underlyingMessage = underlyingMessage
@@ -47,26 +48,29 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
     private func decodeIntegerType<I: SignedInteger>(_ type: I.Type, forKey key: Key) throws -> I {
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return try XPCDecodingHelpers.decodeSignedInteger(type.self, from: foundValue)
+        return try XPCDecodingHelpers.decodeSignedInteger(type.self, from: foundValue, at: self.codingPath)
     }
 
     private func decodeIntegerType<I: UnsignedInteger>(_ type: I.Type, forKey key: Key) throws -> I {
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return try XPCDecodingHelpers.decodeUnsignedInteger(type.self, from: foundValue)
+        return try XPCDecodingHelpers.decodeUnsignedInteger(type.self, from: foundValue, at: self.codingPath)
     }
 
     private func decodeFloatingPointType<F: BinaryFloatingPoint>(_ type: F.Type, forKey key: Key) throws -> F {
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return try XPCDecodingHelpers.decodeFloatingPointNumber(type.self, from: foundValue)
+        return try XPCDecodingHelpers.decodeFloatingPointNumber(type.self, from: foundValue, at: self.codingPath)
     }
 
     private func getXPCObjectForKey(from key: CodingKey) throws -> xpc_object_t {
         guard let foundValue = key.stringValue.withCString({
             return xpc_dictionary_get_value(self.underlyingMessage, $0)
         }) else {
-            throw XPCParsingError.keyDoesNotExist
+            throw DecodingError.keyNotFound(key,
+                                            DecodingError.Context(
+                                              codingPath: self.codingPath,
+                                              debugDescription: "Could not find key \(key.stringValue)"))
         }
 
         return foundValue
@@ -100,7 +104,7 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
         defer { self.decoder.codingPath.removeLast() }
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return XPCDecodingHelpers.decodeNil(from: foundValue)
+        return XPCDecodingHelpers.decodeNil(from: foundValue, at: self.codingPath)
     }
 
     public func decode(_ type: Bool.Type, forKey key: Key) throws -> Bool {
@@ -109,7 +113,7 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
 
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return try XPCDecodingHelpers.decodeBool(from: foundValue)
+        return try XPCDecodingHelpers.decodeBool(from: foundValue, at: self.codingPath)
     }
 
 
@@ -203,7 +207,7 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
 
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return try XPCDecodingHelpers.decodeString(from: foundValue)
+        return try XPCDecodingHelpers.decodeString(from: foundValue, at: self.codingPath)
     }
 
     public func decode<T: Decodable>(_ type: T.Type, forKey key: Key) throws -> T {

@@ -42,7 +42,8 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     // MARK: - Initilization
     init(referencing decoder: XPCDecoder, wrapping: xpc_object_t) throws {
         guard xpc_get_type(wrapping) == XPC_TYPE_ARRAY else {
-            throw XPCParsingError.typeMismatch
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath,
+                                                                    debugDescription: "Did not find xpc array in unkeyed container."))
         }
 
         self.underlyingMessage = wrapping
@@ -53,49 +54,62 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 
     // MARK: - Helpers
     private mutating func decodeIntegerType<I: SignedInteger>(_ type: I.Type) throws -> I {
-        guard !self.isAtEnd else { throw XPCParsingError.reachedArrayEnd }
+        guard !self.isAtEnd else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Reached end of unkeyed container."))
+        }
         self.decoder.codingPath.append(XPCCodingKey(intValue: self.currentIndex)!)
         defer { self.decoder.codingPath.removeLast() }
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-        let integer: I = try XPCDecodingHelpers.decodeSignedInteger(type.self, from: foundValue)
+        let integer: I = try XPCDecodingHelpers.decodeSignedInteger(type.self, from: foundValue, at: self.codingPath)
         self.currentIndex += 1
         return integer
     }
 
     private mutating func decodeIntegerType<I: UnsignedInteger>(_ type: I.Type) throws -> I {
-        guard !self.isAtEnd else { throw XPCParsingError.reachedArrayEnd }
+        guard !self.isAtEnd else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Reached end of unkeyed container."))
+        }
         self.decoder.codingPath.append(XPCCodingKey(intValue: self.currentIndex)!)
         defer { self.decoder.codingPath.removeLast() }
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-        let integer: I = try XPCDecodingHelpers.decodeUnsignedInteger(type.self, from: foundValue)
+        let integer: I = try XPCDecodingHelpers.decodeUnsignedInteger(type.self, from: foundValue, at: self.codingPath)
         self.currentIndex += 1
         return integer
     }
 
     private mutating func decodeFloatingPointType<F: BinaryFloatingPoint>(_ type: F.Type) throws -> F {
-        guard !self.isAtEnd else { throw XPCParsingError.reachedArrayEnd }
+        guard !self.isAtEnd else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Reached end of unkeyed container."))
+        }
         self.decoder.codingPath.append(XPCCodingKey(intValue: self.currentIndex)!)
         defer { self.decoder.codingPath.removeLast() }
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-        let float: F = try XPCDecodingHelpers.decodeFloatingPointNumber(type.self, from: foundValue)
+        let float: F = try XPCDecodingHelpers.decodeFloatingPointNumber(type.self, from: foundValue, at: self.codingPath)
         self.currentIndex += 1
         return float
     }
 
     // MARK: - UnkeyedDecodingContainer protocol methods
     public mutating func decodeNil() throws -> Bool {
-        guard !self.isAtEnd else { throw XPCParsingError.reachedArrayEnd }
+        guard !self.isAtEnd else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Reached end of unkeyed container."))
+        }
+        self.decoder.codingPath.append(XPCCodingKey(intValue: self.currentIndex)!)
+        defer { self.decoder.codingPath.removeLast() }
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-
-        if XPCDecodingHelpers.decodeNil(from: foundValue) {
+        if XPCDecodingHelpers.decodeNil(from: foundValue, at: self.codingPath) {
             self.currentIndex += 1
             return true
         }
@@ -103,25 +117,31 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     public mutating func decode(_ type: Bool.Type) throws -> Bool {
-        guard !self.isAtEnd else { throw XPCParsingError.reachedArrayEnd }
+        guard !self.isAtEnd else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Reached end of unkeyed container."))
+        }
         self.decoder.codingPath.append(XPCCodingKey(intValue: self.currentIndex)!)
         defer { self.decoder.codingPath.removeLast() }
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-        let boolean = try XPCDecodingHelpers.decodeBool(from: foundValue)
+        let boolean = try XPCDecodingHelpers.decodeBool(from: foundValue, at: self.codingPath)
         self.currentIndex += 1
         return boolean
     }
 
     public mutating func decode(_ type: String.Type) throws -> String {
-        guard !self.isAtEnd else { throw XPCParsingError.reachedArrayEnd }
+        guard !self.isAtEnd else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Reached end of unkeyed container."))
+        }
         self.decoder.codingPath.append(XPCCodingKey(intValue: self.currentIndex)!)
         defer { self.decoder.codingPath.removeLast() }
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-        let string = try XPCDecodingHelpers.decodeString(from: foundValue)
+        let string = try XPCDecodingHelpers.decodeString(from: foundValue, at: self.codingPath)
         self.currentIndex += 1
         return string
     }
@@ -175,7 +195,10 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     public mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
-        guard !isAtEnd else { throw XPCParsingError.reachedArrayEnd }
+        guard !self.isAtEnd else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Reached end of unkeyed container."))
+        }
         self.decoder.codingPath.append(XPCCodingKey(intValue: self.currentIndex)!)
         defer { self.decoder.codingPath.removeLast() }
 
@@ -187,7 +210,10 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     public mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
-        guard !self.isAtEnd else { throw XPCParsingError.reachedArrayEnd }
+        guard !self.isAtEnd else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Reached end of unkeyed container."))
+        }
         self.decoder.codingPath.append(XPCCodingKey(intValue: self.currentIndex)!)
         defer { self.decoder.codingPath.removeLast() }
 
@@ -199,7 +225,10 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     public mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
-        guard !self.isAtEnd else { throw XPCParsingError.reachedArrayEnd }
+        guard !self.isAtEnd else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Reached end of unkeyed container."))
+        }
         self.decoder.codingPath.append(XPCCodingKey(intValue: self.currentIndex)!)
         defer { self.decoder.codingPath.removeLast() }
 
@@ -211,7 +240,10 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     public mutating func superDecoder() throws -> Decoder {
-        guard !self.isAtEnd else { throw XPCParsingError.reachedArrayEnd }
+        guard !self.isAtEnd else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
+                                                                    debugDescription: "Reached end of unkeyed container."))
+        }
         self.decoder.codingPath.append(XPCCodingKey(intValue: self.currentIndex)!)
         defer { self.decoder.codingPath.removeLast() }
 
