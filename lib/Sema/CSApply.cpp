@@ -7676,7 +7676,7 @@ namespace {
       if (auto tap = dyn_cast_or_null<TapExpr>(expr)) {
         // We remember the DeclContext because the code to handle 
         // single-expression-body closures above changes it.
-        TapsToTypeCheck.push_back(std::make_tuple(tap, Rewriter.dc));
+        TapsToTypeCheck.push_back(std::make_pair(tap, Rewriter.dc));
       }
 
       Rewriter.walkToExprPre(expr);
