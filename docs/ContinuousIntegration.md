@@ -31,9 +31,9 @@ Platform     | Comment
 ------------ | -------
 All supported platforms     | @swift-ci Please test tensorflow
 All supported platforms     | @swift-ci Please clean test tensorflow
-Linux     | @swift-ci Please test tensorflow Linux
-Linux GPU     | @swift-ci Please test tensorflow Linux GPU
-Mac OS     | @swift-ci Please test tensorflow macOS
+Linux                       | @swift-ci Please test tensorflow Linux
+Linux GPU                   | @swift-ci Please test tensorflow Linux GPU
+Mac OS                      | @swift-ci Please test tensorflow macOS
 
 Status can be checked at https://ci-external.swift.org/view/Pull%20Request/.
 
