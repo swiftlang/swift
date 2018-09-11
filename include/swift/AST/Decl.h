@@ -6272,7 +6272,7 @@ class OperatorDecl : public Decl {
 
   Identifier DesignatedProtocolName;
   SourceLoc DesignatedProtocolNameLoc;
-  TypeLoc DesignatedProtocolTypeLoc;
+  ProtocolDecl *DesignatedProtocol = nullptr;
 
 public:
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
@@ -6293,24 +6293,14 @@ public:
     return DesignatedProtocolName;
   }
 
-  void setDesignatedProtocolName(Identifier name) {
-    DesignatedProtocolName = name;
-  }
-
   SourceLoc getDesignatedProtocolNameLoc() const {
     return DesignatedProtocolNameLoc;
   }
 
-  void setDesignatedProtocolNameLoc(SourceLoc loc) {
-    DesignatedProtocolNameLoc = loc;
-  }
+  ProtocolDecl *getDesignatedProtocol() const { return DesignatedProtocol; }
 
-  TypeLoc getDesignatedProtocolTypeLoc() const {
-    return DesignatedProtocolTypeLoc;
-  }
-
-  void setDesignatedProtocolTypeLoc(TypeLoc typeLoc) {
-    DesignatedProtocolTypeLoc = typeLoc;
+  void setDesignatedProtocol(ProtocolDecl *protocol) {
+    DesignatedProtocol = protocol;
   }
 
   static bool classof(const Decl *D) {
