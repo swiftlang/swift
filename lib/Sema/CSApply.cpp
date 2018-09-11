@@ -5679,6 +5679,8 @@ Expr *ExprRewriter::coerceCallArguments(
                      param.getParameterFlags()));
   }
 
+  Type argTupleType = TupleType::get(fromTupleExprFields, tc.Context);
+
   // Compute a new 'arg', from the bits we have.  We have three cases: the
   // scalar case, the paren case, and the tuple literal case.
   if (!argTuple && !argParen) {
@@ -5695,7 +5697,7 @@ Expr *ExprRewriter::coerceCallArguments(
                                fromTupleExpr[0],
                                argParen->getRParenLoc(),
                                argParen->hasTrailingClosure(),
-                               cs.getType(fromTupleExpr[0])));
+                               argTupleType));
       if (argParenImplicit) {
         argParen->setImplicit();
       }
@@ -5703,7 +5705,7 @@ Expr *ExprRewriter::coerceCallArguments(
     } else {
       // coerceToType may have updated the element type of the ParenExpr in
       // place.  If so, propagate the type out to the ParenExpr as well.
-      cs.setType(argParen, cs.getType(fromTupleExpr[0]));
+      cs.setType(argParen, argTupleType);
     }
   } else {
     assert(argTuple);
@@ -5731,14 +5733,6 @@ Expr *ExprRewriter::coerceCallArguments(
                                        argTupleType));
       arg = argTuple;
     }
-  }
-
-  // If we only have one argument and one parameter, we're done.
-  if (argTuple == nullptr &&
-      params.size() == 1 &&
-      params[0].getLabel().empty() &&
-      !params[0].isVariadic()) {
-    return arg;
   }
 
   // If we don't have to shuffle anything, we're done.
@@ -7127,15 +7121,18 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         
         auto escapable = new (tc.Context)
           OpaqueValueExpr(apply->getFn()->getLoc(), Type());
-        cs.setType(escapable, FunctionType::composeInput(
-                                  tc.Context, escapableParams, false));
+        cs.setType(escapable, escapableParams[0].getType());
 
         auto getType = [&](const Expr *E) -> Type {
           return cs.getType(E);
         };
 
-        auto callSubExpr = CallExpr::createImplicit(tc.Context, body, {escapable}, {}, getType);
+        auto callSubExpr = CallExpr::createImplicit(tc.Context, body,
+                                                    {escapable}, {}, getType);
         cs.cacheSubExprTypes(callSubExpr);
+        cs.setType(callSubExpr->getArg(),
+                   AnyFunctionType::composeInput(tc.Context,
+                                                 escapableParams, false));
         cs.setType(callSubExpr, resultType);
         
         auto replacement = new (tc.Context)

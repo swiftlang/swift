@@ -31,3 +31,8 @@ func testVariations(
     return takesFn($0)
   }
 }
+
+func testBlock(f: @convention(block) () -> ()) {
+  let escape: (@escaping @convention(block) () -> ()) -> () = { _ in }
+  let _: () = withoutActuallyEscaping(f, do: escape)
+}

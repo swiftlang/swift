@@ -271,7 +271,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   TC.typeCheckClosureBody(CE);
 
   auto *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
-  TheCall->getArg()->setType(ParenType::get(Context, E->getType()));
+  TheCall->getArg()->setType(AnyFunctionType::composeInput(Context, args, false));
   TheCall->setType(Context.TheEmptyTupleType);
 
   // Inject the call into the top level stream by wrapping it with a TLCD.
