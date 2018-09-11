@@ -235,9 +235,7 @@ bool SplitterStep::mergePartialSolutions() const {
 }
 
 StepResult ComponentStep::take(bool prevFailed) {
-  // If we came either back to this step and previous
-  // (either disjunction or type var) failed, or
-  // one of the previous components created by "split"
+  // One of the previous components created by "split"
   // failed, it means that we can't solve this component.
   if (prevFailed)
     return done(/*isSuccess=*/false);
@@ -297,13 +295,30 @@ StepResult ComponentStep::take(bool prevFailed) {
 }
 
 StepResult ComponentStep::resume(bool prevFailed) {
+  // Rewind all modifications done to constraint system.
+  ComponentScope.reset();
+
+  // If we came either back to this step and previous
+  // (either disjunction or type var) failed, it means
+  // that component as a whole has failed.
   if (prevFailed)
     return done(/*isSuccess=*/false);
+
+  // If this was a single component, there is nothing to be done,
+  // because it represents the whole constraint system at some
+  // point of the solver path.
+  if (IsSingle)
+    return done(/*isSuccess=*/true);
+
+  assert(!Solutions.empty() && "No Solutions?");
 
   // For each of the partial solutions, subtract off the current score.
   // It doesn't contribute.
   for (auto &solution : Solutions)
     solution.getFixedScore() -= OriginalScore;
+
+  // Restore the original best score.
+  CS.solverState->BestScore = OriginalBestScore;
 
   // When there are multiple partial solutions for a given connected component,
   // rank those solutions to pick the best ones. This limits the number of

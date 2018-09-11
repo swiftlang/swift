@@ -331,13 +331,6 @@ class ComponentStep final : public SolverStep {
         Constraints(constraints) {}
 
 public:
-  ~ComponentStep() {
-    // Restore the original best score, if this wasn't
-    // a single component.
-    if (!IsSingle)
-      CS.solverState->BestScore = OriginalBestScore;
-  }
-
   /// Record a type variable as associated with this step.
   void record(TypeVariableType *typeVar) { TypeVars.insert(typeVar); }
 
