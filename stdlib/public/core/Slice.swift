@@ -239,9 +239,9 @@ extension Slice: MutableCollection where Base: MutableCollection {
       _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
       return _base[index]
     }
-    set {
+    _modify {
       _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
-      _base[index] = newValue
+      yield &_base[index]
       // MutableSlice requires that the underlying collection's subscript
       // setter does not invalidate indices, so our `startIndex` and `endIndex`
       // continue to be valid.
