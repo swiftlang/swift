@@ -535,10 +535,10 @@ private class TFEState {
     let entryFunctionBaseName = String(cString: entryFunctionBaseNameAddress)
     debugLog("Looking up op(s) from func base name \(entryFunctionBaseName).")
     for i in 0...helperFunctionCount {
-      /// Also look up in the TensorFlow program a function name (op type) based
-      /// on the op name. e.g. given op name "tfc_func_S4mainyycfU_.tf", return
-      /// op type "S4mainyycfU_.tf_CPU.device_partition". TFE ops are created by
-      /// the op types.
+      // Also look up in the TensorFlow program a function name (op type) based
+      // on the op name. e.g. given op name "tfc_func_S4mainyycfU_.tf", return
+      // op type "S4mainyycfU_.tf_CPU.device_partition". TFE ops are created by
+      // the op types.
       var opName = "tfc_func_" + entryFunctionBaseName;
       if i > 0 {
         opName += "_helper_\(i-1)"
@@ -786,11 +786,11 @@ public final class _TensorComputation {
   /// The data structure to pass into pthread creation API.
   /// We cannot have the ThreadBody closure below close over on `threadIndex`,
   /// because ThreadBody is of C convention.
-  class ThreadParam {
-    public let computation: _TensorComputation
-    public let threadIndex: Int
-    
-    public init(computation: _TensorComputation, threadIndex: Int) {
+  private class ThreadParam {
+    let computation: _TensorComputation
+    let threadIndex: Int
+
+    init(computation: _TensorComputation, threadIndex: Int) {
       self.computation = computation
       self.threadIndex = threadIndex
     }
@@ -908,7 +908,7 @@ public final class _TensorComputation {
           return nil
         }
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-        var newThread: pthread_t?
+        var newThread: pthread_t!
 #else
         var newThread = pthread_t()
 #endif

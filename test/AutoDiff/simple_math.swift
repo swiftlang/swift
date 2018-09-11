@@ -35,22 +35,17 @@ SimpleMathTests.test("Fanout") {
   })
   expectEqual(2, dfoo2(100))
   let dfoo3 = #gradient({ (x: Float, y: Float) -> Float in
-    x + x + x * y * sin(1.0)
+    x + x + x * y
   })
-  expectEqual((3.682942, 2.5244129), dfoo3(3, 2))
+  expectEqual((4, 3), dfoo3(3, 2))
 }
 
 SimpleMathTests.test("FunctionCall") {
   func foo(_ x: Float, _ y: Float) -> Float {
-    return x * 3 + bar(3) * y
+    return 3 * x + { $0 * 3 }(3) * y
   }
-  func bar(_ x: Float) -> Float {
-    return 3 * x
-  }
-  let dfoo = #gradient(foo)
-  expectEqual((3, 9), dfoo(3, 4))
-  let dfoo_dx = #gradient(foo, wrt: .0)
-  expectEqual(3, dfoo_dx(3, 4))
+  expectEqual((3, 9), #gradient(foo)(3, 4))
+  expectEqual(3, #gradient(foo, wrt: .0)(3, 4))
 }
 
 runAllTests()

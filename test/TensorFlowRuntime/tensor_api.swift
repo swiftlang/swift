@@ -12,11 +12,6 @@ import StdlibUnittest
 
 var TensorNonTPUTests = TestSuite("TensorNonTPU")
 
-TensorNonTPUTests.testAllBackends("RandomInitializer") {
-  let _ = Tensor<Float>(randomUniform: [3, 4])
-  let _ = Tensor<Float>(randomNormal: [3, 4])
-}
-
 TensorNonTPUTests.testAllBackends("SliceUpdate") {
 #if CUDA
   // TODO: fix GPU compilation error:
