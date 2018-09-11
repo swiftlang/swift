@@ -72,8 +72,8 @@ public struct ARC4RandomNumberGenerator: SeedableRandomNumberGenerator {
   /// Initialize ARC4RandomNumberGenerator using an array of UInt8. The array
   /// must have length between 1 and 256 inclusive.
   public init(seed: [UInt8]) {
-    _precondition(seed.count > 0, "Length of seed must be positive")
-    _precondition(seed.count <= 256, "Length of seed must be at most 256")
+    precondition(seed.count > 0, "Length of seed must be positive")
+    precondition(seed.count <= 256, "Length of seed must be at most 256")
     var j: UInt8 = 0
     for i: UInt8 in 0...255 {
       j &+= S(i) &+ seed[Int(i) % seed.count]
