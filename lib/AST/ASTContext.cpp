@@ -573,6 +573,7 @@ void ASTContext::addLazyParser(LazyMemberParser *lazyParser) {
 
 void ASTContext::removeLazyParser(LazyMemberParser *lazyParser) {
   auto removed = getImpl().lazyParsers.erase(lazyParser);
+  (void)removed;
   assert(removed && "Removing an non-existing lazy parser.");
 }
 
