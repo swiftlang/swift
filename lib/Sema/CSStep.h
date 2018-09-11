@@ -332,8 +332,10 @@ class ComponentStep final : public SolverStep {
 
 public:
   ~ComponentStep() {
-    // Restore the original best score.
-    CS.solverState->BestScore = OriginalBestScore;
+    // Restore the original best score, if this wasn't
+    // a single component.
+    if (!IsSingle)
+      CS.solverState->BestScore = OriginalBestScore;
   }
 
   /// Record a type variable as associated with this step.
