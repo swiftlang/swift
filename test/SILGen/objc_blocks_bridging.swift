@@ -154,7 +154,7 @@ class Test: NSObject {
 // CHECK:         return [[RESULT]]
 
 func clearDraggingItemImageComponentsProvider(_ x: NSDraggingItem) {
-  x.imageComponentsProvider = {}
+  x.imageComponentsProvider = { [] }
 }
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SSayypGIego_So7NSArrayCSgIeyBa_TR
 // CHECK:         [[CONVERT:%.*]] = function_ref @$SSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF
