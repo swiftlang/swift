@@ -31,7 +31,7 @@ let dataset = Dataset(elements: scalars)
 // transfers.
 _ = Tensor<Float>(0.0)
 
-DatasetGlobalTests.testCPUOrGPU("DataSetAsGlobalVar") {
+DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
   // This stmt makes sure the load inst from the global var `dataset` does not
   // make dataset an input arg tensor.
   //

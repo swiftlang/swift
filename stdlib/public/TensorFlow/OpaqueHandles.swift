@@ -46,8 +46,9 @@ public final class VariantHandle {
 
 extension VariantHandle : TensorSendableReceivable {
   @inlinable
-  static func receiveFromAccelerator(_ computation: _TensorComputation,
-                                     _ tensorID: Int
+  static func receiveFromAccelerator(
+    _ computation: _TensorComputation,
+    _ tensorID: Int
   ) -> VariantHandle {
     debugLog("Receiving variant tensor of id \(tensorID).")
     let status = TF_NewStatus()
@@ -77,6 +78,6 @@ extension VariantHandle : TensorSendableReceivable {
   typealias Scalar = Float
   @inlinable
   static func scalar(_ scalar: Scalar) -> VariantHandle {
-    fatalError("Unsupported");
+    fatalError("Unsupported")
   }
 }
