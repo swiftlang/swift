@@ -4975,7 +4975,10 @@ public:
     TypeChecked,
 
     /// This is a memberwise initializer that will be synthesized by SILGen.
-    MemberwiseInitializer
+    MemberwiseInitializer,
+
+    /// Function body was deserialized
+    Deserialized
 
     // This enum currently needs to fit in a 3-bit bitfield.
   };
@@ -4995,13 +4998,11 @@ protected:
   union {
     /// This enum member is active if getBodyKind() is BodyKind::Parsed or
     /// BodyKind::TypeChecked.
-    struct {
-      /// The AST node of the body.
-      BraceStmt *Node;
+    BraceStmt *Body;
 
-      /// The string representation of the body, if anything.
-      StringRef StringRepresentation;
-    } Body;
+    /// This enum member is active if getBodyKind() is BodyKind::Deserialized or
+    /// BodyKind::TypeChecked.
+    StringRef BodyStringRepresentation;
 
     /// This enum member is active if getBodyKind() == BodyKind::Synthesize.
     BodySynthesizer Synthesizer;
@@ -5024,7 +5025,7 @@ protected:
                        GenericParamList *GenericParams)
       : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
         ValueDecl(Kind, Parent, Name, NameLoc),
-        Body({nullptr, {}}), ThrowsLoc(ThrowsLoc) {
+        Body(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
@@ -5112,7 +5113,7 @@ public:
     }
     if (getBodyKind() == BodyKind::Parsed ||
         getBodyKind() == BodyKind::TypeChecked) {
-      return Body.Node;
+      return Body;
     }
     return nullptr;
   }
@@ -5120,7 +5121,7 @@ public:
     assert(getBodyKind() != BodyKind::Skipped &&
            "cannot set a body if it was skipped");
 
-    Body.Node = S;
+    Body = S;
     setBodyKind(NewBodyKind);
   }
 
@@ -5164,7 +5165,9 @@ public:
 
   StringRef getBodyStringRepresentation(SmallVectorImpl<char> &scratch) const;
   void setBodyStringRepresentation(StringRef body) {
-    Body.StringRepresentation = body;
+    assert(getBodyKind() == BodyKind::None);
+    setBodyKind(BodyKind::Deserialized);
+    BodyStringRepresentation = body;
   }
 
   bool isBodyTypeChecked() const {

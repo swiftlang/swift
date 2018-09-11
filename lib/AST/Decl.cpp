@@ -5064,6 +5064,7 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   switch (getBodyKind()) {
   case BodyKind::None:
   case BodyKind::MemberwiseInitializer:
+  case BodyKind::Deserialized:
     return SourceRange();
 
   case BodyKind::Parsed:
@@ -5420,7 +5421,7 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {
-  if (!Body.StringRepresentation.empty())
+  if (getBodyKind() == BodyKind::Deserialized)
     return true;
   if (getBodyKind() != BodyKind::Parsed &&
       getBodyKind() != BodyKind::TypeChecked)
@@ -5433,8 +5434,9 @@ StringRef AbstractFunctionDecl::getBodyStringRepresentation(
   SmallVectorImpl<char> &scratch) const {
   assert(hasInlinableBodyText() &&
          "can't get string representation of function with no text");
-  if (!Body.StringRepresentation.empty())
-    return Body.StringRepresentation;
+
+  if (getBodyKind() == BodyKind::Deserialized)
+    return BodyStringRepresentation;
 
   auto body = getBody();
   return extractInlinableText(getASTContext().SourceMgr, body, scratch);

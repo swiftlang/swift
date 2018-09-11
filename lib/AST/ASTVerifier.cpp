@@ -492,6 +492,7 @@ public:
       case AbstractFunctionDecl::BodyKind::MemberwiseInitializer:
         return true;
 
+      case AbstractFunctionDecl::BodyKind::Deserialized:
       case AbstractFunctionDecl::BodyKind::Unparsed:
       case AbstractFunctionDecl::BodyKind::Parsed:
       case AbstractFunctionDecl::BodyKind::Synthesize:

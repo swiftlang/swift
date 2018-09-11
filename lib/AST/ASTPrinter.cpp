@@ -1656,6 +1656,8 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     // Omit the 'get' keyword. Directly print getter
     if (auto BodyFunc = Options.FunctionBody) {
       BodyFunc(ASD->getGetter(), Printer);
+      indent();
+      return;
     }
     Printer.printNewline();
     indent();
@@ -1716,7 +1718,10 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     Printer << " ";
 
   Printer << "}";
-  Printer.printNewline();
+
+  if (!PrintAbstract)
+    Printer.printNewline();
+
   indent();
 }
 
@@ -2534,6 +2539,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
         }
       });
   }
+
   if (auto BodyFunc = Options.FunctionBody) {
     BodyFunc(decl, Printer);
     indent();
