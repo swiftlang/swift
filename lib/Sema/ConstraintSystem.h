@@ -2027,12 +2027,9 @@ public:
   ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
-  ///
-  /// param retainParens Whether to retain parentheses.
-  Type getFixedTypeRecursive(Type type, bool wantRValue,
-                             bool retainParens = false) {
+  Type getFixedTypeRecursive(Type type, bool wantRValue) {
     TypeMatchOptions flags = None;
-    return getFixedTypeRecursive(type, flags, wantRValue, retainParens);
+    return getFixedTypeRecursive(type, flags, wantRValue);
   }
 
   /// Retrieve the fixed type corresponding to a given type variable,
@@ -2047,11 +2044,8 @@ public:
   ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
-  ///
-  /// param retainParens Whether to retain parentheses.
   Type getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
-                             bool wantRValue,
-                             bool retainParens = false);
+                             bool wantRValue);
 
   /// Determine whether the given type variable occurs within the given type.
   ///

@@ -1942,14 +1942,13 @@ public:
     void verifyChecked(TupleShuffleExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying TupleShuffleExpr", E);
 
-      TupleType *TT = E->getType()->getAs<TupleType>();
-      TupleType *SubTT = E->getSubExpr()->getType()->getAs<TupleType>();
       auto getSubElementType = [&](unsigned i) {
         if (E->isSourceScalar()) {
           assert(i == 0);
           return E->getSubExpr()->getType();
         } else {
-          return SubTT->getElementType(i);
+          return (E->getSubExpr()->getType()->castTo<TupleType>()
+                   ->getElementType(i));
         }
       };
 
@@ -1959,7 +1958,7 @@ public:
           assert(i == 0);
           return E->getType()->getWithoutParens();
         } else {
-          return TT->getElementType(i);
+          return E->getType()->castTo<TupleType>()->getElementType(i);
         }
       };
 
@@ -1970,7 +1969,8 @@ public:
         if (subElem == TupleShuffleExpr::DefaultInitialize)
           continue;
         if (subElem == TupleShuffleExpr::Variadic) {
-          varargsType = TT->getElement(i).getVarargBaseTy();
+          varargsType = (E->getType()->castTo<TupleType>()
+                          ->getElement(i).getVarargBaseTy());
           break;
         }
         if (subElem == TupleShuffleExpr::CallerDefaultInitialize) {

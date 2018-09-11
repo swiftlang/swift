@@ -969,10 +969,6 @@ public:
   static Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member,
                                       Type baseTy, bool useArchetypes = true);
 
-  /// \brief Retrieve the superclass type of the given type, or a null type if
-  /// the type has no supertype.
-  Type getSuperClassOf(Type type);
-
   /// \brief Determine whether one type is a subtype of another.
   ///
   /// \param t1 The potential subtype.
