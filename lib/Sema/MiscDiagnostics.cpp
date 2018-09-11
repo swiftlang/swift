@@ -3752,33 +3752,37 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
-      // Warn about interpolated segments that contain optionals.
+      // Warn about interpolated segments that contain optionals or function.
       for (auto &segment : E->getSegments()) {
         // Allow explicit casts.
         if (auto paren = dyn_cast<ParenExpr>(segment))
           if (isa<ExplicitCastExpr>(paren->getSubExpr()))
             continue;
 
-        // Bail out if we don't have an optional.
-        if (!segment->getType()->getRValueType()->getOptionalObjectType())
+        bool isOptional = bool(segment->getType()->getRValueType()->getOptionalObjectType());
+        bool isFunction = segment->getType()->getRValueType()->is<AnyFunctionType>();
+
+        // Bail out if we don't have an optional and a function.
+        if (!isOptional && !isFunction)
           continue;
 
         TC.diagnose(segment->getStartLoc(),
-                    diag::optional_in_string_interpolation_segment)
+                    diag::debug_description_in_string_interpolation_segment, isFunction)
           .highlight(segment->getSourceRange());
 
         // Suggest 'String(describing: <expr>)'.
         auto segmentStart = segment->getStartLoc().getAdvancedLoc(1);
         TC.diagnose(segment->getLoc(),
-                    diag::silence_optional_in_interpolation_segment_call)
+                    diag::silence_debug_description_in_interpolation_segment_call)
           .highlight(segment->getSourceRange())
           .fixItInsert(segmentStart, "String(describing: ")
           .fixItInsert(segment->getEndLoc(), ")");
 
-        // Suggest inserting a default value.
-        TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
-          .highlight(segment->getSourceRange())
-          .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
+        // Suggest inserting a default value about an optional.
+        if (isOptional)
+            TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
+              .highlight(segment->getSourceRange())
+              .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
       }
     }
 
