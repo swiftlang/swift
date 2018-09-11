@@ -297,13 +297,11 @@ static SILValue createTFIntegerConst(GraphFunctionDeviceInfo &deviceInfo,
 // A helper class to transform a loop to have a single exit from the header.
 class SingleExitLoopTransformer {
 public:
-  SingleExitLoopTransformer(
-      GraphFunctionDeviceInfo *deviceInfo, SILLoopInfo *LI, DominanceInfo *DI,
-      SILLoop *loop, const llvm::EquivalenceClasses<SILValue> *equivalentValues)
+  SingleExitLoopTransformer(GraphFunctionDeviceInfo *deviceInfo,
+                            SILLoopInfo *LI, DominanceInfo *DI, SILLoop *loop)
       : deviceInfo(deviceInfo), DI(DI), LI(LI), loop(loop),
         header(loop->getHeader()), preheader(loop->getLoopPreheader()),
-        latch(loop->getLoopLatch()), currentFn(header->getParent()),
-        equivalentValues(equivalentValues) {
+        latch(loop->getLoopLatch()), currentFn(header->getParent()) {
     assert(preheader && "Canonicalization should have given us one preheader");
     assert(latch && "Canonicalization should have given us one latch block");
     initialize();
@@ -367,7 +365,6 @@ private:
   SILBasicBlock *preheader;
   SILBasicBlock *latch;
   SILFunction *currentFn;
-  const llvm::EquivalenceClasses<SILValue> *equivalentValues;
   /// exit blocks before the loop is transformed.
   SmallVector<SILBasicBlock*, 8> exitBlocks;
   /// The list of edges that need to rewired to the newHeader or
@@ -429,15 +426,25 @@ SingleExitLoopTransformer::computeEscapingValues() const {
   // Do not eliminate undefs unless requested for.
   if (!TFNoUndefsInSESE)  return result;
 
-  // Find a def-free path from the escaping value to the preheader for each
-  // escaping value. If no such path is found, set the escaping value at
-  // preheader to undef.
+  // Build the equivalence classes induced by argument passing.
+  llvm::EquivalenceClasses<SILValue> equivalentValues;
+  for (auto &bb : *currentFn) {
+    for (auto arg : bb.getArguments()) {
+      SmallVector<SILValue, 8> incomingValues;
+      arg->getIncomingValues(incomingValues);
+      for (SILValue incomingValue : incomingValues) {
+        equivalentValues.unionSets(arg, incomingValue);
+      }
+    }
+  }
+
+  // Replace undef with an equivalent value that is available at preheader.
   for (auto &kv : result) {
     const SILValue &escapingValue = kv.first;
     // Find an equivalent value that dominates the header.
     for (auto equivalentValue :
-         make_range(equivalentValues->findLeader(escapingValue),
-                    equivalentValues->member_end())) {
+         make_range(equivalentValues.findLeader(escapingValue),
+                    equivalentValues.member_end())) {
       if (DI->properlyDominates(equivalentValue, preheader->getTerminator())) {
         // Found a definition that we could use.
         kv.second = equivalentValue;
@@ -796,18 +803,6 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
   GraphFunctionDeviceInfo deviceInfo(
       GraphFunctionDeviceInfo::getForFunction(*F, /*removeConfigInst*/ false));
 
-  // Build the equivalence classes induced by argument passing.
-  llvm::EquivalenceClasses<SILValue> equivalentValues;
-  for (auto &bb : *F) {
-    for (auto arg : bb.getArguments()) {
-      SmallVector<SILValue, 8> incomingValues;
-      arg->getIncomingValues(incomingValues);
-      for (SILValue incomingValue : incomingValues) {
-        equivalentValues.unionSets(arg, incomingValue);
-      }
-    }
-  }
-
   // Visit the loop nest hierarchy bottom up.
   bool changed = false;
   // The bool indicates whether the subloops are already processed.
@@ -826,8 +821,7 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
       }
       continue;
     }
-    SingleExitLoopTransformer transformer(&deviceInfo, &LI, &DI, loop,
-                                          &equivalentValues);
+    SingleExitLoopTransformer transformer(&deviceInfo, &LI, &DI, loop);
     bool loopChanged = transformer.transform();
     if (loopChanged) {
       // Recalculate dominator information as it is stale now.
