@@ -1699,7 +1699,6 @@ public:
         Out << "\n";
         abort();
       }
-      Type InputExprTy = E->getArg()->getType();
       Type ResultExprTy = E->getType();
       if (!ResultExprTy->isEqual(FT->getResult())) {
         Out << "result of ApplyExpr does not match result type of callee:";
@@ -1709,31 +1708,20 @@ public:
         Out << "\n";
         abort();
       }
-      if (!InputExprTy->isEqual(FT->getInput())) {
-        TupleType *TT = FT->getInput()->getAs<TupleType>();
-        if (isa<SelfApplyExpr>(E)) {
-          Type InputExprObjectTy;
-          if (InputExprTy->hasReferenceSemantics() ||
-              InputExprTy->is<AnyMetatypeType>())
-            InputExprObjectTy = InputExprTy;
-          else
-            InputExprObjectTy = checkLValue(InputExprTy, "object argument");
-          Type FunctionInputObjectTy = checkLValue(FT->getInput(),
-                                                   "'self' parameter");
-          
-          checkSameOrSubType(InputExprObjectTy, FunctionInputObjectTy,
-                             "object argument and 'self' parameter");
-        } else if (!TT || TT->getNumElements() != 1 ||
-                   !TT->getElement(0).getType()->isEqual(InputExprTy)) {
-          Out << "Argument type does not match parameter type in ApplyExpr:"
-                 "\nArgument type: ";
-          E->getArg()->getType().print(Out);
-          Out << "\nParameter type: ";
-          FT->printParams(Out);
-          Out << "\n";
-          E->dump(Out);
-          abort();
-        }
+
+      SmallVector<AnyFunctionType::Param, 8> Args;
+      Type InputExprTy = E->getArg()->getType();
+      AnyFunctionType::decomposeInput(InputExprTy, Args);
+      auto Params = FT->getParams();
+      if (!AnyFunctionType::equalParams(Args, Params)) {
+        Out << "Argument type does not match parameter type in ApplyExpr:"
+               "\nArgument type: ";
+        InputExprTy.print(Out);
+        Out << "\nParameter types: ";
+        FT->printParams(Out);
+        Out << "\n";
+        E->dump(Out);
+        abort();
       }
 
       if (!E->isThrowsSet()) {
