@@ -1442,9 +1442,9 @@ extension Dictionary {
       get {
         return _variant.assertingGet(at: position).value
       }
-      mutableAddressWithNativeOwner {
+      _modify {
         let address = _variant.pointerToValue(at: position)
-        return (address, Builtin.castToNativeObject(_variant.asNative._storage))
+        yield &address.pointee
       }
     }
 
