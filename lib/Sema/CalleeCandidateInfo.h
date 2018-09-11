@@ -206,9 +206,6 @@ namespace swift {
                       ArrayRef<AnyFunctionType::Param> actualArgs);
     
     void filterListArgs(ArrayRef<AnyFunctionType::Param> actualArgs);
-    void filterList(Type actualArgsType, ArrayRef<Identifier> argLabels) {
-      return filterListArgs(decomposeArgType(actualArgsType, argLabels));
-    }
     void filterList(ClosenessPredicate predicate);
     void filterContextualMemberList(Expr *argExpr);
     
