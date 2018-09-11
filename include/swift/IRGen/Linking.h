@@ -194,6 +194,12 @@ class LinkEntity {
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
 
+    /// An descriptor for an associated type within a protocol, which
+    /// will alias the TargetProtocolRequirement descripting this
+    /// particular associated type.
+    /// The pointer is an AssociatedTypeDecl*.
+    AssociatedTypeDescriptor,
+
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
 
@@ -307,7 +313,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::ProtocolDescriptor;
+    return k <= Kind::AssociatedTypeDescriptor;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -729,6 +735,13 @@ public:
   }
 
   static LinkEntity
+  forAssociatedTypeDescriptor(AssociatedTypeDecl *assocType) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::AssociatedTypeDescriptor, assocType);
+    return entity;
+  }
+
+  static LinkEntity
   forAssociatedTypeMetadataAccessFunction(const ProtocolConformance *C,
                                           AssociatedType association) {
     LinkEntity entity;
@@ -824,9 +837,12 @@ public:
   }
 
   AssociatedTypeDecl *getAssociatedType() const {
-    assert(getKind() == Kind::AssociatedTypeMetadataAccessFunction);
-    return getAssociatedTypeByIndex(getProtocolConformance(),
+    if (getKind() == Kind::AssociatedTypeMetadataAccessFunction)
+      return getAssociatedTypeByIndex(getProtocolConformance(),
                               LINKENTITY_GET_FIELD(Data, AssociatedTypeIndex));
+
+    assert(getKind() == Kind::AssociatedTypeDescriptor);
+    return reinterpret_cast<AssociatedTypeDecl *>(Pointer);
   }
 
   std::pair<CanType, ProtocolDecl *> getAssociatedConformance() const {

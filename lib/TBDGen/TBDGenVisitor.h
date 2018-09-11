@@ -64,6 +64,8 @@ private:
 
   void addMethodDescriptor(SILDeclRef declRef);
 
+  void addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType);
+
 public:
   TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
                 tapi::internal::ArchitectureSet archs, StringSet *stringSymbols,

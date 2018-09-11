@@ -569,6 +569,11 @@ void Remangler::mangleAssociatedTypeRef(Node *node) {
   addSubstitution(entry);
 }
 
+void Remangler::mangleAssociatedTypeDescriptor(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Tl";
+}
+
 void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node) {
   mangleChildNodes(node); // protocol conformance, identifier
   Buffer << "Wt";

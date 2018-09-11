@@ -308,6 +308,7 @@ private:
     case Node::Kind::ProtocolListWithClass:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
+    case Node::Kind::AssociatedTypeDescriptor:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
     case Node::Kind::AutoClosureType:
@@ -1546,6 +1547,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::TypeMetadataLazyCache:
     Printer << "lazy cache variable for type metadata for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::AssociatedTypeDescriptor:
+    Printer << "associated type descriptor for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::AssociatedTypeMetadataAccessor:

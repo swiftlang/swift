@@ -876,6 +876,10 @@ void Remangler::mangleLazyProtocolWitnessTableCacheVariable(Node *node) {
   mangleChildNodes(node); // type, protocol conformance
 }
 
+void Remangler::mangleAssociatedTypeDescriptor(Node *node) {
+  Out << "<associated-type-descriptor>";
+}
+
 void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node) {
   Out << "Wt";
   mangleChildNodes(node); // protocol conformance, identifier

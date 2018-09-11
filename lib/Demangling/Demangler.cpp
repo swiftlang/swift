@@ -1812,6 +1812,14 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       }
       return result;
     }
+    case 'l': {
+      auto assocTypeName = popAssocTypeName();
+      if (!assocTypeName)
+        return nullptr;
+
+      return createWithChild(Node::Kind::AssociatedTypeDescriptor,
+                             assocTypeName);
+    }
     case 'H':
     case 'h': {
       auto nodeKind = c == 'H' ? Node::Kind::KeyPathEqualsThunkHelper
