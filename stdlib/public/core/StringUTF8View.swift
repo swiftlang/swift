@@ -140,7 +140,7 @@ extension String {
       } else {
         r =  _nonASCIIIndex(atEncodedOffset: 0)
       }
-      _sanityCheck(r.encodedOffset == 0)
+      _correctnessCheck(r.encodedOffset == 0)
       if _fastPath(_legacyOffsets.start == 0) { return r }
 
       return index(r, offsetBy: numericCast(_legacyOffsets.start))
@@ -152,7 +152,7 @@ extension String {
     /// In an empty UTF-8 view, `endIndex` is equal to `startIndex`.
     @inlinable // FIXME(sil-serialize-all)
     public var endIndex: Index {
-      _sanityCheck(_legacyOffsets.end >= -3 && _legacyOffsets.end <= 0,
+      _correctnessCheck(_legacyOffsets.end >= -3 && _legacyOffsets.end <= 0,
         "out of bounds legacy end")
 
       var r = Index(encodedOffset: _guts.endIndex)
@@ -171,7 +171,7 @@ extension String {
     @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIIIndex(atEncodedOffset n: Int) -> Index {
-      _sanityCheck(!_guts._isASCIIOrSmallASCII)
+      _correctnessCheck(!_guts._isASCIIOrSmallASCII)
       let count = _guts.count
       if n == count { return endIndex }
       let buffer: Index._UTF8Buffer = _visitGuts(
@@ -236,7 +236,7 @@ extension String {
     @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIIIndex(after i: Index) -> Index {
-      _sanityCheck(!_guts._isASCIIOrSmallASCII)
+      _correctnessCheck(!_guts._isASCIIOrSmallASCII)
 
       var j = i
 
@@ -296,9 +296,9 @@ extension String {
     @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIIIndex(before i: Index) -> Index {
-      _sanityCheck(!_guts._isASCIIOrSmallASCII)
+      _correctnessCheck(!_guts._isASCIIOrSmallASCII)
       if i.transcodedOffset != 0 {
-        _sanityCheck(i.utf8Buffer != nil)
+        _correctnessCheck(i.utf8Buffer != nil)
         return Index(
           encodedOffset: i.encodedOffset,
           transcodedOffset: i.transcodedOffset &- 1,
@@ -378,7 +378,7 @@ extension String {
     @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIISubscript(position: Index) -> UTF8.CodeUnit {
-      _sanityCheck(!_guts._isASCIIOrSmallASCII)
+      _correctnessCheck(!_guts._isASCIIOrSmallASCII)
       var j = position
       while true {
         if let buffer = j.utf8Buffer {
@@ -542,7 +542,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
   @usableFromInline
   @inline(never)
   internal mutating func _fillBuffer() -> Unicode.UTF8.CodeUnit {
-    _sanityCheck(!_guts.isASCII, "next() already checks for known ASCII")
+    _correctnessCheck(!_guts.isASCII, "next() already checks for known ASCII")
     if _slowPath(_guts._isOpaque) {
       return _opaqueFillBuffer()
     }
@@ -553,7 +553,7 @@ extension String.UTF8View.Iterator : IteratorProtocol {
 
   @usableFromInline // @opaque
   internal mutating func _opaqueFillBuffer() -> Unicode.UTF8.CodeUnit {
-    _sanityCheck(_guts._isOpaque)
+    _correctnessCheck(_guts._isOpaque)
     defer { _fixLifetime(_guts) }
     return _fillBuffer(from: _guts._asOpaque())
   }
@@ -623,7 +623,7 @@ extension String.UTF8View {
   internal func _gutsNonASCIIUTF8Count(
     _ range: Range<Int>
   ) -> Int {
-    _sanityCheck(!_guts._isASCIIOrSmallASCII)
+    _correctnessCheck(!_guts._isASCIIOrSmallASCII)
     return _visitGuts(_guts, range: (range, performBoundsCheck: true),
       ascii: { ascii in return ascii.count },
       utf16: { utf16 in return String.UTF8View._count(fromUTF16: utf16) },

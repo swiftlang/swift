@@ -59,7 +59,7 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
     _ subRange: Range<Int>
   ) -> UnsafeMutablePointer<AnyObject>?
   {
-    _sanityCheck(!subRange.isEmpty)
+    _correctnessCheck(!subRange.isEmpty)
     var enumerationState = _makeSwiftNSFastEnumerationState()
 
     // This function currently returns nil unless the first

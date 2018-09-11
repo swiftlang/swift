@@ -132,7 +132,7 @@ open class ManagedBuffer<Header, Element> {
   /// Make ordinary initialization unavailable
   @inlinable // FIXME(sil-serialize-all)
   internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Only initialize these by calling create")
+    _correctnessCheckFailure("Only initialize these by calling create")
   }
 }
 
@@ -234,7 +234,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// it in this specialized constructor.
   @inlinable // FIXME(sil-serialize-all)
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
-    ManagedBufferPointer._sanityCheckValidBufferClass(type(of: buffer))
+    ManagedBufferPointer._correctnessCheckValidBufferClass(type(of: buffer))
     self._nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
 
@@ -344,8 +344,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     _uncheckedBufferClass: AnyClass,
     minimumCapacity: Int
   ) {
-    ManagedBufferPointer._sanityCheckValidBufferClass(_uncheckedBufferClass, creating: true)
-    _sanityCheck(
+    ManagedBufferPointer._correctnessCheckValidBufferClass(_uncheckedBufferClass, creating: true)
+    _correctnessCheck(
       minimumCapacity >= 0,
       "ManagedBufferPointer must have non-negative capacity")
 
@@ -391,10 +391,10 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal static func _sanityCheckValidBufferClass(
+  internal static func _correctnessCheckValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
-    _sanityCheck(
+    _correctnessCheck(
       _class_getInstancePositiveExtentSize(bufferClass) == MemoryLayout<_HeapObject>.size
       || (
         (!creating || bufferClass is ManagedBuffer<Header, Element>.Type)
@@ -402,7 +402,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
           == _headerOffset + MemoryLayout<Header>.size),
       "ManagedBufferPointer buffer class has illegal stored properties"
     )
-    _sanityCheck(
+    _correctnessCheck(
       _usesNativeSwiftReferenceCounting(bufferClass),
       "ManagedBufferPointer buffer class must be non-@objc"
     )

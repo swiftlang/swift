@@ -27,8 +27,8 @@ func memcpy_zext<
 >(
   dst: UnsafeMutablePointer<Target>, src: UnsafePointer<Source>, count: Int
 ) {
-  _sanityCheck(Source.bitWidth < Target.bitWidth)
-  _sanityCheck(count >= 0)
+  _correctnessCheck(Source.bitWidth < Target.bitWidth)
+  _correctnessCheck(count >= 0)
   // Don't use the for-in-range syntax to avoid precondition checking in Range.
   // This enables vectorization of the memcpy loop.
   var i = 0
@@ -47,8 +47,8 @@ func memcpy_trunc<
 >(
   dst: UnsafeMutablePointer<Target>, src: UnsafePointer<Source>, count: Int
 ) {
-  _sanityCheck(Source.bitWidth > Target.bitWidth)
-  _sanityCheck(count >= 0)
+  _correctnessCheck(Source.bitWidth > Target.bitWidth)
+  _correctnessCheck(count >= 0)
   // Don't use the for-in-range syntax to avoid precondition checking in Range.
   // This enables vectorization of the memcpy loop.
   var i = 0
@@ -99,7 +99,7 @@ struct _UnmanagedString<CodeUnit>
 
   @inlinable
   init(start: UnsafePointer<CodeUnit>, count: Int) {
-    _sanityCheck(CodeUnit.self == UInt8.self || CodeUnit.self == UInt16.self)
+    _correctnessCheck(CodeUnit.self == UInt8.self || CodeUnit.self == UInt16.self)
     self.start = start
     self.count = count
   }
@@ -165,14 +165,14 @@ extension _UnmanagedString : RandomAccessCollection {
   internal subscript(position: Index) -> UTF16.CodeUnit {
     @inline(__always)
     get {
-      _sanityCheck(position >= start && position < end)
+      _correctnessCheck(position >= start && position < end)
       return UTF16.CodeUnit(position.pointee)
     }
   }
 
   @inlinable // FIXME(sil-serialize-all)
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
-    _sanityCheck(bounds.lowerBound >= start && bounds.upperBound <= end)
+    _correctnessCheck(bounds.lowerBound >= start && bounds.upperBound <= end)
     return _UnmanagedString(start: bounds.lowerBound, count: bounds.count)
   }
 }
@@ -188,14 +188,14 @@ extension _UnmanagedString : _StringVariant {
   internal subscript(offset: Int) -> UTF16.CodeUnit {
     @inline(__always)
     get {
-      _sanityCheck(offset >= 0 && offset < count)
+      _correctnessCheck(offset >= 0 && offset < count)
       return UTF16.CodeUnit(start[offset])
     }
   }
 
   @inlinable // FIXME(sil-serialize-all)
   internal subscript(offsetRange: Range<Int>) -> _UnmanagedString {
-    _sanityCheck(offsetRange.lowerBound >= 0 && offsetRange.upperBound <= count)
+    _correctnessCheck(offsetRange.lowerBound >= 0 && offsetRange.upperBound <= count)
     return _UnmanagedString(
       start: start + offsetRange.lowerBound,
       count: offsetRange.count)
@@ -203,7 +203,7 @@ extension _UnmanagedString : _StringVariant {
   
   @inlinable // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeFrom<Int>) -> SubSequence {
-    _sanityCheck(offsetRange.lowerBound >= 0)
+    _correctnessCheck(offsetRange.lowerBound >= 0)
     return _UnmanagedString(
       start: start + offsetRange.lowerBound, 
       count: self.count - offsetRange.lowerBound
@@ -212,7 +212,7 @@ extension _UnmanagedString : _StringVariant {
   
   @inlinable // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeUpTo<Int>) -> SubSequence {
-    _sanityCheck(offsetRange.upperBound <= count)
+    _correctnessCheck(offsetRange.upperBound <= count)
     return _UnmanagedString(
       start: start, 
       count: offsetRange.upperBound
@@ -221,7 +221,7 @@ extension _UnmanagedString : _StringVariant {
   
   @inlinable // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeThrough<Int>) -> SubSequence {
-    _sanityCheck(offsetRange.upperBound < count)
+    _correctnessCheck(offsetRange.upperBound < count)
     return _UnmanagedString(
       start: start, 
       count: offsetRange.upperBound + 1
@@ -233,24 +233,24 @@ extension _UnmanagedString : _StringVariant {
   internal func _copy<TargetCodeUnit>(
     into target: UnsafeMutableBufferPointer<TargetCodeUnit>
   ) where TargetCodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(
+    _correctnessCheck(
       TargetCodeUnit.self == UInt8.self || TargetCodeUnit.self == UInt16.self)
     guard count > 0 else { return }
-    _sanityCheck(target.count >= self.count)
+    _correctnessCheck(target.count >= self.count)
     if CodeUnit.bitWidth == TargetCodeUnit.bitWidth {
       _memcpy(
         dest: target.baseAddress!,
         src: self.start,
         size: UInt(self.count * MemoryLayout<CodeUnit>.stride))
     } else if CodeUnit.bitWidth == 8 {
-      _sanityCheck(TargetCodeUnit.bitWidth == 16)
+      _correctnessCheck(TargetCodeUnit.bitWidth == 16)
       memcpy_zext(
         dst: target.baseAddress._unsafelyUnwrappedUnchecked,
         src: start,
         count: self.count)
     } else {
-      _sanityCheck(CodeUnit.bitWidth == 16 && TargetCodeUnit.bitWidth == 8)
-      _sanityCheck(self.filter { $0 >= UInt8.max }.isEmpty, "ASCII only")
+      _correctnessCheck(CodeUnit.bitWidth == 16 && TargetCodeUnit.bitWidth == 8)
+      _correctnessCheck(self.filter { $0 >= UInt8.max }.isEmpty, "ASCII only")
       memcpy_trunc(
         dst: target.baseAddress._unsafelyUnwrappedUnchecked,
         src: start,

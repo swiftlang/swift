@@ -103,7 +103,7 @@ extension _StringObject {
       UInt(truncatingIfNeeded: taggedRawBits &>> 32))
 #else
     self.init(_bridgeObject(fromTagged: taggedRawBits))
-    _sanityCheck(self.isValue)
+    _correctnessCheck(self.isValue)
 #endif
   }
 
@@ -118,7 +118,7 @@ extension _StringObject {
       UInt(truncatingIfNeeded: nonTaggedRawBits &>> 32))
 #else
     self.init(Builtin.reinterpretCast(nonTaggedRawBits))
-    _sanityCheck(!self.isValue)
+    _correctnessCheck(!self.isValue)
 #endif
   }
 
@@ -276,11 +276,11 @@ extension _StringObject {
     get {
 #if arch(i386) || arch(arm)
       guard case let .strong(object) = _variant else {
-        _sanityCheckFailure("internal error: expected a non-tagged String")
+        _correctnessCheckFailure("internal error: expected a non-tagged String")
       }
       return Builtin.reinterpretCast(object)
 #else
-      _sanityCheck(isNative || isCocoa)
+      _correctnessCheck(isNative || isCocoa)
       return rawBits & _StringObject._payloadMask
 #endif
     }
@@ -293,11 +293,11 @@ extension _StringObject {
     get {
 #if arch(i386) || arch(arm)
       if case .strong = _variant {
-        _sanityCheckFailure("internal error: expected a tagged String")
+        _correctnessCheckFailure("internal error: expected a tagged String")
       }
       return _bits
 #else
-      _sanityCheck(!isNative && !isCocoa)
+      _correctnessCheck(!isNative && !isCocoa)
       return rawBits & _StringObject._payloadMask
 #endif
     }
@@ -426,7 +426,7 @@ extension _StringObject {
 #if arch(i386) || arch(arm)
       unsupportedOn32bit()
 #else
-      _sanityCheck(_isSmallUTF8)
+      _correctnessCheck(_isSmallUTF8)
       return rawBits & ~_StringObject._topNibbleMask
 #endif
     }
@@ -440,9 +440,9 @@ extension _StringObject {
 #if arch(i386) || arch(arm)
       unsupportedOn32bit()
 #else
-      _sanityCheck(_isSmallUTF8)
+      _correctnessCheck(_isSmallUTF8)
       let count = (rawBits & _StringObject._smallUTF8CountMask) &>> 56
-      _sanityCheck(count <= _SmallUTF8String.capacity)
+      _correctnessCheck(count <= _SmallUTF8String.capacity)
       return Int(bitPattern: count)
 #endif
     }
@@ -454,7 +454,7 @@ extension _StringObject {
 #if arch(i386) || arch(arm)
       unsupportedOn32bit()
 #else
-    _sanityCheck(bits & _StringObject._topNibbleMask == 0)
+    _correctnessCheck(bits & _StringObject._topNibbleMask == 0)
     self.init(taggedRawBits: bits | _StringObject._smallUTF8TopNibble)
 #endif
   }
@@ -474,15 +474,15 @@ extension _StringObject {
 #if arch(i386) || arch(arm)
       switch _variant {
       case .strong(let object):
-        _sanityCheck(_bits & _StringObject._isCocoaBit == 0)
-        _sanityCheck(_usesNativeSwiftReferenceCounting(type(of: object)))
+        _correctnessCheck(_bits & _StringObject._isCocoaBit == 0)
+        _correctnessCheck(_usesNativeSwiftReferenceCounting(type(of: object)))
         return object
       default:
-        _sanityCheckFailure("asNativeObject on unmanaged _StringObject")
+        _correctnessCheckFailure("asNativeObject on unmanaged _StringObject")
       }
 #else
-      _sanityCheck(isNative)
-      _sanityCheck(
+      _correctnessCheck(isNative)
+      _correctnessCheck(
         _usesNativeSwiftReferenceCounting(
           type(of: Builtin.reinterpretCast(referenceBits) as AnyObject)))
       return Builtin.reinterpretCast(referenceBits)
@@ -499,15 +499,15 @@ extension _StringObject {
 #if arch(i386) || arch(arm)
       switch _variant {
       case .strong(let object):
-        _sanityCheck(_bits & _StringObject._isCocoaBit != 0)
-        _sanityCheck(!_usesNativeSwiftReferenceCounting(type(of: object)))
+        _correctnessCheck(_bits & _StringObject._isCocoaBit != 0)
+        _correctnessCheck(!_usesNativeSwiftReferenceCounting(type(of: object)))
         return object
       default:
-        _sanityCheckFailure("asCocoaObject on unmanaged _StringObject")
+        _correctnessCheckFailure("asCocoaObject on unmanaged _StringObject")
       }
 #else
-      _sanityCheck(isCocoa)
-      _sanityCheck(
+      _correctnessCheck(isCocoa)
+      _correctnessCheck(
         !_usesNativeSwiftReferenceCounting(
           type(of: Builtin.reinterpretCast(referenceBits) as AnyObject)))
       return Builtin.reinterpretCast(referenceBits)
@@ -521,7 +521,7 @@ extension _StringObject {
   var asOpaqueObject: _OpaqueString {
     @inline(__always)
     get {
-      _sanityCheck(isOpaque)
+      _correctnessCheck(isOpaque)
       let object = Builtin.reinterpretCast(referenceBits) as AnyObject
       return object as! _OpaqueString
     }
@@ -532,7 +532,7 @@ extension _StringObject {
   var asUnmanagedRawStart: UnsafeRawPointer {
     @inline(__always)
     get {
-      _sanityCheck(isUnmanaged)
+      _correctnessCheck(isUnmanaged)
 #if arch(i386) || arch(arm)
       return UnsafeRawPointer(bitPattern: _bits)._unsafelyUnwrappedUnchecked
 #else
@@ -757,8 +757,8 @@ extension _StringObject {
     of codeUnit: CodeUnit.Type = CodeUnit.self
   ) -> _SwiftStringStorage<CodeUnit>
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(isNative)
-    _sanityCheck(CodeUnit.bitWidth == self.bitWidth)
+    _correctnessCheck(isNative)
+    _correctnessCheck(CodeUnit.bitWidth == self.bitWidth)
     // TODO: Is this the way to do it?
     return _unsafeUncheckedDowncast(
       asNativeObject, to: _SwiftStringStorage<CodeUnit>.self)
@@ -767,7 +767,7 @@ extension _StringObject {
   @inlinable
   var nativeRawStorage: _SwiftRawStringStorage {
     @inline(__always) get {
-      _sanityCheck(isNative)
+      _correctnessCheck(isNative)
       return _unsafeUncheckedDowncast(
         asNativeObject, to: _SwiftRawStringStorage.self)
     }
@@ -778,31 +778,31 @@ extension _StringObject {
   @inlinable // FIXME(sil-serialize-all)
   internal func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
-    _sanityCheck(MemoryLayout<_StringObject>.size == 8)
-    _sanityCheck(isContiguous || isOpaque)
-    _sanityCheck(isOpaque || isContiguousASCII || isContiguousUTF16)
+    _correctnessCheck(MemoryLayout<_StringObject>.size == 8)
+    _correctnessCheck(isContiguous || isOpaque)
+    _correctnessCheck(isOpaque || isContiguousASCII || isContiguousUTF16)
     if isNative {
-      _sanityCheck(isContiguous)
+      _correctnessCheck(isContiguous)
       if isSingleByte {
-        _sanityCheck(isContiguousASCII)
-        _sanityCheck(asNativeObject is _SwiftStringStorage<UInt8>)
+        _correctnessCheck(isContiguousASCII)
+        _correctnessCheck(asNativeObject is _SwiftStringStorage<UInt8>)
       } else {
-        _sanityCheck(asNativeObject is _SwiftStringStorage<UInt16>)
+        _correctnessCheck(asNativeObject is _SwiftStringStorage<UInt16>)
       }
     } else if isUnmanaged {
-      _sanityCheck(isContiguous)
-      _sanityCheck(payloadBits > 0) // TODO: inside address space
+      _correctnessCheck(isContiguous)
+      _correctnessCheck(payloadBits > 0) // TODO: inside address space
     } else if isCocoa {
 #if _runtime(_ObjC)
       let object = asCocoaObject
-      _sanityCheck(
+      _correctnessCheck(
         !_usesNativeSwiftReferenceCounting(type(of: object as AnyObject)))
 #else
-      _sanityCheckFailure("Cocoa objects aren't supported on this platform")
+      _correctnessCheckFailure("Cocoa objects aren't supported on this platform")
 #endif
     } else if isSmall {
       // TODO: Drop the whole opaque bit thing...
-      _sanityCheck(isOpaque)
+      _correctnessCheck(isOpaque)
 
     } else {
       fatalError("Unimplemented string form")
@@ -827,20 +827,20 @@ extension _StringObject {
   ) {
 #if INTERNAL_CHECKS_ENABLED
     defer {
-      _sanityCheck(isSmall == (isValue && isSmallOrObjC))
-      _sanityCheck(isUnmanaged == (isValue && !isSmallOrObjC))
-      _sanityCheck(isCocoa == (!isValue && isSmallOrObjC))
-      _sanityCheck(isNative == (!isValue && !isSmallOrObjC))
+      _correctnessCheck(isSmall == (isValue && isSmallOrObjC))
+      _correctnessCheck(isUnmanaged == (isValue && !isSmallOrObjC))
+      _correctnessCheck(isCocoa == (!isValue && isSmallOrObjC))
+      _correctnessCheck(isNative == (!isValue && !isSmallOrObjC))
     }
 #endif
 
 #if arch(i386) || arch(arm)
     if isValue {
       if isSmallOrObjC {
-        _sanityCheck(isOpaque)
+        _correctnessCheck(isOpaque)
         self.init(isTwoByte ? .smallDoubleByte : .smallSingleByte, _payloadBits)
       } else {
-        _sanityCheck(!isOpaque)
+        _correctnessCheck(!isOpaque)
         self.init(
           isTwoByte ? .unmanagedDoubleByte : .unmanagedSingleByte, _payloadBits)
       }
@@ -859,7 +859,7 @@ extension _StringObject {
     }
     self.init(.strong(Builtin.reinterpretCast(_payloadBits)), bits)
 #else
-    _sanityCheck(_payloadBits & ~_StringObject._payloadMask == 0)
+    _correctnessCheck(_payloadBits & ~_StringObject._payloadMask == 0)
     var rawBits = _payloadBits
     if isValue {
       var rawBitsBuiltin = Builtin.stringObjectOr_Int64(
@@ -959,7 +959,7 @@ extension _StringObject {
       isSmallOrObjC: false,
       isOpaque: false,
       isTwoByte: CodeUnit.bitWidth == 16)
-    _sanityCheck(isSingleByte == (CodeUnit.bitWidth == 8))
+    _correctnessCheck(isSingleByte == (CodeUnit.bitWidth == 8))
   }
 
   @inlinable
@@ -969,6 +969,6 @@ extension _StringObject {
     _ storage: _SwiftStringStorage<CodeUnit>
   ) where CodeUnit : FixedWidthInteger & UnsignedInteger {
     self.init(nativeObject: storage, isSingleByte: CodeUnit.bitWidth == 8)
-    _sanityCheck(isSingleByte == (CodeUnit.bitWidth == 8))
+    _correctnessCheck(isSingleByte == (CodeUnit.bitWidth == 8))
   }
 }

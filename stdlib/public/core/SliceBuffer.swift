@@ -58,9 +58,9 @@ internal struct _SliceBuffer<Element>
   internal func _invariantCheck() {
     let isNative = _hasNativeBuffer
     let isNativeStorage: Bool = owner is _ContiguousArrayStorageBase
-    _sanityCheck(isNativeStorage == isNative)
+    _correctnessCheck(isNativeStorage == isNative)
     if isNative {
-      _sanityCheck(count <= nativeBuffer.count)
+      _correctnessCheck(count <= nativeBuffer.count)
     }
   }
 
@@ -71,14 +71,14 @@ internal struct _SliceBuffer<Element>
 
   @inlinable // FIXME(sil-serialize-all)
   internal var nativeBuffer: NativeBuffer {
-    _sanityCheck(_hasNativeBuffer)
+    _correctnessCheck(_hasNativeBuffer)
     return NativeBuffer(
       owner as? _ContiguousArrayStorageBase ?? _emptyArrayStorage)
   }
 
   @inlinable // FIXME(sil-serialize-all)
   internal var nativeOwner: AnyObject {
-    _sanityCheck(_hasNativeBuffer, "Expect a native array")
+    _correctnessCheck(_hasNativeBuffer, "Expect a native array")
     return owner
   }
 
@@ -96,10 +96,10 @@ internal struct _SliceBuffer<Element>
   ) where C : Collection, C.Element == Element {
 
     _invariantCheck()
-    _sanityCheck(insertCount <= numericCast(newValues.count))
+    _correctnessCheck(insertCount <= numericCast(newValues.count))
 
-    _sanityCheck(_hasNativeBuffer)
-    _sanityCheck(isUniquelyReferenced())
+    _correctnessCheck(_hasNativeBuffer)
+    _correctnessCheck(isUniquelyReferenced())
 
     let eraseCount = subrange.count
     let growth = insertCount - eraseCount
@@ -108,7 +108,7 @@ internal struct _SliceBuffer<Element>
     var native = nativeBuffer
     let hiddenElementCount = firstElementAddress - native.firstElementAddress
 
-    _sanityCheck(native.count + growth <= native.capacity)
+    _correctnessCheck(native.count + growth <= native.capacity)
 
     let start = subrange.lowerBound - startIndex + hiddenElementCount
     let end = subrange.upperBound - startIndex + hiddenElementCount
@@ -226,9 +226,9 @@ internal struct _SliceBuffer<Element>
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
     _invariantCheck()
-    _sanityCheck(bounds.lowerBound >= startIndex)
-    _sanityCheck(bounds.upperBound >= bounds.lowerBound)
-    _sanityCheck(bounds.upperBound <= endIndex)
+    _correctnessCheck(bounds.lowerBound >= startIndex)
+    _correctnessCheck(bounds.upperBound >= bounds.lowerBound)
+    _correctnessCheck(bounds.upperBound <= endIndex)
     let c = bounds.count
     target.initialize(from: subscriptBaseAddress + bounds.lowerBound, count: c)
     return target + c
@@ -284,8 +284,8 @@ internal struct _SliceBuffer<Element>
 
   @inlinable // FIXME(sil-serialize-all)
   internal func getElement(_ i: Int) -> Element {
-    _sanityCheck(i >= startIndex, "slice index is out of range (before startIndex)")
-    _sanityCheck(i < endIndex, "slice index is out of range")
+    _correctnessCheck(i >= startIndex, "slice index is out of range (before startIndex)")
+    _correctnessCheck(i < endIndex, "slice index is out of range")
     return subscriptBaseAddress[i]
   }
 
@@ -299,8 +299,8 @@ internal struct _SliceBuffer<Element>
       return getElement(position)
     }
     nonmutating set {
-      _sanityCheck(position >= startIndex, "slice index is out of range (before startIndex)")
-      _sanityCheck(position < endIndex, "slice index is out of range")
+      _correctnessCheck(position >= startIndex, "slice index is out of range (before startIndex)")
+      _correctnessCheck(position < endIndex, "slice index is out of range")
       subscriptBaseAddress[position] = newValue
     }
   }
@@ -308,9 +308,9 @@ internal struct _SliceBuffer<Element>
   @inlinable // FIXME(sil-serialize-all)
   internal subscript(bounds: Range<Int>) -> _SliceBuffer {
     get {
-      _sanityCheck(bounds.lowerBound >= startIndex)
-      _sanityCheck(bounds.upperBound >= bounds.lowerBound)
-      _sanityCheck(bounds.upperBound <= endIndex)
+      _correctnessCheck(bounds.lowerBound >= startIndex)
+      _correctnessCheck(bounds.upperBound >= bounds.lowerBound)
+      _correctnessCheck(bounds.upperBound <= endIndex)
       return _SliceBuffer(
         owner: owner,
         subscriptBaseAddress: subscriptBaseAddress,

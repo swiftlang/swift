@@ -1028,7 +1028,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
       _buffer = _Buffer(
         _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
     }
-    _sanityCheck(capacity >= minimumCapacity)
+    _correctnessCheck(capacity >= minimumCapacity)
   }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
@@ -1055,9 +1055,9 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   @_semantics("array.mutate_unknown")
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // This is a performance optimization. This code used to be in an ||
-    // statement in the _sanityCheck below.
+    // statement in the _correctnessCheck below.
     //
-    //   _sanityCheck(_buffer.capacity == 0 ||
+    //   _correctnessCheck(_buffer.capacity == 0 ||
     //                _buffer.isMutableAndUniquelyReferenced())
     //
     // SR-6437
@@ -1072,7 +1072,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
     // This specific case is okay because we will make the buffer unique in this
     // function because we request a capacity > 0 and therefore _copyToNewBuffer
     // will be called creating a new buffer.
-    _sanityCheck(capacity ||
+    _correctnessCheck(capacity ||
                  _buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
@@ -1086,8 +1086,8 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
     _ oldCount: Int,
     newElement: Element
   ) {
-    _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
-    _sanityCheck(_buffer.capacity >= _buffer.count + 1)
+    _correctnessCheck(_buffer.isMutableAndUniquelyReferenced())
+    _correctnessCheck(_buffer.capacity >= _buffer.count + 1)
 
     _buffer.count = oldCount + 1
     (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
@@ -1608,8 +1608,8 @@ extension Array: Equatable where Element: Equatable {
     }
 
 
-    _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
-    _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
+    _correctnessCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
+    _correctnessCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
 
     // We know that lhs.count == rhs.count, compare element wise.
     for idx in 0..<lhsCount {

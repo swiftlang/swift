@@ -446,7 +446,7 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
 @inlinable // FIXME(sil-serialize-all)
 public // SPI(SwiftExperimental)
 func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
-  _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
+  _correctnessCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF16.CodeUnit(c.value)
 }
 
@@ -474,7 +474,7 @@ extension Unicode.Scalar {
     var codeUnits: (UInt16, UInt16) = (self.utf16[0], 0)
     let utf16Count = self.utf16.count
     if utf16Count > 1 {
-      _sanityCheck(utf16Count == 2)
+      _correctnessCheck(utf16Count == 2)
       codeUnits.1 = self.utf16[1]
     }
     return try Swift.withUnsafePointer(to: &codeUnits) {

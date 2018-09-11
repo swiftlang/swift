@@ -93,7 +93,7 @@ public struct Character {
 
   @inlinable // FIXME(sil-serialize-all)
   internal init(_smallRepresentation b: _SmallUTF16) {
-    _sanityCheck(Int64(b._storage) >= 0)
+    _correctnessCheck(Int64(b._storage) >= 0)
     _representation = .smallUTF16(
       Builtin.trunc_Int64_Int63(b._storage._value))
   }
@@ -276,9 +276,9 @@ extension Character
           return Character(_singleCodeUnit: ascii[0])
         }
         // The only multi-scalar ASCII grapheme cluster is CR/LF.
-        _sanityCheck(ascii.count == 2)
-        _sanityCheck(ascii.start[0] == _CR)
-        _sanityCheck(ascii.start[1] == _LF)
+        _correctnessCheck(ascii.count == 2)
+        _correctnessCheck(ascii.start[0] == _CR)
+        _correctnessCheck(ascii.start[1] == _LF)
         return Character(_codeUnitPair: UInt16(_CR), UInt16(_LF))
       },
       utf16: { utf16 in return Character(_unverified: utf16) },
@@ -296,9 +296,9 @@ extension Character
           return Character(_singleCodeUnit: ascii[0])
         }
         // The only multi-scalar ASCII grapheme cluster is CR/LF.
-        _sanityCheck(ascii.count == 2)
-        _sanityCheck(ascii.start[0] == _CR)
-        _sanityCheck(ascii.start[1] == _LF)
+        _correctnessCheck(ascii.count == 2)
+        _correctnessCheck(ascii.start[0] == _CR)
+        _correctnessCheck(ascii.start[1] == _LF)
         return Character(_codeUnitPair: UInt16(_CR), UInt16(_LF))
       },
       utf16: { utf16 in return Character(_unverified: utf16) },
@@ -308,7 +308,7 @@ extension Character
   @inlinable
   internal
   init(_singleCodeUnit cu: UInt16) {
-    _sanityCheck(UTF16._isScalar(cu))
+    _correctnessCheck(UTF16._isScalar(cu))
     _representation = .smallUTF16(
       Builtin.zext_Int16_Int63(Builtin.reinterpretCast(cu)))
   }
@@ -316,7 +316,7 @@ extension Character
   @inlinable
   internal
     init(_codeUnitPair first: UInt16, _ second: UInt16) {
-    _sanityCheck(
+    _correctnessCheck(
       (UTF16._isScalar(first) && UTF16._isScalar(second)) ||
       (UTF16.isLeadSurrogate(first) && UTF16.isTrailSurrogate(second)))
     _representation = .smallUTF16(
@@ -329,7 +329,7 @@ extension Character
   internal
   init(_unverified storage: _SwiftStringStorage<Unicode.UTF16.CodeUnit>) {
     if _fastPath(storage.count <= 4) {
-      _sanityCheck(storage.count > 0)
+      _correctnessCheck(storage.count > 0)
       let b = _SmallUTF16(storage.unmanagedView)
       if _fastPath(Int64(bitPattern: b._storage) >= 0) {
         self.init(_smallRepresentation: b)
@@ -345,7 +345,7 @@ extension Character
   internal
   init<V: _StringVariant>(_unverified variant: V) {
     if _fastPath(variant.count <= 4) {
-      _sanityCheck(variant.count > 0)
+      _correctnessCheck(variant.count > 0)
       let b = _SmallUTF16(variant)
       if _fastPath(Int64(bitPattern: b._storage) >= 0) {
         self.init(_smallRepresentation: b)

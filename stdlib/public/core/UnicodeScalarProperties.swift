@@ -723,7 +723,7 @@ extension Unicode.Scalar.Properties {
         guard err.isSuccess else {
           fatalError("Unexpected error case-converting Unicode scalar.")
         }
-        _sanityCheck(count == correctSize, "inconsistent ICU behavior")
+        _correctnessCheck(count == correctSize, "inconsistent ICU behavior")
       }
     }
     return String._fromWellFormedUTF16CodeUnits(array[..<count])
@@ -1100,7 +1100,7 @@ extension Unicode.Scalar.Properties {
       guard err.isSuccess else {
         fatalError("Unexpected error case-converting Unicode scalar.")
       }
-      _sanityCheck(count == correctSize, "inconsistent ICU behavior")
+      _correctnessCheck(count == correctSize, "inconsistent ICU behavior")
       return String._fromASCII(
         UnsafeBufferPointer(rebasing: bufPtr[..<count]))
     }

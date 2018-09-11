@@ -21,8 +21,8 @@ import SwiftShims
 @inlinable
 @inline(__always)
 internal func _roundUpImpl(_ offset: UInt, toAlignment alignment: Int) -> UInt {
-  _sanityCheck(alignment > 0)
-  _sanityCheck(_isPowerOf2(alignment))
+  _correctnessCheck(alignment > 0)
+  _correctnessCheck(_isPowerOf2(alignment))
   // Note, given that offset is >= 0, and alignment > 0, we don't
   // need to underflow check the -1, as it can never underflow.
   let x = offset + UInt(bitPattern: alignment) &- 1
@@ -38,7 +38,7 @@ internal func _roundUp(_ offset: UInt, toAlignment alignment: Int) -> UInt {
 
 @inlinable
 internal func _roundUp(_ offset: Int, toAlignment alignment: Int) -> Int {
-  _sanityCheck(offset >= 0)
+  _correctnessCheck(offset >= 0)
   return Int(_roundUpImpl(UInt(bitPattern: offset), toAlignment: alignment))
 }
 
@@ -238,7 +238,7 @@ public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T 
 
 @_transparent
 public func _unsafeUncheckedDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
-  _sanityCheck(x is T, "invalid unsafeDowncast")
+  _correctnessCheck(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
 
@@ -353,7 +353,7 @@ internal var _objectPointerSpareBits: UInt {
 @inlinable // FIXME(sil-serialize-all)
 internal var _objectPointerLowSpareBitShift: UInt {
     @inline(__always) get {
-      _sanityCheck(_swift_abi_ObjCReservedLowBits < 2,
+      _correctnessCheck(_swift_abi_ObjCReservedLowBits < 2,
         "num bits now differs from num-shift-amount, new platform?")
       return UInt(_swift_abi_ObjCReservedLowBits)
     }
@@ -418,7 +418,7 @@ func _isNonTaggedObjCPointer(_ x: Builtin.BridgeObject) -> Bool {
 @inline(__always)
 func _getNonTagBits(_ x: Builtin.BridgeObject) -> UInt {
   // Zero out the tag bits, and leave them all at the top.
-  _sanityCheck(_isTaggedObject(x), "not tagged!")
+  _correctnessCheck(_isTaggedObject(x), "not tagged!")
   return (_bitPattern(x) & ~_objCTaggedPointerBits)
     >> _objectPointerLowSpareBitShift
 }
@@ -427,9 +427,9 @@ func _getNonTagBits(_ x: Builtin.BridgeObject) -> UInt {
 @inline(__always)
 @inlinable
 public func _bridgeObject(fromNative x: AnyObject) -> Builtin.BridgeObject {
-  _sanityCheck(!_isObjCTaggedPointer(x))
+  _correctnessCheck(!_isObjCTaggedPointer(x))
   let object = Builtin.castToBridgeObject(x, 0._builtinWordValue)
-  _sanityCheck(_isNativePointer(object))
+  _correctnessCheck(_isNativePointer(object))
   return object
 }
 
@@ -438,18 +438,18 @@ public func _bridgeObject(fromNative x: AnyObject) -> Builtin.BridgeObject {
 public func _bridgeObject(
   fromNonTaggedObjC x: AnyObject
 ) -> Builtin.BridgeObject {
-  _sanityCheck(!_isObjCTaggedPointer(x))
+  _correctnessCheck(!_isObjCTaggedPointer(x))
   let object = _makeObjCBridgeObject(x)
-  _sanityCheck(_isNonTaggedObjCPointer(object))
+  _correctnessCheck(_isNonTaggedObjCPointer(object))
   return object
 }
 
 @inline(__always)
 @inlinable
 public func _bridgeObject(fromTagged x: UInt) -> Builtin.BridgeObject {
-  _sanityCheck(x & _objCTaggedPointerBits != 0)
+  _correctnessCheck(x & _objCTaggedPointerBits != 0)
   let object: Builtin.BridgeObject = Builtin.valueToBridgeObject(x)
-  _sanityCheck(_isTaggedObject(object))
+  _correctnessCheck(_isTaggedObject(object))
   return object
 }
 
@@ -457,9 +457,9 @@ public func _bridgeObject(fromTagged x: UInt) -> Builtin.BridgeObject {
 @inlinable
 public func _bridgeObject(taggingPayload x: UInt) -> Builtin.BridgeObject {
   let shifted = x &<< _objectPointerLowSpareBitShift
-  _sanityCheck(x == (shifted &>> _objectPointerLowSpareBitShift),
+  _correctnessCheck(x == (shifted &>> _objectPointerLowSpareBitShift),
     "out-of-range: limited bit range requires some zero top bits")
-  _sanityCheck(shifted & _objCTaggedPointerBits == 0,
+  _correctnessCheck(shifted & _objCTaggedPointerBits == 0,
     "out-of-range: post-shift use of tag bits")
   return _bridgeObject(fromTagged: shifted | _objCTaggedPointerBits)
 }
@@ -468,7 +468,7 @@ public func _bridgeObject(taggingPayload x: UInt) -> Builtin.BridgeObject {
 @inline(__always)
 @inlinable
 public func _bridgeObject(toNative x: Builtin.BridgeObject) -> AnyObject {
-  _sanityCheck(_isNativePointer(x))
+  _correctnessCheck(_isNativePointer(x))
   return Builtin.castReferenceFromBridgeObject(x)
 }
 
@@ -477,16 +477,16 @@ public func _bridgeObject(toNative x: Builtin.BridgeObject) -> AnyObject {
 public func _bridgeObject(
   toNonTaggedObjC x: Builtin.BridgeObject
 ) -> AnyObject {
-  _sanityCheck(_isNonTaggedObjCPointer(x))
+  _correctnessCheck(_isNonTaggedObjCPointer(x))
   return Builtin.castReferenceFromBridgeObject(x)
 }
 
 @inline(__always)
 @inlinable
 public func _bridgeObject(toTagged x: Builtin.BridgeObject) -> UInt {
-  _sanityCheck(_isTaggedObject(x))
+  _correctnessCheck(_isTaggedObject(x))
   let bits = _bitPattern(x)
-  _sanityCheck(bits & _objCTaggedPointerBits != 0)
+  _correctnessCheck(bits & _objCTaggedPointerBits != 0)
   return bits
 }
 @inline(__always)
@@ -510,9 +510,9 @@ public func _bridgeObject(
 @inline(__always)
 @inlinable
 public func _nativeObject(fromNative x: AnyObject) -> Builtin.NativeObject {
-  _sanityCheck(!_isObjCTaggedPointer(x))
+  _correctnessCheck(!_isObjCTaggedPointer(x))
   let native = Builtin.unsafeCastToNativeObject(x)
-  // _sanityCheck(native == Builtin.castToNativeObject(x))
+  // _correctnessCheck(native == Builtin.castToNativeObject(x))
   return native
 }
 @inline(__always)
@@ -552,7 +552,7 @@ extension ManagedBufferPointer {
 internal func _makeNativeBridgeObject(
   _ nativeObject: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
-  _sanityCheck(
+  _correctnessCheck(
     (bits & _objectPointerIsObjCBit) == 0,
     "BridgeObject is treated as non-native when ObjC bit is set"
   )
@@ -585,17 +585,17 @@ func _makeObjCBridgeObject(
 internal func _makeBridgeObject(
   _ object: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
-  _sanityCheck(!_isObjCTaggedPointer(object) || bits == 0,
+  _correctnessCheck(!_isObjCTaggedPointer(object) || bits == 0,
     "Tagged pointers cannot be combined with bits")
 
-  _sanityCheck(
+  _correctnessCheck(
     _isObjCTaggedPointer(object)
     || _usesNativeSwiftReferenceCounting(type(of: object))
     || bits == _objectPointerIsObjCBit,
     "All spare bits must be set in non-native, non-tagged bridge objects"
   )
 
-  _sanityCheck(
+  _correctnessCheck(
     bits & _objectPointerSpareBits == bits,
     "Can't store non-spare bits into Builtin.BridgeObject")
 
@@ -656,10 +656,10 @@ func _isUnique_native<T>(_ object: inout T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
   // reference. Any case it's non pointer bits must be zero, so
   // force cast it to BridgeObject and check the spare bits.
-  _sanityCheck(
+  _correctnessCheck(
     (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
     == 0)
-  _sanityCheck(_usesNativeSwiftReferenceCounting(
+  _correctnessCheck(_usesNativeSwiftReferenceCounting(
       type(of: Builtin.reinterpretCast(object) as AnyObject)))
   return Bool(Builtin.isUnique_native(&object))
 }
@@ -690,7 +690,7 @@ func _isOptional<T>(_ type: T.Type) -> Bool {
 /// Extract an object reference from an Any known to contain an object.
 @inlinable // FIXME(sil-serialize-all)
 internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
-  _sanityCheck(type(of: any) is AnyObject.Type
+  _correctnessCheck(type(of: any) is AnyObject.Type
                || type(of: any) is AnyObject.Protocol,
                "Any expected to contain object reference")
   // Ideally we would do something like this:

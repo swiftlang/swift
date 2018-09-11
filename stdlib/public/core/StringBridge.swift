@@ -84,7 +84,7 @@ internal func _cocoaStringSlice(
 ) -> _CocoaString {
   let cfSelf: _swift_shims_CFStringRef = target
 
-  _sanityCheck(
+  _correctnessCheck(
     _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")
 
@@ -102,7 +102,7 @@ internal func _cocoaStringSubscript(
 ) -> UTF16.CodeUnit {
   let cfSelf: _swift_shims_CFStringRef = target
 
-  _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
+  _correctnessCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")
 
   return _swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
@@ -266,7 +266,7 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
 
   @inlinable // FIXME(sil-serialize-all)
   public init(_ _guts: _StringGuts) {
-    _sanityCheck(!_guts._isOpaque,
+    _correctnessCheck(!_guts._isOpaque,
       "_NSContiguousString requires contiguous storage")
     self._guts = _guts
     super.init()
@@ -274,7 +274,7 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
 
   @inlinable // FIXME(sil-serialize-all)
   public init(_unmanaged guts: _StringGuts) {
-    _sanityCheck(!guts._isOpaque,
+    _correctnessCheck(!guts._isOpaque,
       "_NSContiguousString requires contiguous storage")
     if guts.isASCII {
       self._guts = _StringGuts(_large: guts._unmanagedASCIIView)
@@ -286,7 +286,7 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
 
   @inlinable // FIXME(sil-serialize-all)
   public init(_unmanaged guts: _StringGuts, range: Range<Int>) {
-    _sanityCheck(!guts._isOpaque,
+    _correctnessCheck(!guts._isOpaque,
       "_NSContiguousString requires contiguous storage")
     if guts.isASCII {
       self._guts = _StringGuts(_large: guts._unmanagedASCIIView[range])
@@ -299,7 +299,7 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   @usableFromInline // FIXME(sil-serialize-all)
   @objc
   init(coder aDecoder: AnyObject) {
-    _sanityCheckFailure("init(coder:) not implemented for _NSContiguousString")
+    _correctnessCheckFailure("init(coder:) not implemented for _NSContiguousString")
   }
 
   @inlinable // FIXME(sil-serialize-all)

@@ -31,7 +31,7 @@ public struct _ValidUTF8Buffer<Storage: UnsignedInteger & FixedWidthInteger> {
   
   @inlinable // FIXME(sil-serialize-all)
   internal init(_containing e: Element) {
-    _sanityCheck(
+    _correctnessCheck(
       e != 192 && e != 193 && !(245...255).contains(e), "invalid UTF8 byte")
     _biasedBits = Storage(truncatingIfNeeded: e &+ 1)
   }
@@ -167,7 +167,7 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
   @inline(__always)
   public mutating func append(_ e: Element) {
     _debugPrecondition(count + 1 <= capacity)
-    _sanityCheck(
+    _correctnessCheck(
       e != 192 && e != 193 && !(245...255).contains(e), "invalid UTF8 byte")
     _biasedBits |= Storage(e &+ 1) &<< (count &<< 3)
   }

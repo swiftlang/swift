@@ -67,14 +67,14 @@ internal struct _UnsafeBitMap {
   internal subscript(i: Int) -> Bool {
     @inline(__always)
     get {
-      _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
+      _correctnessCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
       let word = values[_UnsafeBitMap.wordIndex(i)]
       let bit = word & (1 << _UnsafeBitMap.bitIndex(i))
       return bit != 0
     }
     @inline(__always)
     nonmutating set {
-      _sanityCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
+      _correctnessCheck(i < Int(bitCount) && i >= 0, "index out of bounds")
       let wordIdx = _UnsafeBitMap.wordIndex(i)
       let bitMask = (1 as UInt) &<< _UnsafeBitMap.bitIndex(i)
       if newValue {
