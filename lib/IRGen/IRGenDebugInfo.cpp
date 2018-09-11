@@ -1587,6 +1587,7 @@ void IRGenDebugInfoImpl::finalize() {
   DBuilder.finalize();
 }
 
+#ifndef NDEBUG
 bool IRGenDebugInfoImpl::lineEntryIsSane(SILLocation::DebugLoc DL,
                                          const SILDebugScope *DS) {
   // All bets are off for optimized code.
@@ -1603,6 +1604,7 @@ bool IRGenDebugInfoImpl::lineEntryIsSane(SILLocation::DebugLoc DL,
   // Return true iff DL was not yet in PreviousLineEntries.
   return ItNew.second;
 }
+#endif
 
 void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
                                        const SILDebugScope *DS,
