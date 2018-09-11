@@ -1370,7 +1370,7 @@ void Serializer::writeInlinableBodyText(const AbstractFunctionDecl *AFD) {
     return;
   if (!AFD->hasInlinableBodyText()) return;
   SmallString<128> scratch;
-  auto body = AFD->getBodyStringRepresentation(scratch);
+  auto body = AFD->getInlinableBodyText(scratch);
 
   unsigned abbrCode = DeclTypeAbbrCodes[InlinableBodyTextLayout::Code];
   InlinableBodyTextLayout::emitRecord(Out, ScratchRecord, abbrCode, body);

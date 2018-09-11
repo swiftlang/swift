@@ -87,7 +87,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
     if (AFD->getResilienceExpansion() != ResilienceExpansion::Minimal)
       return;
     SmallString<128> scratch;
-    printer << " " << AFD->getBodyStringRepresentation(scratch);
+    printer << " " << AFD->getInlinableBodyText(scratch);
   };
 
   class ShouldPrintForTextualInterface : public ShouldPrintChecker {

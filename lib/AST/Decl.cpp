@@ -5430,7 +5430,7 @@ bool AbstractFunctionDecl::hasInlinableBodyText() const {
   return body && !body->isImplicit();
 }
 
-StringRef AbstractFunctionDecl::getBodyStringRepresentation(
+StringRef AbstractFunctionDecl::getInlinableBodyText(
   SmallVectorImpl<char> &scratch) const {
   assert(hasInlinableBodyText() &&
          "can't get string representation of function with no text");
