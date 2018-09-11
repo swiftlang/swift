@@ -149,8 +149,8 @@ class TestXPCEncoder {
         do {
             _ = try XPCDecoder.decode(DecodeFailureNested.self, message: input)
         } catch DecodingError.typeMismatch(let (_, context)) {
-            expectEqual(4, context.codingPath.count)
-            expectEqual("intValue", context.codingPath[3].stringValue)
+            expectEqual(2, context.codingPath.count)
+            expectEqual("intValue", context.codingPath[1].stringValue)
         } catch {
             expectUnreachable("Unexpected error: \(String(describing: error))")
         }
