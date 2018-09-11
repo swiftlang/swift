@@ -193,14 +193,14 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   }
 
   bool getModuleUSR(const ModuleDecl *D, StringRef &USR) {
-      SmallString<128> storage;
-      {
-          llvm::raw_svector_ostream OS(storage);
-          if (ide::printDeclUSR(D, OS))
-              return true;
-          USR = stringStorage.copyString(OS.str());
-      }
-      return false;
+    SmallString<128> storage;
+    {
+      llvm::raw_svector_ostream OS(storage);
+      if (ide::printDeclUSR(D, OS))
+        return true;
+      USR = stringStorage.copyString(OS.str());
+    }
+    return false;
   }
 
   bool getPseudoAccessorNameAndUSR(AbstractStorageDecl *D, AccessorKind AK, StringRef &Name, StringRef &USR) {

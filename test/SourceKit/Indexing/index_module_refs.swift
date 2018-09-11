@@ -6,7 +6,7 @@ import Foundation
 struct Array {}
 
 extension Swift.Array {
-    func myMethod() {
-        let dict = Swift.Dictionary<Swift.Array, Array>()
-    }
+  func myMethod() {
+    let dict = Swift.Dictionary<Swift.Array, Array>()
+  }
 }
