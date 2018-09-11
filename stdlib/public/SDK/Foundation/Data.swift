@@ -1178,7 +1178,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter url: The `URL` to read.
     /// - parameter options: Options for the read operation. Default value is `[]`.
     /// - throws: An error in the Cocoa domain, if `url` cannot be read.
-    public init(contentsOf url: URL, options: Data.ReadingOptions = []) throws {
+    public init(contentsOf url: __shared URL, options: __shared Data.ReadingOptions = []) throws {
         let d = try NSData(contentsOf: url, options: ReadingOptions(rawValue: options.rawValue))
         _backing = _DataStorage(immutableReference: d, offset: 0)
         _sliceRange = 0..<d.length
@@ -1189,7 +1189,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Returns nil when the input is not recognized as valid Base-64.
     /// - parameter base64String: The string to parse.
     /// - parameter options: Encoding options. Default value is `[]`.
-    public init?(base64Encoded base64String: String, options: Data.Base64DecodingOptions = []) {
+    public init?(base64Encoded base64String: __shared String, options: __shared Data.Base64DecodingOptions = []) {
         if let d = NSData(base64Encoded: base64String, options: Base64DecodingOptions(rawValue: options.rawValue)) {
             _backing = _DataStorage(immutableReference: d, offset: 0)
             _sliceRange = 0..<d.length
@@ -1204,7 +1204,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// - parameter base64Data: Base-64, UTF-8 encoded input data.
     /// - parameter options: Decoding options. Default value is `[]`.
-    public init?(base64Encoded base64Data: Data, options: Data.Base64DecodingOptions = []) {
+    public init?(base64Encoded base64Data: __shared Data, options: __shared Data.Base64DecodingOptions = []) {
         if let d = NSData(base64Encoded: base64Data, options: Base64DecodingOptions(rawValue: options.rawValue)) {
             _backing = _DataStorage(immutableReference: d, offset: 0)
             _sliceRange = 0..<d.length

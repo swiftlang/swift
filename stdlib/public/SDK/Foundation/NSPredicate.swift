@@ -15,7 +15,7 @@
 extension NSPredicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
   public
-  convenience init(format predicateFormat: String, _ args: CVarArg...) {
+  convenience init(format predicateFormat: __shared String, _ args: CVarArg...) {
     let va_args = getVaList(args)
     self.init(format: predicateFormat, arguments: va_args)
   }

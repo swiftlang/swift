@@ -156,7 +156,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
             }
         }
         
-        mutating func append(contentsOf other: [Int]) {
+        mutating func append(contentsOf other: __owned [Int]) {
             switch self {
             case .empty:
                 switch other.count {

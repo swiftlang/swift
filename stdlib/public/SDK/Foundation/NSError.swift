@@ -359,7 +359,7 @@ extension CFError : Error {
 public protocol _ObjectiveCBridgeableError : Error {
   /// Produce a value of the error type corresponding to the given NSError,
   /// or return nil if it cannot be bridged.
-  init?(_bridgedNSError: NSError)
+  init?(_bridgedNSError: __shared NSError)
 }
 
 /// A hook for the runtime to use _ObjectiveCBridgeableError in order to

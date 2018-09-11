@@ -97,7 +97,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// Returns a new Calendar.
     ///
     /// - parameter identifier: The kind of calendar to use.
-    public init(identifier: Identifier) {
+    public init(identifier: __shared Identifier) {
         let result = __NSCalendarCreate(Calendar._toNSCalendarIdentifier(identifier))
         _handle = _MutableHandle(adoptingReference: result as! NSCalendar)
         _autoupdating = false
