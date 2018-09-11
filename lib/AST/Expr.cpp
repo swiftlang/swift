@@ -1855,6 +1855,10 @@ void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
   getBody()->setElement(0, NewBody);
 }
 
+bool ClosureExpr::hasEmptyBody() const {
+  return getBody()->getNumElements() == 0;
+}
+
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
 
 void AutoClosureExpr::setBody(Expr *E) {
