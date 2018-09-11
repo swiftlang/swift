@@ -33,6 +33,7 @@
 #include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/EquivalenceClasses.h"
 
 using namespace swift;
 using namespace tf;
@@ -296,11 +297,13 @@ static SILValue createTFIntegerConst(GraphFunctionDeviceInfo &deviceInfo,
 // A helper class to transform a loop to have a single exit from the header.
 class SingleExitLoopTransformer {
 public:
-  SingleExitLoopTransformer(GraphFunctionDeviceInfo *deviceInfo,
-                            SILLoopInfo *LI, DominanceInfo *DI, SILLoop *loop)
+  SingleExitLoopTransformer(
+      GraphFunctionDeviceInfo *deviceInfo, SILLoopInfo *LI, DominanceInfo *DI,
+      SILLoop *loop, const llvm::EquivalenceClasses<SILValue> *equivalentValues)
       : deviceInfo(deviceInfo), DI(DI), LI(LI), loop(loop),
         header(loop->getHeader()), preheader(loop->getLoopPreheader()),
-        latch(loop->getLoopLatch()), currentFn(header->getParent()) {
+        latch(loop->getLoopLatch()), currentFn(header->getParent()),
+        equivalentValues(equivalentValues) {
     assert(preheader && "Canonicalization should have given us one preheader");
     assert(latch && "Canonicalization should have given us one latch block");
     initialize();
@@ -364,6 +367,7 @@ private:
   SILBasicBlock *preheader;
   SILBasicBlock *latch;
   SILFunction *currentFn;
+  const llvm::EquivalenceClasses<SILValue> *equivalentValues;
   /// exit blocks before the loop is transformed.
   SmallVector<SILBasicBlock*, 8> exitBlocks;
   /// The list of edges that need to rewired to the newHeader or
@@ -430,34 +434,14 @@ SingleExitLoopTransformer::computeEscapingValues() const {
   // preheader to undef.
   for (auto &kv : result) {
     const SILValue &escapingValue = kv.first;
-    // FIXME: We should explore the data dependencies in DFS order. Currently,
-    // the order of iteration is arbitrary. DFS should be more efficient.
-    SmallPtrSet<SILValue, 8> worklist;
-    SmallPtrSet<SILValue, 8> visited;
-    worklist.insert(escapingValue);
-    while (!worklist.empty()) {
-      SILValue current = *worklist.begin();
-      visited.insert(current);
-      worklist.erase(current);
-      if (auto *inst = current->getDefiningInstruction()) {
-        if (DI->dominates(inst->getParent(), preheader)) {
-          // Found a definition that we could use.
-          kv.second = current;
-          break;
-        }
-      } else if (auto *arg = dyn_cast<SILArgument>(current)) {
-        if (DI->dominates(arg->getParent(), preheader)) {
-          // Found an argument that we could use.
-          kv.second = current;
-          break;
-        }
-        // This is not usable. Add incoming values to worklist.
-        SmallVector<SILValue, 8> incomingValues;
-        arg->getIncomingValues(incomingValues);
-        for (const SILValue &incomingValue : incomingValues) {
-          if (visited.count(incomingValue) > 0) continue;
-          worklist.insert(incomingValue);
-        }
+    // Find an equivalent value that dominates the header.
+    for (auto equivalentValue :
+         make_range(equivalentValues->findLeader(escapingValue),
+                    equivalentValues->member_end())) {
+      if (DI->properlyDominates(equivalentValue, &(header->front()))) {
+        // Found a definition that we could use.
+        kv.second = equivalentValue;
+        break;
       }
     }
   }
@@ -811,6 +795,19 @@ bool SingleExitLoopTransformer::transform() {
 void SESERegionBuilder::ensureSingleExitFromLoops() {
   GraphFunctionDeviceInfo deviceInfo(
       GraphFunctionDeviceInfo::getForFunction(*F, /*removeConfigInst*/ false));
+
+  // Build the equivalence classes induced by argument passing.
+  llvm::EquivalenceClasses<SILValue> equivalentValues;
+  for (auto &bb : *F) {
+    for (auto arg : bb.getArguments()) {
+      SmallVector<SILValue, 8> incomingValues;
+      arg->getIncomingValues(incomingValues);
+      for (SILValue incomingValue : incomingValues) {
+        equivalentValues.unionSets(arg, incomingValue);
+      }
+    }
+  }
+
   // Visit the loop nest hierarchy bottom up.
   bool changed = false;
   // The bool indicates whether the subloops are already processed.
@@ -829,7 +826,8 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
       }
       continue;
     }
-    SingleExitLoopTransformer transformer(&deviceInfo, &LI, &DI, loop);
+    SingleExitLoopTransformer transformer(&deviceInfo, &LI, &DI, loop,
+                                          &equivalentValues);
     bool loopChanged = transformer.transform();
     if (loopChanged) {
       // Recalculate dominator information as it is stale now.
