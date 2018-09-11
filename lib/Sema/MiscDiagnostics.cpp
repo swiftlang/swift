@@ -3779,7 +3779,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
           .fixItInsert(segment->getEndLoc(), ")");
 
         // Suggest inserting a default value about an optional.
-        if(isOptional)
+        if (isOptional)
             TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
               .highlight(segment->getSourceRange())
               .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
