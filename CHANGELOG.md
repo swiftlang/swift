@@ -24,6 +24,24 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* [SR-7251][]:
+
+  In Swift 5 mode, attempting to declare a static property with the same name as a
+  nested type is now always correctly rejected. Previously, it was possible to
+  perform such a redeclaration in an extension of a generic type.
+  
+  For example:
+  ```swift
+  struct Foo<T> {}
+  extension Foo {
+    struct i {}
+    
+    // compiler error: Invalid redeclaration of 'i'
+    // (prior to Swift 5, this did not produce an error)
+    static var i: Int { return 0 }
+  }
+  ```
+
 * [SR-4248][]:
 
   In Swift 5 mode, when casting an optional value to a generic placeholder type,
@@ -7199,3 +7217,4 @@ Swift 1.0
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
+[SR-7251]: <https://bugs.swift.org/browse/SR-7251>
