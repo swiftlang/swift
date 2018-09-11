@@ -3755,7 +3755,8 @@ namespace {
       if (auto contextTy = decl->getDeclContext()->getDeclaredInterfaceType()) {
         if (auto classDecl = contextTy->getClassOrBoundGenericClass()) {
           if (auto method = dyn_cast<AbstractFunctionDecl>(decl)) {
-            classDecl->recordObjCMethod(method);
+            if (name)
+              classDecl->recordObjCMethod(method, *name);
           }
         }
       }

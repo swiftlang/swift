@@ -1714,14 +1714,14 @@ ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return { stored.Methods.begin(), stored.Methods.end() };
 }
 
-void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
+void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
+                                 ObjCSelector selector) {
   if (!ObjCMethodLookup) {
     createObjCMethodLookup();
   }
 
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
-  auto selector = method->getObjCSelector();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
 
   // In a non-empty vector, we could have duplicates or conflicts.
