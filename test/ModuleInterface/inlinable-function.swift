@@ -138,3 +138,21 @@ public struct Foo: Hashable {
 
   // CHECK: {{^}}}
 }
+
+// CHECK-NOT: private func topLevelPrivate()
+private func topLevelPrivate() {
+  print("Ssshhhhh")
+}
+
+// CHECK: internal func topLevelUsableFromInline(){{$}}
+@usableFromInline
+internal func topLevelUsableFromInline() {
+  topLevelPrivate()
+}
+
+// CHECK: @inlinable public func topLevelInlinable() {
+// CHECK-NEXT:  topLevelUsableFromInline()
+// CHECK-NEXT: }
+@inlinable public func topLevelInlinable() {
+  topLevelUsableFromInline()
+}
