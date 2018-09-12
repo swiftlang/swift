@@ -888,6 +888,24 @@ namespace {
       : SGF(SGF), Loc(loc), Inputs(inputs), Outputs(outputs),
         OutputTypes(outputTypes) {}
 
+    void translate(AbstractionPattern inputOrigFunctionType,
+                   AnyFunctionType::CanParamArrayRef inputSubstTypes,
+                   AbstractionPattern outputOrigFunctionType,
+                   AnyFunctionType::CanParamArrayRef outputSubstTypes) {
+      assert(inputSubstTypes.size() == outputSubstTypes.size());
+
+      SmallVector<AbstractionPattern, 8> inputOrigTypes;
+      SmallVector<AbstractionPattern, 8> outputOrigTypes;
+
+      for (auto i : indices(inputSubstTypes)) {
+        inputOrigTypes.push_back(inputOrigFunctionType.getFunctionParamType(i));
+        outputOrigTypes.push_back(outputOrigFunctionType.getFunctionParamType(i));
+      }
+
+      translate(inputOrigTypes, inputSubstTypes,
+                outputOrigTypes, outputSubstTypes);
+    }
+
     void translate(ArrayRef<AbstractionPattern> inputOrigTypes,
                    AnyFunctionType::CanParamArrayRef inputSubstTypes,
                    ArrayRef<AbstractionPattern> outputOrigTypes,
@@ -906,8 +924,11 @@ namespace {
                    AnyFunctionType::CanParam inputSubstType,
                    AbstractionPattern outputOrigType,
                    AnyFunctionType::CanParam outputSubstType) {
-      assert(inputSubstType.isInOut() == outputSubstType.isInOut());
-      if (inputSubstType.isInOut()) {
+      // Note that it's OK for the input to be inout but not the output;
+      // this means we're just going to load the inout and pass it on as a
+      // scalar.
+      if (outputSubstType.isInOut()) {
+        assert(inputSubstType.isInOut());
         auto inputValue = claimNextInput();
         auto outputLoweredTy = claimNextOutputType();
 
@@ -3525,10 +3546,10 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 
   // Reabstract the arguments.
   TranslateArguments(*this, loc, thunkArgs, substArgs, fTy->getParameters())
-    .translate(inputOrigType.getFunctionInputType(),
-               inputSubstType.getInput(),
-               outputOrigType.getFunctionInputType(),
-               outputSubstType.getInput());
+    .translate(inputOrigType,
+               inputSubstType.getParams(),
+               outputOrigType,
+               outputSubstType.getParams());
   
   // Collect the arguments to the implementation.
   SmallVector<SILValue, 8> args;
@@ -3652,11 +3673,6 @@ getWitnessFunctionRef(SILGenFunction &SGF,
   llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
 }
 
-static CanType dropLastElement(CanType type) {
-  auto elts = cast<TupleType>(type)->getElements().drop_back();
-  return TupleType::get(elts, type->getASTContext())->getCanonicalType();
-}
-
 namespace {
   class EmitAbortApply : public Cleanup {
     SILValue Token;
@@ -3710,18 +3726,25 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                           ->substGenericArgs(witnessSubs)
                                           ->getCanonicalType());
   }
-  CanType reqtSubstInputTy = F.mapTypeIntoContext(reqtSubstTy.getInput())
-      ->getCanonicalType();
-  CanType reqtSubstResultTy = F.mapTypeIntoContext(reqtSubstTy.getResult())
-      ->getCanonicalType();
 
-  AbstractionPattern reqtOrigInputTy = reqtOrigTy.getFunctionInputType();
+  if (auto genericFnType = dyn_cast<GenericFunctionType>(reqtSubstTy)) {
+    auto forwardingSubs = F.getForwardingSubstitutionMap();
+    reqtSubstTy = cast<FunctionType>(genericFnType
+                                          ->substGenericArgs(forwardingSubs)
+                                          ->getCanonicalType());
+  } else {
+    reqtSubstTy = cast<FunctionType>(F.mapTypeIntoContext(reqtSubstTy)
+                                          ->getCanonicalType());
+  }
+
+  auto reqtSubstParams = reqtSubstTy.getParams();
+  auto witnessSubstParams = witnessSubstTy.getParams();
+
   // For a free function witness, discard the 'self' parameter of the
   // requirement.
   if (isFree) {
     origParams.pop_back();
-    reqtOrigInputTy = reqtOrigInputTy.dropLastTupleElement();
-    reqtSubstInputTy = dropLastElement(reqtSubstInputTy);
+    reqtSubstParams = reqtSubstParams.drop_back();
   }
 
   // Translate the argument values from the requirement abstraction level to
@@ -3736,10 +3759,10 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   TranslateArguments(*this, loc,
                      origParams, witnessParams,
                      witnessFTy->getParameters())
-    .translate(reqtOrigInputTy,
-               reqtSubstInputTy,
-               witnessOrigTy.getFunctionInputType(),
-               witnessSubstTy.getInput());
+    .translate(reqtOrigTy,
+               reqtSubstParams,
+               witnessOrigTy,
+               witnessSubstParams);
 
   SILValue witnessFnRef = getWitnessFunctionRef(*this, witness,
                                                 origWitnessFTy,
@@ -3761,7 +3784,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
     resultPlanner->plan(witnessOrigTy.getFunctionResultType(),
                         witnessSubstTy.getResult(),
                         reqtOrigTy.getFunctionResultType(),
-                        reqtSubstResultTy,
+                        reqtSubstTy.getResult(),
                         witnessFTy, thunkTy, args);
   }
 
