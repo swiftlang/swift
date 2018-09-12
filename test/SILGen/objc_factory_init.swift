@@ -38,6 +38,7 @@ extension Hive {
   //
   // CHECK: [[SOME_BB]]([[NEW_HIVE:%.*]] : @owned $Hive):
   // CHECK:   assign [[NEW_HIVE]] to [[PB_BOX]]
+  // CHECK: } // end sil function '$SSo4HiveC17objc_factory_initE10otherQueenABSo3BeeC_tcfC'
   convenience init(otherQueen other: Bee) {
     self.init(queen: other)
   }
@@ -66,6 +67,7 @@ class SubHive : Hive {
   // CHECK:   [[HIVE_INIT_FN:%.*]] = objc_method [[OBJC_METATYPE]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign
   // CHECK:   apply [[HIVE_INIT_FN]]([[QUEEN]], [[OBJC_METATYPE]]) : $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK:   destroy_value [[QUEEN]]
+  // CHECK: } // end sil function '$S17objc_factory_init7SubHiveC20delegatesToInheritedACyt_tcfC'
   convenience init(delegatesToInherited: ()) {
     self.init(queen: Bee())
   }

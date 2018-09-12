@@ -433,7 +433,7 @@ class DelegatingCtorClass {
   
   convenience init(x: EmptyStruct, y: EmptyStruct) {
     _ = ivar       // expected-error {{'self' used before 'self.init' call}}
-    ivar = x       // expected-error* {{'self' used before 'self.init' call}}
+    ivar = x       // expected-error {{'self' used before 'self.init' call}}
     self.init()
   }
 
@@ -443,7 +443,7 @@ class DelegatingCtorClass {
   }
 
   convenience init(x: (EmptyStruct, EmptyStruct)) {
-    method()       // expected-error* {{'self' used before 'self.init' call}}
+    method()       // expected-error {{'self' used before 'self.init' call}}
     self.init()
   }
 
