@@ -247,7 +247,7 @@ public:
     return {NewValue, SubElementNumber, InsertionPoints};
   }
 
-  void dump() const __attribute__((used));
+  void dump() const LLVM_ATTRIBUTE_USED;
   void print(llvm::raw_ostream &os) const;
 
 private:
@@ -379,7 +379,7 @@ public:
   SILValue aggregateValues(SILType LoadTy, SILValue Address, unsigned FirstElt);
 
   void print(llvm::raw_ostream &os) const;
-  void dump() const __attribute__((used));
+  void dump() const LLVM_ATTRIBUTE_USED;
 
 private:
   SILValue aggregateFullyAvailableValue(SILType LoadTy, unsigned FirstElt);
