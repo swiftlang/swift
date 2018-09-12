@@ -3022,14 +3022,13 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
     // Set the interface type of this declaration.
     ASTContext &ctx = getASTContext();
 
-    // If we can set a sugared type, do so.
-    if (!getGenericSignature()) {
-      auto sugaredType =
-        NameAliasType::get(this, Type(), SubstitutionMap(), underlying);
-      setInterfaceType(MetatypeType::get(sugaredType, ctx));
-    } else {
-      setInterfaceType(MetatypeType::get(underlying, ctx));
-    }
+    auto *genericSig = getGenericSignature();
+    auto subs = SubstitutionMap::get(
+        genericSig, [&](SubstitutableType *type) -> Type { return type; },
+        MakeAbstractConformanceForGenericType());
+
+    auto sugaredType = NameAliasType::get(this, Type(), subs, underlying);
+    setInterfaceType(MetatypeType::get(sugaredType, ctx));
   }
 }
 

@@ -119,7 +119,7 @@ protocol P { // expected-note {{'P' previously declared here}}
 protocol P {} // expected-error {{invalid redeclaration of 'P'}}
 
 func hasTypo() {
-  _ = P.a.a // expected-error {{type 'Generic' has no member 'a'}}
+  _ = P.a.a // expected-error {{type 'a' (aka 'Generic') has no member 'a'}}
 }
 
 // Typo correction with AnyObject.
