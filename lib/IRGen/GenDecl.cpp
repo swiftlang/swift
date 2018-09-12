@@ -3359,11 +3359,27 @@ llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                ProtocolDescriptorStructTy, DebugTypeInfo());
 }
 
+llvm::Constant *IRGenModule::getAddrOfProtocolRequirementsBaseDescriptor(
+                                                         ProtocolDecl *proto) {
+  auto entity = LinkEntity::forProtocolRequirementsBaseDescriptor(proto);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                               ProtocolRequirementStructTy,
+                               DebugTypeInfo());
+}
+
 llvm::GlobalValue *IRGenModule::defineProtocolRequirementsBaseDescriptor(
                                                 ProtocolDecl *proto,
                                                 llvm::Constant *definition) {
   auto entity = LinkEntity::forProtocolRequirementsBaseDescriptor(proto);
   return defineAlias(entity, definition);
+}
+
+llvm::Constant *IRGenModule::getAddrOfAssociatedTypeDescriptor(
+                                               AssociatedTypeDecl *assocType) {
+  auto entity = LinkEntity::forAssociatedTypeDescriptor(assocType);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                               ProtocolRequirementStructTy,
+                               DebugTypeInfo());
 }
 
 llvm::GlobalValue *IRGenModule::defineAssociatedTypeDescriptor(
