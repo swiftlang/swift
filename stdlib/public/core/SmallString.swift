@@ -79,7 +79,7 @@ extension _SmallUTF8String {
       return len
     }
     guard let count = len else { return nil }
-    _correctnessCheck(self.count == 0, "overwrote count early?")
+    _invariant(self.count == 0, "overwrote count early?")
 
     self.count = count
     _invariantCheck()
@@ -105,10 +105,10 @@ extension _SmallUTF8String {
         encodedScalar, from: Unicode.UTF16.self
       ) else {
         // FIXME: can this fail with unpaired surrogates?
-        _correctnessCheckFailure("UTF-16 should be transcodable to UTF-8")
+        _invariantFailure("UTF-16 should be transcodable to UTF-8")
         return nil
       }
-      _correctnessCheck(transcoded.count <= 4, "how?")
+      _invariant(transcoded.count <= 4, "how?")
       guard bufferIdx + transcoded.count <= _SmallUTF8String.capacity else {
         return nil
       }
@@ -117,7 +117,7 @@ extension _SmallUTF8String {
         bufferIdx += 1
       }
     }
-    _correctnessCheck(self.count == 0, "overwrote count early?")
+    _invariant(self.count == 0, "overwrote count early?")
     self.count = bufferIdx
 
     // FIXME: support transcoding
@@ -247,7 +247,7 @@ extension _SmallUTF8String {
 #if arch(i386) || arch(arm)
     unsupportedOn32bit()
 #else
-    _correctnessCheck(self.isASCII)
+    _invariant(self.isASCII)
     return try withUTF8CodeUnits {
       return try body(_UnmanagedString($0))
     }
@@ -270,7 +270,7 @@ extension _SmallUTF8String {
 #if arch(i386) || arch(arm)
     unsupportedOn32bit()
 #else
-      _correctnessCheck(newValue <= _SmallUTF8String.capacity, "out of bounds")
+      _invariant(newValue <= _SmallUTF8String.capacity, "out of bounds")
       self._uncheckedSetCodeUnit(
         at: 15, to: UInt8(truncatingIfNeeded: UInt(bitPattern: newValue)))
 #endif
@@ -293,7 +293,7 @@ extension _SmallUTF8String {
       unsupportedOn32bit()
 #else
       // TODO (TODO: JIRA): Consider using our last bit for this
-      _correctnessCheck(_uncheckedCodeUnit(at: 15) & 0xF0 == 0)
+      _invariant(_uncheckedCodeUnit(at: 15) & 0xF0 == 0)
 
       let topBitMask: UInt = 0x8080_8080_8080_8080
       return (_storage.low | _storage.high) & topBitMask == 0
@@ -307,8 +307,8 @@ extension _SmallUTF8String {
     unsupportedOn32bit()
 #else
     #if INTERNAL_CHECKS_ENABLED
-    _correctnessCheck(count <= _SmallUTF8String.capacity)
-    _correctnessCheck(self.isASCII, "UTF-8 currently unsupported")
+    _invariant(count <= _SmallUTF8String.capacity)
+    _invariant(self.isASCII, "UTF-8 currently unsupported")
     #endif // INTERNAL_CHECKS_ENABLED
 #endif
   }
@@ -335,11 +335,11 @@ extension _SmallUTF8String {
 #if arch(i386) || arch(arm)
     unsupportedOn32bit()
 #else
-    _correctnessCheck(target.count >= self.count)
+    _invariant(target.count >= self.count)
     guard count > 0 else { return }
 
     if _fastPath(TargetCodeUnit.bitWidth == 8) {
-      _correctnessCheck(TargetCodeUnit.self == UInt8.self)
+      _invariant(TargetCodeUnit.self == UInt8.self)
       let target = _castBufPtr(target, to: UInt8.self)
 
       // TODO: Inspect generated code. Consider checking count for alignment so
@@ -352,7 +352,7 @@ extension _SmallUTF8String {
       return
     }
 
-    _correctnessCheck(TargetCodeUnit.self == UInt16.self)
+    _invariant(TargetCodeUnit.self == UInt16.self)
     self.transcode(_uncheckedInto: _castBufPtr(target, to: UInt16.self))
 #endif
   }
@@ -380,7 +380,7 @@ extension _SmallUTF8String: RandomAccessCollection {
 #if arch(i386) || arch(arm)
       unsupportedOn32bit()
 #else
-      _correctnessCheck(idx >= 0 && idx <= count)
+      _invariant(idx >= 0 && idx <= count)
       return _uncheckedCodeUnit(at: idx)
 #endif
     }
@@ -388,7 +388,7 @@ extension _SmallUTF8String: RandomAccessCollection {
 #if arch(i386) || arch(arm)
       unsupportedOn32bit()
 #else
-      _correctnessCheck(idx >= 0 && idx <= count)
+      _invariant(idx >= 0 && idx <= count)
       _uncheckedSetCodeUnit(at: idx, to: newValue)
 #endif
     }
@@ -401,7 +401,7 @@ extension _SmallUTF8String: RandomAccessCollection {
 #if arch(i386) || arch(arm)
     unsupportedOn32bit()
 #else
-      _correctnessCheck(bounds.lowerBound >= 0 && bounds.upperBound <= count)
+      _invariant(bounds.lowerBound >= 0 && bounds.upperBound <= count)
       return self._uncheckedClamp(
         lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
 #endif
@@ -416,7 +416,7 @@ extension _SmallUTF8String {
 #if arch(i386) || arch(arm)
       unsupportedOn32bit()
 #else
-    _correctnessCheck(n > 1)
+    _invariant(n > 1)
     let finalCount = self.count * n
     guard finalCount <= 15 else { return nil }
     var ret = self
@@ -507,14 +507,14 @@ extension _SmallUTF8String {
       ) else {
         fatalError("Somehow un-transcodable?")
       }
-      _correctnessCheck(transcoded.count <= 4, "how?")
+      _invariant(transcoded.count <= 4, "how?")
       guard bufferIdx + transcoded.count <= 15 else { return nil }
       for i in transcoded.indices {
         self._uncheckedSetCodeUnit(at: bufferIdx, to: transcoded[i])
         bufferIdx += 1
       }
     }
-    _correctnessCheck(self.count == 0, "overwrote count early?")
+    _invariant(self.count == 0, "overwrote count early?")
     self.count = bufferIdx
 
     // FIXME: support transcoding
@@ -660,7 +660,7 @@ extension _SmallUTF8String {
   @inlinable
   @inline(__always)
   func _uncheckedCodeUnit(at i: Int) -> UInt8 {
-    _correctnessCheck(i >= 0 && i <= 15)
+    _invariant(i >= 0 && i <= 15)
     if i < 8 {
       return _storage.low._uncheckedGetByte(at: i)
     } else {
@@ -679,7 +679,7 @@ extension _SmallUTF8String {
   @inlinable
   @inline(__always)
   internal func _uncheckedClamp(upperBound: Int) -> _SmallUTF8String {
-    _correctnessCheck(upperBound <= self.count)
+    _invariant(upperBound <= self.count)
     guard upperBound >= 8 else {
       var low = self.lowUnpackedBits
       let shift = upperBound &* 8
@@ -688,7 +688,7 @@ extension _SmallUTF8String {
       return _SmallUTF8String(low: low, high: 0, count: upperBound)
     }
     let shift = (upperBound &- 8) &* 8
-    _correctnessCheck(shift % 8 == 0)
+    _invariant(shift % 8 == 0)
 
     var high = self.highUnpackedBits
     high &= (1 &<< shift) &- 1
@@ -699,7 +699,7 @@ extension _SmallUTF8String {
   @inlinable
   @inline(__always)
   internal func _uncheckedClamp(lowerBound: Int) -> _SmallUTF8String {
-    _correctnessCheck(lowerBound < self.count)
+    _invariant(lowerBound < self.count)
     let low: UInt
     let high: UInt
     if lowerBound < 8 {
@@ -723,7 +723,7 @@ extension _SmallUTF8String {
   ) -> _SmallUTF8String {
     // TODO: More efficient to skip the intermediary shifts and just mask up
     // front.
-    _correctnessCheck(upperBound >= lowerBound)
+    _invariant(upperBound >= lowerBound)
     if lowerBound == upperBound { return _SmallUTF8String() }
     let dropTop = self._uncheckedClamp(upperBound: upperBound)
     return dropTop._uncheckedClamp(lowerBound: lowerBound)
@@ -740,7 +740,7 @@ extension _SmallUTF8String {//}: _StringVariant {
     _uncheckedInto buffer: UnsafeMutableBufferPointer<UInt16>
   ) -> Int {
       if _fastPath(isASCII) {
-        _correctnessCheck(buffer.count >= self.count)
+        _invariant(buffer.count >= self.count)
         var bufferIdx = 0
         for cu in self {
             buffer[bufferIdx] = UInt16(cu)
@@ -750,7 +750,7 @@ extension _SmallUTF8String {//}: _StringVariant {
     }
 
     let length = _transcodeNonASCII(_uncheckedInto: buffer)
-    _correctnessCheck(length <= buffer.count) // TODO: assert ahead-of-time
+    _invariant(length <= buffer.count) // TODO: assert ahead-of-time
 
     return length
   }
@@ -780,7 +780,7 @@ extension _SmallUTF8String {//}: _StringVariant {
   func _transcodeNonASCII(
     _uncheckedInto buffer: UnsafeMutableBufferPointer<UInt16>
   ) -> Int {
-    _correctnessCheck(!isASCII)
+    _invariant(!isASCII)
 
     // TODO(TODO: JIRA): Just implement this directly
 
@@ -806,7 +806,7 @@ extension _SmallUTF8String {//}: _StringVariant {
       }
     }
 
-    _correctnessCheck(bufferIdx <= buffer.count) // TODO: assert earlier
+    _invariant(bufferIdx <= buffer.count) // TODO: assert earlier
     return bufferIdx
   }
 }
@@ -818,7 +818,7 @@ func _castBufPtr<A, B>(
   _ bufPtr: UnsafeMutableBufferPointer<A>, to: B.Type = B.self
 ) -> UnsafeMutableBufferPointer<B> {
   let numBytes = bufPtr.count &* MemoryLayout<A>.stride
-  _correctnessCheck(numBytes % MemoryLayout<B>.stride == 0)
+  _invariant(numBytes % MemoryLayout<B>.stride == 0)
 
   let ptr = UnsafeMutableRawPointer(
     bufPtr.baseAddress._unsafelyUnwrappedUnchecked
@@ -836,7 +836,7 @@ extension UInt {
   @inlinable
   @inline(__always)
   func _uncheckedGetByte(at i: Int) -> UInt8 {
-    _correctnessCheck(i >= 0 && i < MemoryLayout<UInt>.stride)
+    _invariant(i >= 0 && i < MemoryLayout<UInt>.stride)
     let shift = UInt(bitPattern: i) &* 8
     return UInt8(truncatingIfNeeded: (self &>> shift))
   }

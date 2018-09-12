@@ -59,7 +59,7 @@ extension _StringVariant {
     _precondition(offset <= count, "String index is out of bounds")
     let slice = self[0..<offset]
     let stride = slice.measureLastExtendedGraphemeCluster()
-    _correctnessCheck(stride > 0 && stride <= UInt16.max)
+    _invariant(stride > 0 && stride <= UInt16.max)
     return String.Index(
       encodedOffset: offset &- stride,
       characterStride: stride)
@@ -213,7 +213,7 @@ extension _UnmanagedString {
   internal func _measureFirstExtendedGraphemeClusterSlow() -> Int {
     // ASCII case handled entirely on fast path.
     // FIXME: Have separate implementations for ASCII & UTF-16 views.
-    _correctnessCheck(CodeUnit.self == UInt16.self)
+    _invariant(CodeUnit.self == UInt16.self)
     return UTF16._measureFirstExtendedGraphemeCluster(
       in: UnsafeBufferPointer(
         start: rawStart.assumingMemoryBound(to: UInt16.self),
@@ -225,7 +225,7 @@ extension _UnmanagedString {
   internal func _measureLastExtendedGraphemeClusterSlow() -> Int {
     // ASCII case handled entirely on fast path.
     // FIXME: Have separate implementations for ASCII & UTF-16 views.
-    _correctnessCheck(CodeUnit.self == UInt16.self)
+    _invariant(CodeUnit.self == UInt16.self)
     return UTF16._measureLastExtendedGraphemeCluster(
       in: UnsafeBufferPointer(
         start: rawStart.assumingMemoryBound(to: UInt16.self),
@@ -237,7 +237,7 @@ extension _UnmanagedOpaqueString {
   @inline(never)
   @usableFromInline
   internal func _measureFirstExtendedGraphemeClusterSlow() -> Int {
-    _correctnessCheck(count >= 2, "should have at least two code units")
+    _invariant(count >= 2, "should have at least two code units")
 
     // Pull out some code units into a fixed array and try to perform grapheme
     // breaking on that.
@@ -264,7 +264,7 @@ extension _UnmanagedOpaqueString {
   @inline(never)
   @usableFromInline
   internal func _measureLastExtendedGraphemeClusterSlow() -> Int {
-    _correctnessCheck(count >= 2, "should have at least two code units")
+    _invariant(count >= 2, "should have at least two code units")
 
     // Pull out some code units into a fixed array and try to perform grapheme
     // breaking on that.
@@ -308,7 +308,7 @@ extension Unicode.UTF16 {
   internal static func _internalExtraCheckGraphemeBreakBetween(
     _ lhs: UInt16, _ rhs: UInt16
   ) -> Bool {
-    _correctnessCheck(
+    _invariant(
       lhs != _CR || rhs != _LF,
       "CR-LF special case handled by _quickCheckGraphemeBreakBetween")
 
@@ -385,7 +385,7 @@ extension Unicode.UTF16 {
     // ubrk_following returns -1 (UBRK_DONE) when it hits the end of the buffer.
     if _fastPath(offset != -1) {
       // The offset into our buffer is the distance.
-      _correctnessCheck(offset > 0, "zero-sized grapheme?")
+      _invariant(offset > 0, "zero-sized grapheme?")
       return Int(offset)
     }
     return Int(count)
@@ -414,7 +414,7 @@ extension Unicode.UTF16 {
     // ubrk_following returns -1 (UBRK_DONE) when it hits the end of the buffer.
     if _fastPath(offset != -1) {
       // The offset into our buffer is the distance.
-      _correctnessCheck(offset < count, "zero-sized grapheme?")
+      _invariant(offset < count, "zero-sized grapheme?")
       return Int(count - offset)
     }
     return Int(count)

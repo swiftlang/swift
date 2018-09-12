@@ -125,7 +125,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   // Prevent normal initialization. We use tail allocation via
   // allocWithTailElems().
   internal init() {
-    _correctnessCheckFailure("use _create(...)")
+    _invariantFailure("use _create(...)")
   }
 
   @usableFromInline
@@ -137,7 +137,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     capacityInBytes bytes: Int,
     initializedBy body: (UnsafeMutableRawBufferPointer) -> Void
   ) -> Self {
-    _correctnessCheck(bytes > 0 && bytes % 4 == 0,
+    _invariant(bytes > 0 && bytes % 4 == 0,
                  "capacity must be multiple of 4 bytes")
     let result = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,
                                               Int32.self)
@@ -245,7 +245,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
               to: NewValue.self, endingWith: Value.self) {
             case .continue(let newBase):
               if isLast {
-                _correctnessCheck(NewValue.self == Value.self,
+                _invariant(NewValue.self == Value.self,
                              "key path does not terminate in correct type")
                 return unsafeBitCast(newBase, to: Value.self)
               } else {
@@ -290,7 +290,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
     return withBuffer {
       var buffer = $0
       
-      _correctnessCheck(!buffer.hasReferencePrefix,
+      _invariant(!buffer.hasReferencePrefix,
                    "WritableKeyPath should not have a reference prefix")
       
       if buffer.data.isEmpty {
@@ -366,7 +366,7 @@ public class ReferenceWritableKeyPath<
       var base: Any = origBase
       while buffer.hasReferencePrefix {
         let (rawComponent, optNextType) = buffer.next()
-        _correctnessCheck(optNextType != nil,
+        _invariant(optNextType != nil,
                      "reference prefix should not go to end of buffer")
         let nextType = optNextType.unsafelyUnwrapped
         
@@ -808,7 +808,7 @@ internal struct RawKeyPathComponent {
     }
 
     internal var isStoredMutable: Bool {
-      _correctnessCheck(kind == .struct || kind == .class)
+      _invariant(kind == .struct || kind == .class)
       return _value & Header.storedMutableFlag != 0
     }
 
@@ -816,7 +816,7 @@ internal struct RawKeyPathComponent {
       return _SwiftKeyPathComponentHeader_ComputedMutatingFlag
     }
     internal var isComputedMutating: Bool {
-      _correctnessCheck(kind == .computed)
+      _invariant(kind == .computed)
       return _value & Header.computedMutatingFlag != 0
     }
 
@@ -824,7 +824,7 @@ internal struct RawKeyPathComponent {
       return _SwiftKeyPathComponentHeader_ComputedSettableFlag
     }
     internal var isComputedSettable: Bool {
-      _correctnessCheck(kind == .computed)
+      _invariant(kind == .computed)
       return _value & Header.computedSettableFlag != 0
     }
 
@@ -839,7 +839,7 @@ internal struct RawKeyPathComponent {
       return _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag
     }
     internal var hasComputedArguments: Bool {
-      _correctnessCheck(kind == .computed)
+      _invariant(kind == .computed)
       return _value & Header.computedHasArgumentsFlag != 0
     }
 
@@ -852,12 +852,12 @@ internal struct RawKeyPathComponent {
     }
     internal var isComputedInstantiatedFromExternalWithArguments: Bool {
       get {
-        _correctnessCheck(kind == .computed)
+        _invariant(kind == .computed)
         return
           _value & Header.computedInstantiatedFromExternalWithArgumentsFlag != 0
       }
       set {
-        _correctnessCheck(kind == .computed)
+        _invariant(kind == .computed)
         _value =
             _value & ~Header.computedInstantiatedFromExternalWithArgumentsFlag
           | (newValue ? Header.computedInstantiatedFromExternalWithArgumentsFlag
@@ -888,21 +888,21 @@ internal struct RawKeyPathComponent {
         return _value & Header.payloadMask
       }
       set {
-        _correctnessCheck(newValue & Header.payloadMask == newValue,
+        _invariant(newValue & Header.payloadMask == newValue,
                      "payload too big")
         _value = _value & ~Header.payloadMask | newValue
       }
     }
     internal var storedOffsetPayload: UInt32 {
       get {
-        _correctnessCheck(kind == .struct || kind == .class,
+        _invariant(kind == .struct || kind == .class,
                      "not a stored component")
         return _value & Header.storedOffsetPayloadMask
       }
       set {
-        _correctnessCheck(kind == .struct || kind == .class,
+        _invariant(kind == .struct || kind == .class,
                      "not a stored component")
-        _correctnessCheck(newValue & Header.storedOffsetPayloadMask == newValue,
+        _invariant(newValue & Header.storedOffsetPayloadMask == newValue,
                      "payload too big")
         _value = _value & ~Header.storedOffsetPayloadMask | newValue
       }
@@ -937,7 +937,7 @@ internal struct RawKeyPathComponent {
       case (Header.optionalTag, Header.optionalForcePayload):
         return .optionalForce
       default:
-        _correctnessCheckFailure("invalid header")
+        _invariantFailure("invalid header")
       }
     }
 
@@ -1046,13 +1046,13 @@ internal struct RawKeyPathComponent {
   }
 
   internal var _structOrClassOffset: Int {
-    _correctnessCheck(header.kind == .struct || header.kind == .class,
+    _invariant(header.kind == .struct || header.kind == .class,
                  "no offset for this kind")
     // An offset too large to fit inline is represented by a signal and stored
     // in the body.
     if header.storedOffsetPayload == Header.outOfLineOffsetPayload {
       // Offset overflowed into body
-      _correctnessCheck(body.count >= MemoryLayout<UInt32>.size,
+      _invariant(body.count >= MemoryLayout<UInt32>.size,
                    "component not big enough")
       return Int(body.load(as: UInt32.self))
     }
@@ -1060,7 +1060,7 @@ internal struct RawKeyPathComponent {
   }
 
   internal var _computedIDValue: Int {
-    _correctnessCheck(header.kind == .computed,
+    _invariant(header.kind == .computed,
                  "not a computed property")
     return body.load(fromByteOffset: Header.pointerAlignmentSkew,
                      as: Int.self)
@@ -1075,7 +1075,7 @@ internal struct RawKeyPathComponent {
   }
 
   internal var _computedGetter: UnsafeRawPointer {
-    _correctnessCheck(header.kind == .computed,
+    _invariant(header.kind == .computed,
                  "not a computed property")
 
     return body.load(
@@ -1084,7 +1084,7 @@ internal struct RawKeyPathComponent {
   }
 
   internal var _computedSetter: UnsafeRawPointer {
-    _correctnessCheck(header.isComputedSettable,
+    _invariant(header.isComputedSettable,
                  "not a settable property")
 
     return body.load(
@@ -1099,7 +1099,7 @@ internal struct RawKeyPathComponent {
      _ instanceArguments: UnsafeMutableRawPointer) -> ()
 
   internal var _computedArgumentHeaderPointer: UnsafeRawPointer {
-    _correctnessCheck(header.hasComputedArguments, "no arguments")
+    _invariant(header.hasComputedArguments, "no arguments")
 
     return body.baseAddress.unsafelyUnwrapped
       + Header.pointerAlignmentSkew
@@ -1184,10 +1184,10 @@ internal struct RawKeyPathComponent {
                                set: _computedSetter,
                                argument: argument)
       case (false, true):
-        _correctnessCheckFailure("impossible")
+        _invariantFailure("impossible")
       }
     case .external:
-      _correctnessCheckFailure("should have been instantiated away")
+      _invariantFailure("should have been instantiated away")
     }
   }
 
@@ -1208,7 +1208,7 @@ internal struct RawKeyPathComponent {
                  _computedArgumentSize - _computedArgumentWitnessSizeAdjustment)
       }
     case .external:
-      _correctnessCheckFailure("should have been instantiated away")
+      _invariantFailure("should have been instantiated away")
     }
   }
 
@@ -1291,7 +1291,7 @@ internal struct RawKeyPathComponent {
       }
 
     case .external:
-      _correctnessCheckFailure("should have been instantiated away")
+      _invariantFailure("should have been instantiated away")
     }
     buffer = UnsafeMutableRawBufferPointer(
       start: buffer.baseAddress.unsafelyUnwrapped + componentSize,
@@ -1310,7 +1310,7 @@ internal struct RawKeyPathComponent {
       case .continue(let x):
         return x
       case .break:
-        _correctnessCheckFailure("should not have stopped key path projection")
+        _invariantFailure("should not have stopped key path projection")
       }
     }
   }
@@ -1331,7 +1331,7 @@ internal struct RawKeyPathComponent {
       })
 
     case .class(let offset):
-      _correctnessCheck(CurValue.self is AnyObject.Type,
+      _invariant(CurValue.self is AnyObject.Type,
                    "base is not a class")
       let baseObj = unsafeBitCast(base, to: AnyObject.self)
       let basePtr = UnsafeRawPointer(Builtin.bridgeToRawPointer(baseObj))
@@ -1359,9 +1359,9 @@ internal struct RawKeyPathComponent {
                            argument?.data.count ?? 0))
 
     case .optionalChain:
-      _correctnessCheck(CurValue.self == Optional<NewValue>.self,
+      _invariant(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
-      _correctnessCheck(_isOptional(LeafValue.self),
+      _invariant(_isOptional(LeafValue.self),
                    "leaf result should be optional")
       if let baseValue = unsafeBitCast(base, to: Optional<NewValue>.self) {
         return .continue(baseValue)
@@ -1372,12 +1372,12 @@ internal struct RawKeyPathComponent {
       }
 
     case .optionalForce:
-      _correctnessCheck(CurValue.self == Optional<NewValue>.self,
+      _invariant(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
       return .continue(unsafeBitCast(base, to: Optional<NewValue>.self)!)
 
     case .optionalWrap:
-      _correctnessCheck(NewValue.self == Optional<CurValue>.self,
+      _invariant(NewValue.self == Optional<CurValue>.self,
                    "should be wrapping optional value")
       return .continue(
         unsafeBitCast(base as Optional<CurValue>, to: NewValue.self))
@@ -1397,7 +1397,7 @@ internal struct RawKeyPathComponent {
     case .class(let offset):
       // A class dereference should only occur at the root of a mutation,
       // since otherwise it would be part of the reference prefix.
-      _correctnessCheck(isRoot,
+      _invariant(isRoot,
                  "class component should not appear in the middle of mutation")
       // AnyObject memory can alias any class reference memory, so we can
       // assume type here
@@ -1442,7 +1442,7 @@ internal struct RawKeyPathComponent {
                             argument: let argument):
       // A nonmutating property should only occur at the root of a mutation,
       // since otherwise it would be part of the reference prefix.
-      _correctnessCheck(isRoot,
+      _invariant(isRoot,
            "nonmutating component should not appear in the middle of mutation")
 
       typealias Getter
@@ -1468,7 +1468,7 @@ internal struct RawKeyPathComponent {
       return UnsafeRawPointer(Builtin.addressof(&writeback.value))
 
     case .optionalForce:
-      _correctnessCheck(CurValue.self == Optional<NewValue>.self,
+      _invariant(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping an optional value")
       // Optional's layout happens to always put the payload at the start
       // address of the Optional value itself, if a value is present at all.
@@ -1479,7 +1479,7 @@ internal struct RawKeyPathComponent {
       return base
     
     case .optionalChain, .optionalWrap, .get:
-      _correctnessCheckFailure("not a mutable key path component")
+      _invariantFailure("not a mutable key path component")
     }
   }
 }
@@ -1510,7 +1510,7 @@ internal struct KeyPathBuffer {
     }
 
     internal init(size: Int, trivial: Bool, hasReferencePrefix: Bool) {
-      _correctnessCheck(size <= Int(Header.sizeMask), "key path too big")
+      _invariant(size <= Int(Header.sizeMask), "key path too big")
       _value = UInt32(size)
         | (trivial ? Header.trivialFlag : 0)
         | (hasReferencePrefix ? Header.hasReferencePrefixFlag : 0)
@@ -1576,7 +1576,7 @@ internal struct KeyPathBuffer {
     let header = pop(RawKeyPathComponent.Header.self)
     // Track if this is the last component of the reference prefix.
     if header.endOfReferencePrefix {
-      _correctnessCheck(self.hasReferencePrefix,
+      _invariant(self.hasReferencePrefix,
                    "beginMutation marker in non-reference-writable key path?")
       self.hasReferencePrefix = false
     }
@@ -1599,7 +1599,7 @@ internal struct KeyPathBuffer {
   }
   
   internal mutating func pop<T>(_ type: T.Type) -> T {
-    _correctnessCheck(_isPOD(T.self), "should be POD")
+    _invariant(_isPOD(T.self), "should be POD")
     let raw = popRaw(size: MemoryLayout<T>.size,
                      alignment: T.self)
     let resultBuf = UnsafeMutablePointer<T>.allocate(capacity: 1)
@@ -2101,7 +2101,7 @@ internal func _appendingKeyPaths<
           }
         }
         
-        _correctnessCheck(destBuffer.count == 0,
+        _invariant(destBuffer.count == 0,
                      "did not fill entire result buffer")
       }
 
@@ -2247,7 +2247,7 @@ internal func _getKeyPath_instantiateInline(
   // have arguments.
   let (keyPathClass, rootType, instantiatedSize, alignmentMask)
     = _getKeyPathClassAndInstanceSizeFromPattern(objectPtr, objectPtr)
-  _correctnessCheck(alignmentMask < MemoryLayout<Int>.alignment,
+  _invariant(alignmentMask < MemoryLayout<Int>.alignment,
                "overalignment not implemented")
 
   let bufferPtr = objectPtr.advanced(by: keyPathObjectHeaderSize)
@@ -2324,7 +2324,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     var bufferSizeBefore = 0
     var expectedPop = 0
 
-    _correctnessCheck({
+    _invariant({
       bufferSizeBefore = buffer.data.count
       expectedPop = header.patternComponentBodySize
       return true
@@ -2356,7 +2356,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
         // Writable if the base is. No effect.
         break
       case (false, true):
-        _correctnessCheckFailure("unpossible")
+        _invariantFailure("unpossible")
       }
     }
 
@@ -2413,7 +2413,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       // just yet, since we may need parts of it to instantiate the final
       // component in some cases below. It still ought to be consumed
       // in the computation below.)
-      _correctnessCheck({
+      _invariant({
         expectedPop += localCandidateSize
                     +  MemoryLayout<RawKeyPathComponent.Header>.size
         return true
@@ -2473,7 +2473,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
 
             let (addedSize, addedAlignmentMask) = getLayout(arguments)
             // TODO: Handle over-aligned values
-            _correctnessCheck(addedAlignmentMask < MemoryLayout<Int>.alignment,
+            _invariant(addedAlignmentMask < MemoryLayout<Int>.alignment,
                          "overaligned computed property element not supported")
 
             argumentBufferSize += addedSize
@@ -2518,7 +2518,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
         }
 
       case .external, .optionalChain, .optionalForce, .optionalWrap:
-        _correctnessCheckFailure("should not appear as property descriptor")
+        _invariantFailure("should not appear as property descriptor")
       }
 
       // Round up to pointer alignment if there are following components.
@@ -2550,7 +2550,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
 
         let (addedSize, addedAlignmentMask) = getLayout(arguments)
         // TODO: Handle over-aligned values
-        _correctnessCheck(addedAlignmentMask < MemoryLayout<Int>.alignment,
+        _invariant(addedAlignmentMask < MemoryLayout<Int>.alignment,
                      "overaligned computed property element not supported")
 
         // Argument payload replaces the space taken by the initializer
@@ -2571,7 +2571,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     }
 
     // Check that we consumed the expected amount of data from the pattern.
-    _correctnessCheck(
+    _invariant(
       {
         // Round the amount of data we read up to alignment to include padding,
         // skewed by the header size.
@@ -2596,7 +2596,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
    }
   }
 
-  _correctnessCheck(buffer.data.isEmpty, "didn't read entire pattern")
+  _invariant(buffer.data.isEmpty, "didn't read entire pattern")
 
   // Chaining always renders the whole key path read-only.
   if didChain {
@@ -2642,7 +2642,7 @@ internal func _instantiateKeyPathBuffer(
     count: origDestData.count - MemoryLayout<Int>.size)
 
   func pushDest<T>(_ value: T) {
-    _correctnessCheck(_isPOD(T.self))
+    _invariant(_isPOD(T.self))
     var value2 = value
     let size = MemoryLayout<T>.size
     let alignment = MemoryLayout<T>.alignment
@@ -2680,7 +2680,7 @@ internal func _instantiateKeyPathBuffer(
     var bufferSizeBefore = 0
     var expectedPop = 0
 
-    _correctnessCheck({
+    _invariant({
       bufferSizeBefore = patternBuffer.data.count
       expectedPop = header.patternComponentBodySize
       return true
@@ -2754,7 +2754,7 @@ internal func _instantiateKeyPathBuffer(
         let idPtr = UnsafeRawPointer(bitPattern: id).unsafelyUnwrapped
         id = idPtr.load(as: Int.self)
       default:
-        _correctnessCheckFailure("unpossible")
+        _invariantFailure("unpossible")
       }
       newHeader.payload &= ~RawKeyPathComponent.Header.computedIDResolutionMask
       pushDest(newHeader)
@@ -2798,7 +2798,7 @@ internal func _instantiateKeyPathBuffer(
 
       // Carry over the arguments.
       let (size, alignmentMask) = getLayout(arguments)
-      _correctnessCheck(alignmentMask < MemoryLayout<Int>.alignment,
+      _invariant(alignmentMask < MemoryLayout<Int>.alignment,
                    "overaligned computed arguments not implemented yet")
 
       // The real buffer stride will be rounded up to alignment.
@@ -2806,7 +2806,7 @@ internal func _instantiateKeyPathBuffer(
       pushDest(stride)
       pushDest(witnesses)
 
-      _correctnessCheck(Int(bitPattern: destData.baseAddress) & alignmentMask == 0,
+      _invariant(Int(bitPattern: destData.baseAddress) & alignmentMask == 0,
                    "argument destination not aligned")
       initializer(arguments, destData.baseAddress.unsafelyUnwrapped)
 
@@ -2864,7 +2864,7 @@ internal func _instantiateKeyPathBuffer(
       let localCandidateSize = localCandidateHeader.patternComponentBodySize
 
       // ...though we still ought to fully consume it before proceeding.
-      _correctnessCheck({
+      _invariant({
         expectedPop += localCandidateSize
                     +  MemoryLayout<RawKeyPathComponent.Header>.size
         return true
@@ -2933,7 +2933,7 @@ internal func _instantiateKeyPathBuffer(
           // Bring in the accessors from the descriptor.
           tryToResolveComputedAccessors(header: descriptorHeader,
                                         accessorsBuffer: &descriptorBuffer)
-          _correctnessCheck(descriptorBuffer.data.isEmpty)
+          _invariant(descriptorBuffer.data.isEmpty)
 
           if localCandidateHasArguments {
             // We don't need the local candidate's accessors.
@@ -2949,7 +2949,7 @@ internal func _instantiateKeyPathBuffer(
 
             // Carry over the arguments.
             let (baseSize, alignmentMask) = getLayout(arguments)
-            _correctnessCheck(alignmentMask < MemoryLayout<Int>.alignment,
+            _invariant(alignmentMask < MemoryLayout<Int>.alignment,
                          "overaligned computed arguments not implemented yet")
 
             // The real buffer stride will be rounded up to alignment.
@@ -2973,7 +2973,7 @@ internal func _instantiateKeyPathBuffer(
             }
 
             // Initialize the local candidate arguments here.
-            _correctnessCheck(Int(bitPattern: destData.baseAddress) & alignmentMask == 0,
+            _invariant(Int(bitPattern: destData.baseAddress) & alignmentMask == 0,
                          "argument destination not aligned")
             initializer(arguments, destData.baseAddress.unsafelyUnwrapped)
 
@@ -3008,17 +3008,17 @@ internal func _instantiateKeyPathBuffer(
           // component from the descriptor.
           tryToResolveComputedAccessors(header: descriptorHeader,
                                         accessorsBuffer: &descriptorBuffer)
-          _correctnessCheck(descriptorBuffer.data.isEmpty)
+          _invariant(descriptorBuffer.data.isEmpty)
 
           // We know there are no arguments to instantiate.
         }
       case .external, .optionalChain, .optionalForce, .optionalWrap:
-        _correctnessCheckFailure("should not appear as property descriptor")
+        _invariantFailure("should not appear as property descriptor")
       }
     }
 
     // Check that we consumed the expected amount of data from the pattern.
-    _correctnessCheck(
+    _invariant(
       {
         let popped = MemoryLayout<Int>._roundingUpToAlignment(
            bufferSizeBefore - patternBuffer.data.count
@@ -3043,8 +3043,8 @@ internal func _instantiateKeyPathBuffer(
   }
 
   // We should have traversed both buffers.
-  _correctnessCheck(patternBuffer.data.isEmpty, "did not read the entire pattern")
-  _correctnessCheck(destData.count == 0,
+  _invariant(patternBuffer.data.isEmpty, "did not read the entire pattern")
+  _invariant(destData.count == 0,
                "did not write to all of the allocated space")
 
   // Write out the header.

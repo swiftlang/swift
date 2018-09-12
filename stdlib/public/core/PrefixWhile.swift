@@ -277,7 +277,7 @@ where Base: BidirectionalCollection {
       // Safe to assume that `_base.startIndex != _base.endIndex`; if they
       // were equal, `_base.startIndex` would be used as the `endIndex` of
       // this collection.
-      _correctnessCheck(!_base.isEmpty)
+      _invariant(!_base.isEmpty)
       var result = _base.startIndex
       while true {
         let next = _base.index(after: result)

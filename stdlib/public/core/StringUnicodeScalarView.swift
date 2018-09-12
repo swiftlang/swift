@@ -203,7 +203,7 @@ extension String {
       @inlinable // FIXME(sil-serialize-all)
       @inline(__always)
       internal init(_concrete guts: _StringGuts) {
-        _correctnessCheck(!guts._isOpaque)
+        _invariant(!guts._isOpaque)
         self._guts = guts
         defer { _fixLifetime(self) }
         if _guts.isASCII {
@@ -217,7 +217,7 @@ extension String {
 
       @usableFromInline // @opaque
       init(_opaque _guts: _StringGuts) {
-        _correctnessCheck(_guts._isOpaque)
+        _invariant(_guts._isOpaque)
         defer { _fixLifetime(self) }
         self._guts = _guts
         // TODO: Replace the whole iterator scheme with a sensible solution.
@@ -386,11 +386,11 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
       let width = UTF16.width(c)
       _guts.withMutableUTF16Storage(unusedCapacity: width) { storage in
         unowned(unsafe) let s = storage._value
-        _correctnessCheck(s.count + width <= s.capacity)
+        _invariant(s.count + width <= s.capacity)
         if _fastPath(width == 1) {
           s.end.pointee = UTF16.CodeUnit(c.value)
         } else {
-          _correctnessCheck(width == 2)
+          _invariant(width == 2)
           s.end[0] = UTF16.leadSurrogate(c)
           s.end[1] = UTF16.trailSurrogate(c)
         }
@@ -420,7 +420,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
           if w == 1 {
             p.pointee = UTF16.CodeUnit(n.value)
           } else {
-            _correctnessCheck(w == 2)
+            _invariant(w == 2)
             p[0] = UTF16.leadSurrogate(n)
             p[1] = UTF16.trailSurrogate(n)
           }

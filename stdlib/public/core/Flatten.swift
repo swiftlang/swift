@@ -391,7 +391,7 @@ extension FlattenCollection : Collection {
   @inline(__always)
   @inlinable // lazy-performance
   internal func _advanceIndex(_ i: inout Index, step: Int) {
-    _correctnessCheck(-1...1 ~= step, "step should be within the -1...1 range")
+    _invariant(-1...1 ~= step, "step should be within the -1...1 range")
     i = step < 0 ? _index(before: i) : _index(after: i)
   }
 

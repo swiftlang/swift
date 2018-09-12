@@ -193,7 +193,7 @@ extension Set {
   ///   is a reference type).
   @inlinable
   public init(_immutableCocoaSet: _NSSet) {
-    _correctnessCheck(_isBridgedVerbatimToObjectiveC(Element.self),
+    _invariant(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variant only when the member type can be bridged verbatim to Objective-C")
     _variant = _Variant.cocoa(_CocoaSet(_immutableCocoaSet))
   }
@@ -1450,7 +1450,7 @@ internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   internal init(_doNotCallMe: ()) {
-    _correctnessCheckFailure("Only create this by using the `empty` singleton")
+    _invariantFailure("Only create this by using the `empty` singleton")
   }
 
 #if _runtime(_ObjC)
@@ -1492,7 +1492,7 @@ internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
 
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _correctnessCheckFailure("don't call this designated initializer")
+    _invariantFailure("don't call this designated initializer")
   }
 
   @objc
@@ -1530,13 +1530,13 @@ internal class _TypedNativeSetStorage<Element>: _RawNativeSetStorage {
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   override internal init(_doNotCallMe: ()) {
-    _correctnessCheckFailure("Only create this by calling Buffer's inits")
+    _invariantFailure("Only create this by calling Buffer's inits")
   }
 
 #if _runtime(_ObjC)
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _correctnessCheckFailure("don't call this designated initializer")
+    _invariantFailure("don't call this designated initializer")
   }
 #endif
 }
@@ -1550,7 +1550,7 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   override internal init(_doNotCallMe: ()) {
-    _correctnessCheckFailure("Only create this by calling Buffer's inits'")
+    _invariantFailure("Only create this by calling Buffer's inits'")
   }
 
 #if _runtime(_ObjC)
@@ -1618,7 +1618,7 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
 
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _correctnessCheckFailure("don't call this designated initializer")
+    _invariantFailure("don't call this designated initializer")
   }
 
   @objc
@@ -1743,8 +1743,8 @@ internal struct _NativeSet<Element> {
   @inlinable
   @inline(__always)
   internal func key(at i: Int) -> Element {
-    _correctnessCheck(i >= 0 && i < bucketCount)
-    _correctnessCheck(isInitializedEntry(at: i))
+    _invariant(i >= 0 && i < bucketCount)
+    _invariant(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
     let res = (keys + i).pointee
@@ -1773,7 +1773,7 @@ internal struct _NativeSet<Element> {
 
   @inlinable
   internal func isInitializedEntry(at i: Int) -> Bool {
-    _correctnessCheck(i >= 0 && i < bucketCount)
+    _invariant(i >= 0 && i < bucketCount)
     defer { _fixLifetime(self) }
 
     return _storage.initializedEntries[i]
@@ -1781,7 +1781,7 @@ internal struct _NativeSet<Element> {
 
   @usableFromInline @_transparent
   internal func destroyEntry(at i: Int) {
-    _correctnessCheck(isInitializedEntry(at: i))
+    _invariant(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
     (keys + i).deinitialize(count: 1)
@@ -1790,7 +1790,7 @@ internal struct _NativeSet<Element> {
 
   @usableFromInline @_transparent
   internal func initializeKey(_ k: Element, at i: Int) {
-    _correctnessCheck(!isInitializedEntry(at: i))
+    _invariant(!isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
     (keys + i).initialize(to: k)
@@ -1803,7 +1803,7 @@ internal struct _NativeSet<Element> {
     at: Int,
     toEntryAt: Int
   ) {
-    _correctnessCheck(!isInitializedEntry(at: toEntryAt))
+    _invariant(!isInitializedEntry(at: toEntryAt))
 
     defer { _fixLifetime(self) }
 
@@ -1820,8 +1820,8 @@ internal struct _NativeSet<Element> {
 
   @inlinable
   internal func setKey(_ key: Element, at i: Int) {
-    _correctnessCheck(i >= 0 && i < bucketCount)
-    _correctnessCheck(isInitializedEntry(at: i))
+    _invariant(i >= 0 && i < bucketCount)
+    _invariant(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
     (keys + i).pointee = key
@@ -1881,7 +1881,7 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
   internal init(bucketCount: Int) {
     // Actual bucket count is the next power of 2 greater than or equal to
     // bucketCount. Make sure that is representable.
-    _correctnessCheck(bucketCount <= (Int.max >> 1) + 1)
+    _invariant(bucketCount <= (Int.max >> 1) + 1)
     let buckets = 1 &<< ((Swift.max(bucketCount, 2) - 1)._binaryLogarithm() + 1)
     self.init(_exactBucketCount: buckets)
   }
@@ -2048,7 +2048,7 @@ extension _NativeSet where Element: Hashable {
   /// bucket.
   @inlinable // FIXME(sil-serialize-all)
   internal mutating func _delete(idealBucket: Int, bucket: Int) {
-    _correctnessCheck(isInitializedEntry(at: bucket), "expected initialized entry")
+    _invariant(isInitializedEntry(at: bucket), "expected initialized entry")
 
     // remove the element
     destroyEntry(at: bucket)
@@ -2166,7 +2166,7 @@ final internal class _SwiftSetNSEnumerator<Element>
   internal var endIndex: _NativeSet<Element>.Index
 
   internal override required init() {
-    _correctnessCheckFailure("don't call this designated initializer")
+    _invariantFailure("don't call this designated initializer")
   }
 
   internal init(_ base: _NativeSet<Element>) {
@@ -2313,7 +2313,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _correctnessCheckFailure("don't call this designated initializer")
+    _invariantFailure("don't call this designated initializer")
   }
 
   @objc(copyWithZone:)
@@ -2454,7 +2454,7 @@ internal struct _CocoaSet: _SetBuffer {
         break
       }
     }
-    _correctnessCheck(keyIndex >= 0,
+    _invariant(keyIndex >= 0,
         "Key was found in fast path, but not found later?")
     return Index(self, allKeys, keyIndex)
   }
@@ -2472,7 +2472,7 @@ internal struct _CocoaSet: _SetBuffer {
   @inlinable // FIXME(sil-serialize-all)
   internal func assertingGet(at i: Index) -> AnyObject {
     let value: AnyObject? = i.allKeys[i.currentKeyIndex]
-    _correctnessCheck(value != nil, "Item not found in underlying NSSet")
+    _invariant(value != nil, "Item not found in underlying NSSet")
     return value!
   }
 
@@ -2543,7 +2543,7 @@ extension Set._Variant: _SetBuffer {
         return nativeSet
 #if _runtime(_ObjC)
       case .cocoa:
-        _correctnessCheckFailure("internal error: not backed by native buffer")
+        _invariantFailure("internal error: not backed by native buffer")
 #endif
       }
     }
@@ -2567,7 +2567,7 @@ extension Set._Variant: _SetBuffer {
   internal var asCocoa: _CocoaSet {
     switch self {
     case .native:
-      _correctnessCheckFailure("internal error: not backed by NSSet")
+      _invariantFailure("internal error: not backed by NSSet")
     case .cocoa(let cocoaSet):
       return cocoaSet
     }
@@ -2662,7 +2662,7 @@ extension Set._Variant: _SetBuffer {
   internal mutating func migrateToNative(_ cocoaSet: _CocoaSet) {
     let allocated = ensureUniqueNative(
       withCapacity: cocoaSet.count).reallocated
-    _correctnessCheck(allocated, "failed to allocate native Set buffer")
+    _invariant(allocated, "failed to allocate native Set buffer")
   }
 #endif
 
@@ -2937,7 +2937,7 @@ extension Set._Variant: _SetBuffer {
     if capacityChanged {
       idealBucket = native._bucket(member)
       (index, found) = native._find(member, startBucket: idealBucket)
-      _correctnessCheck(found, "key was lost during buffer migration")
+      _invariant(found, "key was lost during buffer migration")
     }
     let old = native.key(at: index.bucket)
     native._delete(idealBucket: idealBucket, bucket: index.bucket)
@@ -2986,7 +2986,7 @@ extension Set._Variant: _SetBuffer {
       migrateToNative(cocoaSet)
       let member = _forceBridgeFromObjectiveC(cocoaMember, Element.self)
       let old = nativeRemove(member)
-      _correctnessCheck(member == old, "bridging did not preserve equality")
+      _invariant(member == old, "bridging did not preserve equality")
       return member
 #endif
     }
@@ -3255,7 +3255,7 @@ extension Set.Index {
       return nativeIndex
 #if _runtime(_ObjC)
     case .cocoa:
-      _correctnessCheckFailure("internal error: does not contain a native index")
+      _invariantFailure("internal error: does not contain a native index")
 #endif
     }
   }
@@ -3265,7 +3265,7 @@ extension Set.Index {
   internal var _asCocoa: _CocoaSet.Index {
     switch _variant {
     case .native:
-      _correctnessCheckFailure("internal error: does not contain a Cocoa index")
+      _invariantFailure("internal error: does not contain a Cocoa index")
     case .cocoa(let cocoaIndex):
       return cocoaIndex
     }
@@ -3535,7 +3535,7 @@ extension Set.Iterator {
         return nativeIterator
 #if _runtime(_ObjC)
       case .cocoa:
-        _correctnessCheckFailure("internal error: does not contain a native index")
+        _invariantFailure("internal error: does not contain a native index")
 #endif
       }
     }
@@ -3668,7 +3668,7 @@ extension Set {
   @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
     _variant.reserveCapacity(minimumCapacity)
-    _correctnessCheck(self.capacity >= minimumCapacity)
+    _invariant(self.capacity >= minimumCapacity)
   }
 }
 

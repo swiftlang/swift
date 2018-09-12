@@ -45,7 +45,7 @@ extension String {
     }
     let storage = _SwiftStringStorage<UInt8>.create(
       capacity: input.count, count: input.count)
-    _correctnessCheck(storage.count == input.count)
+    _invariant(storage.count == input.count)
     storage.start.initialize(
       from: input.baseAddress._unsafelyUnwrappedUnchecked, count: input.count)
     return String(_StringGuts(_large: storage))
@@ -112,7 +112,7 @@ extension String {
         from: encoding, to: UTF32.self,
         stoppingOnError: true,
         into: sink)
-      _correctnessCheck(!hadError,
+      _invariant(!hadError,
         "string cannot be ASCII if there were decoding errors")
       return String(_largeStorage: storage)
     } else {
@@ -154,7 +154,7 @@ extension String {
     }
 
     let capacity = utf16Count
-    _correctnessCheck(!isASCII, "was given ASCII UTF-8")
+    _invariant(!isASCII, "was given ASCII UTF-8")
     let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
       capacity: capacity,
       count: utf16Count)

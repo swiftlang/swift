@@ -15,7 +15,7 @@ import SwiftShims
 extension _StringVariant {
   @usableFromInline
   func _repeated(_ count: Int) -> _SwiftStringStorage<CodeUnit> {
-    _correctnessCheck(count > 0)
+    _invariant(count > 0)
     let c = self.count
     let storage = _copyToNativeStorage(
       of: CodeUnit.self,
@@ -25,7 +25,7 @@ extension _StringVariant {
       p.initialize(from: storage.start, count: c)
       p += c
     }
-    _correctnessCheck(p == storage.start + count * c)
+    _invariant(p == storage.start + count * c)
     storage.count = p - storage.start
     return storage
   }
@@ -294,7 +294,7 @@ extension String {
 extension _StringGuts {
   @inlinable
   func _repeated(_ n: Int) -> _StringGuts {
-    _correctnessCheck(n > 1)
+    _invariant(n > 1)
     if self._isSmall {
       // TODO: visitor pattern for something like this...
       if let small = self._smallUTF8String._repeated(n) {

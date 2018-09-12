@@ -127,7 +127,7 @@ extension _SmallUTF8String {
     _conditionallyUnreachable()
 #else
     // TODO: Ensure normality when adding UTF-8 support
-    _correctnessCheck(self.isASCII && other.isASCII, "Need to ensure normality")
+    _invariant(self.isASCII && other.isASCII, "Need to ensure normality")
     if self._storage == other._storage { return .equal }
     for i in 0..<Swift.min(self.count, other.count) {
       if self[i] < other[i] { return .less }
@@ -140,7 +140,7 @@ extension _SmallUTF8String {
 #if arch(i386) || arch(arm)
     unsupportedOn32bit()
 #else
-    _correctnessCheck(other._isContiguous)
+    _invariant(other._isContiguous)
     if other.isASCII {
       // TODO: fast in-register comparison
       return self._compare(other._unmanagedASCIIView)
@@ -155,7 +155,7 @@ extension _SmallUTF8String {
 #if arch(i386) || arch(arm)
     unsupportedOn32bit()
 #else
-    _correctnessCheck(other._isContiguous)
+    _invariant(other._isContiguous)
     if other.isASCII {
       return self._compare(other._unmanagedASCIIView[otherRange])
     }
@@ -191,7 +191,7 @@ extension _SmallUTF8String {
 
 extension _UnmanagedString where CodeUnit == UInt8 {
   func _compare(_contiguous other: _StringGuts) -> _Ordering {
-    _correctnessCheck(other._isContiguous)
+    _invariant(other._isContiguous)
     if other.isASCII {
       return self._compare(other._unmanagedASCIIView)
     }
@@ -200,7 +200,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
   func _compare(
     _contiguous other: _StringGuts, _ otherRange: Range<Int>
   ) -> _Ordering {
-    _correctnessCheck(other._isContiguous)
+    _invariant(other._isContiguous)
     if other.isASCII {
       return self._compare(other._unmanagedASCIIView[otherRange])
     }
@@ -217,7 +217,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 
 extension _UnmanagedString where CodeUnit == UInt16 {
   func _compare(_contiguous other: _StringGuts) -> _Ordering {
-    _correctnessCheck(other._isContiguous)
+    _invariant(other._isContiguous)
     if other.isASCII {
       return self._compare(other._unmanagedASCIIView)
     }
@@ -226,7 +226,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
   func _compare(
     _contiguous other: _StringGuts, _ otherRange: Range<Int>
   ) -> _Ordering {
-    _correctnessCheck(other._isContiguous)
+    _invariant(other._isContiguous)
     if other.isASCII {
       return self._compare(other._unmanagedASCIIView[otherRange])
     }
@@ -300,11 +300,11 @@ internal func _isTrailingSurrogate(_ cu: UInt16) -> Bool {
 internal func _decodeSurrogatePair(
   leading high: UInt16, trailing low: UInt16
 ) -> UInt32 {
-  _correctnessCheck(_isLeadingSurrogate(high) && _isTrailingSurrogate(low))
+  _invariant(_isLeadingSurrogate(high) && _isTrailingSurrogate(low))
   let hi10: UInt32 = UInt32(high) &- UInt32(_leadingSurrogateBias)
-  _correctnessCheck(hi10 < 1<<10, "I said high 10. Not high, like, 20 or something")
+  _invariant(hi10 < 1<<10, "I said high 10. Not high, like, 20 or something")
   let lo10: UInt32 = UInt32(low) &- UInt32(_trailingSurrogateBias)
-  _correctnessCheck(lo10 < 1<<10, "I said low 10. Not low, like, 20 or something")
+  _invariant(lo10 < 1<<10, "I said low 10. Not low, like, 20 or something")
 
   return ((hi10 &<< 10) | lo10) &+ 0x1_00_00
 }
@@ -338,7 +338,7 @@ internal func _castOutputBuffer(
 
 extension _FixedArray16 where T == UInt16 {
   mutating func fill(from other: _UnmanagedString<T>) {
-    _correctnessCheck(other.count < _FixedArray16<T>.capacity,
+    _invariant(other.count < _FixedArray16<T>.capacity,
       "out of bounds fill")
     for i in 0..<other.count {
       self[i] = other[i]
@@ -512,7 +512,7 @@ internal func _parseRawScalar(
   startingFrom idx: Int = 0
 ) -> (UnicodeScalar, scalarEndIndex: Int) {
   let ptr = buf.baseAddress._unsafelyUnwrappedUnchecked
-  _correctnessCheck(idx >= 0 && idx < buf.count, "out of bounds index")
+  _invariant(idx >= 0 && idx < buf.count, "out of bounds index")
   let cu: UInt16 = ptr[idx]
   if _slowPath(idx+1 == buf.count) {
     return (UnicodeScalar(_unchecked: UInt32(cu)), idx+1)
@@ -528,7 +528,7 @@ internal func _parseRawScalar(
 
   // Decode
   let value: UInt32 = _decodeSurrogatePair(leading: cu, trailing: nextCu)
-  _correctnessCheck(Int32(exactly: value) != nil, "top bit shouldn't be set")
+  _invariant(Int32(exactly: value) != nil, "top bit shouldn't be set")
   return (UnicodeScalar(_unchecked: value), idx+2)
 }
 
@@ -560,7 +560,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
   internal func _parseRawScalar(
     startingFrom idx: Int = 0
   ) -> (UnicodeScalar, scalarEndIndex: Int) {
-    _correctnessCheck(idx >= 0 && idx < self.count, "out of bounds index")
+    _invariant(idx >= 0 && idx < self.count, "out of bounds index")
     let cu = self[idx]
     if _slowPath(idx+1 == self.count) {
       return (UnicodeScalar(_unchecked: UInt32(cu)), idx+1)
@@ -576,14 +576,14 @@ extension _UnmanagedString where CodeUnit == UInt16 {
 
     // Decode
     let value: UInt32 = _decodeSurrogatePair(leading: cu, trailing: nextCu)
-    _correctnessCheck(Int32(exactly: value) != nil, "top bit shouldn't be set")
+    _invariant(Int32(exactly: value) != nil, "top bit shouldn't be set")
     return (UnicodeScalar(_unchecked: value), idx+2)
   }
 
   internal func _reverseParseRawScalar(
     endingAt idx: Int // one-past-the-end
   ) -> (UnicodeScalar, scalarStartIndex: Int) {
-    _correctnessCheck(idx > 0 && idx <= self.count, "out of bounds end index")
+    _invariant(idx > 0 && idx <= self.count, "out of bounds end index")
 
     // Corner case: leading un-paired surrogate
     if _slowPath(idx == 1) {
@@ -601,7 +601,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
 
     // Decode
     let value: UInt32 = _decodeSurrogatePair(leading: priorCU, trailing: cu)
-    _correctnessCheck(Int32(exactly: value) != nil, "top bit shouldn't be set")
+    _invariant(Int32(exactly: value) != nil, "top bit shouldn't be set")
     return (UnicodeScalar(_unchecked: value), idx-2)
   }
 
@@ -631,7 +631,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
   }
 
   internal func _slowNormalize() -> [UInt16] {
-    _correctnessCheck(self.count > 0, "called on empty string")
+    _invariant(self.count > 0, "called on empty string")
 
     let canary = self.count * _Normalization._maxNFCExpansionFactor
     var count = self.count
@@ -743,7 +743,7 @@ extension _UnmanagedOpaqueString {
         && _hasNormalizationBoundary(before: otherCU)
 
     if _fastPath(selfIsASCII || otherIsASCII) {
-      _correctnessCheck(idx < selfCount && idx < otherCount,
+      _invariant(idx < selfCount && idx < otherCount,
         "Should be caught by check against min-count")
       // Check if next CU is <0x300, or if we're in a
       // "_isNormalizedSuperASCII" case. 99.9% of the time, we're here because
@@ -943,7 +943,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
     }
 
     let selfASCIIChar = UInt16(self[idx])
-    _correctnessCheck(selfASCIIChar != otherCU, "should be different")
+    _invariant(selfASCIIChar != otherCU, "should be different")
     if idx+1 == other.count {
       return _lexicographicalCompare(selfASCIIChar, otherCU)
     }
@@ -1014,7 +1014,7 @@ private func _compareStringsPostSuffix(
   otherUTF16WithLeadingASCII: _UnmanagedString<UInt16>
 ) -> _Ordering {
   let otherCU = otherUTF16WithLeadingASCII[0]
-  _correctnessCheck(otherCU <= 0x7F, "should be ASCII, otherwise no need to call")
+  _invariant(otherCU <= 0x7F, "should be ASCII, otherwise no need to call")
 
   let segmentEndIdx = otherUTF16WithLeadingASCII._findNormalizationSegmentEnd(
     startingFrom: 0)
@@ -1041,7 +1041,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
   //
   internal func _findNormalizationSegmentEnd(startingFrom idx: Int) -> Int {
     let count = self.count
-    _correctnessCheck(idx < count, "out of bounds")
+    _invariant(idx < count, "out of bounds")
 
     // Normalization boundaries are best queried before known starters. Advance
     // past one scalar first.
@@ -1061,7 +1061,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
   ) -> Int {
     var idx = idx
     let count = self.count
-    _correctnessCheck(idx > 0 && idx <= count, "out of bounds")
+    _invariant(idx > 0 && idx <= count, "out of bounds")
 
     while idx > 0 {
       let (scalar, priorIdx) = _reverseParseRawScalar(endingAt: idx)
@@ -1116,7 +1116,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
   //
   internal func _isLatinyPrenormal(idx: Int
   ) -> Bool {
-    _correctnessCheck(idx < self.count, "out of bounds")
+    _invariant(idx < self.count, "out of bounds")
 
     let cu = self[idx]
     if _slowPath(cu >= 0x300) {
@@ -1184,8 +1184,8 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     let count = Swift.min(self.count, other.count)
     let selfCU = self[randomIndex]
     let otherCU = other[randomIndex]
-    _correctnessCheck(randomIndex >= 0 && randomIndex < count, "out of bounds")
-    _correctnessCheck(selfCU != otherCU, "should be called at a point of difference")
+    _invariant(randomIndex >= 0 && randomIndex < count, "out of bounds")
+    _invariant(selfCU != otherCU, "should be called at a point of difference")
 
     //
     // Find the segment surrounding the random index passed in. This may involve

@@ -175,9 +175,9 @@ extension _ArrayBufferProtocol {
     countForBuffer: Int, minNewCapacity: Int,
     requiredCapacity: Int
   ) -> _ContiguousArrayBuffer<Element> {
-    _correctnessCheck(countForBuffer >= 0)
-    _correctnessCheck(requiredCapacity >= countForBuffer)
-    _correctnessCheck(minNewCapacity >= countForBuffer)
+    _invariant(countForBuffer >= 0)
+    _invariant(requiredCapacity >= countForBuffer)
+    _invariant(minNewCapacity >= countForBuffer)
 
     let minimumCapacity = Swift.max(requiredCapacity,
       minNewCapacity > capacity
@@ -204,17 +204,17 @@ extension _ArrayBufferProtocol {
     _ newCount: Int,  // Number of new elements to insert
     _ initializeNewElements: 
         ((UnsafeMutablePointer<Element>, _ count: Int) -> ()) = { ptr, count in
-      _correctnessCheck(count == 0)
+      _invariant(count == 0)
     }
   ) {
 
-    _correctnessCheck(headCount >= 0)
-    _correctnessCheck(newCount >= 0)
+    _invariant(headCount >= 0)
+    _invariant(newCount >= 0)
 
     // Count of trailing source elements to copy/move
     let sourceCount = self.count
     let tailCount = dest.count - headCount - newCount
-    _correctnessCheck(headCount + tailCount <= sourceCount)
+    _invariant(headCount + tailCount <= sourceCount)
 
     let oldCount = sourceCount - headCount - tailCount
     let destStart = dest.firstElementAddress
@@ -290,7 +290,7 @@ extension _ArrayBufferProtocol {
     
     // this function is only ever called from append(contentsOf:)
     // which should always have exhausted its capacity before calling
-    _correctnessCheck(count == capacity)
+    _invariant(count == capacity)
     var newCount = self.count
 
     // there might not be any elements to append remaining,

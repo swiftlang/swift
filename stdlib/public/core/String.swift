@@ -102,7 +102,7 @@ extension _StringGuts {
     encoding targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>, Int) throws -> Result
   ) rethrows -> Result {
-    _correctnessCheck(_isOpaque)
+    _invariant(_isOpaque)
 
     if self._isSmall {
       let small = self._smallUTF8String[bounds]
@@ -625,7 +625,7 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
       } else {
 #if arch(i386) || arch(arm)
 #else
-      _correctnessCheckFailure("Couldn't fit ASCII scalar into small string?")
+      _invariantFailure("Couldn't fit ASCII scalar into small string?")
 #endif
       }
     }
@@ -808,7 +808,7 @@ extension String {
       return
     }
 
-    _correctnessCheck(_guts._isOpaque)
+    _invariant(_guts._isOpaque)
     defer { _fixLifetime(self) }
     let opaque = _guts._asOpaque()
     var i = opaque.makeIterator()
