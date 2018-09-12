@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -3378,27 +3378,43 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
   case decls_block::PREFIX_OPERATOR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
+    DeclID protoID;
 
-    decls_block::PrefixOperatorLayout::readRecord(scratch, nameID,
-                                                  contextID);
+    decls_block::PrefixOperatorLayout::readRecord(scratch, nameID, contextID,
+                                                  protoID);
     auto DC = getDeclContext(contextID);
-    declOrOffset = createDecl<PrefixOperatorDecl>(DC, SourceLoc(),
-                                                  getIdentifier(nameID),
-                                                  SourceLoc());
+
+    Expected<Decl *> protocol = getDeclChecked(protoID);
+    if (!protocol)
+      return protocol.takeError();
+
+    auto result = createDecl<PrefixOperatorDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(),
+        cast_or_null<ProtocolDecl>(protocol.get()));
+
+    declOrOffset = result;
     break;
   }
 
   case decls_block::POSTFIX_OPERATOR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
+    DeclID protoID;
 
-    decls_block::PostfixOperatorLayout::readRecord(scratch, nameID,
-                                                   contextID);
+    decls_block::PostfixOperatorLayout::readRecord(scratch, nameID, contextID,
+                                                   protoID);
 
     auto DC = getDeclContext(contextID);
-    declOrOffset = createDecl<PostfixOperatorDecl>(DC, SourceLoc(),
-                                                   getIdentifier(nameID),
-                                                   SourceLoc());
+
+    Expected<Decl *> protocol = getDeclChecked(protoID);
+    if (!protocol)
+      return protocol.takeError();
+
+    auto result = createDecl<PostfixOperatorDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(),
+        cast_or_null<ProtocolDecl>(protocol.get()));
+
+    declOrOffset = result;
     break;
   }
 
@@ -3406,9 +3422,10 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     IdentifierID nameID;
     DeclContextID contextID;
     DeclID precedenceGroupID;
+    DeclID protoID;
 
     decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                 precedenceGroupID);
+                                                 precedenceGroupID, protoID);
 
     PrecedenceGroupDecl *precedenceGroup = nullptr;
     Identifier precedenceGroupName;
@@ -3422,11 +3439,14 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     auto DC = getDeclContext(contextID);
 
-    auto result = createDecl<InfixOperatorDecl>(DC, SourceLoc(),
-                                                 getIdentifier(nameID),
-                                                 SourceLoc(), SourceLoc(),
-                                                 precedenceGroupName,
-                                                 SourceLoc());
+    Expected<Decl *> protocol = getDeclChecked(protoID);
+    if (!protocol)
+      return protocol.takeError();
+
+    auto result = createDecl<InfixOperatorDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(), SourceLoc(),
+        precedenceGroupName, SourceLoc(),
+        cast_or_null<ProtocolDecl>(protocol.get()));
     result->setPrecedenceGroup(precedenceGroup);
 
     declOrOffset = result;
