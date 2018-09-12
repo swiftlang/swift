@@ -136,6 +136,34 @@ public struct Foo: Hashable {
     print("Not inlinable")
   }
 
+  // CHECK: public subscript(i: [[INT]]) -> [[INT]] {
+  // CHECK-NEXT:   get{{$}}
+  // CHECK-NEXT:   @inlinable set[[NEWVALUE]] { print("set") }
+  // CHECK-NEXT: }
+  public subscript(i: Int) -> Int {
+    get { return 0 }
+    @inlinable set { print("set") }
+  }
+
+  // CHECK: public subscript(j: [[INT]], k: [[INT]]) -> [[INT]] {
+  // CHECK-NEXT:   @inlinable get { return 0 }
+  // CHECK-NEXT:   set[[NEWVALUE]]{{$}}
+  // CHECK-NEXT: }
+  public subscript(j: Int, k: Int) -> Int {
+    @inlinable get { return 0 }
+    set { print("set") }
+  }
+
+  // CHECK: @inlinable public subscript(l: [[INT]], m: [[INT]], n: [[INT]]) -> [[INT]] {
+  // CHECK-NEXT:   get { return 0 }
+  // CHECK-NEXT:   set[[NEWVALUE]] { print("set") }
+  // CHECK-NEXT: }
+  @inlinable
+  public subscript(l: Int, m: Int, n: Int) -> Int {
+    get { return 0 }
+    set { print("set") }
+  }
+
   // CHECK: public init(value: [[INT]]) {
   // CHECK-NEXT: topLevelUsableFromInline()
   // CHECK-NEXT: noAccessors = value
