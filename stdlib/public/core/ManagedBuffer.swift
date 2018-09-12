@@ -244,8 +244,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     addressWithNativeOwner {
       return (UnsafePointer(_headerPointer), _nativeBuffer)
     }
-    mutableAddressWithNativeOwner {
-      return (_headerPointer, _nativeBuffer)
+    _modify {
+      yield &_headerPointer.pointee
     }
   }
 
