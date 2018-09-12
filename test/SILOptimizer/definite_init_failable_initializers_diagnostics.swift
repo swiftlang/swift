@@ -128,16 +128,16 @@ class ErrantClass : ErrantBaseClass {
     do {
       try self.init()
     } catch let e {
-      something(x) // expected-error* {{'self' used before 'self.init'}}
-      something(self.x) // expected-error* {{'self' used before 'self.init'}}
+      something(x) // expected-error {{'self' used before 'self.init'}}
+      something(self.x) // expected-error {{'self' used before 'self.init'}}
 
-      something(y) // expected-error* {{'self' used before 'self.init'}}
-      something(self.y) // expected-error* {{'self' used before 'self.init'}}
+      something(y) // expected-error {{'self' used before 'self.init'}}
+      something(self.y) // expected-error {{'self' used before 'self.init'}}
 
-      something(&y) // expected-error* {{'self' used before 'self.init'}}
-      something(&self.y) // expected-error* {{'self' used before 'self.init'}}
+      something(&y) // expected-error {{'self' used before 'self.init'}}
+      something(&self.y) // expected-error {{'self' used before 'self.init'}}
 
-      something(self) // expected-error* {{'self' used before 'self.init'}}
+      something(self) // expected-error {{'self' used before 'self.init'}}
 
       something(type(of: self))
 

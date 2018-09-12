@@ -369,6 +369,7 @@ class FailableBaseClass {
   // CHECK:   br bb2([[RESULT]] : $Optional<FailableBaseClass>)
   // CHECK: bb2([[RESULT:%.*]] : @owned $Optional<FailableBaseClass>):
   // CHECK:   return [[RESULT]]
+  // CHECK-NEXT: }
   convenience init?(failAfterDelegation: ()) {
     self.init(noFail: ())
     return nil
@@ -429,6 +430,7 @@ class FailableBaseClass {
   //
   // CHECK: [[EPILOG_BB]]([[WRAPPED_RESULT:%.*]] : @owned $Optional<FailableBaseClass>):
   // CHECK:   return [[WRAPPED_RESULT]]
+  // CHECK-NEXT: }
   convenience init!(failDuringDelegation2: ()) {
     self.init(failBeforeFullInitialization: ())! // unnecessary-but-correct '!'
   }

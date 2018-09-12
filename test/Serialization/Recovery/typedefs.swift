@@ -181,10 +181,10 @@ open class User {
 // 20 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
 // 21 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
 // 22 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 26 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 27 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 28 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 30 CHECK-VTABLE-NEXT: #User.lastMethod!1:
+// 23 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 24 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 25 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 26 CHECK-VTABLE-NEXT: #User.lastMethod!1:
 // CHECK-VTABLE: }
 
 
