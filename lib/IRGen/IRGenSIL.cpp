@@ -5353,19 +5353,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
 
-  // Find the original entry in the witness table.
-  bool wasOverriding = false;
-  while (auto overridden = member.getOverridden()) {
-    member = overridden;
-    wasOverriding = true;
-  }
-
-  // If the requirement given override another requirement, adjust the
-  // conformance appropriately.
-  if (wasOverriding) {
-    auto memberProto = cast<ProtocolDecl>(member.getDecl()->getDeclContext());
-    conformance = conformance.getInheritedConformanceRef(memberProto);
-  }
+  assert(member.requiresNewWitnessTableEntry());
 
   if (IGM.isResilient(conformance.getRequirement(),
                       ResilienceExpansion::Maximal)) {
