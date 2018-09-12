@@ -1,5 +1,6 @@
 
 /* Generic Signature Changes */
+Func Substring.replaceSubrange(_:with:) has generic signature change from <C where C : Collection, C.Element == Character> to <C where C : Collection, C.Element == Substring.Iterator.Element>
 Protocol BinaryInteger has generic signature change from <Self : CustomStringConvertible, Self : Hashable, Self : Numeric, Self : Strideable, Self.Magnitude : BinaryInteger, Self.Magnitude == Self.Magnitude.Magnitude, Self.Words : Sequence, Self.Words.Element == UInt> to <Self : CustomStringConvertible, Self : Hashable, Self : Numeric, Self : Strideable, Self.Magnitude : BinaryInteger, Self.Magnitude == Self.Magnitude.Magnitude, Self.Words : RandomAccessCollection, Self.Words.Element == UInt, Self.Words.Index == Int>
 /* RawRepresentable Changes */
 

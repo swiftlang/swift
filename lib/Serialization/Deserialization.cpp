@@ -4195,37 +4195,53 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return aliasOrError.takeError();
     auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
 
+    bool formSugaredType = true;
+
     Type underlyingType;
     if (ctx.LangOpts.EnableDeserializationRecovery) {
-      Expected<Type> expectedType = getTypeChecked(underlyingTypeID);
-      if (!expectedType)
-        return expectedType.takeError();
-      if (expectedType.get()) {
-        if (!alias ||
-            !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
-          // Fall back to the canonical type.
-          typeOrOffset = expectedType.get()->getCanonicalType();
-          break;
-        }
+      auto underlyingTypeOrError = getTypeChecked(underlyingTypeID);
+      if (!underlyingTypeOrError)
+        return underlyingTypeOrError.takeError();
+
+      underlyingType = underlyingTypeOrError.get();
+
+      if (!alias ||
+          !alias->getDeclaredInterfaceType()->isEqual(underlyingType)) {
+        // Fall back to the canonical type.
+        formSugaredType = false;
       }
 
-      underlyingType = expectedType.get();
     } else {
       underlyingType = getType(underlyingTypeID);
     }
 
-    Type parentType = getType(parentTypeID);
-
     // Read the substitutions.
-    SubstitutionMap subMap = getSubstitutionMap(substitutionsID);
+    auto subMap = getSubstitutionMap(substitutionsID);
+    underlyingType = underlyingType.subst(subMap);
+    assert(underlyingType);
 
-    // Look through compatibility aliases that are now unavailable.
-    if (alias->getAttrs().isUnavailable(ctx) &&
-        alias->isCompatibilityAlias()) {
-      typeOrOffset = alias->getUnderlyingTypeLoc().getType();
+    auto parentTypeOrError = getTypeChecked(parentTypeID);
+    if (!parentTypeOrError) {
+      typeOrOffset = underlyingType;
       break;
     }
 
+    // Look through compatibility aliases that are now unavailable.
+    if (alias &&
+        alias->getAttrs().isUnavailable(ctx) &&
+        alias->isCompatibilityAlias()) {
+      underlyingType = alias->getUnderlyingTypeLoc().getType().subst(subMap);
+      assert(underlyingType);
+      typeOrOffset = underlyingType;
+      break;
+    }
+
+    if (!formSugaredType) {
+      typeOrOffset = underlyingType;
+      break;
+    }
+
+    auto parentType = parentTypeOrError.get();
     typeOrOffset = NameAliasType::get(alias, parentType, subMap,
                                       underlyingType);
     break;
