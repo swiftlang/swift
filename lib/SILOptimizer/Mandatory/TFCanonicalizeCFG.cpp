@@ -642,7 +642,7 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
     // Find an appropriate value to use for each escaping value.
     unsigned argIndex = oldHeaderNumArgs;
     for (const auto &kv : escapingValueSubstMap) {
-      const SILValue &escapingValue = kv.first;
+      const SILValue escapingValue = kv.first;
       if (DI->properlyDominates(escapingValue, src->getTerminator())) {
         newArgs.push_back(escapingValue);
       } else {
