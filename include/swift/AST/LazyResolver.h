@@ -101,6 +101,9 @@ public:
   ///
   /// The implementation should add the members to IDC.
   virtual void parseMembers(IterableDeclContext *IDC) = 0;
+
+  /// Return whether the iterable decl context needs parsing.
+  virtual bool hasUnparsedMembers(const IterableDeclContext *IDC) = 0;
 };
 
 /// Context data for generic contexts.
