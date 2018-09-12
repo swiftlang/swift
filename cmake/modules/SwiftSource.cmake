@@ -334,7 +334,7 @@ function(_compile_swift_files
   endif()
 
   swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-    FILES "${module_file}" "${module_doc_file}"
+    FILES "${module_file}" "${module_doc_file}" "${interface_file}"
     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
