@@ -1738,20 +1738,10 @@ DeclBaseName ModuleFile::getDeclBaseName(IdentifierID IID) {
   assert(rawID < Identifiers.size() && "invalid identifier ID");
   auto &identRecord = Identifiers[rawID];
 
-  if (identRecord.Offset == 0)
-    return identRecord.Ident;
-
-  assert(!IdentifierData.empty() && "no identifier data in module");
-
-  StringRef rawStrPtr = IdentifierData.substr(identRecord.Offset);
-  size_t terminatorOffset = rawStrPtr.find('\0');
-  assert(terminatorOffset != StringRef::npos &&
-         "unterminated identifier string data");
-
-  // Cache the resulting identifier.
-  identRecord.Ident =
-      getContext().getIdentifier(rawStrPtr.slice(0, terminatorOffset));
-  identRecord.Offset = 0;
+  if (identRecord.Ident.empty()) {
+    StringRef text = getIdentifierText(IID);
+    identRecord.Ident = getContext().getIdentifier(text);
+  }
   return identRecord.Ident;
 }
 
@@ -1759,6 +1749,28 @@ Identifier ModuleFile::getIdentifier(IdentifierID IID) {
   auto name = getDeclBaseName(IID);
   assert(!name.isSpecial());
   return name.getIdentifier();
+}
+
+StringRef ModuleFile::getIdentifierText(IdentifierID IID) {
+  if (IID == 0)
+    return StringRef();
+
+  assert(IID >= NUM_SPECIAL_IDS);
+
+  size_t rawID = IID - NUM_SPECIAL_IDS;
+  assert(rawID < Identifiers.size() && "invalid identifier ID");
+  auto identRecord = Identifiers[rawID];
+
+  if (!identRecord.Ident.empty())
+    return identRecord.Ident.str();
+
+  assert(!IdentifierData.empty() && "no identifier data in module");
+
+  StringRef rawStrPtr = IdentifierData.substr(identRecord.Offset);
+  size_t terminatorOffset = rawStrPtr.find('\0');
+  assert(terminatorOffset != StringRef::npos &&
+         "unterminated identifier string data");
+  return rawStrPtr.slice(0, terminatorOffset);
 }
 
 DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
@@ -3661,7 +3673,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     DeclContextID contextID;
     bool isImplicit; bool hasPayload; bool isNegative;
     unsigned rawValueKindID;
-    IdentifierID blobData;
+    IdentifierID rawValueData;
     uint8_t rawResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
@@ -3669,7 +3681,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                isImplicit, hasPayload,
                                                rawValueKindID, isNegative,
-                                               blobData,
+                                               rawValueData,
                                                rawResilienceExpansion,
                                                numArgNames,
                                                argNameAndDependencyIDs);
@@ -3713,8 +3725,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     case EnumElementRawValueKind::None:
       break;
     case EnumElementRawValueKind::IntegerLiteral: {
-      auto literalText = getIdentifier(blobData);
-      auto literal = new (getContext()) IntegerLiteralExpr(literalText.get(),
+      auto literalText = getIdentifierText(rawValueData);
+      auto literal = new (getContext()) IntegerLiteralExpr(literalText,
                                                            SourceLoc(),
                                                            /*implicit*/ true);
       if (isNegative)

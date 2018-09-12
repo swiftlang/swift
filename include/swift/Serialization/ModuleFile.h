@@ -314,11 +314,11 @@ private:
 
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
-  /// If \c Offset is non-zero, the identifier has not been loaded yet.
+  /// If \c Ident is empty, the identifier has not been loaded yet.
   class SerializedIdentifier {
   public:
     Identifier Ident;
-    serialization::BitOffset Offset;
+    unsigned Offset;
 
     template <typename IntTy>
     /*implicit*/ SerializedIdentifier(IntTy rawOffset)
@@ -792,6 +792,11 @@ public:
   /// Convenience method to retrieve the identifier backing the name with
   /// given ID. Asserts that the name with this ID is not special.
   Identifier getIdentifier(serialization::IdentifierID IID);
+
+  /// Convenience method to retrieve the text of the name with the given ID.
+  /// This can be used if the result doesn't need to be uniqued in the
+  /// ASTContext. Asserts that the name with this ID is not special.
+  StringRef getIdentifierText(serialization::IdentifierID IID);
 
   /// Returns the decl with the given ID, deserializing it if needed.
   ///
