@@ -13,8 +13,8 @@ import TestsUtils
 
 public let CountAlgo = [
   BenchmarkInfo(
-    name: "CountAlgoRange",
-    runFunction: run_CountAlgoRange,
+    name: "CountAlgoArray",
+    runFunction: run_CountAlgoArray,
     tags: [.validation, .api]),
   BenchmarkInfo(
     name: "CountAlgoString",
@@ -23,9 +23,9 @@ public let CountAlgo = [
 ]
 
 @inline(never)
-public func run_CountAlgoRange(_ N: Int) {
-  for _ in 1...N {
-    CheckResults((0..<10_000_000).count(where: { $0 & 65535 == 0 }) == 153)
+public func run_CountAlgoArray(_ N: Int) {
+  for _ in 1...10*N {
+    CheckResults(numbers.count(where: { $0 & 4095 == 0 }) == 25)
   }
 }
 
@@ -36,6 +36,8 @@ public func run_CountAlgoString(_ N: Int) {
     CheckResults(text.count(where: vowels.contains) == 2014)
   }
 }
+
+let numbers = Array(0..<100_000)
 
 let text = """
     Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas tempus
