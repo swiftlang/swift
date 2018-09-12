@@ -189,35 +189,6 @@ double lgamma_r(double x, int *psigngam);
 long double lgammal_r(long double x, int *psigngam);
 #endif // defined(__APPLE__)
 
-// TLS - thread local storage
-
-#if defined(__linux__)
-# if defined(__ANDROID__)
-typedef int __swift_thread_key_t;
-# else
-typedef unsigned int __swift_thread_key_t;
-# endif
-#elif defined(__FreeBSD__)
-typedef int __swift_thread_key_t;
-#elif defined(_WIN32)
-typedef unsigned long __swift_thread_key_t;
-#elif defined(__HAIKU__)
-typedef int __swift_thread_key_t;
-#else
-typedef unsigned long __swift_thread_key_t;
-#endif
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
-                              void (* _Nullable destructor)(void * _Nullable));
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void * _Nullable _stdlib_thread_getspecific(__swift_thread_key_t key);
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_thread_setspecific(__swift_thread_key_t key,
-                               const void * _Nullable value);
-
 #ifdef __cplusplus
 }} // extern "C", namespace swift
 #endif
