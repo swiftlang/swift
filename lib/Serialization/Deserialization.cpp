@@ -1736,7 +1736,7 @@ DeclBaseName ModuleFile::getDeclBaseName(IdentifierID IID) {
 
   size_t rawID = IID - NUM_SPECIAL_IDS;
   assert(rawID < Identifiers.size() && "invalid identifier ID");
-  auto identRecord = Identifiers[rawID];
+  auto &identRecord = Identifiers[rawID];
 
   if (identRecord.Offset == 0)
     return identRecord.Ident;
@@ -1748,7 +1748,11 @@ DeclBaseName ModuleFile::getDeclBaseName(IdentifierID IID) {
   assert(terminatorOffset != StringRef::npos &&
          "unterminated identifier string data");
 
-  return getContext().getIdentifier(rawStrPtr.slice(0, terminatorOffset));
+  // Cache the resulting identifier.
+  identRecord.Ident =
+      getContext().getIdentifier(rawStrPtr.slice(0, terminatorOffset));
+  identRecord.Offset = 0;
+  return identRecord.Ident;
 }
 
 Identifier ModuleFile::getIdentifier(IdentifierID IID) {
