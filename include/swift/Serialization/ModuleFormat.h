@@ -1162,7 +1162,6 @@ namespace decls_block {
     // Trailed by:
     // - generic parameters, if any
     // - the indices pattern
-    // - inlinable body text, if any
   >;
 
   using ExtensionLayout = BCRecordLayout<
