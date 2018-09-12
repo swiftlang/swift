@@ -433,12 +433,33 @@ unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
   // Update the aggregate alignment
   Alignment = std::max(Alignment, fieldAlignment);
 
-  // The extra inhabitants of a record are the same as the extra
-  // inhabitants of the first field of the record.
-  if (Empty) {
-    NumExtraInhabitants = numExtraInhabitants;
-    Empty = false;
+  switch (Kind) {
+  // The extra inhabitants of a struct are the same as the extra
+  // inhabitants of the field that has the most.
+  case RecordKind::Struct:
+    NumExtraInhabitants = std::max(NumExtraInhabitants, numExtraInhabitants);
+    break;
+  
+  // For other kinds of records, we only use the extra inhabitants of the
+  // first field.
+  case RecordKind::ClassExistential:
+  case RecordKind::ClassInstance:
+  case RecordKind::ClosureContext:
+  case RecordKind::ErrorExistential:
+  case RecordKind::ExistentialMetatype:
+  case RecordKind::Invalid:
+  case RecordKind::MultiPayloadEnum:
+  case RecordKind::NoPayloadEnum:
+  case RecordKind::OpaqueExistential:
+  case RecordKind::SinglePayloadEnum:
+  case RecordKind::ThickFunction:
+  case RecordKind::Tuple:
+    if (Empty) {
+      NumExtraInhabitants = numExtraInhabitants;
+    }
+    break;
   }
+  Empty = false;
 
   return offset;
 }
