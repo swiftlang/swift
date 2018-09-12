@@ -3339,20 +3339,75 @@ Signature IRGenModule::getAssociatedTypeMetadataAccessFunctionSignature() {
   return Signature(fnType, attrs, SwiftCC);
 }
 
+/// Compute the index into a witness table for a resilient protocol given
+/// a reference to a descriptor of one of the requirements in that witness
+/// table.
+///
+/// Given an index into the witness table for a resilient protocol that
+/// was compiuted
+static llvm::Value *computeResilientWitnessTableIndex(
+                                            IRGenFunction &IGF,
+                                            ProtocolDecl *proto,
+                                            llvm::Constant *reqtDescriptor) {
+  // The requirement base descriptor refers to the first requirement in the
+  // protocol descriptor, offset by the start of the witness table requirements.
+  auto requirementsBaseDescriptor =
+    IGF.IGM.getAddrOfProtocolRequirementsBaseDescriptor(proto);
+
+  // Subtract the two pointers to determine the offset to this particular
+  // requirement.
+  auto baseAddress = IGF.Builder.CreatePtrToInt(requirementsBaseDescriptor,
+                                                IGF.IGM.IntPtrTy);
+  auto reqtAddress = IGF.Builder.CreatePtrToInt(reqtDescriptor,
+                                                IGF.IGM.IntPtrTy);
+  auto offset = IGF.Builder.CreateSub(reqtAddress, baseAddress);
+
+  // Determine how to adjust the byte offset we have to make it a witness
+  // table offset.
+  const auto &dataLayout = IGF.IGM.Module.getDataLayout();
+  auto protoReqSize =
+    dataLayout.getTypeAllocSizeInBits(IGF.IGM.ProtocolRequirementStructTy);
+  auto ptrSize = dataLayout.getTypeAllocSizeInBits(IGF.IGM.Int8PtrTy);
+  assert(protoReqSize >= ptrSize && "> 64-bit pointers?");
+  assert((protoReqSize % ptrSize == 0) && "Must be evenly divisible");
+  unsigned factor = (protoReqSize / ptrSize) * 8;
+  auto factorConstant = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, factor);
+  return IGF.Builder.CreateUDiv(offset, factorConstant);
+}
+
 MetadataResponse
 irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                      llvm::Value *parentMetadata,
                                      llvm::Value *wtable,
                                      AssociatedType associatedType,
                                      DynamicMetadataRequest request) {
-  auto &pi = IGF.IGM.getProtocolInfo(associatedType.getSourceProtocol(),
-                                     ProtocolInfoKind::RequirementSignature);
-  auto index = pi.getAssociatedTypeIndex(associatedType);
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
-                                            index.forProtocolWitnessTable());
+  llvm::Value *witness;
+  auto &IGM = IGF.IGM;
+  if (IGM.isResilient(associatedType.getSourceProtocol(),
+                      ResilienceExpansion::Maximal)) {
+    // For resilient protocols, use the associated type descriptor to
+    // determine the index.
+    auto assocTypeDescriptor =
+      IGM.getAddrOfAssociatedTypeDescriptor(associatedType.getAssociation());
+
+    auto index =
+      computeResilientWitnessTableIndex(IGF,
+                                        associatedType.getSourceProtocol(),
+                                        assocTypeDescriptor);
+
+    witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+  } else {
+    // For non-resilient protocols, the index is a constant.
+    auto &pi = IGM.getProtocolInfo(associatedType.getSourceProtocol(),
+                                   ProtocolInfoKind::RequirementSignature);
+
+    auto index = pi.getAssociatedTypeIndex(associatedType);
+    witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
+                                               index.forProtocolWitnessTable());
+  }
 
   // Cast the witness to the appropriate function type.
-  auto sig = IGF.IGM.getAssociatedTypeMetadataAccessFunctionSignature();
+  auto sig = IGM.getAssociatedTypeMetadataAccessFunctionSignature();
   auto witnessTy = sig.getType();
   witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
 
