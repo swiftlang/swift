@@ -29,8 +29,6 @@
 
 // RUN: %target-swift-frontend -module-cache-path %t -enable-objc-interop -typecheck %s -F %S/Inputs/frameworks -Xcc -Wno-#warnings 2>&1 | %FileCheck -check-prefix CHECK-NO-WARN -allow-empty %s
 
-// XFAIL: linux
-
 import Module
 
 // CHECK: Another.h:2:4: error: Module should have been built without -DFOO
