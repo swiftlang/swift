@@ -194,6 +194,12 @@ class LinkEntity {
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
 
+    /// The alias referring to the base of the requirements within the
+    /// protocol descriptor, which is used to determine the offset of a
+    /// particular requirement in the witness table.
+    /// The pointer is a ProtocolDecl*.
+    ProtocolRequirementsBaseDescriptor,
+
     /// An descriptor for an associated type within a protocol, which
     /// will alias the TargetProtocolRequirement descripting this
     /// particular associated type.
@@ -637,6 +643,12 @@ public:
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ProtocolDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forProtocolRequirementsBaseDescriptor(ProtocolDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ProtocolRequirementsBaseDescriptor, decl);
     return entity;
   }
 

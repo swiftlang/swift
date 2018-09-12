@@ -1224,6 +1224,9 @@ public:
   llvm::Constant *getAddrOfObjCModuleContextDescriptor();
   llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();
   ConstantReference getAddrOfParentContextDescriptor(DeclContext *from);
+  llvm::GlobalValue *defineProtocolRequirementsBaseDescriptor(
+                                                  ProtocolDecl *proto,
+                                                  llvm::Constant *definition);
   llvm::GlobalValue *defineAssociatedTypeDescriptor(
                                                   AssociatedTypeDecl *assocType,
                                                   llvm::Constant *definition);

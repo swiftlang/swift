@@ -777,6 +777,10 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   mangleProtocolWithoutPrefix(node->begin()[0]);
 }
 
+void Remangler::mangleProtocolRequirementsBaseDescriptor(Node *node) {
+  Out << "<protocol-requirements-base-descriptor>";
+}
+
 void Remangler::mangleProtocolWitnessTablePattern(Node *node) {
   unreachable("todo");
 }

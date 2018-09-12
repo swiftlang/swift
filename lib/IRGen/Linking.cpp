@@ -171,6 +171,10 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::ProtocolDescriptor:
     return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
 
+  case Kind::ProtocolRequirementsBaseDescriptor:
+    return mangler.mangleProtocolRequirementsBaseDescriptor(
+                                                 cast<ProtocolDecl>(getDecl()));
+
   case Kind::AssociatedTypeDescriptor:
     return mangler.mangleAssociatedTypeDescriptor(
                                           cast<AssociatedTypeDecl>(getDecl()));
@@ -447,6 +451,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::NominalTypeDescriptor:
   case Kind::ClassMetadataBaseOffset:
   case Kind::ProtocolDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::MethodLookupFunction:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
@@ -581,6 +586,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::MethodLookupFunction:
     return ::isAvailableExternally(IGM, getDecl());
 

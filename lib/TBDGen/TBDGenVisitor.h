@@ -64,6 +64,7 @@ private:
 
   void addMethodDescriptor(SILDeclRef declRef);
 
+  void addProtocolRequirementsBaseDescriptor(ProtocolDecl *proto);
   void addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType);
 
 public:
