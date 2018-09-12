@@ -514,7 +514,7 @@
 
 12TypeLowering17ExistentialStructV
 // CHECK-64:      (struct TypeLowering.ExistentialStruct)
-// CHECK-64-NEXT: (struct size=464 alignment=8 stride=464 num_extra_inhabitants=0
+// CHECK-64-NEXT: (struct size=464 alignment=8 stride=464 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:   (field name=any offset=0
 // CHECK-64-NEXT:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=0
 // CHECK-64-NEXT:       (field name=metadata offset=24
@@ -645,7 +645,7 @@
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1)))))
 
 // CHECK-32: (struct TypeLowering.ExistentialStruct)
-// CHECK-32-NEXT: (struct size=232 alignment=4 stride=232 num_extra_inhabitants=0
+// CHECK-32-NEXT: (struct size=232 alignment=4 stride=232 num_extra_inhabitants=4096
 // CHECK-32-NEXT:   (field name=any offset=0
 // CHECK-32-NEXT:     (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=metadata offset=12
@@ -924,7 +924,7 @@
 
 12TypeLowering10EnumStructV
 // CHECK-64: (struct TypeLowering.EnumStruct)
-// CHECK-64-NEXT: (struct size=81 alignment=8 stride=88 num_extra_inhabitants=0
+// CHECK-64-NEXT: (struct size=81 alignment=8 stride=88 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:   (field name=empty offset=0
 // CHECK-64-NEXT:     (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0))
 // CHECK-64-NEXT:   (field name=noPayload offset=0
