@@ -3625,14 +3625,13 @@ void Serializer::writeType(Type ty) {
   case TypeKind::NameAlias: {
     auto alias = cast<NameAliasType>(ty.getPointer());
     const TypeAliasDecl *typeAlias = alias->getDecl();
-    auto underlyingType = typeAlias->getUnderlyingTypeLoc().getType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(
                            Out, ScratchRecord, abbrCode,
                            addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
                            addTypeRef(alias->getParent()),
-                           addTypeRef(underlyingType),
+                           addTypeRef(alias->getSinglyDesugaredType()),
                            addSubstitutionMapRef(alias->getSubstitutionMap()));
     break;
   }
