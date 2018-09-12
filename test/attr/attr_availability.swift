@@ -1028,3 +1028,16 @@ struct UnavailableAccessors {
     other[alsoUnavailable: 0] += 1 // expected-error {{'subscript(alsoUnavailable:)' is unavailable: bad subscript!}} {{none}}
   }
 }
+
+// Should produce no warnings.
+enum SR8634_Enum: Int {
+  case a
+  @available(*, deprecated, message: "I must not be raised in synthesized code")
+  case b
+  case c
+}
+
+struct SR8634_Struct: Equatable {
+  @available(*, deprecated, message: "I must not be raised in synthesized code", renamed: "x")
+  let a: Int
+}
