@@ -241,7 +241,7 @@ public:
     T Value;
 
     /// The offset.
-    serialization::BitOffset Offset;
+    unsigned Offset : 31;
 
     unsigned IsFullyDeserialized : 1;
 
