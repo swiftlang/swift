@@ -87,12 +87,16 @@ fromStableVTableEntryKind(unsigned value) {
 
 /// Used to deserialize entries in the on-disk func hash table.
 class SILDeserializer::FuncTableInfo {
+  ModuleFile &MF;
+
 public:
   using internal_key_type = StringRef;
   using external_key_type = StringRef;
   using data_type = DeclID;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
+
+  explicit FuncTableInfo(ModuleFile &MF) : MF(MF) {}
 
   internal_key_type GetInternalKey(external_key_type ID) { return ID; }
 
@@ -108,12 +112,13 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, sizeof(uint32_t) };
+    return { sizeof(uint32_t), sizeof(uint32_t) };
   }
 
-  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
-    return StringRef(reinterpret_cast<const char *>(data), length);
+  internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    assert(length == sizeof(uint32_t) && "Expect a single IdentifierID.");
+    IdentifierID keyID = endian::readNext<uint32_t, little, unaligned>(data);
+    return MF.getIdentifierText(keyID);
   }
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
@@ -223,7 +228,8 @@ SILDeserializer::readFuncTable(ArrayRef<uint64_t> fields, StringRef blobData) {
 
   using OwnedTable = std::unique_ptr<SerializedFuncTable>;
   return OwnedTable(SerializedFuncTable::Create(base + tableOffset,
-                                                base + sizeof(uint32_t), base));
+                                                base + sizeof(uint32_t), base,
+                                                FuncTableInfo(*MF)));
 }
 
 /// A high-level overview of how forward references work in serializer and
