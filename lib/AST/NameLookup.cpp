@@ -85,6 +85,15 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
 
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
   for (auto decl : decls) {
+    // Don't look at the overrides of operators in protocols. The global
+    // lookup of operators means that we can find overriding operators that
+    // aren't relevant to the types in hand, and will fail to type check.
+    if (isa<ProtocolDecl>(decl->getDeclContext())) {
+      if (auto func = dyn_cast<FuncDecl>(decl))
+        if (func->isOperator())
+          continue;
+    }
+
     while (auto overrides = decl->getOverriddenDecl()) {
       overridden.insert(overrides);
 
@@ -589,6 +598,43 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
+TinyPtrVector<TypeDecl *>
+TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
+                                          ExtensionDecl *ext) const {
+  ASTContext &ctx = ext->getASTContext();
+
+  TinyPtrVector<TypeDecl *> result;
+  for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
+    auto resolve = [&](TypeLoc loc) {
+      DirectlyReferencedTypeDecls decls;
+      if (auto *typeRepr = loc.getTypeRepr())
+        decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+      else if (Type type = loc.getType())
+        decls = directReferencesForType(type);
+
+      result.insert(result.end(), decls.begin(), decls.end());
+    };
+
+    switch (req.getKind()) {
+    case RequirementReprKind::TypeConstraint:
+      resolve(req.getSubjectLoc());
+      resolve(req.getConstraintLoc());
+      break;
+
+    case RequirementReprKind::SameType:
+      resolve(req.getFirstTypeLoc());
+      resolve(req.getSecondTypeLoc());
+      break;
+
+    case RequirementReprKind::LayoutConstraint:
+      resolve(req.getSubjectLoc());
+      break;
+    }
+  }
+
+  return result;
+}
+
 namespace {
 
 /// Determine whether unqualified lookup should look at the members of the
@@ -963,12 +1009,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (!isCascadingUse.hasValue())
             isCascadingUse = ACE->isCascadingContextForLookup(false);
         } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-          auto ExtendedNominal = ED->getExtendedNominal();
-          if (!ExtendedNominal) {
-            DC = ED->getParent();
-            continue;
-          }
-
           if (shouldLookupMembers(ED, Loc))
             populateLookupDeclsFromContext(ED);
 
@@ -1552,7 +1592,6 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
   ASTContext &ctx = getASTContext();
-  FrontendStatsTracer tracer(ctx.Stats, "lookup-direct", this);
   if (auto s = ctx.Stats) {
     ++s->getFrontendCounters().NominalTypeLookupDirectCount;
   }
@@ -1675,14 +1714,14 @@ ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return { stored.Methods.begin(), stored.Methods.end() };
 }
 
-void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
+void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
+                                 ObjCSelector selector) {
   if (!ObjCMethodLookup) {
     createObjCMethodLookup();
   }
 
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
-  auto selector = method->getObjCSelector();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
 
   // In a non-empty vector, we could have duplicates or conflicts.

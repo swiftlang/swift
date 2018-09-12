@@ -203,6 +203,9 @@ namespace swift {
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 
+    /// \brief Enable experimental operator protocol designator feature.
+    bool EnableOperatorDesignatedProtocols = false;
+
     /// \brief Staging flag for treating inout parameters as Thread Sanitizer
     /// accesses.
     bool DisableTsanInoutInstrumentation = false;
@@ -247,6 +250,9 @@ namespace swift {
     /// of Swift do not.
     Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
       Swift3ObjCInferenceWarnings::None;
+
+    /// Diagnose implicit 'override'.
+    bool WarnImplicitOverrides = false;
 
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;

@@ -117,8 +117,8 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr, PersistentState);
   PrettyStackTraceParser StackTrace(P);
 
-  llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens, true);
-
+  llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
+                               SF.hasInterfaceHash());
   if (DelayedParseCB)
     P.setDelayedParsingCallbacks(DelayedParseCB);
 
@@ -2378,18 +2378,22 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
 
-    // Drop the double quotes.
-    StringRef rawString = P.Tok.getText().drop_front().drop_back();
+    // Parse the string.
+    SmallVector<Lexer::StringSegment, 1> segments;
+    P.L->getStringLiteralSegments(P.Tok, segments);
+    assert(segments.size() == 1);
 
     P.consumeToken(tok::string_literal);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    // Ask the lexer to interpret the entire string as a literal segment.
     SmallVector<char, 128> stringBuffer;
 
     if (encoding == StringLiteralInst::Encoding::Bytes) {
       // Decode hex bytes.
+      CharSourceRange rawStringRange(segments.front().Loc,
+                                     segments.front().Length);
+      StringRef rawString = P.SourceMgr.extractText(rawStringRange);
       if (rawString.size() & 1) {
         P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,
                    "even number of hex bytes");
@@ -2411,43 +2415,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       break;
     }
 
-    StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
+    StringRef string = P.L->getEncodedStringSegment(segments.front(),
+                                                    stringBuffer);
     ResultVal = B.createStringLiteral(InstLoc, string, encoding);
-    break;
-  }
-
-  case SILInstructionKind::ConstStringLiteralInst: {
-    if (P.Tok.getKind() != tok::identifier) {
-      P.diagnose(P.Tok, diag::sil_string_no_encoding);
-      return true;
-    }
-
-    ConstStringLiteralInst::Encoding encoding;
-    if (P.Tok.getText() == "utf8") {
-      encoding = ConstStringLiteralInst::Encoding::UTF8;
-    } else if (P.Tok.getText() == "utf16") {
-      encoding = ConstStringLiteralInst::Encoding::UTF16;
-    } else {
-      P.diagnose(P.Tok, diag::sil_string_invalid_encoding, P.Tok.getText());
-      return true;
-    }
-    P.consumeToken(tok::identifier);
-
-    if (P.Tok.getKind() != tok::string_literal) {
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
-      return true;
-    }
-
-    // Drop the double quotes.
-    StringRef rawString = P.Tok.getText().drop_front().drop_back();
-
-    // Ask the lexer to interpret the entire string as a literal segment.
-    SmallVector<char, 128> stringBuffer;
-    StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
-    P.consumeToken(tok::string_literal);
-    if (parseSILDebugLocation(InstLoc, B))
-      return true;
-    ResultVal = B.createConstStringLiteral(InstLoc, string, encoding);
     break;
   }
 
@@ -2680,7 +2650,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     UNARY_INSTRUCTION(CopyValue)
     UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(CondFail)
-    UNARY_INSTRUCTION(EndBorrowArgument)
+    UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
     UNARY_INSTRUCTION(DestructureTuple)
     REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
@@ -3392,36 +3362,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
     ResultVal = B.createStore(InstLoc, getLocalValue(From, ValType, InstLoc, B),
                               AddrVal, Qualifier);
-    break;
-  }
-
-  case SILInstructionKind::EndBorrowInst: {
-    UnresolvedValueName BorrowedFromName, BorrowedValueName;
-    SourceLoc ToLoc;
-    Identifier ToToken;
-    SILType BorrowedFromTy, BorrowedValueTy;
-
-    if (parseValueName(BorrowedValueName) ||
-        parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
-                           "from") ||
-        parseValueName(BorrowedFromName) ||
-        P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-        parseSILType(BorrowedValueTy) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(BorrowedFromTy) || parseSILDebugLocation(InstLoc, B))
-      return true;
-
-    if (ToToken.str() != "from") {
-      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "from");
-      return true;
-    }
-
-    SILValue BorrowedValue =
-        getLocalValue(BorrowedValueName, BorrowedValueTy, InstLoc, B);
-    SILValue BorrowedFrom =
-        getLocalValue(BorrowedFromName, BorrowedFromTy, InstLoc, B);
-
-    ResultVal = B.createEndBorrow(InstLoc, BorrowedValue, BorrowedFrom);
     break;
   }
 

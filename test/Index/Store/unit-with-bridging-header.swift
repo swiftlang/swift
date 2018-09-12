@@ -1,5 +1,3 @@
-// XFAIL: linux
-
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-pch -index-store-path %t/idx -o %t/bridge-head.pch %S/Inputs/bridge-head.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -import-objc-header %t/bridge-head.pch -primary-file %s -o %t/s1.o -index-store-path %t/idx

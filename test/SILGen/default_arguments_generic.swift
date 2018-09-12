@@ -40,11 +40,19 @@ struct InitializableImpl: Initializable {
 }
 // CHECK-LABEL: sil hidden @$S25default_arguments_generic17testInitializableyyF
 func testInitializable() {
-  // The ".init" is required to trigger the crash that used to happen.
-  _ = Generic<InitializableImpl>.init()
+  // Previously the metatype construction crashed in the type checker
+  // and the ".init" form crashed in SILGen. Test both forms.
+
   // CHECK: function_ref @$S25default_arguments_generic7GenericVyACyxGxcfcfA_ : $@convention(thin) <τ_0_0 where τ_0_0 : Initializable> () -> @out τ_0_0
   // CHECK: [[INIT:%.+]] = function_ref @$S25default_arguments_generic7GenericVyACyxGxcfC
   // CHECK: apply [[INIT]]<InitializableImpl>({{%.+}}, {{%.+}}) : $@convention(method) <τ_0_0 where τ_0_0 : Initializable> (@in τ_0_0, @thin Generic<τ_0_0>.Type) -> Generic<τ_0_0>
+  _ = Generic<InitializableImpl>()
+
+  // CHECK: function_ref @$S25default_arguments_generic7GenericVyACyxGxcfcfA_ : $@convention(thin) <τ_0_0 where τ_0_0 : Initializable> () -> @out τ_0_0
+  // CHECK: [[INIT:%.+]] = function_ref @$S25default_arguments_generic7GenericVyACyxGxcfC
+  // CHECK: apply [[INIT]]<InitializableImpl>({{%.+}}, {{%.+}}) : $@convention(method) <τ_0_0 where τ_0_0 : Initializable> (@in τ_0_0, @thin Generic<τ_0_0>.Type) -> Generic<τ_0_0>
+  _ = Generic<InitializableImpl>.init()
+
 } // CHECK: end sil function '$S25default_arguments_generic17testInitializableyyF'
 
 // Local generic functions with default arguments

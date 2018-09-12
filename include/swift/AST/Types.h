@@ -3073,13 +3073,6 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
     return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  
-/// Break an argument type into an array of \c AnyFunctionType::Params.
-///
-/// \param type The type to decompose.
-/// \param argumentLabels The argument labels to use.
-SmallVector<AnyFunctionType::Param, 4>
-decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 
 /// Map the given parameter list onto a bitvector describing whether
 /// the argument type at each index has a default argument associated with

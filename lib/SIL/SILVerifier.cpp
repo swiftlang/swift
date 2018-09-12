@@ -1531,13 +1531,6 @@ public:
     require(
         F.hasQualifiedOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
-    // We allow for end_borrow to express relationships in between addresses and
-    // values, but we require that the types are the same ignoring value
-    // category.
-    require(EBI->getBorrowedValue()->getType().getObjectType() ==
-                EBI->getOriginalValue()->getType().getObjectType(),
-            "end_borrow can only relate the same types ignoring value "
-            "category");
   }
 
   template <class AI>
@@ -2522,6 +2515,9 @@ public:
       require(AMI->getModule().lookUpWitnessTable(conformance, false),
               "Could not find witness table for conformance");
     }
+
+    require(AMI->getMember().requiresNewWitnessTableEntry(),
+            "method does not have a witness table entry");
   }
 
   // Get the expected type of a dynamic method reference.
@@ -2847,12 +2843,6 @@ public:
         case SILInstructionKind::DestroyAddrInst:
           return true;
         case SILInstructionKind::UncheckedAddrCastInst: {
-          // Don't be too conservative here, we have a new case:
-          // sil-combine producing a new code pattern for devirtualizer
-          // open_existential_addr immutable_access -> witness_method
-          // witness_method gets transformed into unchecked_addr_cast
-          // we are "OK" If one of the new users is an non-consuming apply
-          // we are also "OK" if we have a single non-consuming user
           auto isCastToNonConsuming = [=](UncheckedAddrCastInst *I) -> bool {
             for (auto *use : I->getUses()) {
               auto *inst = use->getUser();
@@ -2860,22 +2850,16 @@ public:
               case SILInstructionKind::ApplyInst:
               case SILInstructionKind::TryApplyInst:
               case SILInstructionKind::PartialApplyInst:
-                if (!isConsumingOrMutatingApplyUse(use))
-                  return true;
-                break;
-              case SILInstructionKind::StructElementAddrInst:
-              case SILInstructionKind::LoadInst:
-              case SILInstructionKind::DebugValueAddrInst:
-                if (I->hasOneUse())
-                  return true;
-                break;
+                if (isConsumingOrMutatingApplyUse(use))
+                  return false;
+                continue;
               default:
-                break;
+                continue;
               }
             }
-            return false;
+            return true;
           };
-          if (isCastToNonConsuming(dyn_cast<UncheckedAddrCastInst>(inst))) {
+          if (isCastToNonConsuming(cast<UncheckedAddrCastInst>(inst))) {
             break;
           }
           return true;

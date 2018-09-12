@@ -37,9 +37,6 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
-
-#include "clang/Basic/Module.h"
-
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
@@ -1029,52 +1026,15 @@ void Serializer::writeDocHeader() {
   }
 }
 
-static void
-removeDuplicateImports(SmallVectorImpl<ModuleDecl::ImportedModule> &imports) {
-  std::sort(imports.begin(), imports.end(),
-            [](const ModuleDecl::ImportedModule &lhs,
-               const ModuleDecl::ImportedModule &rhs) -> bool {
-    // Arbitrarily sort by name to get a deterministic order.
-    // FIXME: Submodules don't get sorted properly here.
-    if (lhs.second != rhs.second)
-      return lhs.second->getName().str() < rhs.second->getName().str();
-    using AccessPathElem = std::pair<Identifier, SourceLoc>;
-    return std::lexicographical_compare(lhs.first.begin(), lhs.first.end(),
-                                        rhs.first.begin(), rhs.first.end(),
-                                        [](const AccessPathElem &lElem,
-                                           const AccessPathElem &rElem) {
-      return lElem.first.str() < rElem.first.str();
-    });
-  });
-  auto last = std::unique(imports.begin(), imports.end(),
-                          [](const ModuleDecl::ImportedModule &lhs,
-                             const ModuleDecl::ImportedModule &rhs) -> bool {
-    if (lhs.second != rhs.second)
-      return false;
-    return ModuleDecl::isSameAccessPath(lhs.first, rhs.first);
-  });
-  imports.erase(last, imports.end());
-}
-
 using ImportPathBlob = llvm::SmallString<64>;
 static void flattenImportPath(const ModuleDecl::ImportedModule &import,
                               ImportPathBlob &out) {
-  ArrayRef<FileUnit *> files = import.second->getFiles();
-  if (auto clangModule = dyn_cast<ClangModuleUnit>(files.front())) {
-    // FIXME: This is an awful hack to handle Clang submodules.
-    // Once Swift has a native notion of submodules, this can go away.
-    const clang::Module *submodule = clangModule->getClangModule();
-    SmallVector<StringRef, 4> submoduleNames;
-    do {
-      submoduleNames.push_back(submodule->Name);
-      submodule = submodule->Parent;
-    } while (submodule);
-    interleave(submoduleNames.rbegin(), submoduleNames.rend(),
-               [&out](StringRef next) { out.append(next); },
-               [&out] { out.push_back('\0'); });
-  } else {
-    out.append(import.second->getName().str());
-  }
+  SmallVector<StringRef, 4> reverseSubmoduleNames(
+      import.second->getReverseFullModuleName(), {});
+
+  interleave(reverseSubmoduleNames.rbegin(), reverseSubmoduleNames.rend(),
+             [&out](StringRef next) { out.append(next); },
+             [&out] { out.push_back('\0'); });
 
   if (import.first.empty())
     return;
@@ -1104,20 +1064,17 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
   }
 
-  // FIXME: Having to deal with private imports as a superset of public imports
-  // is inefficient.
-  SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
-  for (auto file : M->getFiles()) {
-    file->getImportedModules(publicImports, ModuleDecl::ImportFilter::Public);
-    file->getImportedModules(allImports, ModuleDecl::ImportFilter::All);
-  }
+  M->getImportedModules(allImports, ModuleDecl::ImportFilter::All);
+  ModuleDecl::removeDuplicateImports(allImports);
 
-  llvm::SmallSet<ModuleDecl::ImportedModule, 8, ModuleDecl::OrderImportedModules>
-    publicImportSet;
+  // Collect the public imports as a subset so that we can mark them with an
+  // extra flag.
+  SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
+  M->getImportedModules(publicImports, ModuleDecl::ImportFilter::Public);
+  llvm::SmallSet<ModuleDecl::ImportedModule, 8,
+                 ModuleDecl::OrderImportedModules> publicImportSet;
   publicImportSet.insert(publicImports.begin(), publicImports.end());
-
-  removeDuplicateImports(allImports);
 
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
@@ -2671,8 +2628,7 @@ void Serializer::writeDecl(const Decl *D) {
   }
 
   if (auto *value = dyn_cast<ValueDecl>(D)) {
-    if (value->hasAccess() &&
-        value->getFormalAccess() <= swift::AccessLevel::FilePrivate &&
+    if (value->getFormalAccess() <= swift::AccessLevel::FilePrivate &&
         !value->getDeclContext()->isLocalContext()) {
       // FIXME: We shouldn't need to encode this for /all/ private decls.
       // In theory we can follow the same rules as mangling and only include
@@ -2863,10 +2819,11 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(op->getDeclContext());
     auto nameID = addDeclBaseNameRef(op->getName());
     auto groupID = addDeclRef(op->getPrecedenceGroup());
+    auto protoID = addDeclRef(op->getDesignatedProtocol());
 
     unsigned abbrCode = DeclTypeAbbrCodes[InfixOperatorLayout::Code];
-    InfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    nameID, contextID, groupID);
+    InfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode, nameID,
+                                    contextID, groupID, protoID);
     break;
   }
 
@@ -2875,11 +2832,12 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(op);
 
     auto contextID = addDeclContextRef(op->getDeclContext());
+    auto protoID = addDeclRef(op->getDesignatedProtocol());
 
     unsigned abbrCode = DeclTypeAbbrCodes[PrefixOperatorLayout::Code];
     PrefixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                      addDeclBaseNameRef(op->getName()),
-                                     contextID);
+                                     contextID, protoID);
     break;
   }
 
@@ -2888,11 +2846,12 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(op);
 
     auto contextID = addDeclContextRef(op->getDeclContext());
+    auto protoID = addDeclRef(op->getDesignatedProtocol());
 
     unsigned abbrCode = DeclTypeAbbrCodes[PostfixOperatorLayout::Code];
     PostfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       addDeclBaseNameRef(op->getName()),
-                                      contextID);
+                                      contextID, protoID);
     break;
   }
 
@@ -3198,8 +3157,10 @@ void Serializer::writeDecl(const Decl *D) {
     // Only save the text for normal default arguments, not any of the special
     // ones.
     StringRef defaultArgumentText;
+    SmallString<128> scratch;
     if (param->getDefaultArgumentKind() == swift::DefaultArgumentKind::Normal)
-      defaultArgumentText = param->getDefaultValueStringRepresentation();
+      defaultArgumentText =
+        param->getDefaultValueStringRepresentation(scratch);
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3664,13 +3625,14 @@ void Serializer::writeType(Type ty) {
   case TypeKind::NameAlias: {
     auto alias = cast<NameAliasType>(ty.getPointer());
     const TypeAliasDecl *typeAlias = alias->getDecl();
+    auto underlyingType = typeAlias->getUnderlyingTypeLoc().getType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(
                            Out, ScratchRecord, abbrCode,
                            addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
                            addTypeRef(alias->getParent()),
-                           addTypeRef(alias->getSinglyDesugaredType()),
+                           addTypeRef(underlyingType),
                            addSubstitutionMapRef(alias->getSubstitutionMap()));
     break;
   }

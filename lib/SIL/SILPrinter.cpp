@@ -1202,22 +1202,6 @@ public:
     *this << '"' << llvm::toHex(SLI->getValue()) << '"';
   }
 
-  static StringRef
-  getStringEncodingName(ConstStringLiteralInst::Encoding kind) {
-    switch (kind) {
-    case ConstStringLiteralInst::Encoding::UTF8:
-      return "utf8 ";
-    case ConstStringLiteralInst::Encoding::UTF16:
-      return "utf16 ";
-    }
-    llvm_unreachable("bad string literal encoding");
-  }
-
-  void visitConstStringLiteralInst(ConstStringLiteralInst *SLI) {
-    *this << getStringEncodingName(SLI->getEncoding())
-          << QuotedString(SLI->getValue());
-  }
-
   void printLoadOwnershipQualifier(LoadOwnershipQualifier Qualifier) {
     switch (Qualifier) {
     case LoadOwnershipQualifier::Unqualified:
@@ -1275,14 +1259,7 @@ public:
   }
 
   void visitEndBorrowInst(EndBorrowInst *EBI) {
-    *this << Ctx.getID(EBI->getBorrowedValue()) << " from "
-          << Ctx.getID(EBI->getOriginalValue()) << " : "
-          << EBI->getBorrowedValue()->getType() << ", "
-          << EBI->getOriginalValue()->getType();
-  }
-
-  void visitEndBorrowArgumentInst(EndBorrowArgumentInst *EBAI) {
-    *this << getIDAndType(EBAI->getOperand());
+    *this << getIDAndType(EBI->getOperand());
   }
 
   void visitAssignInst(AssignInst *AI) {
@@ -2663,7 +2640,6 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     Options.SkipImplicit = false;
     Options.PrintGetSetOnRWProperties = true;
     Options.PrintInSILBody = false;
-    Options.PrintDefaultParameterPlaceholder = false;
     bool WholeModuleMode = (M == AssociatedDeclContext);
 
     SmallVector<Decl *, 32> topLevelDecls;

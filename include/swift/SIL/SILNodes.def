@@ -264,9 +264,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(StringLiteralInst, string_literal,
                       LiteralInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(ConstStringLiteralInst, const_string_literal,
-                      LiteralInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST_RANGE(LiteralInst, FunctionRefInst, ConstStringLiteralInst)
+    SINGLE_VALUE_INST_RANGE(LiteralInst, FunctionRefInst, StringLiteralInst)
 
   // Dynamic Dispatch
   ABSTRACT_SINGLE_VALUE_INST(MethodInst, SingleValueInstruction)
@@ -597,8 +595,6 @@ NON_VALUE_INST(FixLifetimeInst, fix_lifetime,
 NON_VALUE_INST(DestroyValueInst, destroy_value,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(EndBorrowInst, end_borrow,
-               SILInstruction, MayHaveSideEffects, DoesNotRelease)
-NON_VALUE_INST(EndBorrowArgumentInst, end_borrow_argument,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(EndAccessInst, end_access,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)

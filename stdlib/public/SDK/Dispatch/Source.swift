@@ -13,8 +13,8 @@
 // import Foundation
 import _SwiftDispatchOverlayShims
 
-public extension DispatchSourceProtocol {
-	typealias DispatchSourceHandler = @convention(block) () -> Void
+extension DispatchSourceProtocol {
+	public typealias DispatchSourceHandler = @convention(block) () -> Void
 
 	public func setEventHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
 		if #available(macOS 10.10, iOS 8.0, *),
@@ -98,7 +98,7 @@ public extension DispatchSourceProtocol {
 	}
 }
 
-public extension DispatchSource {
+extension DispatchSource {
 	public struct MachSendEvent : OptionSet, RawRepresentable {
 		public let rawValue: UInt
 		public init(rawValue: UInt) { self.rawValue = rawValue }
@@ -210,7 +210,7 @@ public extension DispatchSource {
 	}
 }
 
-public extension DispatchSourceMachSend {
+extension DispatchSourceMachSend {
 	public var handle: mach_port_t {
 		return mach_port_t(__dispatch_source_get_handle(self as! DispatchSource))
 	}
@@ -226,13 +226,13 @@ public extension DispatchSourceMachSend {
 	}
 }
 
-public extension DispatchSourceMachReceive {
+extension DispatchSourceMachReceive {
 	public var handle: mach_port_t {
 		return mach_port_t(__dispatch_source_get_handle(self as! DispatchSource))
 	}
 }
 
-public extension DispatchSourceMemoryPressure {
+extension DispatchSourceMemoryPressure {
 	public var data: DispatchSource.MemoryPressureEvent {
 		let data = __dispatch_source_get_data(self as! DispatchSource)
 		return DispatchSource.MemoryPressureEvent(rawValue: data)
@@ -244,7 +244,7 @@ public extension DispatchSourceMemoryPressure {
 	}
 }
 
-public extension DispatchSourceProcess {
+extension DispatchSourceProcess {
 	public var handle: pid_t {
 		return pid_t(__dispatch_source_get_handle(self as! DispatchSource))
 	}
@@ -260,7 +260,7 @@ public extension DispatchSourceProcess {
 	}
 }
 
-public extension DispatchSourceTimer {
+extension DispatchSourceTimer {
 	///
 	/// Sets the deadline and leeway for a timer event that fires once.
 	///
@@ -599,7 +599,7 @@ public extension DispatchSourceTimer {
 	}
 }
 
-public extension DispatchSourceFileSystemObject {
+extension DispatchSourceFileSystemObject {
 	public var handle: Int32 {
 		return Int32(__dispatch_source_get_handle(self as! DispatchSource))
 	}
@@ -615,7 +615,7 @@ public extension DispatchSourceFileSystemObject {
 	}
 }
 
-public extension DispatchSourceUserDataAdd {
+extension DispatchSourceUserDataAdd {
 	/// @function add
 	///
 	/// @abstract
@@ -630,7 +630,7 @@ public extension DispatchSourceUserDataAdd {
 	}
 }
 
-public extension DispatchSourceUserDataOr {
+extension DispatchSourceUserDataOr {
 	/// @function or
 	///
 	/// @abstract
@@ -645,7 +645,7 @@ public extension DispatchSourceUserDataOr {
 	}
 }
 
-public extension DispatchSourceUserDataReplace {
+extension DispatchSourceUserDataReplace {
 	/// @function replace
 	///
 	/// @abstract

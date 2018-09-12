@@ -1,5 +1,3 @@
-// XFAIL: linux
-
 // RUN: rm -rf %t
 // RUN: %target-swift-frontend -index-store-path %t/idx %s -o %t/file1.o -typecheck
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck %s -check-prefix=FILE1

@@ -55,6 +55,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
+#include "InlinableText.h"
 #include <algorithm>
 
 using namespace swift;
@@ -1391,22 +1392,42 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
   return false;
 }
 
+static bool isDirectToStorageAccess(const AccessorDecl *accessor,
+                                    const VarDecl *var, bool isAccessOnSelf) {
+  // All accesses have ordinary semantics except those to variables
+  // with storage from within their own accessors.
+  if (accessor->getStorage() != var)
+    return false;
+
+  if (!var->hasStorage())
+    return false;
+
+  // In Swift 5 and later, the access must also be a member access on 'self'.
+  if (!isAccessOnSelf &&
+      var->getDeclContext()->isTypeContext() &&
+      var->getASTContext().isSwiftVersionAtLeast(5))
+    return false;
+
+  // As a special case, 'read' and 'modify' coroutines with forced static
+  // dispatch must use ordinary semantics, so that the 'modify' coroutine for a
+  // 'dynamic' property uses Objective-C message sends and not direct access to
+  // storage.
+  if (accessor->hasForcedStaticDispatch())
+    return false;
+
+  return true;
+}
+
 /// Determines the access semantics to use in a DeclRefExpr or
 /// MemberRefExpr use of this value in the specified context.
 AccessSemantics
 ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC,
                                          bool isAccessOnSelf) const {
-  // All accesses have ordinary semantics except those to variables
-  // with storage from within their own accessors.  In Swift 5 and later,
-  // the access must also be a member access on 'self'.
-
   // The condition most likely to fast-path us is not being in an accessor,
   // so we check that first.
   if (auto *accessor = dyn_cast<AccessorDecl>(UseDC)) {
     if (auto *var = dyn_cast<VarDecl>(this)) {
-      if (accessor->getStorage() == var && var->hasStorage() &&
-          (isAccessOnSelf || !var->getDeclContext()->isTypeContext() ||
-           !var->getASTContext().isSwiftVersionAtLeast(5)))
+      if (isDirectToStorageAccess(accessor, var, isAccessOnSelf))
         return AccessSemantics::DirectToStorage;
     }
   }
@@ -1674,7 +1695,7 @@ void AbstractStorageDecl::visitOpaqueAccessors(
 }
 
 static bool hasPrivateOrFilePrivateFormalAccess(const ValueDecl *D) {
-  return D->hasAccess() && D->getFormalAccess() <= AccessLevel::FilePrivate;
+  return D->getFormalAccess() <= AccessLevel::FilePrivate;
 }
 
 /// Returns true if one of the ancestor DeclContexts of this ValueDecl is either
@@ -2223,9 +2244,10 @@ bool ValueDecl::hasValidSignature() const {
   return getValidationState() != ValidationState::Checking;
 }
 
-Optional<ObjCSelector> ValueDecl::getObjCRuntimeName() const {
+Optional<ObjCSelector> ValueDecl::getObjCRuntimeName(
+                                              bool skipIsObjCResolution) const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
-    return func->getObjCSelector();
+    return func->getObjCSelector(DeclName(), skipIsObjCResolution);
 
   ASTContext &ctx = getASTContext();
   auto makeSelector = [&](Identifier name) -> ObjCSelector {
@@ -2329,6 +2351,11 @@ bool ValueDecl::isUsableFromInline() const {
   if (auto *ATD = dyn_cast<AssociatedTypeDecl>(this))
     if (ATD->getProtocol()->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
+
+  if (auto *DD = dyn_cast<DestructorDecl>(this))
+    if (auto *CD = dyn_cast<ClassDecl>(DD->getDeclContext()))
+      if (CD->getAttrs().hasAttribute<UsableFromInlineAttr>())
+        return true;
 
   return false;
 }
@@ -2471,6 +2498,11 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   const DeclContext *resultDC = VD->getDeclContext();
 
   while (!resultDC->isModuleScopeContext()) {
+    if (isa<TopLevelCodeDecl>(resultDC)) {
+      return AccessScope(resultDC->getModuleScopeContext(),
+                         access == AccessLevel::Private);
+    }
+
     if (resultDC->isLocalContext() || access == AccessLevel::Private)
       return AccessScope(resultDC, /*private*/true);
 
@@ -2635,23 +2667,23 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
 
 void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
                                      bool sourceIsParentContext) {
-  if (!hasAccess()) {
-    AccessLevel access = source->getFormalAccess();
+  assert(!hasAccess());
 
-    // To make something have the same access as a 'private' parent, it has to
-    // be 'fileprivate' or greater.
-    if (sourceIsParentContext && access == AccessLevel::Private)
-      access = AccessLevel::FilePrivate;
+  AccessLevel access = source->getFormalAccess();
 
-    // Only certain declarations can be 'open'.
-    if (access == AccessLevel::Open && !isPotentiallyOverridable()) {
-      assert(!isa<ClassDecl>(this) &&
-             "copying 'open' onto a class has complications");
-      access = AccessLevel::Public;
-    }
+  // To make something have the same access as a 'private' parent, it has to
+  // be 'fileprivate' or greater.
+  if (sourceIsParentContext && access == AccessLevel::Private)
+    access = AccessLevel::FilePrivate;
 
-    setAccess(access);
+  // Only certain declarations can be 'open'.
+  if (access == AccessLevel::Open && !isPotentiallyOverridable()) {
+    assert(!isa<ClassDecl>(this) &&
+           "copying 'open' onto a class has complications");
+    access = AccessLevel::Public;
   }
+
+  setAccess(access);
 
   // Inherit the @usableFromInline attribute.
   if (source->getAttrs().hasAttribute<UsableFromInlineAttr>() &&
@@ -3226,8 +3258,9 @@ void ClassDecl::addImplicitDestructor() {
 
   // Mark DD as ObjC, as all dtors are.
   DD->setIsObjC(getASTContext().LangOpts.EnableObjCInterop);
-  if (getASTContext().LangOpts.EnableObjCInterop)
-    recordObjCMethod(DD);
+  if (getASTContext().LangOpts.EnableObjCInterop) {
+    recordObjCMethod(DD, DD->getObjCSelector());
+  }
 
   // Assign DD the interface type (Self) -> () -> ()
   DD->computeType();
@@ -4040,41 +4073,6 @@ void ProtocolDecl::setDefaultWitness(ValueDecl *requirement, Witness witness) {
   (void) pair;
 }
 
-#ifndef NDEBUG
-static bool isAccessor(AccessorDecl *accessor, AccessorKind kind,
-                       AbstractStorageDecl *storage) {
-  // TODO: this should check that the accessor belongs to this storage, but
-  // the Clang importer currently likes to violate that condition.
-  return (accessor && accessor->getAccessorKind() == kind);
-}
-#endif
-
-void AbstractStorageDecl::configureAccessor(AccessorDecl *accessor) {
-  assert(isAccessor(accessor, accessor->getAccessorKind(), this));
-
-  switch (accessor->getAccessorKind()) {
-  case AccessorKind::Get:
-  case AccessorKind::Address:
-  case AccessorKind::Read:
-    // Nothing to do.
-    return;
-
-  case AccessorKind::Set:
-  case AccessorKind::WillSet:
-  case AccessorKind::DidSet:
-  case AccessorKind::MutableAddress:
-  case AccessorKind::Modify:
-    // Propagate the setter access.
-    if (auto setterAccess = Accessors.getInt()) {
-      assert(!accessor->hasAccess() ||
-             accessor->getFormalAccess() == setterAccess.getValue());
-      accessor->overwriteAccess(setterAccess.getValue());
-    }
-    return;
-  }
-  llvm_unreachable("bad accessor kind");
-}
-
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
   setFieldsFromImplInfo(implInfo);
   Accessors.getPointer()->overwriteImplInfo(implInfo);
@@ -4100,9 +4098,6 @@ void AbstractStorageDecl::setAccessors(StorageImplInfo implInfo,
                                     implInfo, accessors);
     Accessors.setPointer(record);
   }
-
-  for (auto accessor : accessors)
-    configureAccessor(accessor);
 }
 
 // Compute the number of opaque accessors.
@@ -4215,6 +4210,15 @@ AbstractStorageDecl::getSetterFormalAccess() const {
         AccessLevel::Private);
 }
 
+#ifndef NDEBUG
+static bool isAccessor(AccessorDecl *accessor, AccessorKind kind,
+                       AbstractStorageDecl *storage) {
+  // TODO: this should check that the accessor belongs to this storage, but
+  // the Clang importer currently likes to violate that condition.
+  return (accessor && accessor->getAccessorKind() == kind);
+}
+#endif
+
 void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
   assert(getImplInfo().getReadImpl() == ReadImplKind::Get);
   assert(!getImplInfo().supportsMutation());
@@ -4226,7 +4230,6 @@ void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
 
   overwriteImplInfo(StorageImplInfo::getMutableComputed());
   Accessors.getPointer()->addOpaqueAccessor(setter);
-  configureAccessor(setter);
 }
 
 void
@@ -4242,7 +4245,6 @@ AbstractStorageDecl::setSynthesizedGetter(AccessorDecl *accessor) {
   }
 
   accessors->addOpaqueAccessor(accessor);
-  configureAccessor(accessor);
 }
 
 void
@@ -4258,7 +4260,6 @@ AbstractStorageDecl::setSynthesizedReadCoroutine(AccessorDecl *accessor) {
   }
 
   accessors->addOpaqueAccessor(accessor);
-  configureAccessor(accessor);
 }
 
 void
@@ -4268,7 +4269,6 @@ AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
   assert(isAccessor(accessor, AccessorKind::Set, this));
 
   Accessors.getPointer()->addOpaqueAccessor(accessor);
-  configureAccessor(accessor);
 }
 
 void
@@ -4280,7 +4280,6 @@ AbstractStorageDecl::setSynthesizedModifyCoroutine(AccessorDecl *accessor) {
   assert(isAccessor(accessor, AccessorKind::Modify, this));
 
   Accessors.getPointer()->addOpaqueAccessor(accessor);
-  configureAccessor(accessor);
 }
 
 void AbstractStorageDecl::addBehavior(TypeRepr *Type,
@@ -4829,14 +4828,22 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndIsVariadic.getPointer()->InitContext = initContext;
 }
 
-StringRef ParamDecl::getDefaultValueStringRepresentation() const {
+StringRef
+ParamDecl::getDefaultValueStringRepresentation(
+  SmallVectorImpl<char> &scratch) const {
   switch (getDefaultArgumentKind()) {
   case DefaultArgumentKind::None:
     llvm_unreachable("called on a ParamDecl with no default value");
-  case DefaultArgumentKind::Normal:
+  case DefaultArgumentKind::Normal: {
     assert(DefaultValueAndIsVariadic.getPointer() &&
            "default value not provided yet");
-    return DefaultValueAndIsVariadic.getPointer()->StringRepresentation;
+    auto existing =
+      DefaultValueAndIsVariadic.getPointer()->StringRepresentation;
+    if (!existing.empty())
+      return existing;
+    return extractInlinableText(getASTContext().SourceMgr, getDefaultValue(),
+                                scratch);
+  }
   case DefaultArgumentKind::Inherited:
     // FIXME: This needs /some/ kind of textual representation, but this isn't
     // a great one.
@@ -5088,9 +5095,10 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
 }
 
 ObjCSelector
-AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
+AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
+                                      bool skipIsObjCResolution) const {
   // FIXME: Forces computation of the Objective-C selector.
-  if (getASTContext().getLazyResolver())
+  if (getASTContext().getLazyResolver() && !skipIsObjCResolution)
     (void)isObjC();
 
   // If there is an @objc attribute with a name, use that name.
@@ -5102,9 +5110,8 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
   auto &ctx = getASTContext();
 
   StringRef baseNameStr;
-  if (isa<DestructorDecl>(this)) {
-    // Deinitializers are always called "dealloc".
-    return ObjCSelector(ctx, 0, ctx.Id_dealloc);
+  if (auto destructor = dyn_cast<DestructorDecl>(this)) {
+    return destructor->getObjCSelector();
   } else if (auto func = dyn_cast<FuncDecl>(this)) {
     // Otherwise cast this to be able to access getName()
     baseNameStr = func->getName().str();
@@ -5640,6 +5647,12 @@ DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
                          /*GenericParams=*/nullptr),
     SelfDecl(nullptr) {
   setParameters(ParameterList::createEmpty(Parent->getASTContext()));
+}
+
+ObjCSelector DestructorDecl::getObjCSelector() const {
+  // Deinitializers are always called "dealloc".
+  auto &ctx = getASTContext();
+  return ObjCSelector(ctx, 0, ctx.Id_dealloc);
 }
 
 SourceRange FuncDecl::getSourceRange() const {

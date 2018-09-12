@@ -504,10 +504,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::DebugValueAddrInst:
   case SILInstructionKind::StringLiteralInst:
-  case SILInstructionKind::ConstStringLiteralInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndBorrowInst:
-  case SILInstructionKind::EndBorrowArgumentInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::FunctionRefInst:

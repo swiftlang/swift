@@ -58,7 +58,7 @@ struct SillyUTF16String : _ExpressibleByBuiltinUTF16StringLiteral, ExpressibleBy
   init(stringLiteral value: SillyUTF16String) { }
 }
 
-struct SillyConstUTF16String : _ExpressibleByBuiltinConstUTF16StringLiteral, ExpressibleByStringLiteral {
+struct SillyConstUTF16String : ExpressibleByStringLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) { }
 
   init(unicodeScalarLiteral value: SillyString) { }
@@ -72,10 +72,6 @@ struct SillyConstUTF16String : _ExpressibleByBuiltinConstUTF16StringLiteral, Exp
 
   init(extendedGraphemeClusterLiteral value: SillyString) { }
 
-  init( _builtinConstStringLiteral start: Builtin.RawPointer) { }
-
-  init( _builtinConstUTF16StringLiteral start: Builtin.RawPointer) { }
-
   init(stringLiteral value: SillyUTF16String) { }
 }
 
@@ -84,22 +80,12 @@ func literals() {
   var b = 1.25
   var d = "foö"
   var e:SillyString = "foo"
-
-  var f:SillyConstUTF16String = "foobar"
-  var non_ascii:SillyConstUTF16String = "foobarö"
 }
 // CHECK-LABEL: sil hidden @$S11expressions8literalsyyF
 // CHECK: integer_literal $Builtin.Int2048, 1
 // CHECK: float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF4000000000000|0x3FFFA000000000000000}}
 // CHECK: string_literal utf16 "foö"
 // CHECK: string_literal utf8 "foo"
-// CHECK: [[CONST_STRING_LIT:%.*]] = const_string_literal utf8 "foobar"
-// CHECK: [[METATYPE:%.*]] = metatype $@thin SillyConstUTF16String.Type
-// CHECK: [[FUN:%.*]] = function_ref @$S11expressions21SillyConstUTF16StringV08_builtincE7LiteralACBp_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
-// CHECK: apply [[FUN]]([[CONST_STRING_LIT]], [[METATYPE]]) : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
-// CHECK: [[CONST_UTF16STRING_LIT:%.*]] = const_string_literal utf16 "foobarö"
-// CHECK: [[FUN:%.*]] = function_ref @$S11expressions21SillyConstUTF16StringV08_builtincdE7LiteralACBp_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
-// CHECK: apply [[FUN]]([[CONST_UTF16STRING_LIT]], {{.*}}) : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
 
 func bar(_ x: Int) {}
 func bar(_ x: Int, _ y: Int) {}
@@ -631,7 +617,7 @@ func loadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct) -> NonTrivialStru
 // CHECK-NEXT: // function_ref NonTrivialStruct.x.getter
 // CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$S{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>
 // CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
-// CHECK-NEXT: end_borrow [[BORROW]] from [[READ]]
+// CHECK-NEXT: end_borrow [[BORROW]]
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
@@ -657,7 +643,7 @@ func loadIgnoredLValueThroughForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTri
 // CHECK-NEXT: // function_ref NonTrivialStruct.x.getter
 // CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$S{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>
 // CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
-// CHECK-NEXT: end_borrow [[BORROW]] from [[UNWRAPPED]]
+// CHECK-NEXT: end_borrow [[BORROW]]
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb3
 // CHECK: bb3:

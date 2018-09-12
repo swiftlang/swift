@@ -1613,7 +1613,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   Type allocatorSelfType;
   if (thunk.kind == SILDeclRef::Kind::Allocator) {
     auto *selfDecl = fd->getImplicitSelfDecl();
-    allocatorSelfType = F.mapTypeIntoContext(selfDecl->getInterfaceType());
+    allocatorSelfType = F.mapTypeIntoContext(
+      fd->getDeclContext()->getSelfInterfaceType());
 
     auto selfMetatype =
       CanMetatypeType::get(allocatorSelfType->getCanonicalType());

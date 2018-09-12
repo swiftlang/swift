@@ -1694,6 +1694,7 @@ namespace {
 
 Type TypeResolution::resolveType(TypeRepr *TyR,
                               TypeResolutionOptions options) {
+  FrontendStatsTracer StatsTracer(getASTContext().Stats, "resolve-type", TyR);
   PrettyStackTraceTypeRepr stackTrace(getASTContext(), "resolving", TyR);
 
   TypeResolver typeResolver(*this);
@@ -3170,16 +3171,6 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   }
 
   return resultType;
-}
-
-Type TypeChecker::getSuperClassOf(Type type) {
-  if (auto *parenTy = dyn_cast<ParenType>(type.getPointer())) {
-    auto superclassTy = getSuperClassOf(parenTy->getUnderlyingType());
-    if (!superclassTy)
-      return Type();
-    return ParenType::get(Context, superclassTy);
-  }
-  return type->getSuperclass();
 }
 
 namespace {

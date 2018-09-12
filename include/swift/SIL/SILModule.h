@@ -380,9 +380,6 @@ public:
     return wholeModule;
   }
 
-  /// Returns true if it is the OnoneSupport module.
-  bool isOnoneSupportModule() const;
-
   /// Returns true if it is the optimized OnoneSupport module.
   bool isOptimizedOnoneSupportModule() const;
 

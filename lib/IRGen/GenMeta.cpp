@@ -1211,33 +1211,41 @@ namespace {
 
     Optional<TypeEntityReference> SuperClassRef;
 
-    SILVTable *VTable = nullptr;
-    unsigned VTableSize = 0;
+    SILVTable *VTable;
     bool Resilient;
+
+    SmallVector<SILDeclRef, 8> VTableEntries;
+    SmallVector<std::pair<SILDeclRef, SILDeclRef>, 8> OverrideTableEntries;
 
   public:
     ClassContextDescriptorBuilder(IRGenModule &IGM, ClassDecl *Type,
                                   RequireMetadata_t requireMetadata)
       : super(IGM, Type, requireMetadata),
+        VTable(IGM.getSILModule().lookUpVTable(getType())),
         Resilient(IGM.isResilient(Type, ResilienceExpansion::Minimal)) {
 
       if (getType()->isForeign()) return;
 
       MetadataLayout = &IGM.getClassMetadataLayout(Type);
 
-      if (auto superclassDecl = getType()->getSuperclassDecl()) {
+      if (auto superclassDecl = getType()->getSuperclassDecl())
         SuperClassRef = IGM.getTypeEntityReference(superclassDecl);
-      }
 
-      VTableSize = MetadataLayout->getVTableSize();
-      if (VTableSize) {
-        VTable = IGM.getSILModule().lookUpVTable(getType());
-      }
+      addVTableEntries(getType());
     }
-    
+
+    void addMethod(SILDeclRef fn) {
+      VTableEntries.push_back(fn);
+    }
+
+    void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {
+      OverrideTableEntries.emplace_back(baseRef, declRef);
+    }
+
     void layout() {
       super::layout();
       addVTable();
+      addOverrideTable();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -1264,8 +1272,11 @@ namespace {
         if (MetadataLayout->areImmediateMembersNegative())
           flags.class_setAreImmediateMembersNegative(true);
 
-        if (VTableSize != 0)
+        if (!VTableEntries.empty())
           flags.class_setHasVTable(true);
+
+        if (!OverrideTableEntries.empty())
+          flags.class_setHasOverrideTable(true);
 
         if (MetadataLayout->hasResilientSuperclass())
           flags.class_setHasResilientSuperclass(true);
@@ -1300,21 +1311,25 @@ namespace {
     }
     
     void addVTable() {
-      if (VTableSize == 0)
+      if (VTableEntries.empty())
         return;
+
+      // Only emit a method lookup function if the class is resilient
+      // and has a non-empty vtable.
+      if (IGM.isResilient(getType(), ResilienceExpansion::Minimal))
+        IGM.emitMethodLookupFunction(getType());
 
       auto offset = MetadataLayout->hasResilientSuperclass()
                       ? MetadataLayout->getRelativeVTableOffset()
                       : MetadataLayout->getStaticVTableOffset();
       B.addInt32(offset / IGM.getPointerSize());
-      B.addInt32(VTableSize);
+      B.addInt32(VTableEntries.size());
       
-      addVTableEntries(getType());
+      for (auto fn : VTableEntries)
+        emitMethodDescriptor(fn);
     }
 
-    void addMethod(SILDeclRef fn) {
-      assert(VTable && "no vtable?!");
-
+    void emitMethodDescriptor(SILDeclRef fn) {
       // Define the method descriptor to point to the current position in the
       // nominal type descriptor.
       IGM.defineMethodDescriptor(fn, Type,
@@ -1333,24 +1348,18 @@ namespace {
         flags = flags.withIsDynamic(true);
 
       // TODO: final? open?
-
-      auto *dc = func->getDeclContext();
-      assert(!isa<ExtensionDecl>(dc));
-
-      if (dc == getType()) {
-        if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
-          assert(entry->TheKind == SILVTable::Entry::Kind::Normal);
-          auto *implFn = IGM.getAddrOfSILFunction(entry->Implementation,
-                                                  NotForDefinition);
-          descriptor.addRelativeAddress(implFn);
-        } else {
-          // The method is removed by dead method elimination.
-          // It should be never called. We add a pointer to an error function.
-          descriptor.addRelativeAddressOrNull(nullptr);
-        }
-      }
-
       descriptor.addInt(IGM.Int32Ty, flags.getIntValue());
+
+      if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
+        assert(entry->TheKind == SILVTable::Entry::Kind::Normal);
+        auto *implFn = IGM.getAddrOfSILFunction(entry->Implementation,
+                                                NotForDefinition);
+        descriptor.addRelativeAddress(implFn);
+      } else {
+        // The method is removed by dead method elimination.
+        // It should be never called. We add a pointer to an error function.
+        descriptor.addRelativeAddressOrNull(nullptr);
+      }
 
       descriptor.finishAndAddTo(B);
 
@@ -1361,7 +1370,50 @@ namespace {
       }
     }
 
-    void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
+    void addOverrideTable() {
+      if (OverrideTableEntries.empty())
+        return;
+
+      B.addInt32(OverrideTableEntries.size());
+
+      for (auto pair : OverrideTableEntries)
+        emitMethodOverrideDescriptor(pair.first, pair.second);
+    }
+
+    void emitMethodOverrideDescriptor(SILDeclRef baseRef, SILDeclRef declRef) {
+      auto descriptor = B.beginStruct(IGM.MethodOverrideDescriptorStructTy);
+
+      // The class containing the base method.
+      auto *baseClass = cast<ClassDecl>(baseRef.getDecl()->getDeclContext());
+      auto baseClassEntity = LinkEntity::forNominalTypeDescriptor(baseClass);
+      auto baseClassDescriptor =
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+          baseClassEntity, IGM.getPointerAlignment(),
+          IGM.Int8Ty);
+      descriptor.addRelativeAddress(baseClassDescriptor);
+
+      // The base method.
+      auto baseMethodEntity = LinkEntity::forMethodDescriptor(baseRef);
+      auto baseMethodDescriptor =
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+          baseMethodEntity, Alignment(4),
+          IGM.MethodDescriptorStructTy);
+      descriptor.addRelativeAddress(baseMethodDescriptor);
+
+      // The implementation of the override.
+      if (auto entry = VTable->getEntry(IGM.getSILModule(), baseRef)) {
+        assert(entry->TheKind == SILVTable::Entry::Kind::Override);
+        auto *implFn = IGM.getAddrOfSILFunction(entry->Implementation,
+                                                NotForDefinition);
+        descriptor.addRelativeAddress(implFn);
+      } else {
+        // The method is removed by dead method elimination.
+        // It should be never called. We add a pointer to an error function.
+        descriptor.addRelativeAddressOrNull(nullptr);
+      }
+
+      descriptor.finishAndAddTo(B);
+    }
 
     void addPlaceholder(MissingMemberDecl *MMD) {
       llvm_unreachable("cannot generate metadata with placeholders in it");
@@ -1689,34 +1741,6 @@ static void emitInitializeClassMetadata(IRGenFunction &IGF,
         IGF.Builder.CreateStore(offsetVal, offsetA);
       }
     }
-  }
-
-  if (!doesClassMetadataRequireRelocation(IGM, classDecl))
-    return;
-
-  // Update vtable entries for method overrides. The runtime copies in
-  // the vtable from the superclass for us; we have to install method
-  // overrides ourselves.
-  auto *vtable = IGM.getSILModule().lookUpVTable(classDecl);
-  for (auto &entry : vtable->getEntries()) {
-    if (entry.TheKind != SILVTable::Entry::Kind::Override)
-      continue;
-
-    auto fn = entry.Method;
-
-    auto *classDecl = cast<ClassDecl>(fn.getDecl()->getDeclContext());
-    auto &layout = IGM.getClassMetadataLayout(classDecl);
-
-    auto offset = layout.getMethodInfo(IGF, fn).getOffset();
-
-    auto slot = IGF.emitAddressAtOffset(metadata, offset,
-                                        IGM.Int8PtrTy,
-                                        IGM.getPointerAlignment());
-
-    auto *implFn = IGM.getAddrOfSILFunction(entry.Implementation,
-                                            NotForDefinition);
-    auto *value = IGF.Builder.CreateBitCast(implFn, IGM.Int8PtrTy);
-    IGF.Builder.CreateStore(value, slot);
   }
 }
 
@@ -3851,8 +3875,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::BridgedStoredNSError:
   case KnownProtocolKind::CFObject:
   case KnownProtocolKind::ErrorCodeProtocol:
-  case KnownProtocolKind::ExpressibleByBuiltinConstStringLiteral:
-  case KnownProtocolKind::ExpressibleByBuiltinConstUTF16StringLiteral:
   case KnownProtocolKind::CodingKey:
   case KnownProtocolKind::Encodable:
   case KnownProtocolKind::Decodable:

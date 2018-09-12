@@ -46,7 +46,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T1:%.*]] = function_ref @$S9accessors11OrdinarySubVyS2icig
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[T0]])
-// CHECK-NEXT: end_borrow [[T0]] from [[TEMP]]
+// CHECK-NEXT: end_borrow [[T0]]
 // CHECK-NEXT: destroy_addr [[TEMP]]
 //   Formal access to LHS.
 // CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $A, #A.array!modify.1

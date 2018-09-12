@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -594,4 +595,32 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
                                const PrintOptions &Opts) const {
   // TODO
   Printer.printKeyword("sil_box");
+}
+
+// See swift/Basic/Statistic.h for declaration: this enables tracing
+// TypeReprs, is defined here to avoid too much layering violation / circular
+// linkage dependency.
+
+struct TypeReprTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const TypeRepr *TR = static_cast<const TypeRepr *>(Entity);
+    TR->print(OS);
+  }
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const TypeRepr *TR = static_cast<const TypeRepr *>(Entity);
+    TR->getSourceRange().print(OS, *SM, false);
+  }
+};
+
+static TypeReprTraceFormatter TF;
+
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const TypeRepr *>() {
+  return &TF;
 }

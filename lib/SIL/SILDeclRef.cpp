@@ -451,6 +451,14 @@ IsSerialized_t SILDeclRef::isSerialized() const {
       }
     }
 
+    // 'read' and 'modify' accessors synthesized on-demand are serialized if
+    // visible outside the module.
+    if (auto fn = dyn_cast<FuncDecl>(d))
+      if (!isClangImported() &&
+          fn->hasForcedStaticDispatch() &&
+          fn->getEffectiveAccess() >= AccessLevel::Public)
+        return IsSerialized;
+
     dc = getDecl()->getInnermostDeclContext();
 
     // Enum element constructors are serialized if the enum is
@@ -720,6 +728,14 @@ bool SILDeclRef::requiresNewVTableEntry() const {
   return false;
 }
 
+bool SILDeclRef::requiresNewWitnessTableEntry() const {
+  return requiresNewWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
+}
+
+bool SILDeclRef::requiresNewWitnessTableEntry(AbstractFunctionDecl *func) {
+  return func->getOverriddenDecls().empty();
+}
+
 SILDeclRef SILDeclRef::getOverridden() const {
   if (!hasDecl())
     return SILDeclRef();
@@ -763,6 +779,54 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     return overridden;
   }
   return SILDeclRef();
+}
+
+SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
+  auto bestOverridden =
+    getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
+  return SILDeclRef(bestOverridden, kind, isCurried);
+}
+
+AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(
+                                                 AbstractFunctionDecl *func) {
+  if (!isa<ProtocolDecl>(func->getDeclContext()))
+    return func;
+
+  AbstractFunctionDecl *bestOverridden = nullptr;
+
+  SmallVector<AbstractFunctionDecl *, 4> stack;
+  SmallPtrSet<AbstractFunctionDecl *, 4> visited;
+  stack.push_back(func);
+  visited.insert(func);
+
+  while (!stack.empty()) {
+    auto current = stack.back();
+    stack.pop_back();
+
+    auto overriddenDecls = current->getOverriddenDecls();
+    if (overriddenDecls.empty()) {
+      // This entry introduced a witness table entry. Determine whether it is
+      // better than the best entry we've seen thus far.
+      if (!bestOverridden ||
+          ProtocolDecl::compare(
+                        cast<ProtocolDecl>(current->getDeclContext()),
+                        cast<ProtocolDecl>(bestOverridden->getDeclContext()))
+            < 0) {
+        bestOverridden = cast<AbstractFunctionDecl>(current);
+      }
+
+      continue;
+    }
+
+    // Add overridden declarations to the stack.
+    for (auto overridden : overriddenDecls) {
+      auto overriddenFunc = cast<AbstractFunctionDecl>(overridden);
+      if (visited.insert(overriddenFunc).second)
+        stack.push_back(overriddenFunc);
+    }
+  }
+
+  return bestOverridden;
 }
 
 SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {

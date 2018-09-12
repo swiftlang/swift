@@ -25,8 +25,8 @@ func owned_arguments(trivial : Int, value : ValueAggregate, ref : RefAggregate) 
   // CHECK: [[BORROW_REF_VAL:%[0-9]+]] = begin_borrow [[REF_VAL]] : $RefAggregate
   // CHECK: [[SHARED_FUNC:%[0-9]+]] = function_ref @$S6shared0A10_arguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefG0ChtF
   // CHECK: {{%.*}} = apply [[SHARED_FUNC]]([[TRIVIAL_VAL]], [[BORROW_VALUE_VAL]], [[BORROW_REF_VAL]])
-  // CHECK: end_borrow [[BORROW_REF_VAL]] from [[REF_VAL]] : $RefAggregate, $RefAggregate
-  // CHECK: end_borrow [[BORROW_VALUE_VAL]] from [[VALUE_VAL]] : $ValueAggregate, $ValueAggregate
+  // CHECK: end_borrow [[BORROW_REF_VAL]] : $RefAggregate
+  // CHECK: end_borrow [[BORROW_VALUE_VAL]] : $ValueAggregate
   // CHECK: destroy_value [[REF_VAL]] : $RefAggregate
   // CHECK: destroy_value [[VALUE_VAL]] : $ValueAggregate
   // CHECK: } // end sil function '$S6shared15owned_arguments7trivial5value3refySi_AA14ValueAggregateVAA03RefH0CtF'
@@ -116,8 +116,8 @@ func owned_to_shared_conversion(_ f : (Int, ValueAggregate, RefAggregate) -> Voi
   // CHECK: [[BORROW_VALUE_VAL:%[0-9]+]] = begin_borrow [[VALUE_VAL]] : $ValueAggregate
   // CHECK: [[BORROW_REF_VAL:%[0-9]+]] = begin_borrow [[REF_VAL]] : $RefAggregate
   // CHECK: {{%.*}} = apply [[FUNC]]([[TRIVIAL_VAL]], [[BORROW_VALUE_VAL]], [[BORROW_REF_VAL]]) : $@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
-  // CHECK: end_borrow [[BORROW_REF_VAL]] from [[REF_VAL]] : $RefAggregate, $RefAggregate
-  // CHECK: end_borrow [[BORROW_VALUE_VAL]] from [[VALUE_VAL]] : $ValueAggregate, $ValueAggregate
+  // CHECK: end_borrow [[BORROW_REF_VAL]] : $RefAggregate
+  // CHECK: end_borrow [[BORROW_VALUE_VAL]] : $ValueAggregate
   // CHECK: destroy_value [[REF_VAL]] : $RefAggregate
   // CHECK: destroy_value [[VALUE_VAL]] : $ValueAggregate
   // CHECK: } // end sil function '$SSi6shared14ValueAggregateVAA03RefC0CIgygg_SiAcEIegyxx_TR'
@@ -149,8 +149,8 @@ struct Foo {
         // CHECK: [[BORROW_REF_VAL:%[0-9]+]] = begin_borrow [[REF_VAL]] : $RefAggregate
         // CHECK: [[SHARED_FUNC:%[0-9]+]] = function_ref @$S6shared3FooV21methodSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtF
         // CHECK: {{%.*}} = apply [[SHARED_FUNC]]([[TRIVIAL_VAL]], [[BORROW_VALUE_VAL]], [[BORROW_REF_VAL]], [[SELF]])
-        // CHECK: end_borrow [[BORROW_REF_VAL]] from [[REF_VAL]] : $RefAggregate, $RefAggregate
-        // CHECK: end_borrow [[BORROW_VALUE_VAL]] from [[VALUE_VAL]] : $ValueAggregate, $ValueAggregate
+        // CHECK: end_borrow [[BORROW_REF_VAL]] : $RefAggregate
+        // CHECK: end_borrow [[BORROW_VALUE_VAL]] : $ValueAggregate
         // CHECK: destroy_value [[REF_VAL]] : $RefAggregate
         // CHECK: destroy_value [[VALUE_VAL]] : $ValueAggregate
         // CHECK: } // end sil function '$S6shared3FooV20methodOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtF'
@@ -174,8 +174,8 @@ struct Foo {
         // CHECK: [[BORROW_REF_VAL:%[0-9]+]] = begin_borrow [[REF_VAL]] : $RefAggregate
         // CHECK: [[SHARED_FUNC:%[0-9]+]] = function_ref @$S6shared3FooV21staticSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtFZ
         // CHECK: {{%.*}} = apply [[SHARED_FUNC]]([[TRIVIAL_VAL]], [[BORROW_VALUE_VAL]], [[BORROW_REF_VAL]], [[SELF_METATYPE]])
-        // CHECK: end_borrow [[BORROW_REF_VAL]] from [[REF_VAL]] : $RefAggregate, $RefAggregate
-        // CHECK: end_borrow [[BORROW_VALUE_VAL]] from [[VALUE_VAL]] : $ValueAggregate, $ValueAggregate
+        // CHECK: end_borrow [[BORROW_REF_VAL]] : $RefAggregate
+        // CHECK: end_borrow [[BORROW_VALUE_VAL]] : $ValueAggregate
         // CHECK: destroy_value [[REF_VAL]] : $RefAggregate
         // CHECK: destroy_value [[VALUE_VAL]] : $ValueAggregate
         // CHECK: } // end sil function '$S6shared3FooV20staticOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtFZ'

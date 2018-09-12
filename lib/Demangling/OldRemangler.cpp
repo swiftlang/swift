@@ -1899,6 +1899,12 @@ void Remangler::mangleBoundGenericTypeAlias(Node *node) {
   mangleAnyNominalType(node, ctx);
 }
 
+void Remangler::mangleBoundGenericFunction(Node *node) {
+  EntityContext ctx;
+  // Not really a nominal type, but it works for functions, too.
+  mangleAnyNominalType(node, ctx);
+}
+
 void Remangler::mangleTypeList(Node *node) {
   mangleChildNodes(node); // all types
   Out << '_';
@@ -1941,6 +1947,10 @@ void Remangler::mangleDispatchThunk(Node *node) {
 
 void Remangler::mangleMethodDescriptor(Node *node) {
   Out << "<method-descriptor>";
+}
+
+void Remangler::mangleMethodLookupFunction(Node *node) {
+  Out << "<method-lookup-function>";
 }
 
 void Remangler::mangleEmptyList(Node *node) {

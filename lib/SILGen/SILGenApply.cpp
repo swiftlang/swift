@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -43,6 +43,21 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
+
+SubstitutionMap SILGenModule::mapSubstitutionsForWitnessOverride(
+                                              AbstractFunctionDecl *original,
+                                              AbstractFunctionDecl *overridden,
+                                              SubstitutionMap subs) {
+  // Substitute the 'Self' type of the base protocol.
+  auto origProto = cast<ProtocolDecl>(original->getDeclContext());
+  Type origProtoSelfType = origProto->getProtocolSelfType();
+  auto baseProto = cast<ProtocolDecl>(overridden->getDeclContext());
+  return SubstitutionMap::getProtocolSubstitutions(
+           baseProto,
+           origProtoSelfType.subst(subs),
+           *subs.lookupConformance(origProtoSelfType->getCanonicalType(),
+                                   baseProto));
+}
 
 /// Return the abstraction pattern to use when calling a function value.
 static AbstractionPattern
@@ -388,6 +403,20 @@ public:
                                  SILDeclRef c,
                                  SubstitutionMap subs,
                                  SILLocation l) {
+    // Find a witness that has an entry in the witness table.
+    if (!c.requiresNewWitnessTableEntry()) {
+      // Retrieve the constant that has an entry in the witness table.
+      auto original = cast<AbstractFunctionDecl>(c.getDecl());
+      c = c.getOverriddenWitnessTableEntry();
+      c = c.asForeign(c.getDecl()->isObjC());
+      auto overridden = cast<AbstractFunctionDecl>(c.getDecl());
+
+      // Substitute the 'Self' type of the base protocol.
+      subs = SILGenModule::mapSubstitutionsForWitnessOverride(original,
+                                                              overridden,
+                                                              subs);
+    }
+
     auto &ci = SGF.getConstantInfo(c);
     return Callee(Kind::WitnessMethod, SGF, c, ci.FormalPattern,
                   ci.FormalType, subs, l);
@@ -1442,9 +1471,7 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
       break;
     }
   }
-  bool useConstantStringBuiltin = false;
   StringLiteralInst::Encoding instEncoding;
-  ConstStringLiteralInst::Encoding constInstEncoding;
   switch (encoding) {
   case StringLiteralExpr::UTF8:
     instEncoding = StringLiteralInst::Encoding::UTF8;
@@ -1456,16 +1483,6 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
     Length = unicode::getUTF16Length(Str);
     break;
   }
-  case StringLiteralExpr::UTF8ConstString:
-    constInstEncoding = ConstStringLiteralInst::Encoding::UTF8;
-    useConstantStringBuiltin = true;
-    break;
-
-  case StringLiteralExpr::UTF16ConstString: {
-    constInstEncoding = ConstStringLiteralInst::Encoding::UTF16;
-    useConstantStringBuiltin = true;
-    break;
-  }
   case StringLiteralExpr::OneUnicodeScalar: {
     SILType Int32Ty = SILType::getBuiltinIntegerType(32, SGF.getASTContext());
     SILValue UnicodeScalarValue =
@@ -1474,16 +1491,6 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
     return RValue(SGF, E, Int32Ty.getASTType(),
                   ManagedValue::forUnmanaged(UnicodeScalarValue));
   }
-  }
-
-  // Should we build a constant string literal?
-  if (useConstantStringBuiltin) {
-    auto *string = SGF.B.createConstStringLiteral(E, Str, constInstEncoding);
-    ManagedValue Elts[] = {ManagedValue::forUnmanaged(string)};
-    TupleTypeElt TypeElts[] = {Elts[0].getType().getASTType()};
-    CanType ty =
-        TupleType::get(TypeElts, SGF.getASTContext())->getCanonicalType();
-    return RValue(SGF, Elts, ty);
   }
 
   // The string literal provides the data.
@@ -4904,7 +4911,7 @@ getMagicFunctionString(SILGenFunction &SGF) {
          && "asking for #function but we don't have a function name?!");
   if (SGF.MagicFunctionString.empty()) {
     llvm::raw_string_ostream os(SGF.MagicFunctionString);
-    SGF.MagicFunctionName.printPretty(os);
+    SGF.MagicFunctionName.print(os);
   }
   return SGF.MagicFunctionString;
 }

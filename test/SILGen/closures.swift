@@ -384,7 +384,7 @@ func closeOverLetLValue() {
 // CHECK:   [[INT_IN_CLASS_ADDR:%.*]] = ref_element_addr [[BORROWED_LOADED_CLASS]] : $ClassWithIntProperty, #ClassWithIntProperty.x
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[INT_IN_CLASS_ADDR]] : $*Int
 // CHECK:   [[INT_IN_CLASS:%.*]] = load [trivial] [[ACCESS]] : $*Int
-// CHECK:   end_borrow [[BORROWED_LOADED_CLASS]] from [[TMP_CLASS_ADDR]]
+// CHECK:   end_borrow [[BORROWED_LOADED_CLASS]]
 // CHECK:   destroy_addr [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   dealloc_stack %1 : $*ClassWithIntProperty
 // CHECK:   return [[INT_IN_CLASS]]
@@ -396,7 +396,7 @@ func closeOverLetLValue() {
 // GUARANTEED:   [[COPY:%.*]] = copy_value %0 : $ClassWithIntProperty
 // GUARANTEED:   store [[COPY]] to [init] [[TMP]] : $*ClassWithIntProperty
 // GUARANTEED:   [[BORROWED:%.*]] = load_borrow [[TMP]]
-// GUARANTEED:   end_borrow [[BORROWED]] from [[TMP]]
+// GUARANTEED:   end_borrow [[BORROWED]]
 // GUARANTEED:   destroy_addr [[TMP]]
 // GUARANTEED: } // end sil function '$S8closures18closeOverLetLValueyyFSiyXEfU_'
 
@@ -498,7 +498,7 @@ class SuperSub : SuperBase {
   // CHECK:   apply [[B]]()
 	// CHECK:   end_borrow [[B]]
   // CHECK:   destroy_value [[PA_COPY]]
-  // CHECK:   end_borrow [[BORROWED_PA]] from [[PA]]
+  // CHECK:   end_borrow [[BORROWED_PA]]
   // CHECK:   destroy_value [[PA]]
   // CHECK: } // end sil function '$S8closures8SuperSubC1cyyF'
   func c() {
@@ -531,7 +531,7 @@ class SuperSub : SuperBase {
   // CHECK:   apply [[B]]()
   // CHECK:   end_borrow [[B]]
   // CHECK:   destroy_value [[PA_COPY]]
-  // CHECK:   end_borrow [[BORROWED_PA]] from [[PA]]
+  // CHECK:   end_borrow [[BORROWED_PA]]
   // CHECK:   destroy_value [[PA]]
   // CHECK: } // end sil function '$S8closures8SuperSubC1dyyF'
   func d() {
@@ -575,7 +575,7 @@ class SuperSub : SuperBase {
     // CHECK:   apply [[B]]() : $@callee_guaranteed () -> ()
     // CHECK:   end_borrow [[B]]
     // CHECK:   destroy_value [[PA_COPY]]
-    // CHECK:   end_borrow [[BORROWED_PA]] from [[PA]]
+    // CHECK:   end_borrow [[BORROWED_PA]]
     // CHECK:   destroy_value [[PA]]
     // CHECK: } // end sil function '[[INNER_FUNC_NAME1]]'
     func e1() {
@@ -682,7 +682,7 @@ class SuperSub : SuperBase {
 // CHECK:         [[UNOWNED_SELF:%.*]] = load_borrow [[PB]]
 // -- strong +2, unowned +1
 // CHECK:         [[SELF:%.*]] = copy_unowned_value [[UNOWNED_SELF]]
-// CHECK:         end_borrow [[UNOWNED_SELF]] from [[PB]]
+// CHECK:         end_borrow [[UNOWNED_SELF]]
 // CHECK:         [[UNOWNED_SELF2:%.*]] = ref_to_unowned [[SELF]]
 // -- strong +2, unowned +2
 // CHECK:         [[UNOWNED_SELF2_COPY:%.*]] = copy_value [[UNOWNED_SELF2]]

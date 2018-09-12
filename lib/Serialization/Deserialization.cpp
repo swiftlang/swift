@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -381,9 +381,11 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       return subPattern;
     }
 
-    auto result = new (getContext()) TypedPattern(subPattern.get(), TypeLoc(),
+    auto type = getType(typeID);
+    auto result = new (getContext()) TypedPattern(subPattern.get(),
+                                                  /*typeRepr*/nullptr,
                                                   isImplicit);
-    recordPatternType(result, getType(typeID));
+    recordPatternType(result, type);
     restoreOffset.reset();
     return result;
   }
@@ -1589,6 +1591,7 @@ giveUpFastPath:
             return nullptr;
           }
           values.front() = storage->getAccessor(*actualKind);
+          assert(values.front() && "missing accessor");
         }
         break;
       }
@@ -1706,6 +1709,7 @@ giveUpFastPath:
                                        getXRefDeclNameForError());
   }
 
+  assert(values.front() != nullptr);
   return values.front();
 }
 
@@ -2840,8 +2844,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       ctor->setStubImplementation(true);
     if (initKind.hasValue())
       ctor->setInitKind(initKind.getValue());
-    if (auto overriddenCtor = cast_or_null<ConstructorDecl>(overridden.get()))
-      ctor->setOverriddenDecl(overriddenCtor);
+    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
     ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
 
     if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
@@ -2965,10 +2968,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       var->setImplicit();
     var->setIsObjC(isObjC);
 
-    if (auto overriddenVar = cast_or_null<VarDecl>(overridden.get())) {
-      var->setOverriddenDecl(overriddenVar);
+    var->setOverriddenDecl(cast_or_null<VarDecl>(overridden.get()));
+    if (var->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
-    }
 
     break;
   }
@@ -3227,10 +3229,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (auto errorConvention = maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
 
-    if (auto overriddenFunc = cast_or_null<FuncDecl>(overridden.get())) {
-      fn->setOverriddenDecl(overriddenFunc);
+    fn->setOverriddenDecl(cast_or_null<FuncDecl>(overridden.get()));
+    if (fn->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
-    }
 
     if (isImplicit)
       fn->setImplicit();
@@ -3377,27 +3378,43 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
   case decls_block::PREFIX_OPERATOR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
+    DeclID protoID;
 
-    decls_block::PrefixOperatorLayout::readRecord(scratch, nameID,
-                                                  contextID);
+    decls_block::PrefixOperatorLayout::readRecord(scratch, nameID, contextID,
+                                                  protoID);
     auto DC = getDeclContext(contextID);
-    declOrOffset = createDecl<PrefixOperatorDecl>(DC, SourceLoc(),
-                                                  getIdentifier(nameID),
-                                                  SourceLoc());
+
+    Expected<Decl *> protocol = getDeclChecked(protoID);
+    if (!protocol)
+      return protocol.takeError();
+
+    auto result = createDecl<PrefixOperatorDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(),
+        cast_or_null<ProtocolDecl>(protocol.get()));
+
+    declOrOffset = result;
     break;
   }
 
   case decls_block::POSTFIX_OPERATOR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
+    DeclID protoID;
 
-    decls_block::PostfixOperatorLayout::readRecord(scratch, nameID,
-                                                   contextID);
+    decls_block::PostfixOperatorLayout::readRecord(scratch, nameID, contextID,
+                                                   protoID);
 
     auto DC = getDeclContext(contextID);
-    declOrOffset = createDecl<PostfixOperatorDecl>(DC, SourceLoc(),
-                                                   getIdentifier(nameID),
-                                                   SourceLoc());
+
+    Expected<Decl *> protocol = getDeclChecked(protoID);
+    if (!protocol)
+      return protocol.takeError();
+
+    auto result = createDecl<PostfixOperatorDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(),
+        cast_or_null<ProtocolDecl>(protocol.get()));
+
+    declOrOffset = result;
     break;
   }
 
@@ -3405,9 +3422,10 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     IdentifierID nameID;
     DeclContextID contextID;
     DeclID precedenceGroupID;
+    DeclID protoID;
 
     decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                 precedenceGroupID);
+                                                 precedenceGroupID, protoID);
 
     PrecedenceGroupDecl *precedenceGroup = nullptr;
     Identifier precedenceGroupName;
@@ -3421,11 +3439,14 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     auto DC = getDeclContext(contextID);
 
-    auto result = createDecl<InfixOperatorDecl>(DC, SourceLoc(),
-                                                 getIdentifier(nameID),
-                                                 SourceLoc(), SourceLoc(),
-                                                 precedenceGroupName,
-                                                 SourceLoc());
+    Expected<Decl *> protocol = getDeclChecked(protoID);
+    if (!protocol)
+      return protocol.takeError();
+
+    auto result = createDecl<InfixOperatorDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(), SourceLoc(),
+        precedenceGroupName, SourceLoc(),
+        cast_or_null<ProtocolDecl>(protocol.get()));
     result->setPrecedenceGroup(precedenceGroup);
 
     declOrOffset = result;
@@ -3810,10 +3831,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (isImplicit)
       subscript->setImplicit();
     subscript->setIsObjC(isObjC);
-    if (auto overriddenSub = cast_or_null<SubscriptDecl>(overridden.get())) {
-      subscript->setOverriddenDecl(overriddenSub);
+    subscript->setOverriddenDecl(cast_or_null<SubscriptDecl>(overridden.get()));
+    if (subscript->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
-    }
     break;
   }
 
@@ -4175,37 +4195,53 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return aliasOrError.takeError();
     auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
 
+    bool formSugaredType = true;
+
     Type underlyingType;
     if (ctx.LangOpts.EnableDeserializationRecovery) {
-      Expected<Type> expectedType = getTypeChecked(underlyingTypeID);
-      if (!expectedType)
-        return expectedType.takeError();
-      if (expectedType.get()) {
-        if (!alias ||
-            !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
-          // Fall back to the canonical type.
-          typeOrOffset = expectedType.get()->getCanonicalType();
-          break;
-        }
+      auto underlyingTypeOrError = getTypeChecked(underlyingTypeID);
+      if (!underlyingTypeOrError)
+        return underlyingTypeOrError.takeError();
+
+      underlyingType = underlyingTypeOrError.get();
+
+      if (!alias ||
+          !alias->getDeclaredInterfaceType()->isEqual(underlyingType)) {
+        // Fall back to the canonical type.
+        formSugaredType = false;
       }
 
-      underlyingType = expectedType.get();
     } else {
       underlyingType = getType(underlyingTypeID);
     }
 
-    Type parentType = getType(parentTypeID);
-
     // Read the substitutions.
-    SubstitutionMap subMap = getSubstitutionMap(substitutionsID);
+    auto subMap = getSubstitutionMap(substitutionsID);
+    underlyingType = underlyingType.subst(subMap);
+    assert(underlyingType);
 
-    // Look through compatibility aliases that are now unavailable.
-    if (alias->getAttrs().isUnavailable(ctx) &&
-        alias->isCompatibilityAlias()) {
-      typeOrOffset = alias->getUnderlyingTypeLoc().getType();
+    auto parentTypeOrError = getTypeChecked(parentTypeID);
+    if (!parentTypeOrError) {
+      typeOrOffset = underlyingType;
       break;
     }
 
+    // Look through compatibility aliases that are now unavailable.
+    if (alias &&
+        alias->getAttrs().isUnavailable(ctx) &&
+        alias->isCompatibilityAlias()) {
+      underlyingType = alias->getUnderlyingTypeLoc().getType().subst(subMap);
+      assert(underlyingType);
+      typeOrOffset = underlyingType;
+      break;
+    }
+
+    if (!formSugaredType) {
+      typeOrOffset = underlyingType;
+      break;
+    }
+
+    auto parentType = parentTypeOrError.get();
     typeOrOffset = NameAliasType::get(alias, parentType, subMap,
                                       underlyingType);
     break;

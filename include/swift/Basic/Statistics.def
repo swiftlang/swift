@@ -147,6 +147,9 @@ FRONTEND_STATISTIC(AST, NumUsedConformances)
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 
+/// Number of full braced decl list parsed.
+FRONTEND_STATISTIC(Parse, NumIterableDeclContextParsed)
+
 /// Number of conformances that were deserialized by this frontend job.
 FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 

@@ -117,10 +117,7 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
   Pattern *P = new (Ctx) NamedPattern(decl);
   P->setType(ty);
   P->setImplicit();
-  P = new (Ctx) TypedPattern(P, TypeLoc::withoutLoc(ty));
-  P->setType(ty);
-  P->setImplicit();
-  return P;
+  return TypedPattern::createImplicit(Ctx, P, ty);
 }
 
 /// Create a var member for this struct, along with its pattern binding, and add
@@ -3758,7 +3755,8 @@ namespace {
       if (auto contextTy = decl->getDeclContext()->getDeclaredInterfaceType()) {
         if (auto classDecl = contextTy->getClassOrBoundGenericClass()) {
           if (auto method = dyn_cast<AbstractFunctionDecl>(decl)) {
-            classDecl->recordObjCMethod(method);
+            if (name)
+              classDecl->recordObjCMethod(method, *name);
           }
         }
       }

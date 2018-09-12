@@ -270,6 +270,7 @@ private:
     case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericTypeAlias:
+    case Node::Kind::BoundGenericFunction:
     case Node::Kind::BuiltinTypeName:
     case Node::Kind::Class:
     case Node::Kind::DependentGenericType:
@@ -382,6 +383,7 @@ private:
     case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
     case Node::Kind::MethodDescriptor:
+    case Node::Kind::MethodLookupFunction:
     case Node::Kind::ModifyAccessor:
     case Node::Kind::NativeOwningAddressor:
     case Node::Kind::NativeOwningMutableAddressor:
@@ -748,6 +750,16 @@ private:
                           TypePrinting TypePr, bool hasName,
                           StringRef ExtraName = "", int ExtraIndex = -1,
                           StringRef OverwriteName = "");
+
+  /// Print the type of an entity.
+  ///
+  /// \param Entity The entity.
+  /// \param type The type of the entity.
+  /// \param genericFunctionTypeList If not null, the generic argument types
+  ///           which is printed in the generic signature.
+  void printEntityType(NodePointer Entity, NodePointer type,
+                       NodePointer genericFunctionTypeList);
+
 };
 } // end anonymous namespace
 
@@ -912,6 +924,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "method descriptor for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::MethodLookupFunction:
+    Printer << "method lookup function for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::OutlinedBridgedMethod:
     Printer << "outlined bridged method (" << Node->getText() << ") of ";
     return nullptr;
@@ -989,6 +1005,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return printEntity(Node, asPrefixContext, TypePrinting::WithColon,
                        /*hasName*/true);
   case Node::Kind::Function:
+  case Node::Kind::BoundGenericFunction:
     return printEntity(Node, asPrefixContext, TypePrinting::FunctionStyle,
                        /*hasName*/true);
   case Node::Kind::Subscript:
@@ -1821,6 +1838,13 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       for (unsigned index = 0; index < count; ++index) {
         if (index != 0)
           Printer << ", ";
+        // Limit the number of printed generic parameters. In practice this
+        // it will never be exceeded. The limit is only imporant for malformed
+        // symbols where count can be really huge.
+        if (index >= 128) {
+          Printer << "...";
+          break;
+        }
         // FIXME: Depth won't match when a generic signature applies to a
         // method in generic type context.
         Printer << archetypeName(index, depth);
@@ -2040,6 +2064,13 @@ NodePointer NodePrinter::
 printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
             bool hasName, StringRef ExtraName, int ExtraIndex,
             StringRef OverwriteName) {
+
+  NodePointer genericFunctionTypeList = nullptr;
+  if (Entity->getKind() == Node::Kind::BoundGenericFunction) {
+    genericFunctionTypeList = Entity->getChild(1);
+    Entity = Entity->getFirstChild();
+  }
+
   // Either we print the context in prefix form "<context>.<name>" or in
   // suffix form "<name> in <context>".
   bool MultiWordName = ExtraName.contains(' ');
@@ -2119,32 +2150,16 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
       }
     }
 
-    auto printEntityType = [&](NodePointer type) {
-      if (auto labelList = getChildIf(Entity, Node::Kind::LabelList)) {
-        if (type->getKind() == Node::Kind::DependentGenericType) {
-          print(type->getChild(0)); // generic signature
-
-          auto dependentType = type->getChild(1);
-          if (needSpaceBeforeType(dependentType))
-            Printer << ' ';
-          type = dependentType->getFirstChild();
-        }
-        printFunctionType(labelList, type);
-      } else {
-        print(type);
-      }
-    };
-
     if (TypePr == TypePrinting::WithColon) {
       if (Options.DisplayEntityTypes) {
         Printer << " : ";
-        printEntityType(type);
+        printEntityType(Entity, type, genericFunctionTypeList);
       }
     } else {
       assert(TypePr == TypePrinting::FunctionStyle);
       if (MultiWordName || needSpaceBeforeType(type))
         Printer << ' ';
-      printEntityType(type);
+      printEntityType(Entity, type, genericFunctionTypeList);
     }
   }
   if (!asPrefixContext && PostfixContext) {
@@ -2160,6 +2175,30 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
   }
   return PostfixContext;
 };
+
+void NodePrinter::printEntityType(NodePointer Entity, NodePointer type,
+                                  NodePointer genericFunctionTypeList) {
+  NodePointer labelList = getChildIf(Entity, Node::Kind::LabelList);
+  if (labelList || genericFunctionTypeList) {
+    if (genericFunctionTypeList) {
+      Printer << "<";
+      printChildren(genericFunctionTypeList, ", ");
+      Printer << ">";
+    }
+    if (type->getKind() == Node::Kind::DependentGenericType) {
+      if (!genericFunctionTypeList)
+        print(type->getChild(0)); // generic signature
+
+      auto dependentType = type->getChild(1);
+      if (needSpaceBeforeType(dependentType))
+        Printer << ' ';
+      type = dependentType->getFirstChild();
+    }
+    printFunctionType(labelList, type);
+  } else {
+    print(type);
+  }
+}
 
 std::string Demangle::nodeToString(NodePointer root,
                                    const DemangleOptions &options) {

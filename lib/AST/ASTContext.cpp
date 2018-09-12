@@ -120,6 +120,10 @@ struct ASTContext::Implementation {
   /// The last resolver.
   LazyResolver *Resolver = nullptr;
 
+  /// The lazy parsers for various input files. We may have separate
+  /// lazy parsers for imported module files and source files.
+  llvm::SmallPtrSet<LazyMemberParser*, 2> lazyParsers;
+
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
 
   /// The declaration of Swift.AssignmentPrecedence.
@@ -561,6 +565,15 @@ void ASTContext::setLazyResolver(LazyResolver *resolver) {
     assert(getImpl().Resolver != nullptr && "no resolver to remove");
     getImpl().Resolver = resolver;
   }
+}
+
+void ASTContext::addLazyParser(LazyMemberParser *lazyParser) {
+  getImpl().lazyParsers.insert(lazyParser);
+}
+
+void ASTContext::removeLazyParser(LazyMemberParser *lazyParser) {
+  auto removed = getImpl().lazyParsers.erase(lazyParser);
+  assert(removed && "Removing an non-existing lazy parser.");
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the
@@ -1889,6 +1902,12 @@ LazyContextData *ASTContext::getOrCreateLazyContextData(
   return contextData;
 }
 
+void ASTContext::parseMembers(IterableDeclContext *IDC) {
+  for (auto *p: getImpl().lazyParsers) {
+    p->parseMembers(IDC);
+  }
+}
+
 LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
                                             const IterableDeclContext *idc,
                                             LazyMemberLoader *lazyLoader) {
@@ -2480,7 +2499,7 @@ void ASTContext::recordObjCMethodConflict(ClassDecl *classDecl,
                                           ObjCSelector selector,
                                           bool isInstance) {
   getImpl().ObjCMethodConflicts.push_back(std::make_tuple(classDecl, selector,
-                                                     isInstance));
+                                                          isInstance));
 }
 
 /// Retrieve the source file for the given Objective-C member conflict.

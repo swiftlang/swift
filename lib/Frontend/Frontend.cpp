@@ -128,6 +128,7 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
 void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
   assert(MainModule && "main module not created yet");
   PrimarySourceFiles.push_back(SF);
+  SF->enableInterfaceHash();
   SF->createReferencedNameTracker();
   if (SF->getBufferID().hasValue())
     recordPrimaryInputBuffer(SF->getBufferID().getValue());
@@ -666,7 +667,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   std::unique_ptr<DelayedParsingCallbacks> SecondaryDelayedCB{
       computeDelayedParsingCallback(false)};
 
-  PersistentParserState PersistentState;
+  PersistentParserState PersistentState(getASTContext());
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
       implicitImports, PersistentState,
@@ -945,7 +946,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
                                   MainBufferID);
   }
 
-  PersistentParserState PersistentState;
+  PersistentParserState PersistentState(getASTContext());
   PersistentState.PerformConditionEvaluation = EvaluateConditionals;
   // Parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {

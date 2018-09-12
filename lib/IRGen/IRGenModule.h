@@ -566,6 +566,7 @@ public:
   llvm::PointerType *TypeContextDescriptorPtrTy;
   llvm::StructType *ClassContextDescriptorTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
+  llvm::StructType *MethodOverrideDescriptorStructTy; /// %swift.method_override_descriptor
   llvm::StructType *TypeMetadataRecordTy;
   llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;
@@ -798,8 +799,6 @@ public:
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
                                         bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
-  llvm::Constant *getAddrOfGlobalConstantString(StringRef utf8);
-  llvm::Constant *getAddrOfGlobalUTF16ConstantString(StringRef utf8);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCSelectorRef(SILDeclRef method);
   llvm::Constant *getAddrOfObjCMethodName(StringRef methodName);
@@ -1143,8 +1142,11 @@ public:
 
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);
-
   void emitDispatchThunk(SILDeclRef declRef);
+
+  llvm::Function *getAddrOfMethodLookupFunction(ClassDecl *classDecl,
+                                                ForDefinition_t forDefinition);
+  void emitMethodLookupFunction(ClassDecl *classDecl);
 
   llvm::GlobalValue *defineAlias(LinkEntity entity,
                                  llvm::Constant *definition);
@@ -1152,7 +1154,8 @@ public:
   llvm::GlobalValue *defineMethodDescriptor(SILDeclRef declRef,
                                             NominalTypeDecl *nominalDecl,
                                             llvm::Constant *definition);
-
+  llvm::Constant *getAddrOfMethodDescriptor(SILDeclRef declRef,
+                                            ForDefinition_t forDefinition);
 
   Address getAddrOfEnumCase(EnumElementDecl *Case,
                             ForDefinition_t forDefinition);

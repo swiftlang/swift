@@ -865,9 +865,10 @@ public:
           D->getAttrs().hasAttribute<OverrideAttr>()) {
         if (!D->isInvalid() && D->hasInterfaceType() &&
             !isa<ClassDecl>(D->getDeclContext()) &&
+            !isa<ProtocolDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
           PrettyStackTraceDecl debugStack("verifying override", D);
-          Out << "'override' attribute outside of a class\n";
+          Out << "'override' attribute outside of a class or protocol\n";
           D->dump(Out);
           abort();
         }
@@ -1698,7 +1699,6 @@ public:
         Out << "\n";
         abort();
       }
-      Type InputExprTy = E->getArg()->getType();
       Type ResultExprTy = E->getType();
       if (!ResultExprTy->isEqual(FT->getResult())) {
         Out << "result of ApplyExpr does not match result type of callee:";
@@ -1708,31 +1708,20 @@ public:
         Out << "\n";
         abort();
       }
-      if (!InputExprTy->isEqual(FT->getInput())) {
-        TupleType *TT = FT->getInput()->getAs<TupleType>();
-        if (isa<SelfApplyExpr>(E)) {
-          Type InputExprObjectTy;
-          if (InputExprTy->hasReferenceSemantics() ||
-              InputExprTy->is<AnyMetatypeType>())
-            InputExprObjectTy = InputExprTy;
-          else
-            InputExprObjectTy = checkLValue(InputExprTy, "object argument");
-          Type FunctionInputObjectTy = checkLValue(FT->getInput(),
-                                                   "'self' parameter");
-          
-          checkSameOrSubType(InputExprObjectTy, FunctionInputObjectTy,
-                             "object argument and 'self' parameter");
-        } else if (!TT || TT->getNumElements() != 1 ||
-                   !TT->getElement(0).getType()->isEqual(InputExprTy)) {
-          Out << "Argument type does not match parameter type in ApplyExpr:"
-                 "\nArgument type: ";
-          E->getArg()->getType().print(Out);
-          Out << "\nParameter type: ";
-          FT->printParams(Out);
-          Out << "\n";
-          E->dump(Out);
-          abort();
-        }
+
+      SmallVector<AnyFunctionType::Param, 8> Args;
+      Type InputExprTy = E->getArg()->getType();
+      AnyFunctionType::decomposeInput(InputExprTy, Args);
+      auto Params = FT->getParams();
+      if (!AnyFunctionType::equalParams(Args, Params)) {
+        Out << "Argument type does not match parameter type in ApplyExpr:"
+               "\nArgument type: ";
+        InputExprTy.print(Out);
+        Out << "\nParameter types: ";
+        FT->printParams(Out);
+        Out << "\n";
+        E->dump(Out);
+        abort();
       }
 
       if (!E->isThrowsSet()) {
@@ -1941,14 +1930,13 @@ public:
     void verifyChecked(TupleShuffleExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying TupleShuffleExpr", E);
 
-      TupleType *TT = E->getType()->getAs<TupleType>();
-      TupleType *SubTT = E->getSubExpr()->getType()->getAs<TupleType>();
       auto getSubElementType = [&](unsigned i) {
         if (E->isSourceScalar()) {
           assert(i == 0);
           return E->getSubExpr()->getType();
         } else {
-          return SubTT->getElementType(i);
+          return (E->getSubExpr()->getType()->castTo<TupleType>()
+                   ->getElementType(i));
         }
       };
 
@@ -1958,7 +1946,7 @@ public:
           assert(i == 0);
           return E->getType()->getWithoutParens();
         } else {
-          return TT->getElementType(i);
+          return E->getType()->castTo<TupleType>()->getElementType(i);
         }
       };
 
@@ -1969,7 +1957,8 @@ public:
         if (subElem == TupleShuffleExpr::DefaultInitialize)
           continue;
         if (subElem == TupleShuffleExpr::Variadic) {
-          varargsType = TT->getElement(i).getVarargBaseTy();
+          varargsType = (E->getType()->castTo<TupleType>()
+                          ->getElement(i).getVarargBaseTy());
           break;
         }
         if (subElem == TupleShuffleExpr::CallerDefaultInitialize) {
@@ -2281,12 +2270,6 @@ public:
             VD->dump(Out);
             abort();
           }
-        }
-      } else {
-        if (!isa<GenericTypeParamDecl>(VD) && !isa<VarDecl>(VD)) {
-          dumpRef(VD);
-          Out << " does not have access\n";
-          abort();
         }
       }
 
@@ -2995,6 +2978,25 @@ public:
 
     void verifyChecked(FuncDecl *FD) {
       PrettyStackTraceDecl debugStack("verifying FuncDecl", FD);
+
+      // Note that there's nothing inherently wrong with wanting to use this on
+      // non-accessors in the future, but you should visit all call sites and
+      // make sure we do the right thing, because this flag conflates several
+      // different behaviors.
+      if (FD->hasForcedStaticDispatch()) {
+        auto *AD = dyn_cast<AccessorDecl>(FD);
+        if (AD == nullptr) {
+          Out << "hasForcedStaticDispatch() set on non-accessor\n";
+          abort();
+        }
+
+        if (AD->getAccessorKind() != AccessorKind::Read &&
+            AD->getAccessorKind() != AccessorKind::Modify) {
+          Out << "hasForcedStaticDispatch() set on accessor other than "
+                 "read or modify\n";
+          abort();
+        }
+      }
 
       if (FD->isMutating()) {
         if (!FD->isInstanceMember()) {

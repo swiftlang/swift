@@ -3201,6 +3201,14 @@ void ConstraintSystem::diagnoseDeprecatedConditionalConformanceOuterAccess(
       choiceBaseName, choiceKind);
 }
 
+static SmallVector<AnyFunctionType::Param, 4>
+decomposeArgType(Type argType, ArrayRef<Identifier> argLabels) {
+  SmallVector<AnyFunctionType::Param, 4> result;
+  AnyFunctionType::decomposeInput(argType, result);
+  AnyFunctionType::relabelParams(result, argLabels);
+  return result;
+}
+
 static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
                                        CalleeCandidateInfo &CCI,
                                        ArrayRef<Identifier> argLabels,
@@ -3311,7 +3319,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
                                    candidates, CCI.hasTrailingClosure, CS,
                                    base);
 
-    calleeInfo.filterList(argType, argLabels);
+    calleeInfo.filterListArgs(decomposeArgType(argType, argLabels));
 
     auto diagnostic = diag::member_shadows_global_function_near_match;
     switch (calleeInfo.closeness) {
@@ -4558,7 +4566,7 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
     return false;
 
   // Let's filter our candidate list based on that type.
-  candidates.filterList(argType, argLabels);
+  candidates.filterListArgs(decomposeArgType(argType, argLabels));
 
   if (candidates.closeness == CC_ExactMatch)
     return false;
@@ -4610,7 +4618,7 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
 
   // Filter list of the unviable candidates based on the
   // already established type of the argument expression.
-  unviableCandidates.filterList(argType, argLabels);
+  unviableCandidates.filterListArgs(decomposeArgType(argType, argLabels));
 
   // If one of the unviable candidates matches arguments exactly,
   // that means that actual problem is related to function attributes.
@@ -5101,7 +5109,7 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
                                     callArgHasTrailingClosure(argExpr),
                                     CS, true);
 
-  auto params = swift::decomposeArgType(CS.getType(argExpr), argLabels);
+  auto params = decomposeArgType(CS.getType(argExpr), argLabels);
   using ClosenessPair = CalleeCandidateInfo::ClosenessResultTy;
 
   candidateInfo.filterList([&](UncurriedCandidate cand) -> ClosenessPair {
@@ -5496,7 +5504,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (!argExpr)
     return true; // already diagnosed.
 
-  calleeInfo.filterList(CS.getType(argExpr), argLabels);
+  calleeInfo.filterListArgs(decomposeArgType(CS.getType(argExpr), argLabels));
 
   if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(), argExpr,
                               argLabels))

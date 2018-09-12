@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "CodeSynthesis.h"
 #include "CSDiagnostics.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckProtocol.h"
@@ -2119,27 +2120,8 @@ namespace {
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral);
-        auto *builtinConstUTF16StringProtocol = tc.getProtocol(
-            expr->getLoc(),
-            KnownProtocolKind::ExpressibleByBuiltinConstUTF16StringLiteral);
-        auto *builtinConstStringProtocol = tc.getProtocol(
-            expr->getLoc(),
-            KnownProtocolKind::ExpressibleByBuiltinConstStringLiteral);
 
-        // First try the constant string protocols.
-        if (!forceASCII &&
-            (tc.conformsToProtocol(type, builtinConstUTF16StringProtocol, cs.DC,
-                                   ConformanceCheckFlags::InExpression))) {
-          builtinProtocol = builtinConstUTF16StringProtocol;
-          builtinLiteralFuncName =
-              DeclName(tc.Context, DeclBaseName::createConstructor(),
-                       {tc.Context.Id_builtinConstUTF16StringLiteral});
-
-          if (stringLiteral)
-            stringLiteral->setEncoding(StringLiteralExpr::UTF16ConstString);
-          else
-            magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
-        } else if (!forceASCII && (tc.conformsToProtocol(
+        if (!forceASCII && (tc.conformsToProtocol(
                                       type, builtinProtocol, cs.DC,
                                       ConformanceCheckFlags::InExpression))) {
           builtinLiteralFuncName =
@@ -2151,17 +2133,6 @@ namespace {
             stringLiteral->setEncoding(StringLiteralExpr::UTF16);
           else
             magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
-        } else if (tc.conformsToProtocol(type, builtinConstStringProtocol,
-                                         cs.DC,
-                                         ConformanceCheckFlags::InExpression)) {
-          builtinProtocol = builtinConstStringProtocol;
-          builtinLiteralFuncName =
-              DeclName(tc.Context, DeclBaseName::createConstructor(),
-                       {tc.Context.Id_builtinConstStringLiteral});
-          if (stringLiteral)
-            stringLiteral->setEncoding(StringLiteralExpr::UTF8ConstString);
-          else
-            magicLiteral->setStringEncoding(StringLiteralExpr::UTF8);
         } else {
           // Otherwise, fall back to UTF-8.
           builtinProtocol = tc.getProtocol(
@@ -4142,6 +4113,7 @@ namespace {
         method = func;
       } else if (auto var = dyn_cast<VarDecl>(foundDecl)) {
         // Properties.
+        maybeAddAccessorsToStorage(tc, var);
 
         // If this isn't a property on a type, complain.
         if (!var->getDeclContext()->isTypeContext()) {
@@ -5217,7 +5189,7 @@ static Type getMetatypeSuperclass(Type t, TypeChecker &tc) {
                                           metaTy->getInstanceType(),
                                           tc));
 
-  return tc.getSuperClassOf(t);
+  return t->getSuperclass();
 }
 
 Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
@@ -5514,8 +5486,7 @@ Expr *ExprRewriter::coerceCallArguments(
   auto &tc = getConstraintSystem().getTypeChecker();
   auto params = funcType->getParams();
 
-  // Local function to produce a locator to refer to the ith element of the
-  // argument tuple.
+  // Local function to produce a locator to refer to the given parameter.
   auto getArgLocator = [&](unsigned argIdx, unsigned paramIdx)
                          -> ConstraintLocatorBuilder {
     return locator.withPathElement(
@@ -5524,11 +5495,8 @@ Expr *ExprRewriter::coerceCallArguments(
 
   bool matchCanFail =
       llvm::any_of(params, [](const AnyFunctionType::Param &param) {
-        return param.getType()->hasUnresolvedType();
+        return param.getPlainType()->hasUnresolvedType();
       });
-
-  auto paramType = AnyFunctionType::composeInput(tc.Context, params, false);
-  bool allParamsMatch = cs.getType(arg)->isEqual(paramType);
 
   // Find the callee declaration.
   ConcreteDeclRef callee =
@@ -5540,12 +5508,17 @@ Expr *ExprRewriter::coerceCallArguments(
   // Determine the parameter bindings.
   llvm::SmallBitVector defaultMap
     = computeDefaultMap(params, callee.getDecl(), level);
-  auto args = decomposeArgType(cs.getType(arg), argLabels);
+
+  SmallVector<AnyFunctionType::Param, 8> args;
+  AnyFunctionType::decomposeInput(cs.getType(arg), args);
 
   // Quickly test if any further fix-ups for the argument types are necessary.
-  if (allParamsMatch)
+  if (AnyFunctionType::equalParams(args, params))
     return arg;
-  
+
+  // Apply labels to arguments.
+  AnyFunctionType::relabelParams(args, argLabels);
+
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 4> parameterBindings;
   bool failed = constraints::matchCallArguments(args, params,
@@ -5708,6 +5681,8 @@ Expr *ExprRewriter::coerceCallArguments(
                      param.getParameterFlags()));
   }
 
+  Type argTupleType = TupleType::get(fromTupleExprFields, tc.Context);
+
   // Compute a new 'arg', from the bits we have.  We have three cases: the
   // scalar case, the paren case, and the tuple literal case.
   if (!argTuple && !argParen) {
@@ -5724,7 +5699,7 @@ Expr *ExprRewriter::coerceCallArguments(
                                fromTupleExpr[0],
                                argParen->getRParenLoc(),
                                argParen->hasTrailingClosure(),
-                               cs.getType(fromTupleExpr[0])));
+                               argTupleType));
       if (argParenImplicit) {
         argParen->setImplicit();
       }
@@ -5732,7 +5707,7 @@ Expr *ExprRewriter::coerceCallArguments(
     } else {
       // coerceToType may have updated the element type of the ParenExpr in
       // place.  If so, propagate the type out to the ParenExpr as well.
-      cs.setType(argParen, cs.getType(fromTupleExpr[0]));
+      cs.setType(argParen, argTupleType);
     }
   } else {
     assert(argTuple);
@@ -5763,18 +5738,24 @@ Expr *ExprRewriter::coerceCallArguments(
   }
 
   // If we don't have to shuffle anything, we're done.
-  paramType = AnyFunctionType::composeInput(tc.Context, params, false);
-  if (cs.getType(arg)->isEqual(paramType))
+  args.clear();
+  AnyFunctionType::decomposeInput(cs.getType(arg), args);
+  if (AnyFunctionType::equalParams(args, params))
     return arg;
+
+  auto paramType = AnyFunctionType::composeInput(tc.Context, params,
+                                                 /*canonicalVararg=*/false);
 
   // If we came from a scalar, create a scalar-to-tuple conversion.
   TupleShuffleExpr::TypeImpact typeImpact;
   if (argTuple == nullptr) {
     typeImpact = TupleShuffleExpr::ScalarToTuple;
+    assert(isa<TupleType>(paramType.getPointer()));
   } else if (isa<TupleType>(paramType.getPointer())) {
     typeImpact = TupleShuffleExpr::TupleToTuple;
   } else {
     typeImpact = TupleShuffleExpr::TupleToScalar;
+    assert(isa<ParenType>(paramType.getPointer()));
   }
 
   // Create the tuple shuffle.
@@ -6545,9 +6526,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // conversion restriction in this case?
   if (fromType->mayHaveSuperclass() &&
       toType->getClassOrBoundGenericClass()) {
-    for (auto fromSuperClass = tc.getSuperClassOf(fromType);
+    for (auto fromSuperClass = fromType->getSuperclass();
          fromSuperClass;
-         fromSuperClass = tc.getSuperClassOf(fromSuperClass)) {
+         fromSuperClass = fromSuperClass->getSuperclass()) {
       if (fromSuperClass->isEqual(toType)) {
         return coerceSuperclass(expr, toType, locator);
       }
@@ -7142,15 +7123,18 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         
         auto escapable = new (tc.Context)
           OpaqueValueExpr(apply->getFn()->getLoc(), Type());
-        cs.setType(escapable, FunctionType::composeInput(
-                                  tc.Context, escapableParams, false));
+        cs.setType(escapable, escapableParams[0].getType());
 
         auto getType = [&](const Expr *E) -> Type {
           return cs.getType(E);
         };
 
-        auto callSubExpr = CallExpr::createImplicit(tc.Context, body, {escapable}, {}, getType);
+        auto callSubExpr = CallExpr::createImplicit(tc.Context, body,
+                                                    {escapable}, {}, getType);
         cs.cacheSubExprTypes(callSubExpr);
+        cs.setType(callSubExpr->getArg(),
+                   AnyFunctionType::composeInput(tc.Context,
+                                                 escapableParams, false));
         cs.setType(callSubExpr, resultType);
         
         auto replacement = new (tc.Context)

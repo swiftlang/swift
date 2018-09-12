@@ -235,7 +235,7 @@ func callSetBar(_ s: String) {
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
 // CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
-// CHECK:   end_borrow [[BORROWED_NATIVE]] from [[NATIVE]]
+// CHECK:   end_borrow [[BORROWED_NATIVE]]
 // CHECK:   [[SET_BAR:%.*]] = function_ref @setBar
 // CHECK:   apply [[SET_BAR]]([[OPT_BRIDGED]])
 // CHECK:   destroy_value [[OPT_BRIDGED]]
@@ -282,12 +282,12 @@ class Bas : NSObject {
   // CHECK:   // function_ref objc_bridging.Bas.strRealProp.getter
   // CHECK:   [[PROPIMPL:%.*]] = function_ref @$S13objc_bridging3BasC11strRealPropSSvg
   // CHECK:   [[PROP_COPY:%.*]] = apply [[PROPIMPL]]([[BORROWED_THIS_COPY]]) : $@convention(method) (@guaranteed Bas) -> @owned String
-  // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
+  // CHECK:   end_borrow [[BORROWED_THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
   // CHECK:   [[BORROWED_PROP_COPY:%.*]] = begin_borrow [[PROP_COPY]]
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_PROP_COPY]])
-  // CHECK:   end_borrow [[BORROWED_PROP_COPY]] from [[PROP_COPY]]
+  // CHECK:   end_borrow [[BORROWED_PROP_COPY]]
   // CHECK:   destroy_value [[PROP_COPY]]
   // CHECK:   return [[NSSTR]]
   // CHECK: }
@@ -310,7 +310,7 @@ class Bas : NSObject {
   // CHECK:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK:   [[SETIMPL:%.*]] = function_ref @$S13objc_bridging3BasC11strRealPropSSvs
   // CHECK:   apply [[SETIMPL]]([[STR]], [[BORROWED_THIS_COPY]])
-  // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
+  // CHECK:   end_borrow [[BORROWED_THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
   // CHECK: } // end sil function '$S13objc_bridging3BasC11strRealPropSSvsTo'
 
@@ -332,12 +332,12 @@ class Bas : NSObject {
   // CHECK:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK:   [[GETTER:%.*]] = function_ref @$S13objc_bridging3BasC11strFakePropSSvg
   // CHECK:   [[STR:%.*]] = apply [[GETTER]]([[BORROWED_THIS_COPY]])
-  // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
+  // CHECK:   end_borrow [[BORROWED_THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
   // CHECK:   [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_STR]])
-  // CHECK:   end_borrow [[BORROWED_STR]] from [[STR]]
+  // CHECK:   end_borrow [[BORROWED_STR]]
   // CHECK:   destroy_value [[STR]]
   // CHECK:   return [[NSSTR]]
   // CHECK: }
@@ -352,7 +352,7 @@ class Bas : NSObject {
   // CHECK:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK:   [[SETTER:%.*]] = function_ref @$S13objc_bridging3BasC11strFakePropSSvs
   // CHECK:   apply [[SETTER]]([[STR]], [[BORROWED_THIS_COPY]])
-  // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
+  // CHECK:   end_borrow [[BORROWED_THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
   // CHECK: } // end sil function '$S13objc_bridging3BasC11strFakePropSSvsTo'
 
@@ -380,12 +380,12 @@ class Bas : NSObject {
   // CHECK:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK:   [[METHOD:%.*]] = function_ref @$S13objc_bridging3BasC9strResultSSyF
   // CHECK:   [[STR:%.*]] = apply [[METHOD]]([[BORROWED_THIS_COPY]])
-  // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
+  // CHECK:   end_borrow [[BORROWED_THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
   // CHECK:   [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_STR]])
-  // CHECK:   end_borrow [[BORROWED_STR]] from [[STR]]
+  // CHECK:   end_borrow [[BORROWED_STR]]
   // CHECK:   destroy_value [[STR]]
   // CHECK:   return [[NSSTR]]
   // CHECK: }
@@ -401,7 +401,7 @@ class Bas : NSObject {
   // CHECK:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK:   [[METHOD:%.*]] = function_ref @$S13objc_bridging3BasC6strArgyySSF
   // CHECK:   apply [[METHOD]]([[BORROWED_STR]], [[BORROWED_THIS_COPY]])
-  // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
+  // CHECK:   end_borrow [[BORROWED_THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
   // CHECK: } // end sil function '$S13objc_bridging3BasC6strArgyySSFTo'
 
@@ -434,7 +434,7 @@ class Bas : NSObject {
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @$S13objc_bridging3BasC8arrayArgyySayyXlGF : $@convention(method) (@guaranteed Array<AnyObject>, @guaranteed Bas) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[BORROWED_ARRAY]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@guaranteed Array<AnyObject>, @guaranteed Bas) -> ()
-  // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+  // CHECK:   end_borrow [[BORROWED_SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]] : $Bas
   // CHECK:   return [[RESULT]] : $()
   @objc func arrayArg(_ array: [AnyObject]) { }
@@ -445,12 +445,12 @@ class Bas : NSObject {
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @$S13objc_bridging3BasC11arrayResultSayyXlGyF : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
   // CHECK:   [[ARRAY:%[0-9]+]] = apply [[SWIFT_FN]]([[BORROWED_SELF_COPY]]) : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
-  // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+  // CHECK:   end_borrow [[BORROWED_SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]]
   // CHECK:   [[CONV_FN:%[0-9]+]] = function_ref @$SSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF
   // CHECK:   [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
   // CHECK:   [[NSARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[BORROWED_ARRAY]]) : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @owned NSArray
-  // CHECK:   end_borrow [[BORROWED_ARRAY]] from [[ARRAY]]
+  // CHECK:   end_borrow [[BORROWED_ARRAY]]
   // CHECK:   destroy_value [[ARRAY]]
   // CHECK:   return [[NSARRAY]]
   @objc func arrayResult() -> [AnyObject] { return [] }
@@ -470,7 +470,7 @@ func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> 
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
   // CHECK:   [[BORROWED_STRING_COPY:%.*]] = begin_borrow [[STRING_COPY]]
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_STRING_COPY]]) : $@convention(method) (@guaranteed String)
-  // CHECK:   end_borrow [[BORROWED_STRING_COPY]] from [[STRING_COPY]]
+  // CHECK:   end_borrow [[BORROWED_STRING_COPY]]
   // CHECK:   destroy_value [[STRING_COPY]]
   // CHECK:   [[RESULT_NSSTR:%.*]] = apply [[BLOCK_COPY_COPY]]([[NSSTR]]) : $@convention(block) @noescape (NSString) -> @autoreleased NSString
   // CHECK:   destroy_value [[NSSTR]]
@@ -595,7 +595,7 @@ func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   // XCHECK: [[OBJC_ARG:%[0-9]+]] = apply [[BRIDGE_TO_FN]]([[FRIDGE]])
   // XCHECK: apply [[SETTER]]([[OBJC_ARG]], [[BORROWED_HOME]]) : $@convention(objc_method) (APPRefrigerator, APPHouse) -> ()
   // XCHECK: destroy_value [[OBJC_ARG]]
-  // XCHECK: end_borrow [[BORROWED_HOME]] from [[HOME]]
+  // XCHECK: end_borrow [[BORROWED_HOME]]
   // XCHECK: destroy_value [[HOME]]
   home.fridge.temperature += delta
 }

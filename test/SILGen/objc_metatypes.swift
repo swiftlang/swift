@@ -15,7 +15,7 @@ class A {
     // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK:   [[NATIVE_FOO:%[0-9]+]] = function_ref @$S14objc_metatypes1AC3foo{{[_0-9a-zA-Z]*}}F
     // CHECK:   [[NATIVE_RESULT:%[0-9]+]] = apply [[NATIVE_FOO]]([[M_AS_THICK]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@thick ObjCClass.Type, @guaranteed A) -> @thick ObjCClass.Type
-    // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
+    // CHECK:   end_borrow [[BORROWED_SELF_COPY]]
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   [[OBJC_RESULT:%[0-9]+]] = thick_to_objc_metatype [[NATIVE_RESULT]] : $@thick ObjCClass.Type to $@objc_metatype ObjCClass.Type
     // CHECK:   return [[OBJC_RESULT]] : $@objc_metatype ObjCClass.Type

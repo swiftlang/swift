@@ -29,8 +29,8 @@ func createErrorDomain(str: String) -> ErrorDomain {
 // CHECK-RAW: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_BOX]]
 // CHECK-RAW: [[RAWVALUE_ADDR:%[0-9]+]] = struct_element_addr [[WRITE]]
 // CHECK-RAW: assign [[BRIDGED]] to [[RAWVALUE_ADDR]]
-// CHECK-RAW: end_borrow [[BORROWED_COPIED_STR]] from [[COPIED_STR]]
-// CHECK-RAW: end_borrow [[BORROWED_STR]] from [[STR]]
+// CHECK-RAW: end_borrow [[BORROWED_COPIED_STR]]
+// CHECK-RAW: end_borrow [[BORROWED_STR]]
 
 func getRawValue(ed: ErrorDomain) -> String {
   return ed.rawValue

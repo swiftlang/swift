@@ -1245,19 +1245,23 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// descriptor.  A TypeReferenceKind.
     ///
     /// Only meaningful for class descriptors.
-    Class_SuperclassReferenceKind = 10,
+    Class_SuperclassReferenceKind = 9,
     Class_SuperclassReferenceKind_width = 3,
 
     /// Whether the immediate class members in this metadata are allocated
     /// at negative offsets.  For now, we don't use this.
-    Class_AreImmediateMembersNegative = 13,
+    Class_AreImmediateMembersNegative = 12,
 
     /// Set if the context descriptor is for a class with resilient ancestry.
     ///
     /// Only meaningful for class descriptors.
-    Class_HasResilientSuperclass = 14,
+    Class_HasResilientSuperclass = 13,
 
-    /// Set if the context descriptor is includes metadata for dynamically
+    /// Set if the context descriptor includes metadata for dynamically
+    /// installing method overrides at metadata instantiation time.
+    Class_HasOverrideTable = 14,
+
+    /// Set if the context descriptor includes metadata for dynamically
     /// constructing a class's vtables at metadata instantiation time.
     ///
     /// Only meaningful for class descriptors.
@@ -1305,6 +1309,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,
                                 class_setHasVTable)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasOverrideTable,
+                                class_hasOverrideTable,
+                                class_setHasOverrideTable)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasResilientSuperclass,
                                 class_hasResilientSuperclass,
                                 class_setHasResilientSuperclass)

@@ -104,7 +104,7 @@ extension NSObject {
 // CHECK:   [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]]
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[BORROWED_RESULT]])
 // CHECK:   [[T2:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]] : $NSString
-// CHECK:   end_borrow [[BORROWED_RESULT]] from [[RESULT]]
+// CHECK:   end_borrow [[BORROWED_RESULT]]
 // CHECK:   destroy_value [[RESULT]]  
 // CHECK:   br bb6([[T2]] : $Optional<NSString>)
 //
@@ -131,7 +131,7 @@ extension NSObject {
 // CHECK:   br bb6([[T0]] : $Optional<NSString>)
 //
 // CHECK: bb6([[T0:%.*]] : @owned $Optional<NSString>):
-// CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
+// CHECK:   end_borrow [[BORROWED_ARG1]]
 // CHECK:   destroy_value [[ARG1]]
 // CHECK:   return [[T0]] : $Optional<NSString>
 
@@ -204,7 +204,7 @@ class VeryErrorProne : ErrorProne {
 // CHECK: [[BORROWED_T1:%.*]] = begin_borrow [[T1]]
 // CHECK-NEXT: [[DOWNCAST_BORROWED_T1:%.*]] = unchecked_ref_cast [[BORROWED_T1]] : $ErrorProne to $VeryErrorProne
 // CHECK-NEXT: [[T2:%.*]] = objc_super_method [[DOWNCAST_BORROWED_T1]] : $VeryErrorProne, #ErrorProne.init!initializer.1.foreign : (ErrorProne.Type) -> (Any?) throws -> ErrorProne, $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
-// CHECK:      end_borrow [[BORROWED_T1]] from [[T1]]
+// CHECK:      end_borrow [[BORROWED_T1]]
 // CHECK:      apply [[T2]]([[ARG1_COPY]], {{%.*}}, [[T1]])
 
 // rdar://21051021

@@ -776,7 +776,7 @@ static SmallVector<Type, 4> enumerateDirectSupertypes(Type type) {
   return result;
 }
 
-bool TypeVarBindingGenerator::computeNext() {
+bool TypeVarBindingProducer::computeNext() {
   SmallVector<Binding, 4> newBindings;
   auto addNewBinding = [&](Binding binding) {
     auto type = binding.BindingType;
@@ -847,4 +847,35 @@ bool TypeVarBindingGenerator::computeNext() {
   ++NumTries;
   Bindings = std::move(newBindings);
   return true;
+}
+
+void TypeVariableBinding::attempt(ConstraintSystem &cs) const {
+  auto type = Binding.BindingType;
+  auto *locator = TypeVar->getImpl().getLocator();
+
+  if (Binding.DefaultedProtocol) {
+    type = cs.openUnboundGenericType(type, locator);
+    type = type->reconstituteSugar(/*recursive=*/false);
+  } else if (Binding.BindingSource == ConstraintKind::ArgumentConversion &&
+             !type->hasTypeVariable() && cs.isCollectionType(type)) {
+    // If the type binding comes from the argument conversion, let's
+    // instead of binding collection types directly, try to bind
+    // using temporary type variables substituted for element
+    // types, that's going to ensure that subtype relationship is
+    // always preserved.
+    auto *BGT = type->castTo<BoundGenericType>();
+    auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
+                                       BGT->getASTContext());
+
+    type = cs.openUnboundGenericType(UGT, locator);
+    type = type->reconstituteSugar(/*recursive=*/false);
+  }
+
+  // FIXME: We want the locator that indicates where the binding came
+  // from.
+  cs.addConstraint(ConstraintKind::Bind, TypeVar, type, locator);
+
+  // If this was from a defaultable binding note that.
+  if (Binding.isDefaultableBinding())
+    cs.DefaultedConstraints.push_back(Binding.DefaultableBinding);
 }

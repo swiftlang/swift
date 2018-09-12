@@ -59,18 +59,6 @@ fromStableStringEncoding(unsigned value) {
   }
 }
 
-static Optional<ConstStringLiteralInst::Encoding>
-fromStableConstStringEncoding(unsigned value) {
-  switch (value) {
-  case SIL_UTF8:
-    return ConstStringLiteralInst::Encoding::UTF8;
-  case SIL_UTF16:
-    return ConstStringLiteralInst::Encoding::UTF16;
-  default:
-    return None;
-  }
-}
-
 static Optional<SILLinkage>
 fromStableSILLinkage(unsigned value) {
   switch (value) {
@@ -1571,15 +1559,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                             encoding.getValue());
     break;
   }
-  case SILInstructionKind::ConstStringLiteralInst: {
-    Identifier StringVal = MF->getIdentifier(ValID);
-    auto encoding = fromStableConstStringEncoding(Attr);
-    if (!encoding)
-      return true;
-    ResultVal = Builder.createConstStringLiteral(Loc, StringVal.str(),
-                                                 encoding.getValue());
-    break;
-  }
   case SILInstructionKind::MarkFunctionEscapeInst: {
     // Format: a list of typed values. A typed value is expressed by 4 IDs:
     // TypeID, TypeCategory, ValueID, ValueResultNumber.
@@ -1641,7 +1620,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(SetDeallocating)
   UNARY_INSTRUCTION(DeinitExistentialAddr)
   UNARY_INSTRUCTION(DeinitExistentialValue)
-  UNARY_INSTRUCTION(EndBorrowArgument)
+  UNARY_INSTRUCTION(EndBorrow)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(Return)
   UNARY_INSTRUCTION(Throw)
@@ -1747,15 +1726,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType ValType = addrType.getObjectType();
     ResultVal = Builder.createStoreBorrow(Loc, getLocalValue(ValID, ValType),
                                           getLocalValue(ValID2, addrType));
-    break;
-  }
-  case SILInstructionKind::EndBorrowInst: {
-    SILValue BorrowSource, BorrowDest;
-    BorrowSource = getLocalValue(
-        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
-    BorrowDest = getLocalValue(
-        ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
-    ResultVal = Builder.createEndBorrow(Loc, BorrowSource, BorrowDest);
     break;
   }
   case SILInstructionKind::BeginAccessInst: {

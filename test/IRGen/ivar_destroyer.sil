@@ -50,7 +50,7 @@ sil public_external @alloc_NonTrivialDerived : $@convention(method) (@thick NonT
 sil public_external @$S14ivar_destroyer17NonTrivialDerivedCfE : $@convention(method) (@guaranteed NonTrivialDerived) -> ()
 
 sil_vtable NonTrivialDerived {
-  #NonTrivialDerived.init!initializer.1: @init_NonTrivialDerived
+  #NonTrivialDerived.init!initializer.1: @init_NonTrivialDerived [override]
   #NonTrivialDerived.init!allocator.1: @alloc_NonTrivialDerived
   #NonTrivialDerived!ivardestroyer.1: @$S14ivar_destroyer17NonTrivialDerivedCfE
 }

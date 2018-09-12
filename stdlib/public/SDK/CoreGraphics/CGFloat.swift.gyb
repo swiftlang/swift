@@ -575,7 +575,7 @@ public func remquo(_ x: CGFloat, _ y: CGFloat) -> (CGFloat, Int) {
   return (CGFloat(rem), quo)
 }
 
-@available(*, deprecated: 4.2, message:
+@available(swift, deprecated: 4.2, message:
            "use CGFloat(nan: CGFloat.RawSignificand) instead.")
 @_transparent
 public func nan(_ tag: String) -> CGFloat {

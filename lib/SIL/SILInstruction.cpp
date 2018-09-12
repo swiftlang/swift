@@ -482,12 +482,6 @@ namespace {
         && LHS_->getValue().equals(RHS->getValue());
     }
 
-    bool visitConstStringLiteralInst(const ConstStringLiteralInst *RHS) {
-      auto LHS_ = cast<ConstStringLiteralInst>(LHS);
-      return LHS_->getEncoding() == RHS->getEncoding() &&
-             LHS_->getValue().equals(RHS->getValue());
-    }
-
     bool visitStructInst(const StructInst *RHS) {
       // We have already checked the operands. Make sure that the StructDecls
       // match up.

@@ -630,13 +630,12 @@ public protocol BinaryInteger :
   /// - Parameter source: An integer to convert to this type.
   init<T : BinaryInteger>(clamping source: T)
 
-  // FIXME: Should be `Words : Collection where Words.Element == UInt`
-  // See <rdar://problem/31798916> for why it isn't.
   /// A type that represents the words of a binary integer.
   ///
-  /// The `Words` type must conform to the `Collection` protocol with an
-  /// `Element` type of `UInt`.
-  associatedtype Words : Sequence where Words.Element == UInt
+  /// The `Words` type must conform to the `RandomAccessCollection` protocol
+  /// with an `Element` type of `UInt` and `Index` type of `Int.
+  associatedtype Words : RandomAccessCollection
+      where Words.Element == UInt, Words.Index == Int
 
   /// A collection containing the words of this value's binary
   /// representation, in order from the least significant to most significant.
@@ -758,14 +757,14 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +(lhs: Self, rhs: Self) -> Self
+  override static func +(lhs: Self, rhs: Self) -> Self
 
   /// Adds two values and stores the result in the left-hand-side variable.
   ///
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +=(lhs: inout Self, rhs: Self)
+  override static func +=(lhs: inout Self, rhs: Self)
 
   /// Subtracts one value from another and produces their difference.
   ///
@@ -787,7 +786,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -(lhs: Self, rhs: Self) -> Self
+  override static func -(lhs: Self, rhs: Self) -> Self
 
   /// Subtracts the second value from the first and stores the difference in the
   /// left-hand-side variable.
@@ -795,7 +794,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -=(lhs: inout Self, rhs: Self)
+  override static func -=(lhs: inout Self, rhs: Self)
 
   /// Multiplies two values and produces their product.
   ///
@@ -817,7 +816,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *(lhs: Self, rhs: Self) -> Self
+  override static func *(lhs: Self, rhs: Self) -> Self
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable.
@@ -825,7 +824,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *=(lhs: inout Self, rhs: Self)
+  override static func *=(lhs: inout Self, rhs: Self)
 
   /// Returns the inverse of the bits set in the argument.
   ///
@@ -1151,6 +1150,21 @@ public protocol BinaryInteger :
   func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self)
 
+  /// Returns true if this value is a multiple of `other`, and false otherwise.
+  ///
+  /// For two integers a and b, a is a multiple of b if there exists a third
+  /// integer q such that a = q*b. For example, 6 is a multiple of 3, because
+  /// 6 = 2*3, and zero is a multiple of everything, because 0 = 0*x, for any
+  /// integer x.
+  ///
+  /// Two edge cases are worth particular attention:
+  /// - `x.isMultiple(of: 0)` is `true` if `x` is zero and `false` otherwise.
+  /// - `T.min.isMultiple(of: -1)` is `true` for signed integer `T`, even
+  ///   though the quotient `T.min / -1` is not representable in type `T`.
+  ///
+  /// - Parameter other: the value to test.
+  func isMultiple(of other: Self) -> Bool
+
   /// Returns `-1` if this value is negative and `1` if it's positive;
   /// otherwise, `0`.
   ///
@@ -1223,6 +1237,16 @@ extension BinaryInteger {
   public func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self) {
     return (self / rhs, self % rhs)
+  }
+  
+  @inlinable
+  public func isMultiple(of other: Self) -> Bool {
+    // Nothing but zero is a multiple of zero.
+    if other == 0 { return self == 0 }
+    // Do the test in terms of magnitude, which guarantees there are no other
+    // edge cases. If we write this as `self % other` instead, it could trap
+    // for types that are not symmetric around zero.
+    return self.magnitude % other.magnitude == 0
   }
 
 //===----------------------------------------------------------------------===//
@@ -2512,6 +2536,12 @@ extension FixedWidthInteger {
   ///     // Prints "44"
   ///     // Prints "21"
   ///
+  /// - Note: The algorithm used to create random values may change in a future
+  ///   version of Swift. If you're passing a generator that results in the
+  ///   same sequence of integer values each time you run your program, that
+  ///   sequence may change when your program is compiled using a different
+  ///   version of Swift.
+  ///
   /// - Parameters:
   ///   - range: The range in which to create a random value.
   ///     `range` must not be empty.
@@ -2634,8 +2664,8 @@ extension FixedWidthInteger {
   ///     // Prints "64"
   ///     // Prints "5"
   ///
-  /// This method is equivalent to calling the version that takes a generator,
-  /// passing in the system's default random generator.
+  /// This method is equivalent to calling `random(in:using:)`, passing in the
+  /// system's default random generator.
   ///
   /// - Parameter range: The range in which to create a random value.
   /// - Returns: A random value within the bounds of `range`.
@@ -3592,6 +3622,16 @@ extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public static var min: Self {
     return (-1 as Self) &<< Self._highBitIndex
+  }
+  
+  @inlinable
+  public func isMultiple(of other: Self) -> Bool {
+    // Nothing but zero is a multiple of zero.
+    if other == 0 { return self == 0 }
+    // Special case to avoid overflow on .min / -1 for signed types.
+    if other == -1 { return true }
+    // Having handled those special cases, this is safe.
+    return self % other == 0
   }
 }
 

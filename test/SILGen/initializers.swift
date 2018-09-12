@@ -595,7 +595,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   [[CANARY_ACCESS:%.*]] = begin_access [modify] [dynamic] [[CANARY_ADDR]]
   // CHECK:   assign [[OPT_CANARY]] to [[CANARY_ACCESS]]
   // CHECK:   end_access [[CANARY_ACCESS]]
-  // CHECK:   end_borrow [[SELF]] from [[PROJ]]
+  // CHECK:   end_borrow [[SELF]]
   //
   // Now we perform the unwrap.
   // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$S21failable_initializers6unwrapyS2iKF : $@convention(thin)
@@ -639,7 +639,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   [[CANARY_ACCESS:%.*]] = begin_access [modify] [dynamic] [[CANARY_ADDR]]
   // CHECK:   assign [[OPT_CANARY]] to [[CANARY_ACCESS]]
   // CHECK:   end_access [[CANARY_ACCESS]]
-  // CHECK:   end_borrow [[SELF]] from [[PROJ]]
+  // CHECK:   end_borrow [[SELF]]
   //
   // Now we begin argument emission where we perform the unwrap.
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]

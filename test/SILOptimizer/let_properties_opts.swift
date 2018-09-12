@@ -354,3 +354,25 @@ public func useInitializers() -> StructWithPublicAndInternalLetProperties {
 public func useInitializers() -> StructWithPublicAndInternalAndPrivateLetProperties {
   return StructWithPublicAndInternalAndPrivateLetProperties(1, 1)
 }
+
+struct RACStruct {
+    private let end = 27
+    
+    var startIndex: Int { return 0 }
+
+
+    // CHECK-LABEL: RACStruct.endIndex.getter
+    // CHECK-NEXT: sil hidden @{{.*}}endIndexSivg
+    // CHECK-NEXT: bb0
+    // CHECK-NEXT:   %1 = integer_literal $Builtin.Int{{.*}}, 27
+    // CHECK-NEXT:   %2 = struct $Int (%1 : $Builtin.Int{{.*}})
+    // CHECK-NEXT:   return %2 : $Int
+    var endIndex: Int { return end }
+    
+    subscript(_ bitIndex: Int) -> Bool {
+        get { return false }
+        set { }
+    }
+}
+
+extension RACStruct : RandomAccessCollection {}
