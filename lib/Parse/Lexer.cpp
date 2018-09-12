@@ -2095,17 +2095,18 @@ void Lexer::tryLexEditorPlaceholder() {
   lexOperatorIdentifier();
 }
 
-StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
-                                         SmallVectorImpl<char> &TempString,
-                                         bool IsFirstSegment,
-                                         bool IsLastSegment,
-                                         unsigned IndentToStrip,
-                                         unsigned CustomDelimiterLen) {
+StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
+                                             SmallVectorImpl<char> &TempString,
+                                             bool IsFirstSegment,
+                                             bool IsLastSegment,
+                                             unsigned IndentToStrip,
+                                             unsigned CustomDelimiterLen) {
 
   TempString.clear();
-  // Note that it is always safe to read one over the end of "Bytes" because
-  // we know that there is a terminating " character.  Use BytesPtr to avoid a
-  // range check subscripting on the StringRef.
+  // Note that it is always safe to read one over the end of "Bytes" because we
+  // know that there is a terminating " character (or null byte for an
+  // unterminated literal or a segment that doesn't come from source). Use
+  // BytesPtr to avoid a range check subscripting on the StringRef.
   const char *BytesPtr = Bytes.begin();
 
   bool IsEscapedNewline = false;

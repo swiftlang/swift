@@ -2378,18 +2378,22 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
 
-    // Drop the double quotes.
-    StringRef rawString = P.Tok.getText().drop_front().drop_back();
+    // Parse the string.
+    SmallVector<Lexer::StringSegment, 1> segments;
+    P.L->getStringLiteralSegments(P.Tok, segments);
+    assert(segments.size() == 1);
 
     P.consumeToken(tok::string_literal);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    // Ask the lexer to interpret the entire string as a literal segment.
     SmallVector<char, 128> stringBuffer;
 
     if (encoding == StringLiteralInst::Encoding::Bytes) {
       // Decode hex bytes.
+      CharSourceRange rawStringRange(segments.front().Loc,
+                                     segments.front().Length);
+      StringRef rawString = P.SourceMgr.extractText(rawStringRange);
       if (rawString.size() & 1) {
         P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,
                    "even number of hex bytes");
@@ -2411,7 +2415,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       break;
     }
 
-    StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
+    StringRef string = P.L->getEncodedStringSegment(segments.front(),
+                                                    stringBuffer);
     ResultVal = B.createStringLiteral(InstLoc, string, encoding);
     break;
   }
