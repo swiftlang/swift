@@ -1903,9 +1903,16 @@ LazyContextData *ASTContext::getOrCreateLazyContextData(
   return contextData;
 }
 
+bool ASTContext::hasUnparsedMembers(const IterableDeclContext *IDC) const {
+  auto parsers = getImpl().lazyParsers;
+  return std::any_of(parsers.begin(), parsers.end(),
+    [IDC](LazyMemberParser *p) { return p->hasUnparsedMembers(IDC); });
+}
+
 void ASTContext::parseMembers(IterableDeclContext *IDC) {
   for (auto *p: getImpl().lazyParsers) {
-    p->parseMembers(IDC);
+    if (p->hasUnparsedMembers(IDC))
+      p->parseMembers(IDC);
   }
 }
 

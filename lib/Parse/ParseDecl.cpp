@@ -181,8 +181,6 @@ namespace {
 } // end anonymous namespace
 
 void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
-  if (!hasDelayedDeclList(IDC))
-    return;
   SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
   assert(!SF.hasInterfaceHash() &&
     "Cannot delay parsing if we care about the interface hash.");
