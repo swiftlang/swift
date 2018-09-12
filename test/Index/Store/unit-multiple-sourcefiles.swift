@@ -1,5 +1,3 @@
-// XFAIL: linux
-
 //===--- Building source files separately with a module merge at the end
 
 // RUN: %empty-directory(%t)
