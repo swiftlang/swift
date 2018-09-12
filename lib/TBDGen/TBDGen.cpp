@@ -89,6 +89,11 @@ void TBDGenVisitor::addMethodDescriptor(SILDeclRef declRef) {
   addSymbol(entity);
 }
 
+void TBDGenVisitor::addProtocolRequirementsBaseDescriptor(ProtocolDecl *proto) {
+  auto entity = LinkEntity::forProtocolRequirementsBaseDescriptor(proto);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType) {
   auto entity = LinkEntity::forAssociatedTypeDescriptor(assocType);
   addSymbol(entity);
@@ -374,11 +379,37 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
     visit(member);
 }
 
+/// Determine whether the protocol descriptor for the given protocol will
+/// contain any protocol requirements.
+static bool protocolDescriptorHasRequirements(ProtocolDecl *proto) {
+  if (!proto->getRequirementSignature().empty())
+    return true;
+
+  for (auto *member : proto->getMembers()) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (SILDeclRef::requiresNewWitnessTableEntry(func))
+        return true;
+    }
+
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+      if (assocType->getOverriddenDecls().empty()) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
     if (PD->isResilient()) {
+      // If there are any requirements, emit a requirements base descriptor.
+      if (protocolDescriptorHasRequirements(PD))
+        addProtocolRequirementsBaseDescriptor(PD);
+
       for (auto *member : PD->getMembers()) {
         if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(member)) {
           if (SILDeclRef::requiresNewWitnessTableEntry(funcDecl)) {

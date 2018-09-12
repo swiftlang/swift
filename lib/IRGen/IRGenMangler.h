@@ -161,6 +161,14 @@ public:
     return finalize();
   }
 
+  std::string mangleProtocolRequirementsBaseDescriptor(
+                                                    const ProtocolDecl *Decl) {
+    beginMangling();
+    appendProtocolName(Decl);
+    appendOperator("TL");
+    return finalize();
+  }
+
   std::string mangleAssociatedTypeDescriptor(
                                          const AssociatedTypeDecl *assocType) {
     // Don't optimize away the protocol name, because we need it to distinguish
