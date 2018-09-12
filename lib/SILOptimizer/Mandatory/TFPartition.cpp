@@ -1548,6 +1548,10 @@ static bool hoistValueAboveStartPoint(SILInstruction *inst,
   if (DI.properlyDominates(inst, tensorStartPoint))
     return true;
 
+  // It doesn't make sense to hoist the start point above itself.
+  if (inst == tensorStartPoint)
+    return false;
+
   // In general, we need to check to see if we have a chain of side-effect free
   // instructions whose ultimate inputs dominate the start point.
   if (canMoveInstruction(inst, /*plusZeroTensorOperand*/ nullptr)) {
