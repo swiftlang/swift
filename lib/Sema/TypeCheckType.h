@@ -141,8 +141,9 @@ class TypeResolutionOptions {
   Context context = Context::None;
   // TypeResolutionFlags
   uint16_t flags = 0;
-  static_assert(sizeof(flags) == sizeof(TypeResolutionFlags),
-      "Flags size error");
+  static_assert(sizeof(TypeResolutionOptions::flags) ==
+                    sizeof(TypeResolutionFlags),
+                "Flags size error");
 
 public:
   ~TypeResolutionOptions() = default;
