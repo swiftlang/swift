@@ -306,13 +306,11 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
     Info.ID = BuiltinValueKind::AtomicStore;
   else if (OperationName.startswith("allocWithTailElems_"))
     Info.ID = BuiltinValueKind::AllocWithTailElems;
-  else {
-    // Switch through the rest of builtins.
-#define BUILTIN(Id, Name, Attrs) \
-    if (OperationName == Name) { Info.ID = BuiltinValueKind::Id; } else
+  else
+    Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
+#define BUILTIN(id, name, attrs) .Case(name, BuiltinValueKind::id)
 #include "swift/AST/Builtins.def"
-    /* final "else" */ { Info.ID = BuiltinValueKind::None; }
-  }
+      .Default(BuiltinValueKind::None);
 
   return Info;
 }

@@ -1600,11 +1600,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAllocWithTailElemsOperation(Context, Id, NumTailTypes);
   }
 
-  auto BV = BuiltinValueKind::None;
-#define BUILTIN(id, name, Attrs) \
-  if (name == OperationName) { BV = BuiltinValueKind::id; } else
+  auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
+#define BUILTIN(id, name, Attrs) .Case(name, BuiltinValueKind::id)
 #include "swift/AST/Builtins.def"
-  /* final "else" */ {}
+    .Default(BuiltinValueKind::None);
 
   // Filter out inappropriate overloads.
   OverloadedBuiltinKind OBK = OverloadedBuiltinKinds[unsigned(BV)];
