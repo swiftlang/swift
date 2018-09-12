@@ -1,11 +1,20 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Process.h"
 #include "gtest/gtest.h"
+
+#if __has_include(<sys/mman.h>)
+# include <sys/mman.h>
+# define HAS_MMAP 1
+#else
+# define HAS_MMAP 0
+#endif
 
 using namespace swift;
 using namespace llvm;
@@ -806,3 +815,37 @@ TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
   ASSERT_FALSE(containsPrefix(
       DiagConsumer.messages, "1, 4: nul character embedded in middle of file"));
 }
+
+#if HAS_MMAP
+
+// This test requires mmap because llvm::sys::Memory doesn't support protecting
+// pages to have no permissions.
+TEST_F(LexerTest, EncodedStringSegmentPastTheEnd) {
+  size_t PageSize = llvm::sys::Process::getPageSize();
+
+  void *FirstPage = mmap(/*addr*/nullptr, PageSize * 2, PROT_NONE,
+                         MAP_PRIVATE | MAP_ANON, /*fd*/-1, /*offset*/0);
+  SWIFT_DEFER { (void)munmap(FirstPage, PageSize * 2); };
+  ASSERT_NE(FirstPage, MAP_FAILED);
+  int ProtectResult = mprotect(FirstPage, PageSize, PROT_READ | PROT_WRITE);
+  ASSERT_EQ(ProtectResult, 0);
+
+  auto check = [FirstPage, PageSize](StringRef Input, StringRef Expected) {
+    char *StartPtr = static_cast<char *>(FirstPage) + PageSize - Input.size();
+    memcpy(StartPtr, Input.data(), Input.size());
+
+    SmallString<64> Buffer;
+    StringRef Escaped = Lexer::getEncodedStringSegment({StartPtr, Input.size()},
+                                                       Buffer);
+    EXPECT_EQ(Escaped, Expected);
+  };
+
+  check("needs escaping\\r",
+        "needs escaping\r");
+  check("does not need escaping",
+        "does not need escaping");
+  check("invalid escape at the end \\",
+        "invalid escape at the end ");
+}
+
+#endif // HAS_MMAP

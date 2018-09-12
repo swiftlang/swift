@@ -399,22 +399,46 @@ public:
     }
 
   };
-  
+
+  /// Implementation of getEncodedStringSegment. Note that \p Str must support
+  /// reading one byte past the end.
+  static StringRef getEncodedStringSegmentImpl(StringRef Str,
+                                               SmallVectorImpl<char> &Buffer,
+                                               bool IsFirstSegment,
+                                               bool IsLastSegment,
+                                               unsigned IndentToStrip,
+                                               unsigned CustomDelimiterLen);
+
   /// \brief Compute the bytes that the actual string literal should codegen to.
   /// If a copy needs to be made, it will be allocated out of the provided
-  /// Buffer.
-  static StringRef getEncodedStringSegment(StringRef Str,
-                                           SmallVectorImpl<char> &Buffer,
-                                           bool IsFirstSegment = false,
-                                           bool IsLastSegment = false,
-                                           unsigned IndentToStrip = 0,
-                                           unsigned CustomDelimiterLen = 0);
+  /// \p Buffer.
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
-    return getEncodedStringSegment(
+    return getEncodedStringSegmentImpl(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
         Buffer, Segment.IsFirstSegment, Segment.IsLastSegment,
         Segment.IndentToStrip, Segment.CustomDelimiterLen);
+  }
+
+  /// \brief Given a string encoded with escapes like a string literal, compute
+  /// the byte content.
+  ///
+  /// If a copy needs to be made, it will be allocated out of the provided
+  /// \p Buffer.
+  static StringRef getEncodedStringSegment(StringRef Str,
+                                           SmallVectorImpl<char> &Buffer) {
+    SmallString<128> TerminatedStrBuf(Str);
+    TerminatedStrBuf.push_back('\0');
+    StringRef TerminatedStr = StringRef(TerminatedStrBuf).drop_back();
+    StringRef Result = getEncodedStringSegmentImpl(TerminatedStr, Buffer,
+                                                   /*IsFirstSegment*/false,
+                                                   /*IsLastSegment*/false,
+                                                   /*IndentToStrip*/0,
+                                                   /*CustomDelimiterLen*/0);
+    if (Result == TerminatedStr)
+      return Str;
+    assert(Result.data() == Buffer.data());
+    return Result;
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments
