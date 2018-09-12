@@ -92,6 +92,8 @@ static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
 namespace {
     /// Used to serialize the on-disk func hash table.
   class FuncTableInfo {
+    Serializer &S;
+
   public:
     using key_type = Identifier;
     using key_type_ref = key_type;
@@ -99,6 +101,8 @@ namespace {
     using data_type_ref = const data_type &;
     using hash_value_type = uint32_t;
     using offset_type = unsigned;
+
+    explicit FuncTableInfo(Serializer &S) : S(S) {}
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
@@ -109,16 +113,12 @@ namespace {
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      uint32_t keyLength = key.str().size();
-      uint32_t dataLength = sizeof(uint32_t);
-      endian::Writer writer(out, little);
-      writer.write<uint16_t>(keyLength);
-      // No need to write the data length; it's constant.
-      return { keyLength, dataLength };
+      return { sizeof(uint32_t), sizeof(uint32_t) };
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      out << key.str();
+      uint32_t keyID = S.addDeclBaseNameRef(key);
+      endian::write<uint32_t>(out, keyID, little);
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
@@ -2062,7 +2062,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
 /// Depending on the RecordKind, we write the SILFunction table, the global
 /// variable table, the table for SILVTable, or the table for SILWitnessTable.
-static void writeIndexTable(const sil_index_block::ListLayout &List,
+static void writeIndexTable(Serializer &S,
+                            const sil_index_block::ListLayout &List,
                             sil_index_block::RecordKind kind,
                             const SILSerializer::Table &table) {
   assert((kind == sil_index_block::SIL_FUNC_NAMES ||
@@ -2076,13 +2077,14 @@ static void writeIndexTable(const sil_index_block::ListLayout &List,
   uint32_t tableOffset;
   {
     llvm::OnDiskChainedHashTableGenerator<FuncTableInfo> generator;
+    FuncTableInfo tableInfo(S);
     for (auto &entry : table)
-      generator.insert(entry.first, entry.second);
+      generator.insert(entry.first, entry.second, tableInfo);
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0.
     endian::write<uint32_t>(blobStream, 0, little);
-    tableOffset = generator.Emit(blobStream);
+    tableOffset = generator.Emit(blobStream, tableInfo);
   }
   SmallVector<uint64_t, 8> scratch;
   List.emit(scratch, kind, tableOffset, hashTableBlob);
@@ -2094,31 +2096,32 @@ void SILSerializer::writeIndexTables() {
   sil_index_block::ListLayout List(Out);
   sil_index_block::OffsetLayout Offset(Out);
   if (!FuncTable.empty()) {
-    writeIndexTable(List, sil_index_block::SIL_FUNC_NAMES, FuncTable);
+    writeIndexTable(S, List, sil_index_block::SIL_FUNC_NAMES, FuncTable);
     Offset.emit(ScratchRecord, sil_index_block::SIL_FUNC_OFFSETS, Funcs);
   }
 
   if (!VTableList.empty()) {
-    writeIndexTable(List, sil_index_block::SIL_VTABLE_NAMES, VTableList);
+    writeIndexTable(S, List, sil_index_block::SIL_VTABLE_NAMES, VTableList);
     Offset.emit(ScratchRecord, sil_index_block::SIL_VTABLE_OFFSETS,
                 VTableOffset);
   }
 
   if (!GlobalVarList.empty()) {
-    writeIndexTable(List, sil_index_block::SIL_GLOBALVAR_NAMES, GlobalVarList);
+    writeIndexTable(S, List, sil_index_block::SIL_GLOBALVAR_NAMES,
+                    GlobalVarList);
     Offset.emit(ScratchRecord, sil_index_block::SIL_GLOBALVAR_OFFSETS,
                 GlobalVarOffset);
   }
 
   if (!WitnessTableList.empty()) {
-    writeIndexTable(List, sil_index_block::SIL_WITNESS_TABLE_NAMES,
+    writeIndexTable(S, List, sil_index_block::SIL_WITNESS_TABLE_NAMES,
                     WitnessTableList);
     Offset.emit(ScratchRecord, sil_index_block::SIL_WITNESS_TABLE_OFFSETS,
                 WitnessTableOffset);
   }
   
   if (!DefaultWitnessTableList.empty()) {
-    writeIndexTable(List, sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES,
+    writeIndexTable(S, List, sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES,
                     DefaultWitnessTableList);
     Offset.emit(ScratchRecord,
                 sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
