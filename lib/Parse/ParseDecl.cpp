@@ -186,7 +186,9 @@ void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
   SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
   assert(!SF.hasInterfaceHash() &&
     "Cannot delay parsing if we care about the interface hash.");
+  assert(SF.Kind != SourceFileKind::SIL && "cannot delay parsing SIL");
   unsigned BufferID = *SF.getBufferID();
+
   // MarkedPos is not useful for delayed parsing because we know where we should
   // jump the parser to. However, we should recover the MarkedPos here in case
   // the PersistentParserState will be used to continuously parse the rest of
@@ -3362,6 +3364,10 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
 }
 
 bool Parser::canDelayMemberDeclParsing() {
+  // There's no fundamental reasons that SIL cannnot be lasily parsed. We need
+  // to keep SILParserTUStateBase persistent to make it happen.
+  if (isInSILMode())
+    return false;
   // Calculating interface hash requires tokens consumed in the original order.
   if (SF.hasInterfaceHash())
     return false;
