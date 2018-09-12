@@ -5421,13 +5421,19 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {
-  if (getBodyKind() == BodyKind::Deserialized)
+  switch (getBodyKind()) {
+  case BodyKind::Deserialized:
     return true;
-  if (getBodyKind() != BodyKind::Parsed &&
-      getBodyKind() != BodyKind::TypeChecked)
+  case BodyKind::Parsed:
+  case BodyKind::TypeChecked:
+    return getBody() && !getBody()->isImplicit();
+  case BodyKind::None:
+  case BodyKind::Unparsed:
+  case BodyKind::Synthesize:
+  case BodyKind::Skipped:
+  case BodyKind::MemberwiseInitializer:
     return false;
-  auto body = getBody();
-  return body && !body->isImplicit();
+  }
 }
 
 StringRef AbstractFunctionDecl::getInlinableBodyText(

@@ -898,8 +898,6 @@ void Serializer::writeBlockInfoBlock() {
                               decls_block::GENERIC_REQUIREMENT);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::LAYOUT_REQUIREMENT);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::INLINABLE_BODY_TEXT);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -1363,7 +1361,8 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
   }
 }
 
-void Serializer::writeInlinableBodyText(const AbstractFunctionDecl *AFD) {
+void Serializer::writeInlinableBodyTextIfNeeded(
+  const AbstractFunctionDecl *AFD) {
   using namespace decls_block;
 
   if (AFD->getResilienceExpansion() != swift::ResilienceExpansion::Minimal)
@@ -3250,7 +3249,7 @@ void Serializer::writeDecl(const Decl *D) {
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
 
-    writeInlinableBodyText(fn);
+    writeInlinableBodyTextIfNeeded(fn);
 
     break;
   }
@@ -3309,7 +3308,7 @@ void Serializer::writeDecl(const Decl *D) {
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
 
-    writeInlinableBodyText(fn);
+    writeInlinableBodyTextIfNeeded(fn);
 
     break;
   }
@@ -3464,8 +3463,7 @@ void Serializer::writeDecl(const Decl *D) {
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
 
-    writeInlinableBodyText(ctor);
-
+    writeInlinableBodyTextIfNeeded(ctor);
     break;
   }
 
@@ -3482,7 +3480,7 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isObjC(),
                                  addGenericEnvironmentRef(
                                                 dtor->getGenericEnvironment()));
-    writeInlinableBodyText(dtor);
+    writeInlinableBodyTextIfNeeded(dtor);
     break;
   }
 

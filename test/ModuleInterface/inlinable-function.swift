@@ -18,6 +18,7 @@ public struct Foo: Hashable {
     set {
       print("I am set to \(newValue)")
     }
+    // CHECK-NEXT: {{^}}  }
   }
 
   // CHECK: public var noAccessors: [[INT]]{{$}}
@@ -31,13 +32,13 @@ public struct Foo: Hashable {
     didSet {
       print("b set to \(hasDidSet)")
     }
-    // CHECK-NEXT: }
+    // CHECK-NEXT: {{^}}  }
   }
 
 
   // CHECK: @_transparent public var transparent: [[INT]] {
-  // CHECK:   return 34
-  // CHECK: }
+  // CHECK-NEXT:   return 34
+  // CHECK-NEXT: }
   @_transparent
   public var transparent: Int {
     return 34
@@ -59,6 +60,7 @@ public struct Foo: Hashable {
     // CHECK:       print("I am set to \(newValue)")
     // CHECK-NOT:   #endif
     // CHECK-NOT:   #endif
+    // CHECK-NEXT: }
     @_transparent
     set {
       #if false
@@ -97,6 +99,7 @@ public struct Foo: Hashable {
       print("I should not appear")
       #endif
     }
+    // CHECK-NEXT: }
   }
 
   // CHECK: @inlinable public func inlinableMethod() {
