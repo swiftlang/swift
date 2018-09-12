@@ -3082,7 +3082,8 @@ void ClangModuleUnit::getImportedModules(
   switch (filter) {
   case ModuleDecl::ImportFilter::All:
   case ModuleDecl::ImportFilter::Private:
-    imports.push_back({ModuleDecl::AccessPathTy(), owner.getStdlibModule()});
+    if (auto stdlib = owner.getStdlibModule())
+      imports.push_back({ModuleDecl::AccessPathTy(), stdlib});
     break;
   case ModuleDecl::ImportFilter::Public:
     break;
