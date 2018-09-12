@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 
-import TensorFlow
-
 @inline(never)
 func print<T>(_ x: T) {
   Swift.print(x)
