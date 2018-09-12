@@ -1977,7 +1977,7 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
       return OpaqueValue(42)
     }
     if wasInvoked {
-      expectOptionalEqual(42, result?.value)
+      expectEqual(42, result?.value)
     } else {
       expectNil(result)
     }
@@ -1999,7 +1999,7 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
     }
     expectNil(result)
     if wasInvoked {
-      expectOptionalEqual(TestError.error2, caughtError as? TestError)
+      expectEqual(TestError.error2, caughtError as? TestError)
     }
   }
 }
