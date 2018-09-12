@@ -187,6 +187,7 @@ private:
       ConsumerSpecificInfoForSubsequentNotes = None;
 
   bool HasAnErrorBeenConsumed = false;
+  bool HasAnErrorWithNoConsumerSpecificInfoBeenConsumed = false;
 
 public:
   /// Takes ownership of the DiagnosticConsumers specified in \p consumers.

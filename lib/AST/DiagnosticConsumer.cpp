@@ -172,6 +172,8 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     break;
   }
   if (!consumerSpecificInfo.hasValue()) {
+    HasAnErrorWithNoConsumerSpecificInfoBeenConsumed |=
+        Kind == DiagnosticKind::Error;
     for (auto &subConsumer : SubConsumers) {
       if (subConsumer.second) {
         subConsumer.second->handleDiagnostic(SM, Loc, Kind, FormatString,
@@ -205,6 +207,11 @@ void FileSpecificDiagnosticConsumer::
     tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation() const {
   if (!HasAnErrorBeenConsumed)
     return;
+  if (HasAnErrorWithNoConsumerSpecificInfoBeenConsumed) {
+    // An error was emitted, but not through a consumerSpecificInfo.
+    // Falling through would lose the error, so return.
+    return;
+  }
   for (auto &info : ConsumersOrderedByRange) {
     if (!info.hasAnErrorBeenEmitted && info.consumer)
       info.consumer->informDriverOfIncompleteBatchModeCompilation();
