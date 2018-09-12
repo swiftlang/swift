@@ -328,7 +328,7 @@ LazyTestSuite.test("EmptyCollection/index(_:offsetBy:limitedBy:)/NoTrap")
   let result =
     c.index(c.startIndex, offsetBy: offset, limitedBy: c.startIndex)
   if offset == 0 {
-    expectOptionalEqual(c.startIndex, result)
+    expectEqual(c.startIndex, result)
   } else {
     expectNil(result)
   }
@@ -390,7 +390,7 @@ LazyTestSuite.test("isEmpty") {
 }
 
 LazyTestSuite.test("first") {
-  expectOptionalEqual(7, (7..<42).lazy.first)
+  expectEqual(7, (7..<42).lazy.first)
 }
 
 LazyTestSuite.test("first empty") {
@@ -398,7 +398,7 @@ LazyTestSuite.test("first empty") {
 }
 
 LazyTestSuite.test("last") {
-  expectOptionalEqual(41, (7..<42).lazy.last)
+  expectEqual(41, (7..<42).lazy.last)
 }
 
 LazyTestSuite.test("last empty") {
