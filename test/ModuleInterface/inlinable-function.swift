@@ -212,7 +212,7 @@ public class HasInlinableDeinit {
   // CHECK: public init(){{$}}
   public init() {}
 
-  // CHECK: @objc @inlinable deinit {
+  // CHECK: [[OBJC:(@objc )?]]@inlinable deinit {
   // CHECK-NEXT: print("goodbye")
   // CHECK-NEXT: }
   @inlinable deinit {
@@ -227,7 +227,7 @@ public class HasStandardDeinit {
   // CHECK: public init(){{$}}
   public init() {}
 
-  // CHECK: @objc deinit{{$}}
+  // CHECK: [[OBJC]]deinit{{$}}
   deinit {
     print("goodbye")
   }
@@ -240,6 +240,6 @@ public class HasDefaultDeinit {
   // CHECK: public init(){{$}}
   public init() {}
 
-  // CHECK: @objc deinit{{$}}
+  // CHECK: [[OBJC]]deinit{{$}}
   // CHECK-NEXT: }
 }
