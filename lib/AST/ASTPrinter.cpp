@@ -654,6 +654,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printAttributes(const Decl *D);
   void printTypedPattern(const TypedPattern *TP);
+  void printBraceStmt(const BraceStmt *stmt, bool newlineIfEmpty = true);
 
 public:
   void printPattern(const Pattern *pattern);
@@ -695,6 +696,7 @@ private:
   void printGenericDeclGenericParams(GenericContext *decl);
   void printGenericDeclGenericRequirements(GenericContext *decl);
   void printInherited(const Decl *decl);
+  void printBodyIfNecessary(const AbstractFunctionDecl *decl);
 
   void printEnumElement(EnumElementDecl *elt);
 
@@ -1478,6 +1480,29 @@ bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
   if (!Result && Notify)
     Printer.callAvoidPrintDeclPost(D);
   return Result;
+}
+
+void PrintAST::printBraceStmt(const BraceStmt *stmt, bool newlineIfEmpty) {
+  Printer << "{";
+  if (printASTNodes(stmt->getElements()) || newlineIfEmpty) {
+    Printer.printNewline();
+    indent();
+  }
+  Printer << "}";
+}
+
+void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
+  if (auto BodyFunc = Options.FunctionBody) {
+    BodyFunc(decl, Printer);
+    indent();
+    return;
+  }
+
+  if (!Options.FunctionDefinitions || !decl->getBody())
+    return;
+
+  Printer << " ";
+  printBraceStmt(decl->getBody(), /*newlineIfEmpty*/!isa<AccessorDecl>(decl));
 }
 
 static bool isAccessorAssumedNonMutating(AccessorKind kind) {
@@ -2540,19 +2565,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
       });
   }
 
-  if (auto BodyFunc = Options.FunctionBody) {
-    BodyFunc(decl, Printer);
-    indent();
-    return;
-  }
-
-  Printer << " {";
-  if (Options.FunctionDefinitions && decl->getBody())
-    if (printASTNodes(decl->getBody()->getElements())) {
-      Printer.printNewline();
-      indent();
-    }
-  Printer << "}";
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
@@ -2624,13 +2637,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printGenericDeclGenericRequirements(decl);
   }
 
-  if (auto BodyFunc = Options.FunctionBody) {
-    BodyFunc(decl, Printer);
-    indent();
-  } else if (Options.FunctionDefinitions && decl->getBody()) {
-    Printer << " ";
-    visit(decl->getBody());
-  }
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::printEnumElement(EnumElementDecl *elt) {
@@ -2799,13 +2806,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
   printGenericDeclGenericRequirements(decl);
 
-  if (auto BodyFunc = Options.FunctionBody) {
-    BodyFunc(decl, Printer);
-    indent();
-  } else if (Options.FunctionDefinitions && decl->getBody()) {
-    Printer << " ";
-    visit(decl->getBody());
-  }
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
@@ -2817,12 +2818,7 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
       Printer << "deinit";
     });
 
-  if (!Options.FunctionDefinitions || !decl->getBody()) {
-    return;
-  }
-
-  Printer << " ";
-  visit(decl->getBody());
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
@@ -2932,11 +2928,7 @@ void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
 }
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
-  Printer << "{";
-  printASTNodes(stmt->getElements());
-  Printer.printNewline();
-  indent();
-  Printer << "}";
+  printBraceStmt(stmt);
 }
 
 void PrintAST::visitReturnStmt(ReturnStmt *stmt) {

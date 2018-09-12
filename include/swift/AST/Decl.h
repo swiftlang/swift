@@ -5000,8 +5000,7 @@ protected:
     /// BodyKind::TypeChecked.
     BraceStmt *Body;
 
-    /// This enum member is active if getBodyKind() is BodyKind::Deserialized or
-    /// BodyKind::TypeChecked.
+    /// This enum member is active if getBodyKind() is BodyKind::Deserialized.
     StringRef BodyStringRepresentation;
 
     /// This enum member is active if getBodyKind() == BodyKind::Synthesize.

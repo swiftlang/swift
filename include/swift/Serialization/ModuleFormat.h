@@ -983,7 +983,7 @@ namespace decls_block {
     // - its generic parameters, if any
     // - its parameter patterns,
     // - the foreign error convention, if any
-    // - inlinable bldy text, if any
+    // - inlinable body text, if any
   >;
 
   using VarLayout = BCRecordLayout<

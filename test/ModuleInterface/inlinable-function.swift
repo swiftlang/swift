@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule -emit-interface-path %t/Test.swiftinterface -module-name Test %s
 // RUN: %FileCheck %s < %t/Test.swiftinterface
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -emit-interface-path - -module-name Test | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-interface-path - -module-name Test | %FileCheck %s
 
 // CHECK: public struct Foo : Hashable {
 public struct Foo: Hashable {
@@ -136,6 +136,25 @@ public struct Foo: Hashable {
     print("Not inlinable")
   }
 
+  // CHECK: public init(value: [[INT]]) {
+  // CHECK-NEXT: topLevelUsableFromInline()
+  // CHECK-NEXT: noAccessors = value
+  // CHECK-NEXT: hasDidSet = value
+  // CHECK-NEXT: }
+  @inlinable public init(value: Int) {
+    topLevelUsableFromInline()
+    noAccessors = value
+    hasDidSet = value
+  }
+
+  // CHECK: public init(){{$}}
+  // CHECK-NOT: noAccessors = 0
+  // CHECK-NOT: hasDidSet = 0
+  public init() {
+    noAccessors = 0
+    hasDidSet = 0
+  }
+
   // CHECK: {{^}}}
 }
 
@@ -155,4 +174,41 @@ internal func topLevelUsableFromInline() {
 // CHECK-NEXT: }
 @inlinable public func topLevelInlinable() {
   topLevelUsableFromInline()
+}
+
+// CHECK: public class HasInlinableDeinit {
+public class HasInlinableDeinit {
+  // CHECK: public init(){{$}}
+  public init() {}
+
+  // CHECK: @objc @inlinable deinit {
+  // CHECK-NEXT: print("goodbye")
+  // CHECK-NEXT: }
+  @inlinable deinit {
+    print("goodbye")
+  }
+
+  // CHECK-NEXT: }
+}
+
+// CHECK: public class HasStandardDeinit {
+public class HasStandardDeinit {
+  // CHECK: public init(){{$}}
+  public init() {}
+
+  // CHECK: @objc deinit{{$}}
+  deinit {
+    print("goodbye")
+  }
+
+  // CHECK-NEXT: }
+}
+
+// CHECK: public class HasDefaultDeinit {
+public class HasDefaultDeinit {
+  // CHECK: public init(){{$}}
+  public init() {}
+
+  // CHECK: @objc deinit{{$}}
+  // CHECK-NEXT: }
 }
