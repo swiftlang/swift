@@ -793,13 +793,77 @@ AbstractionPattern AbstractionPattern::getFunctionInputType() const {
 AbstractionPattern
 AbstractionPattern::getFunctionParamType(unsigned index) const {
   switch (getKind()) {
+  case Kind::Opaque:
+    return *this;
   case Kind::Type: {
     if (isTypeParameter())
       return AbstractionPattern::getOpaque();
-    auto fnType = cast<AnyFunctionType>(getType());
-    auto param = fnType.getParams()[index];
+    auto params = cast<AnyFunctionType>(getType()).getParams();
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
-                              param.getParameterType());
+                              params[index].getParameterType());
+  }
+  case Kind::CFunctionAsMethodType: {
+    auto params = cast<AnyFunctionType>(getType()).getParams();
+    assert(params.size() > 0);
+
+    // The last parameter is 'self'.
+    if (index == params.size() - 1) {
+      return getCFunctionAsMethodSelfPattern(params.back().getParameterType());
+    }
+
+    // A parameter of type () does not correspond to a Clang parameter.
+    auto paramType = params[index].getParameterType();
+    if (paramType->isVoid())
+      return AbstractionPattern(paramType);
+
+    // Otherwise, we're talking about the formal parameter clause.
+    // Jump over the self parameter in the Clang type.
+    unsigned clangIndex = index;
+    auto memberStatus = getImportAsMemberStatus();
+    if (memberStatus.isInstance() && clangIndex >= memberStatus.getSelfIndex())
+      ++clangIndex;
+    return AbstractionPattern(getGenericSignatureForFunctionComponent(),
+                              paramType,
+                     getClangFunctionParameterType(getClangType(), clangIndex));
+  }
+  case Kind::ObjCMethodType: {
+    auto params = cast<AnyFunctionType>(getType()).getParams();
+    assert(params.size() > 0);
+
+    // The last parameter is 'self'.
+    if (index == params.size() - 1) {
+      return getObjCMethodSelfPattern(params.back().getParameterType());
+    }
+
+    // A parameter of type () does not correspond to a Clang parameter.
+    auto paramType = params[index].getParameterType();
+    if (paramType->isVoid())
+      return AbstractionPattern(paramType);
+
+    // Otherwise, we're talking about the formal parameter clause.
+    auto method = getObjCMethod();
+    auto errorInfo = getEncodedForeignErrorInfo();
+
+    unsigned paramIndex = index;
+    if (errorInfo.hasErrorParameter()) {
+      auto errorParamIndex = errorInfo.getErrorParameterIndex();
+
+      if (!errorInfo.isErrorParameterReplacedWithVoid()) {
+        if (paramIndex >= errorParamIndex) {
+          paramIndex++;
+        }
+      }
+    }
+
+    return AbstractionPattern(getGenericSignatureForFunctionComponent(),
+                              paramType,
+                      method->parameters()[paramIndex]->getType().getTypePtr());
+  }
+  case Kind::ClangType: {
+    auto params = cast<AnyFunctionType>(getType()).getParams();
+    return AbstractionPattern(getGenericSignatureForFunctionComponent(),
+                              params[index].getParameterType(),
+                          getClangFunctionParameterType(getClangType(), index));
   }
   default:
     // FIXME: Re-implement this
