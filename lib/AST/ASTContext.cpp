@@ -277,6 +277,10 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// Overridden declarations.
   llvm::DenseMap<const ValueDecl *, ArrayRef<ValueDecl *>> Overrides;
 
+  /// Default witnesses.
+  llvm::DenseMap<std::pair<const ProtocolDecl *, ValueDecl *>, Witness>
+    DefaultWitnesses;
+
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -1654,6 +1658,28 @@ void OverriddenDeclsRequest::cacheResult(
   auto overriddenCopy =
     ctx.AllocateCopy(value.operator ArrayRef<ValueDecl *>());
   (void)ctx.getImpl().Overrides.insert({decl, overriddenCopy});
+}
+
+/// Returns the default witness for a requirement, or nullptr if there is
+/// no default.
+Witness ProtocolDecl::getDefaultWitness(ValueDecl *requirement) const {
+  loadAllMembers();
+
+  ASTContext &ctx = getASTContext();
+  auto found = ctx.getImpl().DefaultWitnesses.find({this, requirement});
+  if (found == ctx.getImpl().DefaultWitnesses.end())
+    return Witness();
+  return found->second;
+}
+
+/// Record the default witness for a requirement.
+void ProtocolDecl::setDefaultWitness(ValueDecl *requirement, Witness witness) {
+  assert(witness);
+  ASTContext &ctx = getASTContext();
+  auto pair = ctx.getImpl().DefaultWitnesses.insert(
+                std::make_pair(std::make_pair(this, requirement), witness));
+  assert(pair.second && "Already have a default witness!");
+  (void) pair;
 }
 
 bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
