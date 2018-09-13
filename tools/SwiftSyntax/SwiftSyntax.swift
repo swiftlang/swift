@@ -92,7 +92,7 @@ public final class SyntaxTreeDeserializer {
   /// - Returns: A top-level Syntax node representing the contents of the tree,
   ///            if the parse was successful.
   public func deserialize(
-    _ data: Data, serializationFormat: SerializationFormat
+    _ data: Data, serializationFormat: SerializationFormat = .json
   ) throws -> SourceFileSyntax {
     reusedNodeIds = []
     let rawSyntax: RawSyntax
