@@ -429,7 +429,7 @@ extension Set: Equatable {
 
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
-      return _stdlib_NSObject_isEqual(lhsCocoa.object, rhsCocoa.object)
+      return lhsCocoa == rhsCocoa
 
     case (.native(let lhsNative), .cocoa(let rhsCocoa)):
       if lhsNative.count != rhsCocoa.count {
@@ -2431,6 +2431,18 @@ internal struct _CocoaSet {
   internal init(_ object: _NSSet) {
     self.object = object
   }
+}
+
+extension _CocoaSet: Equatable {
+  @usableFromInline
+  internal static func ==(lhs: _CocoaSet, rhs: _CocoaSet) -> Bool {
+    return _stdlib_NSObject_isEqual(lhs.object, rhs.object)
+  }
+}
+
+extension _CocoaSet: _SetBuffer {
+  @usableFromInline
+  internal typealias Element = AnyObject
 
   @inlinable
   internal var startIndex: Index {
@@ -2453,7 +2465,7 @@ internal struct _CocoaSet {
     i = i.successor()
   }
 
-  @inlinable
+  @usableFromInline
   internal func index(forKey key: AnyObject) -> Index? {
     // Fast path that does not involve creating an array of all keys.  In case
     // the key is present, this lookup is a penalty for the slow path, but the
@@ -2486,7 +2498,7 @@ internal struct _CocoaSet {
     return object.member(element) != nil
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal func assertingGet(at i: Index) -> AnyObject {
     let value: AnyObject? = i.allKeys[i.currentKeyIndex]
     _sanityCheck(value != nil, "Item not found in underlying NSSet")

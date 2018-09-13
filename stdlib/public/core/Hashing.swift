@@ -14,6 +14,8 @@
 // This file implements helpers for hashing collections.
 //
 
+import SwiftShims
+
 /// The inverse of the default hash table load factor.  Factored out so that it
 /// can be used in multiple places in the implementation and stay consistent.
 /// Should not be used outside `Dictionary` implementation.
@@ -27,8 +29,6 @@ internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
 ///
 /// This function is part of the runtime because `Bool` type is bridged to
 /// `ObjCBool`, which is in Foundation overlay.
-/// FIXME(sil-serialize-all): this should be internal
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSObject_isEqual")
 internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bool
 #endif

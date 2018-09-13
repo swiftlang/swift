@@ -1499,7 +1499,7 @@ extension Dictionary: Equatable where Value: Equatable {
 
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
-      return _stdlib_NSObject_isEqual(lhsCocoa.object, rhsCocoa.object)
+      return lhsCocoa == rhsCocoa
 
     case (.native(let lhsNative), .cocoa(let rhsCocoa)):
 
@@ -3057,7 +3057,7 @@ internal struct _CocoaDictionary: _DictionaryBuffer {
     i = i.successor()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal func index(forKey key: Key) -> Index? {
     // Fast path that does not involve creating an array of all keys.  In case
     // the key is present, this lookup is a penalty for the slow path, but the
@@ -3133,6 +3133,16 @@ internal struct _CocoaDictionary: _DictionaryBuffer {
       result.count += 1
     }
     return result
+  }
+}
+
+extension _CocoaDictionary: Equatable {
+  @usableFromInline
+  internal static func ==(
+    lhs: _CocoaDictionary,
+    rhs: _CocoaDictionary
+  ) -> Bool {
+    return _stdlib_NSObject_isEqual(lhs.object, rhs.object)
   }
 }
 #endif
