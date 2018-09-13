@@ -441,10 +441,13 @@ SingleExitLoopTransformer::computeEscapingValues() const {
   // Replace undef with an equivalent value that is available at preheader.
   for (auto &kv : result) {
     const SILValue &escapingValue = kv.first;
-    // Find an equivalent value that dominates the header.
+    // Get the member iterator for the equivalence class of escapingValue.
+    auto member_begin = equivalentValues.findLeader(escapingValue);
+
+    // Iterate over *all* the members and find an equivalent value that
+    // dominates the terminator instruction of the preheader.
     for (auto equivalentValue :
-         make_range(equivalentValues.findLeader(escapingValue),
-                    equivalentValues.member_end())) {
+         make_range(member_begin, equivalentValues.member_end())) {
       if (DI->properlyDominates(equivalentValue, preheader->getTerminator())) {
         // Found a definition that we could use.
         kv.second = equivalentValue;
