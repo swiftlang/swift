@@ -55,8 +55,8 @@ import resilient_protocol
 // CHECK-SAME:   @"$S19protocol_resilience17ResilientProtocolMp"
 
 // Protocol requirements
-// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 8, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
 
@@ -147,7 +147,7 @@ protocol InternalProtocol {
 
 // -- type metadata for associated type
 // CHECK-SAME: @"{{got.|__imp_}}$S1T18resilient_protocol24ProtocolWithRequirementsPTl"
-// CHECK-SAME: "$SSiMa"
+// CHECK-SAME: @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AA1TWt"
 
 // CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTq"
 // CHECK-SAME: @firstWitness
@@ -161,8 +161,8 @@ protocol InternalProtocol {
 // Witness table for conformance with resilient associated type
 
 // CHECK: @"$S19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden constant [3 x i8*] [
-// CHECK-SAME:   i8* bitcast (%swift.metadata_response ([[INT]])* @"$S19protocol_resilience23ResilientConformingTypeVMa" to i8*),
 // CHECK-SAME:   i8* bitcast (i8** ()* @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa" to i8*)
+// CHECK-SAME:   i8* bitcast (%swift.metadata_response ([[INT]])* @"$S19protocol_resilience23ResilientConformingTypeVMa" to i8*)
 // CHECK-SAME: ]
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
