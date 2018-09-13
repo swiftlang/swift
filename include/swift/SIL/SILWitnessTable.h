@@ -226,10 +226,6 @@ public:
   /// object file level.
   StringRef getName() const { return Name; }
 
-  /// Return the symbol name of the witness table that will be propagated to the
-  /// object file as an Identifier.
-  Identifier getIdentifier() const;
-
   /// Returns true if this witness table is a declaration.
   bool isDeclaration() const { return IsDeclaration; }
 
