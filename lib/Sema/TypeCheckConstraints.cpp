@@ -2535,7 +2535,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
 
-      // The expression type must conform to the Sequence.
+      // The expression type must conform to Sequence.
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *sequenceProto
         = tc.getProtocol(Stmt->getForLoc(), KnownProtocolKind::Sequence);
