@@ -4424,20 +4424,21 @@ public:
             "have at least one argument for self.");
   }
 
+  enum CFGState {
+    /// No special rules are in play.
+    Normal,
+    /// We've followed the resume edge of a yield in a yield_once coroutine.
+    YieldOnceResume,
+    /// We've followed the unwind edge of a yield.
+    YieldUnwind
+  };
+
   /// Verify the various control-flow-sensitive rules of SIL:
   ///
   /// - stack allocations and deallocations must obey a stack discipline
   /// - accesses must be uniquely ended
   /// - flow-sensitive states must be equivalent on all paths into a block
   void verifyFlowSensitiveRules(SILFunction *F) {
-    enum CFGState {
-      /// No special rules are in play.
-      Normal,
-      /// We've followed the resume edge of a yield in a yield_once coroutine.
-      YieldOnceResume,
-      /// We've followed the unwind edge of a yield.
-      YieldUnwind
-    };
     struct BBState {
       std::vector<SingleValueInstruction*> Stack;
 
