@@ -686,10 +686,9 @@ bool ConstraintSystem::Candidate::solve(
   {
     SolverState state(E, cs, FreeTypeVariableBinding::Allow);
 
-    // Use solveRec() instead of solve() in here, because solve()
-    // would try to deduce the best solution, which we don't
-    // really want. Instead, we want the reduced set of domain choices.
-    cs.solveRec(solutions);
+    // Use solve which doesn't try to filter solution list.
+    // Because we want the whole set of possible domain choices.
+    cs.solve(solutions);
   }
 
   if (TC.getLangOpts().DebugConstraintSolver) {
@@ -1276,7 +1275,7 @@ bool ConstraintSystem::solve(Expr *const expr,
   SolverState state(expr, *this, allowFreeTypeVariables);
 
   // Solve the system.
-  solveRec(solutions);
+  solve(solutions);
 
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -1557,10 +1556,8 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions) {
   return !anySolutions;
 }
 
-bool ConstraintSystem::solveIteratively(
-    Expr *expr, SmallVectorImpl<Solution> &solutions,
-    FreeTypeVariableBinding allowFreeTypeVariables) {
-  SolverState state(expr, *this, allowFreeTypeVariables);
+void ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
+  assert(solverState);
 
   SmallVector<SolverStep *, 16> workList;
   // First step is always wraps whole constraint system.
@@ -1640,15 +1637,6 @@ bool ConstraintSystem::solveIteratively(
       result.transfer(workList);
     }
   }
-
-  // Filter deduced solutions, try to figure out if there is
-  // a single best solution to use, if not explicitly disabled
-  // by constraint system options.
-  if (!retainAllSolutions())
-    filterSolutions(solutions, state.ExprWeights);
-
-  // We fail if there is no solution or the expression was too complex.
-  return solutions.empty() || getExpressionTooComplex(solutions);
 }
 
 /// Whether we should short-circuit a disjunction that already has a

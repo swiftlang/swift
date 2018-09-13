@@ -3100,9 +3100,6 @@ public:
   /// \returns true if there are no solutions
   bool solveRec(SmallVectorImpl<Solution> &solutions);
 
-  bool solveIteratively(Expr *expr, SmallVectorImpl<Solution> &solutions,
-                        FreeTypeVariableBinding allowFreeTypeVariables);
-
   /// \brief Solve the system of constraints.
   ///
   /// \param allowFreeTypeVariables How to bind free type variables in
@@ -3114,6 +3111,14 @@ public:
                                     = FreeTypeVariableBinding::Disallow);
 
 private:
+  /// \brief Solve the system of constraints.
+  ///
+  /// This method responsible for running search/solver algorithm.
+  /// It doesn't filter solutions, that's the job of top-level `solve` methods.
+  ///
+  /// \param solutions The set of solutions to this system of constraints.
+  void solve(SmallVectorImpl<Solution> &solutions);
+
   /// \brief Compare two solutions to the same set of constraints.
   ///
   /// \param cs The constraint system.
