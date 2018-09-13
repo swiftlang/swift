@@ -4049,29 +4049,6 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
   }
 }
 
-/// Returns the default witness for a requirement, or nullptr if there is
-/// no default.
-Witness ProtocolDecl::getDefaultWitness(ValueDecl *requirement) const {
-  loadAllMembers();
-
-  auto found = DefaultWitnesses.find(requirement);
-  if (found == DefaultWitnesses.end())
-    return Witness();
-  return found->second;
-}
-
-/// Record the default witness for a requirement.
-void ProtocolDecl::setDefaultWitness(ValueDecl *requirement, Witness witness) {
-  assert(witness);
-  // The first type we insert a default witness, register a destructor for
-  // this type.
-  if (DefaultWitnesses.empty())
-    getASTContext().addDestructorCleanup(DefaultWitnesses);
-  auto pair = DefaultWitnesses.insert(std::make_pair(requirement, witness));
-  assert(pair.second && "Already have a default witness!");
-  (void) pair;
-}
-
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
   setFieldsFromImplInfo(implInfo);
   Accessors.getPointer()->overwriteImplInfo(implInfo);

@@ -3774,8 +3774,6 @@ private:
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
-  llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
-
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
   const Requirement *RequirementSignature = nullptr;
