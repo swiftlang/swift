@@ -68,7 +68,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   DirectlyReferencedTypeDecls evaluate(
@@ -114,7 +114,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   DirectlyReferencedTypeDecls evaluate(
@@ -140,7 +140,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<ClassDecl *>
@@ -165,7 +165,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<NominalTypeDecl *>
@@ -193,7 +193,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::TinyPtrVector<NominalTypeDecl *> evaluate(Evaluator &evaluator,
@@ -218,7 +218,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   DirectlyReferencedTypeDecls evaluate(Evaluator &evaluator,
