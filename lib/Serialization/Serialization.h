@@ -467,8 +467,19 @@ public:
   /// Records the use of the given string, which will only be stored once in
   /// the resulting module file.
   ///
+  /// \returns A pair containing the copy of the string now owned by the
+  /// Serializer and the ID for the string in this module.
+  /// \sa addUniquedStringRef
+  std::pair<StringRef, IdentifierID> addUniquedString(StringRef str);
+
+  /// Records the use of the given string, which will only be stored once in
+  /// the resulting module file.
+  ///
   /// \returns The ID for the given string in this module.
-  IdentifierID addUniquedStringRef(StringRef str);
+  /// \sa addUniquedString
+  IdentifierID addUniquedStringRef(StringRef str) {
+    return addUniquedString(str).second;
+  }
 
   /// Records the use of the given Decl.
   ///

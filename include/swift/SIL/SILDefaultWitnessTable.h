@@ -119,7 +119,11 @@ public:
                                         const ProtocolDecl *Protocol,
                                         ArrayRef<Entry> entries);
 
-  Identifier getIdentifier() const;
+  /// Get a name that uniquely identifies this default witness table.
+  ///
+  /// Note that this is /not/ valid as a symbol name; it is only guaranteed to
+  /// be unique among default witness tables, not all symbols.
+  std::string getUniqueName() const;
 
   /// Get the linkage of the default witness table.
   SILLinkage getLinkage() const { return Linkage; }

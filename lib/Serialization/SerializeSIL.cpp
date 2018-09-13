@@ -95,7 +95,7 @@ namespace {
     Serializer &S;
 
   public:
-    using key_type = Identifier;
+    using key_type = StringRef;
     using key_type_ref = key_type;
     using data_type = DeclID;
     using data_type_ref = const data_type &;
@@ -107,7 +107,7 @@ namespace {
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
       // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return llvm::djbHash(key.str(), 0);
+      return llvm::djbHash(key, 0);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -117,7 +117,7 @@ namespace {
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      uint32_t keyID = S.addUniquedStringRef(key.str());
+      uint32_t keyID = S.addUniquedStringRef(key);
       endian::write<uint32_t>(out, keyID, little);
     }
 
@@ -131,7 +131,6 @@ namespace {
     using TypeID = serialization::TypeID;
     
     Serializer &S;
-    ASTContext &Ctx;
 
     llvm::BitstreamWriter &Out;
 
@@ -259,9 +258,8 @@ namespace {
     IdentifierID addSILFunctionRef(SILFunction *F);
 
   public:
-    SILSerializer(Serializer &S, ASTContext &Ctx,
-                  llvm::BitstreamWriter &Out, bool serializeAll)
-      : S(S), Ctx(Ctx), Out(Out), ShouldSerializeAll(serializeAll) {}
+    SILSerializer(Serializer &S, llvm::BitstreamWriter &Out, bool serializeAll)
+      : S(S), Out(Out), ShouldSerializeAll(serializeAll) {}
 
     void writeSILModule(const SILModule *SILMod);
   };
@@ -349,7 +347,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   ValueIDs.clear();
   InstID = 0;
 
-  FuncTable[Ctx.getIdentifier(F.getName())] = NextFuncID++;
+  FuncTable[F.getName()] = NextFuncID++;
   Funcs.push_back(Out.GetCurrentBitNo());
   unsigned abbrCode = SILAbbrCodes[SILFunctionLayout::Code];
   TypeID FnID = S.addTypeRef(F.getLoweredType().getASTType());
@@ -2133,7 +2131,7 @@ void SILSerializer::writeIndexTables() {
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
-  GlobalVarList[Ctx.getIdentifier(g.getName())] = NextGlobalVarID++;
+  GlobalVarList[g.getName()] = NextGlobalVarID++;
   GlobalVarOffset.push_back(Out.GetCurrentBitNo());
   TypeID TyID = S.addTypeRef(g.getLoweredType().getASTType());
   DeclID dID = S.addDeclRef(g.getDecl());
@@ -2152,7 +2150,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
   if (!ShouldSerializeAll &&
       vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Public)
     return;
-  VTableList[vt.getClass()->getName()] = NextVTableID++;
+  VTableList[vt.getClass()->getName().str()] = NextVTableID++;
   VTableOffset.push_back(Out.GetCurrentBitNo());
   VTableLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[VTableLayout::Code],
                            S.addDeclRef(vt.getClass()),
@@ -2204,7 +2202,7 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
 }
 
 void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
-  WitnessTableList[wt.getIdentifier()] = NextWitnessTableID++;
+  WitnessTableList[wt.getName()] = NextWitnessTableID++;
   WitnessTableOffset.push_back(Out.GetCurrentBitNo());
 
   WitnessTableLayout::emitRecord(
@@ -2282,7 +2280,8 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
   if (wt.isDeclaration())
     return;
 
-  DefaultWitnessTableList[wt.getIdentifier()] = NextDefaultWitnessTableID++;
+  StringRef name = S.addUniquedString(wt.getUniqueName()).first;
+  DefaultWitnessTableList[name] = NextDefaultWitnessTableID++;
   DefaultWitnessTableOffset.push_back(Out.GetCurrentBitNo());
 
   DefaultWitnessTableLayout::emitRecord(
@@ -2482,6 +2481,6 @@ void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL) {
   if (!SILMod)
     return;
 
-  SILSerializer SILSer(*this, M->getASTContext(), Out, serializeAllSIL);
+  SILSerializer SILSer(*this, Out, serializeAllSIL);
   SILSer.writeSILModule(SILMod);
 }
