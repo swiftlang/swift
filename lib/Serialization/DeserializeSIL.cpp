@@ -182,7 +182,7 @@ SILDeserializer::SILDeserializer(
       DefaultWitnessTableList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_PROPERTY_OFFSETS) {
       // No matching 'names' block for property descriptors needed yet.
-      Properties.assign(scratch.begin(), scratch.end());
+      MF->allocateBuffer(Properties, scratch);
       return;
     }
 
@@ -195,27 +195,27 @@ SILDeserializer::SILDeserializer(
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_FUNC_OFFSETS) &&
              "Expect a SIL_FUNC_OFFSETS record.");
-      Funcs.assign(scratch.begin(), scratch.end());
+      MF->allocateBuffer(Funcs, scratch);
     } else if (kind == sil_index_block::SIL_VTABLE_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_VTABLE_OFFSETS) &&
              "Expect a SIL_VTABLE_OFFSETS record.");
-      VTables.assign(scratch.begin(), scratch.end());
+      MF->allocateBuffer(VTables, scratch);
     } else if (kind == sil_index_block::SIL_GLOBALVAR_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_GLOBALVAR_OFFSETS) &&
              "Expect a SIL_GLOBALVAR_OFFSETS record.");
-      GlobalVars.assign(scratch.begin(), scratch.end());
+      MF->allocateBuffer(GlobalVars, scratch);
     } else if (kind == sil_index_block::SIL_WITNESS_TABLE_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_WITNESS_TABLE_OFFSETS) &&
              "Expect a SIL_WITNESS_TABLE_OFFSETS record.");
-      WitnessTables.assign(scratch.begin(), scratch.end());
+      MF->allocateBuffer(WitnessTables, scratch);
     } else if (kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS) &&
              "Expect a SIL_DEFAULT_WITNESS_TABLE_OFFSETS record.");
-      DefaultWitnessTables.assign(scratch.begin(), scratch.end());
+      MF->allocateBuffer(DefaultWitnessTables, scratch);
     }
   }
 }
