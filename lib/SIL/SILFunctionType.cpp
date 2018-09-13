@@ -2052,12 +2052,7 @@ getUncachedSILFunctionTypeForConstant(SILModule &M,
       // pretend that it's import-as-member.
       if (!foreignInfo.Self.isImportAsMember() &&
           isImporterGeneratedAccessor(clangDecl, constant)) {
-        assert(origLoweredInterfaceType->getNumParams() == 2);
-
-        // The 'self' parameter is still the second argument.
         unsigned selfIndex = cast<AccessorDecl>(decl)->isSetter() ? 1 : 0;
-        assert(selfIndex == 1 ||
-               origLoweredInterfaceType.getParams()[0].getType()->isVoid());
         foreignInfo.Self.setSelfIndex(selfIndex);
       }
 
@@ -2799,24 +2794,6 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   // Replace the type in the abstraction pattern with the curried type.
   bridgingFnPattern.rewriteType(genericSig, curried);
-
-  // Implode non-self parameters.
-  //
-  // FIXME: Remove this once AbstractionPattern is ported to the new
-  // function type representation.
-  if (bridgedParams.size() != 1 ||
-      bridgedParams[0].isVariadic()) {
-    bool hasInOut = false;
-    for (auto param : bridgedParams)
-      hasInOut |= param.isInOut();
-
-    if (!hasInOut) {
-      auto implodedParams = AnyFunctionType::composeInput(
-        Context, bridgedParams, true);
-      bridgedParams.clear();
-      bridgedParams.emplace_back(implodedParams);
-    }
-  }
 
   // Build the uncurried function type.
   if (innerExtInfo.throws())
