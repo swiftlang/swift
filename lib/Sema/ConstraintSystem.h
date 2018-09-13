@@ -2966,11 +2966,6 @@ private:
       bool &addOptionalSupertypeBindings);
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
 
-  bool
-  tryTypeVariableBindings(TypeVariableType *typeVar,
-                          ArrayRef<ConstraintSystem::PotentialBinding> bindings,
-                          SmallVectorImpl<Solution> &solutions);
-
 private:
   /// \brief Add a constraint to the constraint system.
   SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
@@ -2979,33 +2974,6 @@ private:
 
   /// \brief Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
-
-  /// \brief Attempt find a solution involving the options in a
-  ///        disjunction.
-  ///
-  /// \returns true if we failed to find any solutions, false otherwise.
-  bool solveForDisjunction(Constraint *disjunction,
-                           SmallVectorImpl<Solution> &solutions);
-
-  /// \brief Attempt to solve for some subset of the constraints in a
-  ///        disjunction, skipping constraints that we decide do not
-  ///        need to be solved for because they would not result in
-  ///        the best solution to the constraint system.
-  ///
-  /// \returns true if we failed to find any solutions, false otherwise.
-  bool solveForDisjunctionChoices(ArrayRef<Constraint *> choices,
-                                  ConstraintLocator *disjunctionLocator,
-                                  bool isExplicitConversion,
-                                  SmallVectorImpl<Solution> &solutions);
-
-  /// \brief Attempt to solve constraint system after
-  ///        attempting given disjunction choice.
-  ///
-  /// \returns If solution(s) could be reached, return best score.
-  Optional<Score>
-  solveForDisjunctionChoice(const TypeBinding &choice,
-                            ConstraintLocator *disjunctionLocator,
-                            SmallVectorImpl<Solution> &solutions);
 
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
@@ -3092,13 +3060,6 @@ public:
   bool solve(Expr *const expr, SmallVectorImpl<Solution> &solutions,
              FreeTypeVariableBinding allowFreeTypeVariables =
                  FreeTypeVariableBinding::Disallow);
-
-  /// \brief Solve the system of constraints.
-  ///
-  /// \param solutions The set of solutions to this system of constraints.
-  ///
-  /// \returns true if there are no solutions
-  bool solveRec(SmallVectorImpl<Solution> &solutions);
 
   /// \brief Solve the system of constraints.
   ///
