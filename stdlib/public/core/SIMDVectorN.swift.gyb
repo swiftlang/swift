@@ -45,7 +45,7 @@ public extension SIMDVector${N} {
 % end
 }
 
-//  Defaulted conformance to Collection.
+//  Defaulted conformance to RandomAccessCollection.
 public extension SIMDVector${N} {
   @inlinable
   var endIndex: Int {

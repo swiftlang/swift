@@ -1,9 +1,11 @@
 /// A computational vector type.
-public protocol SIMDVector : MutableCollection,
+public protocol SIMDVector : RandomAccessCollection,
+                             MutableCollection,
+                             Hashable,
                              CustomStringConvertible,
-                             ExpressibleByArrayLiteral,
-                             Equatable
-                       where Index == Int {
+                             ExpressibleByArrayLiteral
+                      where  Index == Int,
+                             Element : Hashable {
   
   /// A vector with zero in all lanes.
   init()
@@ -37,34 +39,58 @@ public protocol SIMDVector : MutableCollection,
   
   static func ==(lhs: Self, rhs: Self) -> Predicate
   
-  // func replacing(with other: Self, where predicate: Predicate) -> Self
+  func replacing(with other: Self, where predicate: Predicate) -> Self
 }
 
 //  Non-customizable operations on SIMDVector
 public extension SIMDVector {
-
+  
+  @_transparent
+  static func ==(lhs: Element, rhs: Self) -> Predicate {
+    return Self(repeating: lhs) == rhs
+  }
+  
+  @_transparent
+  static func ==(lhs: Self, rhs: Element) -> Predicate {
+    return rhs == lhs
+  }
+  
   @_transparent
   static func !=(lhs: Self, rhs: Self) -> Predicate {
     return !(lhs == rhs)
   }
-  /*
+  
+  @_transparent
+  static func !=(lhs: Element, rhs: Self) -> Predicate {
+    return !(lhs == rhs)
+  }
+  
+  @_transparent
+  static func !=(lhs: Self, rhs: Element) -> Predicate {
+    return !(lhs == rhs)
+  }
+  
   @inlinable
   mutating func replace(with other: Self, where predicate: Predicate) {
     self = self.replacing(with: other, where: predicate)
   }
-  */
+  
+  @inlinable
+  func replacing(with other: Element, where predicate: Predicate) -> Self {
+    return self.replacing(with: Self(repeating: other), where: predicate)
+  }
+  
+  @inlinable
+  mutating func replace(with other: Element, where predicate: Predicate) {
+    self = self.replacing(with: Self(repeating: other), where: predicate)
+  }
 }
 
-//  Defaulted conformance to Collection. endIndex is defined on SIMDVectorN.
+//  Defaulted conformance to RandomAccessCollection.
 public extension SIMDVector {
   @inlinable
   var startIndex: Int {
     return 0
-  }
-  
-  @inlinable
-  func index(after i: Int) -> Int {
-    return i + 1
   }
 }
 
@@ -73,6 +99,17 @@ public extension SIMDVector {
   @_transparent
   static func ==(lhs: Self, rhs: Self) -> Bool {
     return all(lhs == rhs)
+  }
+}
+
+//  Defaulted conformance to Hashable.
+public extension SIMDVector {
+  //  We don't get an implementation automatically created for us because these
+  //  structs wrap Builtin.Vectors, which are not themselves hashable.
+  func hash(into hasher: inout Hasher) {
+    for i in indices {
+      hasher.combine(self[i])
+    }
   }
 }
 

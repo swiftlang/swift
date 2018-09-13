@@ -63,6 +63,11 @@ public extension ${Element} {
 %    end
 
     // Conformance to SIMDIntegerVector --------------------------------------
+    @inlinable
+    public init(bitMaskFrom predicate: Predicate) {
+      self._value = predicate._value._value
+    }
+
     // - Bitwise operators
 %    for (op, inst) in [('&','and'), ('|','or'), ('^','xor')]:
     @_transparent
@@ -83,23 +88,58 @@ public extension ${Element} {
 
 %    end
 
-    @inlinable
-    public init(bitMaskFrom predicate: Predicate) {
-      self._value = predicate._value._value
+    @_transparent
+    public static func &>>(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      let masked = rhs & ${Self}(repeating: ${bits-1})
+%    if signed:
+      return ${Self}(Builtin.ashr_${LLVM}(lhs._value, masked._value))
+%    else:
+      return ${Self}(Builtin.lshr_${LLVM}(lhs._value, masked._value))
+%    end
+    }
+
+    @_transparent
+    public static func &<<(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      let masked = rhs & ${Self}(repeating: ${bits-1})
+      return ${Self}(Builtin.shl_${LLVM}(lhs._value, masked._value))
+    }
+
+    // MARK: Arithmetic operators
+%    for (op, inst) in [('&+','add'), ('&-','sub'), ('&*','mul')]:
+    @_transparent
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      return ${Self}(Builtin.${inst}_${LLVM}(lhs._value, rhs._value))
+    }
+
+%    end
+    @_transparent
+    public static func /(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+%    if signed:
+      return ${Self}(Builtin.sdiv_${LLVM}(lhs._value, rhs._value))
+%    else:
+      return ${Self}(Builtin.udiv_${LLVM}(lhs._value, rhs._value))
+%    end
     }
 
     // Operations not required by any protocol -------------------------------
     @inlinable
     public init<Other>(truncatingIfNeeded other: Other)
-      where Other : SIMDVector${N} & SIMDIntegerVector {
+    where Other : SIMDVector${N} & SIMDIntegerVector {
       self.init()
       for i in indices { self[i] = Element(truncatingIfNeeded: other[i]) }
     }
 
     @inlinable
-    public init<Other>(clamping other: Other) {
-      // TODO: implement
-      self.init()
+    public init<Other>(clamping other: Other)
+    where Other : SIMDVector${N} & SIMDIntegerVector {
+      let lowerBound = Other.Element(clamping: Element.min)
+      let upperBound = Other.Element(clamping: Element.max)
+      self.init(truncatingIfNeeded:
+        clamp(other,
+              min: Other(repeating: lowerBound),
+              max: Other(repeating: upperBound)
+        )
+      )
     }
 
     // TODO: we shouldn't need the concrete conversions that follow; we should

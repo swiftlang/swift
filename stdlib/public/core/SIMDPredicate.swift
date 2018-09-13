@@ -12,6 +12,39 @@ public protocol SIMDPredicate : SIMDVector
   static func |(lhs: Self, rhs: Self) -> Self
 }
 
+// Non-customizable extensions
+public extension SIMDPredicate {
+  @_transparent
+  static func ^(lhs: Self, rhs: Bool) -> Self {
+    return lhs ^ Self(repeating: rhs)
+  }
+  
+  @_transparent
+  static func ^(lhs: Bool, rhs: Self) -> Self {
+    return rhs ^ lhs
+  }
+  
+  @_transparent
+  static func &(lhs: Self, rhs: Bool) -> Self {
+    return lhs & Self(repeating: rhs)
+  }
+  
+  @_transparent
+  static func &(lhs: Bool, rhs: Self) -> Self {
+    return rhs & lhs
+  }
+  
+  @_transparent
+  static func |(lhs: Self, rhs: Bool) -> Self {
+    return lhs | Self(repeating: rhs)
+  }
+  
+  @_transparent
+  static func |(lhs: Bool, rhs: Self) -> Self {
+    return rhs | lhs
+  }
+}
+
 // Defaulted requirements of SIMDVector
 public extension SIMDPredicate {
   @_transparent
