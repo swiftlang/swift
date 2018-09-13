@@ -160,7 +160,6 @@ set(SWIFTLIB_ESSENTIAL
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
-  UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
   UnsafePointer.swift

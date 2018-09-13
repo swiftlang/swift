@@ -1817,7 +1817,7 @@ internal class _RawNativeDictionaryStorage: _SwiftNativeNSDictionary {
   internal final var count: Int
 
   @usableFromInline // FIXME(sil-serialize-all)
-  internal final var initializedEntries: _UnsafeBitMap
+  internal final var initializedEntries: _UnsafeBitset
 
   @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
@@ -1833,7 +1833,8 @@ internal class _RawNativeDictionaryStorage: _SwiftNativeNSDictionary {
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal final
-  var _initializedHashtableEntriesBitMapBuffer: UnsafeMutablePointer<UInt> {
+  var _initializedHashtableEntriesBitsetBuffer:
+    UnsafeMutablePointer<_UnsafeBitset.Word> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt.self))
   }
 
@@ -1946,7 +1947,7 @@ internal class _TypedNativeDictionaryStorage<Key, Value>
 
     if !_isPOD(Key.self) {
       for i in 0 ..< bucketCount {
-        if initializedEntries[i] {
+        if initializedEntries.contains(i) {
           (keys+i).deinitialize(count: 1)
         }
       }
@@ -1954,7 +1955,7 @@ internal class _TypedNativeDictionaryStorage<Key, Value>
 
     if !_isPOD(Value.self) {
       for i in 0 ..< bucketCount {
-        if initializedEntries[i] {
+        if initializedEntries.contains(i) {
           (values+i).deinitialize(count: 1)
         }
       }
@@ -2157,10 +2158,10 @@ internal struct _NativeDictionary<Key, Value> {
   /// understand Hashing. Mostly for bridging; prefer `init(minimumCapacity:)`.
   @inlinable // FIXME(sil-serialize-all)
   internal init(_exactBucketCount bucketCount: Int, unhashable: ()) {
-    let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
+    let bitsetWordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)
     let storage = Builtin.allocWithTailElems_3(
       _TypedNativeDictionaryStorage<Key, Value>.self,
-      bitmapWordCount._builtinWordValue, UInt.self,
+      bitsetWordCount._builtinWordValue, UInt.self,
       bucketCount._builtinWordValue, Key.self,
       bucketCount._builtinWordValue, Value.self)
     self.init(_exactBucketCount: bucketCount, storage: storage)
@@ -2178,16 +2179,18 @@ internal struct _NativeDictionary<Key, Value> {
 
     self.init(_storage: storage)
 
-    let initializedEntries = _UnsafeBitMap(
-        storage: _initializedHashtableEntriesBitMapBuffer,
-        bitCount: bucketCount)
-    initializedEntries.initializeToZero()
+    let wordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)
+    let initializedEntries = _UnsafeBitset(
+      words: _initializedHashtableEntriesBitsetBuffer,
+      wordCount: wordCount)
+    initializedEntries.clear()
 
     // Compute all the array offsets now, so we don't have to later
-    let bitmapAddr = Builtin.projectTailElems(_storage, UInt.self)
-    let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
-    let keysAddr = Builtin.getTailAddr_Word(bitmapAddr,
-           bitmapWordCount._builtinWordValue, UInt.self, Key.self)
+    let bitsetAddr = Builtin.projectTailElems(_storage, UInt.self)
+    let keysAddr = Builtin.getTailAddr_Word(
+      bitsetAddr,
+      wordCount._builtinWordValue, _UnsafeBitset.Word.self,
+      Key.self)
 
     // Initialize header
     _storage.initializedEntries = initializedEntries
@@ -2229,8 +2232,9 @@ internal struct _NativeDictionary<Key, Value> {
 
   @inlinable // FIXME(sil-serialize-all)
   internal
-  var _initializedHashtableEntriesBitMapBuffer: UnsafeMutablePointer<UInt> {
-    return _storage._initializedHashtableEntriesBitMapBuffer
+  var _initializedHashtableEntriesBitsetBuffer:
+    UnsafeMutablePointer<_UnsafeBitset.Word> {
+    return _storage._initializedHashtableEntriesBitsetBuffer
   }
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
@@ -2284,7 +2288,7 @@ internal struct _NativeDictionary<Key, Value> {
     _sanityCheck(i >= 0 && i < bucketCount)
     defer { _fixLifetime(self) }
 
-    return _storage.initializedEntries[i]
+    return _storage.initializedEntries.contains(i)
   }
 
   @usableFromInline @_transparent
@@ -2294,7 +2298,7 @@ internal struct _NativeDictionary<Key, Value> {
 
     (keys + i).deinitialize(count: 1)
     (values + i).deinitialize(count: 1)
-    _storage.initializedEntries[i] = false
+    _storage.initializedEntries.uncheckedRemove(i)
   }
 
   @inlinable
@@ -2309,7 +2313,7 @@ internal struct _NativeDictionary<Key, Value> {
     _sanityCheck(isInitializedEntry(at: bucket))
     defer { _fixLifetime(self) }
     (keys + bucket).deinitialize(count: 1)
-    _storage.initializedEntries[bucket] = false
+    _storage.initializedEntries.uncheckedRemove(bucket)
   }
 
   @usableFromInline @_transparent
@@ -2319,7 +2323,7 @@ internal struct _NativeDictionary<Key, Value> {
 
     (keys + i).initialize(to: k)
     (values + i).initialize(to: v)
-    _storage.initializedEntries[i] = true
+    _storage.initializedEntries.uncheckedInsert(i)
   }
 
   @usableFromInline @_transparent
@@ -2332,8 +2336,8 @@ internal struct _NativeDictionary<Key, Value> {
 
     (keys + toEntryAt).initialize(to: (from.keys + at).move())
     (values + toEntryAt).initialize(to: (from.values + at).move())
-    from._storage.initializedEntries[at] = false
-    _storage.initializedEntries[toEntryAt] = true
+    from._storage.initializedEntries.uncheckedRemove(at)
+    _storage.initializedEntries.uncheckedInsert(toEntryAt)
   }
 
   @usableFromInline @_transparent
@@ -2416,10 +2420,10 @@ extension _NativeDictionary where Key: Hashable {
   /// marking all entries invalid.
   @inlinable // FIXME(sil-serialize-all)
   internal init(_exactBucketCount bucketCount: Int) {
-    let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
+    let bitsetWordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)
     let storage = Builtin.allocWithTailElems_3(
       _HashableTypedNativeDictionaryStorage<Key, Value>.self,
-      bitmapWordCount._builtinWordValue, UInt.self,
+      bitsetWordCount._builtinWordValue, UInt.self,
       bucketCount._builtinWordValue, Key.self,
       bucketCount._builtinWordValue, Value.self)
     self.init(_exactBucketCount: bucketCount, storage: storage)
