@@ -1339,7 +1339,6 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     }
 
     void addAssociatedType(AssociatedType requirement) {
-
 #ifndef NDEBUG
       auto &entry = SILEntries.front();
       assert(entry.getKind() == SILWitnessTable::AssociatedType
@@ -1348,12 +1347,19 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
                == requirement.getAssociation()
              && "sil witness table does not match protocol");
       auto piIndex = PI.getAssociatedTypeIndex(requirement);
-      assert((size_t)piIndex.getValue() ==
-              Table.size() - WitnessTableFirstRequirementOffset &&
-             "offset doesn't match ProtocolInfo layout");
 #endif
 
       SILEntries = SILEntries.slice(1);
+
+      // Resilient conformances get a resilient witness table.
+      if (ResilientConformance)
+        return;
+
+#ifndef NDEBUG
+      assert((size_t)piIndex.getValue() ==
+             Table.size() - WitnessTableFirstRequirementOffset &&
+             "offset doesn't match ProtocolInfo layout");
+#endif
 
       auto associate =
         ConformanceInContext.getTypeWitness(
@@ -1477,6 +1483,8 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
       }
       return *Fulfillments;
     }
+
+    llvm::Constant *emitResilientWitnessTable();
   };
 } // end anonymous namespace
 
@@ -1494,7 +1502,8 @@ getAssociatedTypeMetadataAccessFunction(AssociatedType requirement,
                                         CanType associatedType) {
   // If the associated type is non-dependent, we can use an ordinary
   // metadata access function.  We'll just end up passing extra arguments.
-  if (!associatedType->hasArchetype()) {
+  bool hasArchetype = associatedType->hasArchetype();
+  if (!hasArchetype && !ResilientConformance) {
     return getOrCreateTypeMetadataAccessFunction(IGM, associatedType);
   }
 
@@ -1830,11 +1839,11 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
     resultState->addIncoming(completedState, cachingBB);
 }
 
-static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
-                                                 SILWitnessTable *wtable) {
+llvm::Constant *WitnessTableBuilder::emitResilientWitnessTable() {
   unsigned count = 0;
-  for (auto &entry : wtable->getEntries()) {
-    if (entry.getKind() != SILWitnessTable::Method)
+  for (auto &entry : SILWT->getEntries()) {
+    if (entry.getKind() != SILWitnessTable::Method &&
+        entry.getKind() != SILWitnessTable::AssociatedType)
       continue;
 
     count++;
@@ -1849,7 +1858,29 @@ static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
 
   table.addInt(IGM.Int32Ty, count);
 
-  for (auto &entry : wtable->getEntries()) {
+  for (auto &entry : SILWT->getEntries()) {
+    // Associated type witness access function.
+    if (entry.getKind() == SILWitnessTable::AssociatedType) {
+      // Associated type descriptor.
+      auto assocType = entry.getAssociatedTypeWitness().Requirement;
+      auto assocTypeDescriptor =
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forAssociatedTypeDescriptor(assocType),
+          Alignment(4), IGM.ProtocolRequirementStructTy);
+      table.addRelativeAddress(assocTypeDescriptor);
+
+      // Associated type metadata access function.
+      auto associate =
+        ConformanceInContext.getTypeWitness(assocType, nullptr)
+          ->getCanonicalType();
+
+      llvm::Constant *metadataAccessFunction =
+        getAssociatedTypeMetadataAccessFunction(AssociatedType(assocType),
+                                                associate);
+      table.addRelativeAddress(metadataAccessFunction);
+      continue;
+    }
+
     if (entry.getKind() != SILWitnessTable::Method)
       continue;
 
@@ -1874,7 +1905,7 @@ static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
 
   auto *result =
     cast<llvm::GlobalVariable>(
-      IGM.getAddrOfResilientWitnessTable(wtable->getConformance(),
+      IGM.getAddrOfResilientWitnessTable(SILWT->getConformance(),
                                          table.finishAndCreateFuture()));
   result->setConstant(true);
   IGM.setTrueConstGlobal(result);
@@ -1982,7 +2013,7 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   llvm::Constant *resilientWitnessTable = nullptr;
   if (ResilientConformance)
-    resilientWitnessTable = emitResilientWitnessTable(IGM, SILWT);
+    resilientWitnessTable = emitResilientWitnessTable();
 
   // Fill in the global.
   auto cacheTy = cast<llvm::StructType>(cache->getValueType());

@@ -19,10 +19,24 @@
 
 // CHECK-DEFINITION: @"$S1T18resilient_protocol24ProtocolWithRequirementsPTl" = alias
 
+import resilient_protocol
+
+// ----------------------------------------------------------------------------
+// Resilient witness tables
+// ----------------------------------------------------------------------------
+// CHECK-USAGE-LABEL: $S31protocol_resilience_descriptors34ConformsToProtocolWithRequirementsVyxG010resilient_A00fgH0AAWr" = internal
+// CHECK-USAGE-SAME: {{got.|__imp_}}$S1T18resilient_protocol24ProtocolWithRequirementsPTl
+// CHECK-USAGE-SAME: $S31protocol_resilience_descriptors34ConformsToProtocolWithRequirementsVyxG010resilient_A00fgH0AA1TWt
+public struct ConformsToProtocolWithRequirements<Element>
+    : ProtocolWithRequirements {
+  public typealias T = Element
+  public func first() { }
+  public func second() { }
+}
+
 // ----------------------------------------------------------------------------
 // Resilient protocol usage
 // ----------------------------------------------------------------------------
-import resilient_protocol
 
 // CHECK-USAGE: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$S31protocol_resilience_descriptors17assocTypeMetadatay1TQzmxm010resilient_A024ProtocolWithRequirementsRzlF"(%swift.type*, %swift.type* [[PWD:%.*]], i8** [[WTABLE:%.*]])
 public func assocTypeMetadata<PWR: ProtocolWithRequirements>(_: PWR.Type) -> PWR.T.Type {

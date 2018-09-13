@@ -110,13 +110,10 @@ protocol InternalProtocol {
 
 // CHECK: @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
 
-// CHECK-SAME: internal constant [2 x i8*] [
+// CHECK-SAME: internal constant [1 x i8*] [
 
 // -- conformance descriptor
 // CHECK-SAME: "$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAMc"
-
-// -- type metadata for associated type
-// CHECK-SAME: "$SSiMa"
 
 // CHECK-SAME: ]
 
@@ -124,7 +121,7 @@ protocol InternalProtocol {
 // CHECK: @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWG"
 
 // -- number of witness table entries
-// CHECK-SAME:   i16 2,
+// CHECK-SAME:   i16 1,
 
 // -- size of private area
 // CHECK-SAME:   i16 0,
@@ -147,6 +144,10 @@ protocol InternalProtocol {
 // CHECK: @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWr"
 
 // CHECK-SAME: internal constant {
+
+// -- type metadata for associated type
+// CHECK-SAME: @"{{got.|__imp_}}$S1T18resilient_protocol24ProtocolWithRequirementsPTl"
+// CHECK-SAME: "$SSiMa"
 
 // CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTq"
 // CHECK-SAME: @firstWitness
@@ -339,9 +340,9 @@ bb0(%0 : $*ConformingStruct):
 }
 
 sil_witness_table ConformingStruct : ResilientProtocol module protocol_resilience {
-  associated_type T: ResilientConformingType
   associated_type_protocol (T: OtherResilientProtocol): ResilientConformingType: OtherResilientProtocol module protocol_resilience
 
+  associated_type T: ResilientConformingType
   method #ResilientProtocol.noDefaultA!1: @noDefaultA
   method #ResilientProtocol.noDefaultB!1: @noDefaultB
   method #ResilientProtocol.defaultC!1: @defaultC
@@ -460,8 +461,8 @@ struct ConformsWithResilientAssoc : HasResilientAssoc {
 }
 
 sil_witness_table ConformsWithResilientAssoc : HasResilientAssoc module protocol_resilience {
-  associated_type T: ResilientConformingType
   associated_type_protocol (T: OtherResilientProtocol): ResilientConformingType: OtherResilientProtocol module protocol_resilience
+  associated_type T: ResilientConformingType
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doSomethingAssoc(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.HasResilientAssoc)
