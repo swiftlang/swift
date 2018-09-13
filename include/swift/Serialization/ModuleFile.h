@@ -285,32 +285,56 @@ public:
   };
 
 private:
+  /// An allocator for buffers owned by the file.
+  llvm::BumpPtrAllocator Allocator;
+
+  /// Allocates a buffer using #Allocator and initializes it with the contents
+  /// of the container \p rawData, then stores it in \p buffer.
+  ///
+  /// \p buffer is passed as an argument rather than returned so that the
+  /// element type can be inferred.
+  template <typename T, typename RawData>
+  void allocateBuffer(MutableArrayRef<T> &buffer, const RawData &rawData);
+
+  /// Allocates a buffer using #Allocator and initializes it with the contents
+  /// of the container \p rawData, then stores it in \p buffer.
+  ///
+  /// \p buffer is passed as an argument rather than returned so that the
+  /// element type can be inferred.
+  template <typename T, typename RawData>
+  void allocateBuffer(ArrayRef<T> &buffer, const RawData &rawData) {
+    assert(buffer.empty());
+    MutableArrayRef<T> result;
+    allocateBuffer(result, rawData);
+    buffer = result;
+  }
+
   /// Decls referenced by this module.
-  std::vector<Serialized<Decl*>> Decls;
+  MutableArrayRef<Serialized<Decl*>> Decls;
 
   /// DeclContexts referenced by this module.
-  std::vector<Serialized<DeclContext*>> DeclContexts;
+  MutableArrayRef<Serialized<DeclContext*>> DeclContexts;
 
   /// Local DeclContexts referenced by this module.
-  std::vector<Serialized<DeclContext*>> LocalDeclContexts;
+  MutableArrayRef<Serialized<DeclContext*>> LocalDeclContexts;
 
   /// Normal protocol conformances referenced by this module.
-  std::vector<Serialized<NormalProtocolConformance *>> NormalConformances;
+  MutableArrayRef<Serialized<NormalProtocolConformance *>> NormalConformances;
 
   /// SILLayouts referenced by this module.
-  std::vector<Serialized<SILLayout *>> SILLayouts;
+  MutableArrayRef<Serialized<SILLayout *>> SILLayouts;
 
   /// Types referenced by this module.
-  std::vector<Serialized<Type>> Types;
+  MutableArrayRef<Serialized<Type>> Types;
 
   /// Generic signatures referenced by this module.
-  std::vector<Serialized<GenericSignature *>> GenericSignatures;
+  MutableArrayRef<Serialized<GenericSignature *>> GenericSignatures;
 
   /// Generic environments referenced by this module.
-  std::vector<Serialized<GenericEnvironment *>> GenericEnvironments;
+  MutableArrayRef<Serialized<GenericEnvironment *>> GenericEnvironments;
 
   /// Substitution maps referenced by this module.
-  std::vector<Serialized<SubstitutionMap>> SubstitutionMaps;
+  MutableArrayRef<Serialized<SubstitutionMap>> SubstitutionMaps;
 
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
@@ -328,7 +352,7 @@ private:
   };
 
   /// Identifiers referenced by this module.
-  std::vector<SerializedIdentifier> Identifiers;
+  MutableArrayRef<SerializedIdentifier> Identifiers;
 
   class DeclTableInfo;
   using SerializedDeclTable =
@@ -377,9 +401,7 @@ private:
 
   TinyPtrVector<Decl *> ImportDecls;
 
-  using DeclIDVector = SmallVector<serialization::DeclID, 4>;
-
-  DeclIDVector OrderedTopLevelDecls;
+  ArrayRef<serialization::DeclID> OrderedTopLevelDecls;
 
   class DeclCommentTableInfo;
   using SerializedDeclCommentTable =
@@ -863,6 +885,19 @@ public:
   /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
 };
+
+template <typename T, typename RawData>
+void ModuleFile::allocateBuffer(MutableArrayRef<T> &buffer,
+                                const RawData &rawData) {
+  assert(buffer.empty() && "reallocating deserialized buffer");
+  if (rawData.empty())
+    return;
+
+  void *rawBuffer = Allocator.Allocate(sizeof(T) * rawData.size(), alignof(T));
+  buffer = llvm::makeMutableArrayRef(static_cast<T *>(rawBuffer),
+                                     rawData.size());
+  std::uninitialized_copy(rawData.begin(), rawData.end(), buffer.begin());
+}
 
 } // end namespace swift
 

@@ -39,23 +39,23 @@ namespace swift {
       llvm::OnDiskIterableChainedHashTable<FuncTableInfo>;
 
     std::unique_ptr<SerializedFuncTable> FuncTable;
-    std::vector<ModuleFile::PartiallySerialized<SILFunction*>> Funcs;
+    MutableArrayRef<ModuleFile::PartiallySerialized<SILFunction*>> Funcs;
 
     std::unique_ptr<SerializedFuncTable> VTableList;
-    std::vector<ModuleFile::Serialized<SILVTable*>> VTables;
+    MutableArrayRef<ModuleFile::Serialized<SILVTable*>> VTables;
 
     std::unique_ptr<SerializedFuncTable> GlobalVarList;
-    std::vector<ModuleFile::Serialized<SILGlobalVariable*>> GlobalVars;
+    MutableArrayRef<ModuleFile::Serialized<SILGlobalVariable*>> GlobalVars;
 
     std::unique_ptr<SerializedFuncTable> WitnessTableList;
-    std::vector<ModuleFile::PartiallySerialized<SILWitnessTable *>>
+    MutableArrayRef<ModuleFile::PartiallySerialized<SILWitnessTable *>>
     WitnessTables;
 
     std::unique_ptr<SerializedFuncTable> DefaultWitnessTableList;
-    std::vector<ModuleFile::PartiallySerialized<SILDefaultWitnessTable *>>
+    MutableArrayRef<ModuleFile::PartiallySerialized<SILDefaultWitnessTable *>>
     DefaultWitnessTables;
 
-    std::vector<ModuleFile::PartiallySerialized<SILProperty *>>
+    MutableArrayRef<ModuleFile::PartiallySerialized<SILProperty *>>
     Properties;
 
     /// A declaration will only
