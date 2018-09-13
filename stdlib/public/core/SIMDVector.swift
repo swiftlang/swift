@@ -37,34 +37,62 @@ public protocol SIMDVector : RandomAccessCollection,
   /// number of elements as the vectors being compared.
   associatedtype Predicate : SIMDPredicate
   
+  /// Elementwise equality test.
+  ///
+  /// The result is a predicate vector where each lane is `true` if and only
+  /// if the corresponding lane of the vector `lhs` is equal to `rhs`.
+  ///
+  /// There are two `==` and `!=` operators defined on SIMD vectors; the
+  /// "normal" equality operator required by `Equatable`, which returns
+  /// `Bool`, and this operator which returns a vector of `Bool`, called
+  /// `Predicate`.
+  // Note: the corresponding `!=` operator and the `Bool` operators are defined
+  // in terms of this operation in extensions. SIMD types should only define
+  // this operator, and use the default implementations of the others.
   static func ==(lhs: Self, rhs: Self) -> Predicate
   
+  /// A vector formed from the corresponding lane of this vector where
+  /// prediate is false, and from the corresponding lane of other where
+  /// predicate is true.
+  ///
+  /// See Also: replacing(with: Element, where: Predicate), and the in-place
+  /// operations replace(with:,where:).
   func replacing(with other: Self, where predicate: Predicate) -> Self
 }
 
 //  Non-customizable operations on SIMDVector
 public extension SIMDVector {
   
+  /// A predicate vector where each lane is `true` if and only if the
+  /// corresponding lane of the vector `rhs` is equal to `lhs`.
   @_transparent
   static func ==(lhs: Element, rhs: Self) -> Predicate {
     return Self(repeating: lhs) == rhs
   }
   
+  /// A predicate vector where each lane is `true` if and only if the
+  /// corresponding lane of the vector `lhs` is equal to `rhs`.
   @_transparent
   static func ==(lhs: Self, rhs: Element) -> Predicate {
     return rhs == lhs
   }
   
+  /// A predicate vector where each lane is `true` if and only if the
+  /// corresponding lanes of the two arguments are not equal.
   @_transparent
   static func !=(lhs: Self, rhs: Self) -> Predicate {
     return !(lhs == rhs)
   }
   
+  /// A predicate vector where each lane is `true` if and only if the
+  /// corresponding lane of the vector `rhs` is not equal to `lhs`.
   @_transparent
   static func !=(lhs: Element, rhs: Self) -> Predicate {
     return !(lhs == rhs)
   }
   
+  /// A predicate vector where each lane is `true` if and only if the
+  /// corresponding lane of the vector `lhs` is not equal to `rhs`.
   @_transparent
   static func !=(lhs: Self, rhs: Element) -> Predicate {
     return !(lhs == rhs)

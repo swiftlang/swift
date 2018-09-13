@@ -54,5 +54,5 @@ public func run_ByteSwap(_ N: Int) {
           &+ byteswap_logn(byteswap_n(x &+ 9129))
           &+ byteswap_logn(byteswap_n(x &+ 3333))
   }
-  CheckResults(s == (2457 &+ 9129 &+ 3333) &* 10000 &* N)
+  CheckResults(s == Int(2457 &+ 9129 &+ 3333) &* 10000 &* N)
 }
