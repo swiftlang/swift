@@ -19,12 +19,12 @@ import CTensorFlow
 /// A class that implements common functionality for resource and variant handles.
 public class ResourceVariantHandleBase {
 	public let cTensorHandle: CTensorHandle
-	public let cDataType: TF_DataType
+	public let cIsResource: Bool
 	
   @usableFromInline
-  init(owning cTensorHandle: CTensorHandle, cDataType : TF_DataType) {
+  init(owning cTensorHandle: CTensorHandle, cIsResource: Bool) {
     self.cTensorHandle = cTensorHandle
-		self.cDataType = cDataType
+		self.cIsResource = cIsResource
   }
 
   deinit {
@@ -33,24 +33,19 @@ public class ResourceVariantHandleBase {
     debugLog("Returning from deinit of handle.")
   }
 
-	static public func getTFDataTypeName(_ type: TF_DataType) -> String {
-		if type == TF_VARIANT {
-			return "variant"
-		}
-		if type == TF_RESOURCE {
-			return "resource"
-		}
-		return "unknown"
-	}
+  static public func getTFDataTypeName(_ isResource: Bool) -> String {
+    return isResource ? "resource" : "variant"
+  }
 	
 	@inlinable
 	static func receiveTensorHandleHelper(
 		_ computation: _TensorComputation,
     _ tensorID: Int,
-		_ dataType: TF_DataType) -> CTensorHandle {
-		debugLog("Receiving \(ResourceVariantHandleBase.getTFDataTypeName(dataType)) tensor of id \(tensorID).")
+	  _ isResource: Bool) -> CTensorHandle {
+		debugLog("Receiving \(getTFDataTypeName(isResource)) tensor of id \(tensorID).")
     let status = TF_NewStatus()
     let context = _ExecutionContext.global
+		let dataType = isResource ? TF_RESOURCE : TF_VARIANT
     let cTensorHandle: CTensorHandle! = TFE_DequeueNamedTensorFromCtx(
       context.eagerContext, Int32(tensorID), dataType, status)
     checkOk(status)
@@ -61,13 +56,13 @@ public class ResourceVariantHandleBase {
   @inlinable
   func sendToAcceleratorHelper(_ computation: _TensorComputation,
                          _ tensorID: Int) {
-    debugLog("Sending \(ResourceVariantHandleBase.getTFDataTypeName(self.cDataType)) tensor of id \(tensorID).")
+    debugLog("Sending \(type(of: self).getTFDataTypeName(self.cIsResource)) tensor of id \(tensorID).")
     let status = TF_NewStatus()
     let context = _ExecutionContext.global
     TFE_EnqueueNamedTensorFromCtx(
       context.eagerContext, Int32(tensorID), self.cTensorHandle, status)
     TF_DeleteStatus(status)
-    debugLog("Done sending \(ResourceVariantHandleBase.getTFDataTypeName(self.cDataType)) tensor of id \(tensorID).")
+    debugLog("Done sending \(type(of: self).getTFDataTypeName(self.cIsResource)) tensor of id \(tensorID).")
   }
 }
 
@@ -77,7 +72,7 @@ public class ResourceVariantHandleBase {
 public final class ResourceHandle : ResourceVariantHandleBase {
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
-		super.init(owning: cTensorHandle, cDataType: TF_RESOURCE)
+		super.init(owning: cTensorHandle, cIsResource: true)
   }
 }
 
@@ -88,7 +83,7 @@ extension ResourceHandle : TensorSendableReceivable {
     _ computation: _TensorComputation,
     _ tensorID: Int
   ) -> ResourceHandle {
-		let receivedTensor = receiveTensorHandleHelper(computation, tensorID, TF_RESOURCE)
+		let receivedTensor = receiveTensorHandleHelper(computation, tensorID, true)
 		return ResourceHandle(owning: receivedTensor)
 	}
 
@@ -114,7 +109,7 @@ extension ResourceHandle : TensorSendableReceivable {
 public final class VariantHandle : ResourceVariantHandleBase {
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
-		super.init(owning: cTensorHandle, cDataType: TF_VARIANT)
+		super.init(owning: cTensorHandle, cIsResource: false)
   }
 }
 
@@ -124,7 +119,7 @@ extension VariantHandle : TensorSendableReceivable {
     _ computation: _TensorComputation,
     _ tensorID: Int
   ) -> VariantHandle {
-		let receivedTensor = receiveTensorHandleHelper(computation, tensorID, TF_VARIANT)
+		let receivedTensor = receiveTensorHandleHelper(computation, tensorID, false)
 		return VariantHandle(owning: receivedTensor)
 	}
 
