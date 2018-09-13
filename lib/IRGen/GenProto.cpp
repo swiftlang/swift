@@ -1339,16 +1339,7 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     }
 
     void addAssociatedType(AssociatedType requirement) {
-#ifndef NDEBUG
       auto &entry = SILEntries.front();
-      assert(entry.getKind() == SILWitnessTable::AssociatedType
-             && "sil witness table does not match protocol");
-      assert(entry.getAssociatedTypeWitness().Requirement
-               == requirement.getAssociation()
-             && "sil witness table does not match protocol");
-      auto piIndex = PI.getAssociatedTypeIndex(requirement);
-#endif
-
       SILEntries = SILEntries.slice(1);
 
       // Resilient conformances get a resilient witness table.
@@ -1356,9 +1347,17 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
         return;
 
 #ifndef NDEBUG
+      assert(entry.getKind() == SILWitnessTable::AssociatedType
+             && "sil witness table does not match protocol");
+      assert(entry.getAssociatedTypeWitness().Requirement
+             == requirement.getAssociation()
+             && "sil witness table does not match protocol");
+      auto piIndex = PI.getAssociatedTypeIndex(requirement);
       assert((size_t)piIndex.getValue() ==
              Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
+#else
+      (void)entry;
 #endif
 
       auto associate =
@@ -1527,6 +1526,19 @@ getAssociatedTypeMetadataAccessFunction(AssociatedType requirement,
   Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
   setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
                               requirement.getSourceProtocol());
+
+  // If the type witness does not involve any type parameters, directly
+  // reference the type metadata. We only needed a thunk so it could be
+  if (!hasArchetype) {
+    assert(ResilientConformance &&
+           "Non-resilient conformances refer to accessor directly");
+    auto response = IGF.emitTypeMetadataRef(associatedType, request);
+    response.ensureDynamicState(IGF);
+    auto returnValue = response.combine(IGF);
+    IGF.Builder.CreateRet(returnValue);
+    return accessor;
+  }
+
   IGF.bindLocalTypeDataFromSelfWitnessTable(
           &Conformance,
           destTable.getAddress(),

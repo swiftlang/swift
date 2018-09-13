@@ -42,8 +42,8 @@ struct Conformer: Q, QQ {
 // CHECK:   i8* bitcast (void (%T18sil_witness_tables9ConformerV*, %swift.type*, i8**)* @"$S18sil_witness_tables9ConformerVAA1QA2aDP7qMethod{{[_0-9a-zA-Z]*}}FTW" to i8*)
 // CHECK: ]
 // CHECK: [[CONFORMER_P_WITNESS_TABLE]] = hidden constant [5 x i8*] [
-// CHECK:   i8* bitcast (%swift.metadata_response (i64)* @"$S18sil_witness_tables14AssocConformerVMa" to i8*),
 // CHECK:   i8* bitcast (i8** ()* @"$S18sil_witness_tables14AssocConformerVAA1AAAWa" to i8*)
+// CHECK:   i8* bitcast (%swift.metadata_response (i64)* @"$S18sil_witness_tables14AssocConformerVMa" to i8*)
 // CHECK:   i8* bitcast (void (%swift.type*, %swift.type*, i8**)* @"$S18sil_witness_tables9ConformerVAA1PA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW" to i8*),
 // CHECK:   i8* bitcast (void (%T18sil_witness_tables9ConformerV*, %swift.type*, i8**)* @"$S18sil_witness_tables9ConformerVAA1PA2aDP14instanceMethod{{[_0-9a-zA-Z]*}}FTW" to i8*)
 // CHECK: ]
