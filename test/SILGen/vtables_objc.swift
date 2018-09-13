@@ -70,10 +70,10 @@ func callWotsit(_ w: Wotsit) {
 
 // <rdar://problem/15282548>
 // CHECK: sil_vtable Base {
-// CHECK:   #Base.init!initializer.1: {{.*}} : @$S12vtables_objc4BaseC{{[_0-9a-zA-Z]*}}fc
+// CHECK:   #Base.init!allocator.1: {{.*}} : @$S12vtables_objc4BaseC{{[_0-9a-zA-Z]*}}fC
 // CHECK: }
 // CHECK: sil_vtable Derived {
-// CHECK:   #Base.init!initializer.1: {{.*}} : @$S12vtables_objc7DerivedC{{[_0-9a-zA-Z]*}}fc
+// CHECK:   #Base.init!allocator.1: {{.*}} : @$S12vtables_objc7DerivedC{{[_0-9a-zA-Z]*}}fC
 // CHECK: }
 @objc class Base {}
 

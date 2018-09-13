@@ -35,8 +35,8 @@ class A {}
 //   V-table entry #1: flags.
 // CHECK-SAME: i32 1
 //   V-table entry #1: invocation function.
-// CHECK-SAME: @"$S14class_metadata1ACACycfc"
-// CHECK-SAME: } }>, section
+// CHECK-SAME: @"$S14class_metadata1ACACycfC"
+// CHECK-SAME: }>, section
 
 class B : A {}
 
@@ -72,7 +72,7 @@ class B : A {}
 //   Override table entry #1: base method.
 // CHECK-SAME: @"$S14class_metadata1ACMn", i32 0, i32 13
 //   Override table entry #1: invocation function.
-// CHECK-SAME: @"$S14class_metadata1BCACycfc"
+// CHECK-SAME: @"$S14class_metadata1BCACycfC"
 
 // CHECK-SAME: }>, section
 
@@ -128,7 +128,7 @@ class C<T> : B {}
 //   Override table entry #1: base method.
 // CHECK-SAME: @"$S14class_metadata1ACMn", i32 0, i32 13
 //   Override table entry #1: invocation function.
-// CHECK-SAME: @"$S14class_metadata1CCACyxGycfc"
+// CHECK-SAME: @"$S14class_metadata1CCACyxGycfC"
 // CHECK-SAME: }>, section
 
 // CHECK-LABEL: @"$S14class_metadata1CCMP" =
@@ -169,8 +169,8 @@ class D : E {}
 //   Override table entry #1: base class.
 // CHECK-SAME: @"got.$S14class_metadata1ECMn.1"
 //   Override table entry #1: base method.
-// CHECK-SAME: @"got.$S14class_metadata1ECACycfcTq"
+// CHECK-SAME: @"got.$S14class_metadata1ECACycfCTq"
 //   Override table entry #1: invocation function.
-// CHECK-SAME: @"$S14class_metadata1DCACycfc"
+// CHECK-SAME: @"$S14class_metadata1DCACycfC"
 // CHECK-SAME: }>, section
 class E {}

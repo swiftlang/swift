@@ -201,7 +201,6 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
     // Factory initializers cannot be overridden.
     if (parentCtor->isFactoryInit())
       return false;
-
   } else if (auto var = dyn_cast<VarDecl>(decl)) {
     auto parentVar = cast<VarDecl>(parentDecl);
     if (var->isStatic() != parentVar->isStatic())
@@ -1309,10 +1308,9 @@ OverrideRequiresKeyword swift::overrideRequiresKeyword(ValueDecl *overridden) {
   }
 
   if (auto ctor = dyn_cast<ConstructorDecl>(overridden)) {
-    if (ctor->isDesignatedInit() && !ctor->isRequired())
-      return OverrideRequiresKeyword::Always;
-
-    return OverrideRequiresKeyword::Never;
+    return !ctor->isDesignatedInit() || ctor->isRequired()
+      ? OverrideRequiresKeyword::Never
+      : OverrideRequiresKeyword::Always;
   }
 
   return OverrideRequiresKeyword::Always;

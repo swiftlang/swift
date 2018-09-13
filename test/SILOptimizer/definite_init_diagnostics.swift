@@ -432,18 +432,18 @@ class DelegatingCtorClass {
   }
   
   convenience init(x: EmptyStruct, y: EmptyStruct) {
-    _ = ivar       // expected-error {{'self' used in property access 'ivar' before 'self.init' call}}
-    ivar = x       // expected-error {{'self' used in property access 'ivar' before 'self.init' call}}
+    _ = ivar       // expected-error {{'self' used before 'self.init' call}}
+    ivar = x       // expected-error {{'self' used before 'self.init' call}}
     self.init()
   }
 
   convenience init(x: EmptyStruct, y: EmptyStruct, z: EmptyStruct) {
     self.init()
-    self.init()    // expected-error {{'self.init' called multiple times in initializer}}
+    self.init()
   }
 
   convenience init(x: (EmptyStruct, EmptyStruct)) {
-    method()       // expected-error {{'self' used in method call 'method' before 'self.init' call}}
+    method()       // expected-error {{'self' used before 'self.init' call}}
     self.init()
   }
 
@@ -1247,8 +1247,8 @@ class SuperConvenienceSub : SuperConvenienceBase {
     super.init(i)
   }
   public init(_ i1: Int, _ i2: Int, _ i3: Int) {
-    self.init(i1, i1)
-  }
+    self.init(i1, i1) // expected-error{{'self' used before 'super.init' call}}
+  } // expected-error{{'super.init' isn't called}}
 }
 
 // While testing some changes I found this regression that wasn't

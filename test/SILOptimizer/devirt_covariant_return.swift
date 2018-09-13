@@ -109,9 +109,9 @@ public class Bear {
 
   // Check that devirtualizer can handle convenience initializers, which have covariant optional
   // return types.
-  // CHECK-LABEL: sil @$S23devirt_covariant_return4BearC{{[_0-9a-zA-Z]*}}fc
-  // CHECK: checked_cast_br [exact] %{{.*}} : $Bear to $PolarBear
-  // CHECK: upcast %{{.*}} : $Optional<PolarBear> to $Optional<Bear>
+  // CHECK-LABEL: sil @$S23devirt_covariant_return4BearC{{[_0-9a-zA-Z]*}}fC
+  // CHECK: checked_cast_br [exact] %{{.*}} : $@thick Bear.Type to $@thick GummyBear.Type
+  // CHECK: upcast %{{.*}} : $Optional<GummyBear> to $Optional<Bear>
   // CHECK: }
   public convenience init?(delegateFailure: Bool, failAfter: Bool) {
     self.init(fail: delegateFailure)
@@ -119,7 +119,7 @@ public class Bear {
   }
 }
 
-final class PolarBear: Bear {
+final class GummyBear: Bear {
 
   override init?(fail: Bool) {
     super.init(fail: fail)

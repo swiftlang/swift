@@ -328,7 +328,7 @@ func foreignMethodDispatch() {
 }
 
 extension Gizmo {
-  // CHECK-LABEL: sil hidden @$SSo5GizmoC7dynamicE{{[_0-9a-zA-Z]*}}fc
+  // CHECK-LABEL: sil hidden @$SSo5GizmoC7dynamicE{{[_0-9a-zA-Z]*}}fC
   // CHECK:         objc_method {{%.*}} : $Gizmo, #Gizmo.init!initializer.1.foreign
   convenience init(convenienceInExtension: Int) {
     self.init(bellsOn: convenienceInExtension)
@@ -499,7 +499,7 @@ public class ConcreteDerived : GenericBase<Int> {
 
 // Vtable contains entries for native and @objc methods, but not dynamic ones
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   @$S7dynamic3FooC6nativeACSi_tcfc
+// CHECK-NEXT:   #Foo.init!allocator.1: {{.*}} :   @$S7dynamic3FooC6nativeACSi_tcfC
 // CHECK-NEXT:   #Foo.nativeMethod!1: {{.*}} :       @$S7dynamic3FooC12nativeMethodyyF
 // CHECK-NEXT:   #Foo.nativeProp!getter.1: {{.*}} :  @$S7dynamic3FooC10nativePropSivg     // dynamic.Foo.nativeProp.getter : Swift.Int
 // CHECK-NEXT:   #Foo.nativeProp!setter.1: {{.*}} :  @$S7dynamic3FooC10nativePropSivs     // dynamic.Foo.nativeProp.setter : Swift.Int
@@ -507,7 +507,7 @@ public class ConcreteDerived : GenericBase<Int> {
 // CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} :   @$S7dynamic3FooC6nativeS2i_tcig    // dynamic.Foo.subscript.getter : (native: Swift.Int) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} :   @$S7dynamic3FooC6nativeS2i_tcis    // dynamic.Foo.subscript.setter : (native: Swift.Int) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!modify.1:
-// CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   @$S7dynamic3FooC4objcACSi_tcfc
+// CHECK-NEXT:   #Foo.init!allocator.1: {{.*}} :   @$S7dynamic3FooC4objcACSi_tcfC
 // CHECK-NEXT:   #Foo.objcMethod!1: {{.*}} :         @$S7dynamic3FooC10objcMethodyyF
 // CHECK-NEXT:   #Foo.objcProp!getter.1: {{.*}} :    @$S7dynamic3FooC8objcPropSivg  // dynamic.Foo.objcProp.getter : Swift.Int
 // CHECK-NEXT:   #Foo.objcProp!setter.1: {{.*}} :    @$S7dynamic3FooC8objcPropSivs  // dynamic.Foo.objcProp.setter : Swift.Int
@@ -526,20 +526,20 @@ public class ConcreteDerived : GenericBase<Int> {
 
 // Check vtables for implicitly-inherited initializers
 // CHECK-LABEL: sil_vtable SubclassWithInheritedInits {
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic26SubclassWithInheritedInitsC6nativeACSi_tcfc
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic26SubclassWithInheritedInitsC4objcACSi_tcfc
+// CHECK:   #Foo.init!allocator.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic26SubclassWithInheritedInitsC6nativeACSi_tcfC
+// CHECK:   #Foo.init!allocator.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic26SubclassWithInheritedInitsC4objcACSi_tcfC
 // CHECK-NOT: .init!
 // CHECK: }
 
 // CHECK-LABEL: sil_vtable GrandchildWithInheritedInits {
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic28GrandchildWithInheritedInitsC6nativeACSi_tcfc
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic28GrandchildWithInheritedInitsC4objcACSi_tcfc
+// CHECK:   #Foo.init!allocator.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic28GrandchildWithInheritedInitsC6nativeACSi_tcfC
+// CHECK:   #Foo.init!allocator.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic28GrandchildWithInheritedInitsC4objcACSi_tcfC
 // CHECK-NOT: .init!
 // CHECK: }
 
 // CHECK-LABEL: sil_vtable GrandchildOfInheritedInits {
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic26GrandchildOfInheritedInitsC6nativeACSi_tcfc
-// CHECK:   #Foo.init!initializer.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic26GrandchildOfInheritedInitsC4objcACSi_tcfc
+// CHECK:   #Foo.init!allocator.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic26GrandchildOfInheritedInitsC6nativeACSi_tcfC
+// CHECK:   #Foo.init!allocator.1: (Foo.Type) -> (Int) -> Foo : @$S7dynamic26GrandchildOfInheritedInitsC4objcACSi_tcfC
 // CHECK-NOT: .init!
 // CHECK: }
 
@@ -551,6 +551,6 @@ public class ConcreteDerived : GenericBase<Int> {
 // Dynamic thunk + vtable re-abstraction
 // CHECK-LABEL: sil_vtable [serialized] ConcreteDerived {
 // CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public @$S7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV [override]     // vtable thunk for dynamic.GenericBase.method(A) -> () dispatching to dynamic.ConcreteDerived.method(Swift.Int) -> ()
-// CHECK-NEXT: #GenericBase.init!initializer.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : @$S7dynamic15ConcreteDerivedCACycfc [override]      // dynamic.ConcreteDerived.init() -> dynamic.ConcreteDerived
+// CHECK-NEXT: #GenericBase.init!allocator.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : @$S7dynamic15ConcreteDerivedCACycfC [override]
 // CHECK-NEXT: #ConcreteDerived.deinit!deallocator.1: @$S7dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
 // CHECK-NEXT: }
