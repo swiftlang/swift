@@ -124,6 +124,8 @@ struct ASTContext::Implementation {
   /// lazy parsers for imported module files and source files.
   llvm::SmallPtrSet<LazyMemberParser*, 2> lazyParsers;
 
+  // FIXME: This is a StringMap rather than a StringSet because StringSet
+  // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
 
   /// The declaration of Swift.AssignmentPrecedence.

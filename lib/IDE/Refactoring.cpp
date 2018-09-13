@@ -387,7 +387,7 @@ public:
 };
 
 class TextReplacementsRenamer : public Renamer {
-  llvm::StringMap<char> &ReplaceTextContext;
+  llvm::StringSet<> &ReplaceTextContext;
   std::vector<Replacement> Replacements;
 
 public:
@@ -395,7 +395,9 @@ public:
 
 private:
   StringRef registerText(StringRef Text) {
-    return ReplaceTextContext.insert({Text, char()}).first->getKey();
+    if (Text.empty())
+      return Text;
+    return ReplaceTextContext.insert(Text).first->getKey();
   }
 
   StringRef getCallArgLabelReplacement(StringRef OldLabelRange,
@@ -497,7 +499,7 @@ private:
 public:
   TextReplacementsRenamer(const SourceManager &SM, StringRef OldName,
                           StringRef NewName,
-                          llvm::StringMap<char> &ReplaceTextContext)
+                          llvm::StringSet<> &ReplaceTextContext)
       : Renamer(SM, OldName), ReplaceTextContext(ReplaceTextContext),
         New(NewName) {
     assert(Old.isValid() && New.isValid());
@@ -3285,7 +3287,7 @@ int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
     return true; // Already diagnosed.
 
   size_t index = 0;
-  llvm::StringMap<char> ReplaceTextContext;
+  llvm::StringSet<> ReplaceTextContext;
   for(const RenameLoc &Rename: RenameLocs) {
     ResolvedLoc &Resolved = ResolvedLocs[index++];
     TextReplacementsRenamer Renamer(SM, Rename.OldName, Rename.NewName,
