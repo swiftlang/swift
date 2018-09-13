@@ -1029,6 +1029,14 @@ struct UnavailableAccessors {
   }
 }
 
+class BaseDeprecatedInit {
+  @available(*, deprecated) init(bad: Int) { }
+}
+
+class SubInheritedDeprecatedInit: BaseDeprecatedInit { }
+
+_ = SubInheritedDeprecatedInit(bad: 0) // expected-warning {{'init(bad:)' is deprecated}}
+
 // Should produce no warnings.
 enum SR8634_Enum: Int {
   case a
