@@ -4925,11 +4925,11 @@ public:
     bool isValid() const {
       return getKind() != Kind::Invalid;
     }
-    
+
     bool isResolved() const {
       if (!getComponentType())
         return false;
-      
+
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::OptionalChain:
@@ -4937,20 +4937,21 @@ public:
       case Kind::OptionalForce:
       case Kind::Property:
         return true;
-      
+
       case Kind::UnresolvedSubscript:
       case Kind::UnresolvedProperty:
       case Kind::Invalid:
         return false;
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     Expr *getIndexExpr() const {
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
         return SubscriptIndexExprAndKind.getPointer();
-        
+
       case Kind::Invalid:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
@@ -4959,6 +4960,7 @@ public:
       case Kind::Property:
         return nullptr;
       }
+      llvm_unreachable("unhandled kind");
     }
 
     ArrayRef<Identifier> getSubscriptLabels() const {
@@ -4966,7 +4968,7 @@ public:
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
         return SubscriptLabels;
-        
+
       case Kind::Invalid:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
@@ -4975,14 +4977,15 @@ public:
       case Kind::Property:
         llvm_unreachable("no subscript labels for this kind");
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     ArrayRef<ProtocolConformanceRef>
     getSubscriptIndexHashableConformances() const {
       switch (getKind()) {
       case Kind::Subscript:
         return SubscriptHashableConformances;
-        
+
       case Kind::UnresolvedSubscript:
       case Kind::Invalid:
       case Kind::OptionalChain:
@@ -4992,8 +4995,9 @@ public:
       case Kind::Property:
         return {};
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     void setSubscriptIndexHashableConformances(
       ArrayRef<ProtocolConformanceRef> hashables);
 
@@ -5011,8 +5015,9 @@ public:
       case Kind::Property:
         llvm_unreachable("no unresolved name for this kind");
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     ConcreteDeclRef getDeclRef() const {
       switch (getKind()) {
       case Kind::Property:
@@ -5027,8 +5032,9 @@ public:
       case Kind::OptionalForce:
         llvm_unreachable("no decl ref for this kind");
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     Type getComponentType() const {
       return ComponentType;
     }

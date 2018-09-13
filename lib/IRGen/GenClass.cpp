@@ -606,6 +606,7 @@ irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
   case FieldAccess::ConstantIndirect:
     return nullptr;
   }
+  llvm_unreachable("unhandled access");
 }
 
 FieldAccess

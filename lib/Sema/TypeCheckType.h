@@ -212,6 +212,7 @@ public:
     case Context::AbstractFunctionDecl:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   /// Determine whether all of the given options are set.

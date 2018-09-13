@@ -3005,4 +3005,5 @@ bool OutputInfo::mightHaveExplicitPrimaryInputs(
   case Mode::REPL:
     llvm_unreachable("REPL and immediate modes handled elsewhere");
   }
+  llvm_unreachable("unhandled mode");
 }

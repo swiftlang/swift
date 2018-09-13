@@ -88,6 +88,7 @@ public:
     case EnumKind::Constants:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   /// For this error enum, extract the name of the error domain constant
