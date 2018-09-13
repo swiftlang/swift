@@ -802,13 +802,23 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               params[index].getParameterType());
   }
-  case Kind::CFunctionAsMethodType: {
+  case Kind::CurriedCFunctionAsMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
-    assert(params.size() > 0);
+    assert(params.size() == 1);
+    return getCFunctionAsMethodSelfPattern(params[0].getParameterType());
+  }
+  case Kind::CFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType: {
+    auto params = cast<AnyFunctionType>(getType()).getParams();
 
-    // The last parameter is 'self'.
-    if (index == params.size() - 1) {
-      return getCFunctionAsMethodSelfPattern(params.back().getParameterType());
+    // Only the full method type has a 'self' parameter.
+    if (getKind() == Kind::CFunctionAsMethodType) {
+      assert(params.size() > 0);
+
+      // The last parameter is 'self'.
+      if (index == params.size() - 1) {
+        return getCFunctionAsMethodSelfPattern(params.back().getParameterType());
+      }
     }
 
     // A parameter of type () does not correspond to a Clang parameter.
@@ -826,13 +836,23 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
                               paramType,
                      getClangFunctionParameterType(getClangType(), clangIndex));
   }
-  case Kind::ObjCMethodType: {
+  case Kind::CurriedObjCMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
-    assert(params.size() > 0);
+    assert(params.size() == 1);
+    return getObjCMethodSelfPattern(params[0].getParameterType());
+  }
+  case Kind::ObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType: {
+    auto params = cast<AnyFunctionType>(getType()).getParams();
 
-    // The last parameter is 'self'.
-    if (index == params.size() - 1) {
-      return getObjCMethodSelfPattern(params.back().getParameterType());
+    // Only the full method type has a 'self' parameter.
+    if (getKind() == Kind::ObjCMethodType) {
+      assert(params.size() > 0);
+
+      // The last parameter is 'self'.
+      if (index == params.size() - 1) {
+        return getObjCMethodSelfPattern(params.back().getParameterType());
+      }
     }
 
     // A parameter of type () does not correspond to a Clang parameter.
@@ -866,11 +886,7 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
                           getClangFunctionParameterType(getClangType(), index));
   }
   default:
-    // FIXME: Re-implement this
-    auto input = getFunctionInputType();
-    if (input.isTuple() && input.getNumTupleElements() != 0)
-      return input.getTupleElementType(index);
-    return input;
+    llvm_unreachable("does not have function parameters");
   }
 }
 
