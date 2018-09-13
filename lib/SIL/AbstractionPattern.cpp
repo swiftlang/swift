@@ -584,60 +584,6 @@ AbstractionPattern AbstractionPattern::transformType(
   llvm_unreachable("bad kind");
 }
 
-static CanType dropLastElement(CanType type) {
-  auto elts = cast<TupleType>(type)->getElements().drop_back();
-  return TupleType::get(elts, type->getASTContext())->getCanonicalType();
-}
-
-AbstractionPattern AbstractionPattern::dropLastTupleElement() const {
-  switch (getKind()) {
-  case Kind::Invalid:
-    llvm_unreachable("querying invalid abstraction pattern!");
-  case Kind::Tuple: {
-    auto n = getNumTupleElements_Stored();
-    return getTuple(llvm::makeArrayRef(OrigTupleElements, n - 1));
-  }
-  case Kind::Opaque:
-    return getOpaque();
-  case Kind::CurriedObjCMethodType:
-  case Kind::PartialCurriedObjCMethodType:
-  case Kind::CFunctionAsMethodType:
-  case Kind::CurriedCFunctionAsMethodType:
-  case Kind::PartialCurriedCFunctionAsMethodType:
-  case Kind::ObjCMethodType:
-    llvm_unreachable("not a tuple type");
-  case Kind::ClangType:
-    llvm_unreachable("dropping last element of imported array?");
-  case Kind::ObjCMethodParamTupleType:
-  case Kind::ObjCMethodFormalParamTupleType:
-  case Kind::CFunctionAsMethodParamTupleType:
-  case Kind::CFunctionAsMethodFormalParamTupleType:
-    llvm_unreachable("operation is not needed on method abstraction patterns");
-  case Kind::Type:
-    if (isTypeParameter())
-      return AbstractionPattern::getOpaque();
-    return AbstractionPattern(getGenericSignature(),
-                              dropLastElement(getType()));
-  case Kind::Discard:
-    llvm_unreachable("don't need to drop element on discarded abstractions "
-                     "yet");
-  // In both of the following cases, if the transform makes it no
-  // longer a tuple type, we need to change kinds.
-  case Kind::ClangFunctionParamTupleType: {
-    auto newType = dropLastElement(getType());
-    if (isa<TupleType>(newType)) {
-      return getClangFunctionParamTuple(getGenericSignature(),
-                                        newType, getClangType());
-    } else {
-      assert(getNumTupleElements() == 2);
-      return AbstractionPattern(getGenericSignature(), newType,
-                             getClangFunctionParameterType(getClangType(), 0));
-    }
-  }
-  }
-  llvm_unreachable("bad kind");  
-}
-
 AbstractionPattern AbstractionPattern::getWithoutSpecifierType() const {
   switch (getKind()) {
   case Kind::Invalid:
