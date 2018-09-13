@@ -1055,7 +1055,6 @@ extension Set: SetAlgebra {
 
 extension Set: CustomStringConvertible, CustomDebugStringConvertible {
   /// A string that represents the contents of the set.
-  @inlinable
   public var description: String {
     return _makeCollectionDescription(for: self, withTypeName: nil)
   }
