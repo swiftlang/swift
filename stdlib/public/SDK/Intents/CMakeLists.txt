@@ -23,6 +23,7 @@ add_swift_library(swiftIntents ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_O
   INSetProfileInCarIntent.swift
   INSetRadioStationIntent.swift
   INSetSeatSettingsInCarIntent.swift
+  INShortcut.swift
   INStartPhotoPlaybackIntentResponse.swift
   INStartWorkoutIntent.swift
   NSStringIntents.swift
