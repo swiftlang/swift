@@ -192,6 +192,7 @@
     "Tuple.swift",
     "NewtypeWrapper.swift",
     "UnsafeBitMap.swift",
+    "Bitset.swift",
     "DebuggerSupport.swift",
     "Equatable.swift",
     "Comparable.swift",

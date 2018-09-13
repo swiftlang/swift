@@ -31,6 +31,7 @@ set(SWIFTLIB_ESSENTIAL
   Assert.swift
   AssertCommon.swift
   BidirectionalCollection.swift
+  Bitset.swift
   Bool.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
