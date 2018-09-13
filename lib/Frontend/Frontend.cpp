@@ -925,7 +925,8 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   return inputFile;
 }
 
-void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
+void CompilerInstance::performParseOnly(bool EvaluateConditionals,
+                                        bool ParseDelayedBodyOnEnd) {
   const InputFileKind Kind = Invocation.getInputKind();
   ModuleDecl *const MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
@@ -947,6 +948,10 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   }
 
   PersistentParserState PersistentState(getASTContext());
+  SWIFT_DEFER {
+    if (ParseDelayedBodyOnEnd)
+      PersistentState.parseAllDelayedDeclLists();
+  };
   PersistentState.PerformConditionEvaluation = EvaluateConditionals;
   // Parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {

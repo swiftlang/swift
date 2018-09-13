@@ -552,7 +552,8 @@ public:
 
   /// Parses the input file but does no type-checking or module imports.
   /// Note that this only supports parsing an invocation with a single file.
-  void performParseOnly(bool EvaluateConditionals = false);
+  void performParseOnly(bool EvaluateConditionals = false,
+                        bool ParseDelayedBodyOnEnd = false);
 
   /// Parses and performs name binding on all input files.
   ///
