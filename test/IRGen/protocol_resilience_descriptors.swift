@@ -34,6 +34,24 @@ public struct ConformsToProtocolWithRequirements<Element>
   public func second() { }
 }
 
+public protocol P { }
+public struct ConditionallyConforms<Element> { }
+public struct Y { }
+
+// CHECK-USAGE: @"$Sx1T_MXA" =
+// CHECK-USAGE-SAME: i32 0
+// CHECK-USAGE-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsMp"
+// CHECK-USAGE-SAME: @"$Sx1T_MXA"
+// CHECK-USAGE-SAME: %swift.protocol_requirement** @"{{got.|__imp_}}$S1T18resilient_protocol24ProtocolWithRequirementsPTl"
+
+// CHECK-USAGE: @"$S31protocol_resilience_descriptors21ConditionallyConformsVyxG010resilient_A024ProtocolWithRequirementsAaeFRzAA1YV1TRtzlMc"
+extension ConditionallyConforms: ProtocolWithRequirements
+where Element: ProtocolWithRequirements, Element.T == Y {
+  public typealias T = Element.T
+  public func first() { }
+  public func second() { }
+}
+
 // ----------------------------------------------------------------------------
 // Resilient protocol usage
 // ----------------------------------------------------------------------------

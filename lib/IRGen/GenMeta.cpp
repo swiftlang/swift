@@ -667,7 +667,7 @@ namespace {
       B.fillPlaceholderWithInt(*NumRequirements, IGM.Int32Ty,
                                pi.getNumWitnesses());
 
-      if (Resilient && pi.getNumWitnesses() > 0) {
+      if (pi.getNumWitnesses() > 0) {
         // Define the protocol requirements "base" descriptor, which references
         // the beginning of the protocol requirements, offset so that
         // subtracting this address from the address of a given protocol
@@ -692,14 +692,16 @@ namespace {
               B.getAddrOfCurrentPosition(
                 IGM.ProtocolRequirementStructTy);
             IGM.defineMethodDescriptor(func, Proto, descriptor);
-          } else if (entry.isAssociatedType()) {
-            auto assocType = entry.getAssociatedType();
-            // Define the associated type descriptor to point to the current
-            // position in the protocol descriptor.
-            IGM.defineAssociatedTypeDescriptor(
-                assocType,
-                B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
           }
+        }
+
+        if (entry.isAssociatedType()) {
+          auto assocType = entry.getAssociatedType();
+          // Define the associated type descriptor to point to the current
+          // position in the protocol descriptor.
+          IGM.defineAssociatedTypeDescriptor(
+              assocType,
+              B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
         }
 
         auto reqt = B.beginStruct(IGM.ProtocolRequirementStructTy);

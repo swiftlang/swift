@@ -907,15 +907,13 @@ llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
     auto proto = getConstantReferenceForProtocolDescriptor(
                                                       assocType->getProtocol());
     B.addRelativeAddress(proto);
-    
-    // Find the offset of the associated type entry in witness tables of this
-    // protocol.
-    auto &protoInfo = getProtocolInfo(assocType->getProtocol(),
-                                      ProtocolInfoKind::RequirementSignature);
-    auto index = protoInfo.getAssociatedTypeIndex(AssociatedType(assocType))
-      .getValue();
-    
-    B.addInt32(index);
+
+    // Add a reference to the associated type descriptor.
+    auto assocTypeDescriptor =
+      getAddrOfLLVMVariableOrGOTEquivalent(
+        LinkEntity::forAssociatedTypeDescriptor(assocType),
+      Alignment(4), ProtocolRequirementStructTy);
+    B.addRelativeAddress(assocTypeDescriptor);
   }
   
   // Null terminator.

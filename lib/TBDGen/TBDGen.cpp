@@ -405,23 +405,24 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
-    if (PD->isResilient()) {
-      // If there are any requirements, emit a requirements base descriptor.
-      if (protocolDescriptorHasRequirements(PD))
-        addProtocolRequirementsBaseDescriptor(PD);
+    // If there are any requirements, emit a requirements base descriptor.
+    if (protocolDescriptorHasRequirements(PD))
+      addProtocolRequirementsBaseDescriptor(PD);
 
-      for (auto *member : PD->getMembers()) {
+    for (auto *member : PD->getMembers()) {
+      if (PD->isResilient()) {
         if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(member)) {
           if (SILDeclRef::requiresNewWitnessTableEntry(funcDecl)) {
             addDispatchThunk(SILDeclRef(funcDecl));
             addMethodDescriptor(SILDeclRef(funcDecl));
           }
         }
+      }
 
-        if (auto *assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-          if (assocType->getOverriddenDecls().empty())
-            addAssociatedTypeDescriptor(assocType);
-        }
+      // Always produce associated type descriptors.
+      if (auto *assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        if (assocType->getOverriddenDecls().empty())
+          addAssociatedTypeDescriptor(assocType);
       }
     }
   }
