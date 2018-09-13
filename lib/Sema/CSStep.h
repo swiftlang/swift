@@ -361,9 +361,8 @@ public:
   StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
 
-  bool operator>(const ComponentStep *other) const {
-    return NumDisjunctions > other->NumDisjunctions;
-  }
+  // The number of disjunction constraints associated with this component.
+  unsigned disjunctionCount() const { return NumDisjunctions; }
 
   void print(llvm::raw_ostream &Out) override {
     Out << "ComponentStep with at #" << Index << '\n';
