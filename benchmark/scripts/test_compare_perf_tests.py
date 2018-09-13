@@ -587,21 +587,21 @@ class TestReportFormatter(OldAndNewLog):
         comparison_result = self.tc.increased[0]
         self.assertEquals(
             ReportFormatter.header_for(comparison_result),
-            ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP')
+            ('TEST', 'OLD', 'NEW', 'DELTA', 'RATIO')
         )
         self.assert_markdown_contains([
-            'TEST                  | OLD    | NEW    | DELTA   | SPEEDUP',
+            'TEST                  | OLD    | NEW    | DELTA   | RATIO',
             '---                   | ---    | ---    | ---     | ---    ',
             'TEST                  | MIN    | MAX    | MEAN    | MAX_RSS'])
         self.assert_git_contains([
-            'TEST                    OLD      NEW      DELTA     SPEEDUP',
+            'TEST                    OLD      NEW      DELTA     RATIO',
             'TEST                    MIN      MAX      MEAN      MAX_RSS'])
         self.assert_html_contains([
             """
                 <th align='left'>OLD</th>
                 <th align='left'>NEW</th>
                 <th align='left'>DELTA</th>
-                <th align='left'>SPEEDUP</th>""",
+                <th align='left'>RATIO</th>""",
             """
                 <th align='left'>MIN</th>
                 <th align='left'>MAX</th>
@@ -764,12 +764,12 @@ class Test_compare_perf_tests_main(OldAndNewLog, FileSystemIntegration):
     """Integration test that invokes the whole comparison script."""
     markdown = [
         '<summary>Regression (1)</summary>',
-        'TEST                  | OLD    | NEW    | DELTA   | SPEEDUP',
+        'TEST                  | OLD    | NEW    | DELTA   | RATIO',
         'BitCount              | 3      | 9      | +199.9% | **0.33x**',
     ]
     git = [
         'Regression (1):',
-        'TEST                    OLD      NEW      DELTA     SPEEDUP',
+        'TEST                    OLD      NEW      DELTA     RATIO',
         'BitCount                3        9        +199.9%   **0.33x**',
     ]
     html = ['<html>', "<td align='left'>BitCount</td>"]
