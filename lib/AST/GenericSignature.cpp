@@ -186,6 +186,7 @@ static unsigned getRequirementKindOrder(RequirementKind kind) {
   case RequirementKind::SameType: return 3;
   case RequirementKind::Layout: return 1;
   }
+  llvm_unreachable("unhandled kind");
 }
 #endif
 
@@ -585,6 +586,7 @@ bool GenericSignature::isRequirementSatisfied(Requirement requirement) {
     return true;
   }
   }
+  llvm_unreachable("unhandled kind");
 }
 
 SmallVector<Requirement, 4> GenericSignature::requirementsNotSatisfiedBy(

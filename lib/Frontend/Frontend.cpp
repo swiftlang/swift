@@ -299,6 +299,7 @@ static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
   case InputFileKind::None:
     return false;
   }
+  llvm_unreachable("unhandled input kind");
 }
 
 bool CompilerInstance::setUpInputs() {

@@ -706,6 +706,7 @@ static CanType getArgumentLoweringType(CanType type,
   case ParameterConvention::Indirect_InoutAliasable:
     return CanInOutType::get(type);
   }
+  llvm_unreachable("unhandled convention");
 }
 
 static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,

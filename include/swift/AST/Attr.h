@@ -1289,6 +1289,7 @@ public:
     case Kind::NSErrorWrapperAnon:
       return "E";
     }
+    llvm_unreachable("unhandled kind");
   }
 
   static bool classof(const DeclAttribute *DA) {

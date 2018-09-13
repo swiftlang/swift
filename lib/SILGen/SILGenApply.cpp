@@ -650,6 +650,7 @@ public:
       return ManagedValue::forUnmanaged(fn);
     }
     }
+    llvm_unreachable("unhandled kind");
   }
 
   CalleeTypeInfo getTypeInfo(SILGenFunction &SGF, bool isCurried) const & {
@@ -698,6 +699,7 @@ public:
       return createCalleeTypeInfo(SGF, constant, formalType);
     }
     }
+    llvm_unreachable("unhandled kind");
   }
 
   SubstitutionMap getSubstitutions() const {

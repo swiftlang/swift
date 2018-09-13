@@ -318,6 +318,7 @@ bool MissingForcedDowncastFailure::diagnoseAsError() {
         .fixItReplace(coerceExpr->getLoc(), "as!");
     return true;
   }
+  llvm_unreachable("unhandled cast kind");
 }
 
 bool MissingAddressOfFailure::diagnoseAsError() {

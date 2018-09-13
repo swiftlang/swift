@@ -361,6 +361,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       return maybeAddExternal(SILLinkage::Hidden);
     return maybeAddExternal(SILLinkage::Public);
   }
+  llvm_unreachable("unhandled access");
 }
 
 SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,

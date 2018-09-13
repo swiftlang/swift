@@ -830,6 +830,7 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
       return getSILDeclRef(MF, ListOfValues, nextValue);
     }
     }
+    llvm_unreachable("unhandled kind");
   };
 
   ArrayRef<KeyPathPatternComponent::Index> indices;

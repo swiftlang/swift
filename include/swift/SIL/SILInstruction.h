@@ -2411,8 +2411,9 @@ public:
     case Unpacked:
       return (Kind)((uintptr_t)ValueAndKind.getPointer() >> KindPackingBits);
     }
+    llvm_unreachable("unhandled kind");
   }
-  
+
   CanType getComponentType() const {
     return ComponentType;
   }
@@ -2430,7 +2431,7 @@ public:
     }
     llvm_unreachable("unhandled kind");
   }
-  
+
   ComputedPropertyId getComputedPropertyId() const {
     switch (getKind()) {
     case Kind::StoredProperty:
@@ -2445,7 +2446,7 @@ public:
     }
     llvm_unreachable("unhandled kind");
   }
-  
+
   SILFunction *getComputedPropertyGetter() const {
     switch (getKind()) {
     case Kind::StoredProperty:
@@ -2473,7 +2474,7 @@ public:
     }
     llvm_unreachable("unhandled kind");
   }
-  
+
   ArrayRef<Index> getSubscriptIndices() const {
     switch (getKind()) {
     case Kind::StoredProperty:
@@ -2485,8 +2486,9 @@ public:
     case Kind::SettableProperty:
       return Indices;
     }
+    llvm_unreachable("unhandled kind");
   }
-  
+
   SILFunction *getSubscriptIndexEquals() const {
     switch (getKind()) {
     case Kind::StoredProperty:
@@ -2498,6 +2500,7 @@ public:
     case Kind::SettableProperty:
       return IndexEquality.Equal;
     }
+    llvm_unreachable("unhandled kind");
   }
   SILFunction *getSubscriptIndexHash() const {
     switch (getKind()) {
@@ -2510,8 +2513,9 @@ public:
     case Kind::SettableProperty:
       return IndexEquality.Hash;
     }
+    llvm_unreachable("unhandled kind");
   }
-  
+
   bool isComputedSettablePropertyMutating() const;
   
   static KeyPathPatternComponent forStoredProperty(VarDecl *property,
@@ -2530,8 +2534,9 @@ public:
     case Kind::SettableProperty:
       return ExternalStorage;
     }
+    llvm_unreachable("unhandled kind");
   }
-  
+
   SubstitutionMap getExternalSubstitutions() const {
     switch (getKind()) {
     case Kind::StoredProperty:
@@ -2543,6 +2548,7 @@ public:
     case Kind::SettableProperty:
       return ExternalSubstitutions;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   static KeyPathPatternComponent

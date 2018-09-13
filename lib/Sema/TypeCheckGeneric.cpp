@@ -1038,4 +1038,5 @@ RequirementRequest::evaluate(Evaluator &evaluator,
                        resolveType(reqRepr.getSubjectLoc()),
                        reqRepr.getLayoutConstraint());
   }
+  llvm_unreachable("unhandled kind");
 }
