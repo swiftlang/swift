@@ -994,8 +994,6 @@ public:
     llvm_unreachable("bad kind");
   }
 
-  AbstractionPattern dropLastTupleElement() const;
-
   class TupleElementRange;
 
   /// Return a range over the tuple elements.
