@@ -703,9 +703,9 @@ IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
   }
 }
 
-IdentifierID Serializer::addUniquedStringRef(StringRef str) {
+std::pair<StringRef, IdentifierID> Serializer::addUniquedString(StringRef str) {
   if (str.empty())
-    return 0;
+    return {str, 0};
 
   decltype(UniquedStringIDs)::iterator iter;
   bool isNew;
@@ -713,11 +713,12 @@ IdentifierID Serializer::addUniquedStringRef(StringRef str) {
       UniquedStringIDs.insert({str, LastUniquedStringID + 1});
 
   if (!isNew)
-    return iter->getValue();
+    return {iter->getKey(), iter->getValue()};
 
+  ++LastUniquedStringID;
   // Note that we use the string data stored in the StringMap.
   StringsToWrite.push_back(iter->getKey());
-  return ++LastUniquedStringID;
+  return {iter->getKey(), LastUniquedStringID};
 }
 
 IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {

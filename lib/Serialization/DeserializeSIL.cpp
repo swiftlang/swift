@@ -3130,7 +3130,7 @@ SILDeserializer::lookupDefaultWitnessTable(SILDefaultWitnessTable *existingWt) {
 
   // Use the mangled name of the protocol to lookup the partially
   // deserialized value from the default witness table list.
-  auto iter = DefaultWitnessTableList->find(existingWt->getIdentifier().str());
+  auto iter = DefaultWitnessTableList->find(existingWt->getUniqueName());
   if (iter == DefaultWitnessTableList->end())
     return nullptr;
 
