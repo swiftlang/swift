@@ -60,23 +60,23 @@ struct _SwiftSetBodyStorage {
   void *keys;
 };
 
-struct _SwiftEmptyDictionaryStorage {
+struct _SwiftEmptyDictionarySingleton {
   struct HeapObject header;
   struct _SwiftDictionaryBodyStorage body;
   __swift_uintptr_t entries;
 };
 
-struct _SwiftEmptySetStorage {
+struct _SwiftEmptySetSingleton {
   struct HeapObject header;
   struct _SwiftSetBodyStorage body;
   __swift_uintptr_t entries;
 };
 
 SWIFT_RUNTIME_STDLIB_API
-struct _SwiftEmptyDictionaryStorage _swiftEmptyDictionaryStorage;
+struct _SwiftEmptyDictionarySingleton _swiftEmptyDictionarySingleton;
 
 SWIFT_RUNTIME_STDLIB_API
-struct _SwiftEmptySetStorage _swiftEmptySetStorage;
+struct _SwiftEmptySetSingleton _swiftEmptySetSingleton;
 
 struct _SwiftHashingParameters {
   __swift_uint64_t seed0;
@@ -91,9 +91,9 @@ struct _SwiftHashingParameters _swift_stdlib_Hashing_parameters;
 
 static_assert(std::is_pod<_SwiftEmptyArrayStorage>::value,
               "empty array type should be POD");
-static_assert(std::is_pod<_SwiftEmptyDictionaryStorage>::value,
+static_assert(std::is_pod<_SwiftEmptyDictionarySingleton>::value,
               "empty dictionary type should be POD");
-static_assert(std::is_pod<_SwiftEmptySetStorage>::value,
+static_assert(std::is_pod<_SwiftEmptySetSingleton>::value,
               "empty set type should be POD");
 
 }} // extern "C", namespace swift

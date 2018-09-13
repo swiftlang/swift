@@ -1807,14 +1807,13 @@ internal protocol _DictionaryBuffer {
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
-internal class _RawNativeDictionaryStorage
-  : _SwiftNativeNSDictionary, _NSDictionaryCore
-{
+internal class _RawNativeDictionaryStorage: _SwiftNativeNSDictionary {
   @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal final var bucketCount: Int
 
   @usableFromInline // FIXME(sil-serialize-all)
+  @objc
   internal final var count: Int
 
   @usableFromInline // FIXME(sil-serialize-all)
@@ -1838,36 +1837,36 @@ internal class _RawNativeDictionaryStorage
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt.self))
   }
 
-  /// The empty singleton that is used for every single Dictionary that is
-  /// created without any elements. The contents of the storage should never
-  /// be mutated.
-  @inlinable
-  @nonobjc
-  internal static var empty: _RawNativeDictionaryStorage {
-    return Builtin.bridgeFromRawPointer(
-      Builtin.addressof(&_swiftEmptyDictionaryStorage))
-  }
-
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only create this by using the `empty` singleton")
   }
+}
+
+/// The storage class for the singleton empty set.
+/// The single instance of this class is created by the runtime.
+@_fixed_layout
+@usableFromInline
+internal class _EmptyDictionarySingleton
+  : _RawNativeDictionaryStorage, _NSDictionaryCore {
+  @nonobjc
+  internal override init(_doNotCallMe: ()) {
+    _sanityCheckFailure("Only create this by using the `empty` singleton")
+  }
+
+#if _runtime(_ObjC)
+  @objc
+  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
+    _sanityCheckFailure("Don't call this designated initializer")
+  }
+#endif
 
 #if _runtime(_ObjC)
   //
-  // NSDictionary implementation, assuming Self is the empty singleton
+  // NSDictionary implementation
   //
-
-  /// Get the NSEnumerator implementation for self.
-  /// _HashableTypedNativeDictionaryStorage overloads this to give
-  /// _NativeSelfNSEnumerator proper type parameters.
-  @objc
-  internal func enumerator() -> _NSEnumerator {
-    return _SwiftDictionaryNSEnumerator<AnyObject, AnyObject>(
-        _NativeDictionary(_storage: self))
-  }
 
   @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
@@ -1907,8 +1906,9 @@ internal class _RawNativeDictionaryStorage
     return nil
   }
 
+  @objc(keyEnumerator)
   internal func keyEnumerator() -> _NSEnumerator {
-    return enumerator()
+    return _SwiftEmptyNSEnumerator()
   }
 
   @objc(getObjects:andKeys:count:)
@@ -1919,6 +1919,19 @@ internal class _RawNativeDictionaryStorage
     // Do nothing, we're empty
   }
 #endif
+}
+
+
+extension _RawNativeDictionaryStorage {
+  /// The empty singleton that is used for every single Dictionary that is
+  /// created without any elements. The contents of the storage should never
+  /// be mutated.
+  @inlinable
+  @nonobjc
+  internal static var empty: _EmptyDictionarySingleton {
+    return Builtin.bridgeFromRawPointer(
+      Builtin.addressof(&_swiftEmptyDictionarySingleton))
+  }
 }
 
 // See the docs at the top of this file for a description of this type
@@ -1972,7 +1985,7 @@ internal class _TypedNativeDictionaryStorage<Key, Value>
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
-  : _TypedNativeDictionaryStorage<Key, Value> {
+  : _TypedNativeDictionaryStorage<Key, Value>, _NSDictionaryCore {
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
@@ -1990,14 +2003,19 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
     return _NativeDictionary(_storage: self)
   }
 
-  @objc
-  internal override func enumerator() -> _NSEnumerator {
+  @objc(keyEnumerator)
+  internal func keyEnumerator() -> _NSEnumerator {
     return _SwiftDictionaryNSEnumerator<Key, Value>(
         _NativeDictionary(_storage: self))
   }
 
+  @objc(copyWithZone:)
+  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
+    return self
+  }
+
   @objc(countByEnumeratingWithState:objects:count:)
-  internal override func countByEnumerating(
+  internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int {
@@ -2059,13 +2077,13 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
   }
 
   @objc(objectForKey:)
-  override func objectFor(_ aKey: AnyObject) -> AnyObject? {
+  func objectFor(_ aKey: AnyObject) -> AnyObject? {
     return getObjectFor(aKey)
   }
 
   // We also override the following methods for efficiency.
   @objc(getObjects:andKeys:count:)
-  override func getObjects(
+  func getObjects(
     _ objects: UnsafeMutablePointer<AnyObject>?,
     andKeys keys: UnsafeMutablePointer<AnyObject>?,
     count: Int) {
@@ -2414,20 +2432,23 @@ extension _NativeDictionary where Key: Hashable {
     // or if we're the empty singleton.
 
     // Temporary var for SOME type safety before a cast.
-    let nsSet: _NSDictionaryCore
+    let nsDictionary: _NSDictionaryCore
 
-    if (_isBridgedVerbatimToObjectiveC(Key.self) &&
-        _isBridgedVerbatimToObjectiveC(Value.self)) ||
-        self._storage === _RawNativeDictionaryStorage.empty {
-      nsSet = self._storage
+    if _storage === _RawNativeDictionaryStorage.empty {
+      nsDictionary = _RawNativeDictionaryStorage.empty
+    } else  if _isBridgedVerbatimToObjectiveC(Key.self),
+      _isBridgedVerbatimToObjectiveC(Value.self) {
+      nsDictionary = unsafeDowncast(
+        _storage,
+        to: _HashableTypedNativeDictionaryStorage<Key, Value>.self)
     } else {
-      nsSet = _SwiftDeferredNSDictionary(self)
+      nsDictionary = _SwiftDeferredNSDictionary(self)
     }
 
     // Cast from "minimal NSDictionary" to "NSDictionary"
     // Note that if you actually ask Swift for this cast, it will fail.
     // Never trust a shadow protocol!
-    return unsafeBitCast(nsSet, to: _NSDictionary.self)
+    return unsafeBitCast(nsDictionary, to: _NSDictionary.self)
   }
 #endif
 

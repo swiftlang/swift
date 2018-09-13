@@ -1410,12 +1410,13 @@ internal protocol _SetBuffer { // FIXME: Remove or refactor for Set.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
-internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
+internal class _RawNativeSetStorage: _SwiftNativeNSSet {
   @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal final var bucketCount: Int
 
   @usableFromInline // FIXME(sil-serialize-all)
+  @objc
   internal final var count: Int
 
   @usableFromInline // FIXME(sil-serialize-all)
@@ -1436,63 +1437,51 @@ internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt.self))
   }
 
-  /// The empty singleton that is used for every single Dictionary that is
-  /// created without any elements. The contents of the storage should never
-  /// be mutated.
-  @inlinable
-  @nonobjc
-  internal static var empty: _RawNativeSetStorage {
-    return Builtin.bridgeFromRawPointer(
-      Builtin.addressof(&_swiftEmptySetStorage))
-  }
-
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only create this by using the `empty` singleton")
   }
+}
 
+/// The storage class for the singleton empty set.
+/// The single instance of this class is created by the runtime.
+@_fixed_layout
+@usableFromInline
+internal class _EmptySetSingleton: _RawNativeSetStorage {
+  @nonobjc
+  override internal init(_doNotCallMe: ()) {
+    _sanityCheckFailure("Only create this by using the `empty` singleton")
+  }
+
+#if _runtime(_ObjC)
+  @objc
+  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
+    _sanityCheckFailure("Don't call this designated initializer")
+  }
+#endif
+}
+
+extension _RawNativeSetStorage {
+  /// The empty singleton that is used for every single Set that is created
+  /// without any elements. The contents of the storage must never be mutated.
+  @inlinable
+  @nonobjc
+  internal static var empty: _EmptySetSingleton {
+    return Builtin.bridgeFromRawPointer(
+      Builtin.addressof(&_swiftEmptySetSingleton))
+  }
+}
+
+extension _EmptySetSingleton: _NSSetCore {
 #if _runtime(_ObjC)
   //
   // NSSet implementation, assuming Self is the empty singleton
   //
-
-  /// Get the NSEnumerator implementation for self.
-  /// _HashableTypedNativeSetStorage overloads this to give
-  /// _NativeSelfNSEnumerator proper type parameters.
-  @objc
-  internal func enumerator() -> _NSEnumerator {
-    return _SwiftSetNSEnumerator<AnyObject>(_NativeSet(_storage: self))
-  }
-
   @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     return self
-  }
-
-  @objc(countByEnumeratingWithState:objects:count:)
-  internal func countByEnumerating(
-    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>?, count: Int
-  ) -> Int {
-    // Even though we never do anything in here, we need to update the
-    // state so that callers know we actually ran.
-
-    var theState = state.pointee
-    if theState.state == 0 {
-      theState.state = 1 // Arbitrary non-zero value.
-      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
-      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-    }
-    state.pointee = theState
-
-    return 0
-  }
-
-  @objc
-  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("don't call this designated initializer")
   }
 
   @objc
@@ -1502,7 +1491,24 @@ internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
 
   @objc
   internal func objectEnumerator() -> _NSEnumerator {
-    return enumerator()
+    return _SwiftEmptyNSEnumerator()
+  }
+
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
+  ) -> Int {
+    // Even though we never do anything in here, we need to update the
+    // state so that callers know we actually ran.
+    var theState = state.pointee
+    if theState.state == 0 {
+      theState.state = 1 // Arbitrary non-zero value.
+      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
+      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+    }
+    state.pointee = theState
+    return 0
   }
 #endif
 }
@@ -1545,7 +1551,7 @@ internal class _TypedNativeSetStorage<Element>: _RawNativeSetStorage {
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _HashableTypedNativeSetStorage<Element: Hashable>
-  : _TypedNativeSetStorage<Element> {
+  : _TypedNativeSetStorage<Element>, _NSSetCore {
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
@@ -1561,12 +1567,17 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
   }
 
   @objc
-  internal override func enumerator() -> _NSEnumerator {
+  internal func objectEnumerator() -> _NSEnumerator {
     return _SwiftSetNSEnumerator<Element>(_NativeSet(_storage: self))
   }
 
+  @objc(copyWithZone:)
+  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
+    return self
+  }
+
   @objc(countByEnumeratingWithState:objects:count:)
-  internal override func countByEnumerating(
+  internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int {
@@ -1622,7 +1633,7 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
   }
 
   @objc
-  override internal func member(_ object: AnyObject) -> AnyObject? {
+  internal func member(_ object: AnyObject) -> AnyObject? {
     return getObjectFor(object)
   }
 #endif
@@ -1907,9 +1918,12 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
     // Temporary var for SOME type safety before a cast.
     let nsSet: _NSSetCore
 
-    if _isBridgedVerbatimToObjectiveC(Element.self) ||
-      self._storage === _RawNativeSetStorage.empty {
-      nsSet = self._storage
+    if self._storage === _RawNativeSetStorage.empty {
+      nsSet = _RawNativeSetStorage.empty
+    } else if _isBridgedVerbatimToObjectiveC(Element.self) {
+      nsSet = unsafeDowncast(
+        self._storage,
+        to: _HashableTypedNativeSetStorage<Element>.self)
     } else {
       nsSet = _SwiftDeferredNSSet(self)
     }
@@ -2406,7 +2420,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable> { }
 #if _runtime(_ObjC)
 @usableFromInline
 @_fixed_layout
-internal struct _CocoaSet: _SetBuffer {
+internal struct _CocoaSet {
   @usableFromInline
   internal let object: _NSSet
 

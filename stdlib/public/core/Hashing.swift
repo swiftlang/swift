@@ -67,3 +67,35 @@ internal struct _UnmanagedAnyObjectArray {
     }
   }
 }
+
+#if _runtime(_ObjC)
+/// An NSEnumerator implementation returning zero elements. This is useful when
+/// a concrete element type is not recoverable from the empty singleton.
+final internal class _SwiftEmptyNSEnumerator
+  : _SwiftNativeNSEnumerator, _NSEnumerator {
+  internal override required init() {}
+
+  @objc
+  internal func nextObject() -> AnyObject? {
+    return nil
+  }
+
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>,
+    count: Int
+  ) -> Int {
+    // Even though we never do anything in here, we need to update the
+    // state so that callers know we actually ran.
+    var theState = state.pointee
+    if theState.state == 0 {
+      theState.state = 1 // Arbitrary non-zero value.
+      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
+      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+    }
+    state.pointee = theState
+    return 0
+  }
+}
+#endif

@@ -28,13 +28,13 @@ namespace swift {
 SWIFT_RUNTIME_STDLIB_API
 ClassMetadata CLASS_METADATA_SYM(s18_EmptyArrayStorage);
 
-// _direct type metadata for Swift._RawNativeDictionaryStorage
+// _direct type metadata for Swift._EmptyDictionarySingleton
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);
+ClassMetadata CLASS_METADATA_SYM(s25_EmptyDictionarySingleton);
 
-// _direct type metadata for Swift._RawNativeSetStorage
+// _direct type metadata for Swift._EmptySetSingleton
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s20_RawNativeSetStorage);
+ClassMetadata CLASS_METADATA_SYM(s18_EmptySetSingleton);
 } // namespace swift
 
 SWIFT_RUNTIME_STDLIB_API
@@ -52,10 +52,10 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
 };
 
 SWIFT_RUNTIME_STDLIB_API
-swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
+swift::_SwiftEmptyDictionarySingleton swift::_swiftEmptyDictionarySingleton = {
   // HeapObject header;
   {
-    &swift::CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage), // isa pointer
+    &swift::CLASS_METADATA_SYM(s25_EmptyDictionarySingleton), // isa pointer
   },
   
   // _SwiftDictionaryBodyStorage body;
@@ -68,7 +68,7 @@ swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
     
     // _SwiftUnsafeBitMap initializedEntries
     {
-      &swift::_swiftEmptyDictionaryStorage.entries, // unsigned int* values;
+      &swift::_swiftEmptyDictionarySingleton.entries, // unsigned int* values;
       1 // int bitCount; (1 so there's something for iterators to read)
     },
     
@@ -80,10 +80,10 @@ swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
 };
 
 SWIFT_RUNTIME_STDLIB_API
-swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
+swift::_SwiftEmptySetSingleton swift::_swiftEmptySetSingleton = {
   // HeapObject header;
   {
-    &swift::CLASS_METADATA_SYM(s20_RawNativeSetStorage), // isa pointer
+    &swift::CLASS_METADATA_SYM(s18_EmptySetSingleton), // isa pointer
   },
   
   // _SwiftDictionaryBodyStorage body;
@@ -96,7 +96,7 @@ swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
     
     // _SwiftUnsafeBitMap initializedEntries
     {
-      &swift::_swiftEmptySetStorage.entries, // unsigned int* values;
+      &swift::_swiftEmptySetSingleton.entries, // unsigned int* values;
       1 // int bitCount; (1 so there's something for iterators to read)
     },
     
