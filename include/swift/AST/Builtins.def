@@ -72,7 +72,7 @@ BUILTIN_BINARY_OPERATION(Sub,     "sub",      "n", IntegerOrVector)
 BUILTIN_BINARY_OPERATION(FSub,    "fsub",     "n", FloatOrVector)
 BUILTIN_BINARY_OPERATION(UDiv,    "udiv",     "n", IntegerOrVector)
 BUILTIN_BINARY_OPERATION(ExactUDiv, "udiv_exact", "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(URem,    "urem",     "n", Integer)
+BUILTIN_BINARY_OPERATION(URem,    "urem",     "n", IntegerOrVector)
 BUILTIN_BINARY_OPERATION(FRem,    "frem",     "n", FloatOrVector)
 BUILTIN_BINARY_OPERATION(Xor,     "xor",      "n", IntegerOrVector)
 #undef BUILTIN_BINARY_OPERATION

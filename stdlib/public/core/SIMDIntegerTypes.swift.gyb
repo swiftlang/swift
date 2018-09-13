@@ -134,6 +134,28 @@ public extension ${Element} {
 %    end
     }
 
+    @_transparent
+    public static func %(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      _precondition(all(rhs != 0), "Division by zero in remainder operation.")
+%    if N == 3:
+%     # special handling for the 3-element case: insert a 1 in the unused
+%     # fourth component, to avoid dividing by zero since that would invoke
+%     # UB at the LLVM IR level.
+      let rhsValue = Builtin.insertelement_${LLVM}_Int${bits}_Int32(
+        rhs._value, Int${bits}(1)._value, Int32(3)._value
+      )
+%    else:
+      let rhsValue = rhs._value
+%    end
+%    if signed:
+      _precondition(!any((lhs == .min) & (rhs == -1)),
+                    "Division results in an overflow in remainder operation.")
+      return ${Self}(Builtin.srem_${LLVM}(lhs._value, rhsValue))
+%    else:
+      return ${Self}(Builtin.urem_${LLVM}(lhs._value, rhsValue))
+%    end
+    }
+
     // Operations not required by any protocol -------------------------------
     @inlinable
     public init<Other>(truncatingIfNeeded other: Other)

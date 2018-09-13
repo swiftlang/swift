@@ -44,12 +44,21 @@ public protocol SIMDIntegerVector : SIMDVector
   
   static func /(lhs: Self, rhs: Self) -> Self
   
-  // static func %(lhs: Self, rhs: Self) -> Self
+  static func %(lhs: Self, rhs: Self) -> Self
 }
 
 // MARK: Defaulted requirements and extensions
 public extension SIMDIntegerVector {
 
+  /// A vector where the value in each lane is selected from the corresponding
+  /// lane of `self` (if that lane of `predicate` is `false`) or `other` (if
+  /// that lane of `predicate` is `true`).
+  ///
+  /// For example, suppose we want to replace any negative values in a vector
+  /// with zeros. We would do the following:
+  /// ~~~~
+  /// let x: Int32.Vector8(0, 2, -1, 7, -.min, -2, 1, 3)
+  /// let y = x.replacing(with: 0, where: x < 0) // 0, 2, 0, 7, 0, 0, 1, 3
   @_transparent
   func replacing(with other: Self, where predicate: Predicate) -> Self {
     return replacingBits(with: other, where: Self(bitMaskFrom: predicate))
@@ -58,14 +67,6 @@ public extension SIMDIntegerVector {
   @_transparent
   func replacingBits(with other: Self, where mask: Self) -> Self {
     return self & ~mask | other & mask
-  }
-  
-  var max: Self {
-    return Self(repeating: Element.max)
-  }
-  
-  var min: Self {
-    return Self(repeating: Element.min)
   }
   
   // MARK: Comparison operators
@@ -171,7 +172,6 @@ public extension SIMDIntegerVector {
     }
   }
   
-  /*
   @inlinable
   static func <<(lhs: Self, rhs: Self) -> Self {
     if Element.isSigned {
@@ -184,7 +184,6 @@ public extension SIMDIntegerVector {
       return right.replacing(with: 0, where: rhs >= Element.bitWidth)
     }
   }
-  */
   
   @_transparent
   static func &>> <Count>(lhs: Self, rhs: Count) -> Self
