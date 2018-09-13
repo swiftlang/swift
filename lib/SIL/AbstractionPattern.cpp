@@ -798,15 +798,8 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
       return AbstractionPattern::getOpaque();
     auto fnType = cast<AnyFunctionType>(getType());
     auto param = fnType.getParams()[index];
-    auto paramType = param.getType();
-    // FIXME: Extract this into a utility method
-    if (param.isVariadic()) {
-      auto &ctx = paramType->getASTContext();
-      paramType = CanType(BoundGenericType::get(ctx.getArrayDecl(),
-                                                Type(), {paramType}));
-    }
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
-                              paramType);
+                              param.getParameterType());
   }
   default:
     // FIXME: Re-implement this
