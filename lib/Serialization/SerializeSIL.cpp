@@ -117,7 +117,7 @@ namespace {
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      uint32_t keyID = S.addDeclBaseNameRef(key);
+      uint32_t keyID = S.addUniquedStringRef(key.str());
       endian::write<uint32_t>(out, keyID, little);
     }
 
@@ -360,7 +360,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   SmallVector<IdentifierID, 1> SemanticsIDs;
   for (auto SemanticAttr : F.getSemanticsAttrs()) {
-    SemanticsIDs.push_back(S.addDeclBaseNameRef(Ctx.getIdentifier(SemanticAttr)));
+    SemanticsIDs.push_back(S.addUniquedStringRef(SemanticAttr));
   }
 
   SILLinkage Linkage = F.getLinkage();
@@ -490,7 +490,7 @@ static void handleSILDeclRef(Serializer &S, const SILDeclRef &Ref,
 /// functions.
 IdentifierID SILSerializer::addSILFunctionRef(SILFunction *F) {
   addReferencedSILFunction(F);
-  return S.addDeclBaseNameRef(Ctx.getIdentifier(F->getName()));
+  return S.addUniquedStringRef(F->getName());
 }
 
 /// Helper function to update ListOfValues for MethodInst. Format:
@@ -996,8 +996,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0, 0, 0,
-        S.addDeclBaseNameRef(
-            Ctx.getIdentifier(G->getName())));
+        S.addUniquedStringRef(G->getName()));
     break;
   }
   case SILInstructionKind::GlobalAddrInst:
@@ -1011,8 +1010,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(), 0,
         S.addTypeRef(GI->getType().getASTType()),
         (unsigned)GI->getType().getCategory(),
-        S.addDeclBaseNameRef(
-            Ctx.getIdentifier(G->getName())));
+        S.addUniquedStringRef(G->getName()));
     break;
   }
   case SILInstructionKind::BranchInst: {
@@ -1346,7 +1344,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned encoding = toStableStringEncoding(SLI->getEncoding());
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     (unsigned)SI.getKind(), encoding, 0, 0,
-                                    S.addDeclBaseNameRef(Ctx.getIdentifier(Str)));
+                                    S.addUniquedStringRef(Str));
     break;
   }
   case SILInstructionKind::FloatLiteralInst:
@@ -1371,7 +1369,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)SI.getKind(), 0,
         S.addTypeRef(Ty.getASTType()),
         (unsigned)Ty.getCategory(),
-        S.addDeclBaseNameRef(Ctx.getIdentifier(Str)));
+        S.addUniquedStringRef(Str));
     break;
   }
   case SILInstructionKind::MarkFunctionEscapeInst: {
@@ -2011,8 +2009,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(pattern->getNumOperands());
     ListOfValues.push_back(S.addSubstitutionMapRef(KPI->getSubstitutions()));
 
-    ListOfValues.push_back(
-       S.addDeclBaseNameRef(Ctx.getIdentifier(pattern->getObjCString())));
+    ListOfValues.push_back(S.addUniquedStringRef(pattern->getObjCString()));
 
     ArrayRef<Requirement> reqts;
     if (auto sig = pattern->getGenericSignature()) {
@@ -2175,7 +2172,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
     VTableEntryLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[VTableEntryLayout::Code],
         // SILFunction name
-        S.addDeclBaseNameRef(Ctx.getIdentifier(entry.Implementation->getName())),
+        S.addUniquedStringRef(entry.Implementation->getName()),
         toStableVTableEntryKind(entry.TheKind),
         toStableSILLinkage(entry.Linkage),
         ListOfValues);
@@ -2260,7 +2257,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
     IdentifierID witnessID = 0;
     if (SILFunction *witness = methodWitness.Witness) {
       addReferencedSILFunction(witness, true);
-      witnessID = S.addDeclBaseNameRef(Ctx.getIdentifier(witness->getName()));
+      witnessID = S.addUniquedStringRef(witness->getName());
     }
     WitnessMethodEntryLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[WitnessMethodEntryLayout::Code],
@@ -2305,8 +2302,7 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
     handleSILDeclRef(S, entry.getRequirement(), ListOfValues);
     SILFunction *witness = entry.getWitness();
     addReferencedSILFunction(witness, true);
-    IdentifierID witnessID = S.addDeclBaseNameRef(
-        Ctx.getIdentifier(witness->getName()));
+    IdentifierID witnessID = S.addUniquedStringRef(witness->getName());
     DefaultWitnessTableEntryLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[DefaultWitnessTableEntryLayout::Code],
         // SILFunction name
