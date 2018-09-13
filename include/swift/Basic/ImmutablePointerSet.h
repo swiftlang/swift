@@ -180,9 +180,18 @@ template <typename T> class ImmutablePointerSetFactory {
   using PtrTy = typename std::add_pointer<T>::type;
 
   using PtrSet = ImmutablePointerSet<T>;
-  // This is computed out-of-line so that ImmutablePointerSetFactory is
-  // treated as a complete type.
-  static const unsigned AllocAlignment;
+
+  template <typename U>
+  class Alignment {
+    using Pointer = typename std::add_pointer<U>::type;
+    using PointerSet = ImmutablePointerSet<U>;
+  public:
+    static constexpr const size_t value = alignof(Pointer) > alignof(PointerSet)
+                                              ? alignof(Pointer)
+                                              : alignof(PointerSet);
+  };
+
+  static constexpr const unsigned AllocAlignment = Alignment<T>::value;
 
   llvm::BumpPtrAllocator &Allocator;
   llvm::FoldingSetVector<PtrSet> Set;
@@ -347,10 +356,6 @@ public:
 template <typename T>
 ImmutablePointerSet<T> ImmutablePointerSetFactory<T>::EmptyPtrSet =
     ImmutablePointerSet<T>(nullptr, {});
-
-template <typename T>
-constexpr unsigned ImmutablePointerSetFactory<T>::AllocAlignment =
-    (alignof(PtrSet) > alignof(PtrTy)) ? alignof(PtrSet) : alignof(PtrTy);
 
 } // end swift namespace
 
