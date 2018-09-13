@@ -959,4 +959,22 @@ UnsafeMutableBufferPointerTestSuite.test("nonmutating-swapAt-withARC") {
 
 % end # SelfName
 
+UnsafeMutableBufferPointerTestSuite.test("unsafeLength")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches(_isDebugAssertConfiguration() ?
+    "UnsafeBufferPointer with negative count" : "")
+  .code {
+  var a = [ 42, 77, 88 ]
+
+  expectEqual(42, a.withUnsafeBufferPointer({ $0[0] }))
+
+  expectCrashLater()
+
+  _ = a.withUnsafeBufferPointer {
+    UnsafeBufferPointer(start: $0.baseAddress, count: -1)
+  }
+}
+
 runAllTests()
