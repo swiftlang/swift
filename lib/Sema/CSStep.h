@@ -23,7 +23,6 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <memory>
 
@@ -311,7 +310,7 @@ class ComponentStep final : public SolverStep {
   std::unique_ptr<Scope> ComponentScope = nullptr;
 
   /// Type variables and constraints "in scope" of this step.
-  SmallPtrSet<TypeVariableType *, 16> TypeVars;
+  SmallVector<TypeVariableType *, 16> TypeVars;
   /// Constraints "in scope" of this step.
   ConstraintList *Constraints;
 
@@ -332,7 +331,7 @@ class ComponentStep final : public SolverStep {
 
 public:
   /// Record a type variable as associated with this step.
-  void record(TypeVariableType *typeVar) { TypeVars.insert(typeVar); }
+  void record(TypeVariableType *typeVar) { TypeVars.push_back(typeVar); }
 
   /// Record a constraint as associated with this step.
   void record(Constraint *constraint) {
@@ -349,15 +348,14 @@ public:
   }
 
   void setup() override {
-    // If this component has oprhaned constraint attached,
-    // let's return it ot the graph.
-    if (OrphanedConstraint)
-      CS.CG.setOrphanedConstraint(OrphanedConstraint);
-
     // If this is a single component, there is
     // no need to preliminary modify constraint system.
-    if (!IsSingle)
+    if (!IsSingle) {
       ComponentScope = llvm::make_unique<Scope>(*this);
+      // If this component has oprhaned constraint attached,
+      // let's return it ot the graph.
+      CS.CG.setOrphanedConstraint(OrphanedConstraint);
+    }
   }
 
   StepResult take(bool prevFailed) override;

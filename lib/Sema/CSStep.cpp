@@ -30,13 +30,8 @@ ComponentStep::Scope::Scope(ComponentStep &component)
     : CS(component.CS), Component(component) {
   TypeVars = std::move(CS.TypeVariables);
 
-  for (auto *typeVar : component.TypeVars) {
-    // Include type variables that either belong to this
-    // component or have been bound.
-    if (component.TypeVars.count(typeVar) > 0 ||
-        typeVar->getImpl().getFixedType(nullptr))
-      CS.TypeVariables.push_back(typeVar);
-  }
+  for (auto *typeVar : component.TypeVars)
+    CS.TypeVariables.push_back(typeVar);
 
   auto &workList = CS.InactiveConstraints;
   workList.splice(workList.end(), *component.Constraints);
@@ -132,21 +127,22 @@ void SplitterStep::computeFollowupSteps(
   }
 
   // Map type variables and constraints into appropriate steps.
+  llvm::DenseMap<TypeVariableType *, unsigned> typeVarComponent;
   llvm::DenseMap<Constraint *, unsigned> constraintComponent;
   for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
     auto *typeVar = typeVars[i];
-    auto *component = componentSteps[components[i]];
+    // Record the component of this type variable.
+    typeVarComponent[typeVar] = components[i];
 
-    component->record(typeVar);
     for (auto *constraint : CG[typeVar].getConstraints())
       constraintComponent[constraint] = components[i];
   }
 
   // Add the orphaned components to the mapping from constraints to components.
-  unsigned firstOrphanedConstraint =
+  unsigned firstOrphanedComponent =
       numComponents - CG.getOrphanedConstraints().size();
   {
-    unsigned component = firstOrphanedConstraint;
+    unsigned component = firstOrphanedComponent;
     for (auto *constraint : CG.getOrphanedConstraints()) {
       // Register this orphan constraint both as associated with
       // a given component as a regular constrant, as well as an
@@ -155,6 +151,22 @@ void SplitterStep::computeFollowupSteps(
       componentSteps[component]->recordOrphan(constraint);
       ++component;
     }
+  }
+
+  for (auto *typeVar : CS.TypeVariables) {
+    auto known = typeVarComponent.find(typeVar);
+    // If current type variable is associated with
+    // a certain component step, record it as being so.
+    if (known != typeVarComponent.end()) {
+      componentSteps[known->second]->record(typeVar);
+      continue;
+    }
+
+    // Otherwise, associate it with all of the component steps,
+    // expect for components with orphaned constraints, they are
+    // not supposed to have any type variables.
+    for (unsigned i = 0; i != firstOrphanedComponent; ++i)
+      componentSteps[i]->record(typeVar);
   }
 
   // Transfer all of the constraints from the work list to
