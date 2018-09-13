@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  _ContiguousArrayStorageBase supplies the implementation of the
+//  __ContiguousArrayStorageBase supplies the implementation of the
 //  _NSArrayCore API (and thus, NSArray the API) for our
 //  _ContiguousArrayStorage<T>.  We can't put this implementation
 //  directly on _ContiguousArrayStorage because generic classes can't
@@ -39,8 +39,8 @@ internal func _isValidArraySubscript(_ index: Int, count: Int) -> Bool {
 /// storage.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
-internal class _SwiftNativeNSArrayWithContiguousStorage
-  : _SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
+internal class __SwiftNativeNSArrayWithContiguousStorage
+  : __SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
 
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc internal override init() {}
@@ -59,7 +59,7 @@ internal class _SwiftNativeNSArrayWithContiguousStorage
 }
 
 // Implement the APIs required by NSArray 
-extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
+extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
   }
@@ -135,8 +135,8 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 /// buffers used for Array storage.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
-@objc internal final class _SwiftDeferredNSArray
-  : _SwiftNativeNSArrayWithContiguousStorage {
+@objc internal final class __SwiftDeferredNSArray
+  : __SwiftNativeNSArrayWithContiguousStorage {
 
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it.
@@ -150,7 +150,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   // computed one.
   @usableFromInline
   @nonobjc
-  internal let _nativeStorage: _ContiguousArrayStorageBase
+  internal let _nativeStorage: __ContiguousArrayStorageBase
 
   @inlinable
   @nonobjc
@@ -173,7 +173,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc
-  internal init(_nativeStorage: _ContiguousArrayStorageBase) {
+  internal init(_nativeStorage: __ContiguousArrayStorageBase) {
     self._nativeStorage = _nativeStorage
   }
 
@@ -251,7 +251,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 // Empty shim version for non-objc platforms.
 @usableFromInline
 @_fixed_layout
-internal class _SwiftNativeNSArrayWithContiguousStorage {
+internal class __SwiftNativeNSArrayWithContiguousStorage {
   @inlinable
   internal init() {}
 
@@ -263,8 +263,8 @@ internal class _SwiftNativeNSArrayWithContiguousStorage {
 /// Base class of the heap buffer backing arrays.  
 @usableFromInline
 @_fixed_layout
-internal class _ContiguousArrayStorageBase
-  : _SwiftNativeNSArrayWithContiguousStorage {
+internal class __ContiguousArrayStorageBase
+  : __SwiftNativeNSArrayWithContiguousStorage {
 
   @usableFromInline
   final var countAndCapacity: _ArrayBody
@@ -272,7 +272,7 @@ internal class _ContiguousArrayStorageBase
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init(_doNotCallMeBase: ()) {
-    _sanityCheckFailure("creating instance of _ContiguousArrayStorageBase")
+    _sanityCheckFailure("creating instance of __ContiguousArrayStorageBase")
   }
   
 #if _runtime(_ObjC)

@@ -26,13 +26,13 @@ using namespace swift;
 
 /// Class of sentinel objects used to represent the `nil` value of nested
 /// optionals.
-@interface _SwiftNull : NSObject {
+@interface __SwiftNull : NSObject {
 @public
   unsigned depth;
 }
 @end
 
-@implementation _SwiftNull : NSObject
+@implementation __SwiftNull : NSObject
 
 - (NSString*)description {
   return [NSString stringWithFormat:@"<%@ %p depth = %u>", [self class],
@@ -76,7 +76,7 @@ static id getSentinelForDepth(unsigned depth) {
     auto &cached = theSentinels.Cache[depthIndex];
     // Make sure another writer didn't sneak in.
     if (!cached) {
-      auto sentinel = [[_SwiftNull alloc] init];
+      auto sentinel = [[__SwiftNull alloc] init];
       sentinel->depth = depth;
       cached = sentinel;
     }

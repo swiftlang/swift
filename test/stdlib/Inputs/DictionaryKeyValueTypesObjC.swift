@@ -48,7 +48,7 @@ func isCocoaNSDictionary(_ d: NSDictionary) -> Bool {
 
 func isNativeNSArray(_ d: NSArray) -> Bool {
   let className: NSString = NSStringFromClass(type(of: d)) as NSString
-  return ["_SwiftDeferredNSArray", "_ContiguousArray", "_EmptyArray"].contains {
+  return ["__SwiftDeferredNSArray", "_ContiguousArray", "_EmptyArray"].contains {
     className.range(of: $0).length > 0
   }
 }

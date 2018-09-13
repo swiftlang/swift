@@ -24,24 +24,24 @@
 
 namespace swift {
 // FIXME(ABI)#76 : does this declaration need SWIFT_RUNTIME_STDLIB_API?
-// _direct type metadata for Swift._EmptyArrayStorage
+// _direct type metadata for Swift.__EmptyArrayStorage
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s18_EmptyArrayStorage);
+ClassMetadata CLASS_METADATA_SYM(s19__EmptyArrayStorage);
 
-// _direct type metadata for Swift._RawNativeDictionaryStorage
+// _direct type metadata for Swift.__RawNativeDictionaryStorage
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);
+ClassMetadata CLASS_METADATA_SYM(s28__RawNativeDictionaryStorage);
 
-// _direct type metadata for Swift._RawNativeSetStorage
+// _direct type metadata for Swift.__RawNativeSetStorage
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s20_RawNativeSetStorage);
+ClassMetadata CLASS_METADATA_SYM(s21__RawNativeSetStorage);
 } // namespace swift
 
 SWIFT_RUNTIME_STDLIB_API
 swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   // HeapObject header;
   {
-    &swift::CLASS_METADATA_SYM(s18_EmptyArrayStorage), // isa pointer
+    &swift::CLASS_METADATA_SYM(s19__EmptyArrayStorage), // isa pointer
   },
   
   // _SwiftArrayBodyStorage body;
@@ -55,7 +55,7 @@ SWIFT_RUNTIME_STDLIB_API
 swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
   // HeapObject header;
   {
-    &swift::CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage), // isa pointer
+    &swift::CLASS_METADATA_SYM(s28__RawNativeDictionaryStorage), // isa pointer
   },
   
   // _SwiftDictionaryBodyStorage body;
@@ -83,7 +83,7 @@ SWIFT_RUNTIME_STDLIB_API
 swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
   // HeapObject header;
   {
-    &swift::CLASS_METADATA_SYM(s20_RawNativeSetStorage), // isa pointer
+    &swift::CLASS_METADATA_SYM(s21__RawNativeSetStorage), // isa pointer
   },
   
   // _SwiftDictionaryBodyStorage body;

@@ -41,7 +41,7 @@ import SwiftShims
 //   +----/-------------------------------------------+
 //       /
 //      |
-//      V  _RawNativeDictionaryStorage (a class)
+//      V  __RawNativeDictionaryStorage (a class)
 //   +-----------------------------------------------------------+
 //   | bucketCount                                               |
 //   | count                                                     |
@@ -85,7 +85,7 @@ import SwiftShims
 // ---------------------------
 //
 // There are three different classes that can provide a native backing storage:
-// * `_RawNativeDictionaryStorage`
+// * `__RawNativeDictionaryStorage`
 // * `_TypedNativeDictionaryStorage<K, V>`                   (extends Raw)
 // * `_HashableTypedNativeDictionaryStorage<K: Hashable, V>` (extends Typed)
 //
@@ -1807,8 +1807,8 @@ internal protocol _DictionaryBuffer {
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
-internal class _RawNativeDictionaryStorage
-  : _SwiftNativeNSDictionary, _NSDictionaryCore
+internal class __RawNativeDictionaryStorage
+  : __SwiftNativeNSDictionary, _NSDictionaryCore
 {
   @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
@@ -1843,7 +1843,7 @@ internal class _RawNativeDictionaryStorage
   /// be mutated.
   @inlinable
   @nonobjc
-  internal static var empty: _RawNativeDictionaryStorage {
+  internal static var empty: __RawNativeDictionaryStorage {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmptyDictionaryStorage))
   }
@@ -1925,7 +1925,7 @@ internal class _RawNativeDictionaryStorage
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 internal class _TypedNativeDictionaryStorage<Key, Value>
-  : _RawNativeDictionaryStorage {
+  : __RawNativeDictionaryStorage {
 
   deinit {
     let keys = self.keys.assumingMemoryBound(to: Key.self)
@@ -2105,7 +2105,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
 #endif
 }
 
-/// A wrapper around _RawNativeDictionaryStorage that provides most of the
+/// A wrapper around __RawNativeDictionaryStorage that provides most of the
 /// implementation of Dictionary.
 ///
 /// This type and most of its functionality doesn't require Hashable at all.
@@ -2118,20 +2118,20 @@ internal struct _NativeDictionary<Key, Value> {
   @usableFromInline
   internal typealias Element = (key: Key, value: Value)
 
-  /// See this comments on _RawNativeDictionaryStorage and its subclasses to
+  /// See this comments on __RawNativeDictionaryStorage and its subclasses to
   /// understand why we store an untyped storage here.
   @usableFromInline
-  internal var _storage: _RawNativeDictionaryStorage
+  internal var _storage: __RawNativeDictionaryStorage
 
   /// Constructs an instance from the empty singleton.
   @inlinable
   internal init() {
-    self._storage = _RawNativeDictionaryStorage.empty
+    self._storage = __RawNativeDictionaryStorage.empty
   }
 
   /// Constructs a dictionary adopting the given storage.
   @inlinable
-  internal init(_storage: _RawNativeDictionaryStorage) {
+  internal init(_storage: __RawNativeDictionaryStorage) {
     self._storage = _storage
   }
 
@@ -2148,12 +2148,12 @@ internal struct _NativeDictionary<Key, Value> {
     self.init(_exactBucketCount: bucketCount, storage: storage)
   }
 
-  /// Given a bucket count and uninitialized _RawNativeDictionaryStorage,
+  /// Given a bucket count and uninitialized __RawNativeDictionaryStorage,
   /// completes the initialization and returns a native dictionary.
   @inlinable // FIXME(sil-serialize-all)
   internal init(
     _exactBucketCount bucketCount: Int,
-    storage: _RawNativeDictionaryStorage
+    storage: __RawNativeDictionaryStorage
   ) {
     storage.bucketCount = bucketCount
     storage.count = 0
@@ -2418,7 +2418,7 @@ extension _NativeDictionary where Key: Hashable {
 
     if (_isBridgedVerbatimToObjectiveC(Key.self) &&
         _isBridgedVerbatimToObjectiveC(Value.self)) ||
-        self._storage === _RawNativeDictionaryStorage.empty {
+        self._storage === __RawNativeDictionaryStorage.empty {
       nsSet = self._storage
     } else {
       nsSet = _SwiftDeferredNSDictionary(self)
@@ -2681,7 +2681,7 @@ extension _NativeDictionary/*: _DictionaryBuffer */ where Key: Hashable {
 /// An NSEnumerator that works with any _NativeDictionary of
 /// verbatim bridgeable elements. Used by the various NSDictionary impls.
 final internal class _SwiftDictionaryNSEnumerator<Key, Value>
-  : _SwiftNativeNSEnumerator, _NSEnumerator {
+  : __SwiftNativeNSEnumerator, _NSEnumerator {
 
   internal var base: _NativeDictionary<Key, Value>
   internal var nextIndex: _NativeDictionary<Key, Value>.Index
@@ -2751,7 +2751,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key, Value>
 /// toll-free bridging isn't possible. On first access, a _NativeDictionary
 /// of AnyObject will be constructed containing all the bridged elements.
 final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
-  : _SwiftNativeNSDictionary, _NSDictionaryCore {
+  : __SwiftNativeNSDictionary, _NSDictionaryCore {
 
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it.
@@ -2778,10 +2778,10 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
   /// The buffer for bridged Dictionary elements, if present.
   @nonobjc
-  private var _bridgedStorage: _RawNativeDictionaryStorage? {
+  private var _bridgedStorage: __RawNativeDictionaryStorage? {
     get {
       if let ref = _stdlib_atomicLoadARCRef(object: _bridgedStoragePtr) {
-        return unsafeDowncast(ref, to: _RawNativeDictionaryStorage.self)
+        return unsafeDowncast(ref, to: __RawNativeDictionaryStorage.self)
       }
       return nil
     }
@@ -4541,7 +4541,7 @@ extension Dictionary {
       return Dictionary(_native: _NativeDictionary(_storage: nativeStorage))
     }
 
-    if s === _RawNativeDictionaryStorage.empty {
+    if s === __RawNativeDictionaryStorage.empty {
       return Dictionary()
     }
 

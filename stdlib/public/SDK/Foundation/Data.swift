@@ -929,20 +929,20 @@ internal final class _DataStorage {
         
         switch _backing {
         case .swift:
-            return _NSSwiftData(backing: self, range: range)
+            return __NSSwiftData(backing: self, range: range)
         case .immutable(let d):
             guard range.lowerBound == 0 && range.upperBound == _length else {
-                return _NSSwiftData(backing: self, range: range)
+                return __NSSwiftData(backing: self, range: range)
             }
             return d
         case .mutable(let d):
             guard range.lowerBound == 0 && range.upperBound == _length else {
-                return _NSSwiftData(backing: self, range: range)
+                return __NSSwiftData(backing: self, range: range)
             }
             return d
         case .customReference(let d):
             guard range.lowerBound == 0 && range.upperBound == d.length else {
-                return _NSSwiftData(backing: self, range: range)
+                return __NSSwiftData(backing: self, range: range)
             }
             return d
         case .customMutableReference(let d):
@@ -966,7 +966,7 @@ internal final class _DataStorage {
     }
 }
 
-internal class _NSSwiftData : NSData {
+internal class __NSSwiftData : NSData {
     var _backing: _DataStorage!
     var _range: Range<Data.Index>!
     

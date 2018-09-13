@@ -51,7 +51,7 @@ using namespace swift;
 
 % for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator', 'Data', 'IndexSet'):
 SWIFT_RUNTIME_STDLIB_API
-@interface _SwiftNativeNS${Class}Base : NS${Class}
+@interface __SwiftNativeNS${Class}Base : NS${Class}
 {
  @private
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
@@ -59,7 +59,7 @@ SWIFT_RUNTIME_STDLIB_API
 @end
 
 
-@implementation _SwiftNativeNS${Class}Base
+@implementation __SwiftNativeNS${Class}Base
 
 - (id)retain {
   auto SELF = reinterpret_cast<HeapObject *>(self);

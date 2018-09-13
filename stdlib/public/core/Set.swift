@@ -1410,7 +1410,7 @@ internal protocol _SetBuffer { // FIXME: Remove or refactor for Set.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
-internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
+internal class __RawNativeSetStorage: __SwiftNativeNSSet, _NSSetCore {
   @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal final var bucketCount: Int
@@ -1441,7 +1441,7 @@ internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
   /// be mutated.
   @inlinable
   @nonobjc
-  internal static var empty: _RawNativeSetStorage {
+  internal static var empty: __RawNativeSetStorage {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmptySetStorage))
   }
@@ -1510,7 +1510,7 @@ internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
 // See the docs at the top of this file for a description of this type
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
-internal class _TypedNativeSetStorage<Element>: _RawNativeSetStorage {
+internal class _TypedNativeSetStorage<Element>: __RawNativeSetStorage {
 
   deinit {
     let keys = self.keys.assumingMemoryBound(to: Element.self)
@@ -1628,7 +1628,7 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
 #endif
 }
 
-/// A wrapper around _RawNativeSetStorage that provides most of the
+/// A wrapper around __RawNativeSetStorage that provides most of the
 /// implementation of Set.
 ///
 /// This type and most of its functionality doesn't require Hashable at all.
@@ -1638,20 +1638,20 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
 @usableFromInline
 @_fixed_layout
 internal struct _NativeSet<Element> {
-  /// See this comments on _RawNativeSetStorage and its subclasses to
+  /// See this comments on __RawNativeSetStorage and its subclasses to
   /// understand why we store an untyped storage here.
   @usableFromInline
-  internal var _storage: _RawNativeSetStorage
+  internal var _storage: __RawNativeSetStorage
 
   /// Constructs an instance from the empty singleton.
   @inlinable
   internal init() {
-    self._storage = _RawNativeSetStorage.empty
+    self._storage = __RawNativeSetStorage.empty
   }
 
   /// Constructs a native set adopting the given storage.
   @inlinable
-  internal init(_storage: _RawNativeSetStorage) {
+  internal init(_storage: __RawNativeSetStorage) {
     self._storage = _storage
   }
 
@@ -1667,12 +1667,12 @@ internal struct _NativeSet<Element> {
     self.init(_exactBucketCount: bucketCount, storage: storage)
   }
 
-  /// Given a bucket count and uninitialized _RawNativeSetStorage, completes the
+  /// Given a bucket count and uninitialized __RawNativeSetStorage, completes the
   /// initialization and returns a Buffer.
   @inlinable // FIXME(sil-serialize-all)
   internal init(
     _exactBucketCount bucketCount: Int,
-    storage: _RawNativeSetStorage
+    storage: __RawNativeSetStorage
   ) {
     storage.bucketCount = bucketCount
     storage.count = 0
@@ -1908,7 +1908,7 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
     let nsSet: _NSSetCore
 
     if _isBridgedVerbatimToObjectiveC(Element.self) ||
-      self._storage === _RawNativeSetStorage.empty {
+      self._storage === __RawNativeSetStorage.empty {
       nsSet = self._storage
     } else {
       nsSet = _SwiftDeferredNSSet(self)
@@ -2159,7 +2159,7 @@ extension _NativeSet/*: _SetBuffer*/ where Element: Hashable {
 /// An NSEnumerator that works with any _NativeSet of verbatim bridgeable
 /// elements. Used by the various NSSet impls.
 final internal class _SwiftSetNSEnumerator<Element>
-  : _SwiftNativeNSEnumerator, _NSEnumerator {
+  : __SwiftNativeNSEnumerator, _NSEnumerator {
 
   internal var base: _NativeSet<Element>
   internal var nextIndex: _NativeSet<Element>.Index
@@ -2229,7 +2229,7 @@ final internal class _SwiftSetNSEnumerator<Element>
 /// possible. On first access, a _NativeSet of AnyObject will be constructed
 /// containing all the bridged elements.
 final internal class _SwiftDeferredNSSet<Element: Hashable>
-  : _SwiftNativeNSSet, _NSSetCore {
+  : __SwiftNativeNSSet, _NSSetCore {
 
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it.
@@ -2256,10 +2256,10 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
   /// The buffer for bridged Set elements, if present.
   @nonobjc
-  private var _bridgedStorage: _RawNativeSetStorage? {
+  private var _bridgedStorage: __RawNativeSetStorage? {
     get {
       if let ref = _stdlib_atomicLoadARCRef(object: _bridgedStoragePtr) {
-        return unsafeDowncast(ref, to: _RawNativeSetStorage.self)
+        return unsafeDowncast(ref, to: __RawNativeSetStorage.self)
       }
       return nil
     }
@@ -3702,7 +3702,7 @@ extension Set {
       return Set(_native: _NativeSet(_storage: nativeStorage))
     }
 
-    if s === _RawNativeSetStorage.empty {
+    if s === __RawNativeSetStorage.empty {
       return Set()
     }
 

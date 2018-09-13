@@ -353,7 +353,7 @@ public extension _BridgedStoredNSError
 
 extension NSDictionary {
   @objc public subscript(_: Any) -> Any? {
-    @objc(_swift_objectForKeyedSubscript:)
+    @objc(__swift_objectForKeyedSubscript:)
     get { fatalError() }
   }
 
@@ -362,7 +362,7 @@ extension NSDictionary {
 extension NSMutableDictionary {
   public override subscript(_: Any) -> Any? {
     get { fatalError() }
-    @objc(_swift_setObject:forKeyedSubscript:)
+    @objc(__swift_setObject:forKeyedSubscript:)
     set { }
   }
 }

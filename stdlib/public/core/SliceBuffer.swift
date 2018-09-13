@@ -57,7 +57,7 @@ internal struct _SliceBuffer<Element>
   @inlinable // FIXME(sil-serialize-all)
   internal func _invariantCheck() {
     let isNative = _hasNativeBuffer
-    let isNativeStorage: Bool = owner is _ContiguousArrayStorageBase
+    let isNativeStorage: Bool = owner is __ContiguousArrayStorageBase
     _sanityCheck(isNativeStorage == isNative)
     if isNative {
       _sanityCheck(count <= nativeBuffer.count)
@@ -73,7 +73,7 @@ internal struct _SliceBuffer<Element>
   internal var nativeBuffer: NativeBuffer {
     _sanityCheck(_hasNativeBuffer)
     return NativeBuffer(
-      owner as? _ContiguousArrayStorageBase ?? _emptyArrayStorage)
+      owner as? __ContiguousArrayStorageBase ?? _emptyArrayStorage)
   }
 
   @inlinable // FIXME(sil-serialize-all)
