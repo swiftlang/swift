@@ -166,12 +166,16 @@
   "Playground": [
     "PlaygroundDisplay.swift"
   ],
-  "Misc": [
-    "AnyHashable.swift",
-    "Interval.swift",
-    "Hashing.swift",
-    "SipHash.swift",
+  "Hashing": [
+    "Hashable.swift",
     "Hasher.swift",
+    "SipHash.swift",
+    "AnyHashable.swift",
+    "Hashing.swift",
+    "Bitset.swift"
+  ],
+  "Misc": [
+    "Interval.swift",
     "ErrorType.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
@@ -192,11 +196,9 @@
     "CommandLine.swift",
     "Tuple.swift",
     "NewtypeWrapper.swift",
-    "Bitset.swift",
     "DebuggerSupport.swift",
     "Equatable.swift",
     "Comparable.swift",
-    "Hashable.swift",
     "Codable.swift",
     "MigrationSupport.swift"
   ]
