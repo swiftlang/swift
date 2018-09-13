@@ -188,7 +188,7 @@ void SplitterStep::computeFollowupSteps(
   // want to have smaller/faster components at the back of the list.
   std::sort(componentSteps.begin(), componentSteps.end(),
             [](const ComponentStep *lhs, const ComponentStep *rhs) {
-              return lhs > rhs;
+              return lhs->disjunctionCount() > rhs->disjunctionCount();
             });
 }
 
