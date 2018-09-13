@@ -31,13 +31,13 @@ class SourceManager {
   unsigned CodeCompletionOffset;
 
   /// Associates buffer identifiers to buffer IDs.
-  llvm::StringMap<unsigned> BufIdentIDMap;
+  llvm::DenseMap<StringRef, unsigned> BufIdentIDMap;
 
   /// A cache mapping buffer identifiers to vfs Status entries.
   ///
   /// This is as much a hack to prolong the lifetime of status objects as it is
   /// to speed up stats.
-  mutable llvm::StringMap<clang::vfs::Status> StatusCache;
+  mutable llvm::DenseMap<StringRef, clang::vfs::Status> StatusCache;
 
   // \c #sourceLocation directive handling.
   struct VirtualFile {
