@@ -1124,6 +1124,19 @@ static ProtocolConformance &mapConformanceIntoContext(IRGenModule &IGM,
                      LookUpConformanceInModule(IGM.getSwiftModule()));
 }
 
+WitnessIndex ProtocolInfo::getAssociatedTypeIndex(
+                                    IRGenModule &IGM,
+                                    AssociatedType assocType) const {
+  assert(!IGM.isResilient(assocType.getSourceProtocol(),
+                          ResilienceExpansion::Maximal) &&
+         "Cannot ask for the associated type index of non-resilient protocol");
+  for (auto &witness : getWitnessEntries()) {
+    if (witness.matchesAssociatedType(assocType))
+      return getNonBaseWitnessIndex(&witness);
+  }
+  llvm_unreachable("didn't find entry for associated type");
+}
+
 namespace {
 
 /// Conformance info for a witness table that can be directly generated.
@@ -1352,7 +1365,7 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
       assert(entry.getAssociatedTypeWitness().Requirement
              == requirement.getAssociation()
              && "sil witness table does not match protocol");
-      auto piIndex = PI.getAssociatedTypeIndex(requirement);
+      auto piIndex = PI.getAssociatedTypeIndex(IGM, requirement);
       assert((size_t)piIndex.getValue() ==
              Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
@@ -3444,7 +3457,7 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
     auto &pi = IGM.getProtocolInfo(associatedType.getSourceProtocol(),
                                    ProtocolInfoKind::RequirementSignature);
 
-    auto index = pi.getAssociatedTypeIndex(associatedType);
+    auto index = pi.getAssociatedTypeIndex(IGM, associatedType);
     witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
                                                index.forProtocolWitnessTable());
   }
