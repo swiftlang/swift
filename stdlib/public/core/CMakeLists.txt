@@ -72,6 +72,7 @@ set(SWIFTLIB_ESSENTIAL
   HashedCollectionsAnyHashableExtensions.swift
   Hasher.swift
   Hashing.swift
+  HashTable.swift
   HeapBuffer.swift
   ICU.swift
   Indices.swift
