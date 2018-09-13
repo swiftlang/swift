@@ -21,7 +21,6 @@ var DatasetGlobalTests = TestSuite("DatasetGlobal")
 // Global code must turn on eager mode explicitly (until when we change the
 // default mode to eager).
 _RuntimeConfig.usesTFEagerAPI = true
-_RuntimeConfig.printsDebugLog = true
 let scalars = Tensor<Float>([0, 1, 2])
 let dataset = Dataset(elements: scalars)
 var iterator = dataset.makeIterator()
@@ -34,7 +33,6 @@ var iterator = dataset.makeIterator()
 _ = Tensor<Float>(0.0)
 
 DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
-	_RuntimeConfig.printsDebugLog = true
   // This stmt makes sure the load inst from the global var `dataset` does not
   // make dataset an input arg tensor.
   //
@@ -51,7 +49,6 @@ DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
 }
 
 DatasetGlobalTests.testCPUOrGPU("IteratorAsGlobalVar") {
-	_RuntimeConfig.printsDebugLog = true
   // This stmt makes sure the load inst from the global var `iterator` does not
   // make iterator an input arg tensor.
   //
