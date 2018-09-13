@@ -887,44 +887,12 @@ static void addSetterToStorage(TypeChecker &TC, AbstractStorageDecl *storage) {
   storage->setSynthesizedSetter(setter);
 }
 
-/// Add trivial accessors to a Stored or Addressed property.
-static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
-                                         TypeChecker &TC) {
-  assert(!isSynthesizedComputedProperty(storage));
-
-  if (!storage->getGetter())
-    addGetterToStorage(TC, storage);
-
-  if (storage->supportsMutation()) {
-    if (!storage->getSetter())
-      addSetterToStorage(TC, storage);
-
-    if (!storage->getMaterializeForSetFunc())
-      maybeAddMaterializeForSet(storage, TC);
-  }
-}
-
-static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
-  if (!VD->getGetter()) {
-    addGetterToStorage(TC, VD);
-  }
-
-  // Okay, we have the getter; make the VD computed.
-  VD->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
-}
-
-static void synthesizeMutableAddressSetterBody(TypeChecker &TC,
-                                               AccessorDecl *setter) {
-  synthesizeTrivialSetterBodyWithStorage(TC, setter, TargetImpl::Implementation,
-                                         setter->getStorage());
-}
-
 /// Add a materializeForSet accessor to the given declaration.
-static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
-                                      TypeChecker &TC) {
+static void addMaterializeForSetToStorage(TypeChecker &TC,
+                                          AbstractStorageDecl *storage) {
   if (TC.Context.getOptionalDecl() == nullptr) {
     TC.diagnose(storage->getStartLoc(), diag::optional_intrinsics_not_found);
-    return nullptr;
+    return;
   }
 
   auto materializeForSet = createMaterializeForSetPrototype(
@@ -932,8 +900,70 @@ static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
 
   // Install the prototype.
   storage->setSynthesizedMaterializeForSet(materializeForSet);
+}
 
-  return materializeForSet;
+
+static void addOpaqueAccessorToStorage(TypeChecker &TC,
+                                       AbstractStorageDecl *storage,
+                                       AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Get:
+    return addGetterToStorage(TC, storage);
+
+  case AccessorKind::Set:
+    return addSetterToStorage(TC, storage);
+
+  case AccessorKind::MaterializeForSet:
+    return addMaterializeForSetToStorage(TC, storage);
+
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+  case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
+    llvm_unreachable("not an opaque accessor");
+  }
+}
+
+static void addExpectedOpaqueAccessorsToStorage(TypeChecker &TC,
+                                                AbstractStorageDecl *storage) {
+  storage->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
+    // If the accessor is already present, there's nothing to do.
+    if (storage->getAccessor(kind))
+      return;
+
+    addOpaqueAccessorToStorage(TC, storage, kind);
+  });
+}
+
+/// Add trivial accessors to a Stored or Addressed property.
+static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
+                                         TypeChecker &TC) {
+  assert(!isSynthesizedComputedProperty(storage));
+  addExpectedOpaqueAccessorsToStorage(TC, storage);
+}
+
+static StorageImplInfo getProtocolStorageImpl(AbstractStorageDecl *storage) {
+  auto protocol = cast<ProtocolDecl>(storage->getDeclContext());
+  if (protocol->isObjC()) {
+    return StorageImplInfo::getComputed(storage->supportsMutation());
+  } else {
+    return StorageImplInfo::getOpaque(storage->supportsMutation());
+  }
+}
+
+/// Given a storage declaration in a protocol, set it up with the right
+/// StorageImpl and add the right set of opaque accessors.
+static void setProtocolStorageImpl(TypeChecker &TC,
+                                   AbstractStorageDecl *storage) {
+  addExpectedOpaqueAccessorsToStorage(TC, storage);
+
+  storage->overwriteImplInfo(getProtocolStorageImpl(storage));
+}
+
+static void synthesizeMutableAddressSetterBody(TypeChecker &TC,
+                                               AccessorDecl *setter) {
+  synthesizeTrivialSetterBodyWithStorage(TC, setter, TargetImpl::Implementation,
+                                         setter->getStorage());
 }
 
 static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
@@ -961,7 +991,7 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
   // Okay, we have both a getter and setter; overwrite the impl info.
   VD->overwriteImplInfo(StorageImplInfo::getMutableComputed());
 
-  maybeAddMaterializeForSet(VD, TC);
+  addExpectedOpaqueAccessorsToStorage(TC, VD);
 }
 
 /// The specified AbstractStorageDecl was just found to satisfy a
@@ -971,42 +1001,45 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
                                              AbstractStorageDecl *requirement,
                                              AbstractStorageDecl *storage) {
   bool addedAccessor = false;
-  auto flagAddedAccessor = [&](AccessorDecl *accessor,
-                               Optional<SynthesizedFunction::Kind> kind) {
+
+  requirement->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
+    // If the accessor already exists, we have nothing to do.
+    if (storage->getAccessor(kind))
+      return;
+
+    // Otherwise, synthesize it.
+    addOpaqueAccessorToStorage(*this, storage, kind);
+
+    // Flag that we've added an accessor.
     addedAccessor = true;
 
-    // Synthesize a trivial body when we create an on-demand accessor.
-    if (kind && isOnDemandAccessor(accessor->getStorage(),
-                                   accessor->getAccessorKind())) {
-      triggerSynthesis(*this, accessor, *kind);
+    // Trigger synthesize of the accessor body if it's created on-demand.
+    SynthesizedFunction::Kind synthKind;
+    switch (kind) {
+    case AccessorKind::MaterializeForSet:
+      // No need to do this for materializeForSet, which we always synthesize
+      // in SILGen.
+      return;
+
+    case AccessorKind::Get:
+      synthKind = SynthesizedFunction::Getter;
+      break;
+
+    case AccessorKind::Set:
+      synthKind = SynthesizedFunction::Setter;
+      break;
+
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+    case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
+      llvm_unreachable("unexpected synthesized accessor");
     }
-  };
 
-  // Synthesize a getter.
-  if (!storage->getGetter()) {
-    addGetterToStorage(*this, storage);
-    flagAddedAccessor(storage->getGetter(), SynthesizedFunction::Getter);
-  }
-
-  // Synthesize a setter if the storage is mutable and the requirement
-  // needs it.
-  if (!storage->getSetter() &&
-      storage->supportsMutation() &&
-      requirement->supportsMutation()) {
-    addSetterToStorage(*this, storage);
-    flagAddedAccessor(storage->getSetter(), SynthesizedFunction::Setter);
-  }
-
-  // @objc protocols don't need a materializeForSet since ObjC doesn't
-  // have that concept.
-  bool wantMaterializeForSet =
-    !requirement->isObjC() && requirement->getSetter();
-
-  // If we want wantMaterializeForSet, create it now.
-  if (wantMaterializeForSet && !storage->getMaterializeForSetFunc()) {
-    addMaterializeForSet(storage, *this);
-    flagAddedAccessor(storage->getMaterializeForSetFunc(), None);
-  }
+    if (isOnDemandAccessor(storage, kind)) {
+      triggerSynthesis(*this, storage->getAccessor(kind), synthKind);
+    }
+  });
 
   // Cue (delayed) validation of any accessors we just added, just
   // in case this is coming after the normal delayed validation finished.
@@ -1717,38 +1750,6 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   Storage->overwriteSetterAccess(AccessLevel::Private);
 }
 
-/// Consider add a materializeForSet accessor to the given storage
-/// decl (which has accessors).
-void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
-                                      TypeChecker &TC) {
-  assert(storage->getGetter());
-
-  // Be idempotent.  There are a bunch of places where we want to
-  // ensure that there's a materializeForSet accessor.
-  if (storage->getMaterializeForSetFunc()) return;
-
-  // Never add materializeForSet to readonly declarations.
-  if (!storage->getSetter()) return;
-
-  // We only need materializeForSet in type contexts.
-  auto *dc = storage->getDeclContext();
-  if (!dc->isTypeContext())
-    return;
-
-  // Requirements of ObjC protocols don't need this.
-  if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
-    if (protoDecl->isObjC())
-      return;
-
-  // Members of structs imported by Clang don't need this, because we can
-  // synthesize it later.
-  if (auto structDecl = dyn_cast<StructDecl>(dc))
-    if (structDecl->hasClangNode())
-      return;
-
-  addMaterializeForSet(storage, TC);
-}
-
 void swift::triggerAccessorSynthesis(TypeChecker &TC,
                                      AbstractStorageDecl *storage) {
   auto VD = dyn_cast<VarDecl>(storage);
@@ -1946,7 +1947,7 @@ static void maybeAddAccessorsToLazyVariable(TypeChecker &TC, VarDecl *var) {
 
   var->overwriteImplInfo(StorageImplInfo::getMutableComputed());
 
-  maybeAddMaterializeForSet(var, TC);
+  addExpectedOpaqueAccessorsToStorage(TC, var);
 }
 
 /// Try to add the appropriate accessors required a storage declaration.
@@ -1995,11 +1996,9 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
                     diag::protocol_property_must_be_computed_var);
       else
         TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
-
-      convertStoredVarInProtocolToComputed(var, TC);
     }
 
-    maybeAddMaterializeForSet(storage, TC);
+    setProtocolStorageImpl(TC, storage);
     return;
 
   // NSManaged properties on classes require special handling.
@@ -2021,7 +2020,7 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
   if (auto sourceFile = dc->getParentSourceFile())
     if (sourceFile->Kind == SourceFileKind::SIL) {
       if (storage->getGetter() && storage->getSetter()) {
-        maybeAddMaterializeForSet(storage, TC);
+        addExpectedOpaqueAccessorsToStorage(TC, storage);
       }
       return;
     }

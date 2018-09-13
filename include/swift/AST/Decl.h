@@ -4275,6 +4275,13 @@ public:
     return {};
   }
 
+  /// Visit all the opaque accessors that this storage is expected to have.
+  void visitExpectedOpaqueAccessors(
+                            llvm::function_ref<void (AccessorKind)>) const;
+
+  /// Visit all the opaque accessors of this storage declaration.
+  void visitOpaqueAccessors(llvm::function_ref<void (AccessorDecl*)>) const;
+
   void setAccessors(StorageImplInfo storageImpl,
                     SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
                     SourceLoc rbraceLoc);
@@ -4295,6 +4302,9 @@ public:
 
   /// \brief Add a synthesized materializeForSet accessor.
   void setSynthesizedMaterializeForSet(AccessorDecl *materializeForSet);
+
+  /// Does this storage require a materializeForSet accessor?
+  bool requiresMaterializeForSet() const;
 
   SourceRange getBracesRange() const {
     if (auto info = Accessors.getPointer())
@@ -4555,6 +4565,9 @@ public:
   void setParentPatternStmt(Stmt *S) {
     ParentPattern = S;
   }
+
+  /// True if the global stored property requires lazy initialization.
+  bool isLazilyInitializedGlobal() const;
 
   /// Return the initializer involved in this VarDecl.  Recall that the
   /// initializer may be involved in initializing more than just this one

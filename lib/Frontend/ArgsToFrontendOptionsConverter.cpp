@@ -214,9 +214,6 @@ void ArgsToFrontendOptionsConverter::computeTBDOptions() {
                      A->getOption().getPrefixedName(), value);
     }
   }
-  if (const Arg *A = Args.getLastArg(OPT_tbd_install_name)) {
-    Opts.TBDInstallName = A->getValue();
-  }
 }
 
 void ArgsToFrontendOptionsConverter::setUnsignedIntegerArgument(

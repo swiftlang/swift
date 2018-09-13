@@ -1182,14 +1182,13 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->getImplInfo().isSimpleStored()) {
     // If the global variable has storage, it might also have synthesized
     // accessors. Emit them here, since they won't appear anywhere else.
-    if (auto getter = vd->getGetter())
-      emitFunction(getter);
-    if (auto setter = vd->getSetter())
-      emitFunction(setter);
-    if (auto materializeForSet = vd->getMaterializeForSetFunc())
-      emitFunction(materializeForSet);
+    vd->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
+      auto accessor = vd->getAccessor(kind);
+      if (accessor)
+        emitFunction(accessor);
+    });
   }
-  
+
   tryEmitPropertyDescriptor(vd);
 }
 

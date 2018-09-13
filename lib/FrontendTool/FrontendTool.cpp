@@ -767,6 +767,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
   const auto &frontendOpts = Invocation.getFrontendOptions();
+  const auto &tbdOpts = Invocation.getTBDGenOptions();
   if (!frontendOpts.InputsAndOutputs.hasTBDPath())
     return false;
 
@@ -778,16 +779,7 @@ static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
 
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
 
-  auto installName = frontendOpts.TBDInstallName.empty()
-                         ? "lib" + Invocation.getModuleName().str() + ".dylib"
-                         : frontendOpts.TBDInstallName;
-
-  TBDGenOptions opts;
-  opts.InstallName = installName;
-  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
-  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
-
-  return writeTBD(Instance.getMainModule(), TBDPath, opts);
+  return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
 }
 
 static std::deque<PostSILGenInputs>
@@ -971,6 +963,9 @@ static bool performCompile(CompilerInstance &Instance,
     (void)emitIndexData(Invocation, Instance);
     return true;
   }
+
+  if (writeTBDIfNeeded(Invocation, Instance))
+    return true;
 
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.
@@ -1196,14 +1191,13 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   case FrontendOptions::TBDValidationMode::MissingFromTBD:
     break;
   }
-  TBDGenOptions opts;
-  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
-  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
 
   const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
   return MSF.is<SourceFile *>()
-             ? validateTBD(MSF.get<SourceFile *>(), IRModule, opts, allSymbols)
-             : validateTBD(MSF.get<ModuleDecl *>(), IRModule, opts, allSymbols);
+             ? validateTBD(MSF.get<SourceFile *>(), IRModule,
+                           Invocation.getTBDGenOptions(), allSymbols)
+             : validateTBD(MSF.get<ModuleDecl *>(), IRModule,
+                           Invocation.getTBDGenOptions(), allSymbols);
 }
 
 static bool generateCode(CompilerInvocation &Invocation,

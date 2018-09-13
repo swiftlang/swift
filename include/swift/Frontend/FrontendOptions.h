@@ -13,6 +13,8 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/Basic/Version.h"
+#include "swift/Frontend/FileTypes.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -257,9 +259,6 @@ public:
 
   /// Compare the symbols in the IR against the TBD file we would generate.
   TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::Default;
-
-  /// The install_name to use in the TBD file.
-  std::string TBDInstallName;
 
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {
