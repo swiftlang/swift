@@ -965,7 +965,7 @@ void swift::checkBridgedFunctions(ASTContext &ctx) {
   }
 }
 
-#pragma mark @objc declaration handling
+#pragma mark "@objc declaration handling"
 
 /// Whether this declaration is a member of a class extension marked @objc.
 static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
