@@ -857,8 +857,7 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
         break;
     }
     assert(valueMetatype);
-    auto metatypeArgument = load->getFunction()->getEntryBlock()->getArguments()
-      .back();
+    auto metatypeArgument = load->getFunction()->getSelfMetadataArgument();
     replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument,
                                      [](SILInstruction*) { });
   }
