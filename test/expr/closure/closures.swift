@@ -252,6 +252,7 @@ func rdar19179412() -> (Int) -> Int {
     class A {
       let d : Int = 0
     }
+    return 0
   }
 }
 

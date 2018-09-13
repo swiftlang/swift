@@ -2400,22 +2400,30 @@ namespace {
           expr->getExplicitResultTypeLoc().getType()) {
         resultTy = expr->getExplicitResultTypeLoc().getType();
         CS.setFavoredType(expr, resultTy.getPointer());
-      } else if (!crt.isNull()) {
-        resultTy = crt;
-      } else{
+      } else {
         auto locator =
           CS.getConstraintLocator(expr, ConstraintLocator::ClosureResult);
 
-        // If no return type was specified, create a fresh type
-        // variable for it.
-        resultTy = CS.createTypeVariable(locator);
+        if (expr->hasEmptyBody()) {
+          resultTy = CS.createTypeVariable(locator);
 
-        // Allow it to default to () if there are no return statements.
-        if (closureHasNoResult(expr)) {
-          CS.addConstraint(ConstraintKind::Defaultable,
-                           resultTy,
-                           TupleType::getEmpty(CS.getASTContext()),
-                           locator);
+          // Closures with empty bodies should be inferred to return
+          // ().
+          CS.addConstraint(ConstraintKind::Bind, resultTy,
+                           TupleType::getEmpty(CS.getASTContext()), locator);
+        } else if (crt) {
+          // Otherwise, use the contextual type if present.
+          resultTy = crt;
+        } else {
+          // If no return type was specified, create a fresh type
+          // variable for it.
+          resultTy = CS.createTypeVariable(locator);
+
+          if (closureHasNoResult(expr)) {
+            // Allow it to default to () if there are no return statements.
+            CS.addConstraint(ConstraintKind::Defaultable, resultTy,
+                             TupleType::getEmpty(CS.getASTContext()), locator);
+          }
         }
       }
 
