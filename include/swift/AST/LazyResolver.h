@@ -104,6 +104,9 @@ public:
 
   /// Return whether the iterable decl context needs parsing.
   virtual bool hasUnparsedMembers(const IterableDeclContext *IDC) = 0;
+
+  /// Parse all delayed decl list members.
+  virtual void parseAllDelayedDeclLists() = 0;
 };
 
 /// Context data for generic contexts.

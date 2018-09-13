@@ -178,6 +178,8 @@ public:
     return DelayedDeclListStates.find(IDC) != DelayedDeclListStates.end();
   }
 
+  void parseAllDelayedDeclLists() override;
+
   TopLevelContext &getTopLevelContext() {
     return TopLevelCode;
   }
