@@ -65,8 +65,8 @@ static bool isAnyObjectOrAny(Type type) {
 
 /// Returns true if \p name matches a keyword in any Clang language mode.
 static bool isClangKeyword(Identifier name) {
-  static const llvm::StringSet<> keywords = []{
-    llvm::StringSet<> set;
+  static const llvm::DenseSet<StringRef> keywords = []{
+    llvm::DenseSet<StringRef> set;
     // FIXME: clang::IdentifierInfo /nearly/ has the API we need to do this
     // in a more principled way, but not quite.
 #define KEYWORD(SPELLING, FLAGS) \
