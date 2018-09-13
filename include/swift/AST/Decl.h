@@ -6482,9 +6482,8 @@ public:
 
   static MissingMemberDecl *
   forInitializer(ASTContext &ctx, DeclContext *DC, DeclName name,
-                 bool hasNormalVTableEntry,
-                 bool hasAllocatingVTableEntry) {
-    unsigned entries = hasNormalVTableEntry + hasAllocatingVTableEntry;
+                 bool hasVTableEntry) {
+    unsigned entries = hasVTableEntry ? 1 : 0;
     return new (ctx) MissingMemberDecl(DC, name, entries, 0);
   }
   

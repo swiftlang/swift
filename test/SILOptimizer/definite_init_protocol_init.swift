@@ -25,20 +25,17 @@ extension TriviallyConstructible {
 class TrivialClass : TriviallyConstructible {
   required init(lower: Int) {}
 
-  // CHECK-LABEL: sil hidden @$S023definite_init_protocol_B012TrivialClassC5upperACSi_tcfc
-  // CHECK:     bb0(%0 : $Int, [[OLD_SELF:%.*]] : $TrivialClass):
+  // CHECK-LABEL: sil hidden @$S023definite_init_protocol_B012TrivialClassC5upperACSi_tcfC
+  // CHECK:     bb0(%0 : $Int, [[SELF_META:%.*]] : $@thick TrivialClass.Type):
   // CHECK-NEXT:  [[SELF_BOX:%.*]] = alloc_stack $TrivialClass
   // CHECK-NEXT:  debug_value
-  // CHECK-NEXT:  store [[OLD_SELF]] to [[SELF_BOX]]
-  // CHECK-NEXT:  [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self TrivialClass.Type, %1
+  // CHECK-NEXT:  [[METATYPE:%.*]] = unchecked_trivial_bit_cast [[SELF_META]] {{.*}} to $@thick @dynamic_self TrivialClass.Type
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $TrivialClass
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[FN:%.*]] = function_ref @$S023definite_init_protocol_B022TriviallyConstructiblePAAE6middlexSi_tcfC
   // CHECK-NEXT:  apply [[FN]]<@dynamic_self TrivialClass>([[RESULT]], %0, [[METATYPE]])
   // CHECK-NEXT:  [[NEW_SELF:%.*]] = load [[RESULT]]
   // CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]]
-  // CHECK-NEXT:  [[METATYPE:%.*]] = value_metatype $@thick TrivialClass.Type, %1
-  // CHECK-NEXT:  dealloc_partial_ref %1 : $TrivialClass, [[METATYPE]] : $@thick TrivialClass.Type
   // CHECK-NEXT:  dealloc_stack [[RESULT]]
   // TODO: Once we restore arbitrary takes, the strong_retain/destroy_addr pair below will go away.
   // CHECK-NEXT:  strong_retain [[NEW_SELF]]

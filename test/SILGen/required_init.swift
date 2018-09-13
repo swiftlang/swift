@@ -19,8 +19,6 @@ class Bar: Foo {
 
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK:         #Foo.init!allocator.1: {{.*}} : @$S13required_init3FooC{{[_0-9a-zA-Z]*}}fC
-// CHECK:         #Foo.init!initializer.1: {{.*}} : @$S13required_init3FooC{{[_0-9a-zA-Z]*}}fc
 
 // CHECK-LABEL: sil_vtable Bar {
 // CHECK:         #Foo.init!allocator.1: {{.*}} : @$S13required_init3BarC{{[_0-9a-zA-Z]*}}fC
-// CHECK:         #Foo.init!initializer.1: {{.*}} : @$S13required_init3BarC{{[_0-9a-zA-Z]*}}fc

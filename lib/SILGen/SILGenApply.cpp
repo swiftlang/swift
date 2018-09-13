@@ -142,6 +142,12 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
 
   if (funcDecl->isFinal())
     return true;
+  
+  // Native initializing entry points are always statically dispatched.
+  if (constant.kind == SILDeclRef::Kind::Initializer
+      && !constant.isForeign)
+    return true;
+  
   // Extension methods currently must be statically dispatched, unless they're
   // @objc or dynamic.
   if (funcDecl->getDeclContext()->isExtensionContext()
@@ -834,30 +840,64 @@ public:
     visit(e->getFn());
   }
 
-  /// Idempotently convert a metatype to an objc metatype.
-  std::pair<ManagedValue, SILType> convertToObjCMetatype(ManagedValue selfMeta,
-                                                         SILLocation loc) {
-    auto metaType = selfMeta.getType().castTo<AnyMetatypeType>();
-    CanType instanceType = metaType.getInstanceType();
+  static constexpr unsigned metatypeRepPair(MetatypeRepresentation a,
+                                            MetatypeRepresentation b) {
+    return assert(unsigned(a) < 256 && unsigned(b) < 256
+                  && "MetatypeRepresentation got too big for its britches"),
+      unsigned(a) << 8 | unsigned(b);
+  }
 
-    // If we are already objc, just return.
-    if (metaType->getRepresentation() == MetatypeRepresentation::ObjC) {
+  /// Idempotently convert a metatype to a thick or objc metatype, depending
+  /// on what allocation mechanism we need for a given class hierarchy.
+  std::pair<ManagedValue, SILType>
+  convertToMetatypeForAllocRefDynamic(ManagedValue selfMeta,
+                                      SILLocation loc,
+                                      bool usesObjCAllocation) {
+    auto givenMetatype = selfMeta.getType().castTo<AnyMetatypeType>();
+    CanType instanceType = givenMetatype.getInstanceType();
+
+    auto destMetatypeRep = usesObjCAllocation
+      ? MetatypeRepresentation::ObjC
+      : MetatypeRepresentation::Thick;
+
+    // If we are already the right rep, just return.
+    auto givenMetatypeRep = givenMetatype->getRepresentation();
+    if (givenMetatypeRep == destMetatypeRep) {
       return {selfMeta, SGF.SGM.getLoweredType(instanceType)};
     }
 
-    CanAnyMetatypeType objcMetaType;
-    if (isa<MetatypeType>(metaType)) {
-      objcMetaType =
-          CanMetatypeType::get(instanceType, MetatypeRepresentation::ObjC);
+    CanAnyMetatypeType destMetatype;
+    if (isa<MetatypeType>(givenMetatype)) {
+      destMetatype =
+          CanMetatypeType::get(instanceType, destMetatypeRep);
     } else {
-      objcMetaType = CanExistentialMetatypeType::get(
-          instanceType, MetatypeRepresentation::ObjC);
+      destMetatype = CanExistentialMetatypeType::get(instanceType,
+                                                        destMetatypeRep);
     }
-    // ObjC metatypes are trivial and thus do not have a cleanup. Only if we
+    // Metatypes are trivial and thus do not have a cleanup. Only if we
     // convert them to an object do they become non-trivial.
     assert(!selfMeta.hasCleanup());
-    auto result = ManagedValue::forUnmanaged(SGF.B.emitThickToObjCMetatype(
-        loc, selfMeta.getValue(), SGF.SGM.getLoweredType(objcMetaType)));
+    SILValue convertedValue;
+    switch (metatypeRepPair(givenMetatypeRep, destMetatypeRep)) {
+    case metatypeRepPair(MetatypeRepresentation::Thick,
+                         MetatypeRepresentation::ObjC):
+      convertedValue = SGF.B.emitThickToObjCMetatype(
+        loc, selfMeta.getValue(),
+        SILType::getPrimitiveObjectType(destMetatype));
+      break;
+    
+    case metatypeRepPair(MetatypeRepresentation::ObjC,
+                         MetatypeRepresentation::Thick):
+      convertedValue = SGF.B.emitObjCToThickMetatype(
+        loc, selfMeta.getValue(),
+        SILType::getPrimitiveObjectType(destMetatype));
+      break;
+
+    default:
+      llvm_unreachable("shouldn't happen");
+    }
+
+    auto result = ManagedValue::forUnmanaged(convertedValue);
     return {result, SGF.SGM.getLoweredType(instanceType)};
   }
 
@@ -865,15 +905,18 @@ public:
   /// object (with alloc_ref_dynamic) of that type.
   ///
   /// \returns the self object.
-  ManagedValue allocateObjCObject(ManagedValue selfMeta, SILLocation loc) {
-    // Convert to an Objective-C metatype representation, if needed.
-    ManagedValue selfMetaObjC;
+  ManagedValue allocateObject(ManagedValue selfMeta,
+                              SILLocation loc,
+                              bool usesObjCAllocation) {
+    // Convert to the necessary metatype representation, if needed.
+    ManagedValue selfMetaConverted;
     SILType instanceType;
-    std::tie(selfMetaObjC, instanceType) = convertToObjCMetatype(selfMeta, loc);
+    std::tie(selfMetaConverted, instanceType) =
+       convertToMetatypeForAllocRefDynamic(selfMeta, loc, usesObjCAllocation);
 
     // Allocate the object.
-    return SGF.B.createAllocRefDynamic(loc, selfMetaObjC, instanceType,
-                                       /*objc=*/true, {}, {});
+    return SGF.B.createAllocRefDynamic(loc, selfMetaConverted, instanceType,
+                                       usesObjCAllocation, {}, {});
   }
 
   void processProtocolMethod(DeclRefExpr *e, AbstractFunctionDecl *afd,
@@ -896,7 +939,7 @@ public:
         kind = SILDeclRef::Kind::Initializer;
 
         auto metatype = std::move(selfValue).getAsSingleValue(SGF);
-        auto allocated = allocateObjCObject(metatype, loc);
+        auto allocated = allocateObject(metatype, loc, /*objc*/ true);
         auto allocatedType = allocated.getType().getASTType();
         selfValue =
             ArgumentSource(loc, RValue(SGF, loc, allocatedType, allocated));
@@ -969,7 +1012,8 @@ public:
       SILLocation loc = thisCallSite->getArg();
       RValue selfMetatype = SGF.emitRValue(thisCallSite->getArg());
       auto selfValue =
-          allocateObjCObject(std::move(selfMetatype).getAsSingleValue(SGF, loc), loc);
+          allocateObject(std::move(selfMetatype).getAsSingleValue(SGF, loc),
+                         loc, /*objc*/ true);
       RValue self = RValue(SGF, loc, selfValue.getType().getASTType(),
                            selfValue);
       ArgumentSource selfArgSource(thisCallSite->getArg(), std::move(self));
@@ -1188,38 +1232,27 @@ public:
   /// subset of expressions used there.
   ManagedValue emitCorrespondingSelfValue(ManagedValue selfValue,
                                           Expr *selfArg) {
+    SILLocation loc = selfArg;
+    auto resultTy = selfArg->getType()->getCanonicalType();
     while (true) {
       // Handle archetype-to-super and derived-to-base upcasts.
       if (isa<ArchetypeToSuperExpr>(selfArg) ||
           isa<DerivedToBaseExpr>(selfArg)) {
-        auto ice = cast<ImplicitConversionExpr>(selfArg);
-        auto resultTy = ice->getType()->getCanonicalType();
-
-        // If the 'self' value is a metatype, update the target type
-        // accordingly.
-        if (auto selfMetaTy = selfValue.getType().getAs<AnyMetatypeType>()) {
-          resultTy = CanMetatypeType::get(resultTy,
-                                          selfMetaTy->getRepresentation());
-        }
-        auto loweredResultTy = SGF.getLoweredLoadableType(resultTy);
-        if (loweredResultTy != selfValue.getType()) {
-          selfValue = SGF.emitManagedRValueWithCleanup(
-              SGF.B.createUpcast(ice, selfValue.forward(SGF), loweredResultTy));
-        }
-
-        selfArg = ice->getSubExpr();
+        selfArg = cast<ImplicitConversionExpr>(selfArg)->getSubExpr();
         continue;
       }
 
       // Skip over loads.
       if (auto load = dyn_cast<LoadExpr>(selfArg)) {
         selfArg = load->getSubExpr();
+        resultTy = resultTy->getRValueType()->getCanonicalType();
         continue;
       }
 
       // Skip over inout expressions.
       if (auto inout = dyn_cast<InOutExpr>(selfArg)) {
         selfArg = inout->getSubExpr();
+        resultTy = resultTy->getInOutObjectType()->getCanonicalType();
         continue;
       }
 
@@ -1229,7 +1262,37 @@ public:
 
       llvm_unreachable("unhandled conversion for metatype value");
     }
-
+    assert(isa<DeclRefExpr>(selfArg) &&
+           "unexpected expr kind in self argument of initializer delegation");
+  
+    // If the 'self' value is a metatype, update the target type
+    // accordingly.
+    SILType loweredResultTy;
+    auto selfMetaTy = selfValue.getType().getAs<AnyMetatypeType>();
+    if (selfMetaTy) {
+      loweredResultTy = SILType::getPrimitiveObjectType(
+        CanMetatypeType::get(resultTy, selfMetaTy->getRepresentation()));
+    } else {
+      loweredResultTy = SGF.getLoweredLoadableType(resultTy);
+    }
+    
+    if (loweredResultTy != selfValue.getType()) {
+      // Introduce dynamic Self if necessary. A class initializer receives
+      // a metatype argument that's formally the non-dynamic base class type
+      // (though always dynamically of Self type),
+      // but when invoking a protocol initializer, we need to pass it as
+      // dynamic Self.
+      if (!selfValue.getType().getASTType()->hasDynamicSelfType()
+          && loweredResultTy.getASTType()->hasDynamicSelfType()) {
+        assert(selfMetaTy);
+        selfValue = SGF.emitManagedRValueWithCleanup(
+          SGF.B.createUncheckedBitCast(loc, selfValue.forward(SGF),
+                                       loweredResultTy));
+      } else {
+        selfValue = SGF.emitManagedRValueWithCleanup(
+            SGF.B.createUpcast(loc, selfValue.forward(SGF), loweredResultTy));
+      }
+    }
     return selfValue;
   }
 
@@ -1255,19 +1318,14 @@ public:
     // protocols, which only witness initializing initializers.
     else if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
       useAllocatingCtor = !proto->isObjC();
-    // Factory initializers are effectively "allocating" initializers with no
-    // corresponding initializing entry point.
-    } else if (ctorRef->getDecl()->isFactoryInit()) {
-      useAllocatingCtor = true;
+    // Similarly, class initializers self.init-delegate to each other via
+    // their allocating entry points, unless delegating to an ObjC-only,
+    // non-factory initializer.
     } else {
-      // We've established we're in a class initializer or a protocol extension
-      // initializer for a class-bound protocol, In either case, we're
-      // delegating initialization, but we only have an instance in the former
-      // case.
       assert(isa<ClassDecl>(nominal)
              && "some new kind of init context we haven't implemented");
-      useAllocatingCtor = static_cast<bool>(SGF.AllocatorMetatype) &&
-                          !ctorRef->getDecl()->isObjC();
+      useAllocatingCtor = ctorRef->getDecl()->isFactoryInit()
+        || !requiresForeignEntryPoint(ctorRef->getDecl());
     }
 
     // Load the 'self' argument.
@@ -1292,16 +1350,20 @@ public:
         self = ManagedValue::forUnmanaged(SGF.emitMetatypeOfValue(expr, arg));
       }
     } else {
-      // If we're in a protocol extension initializer, we haven't allocated
-      // "self" yet at this point. Do so. Use alloc_ref_dynamic since we should
-      // only ever get here in ObjC protocol extensions currently.
+      // If we haven't allocated "self" yet at this point, do so.
       if (SGF.AllocatorMetatype) {
-        assert(ctorRef->getDecl()->isObjC()
-               && "only expect to delegate an initializer from an allocator "
-                  "in objc protocol extensions");
+        bool usesObjCAllocation;
+        if (auto clas = dyn_cast<ClassDecl>(nominal)) {
+          usesObjCAllocation = usesObjCAllocator(clas);
+        } else {
+          // In the protocol extension case, we should only be here if the callee
+          // initializer is @objc.
+          usesObjCAllocation = true;
+        }
         
-        self = allocateObjCObject(
-                        ManagedValue::forUnmanaged(SGF.AllocatorMetatype), arg);
+        self = allocateObject(
+                      ManagedValue::forUnmanaged(SGF.AllocatorMetatype), arg,
+                      usesObjCAllocation);
 
         // Perform any adjustments needed to 'self'.
         self = emitCorrespondingSelfValue(self, arg);
@@ -1325,19 +1387,15 @@ public:
 
     constant = constant.asForeign(requiresForeignEntryPoint(ctorRef->getDecl()));
 
-    // Determine the callee. For structs and enums, this is the allocating
-    // constructor (because there is no initializing constructor). For protocol
-    // default implementations, we also use the allocating constructor, because
-    // that's the only thing that's witnessed. For classes,
-    // this is the initializing constructor, to which we will dynamically
-    // dispatch.
+    // Determine the callee. This is normally the allocating
+    // entry point, unless we're delegating to an ObjC initializer.
     if (isa<ProtocolDecl>(ctorRef->getDecl()->getDeclContext())) {
       // Look up the witness for the constructor.
       setCallee(Callee::forWitnessMethod(
           SGF, self.getType().getASTType(),
           constant, subs, expr));
-    } else if (getMethodDispatch(ctorRef->getDecl())
-                 == MethodDispatch::Class) {
+    } else if ((useAllocatingCtor || constant.isForeign)
+            && getMethodDispatch(ctorRef->getDecl()) == MethodDispatch::Class) {
       // Dynamic dispatch to the initializer.
       Scope S(SGF, expr);
       setCallee(Callee::forClassMethod(

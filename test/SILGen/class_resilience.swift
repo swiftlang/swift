@@ -41,7 +41,7 @@ class SubclassOfOutsideChild : ResilientOutsideChild {
 // Note: no entries for [inherited] methods
 
 // CHECK-LABEL: sil_vtable SubclassOfOutsideChild {
-// CHECK-NEXT:  #ResilientOutsideParent.init!initializer.1: (ResilientOutsideParent.Type) -> () -> ResilientOutsideParent : @$S16class_resilience22SubclassOfOutsideChildCACycfc [override]
+// CHECK-NEXT:  #ResilientOutsideParent.init!allocator.1: (ResilientOutsideParent.Type) -> () -> ResilientOutsideParent : @$S16class_resilience22SubclassOfOutsideChildCACycfC [override]
 // CHECK-NEXT:  #ResilientOutsideParent.method!1: (ResilientOutsideParent) -> () -> () : @$S16class_resilience22SubclassOfOutsideChildC6methodyyF [override]
 // CHECK-NEXT:  #SubclassOfOutsideChild.newMethod!1: (SubclassOfOutsideChild) -> () -> () : @$S16class_resilience22SubclassOfOutsideChildC9newMethodyyF
 // CHECK-NEXT:  #SubclassOfOutsideChild.deinit!deallocator.1: @$S16class_resilience22SubclassOfOutsideChildCfD

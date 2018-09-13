@@ -54,7 +54,7 @@ public func useClass(d: Double, opts: SomeClass.Options) {
 }
 
 extension SomeClass {
-  // CHECK-LABEL: sil hidden @$SSo12IAMSomeClassC16import_as_memberE6doubleABSd_tcfc
+  // CHECK-LABEL: sil hidden @$SSo12IAMSomeClassC16import_as_memberE6doubleABSd_tcfC
   // CHECK: bb0([[DOUBLE:%[0-9]+]] : @trivial $Double
   // CHECK-NOT: value_metatype
   // CHECK: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass

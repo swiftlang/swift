@@ -85,18 +85,16 @@ struct S2 {
 class C1 {
   var ivar: X
 
- // CHECK-LABEL: sil hidden @$S19init_ref_delegation2C1C{{[_0-9a-zA-Z]*}}fc : $@convention(method) (X, @owned C1) -> @owned C1
+ // CHECK-LABEL: sil hidden @$S19init_ref_delegation2C1C{{[_0-9a-zA-Z]*}}fC
   convenience init(x: X) {
-    // CHECK: bb0([[X:%[0-9]+]] : @trivial $X, [[ORIG_SELF:%[0-9]+]] : @owned $C1):
+    // CHECK: bb0([[X:%[0-9]+]] : @trivial $X, [[SELF_META:%[0-9]+]] : @trivial $@thick C1.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var C1 }
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK:   [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
 
-    // CHECK:   store [[ORIG_SELF]] to [init] [[PB]] : $*C1
-    // CHECK:   [[SELF_FROM_BOX:%[0-9]+]] = load [take] [[PB]] : $*C1
-    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_FROM_BOX]] : $C1, #C1.init!initializer.1 : (C1.Type) -> (X, X) -> C1, $@convention(method) (X, X, @owned C1) -> @owned C1
-    // CHECK:   [[SELFP:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_FROM_BOX]]) : $@convention(method) (X, X, @owned C1) -> @owned C1
-    // CHECK:   store [[SELFP]] to [init] [[PB]] : $*C1
+    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_META]] : $@thick C1.Type, #C1.init!allocator.1
+    // CHECK:   [[SELFP:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_META]])
+    // CHECK:   assign [[SELFP]] to [[PB]]
     // CHECK:   [[SELFP:%[0-9]+]] = load [copy] [[PB]] : $*C1
     // CHECK:   destroy_value [[MARKED_SELF_BOX]] : ${ var C1 }
     // CHECK:   return [[SELFP]] : $C1
@@ -109,17 +107,15 @@ class C1 {
 @objc class C2 {
   var ivar: X
 
-  // CHECK-LABEL: sil hidden @$S19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fc : $@convention(method) (X, @owned C2) -> @owned C2
+  // CHECK-LABEL: sil hidden @$S19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fC
   convenience init(x: X) {
-    // CHECK: bb0([[X:%[0-9]+]] : @trivial $X, [[ORIG_SELF:%[0-9]+]] : @owned $C2):
+    // CHECK: bb0([[X:%[0-9]+]] : @trivial $X, [[SELF_META:%[0-9]+]] : @trivial $@thick C2.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var C2 }
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK:   [[PB_SELF:%.*]] = project_box [[MARKED_SELF_BOX]]
-    // CHECK:   store [[ORIG_SELF]] to [init] [[PB_SELF]] : $*C2
-    // CHECK:   [[SELF:%[0-9]+]] = load [take] [[PB_SELF]] : $*C2
-    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF]] : $C2, #C2.init!initializer.1 : (C2.Type) -> (X, X) -> C2, $@convention(method) (X, X, @owned C2) -> @owned C2
-    // CHECK:   [[REPLACE_SELF:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF]]) : $@convention(method) (X, X, @owned C2) -> @owned C2
-    // CHECK:   store [[REPLACE_SELF]] to [init] [[PB_SELF]] : $*C2
+    // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_META]] : $@thick C2.Type, #C2.init!allocator.1
+    // CHECK:   [[REPLACE_SELF:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_META]])
+    // CHECK:   assign [[REPLACE_SELF]] to [[PB_SELF]] : $*C2
     // CHECK:   [[VAR_15:%[0-9]+]] = load [copy] [[PB_SELF]] : $*C2
     // CHECK:   destroy_value [[MARKED_SELF_BOX]] : ${ var C2 }
     // CHECK:   return [[VAR_15]] : $C2
@@ -137,11 +133,11 @@ var x: X = X()
 class C3 {
   var i: Int = 5
 
-  // CHECK-LABEL: sil hidden @$S19init_ref_delegation2C3C{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned C3) -> @owned C3
+  // CHECK-LABEL: sil hidden @$S19init_ref_delegation2C3C{{[_0-9a-zA-Z]*}}fC
   convenience init() {
     // CHECK: mark_uninitialized [delegatingself]
     // CHECK-NOT: integer_literal
-    // CHECK: class_method [[SELF:%[0-9]+]] : $C3, #C3.init!initializer.1 : (C3.Type) -> (X) -> C3, $@convention(method) (X, @owned C3) -> @owned C3
+    // CHECK: class_method [[SELF:%[0-9]+]] : $@thick C3.Type, #C3.init!allocator.1
     // CHECK-NOT: integer_literal
     // CHECK: return
     self.init(x: x)
@@ -158,9 +154,9 @@ extension C4 {
   convenience init(x1: X) {
     self.init()
   }
-  // CHECK: sil hidden @$S19init_ref_delegation2C4C{{[_0-9a-zA-Z]*}}fc
-  // CHECK: [[PEER:%[0-9]+]] = function_ref @$S19init_ref_delegation2C4C{{[_0-9a-zA-Z]*}}fc
-  // CHECK: apply [[PEER]]([[X:%[0-9]+]], [[OBJ:%[0-9]+]])
+  // CHECK: sil hidden @$S19init_ref_delegation2C4C{{[_0-9a-zA-Z]*}}fC
+  // CHECK: [[PEER:%[0-9]+]] = function_ref @$S19init_ref_delegation2C4C{{[_0-9a-zA-Z]*}}fC
+  // CHECK: apply [[PEER]]([[X:%[0-9]+]], [[META:%[0-9]+]])
   convenience init(x2: X) {
     self.init(x1: x2)
   }

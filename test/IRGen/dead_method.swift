@@ -20,7 +20,7 @@ public class Class {
 // -- vtable
 // CHECK-SAME: %swift.method_descriptor {
 // CHECK-SAME: i32 1,
-// CHECK-SAME: @"$S11dead_method5ClassCACycfc"
+// CHECK-SAME: @"$S11dead_method5ClassCACycfC"
 // CHECK-SAME: }
 
 // CHECK-SAME: %swift.method_descriptor {
@@ -46,7 +46,7 @@ public class Class {
 // CHECK-SAME:   i8* null,
 
 // -- vtable
-// CHECK-SAME:   %T11dead_method5ClassC* (%T11dead_method5ClassC*)* @"$S11dead_method5ClassCACycfc",
+// CHECK-SAME:   %T11dead_method5ClassC* (%swift.type*)* @"$S11dead_method5ClassCACycfC",
 // CHECK-SAME:   void (%T11dead_method5ClassC*)* @"$S11dead_method5ClassC4liveyyF",
 // CHECK-SAME:   i8* bitcast (void ()* @swift_deletedMethodError to i8*)
 

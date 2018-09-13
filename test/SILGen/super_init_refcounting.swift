@@ -27,15 +27,13 @@ class Bar: Foo {
 }
 
 extension Foo {
-  // CHECK-LABEL: sil hidden @$S22super_init_refcounting3FooC{{[_0-9a-zA-Z]*}}fc
+  // CHECK-LABEL: sil hidden @$S22super_init_refcounting3FooC{{[_0-9a-zA-Z]*}}fC
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box ${ var Foo }
   // CHECK:         [[MARKED_SELF_BOX:%.*]] =  mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:         [[PB_SELF_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
-  // CHECK:         [[ORIG_SELF:%.*]] = load [take] [[PB_SELF_BOX]]
-  // CHECK-NOT:     copy_value [[ORIG_SELF]]
-  // CHECK:         [[SUPER_INIT:%.*]] = class_method
-  // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]([[ORIG_SELF]])
-  // CHECK:         store [[NEW_SELF]] to [init] [[PB_SELF_BOX]]
+  // CHECK:         [[SELF_INIT:%.*]] = class_method
+  // CHECK:         [[NEW_SELF:%.*]] = apply [[SELF_INIT]](%1)
+  // CHECK:         assign [[NEW_SELF]] to [[PB_SELF_BOX]]
   convenience init(x: Int) {
     self.init()
   }
