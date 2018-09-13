@@ -3653,6 +3653,9 @@ public:
   /// its body; it can only update that expression.
   void setSingleExpressionBody(Expr *NewBody);
 
+  /// \brief Is this a completely empty closure?
+  bool hasEmptyBody() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
   }
