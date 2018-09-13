@@ -690,8 +690,8 @@ IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
     if (id != 0)
       return id;
 
-    id = ++LastIdentifierID;
-    IdentifiersToWrite.push_back(ident.getIdentifier());
+    id = ++LastUniquedStringID;
+    StringsToWrite.push_back(ident.getIdentifier().str());
     return id;
   }
   case DeclBaseName::Kind::Subscript:
@@ -701,6 +701,23 @@ IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
   case DeclBaseName::Kind::Destructor:
     return DESTRUCTOR_ID;
   }
+}
+
+IdentifierID Serializer::addUniquedStringRef(StringRef str) {
+  if (str.empty())
+    return 0;
+
+  decltype(UniquedStringIDs)::iterator iter;
+  bool isNew;
+  std::tie(iter, isNew) =
+      UniquedStringIDs.insert({str, LastUniquedStringID + 1});
+
+  if (!isNew)
+    return iter->getValue();
+
+  // Note that we use the string data stored in the StringMap.
+  StringsToWrite.push_back(iter->getKey());
+  return ++LastUniquedStringID;
 }
 
 IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
@@ -3312,12 +3329,12 @@ void Serializer::writeDecl(const Decl *D) {
     // of the ABI. That isn't the case for Swift enums.
     auto RawValueKind = EnumElementRawValueKind::None;
     bool Negative = false;
-    Identifier RawValueText;
+    StringRef RawValueText;
     if (elem->getParentEnum()->isObjC()) {
       // Currently ObjC enums always have integer raw values.
       RawValueKind = EnumElementRawValueKind::IntegerLiteral;
       auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
-      RawValueText = M->getASTContext().getIdentifier(ILE->getDigitsText());
+      RawValueText = ILE->getDigitsText();
       Negative = ILE->isNegative();
     }
 
@@ -3331,7 +3348,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   elem->hasAssociatedValues(),
                                   (unsigned)RawValueKind,
                                   Negative,
-                                  addDeclBaseNameRef(RawValueText),
+                                  addUniquedStringRef(RawValueText),
                                   rawResilienceExpansion,
                                   elem->getFullName().getArgumentNames().size()+1,
                                   nameComponentsAndDependencies);
@@ -4155,9 +4172,9 @@ void Serializer::writeAllIdentifiers() {
   // Make sure no identifier has an offset of 0.
   stringData.push_back('\0');
 
-  for (Identifier ident : IdentifiersToWrite) {
+  for (StringRef str : StringsToWrite) {
     IdentifierOffsets.push_back(stringData.size());
-    stringData.append(ident.get());
+    stringData.append(str);
     stringData.push_back('\0');
   }
 
