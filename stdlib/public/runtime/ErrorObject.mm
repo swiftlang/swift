@@ -45,6 +45,10 @@ using namespace swift::hashable_support;
 /// A subclass of NSError used to represent bridged native Swift errors.
 /// This type cannot be subclassed, and should not ever be instantiated
 /// except by the Swift runtime.
+///
+/// NOTE: older runtimes called this _SwiftNativeNSError. The two must
+/// coexist, so it was renamed. The old name must not be used in the new
+/// runtime.
 @interface __SwiftNativeNSError : NSError
 @end
 

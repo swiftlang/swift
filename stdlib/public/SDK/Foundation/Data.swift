@@ -966,6 +966,9 @@ internal final class _DataStorage {
     }
 }
 
+// NOTE: older runtimes called this _NSSwiftData. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
 internal class __NSSwiftData : NSData {
     var _backing: _DataStorage!
     var _range: Range<Data.Index>!

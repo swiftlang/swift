@@ -1407,6 +1407,10 @@ internal protocol _SetBuffer { // FIXME: Remove or refactor for Set.
 // NOTE: The precise layout of this type is relied on in the runtime
 // to provide a statically allocated empty singleton.
 // See stdlib/public/stubs/GlobalObjects.cpp for details.
+//
+// NOTE: older runtimes called this _RawNativeSetStorage. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization

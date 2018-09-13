@@ -45,12 +45,15 @@ fileprivate extension NSObject {
 
 }
 
+// NOTE: older overlays called this _KVOKeyPathBridgeMachinery. The two
+// must coexist, so it was renamed. The old name must not be used in the
+// new runtime.
 @objc private class __KVOKeyPathBridgeMachinery : NSObject {
     @nonobjc static var keyPathTable: [String : AnyKeyPath] = {
         /*
          Move all our methods into place. We want the following:
          __KVOKeyPathBridgeMachinery's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replaces NSObject's versions of them
-         NSObject's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replace NSObject's _old_unswizzled_* methods
+         NSObject's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replace NSObject's __old_unswizzled_* methods
          NSObject's _old_unswizzled_* methods replace __KVOKeyPathBridgeMachinery's methods, and are never invoked
          */
         let rootClass: AnyClass = NSObject.self
@@ -64,7 +67,7 @@ fileprivate extension NSObject {
         let originalDependentImpl = class_getClassMethod(bridgeClass, dependentSel)! //we swizzled it onto this class, so this is actually NSObject's old implementation
         let originalDependentSel = #selector(NSObject.__old_unswizzled_keyPathsForValuesAffectingValue(forKey:))
         let dummyDependentImpl = class_getClassMethod(rootClass, originalDependentSel)!
-        method_exchangeImplementations(originalDependentImpl, dummyDependentImpl) // NSObject's original version <-> NSObject's _old_unswizzled_ version
+        method_exchangeImplementations(originalDependentImpl, dummyDependentImpl) // NSObject's original version <-> NSObject's __old_unswizzled_ version
         
         let autoSel = #selector(NSObject.automaticallyNotifiesObservers(forKey:))
         let rootAutoImpl = class_getClassMethod(rootClass, autoSel)!
@@ -74,7 +77,7 @@ fileprivate extension NSObject {
         let originalAutoImpl = class_getClassMethod(bridgeClass, autoSel)! //we swizzled it onto this class, so this is actually NSObject's old implementation
         let originalAutoSel = #selector(NSObject.__old_unswizzled_automaticallyNotifiesObservers(forKey:))
         let dummyAutoImpl = class_getClassMethod(rootClass, originalAutoSel)!
-        method_exchangeImplementations(originalAutoImpl, dummyAutoImpl) // NSObject's original version <-> NSObject's _old_unswizzled_ version
+        method_exchangeImplementations(originalAutoImpl, dummyAutoImpl) // NSObject's original version <-> NSObject's __old_unswizzled_ version
         
         return [:]
     }()
@@ -128,6 +131,9 @@ func _bridgeStringToKeyPath(_ keyPath:String) -> AnyKeyPath? {
     return __KVOKeyPathBridgeMachinery._bridgeKeyPath(keyPath)
 }
 
+// NOTE: older overlays called this NSKeyValueObservation. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
 public class _NSKeyValueObservation : NSObject {
     
     @nonobjc weak var object : NSObject?

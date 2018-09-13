@@ -37,6 +37,10 @@ internal func _isValidArraySubscript(_ index: Int, count: Int) -> Bool {
 
 /// An `NSArray` with Swift-native reference counting and contiguous
 /// storage.
+///
+/// NOTE: older runtimes called this
+/// _SwiftNativeNSArrayWithContiguousStorage. The two must coexist, so
+/// it was renamed. The old name must not be used in the new runtime.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 internal class __SwiftNativeNSArrayWithContiguousStorage
@@ -261,6 +265,10 @@ internal class __SwiftNativeNSArrayWithContiguousStorage {
 #endif
 
 /// Base class of the heap buffer backing arrays.  
+///
+/// NOTE: older runtimes called this _ContiguousArrayStorageBase. The
+/// two must coexist, so it was renamed. The old name must not be used
+/// in the new runtime.
 @usableFromInline
 @_fixed_layout
 internal class __ContiguousArrayStorageBase

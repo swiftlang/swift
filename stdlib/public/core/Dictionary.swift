@@ -1804,6 +1804,10 @@ internal protocol _DictionaryBuffer {
 // NOTE: The precise layout of this type is relied on in the runtime
 // to provide a statically allocated empty singleton.
 // See stdlib/public/stubs/GlobalObjects.cpp for details.
+//
+// NOTE: older runtimes called this _RawNativeDictionaryStorage. The two
+// must coexist, so it was renamed. The old name must not be used in the
+// new runtime.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization

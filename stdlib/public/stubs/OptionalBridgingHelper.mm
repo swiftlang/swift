@@ -26,6 +26,10 @@ using namespace swift;
 
 /// Class of sentinel objects used to represent the `nil` value of nested
 /// optionals.
+///
+/// NOTE: older runtimes called this _SwiftNull. The two must
+/// coexist, so it was renamed. The old name must not be used in the new
+/// runtime.
 @interface __SwiftNull : NSObject {
 @public
   unsigned depth;

@@ -17,6 +17,10 @@ import SwiftShims
 /// initialized.  See stdlib/runtime/GlobalObjects.cpp for details.
 /// Because it's statically referenced, it requires non-lazy realization
 /// by the Objective-C runtime.
+///
+/// NOTE: older runtimes called this _EmptyArrayStorage. The two must
+/// coexist, so it was renamed. The old name must not be used in the new
+/// runtime.
 @_fixed_layout
 @usableFromInline
 @_objc_non_lazy_realization

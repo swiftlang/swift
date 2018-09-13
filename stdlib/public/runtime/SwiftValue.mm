@@ -45,6 +45,10 @@ using namespace swift::hashable_support;
 // - object header,
 // - `SwiftValueHeader` instance,
 // - the payload, tail-allocated (the Swift value contained in this box).
+//
+// NOTE: older runtimes called this _SwiftValue. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
 @interface __SwiftValue : NSObject <NSCopying>
 
 - (id)copyWithZone:(NSZone *)zone;
