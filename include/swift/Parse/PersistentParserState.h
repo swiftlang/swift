@@ -174,9 +174,11 @@ public:
   std::unique_ptr<DelayedDeclListState>
     takeDelayedDeclListState(IterableDeclContext *IDC);
 
-  bool hasDelayedDeclList(IterableDeclContext *IDC) {
+  bool hasUnparsedMembers(const IterableDeclContext *IDC) override {
     return DelayedDeclListStates.find(IDC) != DelayedDeclListStates.end();
   }
+
+  void parseAllDelayedDeclLists() override;
 
   TopLevelContext &getTopLevelContext() {
     return TopLevelCode;

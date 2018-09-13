@@ -181,18 +181,21 @@ namespace {
 } // end anonymous namespace
 
 void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
-  if (!hasDelayedDeclList(IDC))
-    return;
   SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
   assert(!SF.hasInterfaceHash() &&
     "Cannot delay parsing if we care about the interface hash.");
+  assert(SF.Kind != SourceFileKind::SIL && "cannot delay parsing SIL");
   unsigned BufferID = *SF.getBufferID();
+
   // MarkedPos is not useful for delayed parsing because we know where we should
   // jump the parser to. However, we should recover the MarkedPos here in case
   // the PersistentParserState will be used to continuously parse the rest of
   // the file linearly.
   llvm::SaveAndRestore<ParserPosition> Pos(MarkedPos, ParserPosition());
-  Parser TheParser(BufferID, SF, nullptr, this);
+
+  // Lexer diaganostics have been emitted during skipping, so we disable lexer's
+  // diagnostic engine here.
+  Parser TheParser(BufferID, SF, /*No Lexer Diags*/nullptr, nullptr, this);
   // Disable libSyntax creation in the delayed parsing.
   TheParser.SyntaxContext->disable();
   TheParser.parseDeclListDelayed(IDC);
@@ -2292,7 +2295,8 @@ static unsigned skipUntilMatchingRBrace(Parser &P, bool &HasPoundDirective,
   SyntaxParsingContext BodyContext(SyntaxContext, SyntaxKind::TokenList);
   unsigned OpenBraces = 1;
   while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
-    HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line);
+    HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line,
+      tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
     if (P.consumeIf(tok::l_brace)) {
       OpenBraces++;
       continue;
@@ -2902,6 +2906,15 @@ void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
                   ParseDeclOptions(DelayedState->Flags),
                   [&] (Decl *D) { ext->addMember(D); });
     ext->setBraces({LBLoc, RBLoc});
+  } else if (auto *cd = dyn_cast<ClassDecl>(D)) {
+    auto handler = [&] (Decl *D) {
+      cd->addMember(D);
+      if (isa<DestructorDecl>(D))
+        cd->setHasDestructor();
+    };
+    parseDeclList(cd->getBraces().Start, RBLoc, Id,
+                  ParseDeclOptions(DelayedState->Flags), handler);
+    cd->setBraces({LBLoc, RBLoc});
   } else {
     auto *ntd = cast<NominalTypeDecl>(D);
     parseDeclList(ntd->getBraces().Start, RBLoc, Id,
@@ -3349,6 +3362,10 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
 }
 
 bool Parser::canDelayMemberDeclParsing() {
+  // There's no fundamental reasons that SIL cannnot be lasily parsed. We need
+  // to keep SILParserTUStateBase persistent to make it happen.
+  if (isInSILMode())
+    return false;
   // Calculating interface hash requires tokens consumed in the original order.
   if (SF.hasInterfaceHash())
     return false;
@@ -5831,6 +5848,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Make the entities of the struct as a code block.
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
+  SourceLoc PosBeforeLB = Tok.getLoc();
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
     LBLoc = PreviousLoc;
     RBLoc = LBLoc;
@@ -5839,9 +5857,20 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     // Parse the body.
     Scope S(this, ScopeKind::StructBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_InStruct);
-    if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
-                      Options, [&](Decl *D) {SD->addMember(D);}))
-      Status.setIsParseError();
+    if (canDelayMemberDeclParsing()) {
+      if (Tok.is(tok::r_brace)) {
+        RBLoc = consumeToken();
+      } else {
+        RBLoc = Tok.getLoc();
+        Status.setIsParseError();
+      }
+      State->delayDeclList(SD, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
+                           PosBeforeLB);
+    } else {
+      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
+                        Options, [&](Decl *D) {SD->addMember(D);}))
+        Status.setIsParseError();
+    }
   }
 
   SD->setBraces({LBLoc, RBLoc});
@@ -5942,6 +5971,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
+  auto PosBeforeLB = Tok.getLoc();
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
     LBLoc = PreviousLoc;
     RBLoc = LBLoc;
@@ -5951,14 +5981,25 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor |
                              PD_InClass);
-    auto Handler = [&] (Decl *D) {
-      CD->addMember(D);
-      if (isa<DestructorDecl>(D))
-        CD->setHasDestructor();
-    };
-    if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_class,
-                      Options, Handler))
-      Status.setIsParseError();
+    if (canDelayMemberDeclParsing()) {
+      if (Tok.is(tok::r_brace)) {
+        RBLoc = consumeToken();
+      } else {
+        RBLoc = Tok.getLoc();
+        Status.setIsParseError();
+      }
+      State->delayDeclList(CD, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
+                           PosBeforeLB);
+    } else {
+      auto Handler = [&] (Decl *D) {
+        CD->addMember(D);
+        if (isa<DestructorDecl>(D))
+          CD->setHasDestructor();
+      };
+      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_class,
+                        Options, Handler))
+        Status.setIsParseError();
+    }
   }
 
   CD->setBraces({LBLoc, RBLoc});
@@ -6040,6 +6081,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
     SourceLoc LBraceLoc;
     SourceLoc RBraceLoc;
+    SourceLoc PosBeforeLB = Tok.getLoc();
     if (parseToken(tok::l_brace, LBraceLoc, diag::expected_lbrace_protocol)) {
       LBraceLoc = PreviousLoc;
       RBraceLoc = LBraceLoc;
@@ -6049,9 +6091,21 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       ParseDeclOptions Options(PD_HasContainerType |
                                PD_DisallowInit |
                                PD_InProtocol);
-      if (parseDeclList(LBraceLoc, RBraceLoc, diag::expected_rbrace_protocol,
-                        Options, [&](Decl *D) {Proto->addMember(D);}))
-        Status.setIsParseError();
+      if (canDelayMemberDeclParsing()) {
+        if (Tok.is(tok::r_brace)) {
+          RBraceLoc = consumeToken();
+        } else {
+          RBraceLoc = Tok.getLoc();
+          Status.setIsParseError();
+        }
+        State->delayDeclList(Proto, Options.toRaw(), CurDeclContext,
+                             { LBraceLoc, RBraceLoc },
+                             PosBeforeLB);
+      } else {
+        if (parseDeclList(LBraceLoc, RBraceLoc, diag::expected_rbrace_protocol,
+                          Options, [&](Decl *D) {Proto->addMember(D);}))
+          Status.setIsParseError();
+      }
     }
 
     // Install the protocol elements.

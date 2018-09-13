@@ -81,6 +81,16 @@ void PersistentParserState::delayDeclList(IterableDeclContext* D,
     ParentContext, BodyRange, PreviousLoc, ScopeInfo.saveCurrentScope());
 }
 
+void PersistentParserState::parseAllDelayedDeclLists() {
+  std::vector<IterableDeclContext*> AllDelayed;
+  for (auto &P: DelayedDeclListStates) {
+    AllDelayed.push_back(P.first);
+  }
+  for (auto *D: AllDelayed) {
+    parseMembers(D);
+  }
+}
+
 void PersistentParserState::delayTopLevel(TopLevelCodeDecl *TLCD,
                                           SourceRange BodyRange,
                                           SourceLoc PreviousLoc) {

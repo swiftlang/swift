@@ -346,6 +346,9 @@ public:
   SyntaxParsingContext *SyntaxContext;
 
 public:
+  Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
+         SILParserTUStateBase *SIL,
+         PersistentParserState *PersistentState);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
