@@ -4857,6 +4857,7 @@ ParamDecl::getDefaultValueStringRepresentation(
   case DefaultArgumentKind::EmptyArray: return "[]";
   case DefaultArgumentKind::EmptyDictionary: return "[:]";
   }
+  llvm_unreachable("unhandled kind");
 }
 
 void

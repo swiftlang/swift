@@ -240,6 +240,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
       case ReadImplKind::Get:
         llvm_unreachable("should have a getter");
       }
+      llvm_unreachable("unhandled kind");
     };
 
     auto isStoredSetterMutating = [&] {
@@ -263,6 +264,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
       case WriteImplKind::InheritedWithObservers:
         llvm_unreachable("should have a setter");
       }
+      llvm_unreachable("unhandled kind");
     };
 
     auto isReadWriteMutating = [&] {
@@ -278,6 +280,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
       case ReadWriteImplKind::Immutable:
         llvm_unreachable("asking for setter for immutable storage");
       }
+      llvm_unreachable("unhandled kind");
     };
 
     switch (reqtAsAccessor->getAccessorKind()) {

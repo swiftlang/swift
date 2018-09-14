@@ -965,6 +965,7 @@ visitFullApply(FullApplySite apply) {
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Unexpected non-trivial parameter convention.");
   }
+  llvm_unreachable("unhandled convension");
 }
 
 OwnershipUseCheckerResult
@@ -1020,6 +1021,7 @@ OwnershipCompatibilityUseChecker::visitYieldInst(YieldInst *I) {
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Unexpected non-trivial parameter convention.");
   }
+  llvm_unreachable("unhandled convension");
 }
 
 OwnershipUseCheckerResult

@@ -496,6 +496,7 @@ public:
     case TypeExpansionKind::MostDerivedDescendents:
       return emitLoweredCopyValueMostDerivedDescendents(B, loc, value);
     }
+    llvm_unreachable("unhandled style");
   }
 
   /// Allocate a new TypeLowering using the TypeConverter's allocator.

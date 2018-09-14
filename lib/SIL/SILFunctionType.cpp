@@ -286,6 +286,7 @@ public:
     case ValueOwnership::Owned:
       return ParameterConvention::Indirect_In;
     }
+    llvm_unreachable("unhandled ownership");
   }
 
   ParameterConvention getDirect(ValueOwnership ownership, bool forSelf,
@@ -303,6 +304,7 @@ public:
     case ValueOwnership::Owned:
       return ParameterConvention::Direct_Owned;
     }
+    llvm_unreachable("unhandled ownership");
   }
 };
 
@@ -820,6 +822,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
   case ForeignErrorConvention::NonNilError:
     return {origResultType, substFormalResultType};
   }
+  llvm_unreachable("unhandled kind");
 }
 
 /// Lower any/all capture context parameters.

@@ -1240,6 +1240,7 @@ TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
   case AccessStrategy::BehaviorStorage:
     llvm_unreachable("should not occur");
   }
+  llvm_unreachable("unhandled strategy");
 }
 
 static bool canStorageUseTrivialDescriptor(SILModule &M,
@@ -1285,6 +1286,7 @@ static bool canStorageUseTrivialDescriptor(SILModule &M,
       && decl->getSetter() == nullptr;
   }
   }
+  llvm_unreachable("unhandled strategy");
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {

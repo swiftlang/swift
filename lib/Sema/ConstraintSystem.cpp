@@ -2050,6 +2050,7 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
   case FunctionRefKind::DoubleApply:
     return true;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {

@@ -106,6 +106,7 @@ namespace {
         case DeclBaseName::Kind::Destructor:
           return static_cast<uint8_t>(DeclNameKind::Destructor);
       }
+      llvm_unreachable("unhandled kind");
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -335,6 +336,7 @@ namespace {
       case DeclBaseName::Kind::Destructor:
         return static_cast<uint8_t>(DeclNameKind::Destructor);
       }
+      llvm_unreachable("unhandled kind");
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -701,6 +703,7 @@ IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
   case DeclBaseName::Kind::Destructor:
     return DESTRUCTOR_ID;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 std::pair<StringRef, IdentifierID> Serializer::addUniquedString(StringRef str) {
@@ -1201,6 +1204,7 @@ static uint8_t getRawStableResilienceExpansion(swift::ResilienceExpansion e) {
   case swift::ResilienceExpansion::Maximal:
     return uint8_t(serialization::ResilienceExpansion::Maximal);
   }
+  llvm_unreachable("unhandled expansion");
 }
 
 void Serializer::writeParameterList(const ParameterList *PL) {

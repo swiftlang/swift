@@ -1467,6 +1467,7 @@ bool SourceFile::shouldCollectToken() const {
   case SourceFileKind::SIL:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool SourceFile::shouldBuildSyntaxTree() const {
@@ -1479,6 +1480,7 @@ bool SourceFile::shouldBuildSyntaxTree() const {
   case SourceFileKind::SIL:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool FileUnit::walk(ASTWalker &walker) {

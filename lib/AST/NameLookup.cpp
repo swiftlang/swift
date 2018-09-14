@@ -2416,6 +2416,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::ImplicitlyUnwrappedOptional:
     return { 1, ctx.getOptionalDecl() };
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
