@@ -124,7 +124,9 @@ public:
     {}
     
     WitnessKind getKind() const { return Kind; }
-    
+
+    bool isValid() const { return Kind != WitnessKind::Invalid; }
+
     const MethodWitness &getMethodWitness() const {
       assert(Kind == WitnessKind::Method);
       return Method;
@@ -150,6 +152,9 @@ public:
       }
       Method.Witness = nullptr;
     }
+
+    void print(llvm::raw_ostream &out, bool verbose,
+               const PrintOptions &options) const;
   };
 
   /// An entry for a conformance requirement that makes the requirement

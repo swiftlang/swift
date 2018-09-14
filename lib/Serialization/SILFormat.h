@@ -164,7 +164,6 @@ namespace sil_block {
     SIL_WITNESS_ASSOC_ENTRY,
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
-    SIL_DEFAULT_WITNESS_TABLE_ENTRY,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
@@ -261,12 +260,6 @@ namespace sil_block {
     DeclIDField,  // ID of ProtocolDecl
     SILLinkageField  // Linkage
     // Default witness table entries will be serialized after.
-  >;
-
-  using DefaultWitnessTableEntryLayout = BCRecordLayout<
-    SIL_DEFAULT_WITNESS_TABLE_ENTRY,
-    DeclIDField,  // SILFunction name
-    BCArray<ValueIDField> // SILDeclRef
   >;
 
   using DefaultWitnessTableNoEntryLayout = BCRecordLayout<

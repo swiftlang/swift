@@ -5008,10 +5008,10 @@ void SILWitnessTable::verify(const SILModule &M) const {
 void SILDefaultWitnessTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
   for (const Entry &E : getEntries()) {
-    if (!E.isValid())
+    if (!E.isValid() || E.getKind() != SILWitnessTable::Method)
       continue;
 
-    SILFunction *F = E.getWitness();
+    SILFunction *F = E.getMethodWitness().Witness;
 
 #if 0
     // FIXME: For now, all default witnesses are private.

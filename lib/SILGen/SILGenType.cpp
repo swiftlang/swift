@@ -752,7 +752,7 @@ public:
     SILFunction *witnessFn = SGM.emitProtocolWitness(
         ProtocolConformanceRef(Proto), SILLinkage::Private, IsNotSerialized,
         requirementRef, witnessRef, isFree, witness);
-    auto entry = SILDefaultWitnessTable::Entry(requirementRef, witnessFn);
+    auto entry = SILWitnessTable::MethodWitness{requirementRef, witnessFn};
     DefaultWitnesses.push_back(entry);
   }
 
