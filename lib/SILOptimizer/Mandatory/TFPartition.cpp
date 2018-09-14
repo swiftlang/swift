@@ -70,6 +70,20 @@ static llvm::cl::opt<bool> TFSendRecvOpaqueHandle(
     llvm::cl::desc("When true, variant and resource handles can be sent via "
                    "eager API as tensor handles."));
 
+// The flag below is referenced in multiple translation units.
+namespace llvm {
+// This flag is used as a crutch to develop and test IRGen code that handles
+// graph_op insts.
+// TODO: Fold this flag into -Onone mode.
+llvm::cl::opt<bool> TFDynamicCompilation(
+    "tf-dynamic-compilation", llvm::cl::init(false),
+    llvm::cl::desc(
+        "When true, skip the partitioning and lowering pass, so that graph_op "
+        "instructions flow to IRGen. This flag should not be turned on by end "
+        "users, due to many restrictions (e.g. it will not work with "
+        "tensorflow convention functions)."));
+} // namespace llvm
+
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
                                    Diag<T...> diag, U &&... args) {
@@ -4555,7 +4569,9 @@ bool TFPartition::partitionFunction(
   // isolation.
   LLVM_DEBUG(llvm::dbgs() << "Processing SIL function " << hostFn->getName()
                           << " in TFPartition::partitionFunction().\n");
-  if (!tfc.shouldBePartitioned(hostFn, /*forceTFFunctions=*/true))
+
+  if (!tfc.shouldBePartitioned(hostFn, /*forceTFFunctions=*/true) ||
+      llvm::TFDynamicCompilation)
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()
