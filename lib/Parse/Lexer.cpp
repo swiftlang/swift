@@ -1560,9 +1560,9 @@ static size_t commonPrefixLength(StringRef shorter, StringRef longer) {
 
 /// getMultilineTrailingIndent:
 /// Determine trailing indent to be used for multiline literal indent stripping.
-static std::tuple<StringRef, SourceLoc>
-getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
-  StringRef Bytes = getStringLiteralContent(Str);
+StringRef
+getMultilineTrailingIndent(StringRef Bytes, DiagnosticEngine *Diags = nullptr,
+                           unsigned CustomDelimiterLen = 0) {
   const char *begin = Bytes.begin(), *end = Bytes.end(), *start = end;
   bool sawNonWhitespace = false;
 
@@ -1575,11 +1575,9 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
     case '\n':
     case '\r': {
       ++start;
-      auto startLoc = Lexer::getSourceLoc(start);
-      auto string = StringRef(start, end - start);
 
       // Disallow escaped newline in the last line.
-      if (Diags && Str.getCustomDelimiterLen() == 0) {
+      if (Diags && !CustomDelimiterLen) {
         auto *Ptr = start - 1;
         if (*Ptr == '\n') --Ptr;
         if (*Ptr == '\r') --Ptr;
@@ -1595,7 +1593,7 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
         }
       }
 
-      return std::make_tuple(string, startLoc);
+      return StringRef(start, end - start);
     }
     default:
       sawNonWhitespace = true;
@@ -1609,7 +1607,7 @@ getMultilineTrailingIndent(const Token &Str, DiagnosticEngine *Diags) {
       .fixItInsert(loc, "\n");
   }
 
-  return std::make_tuple("", Lexer::getSourceLoc(end - 1));
+  return "";
 }
 
 /// diagnoseInvalidMultilineIndents:
@@ -1673,12 +1671,13 @@ static void diagnoseInvalidMultilineIndents(
 /// Diagnose contents of string literal that have inconsistent indentation.
 static void validateMultilineIndents(const Token &Str,
                                      DiagnosticEngine *Diags) {
-  StringRef Indent;
-  SourceLoc IndentStartLoc;
-  std::tie(Indent, IndentStartLoc) = getMultilineTrailingIndent(Str, Diags);
+  StringRef Bytes = getStringLiteralContent(Str);
+  StringRef Indent =
+    getMultilineTrailingIndent(Bytes, Diags, Str.getCustomDelimiterLen());
   if (Indent.empty())
     return;
-  
+  SourceLoc IndentStartLoc = Lexer::getSourceLoc(Indent.data());
+
   // The offset into the previous line where it experienced its first indentation 
   // error, or Indent.size() if every character matched.
   size_t lastMistakeOffset = std::numeric_limits<size_t>::max();
@@ -1688,7 +1687,6 @@ static void validateMultilineIndents(const Token &Str,
   // Prefix of indentation that's present on all lines in linesWithLastMatchLength.
   StringRef commonIndentation = "";
   
-  StringRef Bytes = getStringLiteralContent(Str);
   for (size_t pos = Bytes.find('\n'); pos != StringRef::npos; pos = Bytes.find('\n', pos + 1)) {
     size_t nextpos = pos + 1;
     auto restOfBytes = Bytes.substr(nextpos);
@@ -2109,6 +2107,11 @@ StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
   // BytesPtr to avoid a range check subscripting on the StringRef.
   const char *BytesPtr = Bytes.begin();
 
+  // Special case when being called from EncodedDiagnosticMessage(...)
+  // This should allow multiline strings to work as attribute messages.
+  if (IndentToStrip == ~0U)
+    IndentToStrip = getMultilineTrailingIndent(Bytes).size();
+
   bool IsEscapedNewline = false;
   while (BytesPtr < Bytes.end()) {
     char CurChar = *BytesPtr++;
@@ -2203,8 +2206,7 @@ void Lexer::getStringLiteralSegments(
   bool MultilineString = Str.isMultilineString(), IsFirstSegment = true;
   unsigned IndentToStrip = 0, CustomDelimiterLen = Str.getCustomDelimiterLen();
   if (MultilineString)
-    IndentToStrip = 
-      std::get<0>(getMultilineTrailingIndent(Str, /*Diags=*/nullptr)).size();
+    IndentToStrip = getMultilineTrailingIndent(Bytes).size();
 
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
