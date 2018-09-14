@@ -722,9 +722,11 @@ namespace {
       if (!DefaultWitnesses) return nullptr;
 
       for (auto &entry : DefaultWitnesses->getEntries()) {
-        if (!entry.isValid() || entry.getRequirement() != func)
+        if (!entry.isValid() || entry.getKind() != SILWitnessTable::Method ||
+            entry.getMethodWitness().Requirement != func)
           continue;
-        return IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition);
+        return IGM.getAddrOfSILFunction(entry.getMethodWitness().Witness,
+                                        NotForDefinition);
       }
 
       return nullptr;
