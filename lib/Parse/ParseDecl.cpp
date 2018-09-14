@@ -310,13 +310,9 @@ bool Parser::parseTopLevel() {
 static Optional<StringRef>
 getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
                                   StringRef DiagText) {
-  // FIXME: Support extended escaping / multiline string literal.
+  // FIXME: Support extended escaping string literal.
   if (Tok.getCustomDelimiterLen()) {
     P.diagnose(Loc, diag::attr_extended_escaping_string, DiagText);
-    return None;
-  }
-  if (Tok.isMultilineString()) {
-    P.diagnose(Loc, diag::attr_multiline_string, DiagText);
     return None;
   }
 
