@@ -64,12 +64,13 @@ void ArgumentSource::rewriteType(CanType newType) & {
   llvm_unreachable("bad kind");
 }
 
-bool ArgumentSource::requiresCalleeToEvaluate() const {
+bool ArgumentSource::isShuffle() const {
   switch (StoredKind) {
   case Kind::Invalid:
     llvm_unreachable("argument source is invalid");
   case Kind::RValue:
   case Kind::LValue:
+  case Kind::Tuple:
     return false;
   case Kind::Expr:
     // FIXME: TupleShuffleExprs come in two flavors:
@@ -85,28 +86,8 @@ bool ArgumentSource::requiresCalleeToEvaluate() const {
     //
     // It would be good to split up TupleShuffleExpr into these two
     // cases, and simplify ArgEmitter since it no longer has to deal
-    // with re-ordering. However for now, SubscriptExpr emits the
-    // index argument via the RValueEmitter, so the RValueEmitter has
-    // to know about varargs, duplicating some of the logic in
-    // ArgEmitter.
-    //
-    // Once this is fixed, we can also consider allowing subscripts
-    // to have default arguments.
-    if (auto *shuffleExpr = dyn_cast<TupleShuffleExpr>(asKnownExpr())) {
-      for (auto index : shuffleExpr->getElementMapping()) {
-        if (index == TupleShuffleExpr::DefaultInitialize ||
-            index == TupleShuffleExpr::CallerDefaultInitialize ||
-            index == TupleShuffleExpr::Variadic)
-          return true;
-      }
-    }
-    return false;
-  case Kind::Tuple:
-    for (auto &source : Storage.get<TupleStorage>(StoredKind).Elements) {
-      if (source.requiresCalleeToEvaluate())
-        return true;
-    }
-    return false;
+    // with re-ordering.
+    return isa<TupleShuffleExpr>(asKnownExpr());
   }
   llvm_unreachable("bad kind");
 }
