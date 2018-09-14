@@ -237,7 +237,9 @@ fileprivate class XPCDictionaryReferencingEncoder: XPCEncoder {
 
     override func singleValueContainer() -> SingleValueEncodingContainer {
         // It is OK to force this through because we are explicitly passing a dictionary
-        let inserter = try! XPCSingleValueDictionaryInserter(into: self.xpcDictionary, at: self.key)
-        return XPCSingleValueEncodingContainer(referencing: self, inserter: inserter)
+        return XPCSingleValueEncodingContainer(referencing: self, insertionClosure: {
+            value in
+                self.key.stringValue.withCString({ xpc_dictionary_set_value(self.xpcDictionary, $0, value)})
+        })
     }
 }

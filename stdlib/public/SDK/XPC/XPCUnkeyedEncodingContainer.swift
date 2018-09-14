@@ -248,7 +248,12 @@ private class XPCArrayReferencingEncoder: XPCEncoder {
 
     override func singleValueContainer() -> SingleValueEncodingContainer {
         // It is OK to force this through because we are explictly passing an array
-        let inserter = try! XPCSingleValueArrayInserter(into: self.xpcArray, at: self.index)
-        return XPCSingleValueEncodingContainer(referencing: self, inserter: inserter)
+        return XPCSingleValueEncodingContainer(referencing: self, insertionClosure: {
+            value in
+                guard self.index < xpc_array_get_count(self.xpcArray) else {
+                    throw XPCEncodingHelpers.makeEncodingError(value, [], "Internal Error")
+                }
+                xpc_array_set_value(self.xpcArray, self.index, value)
+        })
     }
 }

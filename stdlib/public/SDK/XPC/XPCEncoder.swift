@@ -75,9 +75,9 @@ public class XPCEncoder: Encoder {
             preconditionFailure("This encoder already has a container of kind \(self.containerKind)")
         }
 
-        let inserter = XPCSingleValueEncoderInserter(into: self)
-
-        return XPCSingleValueEncodingContainer(referencing: self, inserter: inserter)
+        return XPCSingleValueEncodingContainer(referencing: self, insertionClosure: {
+            self.topLevelContainer = $0
+        })
     }
 
     public static func encode<T: Encodable>(_ value: T, at codingPath: [CodingKey] = []) throws -> xpc_object_t {
