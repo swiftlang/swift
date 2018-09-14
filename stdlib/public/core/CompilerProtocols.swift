@@ -760,6 +760,15 @@ public protocol ExpressibleByStringInterpolation
   init(stringInterpolation: StringInterpolation)
 }
 
+extension ExpressibleByStringInterpolation {
+  @_transparent
+  public init(stringLiteral value: StringLiteralType) {
+    var interpolation = StringInterpolation(literalCapacity: 0, interpolationCount: 0)
+    interpolation.appendLiteral(value)
+    self.init(stringInterpolation: interpolation)
+  }
+}
+
 extension ExpressibleByStringInterpolation
   where StringInterpolation == DefaultStringInterpolation {
   
@@ -779,6 +788,11 @@ extension ExpressibleByStringInterpolation
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   public init(stringInterpolation: DefaultStringInterpolation) {
     self.init(stringLiteral: stringInterpolation.make())
+  }
+  
+  @available(*, unavailable, message: "please implement init(stringLiteral:) when using DefaultStringInterpolation")
+  public init(stringLiteral _: String) {
+    Builtin.unreachable()
   }
 }
 

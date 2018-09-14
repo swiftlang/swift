@@ -87,3 +87,31 @@ public struct GoodStringInterpolationWithBadOnesToo: StringInterpolationProtocol
   func appendInterpolation(default: ()) {}
   public func appendInterpolation(intResult: ()) -> Int {}
 }
+
+// Uses DefaultStringInterpolation but doesn't specify init(stringLiteral:).
+public struct BadDefaultStringInterpolation: ExpressibleByStringInterpolation {
+	// expected-error@-1{{type 'BadDefaultStringInterpolation' does not conform to protocol 'ExpressibleByStringLiteral'}}
+	// expected-error@-2{{unavailable initializer 'init(stringLiteral:)' was used to satisfy a requirement of protocol 'ExpressibleByStringLiteral'}}
+	public typealias StringLiteralType = String
+}
+
+// Uses DefaultStringInterpolation and specifies init(stringLiteral:).
+// Implicitly checks that we have a default init(stringLiteral:).
+public struct GoodDefaultStringInterpolation: ExpressibleByStringInterpolation {
+	public init(stringLiteral: String) {}
+}
+
+// Uses custom StringInterpolation type but doesn't specify
+// init(stringInterpolation:).
+public struct BadCustomStringInterpolation: ExpressibleByStringInterpolation {
+	// expected-error@-1{{type 'BadCustomStringInterpolation' does not conform to protocol 'ExpressibleByStringInterpolation'}}
+	public typealias StringLiteralType = String
+	public typealias StringInterpolation = GoodStringInterpolation
+}
+
+// Uses custom StringInterpolation type and specifies
+// init(stringInterpolation:). Implicitly checks that we have a
+// default init(stringLiteral:).
+public struct GoodCustomStringInterpolation: ExpressibleByStringInterpolation {
+	public init(stringInterpolation: GoodStringInterpolation) {}
+}
