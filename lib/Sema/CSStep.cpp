@@ -394,6 +394,11 @@ StepResult TypeVariableStep::take(bool prevFailed) {
         // let's try to see if it leads to any solutions.
         return suspend(SplitterStep::create(CS, Solutions));
       }
+
+      // If this binding didn't match, let's check
+      // if we've checked enough bindings to stop.
+      if (shouldStop())
+        break;
     }
   }
 
@@ -417,12 +422,10 @@ StepResult TypeVariableStep::resume(bool prevFailed) {
     log.indent(CS.solverState->depth * 2) << ")\n";
   }
 
-  // If there has been at least one solution so far
-  // at a current batch of bindings is done it's a
-  // success because each new batch would be less
-  // and less precise.
-  if (AnySolved && Producer.needsToComputeNext())
-    return done(/*isSuccess=*/true);
+  // Let's check if we should stop right before
+  // attempting any new bindings.
+  if (shouldStop())
+    return done(/*isSuccess=*/AnySolved);
 
   // Attempt next type variable binding.
   return take(prevFailed);

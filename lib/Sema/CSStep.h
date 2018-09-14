@@ -424,6 +424,17 @@ public:
                                   SmallVectorImpl<Solution> &solutions) {
     return new TypeVariableStep(cs, bindings, solutions);
   }
+
+private:
+  /// Check whether attempting type variable binding choices should
+  /// be stopped, because optimal solution has already been found.
+  bool shouldStop() const {
+    // If there has been at least one solution so far
+    // at a current batch of bindings is done it's a
+    // success because each new batch would be less
+    // and less precise.
+    return AnySolved && Producer.needsToComputeNext();
+  }
 };
 
 class DisjunctionStep final : public SolverStep {
