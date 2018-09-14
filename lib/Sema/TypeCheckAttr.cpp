@@ -1649,6 +1649,7 @@ static Requirement getCanonicalRequirement(const Requirement &req) {
     return Requirement(req.getKind(), req.getFirstType()->getCanonicalType(),
                        req.getLayoutConstraint());
   }
+  llvm_unreachable("unhandled kind");
 }
 
 /// Require that the given type either not involve type parameters or be

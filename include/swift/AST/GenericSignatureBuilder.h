@@ -1732,6 +1732,7 @@ inline bool isErrorResult(GenericSignatureBuilder::ConstraintResult result) {
   case GenericSignatureBuilder::ConstraintResult::Unresolved:
     return false;
   }
+  llvm_unreachable("unhandled result");
 }
 
 /// Canonical ordering for dependent types.

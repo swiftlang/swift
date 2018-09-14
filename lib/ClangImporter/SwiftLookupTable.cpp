@@ -147,6 +147,7 @@ DeclBaseName SerializedSwiftName::toDeclBaseName(ASTContext &Context) const {
   case DeclBaseName::Kind::Destructor:
     return DeclBaseName::createDestructor();
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool SwiftLookupTable::contextRequiresName(ContextKind kind) {

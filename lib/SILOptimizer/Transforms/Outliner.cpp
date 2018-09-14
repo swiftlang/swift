@@ -79,6 +79,7 @@ private:
     case BridgedMethod:
       return 'm';
     }
+    llvm_unreachable("unhandled kind");
   }
 };
 } // end anonymous namespace.

@@ -1182,6 +1182,7 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
   case RequirementCheckResult::Failure:
     return true;
   }
+  llvm_unreachable("unhandled result");
 }
 
 void AssociatedTypeInference::findSolutions(

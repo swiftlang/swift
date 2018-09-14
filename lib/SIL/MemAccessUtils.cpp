@@ -135,6 +135,7 @@ const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
   case Unidentified:
     return nullptr;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
@@ -156,6 +157,7 @@ const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
   case Class:
     return "Class";
   }
+  llvm_unreachable("unhandled kind");
 }
 
 void AccessedStorage::print(raw_ostream &os) const {

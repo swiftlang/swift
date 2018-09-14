@@ -2821,6 +2821,7 @@ namespace {
           // Assume this is a context other than the enum.
           return false;
         }
+        llvm_unreachable("unhandled kind");
       };
 
       for (auto constant : decl->enumerators()) {

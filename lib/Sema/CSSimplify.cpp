@@ -2464,6 +2464,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       case SolutionKind::Unsolved:
         return getTypeMatchAmbiguous();
     }
+    llvm_unreachable("unhandled kind");
   };
 
   // Handle restrictions.
@@ -4294,6 +4295,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       case SolutionKind::Unsolved:
         llvm_unreachable("should have generated constraints");
       }
+      llvm_unreachable("unhandled match");
     };
 
     if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {

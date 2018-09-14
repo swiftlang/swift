@@ -501,6 +501,7 @@ public:
 
         return false;
       }
+      llvm_unreachable("unhandled kind");
     }
 
     // Default cases for cleaning up as we exit a node.
