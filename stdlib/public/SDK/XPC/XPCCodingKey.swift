@@ -17,13 +17,14 @@
 
 
 public struct XPCCodingKey: CodingKey {
-    public var stringValue: String
+    public let stringValue: String
 
     public init?(stringValue: String) {
+        self.intValue = nil
         self.stringValue = stringValue
     }
 
-    public var intValue: Int?
+    public let intValue: Int?
 
     public init?(intValue: Int) {
         self.intValue = intValue
@@ -35,5 +36,5 @@ public struct XPCCodingKey: CodingKey {
         self.stringValue = stringValue
     }
 
-    static let superKey = XPCCodingKey(intValue: 0, stringValue: "super")
+    internal static let superKey = XPCCodingKey(intValue: 0, stringValue: "super")
 }

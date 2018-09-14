@@ -33,7 +33,7 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         }
     }
 
-    public var currentIndex: Int
+    public private(set) var currentIndex: Int
 
     private let underlyingMessage: xpc_object_t
 
