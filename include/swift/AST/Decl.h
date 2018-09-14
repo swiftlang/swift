@@ -4977,7 +4977,10 @@ public:
     TypeChecked,
 
     /// This is a memberwise initializer that will be synthesized by SILGen.
-    MemberwiseInitializer
+    MemberwiseInitializer,
+
+    /// Function body text was deserialized from a .swiftmodule.
+    Deserialized
 
     // This enum currently needs to fit in a 3-bit bitfield.
   };
@@ -4998,6 +5001,9 @@ protected:
     /// This enum member is active if getBodyKind() is BodyKind::Parsed or
     /// BodyKind::TypeChecked.
     BraceStmt *Body;
+
+    /// This enum member is active if getBodyKind() is BodyKind::Deserialized.
+    StringRef BodyStringRepresentation;
 
     /// This enum member is active if getBodyKind() == BodyKind::Synthesize.
     BodySynthesizer Synthesizer;
@@ -5093,6 +5099,11 @@ public:
     return getBodyKind() != BodyKind::None;
   }
 
+  /// Returns true if the text of this function's body can be retrieved either
+  /// by extracting the text from the source buffer or reading the inlinable
+  /// body from a deserialized swiftmodule.
+  bool hasInlinableBodyText() const;
+
   /// Returns the function body, if it was parsed, or nullptr otherwise.
   ///
   /// Note that a null return value does not imply that the source code did not
@@ -5154,6 +5165,18 @@ public:
   void setBodyTypeCheckedIfPresent() {
     if (getBodyKind() == BodyKind::Parsed)
       setBodyKind(BodyKind::TypeChecked);
+  }
+
+  /// Gets the body of this function, stripping the unused portions of #if
+  /// configs inside the body. If this function was not deserialized from a
+  /// .swiftmodule, this body is reconstructed from the original
+  /// source buffer.
+  StringRef getInlinableBodyText(SmallVectorImpl<char> &scratch) const;
+
+  void setBodyStringRepresentation(StringRef body) {
+    assert(getBodyKind() == BodyKind::None);
+    setBodyKind(BodyKind::Deserialized);
+    BodyStringRepresentation = body;
   }
 
   bool isBodyTypeChecked() const {

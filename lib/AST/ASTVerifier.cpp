@@ -490,6 +490,7 @@ public:
       case AbstractFunctionDecl::BodyKind::TypeChecked:
       case AbstractFunctionDecl::BodyKind::Skipped:
       case AbstractFunctionDecl::BodyKind::MemberwiseInitializer:
+      case AbstractFunctionDecl::BodyKind::Deserialized:
         return true;
 
       case AbstractFunctionDecl::BodyKind::Unparsed:

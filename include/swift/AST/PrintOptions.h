@@ -23,6 +23,7 @@
 #include <vector>
 
 namespace swift {
+class ASTPrinter;
 class GenericEnvironment;
 class CanType;
 class Decl;
@@ -356,10 +357,9 @@ struct PrintOptions {
   QualifyNestedDeclarations ShouldQualifyNestedDeclarations =
       QualifyNestedDeclarations::Never;
 
-  /// \brief If this is not \c nullptr then functions (including accessors and
-  /// constructors) will be printed with a body that is determined by this
-  /// function.
-  std::function<std::string(const ValueDecl *)> FunctionBody;
+  /// \brief If this is not \c nullptr then function bodies (including accessors
+  /// and constructors) will be printed by this function.
+  std::function<void(const ValueDecl *, ASTPrinter &)> FunctionBody;
 
   BracketOptions BracketOptions;
 

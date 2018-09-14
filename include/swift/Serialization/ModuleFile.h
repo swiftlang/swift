@@ -884,6 +884,9 @@ public:
 
   /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
+
+  /// Reads inlinable body text from \c DeclTypeCursor, if present.
+  Optional<StringRef> maybeReadInlinableBodyText();
 };
 
 template <typename T, typename RawData>

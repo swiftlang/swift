@@ -2849,6 +2849,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (auto errorConvention = maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
 
+    if (auto bodyText = maybeReadInlinableBodyText())
+      ctor->setBodyStringRepresentation(*bodyText);
+
     if (isImplicit)
       ctor->setImplicit();
     ctor->setIsObjC(isObjC);
@@ -3240,6 +3243,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
+
+    if (auto bodyText = maybeReadInlinableBodyText())
+      fn->setBodyStringRepresentation(*bodyText);
 
     fn->setOverriddenDecl(cast_or_null<FuncDecl>(overridden.get()));
     if (fn->getOverriddenDecl())
@@ -3944,6 +3950,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     auto dtor = createDecl<DestructorDecl>(SourceLoc(), DC);
     declOrOffset = dtor;
+
+    if (auto bodyText = maybeReadInlinableBodyText())
+      dtor->setBodyStringRepresentation(*bodyText);
 
     configureGenericEnvironment(dtor, genericEnvID);
 
@@ -5349,6 +5358,25 @@ decodeRawStableForeignErrorConventionKind(uint8_t kind) {
   default:
     return None;
   }
+}
+
+Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 8> scratch;
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  StringRef blobData;
+
+  auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return None;
+
+  unsigned recKind = DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
+  if (recKind != INLINABLE_BODY_TEXT)
+    return None;
+
+  restoreOffset.reset();
+  return blobData;
 }
 
 Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
