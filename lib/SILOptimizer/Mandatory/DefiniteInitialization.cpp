@@ -857,7 +857,17 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
         break;
     }
     assert(valueMetatype);
-    auto metatypeArgument = load->getFunction()->getSelfMetadataArgument();
+    SILValue metatypeArgument = load->getFunction()->getSelfMetadataArgument();
+    
+    // Bitcast to the formal metatype of the self argument, which may be
+    // different in @dynamic_self-ness.
+    if (metatypeArgument->getType() != valueMetatype->getType()) {
+      SILBuilderWithScope B(valueMetatype);
+      metatypeArgument = B.createUncheckedBitCast(valueMetatype->getLoc(),
+                                                  metatypeArgument,
+                                                  valueMetatype->getType());
+    }
+    
     replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument,
                                      [](SILInstruction*) { });
   }

@@ -3098,6 +3098,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
 
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     isStatic = FD->isStatic();
+    assert(!FD->isMutating() || !containerTy->hasReferenceSemantics());
     isMutating = FD->isMutating();
 
     // Methods returning 'Self' have a dynamic 'self'.
@@ -3108,8 +3109,13 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
-      // inout self.
-      isMutating = true;
+      // inout self, as do convenience initializers in Swift 5 and later.
+      if (!containerTy->hasReferenceSemantics()) {
+        isMutating = true;
+      } else if (Ctx.LangOpts.isSwiftVersionAtLeast(5)
+                 && !CD->isDesignatedInit()) {
+        isMutating = true;
+      }
     } else {
       // allocating constructors have metatype 'self'.
       isStatic = true;
@@ -3123,8 +3129,9 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
             isDynamicSelf = true;
     }
   } else if (isa<DestructorDecl>(AFD)) {
-    // destructors of value types always have an implicitly inout self.
-    isMutating = true;
+    // Destructors only appear on classes today. (If move-only types have
+    // destructors, they probably would want to consume self.)
+    assert(containerTy->hasReferenceSemantics());
   }
 
   if (isDynamicSelf)
@@ -3133,10 +3140,6 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
     return AnyFunctionType::Param(MetatypeType::get(selfTy, Ctx));
-
-  // Reference types have 'self' of type T.
-  if (containerTy->hasReferenceSemantics())
-    return AnyFunctionType::Param(selfTy);
 
   return AnyFunctionType::Param(selfTy, Identifier(),
                                 ParameterTypeFlags().withInOut(isMutating));

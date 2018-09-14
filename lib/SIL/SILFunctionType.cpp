@@ -697,7 +697,12 @@ private:
 
     bool isInout = false;
     if (auto inoutType = dyn_cast<InOutType>(substType)) {
-      isInout = true;
+      // The `self` parameter of convenience initializers is considered 'inout'
+      // for semantic purposes in the AST, but at the ABI level is always
+      // passed by value in and returned out.
+      if (!forSelf || rep != SILFunctionTypeRepresentation::ObjCMethod) {
+        isInout = true;
+      }
       substType = inoutType.getObjectType();
       origType = origType.getWithoutSpecifierType();
     }

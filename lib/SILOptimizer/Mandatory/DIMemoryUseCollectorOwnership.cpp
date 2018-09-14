@@ -1540,8 +1540,17 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
     // for the dynamic type of that uninitialized object.
     if (isa<LoadInst>(User)) {
       auto UserVal = cast<SingleValueInstruction>(User);
-      if (UserVal->hasOneUse()
-          && isa<ValueMetatypeInst>(UserVal->getSingleUse()->get())) {
+      bool onlyUseIsValueMetatype = true;
+      for (auto use : UserVal->getUses()) {
+        // A taking or copying load is supposed to destroy the value after
+        // use, which we can turn into a no-op.
+        if (isa<ValueMetatypeInst>(use->getUser())
+            || isa<DestroyValueInst>(use->getUser()))
+          continue;
+        onlyUseIsValueMetatype = false;
+        break;
+      }
+      if (onlyUseIsValueMetatype) {
         Kind = DIUseKind::LoadForTypeOfSelf;
       }
     }
