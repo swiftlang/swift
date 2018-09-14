@@ -10,10 +10,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 // -----------------------------------------------------------------------------
-///
-/// This file contains a SingleValueDecodingContainer implementation for
-/// xpc_object_t.
-///
+//
+// This file contains a SingleValueDecodingContainer implementation for
+// xpc_object_t.
+//
 // -----------------------------------------------------------------------------//
 
 public struct XPCSingleValueDecodingContainer: SingleValueDecodingContainer {

@@ -10,12 +10,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 // -----------------------------------------------------------------------------
-///
-/// This file contains a KeyedEncodingContainer implementation for xpc_object_t.
-/// This includes a specialization of the XPCEncoder for handling the super
-/// class case, as we don't know what container type is going to be needed to
-/// handle it.
-///
+//
+// This file contains a KeyedEncodingContainer implementation for xpc_object_t.
+// This includes a specialization of the XPCEncoder for handling the super
+// class case, as we don't know what container type is going to be needed to
+// handle it.
+//
 // -----------------------------------------------------------------------------//
 
 public struct XPCKeyedEncodingContainer<K: CodingKey>: KeyedEncodingContainerProtocol {

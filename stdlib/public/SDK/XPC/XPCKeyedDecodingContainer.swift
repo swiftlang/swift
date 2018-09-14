@@ -10,9 +10,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 // -----------------------------------------------------------------------------
-///
-/// This file contains a KeyedDecodingContainer implementation for xpc_object_t.
-///
+//
+// This file contains a KeyedDecodingContainer implementation for xpc_object_t.
+//
 // -----------------------------------------------------------------------------//
 
 public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerProtocol {

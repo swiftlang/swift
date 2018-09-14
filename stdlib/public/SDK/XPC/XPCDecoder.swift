@@ -9,11 +9,11 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 // -----------------------------------------------------------------------------
-///
-/// This file contains an implementation of a Decoder for xpc_object_t types, as
-/// well as generic utility functions for decoding primitives that are reused by
-/// all the decoding containers.
-///
+//
+// This file contains an implementation of a Decoder for xpc_object_t types, as
+// well as generic utility functions for decoding primitives that are reused by
+// all the decoding containers.
+//
 // -----------------------------------------------------------------------------//
 
 open class XPCDecoder: Decoder {

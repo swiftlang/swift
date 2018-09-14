@@ -9,10 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 // -----------------------------------------------------------------------------
-///
-/// This file degines a coding key specific for supporting XPC. This mainly used
-/// for the super key.
-///
+//
+// This file degines a coding key specific for supporting XPC. This mainly used
+// for the super key.
+//
 // -----------------------------------------------------------------------------
 
 

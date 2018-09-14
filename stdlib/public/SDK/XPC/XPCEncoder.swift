@@ -9,11 +9,11 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 // -----------------------------------------------------------------------------
-///
-/// This file contains stuff an Encoder implementation for xpc_object_t as well
-/// as generic utility functions for encoding primiives that are reused by the
-/// encoding containers.
-///
+//
+// This file contains stuff an Encoder implementation for xpc_object_t as well
+// as generic utility functions for encoding primiives that are reused by the
+// encoding containers.
+//
 // -----------------------------------------------------------------------------//
 
 public class XPCEncoder: Encoder {
