@@ -42,8 +42,10 @@ class RefTypePrintable : CustomStringConvertible {
 struct CustomString: ExpressibleByStringInterpolation {
 	var value: String
 	
-	init(stringLiteral: String) {
-		self.value = stringLiteral
+	typealias StringLiteralType = String
+	typealias StringInterpolation = DefaultStringInterpolation
+	init(stringInterpolation: DefaultStringInterpolation) {
+		self.value = String(describing: stringInterpolation)
 	}
 }
 

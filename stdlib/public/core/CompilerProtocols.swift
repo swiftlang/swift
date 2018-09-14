@@ -769,7 +769,7 @@ extension ExpressibleByStringInterpolation {
   }
 }
 
-extension ExpressibleByStringInterpolation
+/*extension ExpressibleByStringInterpolation
   where StringInterpolation == DefaultStringInterpolation {
   
   /// Creates a new instance from an interpolated string literal.
@@ -794,7 +794,7 @@ extension ExpressibleByStringInterpolation
   public init(stringLiteral _: String) {
     Builtin.unreachable()
   }
-}
+}*/
 
 /// Represents the contents of a string literal with interpolations while it is
 /// being built up.
