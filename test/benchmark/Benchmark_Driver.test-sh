@@ -9,7 +9,3 @@
 // RUN:                 | %FileCheck %s --check-prefix RUNJUSTONCE
 // RUNJUSTONCE-LABEL: Ackermann
 // RUNJUSTONCE-NOT: Ackermann
-
-// RUN: %Benchmark_Driver check 1 \
-// RUN:                 | %FileCheck %s --check-prefix DOCTORCHECK
-// DOCTORCHECK: Ackermann
