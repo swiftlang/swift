@@ -168,7 +168,7 @@ public struct XPCUnkeyedEncodingContainer: UnkeyedEncodingContainer {
         xpc_array_append_value(self.underlyingMessage, unsignedValue)
     }
 
-    public mutating func encode<T>(_ value: T) throws where T : Encodable {
+    public mutating func encode<T: Encodable>(_ value: T) throws {
         self.encoder.codingPath.append(XPCCodingKey(intValue: self.count - 1)!)
         defer { self.encoder.codingPath.removeLast() }
 
@@ -208,7 +208,7 @@ public struct XPCUnkeyedEncodingContainer: UnkeyedEncodingContainer {
         self.encoder.codingPath.append(XPCCodingKey(intValue: self.count - 1)!)
         defer { self.encoder.codingPath.removeLast() }
 
-        // Insert dummy value in array so we don't get bit latter
+        // Insert dummy value in array so we don't get bit later
         xpc_array_append_value(self.underlyingMessage, XPCEncodingHelpers.encodeNil())
         return XPCArrayReferencingEncoder(at: self.codingPath, wrapping: self.underlyingMessage, forIndex: self.count - 1)
     }

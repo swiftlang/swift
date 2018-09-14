@@ -238,15 +238,6 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
         return try XPCUnkeyedDecodingContainer(referencing: decoder, wrapping: foundValue)
     }
 
-    private func _superDecoder(forKey key: CodingKey) throws -> Decoder {
-        self.decoder.codingPath.append(key)
-        defer { self.decoder.codingPath.removeLast() }
-
-        let foundValue = try getXPCObject(for: key)
-
-        return XPCDecoder(withUnderlyingMessage: foundValue, at: self.decoder.codingPath)
-    }
-
     public func superDecoder() throws -> Decoder {
         self.decoder.codingPath.append(XPCCodingKey.superKey)
         defer { self.decoder.codingPath.removeLast() }

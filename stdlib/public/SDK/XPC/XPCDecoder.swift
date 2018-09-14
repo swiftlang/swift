@@ -86,7 +86,7 @@ extension xpc_object_t {
         return to.init(xpc_uint64_get_value(self))
     }
 
-    func decodeFloatingPointNumber<F>(_ to: F.Type, at codingPath: [CodingKey]) throws -> F where F: BinaryFloatingPoint{
+    func decodeFloatingPointNumber<F: BinaryFloatingPoint>(_ to: F.Type, at codingPath: [CodingKey]) throws -> F {
         guard xpc_get_type(self) == XPC_TYPE_DOUBLE else {
             throw DecodingError.typeMismatch(to.self,
                                              DecodingError.Context(codingPath: codingPath,

@@ -197,7 +197,7 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         return try decodeIntegerType(type)
     }
 
-    public mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
+    public mutating func decode<T: Decodable>(_ type: T.Type) throws -> T {
         guard !self.isAtEnd else {
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
                                                                     debugDescription: "Reached end of unkeyed container."))

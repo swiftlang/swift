@@ -94,7 +94,7 @@ public struct XPCSingleValueEncodingContainer: SingleValueEncodingContainer {
         try self.insertionClosure(XPCEncodingHelpers.encodeUnsignedInteger(value))
     }
 
-    public mutating func encode<T>(_ value: T) throws where T : Encodable {
+    public mutating func encode<T: Encodable>(_ value: T) throws {
         let xpcObject = try XPCEncoder.encode(value, at: self.encoder.codingPath)
         try self.insertionClosure(xpcObject)
     }

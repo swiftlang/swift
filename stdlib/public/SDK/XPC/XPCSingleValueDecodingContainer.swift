@@ -93,7 +93,7 @@ public struct XPCSingleValueDecodingContainer: SingleValueDecodingContainer {
         return try self.underlyingMessage.decodeUnsignedInteger(UInt64.self, at: self.codingPath)
     }
 
-    public func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
+    public func decode<T: Decodable>(_ type: T.Type) throws -> T {
         return try T(from: XPCDecoder(withUnderlyingMessage: self.underlyingMessage, at: self.decoder.codingPath))
     }
 }
