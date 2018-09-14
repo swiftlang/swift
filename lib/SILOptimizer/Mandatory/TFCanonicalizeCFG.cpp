@@ -316,6 +316,13 @@ private:
 
   void initialize();
 
+  /// Return a map that captures information about what SILValue should be
+  /// used at the pre-header of the loop for every SILValue in the given
+  /// `values` set. If it cannnot find a suitable SILValue for an entry in
+  /// `values`, the corresponding will be mapped to an undef.
+  llvm::DenseMap<SILValue, SILValue>
+  getPreheaderSubstMap(const SmallPtrSetImpl<SILValue> &values) const;
+
   /// Compute escaping values and what values to use as arguments at preheader.
   llvm::DenseMap<SILValue, SILValue> computeEscapingValues() const;
 
@@ -365,6 +372,8 @@ private:
   SILBasicBlock *preheader;
   SILBasicBlock *latch;
   SILFunction *currentFn;
+  /// Equivalence classes induced by argument passing.
+  llvm::EquivalenceClasses<SILValue> equivalentValues;
   /// exit blocks before the loop is transformed.
   SmallVector<SILBasicBlock*, 8> exitBlocks;
   /// The list of edges that need to rewired to the newHeader or
@@ -379,6 +388,17 @@ private:
 
 void SingleExitLoopTransformer::initialize() {
   // Remember some information from the loop before it gets transformed.
+
+  // Build the equivalence classes induced by argument passing.
+  for (auto &bb : *currentFn) {
+    for (auto arg : bb.getArguments()) {
+      SmallVector<SILValue, 8> incomingValues;
+      arg->getIncomingValues(incomingValues);
+      for (SILValue incomingValue : incomingValues) {
+        equivalentValues.unionSets(arg, incomingValue);
+      }
+    }
+  }
 
   // Exit Blocks
   loop->getExitBlocks(exitBlocks);
@@ -403,14 +423,14 @@ void SingleExitLoopTransformer::initialize() {
 
 llvm::DenseMap<SILValue, SILValue>
 SingleExitLoopTransformer::computeEscapingValues() const {
-  llvm::DenseMap<SILValue, SILValue> result;
+  llvm::SmallPtrSet<SILValue, 8> escapingValues;
   for (const SILBasicBlock *bb : loop->getBlocks()) {
     // Save the values that are escaping this loop in result set.
-    auto saveEscaping = [this, &result](SILValue value) {
+    auto saveEscaping = [this, &escapingValues](SILValue value) {
       for (const auto *use : value->getUses()) {
         const SILInstruction *useInst = use->getUser();
         if (!loop->contains(useInst->getParent())) {
-          result[value] = getUndef(value->getType());
+          escapingValues.insert(value);
           break;
         }
       }
@@ -423,20 +443,18 @@ SingleExitLoopTransformer::computeEscapingValues() const {
     }
   }
 
+  return getPreheaderSubstMap(escapingValues);
+}
+
+llvm::DenseMap<SILValue, SILValue>
+SingleExitLoopTransformer::getPreheaderSubstMap(
+    const SmallPtrSetImpl<SILValue> &values) const {
+  llvm::DenseMap<SILValue, SILValue> result;
+  for (const SILValue value : values) {
+    result[value] = getUndef(value->getType());
+  }
   // Do not eliminate undefs unless requested for.
   if (!TFNoUndefsInSESE)  return result;
-
-  // Build the equivalence classes induced by argument passing.
-  llvm::EquivalenceClasses<SILValue> equivalentValues;
-  for (auto &bb : *currentFn) {
-    for (auto arg : bb.getArguments()) {
-      SmallVector<SILValue, 8> incomingValues;
-      arg->getIncomingValues(incomingValues);
-      for (SILValue incomingValue : incomingValues) {
-        equivalentValues.unionSets(arg, incomingValue);
-      }
-    }
-  }
 
   // Replace undef with an equivalent value that is available at preheader.
   for (auto &kv : result) {
