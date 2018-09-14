@@ -18,10 +18,10 @@
 
 public class XPCEncoder: Encoder {
     private enum ContainerKind: String {
-        case Keyed
-        case Unkeyed
-        case SingleValue
-        case None
+        case keyed
+        case unkeyed
+        case singleValue
+        case noContainer
     }
 
     public var codingPath: [CodingKey]
@@ -30,7 +30,7 @@ public class XPCEncoder: Encoder {
 
     var topLevelContainer: xpc_object_t?
 
-    private var containerKind: ContainerKind = .None
+    private var containerKind: ContainerKind = .noContainer
 
     public init(at codingPath: [CodingKey] = []) {
         self.codingPath = codingPath
@@ -38,10 +38,10 @@ public class XPCEncoder: Encoder {
 
     public func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
         switch self.containerKind {
-        case .None:
+        case .noContainer:
             self.topLevelContainer = xpc_dictionary_create(nil, nil, 0)
-            self.containerKind = .Keyed
-        case .Keyed:
+            self.containerKind = .keyed
+        case .keyed:
             break
         default:
             preconditionFailure("This encoder already has a container of kind \(self.containerKind)")
@@ -54,10 +54,10 @@ public class XPCEncoder: Encoder {
 
     public func unkeyedContainer() -> UnkeyedEncodingContainer {
         switch self.containerKind {
-        case .None:
+        case .noContainer:
             self.topLevelContainer = xpc_array_create(nil, 0)
-            self.containerKind = .Unkeyed
-        case .Unkeyed:
+            self.containerKind = .unkeyed
+        case .unkeyed:
             break
         default:
             preconditionFailure("This encoder already has a container of kind \(self.containerKind)")
@@ -69,8 +69,8 @@ public class XPCEncoder: Encoder {
 
     public func singleValueContainer() -> SingleValueEncodingContainer {
         switch self.containerKind {
-        case .None:
-            self.containerKind = .SingleValue
+        case .noContainer:
+            self.containerKind = .singleValue
         default:
             preconditionFailure("This encoder already has a container of kind \(self.containerKind)")
         }
