@@ -2494,6 +2494,13 @@ public:
   }
 
   void emitTopLevel(ArgumentSource &&arg, AbstractionPattern origParamType) {
+    if (arg.isShuffle()) {
+      auto *shuffle = cast<TupleShuffleExpr>(std::move(arg).asKnownExpr());
+      emitShuffle(shuffle, origParamType);
+      maybeEmitForeignErrorArgument();
+      return;
+    }
+
     emit(std::move(arg), origParamType);
     maybeEmitForeignErrorArgument();
   }
@@ -2507,8 +2514,8 @@ public:
       emitTopLevel(std::move(argSources[0]), origParamType);
     } else {
       for (auto i : indices(argSources)) {
-        emitTopLevel(std::move(argSources[i]),
-                     origParamType.getTupleElementType(i));
+        emit(std::move(argSources[i]),
+             origParamType.getTupleElementType(i));
       }
       maybeEmitForeignErrorArgument();
     }
@@ -2519,10 +2526,9 @@ private:
     auto substArgType = arg.getSubstRValueType();
 
     if (!arg.hasLValueType()) {
-      // If it was a tuple in the original type, or the argument
-      // requires the callee to evaluate, the parameters will have
-      // been exploded.
-      if (origParamType.isTuple() || arg.requiresCalleeToEvaluate()) {
+      // If the unsubstituted function type has a parameter of tuple type,
+      // explode the tuple value.
+      if (origParamType.isTuple()) {
         emitExpanded(std::move(arg), origParamType);
         return;
       }
@@ -2665,11 +2671,6 @@ private:
         emit(tuple->getElement(i),
              origParamType.getTupleElementType(i));
       }
-      return;
-    }
-
-    if (auto shuffle = dyn_cast<TupleShuffleExpr>(e)) {
-      emitShuffle(shuffle, origParamType);
       return;
     }
 

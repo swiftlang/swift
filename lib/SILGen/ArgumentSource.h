@@ -292,8 +292,8 @@ public:
   // This is a hack and should be avoided.
   void rewriteType(CanType newType) &;
 
-  /// Whether this argument source requires the callee to evaluate.
-  bool requiresCalleeToEvaluate() const;
+  /// Whether this argument source is a TupleShuffleExpr.
+  bool isShuffle() const;
 
   bool isObviouslyEqual(const ArgumentSource &other) const;
 
