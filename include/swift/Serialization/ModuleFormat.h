@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 443; // Last change: serialize unsubstituted type alias type
+const uint16_t VERSION_MINOR = 444; // Last change: inlinable body text
 
 using DeclIDField = BCFixed<31>;
 
@@ -979,8 +979,11 @@ namespace decls_block {
     BCVBR<5>,     // number of parameter name components
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
-    // Trailed by its generic parameters, if any, followed by the parameter
-    // patterns.
+    // This record is trailed by:
+    // - its generic parameters, if any
+    // - its parameter patterns,
+    // - the foreign error convention, if any
+    // - inlinable body text, if any
   >;
 
   using VarLayout = BCRecordLayout<
@@ -1044,6 +1047,8 @@ namespace decls_block {
     // - its _silgen_name, if any
     // - its generic parameters, if any
     // - body parameter patterns
+    // - the foreign error convention, if any
+    // - inlinable body text, if any
   >;
 
   // TODO: remove the unnecessary FuncDecl components here
@@ -1073,6 +1078,8 @@ namespace decls_block {
     // - its _silgen_name, if any
     // - its generic parameters, if any
     // - body parameter patterns
+    // - the foreign error convention, if any
+    // - inlinable body text, if any
   >;
 
   using PatternBindingLayout = BCRecordLayout<
@@ -1176,6 +1183,12 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     GenericEnvironmentIDField // generic environment
+    // This record is trailed by its inlinable body text
+  >;
+
+  using InlinableBodyTextLayout = BCRecordLayout<
+    INLINABLE_BODY_TEXT,
+    BCBlob // body text
   >;
 
   using ParameterListLayout = BCRecordLayout<

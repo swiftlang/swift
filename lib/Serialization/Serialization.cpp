@@ -1383,6 +1383,20 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
   }
 }
 
+void Serializer::writeInlinableBodyTextIfNeeded(
+  const AbstractFunctionDecl *AFD) {
+  using namespace decls_block;
+
+  if (AFD->getResilienceExpansion() != swift::ResilienceExpansion::Minimal)
+    return;
+  if (!AFD->hasInlinableBodyText()) return;
+  SmallString<128> scratch;
+  auto body = AFD->getInlinableBodyText(scratch);
+
+  unsigned abbrCode = DeclTypeAbbrCodes[InlinableBodyTextLayout::Code];
+  InlinableBodyTextLayout::emitRecord(Out, ScratchRecord, abbrCode, body);
+}
+
 bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   using namespace decls_block;
 
@@ -3257,6 +3271,8 @@ void Serializer::writeDecl(const Decl *D) {
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
 
+    writeInlinableBodyTextIfNeeded(fn);
+
     break;
   }
 
@@ -3313,6 +3329,8 @@ void Serializer::writeDecl(const Decl *D) {
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
+
+    writeInlinableBodyTextIfNeeded(fn);
 
     break;
   }
@@ -3466,6 +3484,8 @@ void Serializer::writeDecl(const Decl *D) {
 
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
+
+    writeInlinableBodyTextIfNeeded(ctor);
     break;
   }
 
@@ -3482,6 +3502,7 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isObjC(),
                                  addGenericEnvironmentRef(
                                                 dtor->getGenericEnvironment()));
+    writeInlinableBodyTextIfNeeded(dtor);
     break;
   }
 
@@ -4063,6 +4084,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<VarPatternLayout>();
   registerDeclTypeAbbr<AnyPatternLayout>();
   registerDeclTypeAbbr<TypedPatternLayout>();
+  registerDeclTypeAbbr<InlinableBodyTextLayout>();
   registerDeclTypeAbbr<GenericParamListLayout>();
   registerDeclTypeAbbr<GenericParamLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();

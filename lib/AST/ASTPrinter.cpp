@@ -81,6 +81,15 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.SkipImports = true;
   result.OmitNameOfInaccessibleProperties = true;
 
+  result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
+    auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
+    if (!AFD || !AFD->hasInlinableBodyText()) return;
+    if (AFD->getResilienceExpansion() != ResilienceExpansion::Minimal)
+      return;
+    SmallString<128> scratch;
+    printer << " " << AFD->getInlinableBodyText(scratch);
+  };
+
   class ShouldPrintForTextualInterface : public ShouldPrintChecker {
     bool shouldPrint(const Decl *D, const PrintOptions &options) override {
       // Skip anything that isn't 'public' or '@usableFromInline'.
@@ -645,6 +654,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printAttributes(const Decl *D);
   void printTypedPattern(const TypedPattern *TP);
+  void printBraceStmt(const BraceStmt *stmt, bool newlineIfEmpty = true);
 
 public:
   void printPattern(const Pattern *pattern);
@@ -686,6 +696,7 @@ private:
   void printGenericDeclGenericParams(GenericContext *decl);
   void printGenericDeclGenericRequirements(GenericContext *decl);
   void printInherited(const Decl *decl);
+  void printBodyIfNecessary(const AbstractFunctionDecl *decl);
 
   void printEnumElement(EnumElementDecl *elt);
 
@@ -1471,6 +1482,29 @@ bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
   return Result;
 }
 
+void PrintAST::printBraceStmt(const BraceStmt *stmt, bool newlineIfEmpty) {
+  Printer << "{";
+  if (printASTNodes(stmt->getElements()) || newlineIfEmpty) {
+    Printer.printNewline();
+    indent();
+  }
+  Printer << "}";
+}
+
+void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
+  if (auto BodyFunc = Options.FunctionBody) {
+    BodyFunc(decl, Printer);
+    indent();
+    return;
+  }
+
+  if (!Options.FunctionDefinitions || !decl->getBody())
+    return;
+
+  Printer << " ";
+  printBraceStmt(decl->getBody(), /*newlineIfEmpty*/!isa<AccessorDecl>(decl));
+}
+
 static bool isAccessorAssumedNonMutating(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Get:
@@ -1630,26 +1664,37 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       Printer << " ";
       Printer.printKeyword(getAccessorLabel(Accessor));
     } else {
-      Printer.printNewline();
-      IndentRAII IndentMore(*this);
+      {
+        IndentRAII IndentMore(*this);
+        indent();
+        visit(Accessor);
+      }
       indent();
-      visit(Accessor);
+      Printer.printNewline();
     }
   };
 
-  Printer << " {";
   if ((PrintAbstract ||
        (impl.getReadImpl() == ReadImplKind::Get && ASD->getGetter())) &&
       !ASD->supportsMutation() && !ASD->isGetterMutating() &&
       PrintAccessorBody && !Options.FunctionDefinitions) {
     // Omit the 'get' keyword. Directly print getter
     if (auto BodyFunc = Options.FunctionBody) {
-      Printer.printNewline();
-      IndentRAII IndentBody(*this);
+      BodyFunc(ASD->getGetter(), Printer);
       indent();
-      Printer << BodyFunc(ASD->getGetter());
+      return;
     }
-  } else if (PrintAbstract) {
+    Printer.printNewline();
+    indent();
+    return;
+  }
+
+  Printer << " {";
+
+  if (PrintAccessorBody)
+    Printer.printNewline();
+
+  if (PrintAbstract) {
     PrintAccessor(ASD->getGetter());
     if (ASD->supportsMutation())
       PrintAccessor(ASD->getSetter());
@@ -1693,12 +1738,16 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       break;
     }
   }
-  if (PrintAccessorBody) {
-    Printer.printNewline();
-    indent();
-  } else
+
+  if (!PrintAccessorBody)
     Printer << " ";
+
   Printer << "}";
+
+  if (!PrintAbstract)
+    Printer.printNewline();
+
+  indent();
 }
 
 void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
@@ -2497,7 +2546,6 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
       [&]{
         Printer << getAccessorLabel(decl);
       });
-    Printer << " {";
     break;
   case AccessorKind::Set:
   case AccessorKind::WillSet:
@@ -2515,24 +2563,9 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
           }
         }
       });
-    Printer << " {";
   }
-  if (auto BodyFunc = Options.FunctionBody) {
-    {
-      IndentRAII IndentBody(*this);
-      indent();
-      Printer.printNewline();
-      Printer << BodyFunc(decl);
-    }
-    indent();
-    Printer.printNewline();
-  } else if (Options.FunctionDefinitions && decl->getBody()) {
-    if (printASTNodes(decl->getBody()->getElements())) {
-      Printer.printNewline();
-      indent();
-    }
-  }
-  Printer << "}";
+
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
@@ -2604,22 +2637,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printGenericDeclGenericRequirements(decl);
   }
 
-  if (auto BodyFunc = Options.FunctionBody) {
-    Printer << " {";
-    Printer.printNewline();
-    {
-      IndentRAII IndentBody(*this);
-      indent();
-      Printer << BodyFunc(decl);
-    }
-    indent();
-    Printer.printNewline();
-    Printer << "}";
-
-  } else if (Options.FunctionDefinitions && decl->getBody()) {
-    Printer << " ";
-    visit(decl->getBody());
-  }
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::printEnumElement(EnumElementDecl *elt) {
@@ -2788,21 +2806,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
   printGenericDeclGenericRequirements(decl);
 
-  if (auto BodyFunc = Options.FunctionBody) {
-    Printer << " {";
-    {
-      Printer.printNewline();
-      IndentRAII IndentBody(*this);
-      indent();
-      Printer << BodyFunc(decl);
-    }
-    indent();
-    Printer.printNewline();
-    Printer << "}";
-  } else if (Options.FunctionDefinitions && decl->getBody()) {
-    Printer << " ";
-    visit(decl->getBody());
-  }
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
@@ -2814,12 +2818,7 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
       Printer << "deinit";
     });
 
-  if (!Options.FunctionDefinitions || !decl->getBody()) {
-    return;
-  }
-
-  Printer << " ";
-  visit(decl->getBody());
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
@@ -2929,11 +2928,7 @@ void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
 }
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
-  Printer << "{";
-  printASTNodes(stmt->getElements());
-  Printer.printNewline();
-  indent();
-  Printer << "}";
+  printBraceStmt(stmt);
 }
 
 void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
