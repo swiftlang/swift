@@ -17,7 +17,7 @@
 import CTensorFlow
 
 /// `ResourceHandle` is the type used by ops and the `#tfop()` syntax to
-/// represent TensorFlow "variant" values.
+/// represent TensorFlow "resource" values.
 /// TODO: rename this source file as this is no longer "opaque".
 public final class ResourceHandle {
   public let cTensorHandle: CTensorHandle
