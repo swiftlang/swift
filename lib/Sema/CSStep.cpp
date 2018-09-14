@@ -249,7 +249,7 @@ bool SplitterStep::mergePartialSolutions() const {
 StepResult ComponentStep::take(bool prevFailed) {
   // One of the previous components created by "split"
   // failed, it means that we can't solve this component.
-  if (prevFailed)
+  if (prevFailed || CS.getExpressionTooComplex(Solutions))
     return done(/*isSuccess=*/false);
 
   if (!IsSingle && CS.TC.getLangOpts().DebugConstraintSolver) {
