@@ -97,11 +97,11 @@ enum XPCEncodingHelpers {
     }
 
     static func encodeSignedInteger<I: SignedInteger & FixedWidthInteger>(_ value: I) -> xpc_object_t {
-        return xpc_int64_create(Int64(exactly: value)!)
+        return xpc_int64_create(Int64(value))
     }
 
     static func encodeUnsignedInteger<U: UnsignedInteger & FixedWidthInteger>(_ value: U) -> xpc_object_t {
-        return xpc_uint64_create(UInt64(exactly: value)!)
+        return xpc_uint64_create(UInt64(value))
     }
 
     static func encodeDouble(_ value: Double) -> xpc_object_t {
