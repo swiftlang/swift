@@ -41,19 +41,19 @@ enum class TypeRefKind {
 // MSVC reports an error if we use "template"
 // Clang reports an error if we don't use "template"
 #if defined(__clang__) || defined(__GNUC__)
-#define DEPENDENT_TEMPLATE template
+#  define DEPENDENT_TEMPLATE template
 #else
-#define DEPENDENT_TEMPLATE
+#  define DEPENDENT_TEMPLATE
 #endif
 
 #define FIND_OR_CREATE_TYPEREF(Allocator, TypeRefTy, ...)                      \
   auto ID = Profile(__VA_ARGS__);                                              \
-  const auto Entry = Allocator.DEPENDENT_TEMPLATE TypeRefTy##s.find(ID);       \
-  if (Entry != Allocator.DEPENDENT_TEMPLATE TypeRefTy##s.end())                \
+  const auto Entry = Allocator.TypeRefTy##s.find(ID);      \
+  if (Entry != Allocator.TypeRefTy##s.end())               \
     return Entry->second;                                                      \
   const auto TR =                                                              \
       Allocator.DEPENDENT_TEMPLATE makeTypeRef<TypeRefTy>(__VA_ARGS__);        \
-  Allocator.DEPENDENT_TEMPLATE TypeRefTy##s.insert({ID, TR});                  \
+  Allocator.TypeRefTy##s.insert({ID, TR});                 \
   return TR;
 
 /// An identifier containing the unique bit pattern made up of all of the
