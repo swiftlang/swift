@@ -171,8 +171,6 @@ public:
     llvm_unreachable("bad kind");
   }
 
-  SILType getSILSubstType(SILGenFunction &SGF) const &;
-
   CanType getSubstRValueType() const & {
     switch (StoredKind) {
     case Kind::Invalid:
@@ -188,8 +186,6 @@ public:
     }
     llvm_unreachable("bad kind");
   }
-
-  SILType getSILSubstRValueType(SILGenFunction &SGF) const &;
 
   bool hasLValueType() const & {
     switch (StoredKind) {
