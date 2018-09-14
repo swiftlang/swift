@@ -1,4 +1,8 @@
-
+// test/stdlib/TestXPCEncoder.swift
+// Tests for XPC Codable support
+//
+// This source file is part of the Swift.org open source project
+//
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,162 +19,20 @@ import XPC
 import Foundation
 import StdlibUnittest
 
-class TestXPCEncoder {
-    // MARK: - Encoding Top-Level Empty Types
-    func testEncodingTopLevelEmptyStruct() {
-        let empty = EmptyStruct()
-        _testRoundTrip(of: empty)
+// MARK: - Testing helpers
+private func _testRoundTrip<T>(of value: T) where T : Codable, T: Equatable {
+    var payload: xpc_object_t! = nil
+    do {
+        payload = try XPCEncoder.encode(value)
+    } catch {
+        expectUnreachable("Failed to encode \(T.self) to xpc_object_t: \(error)")
     }
 
-    func testEncodingTopLevelEmptyClass() {
-        let empty = EmptyClass()
-        _testRoundTrip(of: empty)
-    }
-
-    // MARK: - Encoding Top-Level Single-Value Types
-    func testEncodingTopLevelSingleValueEnum() {
-        _testRoundTrip(of: Switch.off)
-        _testRoundTrip(of: Switch.on)
-    }
-
-    func testEncodingTopLevelSingleValueStruct() {
-        _testRoundTrip(of: Timestamp(3141592653))
-    }
-
-    func testEncodingTopLevelSingleValueClass() {
-        _testRoundTrip(of: Counter())
-    }
-
-    // MARK: - Ecoding Top-Level Structured Types
-    func testEncodingTopLevelStructuredStruct() {
-        // Address is a struct type with multiple fields.
-        let address = Address.testValue
-        _testRoundTrip(of: address)
-    }
-
-    func testEncodingTopLevelStructuredClass() {
-        // Person is a class with multiple fields.
-        let person = Person.testValue
-        _testRoundTrip(of: person)
-    }
-
-    func testEncodingTopLevelStructuredSingleStruct() {
-        // Numbers is a struct which encodes as an array through a single value container.
-        let numbers = Numbers.testValue
-        _testRoundTrip(of: numbers)
-    }
-
-    func testEncodingTopLevelStructuredSingleClass() {
-        // Mapping is a class which encodes as a dictionary through a single value container.
-        let mapping = Mapping.testValue
-        _testRoundTrip(of: mapping)
-    }
-
-    func testEncodingDerivedClass() {
-        let programmer = Programmer.testValue
-        _testRoundTrip(of: programmer)
-    }
-
-    func testEncodingClassWhichSharesEncoderWithSuper() {
-        // Employee is a type which shares its encoder & decoder with its superclass, Person.
-        let employee = Employee.testValue
-        _testRoundTrip(of: employee)
-    }
-
-    func testEncodingTopLevelDeepStructuredType() {
-        // Company is a type with fields which are Codable themselves.
-        let company = Company.testValue
-        _testRoundTrip(of: company)
-    }
-
-    func testEncodingTopLevelNullableType() {
-        _testRoundTrip(of: EnhancedBool.true)
-        _testRoundTrip(of: EnhancedBool.false)
-        _testRoundTrip(of: EnhancedBool.fileNotFound)
-    }
-
-    func testEncodingDictionaryFailureKeyPath() {
-        let toEncode: [String: EncodeFailure] = ["key": EncodeFailure(someValue: 3.14)]
-
-        do {
-            _ = try XPCEncoder.encode(toEncode)
-        } catch EncodingError.invalidValue(let (_, context)) {
-            expectEqual(1, context.codingPath.count)
-            expectEqual("key", context.codingPath[0].stringValue)
-        } catch {
-            expectUnreachable("Unexpected error: \(String(describing: error))")
-        }
-    }
-
-    func testEncodingDictionaryFailureKeyPathNested() {
-        let toEncode: [String: [String: EncodeFailureNested]] = ["key": ["sub_key": EncodeFailureNested(nestedValue: EncodeFailure(someValue: 3.14))]]
-
-        do {
-            _ = try XPCEncoder.encode(toEncode)
-        } catch EncodingError.invalidValue(let (_, context)) {
-            expectEqual(3, context.codingPath.count)
-            expectEqual("key", context.codingPath[0].stringValue)
-            expectEqual("sub_key", context.codingPath[1].stringValue)
-            expectEqual("nestedValue", context.codingPath[2].stringValue)
-        } catch {
-            expectUnreachable("Unexpected error: \(String(describing: error))")
-        }
-    }
-
-    func testDecodingDictionaryFailureKeyPath() {
-        let input = xpc_dictionary_create(nil, nil, 0)
-        let key = "intValue"
-        let value = "not an integer"
-        var xpcValue: xpc_object_t!
-        value.withCString({ xpcValue = xpc_string_create($0) })
-        key.withCString({ xpc_dictionary_set_value(input, $0, xpcValue) })
-
-        do {
-            _ = try XPCDecoder.decode(DecodeFailure.self, message: input)
-        } catch DecodingError.typeMismatch(let (_, context)) {
-            expectEqual(1, context.codingPath.count)
-            expectEqual("intValue", context.codingPath[0].stringValue)
-        } catch {
-            expectUnreachable("Unexpected error: \(String(describing: error))")
-        }
-    }
-
-    func testDecodingDictionaryFailureKeyPathNested() {
-        let input = xpc_dictionary_create(nil, nil, 0)
-        let subInput = xpc_dictionary_create(nil, nil, 0)
-        let nestedKey = "nestedValue"
-        let intKey = "intValue"
-        let value = "not an integer"
-        var xpcValue: xpc_object_t!
-        value.withCString({ xpcValue = xpc_string_create($0) })
-        intKey.withCString({ xpc_dictionary_set_value(subInput, $0, xpcValue) })
-        nestedKey.withCString({ xpc_dictionary_set_value(input, $0, subInput) })
-
-        do {
-            _ = try XPCDecoder.decode(DecodeFailureNested.self, message: input)
-        } catch DecodingError.typeMismatch(let (_, context)) {
-            expectEqual(2, context.codingPath.count)
-            expectEqual("intValue", context.codingPath[1].stringValue)
-        } catch {
-            expectUnreachable("Unexpected error: \(String(describing: error))")
-        }
-    }
-
-    // MARK: - Testing helpers
-    private func _testRoundTrip<T>(of value: T) where T : Codable, T: Equatable {
-        var payload: xpc_object_t! = nil
-        do {
-            payload = try XPCEncoder.encode(value)
-        } catch {
-            expectUnreachable("Failed to encode \(T.self) to xpc_object_t: \(error)")
-        }
-
-        do {
-            let decoded = try XPCDecoder.decode(T.self, message: payload)
-            expectEqual(decoded, value, "\(T.self) did not round-trip to an equal value.")
-        } catch {
-            expectUnreachable("Failed to decode \(T.self) from xpc_object_t: \(error)")
-        }
+    do {
+        let decoded = try XPCDecoder.decode(T.self, message: payload)
+        expectEqual(decoded, value, "\(T.self) did not round-trip to an equal value.")
+    } catch {
+        expectUnreachable("Failed to decode \(T.self) from xpc_object_t: \(error)")
     }
 }
 
@@ -365,7 +227,7 @@ fileprivate final class Mapping : Codable, Equatable {
   }
 
   static var testValue: Mapping {
-    return Mapping(values: ["Apple": URL(string: "http://apple.com")!,
+    return Mapping(values: ["Apple": URL(string: "https://apple.com")!,
                             "localhost": URL(string: "http://127.0.0.1")!])
   }
 }
@@ -404,7 +266,7 @@ fileprivate class Programmer : Person {
     }
 
     override class var testValue: Programmer {
-        return Programmer(name: "Johnny Appleseed", email: "appleseed@apple.com", favoriteIDE: "XCode")
+        return Programmer(name: "Johnny Appleseed", email: "appleseed@apple.com", favoriteIDE: "Xcode")
     }
 }
 
@@ -444,6 +306,10 @@ fileprivate class Employee : Person {
   override class var testValue: Employee {
     return Employee(name: "Johnny Appleseed", email: "appleseed@apple.com", id: 42)
   }
+
+  class var testValue2: Employee {
+      return Employee(name: "J. Random Hacker", email: "random@apple.com", id: 43)
+  }
 }
 
 /// A simple company struct which encodes as a dictionary of nested values.
@@ -457,7 +323,7 @@ fileprivate struct Company : Codable, Equatable {
     }
 
     static var testValue: Company {
-        return Company(address: Address.testValue, employees: [Employee.testValue])
+        return Company(address: Address.testValue, employees: [Employee.testValue, Employee.testValue2])
     }
 }
 
@@ -510,23 +376,146 @@ private struct DecodeFailureNested : Decodable {
     var nestedValue: DecodeFailure
 }
 
-// MARK: - Run the the tests!
 var XPCEncoderTests = TestSuite("TestXPCEncoder")
-XPCEncoderTests.test("testEncodingTopLevelEmptyStruct") { TestXPCEncoder().testEncodingTopLevelEmptyStruct() }
-XPCEncoderTests.test("testEncodingTopLevelEmptyClass") { TestXPCEncoder().testEncodingTopLevelEmptyClass() }
-XPCEncoderTests.test("testEncodingTopLevelSingleValueEnum") { TestXPCEncoder().testEncodingTopLevelSingleValueEnum() }
-XPCEncoderTests.test("testEncodingTopLevelSingleValueStruct") { TestXPCEncoder().testEncodingTopLevelSingleValueStruct() }
-XPCEncoderTests.test("testEncodingTopLevelSingleValueClass") { TestXPCEncoder().testEncodingTopLevelSingleValueClass() }
-XPCEncoderTests.test("testEncodingTopLevelStructuredStruct") { TestXPCEncoder().testEncodingTopLevelStructuredStruct() }
-XPCEncoderTests.test("testEncodingTopLevelStructuredClass") { TestXPCEncoder().testEncodingTopLevelStructuredClass() }
-XPCEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") { TestXPCEncoder().testEncodingTopLevelStructuredSingleStruct() }
-XPCEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { TestXPCEncoder().testEncodingTopLevelStructuredSingleClass() }
-XPCEncoderTests.test("testEncodingDerivedClass") { TestXPCEncoder().testEncodingDerivedClass() }
-XPCEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestXPCEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
-XPCEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestXPCEncoder().testEncodingTopLevelDeepStructuredType() }
-XPCEncoderTests.test("testEncodingTopLevelNullableType") { TestXPCEncoder().testEncodingTopLevelNullableType() }
-XPCEncoderTests.test("testEncodingDictionaryFailureKeyPath") { TestXPCEncoder().testEncodingDictionaryFailureKeyPath() }
-XPCEncoderTests.test("testEncodingDictionaryFailureKeyPathNested") { TestXPCEncoder().testEncodingDictionaryFailureKeyPathNested() }
-XPCEncoderTests.test("testDecodingDictionaryFailureKeyPath") { TestXPCEncoder().testDecodingDictionaryFailureKeyPath() }
-XPCEncoderTests.test("testDecodingDictionaryFailureKeyPathNested") { TestXPCEncoder().testDecodingDictionaryFailureKeyPathNested() }
+// MARK: - Encoding Top-Level Empty Types
+XPCEncoderTests.test("testEncodingTopLevelEmptyStruct") {
+    let empty = EmptyStruct()
+    _testRoundTrip(of: empty)
+}
+
+XPCEncoderTests.test("testEncodingTopLevelEmptyClass") {
+    let empty = EmptyClass()
+    _testRoundTrip(of: empty)
+}
+
+// MARK: - Encoding Top-Level Single-Value Types
+XPCEncoderTests.test("testEncodingTopLevelSingleValueEnum") {
+    _testRoundTrip(of: Switch.off)
+    _testRoundTrip(of: Switch.on)
+}
+
+XPCEncoderTests.test("testEncodingTopLevelSingleValueStruct") {
+    _testRoundTrip(of: Timestamp(3141592653))
+}
+
+XPCEncoderTests.test("testEncodingTopLevelSingleValueClass") {
+    _testRoundTrip(of: Counter())
+}
+
+// MARK: - Encoding Top-Level Structured Types
+XPCEncoderTests.test("testEncodingTopLevelStructuredStruct") {
+    // Address is a struct type with multiple fields.
+    let address = Address.testValue
+    _testRoundTrip(of: address)
+}
+
+XPCEncoderTests.test("testEncodingTopLevelStructuredClass") {
+    // Person is a class with multiple fields.
+    let person = Person.testValue
+    _testRoundTrip(of: person)
+}
+
+XPCEncoderTests.test("testEncodingTopLevelStructuredSingleStruct") {
+    // Numbers is a struct which encodes as an array through a single value container.
+    let numbers = Numbers.testValue
+    _testRoundTrip(of: numbers)
+}
+
+XPCEncoderTests.test("testEncodingTopLevelStructuredSingleClass") {
+    // Mapping is a class which encodes as a dictionary through a single value container.
+    let mapping = Mapping.testValue
+    _testRoundTrip(of: mapping)
+}
+
+XPCEncoderTests.test("testEncodingDerivedClass") {
+    let programmer = Programmer.testValue
+    _testRoundTrip(of: programmer)
+}
+
+XPCEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") {
+    // Employee is a type which shares its encoder & decoder with its superclass, Person.
+    let employee = Employee.testValue
+    _testRoundTrip(of: employee)
+}
+
+XPCEncoderTests.test("testEncodingTopLevelDeepStructuredType") {
+    // Company is a type with fields which are Codable themselves.
+    let company = Company.testValue
+    _testRoundTrip(of: company)
+}
+
+XPCEncoderTests.test("testEncodingTopLevelNullableType") {
+    _testRoundTrip(of: EnhancedBool.true)
+    _testRoundTrip(of: EnhancedBool.false)
+    _testRoundTrip(of: EnhancedBool.fileNotFound)
+}
+
+// MARK: - Test KeyPath during failure
+XPCEncoderTests.test("testEncodingDictionaryFailureKeyPath") {
+    let toEncode: [String: EncodeFailure] = ["key": EncodeFailure(someValue: 3.14)]
+
+    do {
+        _ = try XPCEncoder.encode(toEncode)
+    } catch EncodingError.invalidValue(let (_, context)) {
+        expectEqual(1, context.codingPath.count)
+        expectEqual("key", context.codingPath[0].stringValue)
+    } catch {
+        expectUnreachable("Unexpected error: \(String(describing: error))")
+    }
+}
+
+XPCEncoderTests.test("testEncodingDictionaryFailureKeyPathNested") {
+    let toEncode: [String: [String: EncodeFailureNested]] = ["key": ["sub_key": EncodeFailureNested(nestedValue: EncodeFailure(someValue: 3.14))]]
+
+    do {
+        _ = try XPCEncoder.encode(toEncode)
+    } catch EncodingError.invalidValue(let (_, context)) {
+        expectEqual(3, context.codingPath.count)
+        expectEqual("key", context.codingPath[0].stringValue)
+        expectEqual("sub_key", context.codingPath[1].stringValue)
+        expectEqual("nestedValue", context.codingPath[2].stringValue)
+    } catch {
+        expectUnreachable("Unexpected error: \(String(describing: error))")
+    }
+}
+
+XPCEncoderTests.test("testDecodingDictionaryFailureKeyPath") {
+    let input = xpc_dictionary_create(nil, nil, 0)
+    let key = "intValue"
+    let value = "not an integer"
+    var xpcValue: xpc_object_t!
+    value.withCString({ xpcValue = xpc_string_create($0) })
+    key.withCString({ xpc_dictionary_set_value(input, $0, xpcValue) })
+
+    do {
+        _ = try XPCDecoder.decode(DecodeFailure.self, message: input)
+    } catch DecodingError.typeMismatch(let (_, context)) {
+        expectEqual(1, context.codingPath.count)
+        expectEqual("intValue", context.codingPath[0].stringValue)
+    } catch {
+        expectUnreachable("Unexpected error: \(String(describing: error))")
+    }
+}
+
+XPCEncoderTests.test("testDecodingDictionaryFailureKeyPathNested") {
+    let input = xpc_dictionary_create(nil, nil, 0)
+    let subInput = xpc_dictionary_create(nil, nil, 0)
+    let nestedKey = "nestedValue"
+    let intKey = "intValue"
+    let value = "not an integer"
+    var xpcValue: xpc_object_t!
+    value.withCString({ xpcValue = xpc_string_create($0) })
+    intKey.withCString({ xpc_dictionary_set_value(subInput, $0, xpcValue) })
+    nestedKey.withCString({ xpc_dictionary_set_value(input, $0, subInput) })
+
+    do {
+        _ = try XPCDecoder.decode(DecodeFailureNested.self, message: input)
+    } catch DecodingError.typeMismatch(let (_, context)) {
+        expectEqual(2, context.codingPath.count)
+        expectEqual("intValue", context.codingPath[1].stringValue)
+    } catch {
+        expectUnreachable("Unexpected error: \(String(describing: error))")
+    }
+}
+
 runAllTests()
