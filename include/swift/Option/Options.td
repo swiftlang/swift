@@ -117,6 +117,10 @@ def driver_force_one_batch_repartition : Flag<["-"], "driver-force-one-batch-rep
   InternalDebugOpt,
   HelpText<"Force one batch repartitioning for testing">;
 
+def driver_force_response_files : Flag<["-"], "driver-force-response-files">,
+  InternalDebugOpt,
+  HelpText<"Force the use of response files for testing">;
+
 def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
