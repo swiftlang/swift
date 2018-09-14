@@ -24,11 +24,27 @@ public let StringInterpolationManySmallSegments = BenchmarkInfo(
   name: "StringInterpolationManySmallSegments",
   runFunction: run_StringInterpolationManySmallSegments,
   tags: [.validation, .api, .String])
+public let CustomStringInterpolation = BenchmarkInfo(
+	name: "CustomStringInterpolation",
+	runFunction: run_CustomStringInterpolation,
+	tags: [.validation, .api, .String])
+public let CustomStringNoInterpolation = BenchmarkInfo(
+	name: "CustomStringNoInterpolation",
+	runFunction: run_CustomStringNoInterpolation,
+	tags: [.validation, .api, .String])
 
 class RefTypePrintable : CustomStringConvertible {
   var description: String {
     return "01234567890123456789012345678901234567890123456789"
   }
+}
+
+struct CustomString: ExpressibleByStringInterpolation {
+	var value: String
+	
+	init(stringLiteral: String) {
+		self.value = stringLiteral
+	}
 }
 
 @inline(never)
@@ -104,3 +120,50 @@ public func run_StringInterpolationManySmallSegments(_ N: Int) {
     }
   }
 }
+
+@inline(never)
+public func run_CustomStringInterpolation(_ N: Int) {
+  let reps = 100
+  let refResult = reps
+  let anInt: Int64 = 0x1234567812345678
+  let aRefCountedObject = RefTypePrintable()
+
+  for _ in 1...100*N {
+    var result = 0
+    for _ in 1...reps {
+      let s: String = getString(CustomString(
+        "\(anInt) abcdefdhijklmn \(aRefCountedObject) abcdefdhijklmn \u{01}").value)
+      let utf16 = s.utf16
+
+      // FIXME: if String is not stored as UTF-16 on this platform, then the
+      // following operation has a non-trivial cost and needs to be replaced
+      // with an operation on the native storage type.
+      result = result &+ Int(utf16.last!)
+      blackHole(s)
+    }
+    CheckResults(result == refResult)
+  }
+}
+
+@inline(never)
+public func run_CustomStringNoInterpolation(_ N: Int) {
+  let reps = 100
+  let refResult = reps
+
+  for _ in 1...100*N {
+    var result = 0
+    for _ in 1...reps {
+      let s: String = getString(CustomString(
+        "abcdefdhijklmn abcdefdhijklmn \u{01}").value)
+      let utf16 = s.utf16
+
+      // FIXME: if String is not stored as UTF-16 on this platform, then the
+      // following operation has a non-trivial cost and needs to be replaced
+      // with an operation on the native storage type.
+      result = result &+ Int(utf16.last!)
+      blackHole(s)
+    }
+    CheckResults(result == refResult)
+  }
+}
+
