@@ -16,66 +16,23 @@
 
 import CTensorFlow
 
-/// A class that implements common functionality for resource and variant handles.
-public class ResourceVariantHandleBase {
-	public let cTensorHandle: CTensorHandle
-	public let cIsResource: Bool
-	
+/// `ResourceHandle` is the type used by ops and the `#tfop()` syntax to
+/// represent TensorFlow "variant" values.
+/// TODO: rename this source file as this is no longer "opaque".
+public final class ResourceHandle {
+  public let cTensorHandle: CTensorHandle
+
   @usableFromInline
-  init(owning cTensorHandle: CTensorHandle, cIsResource: Bool) {
+  init(owning cTensorHandle: CTensorHandle) {
     self.cTensorHandle = cTensorHandle
-		self.cIsResource = cIsResource
   }
 
   deinit {
     debugLog("De-initializing TensorHandle.")
     TFE_DeleteTensorHandle(cTensorHandle)
-    debugLog("Returning from deinit of handle.")
-  }
-
-  static public func getTFDataTypeName(_ isResource: Bool) -> String {
-    return isResource ? "resource" : "variant"
-  }
-	
-	@inlinable
-	static func receiveTensorHandleHelper(
-		_ computation: _TensorComputation,
-    _ tensorID: Int,
-	  _ isResource: Bool) -> CTensorHandle {
-		debugLog("Receiving \(getTFDataTypeName(isResource)) tensor of id \(tensorID).")
-    let status = TF_NewStatus()
-    let context = _ExecutionContext.global
-		let dataType = isResource ? TF_RESOURCE : TF_VARIANT
-    let cTensorHandle: CTensorHandle! = TFE_DequeueNamedTensorFromCtx(
-      context.eagerContext, Int32(tensorID), dataType, status)
-    checkOk(status)
-    TF_DeleteStatus(status)
-		return cTensorHandle
-	}
-
-  @inlinable
-  func sendToAcceleratorHelper(_ computation: _TensorComputation,
-                         _ tensorID: Int) {
-    debugLog("Sending \(type(of: self).getTFDataTypeName(self.cIsResource)) tensor of id \(tensorID).")
-    let status = TF_NewStatus()
-    let context = _ExecutionContext.global
-    TFE_EnqueueNamedTensorFromCtx(
-      context.eagerContext, Int32(tensorID), self.cTensorHandle, status)
-    TF_DeleteStatus(status)
-    debugLog("Done sending \(type(of: self).getTFDataTypeName(self.cIsResource)) tensor of id \(tensorID).")
+    debugLog("Returning from deinit of ResourceHandle.")
   }
 }
-
-
-/// `ResourceHandle` is the type used by ops and the `#tfop()` syntax to
-/// represent TensorFlow "resource" values.  
-public final class ResourceHandle : ResourceVariantHandleBase {
-  @usableFromInline
-  init(owning cTensorHandle: CTensorHandle) {
-		super.init(owning: cTensorHandle, cIsResource: true)
-  }
-}
-
 
 extension ResourceHandle : TensorSendableReceivable {
   @inlinable
@@ -83,14 +40,27 @@ extension ResourceHandle : TensorSendableReceivable {
     _ computation: _TensorComputation,
     _ tensorID: Int
   ) -> ResourceHandle {
-		let receivedTensor = receiveTensorHandleHelper(computation, tensorID, true)
-		return ResourceHandle(owning: receivedTensor)
-	}
+    debugLog("Receiving resource tensor of id \(tensorID).")
+    let status = TF_NewStatus()
+    let context = _ExecutionContext.global
+    let cTensorHandle: CTensorHandle! = TFE_DequeueNamedTensorFromCtx(
+      context.eagerContext, Int32(tensorID), TF_RESOURCE, status)
+    checkOk(status)
+    TF_DeleteStatus(status)
+    debugLog("Done receiving resource tensor of id \(tensorID).")
+    return ResourceHandle(owning: cTensorHandle)    
+  }
 
   @inlinable
   func sendToAccelerator(_ computation: _TensorComputation,
-    _ tensorID: Int) {
-		self.sendToAcceleratorHelper(computation, tensorID);
+                         _ tensorID: Int) {
+    debugLog("Sending resource tensor of id \(tensorID).")
+    let status = TF_NewStatus()
+    let context = _ExecutionContext.global
+    TFE_EnqueueNamedTensorFromCtx(
+      context.eagerContext, Int32(tensorID), self.cTensorHandle, status)
+    TF_DeleteStatus(status)
+    debugLog("Done sending resource tensor of id \(tensorID).")
   }
 
   // TODO: remove this dummy Scalar typealias, currently required in order to
@@ -102,14 +72,21 @@ extension ResourceHandle : TensorSendableReceivable {
   }
 }
 
-
 /// `VariantHandle` is the type used by ops and the `#tfop()` syntax to
 /// represent TensorFlow "variant" values.
 /// TODO: rename this source file as this is no longer "opaque".
-public final class VariantHandle : ResourceVariantHandleBase {
+public final class VariantHandle {
+  public let cTensorHandle: CTensorHandle
+
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
-		super.init(owning: cTensorHandle, cIsResource: false)
+    self.cTensorHandle = cTensorHandle
+  }
+
+  deinit {
+    debugLog("De-initializing TensorHandle.")
+    TFE_DeleteTensorHandle(cTensorHandle)
+    debugLog("Returning from deinit of VariantHandle.")
   }
 }
 
@@ -119,14 +96,27 @@ extension VariantHandle : TensorSendableReceivable {
     _ computation: _TensorComputation,
     _ tensorID: Int
   ) -> VariantHandle {
-		let receivedTensor = receiveTensorHandleHelper(computation, tensorID, false)
-		return VariantHandle(owning: receivedTensor)
-	}
+    debugLog("Receiving variant tensor of id \(tensorID).")
+    let status = TF_NewStatus()
+    let context = _ExecutionContext.global
+    let cTensorHandle: CTensorHandle! = TFE_DequeueNamedTensorFromCtx(
+      context.eagerContext, Int32(tensorID), TF_VARIANT, status)
+    checkOk(status)
+    TF_DeleteStatus(status)
+    debugLog("Done receiving variant tensor of id \(tensorID).")
+    return VariantHandle(owning: cTensorHandle)    
+  }
 
   @inlinable
   func sendToAccelerator(_ computation: _TensorComputation,
-    _ tensorID: Int) {
-		self.sendToAcceleratorHelper(computation, tensorID);
+                         _ tensorID: Int) {
+    debugLog("Sending variant tensor of id \(tensorID).")
+    let status = TF_NewStatus()
+    let context = _ExecutionContext.global
+    TFE_EnqueueNamedTensorFromCtx(
+      context.eagerContext, Int32(tensorID), self.cTensorHandle, status)
+    TF_DeleteStatus(status)
+    debugLog("Done sending variant tensor of id \(tensorID).")
   }
 
   // TODO: remove this dummy Scalar typealias, currently required in order to
