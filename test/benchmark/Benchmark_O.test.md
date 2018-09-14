@@ -162,7 +162,7 @@ MEASUREENV: ICS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 MEASUREENV: VCS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 RUNJUSTONCE-LABEL: 1,Ackermann
 RUNJUSTONCE-NOT: 1,Ackermann
-LOGFORMAT: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},,{{[0-9]+}}
+LOGFORMAT: ,{{[0-9]+}},{{[0-9]+}},,{{[0-9]+}},{{[0-9]+}}
 LOGVERBOSE-LABEL: Running AngryPhonebook for 2 samples.
 ````
 
