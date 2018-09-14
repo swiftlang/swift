@@ -49,7 +49,11 @@ public func A_renameAllTheThings(
 
 // CHECK-4-LABEL: func A_renameAllTheThings(
 // CHECK-4-SAME: a: Swift4RenamedClass?
-// CHECK-4-SAME: b: Swift4RenamedGenericClass<AnyObject>?
+
+// FIXME: An issue not specific to the importer where generic typealiases are
+// not preserved when provided arguments.
+// CHECK-4-SAME: b: RenamedGenericClass<AnyObject>?
+
 // CHECK-4-SAME: c: Swift4RenamedTypedef
 // CHECK-4-SAME: d: Swift4RenamedStruct
 // CHECK-4-SAME: e: Swift4RenamedEnum
