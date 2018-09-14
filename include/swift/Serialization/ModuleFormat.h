@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 444; // Last change: inlinable body text
+const uint16_t VERSION_MINOR = 445; // Last change: generic typealias
 
 using DeclIDField = BCFixed<31>;
 
@@ -691,6 +691,7 @@ namespace decls_block {
     DeclIDField,      // typealias decl
     TypeIDField,      // parent type
     TypeIDField,      // underlying type
+    TypeIDField,      // substituted type
     SubstitutionMapIDField // substitution map
   >;
 
