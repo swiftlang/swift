@@ -87,7 +87,7 @@ public class XPCEncoder: Encoder {
     }
 }
 
-struct XPCEncodingHelpers {
+enum XPCEncodingHelpers {
     static func encodeNil() -> xpc_object_t {
         return xpc_null_create()
     }
