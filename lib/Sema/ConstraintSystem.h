@@ -53,16 +53,6 @@ namespace constraints {
 class ConstraintGraph;
 class ConstraintGraphNode;
 class ConstraintSystem;
-class DisjunctionChoiceProducer;
-class TypeBinding;
-class TypeVariableBinding;
-class TypeVarBindingProducer;
-class StepScope;
-class SolverStep;
-class SplitterStep;
-class ComponentStep;
-class TypeVariableStep;
-class DisjunctionStep;
 
 } // end namespace constraints
 
@@ -941,7 +931,6 @@ public:
   friend class SplitterStep;
   friend class ComponentStep;
   friend class TypeVariableStep;
-  friend class DisjunctionStep;
 
   class SolverScope;
 
