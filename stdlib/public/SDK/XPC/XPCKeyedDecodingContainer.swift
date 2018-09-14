@@ -83,7 +83,7 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
         get {
             var keys: [Key] = []
             xpc_dictionary_apply(self.underlyingMessage) { (key, _) -> Bool in
-                keys.append(Key(stringValue: String.init(cString: key))!)
+                keys.append(Key(stringValue: String(cString: key))!)
                 return true
             }
             return keys
