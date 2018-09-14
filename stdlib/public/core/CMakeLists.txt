@@ -201,12 +201,10 @@ set(SWIFTLIB_SOURCES
   CommandLine.swift
   SIMDVector.swift
   SIMDVectorN.swift.gyb
-  SIMDPredicate.swift
-  SIMDPredicateTypes.swift.gyb
   SIMDInteger.swift
   SIMDIntegerTypes.swift.gyb
-  SIMDFloatingPoint.swift
-  SIMDFloatingPointTypes.swift.gyb
+  SIMDPredicate.swift
+  SIMDPredicateTypes.swift.gyb
   SliceBuffer.swift
   Tuple.swift.gyb
   UnfoldSequence.swift

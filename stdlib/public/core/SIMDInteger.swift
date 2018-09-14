@@ -2,19 +2,30 @@ public protocol SIMDIntegerVector : SIMDVector
                               where Element: FixedWidthInteger {
   
   init(bitMaskFrom predicate: Predicate)
-  /*
+  
+  /// A vector where each element is the count of leading zero bits in the
+  /// corresponding lane of this vector.
+  ///
+  /// If a lane of this vector is zero, the corresponding lane of the result
+  /// has the value Element.bitWidth.
   var leadingZeroBitCount: Self { get }
   
+  /// A vector where each element is the count of trailing zero bits in the
+  /// corresponding lane of this vector.
+  ///
+  /// If a lane of this vector is zero, the corresponding lane of the result
+  /// has the value Element.bitWidth.
   var trailingZeroBitCount: Self { get }
   
+  /// A vector where each element is the count of non-zero bits in the
+  /// corresponding lane of this vector.
   var nonzeroBitCount: Self { get }
   
-  var byteSwapped: Self { get }
-  
-  var bigEndian: Self { get }
-  
-  var littleEndian: Self { get }
-   */
+  /// A representation of this vector with the byte order swapped for each
+  /// element.
+  ///
+  /// The ordering of elements within the vector is unchanged.
+  var elementBytesSwapped: Self { get }
   
   static func <(lhs: Self, rhs: Self) -> Predicate
   
@@ -69,13 +80,31 @@ public extension SIMDIntegerVector {
     return self & ~mask | other & mask
   }
   
-  // MARK: Comparison operators
+  // MARK: Comparison with any BinaryInteger scalar, handling cases where
+  // the scalar is outside the range of representable values for the vector
+  // element type correctly, as with heterogeneous scalar integer comparisons.
+  @_transparent
+  static func == <Other>(lhs: Self, rhs: Other) -> Predicate
+    where Other : BinaryInteger {
+      guard rhs >= Element.min else { return Predicate(repeating: false) }
+      guard rhs <= Element.max else { return Predicate(repeating: false) }
+      return lhs == Self(repeating: Self.Element(truncatingIfNeeded: rhs))
+  }
+  
+  @_transparent
+  static func != <Other>(lhs: Self, rhs: Other) -> Predicate
+    where Other : BinaryInteger {
+      guard rhs >= Element.min else { return Predicate(repeating: true) }
+      guard rhs <= Element.max else { return Predicate(repeating: true) }
+      return lhs != Self(repeating: Self.Element(truncatingIfNeeded: rhs))
+  }
+  
   @_transparent
   static func < <Other>(lhs: Self, rhs: Other) -> Predicate
   where Other : BinaryInteger {
     guard rhs >= Element.min else { return Predicate(repeating: false) }
     guard rhs <= Element.max else { return Predicate(repeating: true) }
-    return lhs < Self(repeating: Self.Element(rhs))
+    return lhs < Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
   @_transparent
@@ -83,7 +112,7 @@ public extension SIMDIntegerVector {
   where Other : BinaryInteger {
     guard rhs >= Element.min else { return Predicate(repeating: false) }
     guard rhs <= Element.max else { return Predicate(repeating: true) }
-    return lhs <= Self(repeating: Self.Element(rhs))
+    return lhs <= Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
   @_transparent
@@ -96,6 +125,18 @@ public extension SIMDIntegerVector {
   static func >= <Other>(lhs: Self, rhs: Other) -> Predicate
   where Other : BinaryInteger {
     return !(lhs < rhs)
+  }
+  
+  @_transparent
+  static func == <Other>(lhs: Other, rhs: Self) -> Predicate
+  where Other : BinaryInteger {
+    return rhs == lhs
+  }
+  
+  @_transparent
+  static func != <Other>(lhs: Other, rhs: Self) -> Predicate
+  where Other : BinaryInteger {
+    return rhs != lhs
   }
   
   @_transparent
@@ -158,6 +199,34 @@ public extension SIMDIntegerVector {
     return rhs | lhs
   }
   
+  //  MARK: masking shifts with BinaryInteger counts
+  @_transparent
+  static func &>> <Count>(lhs: Self, rhs: Count) -> Self
+  where Count: BinaryInteger {
+    return lhs &>> Self(repeating: Element(truncatingIfNeeded: rhs))
+  }
+  
+  @_transparent
+  static func &<< <Count>(lhs: Self, rhs: Count) -> Self
+  where Count: BinaryInteger {
+    return lhs &<< Self(repeating: Element(truncatingIfNeeded: rhs))
+  }
+  
+  //  MARK: masking shifts with scalar lhs
+  //  These take Element for the LHS rather than an arbitrary BinaryInteger,
+  //  because the semantics of integer scalars are that the lhs determines
+  //  the type of a shift result, and we want to mirror that for vectors.
+  @_transparent
+  static func &>>(lhs: Element, rhs: Self) -> Self {
+    return Self(repeating: lhs) &>> rhs
+  }
+  
+  @_transparent
+  static func &<<(lhs: Element, rhs: Self) -> Self {
+    return Self(repeating: lhs) &<< rhs
+  }
+  
+  //  MARK: Smart shifts
   @inlinable
   static func >>(lhs: Self, rhs: Self) -> Self {
     let limit = Element(Element.bitWidth - 1)
@@ -183,28 +252,6 @@ public extension SIMDIntegerVector {
       let right = lhs &>> rhs
       return right.replacing(with: 0, where: rhs >= Element.bitWidth)
     }
-  }
-  
-  @_transparent
-  static func &>> <Count>(lhs: Self, rhs: Count) -> Self
-  where Count: BinaryInteger {
-    return lhs &>> Self(repeating: Element(truncatingIfNeeded: rhs))
-  }
-  
-  @_transparent
-  static func &>>(lhs: Element, rhs: Self) -> Self {
-    return Self(repeating: lhs) &>> rhs
-  }
-  
-  @_transparent
-  static func &<< <Count>(lhs: Self, rhs: Count) -> Self
-  where Count: BinaryInteger {
-    return lhs &<< Self(repeating: Element(truncatingIfNeeded: rhs))
-  }
-  
-  @_transparent
-  static func &<<(lhs: Element, rhs: Self) -> Self {
-    return Self(repeating: lhs) &<< rhs
   }
   
   // MARK: In-place bitwise operators
@@ -375,12 +422,12 @@ public func max<V>(_ lhs: V.Element, _ rhs: V) -> V where V: SIMDIntegerVector {
 }
 
 @inlinable
-public func clamp<V>(_ value: V, min lowerBound: V, max upperBound: V) -> V where V: SIMDIntegerVector {
+public func clamp<V>(_ value: V, _ lowerBound: V, _ upperBound: V) -> V where V: SIMDIntegerVector {
   return min(max(value, lowerBound), upperBound)
 }
 
 @inlinable
-public func clamp<V>(_ value: V, min lowerBound: V.Element, max upperBound: V.Element) -> V
+public func clamp<V>(_ value: V, _ lowerBound: V.Element, _ upperBound: V.Element) -> V
 where V: SIMDIntegerVector {
   return min(max(value, lowerBound), upperBound)
 }

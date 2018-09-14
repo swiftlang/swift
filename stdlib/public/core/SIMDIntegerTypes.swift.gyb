@@ -68,6 +68,35 @@ public extension ${Element} {
       self._value = predicate._value._value
     }
 
+    // - Functions
+    @_transparent
+    public var leadingZeroBitCount: ${Self} {
+      return ${Self}(Builtin.int_ctlz_${LLVM}(self._value, false._value))
+    }
+
+    @_transparent
+    public var trailingZeroBitCount: ${Self} {
+      return ${Self}(Builtin.int_cttz_${LLVM}(self._value, false._value))
+    }
+
+    @_transparent
+    public var nonzeroBitCount: ${Self} {
+      return ${Self}(Builtin.int_ctpop_${LLVM}(self._value))
+    }
+
+    @_transparent
+    public var elementBytesSwapped: ${Self} {
+%    if bits == 8:
+      return self
+%    else:
+      var result = ${Self}()
+      for i in indices {
+        result[i] = Element(Builtin.int_bswap_Int${bits}(self[i]._value))
+      }
+      return result
+%    end
+    }
+
     // - Bitwise operators
 %    for (op, inst) in [('&','and'), ('|','or'), ('^','xor')]:
     @_transparent
@@ -167,12 +196,10 @@ public extension ${Element} {
     @inlinable
     public init<Other>(clamping other: Other)
     where Other : SIMDVector${N} & SIMDIntegerVector {
-      let lowerBound = Other.Element(clamping: Element.min)
-      let upperBound = Other.Element(clamping: Element.max)
       self.init(truncatingIfNeeded:
         clamp(other,
-              min: Other(repeating: lowerBound),
-              max: Other(repeating: upperBound)
+              Other(repeating: Other.Element(clamping: Element.min)),
+              Other(repeating: Other.Element(clamping: Element.max))
         )
       )
     }

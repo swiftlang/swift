@@ -164,12 +164,10 @@
       "SIMD": [
         "SIMDVector.swift",
         "SIMDVectorN.swift",
-        "SIMDPredicate.swift",
-        "SIMDPredicateTypes.swift",
         "SIMDInteger.swift",
         "SIMDIntegerTypes.swift",
-        "SIMDFloatingPoint.swift",
-        "SIMDFloatingPointTypes.swift"
+        "SIMDPredicate.swift",
+        "SIMDPredicateTypes.swift"
       ]
     }
   ],
