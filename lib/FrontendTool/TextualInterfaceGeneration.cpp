@@ -57,7 +57,8 @@ static void printImports(raw_ostream &out, ModuleDecl *M) {
 
   for (auto import : allImports) {
     if (import.second->isStdlibModule() ||
-        import.second->isOnoneSupportModule()) {
+        import.second->isOnoneSupportModule() ||
+        import.second->isBuiltinModule()) {
       continue;
     }
 
