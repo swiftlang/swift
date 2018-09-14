@@ -591,7 +591,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
     // If a file was removed, we've lost its dependency info. Rebuild everything.
     // FIXME: Can we do better?
     if (ShowIncrementalBuildDecisions) {
-      llvm::StringSet<> inputArgs;
+      llvm::DenseSet<StringRef> inputArgs;
       for (auto &inputPair : inputs) {
         inputArgs.insert(inputPair.second->getValue());
       }
@@ -1186,7 +1186,7 @@ static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
 void Driver::buildInputs(const ToolChain &TC,
                          const DerivedArgList &Args,
                          InputFileList &Inputs) const {
-  llvm::StringMap<StringRef> SourceFileNames;
+  llvm::DenseMap<StringRef, StringRef> SourceFileNames;
 
   for (Arg *A : Args) {
     if (A->getOption().getKind() == Option::InputClass) {

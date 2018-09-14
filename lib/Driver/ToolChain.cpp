@@ -296,7 +296,7 @@ static void
 sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
                                  SmallVectorImpl<const Job *> &sortedJobs,
                                  Compilation &C) {
-  llvm::StringMap<const Job *> jobsByInput;
+  llvm::DenseMap<StringRef, const Job *> jobsByInput;
   for (const Job *J : unsortedJobs) {
     const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
     const InputAction *IA = findSingleSwiftInput(CJA);

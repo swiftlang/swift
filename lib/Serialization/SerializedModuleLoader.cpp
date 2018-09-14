@@ -20,6 +20,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -376,7 +377,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     // Figure out /which/ dependencies are missing.
     // FIXME: Dependencies should be de-duplicated at serialization time,
     // not now.
-    llvm::StringMap<bool> duplicates;
+    llvm::StringSet<> duplicates;
     llvm::SmallVector<ModuleFile::Dependency, 4> missing;
     std::copy_if(loadedModuleFile->getDependencies().begin(),
                  loadedModuleFile->getDependencies().end(),
@@ -384,11 +385,7 @@ FileUnit *SerializedModuleLoader::loadAST(
                  [&duplicates](const ModuleFile::Dependency &dependency)->bool {
       if (dependency.isLoaded() || dependency.isHeader())
         return false;
-      bool &seen = duplicates[dependency.RawPath];
-      if (seen)
-        return false;
-      seen = true;
-      return true;
+      return duplicates.insert(dependency.RawPath).second;
     });
 
     // FIXME: only show module part of RawAccessPath
