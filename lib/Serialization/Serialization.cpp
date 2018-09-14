@@ -3676,6 +3676,7 @@ void Serializer::writeType(Type ty) {
                            addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
                            addTypeRef(alias->getParent()),
                            addTypeRef(underlyingType),
+                           addTypeRef(alias->getSinglyDesugaredType()),
                            addSubstitutionMapRef(alias->getSubstitutionMap()));
     break;
   }

@@ -4206,10 +4206,12 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     DeclID typealiasID;
     TypeID parentTypeID;
     TypeID underlyingTypeID;
+    TypeID substitutedTypeID;
     SubstitutionMapID substitutionsID;
     decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
                                                  parentTypeID,
                                                  underlyingTypeID,
+                                                 substitutedTypeID,
                                                  substitutionsID);
     auto aliasOrError = getDeclChecked(typealiasID);
     if (!aliasOrError)
@@ -4236,10 +4238,15 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       underlyingType = getType(underlyingTypeID);
     }
 
+    // Read the substituted type.
+    auto substitutedTypeOrError = getTypeChecked(substitutedTypeID);
+    if (!substitutedTypeOrError)
+      return substitutedTypeOrError.takeError();
+
+    auto substitutedType = substitutedTypeOrError.get();
+
     // Read the substitutions.
     auto subMap = getSubstitutionMap(substitutionsID);
-    underlyingType = underlyingType.subst(subMap);
-    assert(underlyingType);
 
     auto parentTypeOrError = getTypeChecked(parentTypeID);
     if (!parentTypeOrError) {
@@ -4264,7 +4271,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
     auto parentType = parentTypeOrError.get();
     typeOrOffset = NameAliasType::get(alias, parentType, subMap,
-                                      underlyingType);
+                                      substitutedType);
     break;
   }
   case decls_block::NOMINAL_TYPE: {
