@@ -934,8 +934,6 @@ public:
     llvm_unreachable("bad kind");
   }
 
-  AbstractionPattern transformType(llvm::function_ref<CanType(CanType)>) const;
-
   /// Is the given tuple type a valid substitution of this abstraction
   /// pattern?
   bool matchesTuple(CanTupleType substType);
