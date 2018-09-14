@@ -221,10 +221,6 @@ fileprivate struct Timestamp : Codable, Equatable {
     var container = encoder.singleValueContainer()
     try container.encode(self.value)
   }
-
-  static func ==(_ lhs: Timestamp, _ rhs: Timestamp) -> Bool {
-    return lhs.value == rhs.value
-  }
 }
 
 /// A simple referential counter type that encodes as a single Int value.
@@ -263,14 +259,6 @@ fileprivate struct Address : Codable, Equatable {
         self.state = state
         self.zipCode = zipCode
         self.country = country
-    }
-
-    static func ==(_ lhs: Address, _ rhs: Address) -> Bool {
-        return lhs.street == rhs.street &&
-          lhs.city == rhs.city &&
-          lhs.state == rhs.state &&
-          lhs.zipCode == rhs.zipCode &&
-          lhs.country == rhs.country
     }
 
     static var testValue: Address {
@@ -347,10 +335,6 @@ struct Numbers : Codable, Equatable {
   func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(values)
-  }
-
-  static func ==(_ lhs: Numbers, _ rhs: Numbers) -> Bool {
-    return lhs.values == rhs.values
   }
 
   static var testValue: Numbers {
@@ -470,10 +454,6 @@ fileprivate struct Company : Codable, Equatable {
     init(address: Address, employees: [Employee]) {
         self.address = address
         self.employees = employees
-    }
-
-    static func ==(_ lhs: Company, _ rhs: Company) -> Bool {
-        return lhs.address == rhs.address && lhs.employees == rhs.employees
     }
 
     static var testValue: Company {
