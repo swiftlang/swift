@@ -83,7 +83,7 @@ extension UnicodeScalar {
 
   // Whether this scalar value always has a normalization boundary before it.
   internal var _hasNormalizationBoundaryBefore: Bool {
-    _sanityCheck(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
+    _invariant(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
     let value = Int32(bitPattern: self.value)
     return 0 != __swift_stdlib_unorm2_hasBoundaryBefore(
       _Normalization._nfcNormalizer, value)

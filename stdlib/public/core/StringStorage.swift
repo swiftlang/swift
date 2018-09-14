@@ -25,7 +25,7 @@ class _SwiftRawStringStorage : _SwiftNativeNSString {
 
   @nonobjc
   internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Use the create method")
+    _invariantFailure("Use the create method")
   }
 
   @inlinable
@@ -37,7 +37,7 @@ class _SwiftRawStringStorage : _SwiftNativeNSString {
   @inlinable
   @nonobjc
   final var unusedCapacity: Int {
-    _sanityCheck(capacity >= count)
+    _invariant(capacity >= count)
     return capacity - count
   }
 }
@@ -61,12 +61,12 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     capacity: Int,
     count: Int = 0
   ) -> _SwiftStringStorage<CodeUnit> {
-    _sanityCheck(count >= 0 && count <= capacity)
+    _invariant(count >= 0 && count <= capacity)
 
 #if arch(i386) || arch(arm)
 #else
     // TODO(SR-7594): Restore below invariant
-    // _sanityCheck(
+    // _invariant(
     //   CodeUnit.self != UInt8.self || capacity > _SmallUTF8String.capacity,
     //   "Should prefer a small representation")
 #endif // 64-bit
@@ -82,7 +82,7 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     ).assumingMemoryBound(to: CodeUnit.self)
     storage.capacity = endAddr - storage.start
     storage.count = count
-    _sanityCheck(storage.capacity >= capacity)
+    _invariant(storage.capacity >= capacity)
     return storage
   }
 
@@ -98,7 +98,7 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
   @objc(initWithCoder:)
   @usableFromInline
   convenience init(coder aDecoder: AnyObject) {
-    _sanityCheckFailure("init(coder:) not implemented for _SwiftStringStorage")
+    _invariantFailure("init(coder:) not implemented for _SwiftStringStorage")
   }
 
   @objc(length)
@@ -205,7 +205,7 @@ extension _SwiftStringStorage {
   )
   where OtherCodeUnit : FixedWidthInteger & UnsignedInteger {
     let otherCount = Int(other.count)
-    _sanityCheck(self.count + otherCount <= self.capacity)
+    _invariant(self.count + otherCount <= self.capacity)
     other._copy(into: self.unusedBuffer)
     self.count += otherCount
   }
@@ -213,7 +213,7 @@ extension _SwiftStringStorage {
   @nonobjc
   internal final func _appendInPlace(_ other: _UnmanagedOpaqueString) {
     let otherCount = Int(other.count)
-    _sanityCheck(self.count + otherCount <= self.capacity)
+    _invariant(self.count + otherCount <= self.capacity)
     other._copy(into: self.unusedBuffer)
     self.count += otherCount
   }
@@ -222,7 +222,7 @@ extension _SwiftStringStorage {
   internal final func _appendInPlace<C: Collection>(contentsOf other: C)
   where C.Element == CodeUnit {
     let otherCount = Int(other.count)
-    _sanityCheck(self.count + otherCount <= self.capacity)
+    _invariant(self.count + otherCount <= self.capacity)
     var (remainder, writtenUpTo) =
       other._copyContents(initializing: self.unusedBuffer)
     _precondition(remainder.next() == nil, "Collection underreported its count")
@@ -235,7 +235,7 @@ extension _SwiftStringStorage {
   internal final func _appendInPlaceUTF16<C: Collection>(contentsOf other: C)
   where C.Element == UInt16 {
     let otherCount = Int(other.count)
-    _sanityCheck(self.count + otherCount <= self.capacity)
+    _invariant(self.count + otherCount <= self.capacity)
     // TODO: Use _copyContents(initializing:) for UTF16->UTF16 case
     var it = other.makeIterator()
     for p in end ..< end + otherCount {
@@ -266,7 +266,7 @@ extension _SwiftStringStorage {
   internal final func _opaqueAppendInPlace(
     opaqueOther other: _StringGuts, range: Range<Int>
   ) {
-    _sanityCheck(other._isOpaque)
+    _invariant(other._isOpaque)
     if other._isSmall {
       other._smallUTF8String[range].withUnmanagedUTF16 {
         self._appendInPlace($0)
@@ -294,7 +294,7 @@ extension _SwiftStringStorage {
 
   @usableFromInline // @opaque
   internal final func _opaqueAppendInPlace(opaqueOther other: _StringGuts) {
-    _sanityCheck(other._isOpaque)
+    _invariant(other._isOpaque)
     if other._isSmall {
       other._smallUTF8String.withUnmanagedUTF16 {
         self._appendInPlace($0)

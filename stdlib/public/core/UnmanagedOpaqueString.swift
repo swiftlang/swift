@@ -135,7 +135,7 @@ extension _UnmanagedOpaqueString : Sequence {
     @inline(never)
     mutating func _nextOnSlowPath() -> Element {
       // Fill buffer
-      _sanityCheck(!_range.isEmpty)
+      _invariant(!_range.isEmpty)
       let end = Swift.min(
         _range.lowerBound + _buffer.capacity,
         _range.upperBound)
@@ -143,7 +143,7 @@ extension _UnmanagedOpaqueString : Sequence {
       let opaque = _UnmanagedOpaqueString(_object, range: r, isSlice: true)
       _buffer.count = r.count
       _buffer.withUnsafeMutableBufferPointer { b in
-        _sanityCheck(b.count == r.count)
+        _invariant(b.count == r.count)
         opaque._copy(into: b)
       }
       _bufferIndex = 1
@@ -203,8 +203,8 @@ extension _UnmanagedOpaqueString : RandomAccessCollection {
 
   @inlinable // FIXME(sil-serialize-all)
   subscript(position: Index) -> UTF16.CodeUnit {
-    _sanityCheck(position._value >= range.lowerBound)
-    _sanityCheck(position._value < range.upperBound)
+    _invariant(position._value >= range.lowerBound)
+    _invariant(position._value < range.upperBound)
 #if _runtime(_ObjC) // FIXME unify
     return _cocoaStringSubscript(object, position._value)
 #else
@@ -214,8 +214,8 @@ extension _UnmanagedOpaqueString : RandomAccessCollection {
 
   @inlinable // FIXME(sil-serialize-all)
   subscript(bounds: Range<Index>) -> _UnmanagedOpaqueString {
-    _sanityCheck(bounds.lowerBound._value >= range.lowerBound)
-    _sanityCheck(bounds.upperBound._value <= range.upperBound)
+    _invariant(bounds.lowerBound._value >= range.lowerBound)
+    _invariant(bounds.upperBound._value <= range.upperBound)
     let b: Range<Int> = bounds.lowerBound._value ..< bounds.upperBound._value
     let newSlice = self.isSlice || b.count != range.count
     return _UnmanagedOpaqueString(object, range: b, isSlice: newSlice)
@@ -263,7 +263,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
 
   @inlinable // FIXME(sil-serialize-all)
   subscript(offset: Int) -> UTF16.CodeUnit {
-    _sanityCheck(offset >= 0 && offset < count)
+    _invariant(offset >= 0 && offset < count)
 #if _runtime(_ObjC) // FIXME unify
     return _cocoaStringSubscript(object, range.lowerBound + offset)
 #else
@@ -273,8 +273,8 @@ extension _UnmanagedOpaqueString : _StringVariant {
 
   @inlinable // FIXME(sil-serialize-all)
   subscript(offsetRange: Range<Int>) -> _UnmanagedOpaqueString {
-    _sanityCheck(offsetRange.lowerBound >= 0)
-    _sanityCheck(offsetRange.upperBound <= range.count)
+    _invariant(offsetRange.lowerBound >= 0)
+    _invariant(offsetRange.upperBound <= range.count)
     let b: Range<Int> =
       range.lowerBound + offsetRange.lowerBound ..<
       range.lowerBound + offsetRange.upperBound
@@ -284,7 +284,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
 
   @inlinable // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeUpTo<Int>) -> SubSequence {
-    _sanityCheck(offsetRange.upperBound <= range.count)
+    _invariant(offsetRange.upperBound <= range.count)
     let b: Range<Int> =
       range.lowerBound ..<
       range.lowerBound + offsetRange.upperBound
@@ -294,7 +294,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
 
   @inlinable // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeThrough<Int>) -> SubSequence {
-    _sanityCheck(offsetRange.upperBound <= range.count)
+    _invariant(offsetRange.upperBound <= range.count)
     let b: Range<Int> =
       range.lowerBound ..<
       range.lowerBound + offsetRange.upperBound + 1
@@ -304,7 +304,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
 
   @inlinable // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeFrom<Int>) -> SubSequence {
-    _sanityCheck(offsetRange.lowerBound < range.count)
+    _invariant(offsetRange.lowerBound < range.count)
     let b: Range<Int> =
       range.lowerBound + offsetRange.lowerBound ..<
       range.upperBound
@@ -316,7 +316,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
   internal func _copy(
     into dest: UnsafeMutableBufferPointer<UTF16.CodeUnit>
   ) {
-    _sanityCheck(dest.count >= range.count)
+    _invariant(dest.count >= range.count)
     guard range.count > 0 else { return }
 #if _runtime(_ObjC) // FIXME unify
     _cocoaStringCopyCharacters(
@@ -334,9 +334,9 @@ extension _UnmanagedOpaqueString : _StringVariant {
   )
   where TargetCodeUnit : FixedWidthInteger & UnsignedInteger {
     guard TargetCodeUnit.bitWidth == 16 else {
-      _sanityCheckFailure("Narrowing copy from opaque strings is not implemented")
+      _invariantFailure("Narrowing copy from opaque strings is not implemented")
     }
-    _sanityCheck(dest.count >= range.count)
+    _invariant(dest.count >= range.count)
     guard range.count > 0 else { return }
     let d = UnsafeMutableRawPointer(dest.baseAddress!)
       .assumingMemoryBound(to: UTF16.CodeUnit.self)

@@ -35,10 +35,10 @@ struct _BridgeStorage<
   @inline(__always)
   public // @testable
   init(native: Native, bits: Int) {
-    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    _invariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
     
     // More bits are available on some platforms, but it's not portable
-    _sanityCheck(0...1 ~= bits,
+    _invariant(0...1 ~= bits,
         "BridgeStorage can't store bits outside the range 0...1")
 
     rawValue = _makeNativeBridgeObject(
@@ -49,7 +49,7 @@ struct _BridgeStorage<
   @inline(__always)
   public // @testable
   init(objC: ObjC) {
-    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    _invariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = _makeObjCBridgeObject(objC)
   }
   
@@ -57,7 +57,7 @@ struct _BridgeStorage<
   @inline(__always)
   public // @testable
   init(native: Native) {
-    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    _invariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = Builtin.reinterpretCast(native)
   }
   
@@ -65,7 +65,7 @@ struct _BridgeStorage<
   public // @testable
   var spareBits: Int {
   @inline(__always) get {
-    _sanityCheck(isNative)
+    _invariant(isNative)
     return Int(
       _nonPointerBits(rawValue) >> _objectPointerLowSpareBitShift)
     }
@@ -109,7 +109,7 @@ struct _BridgeStorage<
   public // @testable
   var nativeInstance: Native {
     @inline(__always) get {
-      _sanityCheck(isNative)
+      _invariant(isNative)
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
   }
@@ -118,8 +118,8 @@ struct _BridgeStorage<
   public // @testable
   var nativeInstance_noSpareBits: Native {
     @inline(__always) get {
-      _sanityCheck(isNative)
-      _sanityCheck(_nonPointerBits(rawValue) == 0)
+      _invariant(isNative)
+      _invariant(_nonPointerBits(rawValue) == 0)
       return Builtin.reinterpretCast(rawValue)
     }
   }
@@ -128,7 +128,7 @@ struct _BridgeStorage<
   @inline(__always)
   public // @testable
   mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
-    _sanityCheck(isNative)
+    _invariant(isNative)
     return _isUnique_native(&rawValue)
   }
 
@@ -136,7 +136,7 @@ struct _BridgeStorage<
   public // @testable
   var objCInstance: ObjC {
     @inline(__always) get {
-      _sanityCheck(isObjC)
+      _invariant(isObjC)
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
   }

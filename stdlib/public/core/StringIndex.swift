@@ -85,10 +85,10 @@ extension String.Index {
   @inlinable
   internal init(encodedOffset: Int, transcodedOffset: Int) {
     let cuOffset = UInt64(truncatingIfNeeded: encodedOffset)
-    _sanityCheck(
+    _invariant(
       cuOffset & 0xFFFF_0000_0000_0000 == 0, "String length capped at 48bits")
     let transOffset = UInt64(truncatingIfNeeded: transcodedOffset)
-    _sanityCheck(transOffset <= 4, "UTF-8 max transcoding is 4 code units")
+    _invariant(transOffset <= 4, "UTF-8 max transcoding is 4 code units")
 
     self._compoundOffset = cuOffset &<< 2 | transOffset
   }

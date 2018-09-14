@@ -66,9 +66,9 @@ where Encoding.EncodedScalar : RangeReplaceableCollection {
 
     // Find one unicode scalar.
     let (isValid, scalarBitCount) = _parseMultipleCodeUnits()
-    _sanityCheck(scalarBitCount % numericCast(Encoding.CodeUnit.bitWidth) == 0)
-    _sanityCheck(1...4 ~= scalarBitCount / 8)
-    _sanityCheck(scalarBitCount <= _buffer._bitCount)
+    _invariant(scalarBitCount % numericCast(Encoding.CodeUnit.bitWidth) == 0)
+    _invariant(1...4 ~= scalarBitCount / 8)
+    _invariant(scalarBitCount <= _buffer._bitCount)
     
     // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
     let encodedScalar = _bufferedScalar(bitCount: scalarBitCount)

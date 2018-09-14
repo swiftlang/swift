@@ -64,7 +64,7 @@ internal func _loadPartialUnalignedUInt64LE(
   case 0:
     return result
   default:
-    _sanityCheckFailure()
+    _invariantFailure()
   }
 }
 
@@ -94,7 +94,7 @@ internal struct _HasherTailBuffer {
     // behavior in the expression type checker <rdar://problem/42672946>.
     let shiftedByteCount: UInt64 = ((byteCount & 7) << 3)
     let mask: UInt64 = (1 << shiftedByteCount - 1)
-    _sanityCheck(tail & ~mask == 0)
+    _invariant(tail & ~mask == 0)
     self.value = (byteCount &<< 56 | tail)
   }
 
@@ -129,8 +129,8 @@ internal struct _HasherTailBuffer {
   @inline(__always)
   internal
   mutating func append(_ bytes: UInt64, count: UInt64) -> UInt64? {
-    _sanityCheck(count >= 0 && count < 8)
-    _sanityCheck(bytes & ~((1 &<< (count &<< 3)) &- 1) == 0)
+    _invariant(count >= 0 && count < 8)
+    _invariant(bytes & ~((1 &<< (count &<< 3)) &- 1) == 0)
     let c = byteCount & 7
     let shift = c &<< 3
     if c + count < 8 {
@@ -196,7 +196,7 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 
   @inline(__always)
   internal mutating func combine(bytes: UInt64, count: Int) {
-    _sanityCheck(count >= 0 && count < 8)
+    _invariant(count >= 0 && count < 8)
     let count = UInt64(truncatingIfNeeded: count)
     if let chunk = _buffer.append(bytes, count: count) {
       _core.compress(chunk)
@@ -221,7 +221,7 @@ internal struct _BufferingHasher<Core: _HasherCore> {
         remaining -= c
       }
     }
-    _sanityCheck(
+    _invariant(
       remaining == 0 ||
       Int(bitPattern: data) & (MemoryLayout<UInt64>.alignment - 1) == 0)
 
@@ -233,7 +233,7 @@ internal struct _BufferingHasher<Core: _HasherCore> {
     }
 
     // Load last partial word of data
-    _sanityCheck(remaining >= 0 && remaining < 8)
+    _invariant(remaining >= 0 && remaining < 8)
     if remaining > 0 {
       let chunk = _loadPartialUnalignedUInt64LE(data, byteCount: remaining)
       combine(bytes: chunk, count: remaining)
@@ -431,12 +431,12 @@ public struct Hasher {
   internal static func _hash(seed: (UInt64, UInt64), _ value: UInt) -> Int {
     var core = RawCore(seed: seed)
 #if arch(i386) || arch(arm)
-    _sanityCheck(UInt.bitWidth < UInt64.bitWidth)
+    _invariant(UInt.bitWidth < UInt64.bitWidth)
     let tbc = _HasherTailBuffer(
       tail: UInt64(truncatingIfNeeded: value),
       byteCount: UInt.bitWidth &>> 3)
 #else
-    _sanityCheck(UInt.bitWidth == UInt64.bitWidth)
+    _invariant(UInt.bitWidth == UInt64.bitWidth)
     core.compress(UInt64(truncatingIfNeeded: value))
     let tbc = _HasherTailBuffer(tail: 0, byteCount: 8)
 #endif
@@ -449,7 +449,7 @@ public struct Hasher {
     seed: (UInt64, UInt64),
     bytes value: UInt64,
     count: Int) -> Int {
-    _sanityCheck(count >= 0 && count < 8)
+    _invariant(count >= 0 && count < 8)
     var core = RawCore(seed: seed)
     let tbc = _HasherTailBuffer(tail: value, byteCount: count)
     return Int(truncatingIfNeeded: core.finalize(tailAndByteCount: tbc.value))

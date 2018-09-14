@@ -990,7 +990,7 @@ struct StructWithLayout {
 // call UInt.init(_builtinIntegerLiteral:)
 // CHECK: apply
 // call default argument
-// call _sanityCheck(_:_:file:line:)
+// call _invariant(_:_:file:line:)
 // CHECK: apply %{{.*}}([[CLOSURE]], {{.*}})
 // CHECK: load [trivial] [[PROJ]] : $*StructWithLayout
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify16StructWithLayoutVACycfC'

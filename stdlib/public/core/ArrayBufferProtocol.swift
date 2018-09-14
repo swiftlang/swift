@@ -151,7 +151,7 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
     with newCount: Int,
     elementsOf newValues: C
   ) where C : Collection, C.Element == Element {
-    _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
+    _invariant(startIndex == 0, "_SliceBuffer should override this function.")
     let oldCount = self.count
     let eraseCount = subrange.count
 

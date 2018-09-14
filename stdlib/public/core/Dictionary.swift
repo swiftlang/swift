@@ -538,7 +538,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   are reference types).
   @inlinable
   public init(_immutableCocoaDictionary: _NSDictionary) {
-    _sanityCheck(
+    _invariant(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
       "Dictionary can be backed by NSDictionary buffer only when both key and value are bridged verbatim to Objective-C")
@@ -807,10 +807,10 @@ extension Dictionary {
       var native = _variant.asNative
       if rehashed {
         // Key needs to be hashed again if storage has been resized.
-        _sanityCheck(!found)
+        _invariant(!found)
         idealBucket = native._bucket(key)
         (pos, found) = native._find(key, startBucket: idealBucket)
-        _sanityCheck(!found)
+        _invariant(!found)
       }
       // FIXME: Mark this entry as being modified in hash table metadata
       // so that lldb can recognize it's not valid.
@@ -1852,7 +1852,7 @@ internal class _RawNativeDictionaryStorage
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Only create this by using the `empty` singleton")
+    _invariantFailure("Only create this by using the `empty` singleton")
   }
 
 #if _runtime(_ObjC)
@@ -1899,7 +1899,7 @@ internal class _RawNativeDictionaryStorage
     forKeys: UnsafeRawPointer,
     count: Int
   ) {
-    _sanityCheckFailure("don't call this designated initializer")
+    _invariantFailure("don't call this designated initializer")
   }
 
   @objc(objectForKey:)
@@ -1953,7 +1953,7 @@ internal class _TypedNativeDictionaryStorage<Key, Value>
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   override internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Only create this by calling Buffer's inits")
+    _invariantFailure("Only create this by calling Buffer's inits")
   }
 
 #if _runtime(_ObjC)
@@ -1963,7 +1963,7 @@ internal class _TypedNativeDictionaryStorage<Key, Value>
     forKeys: UnsafeRawPointer,
     count: Int
   ) {
-    _sanityCheckFailure("don't call this designated initializer")
+    _invariantFailure("don't call this designated initializer")
   }
 #endif
 }
@@ -1977,7 +1977,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   override internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Only create this by calling Buffer's inits'")
+    _invariantFailure("Only create this by calling Buffer's inits'")
   }
 
 #if _runtime(_ObjC)
@@ -2055,7 +2055,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
     forKeys: UnsafeRawPointer,
     count: Int
   ) {
-    _sanityCheckFailure("don't call this designated initializer")
+    _invariantFailure("don't call this designated initializer")
   }
 
   @objc(objectForKey:)
@@ -2233,8 +2233,8 @@ internal struct _NativeDictionary<Key, Value> {
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal func key(at i: Int) -> Key {
-    _sanityCheck(i >= 0 && i < bucketCount)
-    _sanityCheck(isInitializedEntry(at: i))
+    _invariant(i >= 0 && i < bucketCount)
+    _invariant(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
     let res = (keys + i).pointee
@@ -2263,7 +2263,7 @@ internal struct _NativeDictionary<Key, Value> {
 
   @inlinable // FIXME(sil-serialize-all)
   internal func isInitializedEntry(at i: Int) -> Bool {
-    _sanityCheck(i >= 0 && i < bucketCount)
+    _invariant(i >= 0 && i < bucketCount)
     defer { _fixLifetime(self) }
 
     return _storage.initializedEntries[i]
@@ -2271,7 +2271,7 @@ internal struct _NativeDictionary<Key, Value> {
 
   @usableFromInline @_transparent
   internal func destroyEntry(at i: Int) {
-    _sanityCheck(isInitializedEntry(at: i))
+    _invariant(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
     (keys + i).deinitialize(count: 1)
@@ -2288,7 +2288,7 @@ internal struct _NativeDictionary<Key, Value> {
   // This assumes the value is already deinitialized.
   @inlinable
   internal func destroyHalfEntry(at bucket: Int) {
-    _sanityCheck(isInitializedEntry(at: bucket))
+    _invariant(isInitializedEntry(at: bucket))
     defer { _fixLifetime(self) }
     (keys + bucket).deinitialize(count: 1)
     _storage.initializedEntries[bucket] = false
@@ -2296,7 +2296,7 @@ internal struct _NativeDictionary<Key, Value> {
 
   @usableFromInline @_transparent
   internal func initializeKey(_ k: Key, value v: Value, at i: Int) {
-    _sanityCheck(!isInitializedEntry(at: i))
+    _invariant(!isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
     (keys + i).initialize(to: k)
@@ -2309,7 +2309,7 @@ internal struct _NativeDictionary<Key, Value> {
     from: _NativeDictionary,
     at: Int,
     toEntryAt: Int) {
-    _sanityCheck(!isInitializedEntry(at: toEntryAt))
+    _invariant(!isInitializedEntry(at: toEntryAt))
     defer { _fixLifetime(self) }
 
     (keys + toEntryAt).initialize(to: (from.keys + at).move())
@@ -2320,7 +2320,7 @@ internal struct _NativeDictionary<Key, Value> {
 
   @usableFromInline @_transparent
   internal func value(at i: Int) -> Value {
-    _sanityCheck(isInitializedEntry(at: i))
+    _invariant(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
     return (values + i).pointee
@@ -2328,7 +2328,7 @@ internal struct _NativeDictionary<Key, Value> {
 
   @usableFromInline @_transparent
   internal func setKey(_ key: Key, value: Value, at i: Int) {
-    _sanityCheck(isInitializedEntry(at: i))
+    _invariant(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
     (keys + i).pointee = key
@@ -2389,7 +2389,7 @@ extension _NativeDictionary where Key: Hashable {
   internal init(bucketCount: Int) {
     // Actual bucket count is the next power of 2 greater than or equal to
     // bucketCount. Make sure that is representable.
-    _sanityCheck(bucketCount <= (Int.max >> 1) + 1)
+    _invariant(bucketCount <= (Int.max >> 1) + 1)
     let buckets = 1 &<< ((Swift.max(bucketCount, 2) - 1)._binaryLogarithm() + 1)
     self.init(_exactBucketCount: buckets)
   }
@@ -2554,7 +2554,7 @@ extension _NativeDictionary where Key: Hashable {
   /// bucket.
   @inlinable // FIXME(sil-serialize-all)
   internal mutating func _delete(idealBucket: Int, bucket: Int) {
-    _sanityCheck(isInitializedEntry(at: bucket), "expected initialized entry")
+    _invariant(isInitializedEntry(at: bucket), "expected initialized entry")
 
     // remove the element
     destroyEntry(at: bucket)
@@ -2563,7 +2563,7 @@ extension _NativeDictionary where Key: Hashable {
 
   @inlinable // FIXME(sil-serialize-all)
   internal mutating func _deleteDestroyed(idealBucket: Int, bucket: Int) {
-    _sanityCheck(!isInitializedEntry(at: bucket), "expected initialized entry")
+    _invariant(!isInitializedEntry(at: bucket), "expected initialized entry")
 
     self.count -= 1
 
@@ -2688,7 +2688,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key, Value>
   internal var endIndex: _NativeDictionary<Key, Value>.Index
 
   internal override required init() {
-    _sanityCheckFailure("don't call this designated initializer")
+    _invariantFailure("don't call this designated initializer")
   }
 
   internal init(_ base: _NativeDictionary<Key, Value>) {
@@ -2840,7 +2840,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     forKeys: UnsafeRawPointer,
     count: Int
   ) {
-    _sanityCheckFailure("don't call this designated initializer")
+    _invariantFailure("don't call this designated initializer")
   }
 
   @objc(copyWithZone:)
@@ -3052,7 +3052,7 @@ internal struct _CocoaDictionary: _DictionaryBuffer {
         break
       }
     }
-    _sanityCheck(keyIndex >= 0,
+    _invariant(keyIndex >= 0,
         "Key was found in fast path, but not found later?")
     return Index(self, allKeys, keyIndex)
   }
@@ -3079,7 +3079,7 @@ internal struct _CocoaDictionary: _DictionaryBuffer {
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   internal mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
-    _sanityCheckFailure("cannot mutate NSDictionary")
+    _invariantFailure("cannot mutate NSDictionary")
   }
 
   @usableFromInline
@@ -3164,7 +3164,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
         return native
 #if _runtime(_ObjC)
       case .cocoa:
-        _sanityCheckFailure("internal error: not backed by native buffer")
+        _invariantFailure("internal error: not backed by native buffer")
 #endif
       }
     }
@@ -3188,7 +3188,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
   internal var asCocoa: _CocoaDictionary {
     switch self {
     case .native:
-      _sanityCheckFailure("internal error: not backed by NSDictionary")
+      _invariantFailure("internal error: not backed by NSDictionary")
     case .cocoa(let cocoaDictionary):
       return cocoaDictionary
     }
@@ -3312,7 +3312,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @usableFromInline
   internal mutating func migrateToNative(_ cocoa: _CocoaDictionary) {
     let allocated = ensureUniqueNative(withCapacity: cocoa.count).reallocated
-    _sanityCheck(allocated, "failed to allocate native Dictionary buffer")
+    _invariant(allocated, "failed to allocate native Dictionary buffer")
   }
 #endif
 
@@ -3749,7 +3749,7 @@ extension Dictionary._Variant: _DictionaryBuffer {
     if capacityChanged {
       idealBucket = native._bucket(key)
       (index, found) = native._find(key, startBucket: idealBucket)
-      _sanityCheck(found, "key was lost during buffer migration")
+      _invariant(found, "key was lost during buffer migration")
     }
     let oldValue = native.value(at: index.bucket)
     native._delete(idealBucket: idealBucket, bucket: index.bucket)
@@ -4084,7 +4084,7 @@ extension Dictionary.Index {
       return nativeIndex
 #if _runtime(_ObjC)
     case .cocoa:
-      _sanityCheckFailure("internal error: does not contain a native index")
+      _invariantFailure("internal error: does not contain a native index")
 #endif
     }
   }
@@ -4094,7 +4094,7 @@ extension Dictionary.Index {
   internal var _asCocoa: _CocoaDictionary.Index {
     switch _variant {
     case .native:
-      _sanityCheckFailure("internal error: does not contain a Cocoa index")
+      _invariantFailure("internal error: does not contain a Cocoa index")
     case .cocoa(let cocoaIndex):
       return cocoaIndex
     }
@@ -4367,7 +4367,7 @@ extension Dictionary.Iterator {
         return nativeIterator
 #if _runtime(_ObjC)
       case .cocoa:
-        _sanityCheckFailure("internal error: does not contain a native index")
+        _invariantFailure("internal error: does not contain a native index")
 #endif
       }
     }
@@ -4506,7 +4506,7 @@ extension Dictionary {
   @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
     _variant.reserveCapacity(minimumCapacity)
-    _sanityCheck(self.capacity >= minimumCapacity)
+    _invariant(self.capacity >= minimumCapacity)
   }
 }
 

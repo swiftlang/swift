@@ -70,13 +70,13 @@ extension _StringGuts {
 #if INTERNAL_CHECKS_ENABLED
     _object._invariantCheck()
     if _object.isNative {
-      _sanityCheck(UInt(_object.nativeRawStorage.count) == self._otherBits)
+      _invariant(UInt(_object.nativeRawStorage.count) == self._otherBits)
     } else if _object.isUnmanaged {
     } else if _object.isCocoa {
       if _object.isContiguous {
-        _sanityCheck(_isValidAddress(_otherBits))
+        _invariant(_isValidAddress(_otherBits))
       } else {
-        _sanityCheck(_otherBits == 0)
+        _invariant(_otherBits == 0)
       }
     } else if _object.isSmall {
       _smallUTF8String._invariantCheck()
@@ -85,12 +85,12 @@ extension _StringGuts {
     }
 
 #if arch(i386) || arch(arm)
-  _sanityCheck(MemoryLayout<String>.size == 12, """
+  _invariant(MemoryLayout<String>.size == 12, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
     """)
 #else
-  _sanityCheck(MemoryLayout<String>.size == 16, """
+  _invariant(MemoryLayout<String>.size == 16, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
     """)
@@ -178,12 +178,12 @@ extension _StringGuts {
   internal
   var _nativeCount: Int {
     @inline(__always) get {
-      _sanityCheck(_object.isNative)
+      _invariant(_object.isNative)
       return Int(bitPattern: _otherBits)
     }
     @inline(__always) set {
-      _sanityCheck(_object.isNative)
-      _sanityCheck(newValue >= 0)
+      _invariant(_object.isNative)
+      _invariant(newValue >= 0)
       _otherBits = UInt(bitPattern: newValue)
     }
   }
@@ -194,7 +194,7 @@ extension _StringGuts {
   internal
   init<CodeUnit>(_large storage: _SwiftStringStorage<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(storage.count >= 0)
+    _invariant(storage.count >= 0)
     self.init(
       object: _StringObject(storage),
       otherBits: UInt(bitPattern: storage.count))
@@ -226,7 +226,7 @@ extension _StringGuts {
   var _cocoaCount: Int {
     @inline(__always)
     get {
-      _sanityCheck(_object.isCocoa)
+      _invariant(_object.isCocoa)
       defer { _fixLifetime(self) }
       return _StringGuts.getCocoaLength(
         _unsafeBitPattern: _object.referenceBits)
@@ -238,8 +238,8 @@ extension _StringGuts {
   var _cocoaRawStart: UnsafeRawPointer {
     @inline(__always)
     get {
-      _sanityCheck(_object.isContiguousCocoa)
-      _sanityCheck(_isValidAddress(_otherBits))
+      _invariant(_object.isContiguousCocoa)
+      _invariant(_isValidAddress(_otherBits))
       return UnsafeRawPointer(
         bitPattern: _otherBits
       )._unsafelyUnwrappedUnchecked
@@ -251,8 +251,8 @@ extension _StringGuts {
     of codeUnit: CodeUnit.Type = CodeUnit.self
   ) -> _UnmanagedString<CodeUnit>
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(_object.isContiguousCocoa)
-    _sanityCheck(CodeUnit.bitWidth == _object.bitWidth)
+    _invariant(_object.isContiguousCocoa)
+    _invariant(CodeUnit.bitWidth == _object.bitWidth)
     let start = _cocoaRawStart.assumingMemoryBound(to: CodeUnit.self)
     return _UnmanagedString(start: start, count: _cocoaCount)
   }
@@ -266,7 +266,7 @@ extension _StringGuts {
     isSingleByte: Bool,
     start: UnsafeRawPointer?
   ) {
-    _sanityCheck(!_isObjCTaggedPointer(s))
+    _invariant(!_isObjCTaggedPointer(s))
     guard count > 0 else {
       self.init()
       return
@@ -278,9 +278,9 @@ extension _StringGuts {
         isContiguous: start != nil),
       otherBits: UInt(bitPattern: start))
     if start == nil {
-      _sanityCheck(_object.isOpaque)
+      _invariant(_object.isOpaque)
     } else {
-      _sanityCheck(_object.isContiguous)
+      _invariant(_object.isContiguous)
     }
   }
 }
@@ -302,7 +302,7 @@ extension _StringGuts {
   @inlinable
   internal var _unmanagedRawStart: UnsafeRawPointer {
     @inline(__always) get {
-      _sanityCheck(_object.isUnmanaged)
+      _invariant(_object.isUnmanaged)
       return _object.asUnmanagedRawStart
     }
   }
@@ -310,7 +310,7 @@ extension _StringGuts {
   @inlinable
   internal var _unmanagedCount: Int {
     @inline(__always) get {
-      _sanityCheck(_object.isUnmanaged)
+      _invariant(_object.isUnmanaged)
       return Int(bitPattern: _otherBits)
     }
   }
@@ -322,11 +322,11 @@ extension _StringGuts {
     of codeUnit: CodeUnit.Type = CodeUnit.self
   ) -> _UnmanagedString<CodeUnit>
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(_object.isUnmanaged)
-    _sanityCheck(CodeUnit.bitWidth == _object.bitWidth)
+    _invariant(_object.isUnmanaged)
+    _invariant(CodeUnit.bitWidth == _object.bitWidth)
     let start = _unmanagedRawStart.assumingMemoryBound(to: CodeUnit.self)
     let count = _unmanagedCount
-    _sanityCheck(count >= 0)
+    _invariant(count >= 0)
     return _UnmanagedString(start: start, count: count)
   }
 
@@ -334,13 +334,13 @@ extension _StringGuts {
   @inlinable
   init<CodeUnit>(_large s: _UnmanagedString<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(s.count >= 0)
+    _invariant(s.count >= 0)
     self.init(
       object: _StringObject(unmanaged: s.start),
       otherBits: UInt(bitPattern: s.count))
-    _sanityCheck(_object.isUnmanaged)
-    _sanityCheck(_unmanagedRawStart == s.rawStart)
-    _sanityCheck(_unmanagedCount == s.count)
+    _invariant(_object.isUnmanaged)
+    _invariant(_unmanagedRawStart == s.rawStart)
+    _invariant(_unmanagedCount == s.count)
     _invariantCheck()
   }
 }
@@ -389,14 +389,14 @@ extension _StringGuts {
   var _unmanagedASCIIView: _UnmanagedString<UInt8> {
     @_effects(readonly)
     get {
-      _sanityCheck(_object.isContiguousASCII)
+      _invariant(_object.isContiguousASCII)
       if _object.isUnmanaged {
         return _asUnmanaged()
       } else if _object.isNative {
         return _object.nativeStorage(of: UInt8.self).unmanagedView
       } else {
 #if _runtime(_ObjC)
-        _sanityCheck(_object.isContiguousCocoa)
+        _invariant(_object.isContiguousCocoa)
         return _asContiguousCocoa(of: UInt8.self)
 #else
         Builtin.unreachable()
@@ -410,14 +410,14 @@ extension _StringGuts {
   var _unmanagedUTF16View: _UnmanagedString<UTF16.CodeUnit> {
     @_effects(readonly)
     get {
-      _sanityCheck(_object.isContiguousUTF16)
+      _invariant(_object.isContiguousUTF16)
       if _object.isUnmanaged {
         return _asUnmanaged()
       } else if _object.isNative {
         return _object.nativeStorage(of: UTF16.CodeUnit.self).unmanagedView
       } else {
 #if _runtime(_ObjC)
-        _sanityCheck(_object.isContiguousCocoa)
+        _invariant(_object.isContiguousCocoa)
         return _asContiguousCocoa(of: UTF16.CodeUnit.self)
 #else
         Builtin.unreachable()
@@ -483,10 +483,10 @@ extension _StringGuts {
     if _object.isSmall {
       fatalError("Invariant violated: opaque small strings")
     }
-    _sanityCheck(_object.isNoncontiguousCocoa)
+    _invariant(_object.isNoncontiguousCocoa)
     return _UnmanagedOpaqueString(_object.asCocoaObject, count: _cocoaCount)
 #else
-    _sanityCheck(_object.isOpaque)
+    _invariant(_object.isOpaque)
     return _UnmanagedOpaqueString(_object.asOpaqueObject, count: _opaqueCount)
 #endif
   }
@@ -643,7 +643,7 @@ extension _StringGuts {
     unusedCapacity: Int = 0
   ) -> _SwiftStringStorage<CodeUnit>
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(unusedCapacity >= 0)
+    _invariant(unusedCapacity >= 0)
     let storage = _SwiftStringStorage<CodeUnit>.create(
       capacity: range.count + unusedCapacity,
       count: range.count)
@@ -787,7 +787,7 @@ extension _StringGuts {
     }
 
     // TODO(StringObject): Mask off the high bits
-    _sanityCheck(Int(self._otherBits) >= 0)
+    _invariant(Int(self._otherBits) >= 0)
     return Int(bitPattern: self._otherBits)
   }
 
@@ -800,10 +800,10 @@ extension _StringGuts {
         return _object.smallUTF8Count
       }
 #if _runtime(_ObjC)
-      _sanityCheck(_object.isCocoa)
+      _invariant(_object.isCocoa)
       return _cocoaCount
 #else
-      _sanityCheck(_object.isOpaque)
+      _invariant(_object.isOpaque)
       return _opaqueCount
 #endif
     }
@@ -831,7 +831,7 @@ extension _StringGuts {
 
   @usableFromInline // @opaque
   func _opaqueCodeUnit(atCheckedOffset offset: Int) -> UTF16.CodeUnit {
-    _sanityCheck(_isOpaque)
+    _invariant(_isOpaque)
     // TODO: ascii fast path, and reconsider this whole API anyways
     if self._isSmall {
       return self._smallUTF8String.withUnmanagedASCII {
@@ -849,8 +849,8 @@ extension _StringGuts {
     range: Range<Int>,
     into dest: UnsafeMutableBufferPointer<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(CodeUnit.bitWidth == 8 || CodeUnit.bitWidth == 16)
-    _sanityCheck(dest.count >= range.count)
+    _invariant(CodeUnit.bitWidth == 8 || CodeUnit.bitWidth == 16)
+    _invariant(dest.count >= range.count)
     if _slowPath(_isOpaque) {
       _opaqueCopy(range: range, into: dest)
       return
@@ -868,7 +868,7 @@ extension _StringGuts {
     range: Range<Int>,
     into dest: UnsafeMutableBufferPointer<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
-    _sanityCheck(_isOpaque)
+    _invariant(_isOpaque)
     if _fastPath(self._isSmall) {
       var slice = self._smallUTF8String[range]
       slice._copy(into: dest)
@@ -1018,7 +1018,7 @@ extension _StringGuts {
       return
     }
 
-    _sanityCheck(other._isOpaque)
+    _invariant(other._isOpaque)
     defer { _fixLifetime(other) }
     self.append(other._asOpaque())
   }
@@ -1026,7 +1026,7 @@ extension _StringGuts {
   @usableFromInline
   internal
   mutating func append(_ other: _StringGuts, range: Range<Int>) {
-    _sanityCheck(range.lowerBound >= 0 && range.upperBound <= other.count)
+    _invariant(range.lowerBound >= 0 && range.upperBound <= other.count)
     guard range.count > 0 else { return }
     if _isEmptySingleton && range.count == other.count {
       self = other
@@ -1053,7 +1053,7 @@ extension _StringGuts {
       return
     }
 
-    _sanityCheck(other._isOpaque)
+    _invariant(other._isOpaque)
     defer { _fixLifetime(other) }
     self.append(other._asOpaque()[range])
   }
@@ -1108,7 +1108,7 @@ extension _StringGuts {
       // We have unique native storage of the correct code unit,
       // with enough capacity to do the replacement inline.
       unowned(unsafe) let storage = _object.nativeStorage(of: CodeUnit.self)
-      _sanityCheck(storage.unusedCapacity >= deltaCount)
+      _invariant(storage.unusedCapacity >= deltaCount)
       let tailCount = storage.count - bounds.upperBound
       _precondition(tailCount >= 0,
         "replaceSubrange: subrange extends past String end")
@@ -1160,7 +1160,7 @@ extension _StringGuts {
     _copy(
       range: suffixRange,
       into: UnsafeMutableBufferPointer(start: dst, count: suffixRange.count))
-    _sanityCheck(dst + suffixRange.count == storage.end)
+    _invariant(dst + suffixRange.count == storage.end)
     self = _StringGuts(_large: storage)
     _invariantCheck()
   }
@@ -1241,11 +1241,11 @@ extension _SwiftStringStorage {
       from: Encoding.self,
       to: UTF16.self,
       stoppingOnError: false) { cu in
-      _sanityCheck(p < end)
+      _invariant(p < end)
       p.pointee = CodeUnit(cu)
       p += 1
     }
-    _sanityCheck(p == end)
+    _invariant(p == end)
     return hadError
   }
 }

@@ -62,10 +62,10 @@ extension String {
     utf16: /*@convention(thin)*/ (_UnmanagedString<UInt16>) -> Result,
     opaque: /*@convention(thin)*/ (_UnmanagedOpaqueString) -> Result
   ) -> Result {
-    _sanityCheck(_guts._isOpaque)
+    _invariant(_guts._isOpaque)
 
     if _guts._isSmall {
-      _sanityCheck(_guts._object._isSmallUTF8, "no other small forms yet")
+      _invariant(_guts._object._isSmallUTF8, "no other small forms yet")
       let small = _guts._smallUTF8String
       if small.isASCII {
         return small.withUnmanagedASCII { view in
@@ -150,10 +150,10 @@ extension String {
     utf16: /*@convention(thin)*/ (_UnmanagedString<UInt16>, T) -> Result,
     opaque: /*@convention(thin)*/ (_UnmanagedOpaqueString, T) -> Result
   ) -> Result {
-    _sanityCheck(_guts._isOpaque)
+    _invariant(_guts._isOpaque)
 
     if _fastPath(_guts._isSmall) {
-      _sanityCheck(_guts._object._isSmallUTF8, "no other small forms yet")
+      _invariant(_guts._object._isSmallUTF8, "no other small forms yet")
       let small = _guts._smallUTF8String
       if small.isASCII {
         return small.withUnmanagedASCII { view in

@@ -846,7 +846,7 @@ extension ArraySlice: RangeReplaceableCollection, ArrayProtocol {
       _buffer = _Buffer(
         _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
     }
-    _sanityCheck(capacity >= minimumCapacity)
+    _invariant(capacity >= minimumCapacity)
   }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
@@ -874,9 +874,9 @@ extension ArraySlice: RangeReplaceableCollection, ArrayProtocol {
   @_semantics("array.mutate_unknown")
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // This is a performance optimization. This code used to be in an ||
-    // statement in the _sanityCheck below.
+    // statement in the _invariant below.
     //
-    //   _sanityCheck(_buffer.capacity == 0 ||
+    //   _invariant(_buffer.capacity == 0 ||
     //                _buffer.isMutableAndUniquelyReferenced())
     //
     // SR-6437
@@ -891,7 +891,7 @@ extension ArraySlice: RangeReplaceableCollection, ArrayProtocol {
     // This specific case is okay because we will make the buffer unique in this
     // function because we request a capacity > 0 and therefore _copyToNewBuffer
     // will be called creating a new buffer.
-    _sanityCheck(capacity ||
+    _invariant(capacity ||
                  _buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
@@ -905,8 +905,8 @@ extension ArraySlice: RangeReplaceableCollection, ArrayProtocol {
     _ oldCount: Int,
     newElement: Element
   ) {
-    _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
-    _sanityCheck(_buffer.capacity >= _buffer.count + 1)
+    _invariant(_buffer.isMutableAndUniquelyReferenced())
+    _invariant(_buffer.capacity >= _buffer.count + 1)
 
     _buffer.count = oldCount + 1
     (_buffer.firstElementAddress + oldCount).initialize(to: newElement)

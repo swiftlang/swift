@@ -744,7 +744,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
         expectFalse(lhs >= rhs)
         expectFalse(lhs > rhs)
       } else {
-        // The sane case.
+        // The reasonable case.
         checkFloatingPointComparison_${FloatSelf}(
           lhsIdx < rhsIdx ?
             ExpectedComparisonResult.lt :

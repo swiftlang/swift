@@ -27,8 +27,8 @@ internal struct _ArrayBody {
   internal init(
     count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false
   ) {
-    _sanityCheck(count >= 0)
-    _sanityCheck(capacity >= 0)
+    _invariant(count >= 0)
+    _invariant(capacity >= 0)
     
     _storage = _SwiftArrayBodyStorage(
       count: count,

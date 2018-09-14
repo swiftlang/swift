@@ -206,7 +206,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
     } 
     
     //exactly one of the buffers should have code units for us to return
-    _sanityCheck((segmentBufferCount == 0) 
+    _invariant((segmentBufferCount == 0) 
               != ((overflowBuffer?.count ?? 0) == 0))
     
     if segmentBufferIndex < segmentBufferCount {
@@ -214,7 +214,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
       segmentBufferIndex += 1
       return segmentBuffer[index]
     } else if overflowBufferIndex < overflowBufferCount {
-      _sanityCheck(overflowBufferIndex < overflowBuffer!.count)
+      _invariant(overflowBufferIndex < overflowBuffer!.count)
       let index = overflowBufferIndex
       overflowBufferIndex += 1
       return overflowBuffer![index]

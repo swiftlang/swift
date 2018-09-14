@@ -29,7 +29,7 @@ extension _StringGuts {
     }
     if left._isSmall && right._isSmall {
       // TODO: Ensure normality when adding UTF-8 support
-      _sanityCheck(left._isASCIIOrSmallASCII && right._isASCIIOrSmallASCII,
+      _invariant(left._isASCIIOrSmallASCII && right._isASCIIOrSmallASCII,
         "Need to ensure normality")
 
       // Equal small strings should be bitwise equal if ASCII

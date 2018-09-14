@@ -622,7 +622,7 @@ extension UTF8.CodeUnit : _StringElement {
   @inlinable // FIXME(sil-serialize-all)
   public // @testable
   static func _toUTF16CodeUnit(_ x: UTF8.CodeUnit) -> UTF16.CodeUnit {
-    _sanityCheck(x <= 0x7f, "should only be doing this with ASCII")
+    _invariant(x <= 0x7f, "should only be doing this with ASCII")
     return UTF16.CodeUnit(truncatingIfNeeded: x)
   }
   @inlinable // FIXME(sil-serialize-all)
@@ -630,7 +630,7 @@ extension UTF8.CodeUnit : _StringElement {
   static func _fromUTF16CodeUnit(
     _ utf16: UTF16.CodeUnit
   ) -> UTF8.CodeUnit {
-    _sanityCheck(utf16 <= 0x7f, "should only be doing this with ASCII")
+    _invariant(utf16 <= 0x7f, "should only be doing this with ASCII")
     return UTF8.CodeUnit(truncatingIfNeeded: utf16)
   }
 }
@@ -878,9 +878,9 @@ extension Unicode.Scalar {
   /// precondition checks for code point validity.
   @inlinable // FIXME(sil-serialize-all)
   internal init(_unchecked value: UInt32) {
-    _sanityCheck(value < 0xD800 || value > 0xDFFF,
+    _invariant(value < 0xD800 || value > 0xDFFF,
       "high- and low-surrogate code points are not valid Unicode scalar values")
-    _sanityCheck(value <= 0x10FFFF, "value is outside of Unicode codespace")
+    _invariant(value <= 0x10FFFF, "value is outside of Unicode codespace")
 
     self._value = value
   }
