@@ -2238,8 +2238,9 @@ checkAndDiagnoseWrtType(TypeChecker &TC, SourceLoc loc, Type type) {
   return false;
 }
 
-// If the self type of `method`, appends the corresponding return type
-// to `retElts` and returns false. Otherwise, returns true and diagnoses.
+// If the self type of `method` is allowed as a wrt param, appends the
+// corresponding return type to `retElts` and returns false. Otherwise,
+// returns true and diagnoses.
 static bool
 addWrtSelfRetTyOrDiagnose(TypeChecker &TC, SourceLoc loc,
                           const FuncDecl *method,
