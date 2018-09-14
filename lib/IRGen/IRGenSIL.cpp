@@ -720,31 +720,25 @@ public:
   }
 
   /// To make it unambiguous whether a `var` binding has been initialized,
-  /// zero-initialize the first pointer-sized field. LLDB uses this to
-  /// recognize to detect uninitizialized variables. This can be removed once
-  /// swiftc switches to @llvm.dbg.addr() intrinsics.
+  /// zero-initialize the shadow copy alloca. LLDB uses the first pointer-sized
+  /// field to recognize to detect uninitizialized variables. This can be
+  /// removed once swiftc switches to @llvm.dbg.addr() intrinsics.
   void zeroInit(llvm::AllocaInst *AI) {
     if (!AI)
       return;
 
     // Only do this at -Onone.
-    if (IGM.IRGen.Opts.shouldOptimize())
-      return;
-
-    auto &DL = IGM.DataLayout;
-    if (DL.getTypeSizeInBits(AI->getAllocatedType()) <
-        DL.getPointerSizeInBits())
+    uint64_t Size = *AI->getAllocationSizeInBits(IGM.DataLayout) / 8;
+    if (IGM.IRGen.Opts.shouldOptimize() || !Size)
       return;
 
     llvm::IRBuilder<> ZeroInitBuilder(AI->getNextNode());
 
     // No debug location is how LLVM marks prologue instructions.
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
-    auto *BC =
-        ZeroInitBuilder.CreateBitCast(AI, IGM.OpaquePtrTy->getPointerTo());
-    ZeroInitBuilder.CreateAlignedStore(
-        llvm::ConstantPointerNull::get(IGM.OpaquePtrTy), BC,
-        IGM.getPointerAlignment().getValue());
+    ZeroInitBuilder.CreateMemSet(
+        AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
+        Size, AI->getAlignment());
   }
 
   /// Account for bugs in LLVM.
@@ -769,8 +763,8 @@ public:
 
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, Name}}];
     if (!Alloca.isValid())
-      Alloca = createAlloca(Storage->getType(), Align, Name+".addr");
-    zeroInit(dyn_cast<llvm::AllocaInst>(Alloca.getAddress()));
+      Alloca = createAlloca(Storage->getType(), Align, Name+".debug");
+    zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
 
     ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
@@ -848,7 +842,8 @@ public:
 
     SILType Type = SILVal->getType();
     auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
-    auto Alloca = LTI.allocateStack(*this, Type, "debug.copy");
+    auto Alloca = LTI.allocateStack(*this, Type, Name+".debug");
+    zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress().getAddress()));
     ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
     LTI.initialize(*this, e, Alloca.getAddress(), false /* isOutlined */);
     copy.push_back(Alloca.getAddressPointer());
