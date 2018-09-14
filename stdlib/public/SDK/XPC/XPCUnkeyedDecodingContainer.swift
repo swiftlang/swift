@@ -25,7 +25,11 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         }
     }
 
-    public var count: Int?
+    public var count: Int? {
+        get {
+            return xpc_array_get_count(self.underlyingMessage)
+        }
+    }
 
     public var isAtEnd: Bool {
         get {
@@ -48,7 +52,6 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 
         self.underlyingMessage = wrapping
         self.decoder = decoder
-        self.count = xpc_array_get_count(self.underlyingMessage)
         self.currentIndex = 0
     }
 
