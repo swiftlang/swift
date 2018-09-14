@@ -51,11 +51,11 @@ bool PersistentParserState::hasFunctionBodyState(AbstractFunctionDecl *AFD) {
   return DelayedFunctionBodies.find(AFD) != DelayedFunctionBodies.end();
 }
 
-std::unique_ptr<PersistentParserState::DelayedDeclListState>
+PersistentParserState::DelayedDeclListState*
 PersistentParserState::takeDelayedDeclListState(IterableDeclContext *IDC) {
   auto I = DelayedDeclListStates.find(IDC);
   assert(I != DelayedDeclListStates.end() && "State should be saved");
-  auto State = std::move(I->second);
+  auto State = I->second;
   DelayedDeclListStates.erase(I);
   return State;
 }
@@ -77,7 +77,7 @@ void PersistentParserState::delayDeclList(IterableDeclContext* D,
                                           DeclContext *ParentContext,
                                           SourceRange BodyRange,
                                           SourceLoc PreviousLoc) {
-  DelayedDeclListStates[D] = llvm::make_unique<DelayedDeclListState>(Flags,
+  DelayedDeclListStates[D] = new (Ctx) DelayedDeclListState(Flags,
     ParentContext, BodyRange, PreviousLoc, ScopeInfo.saveCurrentScope());
 }
 
@@ -96,4 +96,10 @@ void PersistentParserState::delayTopLevel(TopLevelCodeDecl *TLCD,
                                           SourceLoc PreviousLoc) {
   delayDecl(DelayedDeclKind::TopLevelCodeDecl, 0U, TLCD, BodyRange,
             PreviousLoc);
+}
+
+void *PersistentParserState::
+DelayedDeclListState::operator new(size_t bytes, const ASTContext &ctx,
+                             unsigned alignment) {
+  return ctx.Allocate(bytes, alignment);
 }
