@@ -32,6 +32,7 @@ namespace swift {
 namespace constraints {
 
 class SolverStep;
+class ComponentStep;
 
 /// Represents available states which every
 /// given step could be in during it's lifetime.
@@ -198,6 +199,11 @@ protected:
 
   ResolvedOverloadSetListItem *getResolvedOverloads() const {
     return CS.resolvedOverloadSets;
+  }
+
+  void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
+                               unsigned index) const {
+    CS.DisjunctionChoices.push_back({disjunctionLocator, index});
   }
 
   Score getCurrentScore() const { return CS.CurrentScore; }

@@ -612,7 +612,7 @@ bool DisjunctionStep::attemptChoice(const DisjunctionChoice &choice) {
   // took for it.
   if (auto *disjunctionLocator = Producer.getLocator()) {
     auto index = choice.getIndex();
-    CS.DisjunctionChoices.push_back({disjunctionLocator, index});
+    recordDisjunctionChoice(disjunctionLocator, index);
 
     // Implicit unwraps of optionals are worse solutions than those
     // not involving implicit unwraps.
