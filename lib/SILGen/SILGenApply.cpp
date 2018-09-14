@@ -2637,7 +2637,7 @@ private:
     // all the elements individually.
     if (arg.isRValue()) {
       if (CanTupleType substArgType =
-              dyn_cast<TupleType>(arg.getSubstType())) {
+              dyn_cast<TupleType>(arg.getSubstRValueType())) {
         // The original type isn't necessarily a tuple.
         assert(origParamType.matchesTuple(substArgType));
 
@@ -2787,10 +2787,11 @@ private:
       auto conversion = [&] {
         switch (getSILFunctionLanguage(Rep)) {
         case SILFunctionLanguage::Swift:
-          return Conversion::getSubstToOrig(origParamType, arg.getSubstType());
+          return Conversion::getSubstToOrig(origParamType,
+                                            arg.getSubstRValueType());
         case SILFunctionLanguage::C:
           return Conversion::getBridging(Conversion::BridgeToObjC,
-                                         arg.getSubstType(),
+                                         arg.getSubstRValueType(),
                                          origParamType.getType(),
                                          param.getSILStorageType());
         }
@@ -3668,7 +3669,10 @@ public:
   CallSite(SILLocation loc, ArgumentSource &&value, CanType resultType,
            bool throws)
       : Loc(loc), SubstResultType(resultType),
-        Args(value.getSubstType(), /*scalar*/ true), Throws(throws) {
+        // FIXME: Refactor InOutType usage here
+        Args(value.hasLValueType()
+             ? CanInOutType::get(value.getSubstRValueType())
+             : value.getSubstRValueType(), /*scalar*/ true), Throws(throws) {
     Args.addArbitrary(std::move(value));
   }
 
@@ -4844,9 +4848,10 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   ManagedValue payloadMV;
   AbstractionPattern origFormalType =
       (element == getASTContext().getOptionalSomeDecl()
-           ? AbstractionPattern(payload.getSubstType())
+           ? AbstractionPattern(payload.getSubstRValueType())
            : SGM.M.Types.getAbstractionPattern(element));
-  auto &payloadTL = getTypeLowering(origFormalType, payload.getSubstType());
+  auto &payloadTL = getTypeLowering(origFormalType,
+                                    payload.getSubstRValueType());
 
   SILType loweredPayloadType = payloadTL.getLoweredType();
 

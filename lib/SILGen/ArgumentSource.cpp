@@ -206,7 +206,7 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
 ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
                                               AbstractionPattern origFormalType,
                                               SGFContext C) && {
-  auto substFormalType = getSubstType();
+  auto substFormalType = getSubstRValueType();
   auto conversion = Conversion::getSubstToOrig(origFormalType, substFormalType);
   return std::move(*this).getConverted(SGF, conversion, C);
 }
@@ -291,7 +291,7 @@ ManagedValue ArgumentSource::materialize(SILGenFunction &SGF) && {
   }
 
   auto loc = getLocation();
-  auto temp = SGF.emitTemporary(loc, SGF.getTypeLowering(getSubstType()));
+  auto temp = SGF.emitTemporary(loc, SGF.getTypeLowering(getSubstRValueType()));
   std::move(*this).forwardInto(SGF, temp.get());
   return temp->getManagedAddress();
 }
@@ -299,7 +299,7 @@ ManagedValue ArgumentSource::materialize(SILGenFunction &SGF) && {
 ManagedValue ArgumentSource::materialize(SILGenFunction &SGF,
                                          AbstractionPattern origFormalType,
                                          SILType destType) && {
-  auto substFormalType = CanType(getSubstType()->getInOutObjectType());
+  auto substFormalType = getSubstRValueType();
   assert(!destType || destType.getObjectType() ==
                SGF.SGM.Types.getLoweredType(origFormalType,
                                             substFormalType).getObjectType());
@@ -332,7 +332,7 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF,
                                  AbstractionPattern origFormalType,
                                  Initialization *dest,
                                  const TypeLowering &destTL) && {
-  auto substFormalType = getSubstType();
+  auto substFormalType = getSubstRValueType();
   assert(destTL.getLoweredType() ==
                         SGF.getLoweredType(origFormalType, substFormalType));
 
