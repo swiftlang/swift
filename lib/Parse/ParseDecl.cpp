@@ -2860,8 +2860,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
 void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   auto DelayedState = State->takeDelayedDeclListState(IDC);
-  assert(DelayedState.get() && "should have delayed state");
-
   auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
   auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
 

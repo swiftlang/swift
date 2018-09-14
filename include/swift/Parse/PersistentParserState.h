@@ -102,8 +102,9 @@ public:
                      DeclContext *ParentContext, SourceRange BodyRange,
                      SourceLoc PreviousLoc, SavedScope &&Scope)
     : Flags(Flags), ParentContext(ParentContext), BodyPos{BodyRange.Start, PreviousLoc},
-      BodyEnd(BodyRange.End), Scope(std::move(Scope))
-    {}
+      BodyEnd(BodyRange.End), Scope(std::move(Scope)) {}
+    void *operator new(size_t bytes, const ASTContext &ctx,
+                       unsigned alignment = alignof(DelayedDeclListState));
   };
 
   bool InPoundLineEnvironment = false;
@@ -123,7 +124,7 @@ private:
 
   std::unique_ptr<DelayedDeclState> CodeCompletionDelayedDeclState;
 
-  llvm::DenseMap<IterableDeclContext *, std::unique_ptr<DelayedDeclListState>>
+  llvm::DenseMap<IterableDeclContext*, DelayedDeclListState*>
     DelayedDeclListStates;
 
   /// The local context for all top-level code.
@@ -171,8 +172,7 @@ public:
     return std::move(CodeCompletionDelayedDeclState);
   }
 
-  std::unique_ptr<DelayedDeclListState>
-    takeDelayedDeclListState(IterableDeclContext *IDC);
+  DelayedDeclListState* takeDelayedDeclListState(IterableDeclContext *IDC);
 
   bool hasUnparsedMembers(const IterableDeclContext *IDC) override {
     return DelayedDeclListStates.find(IDC) != DelayedDeclListStates.end();
