@@ -931,12 +931,15 @@ void UsableFromInlineChecker::check(Decl *D) {
   if (D->isInvalid() || D->isImplicit())
     return;
 
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+  auto shouldSkipChecking = [](const ValueDecl *VD) -> bool {
     if (VD->getFormalAccess() != AccessLevel::Internal)
+      return true;
+    return !VD->isUsableFromInline();
+  };
+
+  if (auto *VD = dyn_cast<ValueDecl>(D))
+    if (shouldSkipChecking(VD))
       return;
-    if (!VD->isUsableFromInline())
-      return;
-  }
 
   switch (D->getKind()) {
   case DeclKind::Import:
@@ -969,6 +972,20 @@ void UsableFromInlineChecker::check(Decl *D) {
     auto PBD = cast<PatternBindingDecl>(D);
     bool isTypeContext = PBD->getDeclContext()->isTypeContext();
 
+    // Stored instance properties in public/@usableFromInline fixed-contents
+    // structs in resilient modules must always use public/@usableFromInline
+    // types. In these cases, check the access against the struct instead of the
+    // VarDecl, and customize the diagnostics. (The code below doesn't check
+    // for "in resilient modules" because there's no reason to write
+    // @_fixedLayout on a struct in a non-resilient module.)
+    const ValueDecl *fixedLayoutStructContext = nullptr;
+    if (auto *parentStruct = dyn_cast<StructDecl>(PBD->getDeclContext())) {
+      if (parentStruct->getAttrs().hasAttribute<FixedLayoutAttr>() &&
+          !PBD->isStatic() && PBD->hasStorage()) {
+        fixedLayoutStructContext = parentStruct;
+      }
+    }
+
     llvm::DenseSet<const VarDecl *> seenVars;
     for (auto entry : PBD->getPatternList())
     entry.getPattern()->forEachNode([&](const Pattern *P) {
@@ -976,19 +993,22 @@ void UsableFromInlineChecker::check(Decl *D) {
         // Only check individual variables if we didn't check an enclosing
         // TypedPattern.
         const VarDecl *theVar = NP->getDecl();
-        if (theVar->getFormalAccess() != AccessLevel::Internal)
-          return;
-        if (!theVar->isUsableFromInline())
+        if (!fixedLayoutStructContext && shouldSkipChecking(theVar))
           return;
         if (seenVars.count(theVar) || theVar->isInvalid())
           return;
 
-        checkTypeAccess(theVar->getType(), nullptr, theVar,
+        checkTypeAccess(theVar->getType(), nullptr,
+                        fixedLayoutStructContext ? fixedLayoutStructContext
+                                                 : theVar,
                         [&](AccessScope typeAccessScope,
                             const TypeRepr *complainRepr,
                             DowngradeToWarning downgradeToWarning) {
           auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
-          if (!TC.Context.isSwiftVersionAtLeast(5))
+          if (fixedLayoutStructContext)
+            diagID =
+                diag::pattern_type_not_usable_from_inline_inferred_fixed_layout;
+          else if (!TC.Context.isSwiftVersionAtLeast(5))
             diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
           TC.diagnose(P->getLoc(),
                       diagID,
@@ -1013,17 +1033,19 @@ void UsableFromInlineChecker::check(Decl *D) {
       });
       if (!anyVar)
         return;
-      if (anyVar->getFormalAccess() != AccessLevel::Internal)
-        return;
-      if (!anyVar->isUsableFromInline())
+      if (!fixedLayoutStructContext && shouldSkipChecking(anyVar))
         return;
 
-      checkTypeAccess(TP->getTypeLoc(), anyVar,
+      checkTypeAccess(TP->getTypeLoc(),
+                      fixedLayoutStructContext ? fixedLayoutStructContext
+                                               : anyVar,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
         auto diagID = diag::pattern_type_not_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
+        if (fixedLayoutStructContext)
+          diagID = diag::pattern_type_not_usable_from_inline_fixed_layout;
+        else if (!TC.Context.isSwiftVersionAtLeast(5))
           diagID = diag::pattern_type_not_usable_from_inline_warn;
         auto diag = TC.diagnose(P->getLoc(),
                                 diagID,
