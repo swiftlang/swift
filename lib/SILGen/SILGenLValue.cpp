@@ -1671,7 +1671,7 @@ namespace {
     ManagedValue mutableOffset(
                    SILGenFunction &SGF, SILLocation loc, ManagedValue base) && {
       auto &C = SGF.getASTContext();
-      auto keyPathTy = KeyPath.getSubstType()->castTo<BoundGenericType>();
+      auto keyPathTy = KeyPath.getSubstRValueType()->castTo<BoundGenericType>();
 
       FuncDecl *projectionFunction;
       if (keyPathTy->getDecl() == C.getWritableKeyPathDecl()) {
