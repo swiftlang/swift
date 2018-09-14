@@ -64,7 +64,7 @@ extension xpc_object_t {
         return self === XPC_BOOL_TRUE
     }
 
-    func decodeSignedInteger<I: SignedInteger>(_ to: I.Type, at codingPath: [CodingKey]) throws -> I {
+    func decodeSignedInteger<I: SignedInteger & FixedWidthInteger>(_ to: I.Type, at codingPath: [CodingKey]) throws -> I {
         guard xpc_get_type(self) == XPC_TYPE_INT64 else {
             throw DecodingError.typeMismatch(to.self,
                                              DecodingError.Context(codingPath: codingPath,
@@ -75,7 +75,7 @@ extension xpc_object_t {
         return to.init(xpc_int64_get_value(self))
     }
 
-    func decodeUnsignedInteger<U: UnsignedInteger>(_ to: U.Type, at codingPath: [CodingKey]) throws -> U {
+    func decodeUnsignedInteger<U: UnsignedInteger & FixedWidthInteger>(_ to: U.Type, at codingPath: [CodingKey]) throws -> U {
         guard xpc_get_type(self) == XPC_TYPE_UINT64 else {
             throw DecodingError.typeMismatch(to.self,
                                              DecodingError.Context(codingPath: codingPath,

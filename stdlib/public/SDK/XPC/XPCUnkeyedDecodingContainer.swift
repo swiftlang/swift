@@ -53,7 +53,7 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     }
 
     // MARK: - Helpers
-    private mutating func decodeIntegerType<I: SignedInteger>(_ type: I.Type) throws -> I {
+    private mutating func decodeIntegerType<I: SignedInteger & FixedWidthInteger>(_ type: I.Type) throws -> I {
         guard !self.isAtEnd else {
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
                                                                     debugDescription: "Reached end of unkeyed container."))
@@ -68,7 +68,7 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         return integer
     }
 
-    private mutating func decodeIntegerType<I: UnsignedInteger>(_ type: I.Type) throws -> I {
+    private mutating func decodeIntegerType<I: UnsignedInteger & FixedWidthInteger>(_ type: I.Type) throws -> I {
         guard !self.isAtEnd else {
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
                                                                     debugDescription: "Reached end of unkeyed container."))

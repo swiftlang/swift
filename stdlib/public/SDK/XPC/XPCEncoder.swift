@@ -96,11 +96,11 @@ enum XPCEncodingHelpers {
         return xpc_bool_create(value)
     }
 
-    static func encodeSignedInteger<I: SignedInteger>(_ value: I) -> xpc_object_t {
+    static func encodeSignedInteger<I: SignedInteger & FixedWidthInteger>(_ value: I) -> xpc_object_t {
         return xpc_int64_create(Int64(exactly: value)!)
     }
 
-    static func encodeUnsignedInteger<U: UnsignedInteger>(_ value: U) -> xpc_object_t {
+    static func encodeUnsignedInteger<U: UnsignedInteger & FixedWidthInteger>(_ value: U) -> xpc_object_t {
         return xpc_uint64_create(UInt64(exactly: value)!)
     }
 

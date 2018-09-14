@@ -45,13 +45,13 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
     }
 
     // MARK: - Helpers
-    private func decodeIntegerType<I: SignedInteger>(_ type: I.Type, forKey key: Key) throws -> I {
+    private func decodeIntegerType<I: SignedInteger & FixedWidthInteger>(_ type: I.Type, forKey key: Key) throws -> I {
         let foundValue = try getXPCObjectForKey(from: key)
 
         return try foundValue.decodeSignedInteger(type.self, at: self.codingPath)
     }
 
-    private func decodeIntegerType<I: UnsignedInteger>(_ type: I.Type, forKey key: Key) throws -> I {
+    private func decodeIntegerType<I: UnsignedInteger & FixedWidthInteger>(_ type: I.Type, forKey key: Key) throws -> I {
         let foundValue = try getXPCObjectForKey(from: key)
 
         return try foundValue.decodeUnsignedInteger(type.self, at: self.codingPath)
