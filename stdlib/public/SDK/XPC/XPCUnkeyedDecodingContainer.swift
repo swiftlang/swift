@@ -63,7 +63,7 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-        let integer: I = try XPCDecodingHelpers.decodeSignedInteger(type.self, from: foundValue, at: self.codingPath)
+        let integer: I = try foundValue.decodeSignedInteger(type.self, at: self.codingPath)
         self.currentIndex += 1
         return integer
     }
@@ -78,7 +78,7 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-        let integer: I = try XPCDecodingHelpers.decodeUnsignedInteger(type.self, from: foundValue, at: self.codingPath)
+        let integer: I = try foundValue.decodeUnsignedInteger(type.self, at: self.codingPath)
         self.currentIndex += 1
         return integer
     }
@@ -93,7 +93,7 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-        let float: F = try XPCDecodingHelpers.decodeFloatingPointNumber(type.self, from: foundValue, at: self.codingPath)
+        let float: F = try foundValue.decodeFloatingPointNumber(type.self, at: self.codingPath)
         self.currentIndex += 1
         return float
     }
@@ -109,7 +109,7 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-        if XPCDecodingHelpers.decodeNil(from: foundValue, at: self.codingPath) {
+        if foundValue.decodeNil(at: self.codingPath) {
             self.currentIndex += 1
             return true
         }
@@ -126,7 +126,7 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-        let boolean = try XPCDecodingHelpers.decodeBool(from: foundValue, at: self.codingPath)
+        let boolean = try foundValue.decodeBool(at: self.codingPath)
         self.currentIndex += 1
         return boolean
     }
@@ -141,7 +141,7 @@ public struct XPCUnkeyedDecodingContainer: UnkeyedDecodingContainer {
 
         let foundValue = xpc_array_get_value(self.underlyingMessage, self.currentIndex)
 
-        let string = try XPCDecodingHelpers.decodeString(from: foundValue, at: self.codingPath)
+        let string = try foundValue.decodeString(at: self.codingPath)
         self.currentIndex += 1
         return string
     }

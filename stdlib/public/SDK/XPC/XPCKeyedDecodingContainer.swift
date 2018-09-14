@@ -48,19 +48,19 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
     private func decodeIntegerType<I: SignedInteger>(_ type: I.Type, forKey key: Key) throws -> I {
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return try XPCDecodingHelpers.decodeSignedInteger(type.self, from: foundValue, at: self.codingPath)
+        return try foundValue.decodeSignedInteger(type.self, at: self.codingPath)
     }
 
     private func decodeIntegerType<I: UnsignedInteger>(_ type: I.Type, forKey key: Key) throws -> I {
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return try XPCDecodingHelpers.decodeUnsignedInteger(type.self, from: foundValue, at: self.codingPath)
+        return try foundValue.decodeUnsignedInteger(type.self, at: self.codingPath)
     }
 
     private func decodeFloatingPointType<F: BinaryFloatingPoint>(_ type: F.Type, forKey key: Key) throws -> F {
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return try XPCDecodingHelpers.decodeFloatingPointNumber(type.self, from: foundValue, at: self.codingPath)
+        return try foundValue.decodeFloatingPointNumber(type.self, at: self.codingPath)
     }
 
     private func getXPCObjectForKey(from key: CodingKey) throws -> xpc_object_t {
@@ -104,7 +104,7 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
         defer { self.decoder.codingPath.removeLast() }
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return XPCDecodingHelpers.decodeNil(from: foundValue, at: self.codingPath)
+        return foundValue.decodeNil(at: self.codingPath)
     }
 
     public func decode(_ type: Bool.Type, forKey key: Key) throws -> Bool {
@@ -113,7 +113,7 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
 
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return try XPCDecodingHelpers.decodeBool(from: foundValue, at: self.codingPath)
+        return try foundValue.decodeBool(at: self.codingPath)
     }
 
 
@@ -207,7 +207,7 @@ public struct XPCKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPro
 
         let foundValue = try getXPCObjectForKey(from: key)
 
-        return try XPCDecodingHelpers.decodeString(from: foundValue, at: self.codingPath)
+        return try foundValue.decodeString(at: self.codingPath)
     }
 
     public func decode<T: Decodable>(_ type: T.Type, forKey key: Key) throws -> T {

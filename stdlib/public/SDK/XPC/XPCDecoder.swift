@@ -46,65 +46,65 @@ open class XPCDecoder: Decoder {
     }
 }
 
-struct XPCDecodingHelpers {
-    static func decodeNil(from xpcObject: xpc_object_t, at codingPath: [CodingKey]) -> Bool {
+extension xpc_object_t {
+    func decodeNil(at codingPath: [CodingKey]) -> Bool {
         let nullSingleton = xpc_null_create()
 
-        return xpcObject === nullSingleton
+        return self === nullSingleton
     }
 
-    static func decodeBool(from xpcObject: xpc_object_t, at codingPath: [CodingKey]) throws -> Bool {
-        guard xpc_get_type(xpcObject) == XPC_TYPE_BOOL else {
+    func decodeBool(at codingPath: [CodingKey]) throws -> Bool {
+        guard xpc_get_type(self) == XPC_TYPE_BOOL else {
             throw DecodingError.typeMismatch(Bool.self,
                                              DecodingError.Context(codingPath: codingPath,
                                                                    debugDescription: "Type mismatch.",
                                                                    underlyingError: nil))
         }
 
-        return xpcObject === XPC_BOOL_TRUE
+        return self === XPC_BOOL_TRUE
     }
 
-    static func decodeSignedInteger<I: SignedInteger>(_ to: I.Type, from xpcObject: xpc_object_t, at codingPath: [CodingKey]) throws -> I {
-        guard xpc_get_type(xpcObject) == XPC_TYPE_INT64 else {
+    func decodeSignedInteger<I: SignedInteger>(_ to: I.Type, at codingPath: [CodingKey]) throws -> I {
+        guard xpc_get_type(self) == XPC_TYPE_INT64 else {
             throw DecodingError.typeMismatch(to.self,
                                              DecodingError.Context(codingPath: codingPath,
                                                                    debugDescription: "Type mismatch.",
                                                                    underlyingError: nil))
         }
 
-        return to.init(exactly: xpc_int64_get_value(xpcObject))!
+        return to.init(xpc_int64_get_value(self))
     }
 
-    static func decodeUnsignedInteger<U: UnsignedInteger>(_ to: U.Type, from xpcObject: xpc_object_t, at codingPath: [CodingKey]) throws -> U {
-        guard xpc_get_type(xpcObject) == XPC_TYPE_UINT64 else {
+    func decodeUnsignedInteger<U: UnsignedInteger>(_ to: U.Type, at codingPath: [CodingKey]) throws -> U {
+        guard xpc_get_type(self) == XPC_TYPE_UINT64 else {
             throw DecodingError.typeMismatch(to.self,
                                              DecodingError.Context(codingPath: codingPath,
                                                                    debugDescription: "Type mismatch.",
                                                                    underlyingError: nil))
         }
 
-        return to.init(exactly: xpc_uint64_get_value(xpcObject))!
+        return to.init(xpc_uint64_get_value(self))
     }
 
-    static func decodeFloatingPointNumber<F>(_ to: F.Type, from xpcObject: xpc_object_t, at codingPath: [CodingKey]) throws -> F where F: BinaryFloatingPoint{
-        guard xpc_get_type(xpcObject) == XPC_TYPE_DOUBLE else {
+    func decodeFloatingPointNumber<F>(_ to: F.Type, at codingPath: [CodingKey]) throws -> F where F: BinaryFloatingPoint{
+        guard xpc_get_type(self) == XPC_TYPE_DOUBLE else {
             throw DecodingError.typeMismatch(to.self,
                                              DecodingError.Context(codingPath: codingPath,
                                                                    debugDescription: "Type mismatch.",
                                                                    underlyingError: nil))
         }
 
-        return to.init(xpc_double_get_value(xpcObject))
+        return to.init(xpc_double_get_value(self))
     }
 
-    static func decodeString(from xpcObject: xpc_object_t, at codingPath: [CodingKey]) throws -> String {
-        guard xpc_get_type(xpcObject) == XPC_TYPE_STRING else {
+    func decodeString(at codingPath: [CodingKey]) throws -> String {
+        guard xpc_get_type(self) == XPC_TYPE_STRING else {
             throw DecodingError.typeMismatch(String.self,
                                              DecodingError.Context(codingPath: codingPath,
                                                                    debugDescription: "Type mismatch.",
                                                                    underlyingError: nil))
         }
 
-        return String(cString: xpc_string_get_string_ptr(xpcObject)!)
+        return String(cString: xpc_string_get_string_ptr(self)!)
     }
 }
