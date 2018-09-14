@@ -23,24 +23,17 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Transforms/Utils/Local.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/Basic/TargetInfo.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Pattern.h"
-#include "swift/AST/ParameterList.h"
-#include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/Types.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -48,8 +41,17 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "llvm/IR/TypeBuilder.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -83,6 +85,11 @@ using namespace irgen;
 llvm::cl::opt<bool> DebugInfoInlinedGenerics(
     "debug-info-inlined-generics", llvm::cl::init(false),
     llvm::cl::desc("Emit variable debug info for inlined generic functions"));
+
+// SWIFT_ENABLE_TENSORFLOW
+namespace llvm {
+extern cl::opt<bool> TFDynamicCompilation;
+}
 
 namespace {
 
@@ -944,9 +951,7 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  void visitGraphOperationInst(GraphOperationInst *i) {
-    llvm_unreachable("graph_op is not valid in canonical SIL");
-  }
+  void visitGraphOperationInst(GraphOperationInst *i);
 
   void visitFunctionRefInst(FunctionRefInst *i);
   void visitAllocGlobalInst(AllocGlobalInst *i);
@@ -1859,6 +1864,44 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   }
 
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+/// For now we lower any graph_op inst into a const TF node. (super fast tensor
+/// computation, but those who don't care about correctness. :-) )
+/// TODO: Fix this mis-compilation.
+void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
+  if (!llvm::TFDynamicCompilation)
+    llvm_unreachable("graph_op is not valid in canonical SIL");
+
+  auto &llvmModule = IGM.Module;
+  auto &llvmContext = llvmModule.getContext();
+
+  // TODO: refactor GraphOperationInfo and use that to decode `i`.
+
+  // The overall workflow is:
+  // 1. Prepare the input tensor handles and attributes
+  // 2. Run the graph_op
+  // 3. Set the output tensor handles via setLoweredExplosion()
+
+  // The true return type is TFE_Context*, which is an opaque pointer, so it
+  // maps to void* in the Swift-C calling convention.
+  auto getContextFn = llvmModule.getOrInsertFunction(
+      "_swift_tfc_GetGlobalEagerContext",
+      llvm::TypeBuilder<void *(), false>::get(llvmContext));
+  auto eagerContext = Builder.CreateCall(getContextFn, {});
+
+  // The true function type is TFE_Context* -> TFE_TensorHandle*.
+  auto testFunc = llvmModule.getOrInsertFunction(
+      "_swift_tfc_RunEagerConstTest",
+      llvm::TypeBuilder<void *(void *), false>::get(llvmContext));
+  auto tensorHandle = Builder.CreateCall(testFunc, {eagerContext});
+
+  Explosion e;
+  e.add(tensorHandle);
+
+  SILValue result = i->getResults()[0];
+  setLoweredExplosion(result, e);
 }
 
 void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {

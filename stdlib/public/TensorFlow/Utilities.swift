@@ -88,7 +88,7 @@ typealias CTFFunction = OpaquePointer
 public typealias CTensorHandle = OpaquePointer
 
 /// The `TFE_Context *` type.
-typealias CTFEContext = OpaquePointer
+public typealias CTFEContext = OpaquePointer
 
 /// The `TFE_Op *` type.
 typealias CTFEOp = OpaquePointer
