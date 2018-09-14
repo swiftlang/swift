@@ -2526,24 +2526,6 @@ private:
         emitExpanded(std::move(arg), origParamType);
         return;
       }
-
-      // Otherwise, if the substituted type is a tuple, then we should
-      // emit the tuple in its most general form, because there's a
-      // substitution of an opaque archetype to a tuple or function
-      // type in play.  The most general convention is generally to
-      // pass the entire tuple indirectly, but if it's not
-      // materializable, the convention is actually to break it up
-      // into materializable chunks.  See the comment in SILType.cpp.
-      //
-      // FIXME: Once -swift-version 3 code generation goes away, we
-      // can simplify this.
-      if (auto substTupleType = dyn_cast<TupleType>(substArgType)) {
-        if (shouldExpandTupleType(substTupleType)) {
-          assert(origParamType.isTypeParameter());
-          emitExpanded(std::move(arg), origParamType);
-          return;
-        }
-      }
     }
 
     // Okay, everything else will be passed as a single value, one
