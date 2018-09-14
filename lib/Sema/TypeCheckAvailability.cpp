@@ -1937,6 +1937,12 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   if (!Attr)
     return;
 
+  // We don't want deprecated declarations to trigger warnings
+  // in synthesized code.
+  if (ReferenceRange.isInvalid() &&
+      isInsideImplicitFunction(ReferenceRange, ReferenceDC)) {
+    return;
+  }
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
