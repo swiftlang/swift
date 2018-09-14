@@ -425,9 +425,8 @@ bool Job::writeArgsToResponseFile() const {
     return true;
   }
   for (const char *arg : Arguments) {
-    OS << "\"";
     escapeAndPrintString(OS, arg);
-    OS << "\" ";
+    OS << " ";
   }
   OS.flush();
   return false;
