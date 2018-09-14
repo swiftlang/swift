@@ -1826,10 +1826,10 @@ public:
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     printCommon(E, "interpolated_string_literal_expr");
-    for (auto Segment : E->getSegments()) {
-      OS << '\n';
-      printRec(Segment);
-    }
+    PrintWithColorRAII(OS, LiteralValueColor) << " literal_capacity=" 
+      << E->getLiteralCapacity() << " interpolation_count="
+      << E->getInterpolationCount() << '\n';
+    printRec(E->getAppendingExpr());
     printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -2625,6 +2625,19 @@ public:
 
   void visitKeyPathDotExpr(KeyPathDotExpr *E) {
     printCommon(E, "key_path_dot_expr");
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  
+  void visitTapExpr(TapExpr *E) {
+    printCommon(E, "tap_expr");
+    PrintWithColorRAII(OS, DeclColor) << " var=";
+    printDeclRef(E->getVar());
+    OS << '\n';
+    
+    printRec(E->getSubExpr());
+    OS << '\n';
+    
+    printRec(E->getBody(), E->getVar()->getDeclContext()->getASTContext());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 };

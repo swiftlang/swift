@@ -239,6 +239,14 @@ public:
   std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
     auto *D = DRE->getDecl();
 
+    // HACK: $interpolation variables are seen as needing to be captured. 
+    // The good news is, we literally never need to capture them, so we 
+    // can safely ignore them.
+    // FIXME(TapExpr): This is probably caused by the scoping 
+    // algorithm's ignorance of TapExpr. We should fix that.
+    if (D->getBaseName() == D->getASTContext().Id_dollarInterpolation)
+      return { false, DRE };
+
     // Capture the generic parameters of the decl, unless it's a
     // local declaration in which case we will pick up generic
     // parameter references transitively.

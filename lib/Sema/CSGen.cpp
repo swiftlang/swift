@@ -291,12 +291,6 @@ namespace {
         return { false, expr };
       }      
 
-      // TODO: The systems that we need to solve for interpolated string expressions
-      // require bespoke logic that don't currently work with this approach.
-      if (isa<InterpolatedStringLiteralExpr>(expr)) {
-        return { false, expr };
-      }
-
       // For exprs of a structural type that are not modeling argument lists,
       // avoid merging the type variables. (We need to allow for cases like
       // (Int, Int32).)
@@ -1260,6 +1254,13 @@ namespace {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_missing_proto);
         return nullptr;
       }
+      auto literalProto
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::ExpressibleByStringLiteral);
+      if (!literalProto) {
+        tc.diagnose(expr->getStartLoc(), diag::string_literal_broken_proto);
+        return nullptr;
+      }
 
       // The type of the expression must conform to the
       // ExpressibleByStringInterpolation protocol.
@@ -1268,6 +1269,33 @@ namespace {
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
                        interpolationProto->getDeclaredType(),
                        locator);
+
+      if (auto semanticExpr = expr->getSemanticExpr()) {
+        // The semanticExpr must have the same type as this node.
+        auto semanticTV = CS.getType(semanticExpr);
+        auto semanticLocator = CS.getConstraintLocator(semanticExpr);
+        CS.addConstraint(ConstraintKind::Equal, tv, semanticTV,
+                         semanticLocator);
+      }
+      else if (auto appendingExpr = expr->getAppendingExpr()) {
+        auto associatedTypeArray = 
+          literalProto->lookupDirect(tc.Context.Id_StringLiteralType);
+        if (associatedTypeArray.empty()) {
+          tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
+          return nullptr;
+        }
+        auto associatedTypeDecl =
+          cast<AssociatedTypeDecl>(associatedTypeArray.front());
+        auto interpolationTV = DependentMemberType::get(tv, associatedTypeDecl);
+
+        auto appendingExprType = CS.getType(appendingExpr);
+        auto appendingLocator = CS.getConstraintLocator(appendingExpr);
+
+        // Must be Conversion; if it's Equal, then in semi-rare cases, the 
+        // interpolation temporary variable cannot be @lvalue.
+        CS.addConstraint(ConstraintKind::Conversion, appendingExprType,
+                         interpolationTV, appendingLocator);
+      }
 
       return tv;
     }
@@ -3101,6 +3129,18 @@ namespace {
     Type visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
+    
+    Type visitTapExpr(TapExpr *expr) {
+      auto locator = CS.getConstraintLocator(expr);
+      auto tv = CS.createTypeVariable(locator);
+
+      if (auto subExpr = expr->getSubExpr()) {
+        auto subExprType = CS.getType(subExpr);
+        CS.addConstraint(ConstraintKind::Equal, subExprType, tv, locator);
+      }
+
+      return tv;
+    }
 
     enum class TypeOperation { None,
                                Join,
@@ -3605,26 +3645,6 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
     this->optimizeConstraints(result);
 
   return result;
-}
-
-Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
-  // Sanitize the expression.
-  expr = SanitizeExpr(*this).walkToExprPost(expr);
-
-  cacheSubExprTypes(expr);
-
-  // Visit the top-level expression generating constraints.
-  ConstraintGenerator cg(*this);
-  auto type = cg.visit(expr);
-  if (!type)
-    return nullptr;
-  
-  this->optimizeConstraints(expr);
-  
-  auto &CS = CG.getConstraintSystem();
-  CS.setType(expr, type);
-
-  return expr;
 }
 
 Type ConstraintSystem::generateConstraints(Pattern *pattern,

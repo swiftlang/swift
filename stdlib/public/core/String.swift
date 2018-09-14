@@ -703,7 +703,7 @@ extension String : _ExpressibleByBuiltinStringLiteral {
   }
 }
 
-extension String : ExpressibleByStringLiteral {
+extension String : ExpressibleByStringInterpolation {
   /// Creates an instance initialized to the given string value.
   ///
   /// Do not call this initializer directly. It is used by the compiler when you
@@ -714,8 +714,8 @@ extension String : ExpressibleByStringLiteral {
   /// This assignment to the `nextStop` constant calls this string literal
   /// initializer behind the scenes.
   @inlinable // FIXME(sil-serialize-all)
-  public init(stringLiteral value: String) {
-     self = value
+  public init(stringLiteral value: DefaultStringInterpolation) {
+     self = value.make()
   }
 }
 

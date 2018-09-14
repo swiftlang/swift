@@ -845,8 +845,9 @@ extension Substring : ExpressibleByExtendedGraphemeClusterLiteral {
 
 extension Substring : ExpressibleByStringLiteral {
   @inlinable // FIXME(sil-serialize-all)
-  public init(stringLiteral value: String) {
-     self.init(_base: value, value.startIndex ..< value.endIndex)
+  public init(stringLiteral value: DefaultStringInterpolation) {
+    let str = value.make()
+    self.init(_base: str, str.startIndex ..< str.endIndex)
   }
 }
 

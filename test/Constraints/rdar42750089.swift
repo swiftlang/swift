@@ -18,13 +18,9 @@ extension S : ExpressibleByStringLiteral {
     }
 }
 
-extension S : _ExpressibleByStringInterpolation {
-  init(stringInterpolation strings: S...) {
+extension S : ExpressibleByStringInterpolation {
+  init(stringInterpolation: DefaultStringInterpolation) {
     self.key = "foo"
-  }
-
-  init<T>(stringInterpolationSegment expr: T) {
-    self.init(String(describing: expr))
   }
 }
 

@@ -74,7 +74,7 @@ extension MyString : ExpressibleByExtendedGraphemeClusterLiteral {
 }
 
 extension MyString : ExpressibleByStringLiteral {
-  public init(stringLiteral value: String) {
+  public init(stringLiteral value: DefaultStringInterpolation) {
     base = .init(stringLiteral: value)
   }
 }

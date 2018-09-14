@@ -121,7 +121,11 @@ public class ClassVeryPrintable : CustomStringConvertible,
   }
 }
 
-public struct MyString : ExpressibleByStringLiteral,
+public enum MyStringError: Error {
+  case failure
+}
+
+public struct MyString : 
   ExpressibleByStringInterpolation {
 
   public init(str: String) {
@@ -138,20 +142,54 @@ public struct MyString : ExpressibleByStringLiteral,
     self.init(str: value)
   }
 
-  public init(stringLiteral value: String) {
-    self.init(str: value)
+  public init(stringLiteral value: StringLiteralType) {
+    self.init(str: value.result)
   }
-
-  public init(stringInterpolation strings: MyString...) {
-    var result = ""
-    for s in strings {
-      result += s.value
+  
+  public struct StringLiteralType: StringInterpolationProtocol {
+    var result: String
+    
+    public init(literalCapacity: Int, interpolationCount: Int) {
+      result = String(literalCapacity) + "/" + String(interpolationCount)
     }
-    self.init(str: result)
-  }
-
-  public init<T>(stringInterpolationSegment expr: T) {
-    self.init(str: "<segment " + String(describing: expr) + ">")
+    
+    public mutating func appendLiteral(_ literal: String) {
+      result += "<literal " + literal + ">"
+    }
+    
+    public mutating func appendInterpolation<T>(_ expr: T) {
+      result += "<interpolation:T " + String(describing: expr) + ">"
+    }
+    
+    public mutating func appendInterpolation(_ expr: Int) {
+      result += "<interpolation:Int " + String(expr) + ">"
+    }
+    
+    public mutating func appendInterpolation(_ expr: Int, radix: Int) {
+      result += "<interpolation:Int,radix " + String(expr, radix: radix) + ">"
+    }
+    
+    public mutating func appendInterpolation<T>(debug: T) {
+      result += "<interpolation:T debug: " + String(reflecting: debug) + ">"
+    }
+    
+    public mutating func appendInterpolation(fails: Bool) throws {
+      if fails {
+        throw MyStringError.failure
+      }
+      result += "<interpolation:fails >"
+    }
+    
+    public mutating func appendInterpolation(required: Bool, optional: Bool = false) {
+      result += "<interpolation:required:optional " + String(reflecting: required) + " " + String(reflecting: optional) + ">"
+    }
   }
 }
 
+public struct MySimpleString : ExpressibleByStringInterpolation {
+  public var value: String
+  
+  public init(stringLiteral: DefaultStringInterpolation) {
+    value = String(describing: stringLiteral)
+  }
+}
