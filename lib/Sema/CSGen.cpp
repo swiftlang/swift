@@ -1254,6 +1254,13 @@ namespace {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_missing_proto);
         return nullptr;
       }
+      auto literalProto
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::ExpressibleByStringLiteral);
+      if (!literalProto) {
+        tc.diagnose(expr->getStartLoc(), diag::string_literal_broken_proto);
+        return nullptr;
+      }
 
       // The type of the expression must conform to the
       // ExpressibleByStringInterpolation protocol.
@@ -1272,7 +1279,7 @@ namespace {
       }
       else if (auto appendingExpr = expr->getAppendingExpr()) {
         auto associatedTypeArray = 
-          interpolationProto->lookupDirect(tc.Context.Id_StringInterpolation);
+          literalProto->lookupDirect(tc.Context.Id_StringLiteralType);
         if (associatedTypeArray.empty()) {
           tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
           return nullptr;

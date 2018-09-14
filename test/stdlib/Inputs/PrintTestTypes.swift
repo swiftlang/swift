@@ -125,7 +125,7 @@ public enum MyStringError: Error {
   case failure
 }
 
-public struct MyString : ExpressibleByStringLiteral,
+public struct MyString : 
   ExpressibleByStringInterpolation {
 
   public init(str: String) {
@@ -142,15 +142,11 @@ public struct MyString : ExpressibleByStringLiteral,
     self.init(str: value)
   }
 
-  public init(stringLiteral value: String) {
-    self.init(str: value)
+  public init(stringLiteral value: StringLiteralType) {
+    self.init(str: value.result)
   }
   
-  public init(stringInterpolation: StringInterpolation) {
-    self.init(str: stringInterpolation.result)
-  }
-  
-  public struct StringInterpolation: StringInterpolationProtocol {
+  public struct StringLiteralType: StringInterpolationProtocol {
     var result: String
     
     public init(literalCapacity: Int, interpolationCount: Int) {
@@ -193,7 +189,7 @@ public struct MyString : ExpressibleByStringLiteral,
 public struct MySimpleString : ExpressibleByStringInterpolation {
   public var value: String
   
-  public init(stringLiteral: String) {
-    value = stringLiteral
+  public init(stringLiteral: DefaultStringInterpolation) {
+    value = String(describing: stringLiteral)
   }
 }

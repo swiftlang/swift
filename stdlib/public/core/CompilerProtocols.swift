@@ -737,49 +737,12 @@ public protocol ExpressibleByDictionaryLiteral {
 ///
 /// See the `StringLiteralProtocol` documentation for more details about how to
 /// do this.
-public protocol ExpressibleByStringInterpolation
-  : ExpressibleByStringLiteral {
-  
-  /// The type each segment of a string literal containing interpolations
-  /// should be appended to. Its `StringLiteralType` should match the
-  /// `StringLiteralType` of this type.
-  associatedtype StringInterpolation : StringInterpolationProtocol
-    = DefaultStringInterpolation
-    where StringInterpolation.StringLiteralType == StringLiteralType
-
-  /// Creates an instance from a string interpolation.
-  /// 
-  /// Most `StringInterpolation` types will store information about the
-  /// literals and interpolations appended to them in one or more properties.
-  /// `init(stringInterpolation:)` should use these properties to initialize
-  /// the instance.
-  /// 
-  /// - Parameter stringInterpolation: An instance of `StringInterpolation`
-  ///             which has had each segment of the string literal appended
-  ///             to it.
-  init(stringInterpolation: StringInterpolation)
+public protocol ExpressibleByStringInterpolation : ExpressibleByStringLiteral
+  where StringLiteralType : StringInterpolationProtocol {
 }
 
-extension ExpressibleByStringInterpolation
-  where StringInterpolation == DefaultStringInterpolation {
-  
-  /// Creates a new instance from an interpolated string literal.
-  /// 
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// you create a string using string interpolation. Instead, use string
-  /// interpolation to create a new string by including values, literals,
-  /// variables, or expressions enclosed in parentheses, prefixed by a
-  /// backslash (`\(`...`)`).
-  ///
-  ///     let price = 2
-  ///     let number = 3
-  ///     let message = "If one cookie costs \(price) dollars, " +
-  ///                   "\(number) cookies cost \(price * number) dollars."
-  ///     print(message)
-  ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
-  public init(stringInterpolation: DefaultStringInterpolation) {
-    self.init(stringLiteral: stringInterpolation.make())
-  }
+extension ExpressibleByStringInterpolation {
+  //typealias StringLiteralType = DefaultStringInterpolation
 }
 
 /// Represents the contents of a string literal with interpolations while it is
@@ -837,7 +800,7 @@ extension ExpressibleByStringInterpolation
 /// several different `appendInterpolation` methods with different behaviors.
 /// `appendInterpolation` methods can also throw; when a user uses one of these,
 /// they must mark the string literal with `try` or one of its variants.
-public protocol StringInterpolationProtocol {
+public protocol StringInterpolationProtocol : _ExpressibleByBuiltinStringLiteral {
   /// The type that should be used for literal segments.
   associatedtype StringLiteralType : _ExpressibleByBuiltinStringLiteral
 
@@ -875,6 +838,54 @@ public protocol StringInterpolationProtocol {
   mutating func appendLiteral(_ literal: StringLiteralType)
 
   // Informal requirement: mutating func appendInterpolation(...)
+}
+
+extension StringInterpolationProtocol {
+  @inlinable
+  public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
+    let literal = StringLiteralType(_builtinUnicodeScalarLiteral: value)
+    self.init(literalCapacity: 0, interpolationCount: 0)
+    appendLiteral(literal)
+  }
+  
+  @inlinable
+  public init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    utf8CodeUnitCount: Builtin.Word,
+    isASCII: Builtin.Int1) {
+    let literal = StringLiteralType(_builtinExtendedGraphemeClusterLiteral: start,
+                                    utf8CodeUnitCount: utf8CodeUnitCount,
+                                    isASCII: isASCII)
+    self.init(literalCapacity: 0, interpolationCount: 0)
+    appendLiteral(literal)
+  }
+  
+  @inlinable
+  public init(
+      _builtinStringLiteral start: Builtin.RawPointer,
+      utf8CodeUnitCount: Builtin.Word,
+      isASCII: Builtin.Int1) {
+    let literal = StringLiteralType(_builtinStringLiteral: start,
+                                    utf8CodeUnitCount: utf8CodeUnitCount,
+                                    isASCII: isASCII)
+    self.init(literalCapacity: 0, interpolationCount: 0)
+    appendLiteral(literal)
+  }
+}
+
+// FIXME: We'd really want this to conditionally conform, but it can't.
+extension StringInterpolationProtocol
+  where Self : _ExpressibleByBuiltinUTF16StringLiteral,
+         StringLiteralType : _ExpressibleByBuiltinUTF16StringLiteral {
+  @inlinable
+  public init(
+      _builtinUTF16StringLiteral start: Builtin.RawPointer,
+      utf16CodeUnitCount: Builtin.Word) {
+    let literal = StringLiteralType(_builtinUTF16StringLiteral: start,
+                                    utf16CodeUnitCount: utf16CodeUnitCount)
+    self.init(literalCapacity: 0, interpolationCount: 0)
+    appendLiteral(literal)
+  }
 }
 
 /// A type that can be initialized using a color literal (e.g.

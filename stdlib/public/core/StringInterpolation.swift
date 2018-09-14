@@ -58,7 +58,8 @@
 /// `DefaultStringInterpolation` extensions should add only `mutating` members
 /// and should not copy `self` or capture it in an escaping closure.
 @_fixed_layout
-public struct DefaultStringInterpolation: StringInterpolationProtocol {
+public struct DefaultStringInterpolation: StringInterpolationProtocol,
+    _ExpressibleByBuiltinUTF16StringLiteral {
   /// The string contents accumulated by this instance.
   @usableFromInline
   internal var _storage: String = ""

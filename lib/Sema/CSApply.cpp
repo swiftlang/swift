@@ -2266,8 +2266,8 @@ namespace {
 
       auto associatedTypeArray = 
         tc.getProtocol(expr->getLoc(),
-             KnownProtocolKind::ExpressibleByStringInterpolation)
-          ->lookupDirect(tc.Context.Id_StringInterpolation);
+             KnownProtocolKind::ExpressibleByStringLiteral)
+          ->lookupDirect(tc.Context.Id_StringLiteralType);
       if (associatedTypeArray.empty()) {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
         return nullptr;
@@ -2317,13 +2317,13 @@ namespace {
 
       // initStringInterpolationExpr = """
       //   ExpressibleByStringInterpolation.init(
-      //     stringInterpolation: \(appendingExpr))
+      //     stringLiteral: \(appendingExpr))
       //   """
 
       auto initStringInterpolationExpr =
         buildProtocolInitCall(
-          KnownProtocolKind::ExpressibleByStringInterpolation, type, 
-          { tc.Context.Id_stringInterpolation },
+          KnownProtocolKind::ExpressibleByStringLiteral, type, 
+          { tc.Context.Id_stringLiteral },
           { appendingExpr });
 
       // Set that as the semantic expr.
