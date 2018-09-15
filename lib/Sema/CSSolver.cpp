@@ -1270,9 +1270,8 @@ void ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
     // which should produce another steps to follow,
     // or error, which means that current path is inconsistent.
     {
-      auto currentState = step->getState();
-      assert(!(currentState == StepState::Running ||
-               currentState == StepState::Done) &&
+      assert(!(step->getState() == StepState::Running ||
+               step->getState() == StepState::Done) &&
              "Cannot re-take already running/done step.");
 
       auto result = advance(step, prevFailed);

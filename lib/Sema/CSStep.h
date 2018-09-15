@@ -24,6 +24,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/raw_ostream.h"
 #include <memory>
 
 using namespace llvm;
@@ -214,6 +215,15 @@ protected:
     if (!CS.retainAllSolutions())
       CS.filterSolutions(solutions, CS.solverState->ExprWeights, minimize);
   }
+
+  /// Check whether constraint solver is running in "debug" mode,
+  /// which should output diagnostic information.
+  bool isDebugMode() const { return CS.TC.getLangOpts().DebugConstraintSolver; }
+
+  llvm::raw_ostream &getDebugLogger(bool indent = true) const {
+    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+    return indent ? log.indent(CS.solverState->depth * 2) : log;
+  }
 };
 
 /// `SplitterStep` is responsible for running connected components
@@ -354,14 +364,18 @@ public:
   }
 
   void setup() override {
-    // If this is a single component, there is
-    // no need to preliminary modify constraint system.
-    if (!IsSingle) {
-      ComponentScope = llvm::make_unique<Scope>(*this);
-      // If this component has oprhaned constraint attached,
-      // let's return it ot the graph.
-      CS.CG.setOrphanedConstraint(OrphanedConstraint);
-    }
+    // If this is a single component, there is no need
+    // to preliminary modify constraint system or log anything.
+    if (IsSingle)
+      return;
+
+    if (isDebugMode())
+      getDebugLogger() << "(solving component #" << Index << '\n';
+
+    ComponentScope = llvm::make_unique<Scope>(*this);
+    // If this component has oprhaned constraint attached,
+    // let's return it ot the graph.
+    CS.CG.setOrphanedConstraint(OrphanedConstraint);
   }
 
   StepResult take(bool prevFailed) override;
