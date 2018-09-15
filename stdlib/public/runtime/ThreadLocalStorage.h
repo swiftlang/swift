@@ -88,19 +88,6 @@ typedef unsigned long __swift_thread_key_t;
 static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
               "__swift_thread_key_t is not a DWORD");
 
-#  if defined(_M_IX86)
-typedef stdcall void (*__swift_thread_key_destructor)(void *)
-#  else
-typedef void (*__swift_thread_key_destructor)(void *)
-#  endif
-
-static inline
-_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
-                          __swift_thread_key_destructor _Nullable destructor) {
-  *key = FlsAlloc(destroyTLS_CCAdjustmentThunk);
-  return *key != FLS_OUT_OF_INDEXES;
-}
-
 #  define SWIFT_THREAD_KEY_CREATE _stdlib_thread_key_create
 #  define SWIFT_THREAD_GETSPECIFIC FlsGetValue
 #  define SWIFT_THREAD_SETSPECIFIC(key, value) (FlsSetValue(key, value) == TRUE)
