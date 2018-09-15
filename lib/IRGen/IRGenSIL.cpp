@@ -1888,7 +1888,8 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // maps to void* in the Swift-C calling convention.
   auto getContextFn = llvmModule.getOrInsertFunction(
       "_swift_tfc_GetGlobalEagerContext",
-      llvm::TypeBuilder<void *(), false>::get(llvmContext));
+      llvm::TypeBuilder<void *(), /*cross_compilable=*/false>::get(
+          llvmContext));
   auto eagerContext = Builder.CreateCall(getContextFn, {});
 
   // The true function type is TFE_Context* -> TFE_TensorHandle*.
