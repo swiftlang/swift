@@ -174,6 +174,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
 }
 
 extension DefaultStringInterpolation: CustomStringConvertible {
+  @inlinable
   public var description: String {
     return _storage
   }
