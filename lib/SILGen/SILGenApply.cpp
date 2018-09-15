@@ -2516,31 +2516,33 @@ public:
 
 private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType) {
-    // If it was a tuple in the original type, or the argument
-    // requires the callee to evaluate, the parameters will have
-    // been exploded.
-    if (origParamType.isTuple() || arg.requiresCalleeToEvaluate()) {
-      emitExpanded(std::move(arg), origParamType);
-      return;
-    }
+    auto substArgType = arg.getSubstRValueType();
 
-    auto substArgType = arg.getSubstType();
-
-    // Otherwise, if the substituted type is a tuple, then we should
-    // emit the tuple in its most general form, because there's a
-    // substitution of an opaque archetype to a tuple or function
-    // type in play.  The most general convention is generally to
-    // pass the entire tuple indirectly, but if it's not
-    // materializable, the convention is actually to break it up
-    // into materializable chunks.  See the comment in SILType.cpp.
-    //
-    // FIXME: Once -swift-version 3 code generation goes away, we
-    // can simplify this.
-    if (auto substTupleType = dyn_cast<TupleType>(substArgType)) {
-      if (shouldExpandTupleType(substTupleType)) {
-        assert(origParamType.isTypeParameter());
+    if (!arg.hasLValueType()) {
+      // If it was a tuple in the original type, or the argument
+      // requires the callee to evaluate, the parameters will have
+      // been exploded.
+      if (origParamType.isTuple() || arg.requiresCalleeToEvaluate()) {
         emitExpanded(std::move(arg), origParamType);
         return;
+      }
+
+      // Otherwise, if the substituted type is a tuple, then we should
+      // emit the tuple in its most general form, because there's a
+      // substitution of an opaque archetype to a tuple or function
+      // type in play.  The most general convention is generally to
+      // pass the entire tuple indirectly, but if it's not
+      // materializable, the convention is actually to break it up
+      // into materializable chunks.  See the comment in SILType.cpp.
+      //
+      // FIXME: Once -swift-version 3 code generation goes away, we
+      // can simplify this.
+      if (auto substTupleType = dyn_cast<TupleType>(substArgType)) {
+        if (shouldExpandTupleType(substTupleType)) {
+          assert(origParamType.isTypeParameter());
+          emitExpanded(std::move(arg), origParamType);
+          return;
+        }
       }
     }
 
@@ -2562,10 +2564,7 @@ private:
     SILParameterInfo param = claimNextParameter();
     ArgSpecialDest *specialDest = claimNextSpecialDest();
 
-    // Unwrap InOutType here.
-    assert(isa<InOutType>(substArgType) == param.isIndirectInOut());
-    if (auto inoutType = dyn_cast<InOutType>(substArgType))
-      substArgType = inoutType.getObjectType();
+    assert(arg.hasLValueType() == param.isIndirectInOut());
 
     // Make sure we use the same value category for these so that we
     // can hereafter just use simple equality checks to test for
@@ -2582,6 +2581,8 @@ private:
     // If the caller takes the argument indirectly, the argument has an
     // inout type.
     if (param.isIndirectInOut()) {
+      origParamType = origParamType.getWithoutSpecifierType();
+
       assert(!specialDest);
       emitInOut(std::move(arg), loweredSubstArgType, loweredSubstParamType,
                 origParamType, substArgType);
@@ -2636,7 +2637,7 @@ private:
     // all the elements individually.
     if (arg.isRValue()) {
       if (CanTupleType substArgType =
-              dyn_cast<TupleType>(arg.getSubstType())) {
+              dyn_cast<TupleType>(arg.getSubstRValueType())) {
         // The original type isn't necessarily a tuple.
         assert(origParamType.matchesTuple(substArgType));
 
@@ -2761,11 +2762,7 @@ private:
 
     if (loweredSubstParamType.hasAbstractionDifference(Rep,
                                                        loweredSubstArgType)) {
-      AbstractionPattern origObjectType = origType.transformType(
-        [](CanType type)->CanType {
-          return CanType(type->getInOutObjectType());
-        });
-      lv.addSubstToOrigComponent(origObjectType, loweredSubstParamType);
+      lv.addSubstToOrigComponent(origType, loweredSubstParamType);
     }
 
     // Leave an empty space in the ManagedValue sequence and
@@ -2790,10 +2787,11 @@ private:
       auto conversion = [&] {
         switch (getSILFunctionLanguage(Rep)) {
         case SILFunctionLanguage::Swift:
-          return Conversion::getSubstToOrig(origParamType, arg.getSubstType());
+          return Conversion::getSubstToOrig(origParamType,
+                                            arg.getSubstRValueType());
         case SILFunctionLanguage::C:
           return Conversion::getBridging(Conversion::BridgeToObjC,
-                                         arg.getSubstType(),
+                                         arg.getSubstRValueType(),
                                          origParamType.getType(),
                                          param.getSILStorageType());
         }
@@ -3671,7 +3669,10 @@ public:
   CallSite(SILLocation loc, ArgumentSource &&value, CanType resultType,
            bool throws)
       : Loc(loc), SubstResultType(resultType),
-        Args(value.getSubstType(), /*scalar*/ true), Throws(throws) {
+        // FIXME: Refactor InOutType usage here
+        Args(value.hasLValueType()
+             ? CanInOutType::get(value.getSubstRValueType())
+             : value.getSubstRValueType(), /*scalar*/ true), Throws(throws) {
     Args.addArbitrary(std::move(value));
   }
 
@@ -4847,9 +4848,10 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   ManagedValue payloadMV;
   AbstractionPattern origFormalType =
       (element == getASTContext().getOptionalSomeDecl()
-           ? AbstractionPattern(payload.getSubstType())
+           ? AbstractionPattern(payload.getSubstRValueType())
            : SGM.M.Types.getAbstractionPattern(element));
-  auto &payloadTL = getTypeLowering(origFormalType, payload.getSubstType());
+  auto &payloadTL = getTypeLowering(origFormalType,
+                                    payload.getSubstRValueType());
 
   SILType loweredPayloadType = payloadTL.getLoweredType();
 
