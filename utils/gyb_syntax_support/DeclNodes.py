@@ -680,6 +680,13 @@ DECL_NODES = [
                    description='''
                    The name of the precedence group for the operator
                    '''),
+             Child('TrailingComma', kind='CommaToken',
+                   is_optional=True),
+             Child('ProtocolName', kind='IdentifierToken',
+                   description='''
+                   The protocol associated with the operator
+                   ''',
+                   is_optional=True),
          ]),
 
     # precedence-group-decl -> attributes? modifiers? 'precedencegroup'
