@@ -58,7 +58,7 @@ where Element: ProtocolWithRequirements, Element.T == Y {
 
 // CHECK-USAGE: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$S31protocol_resilience_descriptors17assocTypeMetadatay1TQzmxm010resilient_A024ProtocolWithRequirementsRzlF"(%swift.type*, %swift.type* [[PWD:%.*]], i8** [[WTABLE:%.*]])
 public func assocTypeMetadata<PWR: ProtocolWithRequirements>(_: PWR.Type) -> PWR.T.Type {
-  // CHECK-USAGE: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %PWR.ProtocolWithRequirements, [[INT]] udiv ([[INT]] sub ([[INT]] ptrtoint (%swift.protocol_requirement* @"$S1T18resilient_protocol24ProtocolWithRequirementsPTl" to [[INT]]), [[INT]] ptrtoint (%swift.protocol_requirement* @"$S18resilient_protocol24ProtocolWithRequirementsTL" to [[INT]])), [[INT]] {{(8|16)}})
-  // CHECK-USAGE: load i8*, i8** [[WITNESS_ADDR]], align 8
+  // CHECK-USAGE: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %PWR.ProtocolWithRequirements, [[INT]] udiv ([[INT]] sub ([[INT]] ptrtoint (%swift.protocol_requirement* @"$S1T18resilient_protocol24ProtocolWithRequirementsPTl" to [[INT]]), [[INT]] ptrtoint (%swift.protocol_requirement* @"$S18resilient_protocol24ProtocolWithRequirementsTL" to [[INT]])), [[INT]] 8
+  // CHECK-USAGE: load i8*, i8** [[WITNESS_ADDR]], align {{(4|8)}}
   return PWR.T.self
 }

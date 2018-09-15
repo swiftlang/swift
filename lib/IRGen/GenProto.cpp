@@ -3426,7 +3426,8 @@ static llvm::Value *computeResilientWitnessTableIndex(
   auto ptrSize = dataLayout.getTypeAllocSizeInBits(IGF.IGM.Int8PtrTy);
   assert(protoReqSize >= ptrSize && "> 64-bit pointers?");
   assert((protoReqSize % ptrSize == 0) && "Must be evenly divisible");
-  unsigned factor = (protoReqSize / ptrSize) * 8;
+  (void)ptrSize;
+  unsigned factor = protoReqSize / 8;
   auto factorConstant = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, factor);
   return IGF.Builder.CreateUDiv(offset, factorConstant);
 }
