@@ -3965,6 +3965,13 @@ public:
     Bits.ProtocolDecl.HasMissingRequirements = newValue;
   }
 
+  /// Returns the default type witness for an associated type, or a null
+  /// type if there is no default.
+  Type getDefaultTypeWitness(AssociatedTypeDecl *assocType) const;
+
+  /// Set the default type witness for an associated type.
+  void setDefaultTypeWitness(AssociatedTypeDecl *assocType, Type witness);
+
   /// Returns the default witness for a requirement, or nullptr if there is
   /// no default.
   Witness getDefaultWitness(ValueDecl *requirement) const;

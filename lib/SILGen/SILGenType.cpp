@@ -757,8 +757,15 @@ public:
   }
 
   void addAssociatedType(AssociatedType req) {
-    // Add a dummy entry for the metatype itself.
-    addMissingDefault();
+    Type witness = Proto->getDefaultTypeWitness(req.getAssociation());
+    if (!witness)
+      return addMissingDefault();
+
+    Type witnessInContext = Proto->mapTypeIntoContext(witness);
+    auto entry = SILWitnessTable::AssociatedTypeWitness{
+                                          req.getAssociation(),
+                                          witnessInContext->getCanonicalType()};
+    DefaultWitnesses.push_back(entry);
   }
 
   void addAssociatedConformance(const AssociatedConformance &req) {

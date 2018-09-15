@@ -758,8 +758,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
   return inferred;
 }
 
-/// Find an associated type declarations that provides a default definition.
-static AssociatedTypeDecl *findDefaultedAssociatedType(
+AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
                                              TypeChecker &tc,
                                              AssociatedTypeDecl *assocType) {
   // If this associated type has a default, we're done.

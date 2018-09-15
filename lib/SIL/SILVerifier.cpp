@@ -5008,6 +5008,7 @@ void SILWitnessTable::verify(const SILModule &M) const {
 void SILDefaultWitnessTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
   for (const Entry &E : getEntries()) {
+    // FIXME: associated type witnesses.
     if (!E.isValid() || E.getKind() != SILWitnessTable::Method)
       continue;
 
