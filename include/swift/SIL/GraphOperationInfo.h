@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_GRAPH_OPERATION_INFO_H
-#define SWIFT_AST_GRAPH_OPERATION_INFO_H
+#ifndef SWIFT_SIL_GRAPH_OPERATION_INFO_H
+#define SWIFT_SIL_GRAPH_OPERATION_INFO_H
 
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/SmallVector.h"
@@ -143,4 +143,4 @@ struct GraphOperationInfo {
 };
 } // end namespace tf
 } // end namespace swift
-#endif // SWIFT_AST_GRAPH_OPERATION_INFO_H
+#endif // SWIFT_SIL_GRAPH_OPERATION_INFO_H
