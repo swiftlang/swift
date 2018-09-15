@@ -21,6 +21,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 using namespace swift;
@@ -112,10 +113,8 @@ void SplitterStep::computeFollowupSteps(
         CS, i, /*single=*/false, &Components[i], PartialSolutions[i]));
   }
 
-  if (numComponents > 1 && CS.getASTContext().LangOpts.DebugConstraintSolver) {
-    auto &log = CS.getASTContext().TypeCheckerDebug->getStream().indent(
-        CS.solverState->depth * 2);
-
+  if (numComponents > 1 && isDebugMode()) {
+    auto &log = getDebugLogger();
     // Verify that the constraint graph is valid.
     CG.verify();
 
@@ -212,11 +211,8 @@ bool SplitterStep::mergePartialSolutions() const {
     if (!CS.worseThanBestSolution()) {
       // Finalize this solution.
       auto solution = CS.finalize();
-      if (CS.TC.getLangOpts().DebugConstraintSolver) {
-        auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-        log.indent(CS.solverState->depth * 2)
-            << "(composed solution " << CS.CurrentScore << ")\n";
-      }
+      if (isDebugMode())
+        getDebugLogger() << "(composed solution " << CS.CurrentScore << ")\n";
 
       // Save this solution.
       Solutions.push_back(std::move(solution));
@@ -251,12 +247,6 @@ StepResult ComponentStep::take(bool prevFailed) {
   // failed, it means that we can't solve this component.
   if (prevFailed || CS.getExpressionTooComplex(Solutions))
     return done(/*isSuccess=*/false);
-
-  if (!IsSingle && CS.TC.getLangOpts().DebugConstraintSolver) {
-    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-    log.indent(CS.solverState->depth * 2)
-        << "(solving component #" << Index << '\n';
-  }
 
   /// Try to figure out what this step is going to be,
   /// after the scope has been established.
@@ -296,11 +286,8 @@ StepResult ComponentStep::take(bool prevFailed) {
   }
 
   auto solution = CS.finalize();
-  if (CS.TC.getLangOpts().DebugConstraintSolver) {
-    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-    log.indent(CS.solverState->depth * 2)
-        << "(found solution " << getCurrentScore() << ")\n";
-  }
+  if (isDebugMode())
+    getDebugLogger() << "(found solution " << getCurrentScore() << ")\n";
 
   Solutions.push_back(std::move(solution));
   return done(/*isSuccess=*/true);
@@ -309,6 +296,12 @@ StepResult ComponentStep::take(bool prevFailed) {
 StepResult ComponentStep::resume(bool prevFailed) {
   // Rewind all modifications done to constraint system.
   ComponentScope.reset();
+
+  if (!IsSingle && isDebugMode()) {
+    auto &log = getDebugLogger();
+    log << (prevFailed ? "failed" : "finished") << " component #" << Index
+        << ")\n";
+  }
 
   // If we came either back to this step and previous
   // (either disjunction or type var) failed, it means
@@ -341,11 +334,11 @@ StepResult ComponentStep::resume(bool prevFailed) {
 }
 
 void TypeVariableStep::setup() {
-  auto &TC = CS.TC;
   ++CS.solverState->NumTypeVariablesBound;
-  if (TC.getLangOpts().DebugConstraintSolver) {
-    auto &log = TC.Context.TypeCheckerDebug->getStream();
-    log.indent(CS.solverState->depth * 2) << "Initial bindings: ";
+  if (isDebugMode()) {
+    auto &log = getDebugLogger();
+
+    log << "Initial bindings: ";
     interleave(InitialBindings.begin(), InitialBindings.end(),
                [&](const Binding &binding) {
                  log << TypeVar->getString()
@@ -358,7 +351,6 @@ void TypeVariableStep::setup() {
 }
 
 StepResult TypeVariableStep::take(bool prevFailed) {
-  auto &TC = CS.TC;
   while (auto binding = Producer()) {
     // Try each of the bindings in turn.
     ++CS.solverState->NumTypeVariableBindings;
@@ -375,10 +367,10 @@ StepResult TypeVariableStep::take(bool prevFailed) {
         break;
     }
 
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = TC.Context.TypeCheckerDebug->getStream();
-      log.indent(CS.solverState->depth * 2) << "(trying ";
-      binding->print(log, &TC.Context.SourceMgr);
+    if (isDebugMode()) {
+      auto &log = getDebugLogger();
+      log << "(trying ";
+      binding->print(log, &CS.getASTContext().SourceMgr);
       log << '\n';
     }
 
@@ -394,12 +386,15 @@ StepResult TypeVariableStep::take(bool prevFailed) {
         // let's try to see if it leads to any solutions.
         return suspend(SplitterStep::create(CS, Solutions));
       }
-
-      // If this binding didn't match, let's check
-      // if we've checked enough bindings to stop.
-      if (shouldStop())
-        break;
     }
+
+    if (isDebugMode())
+      getDebugLogger() << ")\n";
+
+    // If this binding didn't match, let's check
+    // if we've checked enough bindings to stop.
+    if (shouldStop())
+      break;
   }
 
   // No more bindings to try, or producer has been short-circuited.
@@ -416,11 +411,8 @@ StepResult TypeVariableStep::resume(bool prevFailed) {
   // that active binding has a solution.
   AnySolved |= !prevFailed;
 
-  auto &TC = CS.TC;
-  if (TC.getLangOpts().DebugConstraintSolver) {
-    auto &log = TC.Context.TypeCheckerDebug->getStream();
-    log.indent(CS.solverState->depth * 2) << ")\n";
-  }
+  if (isDebugMode())
+    getDebugLogger() << ")\n";
 
   // Let's check if we should stop right before
   // attempting any new bindings.
@@ -441,11 +433,10 @@ StepResult DisjunctionStep::take(bool prevFailed) {
     if (shouldShortCircuitAt(currentChoice))
       break;
 
-    if (CS.TC.getLangOpts().DebugConstraintSolver) {
-      auto &ctx = CS.getASTContext();
-      auto &log = ctx.TypeCheckerDebug->getStream();
-      log.indent(CS.solverState->depth) << "(assuming ";
-      currentChoice.print(log, &ctx.SourceMgr);
+    if (isDebugMode()) {
+      auto &log = getDebugLogger();
+      log << "(assuming ";
+      currentChoice.print(log, &CS.getASTContext().SourceMgr);
       log << '\n';
     }
 
@@ -455,6 +446,9 @@ StepResult DisjunctionStep::take(bool prevFailed) {
     /// have to return "split" step which is going to take care of the rest.
     if (attemptChoice(currentChoice))
       return suspend(SplitterStep::create(CS, Solutions));
+
+    if (isDebugMode())
+      getDebugLogger() << ")\n";
   }
 
   return done(/*isSuccess=*/bool(LastSolvedChoice));
@@ -464,11 +458,6 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
   // If disjunction step is re-taken and there should be
   // active choice, let's see if it has be solved or not.
   assert(ActiveChoice);
-
-  if (CS.TC.getLangOpts().DebugConstraintSolver) {
-    auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-    log.indent(CS.solverState->depth) << ")\n";
-  }
 
   // If choice (sub-path) has failed, it's okay, other
   // choices have to be attempted regardless, since final
@@ -491,18 +480,21 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
   // Rewind back the constraint system information.
   ActiveChoice.reset();
 
+  if (isDebugMode())
+    getDebugLogger() << ")\n";
+
   // Attempt next disjunction choice (if any left).
   return take(prevFailed);
 }
 
 bool DisjunctionStep::shouldSkipChoice(const TypeBinding &choice) const {
-  auto &TC = CS.TC;
+  auto &ctx = CS.getASTContext();
 
   if (choice.isDisabled()) {
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-      log.indent(CS.solverState->depth) << "(skipping ";
-      choice.print(log, &TC.Context.SourceMgr);
+    if (isDebugMode()) {
+      auto &log = getDebugLogger();
+      log << "(skipping ";
+      choice.print(log, &ctx.SourceMgr);
       log << '\n';
     }
 
@@ -513,7 +505,7 @@ bool DisjunctionStep::shouldSkipChoice(const TypeBinding &choice) const {
   if (!CS.shouldAttemptFixes() && choice.isUnavailable())
     return true;
 
-  if (TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
   // Don't attempt to solve for generic operators if we already have
