@@ -17,7 +17,7 @@
 
 // Associated type requirement aliases
 
-// CHECK-DEFINITION: @"$S1T18resilient_protocol24ProtocolWithRequirementsPTl" = alias
+// CHECK-DEFINITION: @"$S1T18resilient_protocol24ProtocolWithRequirementsPTl" ={{( dllexport)?}}{{( protected)?}} alias
 
 import resilient_protocol
 
