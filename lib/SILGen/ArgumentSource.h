@@ -155,24 +155,6 @@ public:
     llvm_unreachable("bad kind");
   }
 
-  CanType getSubstType() const & {
-    switch (StoredKind) {
-    case Kind::Invalid:
-      llvm_unreachable("argument source is invalid");
-    case Kind::RValue:
-      return asKnownRValue().getType();
-    case Kind::LValue:
-      return CanInOutType::get(asKnownLValue().getSubstFormalType());
-    case Kind::Expr:
-      return asKnownExpr()->getType()->getCanonicalType();
-    case Kind::Tuple:
-      return Storage.get<TupleStorage>(StoredKind).SubstType;
-    }
-    llvm_unreachable("bad kind");
-  }
-
-  SILType getSILSubstType(SILGenFunction &SGF) const &;
-
   CanType getSubstRValueType() const & {
     switch (StoredKind) {
     case Kind::Invalid:
@@ -188,8 +170,6 @@ public:
     }
     llvm_unreachable("bad kind");
   }
-
-  SILType getSILSubstRValueType(SILGenFunction &SGF) const &;
 
   bool hasLValueType() const & {
     switch (StoredKind) {
@@ -303,7 +283,7 @@ public:
   /// Emit this value to memory so that it follows the abstraction
   /// patterns of the original formal type.
   ///
-  /// \param expectedType - the lowering of getSubstType() under the
+  /// \param expectedType - the lowering of getSubstRValueType() under the
   ///   abstractions of origFormalType
   ManagedValue materialize(SILGenFunction &SGF,
                            AbstractionPattern origFormalType,
