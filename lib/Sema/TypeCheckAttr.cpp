@@ -2285,6 +2285,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_parameters,
                 original->getName())
       .highlight(original->getSourceRange());
+    attr->setInvalid();
     return;
   }
   auto originalResultTy = original->getResultInterfaceType();
@@ -2292,6 +2293,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_void_result,
                 original->getName())
       .highlight(original->getSourceRange());
+    attr->setInvalid();
     return;
   }
 
@@ -2420,12 +2422,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto wrtParams = attr->getParameters();
   SmallVector<TupleTypeElt, 8> retElts;
   // When 'wrt:' is not specified, the adjoint's return type is the type of all
-  // of original's parameters, including the self parameter (if applicable).
+  // of original's parameters. The self parameter is intentionally excluded.
   if (wrtParams.empty()) {
     auto attrLoc = attr->getLocation();
-    if (isInstanceMethod)
-      if (addWrtSelfRetTyOrDiagnose(TC, attrLoc, original, retElts))
-        return;
     for (auto *param : originalParams)
       if (addWrtParamRetTyOrDiagnose(TC, attrLoc, param, retElts))
         return;
@@ -2479,10 +2478,21 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       }
     }
   }
+
+  // This can happen when someone puts the attribute on an instance method with
+  // no paramters (other than the self parameter), and does not specify a wrt
+  // list.
+  if (retElts.size() == 0) {
+    TC.diagnose(attr->getLocation(), diag::differentiable_attr_wrt_nothing,
+                original->getName())
+      .highlight(original->getSourceRange());
+    attr->setInvalid();
+    return;
+  }
+
   // If collected `retElts` has only 1 element, use that element as adjoint's
   // return type. Otherwise, make a tuple out of `retElts` as adjoint's return
   // type.
-  assert(retElts.size() > 0 && "There should be at least one return type");
   Type retTy = retElts.size() > 1
     ? TupleType::get(retElts, ctx)
     : retElts[0].getType();

@@ -93,7 +93,7 @@ func dPlus(_ x: Int, _ y: S, _ primal: S, _ seed: S) -> (Int, S) {
 }
 
 struct C {
-  @differentiable(reverse, wrt: (.0), adjoint: adjoint)
+  @differentiable(reverse, adjoint: adjoint)
   func primal(x: Float) -> Float {
     return x
   }
@@ -104,7 +104,7 @@ struct C {
 }
 
 struct S {
-  @differentiable(reverse, adjoint: dmeow1_out_of_S(_:_:_:_:)) // expected-error {{'dmeow1_out_of_S' is not defined in the current type context}}
+  @differentiable(reverse, wrt: (self, .0), adjoint: dmeow1_out_of_S(_:_:_:_:)) // expected-error {{'dmeow1_out_of_S' is not defined in the current type context}}
   func meow1(_ x: Float) -> Float {
     return x + 1
   }
@@ -148,7 +148,7 @@ struct S {
     return rhs
   }
 
-  @differentiable(reverse, adjoint: dIdentity_wrt_self) // ok
+  @differentiable(reverse, adjoint: dIdentity_wrt_self) // expected-error {{specify at least one parameter to differentiate with respect to}}
   func identity() -> S {
     return self
   }
@@ -198,7 +198,7 @@ func dmeow2(_ x: Float, _: Float, _: Float, _: Float, _: Float) -> (Float, Float
 
 // Original function in struct definition, adjoint in extension.
 struct E1 {
-  @differentiable(reverse, wrt: (.0), adjoint: adjoint)
+  @differentiable(reverse, adjoint: adjoint)
   func original(x: Float) -> Float {
     return x
   }
@@ -212,7 +212,7 @@ extension E1 {
 // Original function and adjoint in separate struct extensions.
 struct E2 {}
 extension E2 {
-  @differentiable(reverse, wrt: (.0), adjoint: adjoint)
+  @differentiable(reverse, adjoint: adjoint)
   func original(x: Float) -> Float {
     return x
   }
@@ -227,7 +227,7 @@ extension E2 {
 // generic constraints.
 struct E3<T> {}
 extension E3 where T == Float {
-  @differentiable(reverse, wrt: (.0), adjoint: adjoint_same_constraint)
+  @differentiable(reverse, adjoint: adjoint_same_constraint)
   func original(x: Float) -> Float {
     return x
   }
@@ -240,7 +240,7 @@ extension E3 where T == Float {
 
 struct E4<T> {}
 extension E4 {
-  @differentiable(reverse, wrt: (.0), adjoint: adjoint_no_constraint)
+  @differentiable(reverse, adjoint: adjoint_no_constraint)
   func original(x: Float) -> Float {
     return x
   }
@@ -255,7 +255,7 @@ extension E4 {
 // non-matching generic constraints.
 struct E5<T> {}
 extension E5 {
-  @differentiable(reverse, wrt: (.0), adjoint: adjoint_diff_constraint)
+  @differentiable(reverse, adjoint: adjoint_diff_constraint)
   // expected-error @-1 {{'adjoint_diff_constraint' does not have expected type '<T> (E5<T>) -> (Float, Float, Float) -> Float'}}
   func original(x: Float) -> Float {
     return x
@@ -417,15 +417,9 @@ func dProtocolParameter(_: ParamProtocol, _: Float, seed: Float) -> ParamProtoco
 }
 
 class ClassWithDifferentiableMethods {
-  @differentiable(reverse, adjoint: dMethod)
-  // expected-error @-1 {{class objects and protocol existentials ('ClassWithDifferentiableMethods') cannot be differentiated with respect to}}
-  func method1() -> Float {
-    return 1
-  }
-
   @differentiable(reverse, wrt: (self), adjoint: dMethod)
   // expected-error @-1 {{class objects and protocol existentials ('ClassWithDifferentiableMethods') cannot be differentiated with respect to}}
-  func method2() -> Float {
+  func method() -> Float {
     return 1
   }
 
