@@ -1823,6 +1823,9 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'L':
       return createWithChild(Node::Kind::ProtocolRequirementsBaseDescriptor,
                              popProtocol());
+    case 'M':
+      return createWithChild(Node::Kind::DefaultAssociatedTypeMetadataAccessor,
+                             popAssocTypeName());
 
     case 'H':
     case 'h': {

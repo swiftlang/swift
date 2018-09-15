@@ -5260,6 +5260,26 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (!valueDecl)
       continue;
 
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(valueDecl)) {
+      if (assocType->getOverriddenDecls().empty()) {
+        if (auto defaultedAssocType =
+                AssociatedTypeInference::findDefaultedAssociatedType(
+                  *this, assocType)) {
+          Type defaultType =
+            defaultedAssocType->getDefaultDefinitionLoc().getType();
+
+          // Map out of its protocol context...
+          defaultType = defaultType->mapTypeOutOfContext();
+
+          if (!defaultType->hasError()) {
+            proto->setDefaultTypeWitness(assocType, defaultType);
+          }
+        }
+      }
+
+      continue;
+    }
+
     if (isa<TypeDecl>(valueDecl))
       continue;
 

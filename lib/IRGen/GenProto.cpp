@@ -1542,6 +1542,7 @@ getAssociatedTypeMetadataAccessFunction(AssociatedType requirement,
 
   // If the type witness does not involve any type parameters, directly
   // reference the type metadata. We only needed a thunk so it could be
+  // relatively referenced.
   if (!hasArchetype) {
     assert(ResilientConformance &&
            "Non-resilient conformances refer to accessor directly");

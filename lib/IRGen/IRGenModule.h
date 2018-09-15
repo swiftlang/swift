@@ -1284,6 +1284,8 @@ public:
   llvm::Function *getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                      const NormalProtocolConformance *C,
                                      const AssociatedConformance &association);
+  llvm::Function *getAddrOfDefaultAssociatedTypeMetadataAccessFunction(
+                                           AssociatedType association);
 
   Address getAddrOfObjCISAMask();
 

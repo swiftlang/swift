@@ -175,3 +175,30 @@ public func doSomething<T : AddSubscriptProtocol>(_ t: inout T, k1: T.Key, k2: T
   t[k1] = t[k2]
 #endif
 }
+
+public struct Wrapper<T> { }
+
+public protocol AddAssocTypesProtocol {
+  // FIXME: The presence of a single method requirement causes us to
+  // create a resilient witness table, avoiding a runtime assertion.
+  func dummy()
+
+#if AFTER
+  associatedtype AssocType = Self
+  associatedtype AssocType2 = Wrapper<AssocType>
+#endif
+}
+
+extension AddAssocTypesProtocol {
+  public func dummy() { }
+}
+
+
+public func doSomethingWithAssocTypes<T: AddAssocTypesProtocol>(_ value: T)
+    -> String {
+#if AFTER
+  return String(describing: T.AssocType2.self)
+#else
+  return "there are no associated types yet"
+#endif
+}

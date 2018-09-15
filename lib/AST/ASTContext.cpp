@@ -281,6 +281,10 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::DenseMap<std::pair<const ProtocolDecl *, ValueDecl *>, Witness>
     DefaultWitnesses;
 
+  /// Default type witnesses for protocols.
+  llvm::DenseMap<std::pair<const ProtocolDecl *, AssociatedTypeDecl *>, Type>
+    DefaultTypeWitnesses;
+
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -1680,6 +1684,29 @@ void ProtocolDecl::setDefaultWitness(ValueDecl *requirement, Witness witness) {
                 std::make_pair(std::make_pair(this, requirement), witness));
   assert(pair.second && "Already have a default witness!");
   (void) pair;
+}
+
+/// Returns the default type witness for an associated type, or a null
+/// type if there is no default.
+Type ProtocolDecl::getDefaultTypeWitness(AssociatedTypeDecl *assocType) const {
+  auto &ctx = getASTContext();
+  auto found = ctx.getImpl().DefaultTypeWitnesses.find({this, assocType});
+  if (found == ctx.getImpl().DefaultTypeWitnesses.end())
+    return Type();
+
+  return found->second;
+}
+
+/// Set the default type witness for an associated type.
+void ProtocolDecl::setDefaultTypeWitness(AssociatedTypeDecl *assocType,
+                                         Type witness) {
+  assert(witness);
+  assert(!witness->hasArchetype() && "Only record interface types");
+  ASTContext &ctx = getASTContext();
+  auto pair = ctx.getImpl().DefaultTypeWitnesses.insert(
+                std::make_pair(std::make_pair(this, assocType), witness));
+  assert(pair.second && "Already have a default witness");
+  (void)pair;
 }
 
 bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {

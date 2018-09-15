@@ -321,6 +321,7 @@ private:
     case Node::Kind::Deallocator:
     case Node::Kind::DeclContext:
     case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
     case Node::Kind::DependentAssociatedTypeRef:
     case Node::Kind::DependentGenericSignature:
     case Node::Kind::DependentGenericParamCount:
@@ -1562,6 +1563,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "associated type metadata accessor for ";
     print(Node->getChild(1));
     Printer << " in ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
+    Printer << "default associated type metadata accessor for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::AssociatedTypeWitnessTableAccessor:
