@@ -27,3 +27,10 @@ public protocol ProtocolWithRequirements {
   func first()
   func second()
 }
+
+public struct Wrapper<T> { }
+
+public protocol ProtocolWithAssocTypeDefaults {
+  associatedtype T1 = Self
+  associatedtype T2 = Wrapper<T1>
+}

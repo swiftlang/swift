@@ -637,7 +637,12 @@ namespace {
 
       if (entry.isAssociatedType()) {
         auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
-        return { flags, nullptr };
+
+        // Look for a default witness.
+        llvm::Constant *defaultImpl =
+          findDefaultTypeWitness(entry.getAssociatedType());
+
+        return { flags, defaultImpl };
       }
 
       if (entry.isAssociatedConformance()) {
@@ -722,14 +727,69 @@ namespace {
       if (!DefaultWitnesses) return nullptr;
 
       for (auto &entry : DefaultWitnesses->getEntries()) {
-        if (!entry.isValid() || entry.getRequirement() != func)
+        if (!entry.isValid() || entry.getKind() != SILWitnessTable::Method ||
+            entry.getMethodWitness().Requirement != func)
           continue;
-        return IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition);
+        return IGM.getAddrOfSILFunction(entry.getMethodWitness().Witness,
+                                        NotForDefinition);
       }
 
       return nullptr;
     }
 
+    llvm::Constant *findDefaultTypeWitness(AssociatedTypeDecl *assocType) {
+      if (!DefaultWitnesses) return nullptr;
+
+      for (auto &entry : DefaultWitnesses->getEntries()) {
+        if (!entry.isValid() ||
+            entry.getKind() != SILWitnessTable::AssociatedType ||
+            entry.getAssociatedTypeWitness().Requirement != assocType)
+          continue;
+
+        auto witness = entry.getAssociatedTypeWitness().Witness;
+        return getDefaultAssociatedTypeMetadataAccessFunction(
+                 AssociatedType(assocType), witness);
+      }
+
+      return nullptr;
+    }
+
+    /// Create an associated type metadata access function for the default
+    /// associated type witness.
+    llvm::Constant *getDefaultAssociatedTypeMetadataAccessFunction(
+                      AssociatedType requirement, CanType witness) {
+      auto accessor =
+        IGM.getAddrOfDefaultAssociatedTypeMetadataAccessFunction(requirement);
+
+      IRGenFunction IGF(IGM, accessor);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
+
+      Explosion parameters = IGF.collectParameters();
+      auto request = DynamicMetadataRequest(parameters.claimNext());
+
+      llvm::Value *self = parameters.claimNext();
+      llvm::Value *wtable = parameters.claimNext();
+
+      CanType selfInContext =
+          Proto->mapTypeIntoContext(Proto->getProtocolSelfType())
+            ->getCanonicalType();
+
+      // Bind local Self type data from the metadata argument.
+      IGF.bindLocalTypeDataFromTypeMetadata(selfInContext, IsExact, self,
+                                            MetadataState::Abstract);
+      IGF.setUnscopedLocalTypeData(
+          selfInContext,
+          LocalTypeDataKind::forAbstractProtocolWitnessTable(Proto),
+          wtable);
+
+      // Emit a reference to the type metadata.
+      auto response = IGF.emitTypeMetadataRef(witness, request);
+      response.ensureDynamicState(IGF);
+      auto returnValue = response.combine(IGF);
+      IGF.Builder.CreateRet(returnValue);
+      return accessor;
+    }
     void addAssociatedTypeNames() {
       std::string AssociatedTypeNames;
 

@@ -2784,6 +2784,82 @@ void SILDeserializer::getAllProperties() {
   }
 }
 
+void SILDeserializer::readWitnessTableEntries(
+    llvm::BitstreamEntry &entry,
+    std::vector<SILWitnessTable::Entry> &witnessEntries,
+    std::vector<SILWitnessTable::ConditionalConformance>
+      &conditionalConformances) {
+  SmallVector<uint64_t, 64> scratch;
+  unsigned kind = SILCursor.readRecord(entry.ID, scratch);
+
+  // Another record means the end of this WitnessTable.
+  while (kind != SIL_WITNESS_TABLE &&
+         kind != SIL_DEFAULT_WITNESS_TABLE &&
+         kind != SIL_FUNCTION) {
+    if (kind == SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY) {
+      witnessEntries.push_back(SILDefaultWitnessTable::Entry());
+    } else if (kind == SIL_WITNESS_BASE_ENTRY) {
+      DeclID protoId;
+      WitnessBaseEntryLayout::readRecord(scratch, protoId);
+      ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
+      auto conformance = MF->readConformance(SILCursor);
+      witnessEntries.push_back(SILWitnessTable::BaseProtocolWitness{
+        proto, conformance.getConcrete()
+      });
+    } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
+      TypeID assocId;
+      DeclID protoId;
+      WitnessAssocProtocolLayout::readRecord(scratch, assocId, protoId);
+      CanType type = MF->getType(assocId)->getCanonicalType();
+      ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
+      auto conformance = MF->readConformance(SILCursor);
+      witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
+        type, proto, conformance
+      });
+    } else if (kind == SIL_WITNESS_ASSOC_ENTRY) {
+      DeclID assocId;
+      TypeID tyId;
+      WitnessAssocEntryLayout::readRecord(scratch, assocId, tyId);
+      AssociatedTypeDecl *assoc = cast<AssociatedTypeDecl>(MF->getDecl(assocId));
+      witnessEntries.push_back(SILWitnessTable::AssociatedTypeWitness{
+        assoc, MF->getType(tyId)->getCanonicalType()
+      });
+    } else if (kind == SIL_WITNESS_METHOD_ENTRY) {
+      ArrayRef<uint64_t> ListOfValues;
+      DeclID NameID;
+      WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
+      SILFunction *Func = nullptr;
+      if (NameID != 0) {
+        Func = getFuncForReference(MF->getIdentifierText(NameID));
+      }
+      if (Func || NameID == 0) {
+        unsigned NextValueIndex = 0;
+        witnessEntries.push_back(SILWitnessTable::MethodWitness{
+          getSILDeclRef(MF, ListOfValues, NextValueIndex), Func
+        });
+      }
+    } else {
+      assert(kind == SIL_WITNESS_CONDITIONAL_CONFORMANCE &&
+             "Content of WitnessTable should be in "
+             "SIL_WITNESS_CONDITIONAL_CONFORMANCE.");
+      TypeID assocId;
+      WitnessConditionalConformanceLayout::readRecord(scratch, assocId);
+      CanType type = MF->getType(assocId)->getCanonicalType();
+      auto conformance = MF->readConformance(SILCursor);
+      conditionalConformances.push_back(
+          SILWitnessTable::ConditionalConformance{type, conformance});
+    }
+
+    // Fetch the next record.
+    scratch.clear();
+    entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+      // EndBlock means the end of this WitnessTable.
+      break;
+    kind = SILCursor.readRecord(entry.ID, scratch);
+  }
+}
+
 SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
                                                    SILWitnessTable *existingWt) {
   if (WId == 0)
@@ -2878,75 +2954,10 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::EndBlock)
     return nullptr;
-  kind = SILCursor.readRecord(entry.ID, scratch);
 
   std::vector<SILWitnessTable::Entry> witnessEntries;
   std::vector<SILWitnessTable::ConditionalConformance> conditionalConformances;
-
-  // Another record means the end of this WitnessTable.
-  while (kind != SIL_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_WITNESS_TABLE &&
-         kind != SIL_FUNCTION) {
-    if (kind == SIL_WITNESS_BASE_ENTRY) {
-      DeclID protoId;
-      WitnessBaseEntryLayout::readRecord(scratch, protoId);
-      ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
-      auto conformance = MF->readConformance(SILCursor);
-      witnessEntries.push_back(SILWitnessTable::BaseProtocolWitness{
-        proto, conformance.getConcrete()
-      });
-    } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
-      TypeID assocId;
-      DeclID protoId;
-      WitnessAssocProtocolLayout::readRecord(scratch, assocId, protoId);
-      CanType type = MF->getType(assocId)->getCanonicalType();
-      ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
-      auto conformance = MF->readConformance(SILCursor);
-      witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-        type, proto, conformance
-      });
-    } else if (kind == SIL_WITNESS_ASSOC_ENTRY) {
-      DeclID assocId;
-      TypeID tyId;
-      WitnessAssocEntryLayout::readRecord(scratch, assocId, tyId);
-      AssociatedTypeDecl *assoc = cast<AssociatedTypeDecl>(MF->getDecl(assocId));
-      witnessEntries.push_back(SILWitnessTable::AssociatedTypeWitness{
-        assoc, MF->getType(tyId)->getCanonicalType()
-      });
-    } else if (kind == SIL_WITNESS_METHOD_ENTRY) {
-      ArrayRef<uint64_t> ListOfValues;
-      DeclID NameID;
-      WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
-      SILFunction *Func = nullptr;
-      if (NameID != 0) {
-        Func = getFuncForReference(MF->getIdentifierText(NameID));
-      }
-      if (Func || NameID == 0) {
-        unsigned NextValueIndex = 0;
-        witnessEntries.push_back(SILWitnessTable::MethodWitness{
-          getSILDeclRef(MF, ListOfValues, NextValueIndex), Func
-        });
-      }
-    } else {
-      assert(kind == SIL_WITNESS_CONDITIONAL_CONFORMANCE &&
-             "Content of WitnessTable should be in "
-             "SIL_WITNESS_CONDITIONAL_CONFORMANCE.");
-      TypeID assocId;
-      WitnessConditionalConformanceLayout::readRecord(scratch, assocId);
-      CanType type = MF->getType(assocId)->getCanonicalType();
-      auto conformance = MF->readConformance(SILCursor);
-      conditionalConformances.push_back(
-          SILWitnessTable::ConditionalConformance{type, conformance});
-    }
-
-    // Fetch the next record.
-    scratch.clear();
-    entry = SILCursor.advance(AF_DontPopBlockAtEnd);
-    if (entry.Kind == llvm::BitstreamEntry::EndBlock)
-      // EndBlock means the end of this WitnessTable.
-      break;
-    kind = SILCursor.readRecord(entry.ID, scratch);
-  }
+  readWitnessTableEntries(entry, witnessEntries, conditionalConformances);
 
   // If we've already serialized the module, don't mark the witness table
   // as serialized, since we no longer need to enforce resilience
@@ -3070,39 +3081,10 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
   entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::EndBlock)
     return nullptr;
-  kind = SILCursor.readRecord(entry.ID, scratch);
 
-  std::vector<SILDefaultWitnessTable::Entry> witnessEntries;
-  // Another SIL_DEFAULT_WITNESS_TABLE record means the end of this WitnessTable.
-  while (kind != SIL_DEFAULT_WITNESS_TABLE && kind != SIL_FUNCTION) {
-    if (kind == SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY) {
-      witnessEntries.push_back(SILDefaultWitnessTable::Entry());
-    } else {
-      assert(kind == SIL_DEFAULT_WITNESS_TABLE_ENTRY &&
-             "Content of DefaultWitnessTable should be in "
-             "SIL_DEFAULT_WITNESS_TABLE_ENTRY.");
-      ArrayRef<uint64_t> ListOfValues;
-      DeclID NameID;
-      DefaultWitnessTableEntryLayout::readRecord(scratch, NameID, ListOfValues);
-      SILFunction *Func = nullptr;
-      if (NameID != 0) {
-        Func = getFuncForReference(MF->getIdentifierText(NameID));
-      }
-      if (Func || NameID == 0) {
-        unsigned NextValueIndex = 0;
-        witnessEntries.push_back(SILDefaultWitnessTable::Entry(
-          getSILDeclRef(MF, ListOfValues, NextValueIndex), Func));
-      }
-    }
-
-    // Fetch the next record.
-    scratch.clear();
-    entry = SILCursor.advance(AF_DontPopBlockAtEnd);
-    if (entry.Kind == llvm::BitstreamEntry::EndBlock)
-      // EndBlock means the end of this WitnessTable.
-      break;
-    kind = SILCursor.readRecord(entry.ID, scratch);
-  }
+  std::vector<SILWitnessTable::Entry> witnessEntries;
+  std::vector<SILWitnessTable::ConditionalConformance> conditionalConformances;
+  readWitnessTableEntries(entry, witnessEntries, conditionalConformances);
 
   wT->convertToDefinition(witnessEntries);
   wTableOrOffset.set(wT, /*fully deserialized*/ true);

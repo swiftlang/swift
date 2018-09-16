@@ -12,12 +12,24 @@
 // Resilient protocol definition
 // ----------------------------------------------------------------------------
 
+// Protocol descriptor
+// CHECK-DEFINITION-LABEL: @"$S18resilient_protocol29ProtocolWithAssocTypeDefaultsMp" ={{( protected)?}} constant
+// CHECK-DEFINITION-SAME: $S2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPTM
+// CHECK-DEFINITION-SAME: $S2T218resilient_protocol29ProtocolWithAssocTypeDefaultsPTM
+
 // Protocol requirements base descriptor
 // CHECK-DEFINITION: @"$S18resilient_protocol21ResilientBaseProtocolTL" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr (%swift.protocol_requirement, %swift.protocol_requirement* getelementptr inbounds (<{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>, <{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>* @"$S18resilient_protocol21ResilientBaseProtocolMp", i32 0, i32 6), i32 -1)
 
 // Associated type requirement aliases
 
 // CHECK-DEFINITION: @"$S1T18resilient_protocol24ProtocolWithRequirementsPTl" ={{( dllexport)?}}{{( protected)?}} alias
+
+// Default associated type witnesses
+// CHECK-DEFINITION-LABEL: define internal swiftcc %swift.metadata_response @"$S2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPTM"
+
+// CHECK-DEFINITION-LABEL: define internal swiftcc %swift.metadata_response @"$S2T218resilient_protocol29ProtocolWithAssocTypeDefaultsPTM"
+// CHECK-DEFINITION: getelementptr inbounds i8*, i8** [[WTABLE:%.*]], i32 1
+// CHECK-DEFINITION: call{{.*}}S18resilient_protocol7WrapperVMa
 
 import resilient_protocol
 
