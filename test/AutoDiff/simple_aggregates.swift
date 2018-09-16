@@ -10,15 +10,10 @@ struct DenseLayer : Equatable {
   let b: Float
 }
 
-// TODO: Deduplicate these when it's possible.
-func prediction1(_ model: DenseLayer, _ input: Float) -> Float {
-  return input * model.w + model.b
-}
-func prediction2(_ model: DenseLayer, _ input: Float) -> Float {
-  return input * model.w + model.b
-}
-func prediction3(_ model: DenseLayer, _ input: Float) -> Float {
-  return input * model.w + model.b
+extension DenseLayer {
+  func prediction(for input: Float) -> Float {
+    return input * w + b
+  }
 }
 
 struct Model : Equatable {
@@ -27,17 +22,19 @@ struct Model : Equatable {
   let l3: DenseLayer
 }
 
-func prediction(_ model: Model, _ input: Float) -> Float {
-  // This "model" is silly because it doesn't have nonlinearities. But it's
-  // simple and good enough for testing purposes.
-  let l1 = prediction1(model.l1, input)
-  let l2 = prediction2(model.l2, l1)
-  return prediction3(model.l3, l2)
-}
+extension Model {
+  func prediction(for input: Float) -> Float {
+    // This "model" is silly because it doesn't have nonlinearities. But it's
+    // simple and good enough for testing purposes.
+    let activation1 = l1.prediction(for: input)
+    let activation2 = l2.prediction(for: activation1)
+    return l3.prediction(for: activation2)
+  }
 
-func loss(_ model: Model, _ input: Float, _ label: Float) -> Float {
-  let p = prediction(model, input)
-  return (p - label) * (p - label)
+  func loss(for input: Float, withLabel label: Float) -> Float {
+    let p = prediction(for: input)
+    return (p - label) * (p - label)
+  }
 }
 
 SimpleAggregateTests.test("gradient") {
@@ -45,6 +42,10 @@ SimpleAggregateTests.test("gradient") {
   let model = Model(l1: layer, l2: layer, l3: layer)
   let input: Float = 1
   let label: Float = 3
+
+  func loss(_ m: Model, _ i: Float, _ l: Float) -> Float {
+    return m.loss(for: i, withLabel: l)
+  }
 
   let grad = #gradient(loss, wrt: .0)(model, input, label)
   let expectedGrad = Model(l1: DenseLayer(w: -4, b: -4),

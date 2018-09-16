@@ -3881,7 +3881,7 @@ static void materializeAdjointIndirectHelper(AdjointValue val,
             eltAndIdx.value(), eltBuf, builder, context);
       }
     } else if (auto *structDecl = dyn_cast_or_null<StructDecl>(
-                  val.getSwiftType()->getAnyNominal())) {
+                   val.getSwiftType()->getAnyNominal())) {
       for (auto eltAndField : zip(val.getAggregateElements(),
                                   structDecl->getStoredProperties())) {
         auto elt = std::get<0>(eltAndField);
