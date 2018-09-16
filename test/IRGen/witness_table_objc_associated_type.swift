@@ -20,8 +20,8 @@ struct SB: B {
   func foo() {}
 }
 // CHECK-LABEL: @"$S34witness_table_objc_associated_type2SBVAA1BAAWP" = hidden constant [4 x i8*] [
-// CHECK:         i8* bitcast (%swift.metadata_response ([[INT]])* @"$S34witness_table_objc_associated_type2SAVMa" to i8*)
 // CHECK:         i8* bitcast (i8** ()* @"$S34witness_table_objc_associated_type2SAVAA1AAAWa" to i8*)
+// CHECK:         i8* bitcast (%swift.metadata_response ([[INT]])* @"$S34witness_table_objc_associated_type2SAVMa" to i8*)
 // CHECK:         i8* bitcast {{.*}} @"$S34witness_table_objc_associated_type2SBVAA1BA2aDP3fooyyFTW"
 // CHECK:       ]
 

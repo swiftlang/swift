@@ -3641,8 +3641,7 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
   for (size_t i = 0, e = protocol->NumRequirements; i < e; ++i) {
     auto &reqt = requirements[i];
 
-    // Only function-like requirements are filled in from the
-    // resilient witness table.
+    // Only certain requirements are filled in from the resilient witness table.
     switch (reqt.Flags.getKind()) {
     case ProtocolRequirementFlags::Kind::Method:
     case ProtocolRequirementFlags::Kind::Init:
@@ -3650,9 +3649,9 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
     case ProtocolRequirementFlags::Kind::Setter:
     case ProtocolRequirementFlags::Kind::ReadCoroutine:
     case ProtocolRequirementFlags::Kind::ModifyCoroutine:
+    case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
       break;
     case ProtocolRequirementFlags::Kind::BaseProtocol:
-    case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
     case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
       continue;
     }

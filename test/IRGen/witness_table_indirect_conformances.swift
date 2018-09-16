@@ -32,8 +32,8 @@ struct Z: P2 {
 
 // CHECK: @"$S35witness_table_indirect_conformances1WVAA2P3AAWP" = hidden constant [5 x i8*] [
 // CHECK-SAME: @"$S35witness_table_indirect_conformances1WVAA2P3AAMc"
-// CHECK-SAME: i8* bitcast (%swift.metadata_response ([[INT]])* @"$S35witness_table_indirect_conformances1ZVMa" to i8*), i8* bitcast (i8** ()* @"$S35witness_table_indirect_conformances1ZVAA2P2AAWa" to i8*),
 // CHECK-SAME: i8* bitcast (i8** ()* @"$S35witness_table_indirect_conformances1YVAA1QAAWa" to i8*),
+// CHECK-SAME: i8* bitcast (%swift.metadata_response ([[INT]])* @"$S35witness_table_indirect_conformances1ZVMa" to i8*),
 // CHECK-SAME: i8* bitcast (void (%T35witness_table_indirect_conformances1ZV*, %T35witness_table_indirect_conformances1WV*, %swift.type*, i8**)* @"$S35witness_table_indirect_conformances1WVAA2P3A2aDP08getAssocE00gE0QzyFTW" to i8*)]
 struct W: P3 {
 	typealias AssocP3 = Z

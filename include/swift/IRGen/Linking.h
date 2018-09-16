@@ -194,6 +194,18 @@ class LinkEntity {
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
 
+    /// The alias referring to the base of the requirements within the
+    /// protocol descriptor, which is used to determine the offset of a
+    /// particular requirement in the witness table.
+    /// The pointer is a ProtocolDecl*.
+    ProtocolRequirementsBaseDescriptor,
+
+    /// An descriptor for an associated type within a protocol, which
+    /// will alias the TargetProtocolRequirement descripting this
+    /// particular associated type.
+    /// The pointer is an AssociatedTypeDecl*.
+    AssociatedTypeDescriptor,
+
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
 
@@ -307,7 +319,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::ProtocolDescriptor;
+    return k <= Kind::AssociatedTypeDescriptor;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -634,6 +646,12 @@ public:
     return entity;
   }
 
+  static LinkEntity forProtocolRequirementsBaseDescriptor(ProtocolDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ProtocolRequirementsBaseDescriptor, decl);
+    return entity;
+  }
+
   static LinkEntity forValueWitness(CanType concreteType, ValueWitness witness) {
     LinkEntity entity;
     entity.Pointer = concreteType.getPointer();
@@ -725,6 +743,13 @@ public:
     LinkEntity entity;
     entity.setForProtocolConformanceAndType(
              Kind::ProtocolWitnessTableLazyCacheVariable, C, type);
+    return entity;
+  }
+
+  static LinkEntity
+  forAssociatedTypeDescriptor(AssociatedTypeDecl *assocType) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::AssociatedTypeDescriptor, assocType);
     return entity;
   }
 
@@ -824,9 +849,12 @@ public:
   }
 
   AssociatedTypeDecl *getAssociatedType() const {
-    assert(getKind() == Kind::AssociatedTypeMetadataAccessFunction);
-    return getAssociatedTypeByIndex(getProtocolConformance(),
+    if (getKind() == Kind::AssociatedTypeMetadataAccessFunction)
+      return getAssociatedTypeByIndex(getProtocolConformance(),
                               LINKENTITY_GET_FIELD(Data, AssociatedTypeIndex));
+
+    assert(getKind() == Kind::AssociatedTypeDescriptor);
+    return reinterpret_cast<AssociatedTypeDecl *>(Pointer);
   }
 
   std::pair<CanType, ProtocolDecl *> getAssociatedConformance() const {
