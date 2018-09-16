@@ -238,9 +238,6 @@ public:
                            AbstractionPattern origFormalType,
                            SILType expectedType = SILType()) &&;
 
-  // This is a hack and should be avoided.
-  void rewriteType(CanType newType) &;
-
   /// Whether this argument source is a TupleShuffleExpr.
   bool isShuffle() const;
 
