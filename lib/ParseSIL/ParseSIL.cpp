@@ -5812,6 +5812,41 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
   return retVal;
 }
 
+/// Bind any unqualified 'Self' references to the given protocol's 'Self'
+/// generic parameter.
+///
+/// FIXME: This is a hack to work around the lack of a DeclContext for
+/// witness tables.
+static void bindProtocolSelfInTypeRepr(TypeLoc &TL, ProtocolDecl *proto) {
+  if (auto typeRepr = TL.getTypeRepr()) {
+    // AST walker to update 'Self' references.
+    class BindProtocolSelf : public ASTWalker {
+      ProtocolDecl *proto;
+      GenericTypeParamDecl *selfParam;
+      Identifier selfId;
+
+    public:
+      BindProtocolSelf(ProtocolDecl *proto)
+        : proto(proto),
+          selfParam(proto->getProtocolSelfType()->getDecl()),
+          selfId(proto->getASTContext().Id_Self) {
+      }
+
+      virtual bool walkToTypeReprPre(TypeRepr *T) override {
+        if (auto ident = dyn_cast<IdentTypeRepr>(T)) {
+          auto firstComponent = ident->getComponentRange().front();
+          if (firstComponent->getIdentifier() == selfId)
+            firstComponent->setValue(selfParam, proto);
+        }
+
+        return true;
+      }
+    };
+
+    typeRepr->walk(BindProtocolSelf(proto));
+  }
+}
+
 /// Parser a single SIL vtable entry and add it to either \p witnessEntries
 /// or \c conditionalConformances.
 static bool parseSILVTableEntry(
@@ -5820,6 +5855,7 @@ static bool parseSILVTableEntry(
          ProtocolDecl *proto,
          GenericEnvironment *witnessEnv,
          SILParser &witnessState,
+         bool isDefaultWitnessTable,
          std::vector<SILWitnessTable::Entry> &witnessEntries,
          std::vector<SILWitnessTable::ConditionalConformance>
            &conditionalConformances) {
@@ -5865,6 +5901,8 @@ static bool parseSILVTableEntry(
       if (TyR.isNull())
         return true;
       TypeLoc Ty = TyR.get();
+      if (isDefaultWitnessTable)
+        bindProtocolSelfInTypeRepr(Ty, proto);
       if (swift::performTypeLocChecking(P.Context, Ty,
                                         /*isSILMode=*/false,
                                         /*isSILType=*/false,
@@ -5921,6 +5959,8 @@ static bool parseSILVTableEntry(
     if (TyR.isNull())
       return true;
     TypeLoc Ty = TyR.get();
+    if (isDefaultWitnessTable)
+      bindProtocolSelfInTypeRepr(Ty, proto);
     if (swift::performTypeLocChecking(P.Context, Ty,
                                       /*isSILMode=*/false,
                                       /*isSILType=*/false,
@@ -6046,7 +6086,7 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
 
   if (P.Tok.isNot(tok::r_brace)) {
     do {
-      if (parseSILVTableEntry(P, M, proto, witnessEnv, WitnessState,
+      if (parseSILVTableEntry(P, M, proto, witnessEnv, WitnessState, false,
                               witnessEntries, conditionalConformances))
         return true;
     } while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof));
@@ -6092,6 +6132,8 @@ bool SILParserTUState::parseSILDefaultWitnessTable(Parser &P) {
 
   // Parse the protocol.
   ProtocolDecl *protocol = parseProtocolDecl(P, WitnessState);
+  if (!protocol)
+    return true;
 
   // Parse the body.
   SourceLoc LBraceLoc = P.Tok.getLoc();
@@ -6106,8 +6148,9 @@ bool SILParserTUState::parseSILDefaultWitnessTable(Parser &P) {
 
   if (P.Tok.isNot(tok::r_brace)) {
     do {
-      if (parseSILVTableEntry(P, M, protocol, nullptr, WitnessState,
-                              witnessEntries, conditionalConformances))
+      if (parseSILVTableEntry(P, M, protocol, protocol->getGenericEnvironment(),
+                              WitnessState, true, witnessEntries,
+                              conditionalConformances))
         return true;
     } while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof));
   }
