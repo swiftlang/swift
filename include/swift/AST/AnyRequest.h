@@ -158,12 +158,6 @@ public:
     return *this;
   }
 
-  AnyRequest(AnyRequest &other)
-    : storageKind(other.storageKind), stored(other.stored) { }
-
-  AnyRequest(const AnyRequest &&other)
-    : storageKind(other.storageKind), stored(other.stored) { }
-
   // Create a local template typename `ValueType` in the template specialization
   // so that we can refer to it in the SFINAE condition as well as the body of
   // the template itself.  The SFINAE condition allows us to remove this
