@@ -140,6 +140,7 @@ types where the metadata itself has unknown layout.)
 
   global ::= protocol 'TL'               // protocol requirements base descriptor
   global ::= assoc-type-name 'Tl'        // associated type descriptor
+  global ::= assoc-type-name 'TM'        // default associated type witness accessor
 
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk helper function

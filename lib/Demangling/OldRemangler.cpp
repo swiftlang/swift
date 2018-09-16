@@ -889,6 +889,10 @@ void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node) {
   mangleChildNodes(node); // protocol conformance, identifier
 }
 
+void Remangler::mangleDefaultAssociatedTypeMetadataAccessor(Node *node) {
+  Out << "<default-associated-type-metadata-accessor>";
+}
+
 void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node) {
   Out << "WT";
   assert(node->getNumChildren() == 3);

@@ -3774,8 +3774,6 @@ private:
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
-  llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
-
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
   const Requirement *RequirementSignature = nullptr;
@@ -3966,6 +3964,13 @@ public:
   void setHasMissingRequirements(bool newValue) {
     Bits.ProtocolDecl.HasMissingRequirements = newValue;
   }
+
+  /// Returns the default type witness for an associated type, or a null
+  /// type if there is no default.
+  Type getDefaultTypeWitness(AssociatedTypeDecl *assocType) const;
+
+  /// Set the default type witness for an associated type.
+  void setDefaultTypeWitness(AssociatedTypeDecl *assocType, Type witness);
 
   /// Returns the default witness for a requirement, or nullptr if there is
   /// no default.

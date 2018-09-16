@@ -115,6 +115,11 @@ namespace swift {
     SILGlobalVariable *readGlobalVar(StringRef Name);
     SILWitnessTable *readWitnessTable(serialization::DeclID,
                                       SILWitnessTable *existingWt);
+    void readWitnessTableEntries(
+           llvm::BitstreamEntry &entry,
+           std::vector<SILWitnessTable::Entry> &witnessEntries,
+           std::vector<SILWitnessTable::ConditionalConformance>
+             &conditionalConformances);
     SILProperty *readProperty(serialization::DeclID);
     SILDefaultWitnessTable *
     readDefaultWitnessTable(serialization::DeclID,

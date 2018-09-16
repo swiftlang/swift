@@ -206,6 +206,11 @@ class LinkEntity {
     /// The pointer is an AssociatedTypeDecl*.
     AssociatedTypeDescriptor,
 
+    /// A function which returns the default type metadata for the associated
+    /// type of a protocol.  The secondary pointer is a ProtocolDecl*.
+    /// The index of the associated type declaration is stored in the data.
+    DefaultAssociatedTypeMetadataAccessFunction,
+
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
 
@@ -319,7 +324,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::AssociatedTypeDescriptor;
+    return k <= Kind::DefaultAssociatedTypeMetadataAccessFunction;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -764,6 +769,14 @@ public:
   }
 
   static LinkEntity
+  forDefaultAssociatedTypeMetadataAccessFunction(AssociatedType association) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::DefaultAssociatedTypeMetadataAccessFunction,
+                      association.getAssociation());
+    return entity;
+  }
+
+  static LinkEntity
   forAssociatedTypeWitnessTableAccessFunction(const ProtocolConformance *C,
                                      const AssociatedConformance &association) {
     LinkEntity entity;
@@ -853,7 +866,8 @@ public:
       return getAssociatedTypeByIndex(getProtocolConformance(),
                               LINKENTITY_GET_FIELD(Data, AssociatedTypeIndex));
 
-    assert(getKind() == Kind::AssociatedTypeDescriptor);
+    assert(getKind() == Kind::AssociatedTypeDescriptor ||
+           getKind() == Kind::DefaultAssociatedTypeMetadataAccessFunction);
     return reinterpret_cast<AssociatedTypeDecl *>(Pointer);
   }
 

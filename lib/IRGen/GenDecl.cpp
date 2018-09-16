@@ -3950,6 +3950,25 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
 }
 
 llvm::Function *
+IRGenModule::getAddrOfDefaultAssociatedTypeMetadataAccessFunction(
+                                  AssociatedType association) {
+  auto forDefinition = ForDefinition;
+
+  LinkEntity entity =
+    LinkEntity::forDefaultAssociatedTypeMetadataAccessFunction(association);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  auto signature = getAssociatedTypeMetadataAccessFunctionSignature();
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+llvm::Function *
 IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType) {
   LinkEntity entity = LinkEntity::forCoroutineContinuationPrototype(fnType);
 
