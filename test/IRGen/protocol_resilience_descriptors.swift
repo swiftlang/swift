@@ -13,7 +13,7 @@
 // ----------------------------------------------------------------------------
 
 // Protocol descriptor
-// CHECK-DEFINITION-LABEL: @"$S18resilient_protocol29ProtocolWithAssocTypeDefaultsMp" = constant
+// CHECK-DEFINITION-LABEL: @"$S18resilient_protocol29ProtocolWithAssocTypeDefaultsMp" ={{( protected)?}} constant
 // CHECK-DEFINITION-SAME: $S2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPTM
 // CHECK-DEFINITION-SAME: $S2T218resilient_protocol29ProtocolWithAssocTypeDefaultsPTM
 
