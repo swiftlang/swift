@@ -2371,8 +2371,12 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
       primalName = addDeclBaseNameRef(primal->Name.getBaseName());
       primalRef = addDeclRef(attr->getPrimalFunction());
     }
-    auto adjointName = addDeclBaseNameRef(attr->getAdjoint().Name.getBaseName());
-    auto adjointRef = addDeclRef(attr->getAdjointFunction());
+    IdentifierID adjointName = 0;
+    DeclID adjointRef = 0;
+    if (auto adjoint = attr->getAdjoint()) {
+      adjointName = addDeclBaseNameRef(adjoint->Name.getBaseName());
+      adjointRef = addDeclRef(attr->getAdjointFunction());
+    }
 
     SmallVector<uint32_t, 4> parameters;
     for (auto param : attr->getParameters()) {

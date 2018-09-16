@@ -22,6 +22,26 @@ func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
+@differentiable(reverse) // okay
+func bar(_ x: Float, _: Float) -> Float {
+  return 1 + x
+}
+
+@_transparent
+@differentiable(reverse) // okay
+@inlinable
+func playWellWithOtherAttrs(_ x: Float, _: Float) -> Float {
+  return 1 + x
+}
+
+@_transparent
+@differentiable(reverse, wrt: (self), adjoint: _adjointSquareRoot) // okay
+public func squareRoot() -> Self {
+  var lhs = self
+  lhs.formSquareRoot()
+  return lhs
+}
+
 /// Bad
 
 @differentiable(primal: bar) // expected-error {{expected a differentiation mode ('forward' or 'reverse')}}
@@ -29,12 +49,12 @@ func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, 3) // expected-error {{missing label 'adjoint:' in '@differentiable' attribute}}
+@differentiable(reverse, 3) // expected-error {{expected a configuration, e.g. 'withRespectTo:', 'primal:' or 'adjoint:'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, foo(_:_:)) // expected-error {{missing label 'adjoint:' in '@differentiable' attribute}}
+@differentiable(reverse, foo(_:_:)) // expected-error {{expected a configuration, e.g. 'withRespectTo:', 'primal:' or 'adjoint:'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }

@@ -839,7 +839,7 @@ public:
       AutoDiffMode &mode, SourceLoc &modeLoc,
       SmallVectorImpl<AutoDiffParameter> &params,
       Optional<DifferentiableAttr::FunctionSpecifier> &primalSpec,
-      DifferentiableAttr::FunctionSpecifier &adjointSpec,
+      Optional<DifferentiableAttr::FunctionSpecifier> &adjointSpec,
       TrailingWhereClause *&whereClause);
 
   /// Parse a specific attribute.

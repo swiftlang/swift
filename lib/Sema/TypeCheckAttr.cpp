@@ -2513,30 +2513,33 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Resolve the adjoint declaration.
   FuncDecl *adjoint = nullptr;
   auto adjointSpecifier = attr->getAdjoint();
-  auto adjointNameLoc = adjointSpecifier.Loc.getBaseNameLoc();
-
+  // If the adjoint is not specified, back out.
+  if (!adjointSpecifier)
+    return;
+  
+  auto adjointNameLoc = adjointSpecifier->Loc.getBaseNameLoc();
   auto adjointOverloadDiagnostic = [&]() {
     TC.diagnose(adjointNameLoc,
                 diag::differentiable_attr_adjoint_overload_not_found,
-                adjointSpecifier.Name, expectedAdjointFnTy);
+                adjointSpecifier->Name, expectedAdjointFnTy);
     attr->setInvalid();
   };
   auto adjointAmbiguousDiagnostic = [&]() {
     TC.diagnose(adjointNameLoc,
                 diag::differentiable_attr_ambiguous_function_identifier,
-                adjointSpecifier.Name);
+                adjointSpecifier->Name);
     attr->setInvalid();
   };
   auto adjointNotFunctionDiagnostic = [&]() {
     TC.diagnose(adjointNameLoc,
                 diag::differentiable_attr_specified_not_function,
-                adjointSpecifier.Name, /*isPrimal*/ false);
+                adjointSpecifier->Name, /*isPrimal*/ false);
     attr->setInvalid();
   };
   std::function<void()> adjointInvalidTypeContextDiagnostic = [&]() {
     TC.diagnose(adjointNameLoc,
                 diag::differentiable_attr_function_not_same_type_context,
-                adjointSpecifier.Name);
+                adjointSpecifier->Name);
     attr->setInvalid();
   };
 
@@ -2548,18 +2551,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   };
 
   adjoint =
-    TC.lookupFuncDecl(adjointSpecifier.Name, adjointNameLoc,
+    TC.lookupFuncDecl(adjointSpecifier->Name, adjointNameLoc,
                       /*baseType*/ Type(), originalTypeCtx, isValidAdjoint,
                       adjointOverloadDiagnostic, adjointAmbiguousDiagnostic,
                       adjointNotFunctionDiagnostic, lookupOptions,
-                      hasValidTypeContext, adjointInvalidTypeContextDiagnostic);
+                      hasValidTypeContext,
+                      adjointInvalidTypeContextDiagnostic);
 
-  if (!adjoint) {
-    attr->setInvalid();
-    return;
-  }
   // Check adjoint access control.
-  if (checkAccessControl(adjoint, adjointSpecifier, /*isPrimal*/ false))
+  if (checkAccessControl(adjoint, *adjointSpecifier, /*isPrimal*/ false))
     return;
   // Done checking @differentiable attribute.
   // Memorize the adjoint reference in the attribute.

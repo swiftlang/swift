@@ -1316,9 +1316,9 @@ private:
   /// The primal function.
   Optional<FunctionSpecifier> Primal;
   /// The adjoint function.
-  FunctionSpecifier Adjoint;
+  Optional<FunctionSpecifier> Adjoint;
   /// The constraint clauses for generic types.
-  TrailingWhereClause *WhereClause;
+  TrailingWhereClause *WhereClause = nullptr;
   /// The primal function (optional), to be resolved by the type checker if
   /// specified.
   FuncDecl *PrimalFunction = nullptr;
@@ -1329,7 +1329,7 @@ private:
                               AutoDiffMode mode, SourceLoc modeLoc,
                               ArrayRef<AutoDiffParameter> parameters,
                               Optional<FunctionSpecifier> primal,
-                              FunctionSpecifier adjoint,
+                              Optional<FunctionSpecifier> adjoint,
                               TrailingWhereClause *clause);
 
 public:
@@ -1338,13 +1338,13 @@ public:
                                     SourceLoc modeLoc,
                                     ArrayRef<AutoDiffParameter> parameters,
                                     Optional<FunctionSpecifier> primal,
-                                    FunctionSpecifier adjoint,
+                                    Optional<FunctionSpecifier> adjoint,
                                     TrailingWhereClause *clause);
 
   AutoDiffMode getMode() const { return Mode; }
   SourceLoc getModeLoc() const { return ModeLoc; }
   Optional<FunctionSpecifier> getPrimal() const { return Primal; }
-  FunctionSpecifier getAdjoint() const { return Adjoint; }
+  Optional<FunctionSpecifier> getAdjoint() const { return Adjoint; }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
