@@ -1729,16 +1729,8 @@ static unsigned getFlattenedValueCount(AbstractionPattern origType,
   return count;
 }
 
-static AbstractionPattern claimNextParamClause(AbstractionPattern &type) {
-  auto result = type.getFunctionInputType();
-  type = type.getFunctionResultType();
-  return result;
-}
-
-static CanType claimNextParamClause(CanAnyFunctionType &type) {
-  auto result = type.getInput();
+static void claimNextParamClause(CanAnyFunctionType &type) {
   type = dyn_cast<AnyFunctionType>(type.getResult());
-  return result;
 }
 
 namespace {
@@ -2505,26 +2497,26 @@ public:
     maybeEmitForeignErrorArgument();
   }
 
-  void emitTopLevel(PreparedArguments &&args,
-                    AbstractionPattern origParamType) {
+  void emitPreparedArgs(PreparedArguments &&args,
+                        AbstractionPattern origFormalType) {
     assert(args.isValid());
     auto argSources = std::move(args).getSources();
+
     if (args.isScalar()) {
       assert(argSources.size() == 1);
-      emitTopLevel(std::move(argSources[0]), origParamType);
+      emitTopLevel(std::move(argSources[0]),
+                   origFormalType.getFunctionInputType());
     } else {
       for (auto i : indices(argSources)) {
         emit(std::move(argSources[i]),
-             origParamType.getTupleElementType(i));
+             origFormalType.getFunctionParamType(i));
+        maybeEmitForeignErrorArgument();
       }
-      maybeEmitForeignErrorArgument();
     }
   }
 
 private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType) {
-    auto substArgType = arg.getSubstRValueType();
-
     if (!arg.hasLValueType()) {
       // If the unsubstituted function type has a parameter of tuple type,
       // explode the tuple value.
@@ -2557,6 +2549,7 @@ private:
     // Make sure we use the same value category for these so that we
     // can hereafter just use simple equality checks to test for
     // abstraction.
+    auto substArgType = arg.getSubstRValueType();
     SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
     if (param.isIndirectInOut()) {
       loweredSubstArgType =
@@ -2649,7 +2642,6 @@ private:
 
     // Otherwise, we're working with an expression.
     Expr *e = std::move(arg).asKnownExpr();
-    e = e->getSemanticsProvidingExpr();
 
     // If the source expression is a tuple literal, we can break it
     // up directly.
@@ -3662,17 +3654,19 @@ public:
   bool throws() const { return Throws; }
 
   /// Evaluate arguments and begin any inout formal accesses.
-  void emit(SILGenFunction &SGF, AbstractionPattern origParamType,
+  void emit(SILGenFunction &SGF, AbstractionPattern origFormalType,
             ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
             SmallVectorImpl<DelayedArgument> &delayedArgs,
             const Optional<ForeignErrorConvention> &foreignError,
             ImportAsMemberStatus foreignSelf) && {
+    auto origParamType = origFormalType.getFunctionInputType();
+
     auto params = lowering.claimParams(origParamType, getSubstArgType(),
                                        foreignError, foreignSelf);
 
     ArgEmitter emitter(SGF, lowering.Rep, params, args, delayedArgs,
                        foreignError, foreignSelf);
-    emitter.emitTopLevel(std::move(Args), origParamType);
+    emitter.emitPreparedArgs(std::move(Args), origFormalType);
   }
 
   /// Take the arguments for special processing, in place of the above.
@@ -3873,7 +3867,7 @@ static AbstractionPattern
 getUncurriedOrigFormalResultType(AbstractionPattern origFormalType,
                                  unsigned numUncurriedSites) {
   for (unsigned i = 0, e = numUncurriedSites; i < e; ++i) {
-    claimNextParamClause(origFormalType);
+    origFormalType = origFormalType.getFunctionResultType();
   }
 
   return origFormalType;
@@ -4079,7 +4073,7 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
   CanType formalResultType = firstLevelResult.formalType.getResult();
 
   // Ignore metatype argument
-  claimNextParamClause(origFormalType);
+  origFormalType = origFormalType.getFunctionResultType();
   claimNextParamClause(firstLevelResult.formalType);
   std::move(uncurriedSites[0]).forward().getAsSingleValue(SGF);
 
@@ -4088,7 +4082,7 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
   if (element->hasAssociatedValues()) {
     assert(uncurriedSites.size() == 2);
     formalResultType = firstLevelResult.formalType.getResult();
-    claimNextParamClause(origFormalType);
+    origFormalType = origFormalType.getFunctionResultType();
     claimNextParamClause(firstLevelResult.formalType);
     payload = std::move(uncurriedSites[1]).forward();
   } else {
@@ -4203,7 +4197,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     assert(!formalApplyType->getExtInfo().throws());
     CanType formalResultType = formalApplyType.getResult();
     SILLocation uncurriedLoc = uncurriedSites[0].Loc;
-    claimNextParamClause(origFormalType);
+    origFormalType = origFormalType.getFunctionResultType();
     claimNextParamClause(firstLevelResult.formalType);
 
     // We should be able to enforce that these arguments are
@@ -4293,7 +4287,6 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
 
     // Collect the arguments to the uncurried call.
     for (auto &site : uncurriedSites) {
-      AbstractionPattern origParamType = claimNextParamClause(origFormalType);
       formalApplyType = cast<FunctionType>(formalType);
       claimNextParamClause(formalType);
       uncurriedLoc = site.Loc;
@@ -4301,7 +4294,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
 
       bool isParamSite = &site == &uncurriedSites.back();
 
-      std::move(site).emit(SGF, origParamType, paramLowering, args.back(),
+      std::move(site).emit(SGF, origFormalType, paramLowering, args.back(),
                            delayedArgs,
                            // Claim the foreign error with the method
                            // formal params.
@@ -4309,6 +4302,8 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
                            // Claim the foreign "self" with the self
                            // param.
                            isParamSite ? ImportAsMemberStatus() : foreignSelf);
+
+      origFormalType = origFormalType.getFunctionResultType();
     }
   }
   assert(uncurriedLoc);
@@ -4365,21 +4360,21 @@ RValue CallEmission::applyRemainingCallSites(RValue &&result,
     // TODO: foreign errors for block or function pointer values?
     assert(substFnType->hasErrorResult() || formalTypeThrows);
 
-    AbstractionPattern origParamType = claimNextParamClause(origFormalType);
-    AbstractionPattern origResultType = origFormalType;
-
     SGFContext context = i == size - 1 ? C : SGFContext();
 
     // Create the callee type info and initialize our indirect results.
     CalleeTypeInfo calleeTypeInfo(
-        substFnType, origResultType, extraSites[i].getSubstResultType(),
-        Optional<ForeignErrorConvention>(), foreignSelf);
+        substFnType,
+        origFormalType.getFunctionResultType(),
+        extraSites[i].getSubstResultType(),
+        Optional<ForeignErrorConvention>(),
+        foreignSelf);
     ResultPlanPtr resultPtr =
         ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
     ArgumentScope argScope(SGF, loc);
 
     std::move(extraSites[i])
-        .emit(SGF, origParamType, paramLowering, siteArgs, delayedArgs,
+        .emit(SGF, origFormalType, paramLowering, siteArgs, delayedArgs,
               calleeTypeInfo.foreignError, calleeTypeInfo.foreignSelf);
     if (!delayedArgs.empty()) {
       emitDelayedArguments(SGF, delayedArgs, siteArgs);
@@ -4388,6 +4383,8 @@ RValue CallEmission::applyRemainingCallSites(RValue &&result,
     result = SGF.emitApply(std::move(resultPtr), std::move(argScope), loc,
                            functionMV, {}, siteArgs, calleeTypeInfo,
                            ApplyOptions::None, context);
+
+    origFormalType = origFormalType.getFunctionResultType();
   }
 
   return std::move(result);
