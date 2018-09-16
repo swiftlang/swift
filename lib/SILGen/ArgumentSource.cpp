@@ -33,8 +33,6 @@ void ArgumentSource::rewriteType(CanType newType) & {
     llvm_unreachable("argument source is invalid");
   case Kind::LValue:
     llvm_unreachable("cannot rewrite type of l-value");
-  case Kind::Tuple:
-    llvm_unreachable("cannot rewrite type of tuple");
   case Kind::RValue:
     Storage.get<RValueStorage>(StoredKind).Value.rewriteType(newType);
     return;
@@ -70,7 +68,6 @@ bool ArgumentSource::isShuffle() const {
     llvm_unreachable("argument source is invalid");
   case Kind::RValue:
   case Kind::LValue:
-  case Kind::Tuple:
     return false;
   case Kind::Expr:
     // FIXME: TupleShuffleExprs come in two flavors:
@@ -102,44 +99,8 @@ RValue ArgumentSource::getAsRValue(SILGenFunction &SGF, SGFContext C) && {
     return std::move(*this).asKnownRValue(SGF);
   case Kind::Expr:
     return SGF.emitRValue(std::move(*this).asKnownExpr(), C);
-  case Kind::Tuple:
-    return std::move(*this).getKnownTupleAsRValue(SGF, C);
   }
   llvm_unreachable("bad kind");
-}
-
-RValue
-ArgumentSource::getKnownTupleAsRValue(SILGenFunction &SGF, SGFContext C) && {
-
-  return std::move(*this).withKnownTupleElementSources<RValue>(
-                            [&](SILLocation loc, CanTupleType type,
-                                MutableArrayRef<ArgumentSource> elements) {
-    // If there's a target initialization, and we can split it, do so.
-    if (auto init = C.getEmitInto()) {
-      if (init->canSplitIntoTupleElements()) {
-        // Split the tuple.
-        SmallVector<InitializationPtr, 4> scratch;
-        auto eltInits = init->splitIntoTupleElements(SGF, loc, type, scratch);
-
-        // Emit each element into the corresponding element initialization.
-        for (auto i : indices(eltInits)) {
-          std::move(elements[i]).forwardInto(SGF, eltInits[i].get());
-        }
-
-        // Finish initialization.
-        init->finishInitialization(SGF);
-
-        return RValue::forInContext();
-      }
-    }
-
-    // Otherwise, emit all of the elements into a single big r-value.
-    RValue result(type);
-    for (auto &element : elements) {
-      result.addElement(std::move(element).getAsRValue(SGF));
-    }
-    return result;
-  });
 }
 
 ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
@@ -172,13 +133,6 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
       return SGF.emitRValueAsSingleValue(e, C);
     }
   }
-  case Kind::Tuple: {
-    auto loc = getKnownTupleLocation();
-    auto rvalue = std::move(*this).getKnownTupleAsRValue(SGF, C);
-    if (rvalue.isInContext())
-      return ManagedValue::forInContext();
-    return std::move(rvalue).getAsSingleValue(SGF, loc);
-  }
   }
   llvm_unreachable("bad kind");
 }
@@ -202,7 +156,6 @@ ManagedValue ArgumentSource::getConverted(SILGenFunction &SGF,
     llvm_unreachable("cannot get converted l-value");
   case Kind::RValue:
   case Kind::Expr:
-  case Kind::Tuple:
     return SGF.emitConvertedRValue(getLocation(), conversion, C,
                 [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
       return std::move(*this).getAsSingleValue(SGF, C);
@@ -227,13 +180,6 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF, Initialization *dest) && {
     SGF.emitExprInto(e, dest);
     return;
   }
-  case Kind::Tuple: {
-    auto loc = getKnownTupleLocation();
-    auto rvalue = std::move(*this).getKnownTupleAsRValue(SGF, SGFContext(dest));
-    if (!rvalue.isInContext())
-      std::move(rvalue).ensurePlusOne(SGF, loc).forwardInto(SGF, loc, dest);
-    return;
-  }
   }
   llvm_unreachable("bad kind");
 }
@@ -256,10 +202,6 @@ ArgumentSource ArgumentSource::borrow(SILGenFunction &SGF) const & {
   }
   case Kind::Expr: {
     llvm_unreachable("cannot borrow an expression");
-  }
-  case Kind::Tuple: {
-    // FIXME: We can if we check the sub argument sources.
-    llvm_unreachable("cannot borrow a tuple");
   }
   }
   llvm_unreachable("bad kind");
@@ -355,16 +297,6 @@ void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
     out << "LValue\n";
     Storage.get<LValueStorage>(StoredKind).Value.dump(out, indent + 2);
     return;
-  case Kind::Tuple: {
-    out << "Tuple\n";
-    auto &storage = Storage.get<TupleStorage>(StoredKind);
-    storage.SubstType.dump(out, indent + 2);
-    for (auto &elt : storage.Elements) {
-      elt.dump(out, indent + 2);
-      out << '\n';
-    }
-    return;
-  }
   case Kind::RValue:
     out << "RValue\n";
     Storage.get<RValueStorage>(StoredKind).Value.dump(out, indent + 2);
@@ -426,17 +358,6 @@ bool ArgumentSource::isObviouslyEqual(const ArgumentSource &other) const {
     return false; // TODO?
   case Kind::Expr:
     return false; // TODO?
-  case Kind::Tuple: {
-    auto &selfTuple = Storage.get<TupleStorage>(StoredKind);
-    auto &otherTuple = other.Storage.get<TupleStorage>(other.StoredKind);
-    if (selfTuple.Elements.size() != otherTuple.Elements.size())
-      return false;
-    for (auto i : indices(selfTuple.Elements)) {
-      if (!selfTuple.Elements[i].isObviouslyEqual(otherTuple.Elements[i]))
-        return false;
-    }
-    return true;
-  }
   }
   llvm_unreachable("bad kind");
 }
@@ -464,14 +385,6 @@ ArgumentSource ArgumentSource::copyForDiagnostics() const {
     return {getKnownRValueLocation(), asKnownRValue().copyForDiagnostics()};
   case Kind::Expr:
     return asKnownExpr();
-  case Kind::Tuple: {
-    auto &tuple = Storage.get<TupleStorage>(StoredKind);
-    SmallVector<ArgumentSource, 4> copiedElements;
-    for (auto &elt : tuple.Elements) {
-      copiedElements.push_back(elt.copyForDiagnostics());
-    }
-    return {tuple.Loc, tuple.SubstType, copiedElements};
-  }
   }
   llvm_unreachable("bad kind");
 }

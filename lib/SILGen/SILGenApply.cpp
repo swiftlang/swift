@@ -2647,19 +2647,6 @@ private:
       return;
     }
 
-    // If we're working with a tuple source, expand it.
-    if (arg.isTuple()) {
-      (void) std::move(arg).withKnownTupleElementSources<int>(
-                          [&](SILLocation loc, CanTupleType type,
-                              MutableArrayRef<ArgumentSource> elts) {
-        for (auto i : indices(elts)) {
-          emit(std::move(elts[i]), origParamType.getTupleElementType(i));
-        }
-        return 0; // We need a fake return value because <void> won't compile.
-      });
-      return;
-    }
-
     // Otherwise, we're working with an expression.
     Expr *e = std::move(arg).asKnownExpr();
     e = e->getSemanticsProvidingExpr();
