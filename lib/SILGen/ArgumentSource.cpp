@@ -27,41 +27,6 @@ RValue &ArgumentSource::peekRValue() & {
   return Storage.get<RValueStorage>(StoredKind).Value;
 }
 
-void ArgumentSource::rewriteType(CanType newType) & {
-  switch (StoredKind) {
-  case Kind::Invalid:
-    llvm_unreachable("argument source is invalid");
-  case Kind::LValue:
-    llvm_unreachable("cannot rewrite type of l-value");
-  case Kind::RValue:
-    Storage.get<RValueStorage>(StoredKind).Value.rewriteType(newType);
-    return;
-  case Kind::Expr:
-    Expr *&expr = Storage.get<Expr*>(StoredKind);
-    CanType oldType = expr->getType()->getCanonicalType();
-
-    // Usually nothing is required.
-    if (oldType == newType) return;
-
-    // Sometimes we need to wrap the expression in a single-element tuple.
-    // This is only necessary because we don't break down the argument list
-    // when dealing with SILGenApply.
-    if (auto newTuple = dyn_cast<TupleType>(newType)) {
-      if (newTuple->getNumElements() == 1 &&
-          newTuple.getElementType(0) == oldType) {
-        expr = TupleExpr::create(newType->getASTContext(),
-                                 SourceLoc(), expr, {}, {}, SourceLoc(),
-                                 /*trailing closure*/ false,
-                                 /*implicit*/ true, newType);
-        return;
-      }
-    }
-
-    llvm_unreachable("unimplemented! hope it doesn't happen");
-  }
-  llvm_unreachable("bad kind");
-}
-
 bool ArgumentSource::isShuffle() const {
   switch (StoredKind) {
   case Kind::Invalid:
