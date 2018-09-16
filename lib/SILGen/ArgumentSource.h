@@ -260,14 +260,15 @@ private:
 };
 
 class PreparedArguments {
-  // TODO: replace this formal type with an array of parameter types.
-  CanType FormalType;
+  SmallVector<AnyFunctionType::Param, 8> Params;
   std::vector<ArgumentSource> Arguments;
-  bool IsScalar = false;
+  unsigned IsScalar : 1;
+  unsigned IsNull : 1;
 public:
-  PreparedArguments() {}
-  PreparedArguments(CanType formalType, bool isScalar) {
-    emplace(formalType, isScalar);
+  PreparedArguments() : IsScalar(false), IsNull(true) {}
+  PreparedArguments(ArrayRef<AnyFunctionType::Param> params, bool isScalar)
+      : IsNull(true) {
+    emplace(params, isScalar);
   }
 
   // Move-only.
@@ -275,39 +276,34 @@ public:
   PreparedArguments &operator=(const PreparedArguments &) = delete;
 
   PreparedArguments(PreparedArguments &&other)
-    : FormalType(other.FormalType), Arguments(std::move(other.Arguments)),
-      IsScalar(other.IsScalar) {
-    other.FormalType = CanType();
-  }
+    : Params(std::move(other.Params)), Arguments(std::move(other.Arguments)),
+      IsScalar(other.IsScalar), IsNull(other.IsNull) {}
   PreparedArguments &operator=(PreparedArguments &&other) {
-    FormalType = other.FormalType;
+    Params = std::move(other.Params);
     IsScalar = other.IsScalar;
     Arguments = std::move(other.Arguments);
-    other.FormalType = CanType();
+    IsNull = other.IsNull;
+    other.IsNull = true;
     return *this;
   }
 
   /// Returns true if this is a null argument list.  Note that this always
   /// indicates the total absence of an argument list rather than the
   /// possible presence of an empty argument list.
-  bool isNull() const { return !FormalType; }
+  bool isNull() const { return IsNull; }
 
   /// Returns true if this is a non-null and completed argument list.
   bool isValid() const {
     assert(!isNull());
-    if (IsScalar) {
+    if (IsScalar)
       return Arguments.size() == 1;
-    } else if (auto tuple = dyn_cast<TupleType>(FormalType)) {
-      return Arguments.size() == tuple->getNumElements();
-    } else {
-      return Arguments.size() == 1;
-    }
+    return Arguments.size() == Params.size();
   }
 
   /// Return the formal type of this argument list.
-  CanType getFormalType() const {
+  ArrayRef<AnyFunctionType::Param> getParams() const {
     assert(!isNull());
-    return FormalType;
+    return Params;
   }
 
   /// Is this a single-argument list?  Note that the argument might be a tuple.
@@ -322,12 +318,11 @@ public:
   }
 
   /// Emplace a (probably incomplete) argument list.
-  void emplace(CanType formalType, bool isScalar) {
+  void emplace(ArrayRef<AnyFunctionType::Param> params, bool isScalar) {
     assert(isNull());
-    assert(!formalType->hasTypeParameter() && "should be a contextual type!");
-    assert(isScalar || isa<TupleType>(formalType));
-    FormalType = formalType;
+    Params.append(params.begin(), params.end());
     IsScalar = isScalar;
+    IsNull = false;
   }
 
   /// Emplace an empty argument list.
