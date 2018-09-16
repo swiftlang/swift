@@ -196,7 +196,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                       /*AllowSepAfterLast=*/false,
                       diag::expected_rparen_parameter,
                       SyntaxKind::FunctionParameterList,
-                      [&]() -> ParserStatus {
+                      [&](SmallVectorImpl<ASTNode> *Elements,
+                          bool IsActive) -> ParserStatus {
     ParsedParameter param;
     ParserStatus status;
     SourceLoc StartLoc = Tok.getLoc();
@@ -1023,7 +1024,8 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
               /*AllowSepAfterLast=*/false,
               diag::expected_rparen_tuple_pattern_list,
               SyntaxKind::TuplePatternElementList,
-              [&] () -> ParserStatus {
+              [&] (SmallVectorImpl<ASTNode> *Elements,
+                   bool IsActive) -> ParserStatus {
     // Parse the pattern tuple element.
     ParserStatus EltStatus;
     Optional<TuplePatternElt> elt;

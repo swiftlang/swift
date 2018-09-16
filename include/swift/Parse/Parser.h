@@ -703,11 +703,58 @@ public:
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
+  /// Tracking IfConfigDecl for conditionals in collections for AST dump.
+  /// Since there is no place to directly represent conditionals in the
+  /// current AST collection model, a map is generated from the location
+  /// of actual data values to the conditionals that directly preceed them.
+  /// This is transferred to the CollectionExpr when the collection completes
+  /// and is used by the ATSDumper to provide a repsentation of the conditional.
+  /// Nested conditionals are elements of their outer IfConfigDecl structure.
+  class ConfigMap {
+    std::vector <IfConfigDecl *> OuterDecls, *PendingConditionals = &OuterDecls;
+    std::map<const void *,std::vector <IfConfigDecl *>> ConditionalsMap;
+    bool hasConditionals = false;
+  public:
+
+    Expr *registerActiveDataElement(Expr *expr) {
+      if (PendingConditionals == &OuterDecls) {
+        const void *Start = expr->getSourceRange().Start.getOpaquePointerValue();
+        PendingConditionals = &(ConditionalsMap[Start] = OuterDecls);
+      }
+      return expr;
+    }
+
+    void newOuterConditionalStarts() {
+      hasConditionals = true;
+      if (PendingConditionals != &OuterDecls)
+        (PendingConditionals = &OuterDecls)->clear();
+    }
+
+    void outerConditionalCompletes(IfConfigDecl *ICD) {
+      PendingConditionals->emplace_back(ICD);
+    }
+
+    CollectionExpr *closeCollection(CollectionExpr *expr) {
+      if (hasConditionals) {
+        if (PendingConditionals == &OuterDecls && OuterDecls.size())
+          registerActiveDataElement(expr);
+        expr->ConditionalsMap = ConditionalsMap;
+      }
+      return expr;
+    }
+  };
+
+  typedef llvm::function_ref<ParserStatus(SmallVectorImpl<ASTNode> *Elements,
+                                          bool IsActive)> ListCallback;
+
   /// \brief Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
-                         syntax::SyntaxKind Kind,
-                         llvm::function_ref<ParserStatus()> callback);
+                         syntax::SyntaxKind Kind, ListCallback callback,
+                         Parser::ConfigMap *IfConfigMap = nullptr,
+                         SmallVectorImpl<ASTNode> *Elements = nullptr,
+                         bool IsActive = true);
+
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
                            TopLevelCodeDecl *TLCD);

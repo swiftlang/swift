@@ -916,7 +916,8 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
-                  llvm::function_ref<ParserStatus()> callback) {
+                  Parser::ListCallback callback, Parser::ConfigMap *IfConfigMap,
+                  SmallVectorImpl<ASTNode> *Elements, bool IsActive) {
   auto TokIsStringInterpolationEOF = [&]() -> bool {
     return Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren;
   };
@@ -939,19 +940,58 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   }
 
   ParserStatus Status;
+
+  auto CheckForSourceLocation = [&]() {
+    while (Tok.is(tok::pound_sourceLocation))
+      Status |= parseLineDirective();
+  };
+
+  auto IsConditionalsEnd = [&]() -> bool {
+    return Tok.is(tok::pound_else) ||
+      Tok.is(tok::pound_elseif) ||
+      Tok.is(tok::pound_endif);
+  };
+
   while (true) {
     while (Tok.is(tok::comma)) {
       diagnose(Tok, diag::unexpected_separator, ",")
         .fixItRemove(SourceRange(Tok.getLoc()));
       consumeToken();
     }
+
+    if (IfConfigMap) {
+      while (true) {
+        CheckForSourceLocation();
+        if (Tok.isNot(tok::pound_if))
+          break;
+        if (!Elements)
+          IfConfigMap->newOuterConditionalStarts();
+        auto IfConfigResult = parseIfConfig(
+          [&](SmallVectorImpl<ASTNode> &Elements, bool SubIsActive) {
+            Status |= parseList(RightK, LeftLoc, RightLoc, AllowSepAfterLast,
+                                ErrorDiag, Kind, callback, IfConfigMap,
+                                &Elements, IsActive && SubIsActive);
+            CheckForSourceLocation();
+        });
+        Status |= IfConfigResult;
+        if (auto ICD = IfConfigResult.getPtrOrNull()) {
+          if (Elements)
+            Elements->emplace_back(ICD);
+          else
+            IfConfigMap->outerConditionalCompletes(ICD);
+        }
+      }
+      if (Tok.is(RightK) || (Elements && IsConditionalsEnd()))
+        break;
+    }
+
     SourceLoc StartLoc = Tok.getLoc();
 
     SyntaxParsingContext ElementContext(SyntaxContext, ElementKind);
     if (ElementKind == SyntaxKind::Unknown)
       ElementContext.setTransparent();
-    Status |= callback();
-    if (Tok.is(RightK))
+    Status |= callback(Elements, IsActive);
+    if (Tok.is(RightK) || IsConditionalsEnd())
       break;
     // If the lexer stopped with an EOF token whose spelling is ")", then this
     // is actually the tuple that is a string literal interpolation context.
@@ -998,6 +1038,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
     RightLoc = Tok.is(RightK) ? consumeToken() : PreviousLoc;
+  } else if (IsConditionalsEnd()) {
+    return Status;
   } else if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
   }

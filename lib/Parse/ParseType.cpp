@@ -868,7 +868,8 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
                                   /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
                                   SyntaxKind::TupleTypeElementList,
-                                  [&] () -> ParserStatus {
+                                  [&] (SmallVectorImpl<ASTNode> *Elements,
+                                       bool IsActive) -> ParserStatus {
     TupleTypeReprElement element;
 
     // 'inout' here can be a obsoleted use of the marker in an argument list,

@@ -2014,21 +2014,36 @@ public:
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void printRelatedIfConfigDecls(Expr *E, CollectionExpr *C) {
+    const void *Start = E->getSourceRange().Start.getOpaquePointerValue();
+    if (C->ConditionalsMap.find(Start) != C->ConditionalsMap.end()) {
+      PrintDecl P(OS, Indent + 2);
+      for (IfConfigDecl *ICD : C->ConditionalsMap[Start]) {
+        OS << '\n';
+        P.visitIfConfigDecl(ICD);
+        OS << '\n';
+      }
+    }
+  }
   void visitArrayExpr(ArrayExpr *E) {
     printCommon(E, "array_expr");
     for (auto elt : E->getElements()) {
+      printRelatedIfConfigDecls(elt, E);
       OS << '\n';
       printRec(elt);
     }
+    printRelatedIfConfigDecls(E, E);
     printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitDictionaryExpr(DictionaryExpr *E) {
     printCommon(E, "dictionary_expr");
     for (auto elt : E->getElements()) {
+      printRelatedIfConfigDecls(elt, E);
       OS << '\n';
       printRec(elt);
     }
+    printRelatedIfConfigDecls(E, E);
     printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
