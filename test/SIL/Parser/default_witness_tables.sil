@@ -4,9 +4,10 @@
 sil_stage raw
 
 public protocol Proto {}
+public struct Wrapper<T>: Proto { }
 
 public protocol ResilientProtocol {
-  associatedtype T : Proto
+  associatedtype T : Proto = Wrapper<Self>
   func noDefaultA()
   func noDefaultB()
   func defaultC()
@@ -48,7 +49,7 @@ bb0(%0 : $*Self):
 
 // CHECK-LABEL: sil_default_witness_table ResilientProtocol {
 // CHECK: no_default
-// CHECK: no_default
+// CHECK: associated_type T: Wrapper<Self>
 // CHECK: no_default
 // CHECK: no_default
 // CHECK: method #ResilientProtocol.defaultC!1: {{.*}} : @defaultC
@@ -58,7 +59,7 @@ bb0(%0 : $*Self):
 
 sil_default_witness_table ResilientProtocol {
   no_default
-  no_default
+  associated_type T: Wrapper<Self>
   no_default
   no_default
   method #ResilientProtocol.defaultC!1: @defaultC
