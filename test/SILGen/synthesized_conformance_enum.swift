@@ -70,8 +70,8 @@ extension NoValues: CaseIterable {}
 // Witness tables for NoValues
 
 // CHECK-LABEL: sil_witness_table hidden NoValues: CaseIterable module synthesized_conformance_enum {
-// CHECK-NEXT:   associated_type AllCases: Array<NoValues>
 // CHECK-NEXT:   associated_type_protocol (AllCases: Collection): [NoValues]: specialize <NoValues> (<Element> Array<Element>: Collection module Swift)
+// CHECK-NEXT:   associated_type AllCases: Array<NoValues>
 // CHECK-NEXT:   method #CaseIterable.allCases!getter.1: <Self where Self : CaseIterable> (Self.Type) -> () -> Self.AllCases : @$S28synthesized_conformance_enum8NoValuesOs12CaseIterableAAsADP8allCases03AllI0QzvgZTW // protocol witness for static CaseIterable.allCases.getter in conformance NoValues
 // CHECK-NEXT: }
 

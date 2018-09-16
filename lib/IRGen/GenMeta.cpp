@@ -667,14 +667,41 @@ namespace {
       B.fillPlaceholderWithInt(*NumRequirements, IGM.Int32Ty,
                                pi.getNumWitnesses());
 
+      if (pi.getNumWitnesses() > 0) {
+        // Define the protocol requirements "base" descriptor, which references
+        // the beginning of the protocol requirements, offset so that
+        // subtracting this address from the address of a given protocol
+        // requirements gives the corresponding offset into the witness
+        // table.
+        auto address =
+          B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy);
+        int offset = WitnessTableFirstRequirementOffset;
+        auto firstReqAdjustment = llvm::ConstantInt::get(IGM.Int32Ty, -offset);
+        address = llvm::ConstantExpr::getGetElementPtr(nullptr, address,
+                                                       firstReqAdjustment);
+
+        IGM.defineProtocolRequirementsBaseDescriptor(Proto, address);
+      }
+
       for (auto &entry : pi.getWitnessEntries()) {
-        if (Resilient && entry.isFunction()) {
-          // Define the method descriptor.
-          SILDeclRef func(entry.getFunction());
-          auto *descriptor =
-            B.getAddrOfCurrentPosition(
-              IGM.ProtocolRequirementStructTy);
-          IGM.defineMethodDescriptor(func, Proto, descriptor);
+        if (Resilient) {
+          if (entry.isFunction()) {
+            // Define the method descriptor.
+            SILDeclRef func(entry.getFunction());
+            auto *descriptor =
+              B.getAddrOfCurrentPosition(
+                IGM.ProtocolRequirementStructTy);
+            IGM.defineMethodDescriptor(func, Proto, descriptor);
+          }
+        }
+
+        if (entry.isAssociatedType()) {
+          auto assocType = entry.getAssociatedType();
+          // Define the associated type descriptor to point to the current
+          // position in the protocol descriptor.
+          IGM.defineAssociatedTypeDescriptor(
+              assocType,
+              B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
         }
 
         auto reqt = B.beginStruct(IGM.ProtocolRequirementStructTy);

@@ -301,6 +301,22 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
   return witness;
 }
 
+/// Load a specific witness from a known table.  The result is
+/// always an i8*.
+llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                     llvm::Value *table,
+                                                     llvm::Value *index) {
+  assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
+
+  // GEP to the appropriate index.
+  llvm::Value *slot = IGF.Builder.CreateInBoundsGEP(table, index);
+
+  auto witness =
+    IGF.Builder.CreateLoad(Address(slot, IGF.IGM.getPointerAlignment()));
+  IGF.setInvariantLoad(witness);
+  return witness;
+}
+
 /// Given a value witness table, load one of the value witnesses.
 /// The result has the appropriate type for the witness.
 static llvm::Value *emitLoadOfValueWitnessValue(IRGenFunction &IGF,

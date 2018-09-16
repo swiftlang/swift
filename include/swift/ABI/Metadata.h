@@ -2501,9 +2501,9 @@ public:
     /// The protocol the associated type belongs to.
     RelativeIndirectablePointer<TargetProtocolDescriptor<Runtime>,
                                 /*nullable*/ false> Protocol;
-    /// The index of the associated type metadata within a witness table for
-    /// the protocol.
-    unsigned Index;
+    /// A reference to the associated type descriptor within the protocol.
+    RelativeIndirectablePointer<TargetProtocolRequirement<Runtime>,
+                                /*nullable*/ false> Requirement;
   };
   
   /// A forward iterator that walks through the associated type path, which is

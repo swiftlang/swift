@@ -16,6 +16,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/IRGen/ValueWitness.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 namespace swift {
 
@@ -157,6 +158,29 @@ public:
     beginMangling();
     appendProtocolName(Decl);
     appendOperator("Mp");
+    return finalize();
+  }
+
+  std::string mangleProtocolRequirementsBaseDescriptor(
+                                                    const ProtocolDecl *Decl) {
+    beginMangling();
+    appendProtocolName(Decl);
+    appendOperator("TL");
+    return finalize();
+  }
+
+  std::string mangleAssociatedTypeDescriptor(
+                                         const AssociatedTypeDecl *assocType) {
+    // Don't optimize away the protocol name, because we need it to distinguish
+    // among the type descriptors of different protocols.
+    llvm::SaveAndRestore<bool> optimizeProtocolNames(OptimizeProtocolNames,
+                                                     false);
+    beginMangling();
+    bool isAssocTypeAtDepth = false;
+    (void)appendAssocType(
+        assocType->getDeclaredInterfaceType()->castTo<DependentMemberType>(),
+        isAssocTypeAtDepth);
+    appendOperator("Tl");
     return finalize();
   }
 

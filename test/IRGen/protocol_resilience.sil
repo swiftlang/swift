@@ -55,8 +55,8 @@ import resilient_protocol
 // CHECK-SAME:   @"$S19protocol_resilience17ResilientProtocolMp"
 
 // Protocol requirements
-// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 8, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
 
@@ -110,13 +110,10 @@ protocol InternalProtocol {
 
 // CHECK: @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
 
-// CHECK-SAME: internal constant [2 x i8*] [
+// CHECK-SAME: internal constant [1 x i8*] [
 
 // -- conformance descriptor
 // CHECK-SAME: "$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAMc"
-
-// -- type metadata for associated type
-// CHECK-SAME: "$SSiMa"
 
 // CHECK-SAME: ]
 
@@ -124,7 +121,7 @@ protocol InternalProtocol {
 // CHECK: @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWG"
 
 // -- number of witness table entries
-// CHECK-SAME:   i16 2,
+// CHECK-SAME:   i16 1,
 
 // -- size of private area
 // CHECK-SAME:   i16 0,
@@ -148,6 +145,10 @@ protocol InternalProtocol {
 
 // CHECK-SAME: internal constant {
 
+// -- type metadata for associated type
+// CHECK-SAME: @"{{got.|__imp_}}$S1T18resilient_protocol24ProtocolWithRequirementsPTl"
+// CHECK-SAME: @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AA1TWt"
+
 // CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTq"
 // CHECK-SAME: @firstWitness
 
@@ -160,8 +161,8 @@ protocol InternalProtocol {
 // Witness table for conformance with resilient associated type
 
 // CHECK: @"$S19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden constant [3 x i8*] [
-// CHECK-SAME:   i8* bitcast (%swift.metadata_response ([[INT]])* @"$S19protocol_resilience23ResilientConformingTypeVMa" to i8*),
 // CHECK-SAME:   i8* bitcast (i8** ()* @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa" to i8*)
+// CHECK-SAME:   i8* bitcast (%swift.metadata_response ([[INT]])* @"$S19protocol_resilience23ResilientConformingTypeVMa" to i8*)
 // CHECK-SAME: ]
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
@@ -339,9 +340,9 @@ bb0(%0 : $*ConformingStruct):
 }
 
 sil_witness_table ConformingStruct : ResilientProtocol module protocol_resilience {
-  associated_type T: ResilientConformingType
   associated_type_protocol (T: OtherResilientProtocol): ResilientConformingType: OtherResilientProtocol module protocol_resilience
 
+  associated_type T: ResilientConformingType
   method #ResilientProtocol.noDefaultA!1: @noDefaultA
   method #ResilientProtocol.noDefaultB!1: @noDefaultB
   method #ResilientProtocol.defaultC!1: @defaultC
@@ -460,8 +461,8 @@ struct ConformsWithResilientAssoc : HasResilientAssoc {
 }
 
 sil_witness_table ConformsWithResilientAssoc : HasResilientAssoc module protocol_resilience {
-  associated_type T: ResilientConformingType
   associated_type_protocol (T: OtherResilientProtocol): ResilientConformingType: OtherResilientProtocol module protocol_resilience
+  associated_type T: ResilientConformingType
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doSomethingAssoc(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.HasResilientAssoc)

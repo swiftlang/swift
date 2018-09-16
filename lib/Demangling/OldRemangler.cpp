@@ -777,6 +777,10 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   mangleProtocolWithoutPrefix(node->begin()[0]);
 }
 
+void Remangler::mangleProtocolRequirementsBaseDescriptor(Node *node) {
+  Out << "<protocol-requirements-base-descriptor>";
+}
+
 void Remangler::mangleProtocolWitnessTablePattern(Node *node) {
   unreachable("todo");
 }
@@ -874,6 +878,10 @@ void Remangler::mangleLazyProtocolWitnessTableAccessor(Node *node) {
 void Remangler::mangleLazyProtocolWitnessTableCacheVariable(Node *node) {
   Out << "WL";
   mangleChildNodes(node); // type, protocol conformance
+}
+
+void Remangler::mangleAssociatedTypeDescriptor(Node *node) {
+  Out << "<associated-type-descriptor>";
 }
 
 void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node) {

@@ -682,11 +682,16 @@ static const Metadata *resolveGenericParamRef(
       swift_conformsToProtocol(current, assocTypeRef.Protocol);
     if (!witnessTable) return nullptr;
 
+    // Determine the index of the associated type based on its offset
+    // from the beginning of the protocol's requirements.
+    auto protocolDescriptor = witnessTable->Description->getProtocol();
+    unsigned index = assocTypeRef.Requirement.get() -
+        protocolDescriptor->getRequirements().data();
+
     // Call the associated type access function.
     using AssociatedTypeAccessFn =
       const Metadata *(*)(const Metadata *base, const WitnessTable *);
-    unsigned adjustedIndex =
-      assocTypeRef.Index + WitnessTableFirstRequirementOffset;
+    unsigned adjustedIndex = index + WitnessTableFirstRequirementOffset;
     current =
       ((const AssociatedTypeAccessFn *)witnessTable)[adjustedIndex]
         (current, witnessTable);

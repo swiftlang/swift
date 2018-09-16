@@ -329,3 +329,5 @@ $S7TestMod5OuterV3Fooayx_SiGD ---> TestMod.Outer<A>.Foo<Swift.Int>
 $Ss17_VariantSetBufferO05CocoaC0ayx_GD ---> Swift._VariantSetBuffer<A>.CocoaBuffer
 $S2t21QP22ProtocolTypeAliasThingayAA4BlahV5SomeQa_GSgD ---> t2.Blah.SomeQ as t2.Q.ProtocolTypeAliasThing?
 A.h<A>(A) -> ()inlined generic function <(A, A1)> of 
+$S1T19protocol_resilience17ResilientProtocolPTl --> associated type descriptor for T
+$S18resilient_protocol21ResilientBaseProtocolTL --> protocol requirements base descriptor for resilient_protocol.ResilientBaseProtocol

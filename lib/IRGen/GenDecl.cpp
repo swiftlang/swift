@@ -907,15 +907,13 @@ llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
     auto proto = getConstantReferenceForProtocolDescriptor(
                                                       assocType->getProtocol());
     B.addRelativeAddress(proto);
-    
-    // Find the offset of the associated type entry in witness tables of this
-    // protocol.
-    auto &protoInfo = getProtocolInfo(assocType->getProtocol(),
-                                      ProtocolInfoKind::RequirementSignature);
-    auto index = protoInfo.getAssociatedTypeIndex(AssociatedType(assocType))
-      .getValue();
-    
-    B.addInt32(index);
+
+    // Add a reference to the associated type descriptor.
+    auto assocTypeDescriptor =
+      getAddrOfLLVMVariableOrGOTEquivalent(
+        LinkEntity::forAssociatedTypeDescriptor(assocType),
+      Alignment(4), ProtocolRequirementStructTy);
+    B.addRelativeAddress(assocTypeDescriptor);
   }
   
   // Null terminator.
@@ -3357,6 +3355,36 @@ llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
   auto entity = LinkEntity::forProtocolDescriptor(D);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), definition,
                                ProtocolDescriptorStructTy, DebugTypeInfo());
+}
+
+llvm::Constant *IRGenModule::getAddrOfProtocolRequirementsBaseDescriptor(
+                                                         ProtocolDecl *proto) {
+  auto entity = LinkEntity::forProtocolRequirementsBaseDescriptor(proto);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                               ProtocolRequirementStructTy,
+                               DebugTypeInfo());
+}
+
+llvm::GlobalValue *IRGenModule::defineProtocolRequirementsBaseDescriptor(
+                                                ProtocolDecl *proto,
+                                                llvm::Constant *definition) {
+  auto entity = LinkEntity::forProtocolRequirementsBaseDescriptor(proto);
+  return defineAlias(entity, definition);
+}
+
+llvm::Constant *IRGenModule::getAddrOfAssociatedTypeDescriptor(
+                                               AssociatedTypeDecl *assocType) {
+  auto entity = LinkEntity::forAssociatedTypeDescriptor(assocType);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                               ProtocolRequirementStructTy,
+                               DebugTypeInfo());
+}
+
+llvm::GlobalValue *IRGenModule::defineAssociatedTypeDescriptor(
+                                                 AssociatedTypeDecl *assocType,
+                                                 llvm::Constant *definition) {
+  auto entity = LinkEntity::forAssociatedTypeDescriptor(assocType);
+  return defineAlias(entity, definition);
 }
 
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(

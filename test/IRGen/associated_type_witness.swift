@@ -12,7 +12,7 @@ protocol Assocked {
 
 struct Universal : P, Q {}
 
-// CHECK: [[ASSOC_TYPE_NAMES:@.*]] = private constant [29 x i8] c"OneAssoc ThreeAssoc TwoAssoc\00"
+// CHECK: [[ASSOC_TYPE_NAMES:@.*]] = private constant [29 x i8] c"OneAssoc TwoAssoc ThreeAssoc\00"
 // CHECK: @"$S23associated_type_witness18HasThreeAssocTypesMp" =
 // CHECK-SAME: [[ASSOC_TYPE_NAMES]] to i64
 
@@ -31,9 +31,9 @@ protocol HasThreeAssocTypes {
 //   Witness table for WithUniversal : Assocked.
 // GLOBAL-LABEL: @"$S23associated_type_witness13WithUniversalVAA8AssockedAAWP" = hidden constant [4 x i8*] [
 // GLOBAL-SAME:    @"$S23associated_type_witness13WithUniversalVAA8AssockedAAMc"
-// GLOBAL-SAME:    i8* bitcast (%swift.metadata_response (i64)* @"$S23associated_type_witness9UniversalVMa" to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** ()* @"$S23associated_type_witness9UniversalVAA1PAAWa" to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** ()* @"$S23associated_type_witness9UniversalVAA1QAAWa" to i8*)  
+// GLOBAL-SAME:    i8* bitcast (%swift.metadata_response (i64)* @"$S23associated_type_witness9UniversalVMa" to i8*)
 // GLOBAL-SAME:  ]
 struct WithUniversal : Assocked {
   typealias Assoc = Universal
@@ -42,9 +42,9 @@ struct WithUniversal : Assocked {
 //   Witness table for GenericWithUniversal : Assocked.
 // GLOBAL-LABEL: @"$S23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAAWP" = hidden constant [4 x i8*] [
 // GLOBAL-SAME:    @"$S23associated_type_witness20GenericWithUniversalVyxGAA8AssockedAAMc"
-// GLOBAL-SAME:    i8* bitcast (%swift.metadata_response (i64)* @"$S23associated_type_witness9UniversalVMa" to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** ()* @"$S23associated_type_witness9UniversalVAA1PAAWa" to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** ()* @"$S23associated_type_witness9UniversalVAA1QAAWa" to i8*)  
+// GLOBAL-SAME:    i8* bitcast (%swift.metadata_response (i64)* @"$S23associated_type_witness9UniversalVMa" to i8*)
 // GLOBAL-SAME:  ]
 struct GenericWithUniversal<T> : Assocked {
   typealias Assoc = Universal
@@ -53,25 +53,13 @@ struct GenericWithUniversal<T> : Assocked {
 //   Witness table for Fulfilled : Assocked.
 // GLOBAL-LABEL: @"$S23associated_type_witness9FulfilledVyxGAA8AssockedAAWp" = internal constant [4 x i8*] [
 // GLOBAL-SAME:    @"$S23associated_type_witness9FulfilledVyxGAA8AssockedAAMc"
-// GLOBAL-SAME:    i8* bitcast (%swift.metadata_response (i64, %swift.type*, i8**)* @"$S23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocWt" to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @"$S23associated_type_witness9FulfilledVyxGAA8AssockedAA5Assoc_AA1PPWT" to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @"$S23associated_type_witness9FulfilledVyxGAA8AssockedAA5Assoc_AA1QPWT" to i8*)
+// GLOBAL-SAME:    i8* bitcast (%swift.metadata_response (i64, %swift.type*, i8**)* @"$S23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocWt" to i8*)
 // GLOBAL-SAME:  ]
 struct Fulfilled<T : P & Q> : Assocked {
   typealias Assoc = T
 }
-
-//   Associated type metadata access function for Fulfilled.Assoc.
-// CHECK-LABEL:  define internal swiftcc %swift.metadata_response @"$S23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocWt"(i64, %swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
-// CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Fulfilled<T>" to %swift.type**
-// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 2
-// CHECK-NEXT:    [[T2:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
-// CHECK-NEXT:    [[T3:%.*]] = call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 %0, %swift.type* [[T2]])
-// CHECK-NEXT:    [[CHECKED:%.*]] = extractvalue %swift.metadata_response [[T3]], 0
-// CHECK-NEXT:    [[STATE:%.*]] = extractvalue %swift.metadata_response [[T3]], 1
-// CHECK:         [[T3:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[CHECKED]], 0
-// CHECK-NEXT:    [[T4:%.*]] = insertvalue %swift.metadata_response [[T3]], i64 [[STATE]], 1
-// CHECK-NEXT:    ret %swift.metadata_response [[T4]]
 
 //   Associated type witness table access function for Fulfilled.Assoc : P.
 // CHECK-LABEL:  define internal swiftcc i8** @"$S23associated_type_witness9FulfilledVyxGAA8AssockedAA5Assoc_AA1PPWT"(%swift.type* %"Fulfilled<T>.Assoc", %swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
@@ -87,14 +75,26 @@ struct Fulfilled<T : P & Q> : Assocked {
 // CHECK-NEXT:    [[T2:%.*]] = load i8**, i8*** [[T1]], align 8, !invariant.load
 // CHECK-NEXT:    ret i8** [[T2]]
 
+//   Associated type metadata access function for Fulfilled.Assoc.
+// CHECK-LABEL:  define internal swiftcc %swift.metadata_response @"$S23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocWt"(i64, %swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
+// CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Fulfilled<T>" to %swift.type**
+// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 2
+// CHECK-NEXT:    [[T2:%.*]] = load %swift.type*, %swift.type** [[T1]], align 8, !invariant.load
+// CHECK-NEXT:    [[T3:%.*]] = call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 %0, %swift.type* [[T2]])
+// CHECK-NEXT:    [[CHECKED:%.*]] = extractvalue %swift.metadata_response [[T3]], 0
+// CHECK-NEXT:    [[STATE:%.*]] = extractvalue %swift.metadata_response [[T3]], 1
+// CHECK:         [[T3:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[CHECKED]], 0
+// CHECK-NEXT:    [[T4:%.*]] = insertvalue %swift.metadata_response [[T3]], i64 [[STATE]], 1
+// CHECK-NEXT:    ret %swift.metadata_response [[T4]]
+
 struct Pair<T, U> : P, Q {}
 
 //   Generic witness table pattern for Computed : Assocked.
 // GLOBAL-LABEL: @"$S23associated_type_witness8ComputedVyxq_GAA8AssockedAAWp" = internal constant [4 x i8*] [
 // GLOBAL-SAME:    @"$S23associated_type_witness8ComputedVyxq_GAA8AssockedAAMc"
-// GLOBAL-SAME:    i8* bitcast (%swift.metadata_response (i64, %swift.type*, i8**)* @"$S23associated_type_witness8ComputedVyxq_GAA8AssockedAA5AssocWt" to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @"$S23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1PPWT" to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @"$S23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1QPWT" to i8*)
+// GLOBAL-SAME:    i8* bitcast (%swift.metadata_response (i64, %swift.type*, i8**)* @"$S23associated_type_witness8ComputedVyxq_GAA8AssockedAA5AssocWt" to i8*)
 // GLOBAL-SAME:  ]
 //   Generic witness table cache for Computed : Assocked.
 // GLOBAL-LABEL: @"$S23associated_type_witness8ComputedVyxq_GAA8AssockedAAWG" = internal constant %swift.generic_witness_table_cache {
