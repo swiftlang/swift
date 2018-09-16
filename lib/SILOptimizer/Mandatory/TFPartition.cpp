@@ -64,6 +64,26 @@ static llvm::cl::opt<bool> TFWarnScalarTransfer(
         "Emit warnings for sends/receives that transfer values that are "
         "known to be scalar."));
 
+// TODO: Remove this short-term flag once we migrate over all unit tests.
+static llvm::cl::opt<bool> TFSendRecvOpaqueHandle(
+    "tf-send-recv-opaque-handle", llvm::cl::init(false),
+    llvm::cl::desc("When true, variant and resource handles can be sent via "
+                   "eager API as tensor handles."));
+
+// The flag below is referenced in multiple translation units.
+namespace llvm {
+// This flag is used as a crutch to develop and test IRGen code that handles
+// graph_op insts.
+// TODO: Fold this flag into -Onone mode.
+llvm::cl::opt<bool> TFDynamicCompilation(
+    "tf-dynamic-compilation", llvm::cl::init(false),
+    llvm::cl::desc(
+        "When true, skip the partitioning and lowering pass, so that graph_op "
+        "instructions flow to IRGen. This flag should not be turned on by end "
+        "users, due to many restrictions (e.g. it will not work with "
+        "tensorflow convention functions)."));
+} // namespace llvm
+
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
                                    Diag<T...> diag, U &&... args) {
@@ -916,8 +936,9 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
   // Opaque handles can never be sent or passed as tensor program arguments.
   // Type checking must have rejected host functions that are either a)
   // public with private ABI or b) marked @inline(never).
-  assert(!isOpaqueHandle(value->getType()) &&
-         "Opaque handles should never have been on the host");
+  assert(TFSendRecvOpaqueHandle ||
+         (!isOpaqueHandle(value->getType()) &&
+          "Opaque handles should never have been on the host"));
 
   // Try to make a useful description of the value being copied to help
   // disambiguate.
@@ -1021,7 +1042,7 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
       continue;
 
     // If the value is a non-copyable opaque handle, emit an error.
-    if (isOpaqueHandle(value->getType())) {
+    if (!TFSendRecvOpaqueHandle && isOpaqueHandle(value->getType())) {
       diagnoseOpaqueHandleCopy(value, user);
       continue;
     }
@@ -1088,6 +1109,7 @@ void TFFunctionPartition::diagnoseCopyToHost(SILValue value,
 /// Emit an error for invalid send/receive of opaque handles.
 void TFFunctionPartition::diagnoseOpaqueHandleCopy(SILValue value,
                                                    SILInstruction *user) {
+  assert(!TFSendRecvOpaqueHandle);
   assert(isOpaqueHandle(value->getType()) &&
          "Shouldn't emit an error for opaque handle copy when the value is not "
          "an opaque handle");
@@ -1539,6 +1561,10 @@ static bool hoistValueAboveStartPoint(SILInstruction *inst,
   // go.  Don't move anything.
   if (DI.properlyDominates(inst, tensorStartPoint))
     return true;
+
+  // It doesn't make sense to hoist the start point above itself.
+  if (inst == tensorStartPoint)
+    return false;
 
   // In general, we need to check to see if we have a chain of side-effect free
   // instructions whose ultimate inputs dominate the start point.
@@ -2029,7 +2055,7 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
       tensorOps.push_back(inst);
       tensorOpsSet.insert(inst);
 
-      auto opDevice = GraphOperationInfo(graphOp).getDeviceType();
+      auto opDevice = getDeviceType(GraphOperationInfo(graphOp));
       deviceInfo.markDeviceUsed(opDevice);
     }
   }
@@ -2709,17 +2735,28 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
   // %4 = apply %2<Float>(..., %1, %3)
   auto tensorId = createIntValue(idNumber, B, loc);
 
+  LLVM_DEBUG(llvm::dbgs() << "Creating host receive with valueTy: " << valueTy
+                          << "\n");
+
   auto scalarType = getTensorHandleElementType(valueTy.getASTType());
-  assert(scalarType && "valueTy is not TensorHandle<T>");
-  auto subMap =
-      getSingleSubstitutionMapForElementType(scalarType, B.getASTContext());
+  SubstitutionMap subMap;
+  if (scalarType) {
+    // This is for TensorHandle<Scalar>, so the submap has one entry for Scalar.
+    subMap =
+        getSingleSubstitutionMapForElementType(scalarType, B.getASTContext());
+  }
+  // Otherwise, this is for VariantHandle, which uses an empty submap.
 
   // Generate an instruction like:
   // %3 = metatype $@thick TensorHandle<Float>.Type
-  auto tensorHandleType =
+  // The type can also be VariantHandle.
+  auto tensorflowValueType =
       convertElementTypeToTensorValueType(valueTy).getASTType();
+  LLVM_DEBUG(llvm::dbgs() << "The created tensor type is: "
+                          << tensorflowValueType << "\n");
+
   auto metatypeType =
-      MetatypeType::get(tensorHandleType, MetatypeRepresentation::Thick)
+      MetatypeType::get(tensorflowValueType, MetatypeRepresentation::Thick)
           ->getCanonicalType();
   auto *metaTypeInst =
       B.createMetatype(loc, SILType::getPrimitiveObjectType(metatypeType));
@@ -2832,16 +2869,27 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
   auto tensorId = createIntValue(idNumber, B, loc);
 
   auto &ctx = B.getASTContext();
-  Type scalarValueTy, tensorValueTy;
-  if (isTensorHandle(value->getType().getASTType())) {
-    tensorValueTy = value->getType().getASTType();
-    scalarValueTy = getTensorHandleElementType(tensorValueTy);
+  SubstitutionMap subMap;
+  if (isOpaqueHandle(value->getType().getASTType())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Sending a variant typed tensor: " << value << "\n");
+    // `subMap` should remain empty.
+  } else if (isTensorHandle(value->getType().getASTType())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Sending a tensor handle typed tensor: " << value << "\n");
+
+    auto tensorValueTy = value->getType().getASTType();
+    auto scalarValueTy = getTensorHandleElementType(tensorValueTy);
+    subMap = getSingleSubstitutionMapForElementType(scalarValueTy,
+                                                    B.getASTContext());
   } else {
+    LLVM_DEBUG(llvm::dbgs() << "Sending a scalar tensor: " << value << "\n");
+
     assert(createScalarTensorFn);
     // Here scalar type is something like $Builtin.FPIEEE32 -- convert it to an
     // AccelerableByTensorFlow conforming type like Float first, and then create
     // a scalar tensor to send that value.
-    scalarValueTy = value->getType().getASTType();
+    auto scalarValueTy = value->getType().getASTType();
     if (!scalarValueTy->getAs<StructType>()) {
       assert(value->getDefiningInstruction());
       auto *typeDecl =
@@ -2854,7 +2902,8 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
       scalarValueTy = value->getType().getASTType();
     }
     assert(scalarValueTy->getAs<StructType>());
-    tensorValueTy =
+    assert(isTensorFlowDType(value->getType().getASTType()));
+    auto tensorValueTy =
         convertElementTypeToTensorValueType(scalarValueTy, ctx).getASTType();
 
     // Convert the scalar to a tensor value.
@@ -2882,22 +2931,23 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
 
     auto createScalarTensorFnRef =
         B.createFunctionRef(loc, createScalarTensorFn);
-    SubstitutionMap subMap = getSingleSubstitutionMapForElementType(
+    SubstitutionMap scalarSubMap = getSingleSubstitutionMapForElementType(
         scalarValueTy, B.getASTContext());
-    value = B.createApply(loc, createScalarTensorFnRef, subMap,
+    value = B.createApply(loc, createScalarTensorFnRef, scalarSubMap,
                           /*args*/ {access, metaTypeInst},
                           /*isNonThrowing*/ false);
 
     // Finish our read access and free the stack memory.
     B.createEndAccess(loc, access, /*aborted*/ false);
     B.createDeallocStack(loc, stackAlloc);
+
+    subMap = getSingleSubstitutionMapForElementType(scalarValueTy,
+                                                    B.getASTContext());
   }
 
   auto sendFnRef = B.createFunctionRef(loc, sendFn);
   // Verify that tensorComputation is passed in as a guaranteed parameter below.
   verifyTensorComputationArgAsGuaranteedParam(sendFnRef);
-  SubstitutionMap subMap =
-      getSingleSubstitutionMapForElementType(scalarValueTy, B.getASTContext());
   // This is a member method of the class of `value`, so we add it as the last
   // parameter.
   return B.createApply(loc, sendFnRef, subMap,
@@ -2908,6 +2958,9 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
 SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
                                                         SILType type,
                                                         SILLocation loc) {
+  LLVM_DEBUG(llvm::dbgs() << "Looking up send/recv func " << fnName
+                          << " with type " << type << "\n");
+
   auto &ctx = FP.hostFn.getASTContext();
   // If `value` is not receivable, reject the program with diagnostics.
   auto proto = ctx.getProtocol(KnownProtocolKind::TensorSendableReceivable);
@@ -2916,8 +2969,10 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
   auto nominal = tensorValueTy.getASTType()->getAnyNominal();
   auto lookup =
       nominal->lookupConformance(&tensorFlowModule, proto, conformances);
-  assert(lookup && "No conformance to TensorSendableReceivable found. "
-         "Is it a sendable/receivable TensorFlow value?");
+  if (!lookup) {
+    type.dump();
+    llvm_unreachable("No conformance to TensorSendableReceivable found.");
+  }
   assert(conformances.size() == 1 && "Found multiple conformance candidates.");
   DeclName fnDeclName(ctx.getIdentifier(fnName));
   auto *fn = findSILFunctionForRequiredProtocolMember(
@@ -4132,7 +4187,7 @@ bool TFFunctionPartition::partition(bool isTest) {
           // If it's an opaque handle such as VariantHandle or ResourceHandle,
           // it cannot be a result except when it's being returned in an
           // accelerator-only function.
-          if (isOpaqueHandle(result->getType()) &&
+          if (!TFSendRecvOpaqueHandle && isOpaqueHandle(result->getType()) &&
               !(isAcceleratorOnly(hostFn) && isReturning(user))) {
             diagnoseOpaqueHandleCopy(result, user);
             return true;
@@ -4518,7 +4573,9 @@ bool TFPartition::partitionFunction(
   // isolation.
   LLVM_DEBUG(llvm::dbgs() << "Processing SIL function " << hostFn->getName()
                           << " in TFPartition::partitionFunction().\n");
-  if (!tfc.shouldBePartitioned(hostFn, /*forceTFFunctions=*/true))
+
+  if (!tfc.shouldBePartitioned(hostFn, /*forceTFFunctions=*/true) ||
+      llvm::TFDynamicCompilation)
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()

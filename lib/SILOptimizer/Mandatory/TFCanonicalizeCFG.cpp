@@ -32,6 +32,8 @@
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/iterator_range.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/EquivalenceClasses.h"
 
 using namespace swift;
 using namespace tf;
@@ -39,6 +41,11 @@ using namespace tf;
 static llvm::cl::opt<bool> TFEnsureSingleLoopExit(
     "tf-ensure-single-loop-exit", llvm::cl::init(true),
     llvm::cl::desc("Transform loops to have a single exit from header."));
+static llvm::cl::opt<bool> TFNoUndefsInSESE(
+    "tf-no-undefs-in-sese", llvm::cl::init(true),
+    llvm::cl::desc(
+        "Try to eliminate undefs in when performing "
+        "sese canonicalization of loops (intended  for debugging)."));
 
 //===----------------------------------------------------------------------===//
 // SESERegionTree Implementation
@@ -309,6 +316,9 @@ private:
 
   void initialize();
 
+  /// Compute escaping values and what values to use as arguments at preheader.
+  llvm::DenseMap<SILValue, SILValue> computeEscapingValues() const;
+
   /// Create a new header for the loop and return a pair consisting of
   /// the new block and the phi argument corresponding to the exitIndex.
   std::pair<SILBasicBlock *, SILValue> createNewHeader();
@@ -361,8 +371,10 @@ private:
   // the new latchBlock as appropriate.
   SmallVector<std::pair<const SILBasicBlock *, const SILBasicBlock *>, 8>
       edgesToFix;
-  /// Identify the set of values that escape the loop.
-  llvm::SmallPtrSet<SILValue, 8> escapingValues;
+  /// Identify the set of values that escape the loop. The key represents the
+  /// escaping value and the associated value will be used as the argument at
+  /// the preheader.
+  llvm::DenseMap<SILValue, SILValue> escapingValueSubstMap;
 };
 
 void SingleExitLoopTransformer::initialize() {
@@ -386,13 +398,19 @@ void SingleExitLoopTransformer::initialize() {
     }
   }
 
+  escapingValueSubstMap = computeEscapingValues();
+}
+
+llvm::DenseMap<SILValue, SILValue>
+SingleExitLoopTransformer::computeEscapingValues() const {
+  llvm::DenseMap<SILValue, SILValue> result;
   for (const SILBasicBlock *bb : loop->getBlocks()) {
-    // Save the values that are escaping this loop in escapingValues set.
-    auto saveEscaping = [this](SILValue value) {
+    // Save the values that are escaping this loop in result set.
+    auto saveEscaping = [this, &result](SILValue value) {
       for (const auto *use : value->getUses()) {
         const SILInstruction *useInst = use->getUser();
         if (!loop->contains(useInst->getParent())) {
-          escapingValues.insert(value);
+          result[value] = getUndef(value->getType());
           break;
         }
       }
@@ -404,6 +422,40 @@ void SingleExitLoopTransformer::initialize() {
       llvm::for_each(inst.getResults(), saveEscaping);
     }
   }
+
+  // Do not eliminate undefs unless requested for.
+  if (!TFNoUndefsInSESE)  return result;
+
+  // Build the equivalence classes induced by argument passing.
+  llvm::EquivalenceClasses<SILValue> equivalentValues;
+  for (auto &bb : *currentFn) {
+    for (auto arg : bb.getArguments()) {
+      SmallVector<SILValue, 8> incomingValues;
+      arg->getIncomingValues(incomingValues);
+      for (SILValue incomingValue : incomingValues) {
+        equivalentValues.unionSets(arg, incomingValue);
+      }
+    }
+  }
+
+  // Replace undef with an equivalent value that is available at preheader.
+  for (auto &kv : result) {
+    const SILValue &escapingValue = kv.first;
+    // Get the member iterator for the equivalence class of escapingValue.
+    auto member_begin = equivalentValues.findLeader(escapingValue);
+
+    // Iterate over *all* the members and find an equivalent value that
+    // dominates the terminator instruction of the preheader.
+    for (auto equivalentValue :
+         make_range(member_begin, equivalentValues.member_end())) {
+      if (DI->properlyDominates(equivalentValue, preheader->getTerminator())) {
+        // Found a definition that we could use.
+        kv.second = equivalentValue;
+        break;
+      }
+    }
+  }
+  return result;
 }
 
 /// Appends the given arguments to the given edge. Deletes the old TermInst
@@ -470,7 +522,8 @@ SingleExitLoopTransformer::createNewHeader() {
   }
   header->dropAllArguments();
   // Add phi arguments in the new header corresponding to the escaping values.
-  for (const auto &escapingValue : escapingValues) {
+  for (const auto &kv : escapingValueSubstMap) {
+    const SILValue escapingValue = kv.first;
     SILValue newValue = newHeader->createPHIArgument(
         escapingValue->getType(), escapingValue.getOwnershipKind());
     // Replace uses *outside* of the loop with the new value.
@@ -526,8 +579,8 @@ void SingleExitLoopTransformer::patchPreheader(SILBasicBlock *newHeader) {
   // State from within the loop is not available in the preheader.
   // Simply pass in an undef. This will never be accessed at runtime.
   SmallVector<SILValue, 8> newArgs;
-  for (const SILValue &escapingValue : escapingValues) {
-    newArgs.push_back(getUndef(escapingValue->getType()));
+  for (const auto &kv : escapingValueSubstMap) {
+    newArgs.push_back(kv.second);
   }
   // `exitIndex` to identify the block to which we exit from the loop.
   newArgs.push_back(createTFIntegerConst(*deviceInfo, builder, location,
@@ -547,7 +600,7 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
 
   unsigned oldHeaderNumArgs =
       newHeader->getNumArguments() -
-      (escapingValues.size() + /* exitIndex, stayInLoop*/ 2);
+      (escapingValueSubstMap.size() + /* exitIndex, stayInLoop*/ 2);
 
   // Identify the exit from the header (if any) and assign '0' as its index.
   SILBasicBlock *headerExit = nullptr;
@@ -591,7 +644,8 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
         getUserSourceLocation(src->getTerminator()->getDebugLocation()));
     // Find an appropriate value to use for each escaping value.
     unsigned argIndex = oldHeaderNumArgs;
-    for (const SILValue &escapingValue : escapingValues) {
+    for (const auto &kv : escapingValueSubstMap) {
+      const SILValue escapingValue = kv.first;
       if (DI->properlyDominates(escapingValue, src->getTerminator())) {
         newArgs.push_back(escapingValue);
       } else {
@@ -751,6 +805,7 @@ bool SingleExitLoopTransformer::transform() {
 void SESERegionBuilder::ensureSingleExitFromLoops() {
   GraphFunctionDeviceInfo deviceInfo(
       GraphFunctionDeviceInfo::getForFunction(*F, /*removeConfigInst*/ false));
+
   // Visit the loop nest hierarchy bottom up.
   bool changed = false;
   // The bool indicates whether the subloops are already processed.
