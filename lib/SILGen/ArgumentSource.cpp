@@ -275,7 +275,7 @@ void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
 }
 
 void PreparedArguments::emplaceEmptyArgumentList(SILGenFunction &SGF) {
-  emplace(CanType(TupleType::getEmpty(SGF.getASTContext())), /*scalar*/ false);
+  emplace({}, /*scalar*/ false);
   assert(isValid());
 }
 
@@ -284,7 +284,7 @@ PreparedArguments::copy(SILGenFunction &SGF, SILLocation loc) const {
   if (isNull()) return PreparedArguments();
 
   assert(isValid());
-  PreparedArguments result(getFormalType(), isScalar());
+  PreparedArguments result(getParams(), isScalar());
   for (auto &elt : Arguments) {
     assert(elt.isRValue());
     result.add(elt.getKnownRValueLocation(),
@@ -332,7 +332,7 @@ PreparedArguments PreparedArguments::copyForDiagnostics() const {
     return PreparedArguments();
 
   assert(isValid());
-  PreparedArguments result(getFormalType(), isScalar());
+  PreparedArguments result(getParams(), isScalar());
   for (auto &arg : Arguments) {
     result.Arguments.push_back(arg.copyForDiagnostics());
   }
