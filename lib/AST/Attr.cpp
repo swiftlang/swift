@@ -967,8 +967,8 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
                                        AutoDiffMode mode, SourceLoc modeLoc,
                                        ArrayRef<AutoDiffParameter> parameters,
-                                       Optional<FunctionSpecifier> primal,
-                                       Optional<FunctionSpecifier> adjoint,
+                                       Optional<DeclNameWithLoc> primal,
+                                       Optional<DeclNameWithLoc> adjoint,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
     Mode(mode), ModeLoc(modeLoc), NumParameters(parameters.size()),
@@ -982,8 +982,8 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
                            SourceRange baseRange, AutoDiffMode mode,
                            SourceLoc modeLoc,
                            ArrayRef<AutoDiffParameter> parameters,
-                           Optional<FunctionSpecifier> primal,
-                           Optional<FunctionSpecifier> adjoint,
+                           Optional<DeclNameWithLoc> primal,
+                           Optional<DeclNameWithLoc> adjoint,
                            TrailingWhereClause *clause) {
   unsigned numParams = parameters.size();
   unsigned size = sizeof(DifferentiableAttr) +

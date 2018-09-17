@@ -2262,8 +2262,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // if they both have no type context and are in different modules, then it's
   // an error.
   // Returns true on error.
-  std::function<bool(FuncDecl *)> hasValidTypeContext
-    = [&](FuncDecl *func) {
+  std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
     if (!original->getInnermostTypeContext() &&
         !func->getInnermostTypeContext() &&
         original->getParentModule() == func->getParentModule())
@@ -2287,7 +2286,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // If the original function is exported (i.e. it is public or
   // @usableFromInline), then the primal/adjoint must also be exported.
   // Returns true on error.
-  using FuncSpecifier = DifferentiableAttr::FunctionSpecifier;
+  using FuncSpecifier = DifferentiableAttr::DeclNameWithLoc;
   auto checkAccessControl = [&](FuncDecl *func, FuncSpecifier funcSpec,
                                 bool isPrimal) {
     if (!isABIPublic(original)) return false;
@@ -2304,7 +2303,17 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   // Set lookup options.
   auto lookupOptions = defaultMemberLookupOptions
-    | NameLookupFlags::IgnoreAccessControl;
+      | NameLookupFlags::IgnoreAccessControl;
+  
+  // Start type-checking the arguments of the @differentiable attribute. This
+  // covers 'wrt:', 'primal:' and 'adjoint:', all of which are optional.
+  // If primal exists but adjoint does not, this is an error.
+  if (attr->getPrimal() && !attr->getAdjoint()) {
+    TC.diagnose(attr->getPrimal()->Loc,
+                diag::differentiable_attr_has_primal_but_not_adjoint);
+    attr->setInvalid();
+    return;
+  }
 
   // Resolve the primal declaration, if it exists.
   FuncDecl *primal = nullptr;

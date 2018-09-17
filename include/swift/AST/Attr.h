@@ -1303,7 +1303,7 @@ public:
 ///   @differentiable(reverse, wrt: (self, .0, .1), adjoint: bar(_:_:_:seed:))
 class DifferentiableAttr : public DeclAttribute {
 public:
-  struct FunctionSpecifier {
+  struct DeclNameWithLoc {
     DeclName Name;
     DeclNameLoc Loc;
   };
@@ -1314,9 +1314,9 @@ private:
   /// The number of parameters specified in 'wrt:'.
   unsigned NumParameters;
   /// The primal function.
-  Optional<FunctionSpecifier> Primal;
+  Optional<DeclNameWithLoc> Primal;
   /// The adjoint function.
-  Optional<FunctionSpecifier> Adjoint;
+  Optional<DeclNameWithLoc> Adjoint;
   /// The constraint clauses for generic types.
   TrailingWhereClause *WhereClause = nullptr;
   /// The primal function (optional), to be resolved by the type checker if
@@ -1328,8 +1328,8 @@ private:
   explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
                               AutoDiffMode mode, SourceLoc modeLoc,
                               ArrayRef<AutoDiffParameter> parameters,
-                              Optional<FunctionSpecifier> primal,
-                              Optional<FunctionSpecifier> adjoint,
+                              Optional<DeclNameWithLoc> primal,
+                              Optional<DeclNameWithLoc> adjoint,
                               TrailingWhereClause *clause);
 
 public:
@@ -1337,14 +1337,14 @@ public:
                                     SourceRange baseRange, AutoDiffMode mode,
                                     SourceLoc modeLoc,
                                     ArrayRef<AutoDiffParameter> parameters,
-                                    Optional<FunctionSpecifier> primal,
-                                    Optional<FunctionSpecifier> adjoint,
+                                    Optional<DeclNameWithLoc> primal,
+                                    Optional<DeclNameWithLoc> adjoint,
                                     TrailingWhereClause *clause);
 
   AutoDiffMode getMode() const { return Mode; }
   SourceLoc getModeLoc() const { return ModeLoc; }
-  Optional<FunctionSpecifier> getPrimal() const { return Primal; }
-  Optional<FunctionSpecifier> getAdjoint() const { return Adjoint; }
+  Optional<DeclNameWithLoc> getPrimal() const { return Primal; }
+  Optional<DeclNameWithLoc> getAdjoint() const { return Adjoint; }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 

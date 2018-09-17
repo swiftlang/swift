@@ -49,12 +49,12 @@ func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, 3) // expected-error {{expected a configuration, e.g. 'withRespectTo:', 'primal:' or 'adjoint:'}}
+@differentiable(reverse, 3) // expected-error {{expected a configuration, e.g. 'wrt:', 'primal:' or 'adjoint:'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, foo(_:_:)) // expected-error {{expected a configuration, e.g. 'withRespectTo:', 'primal:' or 'adjoint:'}}
+@differentiable(reverse, foo(_:_:)) // expected-error {{expected a configuration, e.g. 'wrt:', 'primal:' or 'adjoint:'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }

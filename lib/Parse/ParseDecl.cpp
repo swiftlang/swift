@@ -780,12 +780,12 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
     return makeParserError();
   }
 
-  using FuncSpec = DifferentiableAttr::FunctionSpecifier;
+  using DeclNameWithLoc = DifferentiableAttr::DeclNameWithLoc;
   AutoDiffMode mode;
   SourceLoc modeLoc;
   SmallVector<AutoDiffParameter, 8> params;
-  Optional<FuncSpec> primalSpec;
-  Optional<FuncSpec> adjointSpec;
+  Optional<DeclNameWithLoc> primalSpec;
+  Optional<DeclNameWithLoc> adjointSpec;
   TrailingWhereClause *whereClause = nullptr;
 
   // Parse @differentiable attribute arguments.
@@ -809,8 +809,8 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 bool Parser::parseDifferentiableAttributeArguments(
     AutoDiffMode &mode, SourceLoc &modeLoc,
     SmallVectorImpl<AutoDiffParameter> &params,
-    Optional<DifferentiableAttr::FunctionSpecifier> &primalSpec,
-    Optional<DifferentiableAttr::FunctionSpecifier> &adjointSpec,
+    Optional<DifferentiableAttr::DeclNameWithLoc> &primalSpec,
+    Optional<DifferentiableAttr::DeclNameWithLoc> &adjointSpec,
     TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
 
@@ -859,9 +859,9 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
   if (Tok.is(tok::comma) &&
       peekToken().is(tok::identifier) && peekToken().getText() == "wrt") {
-    consumeToken(tok::comma);
     SyntaxParsingContext DiffParamsContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParams);
+    consumeToken(tok::comma);
     consumeToken(tok::identifier);
     if (!consumeIf(tok::colon)) {
       diagnose(Tok, diag::attr_differentiable_expected_colon_after_label,
@@ -922,7 +922,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     consumeToken(tok::r_paren);
   }
 
-  using FuncSpec = DifferentiableAttr::FunctionSpecifier;
+  using FuncSpec = DifferentiableAttr::DeclNameWithLoc;
   // Function that parses a label and a function specifier,
   // e.g. 'primal: foo(_:)'.
   auto parseFuncSpec = [&](StringRef label, FuncSpec &result) -> bool {
@@ -945,9 +945,9 @@ bool Parser::parseDifferentiableAttributeArguments(
   // Parse 'primal: <func_name>' (optional).
   if (Tok.is(tok::comma) &&
       peekToken().is(tok::identifier) && peekToken().getText() == "primal") {
-    consumeToken(tok::comma);
     SyntaxParsingContext PrimalContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
+    consumeToken(tok::comma);
     primalSpec = FuncSpec();
     if (parseFuncSpec("primal", *primalSpec))
       return errorAndSkipToEnd();
@@ -956,9 +956,9 @@ bool Parser::parseDifferentiableAttributeArguments(
   // Parse 'adjoint: <func_name>' (optional).
   if (Tok.is(tok::comma) &&
       peekToken().is(tok::identifier) && peekToken().getText() == "adjoint") {
-    consumeToken(tok::comma);
     SyntaxParsingContext AdjointContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
+    consumeToken(tok::comma);
     adjointSpec = FuncSpec();
     if (parseFuncSpec("adjoint", *adjointSpec))
       return errorAndSkipToEnd();

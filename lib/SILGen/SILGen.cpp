@@ -811,8 +811,9 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
           primName = silOriginalFn->getName();
         adjName = getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
       }
-      else if (!primName.empty()) {
-        llvm_unreachable("Primal cannot be present if adjoint is not");
+      else {
+        assert(primName.empty() &&
+               "Primal cannot be present if adjoint is not");
       }
       // Get lowered argument indices.
       auto paramIndices =
