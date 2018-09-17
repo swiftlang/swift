@@ -147,6 +147,24 @@ struct S {
   func instance_mul(lhs: Int, rhs: S) -> S {
     return rhs
   }
+
+  @differentiable(reverse, adjoint: dIdentity_wrt_self) // expected-error {{specify at least one parameter to differentiate with respect to}}
+  func identity() -> S {
+    return self
+  }
+
+  func dIdentity_wrt_self(_: S, seed: S) -> S {
+    return seed
+  }
+
+  @differentiable(reverse, adjoint: dStaticIdentity_wrt_0) // ok
+  static func staticIdentity(_ s: S) -> S {
+    return s
+  }
+
+  static func dStaticIdentity_wrt_0(_: S, _: S, seed: S) -> S {
+    return seed
+  }
 }
 
 @differentiable(reverse, wrt: (.1, .2), adjoint: dmeow2(_:_:_:_:_:)) // ok
@@ -358,4 +376,54 @@ func dbaz3_checkpointed<T : Numeric>(_ x: T, _ y: T, primal: CheckpointsNumeric<
 // expected-error @-1 {{'pbaz3' does not have expected parameters' type '(T, T)'}}
 func baz3_checkpointed<T : FloatingPoint>(_ x: T, _ y: T) -> T {
   return x
+}
+
+// Adjoints trying to define derivatives with respect to classes and existentials.
+
+class ParamClass {}
+protocol ParamProtocol {}
+struct ParamProtocolStruct : ParamProtocol {}
+
+@differentiable(reverse, adjoint: dClassParameter)
+// expected-error @-1 {{class objects and protocol existentials ('ParamClass') cannot be differentiated with respect to}}
+func classParameter1(_: ParamClass) -> Float {
+  return 1
+}
+
+@differentiable(reverse, wrt: (.0), adjoint: dClassParameter)
+// expected-error @-1 {{class objects and protocol existentials ('ParamClass') cannot be differentiated with respect to}}
+func classParameter2(_: ParamClass) -> Float {
+  return 1
+}
+
+func dClassParameter(_: ParamClass, _: Float, seed: Float) -> ParamClass {
+  return ParamClass()
+}
+
+@differentiable(reverse, adjoint: dProtocolParameter)
+// expected-error @-1 {{class objects and protocol existentials ('ParamProtocol') cannot be differentiated with respect to}}
+func protocolParameter1(_: ParamProtocol) -> Float {
+  return 1
+}
+
+@differentiable(reverse, wrt: (.0), adjoint: dProtocolParameter)
+// expected-error @-1 {{class objects and protocol existentials ('ParamProtocol') cannot be differentiated with respect to}}
+func protocolParameter2(_: ParamProtocol) -> Float {
+  return 1
+}
+
+func dProtocolParameter(_: ParamProtocol, _: Float, seed: Float) -> ParamProtocol {
+  return ParamProtocolStruct()
+}
+
+class ClassWithDifferentiableMethods {
+  @differentiable(reverse, wrt: (self), adjoint: dMethod)
+  // expected-error @-1 {{class objects and protocol existentials ('ClassWithDifferentiableMethods') cannot be differentiated with respect to}}
+  func method() -> Float {
+    return 1
+  }
+
+  func dMethod(_: Float, _: Float) -> ClassWithDifferentiableMethods {
+    return ClassWithDifferentiableMethods()
+  }
 }

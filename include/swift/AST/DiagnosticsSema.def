@@ -2645,6 +2645,8 @@ ERROR(differentiable_attr_no_parameters,none,
       "%0 has no parameters to differentiate with respect to", (DeclName))
 ERROR(differentiable_attr_void_result,none,
       "cannot differentiate void function %0", (DeclName))
+ERROR(differentiable_attr_wrt_nothing,none,
+      "specify at least one parameter to differentiate with respect to", (DeclName))
 ERROR(differentiable_attr_primal_overload_not_found,none,
       "%0 does not have expected parameters' type %1", (DeclName, Type))
 ERROR(differentiable_attr_adjoint_overload_not_found,none,
