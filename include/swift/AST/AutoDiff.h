@@ -101,6 +101,8 @@ struct SILReverseAutoDiffIndices {
 
   bool operator==(const SILReverseAutoDiffIndices &other) const;
 
+  /// Queries whether the function's parameter with index `parameterIndex` is
+  /// one of the parameters to differentiate with respect to.
   bool isWrtParameter(unsigned parameterIndex) const {
     return parameterIndex < parameters.size() &&
            parameters.test(parameterIndex);

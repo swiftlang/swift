@@ -3215,7 +3215,11 @@ private:
   /// blocks.
   DenseMap<SILBasicBlock *, SILBasicBlock *> adjointBBMap;
 
-  /// The range of original parameters in the adjoint function.
+  /// Original parameters passed to the adjoint function, in the same order as
+  /// they appear in the adjoint function. Note that these parameters are not
+  /// necessarily contiguous in the adjoint function signature because the
+  /// non-self original parameters are at the beginning and the self parameter
+  /// (if any) is at the end.
   SmallVector<SILArgument *, 8> originalParametersInAdj;
 
   /// The primal value aggregate passed to the adjoint function.
@@ -3356,8 +3360,10 @@ public:
     // We get each range of arguments by shifting the `paramArgsData` pointer.
     auto *paramArgsData = adjParamArgs.data();
     originalParametersInAdj.reserve(origNumParams);
-    for (unsigned i = 0; i < origNumParamsWithoutSelf; i++)
+    for (auto i : range(origNumParamsWithoutSelf)) {
+      (void)i;
       originalParametersInAdj.push_back(*paramArgsData++);
+    }
     primalValueAggregateInAdj = *paramArgsData++;
     originalResultsInAdj = {paramArgsData, origNumResults};
     paramArgsData += origNumResults;
@@ -3404,8 +3410,12 @@ public:
     // there.
     getBuilder().setInsertionPoint(adjointEntry);
 
+    // This vector will contain all the materialized return elements.
     SmallVector<SILValue, 8> retElts;
     auto origParams = original.getArgumentsWithoutIndirectResults();
+
+    // Materializes the return element corresponding to the parameter
+    // `parameterIndex` into the `retElts` vector.
     auto addRetElt = [&](unsigned parameterIndex) -> void {
       auto origParam = origParams[parameterIndex];
       auto adjParam = originalParametersInAdj[parameterIndex];
@@ -3415,12 +3425,15 @@ public:
       else
         materializeAdjointIndirect(adjVal, adjParam);
     };
+
     // The original's self parameter, if present, is the last parameter. But we
     // want its gradient, if present, to be the first return element.
     auto selfParamIndex = origParams.size() - 1;
     if (origTy->hasSelfParam() &&
         task->getIndices().isWrtParameter(selfParamIndex))
       addRetElt(selfParamIndex);
+
+    // Add the non-self parameters that are differentiated with respect to.
     for (auto i : task->getIndices().parameters.set_bits()) {
       // Do not add the self parameter because we have already added it at the
       // beginning.
