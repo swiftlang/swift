@@ -50,6 +50,18 @@ static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
 // Device Partitioning Utilities
 //===----------------------------------------------------------------------===//
 
+// Return the device attribute associated with `inst`, which is required to
+// exist.
+StringRef swift::tf::getDeviceString(const GraphOperationInfo &graphOpInfo) {
+  auto attr = graphOpInfo.inst->getAttributeNamed(DEVICE_ATTR);
+  assert(attr.hasValue() && "Tensor op instruction has no device string");
+  return attr.getValue().getStringValue();
+}
+
+DeviceType swift::tf::getDeviceType(const GraphOperationInfo &graphOpInfo) {
+  return getOpDeviceType(getDeviceString(graphOpInfo));
+}
+
 /// Scan the specified function, looking for logic that configures the current
 /// graph.
 GraphFunctionDeviceInfo
@@ -330,7 +342,7 @@ void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
     return;
   }
 
-  auto deviceType = decoder.getDeviceType();
+  auto deviceType = getDeviceType(decoder);
 
   // Skip this instruction if it isn't for the current device.
   if (deviceType != DeviceType::ALL && deviceType != thisDeviceType)
@@ -640,7 +652,7 @@ public:
   }
 
   void visitGraphOperationInst(GraphOperationInst *inst) {
-    auto deviceType = GraphOperationInfo(inst).getDeviceType();
+    auto deviceType = getDeviceType(GraphOperationInfo(inst));
     markInstForDevice(deviceType, inst);
 
     // If any operand of `inst` is produced on another device, insert a

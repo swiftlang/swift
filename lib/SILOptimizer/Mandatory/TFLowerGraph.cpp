@@ -1153,7 +1153,7 @@ static void decodeShapeArrayAtAttr(const ASTContext &ctx,
   auto *inst = graphOpInfo.inst;
   auto attr = inst->getAttribute(attrIdx);
   auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-  assert(attrInfo.second == SILTensorOpInfo::OperandClass::Normal);
+  assert(attrInfo.second == GraphOperationInfo::OperandClass::Normal);
   assert(attrInfo.first == attrName);
   decodeShapeArray(ctx, attr.value, dims, numDims, dimPtrs);
 }
@@ -1183,7 +1183,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
     inputType = getTensorFlowDataType(operand->getType(), inst->getLoc());
   }
 
-  assert(graphOpInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
+  assert(getDeviceString(graphOpInfo) == DEFAULT_CPU_DEVICE &&
          "SendToHost must run on CPU device");
   int tensorId = inst->getAttributeNamed("tensorId")
                      .getValue()
@@ -1280,7 +1280,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
   assert(inst->getNumOperands() == 0);
   assert(inst->getNumAttributes() >= 2);
 
-  assert(graphOpInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
+  assert(getDeviceString(graphOpInfo) == DEFAULT_CPU_DEVICE &&
          "SendToHost must run on CPU device");
   int tensorId = inst->getAttributeNamed("tensorId")
                      .getValue()
@@ -1474,7 +1474,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorRecvInst(
   assert(inst->getNumResults() == 1);
   assert(inst->getNumOperands() == 0);
   assert(inst->getNumAttributes() == 3 || inst->getNumAttributes() == 4);
-  assert(graphOpInfo.getDeviceString() == thisDeviceTypeStr);
+  assert(getDeviceString(graphOpInfo) == thisDeviceTypeStr);
 
   int transferId = graphOpInfo.getIntAttr(0, "transferId");
   auto srcDeviceStr = graphOpInfo.getStringAttr(1, "srcDevice");
@@ -1602,7 +1602,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorSendInst(
   assert(inst->getNumResults() == 0);
   assert(inst->getNumOperands() == 1);
   assert(inst->getNumAttributes() == 3 || inst->getNumAttributes() == 4);
-  assert(graphOpInfo.getDeviceString() == thisDeviceTypeStr);
+  assert(getDeviceString(graphOpInfo) == thisDeviceTypeStr);
 
   int transferId = graphOpInfo.getIntAttr(0, "transferId");
   auto destDeviceStr = graphOpInfo.getStringAttr(1, "destDevice");
@@ -1698,7 +1698,7 @@ GLStatus TFGraphFunctionLowering::createDatasetCreationContext(
   {
     auto operand = inst->getOperand(0);
     auto opInfo = tfopInfo.operandClasses[0];
-    assert(opInfo.second == SILTensorOpInfo::OperandClass::Normal);
+    assert(opInfo.second == GraphOperationInfo::OperandClass::Normal);
     auto *sli = cast<StringLiteralInst>(operand);
     assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8);
     if (sli->getValue().str() == "fake") {
@@ -1726,7 +1726,7 @@ GLStatus TFGraphFunctionLowering::createDatasetCreationContext(
   {
     auto operand = inst->getOperand(2);
     auto opInfo = tfopInfo.operandClasses[2];
-    assert(opInfo.second == SILTensorOpInfo::OperandClass::Normal);
+    assert(opInfo.second == GraphOperationInfo::OperandClass::Normal);
     auto *ili = cast<IntegerLiteralInst>(operand);
     batchSize = ili->getValue().getLimitedValue();
   }
@@ -1952,12 +1952,12 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     std::string name = attrInfo.first.str();
 
     switch (attrInfo.second) {
-    case SILTensorOpInfo::OperandClass::Input:
+    case GraphOperationInfo::OperandClass::Input:
       assert(0 && "Input classes cannot exist for attributes");
-    case SILTensorOpInfo::OperandClass::Out:
+    case GraphOperationInfo::OperandClass::Out:
       assert(0 && "Attributes cannot be output parameters");
 
-    case SILTensorOpInfo::OperandClass::Normal: // No modifier.
+    case GraphOperationInfo::OperandClass::Normal: // No modifier.
       // We add attributes based on what the type of the value is.
       switch (attrValue.getKind()) {
       case SymbolicValue::Unknown:
@@ -2106,7 +2106,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       }
       // Done with normal attributes.
       break;
-    case SILTensorOpInfo::OperandClass::Tensor: {
+    case GraphOperationInfo::OperandClass::Tensor: {
       if (!dtypeAttr) {
         inst->dump();
         llvm_unreachable("dtype attr must have been processed!");
@@ -2157,16 +2157,16 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         return GLStatus::Error;
       break;
     }
-    case SILTensorOpInfo::OperandClass::Shape: {
+    case GraphOperationInfo::OperandClass::Shape: {
       SmallVector<int64_t, 4> shape;
       auto rank = decodeShapeAttr(SILFn.getASTContext(), attrValue, shape);
       TF_SetAttrShape(op, name.c_str(), shape.data(), rank);
       break;
     }
-    case SILTensorOpInfo::OperandClass::UnknownShapeList:
+    case GraphOperationInfo::OperandClass::UnknownShapeList:
       llvm_unreachable("UnknownShapeList should have been eliminated by "
                        "deabstraction");
-    case SILTensorOpInfo::OperandClass::Array: // Handled as 'normal'
+    case GraphOperationInfo::OperandClass::Array: // Handled as 'normal'
       llvm_unreachable("This is a legacy class that shouldn't happen");
     }
   }
