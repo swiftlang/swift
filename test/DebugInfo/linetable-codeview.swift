@@ -47,12 +47,12 @@ func foo() {
   // NOTE: The point of this test is to trigger IRGenSIL::emitShadowCopy()
   //       and IRGenSIL::emitShadowCopyIfNeeded(). It may be worthwhile to
   //       simplify this testcase.
-  // CHECK: store float %0, float* %myArg.addr, {{.*}}, !dbg ![[PROLOGUE:[0-9]+]]
-  // CHECK: store float {{.*}}, float* %debug.copy.myVal1._value, {{.*}}, !dbg ![[PROLOGUE]]
+  // CHECK: store float %0, float* %myArg.debug, {{.*}}, !dbg ![[PROLOGUE:[0-9]+]]
+  // CHECK: store float {{.*}}, float* %self.debug.myVal1._value, {{.*}}, !dbg ![[PROLOGUE]]
 
 // func myLoop() {
   // CHECK: define {{.*}} @"$S4main6myLoopyyF"
-  // CHECK: call void @llvm.dbg.declare(metadata i64* %index.addr, {{.*}}), !dbg ![[FORLOOP:[0-9]+]]
+  // CHECK: call void @llvm.dbg.declare(metadata i64* %index.debug, {{.*}}), !dbg ![[FORLOOP:[0-9]+]]
   // CHECK: phi i64 [ %{{.[0-9]+}}, %{{.[0-9]+}} ], !dbg ![[FORLOOP]]
   // CHECK: call {{.*}} @"$S4main8markUsedyyxlF"{{.*}}, !dbg ![[FORBODY:[0-9]+]]
   // CHECK: ret void
