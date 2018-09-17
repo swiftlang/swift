@@ -1277,16 +1277,20 @@ static bool delimiterMatches(unsigned CustomDelimiterLen, const char *&BytesPtr,
   if (!CustomDelimiterLen)
     return true;
   const char *TmpPtr = BytesPtr;
-  while (CustomDelimiterLen--)
-    if (!diagnoseZeroWidthMatchAndAdvance('#', TmpPtr, Diags))
-      return false;
-  BytesPtr = TmpPtr;
-  if (*BytesPtr == '#' && Diags)
-    Diags->diagnose(Lexer::getSourceLoc(BytesPtr), IsClosing ?
-                    diag::lex_invalid_closing_delimiter :
-                    diag::lex_invalid_escape_delimiter)
-      .fixItRemoveChars(Lexer::getSourceLoc(BytesPtr),
-                        Lexer::getSourceLoc(BytesPtr + 1));
+  while (diagnoseZeroWidthMatchAndAdvance('#', TmpPtr, Diags)) {}
+
+  if (TmpPtr - BytesPtr < CustomDelimiterLen)
+    return false;
+
+  BytesPtr += CustomDelimiterLen;
+
+  if (Diags && TmpPtr > BytesPtr) {
+    Diag<> message = IsClosing ? diag::lex_invalid_closing_delimiter
+                               : diag::lex_invalid_escape_delimiter;
+    Diags->diagnose(Lexer::getSourceLoc(BytesPtr), message)
+        .fixItRemoveChars(Lexer::getSourceLoc(BytesPtr),
+                          Lexer::getSourceLoc(TmpPtr));
+  }
   return true;
 }
 
