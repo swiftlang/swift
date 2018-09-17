@@ -1363,8 +1363,12 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions) {
   // owning component.
   llvm::DenseMap<TypeVariableType *, unsigned> typeVarComponent;
   llvm::DenseMap<Constraint *, unsigned> constraintComponent;
+  // Sort the constraints into component buckets based on component number.
+  std::unique_ptr<Component[]> buckets(new Component[numComponents]);
+
   for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
     // Record the component of this type variable.
+    buckets[components[i]].record(typeVars[i]);
     typeVarComponent[typeVars[i]] = components[i];
 
     // Record the component of each of the constraints.
@@ -1380,9 +1384,6 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions) {
     for (auto constraint : CG.getOrphanedConstraints())
       constraintComponent[constraint] = component++;
   }
-
-  // Sort the constraints into component buckets based on component number.
-  std::unique_ptr<Component[]> buckets(new Component[numComponents]);
 
   while (!InactiveConstraints.empty()) {
     auto *constraint = &InactiveConstraints.front();

@@ -3636,10 +3636,16 @@ class Component {
   ConstraintList Constraints;
   SmallVector<Constraint *, 8> Disjunctions;
 
+  /// Used to break ties in ordering when the number
+  /// of disjunctions is the same in both components.
+  unsigned NumTypeVars = 0;
+
 public:
   void reinstateTo(ConstraintList &workList) {
     workList.splice(workList.end(), Constraints);
   }
+
+  void record(TypeVariableType *typeVar) { ++NumTypeVars; }
 
   void record(Constraint *constraint) {
     Constraints.push_back(constraint);
@@ -3669,7 +3675,16 @@ public:
   }
 
   bool operator<(const Component &other) const {
-    return disjunctionCount() < other.disjunctionCount();
+    auto numDisjunctsA = disjunctionCount();
+    auto numDisjunctsB = other.disjunctionCount();
+
+    // If the number of disjunctions is the same in both
+    // components, let's prioritize the one with fewer
+    // type variables, because it would fail faster.
+    if (numDisjunctsA == numDisjunctsB)
+      return NumTypeVars < other.NumTypeVars;
+
+    return numDisjunctsA < numDisjunctsB;
   }
 
 private:
