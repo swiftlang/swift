@@ -150,14 +150,9 @@ AbstractionPattern::getOptional(AbstractionPattern object) {
   case Kind::PartialCurriedObjCMethodType:
   case Kind::CurriedObjCMethodType:
   case Kind::CFunctionAsMethodType:
-  case Kind::CFunctionAsMethodParamTupleType:
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::ObjCMethodType:
-  case Kind::ObjCMethodParamTupleType:
-  case Kind::ObjCMethodFormalParamTupleType:
-  case Kind::CFunctionAsMethodFormalParamTupleType:
-  case Kind::ClangFunctionParamTupleType:
     llvm_unreachable("cannot add optionality to non-type abstraction");
   case Kind::Opaque:
     return AbstractionPattern::getOpaque();
@@ -222,11 +217,6 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
     return true;
   case Kind::Tuple:
     return getNumTupleElements_Stored() == substType->getNumElements();
-  case Kind::ObjCMethodParamTupleType:
-  case Kind::ObjCMethodFormalParamTupleType:
-  case Kind::CFunctionAsMethodParamTupleType:
-  case Kind::CFunctionAsMethodFormalParamTupleType:
-  case Kind::ClangFunctionParamTupleType:
   case Kind::ClangType:
   case Kind::Type:
   case Kind::Discard:
@@ -265,13 +255,6 @@ const clang::Type *getClangArrayElementType(const clang::Type *ty,
   return ty->castAsArrayTypeUnsafe()->getElementType().getTypePtr();
 }
 
-static bool isVoidLike(CanType type) {
-  return (type->isVoid() ||
-          (isa<TupleType>(type) &&
-           cast<TupleType>(type)->getNumElements() == 1 &&
-           cast<TupleType>(type).getElementType(0)->isVoid()));
-}
-
 static CanType getCanTupleElementType(CanType type, unsigned index) {
   if (auto tupleTy = dyn_cast<TupleType>(type))
     return tupleTy.getElementType(index);
@@ -308,77 +291,6 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSignature(),
                               getCanTupleElementType(getType(), index));
-  case Kind::ClangFunctionParamTupleType: {
-    // Handle the (label: ()) param used by functions imported as labeled
-    // nullary initializers.
-    if (isVoidLike(getType()))
-      return AbstractionPattern(getType()->getASTContext().TheEmptyTupleType);
-    
-    return AbstractionPattern(getGenericSignature(),
-                              getCanTupleElementType(getType(), index),
-                          getClangFunctionParameterType(getClangType(), index));
-  }
-
-  case Kind::ObjCMethodFormalParamTupleType: {
-    auto swiftEltType = getCanTupleElementType(getType(), index);
-    auto method = getObjCMethod();
-    auto errorInfo = getEncodedForeignErrorInfo();
-
-    // If we're asking for something after the error parameter, slide
-    // the parameter index up by one.
-    auto paramIndex = index;
-    if (errorInfo.hasErrorParameter()) {
-      auto errorParamIndex = errorInfo.getErrorParameterIndex();
-      if (errorInfo.isErrorParameterReplacedWithVoid()) {
-        if (paramIndex == errorParamIndex) {
-          assert(isVoidLike(swiftEltType));
-          (void)&isVoidLike;
-          return AbstractionPattern(swiftEltType);
-        }
-      } else {
-        if (paramIndex >= errorParamIndex) {
-          paramIndex++;
-        }
-      }
-    }
-
-    return AbstractionPattern(getGenericSignature(), swiftEltType,
-                  method->parameters()[paramIndex]->getType().getTypePtr());
-  }
-  case Kind::CFunctionAsMethodFormalParamTupleType: {
-    // Jump over the self parameter in the Clang type.
-    unsigned clangIndex = index;
-    auto memberStatus = getImportAsMemberStatus();
-    if (memberStatus.isInstance() && clangIndex >= memberStatus.getSelfIndex())
-      ++clangIndex;
-    return AbstractionPattern(getGenericSignature(),
-                              getCanTupleElementType(getType(), index),
-                     getClangFunctionParameterType(getClangType(), clangIndex));
-  }
-  case Kind::CFunctionAsMethodParamTupleType: {
-    auto tupleType = cast<TupleType>(getType());
-    assert(tupleType->getNumElements() == 2);
-    assert(index < 2);
-
-    auto swiftEltType = tupleType.getElementType(index);
-    if (index != 0) {
-      return getCFunctionAsMethodSelfPattern(swiftEltType);
-    }
-    return getCFunctionAsMethodFormalParamPattern(swiftEltType);
-  }
-  case Kind::ObjCMethodParamTupleType: {
-    auto tupleType = cast<TupleType>(getType());
-    assert(tupleType->getNumElements() == 2);
-    assert(index < 2);
-
-    auto swiftEltType = tupleType.getElementType(index);
-    if (index != 0) {
-      return getObjCMethodSelfPattern(swiftEltType);
-    }
-
-    // Otherwise, we're talking about the formal parameter clause.
-    return getObjCMethodFormalParamPattern(swiftEltType);
-  }
   }
   llvm_unreachable("bad kind");
 }
@@ -418,87 +330,6 @@ AbstractionPattern::getCFunctionAsMethodSelfPattern(CanType selfType) const {
                            getGenericSignatureForFunctionComponent(), selfType);
 }
 
-/// Return a pattern corresponding to the formal method parameters of
-/// the current C function imported as a method.
-AbstractionPattern AbstractionPattern::
-getCFunctionAsMethodFormalParamPattern(CanType paramType) const {
-  auto sig = getGenericSignatureForFunctionComponent();
-  auto clangType = getClangType();
-  
-  // Nullary methods still take a formal () parameter clause.
-  // There's no corresponding Clang type for that.
-  if (isVoidLike(paramType))
-    return AbstractionPattern(paramType);
-  
-  // If we imported as a tuple type, construct the special
-  // method-formal-parameters abstraction pattern.
-  if (isa<TupleType>(paramType)) {
-    return getCFunctionAsMethodFormalParamTuple(sig, paramType,
-                                                clangType,
-                                                getImportAsMemberStatus());
-  }
-  
-  // Otherwise, we imported a single parameter.
-  // Get the non-self parameter from the Clang type.
-  unsigned paramIndex = 0;
-  auto selfIndex = getImportAsMemberStatus();
-  if (selfIndex.isInstance() && selfIndex.getSelfIndex() == 0)
-    paramIndex = 1;
-  
-  return AbstractionPattern(sig, paramType,
-                          getClangFunctionParameterType(clangType, paramIndex));
-}
-
-/// Return a pattern corresponding to the formal parameters of the
-/// current Objective-C method.
-AbstractionPattern
-AbstractionPattern::getObjCMethodFormalParamPattern(CanType inputType) const {
-  auto signature = getGenericSignatureForFunctionComponent();
-  auto method = getObjCMethod();
-  auto errorInfo = getEncodedForeignErrorInfo();
-
-  // Nullary methods still take a formal () parameter clause.
-  // There's no corresponding Clang type for that.
-  if (method->parameters().empty() ||
-      (method->parameters().size() == 1 &&
-       errorInfo.hasErrorParameter())) {
-    // Imported initializers also sometimes get "withFooBar: ()" clauses.
-    assert(isVoidLike(inputType));
-    return AbstractionPattern(inputType);
-  }
-
-  // If we imported as a tuple type, construct the special
-  // method-formal-parameters abstraction pattern.
-  if (isa<TupleType>(inputType)) {
-    // This assertion gets messed up by variadic methods that we've
-    // imported as non-variadic.
-    assert(method->isVariadic() ||
-           method->parameters().size() ==
-             cast<TupleType>(inputType)->getNumElements()
-             + unsigned(errorInfo.hasUnreplacedErrorParameter()));
-    return getObjCMethodFormalParamTuple(signature, inputType,
-                                         method, errorInfo);
-  }
-
-  // Otherwise, we must have imported a single parameter.
-  // But we might also have a foreign error.
-
-  // If we don't, we must have a single source parameter.
-  if (!errorInfo.hasErrorParameter()) {
-    assert(method->parameters().size() == 1);
-    return AbstractionPattern(signature, inputType,
-                            method->parameters()[0]->getType().getTypePtr());
-  }
-
-  // Otherwise, we must have two; pick the one that isn't the foreign error.
-  assert(method->parameters().size() == 2);
-  unsigned errorIndex = errorInfo.getErrorParameterIndex();
-  assert(errorIndex < 2);
-  unsigned paramIndex = (errorIndex == 0 ? 1 : 0);
-  return AbstractionPattern(signature, inputType,
-                   method->parameters()[paramIndex]->getType().getTypePtr());
-}
-
 static CanType getResultType(CanType type) {
   return cast<AnyFunctionType>(type).getResult();
 }
@@ -507,11 +338,6 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
-  case Kind::ClangFunctionParamTupleType:
-  case Kind::ObjCMethodParamTupleType:
-  case Kind::ObjCMethodFormalParamTupleType:
-  case Kind::CFunctionAsMethodParamTupleType:
-  case Kind::CFunctionAsMethodFormalParamTupleType:
   case Kind::Tuple:
     llvm_unreachable("abstraction pattern for tuple cannot be function");
   case Kind::Opaque:
@@ -666,18 +492,13 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
-  case Kind::ClangFunctionParamTupleType:
-  case Kind::ObjCMethodParamTupleType:
-  case Kind::ObjCMethodFormalParamTupleType:
   case Kind::ObjCMethodType:
   case Kind::CurriedObjCMethodType:
   case Kind::PartialCurriedObjCMethodType:
   case Kind::CFunctionAsMethodType:
-  case Kind::CFunctionAsMethodParamTupleType:
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::Tuple:
-  case Kind::CFunctionAsMethodFormalParamTupleType:
     llvm_unreachable("pattern for function or tuple cannot be for optional");
 
   case Kind::Opaque:
@@ -707,18 +528,13 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
   case Kind::Opaque:
-  case Kind::ClangFunctionParamTupleType:
-  case Kind::ObjCMethodParamTupleType:
-  case Kind::ObjCMethodFormalParamTupleType:
   case Kind::ObjCMethodType:
   case Kind::CurriedObjCMethodType:
   case Kind::PartialCurriedObjCMethodType:
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CFunctionAsMethodType:
-  case Kind::CFunctionAsMethodParamTupleType:
   case Kind::Tuple:
-  case Kind::CFunctionAsMethodFormalParamTupleType:
     return *this;
   case Kind::Type:
     return AbstractionPattern(getGenericSignature(),
@@ -770,27 +586,16 @@ void AbstractionPattern::print(raw_ostream &out) const {
     out << ")";
     return;
   case Kind::ClangType:
-  case Kind::ClangFunctionParamTupleType:
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CFunctionAsMethodType:
-  case Kind::CFunctionAsMethodParamTupleType:
-  case Kind::CFunctionAsMethodFormalParamTupleType:
     out << (getKind() == Kind::ClangType
               ? "AP::ClangType(" :
-            getKind() == Kind::ClangFunctionParamTupleType
-              ? "AP::ClangFunctionParamTupleType(" :
             getKind() == Kind::CurriedCFunctionAsMethodType
               ? "AP::CurriedCFunctionAsMethodType(" :
             getKind() == Kind::CFunctionAsMethodType
-              ? "AP::CFunctionAsMethodType(" :
-            getKind() == Kind::CFunctionAsMethodParamTupleType
-              ? "AP::CFunctionAsMethodParamTupleType(" :
-            getKind() == Kind::PartialCurriedCFunctionAsMethodType
-              ? "AP::PartialCurriedCFunctionAsMethodType(" :
-            getKind() == Kind::CFunctionAsMethodFormalParamTupleType
-              ? "AP::CFunctionAsMethodFormalParamTupleType("
-              : "<<UNHANDLED CASE>>(");
+              ? "AP::CFunctionAsMethodType("
+              : "AP::PartialCurriedCFunctionAsMethodType(");
     getType().dump(out);
     out << ", ";
     // It would be better to use print, but we need a PrintingPolicy
@@ -809,18 +614,12 @@ void AbstractionPattern::print(raw_ostream &out) const {
     return;
   case Kind::CurriedObjCMethodType:
   case Kind::PartialCurriedObjCMethodType:
-  case Kind::ObjCMethodFormalParamTupleType:
-  case Kind::ObjCMethodParamTupleType:
   case Kind::ObjCMethodType:
     out << (getKind() == Kind::ObjCMethodType
               ? "AP::ObjCMethodType(" :
             getKind() == Kind::CurriedObjCMethodType
-              ? "AP::CurriedObjCMethodType(" :
-            getKind() == Kind::PartialCurriedObjCMethodType
-              ? "AP::PartialCurriedObjCMethodType(" :
-            getKind() == Kind::ObjCMethodParamTupleType
-              ? "AP::ObjCMethodParamTupleType("
-              : "AP::ObjCMethodFormalParamTupleType(");
+              ? "AP::CurriedObjCMethodType("
+              : "AP::PartialCurriedObjCMethodType(");
     getType().dump(out);
     auto errorInfo = getEncodedForeignErrorInfo();
     if (errorInfo.hasValue()) {
