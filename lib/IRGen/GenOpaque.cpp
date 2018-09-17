@@ -38,7 +38,7 @@
 using namespace swift;
 using namespace irgen;
 
-/// A fixed-size buffer is always 16 bytes and pointer-aligned.
+/// A fixed-size buffer is always three pointers in size and pointer-aligned.
 /// If we align them more, we'll need to introduce padding to
 /// make protocol types work.
 Size irgen::getFixedBufferSize(IRGenModule &IGM) {

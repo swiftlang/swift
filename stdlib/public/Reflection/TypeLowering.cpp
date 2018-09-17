@@ -436,7 +436,10 @@ unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
   switch (Kind) {
   // The extra inhabitants of a struct are the same as the extra
   // inhabitants of the field that has the most.
+  // Opaque existentials pick up the extra inhabitants of their type metadata
+  // field.
   case RecordKind::Struct:
+  case RecordKind::OpaqueExistential:
     NumExtraInhabitants = std::max(NumExtraInhabitants, numExtraInhabitants);
     break;
   
@@ -450,7 +453,6 @@ unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
   case RecordKind::Invalid:
   case RecordKind::MultiPayloadEnum:
   case RecordKind::NoPayloadEnum:
-  case RecordKind::OpaqueExistential:
   case RecordKind::SinglePayloadEnum:
   case RecordKind::ThickFunction:
   case RecordKind::Tuple:
