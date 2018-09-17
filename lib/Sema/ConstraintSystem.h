@@ -53,10 +53,6 @@ namespace constraints {
 class ConstraintGraph;
 class ConstraintGraphNode;
 class ConstraintSystem;
-class DisjunctionChoiceProducer;
-class TypeBinding;
-class TypeVariableBinding;
-class TypeVarBindingProducer;
 
 } // end namespace constraints
 
@@ -930,6 +926,11 @@ public:
   friend class FailureDiagnostic;
   friend class TypeVarBindingProducer;
   friend class TypeVariableBinding;
+  friend class StepScope;
+  friend class SolverStep;
+  friend class SplitterStep;
+  friend class ComponentStep;
+  friend class TypeVariableStep;
 
   class SolverScope;
 
@@ -2954,11 +2955,6 @@ private:
       bool &addOptionalSupertypeBindings);
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
 
-  bool
-  tryTypeVariableBindings(TypeVariableType *typeVar,
-                          ArrayRef<ConstraintSystem::PotentialBinding> bindings,
-                          SmallVectorImpl<Solution> &solutions);
-
 private:
   /// \brief Add a constraint to the constraint system.
   SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
@@ -2967,33 +2963,6 @@ private:
 
   /// \brief Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
-
-  /// \brief Attempt find a solution involving the options in a
-  ///        disjunction.
-  ///
-  /// \returns true if we failed to find any solutions, false otherwise.
-  bool solveForDisjunction(Constraint *disjunction,
-                           SmallVectorImpl<Solution> &solutions);
-
-  /// \brief Attempt to solve for some subset of the constraints in a
-  ///        disjunction, skipping constraints that we decide do not
-  ///        need to be solved for because they would not result in
-  ///        the best solution to the constraint system.
-  ///
-  /// \returns true if we failed to find any solutions, false otherwise.
-  bool solveForDisjunctionChoices(ArrayRef<Constraint *> choices,
-                                  ConstraintLocator *disjunctionLocator,
-                                  bool isExplicitConversion,
-                                  SmallVectorImpl<Solution> &solutions);
-
-  /// \brief Attempt to solve constraint system after
-  ///        attempting given disjunction choice.
-  ///
-  /// \returns If solution(s) could be reached, return best score.
-  Optional<Score>
-  solveForDisjunctionChoice(const TypeBinding &choice,
-                            ConstraintLocator *disjunctionLocator,
-                            SmallVectorImpl<Solution> &solutions);
 
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
@@ -3083,13 +3052,6 @@ public:
 
   /// \brief Solve the system of constraints.
   ///
-  /// \param solutions The set of solutions to this system of constraints.
-  ///
-  /// \returns true if there are no solutions
-  bool solveRec(SmallVectorImpl<Solution> &solutions);
-
-  /// \brief Solve the system of constraints.
-  ///
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
@@ -3099,6 +3061,14 @@ public:
                                     = FreeTypeVariableBinding::Disallow);
 
 private:
+  /// \brief Solve the system of constraints.
+  ///
+  /// This method responsible for running search/solver algorithm.
+  /// It doesn't filter solutions, that's the job of top-level `solve` methods.
+  ///
+  /// \param solutions The set of solutions to this system of constraints.
+  void solve(SmallVectorImpl<Solution> &solutions);
+
   /// \brief Compare two solutions to the same set of constraints.
   ///
   /// \param cs The constraint system.
@@ -3406,7 +3376,14 @@ public:
       : Index(index), Flags(flags) {}
 
   virtual ~TypeBinding() {}
-  virtual void attempt(ConstraintSystem &cs) const = 0;
+
+  /// Attempt given binding in the constraint system, this is going to
+  /// introduce some new constraints (potentially "bind" constraints)
+  /// to try and associate some type variables with new types.
+  ///
+  /// \returns true if attempt has been accepted by the constraint system,
+  ///          which means that new constraints have been successfully solved.
+  virtual bool attempt(ConstraintSystem &cs) const = 0;
 
   /// Position of this binding in the chain.
   unsigned getIndex() const { return Index; }
@@ -3448,11 +3425,14 @@ public:
       : TypeBinding(index, computeFlags(choice)), Choice(choice),
         ExplicitConversion(explicitConversion) {}
 
-  void attempt(ConstraintSystem &cs) const override;
+  bool attempt(ConstraintSystem &cs) const override;
 
   void print(llvm::raw_ostream &Out, SourceManager *SM) const override {
     Choice->print(Out, SM);
   }
+
+  operator Constraint *() { return Choice; }
+  operator Constraint *() const { return Choice; }
 
 private:
   /// \brief If associated disjunction is an explicit conversion,
@@ -3511,7 +3491,7 @@ public:
       : TypeBinding(index, computeFlags(binding)), TypeVar(typeVar),
         Binding(binding) {}
 
-  void attempt(ConstraintSystem &cs) const override;
+  bool attempt(ConstraintSystem &cs) const override;
 
   void print(llvm::raw_ostream &Out, SourceManager *) const override {
     Out << TypeVar->getString() << " := " << Binding.BindingType->getString();
@@ -3607,6 +3587,16 @@ class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
   unsigned Index = 0;
 
 public:
+  DisjunctionChoiceProducer(ConstraintSystem &cs, Constraint *disjunction)
+      : BindingProducer(cs, disjunction->shouldRememberChoice()
+                                ? disjunction->getLocator()
+                                : nullptr),
+        Choices(disjunction->getNestedConstraints()),
+        IsExplicitConversion(disjunction->isExplicitConversion()) {
+    assert(disjunction->getKind() == ConstraintKind::Disjunction);
+    assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
+  }
+
   DisjunctionChoiceProducer(ConstraintSystem &cs,
                             ArrayRef<Constraint *> choices,
                             ConstraintLocator *locator, bool explicitConversion)
