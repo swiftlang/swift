@@ -2225,45 +2225,6 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-/// If `type` is not allowed as a wrt type, diagnoses and returns true.
-static bool
-checkAndDiagnoseWrtType(TypeChecker &TC, SourceLoc loc, Type type) {
-  if (type->isAnyClassReferenceType() || type->isExistentialType()) {
-    TC.diagnose(
-        loc,
-        diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
-        type);
-    return true;
-  }
-  return false;
-}
-
-// If the self type of `method` is allowed as a wrt param, appends the
-// corresponding return type to `retElts` and returns false. Otherwise,
-// returns true and diagnoses.
-static bool
-addWrtSelfRetTyOrDiagnose(TypeChecker &TC, SourceLoc loc,
-                          const FuncDecl *method,
-                          SmallVectorImpl<TupleTypeElt> &retElts) {
-  auto parent = method->getParent();
-  if (checkAndDiagnoseWrtType(TC, loc, parent->getSelfTypeInContext()))
-    return true;
-  retElts.push_back(parent->getSelfInterfaceType());
-  return false;
-}
-
-// If `param` is allowed as a wrt param, appends the corresponding return type
-// to `retElts` and returns false. Otherwise, returns true and diagnoses.
-static bool
-addWrtParamRetTyOrDiagnose(TypeChecker &TC, SourceLoc loc,
-                           const ParamDecl *param,
-                           SmallVectorImpl<TupleTypeElt> &retElts) {
-  if (checkAndDiagnoseWrtType(TC, loc, param->getType()))
-    return true;
-  retElts.push_back(param->getInterfaceType());
-  return false;
-}
-
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Forward mode is unsupported.
   if (attr->getMode() == AutoDiffMode::Forward) {
@@ -2421,12 +2382,46 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Compute the return type of the adjoint function.
   auto wrtParams = attr->getParameters();
   SmallVector<TupleTypeElt, 8> retElts;
+
+  // If `type` is not allowed as a wrt type, diagnoses and returns true.
+  auto checkAndDiagnoseWrtType = [&](SourceLoc loc, Type type) -> bool {
+    if (type->isAnyClassReferenceType() || type->isExistentialType()) {
+      TC.diagnose(
+          loc,
+          diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
+          type);
+      return true;
+    }
+    return false;
+  };
+
+  // If the self type of `original` is allowed as a wrt param, appends the
+  // corresponding return type to `retElts` and returns false. Otherwise,
+  // returns true and diagnoses.
+  auto addWrtSelfRetTyOrDiagnose = [&](SourceLoc loc) -> bool {
+    auto parent = original->getParent();
+    if (checkAndDiagnoseWrtType(loc, parent->getSelfTypeInContext()))
+      return true;
+    retElts.push_back(parent->getSelfInterfaceType());
+    return false;
+  };
+
+  // If `param` is allowed as a wrt param, appends the corresponding return type
+  // to `retElts` and returns false. Otherwise, returns true and diagnoses.
+  auto addWrtParamRetTyOrDiagnose = [&](SourceLoc loc,
+                                        const ParamDecl *param) -> bool {
+    if (checkAndDiagnoseWrtType(loc, param->getType()))
+      return true;
+    retElts.push_back(param->getInterfaceType());
+    return false;
+  };
+
   // When 'wrt:' is not specified, the adjoint's return type is the type of all
   // of original's parameters. The self parameter is intentionally excluded.
   if (wrtParams.empty()) {
     auto attrLoc = attr->getLocation();
     for (auto *param : originalParams)
-      if (addWrtParamRetTyOrDiagnose(TC, attrLoc, param, retElts))
+      if (addWrtParamRetTyOrDiagnose(attrLoc, param))
         return;
   }
   // If 'wrt:' is specified, make sure it's valid and compute the corresponding
@@ -2452,8 +2447,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                       diag::differentiable_attr_wrt_index_out_of_bounds);
           return;
         }
-        if (addWrtParamRetTyOrDiagnose(TC, paramLoc, originalParams[index],
-                                       retElts))
+        if (addWrtParamRetTyOrDiagnose(paramLoc, originalParams[index]))
           return;
         lastIndex = index;
         break;
@@ -2471,7 +2465,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                       diag::differentiable_attr_wrt_self_must_be_first);
           return;
         }
-        if (addWrtSelfRetTyOrDiagnose(TC, paramLoc, original, retElts))
+        if (addWrtSelfRetTyOrDiagnose(paramLoc))
           return;
         break;
       }
@@ -2485,7 +2479,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   if (retElts.size() == 0) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_wrt_nothing,
                 original->getName())
-      .highlight(original->getSourceRange());
+        .highlight(original->getSourceRange());
     attr->setInvalid();
     return;
   }
@@ -2494,8 +2488,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // return type. Otherwise, make a tuple out of `retElts` as adjoint's return
   // type.
   Type retTy = retElts.size() > 1
-    ? TupleType::get(retElts, ctx)
-    : retElts[0].getType();
+      ? TupleType::get(retElts, ctx)
+      : retElts[0].getType();
 
   // Compute parameters of the adjoint function.
   SmallVector<FunctionType::Param, 8> paramTypes;
