@@ -131,8 +131,8 @@ public func run_CustomStringInterpolation(_ N: Int) {
   for _ in 1...100*N {
     var result = 0
     for _ in 1...reps {
-      let s: String = getString(CustomString(
-        "\(anInt) abcdefdhijklmn \(aRefCountedObject) abcdefdhijklmn \u{01}").value)
+      let s: String = identity(CustomString(
+        "\(anInt) abcdefdhijklmn \(aRefCountedObject) abcdefdhijklmn \u{01}")).value
       let utf16 = s.utf16
 
       // FIXME: if String is not stored as UTF-16 on this platform, then the
@@ -153,8 +153,8 @@ public func run_CustomStringNoInterpolation(_ N: Int) {
   for _ in 1...100*N {
     var result = 0
     for _ in 1...reps {
-      let s: String = getString(CustomString(
-        "abcdefdhijklmn abcdefdhijklmn \u{01}").value)
+      let s: String = identity(CustomString(
+        "abcdefdhijklmn abcdefdhijklmn \u{01}")).value
       let utf16 = s.utf16
 
       // FIXME: if String is not stored as UTF-16 on this platform, then the
@@ -166,4 +166,3 @@ public func run_CustomStringNoInterpolation(_ N: Int) {
     CheckResults(result == refResult)
   }
 }
-
