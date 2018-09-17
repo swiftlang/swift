@@ -2741,7 +2741,7 @@ public:
 
 class OpaqueExistentialValueWitnessTableCacheEntry {
 public:
-  ValueWitnessTable Data;
+  ExtraInhabitantsValueWitnessTable Data;
 
   OpaqueExistentialValueWitnessTableCacheEntry(unsigned numTables);
 
@@ -2798,9 +2798,11 @@ public:
 /// The uniquing structure for existential type metadata.
 static SimpleGlobalCache<ExistentialCacheEntry> ExistentialTypes;
 
-static const ValueWitnessTable OpaqueExistentialValueWitnesses_0 =
+static const ExtraInhabitantsValueWitnessTable
+OpaqueExistentialValueWitnesses_0 =
   ValueWitnessTableForBox<OpaqueExistentialBox<0>>::table;
-static const ValueWitnessTable OpaqueExistentialValueWitnesses_1 =
+static const ExtraInhabitantsValueWitnessTable
+OpaqueExistentialValueWitnesses_1 =
   ValueWitnessTableForBox<OpaqueExistentialBox<1>>::table;
 
 /// The standard metadata for Any.
@@ -2855,7 +2857,6 @@ OpaqueExistentialValueWitnessTableCacheEntry::
 OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
   using Box = NonFixedOpaqueExistentialBox;
   using Witnesses = NonFixedValueWitnesses<Box, /*known allocated*/ true>;
-  static_assert(!Witnesses::hasExtraInhabitants, "no extra inhabitants");
 
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
@@ -2869,8 +2870,13 @@ OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
     .withPOD(false)
     .withBitwiseTakable(true)
     .withInlineStorage(false)
-    .withExtraInhabitants(false);
+    .withExtraInhabitants(true);
   Data.stride = Box::Container::getStride(numWitnessTables);
+  
+  // Extra inhabitant behavior does not change with the number of witnesses.
+  Data.extraInhabitantFlags = Witnesses::extraInhabitantFlags;
+  Data.getExtraInhabitantIndex = Witnesses::getExtraInhabitantIndex;
+  Data.storeExtraInhabitant = Witnesses::storeExtraInhabitant;
 
   assert(getNumWitnessTables() == numWitnessTables);
 }
