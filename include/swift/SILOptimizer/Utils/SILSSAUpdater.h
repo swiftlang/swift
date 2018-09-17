@@ -39,8 +39,8 @@ class SILSSAUpdater {
   friend class llvm::SSAUpdaterTraits<SILSSAUpdater>;
 
   // A map of basic block to available phi value.
-  // using AvailableValsTy = llvm::DenseMap<SILBasicBlock *, SILValue>;
-  void *AV;
+  using AvailableValsTy = llvm::DenseMap<SILBasicBlock *, SILValue>;
+  std::unique_ptr<AvailableValsTy> AV;
 
   SILType ValType;
 
