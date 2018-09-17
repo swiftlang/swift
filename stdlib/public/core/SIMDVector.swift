@@ -98,16 +98,22 @@ public extension SIMDVector {
     return !(lhs == rhs)
   }
   
+  /// Replaces elements of this vector with elements of `other` in the lanes
+  /// where `predicate` is `true`.
   @inlinable
   mutating func replace(with other: Self, where predicate: Predicate) {
     self = self.replacing(with: other, where: predicate)
   }
   
+  /// A vector formed by making a copy of this vector, and replacing lanes
+  /// where `predicate` is true with `other`.
   @inlinable
   func replacing(with other: Element, where predicate: Predicate) -> Self {
     return self.replacing(with: Self(repeating: other), where: predicate)
   }
   
+  /// Replaces elements of this vector with `other` in the lanes where
+  /// `predicate` is `true`.
   @inlinable
   mutating func replace(with other: Element, where predicate: Predicate) {
     self = self.replacing(with: Self(repeating: other), where: predicate)

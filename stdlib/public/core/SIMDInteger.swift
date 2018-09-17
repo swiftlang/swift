@@ -1,6 +1,11 @@
 public protocol SIMDIntegerVector : SIMDVector
                               where Element: FixedWidthInteger {
   
+  /// Creates a bitmask vector from `predicate`.
+  ///
+  /// The value of the mask is all 1 bits (i.e. `-1` if the element type is
+  /// signed, .max if it is unsigned) in each lane where `predicate` is true,
+  /// and all 0 bits in each lane where `predicate` is false.
   init(bitMaskFrom predicate: Predicate)
   
   /// A vector where each element is the count of leading zero bits in the
@@ -60,25 +65,6 @@ public protocol SIMDIntegerVector : SIMDVector
 
 // MARK: Defaulted requirements and extensions
 public extension SIMDIntegerVector {
-
-  /// A vector where the value in each lane is selected from the corresponding
-  /// lane of `self` (if that lane of `predicate` is `false`) or `other` (if
-  /// that lane of `predicate` is `true`).
-  ///
-  /// For example, suppose we want to replace any negative values in a vector
-  /// with zeros. We would do the following:
-  /// ~~~~
-  /// let x: Int32.Vector8(0, 2, -1, 7, -.min, -2, 1, 3)
-  /// let y = x.replacing(with: 0, where: x < 0) // 0, 2, 0, 7, 0, 0, 1, 3
-  @_transparent
-  func replacing(with other: Self, where predicate: Predicate) -> Self {
-    return replacingBits(with: other, where: Self(bitMaskFrom: predicate))
-  }
-  
-  @_transparent
-  func replacingBits(with other: Self, where mask: Self) -> Self {
-    return self & ~mask | other & mask
-  }
   
   // MARK: Comparison with any BinaryInteger scalar, handling cases where
   // the scalar is outside the range of representable values for the vector
@@ -387,6 +373,22 @@ public extension SIMDIntegerVector {
   @_transparent
   static func /=(lhs: inout Self, rhs: Element) {
     lhs = lhs / rhs
+  }
+  
+  /// A vector where the value in each lane is selected from the corresponding
+  /// lane of `self` (if that lane of `predicate` is `false`) or `other` (if
+  /// that lane of `predicate` is `true`).
+  @_transparent
+  func replacing(with other: Self, where predicate: Predicate) -> Self {
+    return replacingBits(with: other, where: Self(bitMaskFrom: predicate))
+  }
+  
+  /// A vector where each bit is selected from the corresponding bit of this
+  /// vector or `other` depending on the value of the corresponding bit of
+  /// `mask`.
+  @_transparent
+  func replacingBits(with other: Self, where mask: Self) -> Self {
+    return self & ~mask | other & mask
   }
 }
 
