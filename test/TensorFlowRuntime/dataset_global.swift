@@ -23,6 +23,7 @@ var DatasetGlobalTests = TestSuite("DatasetGlobal")
 _RuntimeConfig.usesTFEagerAPI = true
 let scalars = Tensor<Float>([0, 1, 2])
 let dataset = Dataset(elements: scalars)
+var iterator = dataset.makeIterator()
 
 // This stmt makes sure the store inst into the global var `dataset` does not
 // make dataset a return tensor.
@@ -45,6 +46,22 @@ DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
     expectNearlyEqualWithScalarTensor(expectedVal, item)
     expectedVal += 1.0
   }
+}
+
+DatasetGlobalTests.testCPUOrGPU("IteratorAsGlobalVar") {
+  // This stmt makes sure the load inst from the global var `iterator` does not
+  // make iterator an input arg tensor.
+  //
+  // It can be removed when we convert arg tensors to Swift->TF tensor
+  // transfers.
+  _ = scalars + scalars
+
+  var expectedVal: Float = 0.0
+	while let item = iterator.next() {
+    _hostOp(item)
+    expectNearlyEqualWithScalarTensor(expectedVal, item)
+    expectedVal += 1.0
+	}
 }
 
 #endif // !CUDA
