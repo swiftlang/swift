@@ -2808,20 +2808,23 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
   if (!isa<SubscriptDecl>(storage))
     return PreparedArguments();
 
-  SmallVector<TupleTypeElt, 2> indexElts;
+  SmallVector<AnyFunctionType::Param, 8> indexParams;
   for (auto &elt : indexes) {
-    indexElts.push_back(SGF.F.mapTypeIntoContext(elt.first));
+    // FIXME: Varargs?
+    indexParams.emplace_back(SGF.F.mapTypeIntoContext(elt.first));
   }
   
-  auto indexTupleTy = TupleType::get(indexElts, SGF.getASTContext())
-                        ->getCanonicalType();
-  PreparedArguments indexValues(indexTupleTy, /*scalar*/ indexes.size() == 1);
+  PreparedArguments indexValues(indexParams, /*scalar*/ indexes.size() == 1);
   if (indexes.empty()) {
     assert(indexValues.isValid());
     return indexValues;
   }
 
-  auto indexLoweredTy = SGF.getLoweredType(indexTupleTy);
+  auto indexLoweredTy =
+    SGF.getLoweredType(
+      AnyFunctionType::composeInput(SGF.getASTContext(), indexParams,
+                                    /*canonicalVararg=*/false));
+
   auto addr = SGF.B.createPointerToAddress(loc, pointer,
                                            indexLoweredTy.getAddressType(),
                                            /*isStrict*/ false);
