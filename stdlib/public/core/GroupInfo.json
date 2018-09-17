@@ -167,7 +167,9 @@
         "SIMDInteger.swift",
         "SIMDIntegerTypes.swift",
         "SIMDPredicate.swift",
-        "SIMDPredicateTypes.swift"
+        "SIMDPredicateTypes.swift",
+        "SIMDFloatingPoint.swift",
+        "SIMDFloatingPointTypes.swift"
       ]
     }
   ],

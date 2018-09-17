@@ -205,6 +205,8 @@ set(SWIFTLIB_SOURCES
   SIMDIntegerTypes.swift.gyb
   SIMDPredicate.swift
   SIMDPredicateTypes.swift.gyb
+  SIMDFloatingPoint.swift
+  SIMDFloatingPointTypes.swift.gyb
   SliceBuffer.swift
   Tuple.swift.gyb
   UnfoldSequence.swift
