@@ -519,11 +519,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << "reverse";
       break;
     }
-    Printer << ", ";
     auto params = attr->getParameters();
     // Print differentiation parameters, if any.
     if (!params.empty()) {
-      Printer << "wrt: (";
+      Printer << ", wrt: (";
       interleave(params, [&](const AutoDiffParameter &param) {
         switch (param.getKind()) {
         case AutoDiffParameter::Kind::Index:
@@ -536,14 +535,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       }, [&] {
         Printer << ", ";
       });
-      Printer << "), ";
+      Printer << ")";
     }
     // Print primal function name if any.
     if (auto primal = attr->getPrimal())
-      Printer << "primal: " << primal->Name << ", ";
+      Printer << ", primal: " << primal->Name;
     // Print adjoint function name.
     if (auto adjoint = attr->getAdjoint())
-      Printer << "adjoint: " << adjoint->Name;
+      Printer << ", adjoint: " << adjoint->Name;
     // FIXME: Print 'where' clause, if any.
     Printer << ")";
     break;
