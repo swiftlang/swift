@@ -1799,32 +1799,37 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
            "Single quoted string cannot have custom delimitor, nor multiline");
     assert(*TokStart == '\'' && CurPtr[-1] == '\'');
 
-    StringRef orig(TokStart, CurPtr - TokStart);
-    llvm::SmallString<32> replacement;
-    replacement += '"';
-    std::string str = orig.slice(1, orig.size() - 1).str();
-    std::string quot = "\"";
-    size_t pos = 0;
-    while (pos != str.length()) {
-      if (str.at(pos) == '\\') {
-        if (str.at(pos + 1) == '\'') {
-          // Un-escape escaped single quotes.
-          str.replace(pos, 2, "'");
-          ++pos;
-        } else {
-          // Skip over escaped characters.
-          pos += 2;
+    SmallString<32> replacement;
+    replacement.push_back('"');
+    const char *Ptr = TokStart + 1;
+    const char *OutputPtr = Ptr;
+
+    while (*Ptr++ != '\'') {
+      if (Ptr[-1] == '\\') {
+        if (*Ptr == '\'') {
+          replacement.append(OutputPtr, Ptr - 1);
+          OutputPtr = Ptr + 1;
+          // Un-escape single quotes.
+          replacement.push_back('\'');
+        } else if (*Ptr == '(') {
+          // Preserve the contents of interpolation.
+          Ptr = skipToEndOfInterpolatedExpression(Ptr + 1, replacement.end(),
+                                                  /*IsMultiline=*/false);
+          assert(*Ptr == ')');
         }
-      } else if (str.at(pos) == '"') {
-        str.replace(pos, 1, "\\\"");
-        // Advance past the newly added ["\""].
-        pos += 2;
-      } else {
-        ++pos;
+        // Skip over escaped characters.
+        ++Ptr;
+      } else if (Ptr[-1] == '"') {
+        replacement.append(OutputPtr, Ptr - 1);
+        OutputPtr = Ptr;
+        // Escape double quotes.
+        replacement.append("\\\"");
       }
     }
-    replacement += StringRef(str);
-    replacement += '"';
+    assert(Ptr == CurPtr);
+    replacement.append(OutputPtr, Ptr - 1);
+    replacement.push_back('"');
+
     diagnose(TokStart, diag::lex_single_quote_string)
         .fixItReplaceChars(getSourceLoc(TokStart), getSourceLoc(CurPtr),
                            replacement);
