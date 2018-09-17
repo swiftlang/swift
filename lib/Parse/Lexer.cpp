@@ -1454,67 +1454,61 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
       if (inStringLiteral() ||
           !(CustomDelimiterLen = advanceIfCustomDelimiter(CurPtr, Diags)))
         continue;
+      assert(CurPtr[-1] == '"' &&
+             "advanceIfCustomDelimiter() must stop at after the quote");
       LLVM_FALLTHROUGH;
 
     case '"':
     case '\'': {
-      if (!AllowNewline.back() && inStringLiteral()) {
-        if (OpenDelimiters.back() == CurPtr[-1] &&
-            delimiterMatches(CustomDelimiter.back(), CurPtr, Diags, true)) {
-          // Closing single line string literal.
-          OpenDelimiters.pop_back();
-          AllowNewline.pop_back();
-          CustomDelimiter.pop_back();
-        }
-        // Otherwise, it's just a quote in string literal. e.g. "foo's".
-        continue;
-      }
-
-      bool isMultilineQuote = advanceIfMultilineDelimiter(CurPtr, Diags);
-
       if (!inStringLiteral()) {
-        // Open string literal
+        // Open string literal.
         OpenDelimiters.push_back(CurPtr[-1]);
-        AllowNewline.push_back(isMultilineQuote);
+        AllowNewline.push_back(advanceIfMultilineDelimiter(CurPtr, Diags));
         CustomDelimiter.push_back(CustomDelimiterLen);
         continue;
       }
 
-      // We are in multiline string literal.
-      assert(AllowNewline.back() && "other cases must be handled above");
-      if (isMultilineQuote &&
-          delimiterMatches(CustomDelimiter.back(), CurPtr, Diags, true)) {
-        // Close multiline string literal.
-        OpenDelimiters.pop_back();
-        AllowNewline.pop_back();
-        CustomDelimiter.pop_back();
-      }
+      // In string literal.
 
-      // Otherwise, it's just a normal character in multiline string.
+      // Skip if it's an another kind of quote in string literal. e.g. "foo's".
+      if (OpenDelimiters.back() != CurPtr[-1])
+        continue;
+
+      // Multi-line string can only be closed by '"""'.
+      if (AllowNewline.back() && !advanceIfMultilineDelimiter(CurPtr, Diags))
+        continue;
+
+      // Check whether we have equivalent number of '#'s.
+      if (!delimiterMatches(CustomDelimiter.back(), CurPtr, Diags, true))
+        continue;
+
+      // Close string literal.
+      OpenDelimiters.pop_back();
+      AllowNewline.pop_back();
+      CustomDelimiter.pop_back();
       continue;
     }
     case '\\':
+      // We ignore invalid escape sequence here. They should be diagnosed in
+      // the real lexer functions.
       if (inStringLiteral() &&
           delimiterMatches(CustomDelimiter.back(), CurPtr, Diags)) {
-        char escapedChar = *CurPtr++;
-        switch (escapedChar) {
+        switch (*CurPtr++) {
         case '(':
           // Entering a recursive interpolated expression
           OpenDelimiters.push_back('(');
           continue;
-        case '\n': case '\r':
-          if (AllowNewline.back())
-            continue;
-          LLVM_FALLTHROUGH;
-        case 0:
-          // Don't jump over newline/EOF due to preceding backslash!
-          return CurPtr-1;
+        case '\n': case '\r': case 0:
+          // Don't jump over newline/EOF due to preceding backslash.
+          // Let the outer switch to handle it.
+          --CurPtr;
+          continue;
         default:
           continue;
         }
       }
       continue;
-        
+
     // Paren nesting deeper to support "foo = \((a+b)-(c*d)) bar".
     case '(':
       if (!inStringLiteral()) {
