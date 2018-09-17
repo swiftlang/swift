@@ -217,6 +217,18 @@ func _adjointMatmul<Scalar : Numeric>(
   return (matmul(bcSeed, right.transposed()), matmul(left.transposed(), bcSeed))
 }
 
+// TODO: We have to define a custom adjoint on • because AD can't yet
+// differentiate generic methods. After AD can differentiate generic methods,
+// remove the custom adjoint.
+extension Tensor where Scalar : Numeric {
+  @inlinable
+  static func _adjointMatmulOperator(lhs: Tensor, rhs: Tensor,
+                                     originalValue: Tensor, seed: Tensor)
+      -> (Tensor, Tensor) {
+    return _adjointMatmul(lhs, rhs, originalValue: originalValue, seed: seed)
+  }
+}
+
 extension Tensor {
   @inlinable
   func _adjointTransposed(
