@@ -1444,6 +1444,11 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         continue;
       // Will be diagnosed as an unterminated string literal.
       return CurPtr-1;
+    case 0:
+      if (CurPtr-1 != EndPtr)
+        continue; // CC token or random NUL character.
+      // Will be diagnosed as an unterminated string literal.
+      return CurPtr-1;
 
     case '#':
       if (inStringLiteral() ||
@@ -1507,15 +1512,6 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         default:
           continue;
         }
-      }
-      continue;
-    case 0:
-      // If we hit EOF, we fail.
-      if (CurPtr-1 == EndPtr) {
-        if (Diags)
-          Diags->diagnose(Lexer::getSourceLoc(CurPtr-1),
-                          diag::lex_unterminated_string);
-        return CurPtr-1;
       }
       continue;
         
