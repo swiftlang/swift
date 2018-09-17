@@ -72,6 +72,8 @@ Swift 5.0
 Swift 4.2
 ---------
 
+### 2018-09-17 (Xcode 10.0)
+
 * [SE-0194][]
 
   The new CaseIterable protocol describes types which have a static
@@ -276,8 +278,6 @@ Swift 4.2
   a dynamic cast such as `value as? P`, where the dynamic type of `value`
   conditionally conforms to `P`, will succeed when the conditional
   requirements are met.
-
-**Add new entries to the top of this section, not here!**
 
 Swift 4.1
 ---------
