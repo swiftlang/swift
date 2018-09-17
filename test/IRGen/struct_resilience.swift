@@ -97,7 +97,7 @@ public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned My
 // CHECK: bitcast
 // CHECK: llvm.lifetime.start
 // CHECK: bitcast
-// CHECK: [[COPY:%.*]] = bitcast %T17struct_resilience6MySizeV* %4 to i8*
+// CHECK: [[COPY:%.*]] = bitcast %T17struct_resilience6MySizeV* %5 to i8*
 // CHECK: [[ARG:%.*]] = bitcast %T17struct_resilience6MySizeV* %1 to i8*
 // CHECK: call void @llvm.memcpy{{.*}}(i8* align {{4|8}} [[COPY]], i8* align {{4|8}} [[ARG]], {{i32 8|i64 16}}, i1 false)
 // CHECK: [[FN:%.*]] = bitcast i8* %2

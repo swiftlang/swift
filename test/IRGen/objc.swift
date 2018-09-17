@@ -91,7 +91,7 @@ func test1(_ cell: Blammo) {}
 // CHECK-NEXT:    entry
 // CHECK-NEXT:    alloca
 // CHECK-NEXT:    bitcast
-// CHECK-NEXT:    store
+// CHECK-NEXT:    memset
 // CHECK-NEXT:    store
 // CHECK-NEXT:    ret void
 

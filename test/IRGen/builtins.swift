@@ -748,6 +748,7 @@ func unsafeGuaranteed_test(_ x: Builtin.NativeObject) -> Builtin.NativeObject {
 // CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteedEnd_test
 // CHECK-NEXT: {{.*}}:
 // CHECK-NEXT: alloca
+// CHECK-NEXT: memset
 // CHECK-NEXT: store
 // CHECK-NEXT: ret void
 func unsafeGuaranteedEnd_test(_ x: Builtin.Int8) {
