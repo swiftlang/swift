@@ -615,91 +615,129 @@ void SILCombiner::replaceWitnessMethodInst(
     eraseInstFromFunction(*WMI);
 }
 
-//  This function propagates concrete type of existential self argument using
+//  This function determines concrete type of existential self argument using
 //  ProtocolConformanceAnalysis. The concrete type of self can be a class,
 //  struct, or an enum. It replaces the witness_method instruction
 //  with one that has a concrete type, allowing other optimizations to
 //  devirtualize it later.
-SILInstruction *
-SILCombiner::propagateSoleConformingType(FullApplySite Apply,
-                                         WitnessMethodInst *WMI) {
-  // If WMI has concrete conformance, it can be optimized.
-  if (WMI->getConformance().isConcrete())
-    return nullptr;
+Optional<ConcreteExistentialInfo>
+SILCombiner::buildConcreteExistentialInfoFromSoleConformingType(
+    Operand &ArgOperand) {
+  SILInstruction *AI = ArgOperand.getUser();
+  SILModule &M = AI->getModule();
 
-  // If the lookup type is an opened existential type,
-  // it cannot be made concrete.
-  if (!WMI->getLookupType()->isOpenedExistential())
-    return nullptr;
+  // SoleConformingType is only applicable in whole-module compilation.
+  if (!M.isWholeModule())
+    return None;
 
-  // If the witness method mutates self, we cannot replace self.
-  if (Apply.getOrigCalleeType()->getSelfParameter().isIndirectMutating())
-    return nullptr;
+  // Determine the protocol.
+  ProtocolDecl *PD = nullptr;
+  WitnessMethodInst *WMI = nullptr;
+  FullApplySite FAS = FullApplySite::isa(AI);
+  if (FAS && (WMI = dyn_cast<WitnessMethodInst>(FAS.getCallee())) &&
+      (FAS.getSelfArgumentOperand().get()  == ArgOperand.get())) {
+    // If the witness method mutates self, we cannot replace self.
+    if (FAS.getOrigCalleeType()->getSelfParameter().isIndirectMutating())
+      return None;
+    PD = WMI->getLookupProtocol();
+  } else {
+    auto ArgType = ArgOperand.get()->getType();
+    auto SwiftArgType = ArgType.getASTType();
+    if (!ArgType.isExistentialType() || ArgType.isAnyObject() ||
+        SwiftArgType->isAny())
+      return None;
+    PD = dyn_cast<ProtocolDecl>(SwiftArgType->getAnyNominal());
+  }
 
-  // Only applicable in whole-module compilation.
-  if (!Apply.getModule().isWholeModule())
-    return nullptr;
-
-  auto *PD = WMI->getLookupProtocol();
+  if (!PD)
+    return None;
 
   // Determine the sole conforming type.
   auto *NTD = PCA->findSoleConformingType(PD);
   if (!NTD)
-    return nullptr;
+    return None;
 
   // Sole conforming class should not be open access or have any derived class.
   ClassDecl *CD;
   if ((CD = dyn_cast<ClassDecl>(NTD)) &&
       (CD->getEffectiveAccess() == AccessLevel::Open ||
        CHA->hasKnownDirectSubclasses(CD))) {
-    return nullptr;
+    return None;
   }
 
   // Create SIL type for the concrete type.
   auto ElementType = NTD->getDeclaredType();
   auto ConcreteType = ElementType->getCanonicalType();
-  auto &M = Builder.getModule();
 
   /// Determine OpenedArchetypeDef and SubstituionMap.
-  ConcreteExistentialInfo CEI(Apply.getSelfArgumentOperand(), ConcreteType, PD);
-  if (!CEI.isValid())
-    return nullptr;
+  ConcreteExistentialInfo SoleCEI(ArgOperand, ConcreteType, PD);
+  if (!SoleCEI.isValid())
+    return None;
 
-  if (!CEI.InitExistential) {
+  /// Determine the CEI.ConcreteValue.
+  if (!SoleCEI.InitExistential) {
     // Create SIL type for the concrete type.
     SILType ConcreteSILType = M.Types.getLoweredType(ConcreteType);
 
     // Prepare the code by adding UncheckedCast instructions that cast opened
     // existentials to concrete types. Set the ConcreteValue of CEI.
-    if (auto *OER = dyn_cast<OpenExistentialRefInst>(CEI.OpenedArchetypeDef)) {
+    if (auto *OER =
+            dyn_cast<OpenExistentialRefInst>(SoleCEI.OpenedArchetypeDef)) {
       auto *URCI =
           Builder.createUncheckedRefCast(OER->getLoc(), OER, ConcreteSILType);
-      CEI.ConcreteValue = URCI;
-    } else if (auto *OEA =
-                   dyn_cast<OpenExistentialAddrInst>(CEI.OpenedArchetypeDef)) {
+      SoleCEI.ConcreteValue = URCI;
+    } else if (auto *OEA = dyn_cast<OpenExistentialAddrInst>(
+                   SoleCEI.OpenedArchetypeDef)) {
       auto *UACI = Builder.createUncheckedAddrCast(
           OEA->getLoc(), OEA, ConcreteSILType.getAddressType());
-      CEI.ConcreteValue = UACI;
+      SoleCEI.ConcreteValue = UACI;
     } else {
-      llvm_unreachable(
-          "Unhandled Argument Type in propagateSoleConformingType");
+      return None;
     }
   }
+  return SoleCEI;
+}
+// This function builds a ConcreteExistentialInfo by first following the data
+// flow chain from the ArgOperand. Otherwise, we check if the operand is of
+// protocol type that conforms to a single concrete type.
+Optional<ConcreteExistentialInfo>
+SILCombiner::buildConcreteExistentialInfo(Operand &ArgOperand) {
+  // Build a ConcreteExistentialInfo usfollowing the data flow chain of the
+  // ArgOperand until the init_existential.
+  ConcreteExistentialInfo CEI(ArgOperand);
+  if (CEI.isValid())
+    return CEI;
+  // Use SoleConformingType information.
+  return buildConcreteExistentialInfoFromSoleConformingType(ArgOperand);
+}
 
-  assert(CEI.ConcreteValue);
+// Build ConcreteExistentialInfo for every existential argument of an Apply
+// instruction including Self.
+void SILCombiner::buildConcreteExistentialInfos(
+    FullApplySite Apply,
+    llvm::SmallDenseMap<unsigned, ConcreteExistentialInfo> &CEIs,
+    SILBuilderContext &BuilderCtx,
+    SILOpenedArchetypesTracker &OpenedArchetypesTracker) {
+  for (unsigned ArgIdx = 0; ArgIdx < Apply.getNumArguments(); ArgIdx++) {
+    auto ArgASTType = Apply.getArgument(ArgIdx)->getType().getASTType();
+    if (!ArgASTType->hasArchetype())
+      continue;
 
-  /// Replace the old WitnessMethod with a new one that has concrete type and
-  /// conformance.
-  SILBuilderContext BuilderCtx(M, Builder.getTrackingList());
-  replaceWitnessMethodInst(WMI, BuilderCtx, ConcreteType,
-                           *(CEI.ExistentialSubs.getConformances().begin()));
-  // Construct the map for Self to be used for createApplyWithConcreteType.
-  llvm::SmallDenseMap<unsigned, ConcreteExistentialInfo> CEIs;
-  CEIs.insert(std::pair<unsigned, ConcreteExistentialInfo>(
-      Apply.getCalleeArgIndex(Apply.getSelfArgumentOperand()), CEI));
-  /// Create the new apply instruction using the concrete type.
-  auto *NewAI = createApplyWithConcreteType(Apply, CEIs, BuilderCtx);
-  return NewAI;
+    auto OptionalCEI =
+        buildConcreteExistentialInfo(Apply.getArgumentOperands()[ArgIdx]);
+    if (!OptionalCEI.hasValue())
+      continue;
+    auto CEI = OptionalCEI.getValue();
+    assert(CEI.isValid());
+    CEIs.try_emplace(ArgIdx, CEI);
+
+    if (CEI.ConcreteType->isOpenedExistential()) {
+      // Temporarily record this opened existential def in this local
+      // BuilderContext before rewriting the witness method.
+      OpenedArchetypesTracker.addOpenedArchetypeDef(
+          cast<ArchetypeType>(CEI.ConcreteType), CEI.ConcreteTypeDef);
+    }
+  }
 }
 
 /// Given an Apply and an argument value produced by InitExistentialAddrInst,
@@ -933,26 +971,35 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   if (!WMI->getLookupType()->isOpenedExistential())
     return nullptr;
 
-  // Try to derive the concrete type of self and the related conformance by
-  // searching for a preceding init_existential.
-  const ConcreteExistentialInfo CEI(Apply.getSelfArgumentOperand());
-  if (!CEI.isValid())
+  // Try to derive the concrete type and the related conformance of self and
+  // other existential arguments by searching either for a preceding
+  // init_existential or looking up sole conforming type.
+  SILBuilderContext BuilderCtx(Builder.getModule(), Builder.getTrackingList());
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(&Builder.getFunction());
+  BuilderCtx.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
+  llvm::SmallDenseMap<unsigned, ConcreteExistentialInfo> CEIs;
+  buildConcreteExistentialInfos(Apply, CEIs, BuilderCtx,
+                                OpenedArchetypesTracker);
+
+  // Bail, if no argument has a concrete existential to propagate.
+  if (CEIs.empty())
     return nullptr;
+  auto SelfCEIIt =
+      CEIs.find(Apply.getCalleeArgIndex(Apply.getSelfArgumentOperand()));
+
+  // If no SelfCEI is found, then just update the Apply with new CEIs for
+  // other arguments.
+  if (SelfCEIIt == CEIs.end())
+    return createApplyWithConcreteType(Apply, CEIs, BuilderCtx);
+
+  auto &SelfCEI = SelfCEIIt->second;
+  assert(SelfCEI.isValid());
 
   // Get the conformance of the init_existential type, which is passed as the
   // self argument, on the witness' protocol.
   ProtocolConformanceRef SelfConformance =
-      *CEI.lookupExistentialConformance(WMI->getLookupProtocol());
+      *SelfCEI.lookupExistentialConformance(WMI->getLookupProtocol());
 
-  SILBuilderContext BuilderCtx(Builder.getModule(), Builder.getTrackingList());
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(&Builder.getFunction());
-  BuilderCtx.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  if (CEI.ConcreteType->isOpenedExistential()) {
-    // Temporarily record this opened existential def in this local
-    // BuilderContext before rewriting the witness method.
-    OpenedArchetypesTracker.addOpenedArchetypeDef(
-        cast<ArchetypeType>(CEI.ConcreteType), CEI.ConcreteTypeDef);
-  }
   // Propagate the concrete type into a callee-operand, which is a
   // witness_method instruction. It's ok to rewrite the witness method in terms
   // of a concrete type without rewriting the apply itself. In fact, doing so
@@ -966,15 +1013,12 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   // are stuck:
   // We will re-create the same instruction and re-populate the worklist
   // with it.
-  if (CEI.ConcreteType != WMI->getLookupType() ||
+  if (SelfCEI.ConcreteType != WMI->getLookupType() ||
       SelfConformance != WMI->getConformance()) {
-    replaceWitnessMethodInst(WMI, BuilderCtx, CEI.ConcreteType,
+    replaceWitnessMethodInst(WMI, BuilderCtx, SelfCEI.ConcreteType,
                              SelfConformance);
   }
-  // Construct the map for Self to be used for createApplyWithConcreteType.
-  llvm::SmallDenseMap<unsigned, ConcreteExistentialInfo> CEIs;
-  CEIs.insert(std::pair<unsigned, ConcreteExistentialInfo>(
-      Apply.getCalleeArgIndex(Apply.getSelfArgumentOperand()), CEI));
+
   // Try to rewrite the apply.
   return createApplyWithConcreteType(Apply, CEIs, BuilderCtx);
 }
@@ -995,27 +1039,16 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply) {
   if (!Apply.hasSubstitutions())
     return nullptr;
 
+  // Try to derive the concrete type and the related conformance of self and
+  // other existential arguments by searching either for a preceding
+  // init_existential or looking up sole conforming type.
+  llvm::SmallDenseMap<unsigned, ConcreteExistentialInfo> CEIs;
   SILBuilderContext BuilderCtx(Builder.getModule(), Builder.getTrackingList());
   SILOpenedArchetypesTracker OpenedArchetypesTracker(&Builder.getFunction());
   BuilderCtx.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  llvm::SmallDenseMap<unsigned, ConcreteExistentialInfo> CEIs;
-  for (unsigned ArgIdx = 0; ArgIdx < Apply.getNumArguments(); ArgIdx++) {
-    auto ArgASTType = Apply.getArgument(ArgIdx)->getType().getASTType();
-    if (!ArgASTType->hasArchetype())
-      continue;
-    const ConcreteExistentialInfo CEI(Apply.getArgumentOperands()[ArgIdx]);
-    if (!CEI.isValid())
-      continue;
+  buildConcreteExistentialInfos(Apply, CEIs, BuilderCtx,
+                                OpenedArchetypesTracker);
 
-    CEIs.insert(std::pair<unsigned, ConcreteExistentialInfo>(ArgIdx, CEI));
-
-    if (CEI.ConcreteType->isOpenedExistential()) {
-      // Temporarily record this opened existential def in this local
-      // BuilderContext before rewriting the witness method.
-      OpenedArchetypesTracker.addOpenedArchetypeDef(
-          cast<ArchetypeType>(CEI.ConcreteType), CEI.ConcreteTypeDef);
-    }
-  }
   // Bail, if no argument has a concrete existential to propagate.
   if (CEIs.empty())
     return nullptr;
@@ -1241,13 +1274,9 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
   if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
-    if (!propagateConcreteTypeOfInitExistential(AI, WMI)) {
-      if (auto *WitnessMethod = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
-        // Propagate concrete type from ProtocolConformanceAnalysis.
-        propagateSoleConformingType(AI, WitnessMethod);
-      }
+    if (propagateConcreteTypeOfInitExistential(AI, WMI)) {
+      return nullptr;
     }
-    return nullptr;
   }
 
   // (apply (function_ref method_from_protocol_extension)) ->
@@ -1368,13 +1397,9 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
   if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
-    if (!propagateConcreteTypeOfInitExistential(AI, WMI)) {
-      if (auto *WitnessMethod = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
-        // Propagate concrete type from ProtocolConformanceAnalysis.
-        propagateSoleConformingType(AI, WitnessMethod);
-      }
+    if (propagateConcreteTypeOfInitExistential(AI, WMI)) {
+      return nullptr;
     }
-    return nullptr;
   }
 
   // (apply (function_ref method_from_protocol_extension)) ->
