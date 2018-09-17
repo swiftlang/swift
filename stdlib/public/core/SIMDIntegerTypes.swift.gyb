@@ -16,7 +16,7 @@ public extension ${Element} {
 %    LLVM = 'Vec' + str(llvmN) + 'xInt' + str(bits)
 %    Self = 'Vector' + str(N)
   @_fixed_layout
-  struct Vector${N} : SIMDIntegerVector, SIMDVector${N} {
+  struct ${Self} : SIMDIntegerVector, SIMDVector${N} {
 
     public var _value: Builtin.${LLVM}
 
@@ -50,7 +50,7 @@ public extension ${Element} {
 
     public typealias Predicate = SIMDPredicate${bits}x${N}
 
-%   sext = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + LLVM
+%    sext = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + LLVM
     @_transparent
     public static func ==(lhs: ${Self}, rhs: ${Self}) -> Predicate {
       return Predicate(Int${bits}.Vector${N}(${sext}(

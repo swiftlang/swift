@@ -1,0 +1,136 @@
+%{
+eltsizes = [32,64]
+counts = [2,3,4,8,16]
+}%
+
+%for bits in eltsizes:
+% Element = {32:'Float', 64:'Double'}[bits]
+public extension ${Element} {
+% for N in counts:
+%  # In theory, LLVM should handle padding 3-element vectors out to 4-element
+%  # for us. And it does, but we end up triggering asserts for some operations,
+%  # so it ends up being simpler to pad at the Swift level instead.
+%  llvmN = N if N != 3 else 4
+%  if bits*llvmN <= 512:
+%   LLVM = 'Vec' + str(llvmN) + 'xFPIEEE' + str(bits)
+%   Self = 'Vector' + str(N)
+%   BitPattern = 'Int' + str(bits) + '.Vector' + str(N)
+  @_fixed_layout
+  struct ${Self} : SIMDFloatingPointVector, SIMDVector${N} {
+
+    public var _value: Builtin.${LLVM}
+
+    @_transparent
+    public init(_ _value: Builtin.${LLVM}) {
+      self._value = _value
+    }
+
+    // Conformance to SIMDVector ---------------------------------------------
+    @_transparent
+    public init( ) {
+      self._value = Builtin.zeroInitializer()
+    }
+
+    public subscript(index: Int) -> ${Element} {
+      @_transparent
+      get {
+        _precondition(index >= 0 && index < ${N})
+        return ${Element}(Builtin.extractelement_${LLVM}_Int32(
+          _value, Int32(index)._value
+        ))
+      }
+      @_transparent
+      set {
+        _precondition(index >= 0 && index < ${N})
+        _value = Builtin.insertelement_${LLVM}_FPIEEE${bits}_Int32(
+          _value, newValue._value, Int32(index)._value
+        )
+      }
+    }
+
+    public typealias Predicate = SIMDPredicate${bits}x${N}
+
+%   bitPatternLLVM = 'Vec' + str(llvmN) + 'xInt' + str(bits)
+%   sext = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + bitPatternLLVM
+    @_transparent
+    public static func ==(lhs: ${Self}, rhs: ${Self}) -> Predicate {
+      return Predicate(Int${bits}.Vector${N}(${sext}(
+        Builtin.fcmp_oeq_${LLVM}(lhs._value, rhs._value))))
+    }
+
+    // Conformance to SIMDVector${N} -----------------------------------------
+%   if N >= 4:
+    public typealias HalfVector = Vector${N/2}
+%   end
+
+    // Conformance to SIMDFloatingPointVector --------------------------------
+%   BitPatternLLVM = 'Vec' + str(llvmN) + 'xInt' + str(bits)
+    @_transparent
+    public var bitPattern: ${BitPattern} {
+      return ${BitPattern}(Builtin.bitcast_${LLVM}_${bitPatternLLVM}(self._value))
+    }
+
+    @_transparent
+    public init(bitPattern: ${BitPattern}) {
+      _value = Builtin.bitcast_${bitPatternLLVM}_${LLVM}(bitPattern._value)
+    }
+
+%   for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
+    @_transparent
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Predicate {
+      return Predicate(Int${bits}.Vector${N}(${sext}(
+        Builtin.fcmp_o${inst}_${LLVM}(lhs._value, rhs._value)
+      )))
+    }
+
+%   end
+    // MARK: Arithmetic operators
+%   for (op, inst) in [('+','add'), ('-','sub'), ('*','mul'), ('/','div')]:
+    @_transparent
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      return ${Self}(Builtin.f${inst}_${LLVM}(lhs._value, rhs._value))
+    }
+
+%   end
+    @_transparent
+    public func addingProduct(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
+      return ${Self}(Builtin.int_fma_${LLVM}(lhs._value, rhs._value, _value))
+    }
+
+    @_transparent
+    public mutating func round(_ rule: FloatingPointRoundingRule) {
+      switch rule {
+      case .toNearestOrAwayFromZero:
+        _value = Builtin.int_round_${LLVM}(_value)
+      case .toNearestOrEven:
+        _value = Builtin.int_rint_${LLVM}(_value)
+      case .towardZero:
+        _value = Builtin.int_trunc_${LLVM}(_value)
+      case .awayFromZero:
+        let roundedUp = ${Self}(Builtin.int_ceil_${LLVM}(_value))
+        let roundedDown = ${Self}(Builtin.int_floor_${LLVM}(_value))
+        self = roundedUp.replacing(with: roundedDown, where: self < 0)
+      case .up:
+        _value = Builtin.int_ceil_${LLVM}(_value)
+      case .down:
+        _value = Builtin.int_floor_${LLVM}(_value)
+      @unknown default:
+        self._roundSlowPath(rule)
+      }
+    }
+
+    // Slow path for new cases that might have been inlined into an old
+    // ABI-stable version of round(_:) called from a newer version. If this is
+    // the case, this non-inlinable function will call into the _newer_ version
+    // which _will_ support this rounding rule.
+    @usableFromInline
+    internal mutating func _roundSlowPath(_ rule: FloatingPointRoundingRule) {
+      self.round(rule)
+    }
+  }
+
+%  end
+% end
+}
+
+%end

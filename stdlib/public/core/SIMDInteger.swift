@@ -1,5 +1,5 @@
 public protocol SIMDIntegerVector : SIMDVector
-                              where Element: FixedWidthInteger {
+                    where Element : FixedWidthInteger {
   
   /// Creates a bitmask vector from `predicate`.
   ///
@@ -69,83 +69,83 @@ public extension SIMDIntegerVector {
   // MARK: Comparison with any BinaryInteger scalar, handling cases where
   // the scalar is outside the range of representable values for the vector
   // element type correctly, as with heterogeneous scalar integer comparisons.
-  @_transparent
-  static func == <Other>(lhs: Self, rhs: Other) -> Predicate
-    where Other : BinaryInteger {
-      guard rhs >= Element.min else { return Predicate(repeating: false) }
-      guard rhs <= Element.max else { return Predicate(repeating: false) }
-      return lhs == Self(repeating: Self.Element(truncatingIfNeeded: rhs))
+  @inlinable
+  static func == <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  where Scalar : BinaryInteger {
+    guard rhs >= Element.min else { return Predicate(repeating: false) }
+    guard rhs <= Element.max else { return Predicate(repeating: false) }
+    return lhs == Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
-  @_transparent
-  static func != <Other>(lhs: Self, rhs: Other) -> Predicate
-    where Other : BinaryInteger {
-      guard rhs >= Element.min else { return Predicate(repeating: true) }
-      guard rhs <= Element.max else { return Predicate(repeating: true) }
-      return lhs != Self(repeating: Self.Element(truncatingIfNeeded: rhs))
+  @inlinable
+  static func != <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  where Scalar : BinaryInteger {
+    guard rhs >= Element.min else { return Predicate(repeating: true) }
+    guard rhs <= Element.max else { return Predicate(repeating: true) }
+    return lhs != Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
-  @_transparent
-  static func < <Other>(lhs: Self, rhs: Other) -> Predicate
-  where Other : BinaryInteger {
+  @inlinable
+  static func < <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  where Scalar : BinaryInteger {
     guard rhs >= Element.min else { return Predicate(repeating: false) }
     guard rhs <= Element.max else { return Predicate(repeating: true) }
     return lhs < Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
-  @_transparent
-  static func <= <Other>(lhs: Self, rhs: Other) -> Predicate
-  where Other : BinaryInteger {
+  @inlinable
+  static func <= <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  where Scalar : BinaryInteger {
     guard rhs >= Element.min else { return Predicate(repeating: false) }
     guard rhs <= Element.max else { return Predicate(repeating: true) }
     return lhs <= Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
-  @_transparent
-  static func > <Other>(lhs: Self, rhs: Other) -> Predicate
-  where Other : BinaryInteger {
+  @inlinable
+  static func > <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  where Scalar : BinaryInteger {
     return !(lhs <= rhs)
   }
   
-  @_transparent
-  static func >= <Other>(lhs: Self, rhs: Other) -> Predicate
-  where Other : BinaryInteger {
+  @inlinable
+  static func >= <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  where Scalar : BinaryInteger {
     return !(lhs < rhs)
   }
   
-  @_transparent
-  static func == <Other>(lhs: Other, rhs: Self) -> Predicate
-  where Other : BinaryInteger {
+  @inlinable
+  static func == <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  where Scalar : BinaryInteger {
     return rhs == lhs
   }
   
-  @_transparent
-  static func != <Other>(lhs: Other, rhs: Self) -> Predicate
-  where Other : BinaryInteger {
+  @inlinable
+  static func != <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  where Scalar : BinaryInteger {
     return rhs != lhs
   }
   
-  @_transparent
-  static func < <Other>(lhs: Other, rhs: Self) -> Predicate
-  where Other : BinaryInteger {
+  @inlinable
+  static func < <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  where Scalar : BinaryInteger {
     return rhs > lhs
   }
   
-  @_transparent
-  static func <= <Other>(lhs: Other, rhs: Self) -> Predicate
-  where Other : BinaryInteger {
+  @inlinable
+  static func <= <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  where Scalar : BinaryInteger {
     return rhs >= lhs
   }
   
-  @_transparent
-  static func > <Other>(lhs: Other, rhs: Self) -> Predicate
-  where Other : BinaryInteger {
+  @inlinable
+  static func > <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  where Scalar : BinaryInteger {
     return rhs < lhs
   }
   
-  @_transparent
-  static func >= <Other>(lhs: Other, rhs: Self) -> Predicate
-  where Other : BinaryInteger {
+  @inlinable
+  static func >= <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  where Scalar : BinaryInteger {
     return rhs <= rhs
   }
   
