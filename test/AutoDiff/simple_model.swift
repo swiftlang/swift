@@ -3,7 +3,7 @@
 
 import StdlibUnittest
 
-var SimpleAggregateTests = TestSuite("SimpleAggregate")
+var SimpleModelTests = TestSuite("SimpleModel")
 
 struct DenseLayer : Equatable {
   let w: Float
@@ -37,7 +37,7 @@ extension Model {
   }
 }
 
-SimpleAggregateTests.test("gradient") {
+SimpleModelTests.test("gradient") {
   let layer = DenseLayer(w: 1.0, b: 0.0)
   let model = Model(l1: layer, l2: layer, l3: layer)
   let input: Float = 1
