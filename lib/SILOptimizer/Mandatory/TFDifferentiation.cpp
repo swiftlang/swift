@@ -2894,10 +2894,18 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
   SmallVector<SILResultInfo, 8> adjResults;
   auto origTy = original->getLoweredFunctionType();
   auto origParams = origTy->getParameters();
-  for (auto &param : origParams)
+  assert((!origTy->hasSelfParam() ||
+          origParams.back() == origTy->getSelfParameter()) &&
+         "self argument should be the last one");
+  auto origParamsWithoutSelf = origTy->hasSelfParam() ?
+      origParams.slice(0, origParams.size() - 1) : origParams;
+
+  // Add adjoint parameters for the original non-self parameters. If there is a
+  // self parameter, we'll push it later as the last adjoint parameter, because
+  // Swift's method convention always has self last.
+  for (auto &param : origParamsWithoutSelf)
     adjParams.push_back(param);
-  for (auto i : task->getIndices().parameters.set_bits())
-    adjResults.push_back(getFormalResultInfo(origParams[i].getType(), module));
+
   // If there's a generated primal, accept a primal value struct in the adjoint
   // parameter list.
   if (auto *pi = task->getPrimalInfo()) {
@@ -2906,12 +2914,33 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
                       ->getCanonicalType();
     adjParams.push_back(getFormalParameterInfo(pvType, module));
   }
-  // Add parameter types.
+
+  // Add adjoint parameters for the original results.
   for (auto &origRes : origTy->getResults())
     adjParams.push_back(getFormalParameterInfo(origRes.getType(), module));
-  // Add seed type.
+
+  // Add adjoint parameter for the seed.
   adjParams.push_back(getFormalParameterInfo(
       origTy->getResults()[task->getIndices().source].getType(), module));
+
+  // Add adjoint parameter for the original self parameter, if applicable.
+  if (origTy->hasSelfParam())
+    adjParams.push_back(origTy->getSelfParameter());
+
+  // Add adjoint result for the wrt self parameter, if it was requested.
+  auto selfParamIndex = origParams.size() - 1;
+  if (origTy->hasSelfParam() &&
+      task->getIndices().isWrtParameter(selfParamIndex))
+    adjResults.push_back(getFormalResultInfo(
+        origParams[selfParamIndex].getType(), module));
+
+  // Add adjoint results for the requested non-self wrt parameters.
+  for (auto i : task->getIndices().parameters.set_bits()) {
+    if (origTy->hasSelfParam() && i == selfParamIndex)
+      continue;
+    adjResults.push_back(getFormalResultInfo(origParams[i].getType(), module));
+  }
+
   auto adjName = "AD__" + original->getName().str() + "__adjoint_" +
                  mangleADIndices(task->getIndices());
   auto adjType = SILFunctionType::get(
@@ -3186,8 +3215,12 @@ private:
   /// blocks.
   DenseMap<SILBasicBlock *, SILBasicBlock *> adjointBBMap;
 
-  /// The range of original parameters in the adjoint function.
-  ArrayRef<SILArgument *> originalParametersInAdj;
+  /// Original parameters passed to the adjoint function, in the same order as
+  /// they appear in the adjoint function. Note that these parameters are not
+  /// necessarily contiguous in the adjoint function signature because the
+  /// non-self original parameters are at the beginning and the self parameter
+  /// (if any) is at the end.
+  SmallVector<SILArgument *, 8> originalParametersInAdj;
 
   /// The primal value aggregate passed to the adjoint function.
   SILArgument *primalValueAggregateInAdj = nullptr;
@@ -3312,18 +3345,32 @@ public:
     // `originalResults` and `seed`.
     auto adjParamArgs = getAdjoint().getArgumentsWithoutIndirectResults();
     auto origNumParams = origConv.getNumParameters();
+    auto origNumParamsWithoutSelf = origTy->hasSelfParam() ? origNumParams - 1
+                                                           : origNumParams;
     auto origNumResults = origTy->getNumResults();
     // The adjoint function has type
-    //   (arg0, ..., argn, pv0, ..., pvn, origres, seed) -> (arg0, ..., argn).
+    //   (arg0, ..., argn, pv0, ..., pvn, origres, seed, [self])
+    //       -> ([self], [arg0], ..., [argn]).
+    // Square brackets denote [] elements that are not always in the signature:
+    //   * "self" is present in the argument list when it's present in the
+    //      original's argument list.
+    //   * Results are present when the adjoint is with respect to the
+    //     corresponding original argument.
+    //
     // We get each range of arguments by shifting the `paramArgsData` pointer.
     auto *paramArgsData = adjParamArgs.data();
-    originalParametersInAdj = {paramArgsData, origNumParams};
-    paramArgsData += origNumParams;
+    originalParametersInAdj.reserve(origNumParams);
+    for (auto i : range(origNumParamsWithoutSelf)) {
+      (void)i;
+      originalParametersInAdj.push_back(*paramArgsData++);
+    }
     primalValueAggregateInAdj = *paramArgsData++;
     originalResultsInAdj = {paramArgsData, origNumResults};
     paramArgsData += origNumResults;
-    seed = *paramArgsData;
-    assert(seed == adjParamArgs.back());
+    seed = *paramArgsData++;
+    if (origTy->hasSelfParam())
+      originalParametersInAdj.push_back(*paramArgsData++);
+    assert(paramArgsData == adjParamArgs.data() + adjParamArgs.size());
 
     // Map the original's parameters to the adjoint's corresponding "original
     // parameters".
@@ -3363,16 +3410,36 @@ public:
     // there.
     getBuilder().setInsertionPoint(adjointEntry);
 
+    // This vector will contain all the materialized return elements.
     SmallVector<SILValue, 8> retElts;
-    auto origParamArgs = original.getArgumentsWithoutIndirectResults();
-    for (auto i : task->getIndices().parameters.set_bits()) {
-      auto origParam = origParamArgs[i];
-      auto adjParam = originalParametersInAdj[i];
+    auto origParams = original.getArgumentsWithoutIndirectResults();
+
+    // Materializes the return element corresponding to the parameter
+    // `parameterIndex` into the `retElts` vector.
+    auto addRetElt = [&](unsigned parameterIndex) -> void {
+      auto origParam = origParams[parameterIndex];
+      auto adjParam = originalParametersInAdj[parameterIndex];
       auto adjVal = getAdjointValue(origParam);
       if (adjParam->getType().isObject())
         retElts.push_back(materializeAdjointDirect(adjVal, adjLoc));
       else
         materializeAdjointIndirect(adjVal, adjParam);
+    };
+
+    // The original's self parameter, if present, is the last parameter. But we
+    // want its gradient, if present, to be the first return element.
+    auto selfParamIndex = origParams.size() - 1;
+    if (origTy->hasSelfParam() &&
+        task->getIndices().isWrtParameter(selfParamIndex))
+      addRetElt(selfParamIndex);
+
+    // Add the non-self parameters that are differentiated with respect to.
+    for (auto i : task->getIndices().parameters.set_bits()) {
+      // Do not add the self parameter because we have already added it at the
+      // beginning.
+      if (origTy->hasSelfParam() && i == selfParamIndex)
+        continue;
+      addRetElt(i);
     }
     getBuilder().createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
     return errorOccurred;
@@ -3524,10 +3591,19 @@ public:
       args.push_back(buf);
       allocsToCleanUp.push_back(buf);
     }
-    // For each original parameter, push the mapped parameter.
-    SILFunctionConventions origConv(origTy, getModule());
-    for (auto param : ai->getArgumentsWithoutIndirectResults())
+
+    // For each non-self original parameter, push the mapped parameter. If
+    // there is a self parameter, we'll push it later as the last argument,
+    // because Swift's method convention always has self last.
+    auto originalParams = ai->getArgumentsWithoutIndirectResults();
+    assert((!ai->hasSelfArgument() ||
+           originalParams.back() == ai->getSelfArgument()) &&
+           "self argument should be the last one");
+    auto originalParamsWithoutSelf = ai->hasSelfArgument() ?
+        originalParams.slice(0, originalParams.size() - 1) : originalParams;
+    for (auto param : originalParamsWithoutSelf)
       args.push_back(remapValue(param));
+
     // Add nested primal values.
     if (auto nestedPrimValAggr = extractPrimalValueIfAny(ai, /*nested*/ true)) {
       SmallVector<SILValue, 8> nestedPrimVals;
@@ -3555,6 +3631,11 @@ public:
           loc, access, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
       getBuilder().createEndAccess(loc, access, /*aborted*/ false);
     }
+
+    // Push the mapped self parameter, if any.
+    if (ai->hasSelfArgument())
+      args.push_back(remapValue(ai->getSelfArgument()));
+
     // Call the adjoint function.
     auto *adjointRef = getBuilder().createFunctionRef(ai->getLoc(), adjoint);
     auto origFnRef = ai->getCalleeOrigin();
@@ -3585,9 +3666,23 @@ public:
     // Set adjoints for all original parameters.
     auto origNumIndRes = origConvs.getNumIndirectSILResults();
     auto allResultsIt = allResults.begin();
-    for (unsigned i : otherTask->getIndices().parameters.set_bits())
-      addAdjointValue(ai->getArgument(i + origNumIndRes),
+    // If the applied adjoint returns the adjoint of the original self
+    // parameter, then it returns it first. Set the adjoint of the original
+    // self parameter.
+    auto selfParamIndex = originalParams.size() - 1;
+    if (ai->hasSelfArgument() &&
+        otherTask->getIndices().isWrtParameter(selfParamIndex))
+      addAdjointValue(ai->getArgument(origNumIndRes + selfParamIndex),
                       AdjointValue::getMaterialized(*allResultsIt++));
+    // Set adjoints for the remaining non-self original parameters.
+    for (unsigned i : otherTask->getIndices().parameters.set_bits()) {
+      // Do not set the adjoint of the original self parameter because we
+      // already added it at the beginning.
+      if (ai->hasSelfArgument() && i == selfParamIndex)
+        continue;
+      addAdjointValue(ai->getArgument(origNumIndRes + i),
+                      AdjointValue::getMaterialized(*allResultsIt++));
+    }
   }
 
   /// Handle `gradient` instruction.

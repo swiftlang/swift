@@ -725,18 +725,25 @@ static llvm::SmallBitVector getLoweredAutoDiffParameterIndices(
     const DifferentiableAttr *DA) {
   auto *fnTy =
     AFD->getInterfaceType()->getCanonicalType()->getAs<AnyFunctionType>();
-  auto silFnTy = SGM.getLoweredType(fnTy).castTo<SILFunctionType>();
-  llvm::SmallBitVector indices(silFnTy->getNumParameters());
-  // We don't diff wrt `self` unless it is explicitly specified, therefore
-  // dropping the last SIL parameter if it's a method.
+  // If the function has a self parameter, then its signature is
+  //   (Self) -> ...
+  // Strip off the (Self) parameter list so that indexing can index into the
+  // next parameter list.
   if (AFD->getImplicitSelfDecl())
     fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
-  // If no parameters are specified, add all parameter indices.
-  if (DA->getParameters().empty())
-    indices.set();
+
+  llvm::SmallBitVector indices(F->getLoweredFunctionType()->getNumParameters());
+  // If no parameters are specified, add all parameter indices except the self
+  // parameter.
+  if (DA->getParameters().empty()) {
+    if (F->hasSelfParam())
+      // 'self' is always the last SIL parameter.
+      indices.set(0, indices.size() - 1);
+    else
+      indices.set();
+  }
   // Otherwise, convert differentiation parameters.
   else {
-    bool hasSelf = false;
     for (auto param : DA->getParameters()) {
       switch (param.getKind()) {
       // Normal index maps directly to a SIL parameter index.
@@ -749,16 +756,13 @@ static llvm::SmallBitVector getLoweredAutoDiffParameterIndices(
           indices.set(paramIdxRange.front(), paramIdxRange.back());
         break;
       }
-      // 'self' is always the last SIL parameter.
       case AutoDiffParameter::Kind::Self:
         // Sema guarantees this case to occur at most once.
-        hasSelf = true;
+        // 'self' is always the last SIL parameter.
+        indices.set(indices.size() - 1);
         break;
       }
     }
-    // The last SIL parameter is `self`, if needed.
-    if (hasSelf)
-      indices.set(silFnTy->getNumParameters() - 1);
   }
   return indices;
 }
