@@ -26,4 +26,45 @@ TensorADTests.testAllBackends("TestSimpleGrad") {
   expectTrue(#gradient(square)([[10], [20]]) == [[20], [40]])
 }
 
+TensorADTests.testAllBackends("+") {
+  let grad = #gradient({ (a: Tensor<Float>, b: Tensor<Float>) in a + b })
+  expectTrue(([1], [1]) == grad([0], [0]))
+  expectTrue(([1], [1]) == grad([1], [10]))
+}
+
+TensorADTests.testAllBackends("-") {
+  let grad = #gradient({ (a: Tensor<Float>, b: Tensor<Float>) in a - b })
+  expectTrue(([1], [-1]) == grad([0], [0]))
+  expectTrue(([1], [-1]) == grad([1], [10]))
+}
+
+TensorADTests.testAllBackends("*") {
+  let grad = #gradient({ (a: Tensor<Float>, b: Tensor<Float>) in a * b })
+  expectTrue(([0], [0]) == grad([0], [0]))
+  expectTrue(([10], [1]) == grad([1], [10]))
+}
+
+TensorADTests.testAllBackends("/") {
+  let grad = #gradient({ (a: Tensor<Float>, b: Tensor<Float>) in a / b })
+  expectTrue(([0.1], [-0.01]) == grad([1], [10]))
+}
+
+TensorADTests.testAllBackends("matmul") {
+  let grad = #gradient({ (a: Tensor<Float>, b: Tensor<Float>) in matmul(a, b) })
+  expectTrue(([[0]], [[0]]) == grad([[0]], [[0]]))
+  expectTrue(([[10]], [[1]]) == grad([[1]], [[10]]))
+}
+
+TensorADTests.testAllBackends("•") {
+  let grad = #gradient({ (a: Tensor<Float>, b: Tensor<Float>) in a • b })
+  expectTrue(([[0]], [[0]]) == grad([[0]], [[0]]))
+  expectTrue(([[10]], [[1]]) == grad([[1]], [[10]]))
+}
+
+TensorADTests.testAllBackends("negate") {
+  let grad = #gradient({ (a: Tensor<Float>) in -a })
+  expectTrue([-1] == grad([0]))
+  expectTrue([-1] == grad([10]))
+}
+
 runAllTests()
