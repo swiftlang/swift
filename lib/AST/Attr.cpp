@@ -543,7 +543,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << "primal: " << primal->Name << ", ";
     // Print adjoint function name.
     if (auto adjoint = attr->getAdjoint())
-      Printer << "adjoint: " << adjoint->Name << ", ";
+      Printer << "adjoint: " << adjoint->Name;
     // FIXME: Print 'where' clause, if any.
     Printer << ")";
     break;
