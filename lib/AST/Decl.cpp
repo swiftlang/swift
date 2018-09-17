@@ -3027,7 +3027,11 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
         genericSig, [&](SubstitutableType *type) -> Type { return type; },
         MakeAbstractConformanceForGenericType());
 
-    auto sugaredType = NameAliasType::get(this, Type(), subs, underlying);
+    Type parent;
+    auto parentDC = getDeclContext();
+    if (parentDC->isTypeContext())
+      parent = parentDC->getDeclaredInterfaceType();
+    auto sugaredType = NameAliasType::get(this, parent, subs, underlying);
     setInterfaceType(MetatypeType::get(sugaredType, ctx));
   }
 }
