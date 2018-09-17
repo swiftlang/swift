@@ -46,8 +46,8 @@ Swift 5.0
 
   In Swift 5 mode, when casting an optional value to a generic placeholder type,
   the compiler will be more conservative with the unwrapping of the value. The 
-  result of such a cast now matches the result you would get in a non-generic
-  context.
+  result of such a cast now more closely matches the result you would get in a
+  non-generic context.
   
   For example:
   ```swift
