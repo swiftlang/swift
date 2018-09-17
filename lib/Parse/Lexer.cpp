@@ -1344,23 +1344,14 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     return CurPtr[-1];
 
   case 0:
-    if (CurPtr-1 != BufferEnd) {
-      if (EmitDiagnostics)
-        diagnose(CurPtr-1, diag::lex_nul_character);
-      return CurPtr[-1];
-    }
-    // Move the pointer back to EOF.
-    --CurPtr;
+    assert(CurPtr - 1 != BufferEnd && "Caller must handle EOF");
     if (EmitDiagnostics)
-      diagnose(CurPtr-1, diag::lex_unterminated_string);
-    return ~1U;
+      diagnose(CurPtr-1, diag::lex_nul_character);
+    return CurPtr[-1];
   case '\n':  // String literals cannot have \n or \r in them.
   case '\r':
-    if (IsMultilineString) // ... unless they are multiline
-      return CurPtr[-1];
-    if (EmitDiagnostics)
-      diagnose(CurPtr-1, diag::lex_unterminated_string);
-    return ~1U;
+    assert(IsMultilineString && "Caller must handle newlines in non-multiline");
+    return CurPtr[-1];
   case '\\':  // Escapes.
     if (!delimiterMatches(CustomDelimiterLen, CurPtr,
                           EmitDiagnostics ? Diags : nullptr))
