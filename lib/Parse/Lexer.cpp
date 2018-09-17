@@ -1749,32 +1749,30 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
   // diagnostics about changing them to double quotes.
   assert((QuoteChar == '"' || QuoteChar == '\'') && "Unexpected start");
 
-  bool wasErroneous = false, IsMultilineString = false;
-
-  // Is this the start of a multiline string literal?
-  if ((IsMultilineString = advanceIfMultilineDelimiter(CurPtr, Diags))) {
-    if (*CurPtr != '\n' && *CurPtr != '\r')
-      diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
+  bool IsMultilineString = advanceIfMultilineDelimiter(CurPtr, Diags);
+  if (IsMultilineString && *CurPtr != '\n' && *CurPtr != '\r')
+    diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
         .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");
-  }
 
+  bool wasErroneous = false;
   while (true) {
+    // Handle string interpolation.
     const char *TmpPtr = CurPtr + 1;
-    if (*CurPtr == '\\' && delimiterMatches(CustomDelimiterLen, TmpPtr, nullptr)
-        && *TmpPtr == '(') {
+    if (*CurPtr == '\\' &&
+        delimiterMatches(CustomDelimiterLen, TmpPtr, nullptr) &&
+        *TmpPtr++ == '(') {
       // Consume tokens until we hit the corresponding ')'.
-      CurPtr = TmpPtr + 1;
-      const char *EndPtr = skipToEndOfInterpolatedExpression(CurPtr, BufferEnd,
-                                                             IsMultilineString);
-
-      if (*EndPtr == ')') {
+      CurPtr = skipToEndOfInterpolatedExpression(TmpPtr, BufferEnd,
+                                                 IsMultilineString);
+      if (*CurPtr == ')') {
         // Successfully scanned the body of the expression literal.
-        CurPtr = EndPtr+1;
-      } else {
-        CurPtr = EndPtr;
-        wasErroneous = true;
+        ++CurPtr;
+        continue;
       }
-      continue;
+
+      // Being diagnosed below.
+      assert((*CurPtr == '\r' || *CurPtr == '\n' || CurPtr == BufferEnd) &&
+             "Returned at unexpected position");
     }
 
     // String literals cannot have \n or \r in them (unless multiline).
@@ -1786,59 +1784,57 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
 
     unsigned CharValue = lexCharacter(CurPtr, QuoteChar, true,
                                       IsMultilineString, CustomDelimiterLen);
+    // This is the end of string, we are done.
+    if (CharValue == ~0U)
+      break;
+
+    // Remember we had already-diagnosed invalid characters.
     wasErroneous |= CharValue == ~1U;
-
-    // If this is the end of string, we are done.  If it is a normal character
-    // or an already-diagnosed error, just munch it.
-    if (CharValue == ~0U) {
-
-      if (QuoteChar == '\'') {
-        // Emit diagnostics for single-quote string and suggest replacement
-        // with double-quoted equivalent.
-        assert(
-            !IsMultilineString && CustomDelimiterLen == 0 &&
-            "Single quoted string cannot have custom delimitor, nor multiline");
-        assert(*TokStart == '\'' && CurPtr[-1] == '\'');
-
-        StringRef orig(TokStart, CurPtr - TokStart);
-        llvm::SmallString<32> replacement;
-        replacement += '"';
-        std::string str = orig.slice(1, orig.size() - 1).str();
-        std::string quot = "\"";
-        size_t pos = 0;
-        while (pos != str.length()) {
-          if (str.at(pos) == '\\') {
-            if (str.at(pos + 1) == '\'') {
-                // Un-escape escaped single quotes.
-                str.replace(pos, 2, "'");
-                ++pos;
-            } else {
-                // Skip over escaped characters.
-                pos += 2;
-            }
-          } else if (str.at(pos) == '"') {
-            str.replace(pos, 1, "\\\"");
-            // Advance past the newly added ["\""].
-            pos += 2;
-          } else {
-            ++pos;
-          }
-        }
-        replacement += StringRef(str);
-        replacement += '"';
-        diagnose(TokStart, diag::lex_single_quote_string)
-          .fixItReplaceChars(getSourceLoc(TokStart), getSourceLoc(CurPtr),
-                             replacement);
-      }
-
-      // Is this the end of multiline/custom-delimited string literal?
-      if (wasErroneous)
-        return formToken(tok::unknown, TokStart);
-
-      return formStringLiteralToken(TokStart, IsMultilineString,
-                                    CustomDelimiterLen);
-    }
   }
+
+  if (QuoteChar == '\'') {
+    // Emit diagnostics for single-quote string and suggest replacement
+    // with double-quoted equivalent.
+    assert(!IsMultilineString && CustomDelimiterLen == 0 &&
+           "Single quoted string cannot have custom delimitor, nor multiline");
+    assert(*TokStart == '\'' && CurPtr[-1] == '\'');
+
+    StringRef orig(TokStart, CurPtr - TokStart);
+    llvm::SmallString<32> replacement;
+    replacement += '"';
+    std::string str = orig.slice(1, orig.size() - 1).str();
+    std::string quot = "\"";
+    size_t pos = 0;
+    while (pos != str.length()) {
+      if (str.at(pos) == '\\') {
+        if (str.at(pos + 1) == '\'') {
+          // Un-escape escaped single quotes.
+          str.replace(pos, 2, "'");
+          ++pos;
+        } else {
+          // Skip over escaped characters.
+          pos += 2;
+        }
+      } else if (str.at(pos) == '"') {
+        str.replace(pos, 1, "\\\"");
+        // Advance past the newly added ["\""].
+        pos += 2;
+      } else {
+        ++pos;
+      }
+    }
+    replacement += StringRef(str);
+    replacement += '"';
+    diagnose(TokStart, diag::lex_single_quote_string)
+        .fixItReplaceChars(getSourceLoc(TokStart), getSourceLoc(CurPtr),
+                           replacement);
+  }
+
+  if (wasErroneous)
+    return formToken(tok::unknown, TokStart);
+
+  return formStringLiteralToken(TokStart, IsMultilineString,
+                                CustomDelimiterLen);
 }
 
 
