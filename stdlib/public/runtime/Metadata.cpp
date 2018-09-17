@@ -2874,7 +2874,8 @@ OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
   Data.stride = Box::Container::getStride(numWitnessTables);
   
   // Extra inhabitant behavior does not change with the number of witnesses.
-  Data.extraInhabitantFlags = Witnesses::extraInhabitantFlags;
+  constexpr auto extraInhabitantFlags = Witnesses::extraInhabitantFlags;
+  Data.extraInhabitantFlags = extraInhabitantFlags;
   Data.getExtraInhabitantIndex = Witnesses::getExtraInhabitantIndex;
   Data.storeExtraInhabitant = Witnesses::storeExtraInhabitant;
 
