@@ -766,7 +766,7 @@ public:
       Alloca = createAlloca(Storage->getType(), Align, Name+".debug");
     zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
 
-    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();
   }
@@ -844,7 +844,7 @@ public:
     auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
     auto Alloca = LTI.allocateStack(*this, Type, Name+".debug");
     zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress().getAddress()));
-    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     LTI.initialize(*this, e, Alloca.getAddress(), false /* isOutlined */);
     copy.push_back(Alloca.getAddressPointer());
   }
@@ -873,7 +873,7 @@ public:
                                     IndirectionKind Indirection = DirectValue) {
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
-      PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
+      PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
                                              Name, ArgNo, Indirection);
     } else
@@ -1550,7 +1550,8 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   // emitPolymorphicParameters() may create function calls, so we need
   // to initialize the debug location here.
-  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo, IGF.Builder);
+  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(),
+                         IGF.Builder);
   
   // Bind polymorphic arguments. This can only be done after binding
   // all the value parameters, and must be done even for non-polymorphic
