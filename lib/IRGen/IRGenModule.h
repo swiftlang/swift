@@ -1234,6 +1234,11 @@ public:
   llvm::GlobalValue *defineAssociatedTypeDescriptor(
                                                   AssociatedTypeDecl *assocType,
                                                   llvm::Constant *definition);
+  llvm::GlobalValue *defineAssociatedConformanceDescriptor(
+                                                  ProtocolDecl *proto,
+                                                  CanType subject,
+                                                  ProtocolDecl *requirement,
+                                                  llvm::Constant *definition);
 
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                       ConstantInit definition = ConstantInit());

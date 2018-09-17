@@ -206,6 +206,13 @@ class LinkEntity {
     /// The pointer is an AssociatedTypeDecl*.
     AssociatedTypeDescriptor,
 
+    /// An descriptor for an associated conformance within a protocol, which
+    /// will alias the TargetProtocolRequirement descripting this
+    /// particular associated conformance.
+    /// The pointer is a ProtocolDecl*; the index of the associated conformance
+    /// is stored in the data.
+    AssociatedConformanceDescriptor,
+
     /// A function which returns the default type metadata for the associated
     /// type of a protocol.  The secondary pointer is a ProtocolDecl*.
     /// The index of the associated type declaration is stored in the data.
@@ -342,6 +349,21 @@ class LinkEntity {
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
+  void setForProtocolAndAssociatedConformance(Kind kind,
+                                              const ProtocolDecl *proto,
+                                              CanType associatedType,
+                                              ProtocolDecl *associatedProtocol){
+    assert(isDeclKind(kind));
+    Pointer = static_cast<ValueDecl *>(const_cast<ProtocolDecl *>(proto));
+    SecondaryPointer = nullptr;
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind)) |
+           LINKENTITY_SET_FIELD(AssociatedConformanceIndex,
+                                getAssociatedConformanceIndex(
+                                                          proto,
+                                                          associatedType,
+                                                          associatedProtocol));
+  }
+
   void setForProtocolConformance(Kind kind, const ProtocolConformance *c) {
     assert(isProtocolConformanceKind(kind) && !isTypeKind(kind));
     Pointer = nullptr;
@@ -407,14 +429,12 @@ class LinkEntity {
   }
 
   // We store associated conformances using their index in the requirement
-  // list of the requirement signature of the conformance's protocol.
-  static unsigned getAssociatedConformanceIndex(
-                                      const ProtocolConformance *conformance,
+  // list of the requirement signature of the protocol.
+  static unsigned getAssociatedConformanceIndex(const ProtocolDecl *proto,
                                                 CanType associatedType,
                                                 ProtocolDecl *requirement) {
     unsigned index = 0;
-    for (const auto &reqt :
-           conformance->getProtocol()->getRequirementSignature()) {
+    for (const auto &reqt : proto->getRequirementSignature()) {
       if (reqt.getKind() == RequirementKind::Conformance &&
           reqt.getFirstType()->getCanonicalType() == associatedType &&
           reqt.getSecondType()->castTo<ProtocolType>()->getDecl() ==
@@ -426,13 +446,29 @@ class LinkEntity {
     llvm_unreachable("requirement not found in protocol");
   }
 
+  // We store associated conformances using their index in the requirement
+  // list of the requirement signature of the conformance's protocol.
+  static unsigned getAssociatedConformanceIndex(
+                                      const ProtocolConformance *conformance,
+                                      CanType associatedType,
+                                      ProtocolDecl *requirement) {
+    return getAssociatedConformanceIndex(conformance->getProtocol(),
+                                         associatedType, requirement);
+  }
+
   static std::pair<CanType, ProtocolDecl*>
-  getAssociatedConformanceByIndex(const ProtocolConformance *conformance,
+  getAssociatedConformanceByIndex(const ProtocolDecl *proto,
                                   unsigned index) {
-    auto &reqt = conformance->getProtocol()->getRequirementSignature()[index];
+    auto &reqt = proto->getRequirementSignature()[index];
     assert(reqt.getKind() == RequirementKind::Conformance);
     return { reqt.getFirstType()->getCanonicalType(),
              reqt.getSecondType()->castTo<ProtocolType>()->getDecl() };
+  }
+
+  static std::pair<CanType, ProtocolDecl*>
+  getAssociatedConformanceByIndex(const ProtocolConformance *conformance,
+                                  unsigned index) {
+    return getAssociatedConformanceByIndex(conformance->getProtocol(), index);
   }
 
   void setForType(Kind kind, CanType type) {
@@ -759,6 +795,18 @@ public:
   }
 
   static LinkEntity
+  forAssociatedConformanceDescriptor(ProtocolDecl *proto,
+                                     CanType associatedType,
+                                     ProtocolDecl *associatedProtocol) {
+    LinkEntity entity;
+    entity.setForProtocolAndAssociatedConformance(
+        Kind::AssociatedConformanceDescriptor,
+        proto, associatedType,
+        associatedProtocol);
+    return entity;
+  }
+
+  static LinkEntity
   forAssociatedTypeMetadataAccessFunction(const ProtocolConformance *C,
                                           AssociatedType association) {
     LinkEntity entity;
@@ -872,9 +920,15 @@ public:
   }
 
   std::pair<CanType, ProtocolDecl *> getAssociatedConformance() const {
-    assert(getKind() == Kind::AssociatedTypeWitnessTableAccessFunction);
-    return getAssociatedConformanceByIndex(getProtocolConformance(),
+    if (getKind() == Kind::AssociatedTypeWitnessTableAccessFunction) {
+      return getAssociatedConformanceByIndex(getProtocolConformance(),
                        LINKENTITY_GET_FIELD(Data, AssociatedConformanceIndex));
+    }
+
+    assert(getKind() == Kind::AssociatedConformanceDescriptor);
+    return getAssociatedConformanceByIndex(
+             cast<ProtocolDecl>(getDecl()),
+             LINKENTITY_GET_FIELD(Data, AssociatedConformanceIndex));
   }
 
   ProtocolDecl *getAssociatedProtocol() const {

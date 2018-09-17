@@ -179,6 +179,14 @@ std::string LinkEntity::mangleAsString() const {
     return mangler.mangleAssociatedTypeDescriptor(
                                           cast<AssociatedTypeDecl>(getDecl()));
 
+  case Kind::AssociatedConformanceDescriptor: {
+    auto assocConformance = getAssociatedConformance();
+    return mangler.mangleAssociatedConformanceDescriptor(
+             cast<ProtocolDecl>(getDecl()),
+             assocConformance.first,
+             assocConformance.second);
+  }
+
   case Kind::ProtocolConformanceDescriptor:
     return mangler.mangleProtocolConformanceDescriptor(
                    cast<NormalProtocolConformance>(getProtocolConformance()));
@@ -449,6 +457,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILLinkage(getDeclLinkage(getterDecl), forDefinition);
   }
 
+  case Kind::AssociatedConformanceDescriptor:
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
@@ -586,6 +595,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     // FIXME: Removing this triggers a linker bug
     return true;
 
+  case Kind::AssociatedConformanceDescriptor:
   case Kind::SwiftMetaclassStub:
   case Kind::ClassMetadataBaseOffset:
   case Kind::PropertyDescriptor:

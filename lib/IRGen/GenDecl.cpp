@@ -3387,6 +3387,16 @@ llvm::GlobalValue *IRGenModule::defineAssociatedTypeDescriptor(
   return defineAlias(entity, definition);
 }
 
+llvm::GlobalValue *IRGenModule::defineAssociatedConformanceDescriptor(
+                                                ProtocolDecl *proto,
+                                                CanType subject,
+                                                ProtocolDecl *requirement,
+                                                llvm::Constant *definition) {
+  auto entity = LinkEntity::forAssociatedConformanceDescriptor(proto, subject,
+                                                               requirement);
+  return defineAlias(entity, definition);
+}
+
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
                                 const NormalProtocolConformance *conformance,
                                 ConstantInit definition) {
