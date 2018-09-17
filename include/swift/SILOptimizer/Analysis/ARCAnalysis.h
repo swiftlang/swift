@@ -230,7 +230,7 @@ private:
     Optional<ArrayRef<SILInstruction *>> getFullyPostDomReleases() const {
       if (releases.empty() || foundSomeButNotAllReleases())
         return None;
-      return ArrayRef<SILInstruction *>{releases};
+      return {releases};
     }
 
     /// If we were able to find a set of releases for this argument, but those
