@@ -72,6 +72,8 @@ Swift 5.0
 Swift 4.2
 ---------
 
+### 2018-09-17 (Xcode 10.0)
+
 * [SE-0194][]
 
   The new CaseIterable protocol describes types which have a static
