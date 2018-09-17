@@ -1250,9 +1250,11 @@ static bool advanceIfMultilineDelimiter(const char *&CurPtr,
 
 /// advanceIfCustomDelimiter - Extracts/detects any custom delimiter on
 /// opening a string literal, advances CurPtr if a delimiter is found and
-/// returns a non-zero delimiter length. CurPtr[-1] generally '#' when called.
+/// returns a non-zero delimiter length. CurPtr[-1] must be '#' when called.
 static unsigned advanceIfCustomDelimiter(const char *&CurPtr,
                                          DiagnosticEngine *Diags) {
+  assert(CurPtr[-1] == '#');
+
   const char *TmpPtr = CurPtr;
   unsigned CustomDelimiterLen = 1;
   while (diagnoseZeroWidthMatchAndAdvance('#', TmpPtr, Diags))
