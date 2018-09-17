@@ -453,7 +453,7 @@ public:
         if (seenVars.count(theVar) || theVar->isInvalid())
           return;
 
-        checkTypeAccess(theVar->getType(), nullptr,
+        checkTypeAccess(theVar->getInterfaceType(), nullptr,
                         theVar,
                         [&](AccessScope typeAccessScope,
                             const TypeRepr *complainRepr,
@@ -475,7 +475,7 @@ public:
                                   theVarAccess,
                                   isa<FileUnit>(theVar->getDeclContext()),
                                   typeAccess,
-                                  theVar->getType());
+                                  theVar->getInterfaceType());
         });
         return;
       }
@@ -1024,7 +1024,7 @@ public:
           if (seenVars.count(theVar) || theVar->isInvalid())
             return;
 
-          checkTypeAccess(theVar->getType(), nullptr,
+          checkTypeAccess(theVar->getInterfaceType(), nullptr,
                           fixedLayoutStructContext ? fixedLayoutStructContext
                                                    : theVar,
                           [&](AccessScope typeAccessScope,
@@ -1040,7 +1040,7 @@ public:
                         diagID,
                         theVar->isLet(),
                         isTypeContext,
-                        theVar->getType());
+                        theVar->getInterfaceType());
           });
           return;
         }
