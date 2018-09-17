@@ -40,7 +40,7 @@ public func loopTest(breakCount:Int32) -> Int32 {
 // CHECK: [[CONST_ONE:%.*]] =  integer_literal $Builtin.Int32, 1
 // CHECK: [[PHDR_EXIT:%.*]] = graph_op "Const"() {dtype: $Builtin.Int32, value$tensor: i32 0, __device: "ALL_DEVICES"}
 // CHECK: [[PHDR_FLAG:%.*]] = graph_op "Const"() {dtype: $Builtin.Int1, value$tensor: i1 -1, __device: "ALL_DEVICES"}
-// CHECK: br bb9({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, undef : $Builtin.Int32, [[PHDR_EXIT]] : $TensorHandle<Builtin.Int32>, [[PHDR_FLAG]] : $TensorHandle<Builtin.Int1>)
+// CHECK: br bb9([[A:%.*]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[PHDR_EXIT]] : $TensorHandle<Builtin.Int32>, [[PHDR_FLAG]] : $TensorHandle<Builtin.Int1>)
 
 //- Sets up index to 0 and flag to false on the exit branch of the original header to latch.
 // CHECK: bb1:
@@ -57,8 +57,8 @@ public func loopTest(breakCount:Int32) -> Int32 {
 
 //- Sets up index to 1 and flag to false on the true branch of the if with break to latch.
 // CHECK: bb4:
-// CHECK:  [[SUM_ESCAPING:%.*]] = builtin "sadd_with_overflow_Int32"([[SUM_AT_HDR]] : $Builtin.Int32, [[COUNT_AT_HDR]] : $Builtin.Int32) : $Builtin.Int32 
-// CHECK:  [[COUNT_ESCAPING:%.*]] = builtin "sadd_with_overflow_Int32"([[COUNT_AT_HDR]] : $Builtin.Int32, [[CONST_ONE]] : $Builtin.Int32) : $Builtin.Int32 
+// CHECK:  [[SUM_ESCAPING:%.*]] = builtin "sadd_with_overflow_Int32"([[SUM_AT_HDR]] : $Builtin.Int32, [[COUNT_AT_HDR]] : $Builtin.Int32) : $Builtin.Int32
+// CHECK:  [[COUNT_ESCAPING:%.*]] = builtin "sadd_with_overflow_Int32"([[COUNT_AT_HDR]] : $Builtin.Int32, [[CONST_ONE]] : $Builtin.Int32) : $Builtin.Int32
 // CHECK:  [[LOCAL_EXIT_INDEX:%.*]] = graph_op "Const"() {dtype: $Builtin.Int32, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32>
 // CHECK:  [[LOCAL_STAY_FLAG:%.*]] = graph_op "Const"() {dtype: $Builtin.Int1, value$tensor: i1 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int1>
 // CHECK: cond_br {{.*}}, bb5, bb6
@@ -179,10 +179,10 @@ public func nestedLoopWithBreak(breakCount:Int32) -> Int32 {
 //-- Loop preheaders have appropriate number of additional arguments
 //-- Outer loop
 // CHECK: bb0(%0 : $Builtin.Int32):
-// CHECK: br bb21([[A:%.*]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, undef : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
+// CHECK: br bb21([[A:%.*]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
 //-- Inner loop
 // CHECK: bb4:                                              // Preds: bb1
-// CHECK:  br bb17({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, undef : $Builtin.Int32, undef : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
+// CHECK:  br bb17({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, [[B:%[0-9]+]] : $Builtin.Int32, [[B]] : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
 
 sil @$nestedLoopWithBreak : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 // %0                                             // users: %27, %26, %19
@@ -244,3 +244,57 @@ bb11:                                             // Preds: bb9
 bb12(%31 : $Builtin.Int32):                       // Preds: bb10 bb2
   return %31 : $Builtin.Int32                     // id: %32
 } // end sil function '$S20canonicalize_cfg_xla10nestedLoop10breakCounts5Int32VAE_tF'
+
+/* do while loop of the following form
+public func nestedLoopWithBreak(breakCount:Int32) -> Int32 {
+  var j:Int32 = 0
+	do {
+	  j = j + 1
+	  if j == breakCount { break; }
+		j = j + 1
+	} while (j < 100)
+  return j
+}
+*/
+
+// CHECK-LABEL: --- XLA CFG Canonicalize: $doWhileLoop
+// CHECK: [sequence
+// CHECK:   <while Preheader: bb0, Header: bb9, exit: bb11
+// CHECK:     [sequence
+// CHECK:       {condition Header: bb1
+// CHECK:         {condition Header: bb4
+// CHECK:           block bb6
+// CHECK:           block bb5}
+// CHECK:         block bb2}
+// CHECK:       block bb10]>
+// CHECK:   block bb11
+// CHECK:   {condition Header: bb12
+// CHECK:     block bb3
+// CHECK:     block bb7}
+// CHECK:   block bb8]
+
+// Make sure undef is still left in this case for now.
+// CHECK: sil @$doWhileLoop : {{.*}} (Builtin.Int32) -> Builtin.Int32 {
+// CHECK: bb0({{.*}} : $Builtin.Int32):
+// CHECK: br bb9({{.*}} : $Builtin.Int32, undef : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
+
+sil @$doWhileLoop : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 100
+  br bb1 (%3 : $Builtin.Int32)
+
+bb1(%4: $Builtin.Int32):
+  %5 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %6 = builtin "cmp_eq_Int32"(%5 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %6, bb2, bb3(%5 : $Builtin.Int32)
+	
+bb2:
+  %7 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %8 = builtin "cmp_slt_Int32"(%7 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb1(%7 : $Builtin.Int32), bb3(%5 : $Builtin.Int32)
+
+bb3 (%9 : $Builtin.Int32):
+	return %9 : $Builtin.Int32
+}

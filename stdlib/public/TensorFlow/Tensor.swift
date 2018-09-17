@@ -579,97 +579,99 @@ public extension Tensor where Scalar : Numeric {
 // Random initialization
 //===----------------------------------------------------------------------===//
 
-public extension Float {
-  /// Produces a random value from the standard uniform distribution.
-  /// - Parameter state: An optional `RandomState` instance. If `nil`,
-  ///   `RandomState.global` will be used.
-  static func randomUniform(state: RandomState? = nil) -> Float {
-    let state = state ?? RandomState.global
-    return Float(state.generate()) / Float(RAND_MAX)
-  }
-
-  private static var boxMullerHelper: Float = randomUniform()
-
-  /// Produces a random value from a normal distribution using the Box-Muller
-  /// method.
-  ///
-  /// - Parameters:
-  ///   - mean: The mean of the normal distribution.
-  ///   - stddev: The standard deviation of the normal distribution.
-  ///   - state: An optional `RandomState` instance. If `nil`,
-  ///     `RandomState.global` will be used.
-  static func randomNormal(mean: Float = 0, stddev: Float = 1,
-                           state: RandomState? = nil) -> Float {
-    let tmp = randomUniform(state: state)
-    let result = sqrtf(-2 * logf(tmp)) * cosf(2 * .pi * boxMullerHelper)
-    boxMullerHelper = result
-    return result * stddev + mean
-  }
-}
-
-public extension Double {
-  /// Produces a random value from the standard uniform distribution.
-  /// - Parameter state: An optional `RandomState` instance. If `nil`,
-  ///   `RandomState.global` will be used.
-  static func randomUniform(state: RandomState? = nil) -> Double {
-    let state = state ?? RandomState.global
-    return Double(state.generate()) / Double(RAND_MAX)
-  }
-
-  private static var boxMullerHelper: Double = randomUniform()
-
-  /// Produces a random value from a normal distribution using the Box-Muller
-  /// method.
-  ///
-  /// - Parameters:
-  ///   - mean: The mean of the normal distribution.
-  ///   - stddev: The standard deviation of the normal distribution.
-  ///   - state: An optional `RandomState` instance. If `nil`,
-  ///     `RandomState.global` will be used.
-  static func randomNormal(mean: Double = 0, stddev: Double = 1,
-                           state: RandomState? = nil) -> Double {
-    let tmp = randomUniform(state: state)
-    let result = sqrt(-2 * log(tmp)) * cos(2 * .pi * boxMullerHelper)
-    boxMullerHelper = result
-    return result * stddev + mean
-  }
-}
-
 public extension Tensor where Scalar == Int32 {
   /// Creates a tensor with the specified shape, randomly sampling scalar values
   /// from a discrete uniform distribution.
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
-  ///   - state: The pseudorandom state in which the random numbers are being
-  ///     generated.
+  ///   - generator: Random number generator to use.
   ///
   @inlinable @inline(__always)
-  init(randomStandardUniform shape: TensorShape, state: RandomState? = nil) {
+  init<G: RandomNumberGenerator>(randomStandardUniform shape: TensorShape,
+                                 generator: inout G) {
     self = Tensor(
       handle: _TFHoistable {
-        let state = state ?? RandomState.global
-        return _TFTensorFromScalars(state.generate(Int(shape.contiguousSize)),
-                                    shape: shape.dimensions)
+        let dist = UniformIntegerDistribution<Scalar>()
+        var scalars: [Scalar] = []
+        for _ in 0 ..< shape.contiguousSize {
+          scalars.append(dist.next(using: &generator))
+        }
+        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
       }
     ).toAccelerator()
   }
+
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a discrete uniform distribution, using the default random number
+  /// generator.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///
+  // FIXME: Simply call above init() function when Hoistable closures capture
+  // mutating references correctly
+  @inlinable @inline(__always)
+  init(randomStandardUniform shape: TensorShape) {
+    self = Tensor(
+      handle: _TFHoistable {
+        let dist = UniformIntegerDistribution<Scalar>()
+        var scalars: [Scalar] = []
+        for _ in 0 ..< shape.contiguousSize {
+          scalars.append(dist.next(using: &ARC4RandomNumberGenerator.global))
+        }
+        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+      }
+    ).toAccelerator()
+  }
+
 }
 
-public extension Tensor where Scalar : BinaryFloatingPoint {
+public extension Tensor where Scalar : BinaryFloatingPoint,
+                              Scalar.RawSignificand : FixedWidthInteger {
   /// Creates a tensor with the specified shape, randomly sampling scalar values
   /// from a uniform distribution between 0 and 1.
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
-  ///   - state: The pseudorandom state in which the random numbers are being
-  ///     generated.
+  ///   - generator: Random number generator to use.
   ///
   @inlinable @inline(__always)
-  init(randomUniform shape: TensorShape, state: RandomState? = nil) {
+  init<G: RandomNumberGenerator>(randomUniform shape: TensorShape,
+                                 generator: inout G) {
     self = Tensor(
-      Tensor<Int32>(randomStandardUniform: shape, state: state)
-    ) / Scalar(RAND_MAX)
+      handle: _TFHoistable {
+        let dist = UniformFloatingPointDistribution<Scalar>()
+        var scalars: [Scalar] = []
+        for _ in 0 ..< shape.contiguousSize {
+          scalars.append(dist.next(using: &generator))
+        }
+        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+      }
+    ).toAccelerator()
+  }
+
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a uniform distribution between 0 and 1, using the default random
+  /// number generator.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///
+  // FIXME: Simply call above init() function when Hoistable closures capture
+  // mutating references correctly
+  @inlinable @inline(__always)
+  init(randomUniform shape: TensorShape) {
+    self = Tensor(
+      handle: _TFHoistable {
+        let dist = UniformFloatingPointDistribution<Scalar>()
+        var scalars: [Scalar] = []
+        for _ in 0 ..< shape.contiguousSize {
+          scalars.append(dist.next(using: &ARC4RandomNumberGenerator.global))
+        }
+        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+      }
+    ).toAccelerator()
   }
 
   /// Creates a tensor with the specified shape, randomly sampling scalar values
@@ -679,16 +681,49 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///   - shape: The dimensions of the tensor.
   ///   - mean: The mean of the distribution.
   ///   - stddev: The standard deviation of the distribution.
-  ///   - state: The pseudorandom state in which the random numbers are being
-  ///     generated.
+  ///   - generator: Random number generator to use.
   ///
   @inlinable @inline(__always)
-  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
-       state: RandomState? = nil) {
-    let uniform = Tensor(randomUniform: shape, state: state)
-    let boxMullerHelper = Tensor(randomUniform: shape, state: state)
-    let result = sqrt(-2 * log(uniform)) * cos(2 * .pi * boxMullerHelper)
-    self = result * stddev + mean
+  init<G: RandomNumberGenerator>(randomNormal shape: TensorShape,
+                                 mean: Scalar = 0,
+                                 stddev: Scalar = 1,
+                                 generator: inout G) {
+    self = Tensor(
+      handle: _TFHoistable {
+        let dist = NormalDistribution<Scalar>(
+          mean: mean, standardDeviation: stddev)
+        var scalars: [Scalar] = []
+        for _ in 0 ..< shape.contiguousSize {
+          scalars.append(dist.next(using: &generator))
+        }
+        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+      }
+    ).toAccelerator()
+  }
+
+  /// Creates a tensor with the specified shape, randomly sampling scalar values
+  /// from a normal distribution, using the default random number generator.
+  ///
+  /// - Parameters:
+  ///   - shape: The dimensions of the tensor.
+  ///   - mean: The mean of the distribution.
+  ///   - stddev: The standard deviation of the distribution.
+  ///
+  // FIXME: Simply call above init() function when Hoistable closures capture
+  // mutating references correctly
+  @inlinable @inline(__always)
+  init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1) {
+    self = Tensor(
+      handle: _TFHoistable {
+        let dist = NormalDistribution<Scalar>(
+          mean: mean, standardDeviation: stddev)
+        var scalars: [Scalar] = []
+        for _ in 0 ..< shape.contiguousSize {
+          scalars.append(dist.next(using: &ARC4RandomNumberGenerator.global))
+        }
+        return _TFTensorFromScalars(scalars, shape: shape.dimensions)
+      }
+    ).toAccelerator()
   }
 }
 

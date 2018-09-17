@@ -381,12 +381,11 @@ static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
   // Predicate that returns true if an operand of the specified type should be
   // rewritten - either to load an address argument or expand a struct
   // parameter.
-  auto canSimplifyOperand = [&](SILType type,
-                                SILTensorOpInfo::OperandClass operandClass)
-      -> bool {
+  auto canSimplifyOperand =
+      [&](SILType type, GraphOperationInfo::OperandClass operandClass) -> bool {
     return isLoadableAddressType(type) ||
            getPrimitiveStructField(type.getASTType()) != nullptr ||
-           operandClass == SILTensorOpInfo::OperandClass::Out;
+           operandClass == GraphOperationInfo::OperandClass::Out;
   };
 
   // If we don't have to change any operands, don't rewrite the builtin.
@@ -409,7 +408,7 @@ static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
   // Okay, we do have to simplify something.  Scan through and rewrite operands.
   SILBuilder B(origInst);
   SmallVector<SILValue, 8> operands;
-  SmallVector<std::pair<StringRef, SILTensorOpInfo::OperandClass>, 4>
+  SmallVector<std::pair<StringRef, GraphOperationInfo::OperandClass>, 4>
       operandClasses;
   SILValue outParameterAddress;
   for (auto operandAndClass : zip(origInst->getAllOperands(),
@@ -419,7 +418,7 @@ static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
 
     // If this is an out parameter, take note of it (so that we can deal with it
     // later), and exclude it from the list of rewritten operands.
-    if (operandClass.second == SILTensorOpInfo::OperandClass::Out) {
+    if (operandClass.second == GraphOperationInfo::OperandClass::Out) {
       auto operandType = operand->getType();
       assert(operandType.isAddress());
       if (!operandType.isLoadable(origInst->getModule())) {
@@ -2277,8 +2276,9 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
 
     // Name mangle the attribute classification into the operand list so we can
     // know the difference between a shape and an array, and a shape array, etc.
-    auto attrName = operandClass.first.str() +
-       SILTensorOpInfo::getOperandClassSuffix(operandClass.second);
+    auto attrName =
+        operandClass.first.str() +
+        GraphOperationInfo::getOperandClassSuffix(operandClass.second);
 
     // Get the constant, ignoring struct wrappers.
     auto constValue = it->second.lookThroughSingleElementAggregates();
@@ -2370,14 +2370,14 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     // Verify that the type of this attribute is ok for the OperandClass we
     // have.
     switch (operandClass.second) {
-    case SILTensorOpInfo::OperandClass::Out:
+    case GraphOperationInfo::OperandClass::Out:
       llvm_unreachable("Attributes cannot be output parameters");
-    case SILTensorOpInfo::OperandClass::Input:
-    case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
+    case GraphOperationInfo::OperandClass::Input:
+    case GraphOperationInfo::OperandClass::Normal: // No modifier.
       if (verifyNormalAttr(constValue))
         return; // error already emitted.
       break;
-    case SILTensorOpInfo::OperandClass::Array: {
+    case GraphOperationInfo::OperandClass::Array: {
       if (constValue.getKind() == SymbolicValue::Array)
         break;
       if (constValue.getKind() == SymbolicValue::Metatype) {
@@ -2399,12 +2399,12 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       }
       return diagnoseInvalidAttr("requires an array or a metatype");
     }
-    case SILTensorOpInfo::OperandClass::Shape:
+    case GraphOperationInfo::OperandClass::Shape:
       // A shape attr must be an int array.
       if (getIntArrayProduct(constValue) < 0)
         return; // error already emitted.
       break;
-    case SILTensorOpInfo::OperandClass::UnknownShapeList: {
+    case GraphOperationInfo::OperandClass::UnknownShapeList: {
       if (constValue.getKind() != SymbolicValue::Metatype)
         return diagnoseInvalidAttr("requires a metatype");
       auto type = constValue.getMetatypeValue();
@@ -2427,7 +2427,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                                                   context.getAllocator());
       break;
     }
-    case SILTensorOpInfo::OperandClass::Tensor:
+    case GraphOperationInfo::OperandClass::Tensor:
       if (constValue.getKind() == SymbolicValue::Integer ||
           constValue.getKind() == SymbolicValue::Float   ||
           constValue.getKind() == SymbolicValue::String)
@@ -2443,7 +2443,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       auto getNumEltsFromShapeAttr = [&]() -> long long {
         if (i + 1 >= opInfo.operandClasses.size() ||
             opInfo.operandClasses[i + 1].second !=
-                SILTensorOpInfo::OperandClass::Shape)
+                GraphOperationInfo::OperandClass::Shape)
           return -1;
         auto operand = inst->getOperand(i + 1);
         auto it = constants.find(operand);
