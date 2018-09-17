@@ -1414,7 +1414,6 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
 /// outstanding delimiters as it scans the string.
 static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
                                                      const char *EndPtr,
-                                                     DiagnosticEngine *Diags,
                                                      bool IsMultilineString) {
   SmallVector<char, 4> OpenDelimiters;
   SmallVector<bool, 4> AllowNewline;
@@ -1452,7 +1451,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 
     case '#':
       if (inStringLiteral() ||
-          !(CustomDelimiterLen = advanceIfCustomDelimiter(CurPtr, Diags)))
+          !(CustomDelimiterLen = advanceIfCustomDelimiter(CurPtr, nullptr)))
         continue;
       assert(CurPtr[-1] == '"' &&
              "advanceIfCustomDelimiter() must stop at after the quote");
@@ -1463,7 +1462,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
       if (!inStringLiteral()) {
         // Open string literal.
         OpenDelimiters.push_back(CurPtr[-1]);
-        AllowNewline.push_back(advanceIfMultilineDelimiter(CurPtr, Diags));
+        AllowNewline.push_back(advanceIfMultilineDelimiter(CurPtr, nullptr));
         CustomDelimiter.push_back(CustomDelimiterLen);
         continue;
       }
@@ -1475,11 +1474,11 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         continue;
 
       // Multi-line string can only be closed by '"""'.
-      if (AllowNewline.back() && !advanceIfMultilineDelimiter(CurPtr, Diags))
+      if (AllowNewline.back() && !advanceIfMultilineDelimiter(CurPtr, nullptr))
         continue;
 
       // Check whether we have equivalent number of '#'s.
-      if (!delimiterMatches(CustomDelimiter.back(), CurPtr, Diags, true))
+      if (!delimiterMatches(CustomDelimiter.back(), CurPtr, nullptr, true))
         continue;
 
       // Close string literal.
@@ -1492,7 +1491,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
       // We ignore invalid escape sequence here. They should be diagnosed in
       // the real lexer functions.
       if (inStringLiteral() &&
-          delimiterMatches(CustomDelimiter.back(), CurPtr, Diags)) {
+          delimiterMatches(CustomDelimiter.back(), CurPtr, nullptr)) {
         switch (*CurPtr++) {
         case '(':
           // Entering a recursive interpolated expression
@@ -1757,10 +1756,9 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         && *TmpPtr == '(') {
       // Consume tokens until we hit the corresponding ')'.
       CurPtr = TmpPtr + 1;
-      const char *EndPtr =
-          skipToEndOfInterpolatedExpression(CurPtr, BufferEnd,
-                                            Diags, IsMultilineString);
-      
+      const char *EndPtr = skipToEndOfInterpolatedExpression(CurPtr, BufferEnd,
+                                                             IsMultilineString);
+
       if (*EndPtr == ')') {
         // Successfully scanned the body of the expression literal.
         CurPtr = EndPtr+1;
@@ -2231,9 +2229,8 @@ void Lexer::getStringLiteralSegments(
     IsFirstSegment = false;
 
     // Find the closing ')'.
-    const char *End = skipToEndOfInterpolatedExpression(BytesPtr,
-                                                        Str.getText().end(),
-                                                        Diags, MultilineString);
+    const char *End = skipToEndOfInterpolatedExpression(
+        BytesPtr, Str.getText().end(), MultilineString);
     assert(*End == ')' && "invalid string literal interpolations should"
            " not be returned as string literals");
     ++End;
