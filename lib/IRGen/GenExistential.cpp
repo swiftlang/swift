@@ -150,8 +150,9 @@ namespace {
     create(ArrayRef<const ProtocolDecl *> protocols, As &&...args)
     {
       void *buffer = operator new(
-          ExistentialTypeInfoBase::template totalSizeToAlloc<
-            const ProtocolDecl *>(protocols.size()));
+          llvm::TrailingObjects<Derived, const ProtocolDecl *>::
+              template totalSizeToAlloc<const ProtocolDecl *>(
+                  protocols.size()));
       return new (buffer) Derived(protocols, std::forward<As>(args)...);
     }
 
