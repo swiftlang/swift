@@ -29,6 +29,76 @@ using namespace swift;
 
 namespace {
 
+/// A uniquely-typed boolean to reduce the chances of accidentally inverting
+/// a check.
+///
+/// \see checkTypeAccess
+enum class DowngradeToWarning: bool {
+  No,
+  Yes
+};
+
+/// \see checkTypeAccess
+using CheckTypeAccessCallback =
+    void(AccessScope, const TypeRepr *, DowngradeToWarning);
+
+class AccessControlCheckerBase {
+protected:
+  TypeChecker &TC;
+  bool checkUsableFromInline;
+
+  void checkTypeAccessImpl(
+      Type type, TypeRepr *typeRepr, AccessScope contextAccessScope,
+      const DeclContext *useDC,
+      llvm::function_ref<CheckTypeAccessCallback> diagnose);
+
+  void checkTypeAccess(
+      Type type, TypeRepr *typeRepr, const ValueDecl *context,
+      llvm::function_ref<CheckTypeAccessCallback> diagnose);
+
+  void checkTypeAccess(
+      const TypeLoc &TL, const ValueDecl *context,
+      llvm::function_ref<CheckTypeAccessCallback> diagnose) {
+    return checkTypeAccess(TL.getType(), TL.getTypeRepr(), context, diagnose);
+  }
+
+  void checkRequirementAccess(
+      WhereClauseOwner source,
+      AccessScope accessScope,
+      const DeclContext *useDC,
+      llvm::function_ref<CheckTypeAccessCallback> diagnose);
+
+  AccessControlCheckerBase(TypeChecker &TC, bool checkUsableFromInline)
+    : TC(TC), checkUsableFromInline(checkUsableFromInline) {}
+
+public:
+  void checkGenericParamAccess(
+    const GenericParamList *params,
+    const Decl *owner,
+    AccessScope accessScope,
+    AccessLevel contextAccess);
+
+  void checkGenericParamAccess(
+    const GenericParamList *params,
+    const ValueDecl *owner);
+};
+
+class AccessControlChecker : public AccessControlCheckerBase {
+public:
+  explicit AccessControlChecker(TypeChecker &TC)
+    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/false) {}
+
+  void check(Decl *D);
+};
+
+class UsableFromInlineChecker : public AccessControlCheckerBase {
+public:
+  explicit UsableFromInlineChecker(TypeChecker &TC)
+    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/true) {}
+
+  void check(Decl *D);
+};
+
 class TypeAccessScopeDiagnoser : private ASTWalker {
   AccessScope accessScope;
   const DeclContext *useDC;
@@ -1357,4 +1427,38 @@ void UsableFromInlineChecker::check(Decl *D) {
     return;
   }
   }
+}
+
+void swift::checkAccessControl(TypeChecker &TC, Decl *D) {
+  AccessControlChecker(TC).check(D);
+  UsableFromInlineChecker(TC).check(D);
+}
+
+void swift::checkExtensionGenericParamAccess(TypeChecker &TC,
+                                             const ExtensionDecl *ED,
+                                             AccessLevel userSpecifiedAccess) {
+  AccessScope desiredAccessScope = AccessScope::getPublic();
+  switch (userSpecifiedAccess) {
+  case AccessLevel::Private:
+    assert((ED->isInvalid() ||
+            ED->getDeclContext()->isModuleScopeContext()) &&
+           "non-top-level extensions make 'private' != 'fileprivate'");
+    LLVM_FALLTHROUGH;
+  case AccessLevel::FilePrivate: {
+    const DeclContext *DC = ED->getModuleScopeContext();
+    bool isPrivate = (userSpecifiedAccess == AccessLevel::Private);
+    desiredAccessScope = AccessScope(DC, isPrivate);
+    break;
+  }
+  case AccessLevel::Internal:
+    desiredAccessScope = AccessScope(ED->getModuleContext());
+    break;
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    break;
+  }
+
+  AccessControlChecker(TC).checkGenericParamAccess(ED->getGenericParams(), ED,
+                                                   desiredAccessScope,
+                                                   userSpecifiedAccess);
 }
