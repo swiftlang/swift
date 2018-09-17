@@ -11,14 +11,9 @@ import TensorFlowUnittest
 var TensorADTests = TestSuite("TensorAD")
 
 TensorADTests.testAllBackends("SimpleAdjointCall") {
-  let adjMatmul: (
-    Tensor<Float>,
-    Tensor<Float>,
-    Tensor<Float>,
-    Tensor<Float>
-  ) -> (Tensor<Float>, Tensor<Float>) = #adjoint(matmul)
-  let x = Tensor<Float>([[1]])
-  let (d0, d1) = adjMatmul(x, x, x, x)
+  let adjPlus = #adjoint(Tensor<Float>.+)
+  let x = Tensor<Float>(1)
+  let (d0, d1) = adjPlus(x, x, x + x, x)
   expectNearlyEqual(1, d0.scalarized())
   expectNearlyEqual(1, d1.scalarized())
 }

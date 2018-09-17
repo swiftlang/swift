@@ -49,40 +49,38 @@
 // Elementwise binary
 //===----------------------------------------------------------------------===//
 
-/// TODO(SR-8699): Move this back into an extension of Tensor.
-@inlinable
-func _adjointAdd<T: Numeric>(
-  _ x: Tensor<T>, _ y: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
-) -> (Tensor<T>, Tensor<T>) {
-  let seed = seed.broadcast(like: originalValue)
-  return (seed.unbroadcast(like: x), seed.unbroadcast(like: y))
-}
+extension Tensor where Scalar : Numeric {
+  @inlinable
+  static func _adjointAdd(
+    _ x: Tensor, _ y: Tensor, originalValue: Tensor, seed: Tensor
+  ) -> (Tensor, Tensor) {
+    let seed = seed.broadcast(like: originalValue)
+    return (seed.unbroadcast(like: x), seed.unbroadcast(like: y))
+  }
 
-/// TODO(SR-8699): Move this back into an extension of Tensor.
-@inlinable
-func _adjointSubtract<T: Numeric>(
-  _ x: Tensor<T>, _ y: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
-) -> (Tensor<T>, Tensor<T>) {
-  let seed = seed.broadcast(like: originalValue)
-  return (seed.unbroadcast(like: x), 0 - seed.unbroadcast(like: y))
-}
+  @inlinable
+  static func _adjointSubtract(
+    _ x: Tensor, _ y: Tensor, originalValue: Tensor, seed: Tensor
+  ) -> (Tensor, Tensor) {
+    let seed = seed.broadcast(like: originalValue)
+    return (seed.unbroadcast(like: x), 0 - seed.unbroadcast(like: y))
+  }
 
-/// TODO(SR-8699): Move this back into an extension of Tensor.
-@inlinable
-func _adjointMultiply<T: Numeric>(
-  _ x: Tensor<T>, _ y: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
-) -> (Tensor<T>, Tensor<T>) {
-  return ((y * seed).unbroadcast(like: x),
-          (x * seed).unbroadcast(like: y))
-}
+  @inlinable
+  static func _adjointMultiply(
+    _ x: Tensor, _ y: Tensor, originalValue: Tensor, seed: Tensor
+  ) -> (Tensor, Tensor) {
+    return ((y * seed).unbroadcast(like: x),
+            (x * seed).unbroadcast(like: y))
+  }
 
-/// TODO(SR-8699): Move this back into an extension of Tensor.
-@inlinable
-func _adjointDivide<T: Numeric>(
-  _ x: Tensor<T>, _ y: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
-) -> (Tensor<T>, Tensor<T>) {
-  return ((seed / y).unbroadcast(like: x),
-          ((0 - x) / y.squared() * seed).unbroadcast(like: y))
+  @inlinable
+  static func _adjointDivide(
+    _ x: Tensor, _ y: Tensor, originalValue: Tensor, seed: Tensor
+  ) -> (Tensor, Tensor) {
+    return ((seed / y).unbroadcast(like: x),
+            ((0 - x) / y.squared() * seed).unbroadcast(like: y))
+  }
 }
 
 @inlinable
@@ -107,12 +105,13 @@ func _adjointPow<T : BinaryFloatingPoint>(
 // Elementwise unary
 //===----------------------------------------------------------------------===//
 
-/// TODO(SR-8699): Move this back into an extension of Tensor.
-@inlinable
-func _adjointNegate<T: SignedNumeric>(
-  _ x: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
-) -> Tensor<T> {
-  return -seed.broadcast(like: originalValue)
+extension Tensor where Scalar : SignedNumeric {
+  @inlinable
+  static func _adjointNegate(
+    _ x: Tensor, originalValue: Tensor, seed: Tensor
+  ) -> Tensor {
+    return -seed.broadcast(like: originalValue)
+  }
 }
 
 @inlinable

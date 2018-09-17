@@ -60,33 +60,6 @@ public extension Tensor where Scalar : Numeric {
 // Vector numeric properties and element-wise arithmetics
 //===----------------------------------------------------------------------===//
 
-/// Adds two tensors and produces their sum.
-/// - Note: `+` supports broadcasting.
-/// TODO(SR-8699): Move this back into the extension.
-@inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointAdd(_:_:originalValue:seed:))
-public func + <T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
-  return Raw.add(lhs, rhs)
-}
-
-/// Subtracts one tensor from another and produces their difference.
-/// - Note: `-` supports broadcasting.
-/// TODO(SR-8699): Move this back into the extension.
-@inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointSubtract(_:_:originalValue:seed:))
-public func - <T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
-  return Raw.sub(lhs, rhs)
-}
-
-/// Multiplies two tensors and produces their product.
-/// - Note: `*` supports broadcasting.
-/// TODO(SR-8699): Move this back into the extension.
-@inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointMultiply(_:_:originalValue:seed:))
-public func * <T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
-  return Raw.mul(lhs, rhs)
-}
-
 extension Tensor : VectorNumeric where Scalar : Numeric {
   public typealias ScalarElement = Scalar
   public typealias Dimensionality = TensorShape
@@ -94,6 +67,30 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
   @inlinable @inline(__always)
   public init(dimensionality: TensorShape, repeating repeatedValue: Scalar) {
     self.init(shape: dimensionality, repeating: repeatedValue)
+  }
+
+  /// Adds two tensors and produces their sum.
+  /// - Note: `+` supports broadcasting.
+  @inlinable @inline(__always)
+  @differentiable(reverse, adjoint: _adjointAdd(_:_:originalValue:seed:))
+  public static func + (lhs: Tensor, rhs: Tensor) -> Tensor {
+    return Raw.add(lhs, rhs)
+  }
+
+  /// Subtracts one tensor from another and produces their difference.
+  /// - Note: `-` supports broadcasting.
+  @inlinable @inline(__always)
+  @differentiable(reverse, adjoint: _adjointSubtract(_:_:originalValue:seed:))
+  public static func - (lhs: Tensor, rhs: Tensor) -> Tensor {
+    return Raw.sub(lhs, rhs)
+  }
+
+  /// Multiplies two tensors and produces their product.
+  /// - Note: `*` supports broadcasting.
+  @inlinable @inline(__always)
+  @differentiable(reverse, adjoint: _adjointMultiply(_:_:originalValue:seed:))
+  public static func * (lhs: Tensor, rhs: Tensor) -> Tensor {
+    return Raw.mul(lhs, rhs)
   }
 
   /// Adds the scalar to every scalar of the tensor and produces the sum.
@@ -143,15 +140,6 @@ extension Tensor : DifferentiableVectorNumeric
   public typealias Cotangent = Tensor
 }
 
-/// Returns the quotient of dividing the first tensor by the second.
-/// - Note: `/` supports broadcasting.
-/// TODO(SR-8699): Move this back into the extension.
-@inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointDivide(_:_:originalValue:seed:))
-public func / <T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
-  return Raw.div(lhs, rhs)
-}
-
 public extension Tensor where Scalar : Numeric {
   /// Adds two tensors and stores the result in the left-hand-side variable.
   /// - Note: `+=` supports broadcasting.
@@ -195,6 +183,14 @@ public extension Tensor where Scalar : Numeric {
   @inlinable @inline(__always)
   static func *= (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs * rhs
+  }
+
+  /// Returns the quotient of dividing the first tensor by the second.
+  /// - Note: `/` supports broadcasting.
+  @inlinable @inline(__always)
+  @differentiable(reverse, adjoint: _adjointDivide(_:_:originalValue:seed:))
+  static func / (lhs: Tensor, rhs: Tensor) -> Tensor {
+    return Raw.div(lhs, rhs)
   }
 
   /// Returns the quotient of dividing the scalar by the tensor, broadcasting
@@ -277,13 +273,13 @@ public func matmul<Scalar : Numeric>(
 
 infix operator • : MultiplicationPrecedence
 
-/// Performs matrix multiplication between two tensors and produces the
-/// result.
-/// TODO(SR-8699): Move this back into an extension of Tensor.
-@inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointMatmul(_:_:originalValue:seed:))
-public func • <T: Numeric> (lhs: Tensor<T>, rhs: Tensor<T>) -> Tensor<T> {
-  return matmul(lhs, rhs)
+public extension Tensor where Scalar : Numeric {
+  /// Performs matrix multiplication between two tensors and produces the
+  /// result.
+  @inlinable @inline(__always)
+  static func • (lhs: Tensor, rhs: Tensor) -> Tensor {
+    return matmul(lhs, rhs)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -583,12 +579,13 @@ public extension Tensor {
 @_exported import func Glibc.powf
 #endif
 
-/// Computes the negation of the specified tensor element-wise.
-/// TODO(SR-8699): Move this back into an extension of Tensor.
-@inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointNegate(_:originalValue:seed:))
-public prefix func - <T: SignedNumeric> (rhs: Tensor<T>) -> Tensor<T> {
-  return Raw.neg(rhs)
+public extension Tensor where Scalar : SignedNumeric {
+  /// Computes the negation of the specified tensor element-wise.
+  @inlinable @inline(__always)
+  @differentiable(reverse, adjoint: _adjointNegate(_:originalValue:seed:))
+  static prefix func - (rhs: Tensor) -> Tensor {
+    return Raw.neg(rhs)
+  }
 }
 
 /// Computes the absolute value of the specified tensor element-wise.
