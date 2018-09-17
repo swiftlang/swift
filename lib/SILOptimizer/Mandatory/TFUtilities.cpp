@@ -30,7 +30,7 @@
 
 using namespace swift;
 using namespace tf;
-typedef SILTensorOpInfo::OperandClass OperandClass;
+typedef GraphOperationInfo::OperandClass OperandClass;
 
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
@@ -318,7 +318,7 @@ decodeTensorOpName(StringRef name, StringRef &opName,
     auto opClass = OperandClass::Normal;
     if (dollarLoc != StringRef::npos) {
       auto suffix = attrName.drop_front(dollarLoc + 1);
-      if (auto res = SILTensorOpInfo::getOperandClass(suffix))
+      if (auto res = GraphOperationInfo::getOperandClass(suffix))
         opClass = res.getValue();
       else {
         return "invalid attribute modifier '" + attrName.str() + "'";
@@ -369,139 +369,6 @@ bool SILTensorOpInfo::decodeBuiltin() {
   }
 
   return true;
-}
-
-/// Return the string suffix for the specified attribute modifier.
-const char *SILTensorOpInfo::getOperandClassSuffix(OperandClass opClass) {
-  switch (opClass) {
-  case OperandClass::Input:
-    return "$in";
-  case OperandClass::Normal:
-    return "";
-  case OperandClass::Tensor:
-    return "$tensor";
-  case OperandClass::Shape:
-    return "$shape";
-  case OperandClass::UnknownShapeList:
-    return "$unknownShapeList";
-  case OperandClass::Array:
-    return "$array";
-  case OperandClass::Out:
-    return "$out";
-  }
-}
-
-/// Return the operand class of the specified string form like "tensor"
-llvm::Optional<OperandClass>
-SILTensorOpInfo::getOperandClass(StringRef suffix) {
-  return llvm::StringSwitch<llvm::Optional<OperandClass>>(suffix)
-      .Case("in", OperandClass::Input)
-      .Case("", OperandClass::Normal)
-      .Case("tensor", OperandClass::Tensor)
-      .Case("shape", OperandClass::Shape)
-      .Case("unknownShapeList", OperandClass::UnknownShapeList)
-      .Case("array", OperandClass::Array)
-      .Case("out", OperandClass::Out)
-      .Default(None);
-}
-
-//===----------------------------------------------------------------------===//
-// GraphOperationDecoder implementation
-//===----------------------------------------------------------------------===//
-
-/// Return the device attribute associated with `inst`, which is required to
-/// exist.
-StringRef GraphOperationInfo::getDeviceString() const {
-  auto attr = inst->getAttributeNamed(DEVICE_ATTR);
-  assertWithDump(attr.hasValue(), "Tensor op instruction has no device string");
-  return attr.getValue().getStringValue();
-}
-
-void GraphOperationInfo::assertWithDump(bool cond,
-                                        const char *assertMsg) const {
-#ifndef NDEBUG
-  if (cond)
-    return;
-  inst->dump();
-  llvm_unreachable(assertMsg);
-#endif // NDEBUG
-}
-
-/// Decode the name of a graph_op into its TensorFlow op name and a list of
-/// information about the operands.
-StringRef
-GraphOperationInfo::decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
-  auto name = inst->getName().str();
-  auto pos = name.find(',');
-  auto opName = name.substr(0, pos);
-
-  while (pos != StringRef::npos) {
-    name = name.drop_front(pos + 1);
-    pos = name.find(',');
-    auto letter = name.substr(0, pos);
-    assertWithDump(letter.size() == 1, "malformed graph_op instruction");
-    InputMarker kind;
-    switch (letter[0]) {
-    case 's':
-      kind = InputMarker::IM_Scalar;
-      break;
-    case 'i':
-      kind = InputMarker::IM_Normal;
-      break;
-    case 'L':
-      kind = InputMarker::IM_InputList;
-      break;
-    case 'e':
-      kind = InputMarker::IM_InputListElt;
-      break;
-    default:
-      assertWithDump(false, "malformed graph_op instruction");
-    }
-    inputInfo.push_back(kind);
-  }
-
-  return opName;
-}
-
-/// Given an attribute name like foo$tensor, decode the name and the class.  If
-/// there is no modifier specified, this defaults to OperandClass::Normal.
-std::pair<StringRef, SILTensorOpInfo::OperandClass>
-GraphOperationInfo::decodeAttributeName(Identifier name) {
-  auto nameStr = name.str();
-  // Figure out what the suffix is (if any).
-  auto dollarLoc = nameStr.find('$');
-
-  auto opClass = OperandClass::Normal;
-  if (dollarLoc != StringRef::npos) {
-    auto suffix = nameStr.drop_front(dollarLoc + 1);
-    if (auto res = SILTensorOpInfo::getOperandClass(suffix))
-      opClass = res.getValue();
-    else {
-      std::string msg = "invalid attribute modifier '" + name.str().str() + "'";
-      llvm_unreachable(msg.c_str());
-    }
-  }
-
-  // Slice the suffix off the attribute name and add the decoded version.
-  return {nameStr.substr(0, dollarLoc), opClass};
-}
-
-int64_t GraphOperationInfo::getIntAttr(unsigned attrIdx,
-                                       StringRef attrName) const {
-  auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-  assert(attrInfo.first == attrName);
-  auto attrValue = attr.value;
-  return attrValue.getIntegerValue().getLimitedValue();
-}
-
-std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
-                                              StringRef attrName) const {
-  auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-  assert(attrInfo.first == attrName);
-  auto attrValue = attr.value;
-  return attrValue.getStringValue().str();
 }
 
 //===----------------------------------------------------------------------===//
@@ -587,15 +454,15 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
        SymbolicValue::getMetatype(elementType->getCanonicalType())});
 
   // Add an attribute for the value$tensor attribute.
-  auto tensorSuffix = SILTensorOpInfo::getOperandClassSuffix(
-      SILTensorOpInfo::OperandClass::Tensor);
+  auto tensorSuffix = GraphOperationInfo::getOperandClassSuffix(
+      GraphOperationInfo::OperandClass::Tensor);
   attributes.push_back(
       {context.getIdentifier(std::string("value") + tensorSuffix), scalars});
 
   // Add the shape$shape attribute if we have an array value.
   if (scalars.getKind() == SymbolicValue::Array) {
-    auto shapeId = SILTensorOpInfo::OperandClass::Shape;
-    auto shapeSuffix = SILTensorOpInfo::getOperandClassSuffix(shapeId);
+    auto shapeId = GraphOperationInfo::OperandClass::Shape;
+    auto shapeSuffix = GraphOperationInfo::getOperandClassSuffix(shapeId);
     attributes.push_back(
         {context.getIdentifier(std::string("shape") + shapeSuffix), shape});
   }

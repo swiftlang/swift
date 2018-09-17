@@ -43,6 +43,7 @@ set(SOURCES
   OpaqueHandles.swift
   Ops.swift
   Parameterized.swift
+  Random.swift
   ShapedArray.swift
   Tensor.swift
   TensorHandle.swift

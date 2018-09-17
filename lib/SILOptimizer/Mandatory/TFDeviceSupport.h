@@ -45,6 +45,7 @@ enum class DeviceType {
 static const int NUM_DEVICE_TYPES = 5;
 
 class DevicePartitionerImpl;
+struct GraphOperationInfo;
 
 static const char DEFAULT_CPU_DEVICE[] = "/device:CPU:0";
 static const char DEFAULT_GPU_DEVICE[] = "/device:GPU:0";
@@ -63,7 +64,7 @@ static const char DEVICE_ATTR[] = "__device";
 // other TF ops (e.g. a "Const" op).
 static const char SHAPE_ARRAY_ATTR[] = "__shapes";
 
-static DeviceType getOpDeviceType(llvm::StringRef device) {
+static inline DeviceType getOpDeviceType(llvm::StringRef device) {
   if (device.str() == DEFAULT_CPU_DEVICE)
     return DeviceType::CPU;
   if (device.str() == DEFAULT_GPU_DEVICE)
@@ -93,6 +94,10 @@ static inline std::string getDeviceString(DeviceType deviceType) {
     llvm_unreachable("Unsupported device type");
   }
 }
+
+StringRef getDeviceString(const GraphOperationInfo &graphOpInfo);
+
+DeviceType getDeviceType(const GraphOperationInfo &graphOpInfo);
 
 /// The returned string can be used to construct SIL function names.
 static inline std::string getDeviceShortName(DeviceType deviceType) {

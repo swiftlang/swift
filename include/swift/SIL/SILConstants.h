@@ -86,11 +86,6 @@ private:
     /// function_ref directly, or a devirtualized method reference.
     RK_Function,
 
-    /// This value is a constant, and tracked by the "inst" member of the
-    /// value union.  This could be an integer, floating point, string, or
-    /// metatype value.
-    RK_Inst,
-
     /// This value is represented with a bump-pointer allocated APInt.
     RK_Integer,
 
@@ -313,20 +308,6 @@ public:
   SILFunction *getFunctionValue() const {
     assert(getKind() == Function);
     return value.function;
-  }
-
-  static SymbolicValue getConstantInst(SingleValueInstruction *inst) {
-    assert(inst && "inst value must be present");
-    SymbolicValue result;
-    result.representationKind = RK_Inst;
-    result.value.inst = inst;
-    return result;
-  }
-
-  // TODO: Remove this, it is just needed because deabstraction has no SIL
-  // instruction of its own.
-  SingleValueInstruction *getConstantInstIfPresent() const {
-    return representationKind == RK_Inst ? value.inst : nullptr;
   }
 
   static SymbolicValue getInteger(int64_t value, unsigned bitWidth);
