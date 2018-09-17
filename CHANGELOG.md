@@ -279,8 +279,6 @@ Swift 4.2
   conditionally conforms to `P`, will succeed when the conditional
   requirements are met.
 
-**Add new entries to the top of this section, not here!**
-
 Swift 4.1
 ---------
 
