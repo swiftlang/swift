@@ -996,10 +996,6 @@ public:
   /// the abstraction pattern for its object type.
   AbstractionPattern getTupleElementType(unsigned index) const;
 
-  /// Given that the value being abstracted is an l-value or inout type,
-  /// return the abstraction pattern for its object type.
-  AbstractionPattern getWithoutSpecifierType() const;
-
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its result type.
   AbstractionPattern getFunctionResultType() const;

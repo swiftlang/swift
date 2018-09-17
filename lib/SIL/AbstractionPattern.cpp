@@ -499,39 +499,6 @@ AbstractionPattern::getObjCMethodFormalParamPattern(CanType inputType) const {
                    method->parameters()[paramIndex]->getType().getTypePtr());
 }
 
-AbstractionPattern AbstractionPattern::getWithoutSpecifierType() const {
-  switch (getKind()) {
-  case Kind::Invalid:
-    llvm_unreachable("querying invalid abstraction pattern!");
-  case Kind::Tuple:
-  case Kind::ClangFunctionParamTupleType:
-  case Kind::PartialCurriedObjCMethodType:
-  case Kind::CurriedObjCMethodType:
-  case Kind::CFunctionAsMethodType:
-  case Kind::CFunctionAsMethodParamTupleType:
-  case Kind::CurriedCFunctionAsMethodType:
-  case Kind::PartialCurriedCFunctionAsMethodType:
-  case Kind::ObjCMethodType:
-  case Kind::ObjCMethodParamTupleType:
-  case Kind::ObjCMethodFormalParamTupleType:
-  case Kind::CFunctionAsMethodFormalParamTupleType:
-    llvm_unreachable("abstraction pattern for lvalue cannot be tuple");
-  case Kind::Opaque:
-    return *this;
-  case Kind::Type:
-    return AbstractionPattern(getGenericSignature(),
-                              getType().getWithoutSpecifierType());
-  case Kind::Discard:
-    return AbstractionPattern::getDiscard(getGenericSignature(),
-                                        getType().getWithoutSpecifierType());
-  case Kind::ClangType:
-    return AbstractionPattern(getGenericSignature(),
-                              getType().getWithoutSpecifierType(),
-                              getClangType());
-  }
-  llvm_unreachable("bad kind");
-}
-
 static CanType getResultType(CanType type) {
   return cast<AnyFunctionType>(type).getResult();
 }
