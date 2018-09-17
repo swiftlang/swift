@@ -324,7 +324,7 @@ private:
   getPreheaderSubstMap(const SmallPtrSetImpl<SILValue> &values) const;
 
   /// Compute escaping values and what values to use as arguments at preheader.
-  llvm::DenseMap<SILValue, SILValue> computeEscapingValues() const;
+  llvm::DenseMap<SILValue, SILValue> computeEscapingValuesSubstMap() const;
 
   /// Create a new header for the loop and return a pair consisting of
   /// the new block and the phi argument corresponding to the exitIndex.
@@ -418,11 +418,11 @@ void SingleExitLoopTransformer::initialize() {
     }
   }
 
-  escapingValueSubstMap = computeEscapingValues();
+  escapingValueSubstMap = computeEscapingValuesSubstMap();
 }
 
 llvm::DenseMap<SILValue, SILValue>
-SingleExitLoopTransformer::computeEscapingValues() const {
+SingleExitLoopTransformer::computeEscapingValuesSubstMap() const {
   llvm::SmallPtrSet<SILValue, 8> escapingValues;
   for (const SILBasicBlock *bb : loop->getBlocks()) {
     // Save the values that are escaping this loop in result set.
