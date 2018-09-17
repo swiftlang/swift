@@ -318,7 +318,7 @@ private:
 
   /// Return a map that captures information about what SILValue should be
   /// used at the pre-header of the loop for every SILValue in the given
-  /// `values` set. If it cannnot find a suitable SILValue for an entry in
+  /// `values` set. If it cannot find a suitable SILValue for an entry in
   /// `values`, the corresponding will be mapped to an undef.
   llvm::DenseMap<SILValue, SILValue>
   getPreheaderSubstMap(const SmallPtrSetImpl<SILValue> &values) const;
@@ -454,7 +454,7 @@ SingleExitLoopTransformer::getPreheaderSubstMap(
     result[value] = getUndef(value->getType());
   }
   // Do not eliminate undefs unless requested for.
-  if (!TFNoUndefsInSESE)  return result;
+  if (!TFNoUndefsInSESE) return result;
 
   // Replace undef with an equivalent value that is available at preheader.
   for (auto &kv : result) {
