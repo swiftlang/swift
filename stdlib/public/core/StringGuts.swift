@@ -981,8 +981,8 @@ extension _StringGuts {
   mutating func append<S: StringProtocol>(_ other: S) {
     self.append(other._wholeString._guts, range: other._encodedOffsetRange)
   }
-
-  @usableFromInline // @testable
+  
+  @inlinable // @testable
   internal
   mutating func append(_ other: _StringGuts) {
     // FIXME(TODO: JIRA): shouldn't _isEmptySingleton be sufficient?
@@ -994,7 +994,12 @@ extension _StringGuts {
       self = other
       return
     }
+    _appendSlow(other)
+  }
 
+  @usableFromInline // @testable
+  internal
+  mutating func _appendSlow(_ other: _StringGuts) {
     if _slowPath(other._isOpaque) {
       _opaqueAppend(opaqueOther: other)
       return
