@@ -3439,7 +3439,7 @@ private:
   /// let's try to propagate its type early to prune search space.
   void propagateConversionInfo(ConstraintSystem &cs) const;
 
-  static bool isUnavailable(Constraint *choice) {
+  static bool unavailable(Constraint *choice) {
     if (auto *decl = getDecl(choice))
       return decl->getAttrs().isUnavailable(decl->getASTContext());
     return false;
@@ -3471,7 +3471,7 @@ private:
     TypeBindingFlags flags;
     if (choice->isDisabled())
       flags |= TypeBindingFlag::Disabled;
-    if (isUnavailable(choice))
+    if (unavailable(choice))
       flags |= TypeBindingFlag::Unavailable;
     if (isGenericOp(choice))
       flags |= TypeBindingFlag::GenericOperator;
@@ -3549,12 +3549,15 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
   llvm::SmallPtrSet<TypeBase *, 4> BoundTypes;
 
 public:
-  TypeVarBindingProducer(ConstraintSystem &cs, TypeVariableType *typeVar,
-                         ArrayRef<Binding> initialBindings)
-      : BindingProducer(cs, typeVar->getImpl().getLocator()), TypeVar(typeVar),
-        Bindings(initialBindings.begin(), initialBindings.end()) {}
+  using Element = TypeVariableBinding;
 
-  Optional<TypeVariableBinding> operator()() override {
+  TypeVarBindingProducer(ConstraintSystem &cs,
+                         ConstraintSystem::PotentialBindings &bindings)
+      : BindingProducer(cs, bindings.TypeVar->getImpl().getLocator()),
+        TypeVar(bindings.TypeVar),
+        Bindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
+
+  Optional<Element> operator()() override {
     // Once we reach the end of the current bindings
     // let's try to compute new ones, e.g. supertypes,
     // literal defaults, if that fails, we are done.
@@ -3587,6 +3590,8 @@ class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
   unsigned Index = 0;
 
 public:
+  using Element = DisjunctionChoice;
+
   DisjunctionChoiceProducer(ConstraintSystem &cs, Constraint *disjunction)
       : BindingProducer(cs, disjunction->shouldRememberChoice()
                                 ? disjunction->getLocator()
@@ -3603,7 +3608,7 @@ public:
       : BindingProducer(cs, locator), Choices(choices),
         IsExplicitConversion(explicitConversion) {}
 
-  Optional<DisjunctionChoice> operator()() override {
+  Optional<Element> operator()() override {
     unsigned currIndex = Index;
     if (currIndex >= Choices.size())
       return None;
