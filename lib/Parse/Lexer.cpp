@@ -1292,9 +1292,9 @@ static bool delimiterMatches(unsigned CustomDelimiterLen, const char *&BytesPtr,
 
 /// lexCharacter - Read a character and return its UTF32 code.  If this is the
 /// end of enclosing string/character sequence (i.e. the character is equal to
-/// 'StopQuote'), this returns ~0U and leaves 'CurPtr' pointing to the terminal
-/// quote.  If this is a malformed character sequence, it emits a diagnostic
-/// (when EmitDiagnostics is true) and returns ~1U.
+/// 'StopQuote'), this returns ~0U and advances 'CurPtr' pointing to the end of
+/// terminal quote.  If this is a malformed character sequence, it emits a
+/// diagnostic (when EmitDiagnostics is true) and returns ~1U.
 /// 
 ///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
 ///   character_escape  ::= unicode_character_escape
@@ -1305,6 +1305,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
 
   switch (*CurPtr++) {
   default: {// Normal characters are part of the string.
+    // Normal characters are part of the string.
     // If this is a "high" UTF-8 character, validate it.
     if ((signed char)(CurPtr[-1]) >= 0) {
       if (isPrintable(CurPtr[-1]) == 0)
@@ -1322,14 +1323,26 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   }
   case '"':
   case '\'':
-    // If we found a closing quote character, we're done.
     if (CurPtr[-1] == StopQuote) {
-      --CurPtr;
+      // Mutliline and custom escaping are only enabled for " quote.
+      if (LLVM_UNLIKELY(StopQuote != '"'))
+        return ~0U;
+      if (!IsMultilineString && !CustomDelimiterLen)
+        return ~0U;
+
+      DiagnosticEngine *D = EmitDiagnostics ? Diags : nullptr;
+      auto TmpPtr = CurPtr;
+      if (IsMultilineString && !advanceIfMultilineDelimiter(TmpPtr, D))
+        return '"';
+      if (CustomDelimiterLen &&
+          !delimiterMatches(CustomDelimiterLen, TmpPtr, D, /*IsClosing=*/true))
+        return '"';
+      CurPtr = TmpPtr;
       return ~0U;
     }
     // Otherwise, this is just a character.
     return CurPtr[-1];
-      
+
   case 0:
     if (CurPtr-1 != BufferEnd) {
       if (EmitDiagnostics)
@@ -1738,10 +1751,12 @@ static void validateMultilineIndents(const Token &Str,
 ///   string_literal ::= ["]["]["].*["]["]["] - approximately
 ///   string_literal ::= (#+)("")?".*"(\2\1) - "raw" strings
 void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
-  const char *TokStart = CurPtr-1;
-  assert((*TokStart == '"' || *TokStart == '\'') && "Unexpected start");
+  const char QuoteChar = CurPtr[-1];
+  const char *TokStart = CurPtr - 1 - CustomDelimiterLen;
+
   // NOTE: We only allow single-quote string literals so we can emit useful
   // diagnostics about changing them to double quotes.
+  assert((QuoteChar == '"' || QuoteChar == '\'') && "Unexpected start");
 
   bool wasErroneous = false, IsMultilineString = false;
 
@@ -1774,23 +1789,26 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
     // String literals cannot have \n or \r in them (unless multiline).
     if (((*CurPtr == '\r' || *CurPtr == '\n') && !IsMultilineString)
         || CurPtr == BufferEnd) {
-      TokStart -= CustomDelimiterLen;
       diagnose(TokStart, diag::lex_unterminated_string);
       return formToken(tok::unknown, TokStart);
     }
 
-    unsigned CharValue = lexCharacter(CurPtr, *TokStart, true,
+    unsigned CharValue = lexCharacter(CurPtr, QuoteChar, true,
                                       IsMultilineString, CustomDelimiterLen);
     wasErroneous |= CharValue == ~1U;
 
     // If this is the end of string, we are done.  If it is a normal character
     // or an already-diagnosed error, just munch it.
     if (CharValue == ~0U) {
-      ++CurPtr;
 
-      if (*TokStart == '\'') {
-        // Complain about single-quote string and suggest replacement with
-        // double-quoted equivalent.
+      if (QuoteChar == '\'') {
+        // Emit diagnostics for single-quote string and suggest replacement
+        // with double-quoted equivalent.
+        assert(
+            !IsMultilineString && CustomDelimiterLen == 0 &&
+            "Single quoted string cannot have custom delimitor, nor multiline");
+        assert(*TokStart == '\'' && CurPtr[-1] == '\'');
+
         StringRef orig(TokStart, CurPtr - TokStart);
         llvm::SmallString<32> replacement;
         replacement += '"';
@@ -1823,15 +1841,11 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
       }
 
       // Is this the end of multiline/custom-delimited string literal?
-      if ((!IsMultilineString || advanceIfMultilineDelimiter(CurPtr, Diags)) &&
-          delimiterMatches(CustomDelimiterLen, CurPtr, Diags, true)) {
-        TokStart -= CustomDelimiterLen;
-        if (wasErroneous)
-          return formToken(tok::unknown, TokStart);
+      if (wasErroneous)
+        return formToken(tok::unknown, TokStart);
 
-        return formStringLiteralToken(TokStart, IsMultilineString,
-                                      CustomDelimiterLen);
-      }
+      return formStringLiteralToken(TokStart, IsMultilineString,
+                                    CustomDelimiterLen);
     }
   }
 }
