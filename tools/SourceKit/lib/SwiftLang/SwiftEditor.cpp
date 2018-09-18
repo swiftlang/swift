@@ -596,7 +596,7 @@ class SwiftDocumentSemanticInfo :
 
   const std::string Filename;
   SwiftASTManager &ASTMgr;
-  NotificationCenter &NotificationCtr;
+  std::weak_ptr<NotificationCenter> NotificationCtr;
   ThreadSafeRefCntPtr<SwiftInvocation> InvokRef;
   std::string CompilerArgsError;
 
@@ -873,7 +873,8 @@ void SwiftDocumentSemanticInfo::updateSemanticInfo(
   }
 
   LOG_INFO_FUNC(High, "posted document update notification for: " << Filename);
-  NotificationCtr.postDocumentUpdateNotification(Filename);
+  if (auto notifications = NotificationCtr.lock())
+    notifications->postDocumentUpdateNotification(Filename);
 }
 
 namespace {
