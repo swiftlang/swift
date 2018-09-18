@@ -888,6 +888,10 @@ void Remangler::mangleAssociatedConformanceDescriptor(Node *node) {
   Out << "<associated-conformance-descriptor>";
 }
 
+void Remangler::mangleDefaultAssociatedConformanceAccessor(Node *node) {
+  Out << "<default-associated-conformance-descriptor>";
+}
+
 void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node) {
   Out << "Wt";
   mangleChildNodes(node); // protocol conformance, identifier

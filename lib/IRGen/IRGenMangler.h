@@ -197,6 +197,19 @@ public:
     return finalize();
   }
 
+  std::string mangleDefaultAssociatedConformanceAccessor(
+      const ProtocolDecl *proto,
+      CanType subject,
+      const ProtocolDecl *requirement) {
+    beginMangling();
+    appendAnyGenericType(proto);
+    bool isFirstAssociatedTypeIdentifier = true;
+    appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    appendProtocolName(requirement);
+    appendOperator("TN");
+    return finalize();
+  }
+
   std::string mangleProtocolConformanceDescriptor(
                                  const ProtocolConformance *Conformance) {
     beginMangling();

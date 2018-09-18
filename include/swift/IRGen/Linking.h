@@ -213,6 +213,11 @@ class LinkEntity {
     /// is stored in the data.
     AssociatedConformanceDescriptor,
 
+    /// A default accessor for an associated conformance of a protocol.
+    /// The pointer is a ProtocolDecl*; the index of the associated conformance
+    /// is stored in the data.
+    DefaultAssociatedConformanceAccessor,
+
     /// A function which returns the default type metadata for the associated
     /// type of a protocol.  The secondary pointer is a ProtocolDecl*.
     /// The index of the associated type declaration is stored in the data.
@@ -834,6 +839,17 @@ public:
     return entity;
   }
 
+  static LinkEntity
+  forDefaultAssociatedConformanceAccessor(AssociatedConformance conformance) {
+    LinkEntity entity;
+    entity.setForProtocolAndAssociatedConformance(
+        Kind::DefaultAssociatedConformanceAccessor,
+        conformance.getSourceProtocol(),
+        conformance.getAssociation(),
+        conformance.getAssociatedRequirement());
+    return entity;
+  }
+
   static LinkEntity forReflectionBuiltinDescriptor(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::ReflectionBuiltinDescriptor, type);
@@ -924,7 +940,8 @@ public:
                        LINKENTITY_GET_FIELD(Data, AssociatedConformanceIndex));
     }
 
-    assert(getKind() == Kind::AssociatedConformanceDescriptor);
+    assert(getKind() == Kind::AssociatedConformanceDescriptor ||
+           getKind() == Kind::DefaultAssociatedConformanceAccessor);
     return getAssociatedConformanceByIndex(
              cast<ProtocolDecl>(getDecl()),
              LINKENTITY_GET_FIELD(Data, AssociatedConformanceIndex));
