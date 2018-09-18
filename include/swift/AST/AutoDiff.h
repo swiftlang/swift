@@ -101,6 +101,13 @@ struct SILReverseAutoDiffIndices {
 
   bool operator==(const SILReverseAutoDiffIndices &other) const;
 
+  /// Queries whether the function's parameter with index `parameterIndex` is
+  /// one of the parameters to differentiate with respect to.
+  bool isWrtParameter(unsigned parameterIndex) const {
+    return parameterIndex < parameters.size() &&
+           parameters.test(parameterIndex);
+  }
+
   void print(llvm::raw_ostream &s = llvm::outs()) const {
     s << "(source=" << source << " parameters=(";
     interleave(parameters.set_bits(),
