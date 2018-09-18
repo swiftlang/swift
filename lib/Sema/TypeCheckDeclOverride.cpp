@@ -481,8 +481,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
                                matchDecl->getDescriptiveKind(),
                                matchDecl->getFullName());
     if (attempt == OverrideCheckingAttempt::BaseName) {
-      fixDeclarationName(diag, cast<AbstractFunctionDecl>(decl),
-                         matchDecl->getFullName());
+      fixDeclarationName(diag, decl, matchDecl->getFullName());
     }
   }
 }
@@ -773,8 +772,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                isa<ConstructorDecl>(decl),
                                decl->getFullName(),
                                baseDecl->getFullName());
-    fixDeclarationName(diag, cast<AbstractFunctionDecl>(decl),
-                       baseDecl->getFullName());
+    fixDeclarationName(diag, decl, baseDecl->getFullName());
     emittedMatchError = true;
   }
 
