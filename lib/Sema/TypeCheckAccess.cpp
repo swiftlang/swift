@@ -528,9 +528,7 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    checkTypeAccess(TAD->getUnderlyingTypeLoc().getType(),
-                    TAD->getUnderlyingTypeLoc().getTypeRepr(),
-                    TAD,
+    checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -578,9 +576,7 @@ public:
         }
       });
     });
-    checkTypeAccess(assocType->getDefaultDefinitionLoc().getType(),
-                    assocType->getDefaultDefinitionLoc().getTypeRepr(),
-                    assocType,
+    checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag) {
