@@ -52,6 +52,10 @@ static llvm::cl::opt<bool> TFPromoteGlobalVariables(
         "If enabled, promote global variables into SSA with a best "
         "effort to minimize sends/recvs. This is a performance optimization."));
 
+namespace llvm {
+  extern cl::opt<bool> TFDynamicCompilation;
+}
+
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
@@ -2163,8 +2167,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
           return;
         }
 
-        opName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Scalar);
+        GraphOperationInfo::OperandMarker::appendTo(
+            opName, GraphOperationInfo::OMK_Scalar);
 
         inputs.push_back(operand);
         continue;
@@ -2181,10 +2185,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         // Remember that we have an input list, this marker is important because
         // the list may be empty, and we need to know it exists in graph
         // lowering.
-        opName += GraphOperationInfo::getInputMarker(
-            GraphOperationInfo::IM_InputList);
-        const char *elementMarker = GraphOperationInfo::getInputMarker(
-            GraphOperationInfo::IM_InputListElt);
+        GraphOperationInfo::OperandMarker::appendTo(
+            opName, GraphOperationInfo::OMK_InputList);
 
         // Add each element to the input list we're building, drilling down
         // through any aggregates that may be around it.
@@ -2212,7 +2214,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
           unsigned unpackedInputsCount =
               inputs.size() - beforeUnpackInputsCount;
           for (unsigned i = 0; i < unpackedInputsCount; i++)
-            opName += elementMarker;
+            GraphOperationInfo::OperandMarker::appendTo(
+                opName, GraphOperationInfo::OMK_InputListElt);
         }
         continue;
       }
@@ -2245,8 +2248,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                         "' must contain exactly one TensorFlow value",
                         instLoc);
       }
-      opName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+      GraphOperationInfo::OperandMarker::appendTo(
+          opName, GraphOperationInfo::OMK_Normal);
       continue;
     }
 
@@ -2257,28 +2260,39 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                       "' " + message.str());
     };
 
-    // Ok, we have an attribute operand, we should have been able to fold it
-    // through our constexpr evaluation logic.
-    auto it = constants.find(operand);
-    if (it == constants.end() || !it->second.isConstant()) {
-      // TODO: improve the diagnostic to talk about the parameter label in
-      // the user code, not the internal op attribute.  The bookkeeping for
-      // this isn't obvious though.
-      diagnoseInvalidAttr("requires a constant argument");
-
-      // If we have more specific information about what went wrong, emit
-      // notes.
-      if (it != constants.end() &&
-          it->second.getKind() == SymbolicValue::Unknown)
-        it->second.emitUnknownDiagnosticNotes(opInfo.inst->getLoc());
-      return;
-    }
-
     // Name mangle the attribute classification into the operand list so we can
     // know the difference between a shape and an array, and a shape array, etc.
     auto attrName =
         operandClass.first.str() +
         GraphOperationInfo::getOperandClassSuffix(operandClass.second);
+
+    // Ok, we have an attribute operand, we should have been able to fold it
+    // through our constexpr evaluation logic -- unless we're doing dynamic
+    // compilation.
+    auto it = constants.find(operand);
+    if (it == constants.end() || !it->second.isConstant()) {
+      if (llvm::TFDynamicCompilation) {
+        // Since we're doing dynamic compilation, we can simply pass this
+        // unknown attribute as a named operand to the graph_op, and IRGen will
+        // deal with it.
+        GraphOperationInfo::OperandMarker::appendTo(
+            opName, GraphOperationInfo::OMK_Normal, attrName);
+        inputs.push_back(operand);
+        continue;
+      } else {
+        // TODO: improve the diagnostic to talk about the parameter label in
+        // the user code, not the internal op attribute.  The bookkeeping for
+        // this isn't obvious though.
+        diagnoseInvalidAttr("requires a constant argument");
+
+        // If we have more specific information about what went wrong, emit
+        // notes.
+        if (it != constants.end() &&
+            it->second.getKind() == SymbolicValue::Unknown)
+          it->second.emitUnknownDiagnosticNotes(opInfo.inst->getLoc());
+        return;
+      }
+    }
 
     // Get the constant, ignoring struct wrappers.
     auto constValue = it->second.lookThroughSingleElementAggregates();

@@ -2538,8 +2538,10 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     assert(0 && "Handled above");
   case PromotedScalarKind::Binary:
   case PromotedScalarKind::OverflowingBinary:
-    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
-    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+    GraphOperationInfo::OperandMarker::appendTo(
+        opName, GraphOperationInfo::OMK_Normal);
+    GraphOperationInfo::OperandMarker::appendTo(
+        opName, GraphOperationInfo::OMK_Normal);
     break;
   case PromotedScalarKind::Literal: {
     SymbolicValue constVal;
@@ -2569,7 +2571,8 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   }
   case PromotedScalarKind::Conversion: {
     // Conversions get an attribute specifying the result dtype, named "DstT".
-    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+    GraphOperationInfo::OperandMarker::appendTo(
+        opName, GraphOperationInfo::OMK_Normal);
     attributes.push_back(
         {ctx.getIdentifier("DstT"),
          SymbolicValue::getMetatype(
@@ -2781,7 +2784,8 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto opType = "tfc.SendToHost";
   std::string instName = opType;
-  instName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+  GraphOperationInfo::OperandMarker::appendTo(instName,
+                                              GraphOperationInfo::OMK_Normal);
   SmallVector<GraphOperationAttribute, 2> attributes;
   attributes.push_back(
       {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
@@ -3093,10 +3097,10 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
       // Omit the metatype attr T for simplicity, and TF graphDef compiler can
       // infer the type.
       std::string equalOpName = "Equal";
-      equalOpName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
-      equalOpName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+      GraphOperationInfo::OperandMarker::appendTo(
+          equalOpName, GraphOperationInfo::OMK_Normal);
+      GraphOperationInfo::OperandMarker::appendTo(
+          equalOpName, GraphOperationInfo::OMK_Normal);
 
       auto boolFieldSILType =
           extractBuiltinTypeFromStdlibNumericType(ctx.getBoolDecl());

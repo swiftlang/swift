@@ -727,10 +727,10 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
 
     // Create a condition to compare exitIndex to a constant
     std::string equalOpName("Equal");
-    equalOpName +=
-        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
-    equalOpName +=
-        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+    GraphOperationInfo::OperandMarker::appendTo(
+        equalOpName, GraphOperationInfo::OMK_Normal);
+    GraphOperationInfo::OperandMarker::appendTo(
+        equalOpName, GraphOperationInfo::OMK_Normal);
     SmallVector<GraphOperationAttribute, 2> attributes;
     deviceInfo->handleDevicePlacement(
         equalOpName, /*opDevice*/ getDeviceString(DeviceType::ALL),

@@ -74,35 +74,16 @@ void GraphOperationInfo::assertWithDump(bool cond,
 
 /// Decode the name of a graph_op into its TensorFlow op name and a list of
 /// information about the operands.
-StringRef
-GraphOperationInfo::decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
+StringRef GraphOperationInfo::decodeName(
+    SmallVectorImpl<OperandMarker> &operandMarkers) const {
   auto name = inst->getName().str();
   auto pos = name.find(',');
   auto opName = name.substr(0, pos);
 
   while (pos != StringRef::npos) {
-    name = name.drop_front(pos + 1);
-    pos = name.find(',');
-    auto letter = name.substr(0, pos);
-    assertWithDump(letter.size() == 1, "malformed graph_op instruction");
-    InputMarker kind;
-    switch (letter[0]) {
-    case 's':
-      kind = InputMarker::IM_Scalar;
-      break;
-    case 'i':
-      kind = InputMarker::IM_Normal;
-      break;
-    case 'L':
-      kind = InputMarker::IM_InputList;
-      break;
-    case 'e':
-      kind = InputMarker::IM_InputListElt;
-      break;
-    default:
-      assertWithDump(false, "malformed graph_op instruction");
-    }
-    inputInfo.push_back(kind);
+    name = name.drop_front(pos);
+    pos = name.find(',', 1);
+    operandMarkers.push_back(OperandMarker(name.substr(0, pos), *this));
   }
 
   return opName;
@@ -147,4 +128,73 @@ std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
   assert(attrInfo.first == attrName);
   auto attrValue = attr.value;
   return attrValue.getStringValue().str();
+}
+
+GraphOperationInfo::OperandMarker::OperandMarker(
+    StringRef MangledName, const GraphOperationInfo &info)
+    : MangledName(MangledName) {
+  info.assertWithDump(MangledName.size() >= 2, "marker too short");
+  info.assertWithDump(MangledName.find_last_of(",") == 0, "incorrect comma");
+
+  switch (MangledName[1]) {
+  case 's':
+    Kind = OMK_Scalar;
+    assert(getName().empty());
+    break;
+  case 'i':
+    Kind = OMK_Normal;
+    break;
+  case 'L':
+    Kind = OMK_InputList;
+    break;
+  case 'e':
+    Kind = OMK_InputListElt;
+    assert(getName().empty());
+    break;
+  default:
+    info.assertWithDump(false, "unknown marker kind");
+  }
+}
+
+GraphOperationInfo::OperandMarkerKind
+GraphOperationInfo::OperandMarker::getKind() const {
+  return Kind;
+}
+
+// The name of the marked operand or list.
+StringRef GraphOperationInfo::OperandMarker::getName() const {
+  return MangledName.drop_front(2);
+}
+
+/// A mangled string describing this OperandMarker, suitable for appending
+/// to a mangled graph_op name.
+StringRef GraphOperationInfo::OperandMarker::getMangledName() const {
+  return MangledName;
+}
+
+/// Appends an OperandMarker with `kind` and `name` to the passed-in
+/// `mangledOpName`. `name` must be empty for OMK_Scalar and
+/// OMK_InputListElt.
+void
+GraphOperationInfo::OperandMarker::appendTo(std::string &mangledOpName,
+                                            OperandMarkerKind kind,
+                                            StringRef name) {
+  switch (kind) {
+  case OMK_Scalar:
+    mangledOpName += ",s";
+    assert(name.empty());
+    break;
+  case OMK_Normal:
+    mangledOpName += ",i";
+    mangledOpName += name;
+    break;
+  case OMK_InputList:
+    mangledOpName += ",L";
+    mangledOpName += name;
+    break;
+  case OMK_InputListElt:
+    mangledOpName += ",e";
+    assert(name.empty());
+    break;
+  }
 }
