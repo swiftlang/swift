@@ -931,12 +931,15 @@ void UsableFromInlineChecker::check(Decl *D) {
   if (D->isInvalid() || D->isImplicit())
     return;
 
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+  auto shouldSkipChecking = [](const ValueDecl *VD) -> bool {
     if (VD->getFormalAccess() != AccessLevel::Internal)
+      return true;
+    return !VD->isUsableFromInline();
+  };
+
+  if (auto *VD = dyn_cast<ValueDecl>(D))
+    if (shouldSkipChecking(VD))
       return;
-    if (!VD->isUsableFromInline())
-      return;
-  }
 
   switch (D->getKind()) {
   case DeclKind::Import:
@@ -969,69 +972,89 @@ void UsableFromInlineChecker::check(Decl *D) {
     auto PBD = cast<PatternBindingDecl>(D);
     bool isTypeContext = PBD->getDeclContext()->isTypeContext();
 
+    // Stored instance properties in public/@usableFromInline fixed-contents
+    // structs in resilient modules must always use public/@usableFromInline
+    // types. In these cases, check the access against the struct instead of the
+    // VarDecl, and customize the diagnostics. (The code below doesn't check
+    // for "in resilient modules" because there's no reason to write
+    // @_fixedLayout on a struct in a non-resilient module.)
+    const ValueDecl *fixedLayoutStructContext = nullptr;
+    if (auto *parentStruct = dyn_cast<StructDecl>(PBD->getDeclContext())) {
+      if (parentStruct->getAttrs().hasAttribute<FixedLayoutAttr>() &&
+          !PBD->isStatic() && PBD->hasStorage()) {
+        fixedLayoutStructContext = parentStruct;
+      }
+    }
+
     llvm::DenseSet<const VarDecl *> seenVars;
-    for (auto entry : PBD->getPatternList())
-    entry.getPattern()->forEachNode([&](const Pattern *P) {
-      if (auto *NP = dyn_cast<NamedPattern>(P)) {
-        // Only check individual variables if we didn't check an enclosing
-        // TypedPattern.
-        const VarDecl *theVar = NP->getDecl();
-        if (theVar->getFormalAccess() != AccessLevel::Internal)
+    for (auto entry : PBD->getPatternList()) {
+      entry.getPattern()->forEachNode([&](const Pattern *P) {
+        if (auto *NP = dyn_cast<NamedPattern>(P)) {
+          // Only check individual variables if we didn't check an enclosing
+          // TypedPattern.
+          const VarDecl *theVar = NP->getDecl();
+          if (!fixedLayoutStructContext && shouldSkipChecking(theVar))
+            return;
+          if (seenVars.count(theVar) || theVar->isInvalid())
+            return;
+
+          checkTypeAccess(theVar->getType(), nullptr,
+                          fixedLayoutStructContext ? fixedLayoutStructContext
+                                                   : theVar,
+                          [&](AccessScope typeAccessScope,
+                              const TypeRepr *complainRepr,
+                              DowngradeToWarning downgradeToWarning) {
+            auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
+            if (fixedLayoutStructContext)
+              diagID =
+                diag::pattern_type_not_usable_from_inline_inferred_fixed_layout;
+            else if (!TC.Context.isSwiftVersionAtLeast(5))
+              diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
+            TC.diagnose(P->getLoc(),
+                        diagID,
+                        theVar->isLet(),
+                        isTypeContext,
+                        theVar->getType());
+          });
           return;
-        if (!theVar->isUsableFromInline())
-          return;
-        if (seenVars.count(theVar) || theVar->isInvalid())
+        }
+
+        auto *TP = dyn_cast<TypedPattern>(P);
+        if (!TP)
           return;
 
-        checkTypeAccess(theVar->getType(), nullptr, theVar,
+        // FIXME: We need an access level to check against, so we pull one out
+        // of some random VarDecl in the pattern. They're all going to be the
+        // same, but still, ick.
+        const VarDecl *anyVar = nullptr;
+        TP->forEachVariable([&](VarDecl *V) {
+          seenVars.insert(V);
+          anyVar = V;
+        });
+        if (!anyVar)
+          return;
+        if (!fixedLayoutStructContext && shouldSkipChecking(anyVar))
+          return;
+
+        checkTypeAccess(TP->getTypeLoc(),
+                        fixedLayoutStructContext ? fixedLayoutStructContext
+                                                 : anyVar,
                         [&](AccessScope typeAccessScope,
                             const TypeRepr *complainRepr,
                             DowngradeToWarning downgradeToWarning) {
-          auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
-          if (!TC.Context.isSwiftVersionAtLeast(5))
-            diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
-          TC.diagnose(P->getLoc(),
-                      diagID,
-                      theVar->isLet(),
-                      isTypeContext,
-                      theVar->getType());
+          auto diagID = diag::pattern_type_not_usable_from_inline;
+          if (fixedLayoutStructContext)
+            diagID = diag::pattern_type_not_usable_from_inline_fixed_layout;
+          else if (!TC.Context.isSwiftVersionAtLeast(5))
+            diagID = diag::pattern_type_not_usable_from_inline_warn;
+          auto diag = TC.diagnose(P->getLoc(),
+                                  diagID,
+                                  anyVar->isLet(),
+                                  isTypeContext);
+          highlightOffendingType(TC, diag, complainRepr);
         });
-        return;
-      }
-
-      auto *TP = dyn_cast<TypedPattern>(P);
-      if (!TP)
-        return;
-
-      // FIXME: We need an access level to check against, so we pull one out of
-      // some random VarDecl in the pattern. They're all going to be the same,
-      // but still, ick.
-      const VarDecl *anyVar = nullptr;
-      TP->forEachVariable([&](VarDecl *V) {
-        seenVars.insert(V);
-        anyVar = V;
       });
-      if (!anyVar)
-        return;
-      if (anyVar->getFormalAccess() != AccessLevel::Internal)
-        return;
-      if (!anyVar->isUsableFromInline())
-        return;
-
-      checkTypeAccess(TP->getTypeLoc(), anyVar,
-                      [&](AccessScope typeAccessScope,
-                          const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
-        auto diagID = diag::pattern_type_not_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
-          diagID = diag::pattern_type_not_usable_from_inline_warn;
-        auto diag = TC.diagnose(P->getLoc(),
-                                diagID,
-                                anyVar->isLet(),
-                                isTypeContext);
-        highlightOffendingType(TC, diag, complainRepr);
-      });
-    });
+    }
     return;
   }
 

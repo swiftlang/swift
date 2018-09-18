@@ -16,6 +16,9 @@
 
 import SwiftShims
 
+// FIXME: Remove @usableFromInline once Hasher is resilient.
+// rdar://problem/38549901
+@usableFromInline
 internal protocol _HasherCore {
   init(seed: (UInt64, UInt64))
   mutating func compress(_ value: UInt64)
@@ -74,6 +77,9 @@ internal func _loadPartialUnalignedUInt64LE(
 /// trailing bytes, while the most significant 8 bits hold the count of bytes
 /// appended so far, modulo 256. The count of bytes currently stored in the
 /// buffer is in the lower three bits of the byte count.)
+// FIXME: Remove @usableFromInline and @_fixed_layout once Hasher is resilient.
+// rdar://problem/38549901
+@usableFromInline @_fixed_layout
 internal struct _HasherTailBuffer {
   // msb                                                             lsb
   // +---------+-------+-------+-------+-------+-------+-------+-------+
@@ -146,6 +152,9 @@ internal struct _HasherTailBuffer {
   }
 }
 
+// FIXME: Remove @usableFromInline and @_fixed_layout once Hasher is resilient.
+// rdar://problem/38549901
+@usableFromInline @_fixed_layout
 internal struct _BufferingHasher<Core: _HasherCore> {
   private var _buffer: _HasherTailBuffer
   private var _core: Core
@@ -278,7 +287,13 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 ///   versions of the standard library.
 @_fixed_layout // FIXME: Should be resilient (rdar://problem/38549901)
 public struct Hasher {
+  // FIXME: Remove @usableFromInline once Hasher is resilient.
+  // rdar://problem/38549901
+  @usableFromInline
   internal typealias RawCore = _SipHash13Core
+  // FIXME: Remove @usableFromInline once Hasher is resilient.
+  // rdar://problem/38549901
+  @usableFromInline
   internal typealias Core = _BufferingHasher<RawCore>
 
   internal var _core: Core
