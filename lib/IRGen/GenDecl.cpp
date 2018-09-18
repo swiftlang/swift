@@ -3387,6 +3387,26 @@ llvm::GlobalValue *IRGenModule::defineAssociatedTypeDescriptor(
   return defineAlias(entity, definition);
 }
 
+llvm::Constant *IRGenModule::getAddrOfAssociatedConformanceDescriptor(
+                                          AssociatedConformance conformance) {
+  auto entity = LinkEntity::forAssociatedConformanceDescriptor(
+                  conformance.getSourceProtocol(),
+                  conformance.getAssociation(),
+                  conformance.getAssociatedRequirement());
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                               ProtocolRequirementStructTy, DebugTypeInfo());
+}
+
+llvm::GlobalValue *IRGenModule::defineAssociatedConformanceDescriptor(
+                                                ProtocolDecl *proto,
+                                                CanType subject,
+                                                ProtocolDecl *requirement,
+                                                llvm::Constant *definition) {
+  auto entity = LinkEntity::forAssociatedConformanceDescriptor(proto, subject,
+                                                               requirement);
+  return defineAlias(entity, definition);
+}
+
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
                                 const NormalProtocolConformance *conformance,
                                 ConstantInit definition) {

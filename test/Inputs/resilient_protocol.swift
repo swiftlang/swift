@@ -28,9 +28,9 @@ public protocol ProtocolWithRequirements {
   func second()
 }
 
-public struct Wrapper<T> { }
+public struct Wrapper<T>: OtherResilientProtocol { }
 
 public protocol ProtocolWithAssocTypeDefaults {
   associatedtype T1 = Self
-  associatedtype T2 = Wrapper<T1>
+  associatedtype T2: OtherResilientProtocol = Wrapper<T1>
 }

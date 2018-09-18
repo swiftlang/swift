@@ -99,6 +99,15 @@ void TBDGenVisitor::addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType) {
   addSymbol(entity);
 }
 
+void TBDGenVisitor::addAssociatedConformanceDescriptor(
+                                                 ProtocolDecl *proto,
+                                                 CanType subject,
+                                                 ProtocolDecl *requirement) {
+  auto entity = LinkEntity::forAssociatedConformanceDescriptor(proto, subject,
+                                                               requirement);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addConformances(DeclContext *DC) {
   for (auto conformance : DC->getLocalConformances()) {
     auto protocol = conformance->getProtocol();
@@ -408,6 +417,20 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
     // If there are any requirements, emit a requirements base descriptor.
     if (protocolDescriptorHasRequirements(PD))
       addProtocolRequirementsBaseDescriptor(PD);
+
+    for (const auto &req : PD->getRequirementSignature()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      // Skip inherited requirements.
+      if (req.getFirstType()->isEqual(PD->getProtocolSelfType()))
+        continue;
+
+      addAssociatedConformanceDescriptor(
+          PD,
+          req.getFirstType()->getCanonicalType(),
+          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+    }
 
     for (auto *member : PD->getMembers()) {
       if (PD->isResilient()) {

@@ -2500,10 +2500,30 @@ static llvm::Value *
 emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
                                   llvm::Value *parentMetadata,
                                   llvm::Value *wtable,
-                                  WitnessIndex index,
+                                  AssociatedConformance conformance,
                                   llvm::Value *associatedTypeMetadata) {
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
-                                             index.forProtocolWitnessTable());
+  auto sourceProtocol = conformance.getSourceProtocol();
+  llvm::Value *witness;
+  if (IGF.IGM.isResilient(sourceProtocol, ResilienceExpansion::Maximal)) {
+    // For resilient protocols, use the associated conformance descriptor to
+    // determine the index.
+    auto assocConformanceDescriptor =
+      IGF.IGM.getAddrOfAssociatedConformanceDescriptor(conformance);
+
+    auto index =
+      computeResilientWitnessTableIndex(IGF, sourceProtocol,
+                                        assocConformanceDescriptor);
+
+    witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+  } else {
+    // For non-resilient protocols, the index is a constant.
+    auto &pi = IGF.IGM.getProtocolInfo(sourceProtocol,
+                                       ProtocolInfoKind::RequirementSignature);
+
+    auto index = pi.getAssociatedConformanceIndex(conformance);
+    witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
+                                               index.forProtocolWitnessTable());
+  }
 
   // Cast the witness to the appropriate function type.
   auto sig = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionSignature();
@@ -2663,14 +2683,17 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
     if (!source) return MetadataResponse();
 
-    WitnessIndex index(component.getPrimaryIndex(), /*prefix*/ false);
     auto sourceMetadata = IGF.emitTypeMetadataRef(sourceType);
     auto associatedMetadata = IGF.emitTypeMetadataRef(sourceKey.Type);
     auto sourceWTable = source.getMetadata();
 
+    AssociatedConformance associatedConformanceRef(sourceProtocol,
+                                                   association,
+                                                   associatedRequirement);
     auto associatedWTable = 
       emitAssociatedTypeWitnessTableRef(IGF, sourceMetadata, sourceWTable,
-                                        index, associatedMetadata);
+                                        associatedConformanceRef,
+                                        associatedMetadata);
 
     setProtocolWitnessTableName(IGF.IGM, associatedWTable, sourceKey.Type,
                                 associatedRequirement);
@@ -3396,13 +3419,7 @@ Signature IRGenModule::getAssociatedTypeMetadataAccessFunctionSignature() {
   return Signature(fnType, attrs, SwiftCC);
 }
 
-/// Compute the index into a witness table for a resilient protocol given
-/// a reference to a descriptor of one of the requirements in that witness
-/// table.
-///
-/// Given an index into the witness table for a resilient protocol that
-/// was compiuted
-static llvm::Value *computeResilientWitnessTableIndex(
+llvm::Value *irgen::computeResilientWitnessTableIndex(
                                             IRGenFunction &IGF,
                                             ProtocolDecl *proto,
                                             llvm::Constant *reqtDescriptor) {
