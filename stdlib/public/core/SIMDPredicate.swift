@@ -53,6 +53,21 @@ public extension SIMDPredicate {
   static func |(lhs: Bool, rhs: Self) -> Self {
     return rhs | lhs
   }
+  
+  @inlinable
+  static func random<T: RandomNumberGenerator>(using generator: inout T) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Bool.random(using: &generator)
+    }
+    return result
+  }
+  
+  @inlinable
+  static func random() -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(using: &g)
+  }
 }
 
 // Defaulted requirements of SIMDVector

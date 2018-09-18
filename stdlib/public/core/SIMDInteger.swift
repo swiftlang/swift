@@ -390,6 +390,42 @@ public extension SIMDIntegerVector {
   func replacingBits(with other: Self, where mask: Self) -> Self {
     return self & ~mask | other & mask
   }
+  
+  @inlinable
+  static func random<T: RandomNumberGenerator>(
+    in range: Range<Element>,
+    using generator: inout T
+  ) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Element.random(in: range, using: &generator)
+    }
+    return result
+  }
+  
+  @inlinable
+  static func random(in range: Range<Element>) -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
+  }
+  
+  @inlinable
+  static func random<T: RandomNumberGenerator>(
+    in range: ClosedRange<Element>,
+    using generator: inout T
+  ) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Element.random(in: range, using: &generator)
+    }
+    return result
+  }
+  
+  @inlinable
+  static func random(in range: ClosedRange<Element>) -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
+  }
 }
 
 // MARK: Free functions implemented on the SIMDIntegerVector

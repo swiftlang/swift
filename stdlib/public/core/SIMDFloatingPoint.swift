@@ -1,5 +1,6 @@
 public protocol SIMDFloatingPointVector : SIMDVector
-                          where Element : BinaryFloatingPoint {
+                          where Element : BinaryFloatingPoint,
+                 Element.RawSignificand : FixedWidthInteger {
 
   associatedtype BitPattern: SIMDIntegerVector
     where BitPattern.Predicate == Predicate
@@ -228,4 +229,42 @@ public extension SIMDFloatingPointVector {
       self.bitPattern.replacing(with: other.bitPattern, where: predicate)
     )
   }
+  
+  @inlinable
+  static func random<T: RandomNumberGenerator>(
+    in range: Range<Element>,
+    using generator: inout T
+  ) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Element.random(in: range, using: &generator)
+    }
+    return result
+  }
+  
+  @inlinable
+  static func random(in range: Range<Element>) -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
+  }
+  
+  @inlinable
+  static func random<T: RandomNumberGenerator>(
+    in range: ClosedRange<Element>,
+    using generator: inout T
+  ) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Element.random(in: range, using: &generator)
+    }
+    return result
+  }
+  
+  @inlinable
+  static func random(in range: ClosedRange<Element>) -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
+  }
 }
+
+
