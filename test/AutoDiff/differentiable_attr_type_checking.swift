@@ -15,6 +15,16 @@ func foo(_ x: Float) -> Float {
   return x * x
 }
 
+@differentiable(reverse) // ok!
+func no_prim_or_adj(_ x: Float) -> Float {
+  return x * x
+}
+
+@differentiable(reverse, primal: dfoo) // expected-error {{a corresponding adjoint must be specified when the primal is provided}}
+func prim_but_no_adj(_ x: Float) -> Float {
+  return x * x
+}
+
 // Original function must return non-Void type.
 @differentiable(reverse, adjoint: dvoid) // expected-error {{cannot differentiate void function 'void'}}
 func void(_ a: Float) {}

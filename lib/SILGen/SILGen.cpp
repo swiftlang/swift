@@ -803,25 +803,26 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       break;
     case AutoDiffMode::Reverse: {
       auto silOriginalFn = getFunction(SILDeclRef(AFD), ForDefinition);
-      // If primal exists, get primal's name. Otherwise, set primal name to
-      // the original function's name.
-      // NOTE: the original function is a valid primal function: specifically,
-      // it is equivalent to a primal function which checkpoints no values
-      // except the original result. When no primal is explicitly specified,
-      // the original function is used as the primal.
-      StringRef primName;
+      // Either only adjoint is specified, or both primal and adjoint are
+      // spcified.
+      StringRef primName, adjName;
       if (auto *primFn = diffAttr->getPrimalFunction())
         primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
-      else
-        primName = silOriginalFn->getName();
-      // Get adjoint's name.
-      auto *adjointFn = diffAttr->getAdjointFunction();
-      assert(adjointFn && "Adjoint should've been type-checked and resolved.");
-      StringRef adjName =
-        getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
+      if (auto *adjointFn = diffAttr->getAdjointFunction()) {
+        // If the adjoint is specified but the primal is not, then we treat the
+        // original as the primal.
+        if (primName.empty())
+          primName = silOriginalFn->getName();
+        adjName = getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
+      }
+      else {
+        assert(primName.empty() &&
+               "Primal cannot be present if adjoint is not");
+      }
       // Get lowered argument indices.
       auto paramIndices =
-        getLoweredAutoDiffParameterIndices(*this, AFD, silOriginalFn, diffAttr);
+          getLoweredAutoDiffParameterIndices(*this, AFD, silOriginalFn,
+                                             diffAttr);
       SILReverseAutoDiffIndices indices(/*source*/ 0, paramIndices);
       silOriginalFn->addReverseDifferentiableAttr(
           SILReverseDifferentiableAttr::create(M, indices, primName, adjName));

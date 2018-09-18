@@ -780,12 +780,12 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
     return makeParserError();
   }
 
-  using FuncSpec = DifferentiableAttr::FunctionSpecifier;
+  using DeclNameWithLoc = DifferentiableAttr::DeclNameWithLoc;
   AutoDiffMode mode;
   SourceLoc modeLoc;
   SmallVector<AutoDiffParameter, 8> params;
-  Optional<FuncSpec> primalSpec;
-  FuncSpec adjointSpec;
+  Optional<DeclNameWithLoc> primalSpec;
+  Optional<DeclNameWithLoc> adjointSpec;
   TrailingWhereClause *whereClause = nullptr;
 
   // Parse @differentiable attribute arguments.
@@ -809,8 +809,8 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 bool Parser::parseDifferentiableAttributeArguments(
     AutoDiffMode &mode, SourceLoc &modeLoc,
     SmallVectorImpl<AutoDiffParameter> &params,
-    Optional<DifferentiableAttr::FunctionSpecifier> &primalSpec,
-    DifferentiableAttr::FunctionSpecifier &adjointSpec,
+    Optional<DifferentiableAttr::DeclNameWithLoc> &primalSpec,
+    Optional<DifferentiableAttr::DeclNameWithLoc> &adjointSpec,
     TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
 
@@ -843,23 +843,25 @@ bool Parser::parseDifferentiableAttributeArguments(
     return errorAndSkipToEnd();
   }
   modeLoc = consumeToken(tok::identifier);
-  // Parse comma.
-  parseToken(tok::comma, diag::attr_expected_comma, AttrName,
-             /*isDeclModifier=*/false);
 
   // Parse optional differentiation parameters, starting with the
   // 'wrt:' label.
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
-  if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
+  if (Tok.is(tok::comma) &&
+      peekToken().is(tok::identifier) &&
+      peekToken().getText() == "withRespectTo") {
+    consumeToken(tok::comma);
     SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());
     diagnose(Tok, diag::autodiff_use_wrt_not_withrespectto)
-      .highlight(withRespectToRange)
-      .fixItReplace(withRespectToRange, "wrt:");
+        .highlight(withRespectToRange)
+        .fixItReplace(withRespectToRange, "wrt:");
     return errorAndSkipToEnd();
   }
-  if (Tok.is(tok::identifier) && Tok.getText() == "wrt") {
+  if (Tok.is(tok::comma) &&
+      peekToken().is(tok::identifier) && peekToken().getText() == "wrt") {
     SyntaxParsingContext DiffParamsContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParams);
+    consumeToken(tok::comma);
     consumeToken(tok::identifier);
     if (!consumeIf(tok::colon)) {
       diagnose(Tok, diag::attr_differentiable_expected_colon_after_label,
@@ -918,49 +920,58 @@ bool Parser::parseDifferentiableAttributeArguments(
         SyntaxKind::DifferentiableAttributeDiffParamList);
     // Parse closing ')' of the parameter list and a comma.
     consumeToken(tok::r_paren);
-    parseToken(tok::comma, diag::attr_expected_comma, AttrName,
-               /*isDeclModifier=*/false);
   }
 
-  using FuncSpec = DifferentiableAttr::FunctionSpecifier;
+  using FuncSpec = DifferentiableAttr::DeclNameWithLoc;
   // Function that parses a label and a function specifier,
   // e.g. 'primal: foo(_:)'.
   auto parseFuncSpec = [&](StringRef label, FuncSpec &result) -> bool {
     // Parse label.
     if (parseSpecificIdentifier(label,
-          diag::attr_differentiable_missing_label, label) ||
+            diag::attr_differentiable_missing_label, label) ||
         parseToken(tok::colon,
-          diag::attr_differentiable_expected_colon_after_label, label))
+            diag::attr_differentiable_expected_colon_after_label, label))
       return true;
     // Parse the name of the function.
     Diagnostic funcDiag(diag::attr_differentiable_expected_function_name.ID,
                         { label });
     result.Name =
-      parseUnqualifiedDeclName(/*afterDot=*/false, result.Loc,
-                               funcDiag, /*allowOperators=*/true,
-                               /*allowZeroArgCompoundNames=*/true);
+        parseUnqualifiedDeclName(/*afterDot=*/false, result.Loc,
+                                 funcDiag, /*allowOperators=*/true,
+                                 /*allowZeroArgCompoundNames=*/true);
     return !result.Name;
   };
 
   // Parse 'primal: <func_name>' (optional).
-  if (Tok.is(tok::identifier) && Tok.getText() == "primal") {
+  if (Tok.is(tok::comma) &&
+      peekToken().is(tok::identifier) && peekToken().getText() == "primal") {
     SyntaxParsingContext PrimalContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
+    consumeToken(tok::comma);
     primalSpec = FuncSpec();
-    if (parseFuncSpec("primal", *primalSpec)) return errorAndSkipToEnd();
-    // Parse comma.
-    parseToken(tok::comma, diag::attr_expected_comma, AttrName,
-               /*isDeclModifier=*/false);
-  }
-
-  // Parse 'adjoint: <func_name>'.
-  {
-    SyntaxParsingContext AdjointContext(
-        SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    if (parseFuncSpec("adjoint", adjointSpec))
+    if (parseFuncSpec("primal", *primalSpec))
       return errorAndSkipToEnd();
   }
-
+  
+  // Parse 'adjoint: <func_name>' (optional).
+  if (Tok.is(tok::comma) &&
+      peekToken().is(tok::identifier) && peekToken().getText() == "adjoint") {
+    SyntaxParsingContext AdjointContext(
+        SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
+    consumeToken(tok::comma);
+    adjointSpec = FuncSpec();
+    if (parseFuncSpec("adjoint", *adjointSpec))
+      return errorAndSkipToEnd();
+  }
+  
+  // If the token is still a comma, whatever follows it must be wrong. Emit a
+  // diagnostic there.
+  if (Tok.is(tok::comma)) {
+    diagnose(consumeToken(tok::comma),
+             diag::attr_differentiable_expected_config_after_comma);
+    return errorAndSkipToEnd();
+  }
+    
   // Parse a trailing 'where' clause if any.
   if (Tok.is(tok::kw_where)) {
     SourceLoc whereLoc;

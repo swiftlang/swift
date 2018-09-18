@@ -2556,7 +2556,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
           ? AutoDiffMode::Reverse
           : AutoDiffMode::Forward;
 
-        using FuncSpecifier = DifferentiableAttr::FunctionSpecifier;
+        using FuncSpecifier = DifferentiableAttr::DeclNameWithLoc;
         Optional<FuncSpecifier> primal;
         FuncDecl *primalDecl = nullptr;
         if (primalNameId != 0 && primalDeclId != 0) {

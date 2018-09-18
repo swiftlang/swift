@@ -2264,8 +2264,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // if they both have no type context and are in different modules, then it's
   // an error.
   // Returns true on error.
-  std::function<bool(FuncDecl *)> hasValidTypeContext
-    = [&](FuncDecl *func) {
+  std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
     if (!original->getInnermostTypeContext() &&
         !func->getInnermostTypeContext() &&
         original->getParentModule() == func->getParentModule())
@@ -2289,7 +2288,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // If the original function is exported (i.e. it is public or
   // @usableFromInline), then the primal/adjoint must also be exported.
   // Returns true on error.
-  using FuncSpecifier = DifferentiableAttr::FunctionSpecifier;
+  using FuncSpecifier = DifferentiableAttr::DeclNameWithLoc;
   auto checkAccessControl = [&](FuncDecl *func, FuncSpecifier funcSpec,
                                 bool isPrimal) {
     if (!isABIPublic(original)) return false;
@@ -2306,7 +2305,17 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   // Set lookup options.
   auto lookupOptions = defaultMemberLookupOptions
-    | NameLookupFlags::IgnoreAccessControl;
+      | NameLookupFlags::IgnoreAccessControl;
+  
+  // Start type-checking the arguments of the @differentiable attribute. This
+  // covers 'wrt:', 'primal:' and 'adjoint:', all of which are optional.
+  // If primal exists but adjoint does not, this is an error.
+  if (attr->getPrimal() && !attr->getAdjoint()) {
+    TC.diagnose(attr->getPrimal()->Loc,
+                diag::differentiable_attr_has_primal_but_not_adjoint);
+    attr->setInvalid();
+    return;
+  }
 
   // Resolve the primal declaration, if it exists.
   FuncDecl *primal = nullptr;
@@ -2537,30 +2546,33 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Resolve the adjoint declaration.
   FuncDecl *adjoint = nullptr;
   auto adjointSpecifier = attr->getAdjoint();
-  auto adjointNameLoc = adjointSpecifier.Loc.getBaseNameLoc();
-
+  // If the adjoint is not specified, back out.
+  if (!adjointSpecifier)
+    return;
+  
+  auto adjointNameLoc = adjointSpecifier->Loc.getBaseNameLoc();
   auto adjointOverloadDiagnostic = [&]() {
     TC.diagnose(adjointNameLoc,
                 diag::differentiable_attr_adjoint_overload_not_found,
-                adjointSpecifier.Name, expectedAdjointFnTy);
+                adjointSpecifier->Name, expectedAdjointFnTy);
     attr->setInvalid();
   };
   auto adjointAmbiguousDiagnostic = [&]() {
     TC.diagnose(adjointNameLoc,
                 diag::differentiable_attr_ambiguous_function_identifier,
-                adjointSpecifier.Name);
+                adjointSpecifier->Name);
     attr->setInvalid();
   };
   auto adjointNotFunctionDiagnostic = [&]() {
     TC.diagnose(adjointNameLoc,
                 diag::differentiable_attr_specified_not_function,
-                adjointSpecifier.Name, /*isPrimal*/ false);
+                adjointSpecifier->Name, /*isPrimal*/ false);
     attr->setInvalid();
   };
   std::function<void()> adjointInvalidTypeContextDiagnostic = [&]() {
     TC.diagnose(adjointNameLoc,
                 diag::differentiable_attr_function_not_same_type_context,
-                adjointSpecifier.Name);
+                adjointSpecifier->Name);
     attr->setInvalid();
   };
 
@@ -2572,18 +2584,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   };
 
   adjoint =
-    TC.lookupFuncDecl(adjointSpecifier.Name, adjointNameLoc,
+    TC.lookupFuncDecl(adjointSpecifier->Name, adjointNameLoc,
                       /*baseType*/ Type(), originalTypeCtx, isValidAdjoint,
                       adjointOverloadDiagnostic, adjointAmbiguousDiagnostic,
                       adjointNotFunctionDiagnostic, lookupOptions,
-                      hasValidTypeContext, adjointInvalidTypeContextDiagnostic);
+                      hasValidTypeContext,
+                      adjointInvalidTypeContextDiagnostic);
 
-  if (!adjoint) {
-    attr->setInvalid();
-    return;
-  }
   // Check adjoint access control.
-  if (checkAccessControl(adjoint, adjointSpecifier, /*isPrimal*/ false))
+  if (checkAccessControl(adjoint, *adjointSpecifier, /*isPrimal*/ false))
     return;
   // Done checking @differentiable attribute.
   // Memorize the adjoint reference in the attribute.
