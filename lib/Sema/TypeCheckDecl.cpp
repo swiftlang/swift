@@ -2622,8 +2622,7 @@ public:
 
     TC.checkDeclAttributes(PBD);
 
-    AccessControlChecker::checkAccessControl(TC, PBD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, PBD);
+    checkAccessControl(TC, PBD);
 
     // If the initializers in the PBD aren't checked yet, do so now.
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
@@ -2643,8 +2642,7 @@ public:
 
     TC.checkDeclAttributes(SD);
 
-    AccessControlChecker::checkAccessControl(TC, SD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, SD);
+    checkAccessControl(TC, SD);
 
     if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
@@ -2667,8 +2665,7 @@ public:
     TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
 
-    AccessControlChecker::checkAccessControl(TC, TAD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, TAD);
+    checkAccessControl(TC, TAD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
@@ -2689,8 +2686,7 @@ public:
                   proto->getName());
     }
 
-    AccessControlChecker::checkAccessControl(TC, AT);
-    UsableFromInlineChecker::checkUsableFromInline(TC, AT);
+    checkAccessControl(TC, AT);
 
     // Trigger the checking for overridden declarations.
     (void)AT->getOverriddenDecls();
@@ -2763,8 +2759,7 @@ public:
 
     checkInheritanceClause(ED);
 
-    AccessControlChecker::checkAccessControl(TC, ED);
-    UsableFromInlineChecker::checkUsableFromInline(TC, ED);
+    checkAccessControl(TC, ED);
 
     if (ED->hasRawType() && !ED->isObjC()) {
       // ObjC enums have already had their raw values checked, but pure Swift
@@ -2795,8 +2790,7 @@ public:
 
     checkInheritanceClause(SD);
 
-    AccessControlChecker::checkAccessControl(TC, SD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, SD);
+    checkAccessControl(TC, SD);
 
     SD->getAllConformances();
 
@@ -3028,8 +3022,7 @@ public:
 
     checkInheritanceClause(CD);
 
-    AccessControlChecker::checkAccessControl(TC, CD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, CD);
+    checkAccessControl(TC, CD);
 
     TC.checkDeclCircularity(CD);
     TC.ConformanceContexts.push_back(CD);
@@ -3067,8 +3060,7 @@ public:
 
     TC.checkDeclAttributes(PD);
 
-    AccessControlChecker::checkAccessControl(TC, PD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, PD);
+    checkAccessControl(TC, PD);
 
     checkInheritanceClause(PD);
     checkProtocolSelfRequirements(PD, PD);
@@ -3158,8 +3150,7 @@ public:
       TC.checkProtocolSelfRequirements(FD);
     }
 
-    AccessControlChecker::checkAccessControl(TC, FD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, FD);
+    checkAccessControl(TC, FD);
 
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
@@ -3194,8 +3185,7 @@ public:
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
 
-    AccessControlChecker::checkAccessControl(TC, EED);
-    UsableFromInlineChecker::checkUsableFromInline(TC, EED);
+    checkAccessControl(TC, EED);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -3244,33 +3234,8 @@ public:
     if (!ED->isInvalid())
       TC.checkDeclAttributes(ED);
 
-    if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>()) {
-      const auto access = AA->getAccess();
-      AccessScope desiredAccessScope = AccessScope::getPublic();
-      switch (access) {
-      case AccessLevel::Private:
-        assert((ED->isInvalid() ||
-                ED->getDeclContext()->isModuleScopeContext()) &&
-               "non-top-level extensions make 'private' != 'fileprivate'");
-        LLVM_FALLTHROUGH;
-      case AccessLevel::FilePrivate: {
-        const DeclContext *DC = ED->getModuleScopeContext();
-        bool isPrivate = access == AccessLevel::Private;
-        desiredAccessScope = AccessScope(DC, isPrivate);
-        break;
-      }
-      case AccessLevel::Internal:
-        desiredAccessScope = AccessScope(ED->getModuleContext());
-        break;
-      case AccessLevel::Public:
-      case AccessLevel::Open:
-        break;
-      }
-
-      AccessControlChecker ACC(TC);
-      ACC.checkGenericParamAccess(ED->getGenericParams(), ED,
-                                  desiredAccessScope, access);
-    }
+    if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>())
+      checkExtensionGenericParamAccess(TC, ED, AA->getAccess());
 
     // Trigger the creation of all of the conformances associated with this
     // nominal type.
@@ -3407,8 +3372,7 @@ public:
 
     TC.checkDeclAttributes(CD);
 
-    AccessControlChecker::checkAccessControl(TC, CD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, CD);
+    checkAccessControl(TC, CD);
 
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
