@@ -482,12 +482,21 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
       SILBasicBlock *current = *worklist.begin();
       blocksToBeMoved.insert(current);
       worklist.erase(current);
+      unsigned edgeIdx = 0;
       for (SILBasicBlock *succ : current->getSuccessorBlocks()) {
+        ++edgeIdx;
         // Skip if (1) already processed, (2) reached common pd, or (3)
         // block has in edges from outside the loop. In the last case, we will
         // need to clone the blocks.
-        if (blocksToBeMoved.count(succ) > 0 || succ == nearestCommonPD ||
-            !DI->properlyDominates(header, succ)) {
+        if (blocksToBeMoved.count(succ) > 0 || succ == nearestCommonPD) {
+          continue;
+        }
+        if (!DI->properlyDominates(header, succ)) {
+          // Split this edge so that we don't mess up arguments passed in
+          // from other predecessors of succ.
+          if (succ->getNumArguments() > 0) {
+            splitEdge(current->getTerminator(), edgeIdx - 1, DI, LI);
+          }
           continue;
         }
         worklist.insert(succ);
