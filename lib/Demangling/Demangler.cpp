@@ -168,6 +168,10 @@ bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
   return isSwiftSymbol(mangledNameRef);
 }
 
+bool swift::Demangle::isObjCSymbol(llvm::StringRef mangledName) {
+  return dropSwiftManglingPrefix(mangledName).startswith("So");
+}
+
 bool swift::Demangle::isOldFunctionTypeMangling(llvm::StringRef mangledName) {
   return mangledName.startswith("_T");
 }
