@@ -440,87 +440,91 @@ public:
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
 
+  /// \see visitPatternBindingDecl
+  void checkNamedPattern(const NamedPattern *NP, bool isTypeContext,
+                         const llvm::DenseSet<const VarDecl *> &seenVars) {
+    const VarDecl *theVar = NP->getDecl();
+    if (seenVars.count(theVar) || theVar->isInvalid())
+      return;
+
+    checkTypeAccess(theVar->getInterfaceType(), nullptr, theVar,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *complainRepr,
+                        DowngradeToWarning downgradeToWarning) {
+      auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+      bool isExplicit = theVar->getAttrs().hasAttribute<AccessControlAttr>() ||
+                        isa<ProtocolDecl>(theVar->getDeclContext());
+      auto theVarAccess =
+          isExplicit ? theVar->getFormalAccess()
+                     : typeAccessScope.requiredAccessForDiagnostics();
+      auto diagID = diag::pattern_type_access_inferred;
+      if (downgradeToWarning == DowngradeToWarning::Yes)
+        diagID = diag::pattern_type_access_inferred_warn;
+      auto diag = TC.diagnose(NP->getLoc(), diagID,
+                              theVar->isLet(),
+                              isTypeContext,
+                              isExplicit,
+                              theVarAccess,
+                              isa<FileUnit>(theVar->getDeclContext()),
+                              typeAccess,
+                              theVar->getInterfaceType());
+    });
+  }
+
+  void checkTypedPattern(const TypedPattern *TP, bool isTypeContext,
+                         llvm::DenseSet<const VarDecl *> &seenVars) {
+    const VarDecl *anyVar = nullptr;
+    TP->forEachVariable([&](VarDecl *V) {
+      seenVars.insert(V);
+      anyVar = V;
+    });
+    if (!anyVar)
+      return;
+
+    checkTypeAccess(TP->getTypeLoc(), anyVar,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *complainRepr,
+                        DowngradeToWarning downgradeToWarning) {
+      auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+      bool isExplicit = anyVar->getAttrs().hasAttribute<AccessControlAttr>() ||
+                        isa<ProtocolDecl>(anyVar->getDeclContext());
+      auto diagID = diag::pattern_type_access;
+      if (downgradeToWarning == DowngradeToWarning::Yes)
+        diagID = diag::pattern_type_access_warn;
+      auto anyVarAccess =
+          isExplicit ? anyVar->getFormalAccess()
+                     : typeAccessScope.requiredAccessForDiagnostics();
+      auto diag = TC.diagnose(TP->getLoc(), diagID,
+                              anyVar->isLet(),
+                              isTypeContext,
+                              isExplicit,
+                              anyVarAccess,
+                              isa<FileUnit>(anyVar->getDeclContext()),
+                              typeAccess);
+      highlightOffendingType(TC, diag, complainRepr);
+    });
+  }
+
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     bool isTypeContext = PBD->getDeclContext()->isTypeContext();
 
     llvm::DenseSet<const VarDecl *> seenVars;
-    for (auto entry : PBD->getPatternList())
-    entry.getPattern()->forEachNode([&](const Pattern *P) {
-      if (auto *NP = dyn_cast<NamedPattern>(P)) {
-        // Only check individual variables if we didn't check an enclosing
-        // TypedPattern.
-        const VarDecl *theVar = NP->getDecl();
-        if (seenVars.count(theVar) || theVar->isInvalid())
+    for (auto entry : PBD->getPatternList()) {
+      entry.getPattern()->forEachNode([&](const Pattern *P) {
+        if (auto *NP = dyn_cast<NamedPattern>(P)) {
+          // Only check individual variables if we didn't check an enclosing
+          // TypedPattern.
+          checkNamedPattern(NP, isTypeContext, seenVars);
           return;
+        }
 
-        checkTypeAccess(theVar->getInterfaceType(), nullptr,
-                        theVar,
-                        [&](AccessScope typeAccessScope,
-                            const TypeRepr *complainRepr,
-                            DowngradeToWarning downgradeToWarning) {
-          auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-          bool isExplicit =
-            theVar->getAttrs().hasAttribute<AccessControlAttr>() ||
-            isa<ProtocolDecl>(theVar->getDeclContext());
-          auto theVarAccess = isExplicit
-            ? theVar->getFormalAccess()
-            : typeAccessScope.requiredAccessForDiagnostics();
-          auto diagID = diag::pattern_type_access_inferred;
-          if (downgradeToWarning == DowngradeToWarning::Yes)
-            diagID = diag::pattern_type_access_inferred_warn;
-          auto diag = TC.diagnose(P->getLoc(), diagID,
-                                  theVar->isLet(),
-                                  isTypeContext,
-                                  isExplicit,
-                                  theVarAccess,
-                                  isa<FileUnit>(theVar->getDeclContext()),
-                                  typeAccess,
-                                  theVar->getInterfaceType());
-        });
-        return;
-      }
-
-      auto *TP = dyn_cast<TypedPattern>(P);
-      if (!TP)
-        return;
-
-      // FIXME: We need an access level to check against, so we pull one out of
-      // some random VarDecl in the pattern. They're all going to be the same,
-      // but still, ick.
-      const VarDecl *anyVar = nullptr;
-      TP->forEachVariable([&](VarDecl *V) {
-        seenVars.insert(V);
-        anyVar = V;
+        auto *TP = dyn_cast<TypedPattern>(P);
+        if (!TP)
+          return;
+        checkTypedPattern(TP, isTypeContext, seenVars);
       });
-      if (!anyVar)
-        return;
-
-      checkTypeAccess(TP->getTypeLoc().getType(),
-                      TP->getTypeLoc().getTypeRepr(),
-                      anyVar,
-                      [&](AccessScope typeAccessScope,
-                          const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
-        auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-        bool isExplicit =
-          anyVar->getAttrs().hasAttribute<AccessControlAttr>() ||
-          isa<ProtocolDecl>(anyVar->getDeclContext());
-        auto diagID = diag::pattern_type_access;
-        if (downgradeToWarning == DowngradeToWarning::Yes)
-          diagID = diag::pattern_type_access_warn;
-        auto anyVarAccess = isExplicit
-          ? anyVar->getFormalAccess()
-          : typeAccessScope.requiredAccessForDiagnostics();
-        auto diag = TC.diagnose(P->getLoc(), diagID,
-                                anyVar->isLet(),
-                                isTypeContext,
-                                isExplicit,
-                                anyVarAccess,
-                                isa<FileUnit>(anyVar->getDeclContext()),
-                                typeAccess);
-        highlightOffendingType(TC, diag, complainRepr);
-      });
-    });
+      seenVars.clear();
+    }
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -995,91 +999,114 @@ public:
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
 
+  /// If \p PBD declared stored instance properties in a fixed-contents struct,
+  /// return said struct.
+  static const StructDecl *
+  getFixedLayoutStructContext(const PatternBindingDecl *PBD) {
+    auto *parentStruct = dyn_cast<StructDecl>(PBD->getDeclContext());
+    if (!parentStruct)
+      return nullptr;
+    if (!parentStruct->getAttrs().hasAttribute<FixedLayoutAttr>() ||
+        PBD->isStatic() || !PBD->hasStorage()) {
+      return nullptr;
+    }
+    // We don't check for "in resilient modules" because there's no reason to
+    // write '@_fixedLayout' on a struct in a non-resilient module.
+    return parentStruct;
+  }
+
+  /// \see visitPatternBindingDecl
+  void checkNamedPattern(const NamedPattern *NP,
+                         const ValueDecl *fixedLayoutStructContext,
+                         bool isTypeContext,
+                         const llvm::DenseSet<const VarDecl *> &seenVars) {
+    const VarDecl *theVar = NP->getDecl();
+    if (!fixedLayoutStructContext && shouldSkipChecking(theVar))
+      return;
+    // Only check individual variables if we didn't check an enclosing
+    // TypedPattern.
+    if (seenVars.count(theVar) || theVar->isInvalid())
+      return;
+
+    checkTypeAccess(theVar->getInterfaceType(), nullptr,
+                    fixedLayoutStructContext ? fixedLayoutStructContext
+                                             : theVar,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *complainRepr,
+                        DowngradeToWarning downgradeToWarning) {
+      auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
+      if (fixedLayoutStructContext) {
+        diagID =
+            diag::pattern_type_not_usable_from_inline_inferred_fixed_layout;
+      } else if (!TC.Context.isSwiftVersionAtLeast(5)) {
+        diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
+      }
+      TC.diagnose(NP->getLoc(), diagID, theVar->isLet(), isTypeContext,
+                  theVar->getInterfaceType());
+    });
+  }
+
+  /// \see visitPatternBindingDecl
+  void checkTypedPattern(const TypedPattern *TP,
+                         const ValueDecl *fixedLayoutStructContext,
+                         bool isTypeContext,
+                         llvm::DenseSet<const VarDecl *> &seenVars) {
+    // FIXME: We need an access level to check against, so we pull one out
+    // of some random VarDecl in the pattern. They're all going to be the
+    // same, but still, ick.
+    const VarDecl *anyVar = nullptr;
+    TP->forEachVariable([&](VarDecl *V) {
+      seenVars.insert(V);
+      anyVar = V;
+    });
+    if (!anyVar)
+      return;
+    if (!fixedLayoutStructContext && shouldSkipChecking(anyVar))
+      return;
+
+    checkTypeAccess(TP->getTypeLoc(),
+                    fixedLayoutStructContext ? fixedLayoutStructContext
+                                             : anyVar,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *complainRepr,
+                        DowngradeToWarning downgradeToWarning) {
+      auto diagID = diag::pattern_type_not_usable_from_inline;
+      if (fixedLayoutStructContext)
+        diagID = diag::pattern_type_not_usable_from_inline_fixed_layout;
+      else if (!TC.Context.isSwiftVersionAtLeast(5))
+        diagID = diag::pattern_type_not_usable_from_inline_warn;
+      auto diag = TC.diagnose(TP->getLoc(), diagID, anyVar->isLet(),
+                              isTypeContext);
+      highlightOffendingType(TC, diag, complainRepr);
+    });
+  }
+
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     bool isTypeContext = PBD->getDeclContext()->isTypeContext();
 
     // Stored instance properties in public/@usableFromInline fixed-contents
     // structs in resilient modules must always use public/@usableFromInline
     // types. In these cases, check the access against the struct instead of the
-    // VarDecl, and customize the diagnostics. (The code below doesn't check
-    // for "in resilient modules" because there's no reason to write
-    // @_fixedLayout on a struct in a non-resilient module.)
-    const ValueDecl *fixedLayoutStructContext = nullptr;
-    if (auto *parentStruct = dyn_cast<StructDecl>(PBD->getDeclContext())) {
-      if (parentStruct->getAttrs().hasAttribute<FixedLayoutAttr>() &&
-          !PBD->isStatic() && PBD->hasStorage()) {
-        fixedLayoutStructContext = parentStruct;
-      }
-    }
+    // VarDecl, and customize the diagnostics.
+    const ValueDecl *fixedLayoutStructContext =
+        getFixedLayoutStructContext(PBD);
 
     llvm::DenseSet<const VarDecl *> seenVars;
     for (auto entry : PBD->getPatternList()) {
       entry.getPattern()->forEachNode([&](const Pattern *P) {
         if (auto *NP = dyn_cast<NamedPattern>(P)) {
-          // Only check individual variables if we didn't check an enclosing
-          // TypedPattern.
-          const VarDecl *theVar = NP->getDecl();
-          if (!fixedLayoutStructContext && shouldSkipChecking(theVar))
-            return;
-          if (seenVars.count(theVar) || theVar->isInvalid())
-            return;
-
-          checkTypeAccess(theVar->getInterfaceType(), nullptr,
-                          fixedLayoutStructContext ? fixedLayoutStructContext
-                                                   : theVar,
-                          [&](AccessScope typeAccessScope,
-                              const TypeRepr *complainRepr,
-                              DowngradeToWarning downgradeToWarning) {
-            auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
-            if (fixedLayoutStructContext)
-              diagID =
-                diag::pattern_type_not_usable_from_inline_inferred_fixed_layout;
-            else if (!TC.Context.isSwiftVersionAtLeast(5))
-              diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
-            TC.diagnose(P->getLoc(),
-                        diagID,
-                        theVar->isLet(),
-                        isTypeContext,
-                        theVar->getInterfaceType());
-          });
+          checkNamedPattern(NP, fixedLayoutStructContext, isTypeContext,
+                            seenVars);
           return;
         }
 
         auto *TP = dyn_cast<TypedPattern>(P);
         if (!TP)
           return;
-
-        // FIXME: We need an access level to check against, so we pull one out
-        // of some random VarDecl in the pattern. They're all going to be the
-        // same, but still, ick.
-        const VarDecl *anyVar = nullptr;
-        TP->forEachVariable([&](VarDecl *V) {
-          seenVars.insert(V);
-          anyVar = V;
-        });
-        if (!anyVar)
-          return;
-        if (!fixedLayoutStructContext && shouldSkipChecking(anyVar))
-          return;
-
-        checkTypeAccess(TP->getTypeLoc(),
-                        fixedLayoutStructContext ? fixedLayoutStructContext
-                                                 : anyVar,
-                        [&](AccessScope typeAccessScope,
-                            const TypeRepr *complainRepr,
-                            DowngradeToWarning downgradeToWarning) {
-          auto diagID = diag::pattern_type_not_usable_from_inline;
-          if (fixedLayoutStructContext)
-            diagID = diag::pattern_type_not_usable_from_inline_fixed_layout;
-          else if (!TC.Context.isSwiftVersionAtLeast(5))
-            diagID = diag::pattern_type_not_usable_from_inline_warn;
-          auto diag = TC.diagnose(P->getLoc(),
-                                  diagID,
-                                  anyVar->isLet(),
-                                  isTypeContext);
-          highlightOffendingType(TC, diag, complainRepr);
-        });
+        checkTypedPattern(TP, fixedLayoutStructContext, isTypeContext,
+                          seenVars);
       });
+      seenVars.clear();
     }
   }
 
