@@ -29,4 +29,5 @@ TEST(Demangle, IsObjCSymbol) {
   EXPECT_EQ(true, isObjCSymbol(llvm::StringRef("_$SSo8NSNumberCMa")));
   EXPECT_EQ(false,
             isObjCSymbol(llvm::StringRef("_$S3pat7inlinedSo8NSNumberCvp")));
+  EXPECT_EQ(true, isObjCSymbol(llvm::StringRef("_$SSC3fooyS2d_SdtFTO")));
 }
