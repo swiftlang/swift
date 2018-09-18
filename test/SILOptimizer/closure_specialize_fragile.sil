@@ -15,46 +15,46 @@ import SwiftShims
 public func resilientCallee(fn: () -> ())
 
 // action()
-sil [Onone] @$S26closure_specialize_fragile6actionyyF : $@convention(thin) () -> () {
+sil [Onone] @$s26closure_specialize_fragile6actionyyF : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
-} // end sil function '$S26closure_specialize_fragile6actionyyF'
+} // end sil function '$s26closure_specialize_fragile6actionyyF'
 
-// CHECK-LABEL: sil [serialized] [always_inline] @$S26closure_specialize_fragile0C6CalleryyF : $@convention(thin) () -> ()
-// CHECK: function_ref @$S26closure_specialize_fragile15resilientCalleeyyyc2fn_tF : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+// CHECK-LABEL: sil [serialized] [always_inline] @$s26closure_specialize_fragile0C6CalleryyF : $@convention(thin) () -> ()
+// CHECK: function_ref @$s26closure_specialize_fragile15resilientCalleeyyyc2fn_tF : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 // CHECK: return
 // fragileCaller()
-sil [serialized] [always_inline] @$S26closure_specialize_fragile0C6CalleryyF : $@convention(thin) () -> () {
+sil [serialized] [always_inline] @$s26closure_specialize_fragile0C6CalleryyF : $@convention(thin) () -> () {
 bb0:
   // function_ref resilientCallee(fn:)
-  %0 = function_ref @$S26closure_specialize_fragile15resilientCalleeyyyc2fn_tF : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %0 = function_ref @$s26closure_specialize_fragile15resilientCalleeyyyc2fn_tF : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   // function_ref closure #1 in fragileCaller()
-  %1 = function_ref @$S26closure_specialize_fragile0C6CalleryyFyycfU_ : $@convention(thin) () -> () 
+  %1 = function_ref @$s26closure_specialize_fragile0C6CalleryyFyycfU_ : $@convention(thin) () -> () 
   %2 = thin_to_thick_function %1 : $@convention(thin) () -> () to $@callee_owned () -> () 
   %3 = apply %0(%2) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   %4 = tuple ()
   return %4 : $()
-} // end sil function '$S26closure_specialize_fragile0C6CalleryyF'
+} // end sil function '$s26closure_specialize_fragile0C6CalleryyF'
 
-// CHECK-LABEL: sil @$S26closure_specialize_fragile15resilientCalleeyyyc2fn_tF : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+// CHECK-LABEL: sil @$s26closure_specialize_fragile15resilientCalleeyyyc2fn_tF : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 
 // resilientCallee(fn:)
-sil @$S26closure_specialize_fragile15resilientCalleeyyyc2fn_tF : $@convention(thin) (@owned @callee_owned () -> ()) -> () {
+sil @$s26closure_specialize_fragile15resilientCalleeyyyc2fn_tF : $@convention(thin) (@owned @callee_owned () -> ()) -> () {
 bb0(%0 : $@callee_owned () -> ()):
   strong_retain %0 : $@callee_owned () -> ()
   %3 = apply %0() : $@callee_owned () -> ()
   strong_release %0 : $@callee_owned () -> ()
   %5 = tuple ()
   return %5 : $()
-} // end sil function '$S26closure_specialize_fragile15resilientCalleeyyyc2fn_tF'
+} // end sil function '$s26closure_specialize_fragile15resilientCalleeyyyc2fn_tF'
 
 // closure #1 in fragileCaller()
-sil shared [serialized] @$S26closure_specialize_fragile0C6CalleryyFyycfU_ : $@convention(thin) () -> () {
+sil shared [serialized] @$s26closure_specialize_fragile0C6CalleryyFyycfU_ : $@convention(thin) () -> () {
 bb0:
   // function_ref action()
-  %0 = function_ref @$S26closure_specialize_fragile6actionyyF : $@convention(thin) () -> () 
+  %0 = function_ref @$s26closure_specialize_fragile6actionyyF : $@convention(thin) () -> () 
   %1 = apply %0() : $@convention(thin) () -> ()
   %2 = tuple ()
   return %2 : $()
-} // end sil function '$S26closure_specialize_fragile0C6CalleryyFyycfU_'
+} // end sil function '$s26closure_specialize_fragile0C6CalleryyFyycfU_'

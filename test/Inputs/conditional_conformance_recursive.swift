@@ -19,18 +19,18 @@ protocol P3: P2 where A: P3 { }
 extension Wrapper: P3 where T: P3 { }
 
 // instantiation function for Wrapper<T>: P3
-// CHECK-LABEL: define internal void @"$S33conditional_conformance_recursive7WrapperVyxGAA2P3A2aERzrlWI"
+// CHECK-LABEL: define internal void @"$s33conditional_conformance_recursive7WrapperVyxGAA2P3A2aERzrlWI"
 // CHECK-NOT: ret
-// CHECK: call i8** @"$S33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrlWa"
+// CHECK: call i8** @"$s33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrlWa"
 
 // associated type witness table accessor for A : P2 in Wrapper<T>: P2
-// CHECK-LABEL: define internal swiftcc i8** @"$S33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrl1A_AaEPWT"
+// CHECK-LABEL: define internal swiftcc i8** @"$s33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrl1A_AaEPWT"
 // CHECK: [[CONDITIONAL_REQ_BUFFER:%.*]] = alloca [1 x i8**]
 // CHECK: [[FIRST_REQ:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* [[CONDITIONAL_REQ_BUFFER]]
-// CHECK: call i8** @"$S33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrlWa"(%swift.type* [[WRAPPER_TO_A:%.*]], i8*** [[FIRST_REQ]])
+// CHECK: call i8** @"$s33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrlWa"(%swift.type* [[WRAPPER_TO_A:%.*]], i8*** [[FIRST_REQ]])
 
 // associated type metadata accessor for B in Wrapper<T>: P2
-// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrl1BWt"
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrl1BWt"
 // CHECK:   [[T_TO_P2_PTR:%.*]] = getelementptr inbounds i8*, i8** [[WRAPPER_T_TO_P2:%.*]], i32 -1
 // CHECK:   [[T_TO_P2_VAL:%.*]] = load i8*, i8** [[T_TO_P2_PTR]]
 // CHECK:   [[T_TO_P2:%.*]] = bitcast i8* [[T_TO_P2_VAL]] to i8**

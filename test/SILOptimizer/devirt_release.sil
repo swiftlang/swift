@@ -13,7 +13,7 @@ class B {
 // CHECK: [[A:%[0-9]+]] = alloc_ref
 // CHECK-NEXT: set_deallocating [[A]]
 // CHECK-NOT: strong_release
-// CHECK: [[D:%[0-9]+]] = function_ref @$S4test1BCfD
+// CHECK: [[D:%[0-9]+]] = function_ref @$s4test1BCfD
 // CHECK-NEXT: apply [[D]]([[A]])
 // CHECK-NEXT: dealloc_ref [stack] [[A]]
 // CHECK: return
@@ -78,7 +78,7 @@ bb0(%0 : $B):
 // CHECK: [[A:%[0-9]+]] = alloc_ref
 // CHECK-NEXT: set_deallocating [[A]]
 // CHECK-NOT: strong_release
-// CHECK: [[D:%[0-9]+]] = function_ref @$S4test1BCfD
+// CHECK: [[D:%[0-9]+]] = function_ref @$s4test1BCfD
 // CHECK-NEXT: apply [[D]]([[A]])
 // CHECK-NEXT: dealloc_ref [stack] [[A]]
 // CHECK: return
@@ -97,12 +97,12 @@ bb0:
 sil @unknown_func : $@convention(thin) () -> ()
 
 // test.B.__deallocating_deinit
-sil hidden @$S4test1BCfD : $@convention(method) (@owned B) -> () {
+sil hidden @$s4test1BCfD : $@convention(method) (@owned B) -> () {
 // %0                                             // users: %1, %3
 bb0(%0 : $B):
   debug_value %0 : $B, let, name "self" // id: %1
   // function_ref test.B.deinit
-  %2 = function_ref @$S4test1BCfd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %3
+  %2 = function_ref @$s4test1BCfd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %3
   %3 = apply %2(%0) : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %4
   %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $B // user: %5
   dealloc_ref %4 : $B                             // id: %5
@@ -111,7 +111,7 @@ bb0(%0 : $B):
 }
 
 // test.B.deinit
-sil hidden @$S4test1BCfd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject {
+sil hidden @$s4test1BCfd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject {
 // %0                                             // users: %1, %2
 bb0(%0 : $B):
   debug_value %0 : $B, let, name "self" // id: %1
@@ -120,7 +120,7 @@ bb0(%0 : $B):
 }
 
 // test.B.init () -> test.B
-sil hidden @$S4test1BCACycfc : $@convention(method) (@owned B) -> @owned B {
+sil hidden @$s4test1BCACycfc : $@convention(method) (@owned B) -> @owned B {
 // %0                                             // users: %1, %2
 bb0(%0 : $B):
   debug_value %0 : $B, let, name "self" // id: %1
@@ -128,7 +128,7 @@ bb0(%0 : $B):
 }
 
 sil_vtable B {
-  #B.deinit!deallocator.1: @$S4test1BCfD	// test.B.__deallocating_deinit
-  #B.init!initializer.1: @$S4test1BCACycfc	// test.B.init () -> test.B
+  #B.deinit!deallocator.1: @$s4test1BCfD	// test.B.__deallocating_deinit
+  #B.init!initializer.1: @$s4test1BCACycfc	// test.B.init () -> test.B
 }
 

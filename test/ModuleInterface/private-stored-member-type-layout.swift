@@ -26,7 +26,7 @@
 import PrivateStoredMembers
 #endif
 
-// CHECK-EXEC: swiftcc void @"$S{{[^ ]+}}8makeUseryyF"() #0 {
+// CHECK-EXEC: swiftcc void @"$s{{[^ ]+}}8makeUseryyF"() #0 {
 public func makeUser() {
   let ptr = UnsafeMutablePointer<MyStruct>.allocate(capacity: 1)
   // CHECK-EXEC: %.publicEndVar = getelementptr inbounds [[MYSTRUCT]], [[MYSTRUCT]]* %{{[0-9]+}}, i32 0, i32 [[PUBLIC_END_VAR_IDX:9]]
@@ -44,7 +44,7 @@ public func makeUser() {
   ptr.pointee.publicVar = ptr.pointee.publicEndVar
   ptr.deallocate()
 
-  // CHECK-EXEC: %[[MYCLASS_INIT:[0-9]+]] = call swiftcc [[MYCLASS]]* @"$S{{[^ ]+}}7MyClassCACycfC"(%swift.type* swiftself %{{[0-9]+}})
+  // CHECK-EXEC: %[[MYCLASS_INIT:[0-9]+]] = call swiftcc [[MYCLASS]]* @"$s{{[^ ]+}}7MyClassCACycfC"(%swift.type* swiftself %{{[0-9]+}})
   let myClass = MyClass()
 
   // These are uninteresting as they just call into the standard getter and setter.

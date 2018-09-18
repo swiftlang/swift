@@ -20,16 +20,16 @@
 import Typedefs
 import Lib
 
-// CHECK-SIL-LABEL: sil hidden @$S8typedefs11testSymbolsyyF
+// CHECK-SIL-LABEL: sil hidden @$s8typedefs11testSymbolsyyF
 func testSymbols() {
   // Check that the symbols are not using 'Bool'.
-  // CHECK-SIL: function_ref @$S3Lib1xs5Int32Vvau
+  // CHECK-SIL: function_ref @$s3Lib1xs5Int32Vvau
   _ = Lib.x
-  // CHECK-SIL: function_ref @$S3Lib9usesAssocs5Int32VSgvau
+  // CHECK-SIL: function_ref @$s3Lib9usesAssocs5Int32VSgvau
   _ = Lib.usesAssoc
-} // CHECK-SIL: end sil function '$S8typedefs11testSymbolsyyF'
+} // CHECK-SIL: end sil function '$s8typedefs11testSymbolsyyF'
 
-// CHECK-IR-LABEL: define{{.*}} void @"$S8typedefs18testVTableBuilding4usery3Lib4UserC_tF
+// CHECK-IR-LABEL: define{{.*}} void @"$s8typedefs18testVTableBuilding4usery3Lib4UserC_tF
 public func testVTableBuilding(user: User) {
   // The important thing in this CHECK line is the "i64 30", which is the offset
   // for the vtable slot for 'lastMethod()'. If the layout here

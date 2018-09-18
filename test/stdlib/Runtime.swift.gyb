@@ -364,10 +364,10 @@ Runtime.test("demangleName") {
   expectEqual("", _stdlib_demangleName(""))
   expectEqual("abc", _stdlib_demangleName("abc"))
   expectEqual("\0", _stdlib_demangleName("\0"))
-  expectEqual("Swift.Double", _stdlib_demangleName("$SSdD"))
+  expectEqual("Swift.Double", _stdlib_demangleName("$sSdD"))
   expectEqual("x.a : x.Foo<x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>, x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>>",
-      _stdlib_demangleName("$S1x1aAA3FooCyADyADySiSiGADySiSiGGADyADySiSiGADySiSiGGGvp"))
-  expectEqual("Foobar", _stdlib_demangleName("$S13__lldb_expr_46FoobarCD"))
+      _stdlib_demangleName("$s1x1aAA3FooCyADyADySiSiGADySiSiGGADyADySiSiGADySiSiGGGvp"))
+  expectEqual("Foobar", _stdlib_demangleName("$s13__lldb_expr_46FoobarCD"))
 }
 
 % for optionality in ['', '?']:

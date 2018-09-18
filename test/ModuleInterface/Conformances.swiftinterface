@@ -16,19 +16,19 @@ public struct FullStructImpl: MyProto {
   public var prop: Int { get set }
   public subscript(index: Int) -> Int { get set }
 }
-// CHECK-LABEL: sil @$S16ConformancesUser8testFullSiyF
-// CHECK: function_ref @$S12Conformances14FullStructImplVACycfC
-// CHECK: function_ref @$S12Conformances14FullStructImplV6methodyyF
-// CHECK: function_ref @$S12Conformances14FullStructImplV4propSivs
-// CHECK: function_ref @$S12Conformances14FullStructImplVyS2icig
-// CHECK: end sil function '$S16ConformancesUser8testFullSiyF'
+// CHECK-LABEL: sil @$s16ConformancesUser8testFullSiyF
+// CHECK: function_ref @$s12Conformances14FullStructImplVACycfC
+// CHECK: function_ref @$s12Conformances14FullStructImplV6methodyyF
+// CHECK: function_ref @$s12Conformances14FullStructImplV4propSivs
+// CHECK: function_ref @$s12Conformances14FullStructImplVyS2icig
+// CHECK: end sil function '$s16ConformancesUser8testFullSiyF'
 
 @_fixed_layout // allow conformance devirtualization
 public struct OpaqueStructImpl: MyProto {}
 
-// CHECK-LABEL: sil @$S16ConformancesUser10testOpaqueSiyF
-// CHECK: function_ref @$S12Conformances7MyProtoPxycfC
-// CHECK: function_ref @$S12Conformances7MyProtoP6methodyyF
-// CHECK: function_ref @$S12Conformances7MyProtoP4propSivs
-// CHECK: function_ref @$S12Conformances7MyProtoPyS2icig
-// CHECK: end sil function '$S16ConformancesUser10testOpaqueSiyF'
+// CHECK-LABEL: sil @$s16ConformancesUser10testOpaqueSiyF
+// CHECK: function_ref @$s12Conformances7MyProtoPxycfC
+// CHECK: function_ref @$s12Conformances7MyProtoP6methodyyF
+// CHECK: function_ref @$s12Conformances7MyProtoP4propSivs
+// CHECK: function_ref @$s12Conformances7MyProtoPyS2icig
+// CHECK: end sil function '$s16ConformancesUser10testOpaqueSiyF'

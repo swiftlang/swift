@@ -179,7 +179,7 @@ bb0(%0 : $AnNSArray):
 }
 
 // CHECK-LABEL: sil shared @bridge_from_swift_array_to_NSObject_cast
-// CHECK: function_ref @$SSa10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
+// CHECK: function_ref @$sSa10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
 // CHECK-NOT: retain
 // CHECK: apply
 // CHECK: release_value

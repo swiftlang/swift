@@ -4,7 +4,7 @@ struct SimpleTest {
   var stored: String
 
   var readable: String {
-// CHECK-LABEL: sil hidden @$S13read_accessor10SimpleTestV8readableSSvr
+// CHECK-LABEL: sil hidden @$s13read_accessor10SimpleTestV8readableSSvr
 // CHECK-SAME:    : $@yield_once @convention(method) (@guaranteed SimpleTest) -> @yields @guaranteed String {
 // CHECK:         [[T0:%.*]] = struct_extract %0 : $SimpleTest, #SimpleTest.stored
 // CHECK-NEXT:    [[T1:%.*]] = copy_value [[T0]] : $String
@@ -21,12 +21,12 @@ struct SimpleTest {
     }
   }
 
-// CHECK-LABEL: sil hidden @$S13read_accessor10SimpleTestV3getSSyF
+// CHECK-LABEL: sil hidden @$s13read_accessor10SimpleTestV3getSSyF
 // CHECK:         [[T0:%.*]] = begin_access [read] [unknown] %0
 // CHECK-NEXT:    [[SELF:%.*]] = load [copy] [[T0]] : $*SimpleTest
 // CHECK-NEXT:    end_access [[T0]]
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[READFN:%.*]] = function_ref @$S13read_accessor10SimpleTestV8readableSSvr : $@yield_once @convention(method) (@guaranteed SimpleTest) -> @yields @guaranteed String
+// CHECK-NEXT:    [[READFN:%.*]] = function_ref @$s13read_accessor10SimpleTestV8readableSSvr : $@yield_once @convention(method) (@guaranteed SimpleTest) -> @yields @guaranteed String
 // CHECK-NEXT:    ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[READFN]]([[SELF]])
 //   FIXME: avoid this redundant materialization!
 // CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $String
@@ -46,8 +46,8 @@ struct SimpleTest {
 class GetterSynthesis {
   var stored: String = "hello"
   var readable: String {
-// CHECK: sil hidden [transparent] @$S13read_accessor15GetterSynthesisC8readableSSvg
-// CHECK:         [[READFN:%.*]] = function_ref @$S13read_accessor15GetterSynthesisC8readableSSvr
+// CHECK: sil hidden [transparent] @$s13read_accessor15GetterSynthesisC8readableSSvg
+// CHECK:         [[READFN:%.*]] = function_ref @$s13read_accessor15GetterSynthesisC8readableSSvr
 // CHECK-NEXT:    ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[READFN]](%0)
 //   FIXME: avoid this redundant materialization!
 // CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $String

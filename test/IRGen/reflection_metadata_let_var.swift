@@ -5,7 +5,7 @@
 // CHECK: [[STRING:@.*]] = linkonce_odr hidden constant {{.*}} c"SS"
 // CHECK: [[Y:@.*]] = private constant {{.*}} c"y\00"
 
-// CHECK-LABEL: @"$S27reflection_metadata_let_var6StruccVMF" = internal constant
+// CHECK-LABEL: @"$s27reflection_metadata_let_var6StruccVMF" = internal constant
 struct Strucc {
 // --             flags (let)
 // CHECK-SAME:    i32 0, 
