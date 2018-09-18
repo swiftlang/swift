@@ -669,7 +669,7 @@ DECL_NODES = [
                    is_optional=True),
          ]),
 
-    # infix-operator-group -> ':' identifier
+    # infix-operator-group -> ':' identifier ','? identifier?
     Node('InfixOperatorGroup', kind='Syntax',
          description='''
          A clause to specify precedence group in infix operator declaration.
