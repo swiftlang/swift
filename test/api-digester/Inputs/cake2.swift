@@ -47,3 +47,17 @@ public protocol P2 {}
 public extension P1 {
   func P1Constraint() {}
 }
+
+@_fixed_layout
+public struct fixedLayoutStruct {
+  public var a = 1
+  public var b = 2
+  public func foo() {}
+}
+
+@_frozen
+public enum FrozenKind {
+  case Unchanged
+  case Rigid
+  case Fixed
+}

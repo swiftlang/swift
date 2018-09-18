@@ -220,7 +220,6 @@ class SDKNode {
   std::set<NodeAnnotation> Annotations;
   std::map<NodeAnnotation, StringRef> AnnotateComments;
   NodePtr Parent = nullptr;
-
 protected:
   SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind);
 
@@ -253,7 +252,7 @@ public:
   void addChild(SDKNode *Child);
   ArrayRef<SDKNode*> getChildren() const;
   bool hasSameChildren(const SDKNode &Other) const;
-  unsigned getChildIndex(NodePtr Child) const;
+  unsigned getChildIndex(const SDKNode *Child) const;
   SDKNode* getOnlyChild() const;
   SDKContext &getSDKContext() const { return Ctx; }
   SDKNodeRoot *getRootNode() const;
@@ -442,9 +441,12 @@ public:
 };
 
 class SDKNodeDeclVar : public SDKNodeDecl {
+  Optional<unsigned> FixedBinaryOrder;
 public:
   SDKNodeDeclVar(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
+  bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
+  unsigned getFixedBinaryOrder() const { return *FixedBinaryOrder; }
 };
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
@@ -540,6 +542,7 @@ int deserializeSDKDump(StringRef dumpPath, StringRef OutputPath,
                        CheckerOptions Opts);
 
 int findDeclUsr(StringRef dumpPath, CheckerOptions Opts);
+
 } // end of abi namespace
 } // end of ide namespace
 } // end of Swift namespace

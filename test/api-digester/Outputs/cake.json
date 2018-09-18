@@ -476,6 +476,7 @@
           "usr": "s:4cake6NumberO3oneyA2CmF",
           "location": "",
           "moduleName": "cake",
+          "fixedbinaryorder": 0,
           "children": [
             {
               "kind": "TypeFunc",
@@ -696,6 +697,131 @@
               "name": "String",
               "printedName": "String",
               "usr": "s:SS"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "fixedLayoutStruct",
+      "printedName": "fixedLayoutStruct",
+      "declKind": "Struct",
+      "usr": "s:4cake17fixedLayoutStructV",
+      "location": "",
+      "moduleName": "cake",
+      "declAttributes": [
+        "FixedLayout"
+      ],
+      "children": [
+        {
+          "kind": "Var",
+          "name": "a",
+          "printedName": "a",
+          "declKind": "Var",
+          "usr": "s:4cake17fixedLayoutStructV1aSivp",
+          "location": "",
+          "moduleName": "cake",
+          "fixedbinaryorder": 0,
+          "declAttributes": [
+            "HasInitialValue"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "Getter",
+              "name": "_",
+              "printedName": "_()",
+              "declKind": "Accessor",
+              "usr": "s:4cake17fixedLayoutStructV1aSivg",
+              "location": "",
+              "moduleName": "cake",
+              "implicit": true,
+              "declAttributes": [
+                "Transparent"
+              ],
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
+            },
+            {
+              "kind": "Setter",
+              "name": "_",
+              "printedName": "_()",
+              "declKind": "Accessor",
+              "usr": "s:4cake17fixedLayoutStructV1aSivs",
+              "location": "",
+              "moduleName": "cake",
+              "implicit": true,
+              "mutating": true,
+              "declAttributes": [
+                "Transparent"
+              ],
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(a:)",
+          "declKind": "Constructor",
+          "usr": "s:4cake17fixedLayoutStructV1aACSi_tcfc",
+          "location": "",
+          "moduleName": "cake",
+          "implicit": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "fixedLayoutStruct",
+              "printedName": "fixedLayoutStruct",
+              "usr": "s:4cake17fixedLayoutStructV"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "declKind": "Constructor",
+          "usr": "s:4cake17fixedLayoutStructVACycfc",
+          "location": "",
+          "moduleName": "cake",
+          "implicit": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "fixedLayoutStruct",
+              "printedName": "fixedLayoutStruct",
+              "usr": "s:4cake17fixedLayoutStructV"
             }
           ]
         }

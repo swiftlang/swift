@@ -110,6 +110,7 @@ KEY(hasDefaultArg)
 KEY(conformingProtocols)
 KEY(enumRawTypeName)
 KEY(genericSig)
+KEY(fixedbinaryorder)
 
 KNOWN_TYPE(Optional)
 KNOWN_TYPE(ImplicitlyUnwrappedOptional)
