@@ -712,10 +712,12 @@ namespace {
         if (entry.isAssociatedConformance()) {
           // Define the associated conformance descriptor to point to the
           // current position in the protocol descriptor.
+          AssociatedConformance conformance(
+                                  Proto,
+                                  entry.getAssociatedConformancePath(),
+                                  entry.getAssociatedConformanceRequirement());
           IGM.defineAssociatedConformanceDescriptor(
-              Proto,
-              entry.getAssociatedConformancePath(),
-              entry.getAssociatedConformanceRequirement(),
+              conformance,
               B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
         }
 

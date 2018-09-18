@@ -795,14 +795,13 @@ public:
   }
 
   static LinkEntity
-  forAssociatedConformanceDescriptor(ProtocolDecl *proto,
-                                     CanType associatedType,
-                                     ProtocolDecl *associatedProtocol) {
+  forAssociatedConformanceDescriptor(AssociatedConformance conformance) {
     LinkEntity entity;
     entity.setForProtocolAndAssociatedConformance(
         Kind::AssociatedConformanceDescriptor,
-        proto, associatedType,
-        associatedProtocol);
+        conformance.getSourceProtocol(),
+        conformance.getAssociation(),
+        conformance.getAssociatedRequirement());
     return entity;
   }
 

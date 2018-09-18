@@ -51,6 +51,12 @@ public protocol P { }
 public struct ConditionallyConforms<Element> { }
 public struct Y { }
 
+// CHECK-USAGE: @"$S31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAWr" = internal
+// CHECK-USAGE-SAME: $S18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2_AA014OtherResilientC0Tn
+// CHECK-USAGE-SAME: $S31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAA2T2_AD014OtherResilientI0PWT
+public struct ConformsWithAssocRequirements : ProtocolWithAssocTypeDefaults {
+}
+
 // CHECK-USAGE: @"$Sx1T_MXA" =
 // CHECK-USAGE-SAME: i32 0
 // CHECK-USAGE-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsMp"

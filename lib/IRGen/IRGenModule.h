@@ -1237,10 +1237,8 @@ public:
   llvm::Constant *getAddrOfAssociatedConformanceDescriptor(
                                             AssociatedConformance conformance);
   llvm::GlobalValue *defineAssociatedConformanceDescriptor(
-                                                  ProtocolDecl *proto,
-                                                  CanType subject,
-                                                  ProtocolDecl *requirement,
-                                                  llvm::Constant *definition);
+                                              AssociatedConformance conformance,
+                                              llvm::Constant *definition);
 
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                       ConstantInit definition = ConstantInit());
