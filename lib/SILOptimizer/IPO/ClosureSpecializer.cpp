@@ -829,9 +829,10 @@ void ClosureSpecCloner::populateCloned() {
 namespace {
 
 class SILClosureSpecializerTransform : public SILFunctionTransform {
-  bool gatherCallSites(SILFunction *Caller,
-                       llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
-                       llvm::DenseSet<FullApplySite> &MultipleClosureAI);
+  bool gatherCallSites(
+      SILFunction *Caller,
+      llvm::SmallVectorImpl<std::unique_ptr<ClosureInfo>> &ClosureCandidates,
+      llvm::DenseSet<FullApplySite> &MultipleClosureAI);
   bool specialize(SILFunction *Caller,
                   std::vector<SingleValueInstruction *> &PropagatedClosures);
 
@@ -938,7 +939,7 @@ static bool isClosureAppliedIn(SILFunction *Callee, unsigned closureArgIdx,
 
 bool SILClosureSpecializerTransform::gatherCallSites(
     SILFunction *Caller,
-    llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
+    llvm::SmallVectorImpl<std::unique_ptr<ClosureInfo>> &ClosureCandidates,
     llvm::DenseSet<FullApplySite> &MultipleClosureAI) {
 
   // A set of apply inst that we have associated with a closure. We use this to
@@ -963,7 +964,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
       if (UsedReabstractionClosure.count(ClosureInst))
         continue;
 
-      ClosureInfo *CInfo = nullptr;
+      std::unique_ptr<ClosureInfo> CInfo;
 
       // Go through all uses of our closure.
 
@@ -1096,7 +1097,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         // Compute the final release points of the closure. We will insert
         // release of the captured arguments here.
         if (!CInfo)
-          CInfo = new ClosureInfo(ClosureInst);
+          CInfo.reset(new ClosureInfo(ClosureInst));
 
         // Mark the reabstraction closures as used.
         if (HaveUsedReabstraction)
@@ -1105,7 +1106,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         // Now we know that CSDesc is profitable to specialize. Add it to our
         // call site list.
         CInfo->CallSites.push_back(
-          CallSiteDescriptor(CInfo, AI, ClosureIndex,
+          CallSiteDescriptor(CInfo.get(), AI, ClosureIndex,
                              ClosureParamInfo, std::move(NonFailureExitBBs)));
       }
       if (CInfo) {
@@ -1114,7 +1115,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
                                  ValueLifetimeAnalysis::AllowToModifyCFG)) {
           CFGChanged = true;
         }
-        ClosureCandidates.push_back(CInfo);
+        ClosureCandidates.push_back(std::move(CInfo));
       }
     }
   }
@@ -1129,7 +1130,7 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
 
   // Collect all of the PartialApplyInsts that are used as arguments to
   // ApplyInsts. Check the profitability of specializing the closure argument.
-  llvm::SmallVector<ClosureInfo*, 8> ClosureCandidates;
+  llvm::SmallVector<std::unique_ptr<ClosureInfo>, 8> ClosureCandidates;
   llvm::DenseSet<FullApplySite> MultipleClosureAI;
   if (gatherCallSites(Caller, ClosureCandidates, MultipleClosureAI)) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Branches);
@@ -1137,7 +1138,7 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
 
   SILOptFunctionBuilder FuncBuilder(*this);
   bool Changed = false;
-  for (auto *CInfo : ClosureCandidates) {
+  for (const auto &CInfo : ClosureCandidates) {
     for (auto &CSDesc : CInfo->CallSites) {
       // Do not specialize apply insts that take in multiple closures. This pass
       // does not know how to do this yet.
@@ -1165,7 +1166,6 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
       PropagatedClosures.push_back(CSDesc.getClosure());
       Changed = true;
     }
-    delete CInfo;
   }
   return Changed;
 }
