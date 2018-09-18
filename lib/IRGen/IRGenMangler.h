@@ -184,6 +184,19 @@ public:
     return finalize();
   }
 
+  std::string mangleAssociatedConformanceDescriptor(
+      const ProtocolDecl *proto,
+      CanType subject,
+      const ProtocolDecl *requirement) {
+    beginMangling();
+    appendAnyGenericType(proto);
+    bool isFirstAssociatedTypeIdentifier = true;
+    appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    appendProtocolName(requirement);
+    appendOperator("Tn");
+    return finalize();
+  }
+
   std::string mangleProtocolConformanceDescriptor(
                                  const ProtocolConformance *Conformance) {
     beginMangling();
@@ -413,13 +426,6 @@ public:
 
   std::string manglePartialApplyForwarder(StringRef FuncName);
   
-  std::string mangleForProtocolDescriptor(ProtocolType *Proto) {
-    beginMangling();
-    appendProtocolName(Proto->getDecl(), /*allowStandardSubstitution=*/false);
-    appendOperator("P");
-    return finalize();
-  }
-
   std::string mangleTypeForForeignMetadataUniquing(Type type) {
     return mangleTypeWithoutPrefix(type);
   }
