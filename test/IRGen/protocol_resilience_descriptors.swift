@@ -75,3 +75,12 @@ public func assocTypeMetadata<PWR: ProtocolWithRequirements>(_: PWR.Type) -> PWR
   // CHECK-USAGE: load i8*, i8** [[WITNESS_ADDR]], align {{(4|8)}}
   return PWR.T.self
 }
+
+func useOtherResilientProtocol<T: OtherResilientProtocol>(_: T.Type) { }
+
+// CHECK-USAGE: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S31protocol_resilience_descriptors23extractAssocConformanceyyx010resilient_A0012ProtocolWithE12TypeDefaultsRzlF"
+public func extractAssocConformance<T: ProtocolWithAssocTypeDefaults>(_: T) {
+  // CHECK-USAGE: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.ProtocolWithAssocTypeDefaults, [[INT]] udiv ([[INT]] sub ([[INT]] ptrtoint (%swift.protocol_requirement* @"$S2T218resilient_protocol29ProtocolWithAssocTypeDefaultsPTl" to [[INT]]), [[INT]] ptrtoint (%swift.protocol_requirement* @"$S18resilient_protocol29ProtocolWithAssocTypeDefaultsTL" to [[INT]])), [[INT]] 8)
+  // CHECK-USAGE: load i8*, i8** [[WITNESS_ADDR]]
+  useOtherResilientProtocol(T.T2.self)
+}
