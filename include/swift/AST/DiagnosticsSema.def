@@ -1333,6 +1333,7 @@ WARNING(pattern_type_access_inferred_warn,none,
         "because its type %6 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}5 type",
         (bool, bool, bool, AccessLevel, bool, AccessLevel, Type))
+
 ERROR(pattern_type_not_usable_from_inline,none,
       "type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
@@ -1343,6 +1344,10 @@ WARNING(pattern_type_not_usable_from_inline_warn,none,
         "%select{%select{variable|constant}0|property}1 "
         "should be '@usableFromInline' or public",
         (bool, bool))
+ERROR(pattern_type_not_usable_from_inline_fixed_layout,none,
+      "type referenced from a stored property in a @_fixed_layout struct must "
+      "be '@usableFromInline' or public",
+      (/*ignored*/bool, /*ignored*/bool))
 ERROR(pattern_type_not_usable_from_inline_inferred,none,
       "type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
@@ -1355,6 +1360,11 @@ WARNING(pattern_type_not_usable_from_inline_inferred_warn,none,
         "with inferred type %2 "
         "should be '@usableFromInline' or public",
         (bool, bool, Type))
+ERROR(pattern_type_not_usable_from_inline_inferred_fixed_layout,none,
+      "type referenced from a stored property with inferred type %2 in a "
+      "@_fixed_layout struct must be '@usableFromInline' or public",
+      (/*ignored*/bool, /*ignored*/bool, Type))
+
 ERROR(pattern_binds_no_variables,none,
       "%select{property|global variable}0 declaration does not bind any "
       "variables",

@@ -379,7 +379,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   const SILArgument *CurArgument = nullptr;
-  DominanceInfo *Dominance = nullptr;
+  std::unique_ptr<DominanceInfo> Dominance;
 
   // Used for dominance checking within a basic block.
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
@@ -590,17 +590,12 @@ public:
         InstNumbers[&I] = InstIdx++;
     }
 
-    Dominance = new DominanceInfo(const_cast<SILFunction *>(&F));
+    Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
     require(DebugScope->Parent.get<SILFunction *>() == &F,
             "Scope of SIL function points to different function");
-  }
-
-  ~SILVerifier() {
-    if (Dominance)
-      delete Dominance;
   }
 
   // Checks dominance between two instructions.
