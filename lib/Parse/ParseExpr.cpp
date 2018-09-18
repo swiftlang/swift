@@ -1869,9 +1869,28 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       Status |= E;
       if (auto expr = E.getPtrOrNull()) {
         if (auto tuple = dyn_cast<TupleExpr>(expr)) {
+          // Warn the user that this won't always be allowed.
+          if (tuple->getNumElements() > 1) {
+            auto rParenLoc = tuple->getRParenLoc();
+            auto secondExprLoc = tuple->getElement(1)->getLoc();
+            
+            diagnose(secondExprLoc, diag::string_interpolation_list_changing)
+              .highlightChars(secondExprLoc, rParenLoc);
+            diagnose(secondExprLoc, diag::string_interpolation_list_insert_parens)
+              .fixItInsertAfter(tuple->getLParenLoc(), "(")
+              .fixItInsert(rParenLoc, ")");
+          } else if (tuple->getNumElements() == 1 && tuple->hasElementNames()) {
+            auto startLoc = tuple->getElementNameLoc(0);
+            auto endLoc = tuple->getElement(0)->getStartLoc();
+            
+            diagnose(startLoc, diag::string_interpolation_label_changing)
+              .highlightChars(startLoc, endLoc);
+            diagnose(startLoc, diag::string_interpolation_remove_label, tuple->getElementName(0))
+              .fixItRemoveChars(startLoc, endLoc);
+          }
+          
           // This needs to be wrapped in a ParenExpr so it won't be interpreted
           // as an argument list.
-          // FIXME: Do we want to warn/error about any of these cases?
           expr = new (Context) ParenExpr(SourceLoc(), tuple, SourceLoc(), 
                                          /*hasTrailingClosure=*/false);
           expr->setImplicit();
