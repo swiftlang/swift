@@ -1,6 +1,7 @@
 %{
 eltsizes = [8,16,32,64]
 counts = [2,3,4,8,16,32,64]
+fltnames = {32:'Float', 64:'Double'}
 }%
 
 %for bits in eltsizes:
@@ -204,6 +205,14 @@ public extension ${Element} {
       )
     }
 
+%    if bits in [32, 64]:
+%     FloatElement = fltnames[bits]
+    @_transparent
+    public init(bitPattern other: ${FloatElement}.Vector${N}) {
+      _value = Builtin.bitcast_Vec${llvmN}xFPIEEE${bits}_${LLVM}(other._value)
+    }
+
+%    end
     // TODO: we shouldn't need the concrete conversions that follow; we should
     // be able to vectorize the for-loop in the generic `truncatingIfNeeded`
     // init to a single vector sext, zext, nop, or trunc (or possibly one per

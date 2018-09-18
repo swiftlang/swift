@@ -1,10 +1,13 @@
 %{
-eltsizes = [32,64]
+eltsizes = [32, 64]
+fltnames = {32:'Float', 64:'Double'}
 counts = [2,3,4,8,16]
+def llvmFloatVec(bits, count):
+  return 'Vec' + str(count) + 'xFPIEEE' + str(bits)
 }%
 
 %for bits in eltsizes:
-% Element = {32:'Float', 64:'Double'}[bits]
+% Element = fltnames[bits]
 public extension ${Element} {
 % for N in counts:
 %  # In theory, LLVM should handle padding 3-element vectors out to 4-element
@@ -12,9 +15,10 @@ public extension ${Element} {
 %  # so it ends up being simpler to pad at the Swift level instead.
 %  llvmN = N if N != 3 else 4
 %  if bits*llvmN <= 512:
-%   LLVM = 'Vec' + str(llvmN) + 'xFPIEEE' + str(bits)
+%   LLVM = llvmFloatVec(bits, llvmN)
 %   Self = 'Vector' + str(N)
 %   BitPattern = 'Int' + str(bits) + '.Vector' + str(N)
+%   BitPatternLLVM = 'Vec' + str(llvmN) + 'xInt' + str(bits)
   @_fixed_layout
   struct ${Self} : SIMDFloatingPointVector, SIMDVector${N} {
 
@@ -50,12 +54,28 @@ public extension ${Element} {
 
     public typealias Predicate = SIMDPredicate${bits}x${N}
 
-%   bitPatternLLVM = 'Vec' + str(llvmN) + 'xInt' + str(bits)
-%   sext = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + bitPatternLLVM
+%   sext = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + BitPatternLLVM
     @_transparent
     public static func ==(lhs: ${Self}, rhs: ${Self}) -> Predicate {
       return Predicate(Int${bits}.Vector${N}(${sext}(
         Builtin.fcmp_oeq_${LLVM}(lhs._value, rhs._value))))
+    }
+
+    @_transparent
+    public init(bitPattern other: Int${bits}.Vector${N}) {
+      _value = Builtin.bitcast_${BitPatternLLVM}_${LLVM}(other._value)
+    }
+
+    @_transparent
+    public init(bitPattern other: UInt${bits}.Vector${N}) {
+      _value = Builtin.bitcast_${BitPatternLLVM}_${LLVM}(other._value)
+    }
+
+    @_transparent
+    public func replacing(with other: ${Self}, where predicate: Predicate) -> ${Self} {
+      return ${Self}(bitPattern: ${BitPattern}(bitPattern: self).replacing(
+        with: ${BitPattern}(bitPattern: other), where: predicate
+      ))
     }
 
     // Conformance to SIMDVector${N} -----------------------------------------
@@ -64,17 +84,6 @@ public extension ${Element} {
 %   end
 
     // Conformance to SIMDFloatingPointVector --------------------------------
-%   BitPatternLLVM = 'Vec' + str(llvmN) + 'xInt' + str(bits)
-    @_transparent
-    public var bitPattern: ${BitPattern} {
-      return ${BitPattern}(Builtin.bitcast_${LLVM}_${bitPatternLLVM}(self._value))
-    }
-
-    @_transparent
-    public init(bitPattern: ${BitPattern}) {
-      _value = Builtin.bitcast_${bitPatternLLVM}_${LLVM}(bitPattern._value)
-    }
-
 %   for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
     @_transparent
     public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Predicate {
@@ -127,6 +136,36 @@ public extension ${Element} {
     internal mutating func _roundSlowPath(_ rule: FloatingPointRoundingRule) {
       self.round(rule)
     }
+
+    // Conversion from other floating-point vectors.
+%   for otherBits in eltsizes:
+%    if otherBits != bits and otherBits*llvmN <= 512:
+%     OtherElement = {32:'Float', 64:'Double'}[otherBits]
+    @_transparent
+    public init(_ other: ${OtherElement}.Vector${N}) {
+%     if otherBits > bits:
+      _value = Builtin.fptrunc_${llvmFloatVec(otherBits, llvmN)}_${LLVM}(other._value)
+%     else:
+      _value = Builtin.fpext_${llvmFloatVec(otherBits, llvmN)}_${LLVM}(other._value)
+%     end
+    }
+%    end
+%   end
+
+    // Conversion from integer vectors.
+%   for otherBits in [8,16,32,64]:
+%    if otherBits*llvmN <= 512:
+    @_transparent
+    public init(_ other: Int${otherBits}.Vector${N}) {
+      _value = Builtin.sitofp_Vec${llvmN}xInt${otherBits}_${LLVM}(other._value)
+    }
+
+    @_transparent
+    public init(_ other: UInt${otherBits}.Vector${N}) {
+      _value = Builtin.uitofp_Vec${llvmN}xInt${otherBits}_${LLVM}(other._value)
+    }
+%    end
+%   end
   }
 
 %  end

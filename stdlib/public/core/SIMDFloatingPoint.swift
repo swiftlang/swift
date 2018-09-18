@@ -1,13 +1,6 @@
 public protocol SIMDFloatingPointVector : SIMDVector
                           where Element : BinaryFloatingPoint,
                  Element.RawSignificand : FixedWidthInteger {
-
-  associatedtype BitPattern: SIMDIntegerVector
-    where BitPattern.Predicate == Predicate
-
-  var bitPattern: BitPattern { get }
-  
-  init(bitPattern: BitPattern)
   
   static func <(lhs: Self, rhs: Self) -> Predicate
   
@@ -218,16 +211,6 @@ public extension SIMDFloatingPointVector {
     var result = self
     result.round(rule)
     return result
-  }
-  
-  /// A vector where the value in each lane is selected from the corresponding
-  /// lane of `self` (if that lane of `predicate` is `false`) or `other` (if
-  /// that lane of `predicate` is `true`).
-  @_transparent
-  func replacing(with other: Self, where predicate: Predicate) -> Self {
-    return Self(bitPattern:
-      self.bitPattern.replacing(with: other.bitPattern, where: predicate)
-    )
   }
   
   @inlinable
