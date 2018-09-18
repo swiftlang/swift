@@ -1219,7 +1219,7 @@ static bool maybeConsumeNewlineEscape(const char *&CurPtr, ssize_t Offset) {
 static bool diagnoseZeroWidthMatchAndAdvance(char Target, const char *&CurPtr,
                                              DiagnosticEngine *Diags) {
   // TODO: Detect, diagnose and skip over zero-width characters if required.
-  // See https://github.com/apple/swift/pull/17668 for possible implementation.
+  // See https://bugs.swift.org/browse/SR-8678 for possible implementation.
   return *CurPtr == Target && CurPtr++;
 }
 
