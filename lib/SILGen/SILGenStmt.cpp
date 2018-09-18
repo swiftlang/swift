@@ -507,8 +507,7 @@ void StmtEmitter::visitDeferStmt(DeferStmt *S) {
 void StmtEmitter::visitIfStmt(IfStmt *S) {
   Scope condBufferScope(SGF.Cleanups, S);
   
-  // Create a continuation block.  We need it if there is a labeled break out
-  // of the if statement or if there is an if/then/else.
+  // Create a continuation block.
   JumpDest contDest = createJumpDest(S->getThenStmt());
   auto contBB = contDest.getBlock();
 
