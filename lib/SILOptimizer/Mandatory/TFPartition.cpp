@@ -70,20 +70,6 @@ static llvm::cl::opt<bool> TFSendRecvOpaqueHandle(
     llvm::cl::desc("When true, variant and resource handles can be sent via "
                    "eager API as tensor handles."));
 
-// The flag below is referenced in multiple translation units.
-namespace llvm {
-// This flag is used as a crutch to develop and test IRGen code that handles
-// graph_op insts.
-// TODO: Fold this flag into -Onone mode.
-llvm::cl::opt<bool> TFDynamicCompilation(
-    "tf-dynamic-compilation", llvm::cl::init(false),
-    llvm::cl::desc(
-        "When true, skip the partitioning and lowering pass, so that graph_op "
-        "instructions flow to IRGen. This flag should not be turned on by end "
-        "users, due to many restrictions (e.g. it will not work with "
-        "tensorflow convention functions)."));
-} // namespace llvm
-
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
                                    Diag<T...> diag, U &&... args) {
@@ -2538,8 +2524,10 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     assert(0 && "Handled above");
   case PromotedScalarKind::Binary:
   case PromotedScalarKind::OverflowingBinary:
-    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
-    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+    GraphOperationInfo::OperandMarker::appendTo(
+        opName, GraphOperationInfo::OMK_Normal);
+    GraphOperationInfo::OperandMarker::appendTo(
+        opName, GraphOperationInfo::OMK_Normal);
     break;
   case PromotedScalarKind::Literal: {
     SymbolicValue constVal;
@@ -2569,7 +2557,8 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   }
   case PromotedScalarKind::Conversion: {
     // Conversions get an attribute specifying the result dtype, named "DstT".
-    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+    GraphOperationInfo::OperandMarker::appendTo(
+        opName, GraphOperationInfo::OMK_Normal);
     attributes.push_back(
         {ctx.getIdentifier("DstT"),
          SymbolicValue::getMetatype(
@@ -2781,7 +2770,8 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto opType = "tfc.SendToHost";
   std::string instName = opType;
-  instName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+  GraphOperationInfo::OperandMarker::appendTo(instName,
+                                              GraphOperationInfo::OMK_Normal);
   SmallVector<GraphOperationAttribute, 2> attributes;
   attributes.push_back(
       {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
@@ -3093,10 +3083,10 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
       // Omit the metatype attr T for simplicity, and TF graphDef compiler can
       // infer the type.
       std::string equalOpName = "Equal";
-      equalOpName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
-      equalOpName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+      GraphOperationInfo::OperandMarker::appendTo(
+          equalOpName, GraphOperationInfo::OMK_Normal);
+      GraphOperationInfo::OperandMarker::appendTo(
+          equalOpName, GraphOperationInfo::OMK_Normal);
 
       auto boolFieldSILType =
           extractBuiltinTypeFromStdlibNumericType(ctx.getBoolDecl());

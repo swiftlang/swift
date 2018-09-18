@@ -333,11 +333,11 @@ class DevicePartitionCloner
 
 void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
   GraphOperationInfo decoder(inst);
-  SmallVector<GraphOperationInfo::InputMarker, 4> inputInfos;
-  auto opName = decoder.decodeName(inputInfos);
+  SmallVector<GraphOperationInfo::OperandMarker, 4> operandMarkers;
+  auto opName = decoder.decodeName(operandMarkers);
   if (opName == "tfc.TensorTransfer") {
-    assert(inputInfos.size() == 1);
-    assert(inputInfos[0] == GraphOperationInfo::IM_Normal);
+    assert(operandMarkers.size() == 1);
+    assert(operandMarkers[0].getKind() == GraphOperationInfo::OMK_Normal);
     visitTensorTransferInst(decoder);
     return;
   }
@@ -385,8 +385,8 @@ void DevicePartitionCloner::addD2DSend(GraphOperationInfo &graphOpInfo,
 
   // Insert a send inst, with type <T> (T) {int, str, str} -> ()
   std::string newInstName = "tfc.D2DTensorSend";
-  newInstName +=
-      GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+  GraphOperationInfo::OperandMarker::appendTo(newInstName,
+                                              GraphOperationInfo::OMK_Normal);
 
   auto &allocator = ctx.getAllocator();
   SmallVector<GraphOperationAttribute, 4> attributes;
@@ -809,8 +809,8 @@ public:
       // above is placed on the primary device), we rely on the backend graph
       // compiler (e.g. grappler) to optimize away this extraneous identity op.
       std::string identityOpName = "Identity";
-      identityOpName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+      GraphOperationInfo::OperandMarker::appendTo(
+          identityOpName, GraphOperationInfo::OMK_Normal);
 
       // insert this new inst at the beginning of the function.
       SILBuilder B(&srcFn.front().front());
@@ -870,8 +870,8 @@ public:
       // <T> (T) {transferId$int, srcDevice$str, destDevice$str} -> T
       // Optionally, it also has a shape array attribute (needed for TPU).
       auto newInstName = std::string("tfc.TensorTransfer");
-      newInstName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+      GraphOperationInfo::OperandMarker::appendTo(
+          newInstName, GraphOperationInfo::OMK_Normal);
 
       auto loc = inst->getLoc();
       // Insert the transfer right after the operandInst.

@@ -95,35 +95,59 @@ struct GraphOperationInfo {
   //   return getOpDeviceType(getDeviceString());
   // }
 
-  enum InputMarker {
-    /// Scalar input, used by tfc.scalarToTensor only.
-    IM_Scalar,
-    /// Normal tensor, variant or resource input.
-    IM_Normal,
-    /// Marker for the start of an input list, has no corresponding operand.
-    IM_InputList,
-    /// Element of an input list.
-    IM_InputListElt,
+  enum OperandMarkerKind {
+    /// Scalar input, used by tfc.scalarToTensor only. Cannot have name.
+    OMK_Scalar,
+    /// Operand that is not in a list. Might have name.
+    OMK_Normal,
+    /// Marker for the start of a list, has no corresponding operand. Might have
+    /// name.
+    OMK_InputList,
+    /// Element of a list. Cannot have name.
+    OMK_InputListElt,
   };
 
-  /// Return a comma and letter identifier whose letter corresponds to the
-  /// specified InputMarker.
-  static const char *getInputMarker(InputMarker kind) {
-    switch (kind) {
-    case IM_Scalar:
-      return ",s";
-    case IM_Normal:
-      return ",i";
-    case IM_InputList:
-      return ",L";
-    case IM_InputListElt:
-      return ",e";
+  /// The operands to a GraphOperationInst may be named and/or grouped into
+  /// rank-1 lists. OperandMarkers encode this naming and structure.
+  class OperandMarker {
+    friend struct GraphOperationInfo;
+
+    OperandMarkerKind Kind;
+
+    /// The mangled name as it appears in the graph_op. Matches regexp:
+    ///   ,([iL][^,]*)|(se)
+    StringRef MangledName;
+
+    OperandMarker(StringRef MangledName);
+
+  public:
+    OperandMarkerKind getKind() const {
+      return Kind;
     }
-  }
+
+    // The name of the marked operand or list.
+    StringRef getName() const {
+      return MangledName.drop_front(2);
+    }
+
+    /// A mangled string describing this OperandMarker, suitable for appending
+    /// to a mangled graph_op name.
+    StringRef getMangledName() const {
+      return MangledName;
+    }
+
+    /// Appends an OperandMarker with `kind` and `name` to the passed-in
+    /// `mangledOpName`. `name` must be empty for OMK_Scalar and
+    /// OMK_InputListElt.
+    static void
+    appendTo(std::string &mangledOpName, OperandMarkerKind kind,
+             StringRef name = StringRef());
+  };
 
   /// Decode the name of a graph_op into its TensorFlow op name and a list of
   /// information about the operands.
-  llvm::StringRef decodeName(llvm::SmallVectorImpl<InputMarker> &inputInfo);
+  llvm::StringRef
+  decodeName(llvm::SmallVectorImpl<OperandMarker> &operandMarkers) const;
 
   /// Given an attribute name like foo$tensor, decode the name and the class.
   /// If there is no modifier specified, this defaults to

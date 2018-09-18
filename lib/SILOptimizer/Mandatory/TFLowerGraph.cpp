@@ -1847,8 +1847,8 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
   // Decode information about the graph_op.
   GraphOperationInfo decoder(inst);
-  SmallVector<GraphOperationInfo::InputMarker, 4> inputInfos;
-  auto opName = decoder.decodeName(inputInfos);
+  SmallVector<GraphOperationInfo::OperandMarker, 4> operandMarkers;
+  auto opName = decoder.decodeName(operandMarkers);
 
   // Swift host <-> TF device sends/recvs.
   if (opName == "tfc.RecvFromHost")
@@ -1885,12 +1885,14 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   // Process all inputs.
   unsigned infoIndex = 0;
   for (unsigned i = 0, e = inst->getNumOperands(); i != e;) {
-    switch (inputInfos[infoIndex++]) {
-    case GraphOperationInfo::IM_Scalar:
+    auto operandMarker = operandMarkers[infoIndex++];
+    assert(operandMarker.getName().empty() && "cannot lower named operands");
+    switch (operandMarker.getKind()) {
+    case GraphOperationInfo::OMK_Scalar:
       llvm_unreachable("tfc.scalarToTensor should be lowered by now");
-    case GraphOperationInfo::IM_InputListElt:
+    case GraphOperationInfo::OMK_InputListElt:
       llvm_unreachable("we handle input list elements as part of the list");
-    case GraphOperationInfo::IM_Normal: {
+    case GraphOperationInfo::OMK_Normal: {
       // Normal tensor inputs.
       auto operand = inst->getOperand(i++);
       auto valueKind = classifyTensorFlowValue(operand->getType());
@@ -1905,13 +1907,14 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       TF_AddInput(op, opValue);
       break;
     }
-    case GraphOperationInfo::IM_InputList: {
+    case GraphOperationInfo::OMK_InputList: {
       // Collect all of the elements of the input list.
       SmallVector<TF_Output, 4> elements;
 
       // Collect all of the elements.
       while (i < e &&
-             inputInfos[infoIndex] == GraphOperationInfo::IM_InputListElt) {
+             operandMarkers[infoIndex].getKind() ==
+             GraphOperationInfo::OMK_InputListElt) {
         auto operand = inst->getOperand(i++);
         ++infoIndex;
 

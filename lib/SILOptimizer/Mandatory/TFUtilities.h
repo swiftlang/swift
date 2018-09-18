@@ -23,9 +23,14 @@
 #include "swift/SIL/GraphOperationInfo.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
+#include "llvm/Support/CommandLine.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "tensorflow/c/c_api.h"
 #endif
+
+namespace llvm {
+extern cl::opt<bool> TFDynamicCompilation;
+}
 
 namespace swift {
 namespace tf {

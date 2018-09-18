@@ -52,6 +52,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include "swift/SIL/GraphOperationInfo.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -1877,7 +1878,17 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto &llvmModule = IGM.Module;
   auto &llvmContext = llvmModule.getContext();
 
-  // TODO: refactor GraphOperationInfo and use that to decode `i`.
+  tf::GraphOperationInfo opInfo(i);
+  SmallVector<tf::GraphOperationInfo::OperandMarker, 4> operandMarkers;
+  auto opName = opInfo.decodeName(operandMarkers);
+
+  // TODO: Remove these. They are a temporary way of testing that dynamic
+  // attributes make it here.
+  LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: " << opName << "\n");
+  for (auto oi : operandMarkers) {
+    LLVM_DEBUG(llvm::dbgs() << "  operand: " << oi.getMangledName() << "\n");
+  }
+  LLVM_DEBUG(llvm::dbgs() << "end operands\n");
 
   // The overall workflow is:
   // 1. Prepare the input tensor handles and attributes
