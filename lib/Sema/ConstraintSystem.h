@@ -3345,89 +3345,34 @@ void simplifyLocator(Expr *&anchor,
 /// null otherwise.
 Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 
-enum class TypeBindingFlag {
-  /// The constraint represented by this choice has been
-  /// marked as disabled by the solver.
-  Disabled = 0x01,
-  /// The declaration behind this binding is marked as `@unavailable`
-  Unavailable = 0x02,
-  /// This binding comes from the "defaults to" constraint.
-  Defaultable = 0x04,
-  /// This binding comes from the "defaults to" constraint
-  /// which has associated protocol.
-  HasDefaultedProtocol = 0x08,
-  /// Type of the binding comes from generic operator declaration.
-  GenericOperator = 0x10,
-  /// Type of the binding comes from symmetric operator declaration.
-  SymmetricOperator = 0x20,
-};
-
-using TypeBindingFlags = OptionSet<TypeBindingFlag>;
-
-/// Common interface to encapsulate attempting choices of
-/// different entities, such as type variables (types)
-/// or disjunctions (their choices).
-class TypeBinding {
+class DisjunctionChoice {
   unsigned Index;
-  TypeBindingFlags Flags;
-
-public:
-  TypeBinding(unsigned index, TypeBindingFlags flags)
-      : Index(index), Flags(flags) {}
-
-  virtual ~TypeBinding() {}
-
-  /// Attempt given binding in the constraint system, this is going to
-  /// introduce some new constraints (potentially "bind" constraints)
-  /// to try and associate some type variables with new types.
-  ///
-  /// \returns true if attempt has been accepted by the constraint system,
-  ///          which means that new constraints have been successfully solved.
-  virtual bool attempt(ConstraintSystem &cs) const = 0;
-
-  /// Position of this binding in the chain.
-  unsigned getIndex() const { return Index; }
-
-  bool isDisabled() const { return Flags.contains(TypeBindingFlag::Disabled); }
-
-  bool isUnavailable() const {
-    return Flags.contains(TypeBindingFlag::Unavailable);
-  }
-
-  bool isDefaultable() const {
-    return Flags.contains(TypeBindingFlag::Defaultable);
-  }
-
-  bool hasDefaultedProtocol() const {
-    return Flags.contains(TypeBindingFlag::HasDefaultedProtocol);
-  }
-
-  // FIXME: Both of the accessors below are required to support
-  //        performance optimization hacks in constraint solver.
-
-  bool isGenericOperator() const {
-    return Flags.contains(TypeBindingFlag::GenericOperator);
-  }
-
-  bool isSymmetricOperator() const {
-    return Flags.contains(TypeBindingFlag::SymmetricOperator);
-  }
-
-  virtual void print(llvm::raw_ostream &Out, SourceManager *SM) const = 0;
-};
-
-class DisjunctionChoice : public TypeBinding {
   Constraint *Choice;
   bool ExplicitConversion;
 
 public:
   DisjunctionChoice(unsigned index, Constraint *choice, bool explicitConversion)
-      : TypeBinding(index, computeFlags(choice)), Choice(choice),
-        ExplicitConversion(explicitConversion) {}
+      : Index(index), Choice(choice), ExplicitConversion(explicitConversion) {}
 
-  bool attempt(ConstraintSystem &cs) const override;
+  unsigned getIndex() const { return Index; }
 
-  void print(llvm::raw_ostream &Out, SourceManager *SM) const override {
+  bool attempt(ConstraintSystem &cs) const;
+
+  bool isDisabled() const { return Choice->isDisabled(); }
+
+  bool isUnavailable() const {
+    if (auto *decl = getDecl(Choice))
+      return decl->getAttrs().isUnavailable(decl->getASTContext());
+    return false;
+  }
+
+  // FIXME: Both of the accessors below are required to support
+  //        performance optimization hacks in constraint solver.
+
+  bool isGenericOperator() const;
+  bool isSymmetricOperator() const;
+
+  void print(llvm::raw_ostream &Out, SourceManager *SM) const {
     Choice->print(Out, SM);
   }
 
@@ -3438,15 +3383,6 @@ private:
   /// \brief If associated disjunction is an explicit conversion,
   /// let's try to propagate its type early to prune search space.
   void propagateConversionInfo(ConstraintSystem &cs) const;
-
-  static bool isUnavailable(Constraint *choice) {
-    if (auto *decl = getDecl(choice))
-      return decl->getAttrs().isUnavailable(decl->getASTContext());
-    return false;
-  }
-
-  static bool isGenericOp(Constraint *choice);
-  static bool isSymmetricOp(Constraint *choice);
 
   static ValueDecl *getOperatorDecl(Constraint *choice) {
     auto *decl = getDecl(choice);
@@ -3466,46 +3402,25 @@ private:
 
     return choice.getDecl();
   }
-
-  static TypeBindingFlags computeFlags(Constraint *choice) {
-    TypeBindingFlags flags;
-    if (choice->isDisabled())
-      flags |= TypeBindingFlag::Disabled;
-    if (isUnavailable(choice))
-      flags |= TypeBindingFlag::Unavailable;
-    if (isGenericOp(choice))
-      flags |= TypeBindingFlag::GenericOperator;
-    if (isSymmetricOp(choice))
-      flags |= TypeBindingFlag::SymmetricOperator;
-    return flags;
-  }
 };
 
-class TypeVariableBinding : public TypeBinding {
+class TypeVariableBinding {
   TypeVariableType *TypeVar;
   ConstraintSystem::PotentialBinding Binding;
 
 public:
-  TypeVariableBinding(unsigned index, TypeVariableType *typeVar,
+  TypeVariableBinding(TypeVariableType *typeVar,
                       ConstraintSystem::PotentialBinding &binding)
-      : TypeBinding(index, computeFlags(binding)), TypeVar(typeVar),
-        Binding(binding) {}
+      : TypeVar(typeVar), Binding(binding) {}
 
-  bool attempt(ConstraintSystem &cs) const override;
+  bool isDefaultable() const { return Binding.isDefaultableBinding(); }
 
-  void print(llvm::raw_ostream &Out, SourceManager *) const override {
+  bool hasDefaultedProtocol() const { return Binding.DefaultedProtocol; }
+
+  bool attempt(ConstraintSystem &cs) const;
+
+  void print(llvm::raw_ostream &Out, SourceManager *) const {
     Out << TypeVar->getString() << " := " << Binding.BindingType->getString();
-  }
-
-private:
-  static TypeBindingFlags
-  computeFlags(ConstraintSystem::PotentialBinding &binding) {
-    TypeBindingFlags flags;
-    if (binding.isDefaultableBinding())
-      flags |= TypeBindingFlag::Defaultable;
-    if (binding.DefaultedProtocol)
-      flags |= TypeBindingFlag::HasDefaultedProtocol;
-    return flags;
   }
 };
 
@@ -3549,20 +3464,22 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
   llvm::SmallPtrSet<TypeBase *, 4> BoundTypes;
 
 public:
-  TypeVarBindingProducer(ConstraintSystem &cs, TypeVariableType *typeVar,
-                         ArrayRef<Binding> initialBindings)
-      : BindingProducer(cs, typeVar->getImpl().getLocator()), TypeVar(typeVar),
-        Bindings(initialBindings.begin(), initialBindings.end()) {}
+  using Element = TypeVariableBinding;
 
-  Optional<TypeVariableBinding> operator()() override {
+  TypeVarBindingProducer(ConstraintSystem &cs,
+                         ConstraintSystem::PotentialBindings &bindings)
+      : BindingProducer(cs, bindings.TypeVar->getImpl().getLocator()),
+        TypeVar(bindings.TypeVar),
+        Bindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
+
+  Optional<Element> operator()() override {
     // Once we reach the end of the current bindings
     // let's try to compute new ones, e.g. supertypes,
     // literal defaults, if that fails, we are done.
     if (needsToComputeNext() && !computeNext())
       return None;
 
-    unsigned currIndex = Index++;
-    return TypeVariableBinding(currIndex, TypeVar, Bindings[currIndex]);
+    return TypeVariableBinding(TypeVar, Bindings[Index++]);
   }
 
   bool needsToComputeNext() const override { return Index >= Bindings.size(); }
@@ -3587,6 +3504,8 @@ class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
   unsigned Index = 0;
 
 public:
+  using Element = DisjunctionChoice;
+
   DisjunctionChoiceProducer(ConstraintSystem &cs, Constraint *disjunction)
       : BindingProducer(cs, disjunction->shouldRememberChoice()
                                 ? disjunction->getLocator()
@@ -3603,7 +3522,7 @@ public:
       : BindingProducer(cs, locator), Choices(choices),
         IsExplicitConversion(explicitConversion) {}
 
-  Optional<DisjunctionChoice> operator()() override {
+  Optional<Element> operator()() override {
     unsigned currIndex = Index;
     if (currIndex >= Choices.size())
       return None;

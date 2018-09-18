@@ -23,6 +23,7 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <memory>
@@ -395,43 +396,108 @@ public:
   }
 };
 
-class TypeVariableStep final : public SolverStep {
+template <typename P> class BindingStep : public SolverStep {
   using Scope = ConstraintSystem::SolverScope;
+
+  P Producer;
+
+protected:
+  /// Indicates whether any of the attempted bindings
+  /// produced a solution.
+  bool AnySolved = false;
+
+  /// Active binding (scope + choice) which is currently
+  /// being attempted, helps to rewind state of the
+  /// constraint system back to original before attempting
+  /// next binding, if any.
+  Optional<std::pair<std::unique_ptr<Scope>, typename P::Element>> ActiveChoice;
+
+  BindingStep(ConstraintSystem &cs, P producer,
+              SmallVectorImpl<Solution> &solutions)
+      : SolverStep(cs, solutions), Producer(std::move(producer)) {}
+
+public:
+  StepResult take(bool prevFailed) override {
+    while (auto choice = Producer()) {
+      if (shouldSkip(*choice))
+        continue;
+
+      if (shouldStopAt(*choice))
+        break;
+
+      {
+        auto scope = llvm::make_unique<Scope>(CS);
+        if (attempt(*choice)) {
+          ActiveChoice.emplace(std::move(scope), *choice);
+          return suspend(SplitterStep::create(CS, Solutions));
+        }
+      }
+
+      // If this binding didn't match, let's check if we've attempted
+      // enough bindings to stop, because some producers might need
+      // to compute next step of bindings to try, which we'd want to avoid.
+      if (shouldStopAfter(*choice))
+        break;
+    }
+
+    return done(/*isSuccess=*/AnySolved);
+  }
+
+protected:
+  /// Attempt to apply given binding choice to constraint system.
+  /// This action is going to establish "active choice" of this step
+  /// to point to a given choice.
+  ///
+  /// \param choice The choice to attempt.
+  ///
+  /// \return true if the choice has been accepted and system can be
+  /// simplified further, false otherwise.
+  virtual bool attempt(const typename P::Element &choice) = 0;
+
+  /// Check whether attempting this choice could be avoided,
+  /// which could speed-up solving.
+  virtual bool shouldSkip(const typename P::Element &choice) const = 0;
+
+  /// Check whether attempting binding choices should be stopped,
+  /// because optimal solution has already been found.
+  virtual bool shouldStopAt(const typename P::Element &choice) const = 0;
+
+  /// Check whether attempting binding choices should be stopped,
+  /// after current choice has been attempted, because optimal
+  /// solution has already been found,
+  virtual bool shouldStopAfter(const typename P::Element &choice) const {
+    return false;
+  }
+
+  bool needsToComputeNext() const { return Producer.needsToComputeNext(); }
+
+  ConstraintLocator *getLocator() const { return Producer.getLocator(); }
+};
+
+class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
   using BindingContainer = ConstraintSystem::PotentialBindings;
   using Binding = ConstraintSystem::PotentialBinding;
 
   TypeVariableType *TypeVar;
-  TypeVarBindingProducer Producer;
-
   // A set of the initial bindings to consider, which is
   // also a source of follow-up "computed" bindings such
   // as supertypes, defaults etc.
   SmallVector<Binding, 4> InitialBindings;
 
-  /// Indicates whether any of the attempted bindings
-  /// produced a solution.
-  bool AnySolved = false;
   /// Indicates whether source of one of the previously
   /// attempted bindings was a literal constraint. This
   /// is useful for a performance optimization to stop
   /// attempting other bindings in certain conditions.
   bool SawFirstLiteralConstraint = false;
 
-  /// Solver scope associated with the binding which is
-  /// currently being attempted, helps to rewind state
-  /// of the constraint system back to original.
-  std::unique_ptr<Scope> ActiveChoice;
-
   TypeVariableStep(ConstraintSystem &cs, BindingContainer &bindings,
                    SmallVectorImpl<Solution> &solutions)
-      : SolverStep(cs, solutions), TypeVar(bindings.TypeVar),
-        Producer(cs, bindings.TypeVar, bindings.Bindings),
+      : BindingStep(cs, {cs, bindings}, solutions), TypeVar(bindings.TypeVar),
         InitialBindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
 
 public:
   void setup() override;
 
-  StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
 
   void print(llvm::raw_ostream &Out) override {
@@ -445,38 +511,46 @@ public:
     return new TypeVariableStep(cs, bindings, solutions);
   }
 
-private:
+protected:
+  bool attempt(const TypeVariableBinding &choice) override;
+
+  bool shouldSkip(const TypeVariableBinding &choice) const override {
+    // If this is a defaultable binding and we have found solutions,
+    // don't explore the default binding.
+    return AnySolved && choice.isDefaultable();
+  }
+
   /// Check whether attempting type variable binding choices should
   /// be stopped, because optimal solution has already been found.
-  bool shouldStop() const {
+  bool shouldStopAt(const TypeVariableBinding &choice) const override {
+    // If we were able to solve this without considering
+    // default literals, don't bother looking at default literals.
+    return AnySolved && choice.hasDefaultedProtocol() &&
+           !SawFirstLiteralConstraint;
+  }
+
+  bool shouldStopAfter(const TypeVariableBinding &choice) const override {
     // If there has been at least one solution so far
     // at a current batch of bindings is done it's a
     // success because each new batch would be less
     // and less precise.
-    return AnySolved && Producer.needsToComputeNext();
+    return AnySolved && needsToComputeNext();
   }
 };
 
-class DisjunctionStep final : public SolverStep {
-  using Scope = ConstraintSystem::SolverScope;
-
+class DisjunctionStep final : public BindingStep<DisjunctionChoiceProducer> {
   Constraint *Disjunction;
   SmallVector<Constraint *, 4> DisabledChoices;
   ConstraintList::iterator AfterDisjunction;
 
-  DisjunctionChoiceProducer Producer;
-
   Optional<Score> BestNonGenericScore;
   Optional<std::pair<Constraint *, Score>> LastSolvedChoice;
-
-  /// Scope initialized when attempting each disjunction choice.
-  Optional<std::pair<std::unique_ptr<Scope>, DisjunctionChoice>> ActiveChoice;
 
 public:
   DisjunctionStep(ConstraintSystem &cs, Constraint *disjunction,
                   SmallVectorImpl<Solution> &solutions)
-      : SolverStep(cs, solutions), Disjunction(disjunction),
-        AfterDisjunction(erase(disjunction)), Producer({cs, disjunction}) {
+      : BindingStep(cs, {cs, disjunction}, solutions), Disjunction(disjunction),
+        AfterDisjunction(erase(disjunction)) {
     assert(Disjunction->getKind() == ConstraintKind::Disjunction);
     pruneOverloadSet(Disjunction);
     ++cs.solverState->NumDisjunctions;
@@ -492,7 +566,6 @@ public:
       choice->setEnabled();
   }
 
-  StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
 
   void print(llvm::raw_ostream &Out) override {
@@ -507,7 +580,7 @@ public:
   }
 
 private:
-  bool shouldSkipChoice(const TypeBinding &choice) const;
+  bool shouldSkip(const DisjunctionChoice &choice) const override;
 
   /// Whether we should short-circuit a disjunction that already has a
   /// solution when we encounter the given choice.
@@ -518,7 +591,7 @@ private:
   ///
   /// \returns true if disjunction step should be considered complete,
   ///          false otherwise.
-  bool shouldShortCircuitAt(const DisjunctionChoice &choice) const;
+  bool shouldStopAt(const DisjunctionChoice &choice) const override;
   bool shortCircuitDisjunctionAt(Constraint *currentChoice,
                                  Constraint *lastSuccessfulChoice) const;
 
@@ -530,7 +603,7 @@ private:
   ///
   /// \return true if the choice has been accepted and system can be
   /// simplified further, false otherwise.
-  bool attemptChoice(const DisjunctionChoice &choice);
+  bool attempt(const DisjunctionChoice &choice) override;
 
   // Check if selected disjunction has a representative
   // this might happen when there are multiple binary operators

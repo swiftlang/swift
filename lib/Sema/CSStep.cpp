@@ -350,62 +350,31 @@ void TypeVariableStep::setup() {
   }
 }
 
-StepResult TypeVariableStep::take(bool prevFailed) {
-  while (auto binding = Producer()) {
-    // Try each of the bindings in turn.
-    ++CS.solverState->NumTypeVariableBindings;
+bool TypeVariableStep::attempt(const TypeVariableBinding &choice) {
+  ++CS.solverState->NumTypeVariableBindings;
 
-    if (AnySolved) {
-      // If this is a defaultable binding and we have found solutions,
-      // don't explore the default binding.
-      if (binding->isDefaultable())
-        continue;
-
-      // If we were able to solve this without considering
-      // default literals, don't bother looking at default literals.
-      if (binding->hasDefaultedProtocol() && !SawFirstLiteralConstraint)
-        break;
-    }
-
-    if (isDebugMode()) {
-      auto &log = getDebugLogger();
-      log << "(trying ";
-      binding->print(log, &CS.getASTContext().SourceMgr);
-      log << '\n';
-    }
-
-    if (binding->hasDefaultedProtocol())
-      SawFirstLiteralConstraint = true;
-
-    {
-      // Try to solve the system with typeVar := type
-      auto scope = llvm::make_unique<Scope>(CS);
-      if (binding->attempt(CS)) {
-        ActiveChoice = std::move(scope);
-        // Looks like binding attempt has been successful,
-        // let's try to see if it leads to any solutions.
-        return suspend(SplitterStep::create(CS, Solutions));
-      }
-    }
-
-    if (isDebugMode())
-      getDebugLogger() << ")\n";
-
-    // If this binding didn't match, let's check
-    // if we've checked enough bindings to stop.
-    if (shouldStop())
-      break;
+  if (isDebugMode()) {
+    auto &log = getDebugLogger();
+    log << "(trying ";
+    choice.print(log, &CS.getASTContext().SourceMgr);
+    log << '\n';
   }
 
-  // No more bindings to try, or producer has been short-circuited.
-  return done(/*isSuccess=*/AnySolved);
+  if (choice.hasDefaultedProtocol())
+    SawFirstLiteralConstraint = true;
+
+  // Try to solve the system with typeVar := type
+  if (!choice.attempt(CS)) {
+    if (isDebugMode())
+      getDebugLogger() << ")\n";
+    return false;
+  }
+
+  return true;
 }
 
 StepResult TypeVariableStep::resume(bool prevFailed) {
   assert(ActiveChoice);
-
-  // Rewind back all of the changes made to constraint system.
-  ActiveChoice.reset();
 
   // If there was no failure in the sub-path it means
   // that active binding has a solution.
@@ -414,44 +383,17 @@ StepResult TypeVariableStep::resume(bool prevFailed) {
   if (isDebugMode())
     getDebugLogger() << ")\n";
 
+  const auto choice = ActiveChoice->second;
+  // Rewind back all of the changes made to constraint system.
+  ActiveChoice.reset();
+
   // Let's check if we should stop right before
   // attempting any new bindings.
-  if (shouldStop())
+  if (shouldStopAfter(choice))
     return done(/*isSuccess=*/AnySolved);
 
   // Attempt next type variable binding.
   return take(prevFailed);
-}
-
-StepResult DisjunctionStep::take(bool prevFailed) {
-  while (auto binding = Producer()) {
-    auto &currentChoice = *binding;
-
-    if (shouldSkipChoice(currentChoice))
-      continue;
-
-    if (shouldShortCircuitAt(currentChoice))
-      break;
-
-    if (isDebugMode()) {
-      auto &log = getDebugLogger();
-      log << "(assuming ";
-      currentChoice.print(log, &CS.getASTContext().SourceMgr);
-      log << '\n';
-    }
-
-    /// Attempt given disjunction choice, which is going to simplify
-    /// constraint system by binding some of the type variables. Since
-    /// the system has been simplified and is splittable, we simplify
-    /// have to return "split" step which is going to take care of the rest.
-    if (attemptChoice(currentChoice))
-      return suspend(SplitterStep::create(CS, Solutions));
-
-    if (isDebugMode())
-      getDebugLogger() << ")\n";
-  }
-
-  return done(/*isSuccess=*/bool(LastSolvedChoice));
 }
 
 StepResult DisjunctionStep::resume(bool prevFailed) {
@@ -472,6 +414,7 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
         BestNonGenericScore = score;
     }
 
+    AnySolved = true;
     // Remember the last successfully solved choice,
     // it would be useful when disjunction is exhausted.
     LastSolvedChoice = {choice, *score};
@@ -487,7 +430,7 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
   return take(prevFailed);
 }
 
-bool DisjunctionStep::shouldSkipChoice(const TypeBinding &choice) const {
+bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
   if (choice.isDisabled()) {
@@ -531,8 +474,7 @@ bool DisjunctionStep::shouldSkipChoice(const TypeBinding &choice) const {
   return false;
 }
 
-bool DisjunctionStep::shouldShortCircuitAt(
-    const DisjunctionChoice &choice) const {
+bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   if (!LastSolvedChoice)
     return false;
 
@@ -596,13 +538,12 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   return false;
 }
 
-bool DisjunctionStep::attemptChoice(const DisjunctionChoice &choice) {
-  auto scope = llvm::make_unique<Scope>(CS);
+bool DisjunctionStep::attempt(const DisjunctionChoice &choice) {
   ++CS.solverState->NumDisjunctionTerms;
 
   // If the disjunction requested us to, remember which choice we
   // took for it.
-  if (auto *disjunctionLocator = Producer.getLocator()) {
+  if (auto *disjunctionLocator = getLocator()) {
     auto index = choice.getIndex();
     recordDisjunctionChoice(disjunctionLocator, index);
 
@@ -619,11 +560,11 @@ bool DisjunctionStep::attemptChoice(const DisjunctionChoice &choice) {
     }
   }
 
-  if (!choice.attempt(CS))
+  if (!choice.attempt(CS)) {
+    if (isDebugMode())
+      getDebugLogger() << ")\n";
     return false;
+  }
 
-  // Establish the "active" choice which maintains new scope in the
-  // constraint system, be be able to rollback all of the changes later.
-  ActiveChoice.emplace(std::move(scope), choice);
   return true;
 }
