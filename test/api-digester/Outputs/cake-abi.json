@@ -95,6 +95,7 @@
           "usr": "s:4cake2S1VACycfc",
           "location": "",
           "moduleName": "cake",
+          "implicit": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -125,6 +126,7 @@
           "location": "",
           "moduleName": "cake",
           "genericSig": "<τ_0_0, τ_0_1, τ_0_2>",
+          "implicit": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -241,6 +243,7 @@
               "usr": "s:4cake2C1C3InsACSgXwvg",
               "location": "",
               "moduleName": "cake",
+              "implicit": true,
               "declAttributes": [
                 "Transparent"
               ],
@@ -269,6 +272,7 @@
               "usr": "s:4cake2C1C3InsACSgXwvs",
               "location": "",
               "moduleName": "cake",
+              "implicit": true,
               "declAttributes": [
                 "Transparent"
               ],
@@ -323,6 +327,7 @@
               "usr": "s:4cake2C1C4Ins2ACXovg",
               "location": "",
               "moduleName": "cake",
+              "implicit": true,
               "declAttributes": [
                 "Transparent"
               ],
@@ -343,6 +348,7 @@
               "usr": "s:4cake2C1C4Ins2ACXovs",
               "location": "",
               "moduleName": "cake",
+              "implicit": true,
               "declAttributes": [
                 "Transparent"
               ],
@@ -370,6 +376,7 @@
           "usr": "s:4cake2C1CACycfc",
           "location": "",
           "moduleName": "cake",
+          "implicit": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -499,6 +506,7 @@
           "usr": "s:4cake6NumberO8RawValuea",
           "location": "",
           "moduleName": "cake",
+          "implicit": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -516,6 +524,7 @@
           "usr": "s:4cake6NumberO9hashValueSivp",
           "location": "",
           "moduleName": "cake",
+          "implicit": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -531,6 +540,7 @@
               "usr": "s:4cake6NumberO9hashValueSivg",
               "location": "",
               "moduleName": "cake",
+              "implicit": true,
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -550,6 +560,7 @@
           "usr": "s:4cake6NumberO4hash4intoys6HasherVz_tF",
           "location": "",
           "moduleName": "cake",
+          "implicit": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -572,6 +583,7 @@
           "usr": "s:4cake6NumberO8rawValueACSgSi_tcfc",
           "location": "",
           "moduleName": "cake",
+          "implicit": true,
           "declAttributes": [
             "Inlinable"
           ],
@@ -606,6 +618,7 @@
           "usr": "s:4cake6NumberO8rawValueSivp",
           "location": "",
           "moduleName": "cake",
+          "implicit": true,
           "children": [
             {
               "kind": "TypeNominal",
@@ -621,6 +634,7 @@
               "usr": "s:4cake6NumberO8rawValueSivg",
               "location": "",
               "moduleName": "cake",
+              "implicit": true,
               "declAttributes": [
                 "Inlinable"
               ],

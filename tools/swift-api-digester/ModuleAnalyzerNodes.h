@@ -275,6 +275,7 @@ class SDKNodeDecl: public SDKNode {
   StringRef Location;
   StringRef ModuleName;
   std::vector<DeclAttrKind> DeclAttributes;
+  bool IsImplicit;
   bool IsStatic;
   bool IsDeprecated;
   uint8_t ReferenceOwnership;
@@ -301,6 +302,7 @@ public:
   bool isSDKPrivate() const;
   bool isDeprecated() const { return IsDeprecated; };
   bool hasDeclAttribute(DeclAttrKind DAKind) const;
+  bool isImplicit() const { return IsImplicit; };
   bool isStatic() const { return IsStatic; };
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;

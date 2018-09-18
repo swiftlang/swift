@@ -42,6 +42,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   StringRef USR;
   StringRef Location;
   StringRef ModuleName;
+  bool IsImplicit = false;
   bool IsThrowing = false;
   bool IsMutating = false;
   bool IsStatic = false;
@@ -81,8 +82,8 @@ SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root)
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
       : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.USR),
         Location(Info.Location), ModuleName(Info.ModuleName),
-        DeclAttributes(Info.DeclAttrs), IsStatic(Info.IsStatic),
-        IsDeprecated(Info.IsDeprecated),
+        DeclAttributes(Info.DeclAttrs), IsImplicit(Info.IsImplicit),
+        IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
         GenericSig(Info.GenericSig) {}
 
@@ -555,6 +556,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       case KeyKind::KK_deprecated:
         Info.IsDeprecated = true;
         break;
+      case KeyKind::KK_implicit:
+        Info.IsImplicit = true;
+        break;
       case KeyKind::KK_ownership:
         Info.ReferenceOwnership =
             swift::ReferenceOwnership(getAsInt(Pair.getValue()));
@@ -921,6 +925,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
       PrintedName(getPrintedName(Ctx, VD)), DKind(VD->getKind()),
       USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
       ModuleName(VD->getModuleContext()->getName().str()),
+      IsImplicit(VD->isImplicit()),
       IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
       IsStatic(VD->isStatic()),
       IsDeprecated(VD->getAttrs().getDeprecated(VD->getASTContext())),
@@ -1300,6 +1305,9 @@ struct ObjectTraits<SDKNode *> {
       if (bool isDeprecated = D->isDeprecated())
         out.mapRequired(getKeyContent(Ctx, KeyKind::KK_deprecated).data(),
                         isDeprecated);
+      if (bool isImplicit = D->isImplicit())
+        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_implicit).data(),
+                        isImplicit);
       if (auto F = dyn_cast<SDKNodeDeclAbstractFunc>(value)) {
         if (bool isThrowing = F->isThrowing())
           out.mapRequired(getKeyContent(Ctx, KeyKind::KK_throwing).data(),
