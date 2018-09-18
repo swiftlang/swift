@@ -1406,8 +1406,8 @@ bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
   return !cs.failedConstraint && !cs.simplify();
 }
 
-bool DisjunctionChoice::isGenericOp(Constraint *choice) {
-  auto *decl = getOperatorDecl(choice);
+bool DisjunctionChoice::isGenericOperator() const {
+  auto *decl = getOperatorDecl(Choice);
   if (!decl)
     return false;
 
@@ -1415,8 +1415,8 @@ bool DisjunctionChoice::isGenericOp(Constraint *choice) {
   return interfaceType->is<GenericFunctionType>();
 }
 
-bool DisjunctionChoice::isSymmetricOp(Constraint *choice) {
-  auto *decl = getOperatorDecl(choice);
+bool DisjunctionChoice::isSymmetricOperator() const {
+  auto *decl = getOperatorDecl(Choice);
   if (!decl)
     return false;
 
