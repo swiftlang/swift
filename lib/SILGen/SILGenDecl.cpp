@@ -1320,8 +1320,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     
     // Just branch on the condition.  On failure, we unwind any active cleanups,
     // on success we fall through to a new block.
-    SILBasicBlock *ContBB = createBasicBlock();
     auto FailBB = Cleanups.emitBlockForCleanups(FalseDest, loc);
+    SILBasicBlock *ContBB = createBasicBlock();
     B.createCondBranch(booleanTestLoc, booleanTestValue, ContBB, FailBB,
                        NumTrueTaken, NumFalseTaken);
 
