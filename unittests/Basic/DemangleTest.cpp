@@ -23,3 +23,10 @@ TEST(Demangle, DemangleWrappers) {
       demangleSymbolAsString(MangledName));
 }
 
+TEST(Demangle, IsObjCSymbol) {
+  EXPECT_EQ("type metadata accessor for __C.NSNumber",
+            demangleSymbolAsString(llvm::StringRef("_$SSo8NSNumberCMa")));
+  EXPECT_EQ(true, isObjCSymbol(llvm::StringRef("_$SSo8NSNumberCMa")));
+  EXPECT_EQ(false,
+            isObjCSymbol(llvm::StringRef("_$S3pat7inlinedSo8NSNumberCvp")));
+}
