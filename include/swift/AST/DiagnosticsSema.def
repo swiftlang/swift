@@ -1686,6 +1686,11 @@ ERROR(type_witness_objc_generic_parameter,none,
 NOTE(witness_fix_access,none,
      "mark the %0 as '%select{%error|fileprivate|internal|public|%error}1' to "
      "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
+WARNING(assoc_type_default_conformance_failed,none,
+        "default type %0 for associated type %1 does not satisfy constraint "
+        "%2: %3", (Type, DeclName, Type, Type))
+NOTE(assoc_type_default_here,none,
+     "associated type %0 has default type %1 written here", (DeclName, Type))
 
 ERROR(protocol_access,none,
       "%select{protocol must be declared %select{"

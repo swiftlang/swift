@@ -285,6 +285,11 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::DenseMap<std::pair<const ProtocolDecl *, AssociatedTypeDecl *>, Type>
     DefaultTypeWitnesses;
 
+  /// Default associated conformance witnesses for protocols.
+  llvm::DenseMap<std::pair<const ProtocolDecl *, unsigned>,
+                 ProtocolConformanceRef>
+    DefaultAssociatedConformanceWitnesses;
+
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -1706,6 +1711,27 @@ void ProtocolDecl::setDefaultTypeWitness(AssociatedTypeDecl *assocType,
   auto pair = ctx.getImpl().DefaultTypeWitnesses.insert(
                 std::make_pair(std::make_pair(this, assocType), witness));
   assert(pair.second && "Already have a default witness");
+  (void)pair;
+}
+
+Optional<ProtocolConformanceRef>
+ProtocolDecl::getDefaultAssociatedConformanceWitness(unsigned reqIndex) const {
+  auto &ctx = getASTContext();
+  auto found =
+    ctx.getImpl().DefaultAssociatedConformanceWitnesses.find({this, reqIndex});
+  if (found == ctx.getImpl().DefaultAssociatedConformanceWitnesses.end())
+    return None;
+
+  return found->second;
+}
+
+void ProtocolDecl::setDefaultAssociatedConformanceWitness(
+                                          unsigned reqIndex,
+                                          ProtocolConformanceRef conformance) {
+  auto &ctx = getASTContext();
+  auto pair = ctx.getImpl().DefaultAssociatedConformanceWitnesses.insert(
+                std::make_pair(std::make_pair(this, reqIndex), conformance));
+  assert(pair.second && "Already have a default associated conformance");
   (void)pair;
 }
 
