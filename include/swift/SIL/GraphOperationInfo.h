@@ -118,17 +118,23 @@ struct GraphOperationInfo {
     ///   ,([iL][^,]*)|(se)
     StringRef MangledName;
 
-    OperandMarker(StringRef MangledName, const GraphOperationInfo &info);
+    OperandMarker(StringRef MangledName);
 
   public:
-    OperandMarkerKind getKind() const;
+    OperandMarkerKind getKind() const {
+      return Kind;
+    }
 
     // The name of the marked operand or list.
-    StringRef getName() const;
+    StringRef getName() const {
+      return MangledName.drop_front(2);
+    }
 
     /// A mangled string describing this OperandMarker, suitable for appending
     /// to a mangled graph_op name.
-    StringRef getMangledName() const;
+    StringRef getMangledName() const {
+      return MangledName;
+    }
 
     /// Appends an OperandMarker with `kind` and `name` to the passed-in
     /// `mangledOpName`. `name` must be empty for OMK_Scalar and

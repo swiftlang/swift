@@ -1884,11 +1884,11 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
   // TODO: Remove these. They are a temporary way of testing that dynamic
   // attributes make it here.
-  llvm::dbgs() << "IRGen for graph_op: " << opName << "\n";
+  LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: " << opName << "\n");
   for (auto oi : operandMarkers) {
-    llvm::dbgs() << "  operand: " << oi.getMangledName() << "\n";
+    LLVM_DEBUG(llvm::dbgs() << "  operand: " << oi.getMangledName() << "\n");
   }
-  llvm::dbgs() << "end operands\n";
+  LLVM_DEBUG(llvm::dbgs() << "end operands\n");
 
   // The overall workflow is:
   // 1. Prepare the input tensor handles and attributes

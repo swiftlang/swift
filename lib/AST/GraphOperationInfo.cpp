@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/GraphOperationInfo.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -76,6 +77,8 @@ void GraphOperationInfo::assertWithDump(bool cond,
 /// information about the operands.
 StringRef GraphOperationInfo::decodeName(
     SmallVectorImpl<OperandMarker> &operandMarkers) const {
+  PrettyStackTraceSILNode X("decoding graph_op name", inst);
+
   auto name = inst->getName().str();
   auto pos = name.find(',');
   auto opName = name.substr(0, pos);
@@ -83,7 +86,7 @@ StringRef GraphOperationInfo::decodeName(
   while (pos != StringRef::npos) {
     name = name.drop_front(pos);
     pos = name.find(',', 1);
-    operandMarkers.push_back(OperandMarker(name.substr(0, pos), *this));
+    operandMarkers.push_back(OperandMarker(name.substr(0, pos)));
   }
 
   return opName;
@@ -130,11 +133,10 @@ std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
   return attrValue.getStringValue().str();
 }
 
-GraphOperationInfo::OperandMarker::OperandMarker(
-    StringRef MangledName, const GraphOperationInfo &info)
+GraphOperationInfo::OperandMarker::OperandMarker(StringRef MangledName)
     : MangledName(MangledName) {
-  info.assertWithDump(MangledName.size() >= 2, "marker too short");
-  info.assertWithDump(MangledName.find_last_of(",") == 0, "incorrect comma");
+  assert(MangledName.size() >= 2 && "marker too short");
+  assert(MangledName.find_last_of(",") == 0 && "incorrect comma");
 
   switch (MangledName[1]) {
   case 's':
@@ -152,24 +154,8 @@ GraphOperationInfo::OperandMarker::OperandMarker(
     assert(getName().empty());
     break;
   default:
-    info.assertWithDump(false, "unknown marker kind");
+    llvm_unreachable("unknown marker kind");
   }
-}
-
-GraphOperationInfo::OperandMarkerKind
-GraphOperationInfo::OperandMarker::getKind() const {
-  return Kind;
-}
-
-// The name of the marked operand or list.
-StringRef GraphOperationInfo::OperandMarker::getName() const {
-  return MangledName.drop_front(2);
-}
-
-/// A mangled string describing this OperandMarker, suitable for appending
-/// to a mangled graph_op name.
-StringRef GraphOperationInfo::OperandMarker::getMangledName() const {
-  return MangledName;
 }
 
 /// Appends an OperandMarker with `kind` and `name` to the passed-in

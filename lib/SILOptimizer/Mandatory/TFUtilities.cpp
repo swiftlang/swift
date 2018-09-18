@@ -47,6 +47,20 @@ static llvm::cl::opt<bool> TFDumpIntermediatesToTmp(
     llvm::cl::desc("Dump intermediate results in "
                    "TensorFlow passes to files in /tmp"));
 
+// The flag below is referenced in multiple translation units.
+namespace llvm {
+// This flag is used as a crutch to develop and test IRGen code that handles
+// graph_op insts.
+// TODO: Fold this flag into -Onone mode.
+llvm::cl::opt<bool> TFDynamicCompilation(
+    "tf-dynamic-compilation", llvm::cl::init(false),
+    llvm::cl::desc(
+        "When true, skip the partitioning and lowering pass, so that graph_op "
+        "instructions flow to IRGen. This flag should not be turned on by end "
+        "users, due to many restrictions (e.g. it will not work with "
+        "tensorflow convention functions)."));
+} // namespace llvm
+
 static raw_ostream &getTmpLoggingStream() {
   // If we are supposed to dump the intermediates into /tmp, set that up now.
   SmallString<64> resultPath;

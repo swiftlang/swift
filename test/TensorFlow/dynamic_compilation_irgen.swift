@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -Xllvm -tf-dynamic-compilation %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -Xllvm -tf-dynamic-compilation -Xllvm -debug -Xllvm -debug-only -Xllvm irgensil %s 2>&1 | %FileCheck %s
 
 import TensorFlow
 
@@ -10,7 +10,7 @@ public func unknownAttribute() {
   let x: TensorHandle<Float> = #tfop("Dummy1", value$tensor: Dynamic.float)
   _hostOp(x)
   // CHECK-LABEL: IRGen for graph_op: Dummy1
-  // CHECK-NEXT: ,ivalue$tensor
+  // CHECK-NEXT: operand: ,ivalue$tensor
   // CHECK-NEXT: end operands
 }
 

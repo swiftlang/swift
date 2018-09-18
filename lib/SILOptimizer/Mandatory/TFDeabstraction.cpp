@@ -52,10 +52,6 @@ static llvm::cl::opt<bool> TFPromoteGlobalVariables(
         "If enabled, promote global variables into SSA with a best "
         "effort to minimize sends/recvs. This is a performance optimization."));
 
-namespace llvm {
-  extern cl::opt<bool> TFDynamicCompilation;
-}
-
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
