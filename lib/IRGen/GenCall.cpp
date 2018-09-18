@@ -2763,7 +2763,7 @@ Address IRGenFunction::getErrorResultSlot(SILType errorType) {
   if (!ErrorResultSlot) {
     auto &errorTI = cast<FixedTypeInfo>(getTypeInfo(errorType));
 
-    IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo);
+    IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo != nullptr);
     builder.SetInsertPoint(AllocaIP->getParent(), AllocaIP->getIterator());
 
     // Create the alloca.  We don't use allocateStack because we're

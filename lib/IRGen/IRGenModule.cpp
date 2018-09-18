@@ -460,7 +460,6 @@ IRGenModule::~IRGenModule() {
   destroyClangTypeConverter();
   destroyMetadataLayoutMap();
   delete &Types;
-  delete DebugInfo;
 }
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);

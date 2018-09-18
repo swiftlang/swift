@@ -466,7 +466,7 @@ public:
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
-  IRGenDebugInfo *DebugInfo;
+  std::unique_ptr<IRGenDebugInfo> DebugInfo;
 
   /// A global variable which stores the hash of the module. Used for
   /// incremental compilation.
