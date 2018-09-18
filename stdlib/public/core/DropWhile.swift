@@ -84,7 +84,7 @@ extension LazyDropWhileSequence: Sequence {
   ///
   /// - Complexity: O(1).
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), predicate: _predicate)
   }
 }
@@ -102,7 +102,7 @@ extension LazySequenceProtocol {
   ///   `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
   @inlinable // lazy-performance
-  public func drop(
+  public __consuming func drop(
     while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyDropWhileSequence<Self.Elements> {
     return LazyDropWhileSequence(_base: self.elements, predicate: predicate)
@@ -142,7 +142,7 @@ extension LazyDropWhileCollection: Sequence {
   ///
   /// - Complexity: O(1).
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), predicate: _predicate)
   }
 }
@@ -248,7 +248,7 @@ extension LazyCollectionProtocol {
   ///   `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
   @inlinable // lazy-performance
-  public func drop(
+  public __consuming func drop(
     while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyDropWhileCollection<Self.Elements> {
     return LazyDropWhileCollection(

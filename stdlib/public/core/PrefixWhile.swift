@@ -75,7 +75,7 @@ extension LazyPrefixWhileSequence: Sequence {
   public typealias SubSequence = AnySequence<Element> // >:(
   
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), predicate: _predicate)
   }
 }
@@ -93,7 +93,7 @@ extension LazySequenceProtocol {
   ///   `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
   @inlinable // lazy-performance
-  public func prefix(
+  public __consuming func prefix(
     while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyPrefixWhileSequence<Self.Elements> {
     return LazyPrefixWhileSequence(_base: self.elements, predicate: predicate)
@@ -130,7 +130,7 @@ extension LazyPrefixWhileCollection: Sequence {
   public typealias Iterator = LazyPrefixWhileSequence<Base>.Iterator
   
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), predicate: _predicate)
   }
 }
@@ -304,7 +304,7 @@ extension LazyCollectionProtocol {
   ///   or `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
   @inlinable // lazy-performance
-  public func prefix(
+  public __consuming func prefix(
     while predicate: @escaping (Element) -> Bool
   ) -> LazyPrefixWhileCollection<Elements> {
     return LazyPrefixWhileCollection(

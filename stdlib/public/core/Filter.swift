@@ -89,7 +89,7 @@ extension LazyFilterSequence: LazySequenceProtocol {
   ///
   /// - Complexity: O(1).
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), _predicate)
   }
 
@@ -153,7 +153,7 @@ extension LazyFilterCollection : LazySequenceProtocol {
   ///
   /// - Complexity: O(1).
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), _predicate)
   }
 
@@ -365,7 +365,7 @@ extension LazySequenceProtocol {
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   @inlinable // lazy-performance
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(_base: self.elements, isIncluded)
@@ -380,7 +380,7 @@ extension LazyCollectionProtocol {
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   @inlinable // lazy-performance
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilterCollection<Self.Elements> {
     return LazyFilterCollection(_base: self.elements, isIncluded)
@@ -389,7 +389,7 @@ extension LazyCollectionProtocol {
 
 extension LazyFilterSequence {
   @available(swift, introduced: 5)
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: @escaping (Element) -> Bool
   ) -> LazyFilterSequence<Base> {
     return LazyFilterSequence(_base: _base) {
@@ -400,7 +400,7 @@ extension LazyFilterSequence {
 
 extension LazyFilterCollection {
   @available(swift, introduced: 5)
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: @escaping (Element) -> Bool
   ) -> LazyFilterCollection<Base> {
     return LazyFilterCollection(_base: _base) {

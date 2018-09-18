@@ -88,7 +88,7 @@ extension _ArrayBufferProtocol {
   @inline(never)
   internal mutating func _arrayOutOfPlaceReplace<C: Collection>(
     _ bounds: Range<Int>,
-    with newValues: C,
+    with newValues: __owned C,
     count insertCount: Int
   ) where C.Element == Element {
 
@@ -285,7 +285,7 @@ extension _ArrayBufferProtocol {
   /// Append items from `newItems` to a buffer.
   @inlinable
   internal mutating func _arrayAppendSequence<S: Sequence>(
-    _ newItems: S
+    _ newItems: __owned S
   ) where S.Element == Element {
     
     // this function is only ever called from append(contentsOf:)
