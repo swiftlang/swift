@@ -181,7 +181,8 @@ namespace {
     ProtocolConformance *
     parseProtocolConformanceHelper(ProtocolDecl *&proto,
                                    GenericEnvironment *GenericEnv,
-                                   bool localScope);
+                                   bool localScope,
+                                   ProtocolDecl *defaultForProto);
   public:
     SILParser(Parser &P)
         : P(P), SILMod(static_cast<SILParserTUState *>(P.SIL)->M),
@@ -391,15 +392,18 @@ namespace {
     bool isStartOfSILInstruction();
 
     bool parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
-                            GenericEnvironment *GenericEnv=nullptr);
+                            GenericEnvironment *GenericEnv=nullptr,
+                            ProtocolDecl *defaultForProto = nullptr);
 
     ProtocolConformance *parseProtocolConformance(ProtocolDecl *&proto,
                              GenericEnvironment *&genericEnv,
-                             bool localScope);
-    ProtocolConformance *parseProtocolConformance() {
+                             bool localScope,
+                             ProtocolDecl *defaultForProto);
+    ProtocolConformance *parseProtocolConformance(
+                                              ProtocolDecl *defaultForProto) {
       ProtocolDecl *dummy;
       GenericEnvironment *env;
-      return parseProtocolConformance(dummy, env, true);
+      return parseProtocolConformance(dummy, env, true, defaultForProto);
     }
 
     Optional<llvm::coverage::Counter>
@@ -1012,6 +1016,8 @@ bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
 
   if (!DC)
     DC = &P.SF;
+  else if (!GenericEnv)
+    GenericEnv = DC->getGenericEnvironmentOfContext();
 
   return swift::performTypeLocChecking(P.Context, T,
                                        /*isSILMode=*/true, IsSILType,
@@ -1510,10 +1516,46 @@ bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args,
   return false;
 }
 
+/// Bind any unqualified 'Self' references to the given protocol's 'Self'
+/// generic parameter.
+///
+/// FIXME: This is a hack to work around the lack of a DeclContext for
+/// witness tables.
+static void bindProtocolSelfInTypeRepr(TypeLoc &TL, ProtocolDecl *proto) {
+  if (auto typeRepr = TL.getTypeRepr()) {
+    // AST walker to update 'Self' references.
+    class BindProtocolSelf : public ASTWalker {
+      ProtocolDecl *proto;
+      GenericTypeParamDecl *selfParam;
+      Identifier selfId;
+
+    public:
+      BindProtocolSelf(ProtocolDecl *proto)
+        : proto(proto),
+          selfParam(proto->getProtocolSelfType()->getDecl()),
+          selfId(proto->getASTContext().Id_Self) {
+      }
+
+      virtual bool walkToTypeReprPre(TypeRepr *T) override {
+        if (auto ident = dyn_cast<IdentTypeRepr>(T)) {
+          auto firstComponent = ident->getComponentRange().front();
+          if (firstComponent->getIdentifier() == selfId)
+            firstComponent->setValue(selfParam, proto);
+        }
+
+        return true;
+      }
+    };
+
+    typeRepr->walk(BindProtocolSelf(proto));
+  }
+}
+
 /// Parse the substitution list for an apply instruction or
 /// specialized protocol conformance.
 bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
-                                   GenericEnvironment *GenericEnv) {
+                                   GenericEnvironment *GenericEnv,
+                                   ProtocolDecl *defaultForProto) {
   // Check for an opening '<' bracket.
   if (!P.Tok.isContextualPunctuator("<"))
     return false;
@@ -1529,7 +1571,10 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
     if (TyR.isNull())
       return true;
     TypeLoc Ty = TyR.get();
-    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, GenericEnv))
+    if (defaultForProto)
+      bindProtocolSelfInTypeRepr(Ty, defaultForProto);
+    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, GenericEnv,
+                               defaultForProto))
       return true;
     parsed.push_back({Loc, Ty.getType()});
   } while (P.consumeIf(tok::comma));
@@ -5725,7 +5770,8 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
 ProtocolConformance *SILParser::parseProtocolConformance(
            ProtocolDecl *&proto,
            GenericEnvironment *&genericEnv,
-           bool localScope) {
+           bool localScope,
+           ProtocolDecl *defaultForProto) {
   // Parse generic params for the protocol conformance. We need to make sure
   // they have the right scope.
   Optional<Scope> GenericsScope;
@@ -5741,7 +5787,8 @@ ProtocolConformance *SILParser::parseProtocolConformance(
   }
 
   ProtocolConformance *retVal =
-      parseProtocolConformanceHelper(proto, genericEnv, localScope);
+      parseProtocolConformanceHelper(proto, genericEnv, localScope,
+                                     defaultForProto);
 
   if (localScope) {
     GenericsScope.reset();
@@ -5752,13 +5799,19 @@ ProtocolConformance *SILParser::parseProtocolConformance(
 ProtocolConformance *SILParser::parseProtocolConformanceHelper(
                                     ProtocolDecl *&proto,
                                     GenericEnvironment *witnessEnv,
-                                    bool localScope) {
+                                    bool localScope,
+                                    ProtocolDecl *defaultForProto) {
   // Parse AST type.
   ParserResult<TypeRepr> TyR = P.parseType();
   if (TyR.isNull())
     return nullptr;
   TypeLoc Ty = TyR.get();
-  if (performTypeLocChecking(Ty, /*IsSILType=*/ false, witnessEnv))
+  if (defaultForProto) {
+    bindProtocolSelfInTypeRepr(Ty, defaultForProto);
+  }
+
+  if (performTypeLocChecking(Ty, /*IsSILType=*/ false, witnessEnv,
+                             defaultForProto))
     return nullptr;
   auto ConformingTy = Ty.getType();
 
@@ -5770,7 +5823,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
 
     // Parse substitutions for specialized conformance.
     SmallVector<ParsedSubstitution, 4> parsedSubs;
-    if (parseSubstitutions(parsedSubs, witnessEnv))
+    if (parseSubstitutions(parsedSubs, witnessEnv, defaultForProto))
       return nullptr;
 
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
@@ -5778,7 +5831,8 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
     ProtocolDecl *dummy;
     GenericEnvironment *specializedEnv;
     auto genericConform =
-        parseProtocolConformance(dummy, specializedEnv, localScope);
+        parseProtocolConformance(dummy, specializedEnv, localScope,
+                                 defaultForProto);
     if (!genericConform)
       return nullptr;
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
@@ -5799,7 +5853,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
 
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
       return nullptr;
-    auto baseConform = parseProtocolConformance();
+    auto baseConform = parseProtocolConformance(defaultForProto);
     if (!baseConform)
       return nullptr;
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
@@ -5810,41 +5864,6 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
 
   auto retVal = parseNormalProtocolConformance(P, *this, ConformingTy, proto);
   return retVal;
-}
-
-/// Bind any unqualified 'Self' references to the given protocol's 'Self'
-/// generic parameter.
-///
-/// FIXME: This is a hack to work around the lack of a DeclContext for
-/// witness tables.
-static void bindProtocolSelfInTypeRepr(TypeLoc &TL, ProtocolDecl *proto) {
-  if (auto typeRepr = TL.getTypeRepr()) {
-    // AST walker to update 'Self' references.
-    class BindProtocolSelf : public ASTWalker {
-      ProtocolDecl *proto;
-      GenericTypeParamDecl *selfParam;
-      Identifier selfId;
-
-    public:
-      BindProtocolSelf(ProtocolDecl *proto)
-        : proto(proto),
-          selfParam(proto->getProtocolSelfType()->getDecl()),
-          selfId(proto->getASTContext().Id_Self) {
-      }
-
-      virtual bool walkToTypeReprPre(TypeRepr *T) override {
-        if (auto ident = dyn_cast<IdentTypeRepr>(T)) {
-          auto firstComponent = ident->getComponentRange().front();
-          if (firstComponent->getIdentifier() == selfId)
-            firstComponent->setValue(selfParam, proto);
-        }
-
-        return true;
-      }
-    };
-
-    typeRepr->walk(BindProtocolSelf(proto));
-  }
 }
 
 /// Parser a single SIL vtable entry and add it to either \p witnessEntries
@@ -5859,6 +5878,7 @@ static bool parseSILVTableEntry(
          std::vector<SILWitnessTable::Entry> &witnessEntries,
          std::vector<SILWitnessTable::ConditionalConformance>
            &conditionalConformances) {
+  ProtocolDecl *defaultForProto = isDefaultWitnessTable ? proto : nullptr;
   Identifier EntryKeyword;
   SourceLoc KeywordLoc;
   if (P.parseIdentifier(EntryKeyword, KeywordLoc,
@@ -5878,7 +5898,8 @@ static bool parseSILVTableEntry(
       return true;
     if (P.parseToken(tok::colon, diag::expected_sil_witness_colon))
       return true;
-    ProtocolConformance *conform = witnessState.parseProtocolConformance();
+    ProtocolConformance *conform =
+      witnessState.parseProtocolConformance(defaultForProto);
     if (!conform) // Ignore this witness entry for now.
       return false;
 
@@ -5925,7 +5946,7 @@ static bool parseSILVTableEntry(
 
     ProtocolConformanceRef conformance(proto);
     if (P.Tok.getText() != "dependent") {
-      auto concrete = witnessState.parseProtocolConformance();
+      auto concrete = witnessState.parseProtocolConformance(defaultForProto);
       if (!concrete) // Ignore this witness entry for now.
         return false;
       conformance = ProtocolConformanceRef(concrete);
@@ -6045,7 +6066,8 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
   GenericEnvironment *witnessEnv;
   auto conf = WitnessState.parseProtocolConformance(proto,
                                                     witnessEnv,
-                                                    false/*localScope*/);
+                                                    false/*localScope*/,
+                                                    nullptr);
   WitnessState.ContextGenericEnv = witnessEnv;
 
   NormalProtocolConformance *theConformance = conf ?

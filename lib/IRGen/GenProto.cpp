@@ -1385,6 +1385,13 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     void addAssociatedConformance(AssociatedConformance requirement) {
       // FIXME: Add static witness tables for type conformances.
 
+      auto &entry = SILEntries.front();
+      (void)entry;
+      SILEntries = SILEntries.slice(1);
+
+      if (ResilientConformance)
+        return;
+
       auto associate =
         ConformanceInContext.getAssociatedType(
           requirement.getAssociation())->getCanonicalType();
@@ -1394,9 +1401,8 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
           requirement.getAssociation(),
           requirement.getAssociatedRequirement());
 
+
 #ifndef NDEBUG
-      auto &entry = SILEntries.front();
-      (void)entry;
       assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
              && "sil witness table does not match protocol");
       auto associatedWitness = entry.getAssociatedTypeProtocolWitness();
@@ -1410,8 +1416,6 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
               Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
 #endif
-
-      SILEntries = SILEntries.slice(1);
 
       llvm::Constant *wtableAccessFunction =
         getAssociatedTypeWitnessTableAccessFunction(requirement,
@@ -1644,7 +1648,8 @@ llvm::Constant *WitnessTableBuilder::
 getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
                                             CanType associatedType,
                                 ProtocolConformanceRef associatedConformance) {
-  if (!associatedType->hasArchetype()) {
+  bool hasArchetype = associatedType->hasArchetype();
+  if (!hasArchetype && !ResilientConformance) {
     assert(associatedConformance.isConcrete() &&
            "no concrete conformance for non-dependent type");
     return getOrCreateWitnessTableAccessFunction(IGM,
@@ -1682,13 +1687,6 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
   Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
   setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
                               Conformance.getProtocol());
-  IGF.bindLocalTypeDataFromSelfWitnessTable(
-          &Conformance,
-          destTable.getAddress(),
-          [&](CanType type) {
-            return Conformance.getDeclContext()->mapTypeIntoContext(type)
-                     ->getCanonicalType();
-          });
 
   ProtocolDecl *associatedProtocol = requirement.getAssociatedRequirement();
 
@@ -1709,6 +1707,24 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
       return accessor;
     }
   }
+
+  // If there are no archetypes, return a reference to the table. There is
+  // no need for a cache.
+  if (!hasArchetype) {
+    auto wtable = MetadataResponse::forComplete(
+                    conformanceI->getTable(IGF, &associatedTypeMetadata))
+        .getMetadata();
+    IGF.Builder.CreateRet(wtable);
+    return accessor;
+  }
+
+  IGF.bindLocalTypeDataFromSelfWitnessTable(
+        &Conformance,
+        destTable.getAddress(),
+        [&](CanType type) {
+          return Conformance.getDeclContext()->mapTypeIntoContext(type)
+                   ->getCanonicalType();
+        });
 
   // If the witness table is directly fulfillable from the type,
   // we don't need a cache entry.
@@ -1869,7 +1885,8 @@ llvm::Constant *WitnessTableBuilder::emitResilientWitnessTable() {
   unsigned count = 0;
   for (auto &entry : SILWT->getEntries()) {
     if (entry.getKind() != SILWitnessTable::Method &&
-        entry.getKind() != SILWitnessTable::AssociatedType)
+        entry.getKind() != SILWitnessTable::AssociatedType &&
+        entry.getKind() != SILWitnessTable::AssociatedTypeProtocol)
       continue;
 
     count++;
@@ -1904,6 +1921,36 @@ llvm::Constant *WitnessTableBuilder::emitResilientWitnessTable() {
         getAssociatedTypeMetadataAccessFunction(AssociatedType(assocType),
                                                 associate);
       table.addRelativeAddress(metadataAccessFunction);
+      continue;
+    }
+
+    // Associated conformance access function.
+    if (entry.getKind() == SILWitnessTable::AssociatedTypeProtocol) {
+      const auto &witness = entry.getAssociatedTypeProtocolWitness();
+
+      // Associated type descriptor.
+      AssociatedConformance requirement(SILWT->getConformance()->getProtocol(),
+                                        witness.Requirement,
+                                        witness.Protocol);
+      auto assocConformanceDescriptor =
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forAssociatedConformanceDescriptor(requirement),
+          Alignment(4), IGM.ProtocolRequirementStructTy);
+      table.addRelativeAddress(assocConformanceDescriptor);
+
+      auto associate =
+        ConformanceInContext.getAssociatedType(
+          witness.Requirement)->getCanonicalType();
+
+      ProtocolConformanceRef associatedConformance =
+        ConformanceInContext.getAssociatedConformance(witness.Requirement,
+                                                      witness.Protocol);
+
+      llvm::Constant *wtableAccessFunction =
+        getAssociatedTypeWitnessTableAccessFunction(requirement,
+                                                    associate,
+                                                    associatedConformance);
+      table.addRelativeAddress(wtableAccessFunction);
       continue;
     }
 

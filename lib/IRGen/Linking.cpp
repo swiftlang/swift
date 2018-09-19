@@ -187,6 +187,14 @@ std::string LinkEntity::mangleAsString() const {
              assocConformance.second);
   }
 
+  case Kind::DefaultAssociatedConformanceAccessor: {
+    auto assocConformance = getAssociatedConformance();
+    return mangler.mangleDefaultAssociatedConformanceAccessor(
+             cast<ProtocolDecl>(getDecl()),
+             assocConformance.first,
+             assocConformance.second);
+  }
+
   case Kind::ProtocolConformanceDescriptor:
     return mangler.mangleProtocolConformanceDescriptor(
                    cast<NormalProtocolConformance>(getProtocolConformance()));
@@ -498,6 +506,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::AssociatedTypeMetadataAccessFunction:
   case Kind::DefaultAssociatedTypeMetadataAccessFunction:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
+  case Kind::DefaultAssociatedConformanceAccessor:
   case Kind::GenericProtocolWitnessTableCache:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return SILLinkage::Private;
@@ -629,6 +638,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::TypeMetadataCompletionFunction:
   case Kind::TypeMetadataPattern:
   case Kind::DefaultAssociatedTypeMetadataAccessFunction:
+  case Kind::DefaultAssociatedConformanceAccessor:
     return false;
 
   case Kind::ValueWitness:

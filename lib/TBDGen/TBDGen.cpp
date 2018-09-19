@@ -100,11 +100,8 @@ void TBDGenVisitor::addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType) {
 }
 
 void TBDGenVisitor::addAssociatedConformanceDescriptor(
-                                                 ProtocolDecl *proto,
-                                                 CanType subject,
-                                                 ProtocolDecl *requirement) {
-  auto entity = LinkEntity::forAssociatedConformanceDescriptor(proto, subject,
-                                                               requirement);
+                                           AssociatedConformance conformance) {
+  auto entity = LinkEntity::forAssociatedConformanceDescriptor(conformance);
   addSymbol(entity);
 }
 
@@ -426,10 +423,11 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
       if (req.getFirstType()->isEqual(PD->getProtocolSelfType()))
         continue;
 
-      addAssociatedConformanceDescriptor(
-          PD,
-          req.getFirstType()->getCanonicalType(),
-          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+      AssociatedConformance conformance(
+        PD,
+        req.getFirstType()->getCanonicalType(),
+        req.getSecondType()->castTo<ProtocolType>()->getDecl());
+      addAssociatedConformanceDescriptor(conformance);
     }
 
     for (auto *member : PD->getMembers()) {

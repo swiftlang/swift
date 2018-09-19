@@ -14,6 +14,7 @@
 
 // Protocol descriptor
 // CHECK-DEFINITION-LABEL: @"$S18resilient_protocol29ProtocolWithAssocTypeDefaultsMp" ={{( protected)?}} constant
+// CHECK-DEFINITION-SAME: @"$S18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2_AA014OtherResilientC0TN"
 // CHECK-DEFINITION-SAME: $S2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPTM
 // CHECK-DEFINITION-SAME: $S2T218resilient_protocol29ProtocolWithAssocTypeDefaultsPTM
 
@@ -25,12 +26,17 @@
 // CHECK-DEFINITION: @"$S1T18resilient_protocol24ProtocolWithRequirementsPTl" ={{( dllexport)?}}{{( protected)?}} alias
 // CHECK-DEFINITION: @"$S18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2_AA014OtherResilientC0Tn" ={{( dllexport)?}}{{( protected)?}} alias
 
+// Default associated conformance witnesses
+// CHECK-DEFINITION-LABEL: define internal swiftcc i8** @"$S18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2_AA014OtherResilientC0TN"
+
 // Default associated type witnesses
 // CHECK-DEFINITION-LABEL: define internal swiftcc %swift.metadata_response @"$S2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPTM"
 
 // CHECK-DEFINITION-LABEL: define internal swiftcc %swift.metadata_response @"$S2T218resilient_protocol29ProtocolWithAssocTypeDefaultsPTM"
 // CHECK-DEFINITION: getelementptr inbounds i8*, i8** [[WTABLE:%.*]], i32 2
 // CHECK-DEFINITION: call{{.*}}S18resilient_protocol7WrapperVMa
+
+// CHECK-DEFINITION-LABEL: define internal swiftcc %swift.metadata_response @"$S9AssocType18resilient_protocol20ResilientSelfDefaultPTM
 
 import resilient_protocol
 
@@ -50,6 +56,12 @@ public struct ConformsToProtocolWithRequirements<Element>
 public protocol P { }
 public struct ConditionallyConforms<Element> { }
 public struct Y { }
+
+// CHECK-USAGE: @"$S31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAWr" = internal
+// CHECK-USAGE-SAME: $S18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2_AA014OtherResilientC0Tn
+// CHECK-USAGE-SAME: $S31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAA2T2_AD014OtherResilientI0PWT
+public struct ConformsWithAssocRequirements : ProtocolWithAssocTypeDefaults {
+}
 
 // CHECK-USAGE: @"$Sx1T_MXA" =
 // CHECK-USAGE-SAME: i32 0
