@@ -3979,6 +3979,19 @@ public:
   /// Record the default witness for a requirement.
   void setDefaultWitness(ValueDecl *requirement, Witness witness);
 
+  /// Returns the default associated conformance witness for an associated
+  /// type, or \c None if there is no default.
+  Optional<ProtocolConformanceRef> getDefaultAssociatedConformanceWitness(
+                                              CanType association,
+                                              ProtocolDecl *requirement) const;
+
+  /// Set the default associated conformance witness for the given
+  /// associated conformance.
+  void setDefaultAssociatedConformanceWitness(
+                                            CanType association,
+                                            ProtocolDecl *requirement,
+                                            ProtocolConformanceRef conformance);
+
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;

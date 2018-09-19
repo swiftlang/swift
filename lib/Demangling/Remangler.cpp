@@ -579,6 +579,11 @@ void Remangler::mangleAssociatedConformanceDescriptor(Node *node) {
   Buffer << "Tn";
 }
 
+void Remangler::mangleDefaultAssociatedConformanceAccessor(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "TN";
+}
+
 void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node) {
   mangleChildNodes(node); // protocol conformance, identifier
   Buffer << "Wt";

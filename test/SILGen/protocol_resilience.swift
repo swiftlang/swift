@@ -251,6 +251,13 @@ func inoutResilientProtocol(_ x: inout OtherConformingType) {
   inoutFunc(&OtherConformingType.staticPropertyInExtension)
 }
 
+// Protocol is public -- needs resilient witness table
+public struct ConformsToP: P { }
+
+public protocol ResilientAssocTypes {
+  associatedtype AssocType: P = ConformsToP
+}
+
 // CHECK-LABEL: sil_default_witness_table P {
 // CHECK-NEXT: }
 
@@ -311,4 +318,9 @@ func inoutResilientProtocol(_ x: inout OtherConformingType) {
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!getter.1: {{.*}} : @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!setter.1: {{.*}} : @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvs
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!modify.1: {{.*}} : @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvM
+// CHECK-NEXT: }
+
+// CHECK-LABEL: sil_default_witness_table ResilientAssocTypes {
+// CHECK-NEXT:   associated_type_protocol (AssocType: P): ConformsToP: P module protocol_resilience
+// CHECK-NEXT:   associated_type AssocType: ConformsToP
 // CHECK-NEXT: }

@@ -1841,6 +1841,15 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
                                 protoTy, assocTypePath, requirementTy);
     }
 
+    case 'N': {
+      NodePointer requirementTy = popProtocol();
+      auto assocTypePath = popAssocTypePath();
+      NodePointer protoTy = popNode(Node::Kind::Type);
+      return createWithChildren(
+                            Node::Kind::DefaultAssociatedConformanceAccessor,
+                            protoTy, assocTypePath, requirementTy);
+    }
+
     case 'H':
     case 'h': {
       auto nodeKind = c == 'H' ? Node::Kind::KeyPathEqualsThunkHelper
