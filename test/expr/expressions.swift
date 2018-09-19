@@ -505,6 +505,9 @@ func testSingleQuoteStringLiterals() {
   _ = 'ab\nc' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\nc"}}
 
   _ = "abc\('def')" // expected-error{{single-quoted string literal found, use '"'}}{{13-18="def"}}
+  _ = 'ab\("c")' // expected-error{{single-quoted string literal found, use '"'}}{{7-17="ab\\("c")"}}
+  _ = 'a\('b')c' // expected-error{{single-quoted string literal found, use '"'}}{{7-17="a\\('b')c"}}
+                 // expected-error@-1{{single-quoted string literal found, use '"'}}{{11-14="b"}}
 
   _ = "abc' // expected-error{{unterminated string literal}}
   _ = 'abc" // expected-error{{unterminated string literal}}
