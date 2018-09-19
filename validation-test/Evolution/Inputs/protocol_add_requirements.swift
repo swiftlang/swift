@@ -187,18 +187,10 @@ public struct Wrapper<T>: SimpleProtocol {
 }
 
 public protocol AddAssocTypesProtocol {
-  // FIXME: The presence of a single method requirement causes us to
-  // create a resilient witness table, avoiding a runtime assertion.
-  func dummy()
-
 #if AFTER
   associatedtype AssocType = Self
   associatedtype AssocType2: SimpleProtocol = Wrapper<AssocType>
 #endif
-}
-
-extension AddAssocTypesProtocol {
-  public func dummy() { }
 }
 
 public func doSomethingWithAssocTypes<T: AddAssocTypesProtocol>(_ value: T)

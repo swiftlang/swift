@@ -3613,11 +3613,13 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
     return false;
   }
 
-  // If we don't have resilient witnesses, the template must provide
-  // everything.
-  assert (genericTable->WitnessTableSizeInWords ==
+  // If we don't have the exact number of witnesses expected, we require
+  // instantiation.
+  if (genericTable->WitnessTableSizeInWords !=
           (genericTable->Protocol->NumRequirements +
-           WitnessTableFirstRequirementOffset));
+           WitnessTableFirstRequirementOffset)) {
+    return false;
+  }
 
   // If we have an instantiation function or private data, we require
   // instantiation.
@@ -3636,7 +3638,9 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
   auto protocol = genericTable->Protocol.get();
 
   auto requirements = protocol->getRequirements();
-  auto witnesses = genericTable->ResilientWitnesses->getWitnesses();
+  llvm::ArrayRef<TargetResilientWitness<InProcess>> witnesses;
+  if (auto resilientWitnesses = genericTable->ResilientWitnesses.get())
+    witnesses = resilientWitnesses->getWitnesses();
 
   // Loop over the provided witnesses, filling in appropriate entry.
   for (const auto &witness : witnesses) {
@@ -3733,8 +3737,7 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   }
 
   // Fill in any default requirements.
-  if (genericTable->ResilientWitnesses)
-    initializeResilientWitnessTable(genericTable, table);
+  initializeResilientWitnessTable(genericTable, table);
 
   auto castTable = reinterpret_cast<WitnessTable*>(table);
 
