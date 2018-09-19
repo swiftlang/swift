@@ -326,9 +326,19 @@ FileUnit *SerializedModuleLoader::loadAST(
   if (auto orphanedBuffer = loadedModuleFile->takeBufferForDiagnostics())
     OrphanedMemoryBuffers.push_back(std::move(orphanedBuffer));
 
-  if (!diagLoc)
-    return nullptr;
+  if (diagLoc)
+    serialization::diagnoseSerializedASTLoadFailure(
+        Ctx, *diagLoc, loadInfo, extendedInfo, moduleBufferID,
+        moduleDocBufferID, loadedModuleFile.get(), M.getName());
+  return nullptr;
+}
 
+void swift::serialization::diagnoseSerializedASTLoadFailure(
+    ASTContext &Ctx, SourceLoc diagLoc,
+    const serialization::ValidationInfo &loadInfo,
+    const serialization::ExtendedValidationInfo &extendedInfo,
+    StringRef moduleBufferID, StringRef moduleDocBufferID,
+    ModuleFile *loadedModuleFile, Identifier ModuleName) {
   auto diagnoseDifferentLanguageVersion = [&](StringRef shortVersion) -> bool {
     if (shortVersion.empty())
       return false;
@@ -339,10 +349,9 @@ FileUnit *SerializedModuleLoader::loadAST(
     if (versionString.str() == shortVersion)
       return false;
 
-    Ctx.Diags.diagnose(*diagLoc,
-                       diag::serialization_module_language_version_mismatch,
-                       loadInfo.shortVersion, versionString.str(),
-                       moduleBufferID);
+    Ctx.Diags.diagnose(
+        diagLoc, diag::serialization_module_language_version_mismatch,
+        loadInfo.shortVersion, versionString.str(), moduleBufferID);
     return true;
   };
 
@@ -353,23 +362,23 @@ FileUnit *SerializedModuleLoader::loadAST(
   case serialization::Status::FormatTooNew:
     if (diagnoseDifferentLanguageVersion(loadInfo.shortVersion))
       break;
-    Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_new,
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_module_too_new,
                        moduleBufferID);
     break;
   case serialization::Status::FormatTooOld:
     if (diagnoseDifferentLanguageVersion(loadInfo.shortVersion))
       break;
-    Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_old,
-                       M.getName(), moduleBufferID);
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_module_too_old, ModuleName,
+                       moduleBufferID);
     break;
   case serialization::Status::Malformed:
-    Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_malformed_module,
                        moduleBufferID);
     break;
 
   case serialization::Status::MalformedDocumentation:
     assert(!moduleDocBufferID.empty());
-    Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_malformed_module,
                        moduleDocBufferID);
     break;
 
@@ -379,19 +388,19 @@ FileUnit *SerializedModuleLoader::loadAST(
     // not now.
     llvm::StringSet<> duplicates;
     llvm::SmallVector<ModuleFile::Dependency, 4> missing;
-    std::copy_if(loadedModuleFile->getDependencies().begin(),
-                 loadedModuleFile->getDependencies().end(),
-                 std::back_inserter(missing),
-                 [&duplicates](const ModuleFile::Dependency &dependency)->bool {
-      if (dependency.isLoaded() || dependency.isHeader())
-        return false;
-      return duplicates.insert(dependency.RawPath).second;
-    });
+    std::copy_if(
+        loadedModuleFile->getDependencies().begin(),
+        loadedModuleFile->getDependencies().end(), std::back_inserter(missing),
+        [&duplicates](const ModuleFile::Dependency &dependency) -> bool {
+          if (dependency.isLoaded() || dependency.isHeader())
+            return false;
+          return duplicates.insert(dependency.RawPath).second;
+        });
 
     // FIXME: only show module part of RawAccessPath
     assert(!missing.empty() && "unknown missing dependency?");
     if (missing.size() == 1) {
-      Ctx.Diags.diagnose(*diagLoc,diag::serialization_missing_single_dependency,
+      Ctx.Diags.diagnose(diagLoc, diag::serialization_missing_single_dependency,
                          missing.front().getPrettyPrintedPath());
     } else {
       llvm::SmallString<64> missingNames;
@@ -403,7 +412,7 @@ FileUnit *SerializedModuleLoader::loadAST(
                  [&] { missingNames += "', '"; });
       missingNames += '\'';
 
-      Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_dependencies,
+      Ctx.Diags.diagnose(diagLoc, diag::serialization_missing_dependencies,
                          missingNames);
     }
 
@@ -419,24 +428,25 @@ FileUnit *SerializedModuleLoader::loadAST(
     auto circularDependencyIter =
         llvm::find_if(loadedModuleFile->getDependencies(),
                       [](const ModuleFile::Dependency &next) {
-      return !next.Import.second->hasResolvedImports();
-    });
-    assert(circularDependencyIter != loadedModuleFile->getDependencies().end()
-           && "circular dependency reported, but no module with unresolved "
-              "imports found");
+                        return !next.Import.second->hasResolvedImports();
+                      });
+    assert(circularDependencyIter !=
+               loadedModuleFile->getDependencies().end() &&
+           "circular dependency reported, but no module with unresolved "
+           "imports found");
 
     // FIXME: We should include the path of the circularity as well, but that's
     // hard because we're discovering this /while/ resolving imports, which
     // means the problematic modules haven't been recorded yet.
-    Ctx.Diags.diagnose(*diagLoc, diag::serialization_circular_dependency,
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_circular_dependency,
                        circularDependencyIter->getPrettyPrintedPath(),
-                       M.getName());
+                       ModuleName);
     break;
   }
 
   case serialization::Status::MissingShadowedModule: {
-    Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_shadowed_module,
-                       M.getName());
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_missing_shadowed_module,
+                       ModuleName);
     if (Ctx.SearchPathOpts.SDKPath.empty() &&
         llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
@@ -448,7 +458,7 @@ FileUnit *SerializedModuleLoader::loadAST(
   case serialization::Status::FailedToLoadBridgingHeader:
     // We already emitted a diagnostic about the bridging header. Just emit
     // a generic message here.
-    Ctx.Diags.diagnose(*diagLoc, diag::serialization_load_failed, M.getName());
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_load_failed, ModuleName);
     break;
 
   case serialization::Status::NameMismatch: {
@@ -457,8 +467,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     auto diagKind = diag::serialization_name_mismatch;
     if (Ctx.LangOpts.DebuggerSupport)
       diagKind = diag::serialization_name_mismatch_repl;
-    Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       loadInfo.name, M.getName());
+    Ctx.Diags.diagnose(diagLoc, diagKind, loadInfo.name, ModuleName);
     break;
   }
 
@@ -468,8 +477,8 @@ FileUnit *SerializedModuleLoader::loadAST(
     auto diagKind = diag::serialization_target_incompatible;
     if (Ctx.LangOpts.DebuggerSupport)
       diagKind = diag::serialization_target_incompatible_repl;
-    Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       M.getName(), loadInfo.targetTriple, moduleBufferID);
+    Ctx.Diags.diagnose(diagLoc, diagKind, ModuleName, loadInfo.targetTriple,
+                       moduleBufferID);
     break;
   }
 
@@ -486,14 +495,12 @@ FileUnit *SerializedModuleLoader::loadAST(
     auto diagKind = diag::serialization_target_too_new;
     if (Ctx.LangOpts.DebuggerSupport)
       diagKind = diag::serialization_target_too_new_repl;
-    Ctx.Diags.diagnose(*diagLoc, diagKind,
-                       compilationOSInfo.first, compilationOSInfo.second,
-                       M.getName(), moduleOSInfo.second, moduleBufferID);
+    Ctx.Diags.diagnose(diagLoc, diagKind, compilationOSInfo.first,
+                       compilationOSInfo.second, ModuleName,
+                       moduleOSInfo.second, moduleBufferID);
     break;
   }
   }
-
-  return nullptr;
 }
 
 bool
