@@ -440,7 +440,8 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
         }
       }
 
-      // Always produce associated type descriptors.
+      // Always produce associated type descriptors, because they can
+      // be referenced by generic signatures.
       if (auto *assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         if (assocType->getOverriddenDecls().empty())
           addAssociatedTypeDescriptor(assocType);
