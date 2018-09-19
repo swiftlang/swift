@@ -74,6 +74,51 @@ Swift 4.2
 
 ### 2018-09-17 (Xcode 10.0)
 
+* [SE-0202][]
+
+  The standard library now provides a unified set of randomization functionality.
+  Integer types, floating point types, and Bool all introduce a new random
+  function.
+  
+  ```swift
+  let diceRoll = Int.random(in: 1 ... 6)
+  let randomUnit = Double.random(in: 0 ..< 1)
+  let randomBool = Bool.random()
+  ```
+  
+  There are also a couple of collection additions included as well.
+  
+  ```swift
+  let greetings = ["hey", "hello", "hi", "hola"]
+  let randomGreeting = greetings.randomElement()! // This returns an Optional
+  let newGreetings = greetings.shuffled() // ["hola", "hi", "hey", "hello"]
+  ```
+
+  Core to the randomization functionality is a new `RandomNumberGenerator`
+  protocol. The standard library defines its own random number generator
+  called `SystemRandomNumberGenerator` which is backed by a secure and thread
+  safe random number generator on each platform. All the randomization functions
+  have a `using:` parameter that take a `RandomNumberGenerator` that users can
+  pass in their own random number generator.
+  
+  ```swift
+  struct MersenneTwister: RandomNumberGenerator {
+    func next() -> UInt64 {
+      // Algorithm stuff here
+    }
+  }
+  
+  var mt = MersenneTwister()
+  let diceRoll = Int.random(in: 1 ... 6, using: &mt)
+  let randomUnit = Double.random(in: 0 ..< 1, &mt)
+  let randomBool = Bool.random(using: &mt)
+  
+  // Collection additions
+  let greetings = ["hey", "hello", "hi", "hola"]
+  let randomGreeting = greetings.randomElement(using: &mt)! // This returns an Optional
+  let newGreetings = greetings.shuffled(using: &mt) // ["hola", "hi", "hey", "hello"]
+  ```
+
 * [SE-0194][]
 
   The new CaseIterable protocol describes types which have a static
