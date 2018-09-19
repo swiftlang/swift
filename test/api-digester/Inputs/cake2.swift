@@ -51,8 +51,12 @@ public extension P1 {
 @_fixed_layout
 public struct fixedLayoutStruct {
   public var a = 1
+  public func OKChange() {}
+  private static let constant = 0
   public var b = 2
   public func foo() {}
+  private var c = 3
+  private lazy var lazy_d = 4
 }
 
 @_frozen
@@ -60,4 +64,5 @@ public enum FrozenKind {
   case Unchanged
   case Rigid
   case Fixed
+  case AddedCase
 }

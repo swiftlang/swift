@@ -54,6 +54,8 @@ ERROR(decl_new_attr,none,"%0 is now %1", (StringRef, StringRef))
 
 ERROR(decl_reorder,none,"%0 in a fixed layout type changes position from %1 to %2", (StringRef, unsigned, unsigned))
 
+ERROR(decl_added,none,"%0 is added to a non-resilient type", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

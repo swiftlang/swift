@@ -36,3 +36,6 @@ cake1: EnumElement FrozenKind.Fixed in a fixed layout type changes position from
 cake1: EnumElement FrozenKind.Rigid in a fixed layout type changes position from 2 to 1
 cake1: Var fixedLayoutStruct.a in a fixed layout type changes position from 1 to 0
 cake1: Var fixedLayoutStruct.b in a fixed layout type changes position from 0 to 1
+cake2: EnumElement FrozenKind.AddedCase is added to a non-resilient type
+cake2: Var fixedLayoutStruct.c is added to a non-resilient type
+cake2: Var fixedLayoutStruct.lazy_d.storage is added to a non-resilient type
