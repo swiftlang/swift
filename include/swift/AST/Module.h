@@ -890,8 +890,6 @@ private:
 
   friend ASTContext;
   friend Impl;
-
-  ~SourceFile();
 public:
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
@@ -1164,7 +1162,7 @@ private:
   /// If not None, the underlying vector should contain tokens of this source file.
   Optional<std::vector<Token>> AllCorrectedTokens;
 
-  SourceFileSyntaxInfo &SyntaxInfo;
+  std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
 };
 
 
