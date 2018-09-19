@@ -467,10 +467,8 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
     }
   } while(changed);
 
-  // Phase 3 - anything that remains on the worklist cannot be resolved, which
-  // means its invalid. Diagnose.
-  for (auto *ext : worklist)
-    bindExtensionDecl(ext, TC);
+  // Any remaining extensions are invalid. They will be diagnosed later by
+  // typeCheckDecl().
 }
 
 void TypeChecker::bindExtension(ExtensionDecl *ext) {
