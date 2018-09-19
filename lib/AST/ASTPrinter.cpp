@@ -1587,7 +1587,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   // instead of listing out how they're actually implemented.
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
   if ((inProtocol && !Options.PrintAccessorBodiesInProtocols) ||
-       PrintAbstract) {
+      PrintAbstract) {
     bool mutatingGetter = ASD->getGetter() && ASD->isGetterMutating();
     bool settable = ASD->isSettable(nullptr);
     bool nonmutatingSetter = false;
@@ -1652,9 +1652,11 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   // Otherwise, print all the concrete defining accessors.
   bool PrintAccessorBody = Options.FunctionDefinitions;
 
-  auto PrintAccessor = [&](AccessorDecl *Accessor) {
-    if (!Accessor || !shouldPrint(Accessor))
-      return;
+  // Helper to print an accessor. Returns true if the
+  // accessor was present but skipped.
+  auto PrintAccessor = [&](AccessorDecl *Accessor) -> bool {
+    if (!Accessor) return false;
+    if (!shouldPrint(Accessor)) return true;
     if (!PrintAccessorBody) {
       if (isAccessorAssumedNonMutating(Accessor->getAccessorKind())) {
         if (Accessor->isMutating()) {
@@ -1678,6 +1680,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       indent();
       Printer.printNewline();
     }
+    return false;
   };
 
   // Determine if we should print the getter without the 'get { ... }'
@@ -1722,12 +1725,15 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     case WriteImplKind::Stored:
       llvm_unreachable("simply-stored variable should have been filtered out");
     case WriteImplKind::StoredWithObservers:
-    case WriteImplKind::InheritedWithObservers:
-      PrintAccessor(ASD->getWillSetFunc());
-      PrintAccessor(ASD->getDidSetFunc());
-      if (ASD->supportsMutation())
+    case WriteImplKind::InheritedWithObservers: {
+      bool skippedWillSet = PrintAccessor(ASD->getWillSetFunc());
+      bool skippedDidSet = PrintAccessor(ASD->getDidSetFunc());
+      if (skippedDidSet || skippedWillSet) {
+        PrintAccessor(ASD->getGetter());
         PrintAccessor(ASD->getSetter());
+      }
       break;
+    }
     case WriteImplKind::Set:
       PrintAccessor(ASD->getSetter());
       if (!shouldHideModifyAccessor())

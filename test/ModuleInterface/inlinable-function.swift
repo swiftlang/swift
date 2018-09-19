@@ -26,6 +26,7 @@ public struct Foo: Hashable {
 
   // CHECK: public var hasDidSet: [[INT]] {
   public var hasDidSet: Int {
+    // CHECK-NEXT: @_transparent get{{$}}
     // CHECK-NEXT: set[[NEWVALUE]]{{$}}
     // CHECK-NOT: didSet
     didSet {
