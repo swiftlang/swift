@@ -19,6 +19,7 @@
 #define SWIFT_SIL_GRAPH_OPERATION_INFO_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -95,48 +96,66 @@ struct GraphOperationInfo {
   //   return getOpDeviceType(getDeviceString());
   // }
 
-  enum OperandMarkerKind {
-    /// Scalar input, used by tfc.scalarToTensor only. MangledName is ",s".
-    OMK_Scalar,
-    /// Operand that is not in a list. MangledName is ",i${name}", where ${name}
-    /// is an optional name for the operand.
-    OMK_Normal,
-    /// Marker for the start of a list, has no corresponding operand.
-    /// MangledName is ",L${name}", where ${name} is an optional name for the
-    /// operand.
-    OMK_InputList,
-    /// Element of a list. MangledName is ",e".
-    OMK_InputListElt,
+  enum StructuredOperandKind {
+    /// Scalar input, used by tfc.scalarToTensor only.
+    /// Mangled name is ",s"
+    SOK_Scalar,
+    /// Single operand.
+    /// Mangled name is ",i${name}" where ${name} is an optional name.
+    SOK_Single,
+    /// Operand list.
+    /// Mangled name is ",L${name},e,...,e" where ${name} is an optional name
+    /// and where the number of e's denotes the number of elements.
+    SOK_List,
   };
 
-  /// The operands to a GraphOperationInst may be named and/or grouped into
-  /// rank-1 lists. OperandMarkers encode this naming and structure.
-  class OperandMarker {
+  /// The operands to a GraphOperationInst may be grouped into various
+  /// structures. This is a tagged union representing those structures.
+  class StructuredOperand {
     friend struct GraphOperationInfo;
 
-    OperandMarkerKind Kind;
+    StructuredOperandKind Kind;
+    StringRef Name;
+    union {
+      /// Operand for SOK_Scalar and SOK_Single.
+      SILValue SingleOperand;
+      /// Operands for SOK_List.
+      ArrayRef<Operand> OperandList;
+    };
 
-    /// The mangled name as it appears in the graph_op. Mangling rules described
-    /// in OperandMarkerKind.
-    StringRef MangledName;
-
-    OperandMarker(StringRef MangledName);
+    StructuredOperand(StructuredOperandKind Kind, StringRef Name,
+                      SILValue SingleOperand)
+        : Kind(Kind), Name(Name), SingleOperand(SingleOperand) {};
+    StructuredOperand(StructuredOperandKind Kind, StringRef Name,
+                      ArrayRef<Operand> OperandList)
+        : Kind(Kind), Name(Name), OperandList(OperandList) {};
 
   public:
-    OperandMarkerKind getKind() const {
+    StructuredOperand(const StructuredOperand &other) = default;
+
+    StructuredOperandKind getKind() const {
       return Kind;
     }
 
-    // The name of the marked operand or list.
     StringRef getName() const {
-      return MangledName.drop_front(2);
+      return Name;
+    }
+
+    SILValue getSingleOperand() const {
+      assert(getKind() == SOK_Scalar || getKind() == SOK_Single);
+      return SingleOperand;
+    }
+
+    OperandValueArrayRef getOperandList() const {
+      assert(getKind() == SOK_List);
+      return OperandList;
     }
   };
 
   /// Decode the name of a graph_op into its TensorFlow op name and a list of
-  /// information about the operands.
-  llvm::StringRef
-  decodeName(llvm::SmallVectorImpl<OperandMarker> &operandMarkers) const;
+  /// StructuredOperands.
+  llvm::StringRef decodeName(
+      llvm::SmallVectorImpl<StructuredOperand> &structuredOperands) const;
 
   /// Given an attribute name like foo$tensor, decode the name and the class.
   /// If there is no modifier specified, this defaults to

@@ -1847,8 +1847,8 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
   // Decode information about the graph_op.
   GraphOperationInfo decoder(inst);
-  SmallVector<GraphOperationInfo::OperandMarker, 4> operandMarkers;
-  auto opName = decoder.decodeName(operandMarkers);
+  SmallVector<GraphOperationInfo::StructuredOperand, 4> structuredOperands;
+  auto opName = decoder.decodeName(structuredOperands);
 
   // Swift host <-> TF device sends/recvs.
   if (opName == "tfc.RecvFromHost")
@@ -1883,18 +1883,14 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   bool hasDevice = false;
 
   // Process all inputs.
-  unsigned infoIndex = 0;
-  for (unsigned i = 0, e = inst->getNumOperands(); i != e;) {
-    auto operandMarker = operandMarkers[infoIndex++];
-    assert(operandMarker.getName().empty() && "cannot lower named operands");
-    switch (operandMarker.getKind()) {
-    case GraphOperationInfo::OMK_Scalar:
+  for (auto structuredOperand : structuredOperands) {
+    assert(structuredOperand.getName().empty() && "cannot lower named operands");
+    switch (structuredOperand.getKind()) {
+    case GraphOperationInfo::SOK_Scalar:
       llvm_unreachable("tfc.scalarToTensor should be lowered by now");
-    case GraphOperationInfo::OMK_InputListElt:
-      llvm_unreachable("we handle input list elements as part of the list");
-    case GraphOperationInfo::OMK_Normal: {
+    case GraphOperationInfo::SOK_Single: {
       // Normal tensor inputs.
-      auto operand = inst->getOperand(i++);
+      auto operand = structuredOperand.getSingleOperand();
       auto valueKind = classifyTensorFlowValue(operand->getType());
 
       // Keep track of whether we have any resource inputs.
@@ -1907,17 +1903,10 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       TF_AddInput(op, opValue);
       break;
     }
-    case GraphOperationInfo::OMK_InputList: {
+    case GraphOperationInfo::SOK_List: {
       // Collect all of the elements of the input list.
       SmallVector<TF_Output, 4> elements;
-
-      // Collect all of the elements.
-      while (i < e &&
-             operandMarkers[infoIndex].getKind() ==
-             GraphOperationInfo::OMK_InputListElt) {
-        auto operand = inst->getOperand(i++);
-        ++infoIndex;
-
+      for (auto operand : structuredOperand.getOperandList()) {
         auto valueKind = classifyTensorFlowValue(operand->getType());
 
         // Keep track of whether we have any resource inputs.

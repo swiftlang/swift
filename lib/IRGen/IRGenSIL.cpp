@@ -1879,14 +1879,14 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto &llvmContext = llvmModule.getContext();
 
   tf::GraphOperationInfo opInfo(i);
-  SmallVector<tf::GraphOperationInfo::OperandMarker, 4> operandMarkers;
-  auto opName = opInfo.decodeName(operandMarkers);
+  SmallVector<tf::GraphOperationInfo::StructuredOperand, 4> structuredOperands;
+  auto opName = opInfo.decodeName(structuredOperands);
 
   // TODO: Remove these. They are a temporary way of testing that dynamic
   // attributes make it here.
   LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: " << opName << "\n");
-  LLVM_DEBUG(for (auto oi : operandMarkers) {
-    llvm::dbgs() << "  operand: " << oi.getName() << "\n";
+  LLVM_DEBUG(for (auto structuredOperand : structuredOperands) {
+    llvm::dbgs() << "  operand: " << structuredOperand.getName() << "\n";
   });
   LLVM_DEBUG(llvm::dbgs() << "end operands\n");
 
