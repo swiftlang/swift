@@ -1060,7 +1060,7 @@ struct SwiftEditorDocument::Implementation {
       : LangSupport(LangSupport), FilePath(FilePath), FormatOptions(options) {
     SemanticInfo = new SwiftDocumentSemanticInfo(
         FilePath, LangSupport.getASTManager().shared_from_this(),
-        LangSupport.getContext().getNotificationCenter());
+        LangSupport.getNotificationCenter());
   }
 };
 
@@ -1637,7 +1637,7 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
 
   Impl.SemanticInfo = new SwiftDocumentSemanticInfo(
       Impl.FilePath, Impl.LangSupport.getASTManager().shared_from_this(),
-      Impl.LangSupport.getContext().getNotificationCenter());
+      Impl.LangSupport.getNotificationCenter());
   Impl.SemanticInfo->setCompilerArgs(Args);
   return Impl.EditableBuffer->getSnapshot();
 }

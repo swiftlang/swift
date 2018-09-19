@@ -67,6 +67,7 @@ namespace SourceKit {
   class SwiftASTManager;
   class SwiftLangSupport;
   class Context;
+  class NotificationCenter;
 
 class SwiftEditorDocument :
     public ThreadSafeRefCountedBase<SwiftEditorDocument> {
@@ -270,7 +271,7 @@ struct SwiftStatistics {
 };
 
 class SwiftLangSupport : public LangSupport {
-  SourceKit::Context &SKCtx;
+  std::weak_ptr<NotificationCenter> NotificationCtr;
   std::string RuntimeResourcePath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
   SwiftEditorDocumentFileMap EditorDocuments;
@@ -285,7 +286,9 @@ public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);
   ~SwiftLangSupport();
 
-  SourceKit::Context &getContext() { return SKCtx; }
+  std::shared_ptr<NotificationCenter> getNotificationCenter() const {
+    return NotificationCtr.lock();
+  }
 
   StringRef getRuntimeResourcePath() const { return RuntimeResourcePath; }
 

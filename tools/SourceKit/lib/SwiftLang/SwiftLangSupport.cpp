@@ -173,7 +173,8 @@ UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {
 }
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
-    : SKCtx(SKCtx), CCCache(new SwiftCompletionCache) {
+    : NotificationCtr(SKCtx.getNotificationCenter()),
+      CCCache(new SwiftCompletionCache) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = LibPath.str();
