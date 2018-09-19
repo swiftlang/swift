@@ -49,7 +49,7 @@ StepResult SplitterStep::take(bool prevFailed) {
   if (prevFailed || CS.failedConstraint || CS.simplify())
     return done(/*isSuccess=*/false);
 
-  SmallVector<ComponentStep *, 4> components;
+  SmallVector<std::unique_ptr<ComponentStep>, 4> components;
   // Try to run "connected components" algorithm and split
   // type variables and their constraints into independent
   // sub-systems to solve.
@@ -59,10 +59,14 @@ StepResult SplitterStep::take(bool prevFailed) {
   // try to merge solutions, "split" step should be considered
   // done and replaced by a single component step.
   if (components.size() < 2)
-    return replaceWith(components.front());
+    return replaceWith(std::move(components.front()));
+
+  SmallVector<std::unique_ptr<SolverStep>, 4> followup;
+  for (auto &step : components)
+    followup.push_back(std::move(step));
 
   /// Wait until all of the component steps are done.
-  return suspend<ComponentStep>(components);
+  return suspend(followup);
 }
 
 StepResult SplitterStep::resume(bool prevFailed) {
@@ -83,7 +87,7 @@ StepResult SplitterStep::resume(bool prevFailed) {
 }
 
 void SplitterStep::computeFollowupSteps(
-    SmallVectorImpl<ComponentStep *> &componentSteps) {
+    SmallVectorImpl<std::unique_ptr<ComponentStep>> &componentSteps) {
   // Compute next steps based on that connected components
   // algorithm tells us is splittable.
 
@@ -99,7 +103,7 @@ void SplitterStep::computeFollowupSteps(
   SmallVector<unsigned, 16> components;
   unsigned numComponents = CG.computeConnectedComponents(typeVars, components);
   if (numComponents < 2) {
-    componentSteps.push_back(ComponentStep::create(
+    componentSteps.push_back(llvm::make_unique<ComponentStep>(
         CS, 0, /*single=*/true, &CS.InactiveConstraints, Solutions));
     return;
   }
@@ -109,7 +113,7 @@ void SplitterStep::computeFollowupSteps(
       new SmallVector<Solution, 4>[numComponents]);
 
   for (unsigned i = 0, n = numComponents; i != n; ++i) {
-    componentSteps.push_back(ComponentStep::create(
+    componentSteps.push_back(llvm::make_unique<ComponentStep>(
         CS, i, /*single=*/false, &Components[i], PartialSolutions[i]));
   }
 
@@ -186,7 +190,8 @@ void SplitterStep::computeFollowupSteps(
   // since components are going to be executed in LIFO order, we'd
   // want to have smaller/faster components at the back of the list.
   std::sort(componentSteps.begin(), componentSteps.end(),
-            [](const ComponentStep *lhs, const ComponentStep *rhs) {
+            [](const std::unique_ptr<ComponentStep> &lhs,
+               const std::unique_ptr<ComponentStep> &rhs) {
               return lhs->disjunctionCount() > rhs->disjunctionCount();
             });
 }
@@ -256,10 +261,12 @@ StepResult ComponentStep::take(bool prevFailed) {
   if (bestBindings && (!disjunction || (!bestBindings->InvolvesTypeVariables &&
                                         !bestBindings->FullyBound))) {
     // Produce a type variable step.
-    return suspend(TypeVariableStep::create(CS, *bestBindings, Solutions));
+    return suspend(
+        llvm::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
   } else if (disjunction) {
     // Produce a disjunction step.
-    return suspend(DisjunctionStep::create(CS, disjunction, Solutions));
+    return suspend(
+        llvm::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
   }
 
   // If there are no disjunctions or type variables to bind
