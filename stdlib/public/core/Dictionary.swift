@@ -3512,8 +3512,7 @@ extension Dictionary._Variant {
     case .cocoa(let cocoa):
       // We have to migrate the data first.  But after we do so, the Cocoa
       // index becomes useless, so get the key first.
-      let cocoaIndex = index._asCocoa
-      let cocoaKey = cocoaIndex.allKeys[cocoaIndex.currentKeyIndex]
+      let cocoaKey = cocoa.key(for: index._asCocoa)
       let native = _NativeDictionary<Key, Value>(cocoa)
       self = .native(native)
       let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
