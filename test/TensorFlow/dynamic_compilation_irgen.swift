@@ -10,7 +10,7 @@ public func unknownAttribute() {
   let x: TensorHandle<Float> = #tfop("Dummy1", value$tensor: Dynamic.float)
   _hostOp(x)
   // CHECK-LABEL: IRGen for graph_op: Dummy1
-  // CHECK-NEXT: operand: ,ivalue$tensor
+  // CHECK-NEXT: operand: value$tensor
   // CHECK-NEXT: end operands
 }
 

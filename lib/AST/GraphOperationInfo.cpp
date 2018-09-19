@@ -157,30 +157,3 @@ GraphOperationInfo::OperandMarker::OperandMarker(StringRef MangledName)
     llvm_unreachable("unknown marker kind");
   }
 }
-
-/// Appends an OperandMarker with `kind` and `name` to the passed-in
-/// `mangledOpName`. `name` must be empty for OMK_Scalar and
-/// OMK_InputListElt.
-void
-GraphOperationInfo::OperandMarker::appendTo(std::string &mangledOpName,
-                                            OperandMarkerKind kind,
-                                            StringRef name) {
-  switch (kind) {
-  case OMK_Scalar:
-    mangledOpName += ",s";
-    assert(name.empty());
-    break;
-  case OMK_Normal:
-    mangledOpName += ",i";
-    mangledOpName += name;
-    break;
-  case OMK_InputList:
-    mangledOpName += ",L";
-    mangledOpName += name;
-    break;
-  case OMK_InputListElt:
-    mangledOpName += ",e";
-    assert(name.empty());
-    break;
-  }
-}

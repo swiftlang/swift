@@ -37,6 +37,7 @@ add_swift_library(swiftAST STATIC
   GenericSignature.cpp
   GenericSignatureBuilder.cpp
   # SWIFT_ENABLE_TENSORFLOW
+  GraphOperationBuilder.cpp
   GraphOperationInfo.cpp
   Identifier.cpp
   LayoutConstraint.cpp
