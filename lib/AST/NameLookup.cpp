@@ -564,6 +564,9 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
 
   ASTContext &ctx = proto->getASTContext();
   TinyPtrVector<NominalTypeDecl *> result;
+  if (!ext->getGenericParams())
+    return result;
+
   for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
     // We only care about type constraints.
     if (req.getKind() != RequirementReprKind::TypeConstraint)

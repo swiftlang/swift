@@ -4689,7 +4689,25 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
   (void)decl->isDynamic();
 }
 
-bool swift::isPassThroughTypealias(TypeAliasDecl *typealias) {
+/// Determine whether this is a "pass-through" typealias, which has the
+/// same type parameters as the nominal type it references and specializes
+/// the underlying nominal type with exactly those type parameters.
+/// For example, the following typealias \c GX is a pass-through typealias:
+///
+/// \code
+/// struct X<T, U> { }
+/// typealias GX<A, B> = X<A, B>
+/// \endcode
+///
+/// whereas \c GX2 and \c GX3 are not pass-through because \c GX2 has
+/// different type parameters and \c GX3 doesn't pass its type parameters
+/// directly through.
+///
+/// \code
+/// typealias GX2<A> = X<A, A>
+/// typealias GX3<A, B> = X<B, A>
+/// \endcode
+static bool isPassThroughTypealias(TypeAliasDecl *typealias) {
   // Pass-through only makes sense when the typealias refers to a nominal
   // type.
   Type underlyingType = typealias->getUnderlyingTypeLoc().getType();
@@ -4877,31 +4895,78 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (ext->hasValidationStarted())
     return;
 
-  bindExtension(ext);
-
   DeclValidationRAII IBV(ext);
 
-  // If the extension is already known to be invalid, we're done.
-  if (ext->isInvalid())
-    return;
+  auto dc = ext->getDeclContext();
 
-  // FIXME: We need to check whether anything is specialized, because
-  // the innermost extended type might itself be a non-generic type
-  // within a generic type.
+  // If we didn't parse a type, fill in an error type and bail out.
+  if (!ext->getExtendedTypeLoc().getTypeRepr()) {
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Validate the extended type.
+  TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
+  options |= TypeResolutionFlags::AllowUnboundGenerics;
+  if (validateType(ext->getExtendedTypeLoc(),
+                   TypeResolution::forContextual(dc), options)) {
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Dig out the extended type.
   auto extendedType = ext->getExtendedType();
 
-  if (extendedType.isNull() || extendedType->hasError())
+  // Hack to allow extending a generic typealias.
+  if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
+      auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
+      if (extendedNominal) {
+        extendedType = extendedNominal->getDeclaredType();
+        if (!isPassThroughTypealias(aliasDecl))
+          ext->getExtendedTypeLoc().setType(extendedType);
+      }
+    }
+  }
+
+  // Cannot extend a metatype.
+  if (extendedType->is<AnyMetatypeType>()) {
+    diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
+      .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Cannot extend a bound generic type.
+  if (extendedType->isSpecialized()) {
+    diagnose(ext->getLoc(), diag::extension_specialization,
+             extendedType->getAnyNominal()->getName())
+      .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  auto *nominal = extendedType->getAnyNominal();
+
+  // Cannot extend function types, tuple types, etc.
+  if (nominal == nullptr) {
+    diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
+      .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Extensions nested inside other declarations are invalid and we
+  // do not bind them.
+  if (!isa<SourceFile>(dc))
     return;
 
   // Validate the nominal type declaration being extended.
-  NominalTypeDecl *nominal = extendedType->getAnyNominal();
-  if (!nominal) {
-    auto unbound = cast<UnboundGenericType>(extendedType.getPointer());
-    auto typealias = cast<TypeAliasDecl>(unbound->getDecl());
-    validateDecl(typealias);
-
-    nominal = typealias->getUnderlyingTypeLoc().getType()->getAnyNominal();
-  }
   validateDecl(nominal);
 
   if (nominal->getGenericParamsOfContext()) {

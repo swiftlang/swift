@@ -183,15 +183,19 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (extension == conformanceExtension)
       return true;
 
-    tc.bindExtension(extension);
+    auto *extendedNominal = extension->getExtendedNominal();
+
+    // Invalid case.
+    if (extendedNominal == nullptr)
+      return true;
 
     // Assume unconstrained concrete extensions we found witnesses in are
     // always viable.
-    if (!extension->getExtendedType()->isAnyExistentialType()) {
-      // TODO: When constrained extensions are a thing, we'll need an "is
-      // as specialized as" kind of check here.
+    if (!isa<ProtocolDecl>(extendedNominal))
       return !extension->isConstrainedExtension();
-    }
+
+    // Build a generic signature.
+    tc.validateExtension(extension);
 
     // The extension may not have a generic signature set up yet, as a
     // recursion breaker, in which case we can't yet confidently reject its
