@@ -3981,19 +3981,15 @@ public:
 
   /// Returns the default associated conformance witness for an associated
   /// type, or \c None if there is no default.
-  ///
-  /// \param reqIndex The index of the associated conformance within the
-  /// requirement signature.
   Optional<ProtocolConformanceRef> getDefaultAssociatedConformanceWitness(
-                                                      unsigned reqIndex) const;
+                                              CanType association,
+                                              ProtocolDecl *requirement) const;
 
   /// Set the default associated conformance witness for the given
   /// associated conformance.
-  ///
-  /// \param reqIndex The index of the associated conformance within the
-  /// requirement signature.
   void setDefaultAssociatedConformanceWitness(
-                                            unsigned reqIndex,
+                                            CanType association,
+                                            ProtocolDecl *requirement,
                                             ProtocolConformanceRef conformance);
 
   /// Retrieve the name to use for this protocol when interoperating

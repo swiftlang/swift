@@ -5304,9 +5304,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
 
   // Find defaults for any associated conformances rooted on defaulted
   // associated types.
-  auto requirementSignature = proto->getRequirementSignature();
-  for (unsigned reqIndex : indices(requirementSignature)) {
-    const auto &req = requirementSignature[reqIndex];
+  for (const auto &req : proto->getRequirementSignature()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
     if (req.getFirstType()->isEqual(proto->getProtocolSelfType()))
@@ -5371,7 +5369,8 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     }
 
     // Record the default associated conformance.
-    proto->setDefaultAssociatedConformanceWitness(reqIndex, *conformance);
+    proto->setDefaultAssociatedConformanceWitness(
+        req.getFirstType()->getCanonicalType(), requirementProto, *conformance);
   }
 }
 

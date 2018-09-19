@@ -286,7 +286,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     DefaultTypeWitnesses;
 
   /// Default associated conformance witnesses for protocols.
-  llvm::DenseMap<std::pair<const ProtocolDecl *, unsigned>,
+  llvm::DenseMap<std::tuple<const ProtocolDecl *, CanType, ProtocolDecl *>,
                  ProtocolConformanceRef>
     DefaultAssociatedConformanceWitnesses;
 
@@ -1715,10 +1715,13 @@ void ProtocolDecl::setDefaultTypeWitness(AssociatedTypeDecl *assocType,
 }
 
 Optional<ProtocolConformanceRef>
-ProtocolDecl::getDefaultAssociatedConformanceWitness(unsigned reqIndex) const {
+ProtocolDecl::getDefaultAssociatedConformanceWitness(
+                                             CanType association,
+                                             ProtocolDecl *requirement) const {
   auto &ctx = getASTContext();
   auto found =
-    ctx.getImpl().DefaultAssociatedConformanceWitnesses.find({this, reqIndex});
+    ctx.getImpl().DefaultAssociatedConformanceWitnesses.find(
+      std::make_tuple(this, association, requirement));
   if (found == ctx.getImpl().DefaultAssociatedConformanceWitnesses.end())
     return None;
 
@@ -1726,11 +1729,13 @@ ProtocolDecl::getDefaultAssociatedConformanceWitness(unsigned reqIndex) const {
 }
 
 void ProtocolDecl::setDefaultAssociatedConformanceWitness(
-                                          unsigned reqIndex,
+                                          CanType association,
+                                          ProtocolDecl *requirement,
                                           ProtocolConformanceRef conformance) {
   auto &ctx = getASTContext();
   auto pair = ctx.getImpl().DefaultAssociatedConformanceWitnesses.insert(
-                std::make_pair(std::make_pair(this, reqIndex), conformance));
+                std::make_pair(std::make_tuple(this, association, requirement),
+                               conformance));
   assert(pair.second && "Already have a default associated conformance");
   (void)pair;
 }
