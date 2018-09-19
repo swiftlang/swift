@@ -1018,6 +1018,11 @@ ApplySite swift::tryDevirtualizeApply(ApplySite AI,
   if (isa<WitnessMethodInst>(AI.getCallee()))
     return tryDevirtualizeWitnessMethod(AI, ORE);
 
+  // We can't devirtualize class method calls inside inlinable functions yet.
+  // TODO: Figure out when it is sound to do so.
+  if (AI.getFunction()->getResilienceExpansion() == ResilienceExpansion::Minimal)
+    return std::make_pair(nullptr, ApplySite());
+
   // TODO: check if we can also de-virtualize partial applies of class methods.
   FullApplySite FAS = FullApplySite::isa(AI.getInstruction());
   if (!FAS)
