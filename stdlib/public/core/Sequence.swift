@@ -335,6 +335,11 @@ public protocol Sequence {
     where Element == SubSequence.Element,
           SubSequence.SubSequence == SubSequence
 
+  /// A type that represents a subsequence of some of the sequence's elements.
+  associatedtype Prefix: Sequence = PrefixSequence<Self>
+    where Element == Prefix.Element,
+          Prefix.Prefix == Prefix
+
   /// Returns an iterator over the elements of this sequence.
   __consuming func makeIterator() -> Iterator
 
