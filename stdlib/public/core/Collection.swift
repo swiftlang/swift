@@ -332,7 +332,7 @@ extension IndexingIterator: IteratorProtocol, Sequence {
 /// or bidirectional collection must traverse the entire collection to count
 /// the number of contained elements, accessing its `count` property is an
 /// O(*n*) operation.
-public protocol Collection: Sequence where SubSequence: Collection {
+public protocol Collection: Sequence where SubSequence: Collection, Prefix == SubSequence {
   // FIXME: ideally this would be in MigrationSupport.swift, but it needs
   // to be on the protocol instead of as an extension
   @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
@@ -391,6 +391,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence = Slice<Self> where SubSequence.Index == Index
+  associatedtype Prefix = SubSequence
 
   /// Accesses the element at the specified position.
   ///
@@ -1442,6 +1443,10 @@ extension Collection {
       offsetBy: maxLength, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
+  
+  public func _prefix(_ maxLength: Int) -> SubSequence {
+    return prefix(maxLength)
+  }  
   
   /// Returns a subsequence containing the initial elements until `predicate`
   /// returns `false` and skipping the remaining elements.
