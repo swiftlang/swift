@@ -19,6 +19,7 @@
 #include "TypeCheckType.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -1226,15 +1227,9 @@ bool ConstraintSystem::solve(Expr *const expr,
 void ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
 
-  SmallVector<SolverStep *, 16> workList;
+  SmallVector<std::unique_ptr<SolverStep>, 16> workList;
   // First step is always wraps whole constraint system.
-  workList.push_back(SplitterStep::create(*this, solutions));
-
-  SWIFT_DEFER {
-    // Delete all of the leftover steps from the work list.
-    while (!workList.empty())
-      delete workList.pop_back_val();
-  };
+  workList.push_back(llvm::make_unique<SplitterStep>(*this, solutions));
 
   // Indicate whether previous step in the stack has failed
   // (returned StepResult::Kind = Error), this is useful to
@@ -1264,7 +1259,7 @@ void ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
   // a solution, or producing another set of mergeable
   // steps to take before arriving to solution.
   while (!workList.empty()) {
-    auto *step = workList.back();
+    auto &step = workList.back();
 
     // Now let's try to advance to the next step or re-take previous,
     // which should produce another steps to follow,
@@ -1274,7 +1269,7 @@ void ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
                step->getState() == StepState::Done) &&
              "Cannot re-take already running/done step.");
 
-      auto result = advance(step, prevFailed);
+      auto result = advance(step.get(), prevFailed);
       switch (result.getKind()) {
       // It was impossible to solve this step, let's note that
       // for followup steps, to propogate the error.
@@ -1286,7 +1281,6 @@ void ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
       // toward that solution.
       case SolutionKind::Solved: {
         workList.pop_back();
-        delete step;
         break;
       }
 
