@@ -389,10 +389,10 @@ func subclass_generics<T: C<Int>, U: C<V>, V/*: PoC*/>(_: T, _: U, _: V) {
 // CHECK-LABEL: sil hidden @{{.*}}identity
 func identity<T>(_: T) {
   // CHECK: keypath $WritableKeyPath<T, T>, <τ_0_0> ({{.*}}root $τ_0_0) <T>
-  let _: WritableKeyPath<T, T> = Builtin.identityKeyPath()
-  // CHECK: keypath $WritableKeyPath<Array<T>, Array<T>>, <τ_0_0> ({{.*}}root $τ_0_0) <Array<T>>
-  let _: WritableKeyPath<[T], [T]> = Builtin.identityKeyPath()
+  let _: WritableKeyPath<T, T> = \T.self
+  // CHECK: keypath $WritableKeyPath<Array<T>, Array<T>>, <τ_0_0> ({{.*}}root $Array<τ_0_0>) <T>
+  let _: WritableKeyPath<[T], [T]> = \[T].self
   // CHECK: keypath $WritableKeyPath<String, String>, ({{.*}}root $String)
-  let _: WritableKeyPath<String, String> = Builtin.identityKeyPath()
+  let _: WritableKeyPath<String, String> = \String.self
 }
 

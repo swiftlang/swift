@@ -276,7 +276,11 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
     case KeyPathExpr::Component::Kind::OptionalWrap:
       // KVC propagates nulls, so these don't affect the key path string.
       continue;
-      
+    case KeyPathExpr::Component::Kind::Identity:
+      // The identity component can be elided from the KVC string (unless it's
+      // the only component, in which case we use @"self").
+      continue;
+
     case KeyPathExpr::Component::Kind::Property: {
       // Property references must be to @objc properties.
       // TODO: If we added special properties matching KVC operators like '@sum',
@@ -305,6 +309,12 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
       return false;
     }
     }
+  }
+  
+  // If there are no non-identity components, this is the "self" key.
+  if (buf.empty()) {
+    auto self = StringRef("self");
+    buf.append(self.begin(), self.end());
   }
   
   return true;
@@ -4514,7 +4524,11 @@ namespace {
           baseTy = component.getComponentType();
           resolvedComponents.push_back(component);
           break;
-          
+        case KeyPathExpr::Component::Kind::Identity:
+          component = origComponent;
+          component.setComponentType(baseTy);
+          resolvedComponents.push_back(component);
+          break;
         case KeyPathExpr::Component::Kind::Property:
         case KeyPathExpr::Component::Kind::Subscript:
         case KeyPathExpr::Component::Kind::OptionalWrap:

@@ -3067,6 +3067,8 @@ namespace {
           base = OptionalType::get(base);
           break;
         }
+        case KeyPathExpr::Component::Kind::Identity:
+          continue;
         }
       }
       

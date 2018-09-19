@@ -24,6 +24,20 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* [SE-0227][]:
+
+  Key paths now support the `\.self` keypath, which is a `WritableKeyPath`
+  that refers to its entire input value:
+
+    ```swift
+    let id = \Int.self
+
+    var x = 2
+    print(x[keyPath: id]) // prints 2
+    x[keyPath: id] = 3
+    print(x[keyPath: id]) // prints 3
+    ```
+
 * [SE-0214][]:
 
   Renamed the `DictionaryLiteral` type to `KeyValuePairs`.
