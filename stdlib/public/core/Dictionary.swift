@@ -2506,6 +2506,11 @@ extension _NativeDictionary { // Insertions
     _unsafeInsertNew(key: key, value: value)
   }
 
+  /// Same as find(_:), except assume a corresponding key/value pair will be
+  /// inserted if it doesn't already exist, and mutated if it does exist. When
+  /// this function returns, the storage is guaranteed to be native, uniquely
+  /// held, and with enough capacity for a single insertion (if the key isn't
+  /// already in the dictionary.)
   @inlinable
   @inline(__always)
   internal mutating func mutatingFind(
@@ -3460,6 +3465,11 @@ extension Dictionary._Variant: _DictionaryBuffer {
 }
 
 extension Dictionary._Variant {
+  /// Same as find(_:), except assume a corresponding key/value pair will be
+  /// inserted if it doesn't already exist, and mutated if it does exist. When
+  /// this function returns, the storage is guaranteed to be native, uniquely
+  /// held, and with enough capacity for a single insertion (if the key isn't
+  /// already in the dictionary.)
   @inlinable
   @inline(__always)
   internal mutating func mutatingFind(
