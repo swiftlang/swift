@@ -49,15 +49,15 @@ struct StepResult {
 
 private:
   Kind ResultKind;
-  SmallVector<SolverStep *, 4> NextSteps;
+  SmallVector<std::unique_ptr<SolverStep>, 4> NextSteps;
 
   StepResult(Kind kind) : ResultKind(kind) {}
 
-  StepResult(Kind kind, SolverStep *step) : ResultKind(kind) {
-    NextSteps.push_back(step);
+  StepResult(Kind kind, std::unique_ptr<SolverStep> step) : ResultKind(kind) {
+    NextSteps.push_back(std::move(step));
   }
 
-  StepResult(Kind kind, SmallVectorImpl<SolverStep *> &followup)
+  StepResult(Kind kind, SmallVectorImpl<std::unique_ptr<SolverStep>> &followup)
       : ResultKind(kind), NextSteps(std::move(followup)) {}
 
 public:
@@ -65,28 +65,23 @@ public:
 
   Kind getKind() const { return ResultKind; }
 
-  void transfer(SmallVectorImpl<SolverStep *> &workList) {
+  void transfer(SmallVectorImpl<std::unique_ptr<SolverStep>> &workList) {
     workList.reserve(NextSteps.size());
-    workList.append(NextSteps.begin(), NextSteps.end());
+    for (auto &step : NextSteps)
+      workList.push_back(std::move(step));
   }
 
 private:
   static StepResult success() { return StepResult(Kind::Solved); }
   static StepResult failure() { return StepResult(Kind::Error); }
 
-  static StepResult unsolved(SolverStep *singleStep) {
-    return StepResult(Kind::Unsolved, singleStep);
+  static StepResult unsolved(std::unique_ptr<SolverStep> singleStep) {
+    return StepResult(Kind::Unsolved, std::move(singleStep));
   }
 
-  static StepResult unsolved(SmallVectorImpl<SolverStep *> &followup) {
+  static StepResult
+  unsolved(SmallVectorImpl<std::unique_ptr<SolverStep>> &followup) {
     return StepResult(Kind::Unsolved, followup);
-  }
-
-  template <typename T> static StepResult unsolved(ArrayRef<T *> followup) {
-    auto result = StepResult(Kind::Unsolved);
-    for (auto *step : followup)
-      result.NextSteps.push_back(static_cast<SolverStep *>(step));
-    return result;
   }
 };
 
@@ -167,22 +162,17 @@ protected:
     return isSuccess ? StepResult::success() : StepResult::failure();
   }
 
-  StepResult replaceWith(SolverStep *replacement) {
+  StepResult replaceWith(std::unique_ptr<SolverStep> replacement) {
     transitionTo(StepState::Done);
-    return StepResult(StepResult::Kind::Solved, replacement);
+    return StepResult(StepResult::Kind::Solved, std::move(replacement));
   }
 
-  StepResult suspend(SolverStep *followup) {
+  StepResult suspend(std::unique_ptr<SolverStep> followup) {
     transitionTo(StepState::Suspended);
-    return StepResult::unsolved(followup);
+    return StepResult::unsolved(std::move(followup));
   }
 
-  StepResult suspend(SmallVectorImpl<SolverStep *> &followup) {
-    transitionTo(StepState::Suspended);
-    return StepResult::unsolved(followup);
-  }
-
-  template <typename T> StepResult suspend(ArrayRef<T *> followup) {
+  StepResult suspend(SmallVectorImpl<std::unique_ptr<SolverStep>> &followup) {
     transitionTo(StepState::Suspended);
     return StepResult::unsolved(followup);
   }
@@ -244,10 +234,10 @@ class SplitterStep final : public SolverStep {
 
   SmallVector<Constraint *, 4> OrphanedConstraints;
 
+public:
   SplitterStep(ConstraintSystem &cs, SmallVectorImpl<Solution> &solutions)
       : SolverStep(cs, solutions) {}
 
-public:
   StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
 
@@ -255,15 +245,11 @@ public:
     Out << "SplitterStep with #" << Components.size() << " components\n";
   }
 
-  static SplitterStep *create(ConstraintSystem &cs,
-                              SmallVectorImpl<Solution> &solutions) {
-    return new SplitterStep(cs, solutions);
-  }
-
 private:
   /// If current step needs follow-up steps to get completely solved,
   /// let's compute them using connected components algorithm.
-  void computeFollowupSteps(SmallVectorImpl<ComponentStep *> &componentSteps);
+  void computeFollowupSteps(
+      SmallVectorImpl<std::unique_ptr<ComponentStep>> &componentSteps);
 
   /// Once all of the follow-up steps are complete, let's try
   /// to merge resulting solutions together, to form final solution(s)
@@ -339,6 +325,7 @@ class ComponentStep final : public SolverStep {
   /// with it, which makes it disconnected in the graph.
   Constraint *OrphanedConstraint = nullptr;
 
+public:
   ComponentStep(ConstraintSystem &cs, unsigned index, bool single,
                 ConstraintList *constraints,
                 SmallVectorImpl<Solution> &solutions)
@@ -346,7 +333,6 @@ class ComponentStep final : public SolverStep {
         OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
         Constraints(constraints) {}
 
-public:
   /// Record a type variable as associated with this step.
   void record(TypeVariableType *typeVar) { TypeVars.push_back(typeVar); }
 
@@ -388,12 +374,6 @@ public:
   void print(llvm::raw_ostream &Out) override {
     Out << "ComponentStep with at #" << Index << '\n';
   }
-
-  static ComponentStep *create(ConstraintSystem &cs, unsigned index,
-                               bool single, ConstraintList *constraints,
-                               SmallVectorImpl<Solution> &solutions) {
-    return new ComponentStep(cs, index, single, constraints, solutions);
-  }
 };
 
 template <typename P> class BindingStep : public SolverStep {
@@ -429,7 +409,7 @@ public:
         auto scope = llvm::make_unique<Scope>(CS);
         if (attempt(*choice)) {
           ActiveChoice.emplace(std::move(scope), *choice);
-          return suspend(SplitterStep::create(CS, Solutions));
+          return suspend(llvm::make_unique<SplitterStep>(CS, Solutions));
         }
       }
 
@@ -490,12 +470,12 @@ class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
   /// attempting other bindings in certain conditions.
   bool SawFirstLiteralConstraint = false;
 
+public:
   TypeVariableStep(ConstraintSystem &cs, BindingContainer &bindings,
                    SmallVectorImpl<Solution> &solutions)
       : BindingStep(cs, {cs, bindings}, solutions), TypeVar(bindings.TypeVar),
         InitialBindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
 
-public:
   void setup() override;
 
   StepResult resume(bool prevFailed) override;
@@ -503,12 +483,6 @@ public:
   void print(llvm::raw_ostream &Out) override {
     Out << "TypeVariableStep for " << TypeVar->getString() << " with #"
         << InitialBindings.size() << " initial bindings\n";
-  }
-
-  static TypeVariableStep *create(ConstraintSystem &cs,
-                                  BindingContainer &bindings,
-                                  SmallVectorImpl<Solution> &solutions) {
-    return new TypeVariableStep(cs, bindings, solutions);
   }
 
 protected:
@@ -572,11 +546,6 @@ public:
     Out << "DisjunctionStep for ";
     Disjunction->print(Out, &CS.getASTContext().SourceMgr);
     Out << '\n';
-  }
-
-  static DisjunctionStep *create(ConstraintSystem &cs, Constraint *disjunction,
-                                 SmallVectorImpl<Solution> &solutions) {
-    return new DisjunctionStep(cs, disjunction, solutions);
   }
 
 private:
