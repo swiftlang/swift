@@ -133,11 +133,6 @@ namespace {
     std::unique_ptr<SESERegionTree>
     processAcyclicRegion(SILBasicBlock *startBB, SILBasicBlock *endBB);
 
-    std::unique_ptr<SESERegionTree>
-    processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
-                                     SILBasicBlock *endBB);
-
-
     /// Process all of the top-level loops in the function in post-order.
     void processLoops() {
       // Apply the standard SIL loop canonicalization transformations.  This
@@ -162,9 +157,12 @@ namespace {
         processLoop(loop);
     }
 
-    void processLoop(SILLoop *loop);
 
   private:
+    std::unique_ptr<SESERegionTree>
+    processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
+                                     SILBasicBlock *endBB);
+    void processLoop(SILLoop *loop);
     void ensureSingleExitFromLoops();
   };
 } // end anonymous namespace
