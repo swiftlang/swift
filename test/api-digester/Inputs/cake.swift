@@ -45,4 +45,6 @@ public extension Int {
 @_fixed_layout
 public struct fixedLayoutStruct {
   public var a = 1
+  private var b = 2
+  var c = 3
 }

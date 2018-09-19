@@ -786,9 +786,9 @@
         {
           "kind": "Constructor",
           "name": "init",
-          "printedName": "init(a:)",
+          "printedName": "init(a:b:c:)",
           "declKind": "Constructor",
-          "usr": "s:4cake17fixedLayoutStructV1aACSi_tcfc",
+          "usr": "s:4cake17fixedLayoutStructV1a1b1cACSi_S2itc33_3D8926C30F7417F2EF9A277D0C73FBDBLlfc",
           "location": "",
           "moduleName": "cake",
           "implicit": true,
@@ -798,6 +798,18 @@
               "name": "fixedLayoutStruct",
               "printedName": "fixedLayoutStruct",
               "usr": "s:4cake17fixedLayoutStructV"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
             },
             {
               "kind": "TypeNominal",
