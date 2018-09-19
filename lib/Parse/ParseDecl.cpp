@@ -3583,7 +3583,6 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
   
   unsigned StartLine = 0;
   Optional<StringRef> Filename;
-  const char *LastTokTextEnd;
   if (!isLine) {
     // #sourceLocation()
     // #sourceLocation(file: "foo", line: 42)
@@ -3640,10 +3639,10 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       consumeToken(tok::integer_literal);
     }
 
-    LastTokTextEnd = Tok.getText().end();
-    if (parseToken(tok::r_paren, diag::sourceLocation_expected, ")"))
+    if (Tok.isNot(tok::r_paren)) {
+      diagnose(Tok, diag::sourceLocation_expected, ")");
       return makeParserError();
-    
+    }
   } else {  // Legacy #line syntax.
   
     // #line\n returns to the main buffer.
@@ -3679,10 +3678,10 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
                                                  "#line");
     if (!Filename.hasValue())
       return makeParserError();
-    LastTokTextEnd = Tok.getText().end();
-    consumeToken(tok::string_literal);
   }
-  
+
+  const char *LastTokTextEnd = Tok.getText().end();
+
   // Skip over trailing whitespace and a single \n to the start of the next
   // line.
   while (*LastTokTextEnd == ' ' || *LastTokTextEnd == '\t')
@@ -3702,6 +3701,9 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
   bool isNewFile = SourceMgr.openVirtualFile(nextLineStartLoc,
                                              Filename.getValue(), LineOffset);
   assert(isNewFile);(void)isNewFile;
+
+  // Lexing of next token must be deferred until after virtual file setup.
+  consumeToken(isLine ? tok::string_literal : tok::r_paren);
 
   InPoundLineEnvironment = true;
   return makeParserSuccess();
