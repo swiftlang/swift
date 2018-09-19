@@ -63,9 +63,6 @@ public:
   /// Resolve the generic environment of the given protocol.
   virtual void resolveProtocolEnvironment(ProtocolDecl *proto) = 0;
 
-  /// Bind an extension to its extended type.
-  virtual void bindExtension(ExtensionDecl *ext) = 0;
-
   /// Resolve the type of an extension.
   ///
   /// This can be called to ensure that the members of an extension can be
