@@ -1291,6 +1291,8 @@ public:
                                      const AssociatedConformance &association);
   llvm::Function *getAddrOfDefaultAssociatedTypeMetadataAccessFunction(
                                            AssociatedType association);
+  llvm::Function *getAddrOfDefaultAssociatedConformanceAccessor(
+                                           AssociatedConformance requirement);
 
   Address getAddrOfObjCISAMask();
 

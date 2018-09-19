@@ -176,7 +176,15 @@ public func doSomething<T : AddSubscriptProtocol>(_ t: inout T, k1: T.Key, k2: T
 #endif
 }
 
-public struct Wrapper<T> { }
+public protocol SimpleProtocol {
+  static func getString() -> String
+}
+
+public struct Wrapper<T>: SimpleProtocol {
+  public static func getString() -> String {
+    return "I am a wrapper for \(T.self)"
+  }
+}
 
 public protocol AddAssocTypesProtocol {
   // FIXME: The presence of a single method requirement causes us to
@@ -185,7 +193,7 @@ public protocol AddAssocTypesProtocol {
 
 #if AFTER
   associatedtype AssocType = Self
-  associatedtype AssocType2 = Wrapper<AssocType>
+  associatedtype AssocType2: SimpleProtocol = Wrapper<AssocType>
 #endif
 }
 
@@ -193,12 +201,25 @@ extension AddAssocTypesProtocol {
   public func dummy() { }
 }
 
-
 public func doSomethingWithAssocTypes<T: AddAssocTypesProtocol>(_ value: T)
     -> String {
 #if AFTER
   return String(describing: T.AssocType2.self)
 #else
   return "there are no associated types yet"
+#endif
+}
+
+public func doSomethingWithAssocConformances<T: AddAssocTypesProtocol>(_ value: T)
+    -> String {
+#if AFTER
+  let at2: Any.Type = T.AssocType2.self
+  if let simpleType = at2 as? SimpleProtocol.Type {
+    return simpleType.getString()
+  }
+  
+  return "missing associated conformance"
+#else
+  return "there are no associated conformances yet"
 #endif
 }

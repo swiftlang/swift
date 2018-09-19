@@ -647,7 +647,14 @@ namespace {
 
       if (entry.isAssociatedConformance()) {
         auto flags = Flags(Flags::Kind::AssociatedConformanceAccessFunction);
-        return { flags, nullptr };
+
+        // Look for a default witness.
+        llvm::Constant *defaultImpl =
+          findDefaultAssociatedConformanceWitness(
+            entry.getAssociatedConformancePath(),
+            entry.getAssociatedConformanceRequirement());
+
+        return { flags, defaultImpl };
       }
 
       assert(entry.isFunction());
@@ -802,6 +809,89 @@ namespace {
       IGF.Builder.CreateRet(returnValue);
       return accessor;
     }
+
+    llvm::Constant *findDefaultAssociatedConformanceWitness(
+                                                  CanType association,
+                                                  ProtocolDecl *requirement) {
+      if (!DefaultWitnesses) return nullptr;
+
+      for (auto &entry : DefaultWitnesses->getEntries()) {
+        if (!entry.isValid() ||
+            entry.getKind() != SILWitnessTable::AssociatedTypeProtocol ||
+            entry.getAssociatedTypeProtocolWitness().Protocol != requirement ||
+            entry.getAssociatedTypeProtocolWitness().Requirement != association)
+          continue;
+
+        auto witness = entry.getAssociatedTypeProtocolWitness().Witness;
+        return getDefaultAssociatedConformanceAccessFunction(
+                 AssociatedConformance(Proto, association, requirement),
+                 witness);
+      }
+
+      return nullptr;
+    }
+
+    llvm::Constant *getDefaultAssociatedConformanceAccessFunction(
+                      AssociatedConformance requirement,
+                      ProtocolConformanceRef conformance) {
+      auto accessor =
+        IGM.getAddrOfDefaultAssociatedConformanceAccessor(requirement);
+
+      IRGenFunction IGF(IGM, accessor);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
+
+      Explosion parameters = IGF.collectParameters();
+
+      llvm::Value *associatedTypeMetadata = parameters.claimNext();
+      llvm::Value *self = parameters.claimNext();
+      llvm::Value *wtable = parameters.claimNext();
+
+      bool hasArchetype =
+        !conformance.isConcrete() ||
+        conformance.getConcrete()->getType()->hasArchetype();
+      if (hasArchetype) {
+        // Bind local Self type data from the metadata argument.
+        CanType selfInContext =
+            Proto->mapTypeIntoContext(Proto->getProtocolSelfType())
+              ->getCanonicalType();
+        IGF.bindLocalTypeDataFromTypeMetadata(selfInContext, IsExact, self,
+                                              MetadataState::Abstract);
+        IGF.setUnscopedLocalTypeData(
+            selfInContext,
+            LocalTypeDataKind::forAbstractProtocolWitnessTable(Proto),
+            wtable);
+
+        // Bind the associated type metadata.
+        IGF.bindLocalTypeDataFromTypeMetadata(requirement.getAssociation(),
+                                              IsExact,
+                                              associatedTypeMetadata,
+                                              MetadataState::Abstract);
+      }
+
+      // For a concrete witness table, call it.
+      ProtocolDecl *associatedProtocol = requirement.getAssociatedRequirement();
+      if (conformance.isConcrete()) {
+        auto conformanceI = &IGM.getConformanceInfo(associatedProtocol,
+                                                    conformance.getConcrete());
+        auto returnValue = conformanceI->getTable(IGF, &associatedTypeMetadata);
+        IGF.Builder.CreateRet(returnValue);
+        return accessor;
+      }
+
+      // For an abstract table, emit a reference to the witness table.
+      CanType associatedTypeInContext
+        = Proto->mapTypeIntoContext(requirement.getAssociation())
+            ->getCanonicalType();
+      auto returnValue =
+          emitArchetypeWitnessTableRef(
+            IGF,
+            cast<ArchetypeType>(associatedTypeInContext),
+            associatedProtocol);
+      IGF.Builder.CreateRet(returnValue);
+      return accessor;
+    }
+
     void addAssociatedTypeNames() {
       std::string AssociatedTypeNames;
 

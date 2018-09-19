@@ -154,5 +154,16 @@ ProtocolAddRequirementsTest.test("AddAssociatedTypeRequirements") {
   }
 }
 
+ProtocolAddRequirementsTest.test("AddAssociatedConformanceRequirements") {
+  let addString = AddAssociatedType<String>()
+  let stringResult = doSomethingWithAssocConformances(addString)
+
+  if getVersion() == 0 {
+    expectEqual("there are no associated conformances yet", stringResult)
+  } else {
+    expectEqual("I am a wrapper for AddAssociatedType<String>", stringResult)
+  }
+}
+
 runAllTests()
 
