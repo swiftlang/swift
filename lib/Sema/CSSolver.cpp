@@ -1358,6 +1358,224 @@ static Constraint *selectBestBindingDisjunction(
   return firstBindDisjunction;
 }
 
+// For a given type, determine if it's either a concrete type, the
+// result of converting from a concrete type, or a type variable known
+// to conform to other types (or the result of converting from such a
+// type variable).
+static bool havePotentialTypesOrLiteralConformances(Type ty,
+                                                    ConstraintSystem &cs) {
+  llvm::SmallSet<TypeVariableType *, 4> visited;
+  llvm::SmallVector<Type, 4> worklist;
+  worklist.push_back(ty);
+
+  while (!worklist.empty()) {
+    auto itemTy = worklist.pop_back_val()->getWithoutSpecifierType();
+
+    if (!itemTy->is<TypeVariableType>())
+      return true;
+
+    auto tyvar = itemTy->castTo<TypeVariableType>();
+    if (cs.getFixedType(tyvar))
+      return true;
+
+    auto *rep = cs.getRepresentative(tyvar);
+
+    // FIXME: This can happen when we have two type variables that are
+    // subtypes of each other. We would ideally merge those type
+    // variables somewhere.
+    if (visited.count(rep))
+      continue;
+
+    visited.insert(rep);
+
+    // Gather all the constraints involving this type variable, and
+    // then attempt to trace back through each constraint to see if we
+    // can reach a concrete type or a literal.
+
+    llvm::SetVector<Constraint *> constraints;
+    cs.getConstraintGraph().gatherConstraints(
+        rep, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+        [](Constraint *constraint) {
+          return true;
+        });
+
+    for (auto *constraint : constraints) {
+      switch (constraint->getKind()) {
+      case ConstraintKind::LiteralConformsTo:
+        return true;
+
+      case ConstraintKind::Defaultable:
+        assert(!constraint->getSecondType()->is<TypeVariableType>());
+        return true;
+
+      case ConstraintKind::Bind:
+      case ConstraintKind::Equal: {
+        auto firstTy = constraint->getFirstType();
+        auto secondTy = constraint->getSecondType();
+        if (firstTy->is<TypeVariableType>()) {
+          auto otherRep =
+            cs.getRepresentative(firstTy->castTo<TypeVariableType>());
+          if (otherRep->isEqual(rep))
+            worklist.push_back(secondTy);
+        }
+        if (secondTy->is<TypeVariableType>()) {
+          auto otherRep =
+              cs.getRepresentative(secondTy->castTo<TypeVariableType>());
+          if (otherRep->isEqual(rep))
+            worklist.push_back(constraint->getFirstType());
+        }
+        break;
+      }
+
+      case ConstraintKind::Subtype:
+      case ConstraintKind::OperatorArgumentConversion:
+      case ConstraintKind::ArgumentConversion:
+      case ConstraintKind::Conversion:
+      case ConstraintKind::BridgingConversion:
+      case ConstraintKind::BindParam: {
+        auto secondTy = constraint->getSecondType();
+        if (secondTy->is<TypeVariableType>()) {
+          auto otherRep =
+              cs.getRepresentative(secondTy->castTo<TypeVariableType>());
+          if (otherRep->isEqual(rep))
+            worklist.push_back(constraint->getFirstType());
+        }
+        break;
+      }
+
+      case ConstraintKind::DynamicTypeOf:
+      case ConstraintKind::EscapableFunctionOf: {
+        auto firstTy = constraint->getFirstType();
+        if (firstTy->is<TypeVariableType>()) {
+          auto otherRep =
+              cs.getRepresentative(firstTy->castTo<TypeVariableType>());
+          if (otherRep->isEqual(rep))
+            worklist.push_back(constraint->getSecondType());
+        }
+        break;
+      }
+
+      case ConstraintKind::OptionalObject: {
+        // Get the underlying object type.
+        auto secondTy = constraint->getSecondType();
+        if (secondTy->is<TypeVariableType>()) {
+          auto otherRep =
+              cs.getRepresentative(secondTy->castTo<TypeVariableType>());
+          if (otherRep->isEqual(rep)) {
+            // See if we can actually determine what the underlying
+            // type is.
+            Type fixedTy;
+            auto firstTy = constraint->getFirstType();
+            if (!firstTy->is<TypeVariableType>()) {
+              fixedTy = firstTy;
+            } else {
+              fixedTy =
+                cs.getFixedType(firstTy->castTo<TypeVariableType>());
+            }
+            if (fixedTy && fixedTy->getOptionalObjectType())
+              worklist.push_back(fixedTy->getOptionalObjectType());
+          }
+        }
+        break;
+      }
+
+      case ConstraintKind::KeyPathApplication:
+      case ConstraintKind::KeyPath: {
+        auto firstTy = constraint->getFirstType();
+        if (firstTy->is<TypeVariableType>()) {
+          auto otherRep =
+              cs.getRepresentative(firstTy->castTo<TypeVariableType>());
+          if (otherRep->isEqual(rep))
+            worklist.push_back(constraint->getThirdType());
+        }
+        break;
+      }
+
+      case ConstraintKind::BindToPointerType:
+      case ConstraintKind::ValueMember:
+      case ConstraintKind::UnresolvedValueMember:
+      case ConstraintKind::Disjunction:
+      case ConstraintKind::CheckedCast:
+      case ConstraintKind::OpenedExistentialOf:
+      case ConstraintKind::ApplicableFunction:
+      case ConstraintKind::BindOverload:
+      case ConstraintKind::FunctionInput:
+      case ConstraintKind::FunctionResult:
+      case ConstraintKind::SelfObjectOfProtocol:
+      case ConstraintKind::ConformsTo:
+        break;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Check to see if we know something about the types of all arguments
+// in the given function type.
+static bool haveTypeInformationForAllArguments(AnyFunctionType *fnType,
+                                               ConstraintSystem &cs) {
+  for (auto param : fnType->getParams())
+    if (!havePotentialTypesOrLiteralConformances(param.getType(), cs))
+      return false;
+
+  return true;
+}
+
+// Given a type variable representing the RHS of an ApplicableFunction
+// constraint, attempt to find the disjunction of bind overloads
+// associated with it. This may return null in cases where have not
+// yet created a disjunction because we need to resolve a base type,
+// e.g.: [1].map{ ... } does not have a disjunction until we decide on
+// a type for [1].
+static Constraint *getUnboundBindOverloadDisjunction(TypeVariableType *tyvar,
+                                                     ConstraintSystem &cs) {
+  auto *rep = cs.getRepresentative(tyvar);
+  assert(!cs.getFixedType(rep));
+
+  llvm::SetVector<Constraint *> disjunctions;
+  cs.getConstraintGraph().gatherConstraints(
+      rep, disjunctions, ConstraintGraph::GatheringKind::EquivalenceClass,
+      [](Constraint *match) {
+        return match->getKind() == ConstraintKind::Disjunction;
+      });
+
+  if (disjunctions.empty())
+    return nullptr;
+
+  for (auto *disjunction : disjunctions) {
+    auto *first = disjunction->getNestedConstraints().front();
+    if (first->getKind() == ConstraintKind::BindOverload)
+      return disjunction;
+  }
+
+  return nullptr;
+}
+
+// Find a disjunction associated with an ApplicableFunction constraint
+// where we have some information about all of the types of in the
+// function application (even if we only know something about what the
+// types conform to and not actually a concrete type).
+Constraint *ConstraintSystem::selectApplyDisjunction() {
+  for (auto &constraint : InactiveConstraints) {
+    if (constraint.getKind() != ConstraintKind::ApplicableFunction)
+      continue;
+
+    auto *applicable = &constraint;
+    if (haveTypeInformationForAllArguments(
+            applicable->getFirstType()->castTo<AnyFunctionType>(), *this)) {
+      auto *tyvar = applicable->getSecondType()->castTo<TypeVariableType>();
+
+      // If we have created the disjunction for this apply, find it.
+      auto *disjunction = getUnboundBindOverloadDisjunction(tyvar, *this);
+      if (disjunction)
+        return disjunction;
+    }
+  }
+
+  return nullptr;
+}
+
 Constraint *ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
 
@@ -1366,6 +1584,9 @@ Constraint *ConstraintSystem::selectDisjunction() {
     return nullptr;
 
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
+    return disjunction;
+
+  if (auto *disjunction = selectApplyDisjunction())
     return disjunction;
 
   // Pick the disjunction with the smallest number of active choices.
