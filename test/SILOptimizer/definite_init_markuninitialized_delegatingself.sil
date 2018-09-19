@@ -113,10 +113,13 @@ bb1:
 bb2:
 
 // CHECK-NEXT:  [[BIT:%[0-9]+]] = load [trivial] [[CONTROL]] : $*Builtin.Int1
-// CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[UNINITIALIZED:bb[0-9]+]]
 
 // CHECK: [[INITIALIZED]]:
 // CHECK-NEXT:  destroy_addr [[SELF_BOX]] : $*MyStruct3
+// CHECK-NEXT:  br [[EXIT:bb[0-9]+]]
+
+// CHECK: [[UNINITIALIZED]]:
 // CHECK-NEXT:  br [[EXIT]]
 
 // CHECK: [[EXIT]]:
