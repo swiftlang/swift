@@ -4877,31 +4877,78 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (ext->hasValidationStarted())
     return;
 
-  bindExtension(ext);
-
   DeclValidationRAII IBV(ext);
 
-  // If the extension is already known to be invalid, we're done.
-  if (ext->isInvalid())
-    return;
+  auto dc = ext->getDeclContext();
 
-  // FIXME: We need to check whether anything is specialized, because
-  // the innermost extended type might itself be a non-generic type
-  // within a generic type.
+  // If we didn't parse a type, fill in an error type and bail out.
+  if (!ext->getExtendedTypeLoc().getTypeRepr()) {
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Validate the extended type.
+  TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
+  options |= TypeResolutionFlags::AllowUnboundGenerics;
+  if (validateType(ext->getExtendedTypeLoc(),
+                   TypeResolution::forContextual(dc), options)) {
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Dig out the extended type.
   auto extendedType = ext->getExtendedType();
 
-  if (extendedType.isNull() || extendedType->hasError())
+  // Hack to allow extending a generic typealias.
+  if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
+      auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
+      if (extendedNominal) {
+        extendedType = extendedNominal->getDeclaredType();
+        if (!isPassThroughTypealias(aliasDecl))
+          ext->getExtendedTypeLoc().setType(extendedType);
+      }
+    }
+  }
+
+  // Cannot extend a metatype.
+  if (extendedType->is<AnyMetatypeType>()) {
+    diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
+      .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Cannot extend a bound generic type.
+  if (extendedType->isSpecialized()) {
+    diagnose(ext->getLoc(), diag::extension_specialization,
+             extendedType->getAnyNominal()->getName())
+      .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  auto *nominal = extendedType->getAnyNominal();
+
+  // Cannot extend function types, tuple types, etc.
+  if (nominal == nullptr) {
+    diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
+      .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Extensions nested inside other declarations are invalid and we
+  // do not bind them.
+  if (!isa<SourceFile>(dc))
     return;
 
   // Validate the nominal type declaration being extended.
-  NominalTypeDecl *nominal = extendedType->getAnyNominal();
-  if (!nominal) {
-    auto unbound = cast<UnboundGenericType>(extendedType.getPointer());
-    auto typealias = cast<TypeAliasDecl>(unbound->getDecl());
-    validateDecl(typealias);
-
-    nominal = typealias->getUnderlyingTypeLoc().getType()->getAnyNominal();
-  }
   validateDecl(nominal);
 
   if (nominal->getGenericParamsOfContext()) {

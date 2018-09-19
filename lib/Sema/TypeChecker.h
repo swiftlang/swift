@@ -1106,8 +1106,6 @@ public:
     validateDecl(proto);
   }
 
-  void bindExtension(ExtensionDecl *ext);
-
   virtual void resolveExtension(ExtensionDecl *ext) override {
     validateExtension(ext);
   }
