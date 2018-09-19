@@ -26,7 +26,6 @@ public struct Foo: Hashable {
 
   // CHECK: public var hasDidSet: [[INT]] {
   public var hasDidSet: Int {
-    // CHECK-NEXT: @_transparent get{{$}}
     // CHECK-NEXT: set[[NEWVALUE]]{{$}}
     // CHECK-NOT: didSet
     didSet {
@@ -37,7 +36,9 @@ public struct Foo: Hashable {
 
 
   // CHECK: @_transparent public var transparent: [[INT]] {
+  // CHECK-NEXT:   get {
   // CHECK-NEXT:   return 34
+  // CHECK-NEXT: }
   // CHECK-NEXT: }
   @_transparent
   public var transparent: Int {

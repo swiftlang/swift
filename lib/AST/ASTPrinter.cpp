@@ -80,6 +80,8 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.FullyQualifiedTypes = true;
   result.SkipImports = true;
   result.OmitNameOfInaccessibleProperties = true;
+  result.FunctionDefinitions = true;
+  result.CollapseSingleGetterProperty = false;
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
@@ -1577,15 +1579,15 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     return;
   }
 
-  // AbstractAccessors is suppressed by FunctionDefinitions, but not the
-  // presence of an FunctionBody callback.
+  // AbstractAccessors is suppressed by FunctionDefinitions.
   bool PrintAbstract =
     Options.AbstractAccessors && !Options.FunctionDefinitions;
 
   // We sometimes want to print the accessors abstractly
   // instead of listing out how they're actually implemented.
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
-  if (!Options.FunctionBody && (inProtocol || PrintAbstract)) {
+  if ((inProtocol && !Options.PrintAccessorBodiesInProtocols) ||
+       PrintAbstract) {
     bool mutatingGetter = ASD->getGetter() && ASD->isGetterMutating();
     bool settable = ASD->isSettable(nullptr);
     bool nonmutatingSetter = false;
@@ -1648,11 +1650,10 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   }
 
   // Otherwise, print all the concrete defining accessors.
-
-  bool PrintAccessorBody = Options.FunctionDefinitions || Options.FunctionBody;
+  bool PrintAccessorBody = Options.FunctionDefinitions;
 
   auto PrintAccessor = [&](AccessorDecl *Accessor) {
-    if (!Accessor)
+    if (!Accessor || !shouldPrint(Accessor))
       return;
     if (!PrintAccessorBody) {
       if (isAccessorAssumedNonMutating(Accessor->getAccessorKind())) {
@@ -1679,17 +1680,14 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     }
   };
 
-  if ((PrintAbstract ||
-       (impl.getReadImpl() == ReadImplKind::Get && ASD->getGetter())) &&
-      !ASD->supportsMutation() && !ASD->isGetterMutating() &&
-      PrintAccessorBody && !Options.FunctionDefinitions) {
-    // Omit the 'get' keyword. Directly print getter
-    if (auto BodyFunc = Options.FunctionBody) {
-      BodyFunc(ASD->getGetter(), Printer);
-      indent();
-      return;
-    }
-    Printer.printNewline();
+  // Determine if we should print the getter without the 'get { ... }'
+  // block around it.
+  bool isOnlyGetter = impl.getReadImpl() == ReadImplKind::Get &&
+                      ASD->getGetter();
+  bool isGetterMutating = ASD->supportsMutation() || ASD->isGetterMutating();
+  if (isOnlyGetter && !isGetterMutating && PrintAccessorBody &&
+      Options.FunctionBody && Options.CollapseSingleGetterProperty) {
+    Options.FunctionBody(ASD->getGetter(), Printer);
     indent();
     return;
   }
@@ -1727,6 +1725,8 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     case WriteImplKind::InheritedWithObservers:
       PrintAccessor(ASD->getWillSetFunc());
       PrintAccessor(ASD->getDidSetFunc());
+      if (ASD->supportsMutation())
+        PrintAccessor(ASD->getSetter());
       break;
     case WriteImplKind::Set:
       PrintAccessor(ASD->getSetter());
@@ -1748,9 +1748,6 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     Printer << " ";
 
   Printer << "}";
-
-  if (!PrintAbstract)
-    Printer.printNewline();
 
   indent();
 }
