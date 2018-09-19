@@ -517,7 +517,9 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   }
 
   FrontendStatsTracer tracer(Context->Stats, "perform-sema");
-  Context->LoadedModules[MainModule->getName()] = getMainModule();
+
+  ModuleDecl *mainModule = getMainModule();
+  Context->LoadedModules[mainModule->getName()] = mainModule;
 
   if (Invocation.getInputKind() == InputFileKind::SIL) {
     assert(!InputSourceCodeBufferIDs.empty());
