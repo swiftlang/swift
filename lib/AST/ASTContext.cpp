@@ -4306,10 +4306,6 @@ CapturingTypeCheckerDebugConsumer::CapturingTypeCheckerDebugConsumer()
   Log->SetUnbuffered();
 }
 
-CapturingTypeCheckerDebugConsumer::~CapturingTypeCheckerDebugConsumer() {
-  delete Log;
-}
-
 void SubstitutionMap::Storage::Profile(
                                llvm::FoldingSetNodeID &id,
                                GenericSignature *genericSig,
