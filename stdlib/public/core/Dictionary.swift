@@ -1437,7 +1437,7 @@ extension Dictionary {
         return _variant.lookup(position).value
       }
       _modify {
-        let index = _variant.prepareForMutation(at: position)
+        let index = _variant.ensureUniqueNative(preserving: position)
         let address = _variant.asNative._values + index.bucket
         yield &address.pointee
         _fixLifetime(self)
@@ -3490,10 +3490,13 @@ extension Dictionary._Variant {
     }
   }
 
+  /// Ensure uniquely held native storage, while preserving the given index.
+  /// (If the variant had bridged storage, then the returned index will be the
+  /// corresponding native representation. Otherwise it's kept the same.)
   @inlinable
   @inline(__always)
-  internal mutating func prepareForMutation(
-    at index: Index
+  internal mutating func ensureUniqueNative(
+    preserving index: Index
   ) -> _NativeDictionary<Key, Value>.Index {
     switch self {
     case .native:
@@ -3578,7 +3581,7 @@ extension Dictionary._Variant {
     }
     // FIXME(performance): fuse data migration and element deletion into one
     // operation.
-    let index = prepareForMutation(at: index)
+    let index = ensureUniqueNative(preserving: index)
     return asNative._remove(at: index)
   }
 
