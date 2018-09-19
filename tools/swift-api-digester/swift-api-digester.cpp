@@ -709,6 +709,17 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
             Desc);
         }
       }
+      // Detect re-ordering if they're from structs with a fixed layout.
+      auto *LV = dyn_cast<SDKNodeDeclVar>(L);
+      auto *RV = dyn_cast<SDKNodeDeclVar>(R);
+      if (LV && RV &&
+          LV->hasFixedBinaryOrder() && RV->hasFixedBinaryOrder() &&
+          LV->getFixedBinaryOrder() != RV->getFixedBinaryOrder()) {
+        Ctx.getDiags().diagnose(SourceLoc(), diag::decl_reorder,
+                                LV->getScreenInfo(),
+                                LV->getFixedBinaryOrder(),
+                                RV->getFixedBinaryOrder());
+      }
     }
 
     // Diagnose generic signature change
