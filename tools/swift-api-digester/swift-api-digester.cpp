@@ -762,6 +762,14 @@ public:
     case NodeMatchReason::Added:
       assert(!Left);
       Right->annotate(NodeAnnotation::Added);
+      if (Ctx.checkingABI()) {
+        if (auto *VAD = dyn_cast<SDKNodeDeclVar>(Right)) {
+          if (VAD->hasFixedBinaryOrder()) {
+            Ctx.getDiags().diagnose(SourceLoc(), diag::decl_added,
+                                    VAD->getScreenInfo());
+          }
+        }
+      }
       return;
     case NodeMatchReason::Removed:
       assert(!Right);

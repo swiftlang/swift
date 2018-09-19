@@ -1117,7 +1117,7 @@ static SDKNode* constructInitNode(SDKContext &Ctx, ConstructorDecl *CD) {
   return Func;
 }
 
-static bool shouldIgnore(Decl *D, const Decl* Parent) {
+static bool shouldIgnore(Decl *D, const Decl* Parent, SDKContext &Ctx) {
   if (D->isPrivateStdlibDecl(false))
     return true;
   if (AvailableAttr::isUnavailable(D))
@@ -1135,6 +1135,10 @@ static bool shouldIgnore(Decl *D, const Decl* Parent) {
     case AccessLevel::Internal:
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
+      // Private vars with fixed binary orders can have ABI-impact, so we should
+      // whitelist them if we're checking ABI.
+      if (Ctx.checkingABI() && getFixedBinaryOrder(VD).hasValue())
+        break;
       return true;
     case AccessLevel::Public:
     case AccessLevel::Open:
@@ -1216,7 +1220,7 @@ static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
                              IterableDeclContext *Context,
                              std::set<ExtensionDecl*> &HandledExts) {
   for (auto *Member : Context->getMembers()) {
-    if (shouldIgnore(Member, Context->getDecl()))
+    if (shouldIgnore(Member, Context->getDecl(), Ctx))
       continue;
     if (auto Func = dyn_cast<FuncDecl>(Member)) {
       Root->addChild(constructFunctionNode(Ctx, Func, SDKNodeKind::DeclFunction));
@@ -1245,7 +1249,7 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
     llvm::SmallVector<Decl*, 512> Decls;
     M->getDisplayDecls(Decls);
     for (auto D : Decls) {
-      if (shouldIgnore(D, nullptr))
+      if (shouldIgnore(D, nullptr, Ctx))
         continue;
       if (KnownDecls.count(D))
         continue;
