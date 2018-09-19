@@ -709,6 +709,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   };
 
   if (Loc.isValid() &&
+      DC->getParentSourceFile() &&
       DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
       Ctx.LangOpts.EnableASTScopeLookup) {
     // Find the source file in which we are performing the lookup.
