@@ -270,10 +270,10 @@ struct MyRect4 {
 // double in d0, i32 in r0, return in d0,...,d3
 // V7K: vmov [[ID:s[0-9]+]], r0
 // V7K: vcvt.f64.s32 [[ID2:d[0-9]+]], [[ID]]
-// V7K: vstr d0, [sp]
+// V7K: vstr d0, [sp, #8]
 // V7K: vmov.f64 d0, [[ID2]]
 // V7K: bl
-// V7K: vldr [[ID3:d[0-9]+]], [sp]
+// V7K: vldr [[ID3:d[0-9]+]], [sp, #8]
 // V7K: vmov.f64 d2, [[ID3]]
 func testRet2(w : Double, i : Int) -> MyRect {
   var r = MyRect(x : Double(i), y : 2.0, w : 3.0, h : 4.0)
