@@ -3638,37 +3638,61 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
   auto requirements = protocol->getRequirements();
   auto witnesses = genericTable->ResilientWitnesses->getWitnesses();
 
-  for (size_t i = 0, e = protocol->NumRequirements; i < e; ++i) {
-    auto &reqt = requirements[i];
+  // Loop over the provided witnesses, filling in appropriate entry.
+  for (const auto &witness : witnesses) {
+    // Retrieve the requirement descriptor.
+    auto reqDescriptor = witness.Requirement.get();
 
-    // Only certain requirements are filled in from the resilient witness table.
-    switch (reqt.Flags.getKind()) {
-    case ProtocolRequirementFlags::Kind::Method:
-    case ProtocolRequirementFlags::Kind::Init:
-    case ProtocolRequirementFlags::Kind::Getter:
-    case ProtocolRequirementFlags::Kind::Setter:
-    case ProtocolRequirementFlags::Kind::ReadCoroutine:
-    case ProtocolRequirementFlags::Kind::ModifyCoroutine:
-    case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
-    case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
-      break;
-    case ProtocolRequirementFlags::Kind::BaseProtocol:
-      continue;
+    // The requirement descriptor may be NULL, in which case this is a
+    // requirement introduced in a later version of the protocol./
+    if (!reqDescriptor) continue;
+
+    // If the requirement descriptor doesn't land within the bounds of the
+    // requirements, abort.
+    if (reqDescriptor < requirements.begin() ||
+        reqDescriptor >= requirements.end()) {
+      fatalError(0, "generic witness table at %p contains out-of-bounds "
+                 "requirement descriptor %p",
+                 genericTable, reqDescriptor);
     }
 
+    unsigned witnessIndex = (reqDescriptor - requirements.data()) +
+      WitnessTableFirstRequirementOffset;
+
+#if !NDEBUG
+    // For debug builds, warn if we already have an entry at this index.
+    if (table[witnessIndex]) {
+      warning(0, "generic witness table at %p contains duplicate entry for "
+              "requirement descriptor %p",
+              genericTable, reqDescriptor);
+    }
+#endif
+
+    table[witnessIndex] = witness.Witness.get();
+  }
+
+  // Loop over the requirements, filling in default implementations where
+  // needed.
+  for (size_t i = 0, e = protocol->NumRequirements; i < e; ++i) {
+    unsigned witnessIndex = WitnessTableFirstRequirementOffset + i;
+
+    // If we already have a witness, there's nothing to do.
+    if (table[witnessIndex])
+      continue;
+
+    // Otherwise, fill in a default implementation.
+    auto &reqt = requirements[i];
     void *impl = reqt.DefaultImplementation.get();
 
-    // Find the witness if there is one, otherwise we use the default.
-    for (auto &witness : witnesses) {
-      if (witness.Requirement.get() == &reqt) {
-        impl = witness.Witness.get();
-        break;
-      }
+#if !NDEBUG
+    // For debug builds, warn if we don't have a default implementation.
+    if (!impl) {
+      warning(0, "generic witness table at %p missing an entry for "
+              "requirement descriptor %p", genericTable,
+              requirements.begin() + i);
     }
+#endif
 
-    assert(impl != nullptr && "no implementation for witness");
-
-    unsigned witnessIndex = WitnessTableFirstRequirementOffset + i;
     table[witnessIndex] = impl;
   }
 }
