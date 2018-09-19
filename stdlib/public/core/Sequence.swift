@@ -506,6 +506,8 @@ public protocol Sequence {
   ///   the beginning of the sequence.
   __consuming func prefix(_ maxLength: Int) -> SubSequence
 
+  __consuming func _prefix(_ maxLength: Int) -> Prefix
+
   /// Returns a subsequence containing the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
@@ -768,6 +770,12 @@ extension PrefixSequence: Sequence {
   public __consuming func prefix(_ maxLength: Int) -> SubSequence {
     let length = Swift.min(maxLength, self._maxLength)
     return AnySequence(PrefixSequence(_base, maxLength: length))
+  }
+  
+  @inlinable
+  public func _prefix(_ maxLength: Int) -> Prefix {
+    let length = Swift.min(maxLength, self._maxLength)
+    return PrefixSequence(_base, maxLength: length)
   }
 }
 
@@ -1391,6 +1399,15 @@ extension Sequence where SubSequence == AnySequence<Element> {
       result.append(element)
     }
     return AnySequence(result)
+  }
+}
+
+extension Sequence where Prefix == PrefixSequence<Self> {
+  @inlinable
+  public func _prefix(_ maxLength: Int) -> PrefixSequence<Self> {
+    _precondition(maxLength >= 0, 
+      "Can't take a prefix of negative length from a sequence")
+    return PrefixSequence(self, maxLength: maxLength)
   }
 }
 
