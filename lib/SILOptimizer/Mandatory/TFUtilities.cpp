@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
+#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILModule.h"
@@ -460,35 +461,34 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
   assert(shape.getKind() == SymbolicValue::Array &&
          "expected array constants for scalars and shape");
 
-  SmallVector<GraphOperationAttribute, 8> attributes;
+  GraphOperationBuilder opBuilder("Const");
 
   // Add a dtype attribute for the array element.
-  attributes.push_back(
+  opBuilder.addAttribute(
       {context.getIdentifier("dtype"),
        SymbolicValue::getMetatype(elementType->getCanonicalType())});
 
   // Add an attribute for the value$tensor attribute.
   auto tensorSuffix = GraphOperationInfo::getOperandClassSuffix(
       GraphOperationInfo::OperandClass::Tensor);
-  attributes.push_back(
+  opBuilder.addAttribute(
       {context.getIdentifier(std::string("value") + tensorSuffix), scalars});
 
   // Add the shape$shape attribute if we have an array value.
   if (scalars.getKind() == SymbolicValue::Array) {
     auto shapeId = GraphOperationInfo::OperandClass::Shape;
     auto shapeSuffix = GraphOperationInfo::getOperandClassSuffix(shapeId);
-    attributes.push_back(
+    opBuilder.addAttribute(
         {context.getIdentifier(std::string("shape") + shapeSuffix), shape});
   }
 
   // All graph_op's get a device.
-  attributes.push_back(
+  opBuilder.addAttribute(
       {context.getIdentifier(DEVICE_ATTR),
        SymbolicValue::getString(getDeviceString(targetDevice), allocator)});
 
   // Finally build a new graphop instruction with the simplified operands.
-  return B.createGraphOperation(loc, context.getIdentifier("Const"),
-                                /*operands*/ {}, attributes, resultType);
+  return opBuilder.build(B, context, loc, resultType);
 }
 
 GraphOperationInst *
@@ -496,14 +496,14 @@ tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
                            SILLocation location,
                            GraphFunctionDeviceInfo &deviceInfo) {
   ASTContext &context = builder.getASTContext();
-  SmallVector<GraphOperationAttribute, 1> attributes;
+  GraphOperationBuilder opBuilder("tf_tensor_to_i1");
+  opBuilder.addTFTensorToI1Operand(value);
   deviceInfo.handleDevicePlacement(
       "tf_tensor_to_i1",
       /*opDevice*/ getDeviceString(DeviceType::ALL),
-      builder.getModule().getASTContext(), attributes);
-  GraphOperationInst *condValue = builder.createGraphOperation(
-      location, context.getIdentifier("tf_tensor_to_i1"),
-      /*operands*/ {value}, attributes,
+      builder.getModule().getASTContext(), &opBuilder);
+  GraphOperationInst *condValue = opBuilder.build(
+      builder, context, location,
       {SILType::getBuiltinIntegerType(1, context)});
   assert(condValue->getNumResults() == 1);
   return condValue;

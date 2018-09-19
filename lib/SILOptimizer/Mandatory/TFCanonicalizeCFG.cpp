@@ -27,6 +27,7 @@
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
@@ -276,19 +277,20 @@ static SILValue createTFIntegerConst(GraphFunctionDeviceInfo &deviceInfo,
   SILType intType =
       SILType::getBuiltinIntegerType(bitwidth, builder.getASTContext());
   // Literals take attributes specifying the dtype, value, and device.
-  std::string opName("Const");
-  SmallVector<GraphOperationAttribute, 3>  attributes;
-  attributes.push_back({context.getIdentifier("dtype"),
-                        SymbolicValue::getMetatype(intType.getASTType())});
-  attributes.push_back({context.getIdentifier("value$tensor"),
-                        SymbolicValue::getInteger(APInt(bitwidth, value),
-                                                  context.getAllocator())});
+  GraphOperationBuilder opBuilder("Const");
+  opBuilder.addAttribute(
+      {context.getIdentifier("dtype"),
+       SymbolicValue::getMetatype(intType.getASTType())});
+  opBuilder.addAttribute(
+      {context.getIdentifier("value$tensor"),
+       SymbolicValue::getInteger(APInt(bitwidth, value),
+                                 context.getAllocator())});
   deviceInfo.handleDevicePlacement(
-      opName,
+      "Const",
       /*opDevice*/ getDeviceString(DeviceType::ALL),
-      builder.getModule().getASTContext(), attributes);
-  GraphOperationInst *constNode = builder.createGraphOperation(
-      location, context.getIdentifier(opName), /*operands*/ {}, attributes,
+      builder.getModule().getASTContext(), &opBuilder);
+  GraphOperationInst *constNode = opBuilder.build(
+      builder, context, location,
       {convertElementTypeToTensorValueType(intType)});
   assert(constNode->getNumResults() == 1);
   return constNode->getResults()[0];
@@ -726,22 +728,17 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
     builder.setInsertionPoint(newBlock);
 
     // Create a condition to compare exitIndex to a constant
-    std::string equalOpName("Equal");
-    GraphOperationInfo::OperandMarker::appendTo(
-        equalOpName, GraphOperationInfo::OMK_Normal);
-    GraphOperationInfo::OperandMarker::appendTo(
-        equalOpName, GraphOperationInfo::OMK_Normal);
-    SmallVector<GraphOperationAttribute, 2> attributes;
+    std::string equalOpName = "Equal";
+    GraphOperationBuilder equalOpBuilder(equalOpName);
+    equalOpBuilder.addOperand(exitIndexArg);
+    equalOpBuilder.addOperand(
+        createTFIntegerConst(*deviceInfo, builder, headerLocation,
+                             /*bitwidth*/ 32, exitIndices.lookup(trueBlock)));
     deviceInfo->handleDevicePlacement(
         equalOpName, /*opDevice*/ getDeviceString(DeviceType::ALL),
-        builder.getModule().getASTContext(), attributes);
-    GraphOperationInst *condTensorInst = builder.createGraphOperation(
-        headerLocation, context.getIdentifier(equalOpName),
-        /*operands*/
-        {exitIndexArg,
-         createTFIntegerConst(*deviceInfo, builder, headerLocation,
-                              /*bitwidth*/ 32, exitIndices.lookup(trueBlock))},
-        attributes,
+        builder.getModule().getASTContext(), &equalOpBuilder);
+    GraphOperationInst *condTensorInst = equalOpBuilder.build(
+        builder, context, headerLocation,
         {convertElementTypeToTensorValueType(
             SILType::getBuiltinIntegerType(1, context))});
     assert(condTensorInst->getNumResults() == 1);

@@ -27,6 +27,7 @@
 
 namespace swift {
 namespace tf {
+class GraphOperationBuilder;
 
 /// The device of a tfop instruction (and its output tensors, if any).
 enum class DeviceType {
@@ -203,8 +204,8 @@ struct GraphFunctionDeviceInfo {
     ++numUsedDeviceTypes;
   }
 
-  // Choose a device for the graphOpInst under construction, extend `attributes`
-  // accordingly with the device attribute, and track the chosen device in
+  // Choose a device for the graphOpInst under construction, add the device
+  // attribute to `opBuilder`, and track the chosen device in
   // `usedDeviceTypes`.
   //
   // If `opDevice` is already set, respects that device choice. Otherwise,
@@ -216,8 +217,7 @@ struct GraphFunctionDeviceInfo {
   // inst). Otherwise SILVerifier will fail on that graph_op inst.
   void
   handleDevicePlacement(llvm::StringRef opType, llvm::StringRef opDevice,
-                        ASTContext &ctx,
-                        SmallVectorImpl<GraphOperationAttribute> &attributes);
+                        ASTContext &ctx, GraphOperationBuilder *opBuilder);
 
 private:
   GraphFunctionDeviceInfo(DeviceType primaryDeviceType, bool isTPUInfeedEnabled)

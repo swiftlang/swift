@@ -25,6 +25,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILConstants.h"
@@ -2444,24 +2445,23 @@ void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
 /// constructed const tensor inst get lowered.
 static void createConstTensorAttrsOnAccel(
     SymbolicValue constVal, SILType valTy, ASTContext &ctx,
-    SmallVectorImpl<GraphOperationAttribute> &attributes) {
+    GraphOperationBuilder *opBuilder) {
   // Literals take attributes specifying the dtype and value.
-  attributes.push_back(
+  opBuilder->addAttribute(
       {ctx.getIdentifier("dtype"),
        SymbolicValue::getMetatype(valTy.getASTType()->getCanonicalType())});
-  attributes.push_back({ctx.getIdentifier("value$tensor"), constVal});
+  opBuilder->addAttribute({ctx.getIdentifier("value$tensor"), constVal});
 }
 
 static void
-addScalarShapeArrayAttr(SmallVectorImpl<GraphOperationAttribute> &attributes,
-                        ASTContext &ctx) {
+addScalarShapeArrayAttr(ASTContext &ctx, GraphOperationBuilder *opBuilder) {
   // For TPU graph, set a scalar shape array, with attr name "__shapes".
   auto attrName = std::string(SHAPE_ARRAY_ATTR);
   // A shape is an array of ints -- empty array means it's a scalar (0d) shape.
   auto scalarShape = SymbolicValue::getArray(
       {}, ctx.getInt32Decl()->getDeclaredType()->getCanonicalType(),
       ctx.getAllocator());
-  attributes.push_back(
+  opBuilder->addAttribute(
       {ctx.getIdentifier(attrName),
        SymbolicValue::getArray(
            {scalarShape},
@@ -2488,7 +2488,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     return;
   }
 
-  std::string opName = opInfo.first;
+  GraphOperationBuilder opBuilder(opInfo.first);
 
   // Start remapping the operand list.
   auto operandRange = inst->getAllOperands();
@@ -2498,9 +2498,8 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   if (opKind == PromotedScalarKind::OverflowingBinary)
     operandRange = operandRange.drop_back();
 
-  SmallVector<SILValue, 4> operands;
   for (auto &op : operandRange)
-    operands.push_back(remapValue(op.get()));
+    opBuilder.addOperand(remapValue(op.get()));
 
   // The type of the new builtin is usually the same as the input type, but
   // "remapped", which turns Float into TensorHandle<Float>.
@@ -2514,7 +2513,6 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
 
   auto &B = getBuilder();
   auto &ctx = B.getASTContext();
-  SmallVector<GraphOperationAttribute, 4> attributes;
 
   // Handle opKind-specific issues.
   switch (opKind) {
@@ -2524,10 +2522,6 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     assert(0 && "Handled above");
   case PromotedScalarKind::Binary:
   case PromotedScalarKind::OverflowingBinary:
-    GraphOperationInfo::OperandMarker::appendTo(
-        opName, GraphOperationInfo::OMK_Normal);
-    GraphOperationInfo::OperandMarker::appendTo(
-        opName, GraphOperationInfo::OMK_Normal);
     break;
   case PromotedScalarKind::Literal: {
     SymbolicValue constVal;
@@ -2552,14 +2546,12 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     assert((TF_DataType)dtype == TF_BOOL || bitWidth == dtypeSize * 8);
 #endif // NDEBUG
     (void)bitWidth;
-    createConstTensorAttrsOnAccel(constVal, inst->getType(), ctx, attributes);
+    createConstTensorAttrsOnAccel(constVal, inst->getType(), ctx, &opBuilder);
     break;
   }
   case PromotedScalarKind::Conversion: {
     // Conversions get an attribute specifying the result dtype, named "DstT".
-    GraphOperationInfo::OperandMarker::appendTo(
-        opName, GraphOperationInfo::OMK_Normal);
-    attributes.push_back(
+    opBuilder.addAttribute(
         {ctx.getIdentifier("DstT"),
          SymbolicValue::getMetatype(
              inst->getType().getASTType()->getCanonicalType())});
@@ -2571,14 +2563,12 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   // should get pruned away in the later graph lowering pass.
   FP.deviceInfo.handleDevicePlacement(
       opInfo.first, /*opDevice*/ getDeviceString(DeviceType::ALL),
-      B.getModule().getASTContext(), attributes);
+      B.getModule().getASTContext(), &opBuilder);
 
   if (FP.deviceInfo.primaryDeviceType == DeviceType::TPU)
-    addScalarShapeArrayAttr(attributes, ctx);
+    addScalarShapeArrayAttr(ctx, &opBuilder);
 
-  auto *result =
-      B.createGraphOperation(loc, ctx.getIdentifier(opName), operands,
-                             attributes, {remapType(resultType)});
+  auto *result = opBuilder.build(B, ctx, loc, {remapType(resultType)});
 
   ValueMap[inst] = getSingleValueResult(result);
 }
@@ -2666,13 +2656,12 @@ static SILValue createAcceleratorReceive(SILBuilder &B, SILLocation loc,
                                          GraphFunctionDeviceInfo &deviceInfo) {
   auto &ctx = B.getASTContext();
   auto opType = "tfc.RecvFromHost";
-  std::string instName = opType;
+  GraphOperationBuilder opBuilder(opType);
 
-  SmallVector<GraphOperationAttribute, 3> attributes;
-  attributes.push_back(
+  opBuilder.addAttribute(
       {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
   deviceInfo.handleDevicePlacement(opType, /*opDevice*/ "",
-                                   B.getModule().getASTContext(), attributes);
+                                   B.getModule().getASTContext(), &opBuilder);
 
   // For XLA compilation, and when receiving a promoted scalar from the host,
   // add a __shapes pseudo-attr to assist the XLA compiler. This special case is
@@ -2683,11 +2672,8 @@ static SILValue createAcceleratorReceive(SILBuilder &B, SILLocation loc,
   // TODO: Do this also for XLA-based GPU (and CPU) execution. Consider
   // extending `deviceInfo` with a bool indicating if we are targeting XLA.
   if (deviceInfo.primaryDeviceType == DeviceType::TPU && isScalar)
-    addScalarShapeArrayAttr(attributes, ctx);
-  auto name = ctx.getIdentifier(instName);
-  return getSingleValueResult(B.createGraphOperation(loc, name,
-                                                     /*operands*/ {},
-                                                     attributes, {valueTy}));
+    addScalarShapeArrayAttr(ctx, &opBuilder);
+  return getSingleValueResult(opBuilder.build(B, ctx, loc, {valueTy}));
 }
 
 static void
@@ -2769,16 +2755,13 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
   auto &ctx = B.getASTContext();
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto opType = "tfc.SendToHost";
-  std::string instName = opType;
-  GraphOperationInfo::OperandMarker::appendTo(instName,
-                                              GraphOperationInfo::OMK_Normal);
-  SmallVector<GraphOperationAttribute, 2> attributes;
-  attributes.push_back(
+  GraphOperationBuilder opBuilder(opType);
+  opBuilder.addOperand({value});
+  opBuilder.addAttribute(
       {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
   deviceInfo.handleDevicePlacement(opType, /*opDevice*/ "",
-                                   B.getModule().getASTContext(), attributes);
-  B.createGraphOperation(loc, ctx.getIdentifier(instName),
-                         /*operands*/ {value}, attributes, {voidTy});
+                                   B.getModule().getASTContext(), &opBuilder);
+  opBuilder.build(B, ctx, loc, {voidTy});
 }
 
 template <typename T> static T *castWithDebugInfo(SILInstruction *inst) {
@@ -3062,18 +3045,16 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
     // Create a scalar const tensor i, to compare with case id.
     SILValue constTensorWithCaseId;
     {
-      std::string constOpName = "Const";
-      SmallVector<GraphOperationAttribute, 2> attributes;
+      GraphOperationBuilder constOpBuilder("Const");
       createConstTensorAttrsOnAccel(SymbolicValue::getInteger(caseId, 32),
-                                    int32SILType, ctx, attributes);
+                                    int32SILType, ctx, &constOpBuilder);
       FP.deviceInfo.handleDevicePlacement(
           "Const", /*opDevice*/ getDeviceString(DeviceType::ALL),
-          BA.getModule().getASTContext(), attributes);
+          BA.getModule().getASTContext(), &constOpBuilder);
       auto tensorHandleInt32Ty =
           convertElementTypeToTensorValueType(int32SILType);
-      auto *caseIdInst = BA.createGraphOperation(
-          loc, ctx.getIdentifier(constOpName),
-          /*operands*/ {}, attributes, {tensorHandleInt32Ty});
+      auto *caseIdInst = constOpBuilder.build(BA, ctx, loc,
+                                              {tensorHandleInt32Ty});
       constTensorWithCaseId = getSingleValueResult(caseIdInst);
     }
 
@@ -3082,26 +3063,21 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
     {
       // Omit the metatype attr T for simplicity, and TF graphDef compiler can
       // infer the type.
-      std::string equalOpName = "Equal";
-      GraphOperationInfo::OperandMarker::appendTo(
-          equalOpName, GraphOperationInfo::OMK_Normal);
-      GraphOperationInfo::OperandMarker::appendTo(
-          equalOpName, GraphOperationInfo::OMK_Normal);
+      GraphOperationBuilder equalOpBuilder("Equal");
+      equalOpBuilder.addOperand(receivedCaseId);
+      equalOpBuilder.addOperand(constTensorWithCaseId);
 
       auto boolFieldSILType =
           extractBuiltinTypeFromStdlibNumericType(ctx.getBoolDecl());
       auto tensorHandleI1Ty =
           convertElementTypeToTensorValueType(boolFieldSILType);
 
-      SmallVector<GraphOperationAttribute, 2> attributes;
       FP.deviceInfo.handleDevicePlacement(
           "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL),
-          BA.getModule().getASTContext(), attributes);
+          BA.getModule().getASTContext(), &equalOpBuilder);
 
-      auto *equalComparisonInst = BA.createGraphOperation(
-          loc, ctx.getIdentifier(equalOpName),
-          /*operands*/ {receivedCaseId, constTensorWithCaseId}, attributes,
-          {tensorHandleI1Ty});
+      auto *equalComparisonInst = equalOpBuilder.build(BA, ctx, loc,
+                                                       {tensorHandleI1Ty});
       auto *condBrInst = createTensorToInt1Inst(
           getSingleValueResult(equalComparisonInst), BA, loc, FP.deviceInfo);
       condBrOperand = getSingleValueResult(condBrInst);

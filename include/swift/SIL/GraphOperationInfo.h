@@ -96,14 +96,16 @@ struct GraphOperationInfo {
   // }
 
   enum OperandMarkerKind {
-    /// Scalar input, used by tfc.scalarToTensor only. Cannot have name.
+    /// Scalar input, used by tfc.scalarToTensor only. MangledName is ",s".
     OMK_Scalar,
-    /// Operand that is not in a list. Might have name.
+    /// Operand that is not in a list. MangledName is ",i${name}", where ${name}
+    /// is an optional name for the operand.
     OMK_Normal,
-    /// Marker for the start of a list, has no corresponding operand. Might have
-    /// name.
+    /// Marker for the start of a list, has no corresponding operand.
+    /// MangledName is ",L${name}", where ${name} is an optional name for the
+    /// operand.
     OMK_InputList,
-    /// Element of a list. Cannot have name.
+    /// Element of a list. MangledName is ",e".
     OMK_InputListElt,
   };
 
@@ -114,8 +116,8 @@ struct GraphOperationInfo {
 
     OperandMarkerKind Kind;
 
-    /// The mangled name as it appears in the graph_op. Matches regexp:
-    ///   ,([iL][^,]*)|(se)
+    /// The mangled name as it appears in the graph_op. Mangling rules described
+    /// in OperandMarkerKind.
     StringRef MangledName;
 
     OperandMarker(StringRef MangledName);
@@ -129,19 +131,6 @@ struct GraphOperationInfo {
     StringRef getName() const {
       return MangledName.drop_front(2);
     }
-
-    /// A mangled string describing this OperandMarker, suitable for appending
-    /// to a mangled graph_op name.
-    StringRef getMangledName() const {
-      return MangledName;
-    }
-
-    /// Appends an OperandMarker with `kind` and `name` to the passed-in
-    /// `mangledOpName`. `name` must be empty for OMK_Scalar and
-    /// OMK_InputListElt.
-    static void
-    appendTo(std::string &mangledOpName, OperandMarkerKind kind,
-             StringRef name = StringRef());
   };
 
   /// Decode the name of a graph_op into its TensorFlow op name and a list of

@@ -27,6 +27,7 @@
 #include "TFConstExpr.h"
 #include "TFUtilities.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -2103,9 +2104,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       diagnose(context, userNoteLoc.getSourceLoc(), diag::tf_value_used_here);
   };
 
-  std::string opName = opInfo.opName.str();
-  SmallVector<SILValue, 4> inputs;
-  SmallVector<GraphOperationAttribute, 4> attributes;
+  GraphOperationBuilder opBuilder(opInfo.opName.str());
 
   // Find the device attribute specified for the instruction if present.
   StringRef opDevice;
@@ -2163,10 +2162,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
           return;
         }
 
-        GraphOperationInfo::OperandMarker::appendTo(
-            opName, GraphOperationInfo::OMK_Scalar);
-
-        inputs.push_back(operand);
+        opBuilder.addScalarOperand(operand);
         continue;
       }
 
@@ -2177,16 +2173,10 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       // Handle the case where this is an array, representing an input list.
       ArrayElementDecoder arrayDecoder;
       auto elementType = arrayDecoder.decode(operand);
+      SmallVector<SILValue, 4> inputList;
       if (elementType) {
-        // Remember that we have an input list, this marker is important because
-        // the list may be empty, and we need to know it exists in graph
-        // lowering.
-        GraphOperationInfo::OperandMarker::appendTo(
-            opName, GraphOperationInfo::OMK_InputList);
-
         // Add each element to the input list we're building, drilling down
         // through any aggregates that may be around it.
-        //
         for (auto *use : arrayDecoder.elementsAtInit) {
           auto *store = dyn_cast<StoreInst>(use->getUser());
           if (!store) {
@@ -2197,29 +2187,24 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
             return;
           }
 
-          unsigned beforeUnpackInputsCount = inputs.size();
           if (unpackTensorAggregates(inst->getLoc(), B, store->getSrc(),
                                      loweredTupleElts, loweredStructFields,
-                                     unwrapCache, inputs)) {
+                                     unwrapCache, inputList)) {
             diagnoseInvalid(operandLoc,
                             "argument of type '" + elementType->getString() +
                             "' is not a TensorFlow value or an aggregate of "
                             "TensorFlow values");
             return;
           }
-          unsigned unpackedInputsCount =
-              inputs.size() - beforeUnpackInputsCount;
-          for (unsigned i = 0; i < unpackedInputsCount; i++)
-            GraphOperationInfo::OperandMarker::appendTo(
-                opName, GraphOperationInfo::OMK_InputListElt);
         }
+        opBuilder.addListOperand(inputList);
         continue;
       }
 
       // Otherwise, this must be a single input.
-      unsigned beforeUnpackInputsCount = inputs.size();
       if (unpackTensorAggregates(inst->getLoc(), B, operand, loweredTupleElts,
-                                 loweredStructFields, unwrapCache, inputs)) {
+                                 loweredStructFields, unwrapCache,
+                                 inputList)) {
         // FIXME: Since TFDeabstraction happens after mandatory inlining,
         // numeric operands will appear as having a builtin type such as
         // `Builtin.FPIEEE32`. This is undesirable for user-facing diagnostics.
@@ -2230,8 +2215,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                         "TensorFlow values");
         return;
       }
-      unsigned unpackedInputsCount = inputs.size() - beforeUnpackInputsCount;
-      if (unpackedInputsCount != 1) {
+      if (inputList.size() != 1) {
         // We could accept this situation and unpack the input into an input
         // list.  However, we want users to explicitly indicate that they want
         // unpacking to an input list by wrapping their input in an array, so we
@@ -2243,9 +2227,9 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         diagnoseInvalid(operandLoc, "argument of type '" + astTypeString +
                         "' must contain exactly one TensorFlow value",
                         instLoc);
+        return;
       }
-      GraphOperationInfo::OperandMarker::appendTo(
-          opName, GraphOperationInfo::OMK_Normal);
+      opBuilder.addOperand(inputList[0]);
       continue;
     }
 
@@ -2271,9 +2255,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         // Since we're doing dynamic compilation, we can simply pass this
         // unknown attribute as a named operand to the graph_op, and IRGen will
         // deal with it.
-        GraphOperationInfo::OperandMarker::appendTo(
-            opName, GraphOperationInfo::OMK_Normal, attrName);
-        inputs.push_back(operand);
+        opBuilder.addOperand(operand, attrName);
         continue;
       } else {
         // TODO: improve the diagnostic to talk about the parameter label in
@@ -2297,8 +2279,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     constValue = constValue.cloneInto(allocator);
 
     auto attrIdentifier = context.getIdentifier(attrName);
-    attributes.push_back({ attrIdentifier, constValue });
-    auto &currentAttr = attributes.back();
+    auto &currentAttr = opBuilder.addAttribute({ attrIdentifier, constValue });
 
     // FIXME: Do we detect and reject duplicate attribute names already?
 
@@ -2516,7 +2497,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
   // specified.
   if (opDevice.empty()) {
     deviceInfo.handleDevicePlacement(opInfo.opName, opDevice, context,
-                                     attributes);
+                                     &opBuilder);
   }
   // Okay, if we got this far then we have all valid attributes and inputs.
   // Figure out the result list.
@@ -2533,8 +2514,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 
   auto loc = getUserSourceLocation(inst);
-  auto op = B.createGraphOperation(loc, context.getIdentifier(opName), inputs,
-                                   attributes, resultSILTypes);
+  auto op = opBuilder.build(B, context, loc, resultSILTypes);
 
   // Recursively pack results to a value with the user-specified aggregate type.
   auto resultIt = op->getResults().begin();

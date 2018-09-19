@@ -20,6 +20,7 @@
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILFunctionBuilder.h"
@@ -144,7 +145,7 @@ GraphFunctionDeviceInfo::getForFunction(SILFunction &fn,
 
 void GraphFunctionDeviceInfo::handleDevicePlacement(
     StringRef opType, StringRef opDevice, ASTContext &ctx,
-    SmallVectorImpl<GraphOperationAttribute> &attributes) {
+    GraphOperationBuilder *opBuilder) {
   DeviceType chosenDevice;
   if (!opDevice.empty())
     chosenDevice = getOpDeviceType(opDevice);
@@ -158,7 +159,7 @@ void GraphFunctionDeviceInfo::handleDevicePlacement(
   //   __device: "/device:CPU:0"}
   auto deviceString = getDeviceString(chosenDevice);
   // TODO: Use integer device ID's instead of strings?
-  attributes.push_back(
+  opBuilder->addAttribute(
       {ctx.getIdentifier(DEVICE_ATTR),
        SymbolicValue::getString(deviceString, ctx.getAllocator())});
 }
@@ -384,26 +385,23 @@ void DevicePartitionCloner::addD2DSend(GraphOperationInfo &graphOpInfo,
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
 
   // Insert a send inst, with type <T> (T) {int, str, str} -> ()
-  std::string newInstName = "tfc.D2DTensorSend";
-  GraphOperationInfo::OperandMarker::appendTo(newInstName,
-                                              GraphOperationInfo::OMK_Normal);
+  GraphOperationBuilder newInstBuilder("tfc.D2DTensorSend");
 
   auto &allocator = ctx.getAllocator();
-  SmallVector<GraphOperationAttribute, 4> attributes;
-  attributes.push_back({ctx.getIdentifier("transferId"),
+  newInstBuilder.addAttribute({ctx.getIdentifier("transferId"),
                         SymbolicValue::getInteger(transferId, 32)});
-  attributes.push_back(
+  newInstBuilder.addAttribute(
       {ctx.getIdentifier("destDevice"),
        SymbolicValue::getString(getDeviceString(destDevice), allocator)});
-  attributes.push_back(
+  newInstBuilder.addAttribute(
       {ctx.getIdentifier(DEVICE_ATTR),
        SymbolicValue::getString(getDeviceString(thisDeviceType), allocator)});
 
   auto valueToSend = remapValue(inst->getOperand(0));
+  newInstBuilder.addOperand(valueToSend);
   if (inst->getNumAttributes() > tensorShapeAttrIdx)
-    attributes.push_back(inst->getAttribute(tensorShapeAttrIdx));
-  B.createGraphOperation(loc, ctx.getIdentifier(newInstName),
-                         /*operands*/ {valueToSend}, attributes, {});
+    newInstBuilder.addAttribute(inst->getAttribute(tensorShapeAttrIdx));
+  newInstBuilder.build(B, ctx, loc, {});
   // Do not update ValueMap since Send does not produce a value.
 }
 
@@ -420,27 +418,25 @@ void DevicePartitionCloner::addD2DRecv(GraphOperationInfo &graphOpInfo,
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
 
   // Insert a recv inst, with type <T> {int, str, str} -> (T)
-  std::string newInstName = "tfc.D2DTensorRecv";
+  GraphOperationBuilder newInstBuilder("tfc.D2DTensorRecv");
 
   auto &allocator = ctx.getAllocator();
   SmallVector<GraphOperationAttribute, 4> attributes;
-  attributes.push_back({ctx.getIdentifier("transferId"),
+  newInstBuilder.addAttribute({ctx.getIdentifier("transferId"),
                         SymbolicValue::getInteger(transferId, 32)});
-  attributes.push_back(
+  newInstBuilder.addAttribute(
       {ctx.getIdentifier("srcDevice"),
        SymbolicValue::getString(getDeviceString(srcDevice), allocator)});
-  attributes.push_back(
+  newInstBuilder.addAttribute(
       {ctx.getIdentifier(DEVICE_ATTR),
        SymbolicValue::getString(getDeviceString(thisDeviceType), allocator)});
 
   auto valueTy = inst->getResults()[0]->getType();
   if (inst->getNumAttributes() > tensorShapeAttrIdx)
-    attributes.push_back(inst->getAttribute(tensorShapeAttrIdx));
+    newInstBuilder.addAttribute(inst->getAttribute(tensorShapeAttrIdx));
 
   auto valueToRecv = getSingleValueResult(inst);
-  auto *transferInst =
-      B.createGraphOperation(loc, ctx.getIdentifier(newInstName),
-                             /*operands*/ {}, attributes, {valueTy});
+  auto *transferInst = newInstBuilder.build(B, ctx, loc, {valueTy});
   auto newValue = getSingleValueResult(transferInst);
   ValueMap[valueToRecv] = newValue;
 }
@@ -808,22 +804,19 @@ public:
       // reading the func arg need no tensor transfer (i.e., if the graph_op %3
       // above is placed on the primary device), we rely on the backend graph
       // compiler (e.g. grappler) to optimize away this extraneous identity op.
-      std::string identityOpName = "Identity";
-      GraphOperationInfo::OperandMarker::appendTo(
-          identityOpName, GraphOperationInfo::OMK_Normal);
+      GraphOperationBuilder identityOpBuilder("Identity");
+      identityOpBuilder.addOperand(opValue);
 
       // insert this new inst at the beginning of the function.
       SILBuilder B(&srcFn.front().front());
       auto &ctx = B.getModule().getASTContext();
-      GraphOperationAttribute deviceAttr = {
+      identityOpBuilder.addAttribute({
           ctx.getIdentifier(DEVICE_ATTR),
           SymbolicValue::getString(
               getDeviceString(deviceInfo.primaryDeviceType),
-              ctx.getAllocator())};
-      auto *identityOpInst = B.createGraphOperation(
-          srcFn.getLocation(), ctx.getIdentifier(identityOpName),
-          /*operands*/ {opValue}, /*attributes*/ {deviceAttr},
-          {opValue->getType()});
+              ctx.getAllocator())});
+      auto *identityOpInst = identityOpBuilder.build(
+          B, ctx, srcFn.getLocation(), {opValue->getType()});
       markInstForDevice(deviceInfo.primaryDeviceType, identityOpInst);
 
       auto newValue = getSingleValueResult(identityOpInst);
@@ -869,9 +862,8 @@ public:
       // This inst has type:
       // <T> (T) {transferId$int, srcDevice$str, destDevice$str} -> T
       // Optionally, it also has a shape array attribute (needed for TPU).
-      auto newInstName = std::string("tfc.TensorTransfer");
-      GraphOperationInfo::OperandMarker::appendTo(
-          newInstName, GraphOperationInfo::OMK_Normal);
+      GraphOperationBuilder newInstBuilder("tfc.TensorTransfer");
+      newInstBuilder.addOperand(opValue);
 
       auto loc = inst->getLoc();
       // Insert the transfer right after the operandInst.
@@ -879,15 +871,14 @@ public:
       auto &ctx = B.getASTContext();
 
       auto &allocator = ctx.getAllocator();
-      SmallVector<GraphOperationAttribute, 4> attributes;
-      attributes.push_back(
+      newInstBuilder.addAttribute(
           {ctx.getIdentifier("transferId"),
            SymbolicValue::getInteger(nextTensorTransferId++, 32)});
-      attributes.push_back(
+      newInstBuilder.addAttribute(
           {ctx.getIdentifier("srcDevice"),
            SymbolicValue::getString(getDeviceString(operandDeviceType),
                                     allocator)});
-      attributes.push_back(
+      newInstBuilder.addAttribute(
           {ctx.getIdentifier("destDevice"),
            SymbolicValue::getString(getDeviceString(deviceType),
                                     allocator)});
@@ -899,13 +890,12 @@ public:
           auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
           if (!tf::isShapeArrayPseudoAttr(attrInfo.first, attr.value))
             continue;
-          attributes.push_back(attr);
+          newInstBuilder.addAttribute(attr);
         }
       }
 
-      auto *transferInst = B.createGraphOperation(
-          loc, ctx.getIdentifier(newInstName),
-          /*operands*/ {opValue}, attributes, {opValue->getType()});
+      auto *transferInst = newInstBuilder.build(B, ctx, loc,
+                                                {opValue->getType()});
 
       markInstForDevice(operandDeviceType, transferInst);
       markInstForDevice(deviceType, transferInst);
