@@ -1,4 +1,4 @@
-//=== GraphOperationBuilder.h - GraphOperationInst Build Logic --*- C++ -*-===//
+//=== GraphOperationBuilder.cpp - GraphOperationInst Build Logic *- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -45,12 +45,14 @@ public:
   /// Add a single operand to the GraphOperationInst, with an optional name.
   void addOperand(SILValue operand, llvm::StringRef name = llvm::StringRef());
 
-  /// Add a rank-1 list of operands to the GraphOperationInst, with an optional
-  /// name.
+  /// Add a list operand to the GraphOperationInst, with an optional name.
   void addListOperand(llvm::ArrayRef<SILValue> operands,
                       llvm::StringRef name = llvm::StringRef());
 
   /// Add an attribute with known constant value to the GraphOperationInst.
+  /// Returns a reference to the attribute, valid for the lifetime of the
+  /// GraphOperationBuilder, that you can use to mutate the attribute before
+  /// buiding the GraphOperationInst.
   GraphOperationAttribute &addAttribute(
       const GraphOperationAttribute &attribute);
 
@@ -60,6 +62,8 @@ public:
 
   /// Special method that should only be used for "tf_tensor_to_i1"'s operand,
   /// because it has special name mangling. (No marker for its operand).
+  /// TODO: Make "tf_tensor_to_i1" support normal name mangling, and then remove
+  /// this.
   void addTFTensorToI1Operand(SILValue operand);
 
   /// Build the GraphOperationInst.

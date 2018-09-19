@@ -29,8 +29,7 @@ void GraphOperationBuilder::addOperand(SILValue operand, StringRef name) {
   Operands.push_back(operand);
 }
 
-/// Add a rank-1 list of operands to the GraphOperationInst, with an optional
-/// name.
+/// Add a list operand to the GraphOperationInst, with an optional name.
 void GraphOperationBuilder::addListOperand(ArrayRef<SILValue> operands,
                                            StringRef name) {
   MangledName += ",L";
@@ -42,6 +41,9 @@ void GraphOperationBuilder::addListOperand(ArrayRef<SILValue> operands,
 }
 
 /// Add an attribute with known constant value to the GraphOperationInst.
+/// Returns a reference to the attribute, valid for the lifetime of the
+/// GraphOperationBuilder, that you can use to mutate the attribute before
+/// buiding the GraphOperationInst.
 GraphOperationAttribute &GraphOperationBuilder::addAttribute(
     const GraphOperationAttribute &attribute) {
   Attributes.push_back(attribute);
@@ -57,6 +59,8 @@ void GraphOperationBuilder::addScalarOperand(SILValue operand) {
 
 /// Special method that should only be used for "tf_tensor_to_i1"'s operand,
 /// because it has special name mangling. (No marker for its operand).
+/// TODO: Make "tf_tensor_to_i1" support normal name mangling, and then remove
+/// this.
 void GraphOperationBuilder::addTFTensorToI1Operand(SILValue operand) {
   Operands.push_back(operand);
 }
