@@ -5261,13 +5261,8 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (!defaultedAssocType)
       return nullptr;;
 
-    Type defaultType = defaultedAssocType->getDefaultDefinitionLoc().getType();
+    Type defaultType = defaultedAssocType->getDefaultDefinitionType();
     if (!defaultType)
-      return nullptr;
-
-    // Map out of its protocol context...
-    defaultType = defaultType->mapTypeOutOfContext();
-    if (defaultType->hasError())
       return nullptr;
 
     if (defaultedAssocTypeOut)
