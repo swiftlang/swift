@@ -50,11 +50,11 @@ enum ValueEnum {
   // CHECK-NEXT:   [[NEW_SELF:%.*]] = enum $ValueEnum, #ValueEnum.c!enumelt
   // CHECK-NEXT:   [[SELF_ACCESS:%.*]] = begin_access [modify] [static] [[SELF_BOX]]
   // CHECK-NEXT:   [[STATE_VALUE:%.*]] = load [[STATE]]
-  // CHECK-NEXT:   cond_br [[STATE_VALUE]], bb5, bb4
+  // CHECK-NEXT:   cond_br [[STATE_VALUE]], bb4, bb5
   // CHECK:      bb4:
+  // CHECK-NEXT:   destroy_addr [[SELF_BOX]]
   // CHECK-NEXT:   br bb6
   // CHECK:      bb5:
-  // CHECK-NEXT:   destroy_addr [[SELF_BOX]]
   // CHECK-NEXT:   br bb6
   // CHECK:      bb6:
   // CHECK-NEXT:   [[NEW_STATE:%.*]] = integer_literal $Builtin.Int1, -1
