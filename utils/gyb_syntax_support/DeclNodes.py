@@ -100,6 +100,8 @@ DECL_NODES = [
                        Child('Statements', kind='CodeBlockItemList'),
                        Child('SwitchCases', kind='SwitchCaseList'),
                        Child('Decls', kind='MemberDeclList'),
+                       Child('ArrayElements', kind='ArrayElementList'),
+                       Child('DictionaryElements', kind='DictionaryElementList'),
                    ]),
          ]),
 

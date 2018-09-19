@@ -23,10 +23,12 @@ EXPR_NODES = [
          element='TupleElement'),
 
     Node('ArrayElementList', kind='SyntaxCollection',
-         element='ArrayElement'),
+         element='Syntax', element_name='Element',
+         element_choices=['ArrayElement', 'IfConfigDecl']),
 
     Node('DictionaryElementList', kind='SyntaxCollection',
-         element='DictionaryElement'),
+         element='Syntax', element_name='Element',
+         element_choices=['DictionaryElement', 'IfConfigDecl']),
 
     Node('StringInterpolationSegments', kind='SyntaxCollection',
          element='Syntax', element_name='Segment',
