@@ -2921,6 +2921,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 call mkdir -p "${results_dir}"
 
+                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
+                    LLDB_DOTEST_CC_OPTS="${LLDB_DOTEST_CC_OPTS} --filecheck $(build_directory $LOCAL_HOST llvm)/bin/FileCheck"
+                fi
+
                 # Prefer to use lldb-dotest, as building it guarantees that we build all
                 # test dependencies. Ultimately we want to delete as much lldb-specific logic
                 # from this file as possible and just have a single call to lldb-dotest.
