@@ -2591,12 +2591,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var d = getBridgedVerbatimDictionary([:])
-    let identity1 = d._rawIdentifier()
     assert(isCocoaDictionary(d))
     assert(d.count == 0)
 
+    let empty = Dictionary<Int, Int>()
+    expectNotEqual(empty._rawIdentifier(), d._rawIdentifier())
+
     d.removeAll()
-    assert(identity1 == d._rawIdentifier())
+    assert(empty._rawIdentifier() == d._rawIdentifier())
     assert(d.count == 0)
   }
 
@@ -2674,12 +2676,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var d = getBridgedNonverbatimDictionary([:])
-    let identity1 = d._rawIdentifier()
     assert(isNativeDictionary(d))
     assert(d.count == 0)
 
+    let empty = Dictionary<Int, Int>()
+    expectNotEqual(empty._rawIdentifier(), d._rawIdentifier())
+
     d.removeAll()
-    assert(identity1 == d._rawIdentifier())
+    assert(empty._rawIdentifier() == d._rawIdentifier())
     assert(d.count == 0)
   }
 
