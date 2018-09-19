@@ -595,7 +595,7 @@ class SwiftDocumentSemanticInfo :
     public ThreadSafeRefCountedBase<SwiftDocumentSemanticInfo> {
 
   const std::string Filename;
-  SwiftASTManager &ASTMgr;
+  std::weak_ptr<SwiftASTManager> ASTMgr;
   std::weak_ptr<NotificationCenter> NotificationCtr;
   ThreadSafeRefCntPtr<SwiftInvocation> InvokRef;
   std::string CompilerArgsError;
@@ -610,10 +610,10 @@ class SwiftDocumentSemanticInfo :
   mutable llvm::sys::Mutex Mtx;
 
 public:
-  SwiftDocumentSemanticInfo(StringRef Filename, SwiftLangSupport &LangSupport)
-    : Filename(Filename),
-      ASTMgr(LangSupport.getASTManager()),
-      NotificationCtr(LangSupport.getContext().getNotificationCenter()) {}
+  SwiftDocumentSemanticInfo(StringRef Filename,
+                            std::shared_ptr<SwiftASTManager> ASTMgr,
+                            std::shared_ptr<NotificationCenter> NotificationCtr)
+      : Filename(Filename), ASTMgr(ASTMgr), NotificationCtr(NotificationCtr) {}
 
   SwiftInvocationRef getInvocation() const {
     return InvokRef;
@@ -622,7 +622,9 @@ public:
   uint64_t getASTGeneration() const;
 
   void setCompilerArgs(ArrayRef<const char *> Args) {
-    InvokRef = ASTMgr.getInvocation(Args, Filename, CompilerArgsError);
+    if (auto ASTMgr = this->ASTMgr.lock()) {
+      InvokRef = ASTMgr->getInvocation(Args, Filename, CompilerArgsError);
+    }
   }
 
   void readSemanticInfo(ImmutableTextSnapshotRef NewSnapshot,
@@ -637,8 +639,11 @@ public:
                           ImmutableTextSnapshotRef Snapshot,
                           uint64_t ASTGeneration);
   void removeCachedAST() {
-    if (InvokRef)
-      ASTMgr.removeCachedAST(InvokRef);
+    if (InvokRef) {
+      if (auto ASTMgr = this->ASTMgr.lock()) {
+        ASTMgr->removeCachedAST(InvokRef);
+      }
+    }
   }
 
 private:
@@ -1018,7 +1023,9 @@ void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
   // previously queued queries for the same document. Each document has a
   // SwiftDocumentSemanticInfo pointer so use that for the token.
   const void *OncePerASTToken = SemaInfoRef.get();
-  ASTMgr.processASTAsync(Invok, std::move(Consumer), OncePerASTToken);
+  if (auto ASTMgr = this->ASTMgr.lock()) {
+    ASTMgr->processASTAsync(Invok, std::move(Consumer), OncePerASTToken);
+  }
 }
 
 struct SwiftEditorDocument::Implementation {
@@ -1050,8 +1057,10 @@ struct SwiftEditorDocument::Implementation {
 
   Implementation(StringRef FilePath, SwiftLangSupport &LangSupport,
                  CodeFormatOptions options)
-    : LangSupport(LangSupport), FilePath(FilePath), FormatOptions(options) {
-      SemanticInfo = new SwiftDocumentSemanticInfo(FilePath, LangSupport);
+      : LangSupport(LangSupport), FilePath(FilePath), FormatOptions(options) {
+    SemanticInfo = new SwiftDocumentSemanticInfo(
+        FilePath, LangSupport.getASTManager().shared_from_this(),
+        LangSupport.getContext().getNotificationCenter());
   }
 };
 
@@ -1626,8 +1635,9 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
   Impl.SyntaxMap.Tokens.clear();
   Impl.AffectedRange = {0, static_cast<unsigned>(Buf->getBufferSize())};
 
-  Impl.SemanticInfo =
-      new SwiftDocumentSemanticInfo(Impl.FilePath, Impl.LangSupport);
+  Impl.SemanticInfo = new SwiftDocumentSemanticInfo(
+      Impl.FilePath, Impl.LangSupport.getASTManager().shared_from_this(),
+      Impl.LangSupport.getContext().getNotificationCenter());
   Impl.SemanticInfo->setCompilerArgs(Args);
   return Impl.EditableBuffer->getSnapshot();
 }

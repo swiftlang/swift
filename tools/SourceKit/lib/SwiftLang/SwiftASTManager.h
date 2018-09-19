@@ -84,7 +84,7 @@ public:
 
 typedef std::shared_ptr<SwiftASTConsumer> SwiftASTConsumerRef;
 
-class SwiftASTManager {
+class SwiftASTManager : public std::enable_shared_from_this<SwiftASTManager> {
 public:
   explicit SwiftASTManager(SwiftLangSupport &LangSupport);
   ~SwiftASTManager();
@@ -131,8 +131,6 @@ public:
   void removeCachedAST(SwiftInvocationRef Invok);
 
   struct Implementation;
-
-private:
   Implementation &Impl;
 };
 

@@ -283,7 +283,7 @@ public:
     return AST;
   }
 
-  void getASTUnitAsync(SwiftASTManager::Implementation &MgrImpl,
+  void getASTUnitAsync(std::shared_ptr<SwiftASTManager> Mgr,
                        ArrayRef<ImmutableTextSnapshotRef> Snapshots,
                 std::function<void(ASTUnitRef Unit, StringRef Error)> Receiver);
   bool shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
@@ -592,7 +592,7 @@ void SwiftASTManager::processASTAsync(SwiftInvocationRef InvokRef,
     }
   };
 
-  Producer->getASTUnitAsync(Impl, Snapshots, std::move(handleAST));
+  Producer->getASTUnitAsync(shared_from_this(), Snapshots, std::move(handleAST));
 }
 
 void SwiftASTManager::removeCachedAST(SwiftInvocationRef Invok) {
@@ -660,7 +660,7 @@ SwiftASTManager::Implementation::getMemoryBuffer(StringRef Filename,
   return nullptr;
 }
 
-void ASTProducer::getASTUnitAsync(SwiftASTManager::Implementation &MgrImpl,
+void ASTProducer::getASTUnitAsync(std::shared_ptr<SwiftASTManager> Mgr,
                                   ArrayRef<ImmutableTextSnapshotRef> Snaps,
                std::function<void(ASTUnitRef Unit, StringRef Error)> Receiver) {
 
@@ -668,9 +668,9 @@ void ASTProducer::getASTUnitAsync(SwiftASTManager::Implementation &MgrImpl,
   SmallVector<ImmutableTextSnapshotRef, 4> Snapshots;
   Snapshots.append(Snaps.begin(), Snaps.end());
 
-  MgrImpl.ASTBuildQueue.dispatch([ThisProducer, &MgrImpl, Snapshots, Receiver] {
+  Mgr->Impl.ASTBuildQueue.dispatch([ThisProducer, Mgr, Snapshots, Receiver] {
     std::string Error;
-    ASTUnitRef Unit = ThisProducer->getASTUnitImpl(MgrImpl, Snapshots, Error);
+    ASTUnitRef Unit = ThisProducer->getASTUnitImpl(Mgr->Impl, Snapshots, Error);
     Receiver(Unit, Error);
   }, /*isStackDeep=*/true);
 }

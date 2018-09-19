@@ -272,7 +272,7 @@ struct SwiftStatistics {
 class SwiftLangSupport : public LangSupport {
   SourceKit::Context &SKCtx;
   std::string RuntimeResourcePath;
-  std::unique_ptr<SwiftASTManager> ASTMgr;
+  std::shared_ptr<SwiftASTManager> ASTMgr;
   SwiftEditorDocumentFileMap EditorDocuments;
   SwiftInterfaceGenMap IFaceGenContexts;
   ThreadSafeRefCntPtr<SwiftCompletionCache> CCCache;

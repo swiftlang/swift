@@ -178,7 +178,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = LibPath.str();
 
-  ASTMgr.reset(new SwiftASTManager(*this));
+  ASTMgr = std::make_shared<SwiftASTManager>(*this);
   // By default, just use the in-memory cache.
   CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
 }
