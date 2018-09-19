@@ -6,6 +6,7 @@ cake1: Func P1.P1Constraint() has generic signature change from <Self where Self
 
 /* Removed Decls */
 cake1: Constructor Somestruct2.init(_:) has been removed
+cake1: Constructor fixedLayoutStruct.init(b:a:) has been removed
 cake1: Func C4.foo() has been removed
 
 /* Moved Decls */
