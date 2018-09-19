@@ -700,48 +700,69 @@ internal struct _DropFirstSequence<Base : IteratorProtocol>
 ///
 /// The underlying iterator's sequence may be infinite.
 @_fixed_layout
-@usableFromInline
-internal struct _PrefixSequence<Base : IteratorProtocol>
-    : Sequence, IteratorProtocol {
+public struct PrefixSequence<Base: Sequence> {
   @usableFromInline
   internal let _maxLength: Int
+  internal var _base: Base
   @usableFromInline
-  internal var _iterator: Base
-  @usableFromInline
-  internal var _taken: Int
 
   @inlinable
-  internal init(_iterator: Base, maxLength: Int, taken: Int = 0) {
-    self._iterator = _iterator
+  public init(_ base: Base, maxLength: Int) {
+    self._base = base
     self._maxLength = maxLength
-    self._taken = taken
   }
+}
 
-  @inlinable
-  __consuming internal func makeIterator() -> _PrefixSequence<Base> {
-    return self
+extension PrefixSequence {
+  @_fixed_layout
+  public struct Iterator {
+    @usableFromInline
+    internal let _maxLength: Int
+    @usableFromInline
+    internal var _base: Base.Iterator
+    @usableFromInline
+    internal var _taken: Int
+
+    @inlinable
+    internal init(_ base: Base.Iterator, maxLength: Int) {
+      _base = base
+      _maxLength = maxLength
+      _taken = 0
+    }
   }
+}
 
+extension PrefixSequence.Iterator: IteratorProtocol {
+  public typealias Element = Base.Element
+  
   @inlinable
-  internal mutating func next() -> Base.Element? {
+  public mutating func next() -> Element? {
     if _taken >= _maxLength { return nil }
     _taken += 1
 
-    if let next = _iterator.next() {
+    if let next = _base.next() {
       return next
     }
 
     _taken = _maxLength
     return nil
   }
+}
+
+extension PrefixSequence: Sequence {
+  public typealias Element = Base.Element
+  public typealias SubSequence = AnySequence<Element>
+  public typealias Prefix = PrefixSequence<Base>
+  
+  @inlinable
+  public __consuming func makeIterator() -> Iterator {
+    return Iterator(_base.makeIterator(), maxLength: _maxLength)
+  }
 
   @inlinable
-  internal __consuming func prefix(_ maxLength: Int) -> AnySequence<Base.Element> {
-    return AnySequence(
-      _PrefixSequence(
-        _iterator: _iterator,
-        maxLength: Swift.min(maxLength, self._maxLength),
-        taken: _taken))
+  public __consuming func prefix(_ maxLength: Int) -> SubSequence {
+    let length = Swift.min(maxLength, self._maxLength)
+    return AnySequence(PrefixSequence(_base, maxLength: length))
   }
 }
 
@@ -1327,8 +1348,7 @@ extension Sequence where SubSequence == AnySequence<Element> {
     if maxLength == 0 {
       return AnySequence(EmptyCollection<Element>())
     }
-    return AnySequence(
-      _PrefixSequence(_iterator: makeIterator(), maxLength: maxLength))
+    return AnySequence(PrefixSequence(self, maxLength: maxLength))
   }
 
   /// Returns a subsequence containing the initial, consecutive elements that
