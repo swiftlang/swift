@@ -1,4 +1,4 @@
-//=== GraphOperationBuilder.h - GraphOperationInst Build Logic --*- C++ -*-===//
+//=== GraphOperationBuilder.cpp - GraphOperationInst Build Logic *- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
