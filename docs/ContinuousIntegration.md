@@ -143,14 +143,15 @@ macOS platform | @swift-ci Please Test Source Compatibility Debug | Swift Source
 
 Platform       | Comment | Check Status
 ------------   | ------- | ------------
-macOS platform | preset=<preset> <br> @swift-ci Please test macOS with preset | Swift Test macOS Platform with preset
+macOS platform | preset=<preset> <br> @swift-ci Please test with preset macOS Platform | Swift Test macOS Platform with preset
+Linux platform | preset=<preset> <br> @swift-ci Please test with preset Linux Platform | Swift Test Linux Platform with preset
 
 
 For example:
 
 ```
 preset=buildbot_incremental,tools=RA,stdlib=RD,smoketest=macosx,single-thread
-@swift-ci Please test macOS with preset
+@swift-ci Please test with preset macOS
 
 ```
 ### Build Swift Toolchain
