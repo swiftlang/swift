@@ -99,3 +99,65 @@ final internal class _SwiftEmptyNSEnumerator
   }
 }
 #endif
+
+#if _runtime(_ObjC)
+/// This is a minimal class holding a single tail-allocated flat buffer,
+/// representing hash table storage for AnyObject elements. This is used to
+/// store bridged elements in deferred bridging scenarios. Lacking a _HashTable,
+/// instances of this class don't know which of their elements are initialized,
+/// so they can't be used on their own.
+///
+/// Using a dedicated class for this rather than a _HeapBuffer makes it easy to
+/// recognize these in heap dumps etc.
+internal final class _BridgingHashBuffer {
+  internal var _bucketCount: Int
+
+  // This type is made with allocWithTailElems, so no init is ever called.
+  // But we still need to have an init to satisfy the compiler.
+  private init(_doNotUse: ()) {
+    _sanityCheckFailure("This class cannot be directly initialized")
+  }
+
+  internal static func allocate(bucketCount: Int) -> _BridgingHashBuffer {
+    _sanityCheck(bucketCount & (bucketCount &- 1) == 0,
+      "Bucket count must be a power of two")
+    let object = Builtin.allocWithTailElems_1(
+      _BridgingHashBuffer.self,
+      bucketCount._builtinWordValue, AnyObject.self)
+    object._bucketCount = bucketCount
+    return object
+  }
+
+  deinit {
+    _sanityCheck(_bucketCount == -1)
+  }
+
+  internal var _elements: UnsafeMutablePointer<AnyObject> {
+    @inline(__always) get {
+      let ptr = Builtin.projectTailElems(self, AnyObject.self)
+      return UnsafeMutablePointer(ptr)
+    }
+  }
+
+  internal subscript(index: _HashTable.Index) -> AnyObject {
+    @inline(__always) get {
+      _sanityCheck(index.bucket >= 0 && index.bucket < _bucketCount)
+      return _elements[index.bucket]
+    }
+  }
+
+  @inline(__always)
+  internal func initialize(at index: _HashTable.Index, to object: AnyObject) {
+    _sanityCheck(index.bucket >= 0 && index.bucket < _bucketCount)
+    (_elements + index.bucket).initialize(to: object)
+  }
+
+  @inline(__always)
+  internal func deinitialize(elementsFrom hashTable: _HashTable) {
+    for index in hashTable {
+      (_elements + index.bucket).deinitialize(count: 1)
+    }
+    _bucketCount = -1
+  }
+}
+#endif

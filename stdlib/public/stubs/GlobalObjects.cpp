@@ -60,23 +60,18 @@ swift::_SwiftEmptyDictionarySingleton swift::_swiftEmptyDictionarySingleton = {
   
   // _SwiftDictionaryBodyStorage body;
   {
-    // We set the capacity to 1 so that there's an empty hole to search.
-    // Any insertion will lead to a real storage being allocated, because 
-    // Dictionary guarantees there's always another empty hole after insertion.
-    1, // int capacity;                               
+    // Setting the scale to 0 makes for a bucketCount of 1 -- so that the
+    // storage consists of a single unoccupied bucket. The capacity is set to
+    // 0 so that any insertion will lead to real storage being allocated.
     0, // int count;
-    
-    // _SwiftUnsafeBitMap initializedEntries
-    {
-      &swift::_swiftEmptyDictionarySingleton.entries, // unsigned int* values;
-      1 // int bitCount; (1 so there's something for iterators to read)
-    },
-    
-    (void*)1, // void* keys; (non-null garbage)
-    (void*)1  // void* values; (non-null garbage)
+    0, // int capacity;                                    
+    0, // int scale;
+    0, // uint64 seed;
+    (void *)1, // void* keys; (non-null garbage)
+    (void *)1  // void* values; (non-null garbage)
   },
 
-  0 // int entries; (zero'd bits)
+  ~1UL // int metadata; (bucket 0 is unoccupied; other buckets are out-of-bounds)
 };
 
 SWIFT_RUNTIME_STDLIB_API
@@ -86,24 +81,19 @@ swift::_SwiftEmptySetSingleton swift::_swiftEmptySetSingleton = {
     &swift::CLASS_METADATA_SYM(s18_EmptySetSingleton), // isa pointer
   },
   
-  // _SwiftDictionaryBodyStorage body;
+  // _SwiftSetBodyStorage body;
   {
-    // We set the capacity to 1 so that there's an empty hole to search.
-    // Any insertion will lead to a real storage being allocated, because 
-    // Dictionary guarantees there's always another empty hole after insertion.
-    1, // int capacity;                                    
+    // Setting the scale to 0 makes for a bucketCount of 1 -- so that the
+    // storage consists of a single unoccupied bucket. The capacity is set to
+    // 0 so that any insertion will lead to real storage being allocated.
     0, // int count;
-    
-    // _SwiftUnsafeBitMap initializedEntries
-    {
-      &swift::_swiftEmptySetSingleton.entries, // unsigned int* values;
-      1 // int bitCount; (1 so there's something for iterators to read)
-    },
-    
-    (void*)1 // void* keys; (non-null garbage)
+    0, // int capacity;                                    
+    0, // int scale;
+    0, // uint64 seed;
+    (void *)1, // void *rawElements; (non-null garbage)
   },
 
-  0 // int entries; (zero'd bits)
+  ~1UL // int metadata; (bucket 0 is unoccupied; other buckets are out-of-bounds)
 };
 
 static swift::_SwiftHashingParameters initializeHashingParameters() {

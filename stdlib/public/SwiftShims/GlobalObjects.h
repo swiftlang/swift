@@ -40,36 +40,33 @@ struct _SwiftEmptyArrayStorage {
 SWIFT_RUNTIME_STDLIB_API
 struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
-struct _SwiftUnsafeBitMap {
-  __swift_uintptr_t *values;
-  __swift_intptr_t bitCount;
-};
-
 struct _SwiftDictionaryBodyStorage {
-  __swift_intptr_t capacity;
   __swift_intptr_t count;
-  struct _SwiftUnsafeBitMap initializedEntries;
-  void *keys;
-  void *values;
+  __swift_intptr_t capacity;
+  __swift_intptr_t scale;
+  __swift_uint64_t seed;
+  void *rawKeys;
+  void *rawValues;
 };
 
 struct _SwiftSetBodyStorage {
-  __swift_intptr_t capacity;
   __swift_intptr_t count;
-  struct _SwiftUnsafeBitMap initializedEntries;
-  void *keys;
+  __swift_intptr_t capacity;
+  __swift_intptr_t scale;
+  __swift_uint64_t seed;
+  void *rawElements;
 };
 
 struct _SwiftEmptyDictionarySingleton {
   struct HeapObject header;
   struct _SwiftDictionaryBodyStorage body;
-  __swift_uintptr_t entries;
+  __swift_uint64_t metadata;
 };
 
 struct _SwiftEmptySetSingleton {
   struct HeapObject header;
   struct _SwiftSetBodyStorage body;
-  __swift_uintptr_t entries;
+  __swift_uint64_t metadata;
 };
 
 SWIFT_RUNTIME_STDLIB_API
