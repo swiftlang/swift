@@ -328,9 +328,18 @@ private:
   llvm::DenseMap<SILValue, SILValue>
   getPreheaderSubstMap(const SmallPtrSetImpl<SILValue> &values) const;
 
-  /// Transform the loop by moving and cloning nodes (as needed) so
-  /// that the nearest common post dominator of the current exiting blocks
-  /// is a single exit block for the loop.
+  /// Transform the loop by moving and cloning nodes (as needed) so that the
+  /// nearest common post dominator of the current exit blocks becomes a single
+  /// exit block for the loop. Consider the following snippet:
+  ///     while(...) {
+  ///       if (...) {
+  ///         ...
+  ///         break;
+  ///       }
+  ///     }
+  /// Recall that the blocks within if do not belong to the while loop in the SIL
+  /// IR. The transformation implemented in this function has the effect of moving
+  /// the blocks back into the loop.
   /// FIXME: Cloning is not implemented. Therefore, we don't get a single
   /// exit block right now. Once all the required components are implemented,
   /// we will get a single exit block.
@@ -388,7 +397,7 @@ private:
   SILFunction *currentFn;
   /// Equivalence classes induced by argument passing.
   llvm::EquivalenceClasses<SILValue> equivalentValues;
-  /// exit blocks before the loop is transformed.
+  /// exit blocks of the loop.
   SmallPtrSet<SILBasicBlock*, 8> exitBlocks;
   /// The list of edges that need to rewired to the newHeader or
   // the new latchBlock as appropriate.
@@ -784,7 +793,9 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
     SILBasicBlock *newTgt = latchBlock;
     bool stayInLoop = loop->contains(tgt);
     // Track the incoming value for the exit arguments if this is an exit edge
-    // with arguments.
+    // with arguments. This will be used to unify all the values to be passed
+    // to the exit nodes in the loop header.
+    //
     llvm::DenseMap<SILValue, SILValue> exitArgIncomingValue;
     if (TFNoUndefsInSESE && !stayInLoop && tgt->getNumArguments() != 0) {
       auto *termInst = src->getTerminator();
@@ -820,6 +831,10 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
       ++argIndex;
     }
     if (TFNoUndefsInSESE) {
+      //  Let p0, p1, ..pn be the arguments at new header corresponding to exit
+      // arguments a0, a1, a2, ..., an. For a exit edge
+      //      br exit_i(x, y) ->  exit_i(a2, a3)`,
+      // change the source as br new_latch(p0, p1, x, y, p4, ..., pn)
       for (const auto &kv : exitArgSubstMap) {
         const SILValue exitArg = kv.first;
         auto iter = exitArgIncomingValue.find(exitArg);
