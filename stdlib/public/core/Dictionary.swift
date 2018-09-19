@@ -3684,6 +3684,7 @@ extension Dictionary._Variant {
         keysAndValues,
         isUnique: isUnique,
         uniquingKeysWith: combine)
+#if _runtime(_ObjC)
     case .cocoa(let cocoa):
       var native = _NativeDictionary<Key, Value>(cocoa)
       try native.merge(
@@ -3691,6 +3692,7 @@ extension Dictionary._Variant {
         isUnique: true,
         uniquingKeysWith: combine)
       self = .native(native)
+#endif
     }
   }
 }
