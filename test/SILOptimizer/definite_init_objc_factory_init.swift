@@ -5,7 +5,7 @@
 import Foundation
 import ImportAsMember.Class
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo4HiveC5queenABSgSo3BeeCSg_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
+// CHECK-LABEL: sil shared [serializable] [thunk] @$sSo4HiveC5queenABSgSo3BeeCSg_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
 func testInstanceTypeFactoryMethod(queen: Bee) {
   // CHECK: bb0([[QUEEN:%[0-9]+]] : $Optional<Bee>, [[HIVE_META:%[0-9]+]] : $@thick Hive.Type):
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
@@ -17,7 +17,7 @@ func testInstanceTypeFactoryMethod(queen: Bee) {
 }
 
 extension Hive {
-  // CHECK-LABEL: sil hidden @$SSo4HiveC027definite_init_objc_factory_C0E10otherQueenABSo3BeeC_tcfC
+  // CHECK-LABEL: sil hidden @$sSo4HiveC027definite_init_objc_factory_C0E10otherQueenABSo3BeeC_tcfC
   convenience init(otherQueen other: Bee) {
     // CHECK: bb0({{.*}}, [[META:%.*]] : $@thick Hive.Type)
     // CHECK: [[SELF_ADDR:%[0-9]+]] = alloc_stack $Hive
@@ -47,7 +47,7 @@ extension SomeClass {
 }
 
 class SubHive : Hive {
-  // CHECK-LABEL: sil hidden @$S027definite_init_objc_factory_B07SubHiveC20delegatesToInheritedACyt_tcfC
+  // CHECK-LABEL: sil hidden @$s027definite_init_objc_factory_B07SubHiveC20delegatesToInheritedACyt_tcfC
   convenience init(delegatesToInherited: ()) {
     // CHECK: bb0([[METATYPE:%.*]] : $@thick SubHive.Type)
     // CHECK: [[UPMETA:%.*]] = upcast [[METATYPE]]

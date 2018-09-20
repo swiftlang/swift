@@ -25,40 +25,40 @@ sil_vtable X {}
 // CHECK: @_PROPERTIES__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { {{.*}}i32, i32, [1 x { i8*, i8* }] } { i32 16, i32 1, [1 x { i8*, i8* }] [{ i8*, i8* } { i8* getelementptr inbounds ([2 x i8], [2 x i8]* [[X]], i64 0, i64 0),
 
 // The getter/setter should not show up in the Swift metadata.
-// CHECK: @"$S19objc_attr_NSManaged10SwiftGizmoCMf" = internal global <{ {{.*}} }> <{ void (%T19objc_attr_NSManaged10SwiftGizmoC*)* @"$S19objc_attr_NSManaged10SwiftGizmoCfD", i8** @"$SBOWV", i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo" to i64), %objc_class* @"OBJC_CLASS_$_Gizmo", %swift.opaque* @_objc_empty_cache, %swift.opaque* null, i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, { i32, i32, [2 x { i8*, i8*, i8* }] }*, i8*, i8*, i8*, { i32, i32, [1 x { i8*, i8* }] }* }* @_DATA__TtC19objc_attr_NSManaged10SwiftGizmo to i64), i64 {{1|2}}), i32 {{1|0}}, i32 0, i32 8, i16 7, i16 0, i32 96, i32 16, {{.*}}* @"$S19objc_attr_NSManaged10SwiftGizmoCMn", i8* null }>
+// CHECK: @"$s19objc_attr_NSManaged10SwiftGizmoCMf" = internal global <{ {{.*}} }> <{ void (%T19objc_attr_NSManaged10SwiftGizmoC*)* @"$s19objc_attr_NSManaged10SwiftGizmoCfD", i8** @"$sBOWV", i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo" to i64), %objc_class* @"OBJC_CLASS_$_Gizmo", %swift.opaque* @_objc_empty_cache, %swift.opaque* null, i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, { i32, i32, [2 x { i8*, i8*, i8* }] }*, i8*, i8*, i8*, { i32, i32, [1 x { i8*, i8* }] }* }* @_DATA__TtC19objc_attr_NSManaged10SwiftGizmo to i64), i64 {{1|2}}), i32 {{1|0}}, i32 0, i32 8, i16 7, i16 0, i32 96, i32 16, {{.*}}* @"$s19objc_attr_NSManaged10SwiftGizmoCMn", i8* null }>
 
 @objc class SwiftGizmo : Gizmo {
   @objc @NSManaged var x: X
   @objc @NSManaged func kvc()
 }
-sil @$S19objc_attr_NSManaged1XCACycfcTo : $@convention(objc_method) (@owned X) -> @owned X {
+sil @$s19objc_attr_NSManaged1XCACycfcTo : $@convention(objc_method) (@owned X) -> @owned X {
 bb0(%0 : @owned $X):
   return %0 : $X
 }
 
-sil @$S19objc_attr_NSManaged10SwiftGizmoCACycfcTo : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @$s19objc_attr_NSManaged10SwiftGizmoCACycfcTo : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : @owned $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @$S19objc_attr_NSManaged10SwiftGizmoC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
+sil @$s19objc_attr_NSManaged10SwiftGizmoC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
 bb0(%0 : @trivial $Int, %1 : @owned $SwiftGizmo):
   unreachable
 }
 
-sil @$S19objc_attr_NSManaged10SwiftGizmoCACycfc : $@convention(method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @$s19objc_attr_NSManaged10SwiftGizmoCACycfc : $@convention(method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : @owned $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @$S19objc_attr_NSManaged10SwiftGizmoC7bellsOnACSi_tcfc : $@convention(method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @$s19objc_attr_NSManaged10SwiftGizmoC7bellsOnACSi_tcfc : $@convention(method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : @trivial $Int, %1 : @owned $SwiftGizmo):
   return %1 : $SwiftGizmo
 }
 
-sil @$S19objc_attr_NSManaged10SwiftGizmoCfD : $@convention(method) (@owned SwiftGizmo) -> ()
+sil @$s19objc_attr_NSManaged10SwiftGizmoCfD : $@convention(method) (@owned SwiftGizmo) -> ()
 
-sil @$S19objc_attr_NSManaged10SwiftGizmoC7bellsOnSQyACGSi_tcfc : $@convention(method) (Int, @owned SwiftGizmo) -> Int
+sil @$s19objc_attr_NSManaged10SwiftGizmoC7bellsOnSQyACGSi_tcfc : $@convention(method) (Int, @owned SwiftGizmo) -> Int
 
 sil_vtable SwiftGizmo {
 }

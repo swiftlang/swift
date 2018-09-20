@@ -11,7 +11,7 @@ struct A {
   unowned var x: C
 }
 _ = A(x: C())
-// CHECK-LABEL: sil hidden @$S7unowned1AV{{[_0-9a-zA-Z]*}}fC
+// CHECK-LABEL: sil hidden @$s7unowned1AV{{[_0-9a-zA-Z]*}}fC
 // CHECK: bb0([[X:%.*]] : @owned $C, %1 : @trivial $@thin A.Type):
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
 // CHECK:   [[X_UNOWNED_COPY:%.*]] = copy_value [[X_UNOWNED]]
@@ -28,7 +28,7 @@ struct AddressOnly {
   var p: P
 }
 _ = AddressOnly(x: C(), p: X())
-// CHECK-LABEL: sil hidden @$S7unowned11AddressOnlyV{{[_0-9a-zA-Z]*}}fC
+// CHECK-LABEL: sil hidden @$s7unowned11AddressOnlyV{{[_0-9a-zA-Z]*}}fC
 // CHECK: bb0([[RET:%.*]] : @trivial $*AddressOnly, [[X:%.*]] : @owned $C, {{.*}}):
 // CHECK:   [[X_ADDR:%.*]] = struct_element_addr [[RET]] : $*AddressOnly, #AddressOnly.x
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
@@ -37,7 +37,7 @@ _ = AddressOnly(x: C(), p: X())
 // CHECK:   destroy_value [[X]]
 // CHECK: }
 
-// CHECK-LABEL:    sil hidden @$S7unowned5test01cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
+// CHECK-LABEL:    sil hidden @$s7unowned5test01cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
 func test0(c c: C) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $C):
 
@@ -78,7 +78,7 @@ func test0(c c: C) {
   // CHECK:   destroy_value [[X]]
   // CHECK:   destroy_value [[MARKED_A1]]
 }
-// CHECK: } // end sil function '$S7unowned5test01cyAA1CC_tF'
+// CHECK: } // end sil function '$s7unowned5test01cyAA1CC_tF'
 
 // CHECK-LABEL: sil hidden @{{.*}}testunowned_local
 func testunowned_local() -> C {
@@ -112,7 +112,7 @@ func test_unowned_let_capture(_ aC : C) {
   takeClosure { bC.f() }
 }
 
-// CHECK-LABEL: sil private @$S7unowned05test_A12_let_captureyyAA1CCFSiyXEfU_ : $@convention(thin) (@guaranteed @sil_unowned C) -> Int {
+// CHECK-LABEL: sil private @$s7unowned05test_A12_let_captureyyAA1CCFSiyXEfU_ : $@convention(thin) (@guaranteed @sil_unowned C) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@sil_unowned C):
 // CHECK-NEXT:   debug_value %0 : $@sil_unowned C, let, name "bC", argno 1
 // CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = copy_unowned_value [[ARG]] : $@sil_unowned C
@@ -133,7 +133,7 @@ class TestUnownedMember {
   }
 }
 
-// CHECK-LABEL: sil hidden @$S7unowned17TestUnownedMemberC5invalAcA1CC_tcfc :
+// CHECK-LABEL: sil hidden @$s7unowned17TestUnownedMemberC5invalAcA1CC_tcfc :
 // CHECK: bb0([[ARG1:%.*]] : @owned $C, [[SELF_PARAM:%.*]] : @owned $TestUnownedMember):
 // CHECK:   [[SELF:%.*]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $TestUnownedMember
 // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
@@ -150,7 +150,7 @@ class TestUnownedMember {
 // CHECK:   destroy_value [[SELF]]
 // CHECK:   destroy_value [[ARG1]]
 // CHECK:   return [[RET_SELF]] : $TestUnownedMember
-// CHECK: } // end sil function '$S7unowned17TestUnownedMemberC5invalAcA1CC_tcfc'
+// CHECK: } // end sil function '$s7unowned17TestUnownedMemberC5invalAcA1CC_tcfc'
 
 // Just verify that lowering an unowned reference to a type parameter
 // doesn't explode.
@@ -158,7 +158,7 @@ struct Unowned<T: AnyObject> {
   unowned var object: T
 }
 func takesUnownedStruct(_ z: Unowned<C>) {}
-// CHECK-LABEL: sil hidden @$S7unowned18takesUnownedStructyyAA0C0VyAA1CCGF : $@convention(thin) (@guaranteed Unowned<C>) -> ()
+// CHECK-LABEL: sil hidden @$s7unowned18takesUnownedStructyyAA0C0VyAA1CCGF : $@convention(thin) (@guaranteed Unowned<C>) -> ()
 
 // Make sure we don't crash here
 struct UnownedGenericCapture<T : AnyObject> {

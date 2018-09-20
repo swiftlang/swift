@@ -31,7 +31,7 @@ func foo3(a: Float, b: Bool) {}
 // CHECK-OVERLAY-NEXT: NSUTF8StringEncoding
 // CHECK-OVERLAY-NEXT: s:10Foundation20NSUTF8StringEncodingSuv
 // CHECK-OVERLAY-NEXT: UInt
-// CHECK-OVERLAY-NEXT: $SSuD
+// CHECK-OVERLAY-NEXT: $sSuD
 // CHECK-OVERLAY-NEXT: Foundation
 // CHECK-OVERLAY-NEXT: SYSTEM
 // CHECK-OVERLAY-NEXT: <Declaration>let NSUTF8StringEncoding: <Type usr="s:Su">UInt</Type></Declaration>

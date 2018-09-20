@@ -113,7 +113,7 @@ internal class Other {
      self.s = s;
    }
 
-// CHECK-LABEL: sil hidden [noinline] @$S25sil_combine_protocol_conf5OtherC11doWorkClassSiyF : $@convention(method) (@guaranteed Other) -> Int {
+// CHECK-LABEL: sil hidden [noinline] @$s25sil_combine_protocol_conf5OtherC11doWorkClassSiyF : $@convention(method) (@guaranteed Other) -> Int {
 // CHECK: bb0
 // CHECK: debug_value
 // CHECK: integer_literal
@@ -161,7 +161,7 @@ internal class Other {
 // CHECK: cond_fail
 // CHECK: struct 
 // CHECK: return
-// CHECK: } // end sil function '$S25sil_combine_protocol_conf5OtherC11doWorkClassSiyF'
+// CHECK: } // end sil function '$s25sil_combine_protocol_conf5OtherC11doWorkClassSiyF'
    @inline(never) func doWorkClass () ->Int {
       return self.x.foo(x:self.x) // optimize
              + self.y.bar(x:self.y) // optimize
@@ -234,7 +234,7 @@ internal class OtherClass {
      self.arg4 = arg4
   }
 
-// CHECK-LABEL: sil hidden [noinline] @$S25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF : $@convention(method) (@guaranteed OtherClass) -> Int {
+// CHECK-LABEL: sil hidden [noinline] @$s25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF : $@convention(method) (@guaranteed OtherClass) -> Int {
 // CHECK: bb0
 // CHECK: debug_value
 // CHECK: [[A1:%.*]] = alloc_stack $PropProtocol
@@ -296,7 +296,7 @@ internal class OtherClass {
 // CHECK: dealloc_stack [[A6]] : $*@opened("{{.*}}") GenericNestedPropProtocol
 // CHECK: dealloc_stack [[A5]] : $*GenericNestedPropProtocol
 // CHECK: return
-// CHECK: } // end sil function '$S25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF'
+// CHECK: } // end sil function '$s25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF'
   @inline(never) func doWorkStruct () -> Int{
     return self.arg1.val  // optimize
            + self.arg2.val  // do not optimize
@@ -342,7 +342,7 @@ internal class OtherKlass {
      self.arg2 = arg2
   }
 
-// CHECK-LABEL: sil hidden [noinline] @$S25sil_combine_protocol_conf10OtherKlassC10doWorkEnumSiyF : $@convention(method) (@guaranteed OtherKlass) -> Int {
+// CHECK-LABEL: sil hidden [noinline] @$s25sil_combine_protocol_conf10OtherKlassC10doWorkEnumSiyF : $@convention(method) (@guaranteed OtherKlass) -> Int {
 // CHECK: bb0
 // CHECK: debug_value
 // CHECK: integer_literal
@@ -366,7 +366,7 @@ internal class OtherKlass {
 // CHECK: dealloc_stack [[A2]] : $*@opened("{{.*}}") AGenericProtocol
 // CHECK: dealloc_stack [[A1]] : $*AGenericProtocol
 // CHECK: return
-// CHECK: } // end sil function '$S25sil_combine_protocol_conf10OtherKlassC10doWorkEnumSiyF'
+// CHECK: } // end sil function '$s25sil_combine_protocol_conf10OtherKlassC10doWorkEnumSiyF'
   @inline(never) func doWorkEnum() -> Int {
     return self.arg1.val  // optimize
            + self.arg2.val // do not optimize

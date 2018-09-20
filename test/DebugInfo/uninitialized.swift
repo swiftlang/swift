@@ -2,8 +2,8 @@
 // RUN: %target-swift-frontend %s -O -c -emit-ir -g -o - | %FileCheck %s --check-prefix=OPT
 class MyClass {}
 
-// CHECK-LABEL: define {{.*}} @"$S13uninitialized1fyyF"
-// OPT-LABEL: define {{.*}} @"$S13uninitialized1fyyF"
+// CHECK-LABEL: define {{.*}} @"$s13uninitialized1fyyF"
+// OPT-LABEL: define {{.*}} @"$s13uninitialized1fyyF"
 public func f() {
   var object: MyClass
   // CHECK: %[[OBJ:.*]] = alloca %[[T1:.*]]*, align
@@ -15,8 +15,8 @@ public func f() {
   // OPT: ret
 }
 
-// CHECK-LABEL: define {{.*}} @"$S13uninitialized1gyyF"
-// OPT-LABEL: define {{.*}} @"$S13uninitialized1gyyF"
+// CHECK-LABEL: define {{.*}} @"$s13uninitialized1gyyF"
+// OPT-LABEL: define {{.*}} @"$s13uninitialized1gyyF"
 public func g() {
   var dict: Dictionary<Int64, Int64>
   // CHECK: %[[DICT:.*]] = alloca %[[T2:.*]], align

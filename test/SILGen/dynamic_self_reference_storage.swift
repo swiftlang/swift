@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 class Foo {
-  // CHECK-LABEL: sil hidden @$S30dynamic_self_reference_storage3FooC0A4Self{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$s30dynamic_self_reference_storage3FooC0A4Self{{[_0-9a-zA-Z]*}}F
   func dynamicSelf() -> Self {
     // CHECK: debug_value {{%.*}} : $Foo
     let managedSelf = self

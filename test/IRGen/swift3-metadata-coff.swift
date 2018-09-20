@@ -29,7 +29,7 @@ public func f(s : S) -> (() -> ()) {
 // CHECK-DAG: @"{{.*}}" = {{.*}} c"Sq", {{.*}} section ".sw5tyrf$B"
 // CHECK-DAG: @{{[0-9]+}} = {{.*}} c"none\00", section ".sw5rfst$B"
 // CHECK-DAG: @{{[0-9]+}} = {{.*}} c"some\00", section ".sw5rfst$B"
-// CHECK-DAG: @"$SSqMF" = internal constant {{.*}}, section ".sw5flmd$B"
-// CHECK-DAG: @"$Ss1SVs1PsMA" = internal constant {{.*}}, section ".sw5asty$B"
-// CHECK-DAG: @"$SBoMB" = internal constant {{.*}}, section ".sw5bltn$B"
+// CHECK-DAG: @"$sSqMF" = internal constant {{.*}}, section ".sw5flmd$B"
+// CHECK-DAG: @"$ss1SVs1PsMA" = internal constant {{.*}}, section ".sw5asty$B"
+// CHECK-DAG: @"$sBoMB" = internal constant {{.*}}, section ".sw5bltn$B"
 

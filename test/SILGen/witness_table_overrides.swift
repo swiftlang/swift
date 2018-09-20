@@ -18,7 +18,7 @@ protocol P3: P0, P2 {
   override func foo()
 }
 
-// CHECK-LABEL: sil hidden @$S23witness_table_overrides7callFoo1tyx_tAA2P3RzlF
+// CHECK-LABEL: sil hidden @$s23witness_table_overrides7callFoo1tyx_tAA2P3RzlF
 func callFoo<T: P3>(t: T) {
   // CHECK: witness_method $T, #P0.foo!1 : <Self where Self : P0> (Self) -> () -> ()
   t.foo()
@@ -30,7 +30,7 @@ func callFoo<T: P3>(t: T) {
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table hidden X3: P0 module witness_table_overrides {
-// CHECK-NEXT:    method #P0.foo!1: <Self where Self : P0> (Self) -> () -> () : @$S23witness_table_overrides2X3VAA2P0A2aDP3fooyyFTW
+// CHECK-NEXT:    method #P0.foo!1: <Self where Self : P0> (Self) -> () -> () : @$s23witness_table_overrides2X3VAA2P0A2aDP3fooyyFTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table hidden X3: P2 module witness_table_overrides {

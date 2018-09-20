@@ -5,7 +5,7 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @$S25objc_attr_NSManaged_multi9testMultiyyXlAA10SwiftGizmoCF : $@convention(thin) (@guaranteed SwiftGizmo) -> @owned AnyObject {
+// CHECK-LABEL: sil hidden @$s25objc_attr_NSManaged_multi9testMultiyyXlAA10SwiftGizmoCF : $@convention(thin) (@guaranteed SwiftGizmo) -> @owned AnyObject {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $SwiftGizmo):
 // CHECK: = objc_method [[ARG]] : $SwiftGizmo, #SwiftGizmo.kvc!1.foreign : (SwiftGizmo) -> () -> (), $@convention(objc_method) (SwiftGizmo) -> ()
 // CHECK-NOT: return
@@ -19,7 +19,7 @@ func testMulti(_ obj: SwiftGizmo) -> AnyObject {
   return obj.x
 }
 
-// CHECK-LABEL: sil hidden @$S25objc_attr_NSManaged_multi14testFinalMultiySSAA0F5GizmoCF : $@convention(thin) (@guaranteed FinalGizmo) -> @owned String {
+// CHECK-LABEL: sil hidden @$s25objc_attr_NSManaged_multi14testFinalMultiySSAA0F5GizmoCF : $@convention(thin) (@guaranteed FinalGizmo) -> @owned String {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $FinalGizmo):
 // CHECK: objc_method [[ARG]] : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> (), $@convention(objc_method) (FinalGizmo) -> ()
 // CHECK-NOT: return

@@ -20,11 +20,11 @@ extension QQQ {
 
 // Test that all witness_method instructions are devirtualized.
 // This test used to crash the compiler because it uses inherited conformances.
-// CHECK-LABEL: sil @$S34devirt_protocol_method_invocations24testInheritedConformanceyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil @$s34devirt_protocol_method_invocations24testInheritedConformanceyyF : $@convention(thin) () -> ()
 // CHECK-NOT: witness_method
 // CHECK-NOT: class_method
 // CHECK: apply
-// CHECK: // end sil function '$S34devirt_protocol_method_invocations24testInheritedConformanceyyF'
+// CHECK: // end sil function '$s34devirt_protocol_method_invocations24testInheritedConformanceyyF'
 public func testInheritedConformance() {
     (S() as QQQ).f()
 }
@@ -33,10 +33,10 @@ public func testInheritedConformance() {
 // is devirtualized.
 //
 // This test used to crash the compiler because it uses inherited conformances.
-// CHECK-LABEL: sil @$S34devirt_protocol_method_invocations34testIndirectlyInheritedConformanceyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil @$s34devirt_protocol_method_invocations34testIndirectlyInheritedConformanceyyF : $@convention(thin) () -> ()
 // CHECK-NOT: witness_method
 // CHECK: apply
-// CHECK: // end sil function '$S34devirt_protocol_method_invocations34testIndirectlyInheritedConformanceyyF'
+// CHECK: // end sil function '$s34devirt_protocol_method_invocations34testIndirectlyInheritedConformanceyyF'
 public func testIndirectlyInheritedConformance() {
   (S() as RRR).f()
 }
@@ -82,7 +82,7 @@ func callGetSelf(_ f: Foo) -> Foo {
 }
 
 // Check that methods returning Self are not devirtualized and do not crash the compiler.
-// CHECK-LABEL: sil [noinline] @$S34devirt_protocol_method_invocations05test_a1_b11_extension_C33_invocation_with_self_return_typeyAA3Foo_pAA1CCF
+// CHECK-LABEL: sil [noinline] @$s34devirt_protocol_method_invocations05test_a1_b11_extension_C33_invocation_with_self_return_typeyAA3Foo_pAA1CCF
 // CHECK: init_existential_addr
 // CHECK: open_existential_addr
 // CHECK: return
@@ -97,7 +97,7 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 // be propagated from init_existential_addr into witness_method and 
 // apply instructions.
 
-// CHECK-LABEL: sil [noinline] @$S34devirt_protocol_method_invocations05test_a1_b1_C11_invocationySiAA1CCF
+// CHECK-LABEL: sil [noinline] @$s34devirt_protocol_method_invocations05test_a1_b1_C11_invocationySiAA1CCF
 // CHECK-NOT: witness_method
 // CHECK: checked_cast
 // CHECK-NOT: checked_cast
@@ -124,7 +124,7 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 // In fact, the call is expected to be inlined and then constant-folded
 // into a single integer constant.
 
-// CHECK-LABEL: sil [noinline] @$S34devirt_protocol_method_invocations05test_a1_b11_extension_C11_invocationys5Int32VAA1CCF
+// CHECK-LABEL: sil [noinline] @$s34devirt_protocol_method_invocations05test_a1_b11_extension_C11_invocationys5Int32VAA1CCF
 // CHECK-NOT: checked_cast
 // CHECK-NOT: open_existential
 // CHECK-NOT: witness_method
@@ -132,12 +132,12 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 // CHECK: integer_literal
 // CHECK: return
 
-// CHECK: sil @$S34devirt_protocol_method_invocations12test24114020SiyF
+// CHECK: sil @$s34devirt_protocol_method_invocations12test24114020SiyF
 // CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int{{.*}}, 1
 // CHECK:   [[T1:%.*]] = struct $Int ([[T0]] : $Builtin.Int{{.*}})
 // CHECK:   return [[T1]]
 
-// CHECK: sil @$S34devirt_protocol_method_invocations14testExMetatypeSiyF
+// CHECK: sil @$s34devirt_protocol_method_invocations14testExMetatypeSiyF
 // CHECK:   [[T0:%.*]] = builtin "sizeof"<Int>
 // CHECK:   [[T1:%.*]] = builtin {{.*}}([[T0]]
 // CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : {{.*}})
@@ -252,7 +252,7 @@ public final class V {
 }
 
 // Check that all witness_method invocations are devirtualized.
-// CHECK-LABEL: sil [noinline] @$S34devirt_protocol_method_invocations44testPropagationOfConcreteTypeIntoExistential1v1xyAA1VC_s5Int32VtF
+// CHECK-LABEL: sil [noinline] @$s34devirt_protocol_method_invocations44testPropagationOfConcreteTypeIntoExistential1v1xyAA1VC_s5Int32VtF
 // CHECK-NOT: witness_method
 // CHECK-NOT: class_method
 // CHECK: return
