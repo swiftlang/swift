@@ -211,7 +211,7 @@ enum class TSanKind : bool {
 
 /// Represents an LValue opened for mutating access.
 ///
-/// This is used by LogicalPathComponent::getMaterialized().
+/// This is used by LogicalPathComponent::projectAsBase().
 struct MaterializedLValue {
   ManagedValue temporary;
 
