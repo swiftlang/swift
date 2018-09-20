@@ -17,6 +17,7 @@
 // is known to translate into XLA control flow primitives.
 //
 //===----------------------------------------------------------------------===//
+#define DEBUG_TYPE "canonicalize-cfg-for-xla"
 
 #include "TFCanonicalizeCFG.h"
 #include "TFUtilities.h"
@@ -133,17 +134,15 @@ namespace {
     std::unique_ptr<SESERegionTree>
     processAcyclicRegion(SILBasicBlock *startBB, SILBasicBlock *endBB);
 
-    std::unique_ptr<SESERegionTree>
-    processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
-                                     SILBasicBlock *endBB);
-
-
     /// Process all of the top-level loops in the function in post-order.
     void processLoops() {
       // Apply the standard SIL loop canonicalization transformations.  This
       // automatically gives us the following invariants: loops are guaranteed
       // to have a single preheader, a single backedge block, and exit??
-      canonicalizeAllLoops(&DI, &LI);
+      if (canonicalizeAllLoops(&DI, &LI)) {
+        // Recalculate PDI if canonicalization made any changes.
+        PDI.recalculate(*F);
+      }
       // CanonicalizeAllLoops only ensures the following properties:
       //   - There is a unique preheader block.
       //   - Exit blocks have only predecessors within the loop.
@@ -159,9 +158,12 @@ namespace {
         processLoop(loop);
     }
 
-    void processLoop(SILLoop *loop);
 
   private:
+    std::unique_ptr<SESERegionTree>
+    processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
+                                     SILBasicBlock *endBB);
+    void processLoop(SILLoop *loop);
     void ensureSingleExitFromLoops();
   };
 } // end anonymous namespace
@@ -300,8 +302,9 @@ static SILValue createTFIntegerConst(GraphFunctionDeviceInfo &deviceInfo,
 class SingleExitLoopTransformer {
 public:
   SingleExitLoopTransformer(GraphFunctionDeviceInfo *deviceInfo,
-                            SILLoopInfo *LI, DominanceInfo *DI, SILLoop *loop)
-      : deviceInfo(deviceInfo), DI(DI), LI(LI), loop(loop),
+                            SILLoopInfo *LI, DominanceInfo *DI, SILLoop *loop,
+                            PostDominanceInfo *PDI)
+      : deviceInfo(deviceInfo), DI(DI), PDI(PDI), LI(LI), loop(loop),
         header(loop->getHeader()), preheader(loop->getLoopPreheader()),
         latch(loop->getLoopLatch()), currentFn(header->getParent()) {
     assert(preheader && "Canonicalization should have given us one preheader");
@@ -324,6 +327,23 @@ private:
   /// `values`, the corresponding will be mapped to an undef.
   llvm::DenseMap<SILValue, SILValue>
   getPreheaderSubstMap(const SmallPtrSetImpl<SILValue> &values) const;
+
+  /// Transform the loop by moving and cloning nodes (as needed) so that the
+  /// nearest common post dominator of the current exit blocks becomes a single
+  /// exit block for the loop. Consider the following snippet:
+  ///     while(...) {
+  ///       if (...) {
+  ///         ...
+  ///         break;
+  ///       }
+  ///     }
+  /// Recall that the blocks within if do not belong to the while loop in the SIL
+  /// IR. The transformation implemented in this function has the effect of moving
+  /// the blocks back into the loop.
+  /// FIXME: Cloning is not implemented. Therefore, we don't get a single
+  /// exit block right now. Once all the required components are implemented,
+  /// we will get a single exit block.
+  void ensureSingleExitBlock();
 
   /// Compute escaping values and what values to use as arguments at preheader.
   llvm::DenseMap<SILValue, SILValue> computeEscapingValuesSubstMap() const;
@@ -368,6 +388,7 @@ private:
   // Configuration for graph construction.
   GraphFunctionDeviceInfo *deviceInfo;
   DominanceInfo *DI;
+  PostDominanceInfo *PDI;
   SILLoopInfo *LI;
   SILLoop *loop;
   SILBasicBlock *header;
@@ -376,8 +397,8 @@ private:
   SILFunction *currentFn;
   /// Equivalence classes induced by argument passing.
   llvm::EquivalenceClasses<SILValue> equivalentValues;
-  /// exit blocks before the loop is transformed.
-  SmallVector<SILBasicBlock*, 8> exitBlocks;
+  /// exit blocks of the loop.
+  SmallPtrSet<SILBasicBlock*, 8> exitBlocks;
   /// The list of edges that need to rewired to the newHeader or
   // the new latchBlock as appropriate.
   SmallVector<std::pair<const SILBasicBlock *, const SILBasicBlock *>, 8>
@@ -386,6 +407,8 @@ private:
   /// escaping value and the associated value will be used as the argument at
   /// the preheader.
   llvm::DenseMap<SILValue, SILValue> escapingValueSubstMap;
+  /// Similar to escapingValueSubstMap, but arguments of exit blocks.
+  llvm::DenseMap<SILValue, SILValue> exitArgSubstMap;
 };
 
 void SingleExitLoopTransformer::initialize() {
@@ -402,8 +425,30 @@ void SingleExitLoopTransformer::initialize() {
     }
   }
 
-  // Exit Blocks
-  loop->getExitBlocks(exitBlocks);
+  // Compute common exit block if needed.
+  if (TFNoUndefsInSESE) {
+    ensureSingleExitBlock();
+  }
+
+  // Initialize Exit Blocks
+  {
+    SmallVector<SILBasicBlock*, 8> exitBlockList;
+    // This API returns duplicates if there are multiple exiting edges to the
+    // same exit block. Dedup them here.
+    loop->getExitBlocks(exitBlockList);
+    exitBlocks.insert(exitBlockList.begin(), exitBlockList.end());
+    assert(!exitBlocks.empty() && "A loop has no exit blocks.");
+    if (TFNoUndefsInSESE) {
+      SmallPtrSet<SILValue, 8> exitArgs;
+      for (const SILBasicBlock *bb : exitBlocks) {
+        for (auto arg : bb->getArguments()) {
+          exitArgs.insert(arg);
+        }
+      }
+      exitArgSubstMap = getPreheaderSubstMap(exitArgs);
+    }
+  }
+
   // All the exiting edges need to be rewired.
   loop->getExitEdges(edgesToFix);
   edgesToFix.emplace_back(latch, header);
@@ -421,6 +466,89 @@ void SingleExitLoopTransformer::initialize() {
   }
 
   escapingValueSubstMap = computeEscapingValuesSubstMap();
+}
+
+void SingleExitLoopTransformer::ensureSingleExitBlock() {
+  // Identify the common post dominator
+  SILPrintContext printContext(llvm::dbgs());
+  SmallVector<SILBasicBlock*, 8> exitBlockList;
+  loop->getExitBlocks(exitBlockList);
+
+  auto exitBlockIter = exitBlockList.begin();
+  SILBasicBlock *nearestCommonPD = *exitBlockIter++;
+  while (exitBlockIter != exitBlockList.end()) {
+    nearestCommonPD =
+      PDI->findNearestCommonDominator(nearestCommonPD, *exitBlockIter++);
+    assert(nearestCommonPD);
+  }
+  LLVM_DEBUG(
+      llvm::dbgs() << "Common Exit Block : "
+                   << SILPrintContext(llvm::dbgs()).getID(nearestCommonPD)
+                   << "\n");
+
+  // Collect all the blocks from each exiting block up to nearest common PD.
+  SmallPtrSet<SILBasicBlock *, 32> blocksToBeMoved;
+  for (SILBasicBlock *exitBlock : exitBlockList) {
+    if (exitBlock == nearestCommonPD) continue;
+    SmallPtrSet<SILBasicBlock *, 32> worklist;
+    worklist.insert(exitBlock);
+    while (!worklist.empty()) {
+      SILBasicBlock *current = *worklist.begin();
+      blocksToBeMoved.insert(current);
+      worklist.erase(current);
+      unsigned edgeIdx = 0;
+      for (SILBasicBlock *succ : current->getSuccessorBlocks()) {
+        ++edgeIdx;
+        // Skip if (1) already processed, (2) reached common pd, or (3)
+        // block has in edges from outside the loop. In the last case, we will
+        // need to clone the blocks.
+        if (blocksToBeMoved.count(succ) > 0 || succ == nearestCommonPD) {
+          continue;
+        }
+        if (!DI->properlyDominates(header, succ)) {
+          // Split this edge so that we don't mess up arguments passed in
+          // from other predecessors of succ.
+          if (succ->getNumArguments() > 0) {
+            splitEdge(current->getTerminator(), edgeIdx - 1, DI, LI);
+          }
+          continue;
+        }
+        worklist.insert(succ);
+      }
+    }
+  }
+  // Move blocks from each exitingBlock to commonExitBlock into the loop.
+  for (SILBasicBlock *outsideBlock : blocksToBeMoved) {
+    // Make sure that outsideBlock is *ONLY* reachable from a block in the loop
+    // or blocksToBeMoved.
+    assert(llvm::all_of(outsideBlock->getPredecessorBlocks(),
+                        [this, &blocksToBeMoved](const SILBasicBlock *pred) {
+                          return LI->getLoopFor(pred) == loop ||
+                                 blocksToBeMoved.count(pred) > 0;
+                        }) &&
+           "Nodes being moved are reachable from outside loop.");
+
+    // Update loop info if this belongs to a parent loop.
+    SILLoop *outsideBlockLoop = LI->getLoopFor(outsideBlock);
+    if (outsideBlockLoop != nullptr) {
+      // FIXME: We don't deal with cases where the nodes being moved in
+      // belong to another loop yet. e.g.,
+      // while ... {
+      //   if ... {
+      //     for(...) {...}
+      //     break;
+      //   }
+      // }
+      // Check that `loop` is nested within `reachableLoop`.
+      assert(outsideBlockLoop->contains(loop) &&
+             "Nodes being moved belong to a non-nested loop.");
+      // Move the node into our loop.
+      outsideBlockLoop->removeBlockFromLoop(outsideBlock);
+      LI->changeLoopFor(outsideBlock, nullptr);
+      // top-level loop is already correct.
+    }
+    loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
+  }
 }
 
 llvm::DenseMap<SILValue, SILValue>
@@ -542,21 +670,30 @@ SingleExitLoopTransformer::createNewHeader() {
   }
   header->dropAllArguments();
   // Add phi arguments in the new header corresponding to the escaping values.
+  auto addArgument =
+      [this, newHeader](SILValue escapingValue) {
+        SILValue newValue = newHeader->createPHIArgument(
+          escapingValue->getType(), escapingValue.getOwnershipKind());
+        // Replace uses *outside* of the loop with the new value.
+        auto UI = escapingValue->use_begin(), E = escapingValue->use_end();
+        while (UI != E) {
+          Operand *use = *UI;
+          // Increment iterator before we invalidate it
+          // when we invoke Operand::Set below.
+          ++UI;
+          if (loop->contains(use->getUser()->getParent())) {
+            continue;
+          }
+          use->set(newValue);
+        }
+      };
+
   for (const auto &kv : escapingValueSubstMap) {
-    const SILValue escapingValue = kv.first;
-    SILValue newValue = newHeader->createPHIArgument(
-        escapingValue->getType(), escapingValue.getOwnershipKind());
-    // Replace uses *outside* of the loop with the new value.
-    auto UI = escapingValue->use_begin(), E = escapingValue->use_end();
-    while (UI != E) {
-      Operand *use = *UI;
-      // Increment iterator before we invalidate it
-      // when we invoke Operand::Set below.
-      ++UI;
-      if (loop->contains(use->getUser()->getParent())) {
-        continue;
-      }
-      use->set(newValue);
+    addArgument(kv.first);
+  }
+  if (TFNoUndefsInSESE) {
+    for (const auto &kv : exitArgSubstMap) {
+      addArgument(kv.first);
     }
   }
   // An integer to identify the exit edge.
@@ -602,6 +739,11 @@ void SingleExitLoopTransformer::patchPreheader(SILBasicBlock *newHeader) {
   for (const auto &kv : escapingValueSubstMap) {
     newArgs.push_back(kv.second);
   }
+  if (TFNoUndefsInSESE) {
+    for (const auto &kv : exitArgSubstMap) {
+      newArgs.push_back(kv.second);
+    }
+  }
   // `exitIndex` to identify the block to which we exit from the loop.
   newArgs.push_back(createTFIntegerConst(*deviceInfo, builder, location,
                                          /*bitwidth*/ 32,
@@ -620,7 +762,8 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
 
   unsigned oldHeaderNumArgs =
       newHeader->getNumArguments() -
-      (escapingValueSubstMap.size() + /* exitIndex, stayInLoop*/ 2);
+      (escapingValueSubstMap.size() + exitArgSubstMap.size() +
+       /* exitIndex, stayInLoop*/ 2);
 
   // Identify the exit from the header (if any) and assign '0' as its index.
   SILBasicBlock *headerExit = nullptr;
@@ -649,6 +792,20 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
     SILBasicBlock *tgt = const_cast<SILBasicBlock *>(edge.second);
     SILBasicBlock *newTgt = latchBlock;
     bool stayInLoop = loop->contains(tgt);
+    // Track the incoming value for the exit arguments if this is an exit edge
+    // with arguments. This will be used to unify all the values to be passed
+    // to the exit nodes in the loop header.
+    //
+    llvm::DenseMap<SILValue, SILValue> exitArgIncomingValue;
+    if (TFNoUndefsInSESE && !stayInLoop && tgt->getNumArguments() != 0) {
+      auto *termInst = src->getTerminator();
+      auto *branch = dyn_cast<BranchInst>(termInst);
+      assert(branch && "Critical edges should have been split.");
+      for (unsigned i = 0; i < branch->getNumArgs(); ++i) {
+        exitArgIncomingValue[tgt->getArgument(i)] = branch->getArg(i);
+      }
+    }
+
     replaceBranchTarget(src->getTerminator(), tgt, newTgt,
                         /*preserveArgs=*/stayInLoop);
     // Set up additional arguments.
@@ -673,6 +830,23 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
       }
       ++argIndex;
     }
+    if (TFNoUndefsInSESE) {
+      //  Let p0, p1, ..pn be the arguments at new header corresponding to exit
+      // arguments a0, a1, a2, ..., an. For a exit edge
+      //      br exit_i(x, y) ->  exit_i(a2, a3)`,
+      // change the source as br new_latch(p0, p1, x, y, p4, ..., pn)
+      for (const auto &kv : exitArgSubstMap) {
+        const SILValue exitArg = kv.first;
+        auto iter = exitArgIncomingValue.find(exitArg);
+        if (iter != exitArgIncomingValue.end()) {
+          newArgs.push_back(iter->second);
+        } else {
+          newArgs.push_back(newHeader->getArgument(argIndex));
+        }
+        ++argIndex;
+      }
+    }
+
     // `exitIndex` to identify the block to which we exit from the loop.
     // (insert a new value or get the old key value pair.)
     auto emplaceResult = exitIndices.try_emplace(tgt, nextExitIndex);
@@ -698,6 +872,15 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
 SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
     const llvm::DenseMap<SILBasicBlock *, intmax_t> &exitIndices,
     SILValue exitIndexArg) {
+  if (TFNoUndefsInSESE)  {
+    // Drop all arguments as we have moved them into the headers arguments.
+    for (SILBasicBlock *exitBlock : exitBlocks) {
+      exitBlock->dropAllArguments();
+    }
+  }
+  if (exitBlocks.size() == 1) {
+    return *exitBlocks.begin();
+  }
   auto createBlockOutsideLoop = [this]() {
     SILBasicBlock *newBlock = currentFn->createBasicBlock();
     SILLoop *parentLoop = loop->getParentLoop();
@@ -717,12 +900,12 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
   SILBuilder builder(newExitBlock);
   ASTContext &context = builder.getASTContext();
 
-  auto curBlockIter = exitBlocks.rbegin();
+  auto curBlockIter = exitBlocks.begin();
   SILBasicBlock *demuxBlock = *curBlockIter++;
   SILLocation headerLocation =
       getUserSourceLocation(header->getTerminator()->getDebugLocation());
 
-  while (curBlockIter != exitBlocks.rend()) {
+  while (curBlockIter != exitBlocks.end()) {
     SILBasicBlock *newBlock = createBlockOutsideLoop();
     SILBasicBlock *trueBlock = *curBlockIter++;
     builder.setInsertionPoint(newBlock);
@@ -839,7 +1022,7 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
       }
       continue;
     }
-    SingleExitLoopTransformer transformer(&deviceInfo, &LI, &DI, loop);
+    SingleExitLoopTransformer transformer(&deviceInfo, &LI, &DI, loop, &PDI);
     bool loopChanged = transformer.transform();
     if (loopChanged) {
       // Recalculate dominator information as it is stale now.

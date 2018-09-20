@@ -23,13 +23,12 @@ bb2:                                              // Preds: bb1
 
 // CHECK-LABEL: --- XLA CFG Canonicalize: $loopWithCriticalEdge
 // CHECK: [sequence
-// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb7
+// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb4
 // CHECK:     [sequence
 // CHECK:       {condition Header: bb1
 // CHECK:         block bb3
 // CHECK:         block bb2}
 // CHECK:       block bb6]>
-// CHECK:   block bb7
 // CHECK:   block bb4]
 // CHECK: --- XLA CFG Canonicalize end
 
@@ -58,13 +57,12 @@ bb3:                                              // Preds: bb2
 
 // CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}receiveFromHostGraphOp{{.*}}
 // CHECK: [sequence
-// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb7
+// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb4
 // CHECK:     [sequence
 // CHECK:       {condition Header: bb2
 // CHECK:         block bb1
 // CHECK:         block bb3}
 // CHECK:       block bb6]>
-// CHECK:   block bb7
 // CHECK:   block bb4]
 
 // sendToHost
@@ -90,12 +88,11 @@ bb3:                                              // Preds: bb1
 } // end sil function 'sendToHost'
 // CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}sendToHost{{.*}}
 // CHECK: [sequence
-// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb7
+// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb4
 // CHECK:     [sequence
 // CHECK:       {condition Header: bb1
 // CHECK:         block bb3
 // CHECK:         block bb2}
 // CHECK:       block bb6]>
-// CHECK:   block bb7
 // CHECK:   block bb4]
 
