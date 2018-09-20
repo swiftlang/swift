@@ -1814,6 +1814,16 @@ void Serializer::writeMembers(DeclID parentID,
         (*memberTable)[parentID].push_back(memberID);
       }
 
+      // Same as above, but for @_implements attributes
+      if (auto A = VD->getAttrs().getAttribute<ImplementsAttr>()) {
+        std::unique_ptr<DeclMembersTable> &memberTable =
+          DeclMemberNames[A->getMemberName().getBaseName()].second;
+        if (!memberTable) {
+          memberTable = llvm::make_unique<DeclMembersTable>();
+        }
+        (*memberTable)[parentID].push_back(memberID);
+      }
+
       // Possibly add a record to ClassMembersForDynamicLookup too.
       if (isClass) {
         if (VD->canBeAccessedByDynamicLookup()) {
