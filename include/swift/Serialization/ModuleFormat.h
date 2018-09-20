@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 454; // Last change: multiple nominal types for operators
+const uint16_t VERSION_MINOR = 455; // Last change: reorder block IDs
 
 using DeclIDField = BCFixed<31>;
 
@@ -529,6 +529,11 @@ enum BlockID {
   /// \sa options_block
   OPTIONS_BLOCK_ID,
 
+  /// The declaration member-tables index block, a sub-block of the index block.
+  ///
+  /// \sa decl_member_tables_block
+  DECL_MEMBER_TABLES_BLOCK_ID,
+
   /// The module documentation container block, which contains all other
   /// documentation blocks.
   MODULE_DOC_BLOCK_ID = 96,
@@ -537,11 +542,6 @@ enum BlockID {
   ///
   /// \sa comment_block
   COMMENT_BLOCK_ID,
-
-  /// The declaration member-tables index block, a sub-blocb of the index block.
-  ///
-  /// \sa decl_member_tables_block
-  DECL_MEMBER_TABLES_BLOCK_ID
 };
 
 /// The record types within the control block.
