@@ -1115,6 +1115,47 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
     });
 }
 
+struct swift_closure {
+  void *fptr;
+  HeapObject *context;
+};
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift) swift_closure
+MANGLE_SYM(s20_playgroundPrintHookySScSgvg)();
+
+static bool _shouldReportMissingReflectionMetadataWarnings() {
+  // Missing metadata warnings noise up playground sessions and aren't really
+  // actionable in playground contexts. If we're running in a playground,
+  // suppress warnings.
+  //
+  // Guesstimate whether we're in a playground by looking at the
+  // _playgroundPrintHook variable in the standard library, which is set during
+  // playground execution.
+  auto hook = MANGLE_SYM(s20_playgroundPrintHookySScSgvg)();
+  if (hook.fptr) {
+    swift_release(hook.context);
+    return false;
+  } else {
+    return true;
+  }
+}
+
+/// Raise a warning about reflection metadata that could not be found
+/// at runtime. This is usually mostly harmless, but it's good to alert
+/// users that it happens.
+static void
+missing_reflection_metadata_warning(const char *fmt, ...) {
+  bool shouldWarn =
+    SWIFT_LAZY_CONSTANT(_shouldReportMissingReflectionMetadataWarnings());
+  
+  if (!shouldWarn)
+    return;
+  
+  va_list args;
+  va_start(args, fmt);
+  
+  warningv(0, fmt, args);
+}
+
 void swift::swift_getFieldAt(
   const Metadata *base, unsigned index, 
   void (*callback)(const char *name, const Metadata *type, void *ctx), void *callbackCtx) {
@@ -1182,10 +1223,12 @@ void swift::_swift_getFieldAt(
     // a log message.
     if (typeInfo == nullptr) {
       typeInfo = TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {});
-      warning(0, "SWIFT RUNTIME BUG: unable to demangle type of field '%*s'. "
-                 "mangled type name is '%*s'\n",
-                 (int)name.size(), name.data(),
-                 (int)typeName.size(), typeName.data());
+      missing_reflection_metadata_warning(
+        "warning: the Swift runtime was unable to demangle the type "
+        "of field '%*s'. the mangled type name is '%*s'. this field will "
+        "show up as an empty tuple in Mirrors\n",
+        (int)name.size(), name.data(),
+        (int)typeName.size(), typeName.data());
     }
 
     callback(name, FieldType()
@@ -1235,8 +1278,11 @@ void swift::_swift_getFieldAt(
   // If we failed to find the field descriptor metadata for the type, fall
   // back to returning an empty tuple as a standin.
   auto typeName = swift_getTypeName(base, /*qualified*/ true);
-  warning(0, "SWIFT RUNTIME BUG: unable to find field metadata for type '%*s'\n",
-             (int)typeName.length, typeName.data);
+  missing_reflection_metadata_warning(
+    "warning: the Swift runtime found no field metadata for "
+    "type '%*s' that claims to be reflectable. Its fields will show up as "
+    "'unknown' in Mirrors\n",
+    (int)typeName.length, typeName.data);
   callback("unknown",
            FieldType()
              .withType(TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {}))

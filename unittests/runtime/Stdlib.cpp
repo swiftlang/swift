@@ -252,3 +252,15 @@ const long long $Ss12_ClassMirrorVs01_B0sWP[1] = {0};
 // type metadata accessor for Swift._ClassMirror
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const long long $Ss12_ClassMirrorVMa[1] = {0};
+
+// playground print hook
+
+struct swift_closure {
+  void *fptr;
+  HeapObject *context;
+};
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift) swift_closure
+MANGLE_SYM(s20_playgroundPrintHookySScSgvg)() {
+  return {nullptr, nullptr};
+}
+
