@@ -771,38 +771,35 @@ NormalConformanceID Serializer::addConformanceRef(
 }
 
 /// Record the name of a block.
-static void emitBlockID(llvm::BitstreamWriter &out, unsigned ID,
-                        StringRef name,
-                        SmallVectorImpl<unsigned char> &nameBuffer) {
+void SerializerBase::emitBlockID(unsigned ID, StringRef name,
+                                 SmallVectorImpl<unsigned char> &nameBuffer) {
   SmallVector<unsigned, 1> idBuffer;
   idBuffer.push_back(ID);
-  out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETBID, idBuffer);
+  Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETBID, idBuffer);
 
   // Emit the block name if present.
   if (name.empty())
     return;
   nameBuffer.resize(name.size());
   memcpy(nameBuffer.data(), name.data(), name.size());
-  out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_BLOCKNAME, nameBuffer);
+  Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_BLOCKNAME, nameBuffer);
 }
 
-/// Record the name of a record within a block.
-static void emitRecordID(llvm::BitstreamWriter &out, unsigned ID,
-                         StringRef name,
-                         SmallVectorImpl<unsigned char> &nameBuffer) {
+void SerializerBase::emitRecordID(unsigned ID, StringRef name,
+                                  SmallVectorImpl<unsigned char> &nameBuffer) {
   assert(ID < 256 && "can't fit record ID in next to name");
   nameBuffer.resize(name.size()+1);
   nameBuffer[0] = ID;
   memcpy(nameBuffer.data()+1, name.data(), name.size());
-  out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
+  Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
 }
 
 void Serializer::writeBlockInfoBlock() {
   BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
 
   SmallVector<unsigned char, 64> nameBuffer;
-#define BLOCK(X) emitBlockID(Out, X ## _ID, #X, nameBuffer)
-#define BLOCK_RECORD(K, X) emitRecordID(Out, K::X, #X, nameBuffer)
+#define BLOCK(X) emitBlockID(X ## _ID, #X, nameBuffer)
+#define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer)
 
   BLOCK(MODULE_BLOCK);
 
@@ -891,7 +888,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
 
   // These layouts can exist in both decl blocks and sil blocks.
-#define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)
+#define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(X, #X, nameBuffer)
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::INVALID_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
@@ -927,28 +924,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_PROPERTY_OFFSETS);
-
-#undef BLOCK
-#undef BLOCK_RECORD
-}
-
-void Serializer::writeDocBlockInfoBlock() {
-  BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
-
-  SmallVector<unsigned char, 64> nameBuffer;
-#define BLOCK(X) emitBlockID(Out, X ## _ID, #X, nameBuffer)
-#define BLOCK_RECORD(K, X) emitRecordID(Out, K::X, #X, nameBuffer)
-
-  BLOCK(MODULE_DOC_BLOCK);
-
-  BLOCK(CONTROL_BLOCK);
-  BLOCK_RECORD(control_block, METADATA);
-  BLOCK_RECORD(control_block, MODULE_NAME);
-  BLOCK_RECORD(control_block, TARGET);
-
-  BLOCK(COMMENT_BLOCK);
-  BLOCK_RECORD(comment_block, DECL_COMMENTS);
-  BLOCK_RECORD(comment_block, GROUP_NAMES);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -4686,21 +4661,19 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
   }
 }
 
-void Serializer::writeToStream(raw_ostream &os) {
+void SerializerBase::writeToStream(raw_ostream &os) {
   os.write(Buffer.data(), Buffer.size());
   os.flush();
 }
 
-Serializer::Serializer(ArrayRef<unsigned char> signature,
-                       ModuleOrSourceFile DC) {
+SerializerBase::SerializerBase(ArrayRef<unsigned char> signature,
+                               ModuleOrSourceFile DC) {
   for (unsigned char byte : signature)
     Out.Emit(byte, 8);
 
   this->M = getModule(DC);
   this->SF = DC.dyn_cast<SourceFile *>();
 }
-
-Serializer::~Serializer() = default;
 
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                const SILModule *SILMod,
@@ -4748,8 +4721,7 @@ void swift::serialize(ModuleOrSourceFile DC,
                          options.DocOutputPath,
                          [&](raw_ostream &out) {
       SharedTimer timer("Serialization, swiftdoc");
-      Serializer::writeDocToStream(out, DC, options.GroupInfoPath,
-                                   getContext(DC));
+      writeDocToStream(out, DC, options.GroupInfoPath);
       return false;
     });
   }

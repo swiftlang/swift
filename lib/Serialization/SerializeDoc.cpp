@@ -38,7 +38,9 @@ using pFileNameToGroupNameMap = std::unique_ptr<FileNameToGroupNameMap>;
 namespace {
 class YamlGroupInputParser {
   StringRef RecordPath;
-  std::string Separator = "/";
+  static constexpr const char * const Separator = "/";
+
+  // FIXME: This isn't thread-safe.
   static llvm::StringMap<pFileNameToGroupNameMap> AllMaps;
 
   bool parseRoot(FileNameToGroupNameMap &Map, llvm::yaml::Node *Root,
@@ -136,7 +138,7 @@ llvm::StringMap<pFileNameToGroupNameMap> YamlGroupInputParser::AllMaps;
 
 class DeclGroupNameContext {
   struct GroupNameCollector {
-    const std::string NullGroupName = "";
+    static const StringLiteral NullGroupName;
     const bool Enable;
     GroupNameCollector(bool Enable) : Enable(Enable) {}
     virtual ~GroupNameCollector() = default;
@@ -163,7 +165,7 @@ class DeclGroupNameContext {
       if (!PathOp.hasValue())
         return NullGroupName;
       StringRef FullPath =
-        VD->getASTContext().SourceMgr.getIdentifierForBuffer(PathOp.getValue());
+          Ctx.SourceMgr.getIdentifierForBuffer(PathOp.getValue());
       if (!pMap) {
         YamlGroupInputParser Parser(RecordPath);
         if (!Parser.parse()) {
@@ -208,6 +210,9 @@ public:
     return pNameCollector->Enable;
   }
 };
+
+const StringLiteral
+DeclGroupNameContext::GroupNameCollector::NullGroupName = "";
 
 struct DeclCommentTableData {
   StringRef Brief;
@@ -274,6 +279,42 @@ public:
     writer.write<uint32_t>(data.Group);
     writer.write<uint32_t>(data.Order);
   }
+};
+
+class DocSerializer : public SerializerBase {
+public:
+  using SerializerBase::SerializerBase;
+  using SerializerBase::writeToStream;
+
+  using SerializerBase::Out;
+  using SerializerBase::M;
+  using SerializerBase::SF;
+
+  /// Writes the BLOCKINFO block for the module documentation file.
+  void writeDocBlockInfoBlock() {
+    BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
+
+    SmallVector<unsigned char, 64> nameBuffer;
+#define BLOCK(X) emitBlockID(X ## _ID, #X, nameBuffer)
+#define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer)
+
+    BLOCK(MODULE_DOC_BLOCK);
+
+    BLOCK(CONTROL_BLOCK);
+    BLOCK_RECORD(control_block, METADATA);
+    BLOCK_RECORD(control_block, MODULE_NAME);
+    BLOCK_RECORD(control_block, TARGET);
+
+    BLOCK(COMMENT_BLOCK);
+    BLOCK_RECORD(comment_block, DECL_COMMENTS);
+    BLOCK_RECORD(comment_block, GROUP_NAMES);
+
+#undef BLOCK
+#undef BLOCK_RECORD
+  }
+
+  /// Writes the Swift doc module file header and name.
+  void writeDocHeader();
 };
 
 } // end anonymous namespace
@@ -422,7 +463,7 @@ static void writeDeclCommentTable(
   DeclCommentList.emit(scratch, tableOffset, hashTableBlob);
 }
 
-void Serializer::writeDocHeader() {
+void DocSerializer::writeDocHeader() {
   {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
     control_block::ModuleNameLayout ModuleName(Out);
@@ -440,9 +481,9 @@ void Serializer::writeDocHeader() {
   }
 }
 
-void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                                  StringRef GroupInfoPath, ASTContext &Ctx) {
-  Serializer S{MODULE_DOC_SIGNATURE, DC};
+void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                                     StringRef GroupInfoPath) {
+  DocSerializer S{MODULE_DOC_SIGNATURE, DC};
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeDocBlockInfoBlock();
 
@@ -451,7 +492,7 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
     S.writeDocHeader();
     {
       BCBlockRAII restoreBlock(S.Out, COMMENT_BLOCK_ID, 4);
-      DeclGroupNameContext GroupContext(GroupInfoPath, Ctx);
+      DeclGroupNameContext GroupContext(GroupInfoPath, S.M->getASTContext());
       comment_block::DeclCommentListLayout DeclCommentList(S.Out);
       writeDeclCommentTable(DeclCommentList, S.SF, S.M, GroupContext);
       comment_block::GroupNamesLayout GroupNames(S.Out);
