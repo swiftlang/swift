@@ -16,13 +16,13 @@ sil @testAggregateArgHelper : $@convention(thin) (@owned R<S>) -> ()
 //
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @testAggregateArg : $@convention(thin) (@in R<S>) -> @out () {
 // CHECK: bb0(%0 : $R<S>):
-// CHECK:   [[F:%.*]] = function_ref @$S16testAggregateArgTf4g_n : $@convention(thin) (@in_guaranteed R<S>) -> @out ()
+// CHECK:   [[F:%.*]] = function_ref @$s16testAggregateArgTf4g_n : $@convention(thin) (@in_guaranteed R<S>) -> @out ()
 // CHECK:   [[CALL:%.*]] = apply [[F]](%0) : $@convention(thin) (@in_guaranteed R<S>) -> @out ()
 // CHECK:   release_value %0 : $R<S>
 // CHECK:   return [[CALL]] : $()
 // CHECK-LABEL: } // end sil function 'testAggregateArg'
 //
-// CHECK-LABEL: sil shared @$S16testAggregateArgTf4g_n : $@convention(thin) (@in_guaranteed R<S>) -> @out () {
+// CHECK-LABEL: sil shared @$s16testAggregateArgTf4g_n : $@convention(thin) (@in_guaranteed R<S>) -> @out () {
 // CHECK: bb0(%0 : $R<S>):
 // CHECK:   [[COPY:%.*]] = copy_value %0 : $R<S>
 // CHECK:   retain_value %0 : $R<S>
@@ -30,7 +30,7 @@ sil @testAggregateArgHelper : $@convention(thin) (@owned R<S>) -> ()
 // CHECK:   [[CALL:%.*]] = apply [[F]]([[COPY]]) : $@convention(thin) (@owned R<S>) -> ()
 // CHECK:   destroy_value %0 : $R<S>
 // CHECK:   return %{{.*}} : $()
-// CHECK-LABEL: } // end sil function '$S16testAggregateArgTf4g_n'
+// CHECK-LABEL: } // end sil function '$s16testAggregateArgTf4g_n'
 sil @testAggregateArg : $@convention(thin) (@in R<S>) -> @out () {
 bb0(%0 : $R<S>):
   %9 = copy_value %0 : $R<S>

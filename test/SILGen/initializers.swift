@@ -358,7 +358,7 @@ class FailableBaseClass {
     return nil
   }
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17FailableBaseClassC19failAfterDelegationACSgyt_tcfC
+  // CHECK-LABEL: sil hidden @$s21failable_initializers17FailableBaseClassC19failAfterDelegationACSgyt_tcfC
   // CHECK: bb0([[SELF_META:%.*]] : @trivial $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
@@ -377,7 +377,7 @@ class FailableBaseClass {
 
   // Optional to optional
   //
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17FailableBaseClassC20failDuringDelegationACSgyt_tcfC
+  // CHECK-LABEL: sil hidden @$s21failable_initializers17FailableBaseClassC20failDuringDelegationACSgyt_tcfC
   // CHECK: bb0([[SELF_META:%.*]] : @trivial $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
@@ -410,7 +410,7 @@ class FailableBaseClass {
 
   // IUO to optional
   //
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17FailableBaseClassC21failDuringDelegation2ACSgyt_tcfC
+  // CHECK-LABEL: sil hidden @$s21failable_initializers17FailableBaseClassC21failDuringDelegation2ACSgyt_tcfC
   // CHECK: bb0([[SELF_META:%.*]] : @trivial $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
@@ -456,7 +456,7 @@ extension FailableBaseClass {
 class FailableDerivedClass : FailableBaseClass {
   var otherMember: Canary
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers20FailableDerivedClassC27derivedFailBeforeDelegationACSgyt_tcfc : $@convention(method) (@owned FailableDerivedClass) -> @owned Optional<FailableDerivedClass> {
+  // CHECK-LABEL: sil hidden @$s21failable_initializers20FailableDerivedClassC27derivedFailBeforeDelegationACSgyt_tcfc : $@convention(method) (@owned FailableDerivedClass) -> @owned Optional<FailableDerivedClass> {
   // CHECK: bb0([[OLD_SELF:%.*]] : @owned $FailableDerivedClass):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]
@@ -475,7 +475,7 @@ class FailableDerivedClass : FailableBaseClass {
     return nil
   }
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers20FailableDerivedClassC27derivedFailDuringDelegationACSgyt_tcfc : $@convention(method) (@owned FailableDerivedClass) -> @owned Optional<FailableDerivedClass> {
+  // CHECK-LABEL: sil hidden @$s21failable_initializers20FailableDerivedClassC27derivedFailDuringDelegationACSgyt_tcfc : $@convention(method) (@owned FailableDerivedClass) -> @owned Optional<FailableDerivedClass> {
   // CHECK: bb0([[OLD_SELF:%.*]] : @owned $FailableDerivedClass):
   init?(derivedFailDuringDelegation: ()) {
     // First initialize the lvalue for self.
@@ -571,7 +571,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 
   // ---- Delegating to super
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegationACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+  // CHECK-LABEL: sil hidden @$s21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegationACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
   // CHECK: bb0(
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
@@ -580,7 +580,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
   // Then initialize the canary with nil. We are able to borrow the initialized self to avoid retain/release overhead.
-  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @$S21failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvpfi :
+  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @$s21failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvpfi :
   // CHECK:   [[OPT_CANARY:%.*]] = apply [[CANARY_FUNC]]()
   // CHECK:   [[SELF:%.*]] = load_borrow [[PROJ]]
   // CHECK:   [[CANARY_ADDR:%.*]] = ref_element_addr [[SELF]]
@@ -590,13 +590,13 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   end_borrow [[SELF]]
   //
   // Now we perform the unwrap.
-  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$S21failable_initializers6unwrapyS2iKF : $@convention(thin)
+  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin)
   // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // CHECK: [[NORMAL_BB]](
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
   // CHECK:   [[SELF_BASE:%.*]] = upcast [[SELF]] : $ThrowDerivedClass to $ThrowBaseClass
-  // CHECK:   [[BASE_INIT_FN:%.*]] = function_ref @$S21failable_initializers14ThrowBaseClassC6noFailACyt_tcfc : $@convention(method)
+  // CHECK:   [[BASE_INIT_FN:%.*]] = function_ref @$s21failable_initializers14ThrowBaseClassC6noFailACyt_tcfc : $@convention(method)
   // CHECK:   [[SELF_INIT_BASE:%.*]] = apply [[BASE_INIT_FN]]([[SELF_BASE]])
   // CHECK:   [[SELF:%.*]] = unchecked_ref_cast [[SELF_INIT_BASE]] : $ThrowBaseClass to $ThrowDerivedClass
   // CHECK:   store [[SELF]] to [init] [[PROJ]]
@@ -609,13 +609,13 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
   // CHECK:   destroy_value [[MARK_UNINIT]]
   // CHECK:   throw [[ERROR]]
-  // CHECK: } // end sil function '$S21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegationACSi_tKcfc'
+  // CHECK: } // end sil function '$s21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegationACSi_tKcfc'
   init(delegatingFailBeforeDelegation : Int) throws {
     try unwrap(delegatingFailBeforeDelegation)
     super.init(noFail: ())
   }
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17ThrowDerivedClassC41delegatingFailDuringDelegationArgEmissionACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+  // CHECK-LABEL: sil hidden @$s21failable_initializers17ThrowDerivedClassC41delegatingFailDuringDelegationArgEmissionACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
   // CHECK: bb0(
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
@@ -624,7 +624,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   store {{%.*}} to [init] [[PROJ]]
   //
   // Then initialize the canary with nil. We are able to borrow the initialized self to avoid retain/release overhead.
-  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @$S21failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvpfi :
+  // CHECK:   [[CANARY_FUNC:%.*]] = function_ref @$s21failable_initializers17ThrowDerivedClassC6canaryAA6CanaryCSgvpfi :
   // CHECK:   [[OPT_CANARY:%.*]] = apply [[CANARY_FUNC]]()
   // CHECK:   [[SELF:%.*]] = load_borrow [[PROJ]]
   // CHECK:   [[CANARY_ADDR:%.*]] = ref_element_addr [[SELF]]
@@ -636,13 +636,13 @@ class ThrowDerivedClass : ThrowBaseClass {
   // Now we begin argument emission where we perform the unwrap.
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
   // CHECK:   [[BASE_SELF:%.*]] = upcast [[SELF]] : $ThrowDerivedClass to $ThrowBaseClass
-  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$S21failable_initializers6unwrapyS2iKF : $@convention(thin)
+  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin)
   // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // Now we emit the call to the initializer. Notice how we return self back to
   // its memory locatio nbefore any other work is done.
   // CHECK: [[NORMAL_BB]](
-  // CHECK:   [[INIT_FN:%.*]] = function_ref @$S21failable_initializers14ThrowBaseClassC6noFailACSi_tcfc : $@convention(method)
+  // CHECK:   [[INIT_FN:%.*]] = function_ref @$s21failable_initializers14ThrowBaseClassC6noFailACSi_tcfc : $@convention(method)
   // CHECK:   [[BASE_SELF_INIT:%.*]] = apply [[INIT_FN]]({{%.*}}, [[BASE_SELF]])
   // CHECK:   [[SELF:%.*]] = unchecked_ref_cast [[BASE_SELF_INIT]] : $ThrowBaseClass to $ThrowDerivedClass
   // CHECK:   store [[SELF]] to [init] [[PROJ]]
@@ -661,12 +661,12 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   store [[SELF]] to [init] [[PROJ]]
   // CHECK:   destroy_value [[MARK_UNINIT]]
   // CHECK:   throw [[ERROR]]
-  // CHECK: } // end sil function '$S21failable_initializers17ThrowDerivedClassC41delegatingFailDuringDelegationArgEmissionACSi_tKcfc'
+  // CHECK: } // end sil function '$s21failable_initializers17ThrowDerivedClassC41delegatingFailDuringDelegationArgEmissionACSi_tKcfc'
   init(delegatingFailDuringDelegationArgEmission : Int) throws {
     super.init(noFail: try unwrap(delegatingFailDuringDelegationArgEmission))
   }
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17ThrowDerivedClassC34delegatingFailDuringDelegationCallACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+  // CHECK-LABEL: sil hidden @$s21failable_initializers17ThrowDerivedClassC34delegatingFailDuringDelegationCallACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
   // CHECK: bb0(
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
@@ -677,7 +677,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // Call the initializer.
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
   // CHECK:   [[BASE_SELF:%.*]] = upcast [[SELF]] : $ThrowDerivedClass to $ThrowBaseClass
-  // CHECK:   [[INIT_FN:%.*]] = function_ref @$S21failable_initializers14ThrowBaseClassCACyKcfc : $@convention(method)
+  // CHECK:   [[INIT_FN:%.*]] = function_ref @$s21failable_initializers14ThrowBaseClassCACyKcfc : $@convention(method)
   // CHECK:   try_apply [[INIT_FN]]([[BASE_SELF]]) : $@convention(method) (@owned ThrowBaseClass) -> (@owned ThrowBaseClass, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // Insert the return statement into the normal block...
@@ -692,12 +692,12 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
   // CHECK-NEXT:   destroy_value [[MARK_UNINIT]]
   // CHECK-NEXT:   throw [[ERROR]]
-  // CHECK: } // end sil function '$S21failable_initializers17ThrowDerivedClassC34delegatingFailDuringDelegationCallACSi_tKcfc'
+  // CHECK: } // end sil function '$s21failable_initializers17ThrowDerivedClassC34delegatingFailDuringDelegationCallACSi_tKcfc'
   init(delegatingFailDuringDelegationCall : Int) throws {
     try super.init()
   }
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17ThrowDerivedClassC29delegatingFailAfterDelegationACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+  // CHECK-LABEL: sil hidden @$s21failable_initializers17ThrowDerivedClassC29delegatingFailAfterDelegationACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
   // CHECK: bb0(
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
@@ -708,13 +708,13 @@ class ThrowDerivedClass : ThrowBaseClass {
   // Call the initializer and then store the new self back into its memory slot.
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
   // CHECK:   [[BASE_SELF:%.*]] = upcast [[SELF]] : $ThrowDerivedClass to $ThrowBaseClass
-  // CHECK:   [[INIT_FN:%.*]] = function_ref @$S21failable_initializers14ThrowBaseClassC6noFailACyt_tcfc : $@convention(method)
+  // CHECK:   [[INIT_FN:%.*]] = function_ref @$s21failable_initializers14ThrowBaseClassC6noFailACyt_tcfc : $@convention(method)
   // CHECK:   [[NEW_SELF:%.*]] = apply [[INIT_FN]]([[BASE_SELF]]) : $@convention(method) (@owned ThrowBaseClass) -> @owned ThrowBaseClass
   // CHECK:   [[NEW_SELF_CAST:%.*]] = unchecked_ref_cast [[NEW_SELF]] : $ThrowBaseClass to $ThrowDerivedClass
   // CHECK:   store [[NEW_SELF_CAST]] to [init] [[PROJ]]
   //
   // Finally perform the unwrap.
-  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$S21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error Error)
+  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error Error)
   // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // Insert the return statement into the normal block...
@@ -727,32 +727,32 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
   // CHECK-NEXT:   destroy_value [[MARK_UNINIT]]
   // CHECK-NEXT:   throw [[ERROR]]
-  // CHECK: } // end sil function '$S21failable_initializers17ThrowDerivedClassC29delegatingFailAfterDelegationACSi_tKcfc'
+  // CHECK: } // end sil function '$s21failable_initializers17ThrowDerivedClassC29delegatingFailAfterDelegationACSi_tKcfc'
   init(delegatingFailAfterDelegation : Int) throws {
     super.init(noFail: ())
     try unwrap(delegatingFailAfterDelegation)
   }
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegation0fg6DuringI11ArgEmissionACSi_SitKcfc : $@convention(method) (Int, Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+  // CHECK-LABEL: sil hidden @$s21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegation0fg6DuringI11ArgEmissionACSi_SitKcfc : $@convention(method) (Int, Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
   // Create our box.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
   // CHECK:   [[PROJ:%.*]] = project_box [[MARK_UNINIT]]
   //
   // Perform the unwrap.
-  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$S21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error Error)
+  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error Error)
   // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[UNWRAP_NORMAL_BB:bb[0-9]+]], error [[UNWRAP_ERROR_BB:bb[0-9]+]]
   //
   // Now we begin argument emission where we perform another unwrap.
   // CHECK: [[UNWRAP_NORMAL_BB]](
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
   // CHECK:   [[SELF_CAST:%.*]] = upcast [[SELF]] : $ThrowDerivedClass to $ThrowBaseClass
-  // CHECK:   [[UNWRAP_FN2:%.*]] = function_ref @$S21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error Error)
+  // CHECK:   [[UNWRAP_FN2:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error Error)
   // CHECK:   try_apply [[UNWRAP_FN2]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[UNWRAP_NORMAL_BB2:bb[0-9]+]], error [[UNWRAP_ERROR_BB2:bb[0-9]+]]
   //
   // Then since this example has a
   // CHECK: [[UNWRAP_NORMAL_BB2]]([[INT:%.*]] : @trivial $Int):
-  // CHECK:   [[INIT_FN2:%.*]] = function_ref @$S21failable_initializers14ThrowBaseClassC6noFailACSi_tcfc : $@convention(method) (Int, @owned ThrowBaseClass) -> @owned ThrowBaseClass
+  // CHECK:   [[INIT_FN2:%.*]] = function_ref @$s21failable_initializers14ThrowBaseClassC6noFailACSi_tcfc : $@convention(method) (Int, @owned ThrowBaseClass) -> @owned ThrowBaseClass
   // CHECK:   [[NEW_SELF_CAST:%.*]] = apply [[INIT_FN2]]([[INT]], [[SELF_CAST]]) : $@convention(method) (Int, @owned ThrowBaseClass) -> @owned ThrowBaseClass
   // CHECK:   [[NEW_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF_CAST]] : $ThrowBaseClass to $ThrowDerivedClass
   // CHECK:   store [[NEW_SELF]] to [init] [[PROJ]]
@@ -772,7 +772,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: [[ERROR_JOIN]]([[ERROR_PHI:%.*]] : @owned $Error):
   // CHECK:   destroy_value [[MARK_UNINIT]]
   // CHECK:   throw [[ERROR_PHI]]
-  // CHECK: } // end sil function '$S21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegation0fg6DuringI11ArgEmissionACSi_SitKcfc'
+  // CHECK: } // end sil function '$s21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegation0fg6DuringI11ArgEmissionACSi_SitKcfc'
   init(delegatingFailBeforeDelegation : Int, delegatingFailDuringDelegationArgEmission : Int) throws {
     try unwrap(delegatingFailBeforeDelegation)
     super.init(noFail: try unwrap(delegatingFailDuringDelegationArgEmission))
@@ -867,7 +867,7 @@ class ThrowDerivedClass : ThrowBaseClass {
     try unwrap(chainingFailAfterDelegation)
   }
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17ThrowDerivedClassC39chainingFailDuringDelegationArgEmission0fghI4CallACSi_SitKcfC
+  // CHECK-LABEL: sil hidden @$s21failable_initializers17ThrowDerivedClassC39chainingFailDuringDelegationArgEmission0fghI4CallACSi_SitKcfC
   // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : @trivial $@thick ThrowDerivedClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
@@ -901,7 +901,7 @@ class ThrowDerivedClass : ThrowBaseClass {
     try unwrap(chainingFailAfterDelegation)
   }
 
-  // CHECK-LABEL: sil hidden @$S21failable_initializers17ThrowDerivedClassC32chainingFailDuringDelegationCall0fg5AfterI0ACSi_SitKcfC
+  // CHECK-LABEL: sil hidden @$s21failable_initializers17ThrowDerivedClassC32chainingFailDuringDelegationCall0fg5AfterI0ACSi_SitKcfC
   // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : @trivial $@thick ThrowDerivedClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
@@ -928,7 +928,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK: [[THROWING_BB]]([[ERROR:%.*]] : @owned $Error):
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: throw [[ERROR]]
-  // CHECK: } // end sil function '$S21failable_initializers17ThrowDerivedClassC28chainingFailBeforeDelegation0fg6DuringI11ArgEmission0fgjI4CallACSi_S2itKcfC'
+  // CHECK: } // end sil function '$s21failable_initializers17ThrowDerivedClassC28chainingFailBeforeDelegation0fg6DuringI11ArgEmission0fgjI4CallACSi_S2itKcfC'
   convenience init(chainingFailDuringDelegationCall : Int, chainingFailAfterDelegation : Int) throws {
     try self.init()
     try unwrap(chainingFailAfterDelegation)
@@ -1110,7 +1110,7 @@ struct DynamicTypeStruct {
 }
 
 class InOutInitializer {
-// CHECK-LABEL: sil hidden @$S21failable_initializers16InOutInitializerC1xACSiz_tcfC : $@convention(method) (@inout Int, @thick InOutInitializer.Type) -> @owned InOutInitializer {
+// CHECK-LABEL: sil hidden @$s21failable_initializers16InOutInitializerC1xACSiz_tcfC : $@convention(method) (@inout Int, @thick InOutInitializer.Type) -> @owned InOutInitializer {
 // CHECK: bb0(%0 : @trivial $*Int, %1 : @trivial $@thick InOutInitializer.Type):
   init(x: inout Int) {}
 }
@@ -1121,11 +1121,11 @@ class SuperVariadic {
 }
 class SubVariadic : SuperVariadic { }
 
-// CHECK-LABEL: sil hidden @$S21failable_initializers11SubVariadicC4intsACSid_tcfc
+// CHECK-LABEL: sil hidden @$s21failable_initializers11SubVariadicC4intsACSid_tcfc
 // CHECK:       bb0(%0 : @owned $Array<Int>, %1 : @owned $SubVariadic):
 // CHECK:         [[SELF_UPCAST:%.*]] = upcast {{.*}} : $SubVariadic to $SuperVariadic
 // CHECK:         [[T0:%.*]] = begin_borrow %0 : $Array<Int>
 // CHECK:         [[T1:%.*]] = copy_value [[T0]] : $Array<Int>
-// CHECK:         [[SUPER_INIT:%.*]] = function_ref @$S21failable_initializers13SuperVariadicC4intsACSid_tcfc
+// CHECK:         [[SUPER_INIT:%.*]] = function_ref @$s21failable_initializers13SuperVariadicC4intsACSid_tcfc
 // CHECK:         apply [[SUPER_INIT]]([[T1]], [[SELF_UPCAST]])
 // CHECK-LABEL: } // end sil function

@@ -9,7 +9,7 @@ import Builtin
 import Swift
 import gizmo
 
-// CHECK: @"$S20generic_classes_objc19GenericInheritsObjCCMP"
+// CHECK: @"$s20generic_classes_objc19GenericInheritsObjCCMP"
 
 class GenericInheritsObjC<D> : Gizmo {
   var a : Int
@@ -21,23 +21,23 @@ class GenericInheritsObjC<D> : Gizmo {
 sil_vtable GenericInheritsObjC {}
 
 // __deallocating_deinit
-sil @$S20generic_classes_objc19GenericInheritsObjCCfD : $@convention(method) <T> (GenericInheritsObjC<T>) -> () {
+sil @$s20generic_classes_objc19GenericInheritsObjCCfD : $@convention(method) <T> (GenericInheritsObjC<T>) -> () {
 bb0(%0 : @unowned $GenericInheritsObjC<T>):
   unreachable
 }
 
 // @objc init
-sil @$S20generic_classes_objc19GenericInheritsObjCCACyxGycfcTo : $@convention(objc_method) <T> (@owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
+sil @$s20generic_classes_objc19GenericInheritsObjCCACyxGycfcTo : $@convention(objc_method) <T> (@owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
 bb0(%0 : @owned $GenericInheritsObjC<T>):
   unreachable
 }
 
-sil @$S20generic_classes_objc19GenericInheritsObjCC7bellsOnACyxGSgSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
+sil @$s20generic_classes_objc19GenericInheritsObjCC7bellsOnACyxGSgSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
 bb0(%0 : @trivial $Int, %1 : @owned $GenericInheritsObjC<T>):
   unreachable
 }
 
-// CHECK: @"$S20generic_classes_objc20GenericInheritsObjC2CMP"
+// CHECK: @"$s20generic_classes_objc20GenericInheritsObjC2CMP"
 
 class GenericInheritsObjC2<E> : Gizmo {
   var x : UInt8
@@ -49,18 +49,18 @@ class GenericInheritsObjC2<E> : Gizmo {
 sil_vtable GenericInheritsObjC2 {}
 
 // __deallocating_deinit
-sil @$S20generic_classes_objc20GenericInheritsObjC2CfD : $@convention(method) <T> (GenericInheritsObjC2<T>) -> () {
+sil @$s20generic_classes_objc20GenericInheritsObjC2CfD : $@convention(method) <T> (GenericInheritsObjC2<T>) -> () {
 bb0(%0 : @unowned $GenericInheritsObjC2<T>):
   unreachable
 }
 
 // @objc init
-sil @$S20generic_classes_objc20GenericInheritsObjC2CACyxGycfcTo : $@convention(objc_method) <T> (@owned GenericInheritsObjC2<T>) -> @owned GenericInheritsObjC2<T> {
+sil @$s20generic_classes_objc20GenericInheritsObjC2CACyxGycfcTo : $@convention(objc_method) <T> (@owned GenericInheritsObjC2<T>) -> @owned GenericInheritsObjC2<T> {
 bb0(%0 : @owned $GenericInheritsObjC2<T>):
   unreachable
 }
 
-sil @$S20generic_classes_objc20GenericInheritsObjC2C7bellsOnACyxGSgSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
+sil @$s20generic_classes_objc20GenericInheritsObjC2C7bellsOnACyxGSgSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
 bb0(%0 : @trivial $Int, %1 : @owned $GenericInheritsObjC<T>):
   unreachable
 }
@@ -68,7 +68,7 @@ bb0(%0 : @trivial $Int, %1 : @owned $GenericInheritsObjC<T>):
 @objc protocol P1 { }
 protocol P2 { }
 
-// CHECK: @"$S20generic_classes_objc16Generic3WithReqsCMn" = hidden constant
+// CHECK: @"$s20generic_classes_objc16Generic3WithReqsCMn" = hidden constant
 // CHECK-SAME: i16 3, i16 3, i16 5, i16 0
 class Generic3WithReqs<T: P1, U: P2, V: P2> { }
 sil_vtable Generic3WithReqs { }

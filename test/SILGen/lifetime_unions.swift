@@ -43,24 +43,24 @@ func getNonTrivialUnion3() -> NonTrivialUnion3 { return .Bar(C()) }
 func getAddressOnlyUnion<T>(_: T.Type) -> AddressOnlyUnion<T> { return .Foo }
  */
 
-// CHECK-LABEL: sil hidden @$S15lifetime_unions19destroyUnionRValuesyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$s15lifetime_unions19destroyUnionRValuesyyF : $@convention(thin) () -> () {
 func destroyUnionRValues() {
-  // CHECK:   [[GET_TRIVIAL_UNION:%.*]] = function_ref @$S15lifetime_unions15getTrivialUnionAA0dE0OyF : $@convention(thin) () -> TrivialUnion
+  // CHECK:   [[GET_TRIVIAL_UNION:%.*]] = function_ref @$s15lifetime_unions15getTrivialUnionAA0dE0OyF : $@convention(thin) () -> TrivialUnion
   // CHECK:   [[TRIVIAL_UNION:%.*]] = apply [[GET_TRIVIAL_UNION]]() : $@convention(thin) () -> TrivialUnion
   // CHECK-NOT: [[TRIVIAL_UNION]]
   getTrivialUnion()
 
-  // CHECK:   [[GET_NON_TRIVIAL_UNION_1:%.*]] = function_ref @$S15lifetime_unions19getNonTrivialUnion1AA0deF0OyF : $@convention(thin) () -> @owned NonTrivialUnion1
+  // CHECK:   [[GET_NON_TRIVIAL_UNION_1:%.*]] = function_ref @$s15lifetime_unions19getNonTrivialUnion1AA0deF0OyF : $@convention(thin) () -> @owned NonTrivialUnion1
   // CHECK:   [[NON_TRIVIAL_UNION_1:%.*]] = apply [[GET_NON_TRIVIAL_UNION_1]]() : $@convention(thin) () -> @owned NonTrivialUnion1
   // CHECK:   destroy_value [[NON_TRIVIAL_UNION_1]] : $NonTrivialUnion1
   getNonTrivialUnion1()
 
-  // CHECK:   [[GET_NON_TRIVIAL_UNION_2:%.*]] = function_ref @$S15lifetime_unions19getNonTrivialUnion2AA0deF0OyF : $@convention(thin) () -> @owned NonTrivialUnion2
+  // CHECK:   [[GET_NON_TRIVIAL_UNION_2:%.*]] = function_ref @$s15lifetime_unions19getNonTrivialUnion2AA0deF0OyF : $@convention(thin) () -> @owned NonTrivialUnion2
   // CHECK:   [[NON_TRIVIAL_UNION_2:%.*]] = apply [[GET_NON_TRIVIAL_UNION_2]]() : $@convention(thin) () -> @owned NonTrivialUnion2
   // CHECK:   destroy_value [[NON_TRIVIAL_UNION_2]] : $NonTrivialUnion2
   getNonTrivialUnion2()
 
-  // CHECK:   [[GET_NON_TRIVIAL_UNION_3:%.*]] = function_ref @$S15lifetime_unions19getNonTrivialUnion3AA0deF0OyF : $@convention(thin) () -> @owned NonTrivialUnion3
+  // CHECK:   [[GET_NON_TRIVIAL_UNION_3:%.*]] = function_ref @$s15lifetime_unions19getNonTrivialUnion3AA0deF0OyF : $@convention(thin) () -> @owned NonTrivialUnion3
   // CHECK:   [[NON_TRIVIAL_UNION_3:%.*]] = apply [[GET_NON_TRIVIAL_UNION_3]]() : $@convention(thin) () -> @owned NonTrivialUnion3
   // CHECK:   destroy_value [[NON_TRIVIAL_UNION_3]] : $NonTrivialUnion3
   getNonTrivialUnion3()

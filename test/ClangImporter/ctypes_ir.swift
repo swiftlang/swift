@@ -4,19 +4,19 @@
 
 import ctypes
 
-// CHECK-LABEL: define hidden swiftcc void @"$S9ctypes_ir9testColoryyF"
+// CHECK-LABEL: define hidden swiftcc void @"$s9ctypes_ir9testColoryyF"
 func testColor() {
   // CHECK: store i32 1
   var c : Color = green
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$S9ctypes_ir12testAnonEnumyyF"
+// CHECK-LABEL: define hidden swiftcc void @"$s9ctypes_ir12testAnonEnumyyF"
 func testAnonEnum() {
   // CHECK: store i64 30064771073
   var a = AnonConst2
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$S9ctypes_ir17testAnonEnumSmallyyF"
+// CHECK-LABEL: define hidden swiftcc void @"$s9ctypes_ir17testAnonEnumSmallyyF"
 func testAnonEnumSmall() {
   // CHECK: store i64 17
   var a = AnonConstSmall2
@@ -27,7 +27,7 @@ func testStructWithFlexibleArray(_ s : StructWithFlexibleArray) {
 }
 
 // Make sure flexible array struct member isn't represented in IR function signature as i0 (or at all). rdar://problem/18510461
-// CHECK-LABEL: define hidden swiftcc void @"$S9ctypes_ir27testStructWithFlexibleArrayyySo0defG0aF"(i32)
+// CHECK-LABEL: define hidden swiftcc void @"$s9ctypes_ir27testStructWithFlexibleArrayyySo0defG0aF"(i32)
 
 typealias EightUp = (Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8)
 

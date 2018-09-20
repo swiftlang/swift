@@ -13,10 +13,10 @@ var x: Int
 let reversedArray: ReversedCollection<[Int]>
 
 // x
-sil_global hidden @$S3tmp1xSivp : $Int
+sil_global hidden @$s3tmp1xSivp : $Int
 
 // reversedArray
-sil_global hidden [let] @$S3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $ReversedCollection<Array<Int>>
+sil_global hidden [let] @$s3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $ReversedCollection<Array<Int>>
 
 // _swiftEmptyArrayStorage
 sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
@@ -24,7 +24,7 @@ sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 
 // CHECK-LABEL: sil hidden @multi_end_licm : $@convention(thin) () -> () {
 // CHECK: bb2:
-// CHECK: [[GLOBALVAR:%.*]] = global_addr @$S3tmp1xSivp : $*Int
+// CHECK: [[GLOBALVAR:%.*]] = global_addr @$s3tmp1xSivp : $*Int
 // CHECK: [[BEGINA:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]] : $*Int
 // CHECK-NEXT: br [[LOOPH:bb[0-9]+]]({{.*}} : $Builtin.Int64)
 // CHECK: [[LOOPH]]({{.*}} : $Builtin.Int64)
@@ -51,7 +51,7 @@ sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 // CHECK-NEXT: return
 sil hidden @multi_end_licm : $@convention(thin) () -> () {
 bb0:
-  %0 = global_addr @$S3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>
+  %0 = global_addr @$s3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>
   %1 = struct_element_addr %0 : $*ReversedCollection<Array<Int>>, #ReversedCollection._base
   %2 = struct_element_addr %1 : $*Array<Int>, #Array._buffer
   %3 = struct_element_addr %2 : $*_ArrayBuffer<Int>, #_ArrayBuffer._storage
@@ -74,7 +74,7 @@ bb1:
   br bbRet
 
 bb2:
-  %19 = global_addr @$S3tmp1xSivp : $*Int
+  %19 = global_addr @$s3tmp1xSivp : $*Int
   %20 = integer_literal $Builtin.Int64, 1
   %21 = integer_literal $Builtin.Int1, -1
   %23 = ref_tail_addr %6 : $_ContiguousArrayStorageBase, $Int
@@ -136,7 +136,7 @@ bbRet:
 // CHECK: return
 sil hidden @multi_end_licm_loop_exit : $@convention(thin) () -> () {
 bb0:
-  %0 = global_addr @$S3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>
+  %0 = global_addr @$s3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>
   %1 = struct_element_addr %0 : $*ReversedCollection<Array<Int>>, #ReversedCollection._base
   %2 = struct_element_addr %1 : $*Array<Int>, #Array._buffer
   %3 = struct_element_addr %2 : $*_ArrayBuffer<Int>, #_ArrayBuffer._storage
@@ -159,7 +159,7 @@ bb1:
   br bbRet
 
 bb2:
-  %19 = global_addr @$S3tmp1xSivp : $*Int
+  %19 = global_addr @$s3tmp1xSivp : $*Int
   %20 = integer_literal $Builtin.Int64, 1
   %21 = integer_literal $Builtin.Int1, -1
   %23 = ref_tail_addr %6 : $_ContiguousArrayStorageBase, $Int

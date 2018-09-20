@@ -13,12 +13,12 @@
 
 // CHECK: sil{{.*}} @unknown : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil [serialized] [canonical] @$Ss1XVABycfC : $@convention(method) (@thin X.Type) -> X
+// CHECK-LABEL: sil [serialized] [canonical] @$ss1XVABycfC : $@convention(method) (@thin X.Type) -> X
 // CHECK: bb0
 // CHECK-NEXT: struct $X ()
 // CHECK-NEXT: return
 
-// CHECK-LABEL: sil [serialized] [canonical] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
+// CHECK-LABEL: sil [serialized] [canonical] @$ss1XV4testyyF : $@convention(method) (X) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
@@ -39,12 +39,12 @@
 
 // SIB-CHECK: sil [canonical] @unknown : $@convention(thin) () -> ()
 
-// SIB-CHECK-LABEL: sil [serialized] [canonical] @$Ss1XVABycfC : $@convention(method) (@thin X.Type) -> X
+// SIB-CHECK-LABEL: sil [serialized] [canonical] @$ss1XVABycfC : $@convention(method) (@thin X.Type) -> X
 // SIB-CHECK: bb0
 // SIB-CHECK-NEXT: struct $X ()
 // SIB-CHECK-NEXT: return
 
-// SIB-CHECK-LABEL: sil [serialized] [canonical] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
+// SIB-CHECK-LABEL: sil [serialized] [canonical] @$ss1XV4testyyF : $@convention(method) (X) -> ()
 // SIB-CHECK: bb0
 // SIB-CHECK-NEXT: function_ref
 // SIB-CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()

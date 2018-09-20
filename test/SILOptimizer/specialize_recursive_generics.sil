@@ -9,8 +9,8 @@ import Builtin
 import Swift
 
 // Check that this recursive function is specialized only for Int32.
-// CHECK-LABEL: sil shared [noinline] @$S62_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_s5Int32V_Tg5
-// CHECK: function_ref @$S62_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_s5Int32V_Tg5
+// CHECK-LABEL: sil shared [noinline] @$s62_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_s5Int32V_Tg5
+// CHECK: function_ref @$s62_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_s5Int32V_Tg5
 // CHECK: return
 sil [noinline] @_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_ : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
@@ -28,12 +28,12 @@ bb0(%0 : $*T):
 
 // Check that this recursive function is specialized twice: for (Int, Double) and for (Double, Int).
 
-// CHECK-LABEL: sil shared [noinline] @$S97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_Sd_s5Int32VTg5
-// CHECK: function_ref @$S97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_s5Int32V_SdTg5
+// CHECK-LABEL: sil shared [noinline] @$s97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_Sd_s5Int32VTg5
+// CHECK: function_ref @$s97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_s5Int32V_SdTg5
 // CHECK: return
 
-// CHECK-LABEL: sil shared [noinline] @$S97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_s5Int32V_SdTg5
-// CHECK: function_ref @$S97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_Sd_s5Int32VTg5
+// CHECK-LABEL: sil shared [noinline] @$s97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_s5Int32V_SdTg5
+// CHECK: function_ref @$s97_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_Sd_s5Int32VTg5
 // CHECK: return
 
 
@@ -56,7 +56,7 @@ bb0(%0 : $*T, %1 : $*U):
   return %14 : $()                                // id: %15
 }
 
-sil @$S29specialize_recursive_generics05test_b1_C0yyF : $@convention(thin) () -> () {
+sil @$s29specialize_recursive_generics05test_b1_C0yyF : $@convention(thin) () -> () {
 bb0:
   // function_ref specialize_recursive_generics.recursive_generics <A>(A) -> ()
   %0 = function_ref @_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %5
@@ -70,7 +70,7 @@ bb0:
   return %7 : $()                                 // id: %8
 }
 
-sil @$S29specialize_recursive_generics05test_b1_C29_with_different_substitutionsyyF : $@convention(thin) () -> () {
+sil @$s29specialize_recursive_generics05test_b1_C29_with_different_substitutionsyyF : $@convention(thin) () -> () {
 bb0:
   // function_ref specialize_recursive_generics.recursive_generics_with_different_substitutions <A, B>(A, B) -> ()
   %0 = function_ref @_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_ : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () // user: %10
@@ -118,10 +118,10 @@ bb3(%15 : $Optional<C>):
   return %15 : $Optional<C>
 }
 
-// CHECK-LABEL: sil shared @$S6lookup4main1CC_Tg5
+// CHECK-LABEL: sil shared @$s6lookup4main1CC_Tg5
 sil @lookup : $@convention(method) <Self where Self : P> (@owned C, @in_guaranteed Self) -> @owned Optional<C> {
 bb0(%0 : $C, %1 : $*Self):
-  // CHECK: [[HELPER:%.*]] = function_ref @$S6helpers5Int32V_Tg5
+  // CHECK: [[HELPER:%.*]] = function_ref @$s6helpers5Int32V_Tg5
   %4 = function_ref @helper : $@convention(thin) <τ_0_0> (@in τ_0_0, @in P) -> @owned Optional<C>
   %5 = integer_literal $Builtin.Int32, 1
   %6 = struct $Int32 (%5 : $Builtin.Int32)
@@ -136,7 +136,7 @@ bb0(%0 : $C, %1 : $*Self):
   release_value %12 : $Optional<C>
   dealloc_stack %9 : $*P
   dealloc_stack %7 : $*Int32
-  // CHECK: [[LOOKUP:%.*]] = function_ref @$S6lookup4main1CC_Tg5
+  // CHECK: [[LOOKUP:%.*]] = function_ref @$s6lookup4main1CC_Tg5
   %16 = function_ref @lookup : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned C, @in_guaranteed τ_0_0) -> @owned Optional<C>
   %17 = alloc_stack $C
   store %0 to %17 : $*C

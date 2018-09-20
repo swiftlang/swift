@@ -27,12 +27,12 @@ public class ClassWithResilientField {
 sil_vtable ClassWithResilientField {}
 
 // Field offsets are statically known:
-// CHECK-DAG: @"$S31completely_fragile_class_layout23ClassWithResilientFieldC5firstSivpWvd" = hidden constant i64 16, align 8
-// CHECK-DAG: @"$S31completely_fragile_class_layout23ClassWithResilientFieldC6second16resilient_struct4SizeVvpWvd" = hidden constant i64 24, align 8
-// CHECK-DAG: @"$S31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd" = hidden constant i64 40, align 8
+// CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5firstSivpWvd" = hidden constant i64 16, align 8
+// CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC6second16resilient_struct4SizeVvpWvd" = hidden constant i64 24, align 8
+// CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd" = hidden constant i64 40, align 8
 
 // Class has static metadata:
-// CHECK-LABEL: $S31completely_fragile_class_layout23ClassWithResilientFieldCMf
+// CHECK-LABEL: $s31completely_fragile_class_layout23ClassWithResilientFieldCMf
 
 // rdar://problem/41308521 -- enum lowering needs to pretend payloads are
 // resilient and not use spare bits, even when bypassing resilience while
@@ -60,8 +60,8 @@ public class ClassWithResilientEnum {
 sil_vtable ClassWithResilientEnum {}
 
 // Field offsets are statically known:
-// CHECK-LABEL: @"$S31completely_fragile_class_layout22ClassWithResilientEnumC5firstAA0hfG7PayloadOvpWvd" = hidden constant i64 16, align 8
-// CHECK-LABEL: @"$S31completely_fragile_class_layout22ClassWithResilientEnumC6seconds4Int8VvpWvd" = hidden constant i64 25, align 8
+// CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC5firstAA0hfG7PayloadOvpWvd" = hidden constant i64 16, align 8
+// CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC6seconds4Int8VvpWvd" = hidden constant i64 25, align 8
 
 
 // When allocating a class with resiliently-sized fields, we must still load
@@ -72,7 +72,7 @@ sil_vtable ClassWithResilientEnum {}
 sil @allocClassWithResilientField : $@convention(thin) () -> () {
 bb0:
 
-// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S31completely_fragile_class_layout23ClassWithResilientFieldCMa"(i64 0)
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMa"(i64 0)
 // CHECK-NEXT: [[META:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[META_ADDR:%.*]] = bitcast %swift.type* [[META]] to i8*
 // CHECK-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[META_ADDR]], i32 48
@@ -109,8 +109,8 @@ bb0:
 }
 
 // Metadata accessor for ClassWithResilientField is trivial:
-// CHECK-LABEL: define swiftcc %swift.metadata_response @"$S31completely_fragile_class_layout23ClassWithResilientFieldCMa
-// CHECK: call %objc_class* @swift_getInitializedObjCClass(%objc_class* {{.*}} @"$S31completely_fragile_class_layout23ClassWithResilientFieldCMf"
+// CHECK-LABEL: define swiftcc %swift.metadata_response @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMa
+// CHECK: call %objc_class* @swift_getInitializedObjCClass(%objc_class* {{.*}} @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMf"
 // CHECK: ret
 
 // Accessing a field whose offset depends on resilient types should
@@ -120,7 +120,7 @@ bb0:
 sil @accessClassWithResilientField : $@convention(thin) (@guaranteed ClassWithResilientField) -> Int {
 bb0(%0 : @guaranteed $ClassWithResilientField):
 
-// CHECK:        [[OFFSET:%.*]] = load i64, i64* @"$S31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd", align 8
+// CHECK:        [[OFFSET:%.*]] = load i64, i64* @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd", align 8
 // CHECK-NEXT:   [[SELF_ADDR:%.*]] = bitcast %T31completely_fragile_class_layout23ClassWithResilientFieldC* %0 to i8*
 // CHECK-NEXT:   [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[SELF_ADDR]], i64 [[OFFSET]]
 // CHECK-NEXT:   [[FIELD_PTR2:%.*]] = bitcast i8* [[FIELD_ADDR]] to %TSi*
@@ -136,6 +136,6 @@ bb0(%0 : @guaranteed $ClassWithResilientField):
 }
 
 // Metadata accessor for ClassWithResilientEnum is trivial:
-// CHECK-LABEL: define swiftcc %swift.metadata_response @"$S31completely_fragile_class_layout22ClassWithResilientEnumCMa
-// CHECK: call %objc_class* @swift_getInitializedObjCClass(%objc_class* {{.*}} @"$S31completely_fragile_class_layout22ClassWithResilientEnumCMf"
+// CHECK-LABEL: define swiftcc %swift.metadata_response @"$s31completely_fragile_class_layout22ClassWithResilientEnumCMa
+// CHECK: call %objc_class* @swift_getInitializedObjCClass(%objc_class* {{.*}} @"$s31completely_fragile_class_layout22ClassWithResilientEnumCMf"
 // CHECK: ret
