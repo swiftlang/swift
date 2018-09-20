@@ -27,12 +27,12 @@ protocol _SequenceWrapper : Sequence {
 }
 
 extension _SequenceWrapper  {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public var underestimatedCount: Int {
     return _base.underestimatedCount
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func _preprocessingPass<R>(
     _ preprocess: () throws -> R
   ) rethrows -> R? {
@@ -41,12 +41,12 @@ extension _SequenceWrapper  {
 }
 
 extension _SequenceWrapper where Iterator == Base.Iterator {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func makeIterator() -> Iterator {
     return self._base.makeIterator()
   }
   
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   @discardableResult
   public func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
@@ -56,33 +56,33 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
 }
 
 extension _SequenceWrapper {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func map<T>(
     _ transform: (Element) throws -> T
 ) rethrows -> [T] {
     return try _base.map(transform)
   }
   
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
     return try _base.filter(isIncluded)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func forEach(_ body: (Element) throws -> Void) rethrows {
     return try _base.forEach(body)
   }
   
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
   
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func _copyToContiguousArray()
     -> ContiguousArray<Element> {
     return _base._copyToContiguousArray()
@@ -90,38 +90,38 @@ extension _SequenceWrapper {
 }
 
 extension _SequenceWrapper where SubSequence == Base.SubSequence {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func dropFirst(_ n: Int) -> SubSequence {
     return _base.dropFirst(n)
   }
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func dropLast(_ n: Int) -> SubSequence {
     return _base.dropLast(n)
   }
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func prefix(_ maxLength: Int) -> SubSequence {
     return _base.prefix(maxLength)
   }
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func suffix(_ maxLength: Int) -> SubSequence {
     return _base.suffix(maxLength)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     return try _base.drop(while: predicate)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func prefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     return try _base.prefix(while: predicate)
   }
   
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
     whereSeparator isSeparator: (Element) throws -> Bool
