@@ -28,6 +28,7 @@ class SwiftFloatType(object):
     def __init__(self, name, cFuncSuffix, significandBits, exponentBits,
                  significandSize, totalBits):
         self.stdlib_name = name
+        self.builtin_name = 'FPIEEE' + str(totalBits)
         self.cFuncSuffix = cFuncSuffix
         self.significand_bits = significandBits
         self.significand_size = significandSize

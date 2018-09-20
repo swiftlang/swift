@@ -1,10 +1,9 @@
 %{
-from SwiftIntTypes import all_integer_types
+from SwiftVectorTypes import *
 
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
-counts = [2,3,4,8,16,32,64]
 fltnames = {32:'Float', 64:'Double'}
 }%
 
@@ -13,16 +12,13 @@ fltnames = {32:'Float', 64:'Double'}
 % signed = element_type.is_signed
 % Element = element_type.stdlib_name
 public extension ${Element} {
-% for N in counts:
-%  if bits*N <= 512:
-%   # In theory, LLVM should handle padding 3-element vectors out to 4-element
-%   # for us. And it does, but we end up triggering asserts for some operations,
-%   # so it ends up being simpler to pad at the Swift level instead.
-%   llvmN = N if N != 3 else 4
-%   LLVM = 'Vec' + str(llvmN) + 'x' + element_type.builtin_name
-%   Self = 'Vector' + str(N)
+% for vector_type in all_vector_types(element_type):
+% LLVM = vector_type.builtin_name
+% Self = vector_type.short_name
+% count = vector_type.count
+% llvmN = count if count != 3 else 4
   @_fixed_layout
-  struct ${Self} : SIMDIntegerVector, SIMDVector${N} {
+  struct ${Self} : SIMDIntegerVector, SIMDVector${count} {
 
     public var _value: Builtin.${LLVM}
 
@@ -40,32 +36,32 @@ public extension ${Element} {
     public subscript(index: Int) -> ${Element} {
       @_transparent
       get {
-        _precondition(index >= 0 && index < ${N})
+        _precondition(index >= 0 && index < ${count})
         return ${Element}(Builtin.extractelement_${LLVM}_Int32(
           _value, Int32(index)._value
         ))
       }
       @_transparent
       set {
-        _precondition(index >= 0 && index < ${N})
+        _precondition(index >= 0 && index < ${count})
         _value = Builtin.insertelement_${LLVM}_Int${bits}_Int32(
           _value, newValue._value, Int32(index)._value
         )
       }
     }
 
-    public typealias Predicate = SIMDPredicate${bits}x${N}
+    public typealias Predicate = SIMDPredicate${bits}x${count}
 
 %   sext = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + LLVM
     @_transparent
     public static func ==(lhs: ${Self}, rhs: ${Self}) -> Predicate {
-      return Predicate(Int${bits}.Vector${N}(${sext}(
+      return Predicate(Int${bits}.Vector${count}(${sext}(
         Builtin.cmp_eq_${LLVM}(lhs._value, rhs._value))))
     }
 
-    // Conformance to SIMDVector${N} -----------------------------------------
-%   if N >= 4:
-    public typealias HalfVector = Vector${N/2}
+    // Conformance to SIMDVector${count} -------------------------------------
+%   if count >= 4:
+    public typealias HalfVector = Vector${count/2}
 %   end
 
 %   Index = 'Int' + str(bits) + '.' + Self
@@ -128,7 +124,7 @@ public extension ${Element} {
 %   for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
     @_transparent
     public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Predicate {
-      return Predicate(Int${bits}.Vector${N}(${sext}(
+      return Predicate(Int${bits}.Vector${count}(${sext}(
         Builtin.cmp_${prefix}${inst}_${LLVM}(lhs._value, rhs._value)
       )))
     }
@@ -162,7 +158,7 @@ public extension ${Element} {
     @_transparent
     public static func /(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       _precondition(all(rhs != 0), "Division by zero.")
-%   if N == 3:
+%   if count == 3:
 %   # special handling for the 3-element case: insert a 1 in the unused
 %   # fourth component, to avoid dividing by zero since that would invoke
 %   # UB at the LLVM IR level.
@@ -184,7 +180,7 @@ public extension ${Element} {
     @_transparent
     public static func %(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       _precondition(all(rhs != 0), "Division by zero in remainder operation.")
-%   if N == 3:
+%   if count == 3:
 %   # special handling for the 3-element case: insert a 1 in the unused
 %   # fourth component, to avoid dividing by zero since that would invoke
 %   # UB at the LLVM IR level.
@@ -206,14 +202,14 @@ public extension ${Element} {
     // Operations not required by any protocol -------------------------------
     @inlinable
     public init<Other>(truncatingIfNeeded other: Other)
-    where Other : SIMDVector${N} & SIMDIntegerVector {
+    where Other : SIMDVector${count} & SIMDIntegerVector {
       self.init()
       for i in indices { self[i] = Element(truncatingIfNeeded: other[i]) }
     }
 
     @inlinable
     public init<Other>(clamping other: Other)
-    where Other : SIMDVector${N} & SIMDIntegerVector {
+    where Other : SIMDVector${count} & SIMDIntegerVector {
       self.init(truncatingIfNeeded:
         clamp(other,
               Other(repeating: Other.Element(clamping: Element.min)),
@@ -225,7 +221,7 @@ public extension ${Element} {
 %   if bits in [32, 64]:
 %    FloatElement = fltnames[bits]
     @_transparent
-    public init(bitPattern other: ${FloatElement}.Vector${N}) {
+    public init(bitPattern other: ${FloatElement}.Vector${count}) {
       _value = Builtin.bitcast_Vec${llvmN}xFPIEEE${bits}_${LLVM}(other._value)
     }
 
@@ -240,14 +236,12 @@ public extension ${Element} {
 %    other_bits = other_type.bits
 %    other_signed = other_type.is_signed
 %    Other = other_type.stdlib_name
-%    if other_bits*N <= 512:
+%    if other_bits*count <= 512:
 %     OtherLLVM = 'Vec' + str(llvmN) + 'x' + other_type.builtin_name
     @_transparent
-    public init(truncatingIfNeeded other: ${Other}.Vector${N}) {
-%     if other_bits > bits:
-      self.init(Builtin.trunc_${OtherLLVM}_${LLVM}(other._value))
-%     elif other_bits == bits:
-      self.init(other._value)
+    public init(truncatingIfNeeded other: ${Other}.Vector${count}) {
+%     if other_bits >= bits:
+      self.init(Builtin.truncOrBitCast_${OtherLLVM}_${LLVM}(other._value))
 %     elif other_signed:
       self.init(Builtin.sext_${OtherLLVM}_${LLVM}(other._value))
 %     else:
@@ -259,7 +253,6 @@ public extension ${Element} {
 %   end
   }
 
-%  end
 % end
 }
 

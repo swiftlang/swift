@@ -1,5 +1,9 @@
-%for bits in [8,16,32,64]:
-% for N in [2,3,4,8,16,32,64]:
+%{
+from SwiftIntTypes import _all_integer_type_bitwidths
+from SwiftVectorTypes import all_vector_counts
+}%
+%for bits in _all_integer_type_bitwidths:
+% for N in all_vector_counts:
 %  if bits*N <= 512:
 %   Self = 'SIMDPredicate' + str(bits) + 'x' + str(N)
 %   Value = 'Int' + str(bits) + '.Vector' + str(N)
