@@ -125,14 +125,12 @@ struct GraphOperationInfo {
 
     StructuredOperand(StructuredOperandKind Kind, StringRef Name,
                       SILValue SingleOperand)
-        : Kind(Kind), Name(Name), SingleOperand(SingleOperand) {};
+        : Kind(Kind), Name(Name), SingleOperand(SingleOperand) {}
     StructuredOperand(StructuredOperandKind Kind, StringRef Name,
                       ArrayRef<Operand> OperandList)
-        : Kind(Kind), Name(Name), OperandList(OperandList) {};
+        : Kind(Kind), Name(Name), OperandList(OperandList) {}
 
   public:
-    StructuredOperand(const StructuredOperand &other) = default;
-
     StructuredOperandKind getKind() const {
       return Kind;
     }
