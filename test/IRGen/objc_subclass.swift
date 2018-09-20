@@ -12,8 +12,12 @@
 // CHECK-DAG: [[GIZMO:%TSo5GizmoC]] = type opaque
 // CHECK-DAG: [[OBJC:%objc_object]] = type opaque
 
+
 // CHECK-32: @"$s13objc_subclass10SwiftGizmoC1xSivpWvd" = hidden global i32 4, align [[WORD_SIZE_IN_BYTES:4]]
 // CHECK-64: @"$s13objc_subclass10SwiftGizmoC1xSivpWvd" = hidden global i64 8, align [[WORD_SIZE_IN_BYTES:8]]
+
+// CHECK-32: [[STRING_EMPTY:@.*]] = private unnamed_addr constant [1 x i8] zeroinitializer
+
 // CHECK: @"OBJC_METACLASS_$__TtC13objc_subclass10SwiftGizmo" = hidden global [[OBJC_CLASS]] { [[OBJC_CLASS]]* @"OBJC_METACLASS_$_NSObject", [[OBJC_CLASS]]* @"OBJC_METACLASS_$_Gizmo", [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null, [[LLVM_PTRSIZE_INT]] ptrtoint ({{.*}} @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo to [[LLVM_PTRSIZE_INT]]) }
 
 // CHECK: [[STRING_SWIFTGIZMO:@.*]] = private unnamed_addr constant [32 x i8] c"_TtC13objc_subclass10SwiftGizmo\00"
@@ -157,7 +161,7 @@
 // CHECK-64: }, section "__DATA, __objc_const", align 8
 
 // CHECK: [[STRING_X:@.*]] = private unnamed_addr constant [2 x i8] c"x\00"
-// CHECK: [[STRING_EMPTY:@.*]] = private unnamed_addr constant [1 x i8] zeroinitializer
+// CHECK-64: [[STRING_EMPTY:@.*]] = private unnamed_addr constant [1 x i8] zeroinitializer
 
 // CHECK-32: @_IVARS__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}] } {
 // CHECK-32:   i32 20,
