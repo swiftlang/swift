@@ -4281,7 +4281,7 @@ namespace {
         SmallVector<Type, 2> genericArgs;
         for (auto paramTy :
              env->getGenericSignature()->getInnermostGenericParams()) {
-          genericArgs.push_back(env->mapTypeIntoContext(paramTy));
+          genericArgs.push_back(paramTy);
         }
         Type extendedType =
           BoundGenericClassType::get(objcClass, nullptr, genericArgs);

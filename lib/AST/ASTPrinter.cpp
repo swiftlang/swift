@@ -149,8 +149,10 @@ TypeTransformContext::TypeTransformContext(TypeOrExtensionDecl D)
     : BaseType(nullptr), Decl(D) {
   if (auto NTD = Decl.Decl.dyn_cast<NominalTypeDecl *>())
     BaseType = NTD->getDeclaredTypeInContext().getPointer();
-  else
-    BaseType = Decl.Decl.get<ExtensionDecl *>()->getExtendedType().getPointer();
+  else {
+    auto *ED = Decl.Decl.get<ExtensionDecl *>();
+    BaseType = ED->getDeclaredTypeInContext().getPointer();
+  }
 }
 
 TypeOrExtensionDecl TypeTransformContext::getDecl() const { return Decl; }
@@ -1983,8 +1985,9 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
   if (Options.TransformContext &&
       Options.TransformContext->isPrintingSynthesizedExtension()) {
-    auto extendedType =
-        Options.TransformContext->getBaseType()->mapTypeOutOfContext();
+    auto extendedType = Options.TransformContext->getBaseType();
+    if (extendedType->hasArchetype())
+      extendedType = extendedType->mapTypeOutOfContext();
     printSynthesizedExtension(extendedType, decl);
   } else
     printExtension(decl);

@@ -2838,25 +2838,11 @@ void NominalTypeDecl::computeType() {
 
 enum class DeclTypeKind : unsigned {
   DeclaredType,
-  DeclaredTypeInContext,
   DeclaredInterfaceType
 };
 
 static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   ASTContext &ctx = decl->getASTContext();
-
-  // Handle the declared type in context.
-  if (kind == DeclTypeKind::DeclaredTypeInContext) {
-    auto interfaceType =
-      computeNominalType(decl, DeclTypeKind::DeclaredInterfaceType);
-
-    if (!decl->isGenericContext())
-      return interfaceType;
-
-    auto *genericEnv = decl->getGenericEnvironmentOfContext();
-    return GenericEnvironment::mapTypeIntoContext(
-        genericEnv, interfaceType);
-  }
 
   // Get the parent type.
   Type Ty;
@@ -2867,20 +2853,14 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       auto *nominal = dc->getSelfNominalTypeDecl();
       if (nominal)
         Ty = nominal->getDeclaredType();
-      else
-        Ty = ErrorType::get(ctx);
       break;
     }
-    case DeclTypeKind::DeclaredTypeInContext:
-      llvm_unreachable("Handled above");
     case DeclTypeKind::DeclaredInterfaceType:
       Ty = dc->getDeclaredInterfaceType();
+      if (Ty->is<ErrorType>())
+        Ty = Type();
       break;
     }
-    if (!Ty)
-      return Type();
-    if (Ty->is<ErrorType>())
-      Ty = Type();
   }
 
   if (decl->getGenericParams() &&
@@ -2888,8 +2868,6 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
     switch (kind) {
     case DeclTypeKind::DeclaredType:
       return UnboundGenericType::get(decl, Ty, ctx);
-    case DeclTypeKind::DeclaredTypeInContext:
-      llvm_unreachable("Handled above");
     case DeclTypeKind::DeclaredInterfaceType: {
       // Note that here, we need to be able to produce a type
       // before the decl has been validated, so we rely on
@@ -2923,8 +2901,10 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
     return DeclaredTyInContext;
 
   auto *decl = const_cast<NominalTypeDecl *>(this);
-  decl->DeclaredTyInContext = computeNominalType(decl,
-                                                 DeclTypeKind::DeclaredTypeInContext);
+
+  auto interfaceType = getDeclaredInterfaceType();
+  decl->DeclaredTyInContext = mapTypeIntoContext(interfaceType);
+
   return DeclaredTyInContext;
 }
 
