@@ -139,6 +139,30 @@ open class ManagedBuffer<Header, Element> {
   }
 }
 
+@inline(never)
+public func tryReallocateUniquelyReferenced<Header, Element, Buffer: ManagedBuffer<Header, Element>>(
+  buffer: inout Buffer,
+  newMinimumCapacity: Int
+) -> Bool {
+  precondition(_isBitwiseTakable(Header.self))
+  precondition(_isBitwiseTakable(Element.self))
+  precondition(isKnownUniquelyReferenced(&buffer))
+
+  let newSizeInBytes = MemoryLayout<Header>.stride
+    + newMinimumCapacity * MemoryLayout<Element>.stride
+
+  return withUnsafeMutablePointer(to: &buffer) {
+    $0.withMemoryRebound(to: UnsafeMutableRawPointer.self, capacity: 1) {
+      if let reallocdObject = _reallocObject($0.pointee, newSizeInBytes) {
+        $0.pointee = reallocdObject
+        return true
+      } else {
+        return false
+      }
+    }
+  }
+}
+
 /// Contains a buffer object, and provides access to an instance of
 /// `Header` and contiguous storage for an arbitrary number of
 /// `Element` instances stored in that buffer.

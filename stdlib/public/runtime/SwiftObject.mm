@@ -82,6 +82,24 @@ const ClassMetadata *swift::_swift_getClass(const void *object) {
 #endif
 }
 
+bool isObjCPinned(HeapObject *obj) {
+  #if SWIFT_OBJC_INTEROP
+    /* future: implement checking the relevant objc runtime bits */
+    return true;
+  #else
+    return false;
+  #endif
+}
+
+// returns non-null if realloc was successful
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+HeapObject *swift::_swift_reallocObject(HeapObject *obj, size_t size) {
+ if (isObjCPinned(obj) || obj->refCounts.hasSideTable()) {
+   return nullptr;
+ }
+ return (HeapObject *)realloc(obj, size);
+}
+
 #if SWIFT_OBJC_INTEROP
 
 /// \brief Replacement for ObjC object_isClass(), which is unavailable on
