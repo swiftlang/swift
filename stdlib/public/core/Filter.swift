@@ -18,17 +18,17 @@
 ///   is a `LazyFilterSequence`.
 @_fixed_layout // lazy-performance
 public struct LazyFilterSequence<Base: Sequence> {
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline // lazy-performance
   internal var _base: Base
 
   /// The predicate used to determine which elements produced by
   /// `base` are also produced by `self`.
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline // lazy-performance
   internal let _predicate: (Base.Element) -> Bool
 
   /// Creates an instance consisting of the elements `x` of `base` for
   /// which `isIncluded(x) == true`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // lazy-performance
   public // @testable
   init(_base base: Base, _ isIncluded: @escaping (Base.Element) -> Bool) {
     self._base = base

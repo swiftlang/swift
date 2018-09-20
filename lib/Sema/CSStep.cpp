@@ -360,24 +360,11 @@ void TypeVariableStep::setup() {
 bool TypeVariableStep::attempt(const TypeVariableBinding &choice) {
   ++CS.solverState->NumTypeVariableBindings;
 
-  if (isDebugMode()) {
-    auto &log = getDebugLogger();
-    log << "(trying ";
-    choice.print(log, &CS.getASTContext().SourceMgr);
-    log << '\n';
-  }
-
   if (choice.hasDefaultedProtocol())
     SawFirstLiteralConstraint = true;
 
   // Try to solve the system with typeVar := type
-  if (!choice.attempt(CS)) {
-    if (isDebugMode())
-      getDebugLogger() << ")\n";
-    return false;
-  }
-
-  return true;
+  return choice.attempt(CS);
 }
 
 StepResult TypeVariableStep::resume(bool prevFailed) {
@@ -387,16 +374,16 @@ StepResult TypeVariableStep::resume(bool prevFailed) {
   // that active binding has a solution.
   AnySolved |= !prevFailed;
 
-  if (isDebugMode())
-    getDebugLogger() << ")\n";
-
-  const auto choice = ActiveChoice->second;
+  bool shouldStop = shouldStopAfter(ActiveChoice->second);
   // Rewind back all of the changes made to constraint system.
   ActiveChoice.reset();
 
+  if (isDebugMode())
+    getDebugLogger() << ")\n";
+
   // Let's check if we should stop right before
   // attempting any new bindings.
-  if (shouldStopAfter(choice))
+  if (shouldStop)
     return done(/*isSuccess=*/AnySolved);
 
   // Attempt next type variable binding.
@@ -567,11 +554,5 @@ bool DisjunctionStep::attempt(const DisjunctionChoice &choice) {
     }
   }
 
-  if (!choice.attempt(CS)) {
-    if (isDebugMode())
-      getDebugLogger() << ")\n";
-    return false;
-  }
-
-  return true;
+  return choice.attempt(CS);
 }
