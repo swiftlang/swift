@@ -2458,6 +2458,8 @@ namespace {
     }
 
     void addSuperclass() {
+      // If we might have generic ancestry, leave a placeholder since
+      // swift_initClassMetdata() will fill in the superclass.
       if (doesClassMetadataRequireInitialization(IGM, Target)) {
         // Leave a null pointer placeholder to be filled at runtime
         B.addNullPointer(IGM.TypeMetadataPtrTy);
@@ -2648,7 +2650,8 @@ namespace {
   };
 
   /// A builder for non-generic class metadata which does not require any
-  /// runtime initialization.
+  /// runtime initialization, or that only requires runtime initialization
+  /// on newer Objective-C runtimes.
   class FixedClassMetadataBuilder :
       public ClassMetadataBuilderBase<FixedClassMetadataBuilder> {
     using super = ClassMetadataBuilderBase<FixedClassMetadataBuilder>;
@@ -3096,11 +3099,10 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   auto var = IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
                                     init.finishAndCreateFuture(), section);
 
-  // Add classes that don't require dynamic initialization to the
-  // ObjC class list.
-  //
-  // FIXME: This is where we check the completely fragile layout.
-  if (IGM.ObjCInterop && !isPattern &&
+  // If the class does not require dynamic initialization, or if it only
+  // requires dynamic initialization on a newer Objective-C runtime, add it
+  // to the Objctive-C class list.
+  if (IGM.ObjCInterop &&
       !doesClassMetadataRequireInitialization(IGM, classDecl)) {
     // Emit the ObjC class symbol to make the class visible to ObjC.
     if (classDecl->isObjC()) {

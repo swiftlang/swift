@@ -155,7 +155,9 @@ namespace irgen {
   bool doesClassMetadataRequireRelocation(IRGenModule &IGM,
                                           ClassDecl *theClass);
 
-  /// Does the class have a non-fixed layout, or generic ancestry?
+  /// Does the class require at least in-place initialization because of
+  /// non-fixed size properties or generic ancestry? If the class requires
+  /// relocation, this also returns true.
   bool doesClassMetadataRequireInitialization(IRGenModule &IGM,
                                               ClassDecl *theClass);
 
