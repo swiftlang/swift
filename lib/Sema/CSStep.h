@@ -373,7 +373,18 @@ public:
     OrphanedConstraint = constraint;
   }
 
-  void setup() override {
+  StepResult take(bool prevFailed) override;
+  StepResult resume(bool prevFailed) override;
+
+  // The number of disjunction constraints associated with this component.
+  unsigned disjunctionCount() const { return NumDisjunctions; }
+
+  void print(llvm::raw_ostream &Out) override {
+    Out << "ComponentStep with at #" << Index << '\n';
+  }
+
+private:
+  void setupScope() {
     // If this is a single component, there is no need
     // to preliminary modify constraint system or log anything.
     if (IsSingle)
@@ -386,16 +397,6 @@ public:
     // If this component has oprhaned constraint attached,
     // let's return it ot the graph.
     CS.CG.setOrphanedConstraint(OrphanedConstraint);
-  }
-
-  StepResult take(bool prevFailed) override;
-  StepResult resume(bool prevFailed) override;
-
-  // The number of disjunction constraints associated with this component.
-  unsigned disjunctionCount() const { return NumDisjunctions; }
-
-  void print(llvm::raw_ostream &Out) override {
-    Out << "ComponentStep with at #" << Index << '\n';
   }
 };
 

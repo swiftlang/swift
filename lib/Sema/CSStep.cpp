@@ -253,6 +253,9 @@ StepResult ComponentStep::take(bool prevFailed) {
   if (prevFailed || CS.getExpressionTooComplex(Solutions))
     return done(/*isSuccess=*/false);
 
+  // Setup active scope, only if previous component didn't fail.
+  setupScope();
+
   /// Try to figure out what this step is going to be,
   /// after the scope has been established.
   auto *disjunction = CS.selectDisjunction();
