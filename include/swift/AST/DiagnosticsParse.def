@@ -1653,6 +1653,8 @@ ERROR(sil_graph_op_unhandled_attr_value,PointsToFirstBadToken,
       "unhandled 'graph_op' attribute value", ())
 ERROR(sil_graph_op_expected_rparen,PointsToFirstBadToken,
       "expected ')' in 'graph_op' argument list", ())
+ERROR(sil_graph_op_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' in 'graph_op' list operand", ())
 ERROR(sil_graph_op_expected_rbrace,PointsToFirstBadToken,
       "expected '}' in 'graph_op' attribute list", ())
 ERROR(sil_graph_op_expected_colon_after_attr_name,PointsToFirstBadToken,

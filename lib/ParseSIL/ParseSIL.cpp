@@ -2991,7 +2991,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
         ParserStatus status = P.parseList(tok::r_square, lSquareLoc, rSquareLoc,
                                           /*AllowSepAfterLast*/ false,
-                                          diag::sil_graph_op_expected_rparen, // TODO rsquare
+                                          diag::sil_graph_op_expected_rsquare,
                                           SyntaxKind::TuplePatternElementList,
                                           parseListOperandElement);
         if (status.isError())
