@@ -2938,6 +2938,7 @@ ${assignmentOperatorComment(x.operator, True)}
 #endif
 // end of FIXME(integers)
 
+@available(swift, deprecated: 4.2.1, obsoleted: 5)
 ${unsafeOperationComment(x.operator)}
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
