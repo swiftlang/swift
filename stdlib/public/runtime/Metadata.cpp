@@ -3670,15 +3670,6 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
     unsigned witnessIndex = (reqDescriptor - requirements.data()) +
       WitnessTableFirstRequirementOffset;
 
-#if !NDEBUG
-    // For debug builds, warn if we already have an entry at this index.
-    if (table[witnessIndex]) {
-      warning(0, "generic witness table at %p contains duplicate entry for "
-              "requirement descriptor %p\n",
-              genericTable, reqDescriptor);
-    }
-#endif
-
     table[witnessIndex] = witness.Witness.get();
   }
 
