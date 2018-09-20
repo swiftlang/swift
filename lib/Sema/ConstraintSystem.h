@@ -3373,6 +3373,7 @@ public:
   bool isSymmetricOperator() const;
 
   void print(llvm::raw_ostream &Out, SourceManager *SM) const {
+    Out << "disjunction choice ";
     Choice->print(Out, SM);
   }
 
@@ -3420,7 +3421,8 @@ public:
   bool attempt(ConstraintSystem &cs) const;
 
   void print(llvm::raw_ostream &Out, SourceManager *) const {
-    Out << TypeVar->getString() << " := " << Binding.BindingType->getString();
+    Out << "type variable " << TypeVar->getString()
+        << " := " << Binding.BindingType->getString();
   }
 };
 

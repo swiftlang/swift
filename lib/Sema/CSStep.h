@@ -428,6 +428,13 @@ public:
       if (shouldStopAt(*choice))
         break;
 
+      if (isDebugMode()) {
+        auto &log = getDebugLogger();
+        log << "(attempting ";
+        choice->print(log, &CS.getASTContext().SourceMgr);
+        log << '\n';
+      }
+
       {
         auto scope = llvm::make_unique<Scope>(CS);
         if (attempt(*choice)) {
@@ -435,6 +442,9 @@ public:
           return suspend(llvm::make_unique<SplitterStep>(CS, Solutions));
         }
       }
+
+      if (isDebugMode())
+        getDebugLogger() << ")\n";
 
       // If this binding didn't match, let's check if we've attempted
       // enough bindings to stop, because some producers might need
