@@ -6,7 +6,9 @@
 // CHECK: final public class FinalClass {
 public final class FinalClass {
   // CHECK: @inlinable final public class var a: [[INT:(Swift.)?Int]] {
+  // CHECK-NEXT: {{^}} get {
   // CHECK-NEXT: return 3
+  // CHECK-NEXT: }
   // CHECK-NEXT: }
   @inlinable
   public final class var a: Int {
