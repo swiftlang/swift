@@ -334,11 +334,11 @@ class DevicePartitionCloner
 
 void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
   GraphOperationInfo decoder(inst);
-  SmallVector<GraphOperationInfo::OperandMarker, 4> operandMarkers;
-  auto opName = decoder.decodeName(operandMarkers);
+  SmallVector<GraphOperationInfo::StructuredOperand, 4> structuredOperands;
+  auto opName = decoder.decodeName(structuredOperands);
   if (opName == "tfc.TensorTransfer") {
-    assert(operandMarkers.size() == 1);
-    assert(operandMarkers[0].getKind() == GraphOperationInfo::OMK_Normal);
+    assert(structuredOperands.size() == 1);
+    assert(structuredOperands[0].getKind() == GraphOperationInfo::SOK_Single);
     visitTensorTransferInst(decoder);
     return;
   }

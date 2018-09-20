@@ -76,17 +76,56 @@ void GraphOperationInfo::assertWithDump(bool cond,
 /// Decode the name of a graph_op into its TensorFlow op name and a list of
 /// information about the operands.
 StringRef GraphOperationInfo::decodeName(
-    SmallVectorImpl<OperandMarker> &operandMarkers) const {
+    SmallVectorImpl<StructuredOperand> &structuredOperands) const {
   PrettyStackTraceSILNode X("decoding graph_op name", inst);
 
-  auto name = inst->getName().str();
-  auto pos = name.find(',');
-  auto opName = name.substr(0, pos);
+  ArrayRef<Operand> remainingOperands = inst->getAllOperands();
+  StringRef remainingMangled = inst->getName().str();
+  auto nextMarkerPos = remainingMangled.find(',');
+  StringRef opName = remainingMangled.substr(0, nextMarkerPos);
 
-  while (pos != StringRef::npos) {
-    name = name.drop_front(pos);
-    pos = name.find(',', 1);
-    operandMarkers.push_back(OperandMarker(name.substr(0, pos)));
+  while (nextMarkerPos != StringRef::npos) {
+    remainingMangled = remainingMangled.drop_front(nextMarkerPos);
+    nextMarkerPos = remainingMangled.find(',', 1);
+
+    StringRef thisMarker = remainingMangled.substr(0, nextMarkerPos);
+    StringRef thisMarkerName = thisMarker.drop_front(2);
+    assert(thisMarker.size() >= 2 && "marker too short");
+    switch (thisMarker[1]) {
+    case 's':
+      // Push a SOK_Scalar.
+      assert(thisMarkerName.empty() && "SOK_Scalar should not have name");
+      structuredOperands.emplace_back(SOK_Scalar, StringRef(),
+                                      remainingOperands.front().get());
+      remainingOperands = remainingOperands.drop_front(1);
+      break;
+    case 'i':
+      // Push a SOK_Single.
+      structuredOperands.emplace_back(SOK_Single, thisMarkerName,
+                                      remainingOperands.front().get());
+      remainingOperands = remainingOperands.drop_front(1);
+      break;
+    case 'L':
+      // Push a SOK_List with OperandList of size 0 pointing at the right place
+      // in the inst's operands.
+      structuredOperands.emplace_back(SOK_List, thisMarkerName,
+                                      remainingOperands.take_front(0));
+      break;
+    case 'e':
+      // Extend the OperandList of the curent SOK_List by 1 to include the next
+      // of the inst's operands.
+      assert(structuredOperands.size() > 0 && "list element not in list");
+      assert(structuredOperands.back().Kind == SOK_List &&
+             "list element not in list");
+      assert(thisMarkerName.empty() && "list element should not have name");
+      structuredOperands.back().OperandList = ArrayRef<Operand>(
+          structuredOperands.back().OperandList.data(),
+          structuredOperands.back().OperandList.size() + 1);
+      remainingOperands = remainingOperands.drop_front(1);
+      break;
+    default:
+      llvm_unreachable("unknown marker kind");
+    }
   }
 
   return opName;
@@ -131,29 +170,4 @@ std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
   assert(attrInfo.first == attrName);
   auto attrValue = attr.value;
   return attrValue.getStringValue().str();
-}
-
-GraphOperationInfo::OperandMarker::OperandMarker(StringRef MangledName)
-    : MangledName(MangledName) {
-  assert(MangledName.size() >= 2 && "marker too short");
-  assert(MangledName.find_last_of(",") == 0 && "incorrect comma");
-
-  switch (MangledName[1]) {
-  case 's':
-    Kind = OMK_Scalar;
-    assert(getName().empty());
-    break;
-  case 'i':
-    Kind = OMK_Normal;
-    break;
-  case 'L':
-    Kind = OMK_InputList;
-    break;
-  case 'e':
-    Kind = OMK_InputListElt;
-    assert(getName().empty());
-    break;
-  default:
-    llvm_unreachable("unknown marker kind");
-  }
 }
