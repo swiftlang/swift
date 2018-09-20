@@ -1014,7 +1014,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         }
       }
     } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
-      ExtendedType = ED->getExtendedType();
+      ExtendedType = ED->getDeclaredTypeInContext();
       if (ExtendedType)
         BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
     } else if (auto ND = dyn_cast<NominalTypeDecl>(DC)) {
