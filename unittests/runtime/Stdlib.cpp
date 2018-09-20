@@ -259,3 +259,15 @@ SWIFT_RUNTIME_STDLIB_SPI
 const HeapObject *swift_getKeyPathImpl(const void *p, const void *a) {
   abort();
 }
+
+// playground print hook
+
+struct swift_closure {
+  void *fptr;
+  HeapObject *context;
+};
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift) swift_closure
+MANGLE_SYM(s20_playgroundPrintHookySScSgvg)() {
+  return {nullptr, nullptr};
+}
+
