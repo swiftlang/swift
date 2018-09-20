@@ -156,14 +156,14 @@ extension MTLRenderCommandEncoder {
     public func useHeaps(_ heaps: [MTLHeap]) {
         __use(heaps, count: heaps.count)
     }
-    
-#if os(macOS)
-    @available(macOS 10.13, *)
+
+#if os(macOS) || os(iOS)
+    @available(macOS 10.13, iOS 12.0, *)
     public func setViewports(_ viewports: [MTLViewport]) {
         __setViewports(viewports, count: viewports.count)
     }
     
-    @available(macOS 10.13, *)
+    @available(macOS 10.13, iOS 12.0, *)
     public func setScissorRects(_ scissorRects: [MTLScissorRect]) {
         __setScissorRects(scissorRects, count: scissorRects.count)
     }
