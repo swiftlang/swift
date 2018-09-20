@@ -5,6 +5,7 @@ add_swift_library(swiftSerialization STATIC
   Serialization.cpp
   SerializedModuleLoader.cpp
   SerializedSILLoader.cpp
+  SerializeDoc.cpp
   SerializeSIL.cpp
   LINK_LIBRARIES
     swiftClangImporter)
