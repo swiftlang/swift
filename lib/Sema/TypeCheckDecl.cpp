@@ -4910,7 +4910,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   if (validateType(ext->getExtendedTypeLoc(),
-                   TypeResolution::forContextual(dc), options)) {
+                   TypeResolution::forInterface(dc), options)) {
     ext->setInvalid();
     ext->getExtendedTypeLoc().setInvalidType(Context);
     return;
