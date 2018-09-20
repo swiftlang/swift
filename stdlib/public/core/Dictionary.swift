@@ -1347,7 +1347,7 @@ extension Dictionary {
 
     @inlinable
     public func _customContainsEquatableElement(_ element: Element) -> Bool? {
-      return _variant.index(forKey: element) != nil
+      return _variant.contains(element)
     }
 
     @inlinable
@@ -1764,6 +1764,7 @@ internal protocol _DictionaryBuffer {
   func index(forKey key: Key) -> Index?
   var count: Int { get }
 
+  func contains(_ key: Key) -> Bool
   func lookup(_ index: Index) -> (key: Key, value: Value)
   func lookup(_ key: Key) -> Value?
 }
@@ -2398,6 +2399,12 @@ extension _NativeDictionary: _DictionaryBuffer {
     @inline(__always) get {
       return _assumeNonNegative(_storage._count)
     }
+  }
+
+  @inlinable
+  @inline(__always)
+  func contains(_ key: Key) -> Bool {
+    return find(key).found
   }
 
   @inlinable
@@ -3199,6 +3206,12 @@ extension _CocoaDictionary: _DictionaryBuffer {
 
   @inlinable
   @inline(__always)
+  internal func contains(_ key: Key) -> Bool {
+    return object.object(forKey: key) != nil
+  }
+
+  @inlinable
+  @inline(__always)
   internal func lookup(_ key: Key) -> Value? {
     return object.object(forKey: key)
   }
@@ -3419,6 +3432,23 @@ extension Dictionary._Variant: _DictionaryBuffer {
         return cocoa.count
 #endif
       }
+    }
+  }
+
+  @inlinable
+  @inline(__always)
+  func contains(_ key: Key) -> Bool {
+    if _fastPath(guaranteedNative) {
+      return asNative.contains(key)
+    }
+    switch self {
+    case .native:
+      return asNative.contains(key)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      let cocoaKey = _bridgeAnythingToObjectiveC(key)
+      return cocoa.contains(cocoaKey)
+#endif
     }
   }
 
