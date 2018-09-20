@@ -2159,7 +2159,6 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
   // First, get a function type for the constant.  This creates the
   // right type for a getter or setter.
   auto formalInterfaceType = makeConstantInterfaceType(constant);
-  auto *genericEnv = getConstantGenericEnvironment(constant);
 
   // The formal type is just that with the right representation.
   auto rep = getDeclRefRepresentation(constant);
@@ -2192,8 +2191,7 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
   auto result = ::new (resultBuf) SILConstantInfo{formalInterfaceType,
                                                   bridgedTypes.Pattern,
                                                   loweredInterfaceType,
-                                                  silFnType,
-                                                  genericEnv};
+                                                  silFnType};
   if (DisableConstantInfoCache)
     return *result;
 
@@ -2380,8 +2378,7 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
     derivedInterfaceTy,
     bridgedTypes.Pattern,
     overrideLoweredInterfaceTy,
-    fnTy,
-    derivedInfo.GenericEnv};
+    fnTy};
   
   auto inserted = ConstantOverrideTypes.insert({{derived, base}, result});
   assert(inserted.second);
