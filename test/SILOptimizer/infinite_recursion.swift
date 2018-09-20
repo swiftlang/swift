@@ -33,7 +33,7 @@ func f() { e() }
 
 func g() { // expected-warning {{all paths through this function will call itself}}
   while true { // expected-note {{condition always evaluates to true}}
-    g() 
+    g()
   }
 
   g() // expected-warning {{will never be executed}}
@@ -66,6 +66,19 @@ func l() {
     fatalError() // does not trivially recurse due to noreturn function call
   }
   l()
+}
+
+enum CustomNever {}
+
+func returnsCustomNever() -> CustomNever {
+  fatalError()
+}
+
+func m() {
+  if Bool.random() {
+    returnsCustomNever() // does not warn because function is technically noreturn
+  }
+  m()
 }
 
 class S {
