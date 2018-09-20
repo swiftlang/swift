@@ -41,6 +41,7 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::decl_attr_change:
   case LocalDiagID::decl_new_attr:
     return "/* Decl Attribute changes */";
+  case LocalDiagID::default_arg_removed:
   case LocalDiagID::decl_type_change:
     return "/* Type Changes */";
   case LocalDiagID::raw_type_change:

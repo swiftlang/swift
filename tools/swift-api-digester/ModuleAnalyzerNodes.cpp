@@ -664,6 +664,8 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       auto Right = (&Other)->getAs<SDKNodeType>();
       if (!Left->getTypeAttributes().equals(Right->getTypeAttributes()))
         return false;
+      if (Left->hasDefaultArgument() != Right->hasDefaultArgument())
+        return false;
       if (Left->getPrintedName() == Right->getPrintedName())
         return true;
       return Left->getName() == Right->getName() &&
