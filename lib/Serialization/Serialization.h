@@ -34,7 +34,8 @@ namespace serialization {
 
 using FilenamesTy = ArrayRef<std::string>;
 
-class Serializer {
+class SerializerBase {
+protected:
   SmallVector<char, 0> Buffer;
   llvm::BitstreamWriter Out{Buffer};
 
@@ -50,6 +51,21 @@ class Serializer {
   /// serialized. Any other decls will be cross-referenced instead.
   const SourceFile *SF = nullptr;
 
+  /// Record the name of a block.
+  void emitBlockID(unsigned ID, StringRef name,
+                   SmallVectorImpl<unsigned char> &nameBuffer);
+
+  /// Record the name of a record within a block.
+  void emitRecordID(unsigned ID, StringRef name,
+                    SmallVectorImpl<unsigned char> &nameBuffer);
+
+  void writeToStream(raw_ostream &os);
+
+public:
+  SerializerBase(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC);
+};
+
+class Serializer : public SerializerBase {
 public:
   /// Stores a declaration or a type to be written to the AST file.
   ///
@@ -313,15 +329,9 @@ private:
   /// Writes the BLOCKINFO block for the serialized module file.
   void writeBlockInfoBlock();
 
-  /// Writes the BLOCKINFO block for the module documentation file.
-  void writeDocBlockInfoBlock();
-
   /// Writes the Swift module file header and name, plus metadata determining
   /// if the module can be loaded.
   void writeHeader(const SerializationOptions &options = {});
-
-  /// Writes the Swift doc module file header and name.
-  void writeDocHeader();
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
@@ -439,20 +449,14 @@ private:
   void writeAST(ModuleOrSourceFile DC,
                 bool enableNestedTypeLookupTable);
 
-  void writeToStream(raw_ostream &os);
-
-  Serializer(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC);
-  ~Serializer();
+  using SerializerBase::SerializerBase;
+  using SerializerBase::writeToStream;
 
 public:
   /// Serialize a module to the given stream.
   static void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                             const SILModule *M,
                             const SerializationOptions &options);
-
-  /// Serialize module documentation to the given stream.
-  static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                               StringRef GroupInfoPath, ASTContext &Ctx);
 
   /// Records the use of the given Type.
   ///
@@ -562,6 +566,10 @@ public:
   void writeGenericRequirements(ArrayRef<Requirement> requirements,
                                 const std::array<unsigned, 256> &abbrCodes);
 };
+
+/// Serialize module documentation to the given stream.
+void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                      StringRef GroupInfoPath);
 } // end namespace serialization
 } // end namespace swift
 #endif
