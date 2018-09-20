@@ -2069,7 +2069,7 @@ static void checkDesignatedProtocol(OperatorDecl *OD, Identifier name,
   TypeLoc typeLoc = TypeLoc(TyR);
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
-  if (tc.validateType(typeLoc, TypeResolution::forContextual(dc), options)) {
+  if (tc.validateType(typeLoc, TypeResolution::forInterface(dc), options)) {
     typeLoc.setInvalidType(ctx);
   }
 
@@ -3456,7 +3456,7 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   }
 
   if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                      TypeResolution::forContextual(typeAlias), options)) {
+                      TypeResolution::forInterface(typeAlias), options)) {
     typeAlias->setInvalid();
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
