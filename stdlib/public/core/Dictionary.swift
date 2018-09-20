@@ -3336,6 +3336,7 @@ extension Dictionary._Variant {
       asNative.reserveCapacity(capacity, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       let capacity = Swift.max(cocoa.count, capacity)
       self = .native(_NativeDictionary(cocoa, capacity: capacity))
 #endif
@@ -3356,6 +3357,7 @@ extension Dictionary._Variant {
       return asNative.capacity
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       return cocoa.count
 #endif
     }
@@ -3536,6 +3538,7 @@ extension Dictionary._Variant {
       return asNative.mutatingFind(key, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       var native = _NativeDictionary<Key, Value>(
         cocoa, capacity: cocoa.count + 1)
       let result = native.mutatingFind(key, isUnique: true)
@@ -3679,6 +3682,7 @@ extension Dictionary._Variant {
       asNative.removeAll(isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       self = .native(_NativeDictionary(capacity: cocoa.count))
 #endif
     }
@@ -3697,6 +3701,7 @@ extension Dictionary._Variant {
       return Dictionary.Iterator(_native: native.makeIterator())
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       return Dictionary.Iterator(_cocoa: cocoa.makeIterator())
 #endif
     }
@@ -3733,6 +3738,7 @@ extension Dictionary._Variant {
         uniquingKeysWith: combine)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       var native = _NativeDictionary<Key, Value>(cocoa)
       try native.merge(
         keysAndValues,

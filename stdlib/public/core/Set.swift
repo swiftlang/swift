@@ -2545,6 +2545,7 @@ extension Set._Variant {
       asNative.reserveCapacity(capacity, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       let capacity = Swift.max(cocoa.count, capacity)
       self = .native(_NativeSet(cocoa, capacity: capacity))
 #endif
@@ -2565,6 +2566,7 @@ extension Set._Variant {
       return asNative.capacity
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       return cocoa.count
 #endif
     }
@@ -2795,6 +2797,7 @@ extension Set._Variant {
       asNative.removeAll(isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       self = .native(_NativeSet(capacity: cocoa.count))
 #endif
     }
@@ -2813,6 +2816,7 @@ extension Set._Variant {
       return Set.Iterator(_native: native.makeIterator())
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       return Set.Iterator(_cocoa: cocoa.makeIterator())
 #endif
     }
