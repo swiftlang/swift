@@ -2629,32 +2629,14 @@ extension _NativeDictionary { // Deletion
   }
 
   @inlinable
-  internal mutating func removeValue(
-    forKey key: Key,
+  @inline(__always)
+  internal mutating func uncheckedRemove(
+    at index: Index,
     isUnique: Bool
-  ) -> Value? {
-    var (index, found) = find(key)
-
-    // Fast path: if the key is not present, we will not mutate the dictionary,
-    // so don't force unique buffer.
-    guard found else { return nil }
-
-    if ensureUnique(isUnique: isUnique, capacity: capacity) {
-      (index, found) = find(key)
-      guard found else {
-        KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTS(Key.self)
-      }
-    }
-
-    let old = (_values + index.bucket).move()
-    (_keys + index.bucket).deinitialize(count: 1)
-    _delete(at: index)
-    return old
-  }
-
-  @inlinable
-  internal func _remove(at index: Index) -> Element {
-    _precondition(hashTable.isOccupied(index), "Invalid index")
+  ) -> Element {
+    _sanityCheck(hashTable.isOccupied(index))
+    let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
+    _sanityCheck(!rehashed)
     let oldKey = (_keys + index.bucket).move()
     let oldValue = (_values + index.bucket).move()
     _delete(at: index)
@@ -2662,10 +2644,10 @@ extension _NativeDictionary { // Deletion
   }
 
   @inlinable
+  @inline(__always)
   internal mutating func remove(at index: Index, isUnique: Bool) -> Element {
-    let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
-    _sanityCheck(!rehashed)
-    return _remove(at: index)
+    _precondition(hashTable.isOccupied(index), "Invalid index")
+    return uncheckedRemove(at: index, isUnique: isUnique)
   }
 
   @usableFromInline
@@ -3657,24 +3639,27 @@ extension Dictionary._Variant {
     // FIXME(performance): fuse data migration and element deletion into one
     // operation.
     let index = ensureUniqueNative(preserving: index)
-    return asNative._remove(at: index)
+    return asNative.remove(at: index, isUnique: true)
   }
 
   @inlinable
   internal mutating func removeValue(forKey key: Key) -> Value? {
     switch self {
     case .native:
+      let (index, found) = asNative.find(key)
+      guard found else { return nil }
       let isUnique = isUniquelyReferenced()
-      return asNative.removeValue(forKey: key, isUnique: isUnique)
+      return asNative.uncheckedRemove(at: index, isUnique: isUnique).value
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
       let cocoaKey = _bridgeAnythingToObjectiveC(key)
       guard cocoa.lookup(cocoaKey) != nil else { return nil }
-      var native = _NativeDictionary<Key, Value>(cocoa)
-      let old = native.removeValue(forKey: key, isUnique: true)
+      let native = _NativeDictionary<Key, Value>(cocoa)
+      let (index, found) = native.find(key)
+      _precondition(found, "Bridging did not preserve equality")
+      let old = asNative.uncheckedRemove(at: index, isUnique: true).value
       self = .native(native)
-      _sanityCheck(old != nil, "Bridging did not preserve equality")
       return old
 #endif
     }

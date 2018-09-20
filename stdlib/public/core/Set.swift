@@ -222,12 +222,14 @@ extension Set: ExpressibleByArrayLiteral {
       self.init()
       return
     }
-    var native = _NativeSet<Element>(capacity: elements.count)
+    let native = _NativeSet<Element>(capacity: elements.count)
     for element in elements {
-      let inserted = native._insert(element, isUnique: true).inserted
-      if !inserted {
+      let (index, found) = native.find(element)
+      if found {
         // FIXME: Shouldn't this trap?
+        continue
       }
+      native._unsafeInsertNew(element, at: index)
     }
     self.init(_native: native)
   }
@@ -1733,7 +1735,8 @@ internal struct _NativeSet<Element: Hashable> {
     _sanityCheck(cocoa.count <= capacity)
     self.init(capacity: capacity)
     for element in cocoa {
-      insertNew(_forceBridgeFromObjectiveC(element, Element.self))
+      let nativeElement = _forceBridgeFromObjectiveC(element, Element.self)
+      insertNew(nativeElement, isUnique: true)
     }
   }
 #endif
@@ -1998,9 +2001,34 @@ extension _NativeSet { // Insertions
   /// Storage must be uniquely referenced.
   /// The `element` must not be already present in the Set.
   @inlinable
-  internal mutating func insertNew(_ element: Element) {
-    _ = ensureUnique(isUnique: true, capacity: count + 1)
+  internal mutating func insertNew(_ element: Element, isUnique: Bool) {
+    _ = ensureUnique(isUnique: isUnique, capacity: count + 1)
     _unsafeInsertNew(element)
+  }
+
+  @inlinable
+  internal func _unsafeInsertNew(_ element: Element, at index: Index) {
+    hashTable.insert(index)
+    uncheckedInitialize(at: index, to: element)
+    _storage._count += 1
+  }
+
+  @inlinable
+  internal mutating func insertNew(
+    _ element: Element,
+    at index: Index,
+    isUnique: Bool
+  ) {
+    _sanityCheck(!hashTable.isOccupied(index))
+    var index = index
+    if ensureUnique(isUnique: isUnique, capacity: count + 1) {
+      let (i, f) = find(element)
+      if f {
+        ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
+      }
+      index = i
+    }
+    _unsafeInsertNew(element, at: index)
   }
 
   @inlinable
@@ -2024,44 +2052,8 @@ extension _NativeSet { // Insertions
       uncheckedInitialize(at: index, to: element)
       return old
     }
-    hashTable.insert(index)
-    uncheckedInitialize(at: index, to: element)
-    _storage._count += 1
+    _unsafeInsertNew(element, at: index)
     return nil
-  }
-
-  /// A variant of insert that returns the inserted index rather than the
-  /// corresponding member.
-  @inlinable
-  @discardableResult
-  internal mutating func _insert(
-    _ element: Element,
-    isUnique: Bool
-  ) -> (inserted: Bool, index: Index) {
-    var (index, found) = find(element)
-    if found { return (false, index) }
-    if ensureUnique(isUnique: isUnique, capacity: count + 1) {
-      (index, found) = find(element)
-      guard !found else {
-        ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
-      }
-    }
-    hashTable.insert(index)
-    uncheckedInitialize(at: index, to: element)
-    _storage._count += 1
-    return (true, index)
-  }
-
-  @inlinable
-  internal mutating func insert(
-    _ element: Element,
-    isUnique: Bool
-  ) -> (inserted: Bool, memberAfterInsert: Element) {
-    let (inserted, index) = _insert(element, isUnique: isUnique)
-    if inserted {
-      return (true, element)
-    }
-    return (false, uncheckedElement(at: index))
   }
 }
 
@@ -2088,36 +2080,23 @@ extension _NativeSet { // Deletion
   }
 
   @inlinable
-  internal mutating func remove(_ member: Element, isUnique: Bool) -> Element? {
-    var (index, found) = find(member)
-
-    // Fast path: if the element is not present, we will not mutate the set, so
-    // don't force unique buffer.
-    if !found {
-      return nil
-    }
-
-    if ensureUnique(isUnique: isUnique, capacity: capacity) {
-      (index, found) = find(member)
-      guard found else {
-        ELEMENT_TYPE_OF_SET_VIOLATES_HASHABLE_REQUIREMENTS(Element.self)
-      }
-    }
-
+  @inline(__always)
+  internal mutating func uncheckedRemove(
+    at index: Index,
+    isUnique: Bool) -> Element {
+    _sanityCheck(hashTable.isOccupied(index))
+    let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
+    _sanityCheck(!rehashed)
     let old = (_elements + index.bucket).move()
     _delete(at: index)
     return old
   }
 
   @inlinable
+  @inline(__always)
   internal mutating func remove(at index: Index, isUnique: Bool) -> Element {
     _precondition(hashTable.isOccupied(index), "Invalid index")
-    let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
-    _sanityCheck(!rehashed)
-
-    let old = (_elements + index.bucket).move()
-    _delete(at: index)
-    return old
+    return uncheckedRemove(at: index, isUnique: isUnique)
   }
 
   @usableFromInline
@@ -2393,6 +2372,11 @@ extension _CocoaSet {
   @_effects(releasenone)
   internal func member(for index: Index) -> AnyObject {
     return index.allKeys[index.currentKeyIndex]
+  }
+
+  @inlinable
+  internal func member(for element: AnyObject) -> AnyObject? {
+    return object.member(element)
   }
 }
 
@@ -2718,15 +2702,25 @@ extension Set._Variant {
   ) -> (inserted: Bool, memberAfterInsert: Element) {
     switch self {
     case .native:
+      let (index, found) = asNative.find(element)
+      if found {
+        return (false, asNative.uncheckedElement(at: index))
+      }
       let isUnique = self.isUniquelyReferenced()
-      return asNative.insert(element, isUnique: isUnique)
+      asNative.insertNew(element, at: index, isUnique: isUnique)
+      return (true, element)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       // Make sure we have space for an extra element.
+      let cocoaMember = _bridgeAnythingToObjectiveC(element)
+      if let m = cocoa.member(for: cocoaMember) {
+        return (false, _forceBridgeFromObjectiveC(m, Element.self))
+      }
       var native = _NativeSet<Element>(cocoa, capacity: cocoa.count + 1)
-      let result = native.insert(element, isUnique: true)
+      native.insertNew(element, isUnique: true)
       self = .native(native)
-      return result
+      return (true, element)
 #endif
     }
   }
@@ -2742,17 +2736,10 @@ extension Set._Variant {
     case .cocoa(let cocoa):
       cocoaPath()
       // We have to migrate the data first.  But after we do so, the Cocoa
-      // index becomes useless, so get the key first.
-      //
-      // FIXME(performance): fuse data migration and element deletion into one
-      // operation.
+      // index becomes useless, so get the element first.
       let cocoaMember = cocoa.member(for: index._asCocoa)
-      var native = _NativeSet<Element>(cocoa)
       let nativeMember = _forceBridgeFromObjectiveC(cocoaMember, Element.self)
-      let old = native.remove(nativeMember, isUnique: true)
-      _sanityCheck(nativeMember == old, "Bridging did not preserve equality")
-      self = .native(native)
-      return nativeMember
+      return _migrateToNative(cocoa, removing: nativeMember)
 #endif
     }
   }
@@ -2762,23 +2749,37 @@ extension Set._Variant {
   internal mutating func remove(_ member: Element) -> Element? {
     switch self {
     case .native:
+      let (index, found) = asNative.find(member)
+      guard found else { return nil }
       let isUnique = isUniquelyReferenced()
-      return asNative.remove(member, isUnique: isUnique)
+      return asNative.uncheckedRemove(at: index, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
       let cocoaMember = _bridgeAnythingToObjectiveC(member)
-      if !cocoa.contains(cocoaMember) {
-        return nil
-      }
-      var native = _NativeSet<Element>(cocoa)
-      let old = native.remove(member, isUnique: true)
-      self = .native(native)
-      _sanityCheck(old != nil, "Bridging did not preserve equality")
-      return old
+      guard cocoa.contains(cocoaMember) else { return nil }
+      return _migrateToNative(cocoa, removing: member)
 #endif
     }
   }
+
+#if _runtime(_ObjC)
+  @inlinable
+  internal mutating func _migrateToNative(
+    _ cocoa: _CocoaSet,
+    removing member: Element
+  ) -> Element {
+    // FIXME(performance): fuse data migration and element deletion into one
+    // operation.
+    var native = _NativeSet<Element>(cocoa)
+    let (index, found) = native.find(member)
+    _precondition(found, "Bridging did not preserve equality")
+    let old = native.remove(at: index, isUnique: true)
+    _precondition(member == old, "Bridging did not preserve equality")
+    self = .native(native)
+    return old
+  }
+#endif
 
   @inlinable
   internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
@@ -3302,7 +3303,7 @@ struct _SetBuilder<Element: Hashable> {
   public mutating func add(member: Element) {
     _precondition(_target.count < _requestedCount,
       "Can't add more members than promised")
-    _target.insertNew(member)
+    _target.insertNew(member, isUnique: true)
   }
 
   @inlinable
