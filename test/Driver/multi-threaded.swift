@@ -5,7 +5,7 @@
 // RUN: %target-swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -c | %FileCheck -check-prefix=OBJECT %s
 // RUN: %target-swiftc_driver -parseable-output -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -c 2> %t/parseable-output
 // RUN: cat %t/parseable-output | %FileCheck -check-prefix=PARSEABLE %s
-// RUN: env TMPDIR=/tmp %swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -o a.out | %FileCheck -check-prefix=EXEC %s
+// RUN: (cd %t && env TMPDIR=/tmp %swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -o a.out ) | %FileCheck -check-prefix=EXEC %s
 // RUN: echo "{\"%s\": {\"llvm-bc\": \"multi-threaded.bc\", \"object\": \"%t/multi-threaded.o\"}, \"%S/Inputs/main.swift\": {\"llvm-bc\": \"main.bc\", \"object\": \"%t/main.o\"}}" > %t/ofmo.json
 // RUN: %target-swiftc_driver -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s  -emit-dependencies -output-file-map %t/ofmo.json -c
 // RUN: cat %t/*.d | %FileCheck -check-prefix=DEPENDENCIES %s
@@ -18,7 +18,7 @@
 // RUN: cat %t/parseable2 | %FileCheck -check-prefix=PARSEABLE2 %s
 
 // Check if linking works with -parseable-output
-// RUN: %target-swiftc_driver -parseable-output -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -output-file-map %t/ofmo.json -o a.out 2> %t/parseable3
+// RUN: (cd %t && %target-swiftc_driver -parseable-output -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -output-file-map %t/ofmo.json -o a.out) 2> %t/parseable3
 // RUN: cat %t/parseable3 | %FileCheck -check-prefix=PARSEABLE3 %s
 
 // MODULE: -frontend
