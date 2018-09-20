@@ -151,9 +151,32 @@ protected:
   ///
   /// \param newState The new state this step should be in.
   void transitionTo(StepState newState) {
-    // TODO: Make sure that ordering of the state transitions is correct,
-    //       because `setup -> ready -> running [-> suspended]* -> done`
-    //       is the only reasonable state transition path.
+#ifndef NDEBUG
+    // Make sure that ordering of the state transitions is correct,
+    // because `setup -> ready -> running [-> suspended]* -> done`
+    // is the only reasonable state transition path.
+    switch (State) {
+    case StepState::Setup:
+      assert(newState == StepState::Ready);
+      break;
+
+    case StepState::Ready:
+      assert(newState == StepState::Running);
+      break;
+
+    case StepState::Running:
+      assert(newState == StepState::Suspended || newState == StepState::Done);
+      break;
+
+    case StepState::Suspended:
+      assert(newState == StepState::Running);
+      break;
+
+    case StepState::Done:
+      llvm_unreachable("step is already done.");
+    }
+#endif
+
     State = newState;
   }
 
