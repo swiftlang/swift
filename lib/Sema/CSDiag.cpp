@@ -64,12 +64,10 @@ namespace swift {
     
     if (!ty->hasTypeParameter() && !ty->hasArchetype()) return ty;
     
-    auto &ctx = ty->getASTContext();
-    
     return ty.transform([&](Type type) -> Type {
       if (type->is<ArchetypeType>() ||
           type->isTypeParameter())
-        return ctx.TheUnresolvedType;
+        return UnresolvedType::get(type);
       return type;
     });
   }

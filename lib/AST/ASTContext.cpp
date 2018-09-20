@@ -492,7 +492,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
       new (*this, AllocationArena::Permanent)
         ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
-                      UnresolvedType(*this)),
+                      UnresolvedType(this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
                                             /*HasExplicitAnyObject=*/false)),
@@ -3023,6 +3023,18 @@ Type ErrorType::get(Type originalType) {
   if (originalProperties.hasTypeVariable())
     properties |= RecursiveTypeProperties::HasTypeVariable;
   return entry = new (mem) ErrorType(ctx, originalType, properties);
+}
+
+Type UnresolvedType::get(Type originalType) {
+  assert(originalType);
+
+  auto originalProperties = originalType->getRecursiveProperties();
+  auto arena = getArena(originalProperties);
+
+  auto &ctx = originalType->getASTContext();
+  void *mem = ctx.Allocate(sizeof(UnresolvedType) + sizeof(Type),
+                           alignof(UnresolvedType), arena);
+  return new (mem) UnresolvedType(nullptr, originalType);
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,

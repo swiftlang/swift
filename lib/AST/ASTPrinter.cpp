@@ -3284,8 +3284,11 @@ public:
   void visitUnresolvedType(UnresolvedType *T) {
     if (T->getASTContext().LangOpts.DebugConstraintSolver)
       Printer << "<<unresolvedtype>>";
-    else
+    else if (auto originalType = T->getOriginalType())
+      visit(originalType);
+    else {
       Printer << "_";
+    }
   }
 
   void visitBuiltinRawPointerType(BuiltinRawPointerType *T) {

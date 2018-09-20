@@ -1015,9 +1015,16 @@ CanType TypeBase::computeCanonicalType() {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Error:
-  case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
     llvm_unreachable("these types are always canonical");
+
+  case TypeKind::Unresolved: {
+    auto unresolvedTy = cast<UnresolvedType>(this);
+    auto originalTy = unresolvedTy->getOriginalType();
+    assert(originalTy && "unresolved type without original should already be canonical");
+    Result = originalTy->getASTContext().TheUnresolvedType.getPointer();
+    break;
+  }
 
 #define SUGARED_TYPE(id, parent) \
   case TypeKind::id: \
