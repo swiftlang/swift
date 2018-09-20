@@ -441,8 +441,8 @@ private:
 
   void writeToStream(raw_ostream &os);
 
-  template <size_t N>
-  Serializer(const unsigned char (&signature)[N], ModuleOrSourceFile DC);
+  Serializer(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC);
+  ~Serializer();
 
 public:
   /// Serialize a module to the given stream.
