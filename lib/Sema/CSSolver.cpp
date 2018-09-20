@@ -1512,11 +1512,9 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
 // in the given function type.
 static bool haveTypeInformationForAllArguments(AnyFunctionType *fnType,
                                                ConstraintSystem &cs) {
-  for (auto param : fnType->getParams())
-    if (!havePotentialTypesOrLiteralConformances(param.getType(), cs))
-      return false;
-
-  return true;
+  return llvm::all_of(fnType->getParams(), [&](AnyFunctionType::Param param) {
+    return havePotentialTypesOrLiteralConformances(param.getType(), cs);
+  });
 }
 
 // Given a type variable representing the RHS of an ApplicableFunction
