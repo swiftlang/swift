@@ -860,15 +860,14 @@ function(swift_icu_variables_set sdk arch result)
   endif()
 endfunction()
 
-# ICU is provided through CoreFoundation on Darwin.  On other hosts, assume that
-# we are compiling for the build as the host.  In such a case, if the ICU
+# ICU is provided through CoreFoundation on Darwin.  On other hosts, if the ICU
 # unicode and i18n include and library paths are not defined, perform a standard
 # package lookup.  Otherwise, rely on the paths specified by the user.  These
 # need to be defined when cross-compiling.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
-    swift_icu_variables_set("${SWIFT_HOST_VARIANT_SDK_default}"
-                            "${SWIFT_HOST_VARIANT_ARCH_default}"
+    swift_icu_variables_set("${SWIFT_PRIMARY_VARIANT_SDK}"
+                            "${SWIFT_PRIMARY_VARIANT_ARCH}"
                             ICU_CONFIGURED)
     if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND NOT ${ICU_CONFIGURED})
       find_package(ICU REQUIRED COMPONENTS uc i18n)

@@ -2397,6 +2397,8 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.AccessFilter = AccessLevel::Private;
     Options.PrintAccess = false;
     Options.SkipAttributes = true;
+    Options.FunctionDefinitions = true;
+    Options.PrintAccessorBodiesInProtocols = true;
     Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
       Printer << " {";
       Printer.printNewline();

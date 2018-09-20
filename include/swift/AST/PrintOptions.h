@@ -135,12 +135,31 @@ struct PrintOptions {
   /// \brief Whether to print *any* accessors on properties.
   bool PrintPropertyAccessors = true;
 
-  /// \brief Whether to print the accessors of a property abstractly,
-  /// i.e. always as get and set rather than the specific accessors
-  /// actually used to implement the property.
+  /// Whether to print the accessors of a property abstractly,
+  /// i.e. always as:
+  /// ```
+  /// var x: Int { get set }
+  /// ```
+  /// rather than the specific accessors actually used to implement the
+  /// property.
   ///
   /// Printing function definitions takes priority over this setting.
   bool AbstractAccessors = true;
+
+  /// Whether to print a property with only a single getter using the shorthand
+  /// ```
+  /// var x: Int { return y }
+  /// ```
+  /// vs.
+  /// ```
+  /// var x: Int {
+  ///   get { return y }
+  /// }
+  /// ```
+  bool CollapseSingleGetterProperty = true;
+
+  /// Whether to print the bodies of accessors in protocol context.
+  bool PrintAccessorBodiesInProtocols = false;
 
   /// \brief Whether to print type definitions.
   bool TypeDefinitions = false;
