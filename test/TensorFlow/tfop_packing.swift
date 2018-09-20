@@ -71,7 +71,7 @@ public func unpackAggregate_basic() {
 // CHECK: [[D_Foo_y_0:%.*]] = graph_op "Const"(){{.*}}f32 0x40000000 /* 2 */{{.*}}
 // CHECK: [[D_Foo_y_1_a:%.*]] = graph_op "Const"(){{.*}}i32 3{{.*}}
 // CHECK: [[D_Foo_y_1_b:%.*]] = graph_op "Const"(){{.*}}i1 0{{.*}}
-// CHECK: graph_op "SomeOp5,L,e,e,e,e"([[D_Foo_x]] : $TensorHandle<Float>, [[D_Foo_y_0]] : $TensorHandle<Float>, [[D_Foo_y_1_a]] : $TensorHandle<Int32>, [[D_Foo_y_1_b]] : $TensorHandle<Bool>)
+// CHECK: graph_op "SomeOp5"({{\[}}[[D_Foo_x]] : $TensorHandle<Float>, [[D_Foo_y_0]] : $TensorHandle<Float>, [[D_Foo_y_1_a]] : $TensorHandle<Int32>, [[D_Foo_y_1_b]] : $TensorHandle<Bool>{{\]}})
 
 @inlinable @inline(__always)
 public func genericUnpackedAggregate<T>(t: T) -> Tensor<Float> {
@@ -93,7 +93,7 @@ public func unpackAggregate_generic() {
 // CHECK: [[E_Foo_y_0:%.*]] = graph_op "Const"(){{.*}}f32 0x40000000 /* 2 */{{.*}}
 // CHECK: [[E_Foo_y_1_a:%.*]] = graph_op "Const"(){{.*}}i32 3{{.*}}
 // CHECK: [[E_Foo_y_1_b:%.*]] = graph_op "Const"(){{.*}}i1 0{{.*}}
-// CHECK: graph_op "SomeOp6,L,e,e,e,e"([[E_Foo_x]] : $TensorHandle<Float>, [[E_Foo_y_0]] : $TensorHandle<Float>, [[E_Foo_y_1_a]] : $TensorHandle<Int32>, [[E_Foo_y_1_b]] : $TensorHandle<Bool>)
+// CHECK: graph_op "SomeOp6"({{\[}}[[E_Foo_x]] : $TensorHandle<Float>, [[E_Foo_y_0]] : $TensorHandle<Float>, [[E_Foo_y_1_a]] : $TensorHandle<Int32>, [[E_Foo_y_1_b]] : $TensorHandle<Bool>{{\]}})
 
 // Checks that unpacking reuses extraction instructions instead of making new
 // ones for each element of the input list.
@@ -109,7 +109,7 @@ public func unpackAggregate_reuse(x: Tensor<Float>) {
 // CHECK: struct_extract
 // CHECK: struct_extract
 // CHECK: [[F_TensorHandle:%.*]] = struct_extract %0 : $Tensor<Float>, #Tensor.handle
-// CHECK: graph_op "SomeOp7,L,e,e"([[F_TensorHandle]] : $TensorHandle<Float>, [[F_TensorHandle]] : $TensorHandle<Float>)
+// CHECK: graph_op "SomeOp7"({{\[}}[[F_TensorHandle]] : $TensorHandle<Float>, [[F_TensorHandle]] : $TensorHandle<Float>{{\]}})
 
 // TODO(SR-8680): Make this testcase work.
 // public func unpackAggregate_tuple() {
@@ -129,7 +129,7 @@ public func packResultsToAggregate_basic() {
 }
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}packResultsToAggregate_basic{{.*}}
 // CHECK:  ([[A0:%.*]], [[A1:%.*]], [[A2:%.*]], [[A3:%.*]], [[A4:%.*]]) = graph_op "SomeOp"() {__device: "/device:CPU:0"} : $TensorHandle<Float>, $TensorHandle<Float>, $TensorHandle<Int32>, $TensorHandle<Bool>, $TensorHandle<Double>
-// CHECK: graph_op "Add,i,i"({{.*}} : $TensorHandle<Int32>, [[A2]] : $TensorHandle<Int32>) {T: $Int32, __device: "/device:CPU:0"} : $TensorHandle<Int32>
+// CHECK: graph_op "Add"({{.*}} : $TensorHandle<Int32>, [[A2]] : $TensorHandle<Int32>) {T: $Int32, __device: "/device:CPU:0"} : $TensorHandle<Int32>
 // CHECK:  [[PACKED:%.*]] = tuple ([[A0]] : $TensorHandle<Float>, [[A1]] : $TensorHandle<Float>, [[A2]] : $TensorHandle<Int32>, [[A3]] : $TensorHandle<Bool>, [[A4]] : $TensorHandle<Double>)
 // CHECK:  return [[PACKED]] : $(TensorHandle<Float>, TensorHandle<Float>, TensorHandle<Int32>, TensorHandle<Bool>, TensorHandle<Double>)
 

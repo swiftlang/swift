@@ -97,9 +97,6 @@ struct GraphOperationInfo {
   // }
 
   enum StructuredOperandKind {
-    /// Scalar input, used by tfc.scalarToTensor only.
-    /// Mangled name is ",s"
-    SOK_Scalar,
     /// Single operand.
     /// Mangled name is ",i${name}" where ${name} is an optional name.
     SOK_Single,
@@ -117,7 +114,7 @@ struct GraphOperationInfo {
     StructuredOperandKind Kind;
     StringRef Name;
     union {
-      /// Operand for SOK_Scalar and SOK_Single.
+      /// Operand for SOK_Single.
       SILValue SingleOperand;
       /// Operands for SOK_List.
       ArrayRef<Operand> OperandList;
@@ -140,7 +137,7 @@ struct GraphOperationInfo {
     }
 
     SILValue getSingleOperand() const {
-      assert(getKind() == SOK_Scalar || getKind() == SOK_Single);
+      assert(getKind() == SOK_Single);
       return SingleOperand;
     }
 

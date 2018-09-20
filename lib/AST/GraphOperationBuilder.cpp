@@ -50,21 +50,6 @@ GraphOperationAttribute &GraphOperationBuilder::addAttribute(
   return Attributes.back();
 }
 
-/// Special method that should only be used for "tfc.scalarToTensor"'s operand,
-/// because it has special name mangling. (Marker is "s").
-void GraphOperationBuilder::addScalarOperand(SILValue operand) {
-  MangledName += ",s";
-  Operands.push_back(operand);
-}
-
-/// Special method that should only be used for "tf_tensor_to_i1"'s operand,
-/// because it has special name mangling. (No marker for its operand).
-/// TODO: Make "tf_tensor_to_i1" support normal name mangling, and then remove
-/// this.
-void GraphOperationBuilder::addTFTensorToI1Operand(SILValue operand) {
-  Operands.push_back(operand);
-}
-
 /// Build the GraphOperationInst.
 GraphOperationInst* GraphOperationBuilder::build(
     SILBuilder &B, ASTContext &C, SILLocation loc,

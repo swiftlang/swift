@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -emit-sil -Xllvm -tf-dynamic-compilation -Xllvm -debug -Xllvm -debug-only -Xllvm irgensil %s 2>&1
 // RUN: %target-swift-frontend -emit-ir -Xllvm -tf-dynamic-compilation -Xllvm -debug -Xllvm -debug-only -Xllvm irgensil %s 2>&1 | %FileCheck %s
 
 import TensorFlow

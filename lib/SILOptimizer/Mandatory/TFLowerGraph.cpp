@@ -1842,7 +1842,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   // If this is the magic tf_tensor_to_i1 builtin, then we completely ignore it.
   // the only user of it are things that take conditional branches, and they
   // handle it directly.
-  if (inst->getName().str() == "tf_tensor_to_i1")
+  if (inst->getName().str() == "tf_tensor_to_i1,i")
     return GLStatus::Success;
 
   // Decode information about the graph_op.
@@ -1886,8 +1886,6 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   for (auto structuredOperand : structuredOperands) {
     assert(structuredOperand.getName().empty() && "cannot lower named operands");
     switch (structuredOperand.getKind()) {
-    case GraphOperationInfo::SOK_Scalar:
-      llvm_unreachable("tfc.scalarToTensor should be lowered by now");
     case GraphOperationInfo::SOK_Single: {
       // Normal tensor inputs.
       auto operand = structuredOperand.getSingleOperand();
@@ -2332,7 +2330,7 @@ static TF_Output getCondition(CondBranchInst *condBr,
     auto *graphOpResult = cast<GraphOperationResult>(cond);
     auto *graphOpInst = graphOpResult->getParent();
     assert(graphOpInst->getNumResults() == 1);
-    assert(graphOpInst->getName().str() == "tf_tensor_to_i1");
+    assert(graphOpInst->getName().str() == "tf_tensor_to_i1,i");
     tensorToI1 = graphOpInst;
   }
   assert(tensorToI1->getNumOperands() == 1 &&

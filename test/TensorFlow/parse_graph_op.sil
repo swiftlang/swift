@@ -1,0 +1,41 @@
+// RUN: %target-swift-frontend %s -emit-silgen | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+import TensorFlow
+
+sil @parse_graph_op : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @parse_graph_op
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int64, 2
+
+  %3 = graph_op "Dummy1"(%0 : $Builtin.Int64) : $TensorHandle<Float>
+  // CHECK: %3 = graph_op "Dummy1"(%0 : $Builtin.Int64) : $TensorHandle<Float>
+
+  %4 = graph_op "Dummy2"(named$something %0 : $Builtin.Int64) : $TensorHandle<Float>
+  // CHECK-NEXT: %4 = graph_op "Dummy2"(named$something %0 : $Builtin.Int64) : $TensorHandle<Float>
+
+  %5 = graph_op "Dummy3"([%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $TensorHandle<Float>
+  // CHECK-NEXT: %5 = graph_op "Dummy3"([%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $TensorHandle<Float>
+
+  %6 = graph_op "Dummy4"(named$something [%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $TensorHandle<Float>
+  // CHECK-NEXT: %6 = graph_op "Dummy4"(named$something [%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $TensorHandle<Float>
+
+  %7 = graph_op "Dummy5"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $TensorHandle<Float>
+  // CHECK-NEXT: %7 = graph_op "Dummy5"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $TensorHandle<Float>
+
+  %8 = graph_op "Dummy6"(%0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
+  // CHECK-NEXT: %8 = graph_op "Dummy6"(%0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
+
+  %9 = graph_op "Dummy7"(named$something %0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
+  // CHECK-NEXT: 9 = graph_op "Dummy7"(named$something %0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
+
+  %10 = graph_op "Dummy8"(named$something %0 : $Builtin.Int64, named$somethingelse [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
+  // CHECK-NEXT: %10 = graph_op "Dummy8"(named$something %0 : $Builtin.Int64, named$somethingelse [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
+
+  return undef : $()
+}

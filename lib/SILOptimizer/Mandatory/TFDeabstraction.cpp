@@ -2162,7 +2162,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
           return;
         }
 
-        opBuilder.addScalarOperand(operand);
+        opBuilder.addOperand(operand);
         continue;
       }
 

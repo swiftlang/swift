@@ -2408,7 +2408,7 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
 
 void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
   // Handle special case "ops".
-  if (inst->getName().is("tfc.scalarToTensor,s")) {
+  if (inst->getName().is("tfc.scalarToTensor,i")) {
     assert(inst->getNumOperands() == 1 && "invalid tfc.scalarToTensor!");
     // We just lower the result as the input, since the scalar input will have
     // been promoted to a tensor already.  It is possible that the input will
