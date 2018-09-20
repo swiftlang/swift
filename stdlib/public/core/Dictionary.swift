@@ -3252,26 +3252,33 @@ extension Dictionary {
 }
 
 extension Dictionary._Variant {
-  @usableFromInline
-  @_transparent
+#if _runtime(_ObjC)
+  @usableFromInline @_transparent
   internal var guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
 
+  // Allow the optimizer to consider the surrounding code unreachable if Element
+  // is guaranteed to be native.
+  @usableFromInline @_transparent
+  internal func cocoaPath() {
+    if guaranteedNative {
+      _conditionallyUnreachable()
+    }
+  }
+#endif
+
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
-    // Note that &self drills down through .native(_NativeDictionary) to the
-    // first property in _NativeDictionary, which is the reference to the
-    // storage.
-    if _fastPath(guaranteedNative) {
-      return _isUnique_native(&self)
-    }
-
     switch self {
     case .native:
+      // Note that &self drills down through .native(_NativeDictionary) to the
+      // first property in _NativeDictionary, which is the reference to the
+      // storage.
       return _isUnique_native(&self)
 #if _runtime(_ObjC)
     case .cocoa:
+      cocoaPath()
       // Don't consider Cocoa buffer mutable, even if it is mutable and is
       // uniquely referenced.
       return false
@@ -3354,14 +3361,12 @@ extension Dictionary._Variant: _DictionaryBuffer {
 
   @inlinable
   internal var startIndex: Index {
-    if _fastPath(guaranteedNative) {
-      return Index(_native: asNative.startIndex)
-    }
     switch self {
     case .native:
       return Index(_native: asNative.startIndex)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       return Index(_cocoa: cocoa.startIndex)
 #endif
     }
@@ -3369,14 +3374,12 @@ extension Dictionary._Variant: _DictionaryBuffer {
 
   @inlinable
   internal var endIndex: Index {
-    if _fastPath(guaranteedNative) {
-      return Index(_native: asNative.endIndex)
-    }
     switch self {
     case .native:
       return Index(_native: asNative.endIndex)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       return Index(_cocoa: cocoa.endIndex)
 #endif
     }
@@ -3384,14 +3387,12 @@ extension Dictionary._Variant: _DictionaryBuffer {
 
   @inlinable
   internal func index(after i: Index) -> Index {
-    if _fastPath(guaranteedNative) {
-      return Index(_native: asNative.index(after: i._asNative))
-    }
     switch self {
     case .native:
       return Index(_native: asNative.index(after: i._asNative))
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       return Index(_cocoa: cocoa.index(after: i._asCocoa))
 #endif
     }
@@ -3400,16 +3401,13 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inlinable
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
-    if _fastPath(guaranteedNative) {
-      guard let index = asNative.index(forKey: key) else { return nil }
-      return Index(_native: index)
-    }
     switch self {
     case .native:
       guard let index = asNative.index(forKey: key) else { return nil }
       return Index(_native: index)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       let cocoaKey = _bridgeAnythingToObjectiveC(key)
       guard let index = cocoa.index(forKey: cocoaKey) else { return nil }
       return Index(_cocoa: index)
@@ -3421,14 +3419,12 @@ extension Dictionary._Variant: _DictionaryBuffer {
   internal var count: Int {
     @inline(__always)
     get {
-      if _fastPath(guaranteedNative) {
-        return asNative.count
-      }
       switch self {
       case .native:
         return asNative.count
 #if _runtime(_ObjC)
       case .cocoa(let cocoa):
+        cocoaPath()
         return cocoa.count
 #endif
       }
@@ -3438,14 +3434,12 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inlinable
   @inline(__always)
   func contains(_ key: Key) -> Bool {
-    if _fastPath(guaranteedNative) {
-      return asNative.contains(key)
-    }
     switch self {
     case .native:
       return asNative.contains(key)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       let cocoaKey = _bridgeAnythingToObjectiveC(key)
       return cocoa.contains(cocoaKey)
 #endif
@@ -3455,14 +3449,12 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inlinable
   @inline(__always)
   func lookup(_ index: Index) -> (key: Key, value: Value) {
-    if _fastPath(guaranteedNative) {
-      return asNative.lookup(index._asNative)
-    }
     switch self {
     case .native:
       return asNative.lookup(index._asNative)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       let (cocoaKey, cocoaValue) = cocoa.lookup(index._asCocoa)
       let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
       let nativeValue = _forceBridgeFromObjectiveC(cocoaValue, Value.self)
@@ -3474,14 +3466,12 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inlinable
   @inline(__always)
   func lookup(_ key: Key) -> Value? {
-    if _fastPath(guaranteedNative) {
-      return asNative.lookup(key)
-    }
     switch self {
     case .native:
       return asNative.lookup(key)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       let cocoaKey = _bridgeAnythingToObjectiveC(key)
       guard let cocoaValue = cocoa.lookup(cocoaKey) else { return nil }
       return _forceBridgeFromObjectiveC(cocoaValue, Value.self)
@@ -3549,6 +3539,7 @@ extension Dictionary._Variant {
       return index._asNative
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       // We have to migrate the data first.  But after we do so, the Cocoa
       // index becomes useless, so get the key first.
       let cocoaKey = cocoa.key(for: index._asCocoa)
@@ -3567,16 +3558,13 @@ extension Dictionary._Variant {
     _ value: Value,
     forKey key: Key
   ) -> Value? {
-    if _fastPath(guaranteedNative) {
-      let isUnique = self.isUniquelyReferenced()
-      return asNative.updateValue(value, forKey: key, isUnique: isUnique)
-    }
     switch self {
     case .native:
       let isUnique = self.isUniquelyReferenced()
       return asNative.updateValue(value, forKey: key, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       // Make sure we have space for an extra element.
       var native = _NativeDictionary<Key, Value>(
         cocoa,
@@ -3590,17 +3578,13 @@ extension Dictionary._Variant {
 
   @inlinable
   internal mutating func setValue(_ value: Value, forKey key: Key) {
-    if _fastPath(guaranteedNative) {
-      let isUnique = self.isUniquelyReferenced()
-      asNative.setValue(value, forKey: key, isUnique: isUnique)
-      return
-    }
     switch self {
     case .native:
       let isUnique = self.isUniquelyReferenced()
       asNative.setValue(value, forKey: key, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       // Make sure we have space for an extra element.
       var native = _NativeDictionary<Key, Value>(
         cocoa,
@@ -3613,10 +3597,6 @@ extension Dictionary._Variant {
 
   @inlinable
   internal mutating func remove(at index: Index) -> Element {
-    if _fastPath(guaranteedNative) {
-      let isUnique = isUniquelyReferenced()
-      return asNative.remove(at: index._asNative, isUnique: isUnique)
-    }
     // FIXME(performance): fuse data migration and element deletion into one
     // operation.
     let index = ensureUniqueNative(preserving: index)
@@ -3625,16 +3605,13 @@ extension Dictionary._Variant {
 
   @inlinable
   internal mutating func removeValue(forKey key: Key) -> Value? {
-    if _fastPath(guaranteedNative) {
-      let isUnique = isUniquelyReferenced()
-      return asNative.removeValue(forKey: key, isUnique: isUnique)
-    }
     switch self {
     case .native:
       let isUnique = isUniquelyReferenced()
       return asNative.removeValue(forKey: key, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       let cocoaKey = _bridgeAnythingToObjectiveC(key)
       guard cocoa.lookup(cocoaKey) != nil else { return nil }
       var native = _NativeDictionary<Key, Value>(cocoa)
@@ -3689,14 +3666,12 @@ extension Dictionary._Variant {
   internal func mapValues<T>(
     _ transform: (Value) throws -> T
   ) rethrows -> _NativeDictionary<Key, T> {
-    if _fastPath(guaranteedNative) {
-      return try asNative.mapValues(transform)
-    }
     switch self {
     case .native(let native):
       return try native.mapValues(transform)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       return try cocoa.mapValues(transform)
 #endif
     }
@@ -3861,10 +3836,21 @@ extension Dictionary {
 }
 
 extension Dictionary.Index {
+#if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var _guaranteedNative: Bool {
-    return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
+    return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
+
+  // Allow the optimizer to consider the surrounding code unreachable if Element
+  // is guaranteed to be native.
+  @usableFromInline @_transparent
+  internal func _cocoaPath() {
+    if _guaranteedNative {
+      _conditionallyUnreachable()
+    }
+  }
+#endif
 
   @usableFromInline @_transparent
   internal var _asNative: _NativeDictionary<Key, Value>.Index {
@@ -3897,14 +3883,12 @@ extension Dictionary.Index: Equatable {
     lhs: Dictionary<Key, Value>.Index,
     rhs: Dictionary<Key, Value>.Index
   ) -> Bool {
-    if _fastPath(lhs._guaranteedNative) {
-      return lhs._asNative == rhs._asNative
-    }
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
       return lhsNative == rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
+      lhs._cocoaPath()
       return lhsCocoa == rhsCocoa
     default:
       _preconditionFailure("Comparing indexes from different dictionaries")
@@ -3919,15 +3903,12 @@ extension Dictionary.Index: Comparable {
     lhs: Dictionary<Key, Value>.Index,
     rhs: Dictionary<Key, Value>.Index
   ) -> Bool {
-    if _fastPath(lhs._guaranteedNative) {
-      return lhs._asNative < rhs._asNative
-    }
-
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
       return lhsNative < rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
+      lhs._cocoaPath()
       return lhsCocoa < rhsCocoa
     default:
       _preconditionFailure("Comparing indexes from different dictionaries")
@@ -3940,16 +3921,12 @@ extension Dictionary.Index: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
-    if _fastPath(_guaranteedNative) {
-      hasher.combine(0 as UInt8)
-      hasher.combine(_asNative.bucket)
-      return
-    }
     switch _variant {
     case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
       hasher.combine(nativeIndex.bucket)
     case .cocoa(let cocoaIndex):
+      _cocoaPath()
       hasher.combine(1 as UInt8)
       hasher.combine(cocoaIndex.currentKeyIndex)
     }
@@ -4131,10 +4108,21 @@ extension Dictionary {
 }
 
 extension Dictionary.Iterator {
+#if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var _guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
+
+  /// Allow the optimizer to consider the surrounding code unreachable if
+  /// Dictionary<Key, Value> is guaranteed to be native.
+  @usableFromInline @_transparent
+  internal func _cocoaPath() {
+    if _guaranteedNative {
+      _conditionallyUnreachable()
+    }
+  }
+#endif
 
   @usableFromInline @_transparent
   internal var _asNative: _NativeDictionary<Key, Value>.Iterator {
@@ -4162,15 +4150,12 @@ extension Dictionary.Iterator: IteratorProtocol {
   @inlinable
   @inline(__always)
   public mutating func next() -> (key: Key, value: Value)? {
-    if _fastPath(_guaranteedNative) {
-      return _asNative.next()
-    }
-
     switch _variant {
     case .native:
       return _asNative.next()
 #if _runtime(_ObjC)
     case .cocoa(let cocoaIterator):
+      _cocoaPath()
       if let (cocoaKey, cocoaValue) = cocoaIterator.next() {
         let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
         let nativeValue = _forceBridgeFromObjectiveC(cocoaValue, Value.self)

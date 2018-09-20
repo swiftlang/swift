@@ -2487,24 +2487,34 @@ extension Set {
 }
 
 extension Set._Variant {
+#if _runtime(_ObjC)
   @usableFromInline
   @_transparent
   internal var guaranteedNative: Bool {
     return _canBeClass(Element.self) == 0
   }
 
+  /// Allow the optimizer to consider the surrounding code unreachable if
+  /// Set<Element> is guaranteed to be native.
+  @usableFromInline
+  @_transparent
+  internal func cocoaPath() {
+    if guaranteedNative {
+      _conditionallyUnreachable()
+    }
+  }
+#endif
+
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
     // Note that &self drills down through .native(_NativeSet) to the first
     // property in _NativeSet, which is the reference to the storage.
-    if _fastPath(guaranteedNative) {
-      return _isUnique_native(&self)
-    }
     switch self {
     case .native:
       return _isUnique_native(&self)
 #if _runtime(_ObjC)
     case .cocoa:
+      cocoaPath()
       // Don't consider Cocoa buffer mutable, even if it is mutable and is
       // uniquely referenced.
       return false
@@ -2512,7 +2522,7 @@ extension Set._Variant {
     }
   }
 
-  @inlinable
+  @usableFromInline @_transparent
   internal var asNative: _NativeSet<Element> {
     get {
       switch self {
@@ -2583,14 +2593,12 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   internal var startIndex: Index {
-    if _fastPath(guaranteedNative) {
-      return Index(_native: asNative.startIndex)
-    }
     switch self {
     case .native:
       return Index(_native: asNative.startIndex)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
+      cocoaPath()
       return Index(_cocoa: cocoaSet.startIndex)
 #endif
     }
@@ -2598,14 +2606,12 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   internal var endIndex: Index {
-    if _fastPath(guaranteedNative) {
-      return Index(_native: asNative.endIndex)
-    }
     switch self {
     case .native:
       return Index(_native: asNative.endIndex)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
+      cocoaPath()
       return Index(_cocoa: cocoaSet.endIndex)
 #endif
     }
@@ -2613,14 +2619,12 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   internal func index(after i: Index) -> Index {
-    if _fastPath(guaranteedNative) {
-      return Index(_native: asNative.index(after: i._asNative))
-    }
     switch self {
     case .native:
       return Index(_native: asNative.index(after: i._asNative))
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
+      cocoaPath()
       return Index(_cocoa: cocoaSet.index(after: i._asCocoa))
 #endif
     }
@@ -2629,17 +2633,13 @@ extension Set._Variant: _SetBuffer {
   @inlinable
   @inline(__always)
   internal func index(for element: Element) -> Index? {
-    if _fastPath(guaranteedNative) {
-      guard let index = asNative.index(for: element) else { return nil }
-      return Index(_native: index)
-    }
-
     switch self {
     case .native:
       guard let index = asNative.index(for: element) else { return nil }
       return Index(_native: index)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       let cocoaElement = _bridgeAnythingToObjectiveC(element)
       guard let index = cocoa.index(for: cocoaElement) else { return nil }
       return Index(_cocoa: index)
@@ -2651,14 +2651,12 @@ extension Set._Variant: _SetBuffer {
   internal var count: Int {
     @inline(__always)
     get {
-      if _fastPath(guaranteedNative) {
-        return asNative.count
-      }
       switch self {
       case .native:
         return asNative.count
 #if _runtime(_ObjC)
       case .cocoa(let cocoa):
+        cocoaPath()
         return cocoa.count
 #endif
       }
@@ -2668,14 +2666,12 @@ extension Set._Variant: _SetBuffer {
   @inlinable
   @inline(__always)
   internal func contains(_ member: Element) -> Bool {
-    if guaranteedNative {
-      return asNative.contains(member)
-    }
     switch self {
     case .native:
       return asNative.contains(member)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       return cocoa.contains(_bridgeAnythingToObjectiveC(member))
 #endif
     }
@@ -2684,14 +2680,12 @@ extension Set._Variant: _SetBuffer {
   @inlinable
   @inline(__always)
   internal func element(at i: Index) -> Element {
-    if guaranteedNative {
-      return asNative.element(at: i._asNative)
-    }
     switch self {
     case .native:
       return asNative.element(at: i._asNative)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       let cocoaMember = cocoa.element(at: i._asCocoa)
       return _forceBridgeFromObjectiveC(cocoaMember, Element.self)
 #endif
@@ -2702,16 +2696,13 @@ extension Set._Variant: _SetBuffer {
 extension Set._Variant {
   @inlinable
   internal mutating func update(with value: Element) -> Element? {
-    if _fastPath(guaranteedNative) {
-      let isUnique = self.isUniquelyReferenced()
-      return asNative.update(with: value, isUnique: isUnique)
-    }
     switch self {
     case .native:
       let isUnique = self.isUniquelyReferenced()
       return asNative.update(with: value, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       // Make sure we have space for an extra element.
       var native = _NativeSet<Element>(cocoa, capacity: cocoa.count + 1)
       let old = native.update(with: value, isUnique: true)
@@ -2743,16 +2734,13 @@ extension Set._Variant {
   @inlinable
   @discardableResult
   internal mutating func remove(at index: Index) -> Element {
-    if _fastPath(guaranteedNative) {
-      let isUnique = isUniquelyReferenced()
-      return asNative.remove(at: index._asNative, isUnique: isUnique)
-    }
     switch self {
     case .native:
       let isUnique = isUniquelyReferenced()
       return asNative.remove(at: index._asNative, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       // We have to migrate the data first.  But after we do so, the Cocoa
       // index becomes useless, so get the key first.
       //
@@ -2772,16 +2760,13 @@ extension Set._Variant {
   @inlinable
   @discardableResult
   internal mutating func remove(_ member: Element) -> Element? {
-    if _fastPath(guaranteedNative) {
-      let isUnique = isUniquelyReferenced()
-      return asNative.remove(member, isUnique: isUnique)
-    }
     switch self {
     case .native:
       let isUnique = isUniquelyReferenced()
       return asNative.remove(member, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
+      cocoaPath()
       let cocoaMember = _bridgeAnythingToObjectiveC(member)
       if !cocoa.contains(cocoaMember) {
         return nil
@@ -2951,10 +2936,22 @@ extension Set {
 }
 
 extension Set.Index {
+#if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var _guaranteedNative: Bool {
     return _canBeClass(Element.self) == 0
   }
+
+  /// Allow the optimizer to consider the surrounding code unreachable if
+  /// Set<Element> is guaranteed to be native.
+  @usableFromInline
+  @_transparent
+  internal func _cocoaPath() {
+    if _guaranteedNative {
+      _conditionallyUnreachable()
+    }
+  }
+#endif
 
   @usableFromInline @_transparent
   internal var _asNative: _NativeSet<Element>.Index {
@@ -2987,14 +2984,12 @@ extension Set.Index: Equatable {
     lhs: Set<Element>.Index,
     rhs: Set<Element>.Index
   ) -> Bool {
-    if _fastPath(lhs._guaranteedNative) {
-      return lhs._asNative == rhs._asNative
-    }
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
       return lhsNative == rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
+      lhs._cocoaPath()
       return lhsCocoa == rhsCocoa
     default:
       _preconditionFailure("Comparing indexes from different sets")
@@ -3009,15 +3004,12 @@ extension Set.Index: Comparable {
     lhs: Set<Element>.Index,
     rhs: Set<Element>.Index
   ) -> Bool {
-    if _fastPath(lhs._guaranteedNative) {
-      return lhs._asNative < rhs._asNative
-    }
-
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
       return lhsNative < rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
+      lhs._cocoaPath()
       return lhsCocoa < rhsCocoa
     default:
       _preconditionFailure("Comparing indexes from different sets")
@@ -3035,16 +3027,12 @@ extension Set.Index: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
-    if _fastPath(_guaranteedNative) {
-      hasher.combine(0 as UInt8)
-      hasher.combine(_asNative.bucket)
-      return
-    }
     switch _variant {
     case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
       hasher.combine(nativeIndex.bucket)
     case .cocoa(let cocoaIndex):
+      _cocoaPath()
       hasher.combine(1 as UInt8)
       hasher.combine(cocoaIndex.currentKeyIndex)
     }
@@ -3218,10 +3206,21 @@ extension Set {
 }
 
 extension Set.Iterator {
+#if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var _guaranteedNative: Bool {
     return _canBeClass(Element.self) == 0
   }
+
+  /// Allow the optimizer to consider the surrounding code unreachable if
+  /// Set<Element> is guaranteed to be native.
+  @usableFromInline @_transparent
+  internal func _cocoaPath() {
+    if _guaranteedNative {
+      _conditionallyUnreachable()
+    }
+  }
+#endif
 
   @usableFromInline @_transparent
   internal var _asNative: _NativeSet<Element>.Iterator {
@@ -3249,15 +3248,12 @@ extension Set.Iterator: IteratorProtocol {
   @inlinable
   @inline(__always)
   public mutating func next() -> Element? {
-    if _fastPath(_guaranteedNative) {
-      return _asNative.next()
-    }
-
     switch _variant {
     case .native:
       return _asNative.next()
 #if _runtime(_ObjC)
     case .cocoa(let cocoaIterator):
+      _cocoaPath()
       if let cocoaElement = cocoaIterator.next() {
         return _forceBridgeFromObjectiveC(cocoaElement, Element.self)
       }
