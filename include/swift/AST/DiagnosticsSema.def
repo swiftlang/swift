@@ -3148,6 +3148,8 @@ ERROR(assignment_bang_has_immutable_subcomponent,none,
 NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
+NOTE(masked_instance_variable,none,
+     "perhaps the instance variable of the same name was intended?", ())
 
 ERROR(assignment_let_property_delegating_init,none,
       "'let' property %0 may not be initialized directly; use "
