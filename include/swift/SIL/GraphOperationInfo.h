@@ -124,22 +124,11 @@ struct GraphOperationInfo {
     };
 
   public:
-    /// Restricts classes that can construct a StructuredOperand.
-    /// We can't simply make the StructuredOperand constructor private, because
-    /// that would make it impossible to construct a StructuredOperand using
-    /// emplace_back().
-    class ConstructionAllowed {
-      friend struct GraphOperationInfo;
-    private:
-      ConstructionAllowed() {}
-    };
-
-    StructuredOperand(StructuredOperandKind Kind, StringRef Name,
-                      SILValue SingleOperand, ConstructionAllowed Permission)
+   StructuredOperand(StructuredOperandKind Kind, StringRef Name,
+                      SILValue SingleOperand)
         : Kind(Kind), Name(Name), SingleOperand(SingleOperand) {}
     StructuredOperand(StructuredOperandKind Kind, StringRef Name,
-                      ArrayRef<Operand> OperandList,
-                      ConstructionAllowed Permission)
+                      ArrayRef<Operand> OperandList)
         : Kind(Kind), Name(Name), OperandList(OperandList) {}
 
     StructuredOperandKind getKind() const {

@@ -96,23 +96,20 @@ StringRef GraphOperationInfo::decodeName(
       // Push a SOK_Scalar.
       assert(thisMarkerName.empty() && "SOK_Scalar should not have name");
       structuredOperands.emplace_back(SOK_Scalar, StringRef(),
-                                      remainingOperands.front().get(),
-                                      StructuredOperand::ConstructionAllowed());
+                                      remainingOperands.front().get());
       remainingOperands = remainingOperands.drop_front(1);
       break;
     case 'i':
       // Push a SOK_Single.
       structuredOperands.emplace_back(SOK_Single, thisMarkerName,
-                                      remainingOperands.front().get(),
-                                      StructuredOperand::ConstructionAllowed());
+                                      remainingOperands.front().get());
       remainingOperands = remainingOperands.drop_front(1);
       break;
     case 'L':
       // Push a SOK_List with OperandList of size 0 pointing at the right place
       // in the inst's operands.
       structuredOperands.emplace_back(SOK_List, thisMarkerName,
-                                      remainingOperands.take_front(0),
-                                      StructuredOperand::ConstructionAllowed());
+                                      remainingOperands.take_front(0));
       break;
     case 'e':
       // Extend the OperandList of the curent SOK_List by 1 to include the next
