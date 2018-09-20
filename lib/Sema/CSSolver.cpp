@@ -1532,19 +1532,15 @@ static Constraint *getUnboundBindOverloadDisjunction(TypeVariableType *tyvar,
   cs.getConstraintGraph().gatherConstraints(
       rep, disjunctions, ConstraintGraph::GatheringKind::EquivalenceClass,
       [](Constraint *match) {
-        return match->getKind() == ConstraintKind::Disjunction;
+        return match->getKind() == ConstraintKind::Disjunction &&
+               match->getNestedConstraints().front()->getKind() ==
+                   ConstraintKind::BindOverload;
       });
 
   if (disjunctions.empty())
     return nullptr;
 
-  for (auto *disjunction : disjunctions) {
-    auto *first = disjunction->getNestedConstraints().front();
-    if (first->getKind() == ConstraintKind::BindOverload)
-      return disjunction;
-  }
-
-  return nullptr;
+  return disjunctions[0];
 }
 
 // Find a disjunction associated with an ApplicableFunction constraint
