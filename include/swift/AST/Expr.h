@@ -4773,7 +4773,8 @@ public:
       Subscript,
       OptionalForce,
       OptionalChain,
-      OptionalWrap
+      OptionalWrap,
+      Identity,
     };
   
   private:
@@ -4787,9 +4788,11 @@ public:
     } Decl;
     
     
-    llvm::PointerIntPair<Expr *, 3, Kind> SubscriptIndexExprAndKind;
-    ArrayRef<Identifier> SubscriptLabels;
-    ArrayRef<ProtocolConformanceRef> SubscriptHashableConformances;
+    Expr *SubscriptIndexExpr;
+    const Identifier *SubscriptLabelsData;
+    const ProtocolConformanceRef *SubscriptHashableConformancesData;
+    unsigned SubscriptSize;
+    Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
     
@@ -4914,12 +4917,18 @@ public:
                        SourceLoc());
     }
     
+    static Component forIdentity(SourceLoc selfLoc) {
+      return Component(nullptr, {}, nullptr, {}, {},
+                       Kind::Identity, Type(),
+                       selfLoc);
+    }
+    
     SourceLoc getLoc() const {
       return Loc;
     }
     
     Kind getKind() const {
-      return SubscriptIndexExprAndKind.getInt();
+      return KindValue;
     }
     
     bool isValid() const {
@@ -4936,6 +4945,7 @@ public:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::Property:
+      case Kind::Identity:
         return true;
 
       case Kind::UnresolvedSubscript:
@@ -4950,7 +4960,7 @@ public:
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
-        return SubscriptIndexExprAndKind.getPointer();
+        return SubscriptIndexExpr;
 
       case Kind::Invalid:
       case Kind::OptionalChain:
@@ -4958,6 +4968,7 @@ public:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
+      case Kind::Identity:
         return nullptr;
       }
       llvm_unreachable("unhandled kind");
@@ -4967,7 +4978,7 @@ public:
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
-        return SubscriptLabels;
+        return {SubscriptLabelsData, (size_t)SubscriptSize};
 
       case Kind::Invalid:
       case Kind::OptionalChain:
@@ -4975,6 +4986,7 @@ public:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
+      case Kind::Identity:
         llvm_unreachable("no subscript labels for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -4984,7 +4996,9 @@ public:
     getSubscriptIndexHashableConformances() const {
       switch (getKind()) {
       case Kind::Subscript:
-        return SubscriptHashableConformances;
+        if (!SubscriptHashableConformancesData)
+          return {};
+        return {SubscriptHashableConformancesData, (size_t)SubscriptSize};
 
       case Kind::UnresolvedSubscript:
       case Kind::Invalid:
@@ -4993,6 +5007,7 @@ public:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
+      case Kind::Identity:
         return {};
       }
       llvm_unreachable("unhandled kind");
@@ -5013,6 +5028,7 @@ public:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::Property:
+      case Kind::Identity:
         llvm_unreachable("no unresolved name for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5030,6 +5046,7 @@ public:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
+      case Kind::Identity:
         llvm_unreachable("no decl ref for this kind");
       }
       llvm_unreachable("unhandled kind");

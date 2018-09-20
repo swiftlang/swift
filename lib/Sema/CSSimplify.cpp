@@ -638,6 +638,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     case KeyPathExpr::Component::Kind::OptionalForce:
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalWrap:
+    case KeyPathExpr::Component::Kind::Identity:
       return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
     }
 
@@ -4137,6 +4138,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     
     switch (component.getKind()) {
     case KeyPathExpr::Component::Kind::Invalid:
+    case KeyPathExpr::Component::Kind::Identity:
       break;
       
     case KeyPathExpr::Component::Kind::Property:
