@@ -1216,13 +1216,16 @@ static SDKNode *constructTypeDeclNode(SDKContext &Ctx, NominalTypeDecl *NTD,
 /// synthesize this type node to include those extension members, since these
 /// extension members are legit members of the module.
 static SDKNode *constructExternalExtensionNode(SDKContext &Ctx, SDKNode *Root,
-                                               ExtensionDecl *Ext,
+                                               NominalTypeDecl *NTD,
+                                               ArrayRef<ExtensionDecl*> AllExts,
                                         std::set<ExtensionDecl*> &HandledExts) {
-  auto *TypeNode = SDKNodeInitInfo(Ctx, Ext->getSelfNominalTypeDecl())
-      .createSDKNode(SDKNodeKind::DeclType);
+  auto *TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::DeclType);
 
-  // The members of the extension are the only members of this synthesized type.
-  addMembersToRoot(Ctx, TypeNode, Ext, HandledExts);
+  // The members of the extensions are the only members of this synthesized type.
+  for (auto *Ext: AllExts) {
+    HandledExts.insert(Ext);
+    addMembersToRoot(Ctx, TypeNode, Ext, HandledExts);
+  }
   return TypeNode;
 }
 
@@ -1302,15 +1305,19 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
   for (auto *VD : ClangMacros)
     processDecl(VD);
 
-  // For all known decls, collect those unhandled extensions and handle them
-  // separately.
+  // Collect extensions to types from other modules and synthesize type nodes
+  // for them.
+  llvm::MapVector<NominalTypeDecl*, llvm::SmallVector<ExtensionDecl*, 4>> ExtensionMap;
   for (auto *D: KnownDecls) {
     if (auto *Ext = dyn_cast<ExtensionDecl>(D)) {
       if (HandledExtensions.find(Ext) == HandledExtensions.end()) {
-        RootNode->addChild(constructExternalExtensionNode(Ctx, RootNode, Ext,
-                                                          HandledExtensions));
+        ExtensionMap[Ext->getExtendedNominal()].push_back(Ext);
       }
     }
+  }
+  for (auto Pair: ExtensionMap) {
+    RootNode->addChild(constructExternalExtensionNode(Ctx, RootNode,
+      Pair.first, Pair.second, HandledExtensions));
   }
 }
 

@@ -859,6 +859,7 @@
         "Strideable",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
+        "P1",
         "Encodable",
         "Decodable",
         "Hashable",
@@ -879,6 +880,22 @@
           "printedName": "foo()",
           "declKind": "Func",
           "usr": "s:Si4cakeE3fooyyF",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "bar",
+          "printedName": "bar()",
+          "declKind": "Func",
+          "usr": "s:Si4cakeE3baryyF",
           "location": "",
           "moduleName": "cake",
           "children": [

@@ -495,7 +495,7 @@ class SwiftDeclCollector: public VisibleDeclConsumer {
   SDKContext &Ctx;
   std::vector<std::unique_ptr<llvm::MemoryBuffer>> OwnedBuffers;
   SDKNode *RootNode;
-  llvm::DenseSet<Decl*> KnownDecls;
+  llvm::SetVector<Decl*> KnownDecls;
   // Collected and sorted after we get all of them.
   std::vector<ValueDecl *> ClangMacros;
   std::set<ExtensionDecl*> HandledExtensions;
