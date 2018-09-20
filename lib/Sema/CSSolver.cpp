@@ -1394,10 +1394,7 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
 
     llvm::SetVector<Constraint *> constraints;
     cs.getConstraintGraph().gatherConstraints(
-        rep, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
-        [](Constraint *constraint) {
-          return true;
-        });
+        rep, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
 
     for (auto *constraint : constraints) {
       switch (constraint->getKind()) {
