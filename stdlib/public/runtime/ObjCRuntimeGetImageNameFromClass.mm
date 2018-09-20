@@ -25,9 +25,22 @@
 
 #include <dlfcn.h>
 #include <objc/runtime.h>
+#include <objc/message.h>
+#include <TargetConditionals.h>
 
 // Note: There are more #includes below under "Function patching machinery".
 // Those are only relevant to the function patching machinery.
+
+// On "embedded" targets (i.e. iOS/tvOS/watchOS devices), we need to
+// patch +[NSBundle bundleForClass:] directly. The symbol table patch
+// does not work for calls within the shared cache on those platforms,
+// so the call within +bundleForClass: does not get patched. Instead,
+// swizzle out the whole method with one that does the appropriate
+// lookup for Swift classes. The symbol table patch handles this on Mac
+// and simulators so this is not necessary there.
+#if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
+#define PATCH_NSBUNDLE 1
+#endif
 
 using namespace swift;
 
@@ -40,12 +53,8 @@ typedef BOOL (*objc_hook_getImageName)(
 /// \see customGetImageNameFromClass
 static objc_hook_getImageName defaultGetImageNameFromClass = nullptr;
 
-/// A custom implementation of Objective-C's class_getImageName for Swift
-/// classes, which knows how to handle dynamically-initialized class metadata.
-///
-/// Per the documentation for objc_setHook_getImageName, any non-Swift classes
-/// will still go through the normal implementation of class_getImageName,
-/// which is stored in defaultGetImageNameFromClass.
+/// Get the image name corresponding to a Swift class, accounting for
+/// dynamically-initialized class metadata. Returns NO for ObjC classes.
 static BOOL
 getImageNameFromSwiftClass(Class _Nonnull objcClass,
                            const char * _Nullable * _Nonnull outImageName) {
@@ -63,8 +72,21 @@ getImageNameFromSwiftClass(Class _Nonnull objcClass,
     *outImageName = imageInfo.dli_fname;
     return imageInfo.dli_fname != nullptr;
   }
+  
+  return NO;
+}
 
-  // If not, fall back to the default implementation.
+/// A custom implementation of Objective-C's class_getImageName for Swift
+/// classes, which knows how to handle dynamically-initialized class metadata.
+///
+/// Per the documentation for objc_setHook_getImageName, any non-Swift classes
+/// will still go through the normal implementation of class_getImageName,
+/// which is stored in defaultGetImageNameFromClass.
+static BOOL
+replacementGetImageNameFromClass(Class _Nonnull objcClass,
+                                 const char * _Nullable * _Nonnull outImageName) {
+  if (getImageNameFromSwiftClass(objcClass, outImageName))
+    return YES;
   return defaultGetImageNameFromClass(objcClass, outImageName);
 }
 
@@ -238,10 +260,61 @@ static const char *patchedGetImageNameFromClassForOldOSs(Class _Nullable cls) {
   if (!cls)
     return nullptr;
   const char *result;
-  if (getImageNameFromSwiftClass(cls, &result))
+  if (replacementGetImageNameFromClass(cls, &result))
     return result;
   return nullptr;
 }
+
+#if PATCH_NSBUNDLE
+/// Selectors for the target method, patch method, and helper method.
+#define BUNDLE_FOR_CLASS_SEL @selector(bundleForClass:)
+#define PATCHED_BUNDLE_FOR_CLASS_SEL @selector(_swift_bundleForClass:)
+#define BUNDLE_WITH_EXECUTABLE_PATH_SEL @selector(_swift_bundleWithExecutablePath:)
+
+/// Whether the patch has already been done.
+static bool didPatchNSBundle = false;
+
+/// The patched version of +[NSBundle bundleForClass:]. If the class is
+/// actually a Swift class and an image name can be retrieved from it,
+/// look up the bundle based on that image name. Otherwise fall back to
+/// the original version.
+static id patchedBundleForClass(id self, SEL _cmd, Class objcClass) {
+  const char *imageName;
+  if (getImageNameFromSwiftClass(objcClass, &imageName)) {
+    return ((id (*)(id, SEL, const char *))objc_msgSend)(
+      self, BUNDLE_WITH_EXECUTABLE_PATH_SEL, imageName);
+  }
+  
+  // Call through to the original, which is now found under the patched
+  // selector.
+  return ((id (*)(id, SEL, Class))objc_msgSend)(
+    self, PATCHED_BUNDLE_FOR_CLASS_SEL, objcClass);
+}
+
+/// Install the patched +[NSBundle bundleForClass:].
+static void patchNSBundle(void) {
+  if (didPatchNSBundle) return;
+  
+  Class NSBundle = objc_getClass("NSBundle");
+  if (!NSBundle) return;
+  
+  Method origMethod = class_getClassMethod(NSBundle, BUNDLE_FOR_CLASS_SEL);
+  if (!origMethod) return;
+  
+  // Stuff can fail below, but if it does then we can't reasonably try again.
+  didPatchNSBundle = true;
+  
+  BOOL success = class_addMethod(
+    object_getClass(NSBundle), PATCHED_BUNDLE_FOR_CLASS_SEL,
+    reinterpret_cast<IMP>(patchedBundleForClass), method_getTypeEncoding(origMethod));
+  if (!success) return;
+  
+  Method patchMethod = class_getClassMethod(NSBundle, PATCHED_BUNDLE_FOR_CLASS_SEL);
+  if (!patchMethod) return;
+  
+  method_exchangeImplementations(origMethod, patchMethod);
+}
+#endif
 
 /// A hook for _dyld_register_func_for_add_image that overwrites any references
 /// to class_getImageName with our custom implementation.
@@ -251,6 +324,9 @@ static void patchGetImageNameInImage(const struct mach_header *mh,
   const void *newImplementationAddr =
       reinterpret_cast<const void *>(&patchedGetImageNameFromClassForOldOSs);
   patchLazyPointers(mh, "_class_getImageName", newImplementationAddr);
+#if PATCH_NSBUNDLE
+  patchNSBundle();
+#endif
 }
 
 /***************************************************************************/
@@ -267,7 +343,7 @@ void swift::setUpObjCRuntimeGetImageNameFromClass() {
     auto setHook = reinterpret_cast<
         void(*)(objc_hook_getImageName _Nonnull,
                 objc_hook_getImageName _Nullable * _Nonnull)>(setHookPtr);
-    setHook(getImageNameFromSwiftClass, &defaultGetImageNameFromClass);
+    setHook(replacementGetImageNameFromClass, &defaultGetImageNameFromClass);
 
   } else {
     // On older OSs, manually patch in our new implementation of
