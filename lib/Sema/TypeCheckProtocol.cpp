@@ -953,6 +953,7 @@ WitnessChecker::lookupValueWitnessesViaImplementsAttr(
 SmallVector<ValueDecl *, 4>
 WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
+  assert(req->isProtocolRequirement());
 
   SmallVector<ValueDecl *, 4> witnesses;
 

@@ -418,6 +418,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     auto req = dyn_cast<ValueDecl>(member);
     if (!req)
       continue;
+    if (!req->isProtocolRequirement())
+      continue;
 
     // Infer type witnesses for associated types.
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(req)) {
