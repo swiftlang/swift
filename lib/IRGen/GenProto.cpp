@@ -563,13 +563,12 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
 
       auto selfTy = FnType->getSelfInstanceType();
       CanType argTy = getTypeInContext(selfTy);
-      if (auto archetype = dyn_cast<ArchetypeType>(argTy)) {
-        setProtocolWitnessTableName(IGF.IGM, selfTable, argTy, selfProto);
-        IGF.setUnscopedLocalTypeData(
-            archetype,
-            LocalTypeDataKind::forAbstractProtocolWitnessTable(selfProto),
-            selfTable);
-      }
+
+      setProtocolWitnessTableName(IGF.IGM, selfTable, argTy, selfProto);
+      IGF.setUnscopedLocalTypeData(
+          argTy,
+          LocalTypeDataKind::forProtocolWitnessTable(conformance),
+          selfTable);
 
       if (conformance.isConcrete()) {
         IGF.bindLocalTypeDataFromSelfWitnessTable(
@@ -2637,8 +2636,7 @@ MetadataResponse MetadataPath::follow(IRGenFunction &IGF,
       auto skipRequest =
         (skipI == end ? finalRequest : MetadataState::Abstract);
       if (auto skipResponse =
-            IGF.tryGetConcreteLocalTypeData(skipKey.getCachingKey(),
-                                            skipRequest)) {
+            IGF.tryGetConcreteLocalTypeData(skipKey, skipRequest)) {
         // Advance the baseline information for the source to the current
         // point in the path, then continue the search.
         sourceKey = skipKey;
@@ -3121,19 +3119,17 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   auto concreteConformance = conformance.getConcrete();
   assert(concreteConformance->getProtocol() == proto);
 
+  auto cacheKind =
+    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance);
+
   // Check immediately for an existing cache entry.
-  auto wtable = IGF.tryGetLocalTypeData(
-    srcType,
-    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance));
+  auto wtable = IGF.tryGetLocalTypeData(srcType, cacheKind);
   if (wtable) return wtable;
 
   auto &conformanceI = IGF.IGM.getConformanceInfo(proto, concreteConformance);
   wtable = conformanceI.getTable(IGF, srcMetadataCache);
 
-  IGF.setScopedLocalTypeData(
-    srcType,
-    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance),
-    wtable);
+  IGF.setScopedLocalTypeData(srcType, cacheKind, wtable);
   return wtable;
 }
 

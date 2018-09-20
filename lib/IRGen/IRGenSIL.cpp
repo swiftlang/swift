@@ -2081,37 +2081,19 @@ static llvm::Value *getObjCClassForValue(IRGenFunction &IGF,
   llvm_unreachable("bad metatype representation");
 }
 
-static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
-                                              CanSILFunctionType origCalleeType,
-                                              SubstitutionMap subs) {
-  llvm::Value *wtable;
+static llvm::Value *
+emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
+                                 CanSILFunctionType substCalleeType) {
+  // This use of getSelfInstanceType() assumes that the instance type is
+  // always a meaningful formal type.
+  auto substSelfType = substCalleeType->getSelfInstanceType();
+  auto substConformance = substCalleeType->getWitnessMethodConformance();
 
-  if (auto *proto = origCalleeType->getDefaultWitnessMethodProtocol()) {
-    // The generic signature for a witness method with abstract Self must
-    // have exactly one protocol requirement.
-    //
-    // We recover the witness table from the substitution that was used to
-    // produce the substituted callee type.
-    auto origSelfType = proto->getSelfInterfaceType()->getCanonicalType();
-    auto substSelfType = origSelfType.subst(subs)->getCanonicalType();
-    auto conformance = *subs.lookupConformance(origSelfType, proto);
+  llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
+  llvm::Value *wtable =
+    emitWitnessTableRef(IGF, substSelfType, &argMetadata, substConformance);
 
-    llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
-    wtable = emitWitnessTableRef(IGF, substSelfType, &argMetadata,
-                                 conformance);
-  } else {
-    // Otherwise, we have no way of knowing the original protocol or
-    // conformance, since the witness has a concrete self type.
-    //
-    // Protocol witnesses for concrete types are thus not allowed to touch
-    // the witness table; they already know all the witnesses, and we can't
-    // say who they are.
-    wtable = llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy);
-  }
-
-  assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
   return wtable;
-
 }
 
 Callee LoweredValue::getCallee(IRGenFunction &IGF,
@@ -2205,8 +2187,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
 
   switch (origCalleeType->getRepresentation()) {
   case SILFunctionType::Representation::WitnessMethod: {
-    llvm::Value *wtable = emitWitnessTableForLoweredCallee(
-        IGF, origCalleeType, substitutions);
+    auto wtable = emitWitnessTableForLoweredCallee(IGF, substCalleeType);
     witnessMetadata->SelfWitnessTable = wtable;
     break;
   }
@@ -2402,7 +2383,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 /// applying to 'v'.
 static std::tuple<FunctionPointer, llvm::Value*, CanSILFunctionType>
 getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
-                              SubstitutionMap subs) {
+                              SubstitutionMap subs,
+                              CanSILFunctionType substFnType) {
   LoweredValue &lv = IGF.getLoweredValue(v);
   auto fnType = v->getType().castTo<SILFunctionType>();
 
@@ -2427,7 +2409,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
       llvm_unreachable("partial_apply of foreign functions not implemented");
         
     case SILFunctionTypeRepresentation::WitnessMethod:
-      context = emitWitnessTableForLoweredCallee(IGF, fnType, subs);
+      context = emitWitnessTableForLoweredCallee(IGF, substFnType);
       break;
     case SILFunctionTypeRepresentation::Thick:
     case SILFunctionTypeRepresentation::Thin:
@@ -2447,7 +2429,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     assert(repr != SILFunctionType::Representation::Block &&
            "partial apply of block not implemented");
     if (repr == SILFunctionType::Representation::WitnessMethod) {
-      context = emitWitnessTableForLoweredCallee(IGF, fnType, subs);
+      context = emitWitnessTableForLoweredCallee(IGF, substFnType);
     }
     return std::make_tuple(fn, context, fnType);
   }
@@ -2511,7 +2493,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   
   // Get the function value.
   auto result = getPartialApplicationFunction(*this, i->getCallee(),
-                                              i->getSubstitutionMap());
+                                              i->getSubstitutionMap(),
+                                              i->getSubstCalleeType());
   FunctionPointer calleeFn = std::get<0>(result);
   llvm::Value *innerContext = std::get<1>(result);
   CanSILFunctionType origCalleeTy = std::get<2>(result);
