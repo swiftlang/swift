@@ -1,4 +1,5 @@
 #include <ModuleAnalyzerNodes.h>
+#include <algorithm>
 
 using namespace swift;
 using namespace ide;
@@ -642,6 +643,25 @@ bool SDKNode::hasSameChildren(const SDKNode &Other) const {
   return true;
 }
 
+void swift::ide::api::stringSetDifference(ArrayRef<StringRef> Left,
+                                          ArrayRef<StringRef> Right,
+                                          std::vector<StringRef> &LeftMinusRight,
+                                          std::vector<StringRef> &RightMinusLeft) {
+  std::set<StringRef> LS(Left.begin(), Left.end());
+  std::set<StringRef> RS(Right.begin(), Right.end());
+  std::set_difference(LS.begin(), LS.end(), RS.begin(), RS.end(),
+                      std::back_inserter(LeftMinusRight));
+  std::set_difference(RS.begin(), RS.end(), LS.begin(), LS.end(),
+                      std::back_inserter(RightMinusLeft));
+}
+
+static bool hasSameContents(ArrayRef<StringRef> Left,
+                            ArrayRef<StringRef> Right) {
+  std::vector<StringRef> LeftMinusRight, RightMinusLeft;
+  stringSetDifference(Left, Right, LeftMinusRight, RightMinusLeft);
+  return LeftMinusRight.empty() && RightMinusLeft.empty();
+}
+
 bool SDKNode::operator==(const SDKNode &Other) const {
   auto *LeftAlias = dyn_cast<SDKNodeTypeAlias>(this);
   auto *RightAlias = dyn_cast<SDKNodeTypeAlias>(&Other);
@@ -701,7 +721,16 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       }
       LLVM_FALLTHROUGH;
     }
-    case SDKNodeKind::DeclType:
+    case SDKNodeKind::DeclType: {
+      auto *Left = dyn_cast<SDKNodeDeclType>(this);
+      auto *Right = dyn_cast<SDKNodeDeclType>(&Other);
+      if (Left && Right) {
+        if (!hasSameContents(Left->getAllProtocols(), Right->getAllProtocols())) {
+          return false;
+        }
+      }
+      LLVM_FALLTHROUGH;
+    }
     case SDKNodeKind::DeclTypeAlias: {
       auto Left = this->getAs<SDKNodeDecl>();
       auto Right = (&Other)->getAs<SDKNodeDecl>();

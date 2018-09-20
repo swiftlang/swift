@@ -65,3 +65,7 @@ public enum FrozenKind {
 public class C7 {
   public func foo(_ a: Int = 1, _ b: Int = 2) {}
 }
+
+public protocol P3: P2, P1 {}
+
+extension fixedLayoutStruct: P1 {}

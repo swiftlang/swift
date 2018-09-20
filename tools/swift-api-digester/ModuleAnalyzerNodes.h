@@ -543,6 +543,9 @@ int deserializeSDKDump(StringRef dumpPath, StringRef OutputPath,
 
 int findDeclUsr(StringRef dumpPath, CheckerOptions Opts);
 
+void stringSetDifference(ArrayRef<StringRef> Left, ArrayRef<StringRef> Right,
+  std::vector<StringRef> &LeftMinusRight, std::vector<StringRef> &RightMinusLeft);
+
 } // end of abi namespace
 } // end of ide namespace
 } // end of Swift namespace

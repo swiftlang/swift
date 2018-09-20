@@ -674,6 +674,28 @@ static bool isOwnershipEquivalent(ReferenceOwnership Left,
   return false;
 }
 
+static void diagnoseNominalTypeDeclChange(SDKNodeDeclType *L, SDKNodeDeclType *R) {
+  auto &Ctx = L->getSDKContext();
+  auto &Diags = Ctx.getDiags();
+  std::vector<StringRef> LeftMinusRight;
+  std::vector<StringRef> RightMinusLeft;
+  swift::ide::api::stringSetDifference(L->getAllProtocols(), R->getAllProtocols(),
+                                       LeftMinusRight, RightMinusLeft);
+  bool isProtocol = L->getDeclKind() == DeclKind::Protocol;
+  std::for_each(LeftMinusRight.begin(), LeftMinusRight.end(), [&](StringRef Name) {
+    Diags.diagnose(SourceLoc(), diag::conformance_removed, L->getScreenInfo(), Name,
+                   isProtocol);
+  });
+
+  // Adding inherited protocols can be API breaking.
+  if (isProtocol) {
+    std::for_each(RightMinusLeft.begin(), RightMinusLeft.end(), [&](StringRef Name) {
+      Diags.diagnose(SourceLoc(), diag::conformance_added, L->getScreenInfo(),
+                     Name);
+    });
+  }
+}
+
 static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
   assert(L->getKind() == R->getKind());
   auto &Diags = Ctx.getDiags();
@@ -726,6 +748,12 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
     if (LD->getGenericSignature() != RD->getGenericSignature()) {
       Diags.diagnose(SourceLoc(), diag::generic_sig_change, LD->getScreenInfo(),
         LD->getGenericSignature(), RD->getGenericSignature());
+    }
+
+    if (auto *LDT = dyn_cast<SDKNodeDeclType>(L)) {
+      if (auto *RDT = dyn_cast<SDKNodeDeclType>(R)) {
+        diagnoseNominalTypeDeclChange(LDT, RDT);
+      }
     }
     detectRename(L, R);
   }
