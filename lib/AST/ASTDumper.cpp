@@ -2597,6 +2597,10 @@ public:
         component.getIndexExpr()->print(OS, Indent + 4);
         OS.indent(Indent + 4);
         break;
+      case KeyPathExpr::Component::Kind::Identity:
+        OS << "identity";
+        OS << '\n';
+        break;
       }
       OS << "type=";
       component.getComponentType().print(OS);
