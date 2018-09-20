@@ -2336,12 +2336,11 @@ function(add_swift_host_tool executable)
       ${ARGN})
 
   # Configure variables for this subdirectory.
-  compute_variant_suffix(VARIANT_SUFFIX "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}")
-  set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
+  set(MODULE_VARIANT_SUFFIX "-swiftmodule${SWIFT_HOST_VARIANT_SUFFIX}")
 
   foreach(mod ${ADDSWIFTHOSTTOOL_SWIFT_MODULE_DEPENDS})
     list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${MODULE_VARIANT_SUFFIX}")
-    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${VARIANT_SUFFIX}")
+    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${SWIFT_HOST_VARIANT_SUFFIX}")
   endforeach()
 
   # Create the executable rule.

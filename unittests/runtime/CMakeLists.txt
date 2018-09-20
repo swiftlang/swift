@@ -3,9 +3,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
   set(swift_runtime_test_extra_libraries)
   if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-    compuate_variant_suffix(VARIANT_SUFFIX "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}")
     list(APPEND swift_runtime_test_extra_libraries
-         $<TARGET_FILE:swiftImageInspectionShared${VARIANT_SUFFIX}>)
+         $<TARGET_FILE:swiftImageInspectionShared${SWIFT_HOST_VARIANT_SUFFIX}>)
   endif()
 
   add_subdirectory(LongTests)
