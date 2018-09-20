@@ -56,7 +56,7 @@ bool ClangImporter::Implementation::isOverAligned(const clang::TypeDecl *decl) {
 
 bool ClangImporter::Implementation::isOverAligned(clang::QualType type) {
   auto align = getClangASTContext().getTypeAlignInChars(type);
-  return align.getQuantity() > MaximumAlignment;
+  return align > clang::CharUnits::fromQuantity(MaximumAlignment);
 }
 
 namespace {
