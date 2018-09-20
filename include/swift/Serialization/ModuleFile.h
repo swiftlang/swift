@@ -548,6 +548,11 @@ private:
   /// Returns false if there was an error.
   bool readCommentBlock(llvm::BitstreamCursor &cursor);
 
+  /// Loads data from #ModuleDocInputBuffer.
+  ///
+  /// Returns false if there was an error.
+  bool readModuleDocIfPresent();
+
   /// Recursively reads a pattern from \c DeclTypeCursor.
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 

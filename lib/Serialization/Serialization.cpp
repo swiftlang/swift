@@ -948,7 +948,8 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         versionString.tell() - shortVersionStringLength - 1;
     versionString << ")/" << version::getSwiftFullVersion();
     Metadata.emit(ScratchRecord,
-                  VERSION_MAJOR, VERSION_MINOR, shortVersionStringLength,
+                  SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR,
+                  shortVersionStringLength,
                   compatibilityVersionStringLength,
                   versionString.str());
 
@@ -4678,7 +4679,7 @@ SerializerBase::SerializerBase(ArrayRef<unsigned char> signature,
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                const SILModule *SILMod,
                                const SerializationOptions &options) {
-  Serializer S{MODULE_SIGNATURE, DC};
+  Serializer S{SWIFTMODULE_SIGNATURE, DC};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeBlockInfoBlock();
