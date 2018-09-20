@@ -299,6 +299,8 @@ enum class NameLookupFlags {
   /// Whether to include results from outside the innermost scope that has a
   /// result.
   IncludeOuterResults = 0x20,
+  /// Whether to consider synonyms declared through @_implements().
+  IncludeAttributeImplements = 0x40,
 };
 
 /// A set of options that control name lookup.
