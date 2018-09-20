@@ -61,3 +61,7 @@ public enum FrozenKind {
   case Fixed
   case Rigid
 }
+
+public class C7 {
+  public func foo(_ a: Int = 1, _ b: Int = 2) {}
+}

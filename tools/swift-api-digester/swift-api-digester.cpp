@@ -731,6 +731,21 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
   }
 }
 
+static void diagnoseTypeChange(SDKNode* L, SDKNode* R) {
+  auto &Ctx = L->getSDKContext();
+  auto &Diags = Ctx.getDiags();
+  auto *LT = dyn_cast<SDKNodeType>(L);
+  auto *RT = dyn_cast<SDKNodeType>(R);
+  if (!LT || !RT)
+    return;
+  if (LT->hasDefaultArgument() && !RT->hasDefaultArgument()) {
+    auto *Func = cast<SDKNodeDeclAbstractFunc>(LT->getClosestParentDecl());
+    Diags.diagnose(SourceLoc(), diag::default_arg_removed, Func->getScreenInfo(),
+                   Func->getTypeRoleDescription(Ctx, Func->getChildIndex(LT)));
+  }
+}
+
+
 // This is first pass on two given SDKNode trees. This pass removes the common part
 // of two versions of SDK, leaving only the changed part.
 class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
@@ -792,6 +807,7 @@ public:
     // Push the updated node to the map for future reference.
     UpdateMap.insert(Left, Right);
 
+    diagnoseTypeChange(Left, Right);
     if (Left->getKind() != Right->getKind()) {
       assert(isa<SDKNodeType>(Left) && isa<SDKNodeType>(Right) &&
         "only type nodes can match across kinds.");
