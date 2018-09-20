@@ -83,6 +83,18 @@ public extension ${Element} {
     public typealias HalfVector = Vector${N/2}
 %   end
 
+%   Index = 'Int' + str(bits) + '.' + Self
+    @inlinable
+    public init<D>(gathering source: D, at index: ${Index})
+    where D : SIMDVector, D.Element == Element {
+      self.init()
+      for i in indices {
+        if index[i] >= 0 && index[i] < source.count {
+          self[i] = source[Int(index[i])]
+        }
+      }
+    }
+
     // Conformance to SIMDFloatingPointVector --------------------------------
 %   for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
     @_transparent

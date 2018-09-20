@@ -43,6 +43,17 @@ public extension SIMDVector${N} {
 
 %  end
 % end
+  @inlinable
+  init<D, I>(gathering source: D, at index: I)
+  where D : SIMDVector, D.Element == Element,
+        I : SIMDIntegerVector & SIMDVector${N} {
+    self.init()
+    for i in indices {
+      if index[i] >= 0 && index[i] < source.count {
+        self[i] = source[Int(index[i])]
+      }
+    }
+  }
 }
 
 //  Defaulted conformance to RandomAccessCollection.

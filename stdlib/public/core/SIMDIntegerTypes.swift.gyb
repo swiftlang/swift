@@ -1,21 +1,26 @@
 %{
-eltsizes = [8,16,32,64]
+from SwiftIntTypes import all_integer_types
+
+# Number of bits in the Builtin.Word type
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+
 counts = [2,3,4,8,16,32,64]
 fltnames = {32:'Float', 64:'Double'}
 }%
 
-%for bits in eltsizes:
-% for signed in [True, False]:
-%  Element = ('' if signed else 'U') + 'Int' + str(bits)
+%for element_type in all_integer_types(word_bits):
+% bits = element_type.bits
+% signed = element_type.is_signed
+% Element = element_type.stdlib_name
 public extension ${Element} {
-%  for N in counts:
+% for N in counts:
+%  if bits*N <= 512:
 %   # In theory, LLVM should handle padding 3-element vectors out to 4-element
 %   # for us. And it does, but we end up triggering asserts for some operations,
 %   # so it ends up being simpler to pad at the Swift level instead.
 %   llvmN = N if N != 3 else 4
-%   if bits*llvmN <= 512:
-%    LLVM = 'Vec' + str(llvmN) + 'xInt' + str(bits)
-%    Self = 'Vector' + str(N)
+%   LLVM = 'Vec' + str(llvmN) + 'x' + element_type.builtin_name
+%   Self = 'Vector' + str(N)
   @_fixed_layout
   struct ${Self} : SIMDIntegerVector, SIMDVector${N} {
 
@@ -51,7 +56,7 @@ public extension ${Element} {
 
     public typealias Predicate = SIMDPredicate${bits}x${N}
 
-%    sext = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + LLVM
+%   sext = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + LLVM
     @_transparent
     public static func ==(lhs: ${Self}, rhs: ${Self}) -> Predicate {
       return Predicate(Int${bits}.Vector${N}(${sext}(
@@ -59,9 +64,21 @@ public extension ${Element} {
     }
 
     // Conformance to SIMDVector${N} -----------------------------------------
-%    if N >= 4:
+%   if N >= 4:
     public typealias HalfVector = Vector${N/2}
-%    end
+%   end
+
+%   Index = 'Int' + str(bits) + '.' + Self
+    @inlinable
+    public init<D>(gathering source: D, at index: ${Index})
+    where D : SIMDVector, D.Element == Element {
+      self.init()
+      for i in indices {
+        if index[i] >= 0 && index[i] < source.count {
+          self[i] = source[Int(index[i])]
+        }
+      }
+    }
 
     // Conformance to SIMDIntegerVector --------------------------------------
     @inlinable
@@ -87,28 +104,28 @@ public extension ${Element} {
 
     @_transparent
     public var elementBytesSwapped: ${Self} {
-%    if bits == 8:
+%   if bits == 8:
       return self
-%    else:
+%   else:
       var result = ${Self}()
       for i in indices {
         result[i] = Element(Builtin.int_bswap_Int${bits}(self[i]._value))
       }
       return result
-%    end
+%   end
     }
 
     // - Bitwise operators
-%    for (op, inst) in [('&','and'), ('|','or'), ('^','xor')]:
+%   for (op, inst) in [('&','and'), ('|','or'), ('^','xor')]:
     @_transparent
     public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       return ${Self}(Builtin.${inst}_${LLVM}(lhs._value, rhs._value))
     }
 
-%    end
+%   end
 
-%    prefix = 's' if signed else 'u'
-%    for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
+%   prefix = 's' if signed else 'u'
+%   for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
     @_transparent
     public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Predicate {
       return Predicate(Int${bits}.Vector${N}(${sext}(
@@ -116,16 +133,16 @@ public extension ${Element} {
       )))
     }
 
-%    end
+%   end
 
     @_transparent
     public static func &>>(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       let masked = rhs & ${Self}(repeating: ${bits-1})
-%    if signed:
+%   if signed:
       return ${Self}(Builtin.ashr_${LLVM}(lhs._value, masked._value))
-%    else:
+%   else:
       return ${Self}(Builtin.lshr_${LLVM}(lhs._value, masked._value))
-%    end
+%   end
     }
 
     @_transparent
@@ -135,55 +152,55 @@ public extension ${Element} {
     }
 
     // MARK: Arithmetic operators
-%    for (op, inst) in [('&+','add'), ('&-','sub'), ('&*','mul')]:
+%   for (op, inst) in [('&+','add'), ('&-','sub'), ('&*','mul')]:
     @_transparent
     public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       return ${Self}(Builtin.${inst}_${LLVM}(lhs._value, rhs._value))
     }
 
-%    end
+%   end
     @_transparent
     public static func /(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       _precondition(all(rhs != 0), "Division by zero.")
-%    if N == 3:
-%     # special handling for the 3-element case: insert a 1 in the unused
-%     # fourth component, to avoid dividing by zero since that would invoke
-%     # UB at the LLVM IR level.
+%   if N == 3:
+%   # special handling for the 3-element case: insert a 1 in the unused
+%   # fourth component, to avoid dividing by zero since that would invoke
+%   # UB at the LLVM IR level.
       let rhsValue = Builtin.insertelement_${LLVM}_Int${bits}_Int32(
         rhs._value, Int${bits}(1)._value, Int32(3)._value
       )
-%    else:
+%   else:
       let rhsValue = rhs._value
-%    end
-%    if signed:
+%   end
+%   if signed:
       _precondition(!any((lhs == .min) & (rhs == -1)),
                     "Division results in an overflow.")
       return ${Self}(Builtin.sdiv_${LLVM}(lhs._value, rhsValue))
-%    else:
+%   else:
       return ${Self}(Builtin.udiv_${LLVM}(lhs._value, rhsValue))
-%    end
+%   end
     }
 
     @_transparent
     public static func %(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       _precondition(all(rhs != 0), "Division by zero in remainder operation.")
-%    if N == 3:
-%     # special handling for the 3-element case: insert a 1 in the unused
-%     # fourth component, to avoid dividing by zero since that would invoke
-%     # UB at the LLVM IR level.
+%   if N == 3:
+%   # special handling for the 3-element case: insert a 1 in the unused
+%   # fourth component, to avoid dividing by zero since that would invoke
+%   # UB at the LLVM IR level.
       let rhsValue = Builtin.insertelement_${LLVM}_Int${bits}_Int32(
         rhs._value, Int${bits}(1)._value, Int32(3)._value
       )
-%    else:
+%   else:
       let rhsValue = rhs._value
-%    end
-%    if signed:
+%   end
+%   if signed:
       _precondition(!any((lhs == .min) & (rhs == -1)),
                     "Division results in an overflow in remainder operation.")
       return ${Self}(Builtin.srem_${LLVM}(lhs._value, rhsValue))
-%    else:
+%   else:
       return ${Self}(Builtin.urem_${LLVM}(lhs._value, rhsValue))
-%    end
+%   end
     }
 
     // Operations not required by any protocol -------------------------------
@@ -205,47 +222,45 @@ public extension ${Element} {
       )
     }
 
-%    if bits in [32, 64]:
-%     FloatElement = fltnames[bits]
+%   if bits in [32, 64]:
+%    FloatElement = fltnames[bits]
     @_transparent
     public init(bitPattern other: ${FloatElement}.Vector${N}) {
       _value = Builtin.bitcast_Vec${llvmN}xFPIEEE${bits}_${LLVM}(other._value)
     }
 
-%    end
+%   end
     // TODO: we shouldn't need the concrete conversions that follow; we should
     // be able to vectorize the for-loop in the generic `truncatingIfNeeded`
     // init to a single vector sext, zext, nop, or trunc (or possibly one per
     // Swift-ABI legalized result vector). However, the optimizer can't yet do
     // this for all cases, which we should fix, but as a short-term workaround
     // we also have these concrete conversions.
-%    for otherBits in eltsizes:
-%     if otherBits*llvmN <= 512:
-%      for otherSigned in [True,False]:
-%       OtherElement = ('' if otherSigned else 'U') + 'Int' + str(otherBits)
-%       Other = OtherElement + '.Vector' + str(N)
-%       OtherLLVM = 'Vec' + str(llvmN) + 'xInt' + str(otherBits)
+%   for other_type in all_integer_types(word_bits):
+%    other_bits = other_type.bits
+%    other_signed = other_type.is_signed
+%    Other = other_type.stdlib_name
+%    if other_bits*N <= 512:
+%     OtherLLVM = 'Vec' + str(llvmN) + 'x' + other_type.builtin_name
     @_transparent
-    public init(truncatingIfNeeded other: ${Other}) {
-%       if otherBits > bits:
+    public init(truncatingIfNeeded other: ${Other}.Vector${N}) {
+%     if other_bits > bits:
       self.init(Builtin.trunc_${OtherLLVM}_${LLVM}(other._value))
-%       elif otherBits == bits:
+%     elif other_bits == bits:
       self.init(other._value)
-%       elif otherSigned:
+%     elif other_signed:
       self.init(Builtin.sext_${OtherLLVM}_${LLVM}(other._value))
-%       else:
+%     else:
       self.init(Builtin.zext_${OtherLLVM}_${LLVM}(other._value))
-%       end
+%     end
     }
 
-%      end
-%     end
 %    end
+%   end
   }
 
-%   end
 %  end
+% end
 }
 
-% end
 %end

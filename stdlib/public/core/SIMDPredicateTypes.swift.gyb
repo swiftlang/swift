@@ -61,6 +61,18 @@ public struct ${Self} : SIMDPredicate, SIMDVector${N} {
 %    end
 %   end
 
+%   Index = 'Int' + str(bits) + '.Vector' + str(N)
+    @inlinable
+    public init<D>(gathering source: D, at index: ${Index})
+    where D : SIMDVector, D.Element == Element {
+      self.init()
+      for i in indices {
+        if index[i] >= 0 && index[i] < source.count {
+          self[i] = source[Int(index[i])]
+        }
+      }
+    }
+
   // SIMDPredicateVector conformance -----------------------------------------
 %   for op in ['&','|','^']:
   @_transparent
