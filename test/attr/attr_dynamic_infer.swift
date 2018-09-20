@@ -65,17 +65,17 @@ extension FinalTests {
 
   // CHECK: @objc final var prop: Super
   @objc final var prop: Super {
-    // CHECK: final get
+    // CHECK: get
     get { return Super() }
-    // CHECK: final set
+    // CHECK: set
     set { }
   }
 
   // CHECK: @objc final subscript(sup: Super) -> Super
   @objc final subscript(sup: Super) -> Super {
-    // CHECK: final get
+    // CHECK: get
     get { return sup }
-    // CHECK: final set
+    // CHECK: set
     set { }
   }
 
