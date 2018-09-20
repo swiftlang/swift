@@ -2586,11 +2586,13 @@ extension _NativeDictionary { // Insertions
 }
 
 extension _NativeDictionary: _HashTableDelegate {
+  @inlinable
   @inline(__always)
   internal func hashValue(at index: Index) -> Int {
     return hashValue(for: uncheckedKey(at: index))
   }
 
+  @inlinable
   @inline(__always)
   internal func moveEntry(from source: Index, to target: Index) {
     (_keys + target.bucket)
@@ -2617,9 +2619,7 @@ extension _NativeDictionary { // Deletion
 
     // Fast path: if the key is not present, we will not mutate the dictionary,
     // so don't force unique buffer.
-    if !found {
-      return nil
-    }
+    guard found else { return nil }
 
     if ensureUnique(isUnique: isUnique, capacity: capacity) {
       (index, found) = find(key)

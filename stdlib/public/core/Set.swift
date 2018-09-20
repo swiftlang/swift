@@ -2066,11 +2066,13 @@ extension _NativeSet { // Insertions
 }
 
 extension _NativeSet: _HashTableDelegate {
+  @inlinable
   @inline(__always)
   internal func hashValue(at index: Index) -> Int {
     return hashValue(for: uncheckedElement(at: index))
   }
 
+  @inlinable
   @inline(__always)
   internal func moveEntry(from source: Index, to target: Index) {
     (_elements + target.bucket)
