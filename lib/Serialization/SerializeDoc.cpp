@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "DocFormat.h"
 #include "Serialization.h"
 
 #include "swift/AST/ASTContext.h"
@@ -472,18 +473,19 @@ void DocSerializer::writeDocHeader() {
 
     auto& LangOpts = M->getASTContext().LangOpts;
     Metadata.emit(ScratchRecord,
-                  VERSION_MAJOR, VERSION_MINOR,
+                  SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR,
                   /*short version string length*/0, /*compatibility length*/0,
                   version::getSwiftFullVersion(
                     LangOpts.EffectiveLanguageVersion));
 
+    ModuleName.emit(ScratchRecord, M->getName().str());
     Target.emit(ScratchRecord, LangOpts.Target.str());
   }
 }
 
 void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                      StringRef GroupInfoPath) {
-  DocSerializer S{MODULE_DOC_SIGNATURE, DC};
+  DocSerializer S{SWIFTDOC_SIGNATURE, DC};
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeDocBlockInfoBlock();
 
