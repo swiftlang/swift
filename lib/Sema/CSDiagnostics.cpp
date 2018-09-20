@@ -766,11 +766,11 @@ bool AssignmentFailure::diagnoseAsError() {
     // If there is a masked instance variable of the same type, emit a
     // note to fixit prepend a 'self.'.
     if (auto typeContext = DC->getInnermostTypeContext()) {
-      UnqualifiedLookup lookup(VD->getFullName(), typeContext,
+      auto name = VD->getFullName();
+      UnqualifiedLookup lookup(name, typeContext,
                                getASTContext().getLazyResolver());
       for (auto &result : lookup.Results) {
-        const VarDecl *typeVar =
-            dyn_cast_or_null<VarDecl>(result.getValueDecl());
+        const VarDecl *typeVar = dyn_cast<VarDecl>(result.getValueDecl());
         if (typeVar && typeVar != VD && typeVar->isSettable(DC) &&
             typeVar->isSetterAccessibleFrom(DC) &&
             typeVar->getType()->isEqual(VD->getType())) {
@@ -778,7 +778,7 @@ bool AssignmentFailure::diagnoseAsError() {
           auto AD =
               dyn_cast_or_null<AccessorDecl>(DC->getInnermostMethodContext());
           if (!AD || AD->getStorage() != typeVar) {
-            emitDiagnostic(Loc, diag::masked_instance_variable)
+            emitDiagnostic(Loc, diag::masked_instance_variable, name)
                 .fixItInsert(Loc, "self.");
           }
         }
