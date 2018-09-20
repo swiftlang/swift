@@ -119,3 +119,39 @@ public func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Void = {
 // CHECK: func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1)
 public func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1) {
 }
+
+// CHECK: func hazArrayDefaultArg(_ x: [Int] = [
+// CHECK-NEXT:   1, 2,
+// CHECK-NOT: #if NOT_PROVIDED
+// CHECK-NOT:   3,
+// CHECK-NOT: #endif
+// CHECK-NEXT: 4,
+// CHECK-NOT: #if !NOT_PROVIDED
+// CHECK-NOT:   #if false
+// CHECK-NOT:     50,
+// CHECK-NOT:   #else
+// CHECK:         5,
+// CHECK-NOT:   #endif
+// CHECK-NOT: #else
+// CHECK-NOT:   6,
+// CHECK-NOT: #endif
+// CHECK-NEXT:     7
+// CHECK-NEXT: ]){{$}}
+public func hazArrayDefaultArg(_ x: [Int] = [
+  1, 2,
+  #if NOT_PROVIDED
+    3,
+  #endif
+  4,
+  #if !NOT_PROVIDED
+    #if false
+      50,
+    #else
+      5,
+    #endif
+  #else
+    6,
+  #endif
+  7
+]) {
+}

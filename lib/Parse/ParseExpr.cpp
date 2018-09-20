@@ -3384,8 +3384,9 @@ ParserResult<Expr> Parser::parseExprCollection() {
   {
     BacktrackingScope Scope(*this);
     auto HasDelayedDecl = State->hasDelayedDecl();
-    while (Tok.is(tok::pound_if))
-      consumeToken();
+    while (Tok.is(tok::pound_if) && consumeToken().isValid() &&
+           Tok.is(tok::identifier) && consumeToken().isValid());
+
     // Parse the first expression.
     ParserResult<Expr> FirstExpr
       = parseExpr(diag::expected_expr_in_collection_literal);

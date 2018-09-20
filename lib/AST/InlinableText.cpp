@@ -116,6 +116,18 @@ struct ExtractInactiveRanges : public ASTWalker {
     return false;
   }
 
+  std::pair<bool, Expr *> walkToExprPre(Expr *e) {
+    // For CollectionExprs, the IfconfigDecls related to elements in the
+    // collection are stored in a map keyed on the element they occur before.
+    // Passing them to walkToDeclPre is sufficient to remove all conditionals.
+    if (auto *collection = dyn_cast<CollectionExpr>(e))
+      for (auto &icds : collection->ConditionalsMap)
+        for (auto &icd : icds.second)
+          walkToDeclPre(icd);
+
+    return {true, e};
+  }
+
   /// Gets the ignored ranges in source order.
   ArrayRef<CharSourceRange> getSortedRanges() {
     std::sort(ranges.begin(), ranges.end(),
