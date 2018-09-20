@@ -4,6 +4,10 @@
 
 // REQUIRES: objc_interop
 
+// The order of the output seems to change between asserts/noasserts build of
+// the stlib.
+// REQUIRES: swift_stdlib_asserts
+
 // CHECK: [[SGIZMO:T13objc_subclass10SwiftGizmoC]] = type
 // CHECK: [[OBJC_CLASS:%objc_class]] = type
 // CHECK: [[OPAQUE:%swift.opaque]] = type
