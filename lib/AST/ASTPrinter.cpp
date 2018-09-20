@@ -1655,8 +1655,8 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   // Helper to print an accessor. Returns true if the
   // accessor was present but skipped.
   auto PrintAccessor = [&](AccessorDecl *Accessor) -> bool {
-    if (!Accessor) return false;
-    if (!shouldPrint(Accessor)) return true;
+    if (!Accessor || !shouldPrint(Accessor))
+      return true;
     if (!PrintAccessorBody) {
       if (isAccessorAssumedNonMutating(Accessor->getAccessorKind())) {
         if (Accessor->isMutating()) {
@@ -1728,7 +1728,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     case WriteImplKind::InheritedWithObservers: {
       bool skippedWillSet = PrintAccessor(ASD->getWillSetFunc());
       bool skippedDidSet = PrintAccessor(ASD->getDidSetFunc());
-      if (skippedDidSet || skippedWillSet) {
+      if (skippedDidSet && skippedWillSet) {
         PrintAccessor(ASD->getGetter());
         PrintAccessor(ASD->getSetter());
       }
