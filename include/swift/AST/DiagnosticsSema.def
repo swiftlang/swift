@@ -3149,8 +3149,8 @@ NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
 NOTE(masked_instance_variable,none,
-     "add explicit 'self.' to make %0 an instance variable which is mutable",
-     (DeclName))
+     "add explicit 'self.' to refer to mutable property of %0",
+     (Type))
 
 ERROR(assignment_let_property_delegating_init,none,
       "'let' property %0 may not be initialized directly; use "
