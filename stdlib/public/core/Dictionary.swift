@@ -1326,7 +1326,7 @@ extension Dictionary {
 
     @inlinable
     public subscript(position: Index) -> Element {
-      return _variant.lookup(position).key
+      return _variant.key(at: position)
     }
 
     // Customization
@@ -1430,7 +1430,7 @@ extension Dictionary {
     @inlinable
     public subscript(position: Index) -> Element {
       get {
-        return _variant.lookup(position).value
+        return _variant.value(at: position)
       }
       _modify {
         let index = _variant.ensureUniqueNative(preserving: position)
@@ -1765,8 +1765,10 @@ internal protocol _DictionaryBuffer {
   var count: Int { get }
 
   func contains(_ key: Key) -> Bool
-  func lookup(_ index: Index) -> (key: Key, value: Value)
   func lookup(_ key: Key) -> Value?
+  func lookup(_ index: Index) -> (key: Key, value: Value)
+  func key(at index: Index) -> Key
+  func value(at index: Index) -> Value
 }
 
 /// An instance of this class has all `Dictionary` data tail-allocated.
@@ -2409,6 +2411,17 @@ extension _NativeDictionary: _DictionaryBuffer {
 
   @inlinable
   @inline(__always)
+  func lookup(_ key: Key) -> Value? {
+    if count == 0 {
+      // Fast path that avoids computing the hash of the key.
+      return nil
+    }
+    let (index, found) = self.find(key)
+    return found ? self.uncheckedValue(at: index) : nil
+  }
+
+  @inlinable
+  @inline(__always)
   func lookup(_ index: Index) -> (key: Key, value: Value) {
     _precondition(hashTable.isOccupied(index),
       "Attempting to access Dictionary elements using an invalid Index")
@@ -2419,13 +2432,18 @@ extension _NativeDictionary: _DictionaryBuffer {
 
   @inlinable
   @inline(__always)
-  func lookup(_ key: Key) -> Value? {
-    if count == 0 {
-      // Fast path that avoids computing the hash of the key.
-      return nil
-    }
-    let (index, found) = self.find(key)
-    return found ? self.uncheckedValue(at: index) : nil
+  func key(at index: Index) -> Key {
+    _precondition(hashTable.isOccupied(index),
+      "Attempting to access Dictionary elements using an invalid Index")
+    return self.uncheckedKey(at: index)
+  }
+
+  @inlinable
+  @inline(__always)
+  func value(at index: Index) -> Value {
+    _precondition(hashTable.isOccupied(index),
+      "Attempting to access Dictionary elements using an invalid Index")
+    return self.uncheckedValue(at: index)
   }
 }
 
@@ -3126,14 +3144,6 @@ internal struct _CocoaDictionary {
   }
 }
 
-extension _CocoaDictionary {
-  @usableFromInline
-  @_effects(releasenone)
-  internal func key(for index: Index) -> AnyObject {
-    return index.allKeys[index.currentKeyIndex]
-  }
-}
-
 extension _CocoaDictionary: Equatable {
   @usableFromInline
   internal static func ==(
@@ -3216,11 +3226,28 @@ extension _CocoaDictionary: _DictionaryBuffer {
     return object.object(forKey: key)
   }
 
-  @usableFromInline
-  internal func lookup(_ i: Index) -> (key: Key, value: Value) {
-    let key: Key = i.allKeys[i.currentKeyIndex]
-    let value: Value = i.base.object.object(forKey: key)!
+  @inlinable
+  @inline(__always)
+  internal func lookup(_ index: Index) -> (key: Key, value: Value) {
+    _precondition(index.base.object === self.object, "Invalid index")
+    let key: Key = index.allKeys[index.currentKeyIndex]
+    let value: Value = index.base.object.object(forKey: key)!
     return (key, value)
+  }
+
+  @inlinable
+  @inline(__always)
+  func key(at index: Index) -> Key {
+    _precondition(index.base.object === self.object, "Invalid index")
+    return index.allKeys[index.currentKeyIndex]
+  }
+
+  @inlinable
+  @inline(__always)
+  func value(at index: Index) -> Value {
+    _precondition(index.base.object === self.object, "Invalid index")
+    let key = index.allKeys[index.currentKeyIndex]
+    return index.base.object.object(forKey: key)!
   }
 }
 
@@ -3448,6 +3475,22 @@ extension Dictionary._Variant: _DictionaryBuffer {
 
   @inlinable
   @inline(__always)
+  func lookup(_ key: Key) -> Value? {
+    switch self {
+    case .native:
+      return asNative.lookup(key)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      cocoaPath()
+      let cocoaKey = _bridgeAnythingToObjectiveC(key)
+      guard let cocoaValue = cocoa.lookup(cocoaKey) else { return nil }
+      return _forceBridgeFromObjectiveC(cocoaValue, Value.self)
+#endif
+    }
+  }
+
+  @inlinable
+  @inline(__always)
   func lookup(_ index: Index) -> (key: Key, value: Value) {
     switch self {
     case .native:
@@ -3465,15 +3508,29 @@ extension Dictionary._Variant: _DictionaryBuffer {
 
   @inlinable
   @inline(__always)
-  func lookup(_ key: Key) -> Value? {
+  func key(at index: Index) -> Key {
     switch self {
     case .native:
-      return asNative.lookup(key)
+      return asNative.key(at: index._asNative)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
-      let cocoaKey = _bridgeAnythingToObjectiveC(key)
-      guard let cocoaValue = cocoa.lookup(cocoaKey) else { return nil }
+      let cocoaKey = cocoa.key(at: index._asCocoa)
+      return _forceBridgeFromObjectiveC(cocoaKey, Key.self)
+#endif
+    }
+  }
+
+  @inlinable
+  @inline(__always)
+  func value(at index: Index) -> Value {
+    switch self {
+    case .native:
+      return asNative.value(at: index._asNative)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      cocoaPath()
+      let cocoaValue = cocoa.value(at: index._asCocoa)
       return _forceBridgeFromObjectiveC(cocoaValue, Value.self)
 #endif
     }
@@ -3542,7 +3599,7 @@ extension Dictionary._Variant {
       cocoaPath()
       // We have to migrate the data first.  But after we do so, the Cocoa
       // index becomes useless, so get the key first.
-      let cocoaKey = cocoa.key(for: index._asCocoa)
+      let cocoaKey = cocoa.key(at: index._asCocoa)
       let native = _NativeDictionary<Key, Value>(cocoa)
       self = .native(native)
       let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
