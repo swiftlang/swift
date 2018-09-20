@@ -508,20 +508,15 @@ struct SILConstantInfo {
 
   /// The SIL function type of the constant.
   CanSILFunctionType SILFnType;
-  
-  /// The generic environment used by the constant.
-  GenericEnvironment *GenericEnv;
 
   SILConstantInfo(CanAnyFunctionType formalType,
                   AbstractionPattern formalPattern,
                   CanAnyFunctionType loweredType,
-                  CanSILFunctionType silFnTy,
-                  GenericEnvironment *env)
+                  CanSILFunctionType silFnTy)
     : FormalType(formalType),
       FormalPattern(formalPattern),
       LoweredType(loweredType),
-      SILFnType(silFnTy),
-      GenericEnv(env) {}
+      SILFnType(silFnTy) {}
   
   SILType getSILType() const {
     return SILType::getPrimitiveObjectType(SILFnType);
@@ -530,8 +525,7 @@ struct SILConstantInfo {
   friend bool operator==(SILConstantInfo lhs, SILConstantInfo rhs) {
     return lhs.FormalType == rhs.FormalType &&
            lhs.LoweredType == rhs.LoweredType &&
-           lhs.SILFnType == rhs.SILFnType &&
-           lhs.GenericEnv == rhs.GenericEnv;
+           lhs.SILFnType == rhs.SILFnType;
   }
   friend bool operator!=(SILConstantInfo lhs, SILConstantInfo rhs) {
     return !(lhs == rhs);
@@ -670,9 +664,6 @@ class TypeConverter {
 
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
-  /// Get the generic environment for a constant.
-  GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
-  
   // Types converted during foreign bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   Optional<CanType> BridgedType##Ty;
@@ -792,6 +783,9 @@ public:
   /// Returns the formal type, lowered AST type, and SILFunctionType
   /// for a constant reference.
   const SILConstantInfo &getConstantInfo(SILDeclRef constant);
+  
+  /// Get the generic environment for a constant.
+  GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
   
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILDeclRef constant) {
