@@ -1369,7 +1369,7 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
   worklist.push_back(ty);
 
   while (!worklist.empty()) {
-    auto itemTy = worklist.pop_back_val()->getWithoutSpecifierType();
+    auto itemTy = worklist.pop_back_val()->getRValueType();
 
     if (!itemTy->is<TypeVariableType>())
       return true;
@@ -1513,7 +1513,7 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
 static bool haveTypeInformationForAllArguments(AnyFunctionType *fnType,
                                                ConstraintSystem &cs) {
   return llvm::all_of(fnType->getParams(), [&](AnyFunctionType::Param param) {
-    return havePotentialTypesOrLiteralConformances(param.getType(), cs);
+    return havePotentialTypesOrLiteralConformances(param.getPlainType(), cs);
   });
 }
 
