@@ -3663,7 +3663,7 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
     if (reqDescriptor < requirements.begin() ||
         reqDescriptor >= requirements.end()) {
       fatalError(0, "generic witness table at %p contains out-of-bounds "
-                 "requirement descriptor %p",
+                 "requirement descriptor %p\n",
                  genericTable, reqDescriptor);
     }
 
@@ -3674,7 +3674,7 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
     // For debug builds, warn if we already have an entry at this index.
     if (table[witnessIndex]) {
       warning(0, "generic witness table at %p contains duplicate entry for "
-              "requirement descriptor %p",
+              "requirement descriptor %p\n",
               genericTable, reqDescriptor);
     }
 #endif
@@ -3694,16 +3694,6 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
     // Otherwise, fill in a default implementation.
     auto &reqt = requirements[i];
     void *impl = reqt.DefaultImplementation.get();
-
-#if !NDEBUG
-    // For debug builds, warn if we don't have a default implementation.
-    if (!impl) {
-      warning(0, "generic witness table at %p missing an entry for "
-              "requirement descriptor %p", genericTable,
-              requirements.begin() + i);
-    }
-#endif
-
     table[witnessIndex] = impl;
   }
 }
