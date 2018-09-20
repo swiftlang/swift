@@ -44,7 +44,7 @@ foreach(sdk ${SWIFT_SDKS})
   endif()
 
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-    set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
+    compute_library_subdir(arch_subdir "${sdk}" "${arch}")
     set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
 
     if("${sdk}" STREQUAL "HAIKU")

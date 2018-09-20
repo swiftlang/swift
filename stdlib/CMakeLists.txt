@@ -64,7 +64,8 @@ foreach(SDK ${SWIFT_SDKS})
       PROPERTY FOLDER "Swift libraries/Aggregate")
 
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
-    set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
+    compute_variant_suffix(VARIANT_SUFFIX "${SDK}" "${ARCH}")
+
     add_custom_target("swift-stdlib${VARIANT_SUFFIX}")
     add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sib")
     add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sibopt")

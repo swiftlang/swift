@@ -789,8 +789,7 @@ precondition(SWIFT_CONFIGURED_SDKS MESSAGE "No SDKs selected.")
 precondition(SWIFT_HOST_VARIANT_SDK MESSAGE "No SDK for host tools.")
 precondition(SWIFT_HOST_VARIANT_ARCH MESSAGE "No arch for host tools")
 
-set(SWIFT_PRIMARY_VARIANT_SUFFIX
-    "-${SWIFT_SDK_${SWIFT_PRIMARY_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_PRIMARY_VARIANT_ARCH}")
+compute_variant_suffix(SWIFT_PRIMARY_VARIANT_SUFFIX "${SWIFT_PRIMARY_VARIANT_SDK}" "${SWIFT_PRIMARY_VARIANT_ARCH}")
 
 # Clear universal library names to prevent adding duplicates
 foreach(sdk ${SWIFT_SDKS})

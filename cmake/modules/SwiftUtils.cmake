@@ -174,3 +174,14 @@ function(is_sdk_requested name result_var_name)
     endif()
   endif()
 endfunction()
+
+# Compute the library subdirectory to use for the given sdk and
+# architecture, placing the result in 'result_var_name'.
+function(compute_library_subdir result_var_name sdk arch)
+  set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
+endfunction()
+
+function(compute_variant_suffix result_var_name sdk arch)
+  set("${result_var_name}" "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}" PARENT_SCOPE)
+endfunction()
+

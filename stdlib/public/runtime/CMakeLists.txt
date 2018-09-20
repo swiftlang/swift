@@ -102,7 +102,6 @@ set(sdk "${SWIFT_HOST_VARIANT_SDK}")
 if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   list(REMOVE_ITEM swift_runtime_sources ImageInspectionELF.cpp)
   set(static_binary_lnk_file_list)
-  string(TOLOWER "${sdk}" lowercase_sdk)
 
   # These two libraries are only used with the static swiftcore
   add_swift_library(swiftImageInspectionShared TARGET_LIBRARY STATIC
@@ -112,8 +111,10 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     INSTALL_IN_COMPONENT stdlib)
 
   foreach(arch IN LISTS SWIFT_SDK_${sdk}_ARCHITECTURES)
-    set(FragileSupportLibrary swiftImageInspectionShared-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch})
-    set(LibraryLocation ${SWIFTSTATICLIB_DIR}/${lowercase_sdk}/${arch})
+    compute_variant_suffix(VARIANT_SUFFIX "${sdk}" "${arch}")
+    compute_library_subdir(LIBRARY_SUBDIR "${sdk}" "${arch}")
+    set(FragileSupportLibrary swiftImageInspectionShared${VARIANT_SUFFIX})
+    set(LibraryLocation ${SWIFTSTATICLIB_DIR}/${LIBRARY_SUDIR})
     add_custom_command_target(swift_image_inspection_${arch}_static
       COMMAND
         "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:${FragileSupportLibrary}> ${LibraryLocation}
@@ -122,11 +123,15 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
       DEPENDS
          ${FragileSupportLibrary})
     swift_install_in_component(stdlib
-      FILES $<TARGET_FILE:${FragileSupportLibrary}>
-      DESTINATION "lib/swift_static/${lowercase_sdk}/${arch}")
+                               FILES
+                                 $<TARGET_FILE:${FragileSupportLibrary}>
+                               DESTINATION
+                                 "lib/swift_static/${LIBRARY_SUBDIR}")
   endforeach()
 
-  set(FragileSupportLibraryPrimary swiftImageInspectionShared-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${SWIFT_PRIMARY_VARIANT_ARCH})
+  string(TOLOWER "${sdk}" lowercase_sdk)
+  compute_variant_suffix(SUFFIX "${sdk}" "${SWIFT_PRIMARY_VARIANT_ARCH}")
+  set(FragileSupportLibraryPrimary swiftImageInspectionShared${SUFFIX})
   set(LibraryLocationPrimary ${SWIFTSTATICLIB_DIR}/${lowercase_sdk})
   add_custom_command_target(swift_image_inspection_static_primary_arch
       COMMAND
@@ -203,8 +208,8 @@ add_swift_library(swiftImageRegistrationObjectCOFF
 
 foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-    set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
-    set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+    compute_library_subdir(arch_subdir "${sdk}" "${arch}")
+    compute_variant_suffix(arch_suffix "${sdk}" "${arch}")
 
     if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF" OR
        "${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "COFF")

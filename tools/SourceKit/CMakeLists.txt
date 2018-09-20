@@ -126,13 +126,14 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     include_directories(AFTER
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+    compute_variant_suffix(VARIANT_SUFFIX "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}")
     add_dependencies(libdispatch
                        swift
                        copy_shim_headers
-                       swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
-                       swiftSwiftOnoneSupport-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
-                       swiftCore-swiftmodule-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
-                       swiftSwiftOnoneSupport-swiftmodule-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+                       swiftCore${VARIANT_SUFFIX}
+                       swiftSwiftOnoneSupport${VARIANT_SUFFIX}
+                       swiftCore-swiftmodule-${VARIANT_SUFFIX}
+                       swiftSwiftOnoneSupport-swiftmodule${VARIANT_SUFFIX})
   endif()
 
   ExternalProject_Get_Property(libdispatch install_dir)
@@ -144,7 +145,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
                           INTERFACE_INCLUDE_DIRECTORIES
                             ${install_dir}/include
                           IMPORTED_LINK_INTERFACE_LIBRARIES
-                            swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
+                            swiftCore${VARIANT_SUFFIX})
 
   add_library(BlocksRuntime STATIC IMPORTED)
   set_target_properties(BlocksRuntime
