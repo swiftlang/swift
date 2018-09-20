@@ -204,9 +204,16 @@ foreach(SDK ${SWIFT_SDKS})
       list(APPEND test_dependencies "touch-covering-tests")
     endif()
 
+    # In Darwin, we depend on the fat targets.
+    if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+      set(validation_test_dependencies_suffix "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+    else()
+      set(validation_test_dependencies_suffix "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
+    endif()
+
     set(validation_test_dependencies
-        "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-        "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+        "swiftStdlibCollectionUnittest${validation_test_dependencies_suffix}"
+        "swiftStdlibUnicodeUnittest${validation_test_dependencies_suffix}")
 
     set(command_upload_stdlib)
     set(command_upload_swift_reflection_test)
@@ -234,7 +241,7 @@ foreach(SDK ${SWIFT_SDKS})
               --ndk "${SWIFT_ANDROID_NDK_PATH}"
               --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
               # Build products like libswiftCore.so.
-              "${SWIFTLIB_DIR}/android"
+              "${SWIFTLIB_DIR}/android/${ARCH}"
               # These two directories may contain the same libraries,
               # but upload both to device just in case. Duplicates will be
               # overwritten, and uploading doesn't take very long anyway.

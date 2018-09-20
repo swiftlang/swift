@@ -47,10 +47,19 @@ static void updateRuntimeLibraryPath(SearchPathOptions &SearchPathOpts,
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
-  SearchPathOpts.RuntimeLibraryPath = LibPath.str();
+  // Darwin platforms use the platform name as runtime library path.
+  if (Triple.isOSDarwin()) {
+    SearchPathOpts.RuntimeLibraryPath = LibPath.str();
+  }
 
   llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
   SearchPathOpts.RuntimeLibraryImportPath = LibPath.str();
+
+  // Non-Darwin platforms use the platform name and the architecture as runtime
+  // library path.
+  if (!Triple.isOSDarwin()) {
+    SearchPathOpts.RuntimeLibraryPath = LibPath.str();
+  }
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {

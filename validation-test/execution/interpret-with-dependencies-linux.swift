@@ -8,9 +8,9 @@
 // CHECK: {{okay}}
 
 // Now test a dependency on a library in the compiler's resource directory.
-// RUN: %empty-directory(%t/rsrc/%target-sdk-name)
-// RUN: ln -s %t/libabc.so %t/rsrc/%target-sdk-name/
-// RUN: ln -s %platform-module-dir/../* %t/rsrc/%target-sdk-name/
+// RUN: %empty-directory(%t/rsrc/%target-sdk-name/%target-cpu)
+// RUN: ln -s %t/libabc.so %t/rsrc/%target-sdk-name/%target-cpu
+// RUN: ln -s %platform-module-dir/* %t/rsrc/%target-sdk-name/%target-cpu
 // RUN: ln -s %platform-module-dir/../../shims %t/rsrc/
 // RUN: %empty-directory(%t/other)
 // RUN: ln -s %t/libfoo.so %t/other

@@ -74,6 +74,8 @@ toolchains::GenericUnix::constructInvocation(const InterpretJobAction &job,
   SmallString<128> runtimeLibraryPath;
   getRuntimeLibraryPath(runtimeLibraryPath, context.Args,
                         /*Shared=*/true);
+  llvm::sys::path::append(runtimeLibraryPath,
+                          swift::getMajorArchitectureName(getTriple()));
 
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "LD_LIBRARY_PATH",
                                      ":", options::OPT_L, context.Args,
@@ -209,9 +211,13 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
   SmallString<128> SharedRuntimeLibPath;
   getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args, /*Shared=*/true);
+  llvm::sys::path::append(SharedRuntimeLibPath,
+                          swift::getMajorArchitectureName(getTriple()));
 
   SmallString<128> StaticRuntimeLibPath;
   getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args, /*Shared=*/false);
+  llvm::sys::path::append(StaticRuntimeLibPath,
+                          swift::getMajorArchitectureName(getTriple()));
 
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
@@ -225,8 +231,6 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   }
 
   SmallString<128> swiftrtPath = SharedRuntimeLibPath;
-  llvm::sys::path::append(swiftrtPath,
-                          swift::getMajorArchitectureName(getTriple()));
   llvm::sys::path::append(swiftrtPath, "swiftrt.o");
   Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
 
@@ -263,6 +267,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
 
     SmallString<128> linkFilePath = StaticRuntimeLibPath;
+    llvm::sys::path::remove_filename(linkFilePath); // remove arch name
     llvm::sys::path::append(linkFilePath, "static-executable-args.lnk");
     auto linkFile = linkFilePath.str();
 
@@ -276,6 +281,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
 
     SmallString<128> linkFilePath = StaticRuntimeLibPath;
+    llvm::sys::path::remove_filename(linkFilePath); // remove arch name
     llvm::sys::path::append(linkFilePath, "static-stdlib-args.lnk");
     auto linkFile = linkFilePath.str();
     if (llvm::sys::fs::is_regular_file(linkFile)) {
@@ -313,6 +319,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
     SmallString<128> LibProfile(SharedRuntimeLibPath);
+    llvm::sys::path::remove_filename(LibProfile); // remove arch name
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");
 
