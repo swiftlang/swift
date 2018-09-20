@@ -119,6 +119,10 @@ static bool hasInfinitelyRecursiveApply(SILFunction &Fn,
   
   while (!WorkList.empty()) {
     SILBasicBlock *CurBlock = WorkList.pop_back_val();
+    // Block will terminate the program.
+    if (CurBlock->isNoReturn())
+      return false;
+
     // Found a path to the exit node without a recursive call.
     if (CurBlock->getTerminator()->isFunctionExiting())
       return false;

@@ -61,6 +61,13 @@ func k() -> Any {  // expected-warning {{all paths through this function will ca
   return type(of: k())
 }
 
+func l() {
+  if Bool.random() {
+    fatalError() // does not trivially recurse due to noreturn function call
+  }
+  l()
+}
+
 class S {
   convenience init(a: Int) { // expected-warning {{all paths through this function will call itself}}
     self.init(a: a)
