@@ -20,7 +20,10 @@ namespace tf {
 
 /// Start building a GraphOperationInst for op `OpName`.
 GraphOperationBuilder::GraphOperationBuilder(StringRef OpName)
-    : MangledName(OpName) {}
+    : MangledName(OpName) {
+  assert(MangledName.find(',') == StringRef::npos &&
+         "graph_op name cannot include ','");
+}
 
 /// Add a single operand to the GraphOperationInst, with an optional name.
 void GraphOperationBuilder::addOperand(SILValue operand, StringRef name) {

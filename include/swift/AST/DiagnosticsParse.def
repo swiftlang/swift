@@ -1645,6 +1645,8 @@ ERROR(autodiff_use_wrt_not_withrespectto,none,
 //------------------------------------------------------------------------------
 // Graph operation related parsing diagnostics
 //------------------------------------------------------------------------------
+ERROR(sil_graph_op_name_comma,PointsToFirstBadToken,
+      "'graph_op' name cannot contain ','", ())
 ERROR(sil_graph_op_expected_attr_name,PointsToFirstBadToken,
       "expected 'graph_op' attribute name", ())
 ERROR(sil_graph_op_expected_attr_value,PointsToFirstBadToken,

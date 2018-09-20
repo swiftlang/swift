@@ -77,7 +77,7 @@ bb0:
 bb1(%4 : $Builtin.Int32):                         // Preds: bb2 bb0
   %5 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // users: %10, %9, %6
   %6 = builtin "cmp_slt_Int32"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1 // users: %8, %7
-  %7 = graph_op "tfc.SendToHost,i"(%6 : $Builtin.Int1) {tensorId: i32 1, __device: "/device:CPU:0"} : $()
+  %7 = graph_op "tfc.SendToHost"(%6 : $Builtin.Int1) {tensorId: i32 1, __device: "/device:CPU:0"} : $()
   cond_br %6, bb2, bb3                            // id: %8
 
 bb2:                                              // Preds: bb1

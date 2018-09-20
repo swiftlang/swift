@@ -2962,6 +2962,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
     StringRef opName = P.Tok.getText().drop_front().drop_back();
+    if (opName.find(',') != StringRef::npos) {
+      P.diagnose(P.Tok, diag::sil_graph_op_name_comma);
+      return true;
+    }
     tf::GraphOperationBuilder opBuilder(opName);
     P.consumeToken(tok::string_literal);
 
@@ -3024,7 +3028,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
 
     // Parse optional graph operation attributes.
-    SmallVector<GraphOperationAttribute, 4> attributes;
     SourceLoc lBraceLoc;
     if (P.consumeIf(tok::l_brace, lBraceLoc)) {
       SourceLoc rBraceLoc;
@@ -3046,7 +3049,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         }
         if (parseSymbolicValue(attrValue, *this, B))
           return makeParserError();
-        attributes.push_back({ attrName, attrValue });
+        opBuilder.addAttribute({ attrName, attrValue });
         return makeParserSuccess();
       });
       if (status.isError())
