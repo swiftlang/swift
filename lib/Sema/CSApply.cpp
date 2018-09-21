@@ -4267,10 +4267,24 @@ namespace {
 
       // Resolve each of the components.
       bool didOptionalChain = false;
-      auto keyPathTy = cs.getType(E)->castTo<BoundGenericType>();
-      Type baseTy = keyPathTy->getGenericArgs()[0];
-      Type leafTy = keyPathTy->getGenericArgs()[1];
-      
+      Type baseTy, leafTy;
+      Type exprType = cs.getType(E);
+      if (auto fnTy = exprType->getAs<FunctionType>()) {
+        baseTy = fnTy->getParams()[0].getType();
+        leafTy = fnTy->getResult();
+
+        // Reset the expr type to be KeyPath so that we'll
+        // perform the KeyPath<Base,Leaf> to (Base)->Leaf coercion.
+        auto kpDecl = cs.getASTContext().getKeyPathDecl();
+        auto resolvedKPTy =
+            BoundGenericType::get(kpDecl, nullptr, {baseTy, leafTy});
+        cs.setType(E, resolvedKPTy);
+      } else {
+        auto keyPathTy = exprType->castTo<BoundGenericType>();
+        baseTy = keyPathTy->getGenericArgs()[0];
+        leafTy = keyPathTy->getGenericArgs()[1];
+      }
+
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getMutableComponents()[i];
         
@@ -4556,7 +4570,8 @@ namespace {
       // key path.
       assert(!baseTy || baseTy->hasUnresolvedType()
              || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
-      return E;
+
+      return coerceToType(E, exprType, cs.getConstraintLocator(E));
     }
 
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
@@ -6260,9 +6275,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::TupleToTuple:
     case ConversionRestrictionKind::LValueToRValue:
-        // Restrictions that don't need to be recorded.
-        // Should match recordRestriction() in CSSimplify
-        break;
+    case ConversionRestrictionKind::KeyPathToFunction:
+      // Restrictions that don't need to be recorded.
+      // Should match recordRestriction() in CSSimplify
+      break;
 
     case ConversionRestrictionKind::DeepEquality: {
       if (toType->hasUnresolvedType())
@@ -6537,6 +6553,45 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   // Coercions to function type.
   if (auto toFunc = toType->getAs<FunctionType>()) {
+
+    // Coercions from KeyPath to function type:
+    // Construct an implicit closure which applies this KeyPath.
+    if (auto bgt = fromType->getAs<BoundGenericType>()) {
+      auto &ctx = cs.getASTContext();
+      if (bgt->getDecl() == ctx.getKeyPathDecl() ||
+          bgt->getDecl() == ctx.getWritableKeyPathDecl() ||
+          bgt->getDecl() == ctx.getReferenceWritableKeyPathDecl()) {
+        auto fnTy = toType->getAs<FunctionType>();
+        auto argTy = fnTy->getParams()[0].getType();
+        auto &context = cs.getASTContext();
+        auto discriminator = AutoClosureExpr::InvalidDiscriminator;
+        auto closure = new (context)
+            AutoClosureExpr(expr, fnTy->getResult(), discriminator, cs.DC);
+        auto param = new (context) ParamDecl(
+            VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), Identifier(),
+            SourceLoc(), argTy->getNominalOrBoundGenericNominal()->getName(),
+            closure);
+        param->setInterfaceType(fnTy->getParams()[0].getType());
+        auto *paramRef =
+            new (context) DeclRefExpr(param, DeclNameLoc(), /*Implicit=*/true);
+        paramRef->setType(argTy);
+        cs.cacheType(paramRef);
+        auto *application = new (context)
+            KeyPathApplicationExpr(paramRef, SourceLoc(), expr, SourceLoc(),
+                                   fnTy->getResult(), /*implicit=*/true);
+        cs.cacheType(application);
+        closure->setParameterList(ParameterList::create(context, {param}));
+        closure->setBody(application);
+
+        // KeyPaths are noescape and non-throwing, so we may still need to do
+        // additional function conversion as well.
+        fromType = fnTy->withExtInfo(
+            fnTy->getExtInfo().withNoEscape(true).withThrows(false));
+        closure->setType(fromType);
+        expr = cs.cacheType(closure);
+      }
+    }
+
     // Default argument generator must return escaping functions. Therefore, we
     // leave an explicit escape to noescape cast here such that SILGen can skip
     // the cast and emit a code for the escaping function.

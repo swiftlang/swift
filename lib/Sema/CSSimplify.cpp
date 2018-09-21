@@ -2143,13 +2143,28 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       conversionsOrFixes.push_back(
         ConversionRestrictionKind::LValueToRValue);
 
-    // An expression can be converted to an auto-closure function type, creating
-    // an implicit closure.
     if (auto function2 = type2->getAs<FunctionType>()) {
+      // An expression can be converted to an auto-closure function type,
+      // creating an implicit closure.
       if (function2->isAutoClosure())
         return matchTypes(
             type1, function2->getResult(), kind, subflags,
             locator.withPathElement(ConstraintLocator::AutoclosureResult));
+
+      // A KeyPath<Type, Result> can be converted to function type (Type) ->
+      // Result.
+      auto params = function2->getParams();
+      if (auto bgt = type1->getAs<BoundGenericType>()) {
+        auto decl = bgt->getDecl();
+        auto &ast = getASTContext();
+        if (params.size() == 1 &&
+            (decl == ast.getKeyPathDecl() ||
+             decl == ast.getWritableKeyPathDecl() ||
+             decl == ast.getReferenceWritableKeyPathDecl())) {
+          conversionsOrFixes.push_back(
+              ConversionRestrictionKind::KeyPathToFunction);
+        }
+      }
     }
 
     // It is never legal to form an autoclosure that results in these
@@ -4124,7 +4139,26 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
         return SolutionKind::Error;
     }
   }
-  
+
+  // If we're bound to a (Root) -> Value function type, use that for context.
+  if (auto fnTy = keyPathTy->getAs<FunctionType>()) {
+    if (fnTy->getParams().size() == 1) {
+      Type boundRoot = fnTy->getParams()[0].getType();
+      Type boundValue = fnTy->getResult();
+
+      if (matchTypes(boundRoot, rootTy, ConstraintKind::Bind, subflags, locator)
+              .isFailure())
+        return SolutionKind::Error;
+
+      if (matchTypes(boundValue, valueTy, ConstraintKind::Bind, subflags,
+                     locator)
+              .isFailure())
+        return SolutionKind::Error;
+
+      return SolutionKind::Solved;
+    }
+  }
+
   // See if we resolved overloads for all the components involved.
   enum {
     ReadOnly,
@@ -4893,6 +4927,16 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       bridgedObjCClass->getDeclaredInterfaceType(),
                       ConstraintKind::Subtype, subflags, locator);
   }
+
+  case ConversionRestrictionKind::KeyPathToFunction: {
+    auto generic1 = type1->getAs<BoundGenericType>();
+    auto extInfo =
+        AnyFunctionType::ExtInfo().withThrows(false).withNoEscape(true);
+    auto function1 = FunctionType::get(
+        {AnyFunctionType::Param(generic1->getGenericArgs()[0])},
+        generic1->getGenericArgs()[1], extInfo);
+    return matchTypes(function1, type2, matchKind, subflags, locator);
+  }
   }
   
   llvm_unreachable("bad conversion restriction");
@@ -4904,6 +4948,7 @@ static bool recordRestriction(ConversionRestrictionKind restriction) {
   switch(restriction) {
     case ConversionRestrictionKind::TupleToTuple:
     case ConversionRestrictionKind::LValueToRValue:
+    case ConversionRestrictionKind::KeyPathToFunction:
       return false;
     default:
       return true;

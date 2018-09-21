@@ -196,7 +196,8 @@ enum class ConversionRestrictionKind {
   MetatypeToExistentialMetatype,
   /// Existential metatype to metatype conversion.
   ExistentialMetatypeToMetatype,
-  /// T -> U? value to optional conversion (or to implicitly unwrapped optional).
+  /// T -> U? value to optional conversion (or to implicitly unwrapped
+  /// optional).
   ValueToOptional,
   /// T? -> U? optional to optional conversion (or unchecked to unchecked).
   OptionalToOptional,
@@ -214,7 +215,9 @@ enum class ConversionRestrictionKind {
   CFTollFreeBridgeToObjC,
   /// Implicit conversion from an Objective-C class type to its
   /// toll-free-bridged CF type.
-  ObjCTollFreeBridgeToCF
+  ObjCTollFreeBridgeToCF,
+  /// KeyPath<Root, Value> to (Root) -> Value
+  KeyPathToFunction,
 };
 
 /// Return a string representation of a conversion restriction.
