@@ -4274,12 +4274,6 @@ namespace {
         baseTy = fnTy->getParams()[0].getType();
         leafTy = fnTy->getResult();
         isFunctionType = true;
-        // Reset the expr type to be KeyPath so that we'll
-        // perform the KeyPath<Base,Leaf> to (Base)->Leaf coercion.
-        auto kpDecl = cs.getASTContext().getKeyPathDecl();
-        auto resolvedKPTy =
-            BoundGenericType::get(kpDecl, nullptr, {baseTy, leafTy});
-        cs.setType(E, resolvedKPTy);
       } else {
         auto keyPathTy = exprType->castTo<BoundGenericType>();
         baseTy = keyPathTy->getGenericArgs()[0];
