@@ -67,6 +67,12 @@ public enum FrozenKind {
   case AddedCase
 }
 
-public class C7 {
+public class C7: P1 {
   public func foo(_ a: Int, _ b: Int) {}
 }
+
+public protocol P3: P1, P4 {}
+
+public protocol P4 {}
+
+extension fixedLayoutStruct: P2 {}

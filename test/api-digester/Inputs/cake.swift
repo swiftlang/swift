@@ -48,3 +48,5 @@ public struct fixedLayoutStruct {
   private var b = 2
   var c = 3
 }
+
+extension Int: P1 { public func bar() {} }

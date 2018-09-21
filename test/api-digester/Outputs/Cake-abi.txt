@@ -1,6 +1,7 @@
 
 /* Generic Signature Changes */
 cake1: Func P1.P1Constraint() has generic signature change from <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> to <τ_0_0 where τ_0_0 : P1>
+cake1: Protocol P3 has generic signature change from <τ_0_0 : P1, τ_0_0 : P2> to <τ_0_0 : P1, τ_0_0 : P4>
 
 /* RawRepresentable Changes */
 
@@ -41,3 +42,8 @@ cake1: Var fixedLayoutStruct.b in a non-resilient type changes position from 0 t
 cake2: EnumElement FrozenKind.AddedCase is added to a non-resilient type
 cake2: Var fixedLayoutStruct.c is added to a non-resilient type
 cake2: Var fixedLayoutStruct.lazy_d.storage is added to a non-resilient type
+
+/* Conformance changes */
+cake1: Protocol P3 has added inherited protocol P4
+cake1: Protocol P3 has removed inherited protocol P2
+cake1: Struct fixedLayoutStruct has removed conformance to P1
