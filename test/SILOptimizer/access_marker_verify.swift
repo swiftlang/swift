@@ -502,8 +502,8 @@ func accessOptionalArray(_ dict : MyDict<Int, [Int]>) {
 // ----- call Array.append
 // CHECK:   alloc_stack $Int
 // CHECK:   store %{{.*}} to [trivial]
-// CHECK:   function_ref @$sSa6appendyyxF : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout Array<τ_0_0>) -> ()
-// CHECK:   apply %{{.*}}<Int>(%{{.*}}, [[TEMPARRAYADR]]) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout Array<τ_0_0>) -> ()
+// CHECK:   function_ref @$sSa6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+// CHECK:   apply %{{.*}}<Int>(%{{.*}}, [[TEMPARRAYADR]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
 // CHECK:   [[TEMPARRAYVAL:%.*]] = load [take] [[TEMPACCESS]] : $*Optional<Array<Int>>
 // CHECK:   [[ARRAYCOPY:%.*]] = alloc_stack $Optional<Array<Int>>
 // CHECK:   store [[TEMPARRAYVAL]] to [init] [[ARRAYCOPY]] : $*Optional<Array<Int>>

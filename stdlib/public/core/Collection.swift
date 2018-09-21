@@ -1120,7 +1120,7 @@ extension Collection where Iterator == IndexingIterator<Self> {
   /// Returns an iterator over the elements of the collection.
   @inlinable // trivial-implementation
   @inline(__always)
-  public func makeIterator() -> IndexingIterator<Self> {
+  public __consuming func makeIterator() -> IndexingIterator<Self> {
     return IndexingIterator(_elements: self)
   }
 }
@@ -1356,7 +1356,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to drop from the beginning of the collection.
   @inlinable
-  public func dropFirst(_ k: Int) -> SubSequence {
+  public __consuming func dropFirst(_ k: Int) -> SubSequence {
     _precondition(k >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(startIndex,
       offsetBy: k, limitedBy: endIndex) ?? endIndex
@@ -1384,7 +1384,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
   ///   the collection.
   @inlinable
-  public func dropLast(_ k: Int) -> SubSequence {
+  public __consuming func dropLast(_ k: Int) -> SubSequence {
     _precondition(
       k >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, count - k)
@@ -1403,7 +1403,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public func drop(
+  public __consuming func drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     var start = startIndex
@@ -1434,7 +1434,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to select from the beginning of the collection.
   @inlinable
-  public func prefix(_ maxLength: Int) -> SubSequence {
+  public __consuming func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
@@ -1453,7 +1453,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public func prefix(
+  public __consuming func prefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     var end = startIndex
@@ -1484,7 +1484,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
   ///   the collection.
   @inlinable
-  public func suffix(_ maxLength: Int) -> SubSequence {
+  public __consuming func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
@@ -1529,7 +1529,7 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   @inlinable
-  public func prefix(upTo end: Index) -> SubSequence {
+  public __consuming func prefix(upTo end: Index) -> SubSequence {
     return self[startIndex..<end]
   }
 
@@ -1567,7 +1567,7 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   @inlinable
-  public func suffix(from start: Index) -> SubSequence {
+  public __consuming func suffix(from start: Index) -> SubSequence {
     return self[start..<endIndex]
   }
 
@@ -1601,7 +1601,7 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   @inlinable
-  public func prefix(through position: Index) -> SubSequence {
+  public __consuming func prefix(through position: Index) -> SubSequence {
     return prefix(upTo: index(after: position))
   }
 
@@ -1654,7 +1654,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public func split(
+  public __consuming func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
     whereSeparator isSeparator: (Element) throws -> Bool
@@ -1749,7 +1749,7 @@ extension Collection where Element : Equatable {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public func split(
+  public __consuming func split(
     separator: Element,
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true

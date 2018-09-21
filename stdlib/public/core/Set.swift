@@ -233,7 +233,7 @@ extension Set: Sequence {
   /// Returns an iterator over the members of the set.
   @inlinable
   @inline(__always)
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return _variant.makeIterator()
   }
 
@@ -290,7 +290,7 @@ extension Set {
   /// - Returns: A set of the elements that `isIncluded` allows.
   @inlinable
   @available(swift, introduced: 4.0)
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> Set {
     var result = Set()
@@ -3074,7 +3074,7 @@ extension Set._Variant: _SetBuffer {
   /// - Complexity: O(1).
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  internal func makeIterator() -> Set<Element>.Iterator {
+  __consuming internal func makeIterator() -> Set<Element>.Iterator {
     switch self {
     case .native(let nativeSet):
       return ._native(nativeSet.makeIterator())
@@ -3373,7 +3373,7 @@ extension _NativeSet: Sequence {
   }
 
   @inlinable
-  internal func makeIterator() -> Iterator {
+  __consuming internal func makeIterator() -> Iterator {
     return Iterator(self)
   }
 }
@@ -3432,7 +3432,7 @@ extension _CocoaSet: Sequence {
   }
 
   @usableFromInline
-  internal func makeIterator() -> Iterator {
+  __consuming internal func makeIterator() -> Iterator {
     return Iterator(self)
   }
 }
