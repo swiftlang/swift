@@ -1631,29 +1631,54 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
   return Impl.EditableBuffer->getSnapshot();
 }
 
+static void updateSemaInfo(RefPtr<SwiftDocumentSemanticInfo> SemanticInfo,
+                           EditableTextBufferRef EditableBuffer) {
+  if (SemanticInfo) {
+    SemanticInfo->processLatestSnapshotAsync(EditableBuffer);
+  }
+}
+
 ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
     unsigned Offset, unsigned Length, llvm::MemoryBuffer *Buf,
     bool ProvideSemanticInfo, std::string &error) {
 
-  llvm::sys::ScopedLock L(Impl.AccessMtx);
+  ImmutableTextSnapshotRef Snapshot;
+  EditableTextBufferRef EditableBuffer;
+  RefPtr<SwiftDocumentSemanticInfo> SemanticInfo;
+  {
+    llvm::sys::ScopedLock L(Impl.AccessMtx);
 
-  // Validate offset and length.
-  if ((Offset + Length) > Impl.EditableBuffer->getSize()) {
-    error = "'offset' + 'length' is out of range";
-    return nullptr;
+    EditableBuffer = Impl.EditableBuffer;
+    SemanticInfo = Impl.SemanticInfo;
+
+    // Validate offset and length.
+    if ((Offset + Length) > EditableBuffer->getSize()) {
+      error = "'offset' + 'length' is out of range";
+      return nullptr;
+    }
+
+    Impl.Edited = true;
+    llvm::StringRef Str = Buf->getBuffer();
+
+    // Update the buffer itself
+    Snapshot = EditableBuffer->replace(Offset, Length, Str);
+
+    // Update the old syntax map offsets to account for the replaced range.
+    // Also set the initial AffectedRange to cover any tokens that
+    // the replaced range intersected. This allows for clients that split
+    // multi-line tokens at line boundaries, and ensure all parts of these tokens
+    // will be cleared.
+    Impl.AffectedRange =
+        Impl.SyntaxMap.adjustForReplacement(Offset, Length, Str.size());
+
+    // We need to release `AccessMtx` before calling into the ASTManager, since
+    // it may call back to the editor for document state.
   }
-
-  Impl.Edited = true;
-  llvm::StringRef Str = Buf->getBuffer();
-
-  // Update the buffer itself
-  ImmutableTextSnapshotRef Snapshot =
-      Impl.EditableBuffer->replace(Offset, Length, Str);
 
   if (ProvideSemanticInfo) {
     // If this is not a no-op, update semantic info.
     if (Length != 0 || Buf->getBufferSize() != 0) {
-      updateSemaInfo();
+      ::updateSemaInfo(SemanticInfo, EditableBuffer);
 
       // FIXME: we should also update any "interesting" ASTs that depend on this
       // document here, e.g. any ASTs for files visible in an editor. However,
@@ -1662,13 +1687,6 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
     }
   }
 
-  // Update the old syntax map offsets to account for the replaced range.
-  // Also set the initial AffectedRange to cover any tokens that
-  // the replaced range intersected. This allows for clients that split
-  // multi-line tokens at line boundaries, and ensure all parts of these tokens
-  // will be cleared.
-  Impl.AffectedRange = Impl.SyntaxMap.adjustForReplacement(Offset, Length, Str.size());
-
   return Snapshot;
 }
 
@@ -1676,11 +1694,11 @@ void SwiftEditorDocument::updateSemaInfo() {
   Impl.AccessMtx.lock();
   auto EditableBuffer = Impl.EditableBuffer;
   auto SemanticInfo = Impl.SemanticInfo;
-  Impl.AccessMtx.unlock(); // Not a recursive mutex, so unlock before processing
+  // We need to release `AccessMtx` before calling into the ASTManager, since it
+  // may call back to the editor for document state.
+  Impl.AccessMtx.unlock();
 
-  if (SemanticInfo) {
-    SemanticInfo->processLatestSnapshotAsync(EditableBuffer);
-  }
+  ::updateSemaInfo(SemanticInfo, EditableBuffer);
 }
 
 void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
