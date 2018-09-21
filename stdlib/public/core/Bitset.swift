@@ -37,14 +37,18 @@ extension _UnsafeBitset {
   @inlinable
   @inline(__always)
   internal static func word(for element: Int) -> Int {
+    _sanityCheck(element >= 0)
     return element / Word.capacity
   }
 
   @inlinable
   @inline(__always)
   internal static func bit(for element: Int) -> Int {
+    _sanityCheck(element >= 0)
     // Note: We perform on UInts to get faster unsigned math (masking).
-    return Int(UInt(element) % UInt(Word.capacity))
+    let element = UInt(bitPattern: element)
+    let capacity = UInt(bitPattern: Word.capacity)
+    return Int(bitPattern: element % capacity)
   }
 
   @inlinable
