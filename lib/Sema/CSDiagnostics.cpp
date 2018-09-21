@@ -141,16 +141,16 @@ bool RequirementFailure::diagnoseAsError() {
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = AffectedDecl->getAsGenericContext();
 
-  auto declName = AffectedDecl->getFullName();
   if (reqDC != genericCtx) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
     emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
-                   AffectedDecl->getDescriptiveKind(), declName.isSpecial(),
-                   declName, NTD->getDeclaredType(), getLHS(), getRHS());
+                   AffectedDecl->getDescriptiveKind(),
+                   AffectedDecl->getFullName(), NTD->getDeclaredType(),
+                   getLHS(), getRHS());
   } else {
     emitDiagnostic(anchor->getLoc(), getDiagnosticOnDecl(),
-                   AffectedDecl->getDescriptiveKind(), declName.isSpecial(),
-                   declName, getLHS(), getRHS());
+                   AffectedDecl->getDescriptiveKind(),
+                   AffectedDecl->getFullName(), getLHS(), getRHS());
   }
 
   emitRequirementNote(reqDC->getAsDecl());
