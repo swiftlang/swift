@@ -3534,58 +3534,6 @@ public:
                              IsExplicitConversion);
   }
 };
-
-/// \brief Constraint System "component" represents
-/// a single solvable unit, but the process of assigning
-/// types in some cases allows it to be further split into
-/// multiple smaller parts.
-///
-/// This helps to abstract away logic of holding and
-/// returning sub-set of the constraints in the system,
-/// as well as its partial solving and result tracking.
-class Component {
-  ConstraintList Constraints;
-  SmallVector<Constraint *, 8> Disjunctions;
-
-public:
-  void reinstateTo(ConstraintList &workList) {
-    workList.splice(workList.end(), Constraints);
-  }
-
-  void record(Constraint *constraint) {
-    Constraints.push_back(constraint);
-    if (constraint->getKind() == ConstraintKind::Disjunction)
-      Disjunctions.push_back(constraint);
-  }
-
-  bool solve(ConstraintSystem &cs, SmallVectorImpl<Solution> &solutions) {
-    // Return constraints from the bucket back into circulation.
-    reinstateTo(cs.InactiveConstraints);
-
-    // Solve for this component. If it fails, we're done.
-    bool failed;
-
-    {
-      // Introduce a scope for this partial solution.
-      ConstraintSystem::SolverScope scope(cs);
-      llvm::SaveAndRestore<ConstraintSystem::SolverScope *>
-          partialSolutionScope(cs.solverState->PartialSolutionScope, &scope);
-
-      failed = cs.solveSimplified(solutions);
-    }
-
-    // Put the constraints back into their original bucket.
-    Constraints.splice(Constraints.end(), cs.InactiveConstraints);
-    return failed;
-  }
-
-  bool operator<(const Component &other) const {
-    return disjunctionCount() < other.disjunctionCount();
-  }
-
-private:
-  unsigned disjunctionCount() const { return Disjunctions.size(); }
-};
 } // end namespace constraints
 
 template<typename ...Args>
