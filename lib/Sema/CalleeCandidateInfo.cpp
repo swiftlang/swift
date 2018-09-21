@@ -321,7 +321,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  llvm::SmallBitVector candDefaultMap =
+  SmallBitVector candDefaultMap =
     computeDefaultMap(candArgs, candidate.getDecl(), candidate.level);
   
   struct OurListener : public MatchCallArgumentListener {

@@ -3288,7 +3288,7 @@ public:
 /// \returns true if the call arguments could not be matched to the parameters.
 bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                         ArrayRef<AnyFunctionType::Param> params,
-                        const llvm::SmallBitVector &defaultMap,
+                        const SmallBitVector &defaultMap,
                         bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
@@ -3597,7 +3597,7 @@ public:
 /// in the custom function when necessary.
 class InputMatcher {
   size_t NumSkippedParameters;
-  const llvm::SmallBitVector DefaultValueMap;
+  const SmallBitVector DefaultValueMap;
   const ArrayRef<AnyFunctionType::Param> Params;
 
 public:
@@ -3613,7 +3613,7 @@ public:
   };
 
   InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-               const llvm::SmallBitVector &defaultValueMap);
+               const SmallBitVector &defaultValueMap);
 
   /// Matching a given array of inputs.
   ///

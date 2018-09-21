@@ -1463,7 +1463,7 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
 }
 
 InputMatcher::InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-                           const llvm::SmallBitVector &defaultValueMap)
+                           const SmallBitVector &defaultValueMap)
     : NumSkippedParameters(0), DefaultValueMap(defaultValueMap),
       Params(params) {}
 

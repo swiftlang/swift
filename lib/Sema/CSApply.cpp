@@ -5520,7 +5520,7 @@ Expr *ExprRewriter::coerceCallArguments(
   unsigned level = apply ? computeCallLevel(cs, callee, apply) : 0;
 
   // Determine the parameter bindings.
-  llvm::SmallBitVector defaultMap
+  SmallBitVector defaultMap
     = computeDefaultMap(params, callee.getDecl(), level);
 
   SmallVector<AnyFunctionType::Param, 8> args;

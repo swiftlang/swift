@@ -1651,7 +1651,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   // Import the parameters.
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
-  llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
+  SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
   for (auto param : params) {
     auto paramTy = param->getType();
@@ -2009,7 +2009,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
 
   CanType errorParamType;
 
-  llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
+  SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
   // Import the parameters.
   SmallVector<ParamDecl*, 4> swiftParams;
