@@ -158,7 +158,7 @@ namespace {
     //   F,F -> No
     //   F,T -> Yes
     //   T,F -> Partial
-    llvm::SmallBitVector Data;
+    SmallBitVector Data;
   public:
     AvailabilitySet(unsigned NumElts) {
       Data.resize(NumElts*2, true);
@@ -2711,7 +2711,7 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
 
   // Check locally to see if any elements are satisfied within the block, and
   // keep track of which ones are still needed in the NeededElements set.
-  llvm::SmallBitVector NeededElements(TheMemory.NumElements);
+  SmallBitVector NeededElements(TheMemory.NumElements);
   NeededElements.set(FirstElt, FirstElt+NumElts);
   
   // If there is a store in the current block, scan the block to see if the
