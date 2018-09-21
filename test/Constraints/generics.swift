@@ -610,7 +610,7 @@ func rdar40537858() {
   }
 
   var arr: [S] = []
-  _ = List(arr, id: \.id) // expected-error {{referencing initializer on 'List' requires that 'S.Id' conform to 'Hashable'}}
+  _ = List(arr, id: \.id) // expected-error {{referencing initializer 'init(_:id:)' on 'List' requires that 'S.Id' conform to 'Hashable'}}
 
   enum E<T: P> { // expected-note 2 {{where 'T' = 'S'}}
     case foo(T)
