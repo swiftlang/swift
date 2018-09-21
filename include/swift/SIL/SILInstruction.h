@@ -7477,6 +7477,40 @@ class TryApplyInst final
          const GenericSpecializationInformation *SpecializationInfo);
 };
 
+struct ApplySiteKind {
+  enum innerty : std::underlying_type<SILInstructionKind>::type {
+#define APPLYSITE_INST(ID, PARENT) ID = unsigned(SILInstructionKind::ID),
+#include "swift/SIL/SILNodes.def"
+  } value;
+
+  explicit ApplySiteKind(SILInstructionKind kind) {
+    auto newValue = ApplySiteKind::fromNodeKindHelper(kind);
+    assert(newValue && "Non apply site passed into ApplySiteKind");
+    value = newValue.getValue();
+  }
+
+  ApplySiteKind(innerty value) : value(value) {}
+  operator innerty() const { return value; }
+
+  static Optional<ApplySiteKind> fromNodeKind(SILInstructionKind kind) {
+    if (auto innerTyOpt = ApplySiteKind::fromNodeKindHelper(kind))
+      return ApplySiteKind(*innerTyOpt);
+    return None;
+  }
+
+private:
+  static Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
+    switch (kind) {
+#define APPLYSITE_INST(ID, PARENT)                                             \
+  case SILInstructionKind::ID:                                                 \
+    return ApplySiteKind::ID;
+#include "swift/SIL/SILNodes.def"
+    default:
+      return None;
+    }
+  }
+};
+
 /// An apply instruction.
 class ApplySite {
   SILInstruction *Inst;
@@ -7500,17 +7534,23 @@ public:
   }
 
   static ApplySite isa(SILNode *node) {
-    switch (node->getKind()) {
-    case SILNodeKind::ApplyInst:
-      return ApplySite(cast<ApplyInst>(node));
-    case SILNodeKind::BeginApplyInst:
-      return ApplySite(cast<BeginApplyInst>(node));
-    case SILNodeKind::TryApplyInst:
-      return ApplySite(cast<TryApplyInst>(node));
-    case SILNodeKind::PartialApplyInst:
-      return ApplySite(cast<PartialApplyInst>(node));
-    default:
+    auto *i = dyn_cast<SILInstruction>(node);
+    if (!i)
       return ApplySite();
+
+    auto kind = ApplySiteKind::fromNodeKind(i->getKind());
+    if (!kind)
+      return ApplySite();
+
+    switch (kind.getValue()) {
+    case ApplySiteKind::ApplyInst:
+      return ApplySite(cast<ApplyInst>(node));
+    case ApplySiteKind::BeginApplyInst:
+      return ApplySite(cast<BeginApplyInst>(node));
+    case ApplySiteKind::TryApplyInst:
+      return ApplySite(cast<TryApplyInst>(node));
+    case ApplySiteKind::PartialApplyInst:
+      return ApplySite(cast<PartialApplyInst>(node));
     }
   }
 
@@ -7524,19 +7564,18 @@ public:
   SILFunction *getFunction() const { return Inst->getFunction(); }
   SILBasicBlock *getParent() const { return Inst->getParent(); }
 
-#define FOREACH_IMPL_RETURN(OPERATION) do {                             \
-    switch (Inst->getKind()) {                                          \
-    case SILInstructionKind::ApplyInst:                                 \
-      return cast<ApplyInst>(Inst)->OPERATION;                          \
-    case SILInstructionKind::BeginApplyInst:                            \
-      return cast<BeginApplyInst>(Inst)->OPERATION;                     \
-    case SILInstructionKind::PartialApplyInst:                          \
-      return cast<PartialApplyInst>(Inst)->OPERATION;                   \
-    case SILInstructionKind::TryApplyInst:                              \
-      return cast<TryApplyInst>(Inst)->OPERATION;                       \
-    default:                                                            \
-      llvm_unreachable("not an apply instruction!");                    \
-    }                                                                   \
+#define FOREACH_IMPL_RETURN(OPERATION)                                         \
+  do {                                                                         \
+    switch (ApplySiteKind(Inst->getKind())) {                                  \
+    case ApplySiteKind::ApplyInst:                                             \
+      return cast<ApplyInst>(Inst)->OPERATION;                                 \
+    case ApplySiteKind::BeginApplyInst:                                        \
+      return cast<BeginApplyInst>(Inst)->OPERATION;                            \
+    case ApplySiteKind::PartialApplyInst:                                      \
+      return cast<PartialApplyInst>(Inst)->OPERATION;                          \
+    case ApplySiteKind::TryApplyInst:                                          \
+      return cast<TryApplyInst>(Inst)->OPERATION;                              \
+    }                                                                          \
   } while (0)
 
   /// Return the callee operand.
@@ -7670,12 +7709,12 @@ public:
   /// Return the callee's function argument index corresponding to the first
   /// applied argument: 0 for full applies; >= 0 for partial applies.
   unsigned getCalleeArgIndexOfFirstAppliedArg() const {
-    switch (Inst->getKind()) {
-    case SILInstructionKind::ApplyInst:
-    case SILInstructionKind::BeginApplyInst:
-    case SILInstructionKind::TryApplyInst:
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+    case ApplySiteKind::BeginApplyInst:
+    case ApplySiteKind::TryApplyInst:
       return 0;
-    case SILInstructionKind::PartialApplyInst:
+    case ApplySiteKind::PartialApplyInst:
       // The arguments to partial_apply are a suffix of the partial_apply's
       // callee. Note that getSubstCalleeConv is function type of the callee
       // argument passed to this apply, not necessarilly the function type of
@@ -7686,8 +7725,6 @@ public:
       // pa2 = partial_apply pa1(b) : $(a, b)
       // apply pa2(a)
       return getSubstCalleeConv().getNumSILArguments() - getNumArguments();
-    default:
-      llvm_unreachable("not implemented for this instruction!");
     }
   }
 
@@ -7711,72 +7748,72 @@ public:
 
   /// Return true if 'self' is an applied argument.
   bool hasSelfArgument() const {
-    switch (Inst->getKind()) {
-    case SILInstructionKind::ApplyInst:
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
       return cast<ApplyInst>(Inst)->hasSelfArgument();
-    case SILInstructionKind::BeginApplyInst:
+    case ApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(Inst)->hasSelfArgument();
-    case SILInstructionKind::TryApplyInst:
+    case ApplySiteKind::TryApplyInst:
       return cast<TryApplyInst>(Inst)->hasSelfArgument();
-    default:
-      llvm_unreachable("not implemented for this instruction!");
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("unhandled case");
     }
   }
 
   /// Return the applied 'self' argument value.
   SILValue getSelfArgument() const {
-    switch (Inst->getKind()) {
-    case SILInstructionKind::ApplyInst:
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
       return cast<ApplyInst>(Inst)->getSelfArgument();
-    case SILInstructionKind::BeginApplyInst:
+    case ApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(Inst)->getSelfArgument();
-    case SILInstructionKind::TryApplyInst:
+    case ApplySiteKind::TryApplyInst:
       return cast<TryApplyInst>(Inst)->getSelfArgument();
-    default:
-      llvm_unreachable("not implemented for this instruction!");
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("unhandled case");
     }
   }
 
   /// Return the 'self' apply operand.
   Operand &getSelfArgumentOperand() {
-    switch (Inst->getKind()) {
-    case SILInstructionKind::ApplyInst:
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
       return cast<ApplyInst>(Inst)->getSelfArgumentOperand();
-    case SILInstructionKind::BeginApplyInst:
+    case ApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(Inst)->getSelfArgumentOperand();
-    case SILInstructionKind::TryApplyInst:
+    case ApplySiteKind::TryApplyInst:
       return cast<TryApplyInst>(Inst)->getSelfArgumentOperand();
-    default:
-      llvm_unreachable("not implemented for this instruction!");
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("Unhandled cast");
     }
   }
 
   /// Return a list of applied arguments without self.
   OperandValueArrayRef getArgumentsWithoutSelf() const {
-    switch (Inst->getKind()) {
-    case SILInstructionKind::ApplyInst:
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
       return cast<ApplyInst>(Inst)->getArgumentsWithoutSelf();
-    case SILInstructionKind::BeginApplyInst:
+    case ApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(Inst)->getArgumentsWithoutSelf();
-    case SILInstructionKind::TryApplyInst:
+    case ApplySiteKind::TryApplyInst:
       return cast<TryApplyInst>(Inst)->getArgumentsWithoutSelf();
-    default:
-      llvm_unreachable("not implemented for this instruction!");
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("Unhandled case");
     }
   }
 
   /// Return whether the given apply is of a formally-throwing function
   /// which is statically known not to throw.
   bool isNonThrowing() const {
-    switch (getInstruction()->getKind()) {
-    case SILInstructionKind::ApplyInst:
+    switch (ApplySiteKind(getInstruction()->getKind())) {
+    case ApplySiteKind::ApplyInst:
       return cast<ApplyInst>(Inst)->isNonThrowing();
-    case SILInstructionKind::BeginApplyInst:
+    case ApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(Inst)->isNonThrowing();
-    case SILInstructionKind::TryApplyInst:
+    case ApplySiteKind::TryApplyInst:
       return false;
-    default:
-      llvm_unreachable("not implemented for this instruction!");
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("Unhandled case");
     }
   }
 
@@ -7792,10 +7829,41 @@ public:
   }
 
   static bool classof(const SILInstruction *inst) {
-    return (inst->getKind() == SILInstructionKind::ApplyInst ||
-            inst->getKind() == SILInstructionKind::BeginApplyInst ||
-            inst->getKind() == SILInstructionKind::PartialApplyInst ||
-            inst->getKind() == SILInstructionKind::TryApplyInst);
+    return bool(ApplySiteKind::fromNodeKind(inst->getKind()));
+  }
+};
+
+struct FullApplySiteKind {
+  enum innerty : std::underlying_type<SILInstructionKind>::type {
+#define FULLAPPLYSITE_INST(ID, PARENT) ID = unsigned(SILInstructionKind::ID),
+#include "swift/SIL/SILNodes.def"
+  } value;
+
+  explicit FullApplySiteKind(SILInstructionKind kind) {
+    auto fullApplySiteKind = FullApplySiteKind::fromNodeKindHelper(kind);
+    assert(fullApplySiteKind && "SILNodeKind is not a FullApplySiteKind?!");
+    value = fullApplySiteKind.getValue();
+  }
+
+  FullApplySiteKind(innerty value) : value(value) {}
+  operator innerty() const { return value; }
+
+  static Optional<FullApplySiteKind> fromNodeKind(SILInstructionKind kind) {
+    if (auto innerOpt = FullApplySiteKind::fromNodeKindHelper(kind))
+      return FullApplySiteKind(*innerOpt);
+    return None;
+  }
+
+private:
+  static Optional<innerty> fromNodeKindHelper(SILInstructionKind kind) {
+    switch (kind) {
+#define FULLAPPLYSITE_INST(ID, PARENT)                                         \
+  case SILInstructionKind::ID:                                                 \
+    return FullApplySiteKind::ID;
+#include "swift/SIL/SILNodes.def"
+    default:
+      return None;
+    }
   }
 };
 
@@ -7813,15 +7881,19 @@ public:
   FullApplySite(TryApplyInst *inst) : ApplySite(inst) {}
 
   static FullApplySite isa(SILNode *node) {
-    switch (node->getKind()) {
-    case SILNodeKind::ApplyInst:
-      return FullApplySite(cast<ApplyInst>(node));
-    case SILNodeKind::BeginApplyInst:
-      return FullApplySite(cast<BeginApplyInst>(node));
-    case SILNodeKind::TryApplyInst:
-      return FullApplySite(cast<TryApplyInst>(node));
-    default:
+    auto *i = dyn_cast<SILInstruction>(node);
+    if (!i)
       return FullApplySite();
+    auto kind = FullApplySiteKind::fromNodeKind(i->getKind());
+    if (!kind)
+      return FullApplySite();
+    switch (kind.getValue()) {
+    case FullApplySiteKind::ApplyInst:
+      return FullApplySite(cast<ApplyInst>(node));
+    case FullApplySiteKind::BeginApplyInst:
+      return FullApplySite(cast<BeginApplyInst>(node));
+    case FullApplySiteKind::TryApplyInst:
+      return FullApplySite(cast<TryApplyInst>(node));
     }
   }
 
@@ -7846,9 +7918,7 @@ public:
   }
 
   static bool classof(const SILInstruction *inst) {
-    return (inst->getKind() == SILInstructionKind::ApplyInst ||
-            inst->getKind() == SILInstructionKind::BeginApplyInst ||
-            inst->getKind() == SILInstructionKind::TryApplyInst);
+    return bool(FullApplySiteKind::fromNodeKind(inst->getKind()));
   }
 };
 
