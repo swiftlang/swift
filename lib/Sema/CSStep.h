@@ -479,9 +479,7 @@ protected:
   /// Check whether attempting binding choices should be stopped,
   /// after current choice has been attempted, because optimal
   /// solution has already been found,
-  virtual bool shouldStopAfter(const typename P::Element &choice) const {
-    return false;
-  }
+  virtual bool shouldStopAfter(const typename P::Element &choice) const = 0;
 
   bool needsToComputeNext() const { return Producer.needsToComputeNext(); }
 
@@ -597,6 +595,10 @@ private:
   bool shouldStopAt(const DisjunctionChoice &choice) const override;
   bool shortCircuitDisjunctionAt(Constraint *currentChoice,
                                  Constraint *lastSuccessfulChoice) const;
+
+  bool shouldStopAfter(const DisjunctionChoice &choice) const override {
+    return AnySolved && choice.isEndOfDisjunctionPartition();
+  }
 
   /// Attempt to apply given disjunction choice to constraint system.
   /// This action is going to establish "active choice" of this disjunction

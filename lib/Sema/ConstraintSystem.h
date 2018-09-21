@@ -3349,10 +3349,13 @@ class DisjunctionChoice {
   unsigned Index;
   Constraint *Choice;
   bool ExplicitConversion;
+  bool IsEndOfDisjunctionPartition;
 
 public:
-  DisjunctionChoice(unsigned index, Constraint *choice, bool explicitConversion)
-      : Index(index), Choice(choice), ExplicitConversion(explicitConversion) {}
+  DisjunctionChoice(unsigned index, Constraint *choice, bool explicitConversion,
+                    bool isEndOfDisjunctionPartition)
+      : Index(index), Choice(choice), ExplicitConversion(explicitConversion),
+        IsEndOfDisjunctionPartition(isEndOfDisjunctionPartition) {}
 
   unsigned getIndex() const { return Index; }
 
@@ -3364,6 +3367,10 @@ public:
     if (auto *decl = getDecl(Choice))
       return decl->getAttrs().isUnavailable(decl->getASTContext());
     return false;
+  }
+
+  bool isEndOfDisjunctionPartition() const {
+    return IsEndOfDisjunctionPartition;
   }
 
   // FIXME: Both of the accessors below are required to support
@@ -3500,7 +3507,27 @@ private:
 /// easy to work with disjunction and encapsulates
 /// some other important information such as locator.
 class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
+  // The disjunciton choices that this producer will iterate through.
   ArrayRef<Constraint *> Choices;
+
+  // The ordering of disjunction choices. We index into Choices
+  // through this vector in order to visit the disjunction choices in
+  // the order we want to visit them.
+  SmallVector<unsigned, 8> Ordering;
+
+  // The index after the last element in a partition of the
+  // disjunction choices. The choices are split into partitions where
+  // we will visit all elements within a single partition before
+  // moving to the elements of the next partition. If we visit all
+  // choices within a single partition and have found a successful
+  // solution with one of the choices in that partition, we stop
+  // looking for other solutions
+  SmallVector<unsigned, 4> PartitionEnd;
+
+  // The index in the current partition of disjunction choices that we
+  // are iterating over.
+  unsigned PartitionIndex = 0;
+
   bool IsExplicitConversion;
 
   unsigned Index = 0;
@@ -3516,13 +3543,20 @@ public:
         IsExplicitConversion(disjunction->isExplicitConversion()) {
     assert(disjunction->getKind() == ConstraintKind::Disjunction);
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
+
+    // Order and partition the disjunction choices.
+    partitionDisjunction();
   }
 
   DisjunctionChoiceProducer(ConstraintSystem &cs,
                             ArrayRef<Constraint *> choices,
                             ConstraintLocator *locator, bool explicitConversion)
       : BindingProducer(cs, locator), Choices(choices),
-        IsExplicitConversion(explicitConversion) {}
+        IsExplicitConversion(explicitConversion) {
+
+    // Order and partition the disjunction choices.
+    partitionDisjunction();
+  }
 
   Optional<Element> operator()() override {
     unsigned currIndex = Index;
@@ -3530,8 +3564,30 @@ public:
       return None;
 
     ++Index;
-    return DisjunctionChoice(currIndex, Choices[currIndex],
-                             IsExplicitConversion);
+
+    bool endOfPartition = false;
+
+    if (PartitionEnd[PartitionIndex] == Index) {
+      endOfPartition = true;
+      ++PartitionIndex;
+      assert(PartitionIndex >= PartitionEnd.size() ||
+             Index < PartitionEnd[PartitionIndex]);
+    }
+
+    return DisjunctionChoice(currIndex, Choices[Ordering[currIndex]],
+                             IsExplicitConversion, endOfPartition);
+  }
+
+  // Partition the choices in the disjunction into groups that we will
+  // iterate over in an order appropriate to attempt to stop before we
+  // have to visit all of the options.
+  void partitionDisjunction() {
+    // Temporarily keep the initial ordering and make them all part of
+    // a single partition.
+    for (unsigned long i = 0, e = Choices.size(); i != e; ++i)
+      Ordering.push_back(i);
+
+    PartitionEnd.push_back(Choices.size());
   }
 };
 } // end namespace constraints
