@@ -1374,7 +1374,7 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
   { $0 == $1 }
   
   do {
-    let d2: [MinimalHashableValue : Int] = [
+    var d2: [MinimalHashableValue : Int] = [
       MinimalHashableValue(10): 1010,
       MinimalHashableValue(20): 1020,
       MinimalHashableValue(30): 1030,
@@ -1385,6 +1385,8 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
       MinimalHashableValue(80): 1080,
       MinimalHashableValue(90): 1090,
     ]
+    // Make collisions less likely
+    d2.reserveCapacity(1000)
     
     // Find the last key in the dictionary
     var lastKey: MinimalHashableValue = d2.first!.key
