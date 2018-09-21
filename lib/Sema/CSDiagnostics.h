@@ -149,8 +149,9 @@ private:
 class RequirementFailure : public FailureDiagnostic {
 protected:
   using PathEltKind = ConstraintLocator::PathElementKind;
-  using DiagOnDecl = Diag<DescriptiveDeclKind, DeclName, Type, Type>;
-  using DiagInReference = Diag<DescriptiveDeclKind, DeclName, Type, Type, Type>;
+  using DiagOnDecl = Diag<DescriptiveDeclKind, bool, DeclName, Type, Type>;
+  using DiagInReference =
+      Diag<DescriptiveDeclKind, bool, DeclName, Type, Type, Type>;
   using DiagAsNote = Diag<Type, Type, Type, Type, StringRef>;
 
   const ValueDecl *AffectedDecl;

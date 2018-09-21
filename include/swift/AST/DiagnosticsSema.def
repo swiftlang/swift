@@ -1541,23 +1541,24 @@ ERROR(types_not_equal,none,
 ERROR(type_does_not_conform_owner,none,
       "%0 requires that %1 conform to %2", (Type, Type, Type))
 ERROR(type_does_not_conform_in_decl_ref,none,
-      "referencing %0 %1 on %2 requires that %3 conform to %4",
-      (DescriptiveDeclKind, DeclName, Type, Type, Type))
+      "referencing %0 %select{%2 |}1on %3 requires that %4 conform to %5",
+      (DescriptiveDeclKind, bool, DeclName, Type, Type, Type))
 ERROR(type_does_not_conform_decl_owner,none,
-      "%0 %1 requires that %2 conform to %3",
-      (DescriptiveDeclKind, DeclName, Type, Type))
+      "%0 %select{%2 |}1requires that %3 conform to %4",
+      (DescriptiveDeclKind, bool, DeclName, Type, Type))
 ERROR(types_not_equal_decl,none,
-      "%0 %1 requires the types %2 and %3 be equivalent",
-      (DescriptiveDeclKind, DeclName, Type, Type))
+      "%0 %select{%2 |}1requires the types %3 and %4 be equivalent",
+      (DescriptiveDeclKind, bool, DeclName, Type, Type))
 ERROR(types_not_equal_in_decl_ref,none,
-      "referencing %0 %1 on %2 requires the types %3 and %4 be equivalent",
-      (DescriptiveDeclKind, DeclName, Type, Type, Type))
+      "referencing %0 %select{%2 |}1on %3 requires the types "
+      "%4 and %5 be equivalent",
+      (DescriptiveDeclKind, bool, DeclName, Type, Type, Type))
 ERROR(types_not_inherited_decl,none,
-      "%0 %1 requires that %2 inherit from %3",
-      (DescriptiveDeclKind, DeclName, Type, Type))
+      "%0 %select{%2 |}1requires that %3 inherit from %4",
+      (DescriptiveDeclKind, bool, DeclName, Type, Type))
 ERROR(types_not_inherited_in_decl_ref,none,
-      "referencing %0 %1 on %2 requires that %3 inherit from %4",
-      (DescriptiveDeclKind, DeclName, Type, Type, Type))
+      "referencing %0 %select{%2 |}1on %3 requires that %4 inherit from %5",
+      (DescriptiveDeclKind, bool, DeclName, Type, Type, Type))
 NOTE(where_requirement_failure_one_subst,none,
      "where %0 = %1", (Type, Type))
 NOTE(where_requirement_failure_both_subst,none,
