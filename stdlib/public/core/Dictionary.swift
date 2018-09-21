@@ -3658,10 +3658,10 @@ extension Dictionary._Variant {
       cocoaPath()
       let cocoaKey = _bridgeAnythingToObjectiveC(key)
       guard cocoa.lookup(cocoaKey) != nil else { return nil }
-      let native = _NativeDictionary<Key, Value>(cocoa)
+      var native = _NativeDictionary<Key, Value>(cocoa)
       let (index, found) = native.find(key)
       _precondition(found, "Bridging did not preserve equality")
-      let old = asNative.uncheckedRemove(at: index, isUnique: true).value
+      let old = native.uncheckedRemove(at: index, isUnique: true).value
       self = .native(native)
       return old
 #endif
