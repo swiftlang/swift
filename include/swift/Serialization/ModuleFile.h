@@ -631,6 +631,9 @@ public:
     theModule.reset(new ModuleFile(std::move(moduleInputBuffer),
                                    std::move(moduleDocInputBuffer),
                                    isFramework, info, extInfo));
+    assert(info.status == Status::Valid ||
+           info.status == theModule->getStatus());
+    info.status = theModule->getStatus();
     return info;
   }
 
