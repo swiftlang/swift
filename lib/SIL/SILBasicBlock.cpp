@@ -335,18 +335,17 @@ bool SILBasicBlock::isEntry() const {
   return this == &*getParent()->begin();
 }
 
-SILBasicBlock::PHIArgumentArrayRefTy SILBasicBlock::getPHIArguments() const {
-  return PHIArgumentArrayRefTy(getArguments(),
-                               [](SILArgument *A) -> SILPHIArgument * {
-    return cast<SILPHIArgument>(A);
+/// Declared out of line so we can have a declaration of SILArgument.
+PHIArgumentArrayRef SILBasicBlock::getPHIArguments() const {
+  return PHIArgumentArrayRef(getArguments(), [](SILArgument *arg) {
+    return cast<SILPHIArgument>(arg);
   });
 }
 
-SILBasicBlock::FunctionArgumentArrayRefTy
-SILBasicBlock::getFunctionArguments() const {
-  return FunctionArgumentArrayRefTy(getArguments(),
-                                    [](SILArgument *A) -> SILFunctionArgument* {
-    return cast<SILFunctionArgument>(A);
+/// Declared out of line so we can have a declaration of SILArgument.
+FunctionArgumentArrayRef SILBasicBlock::getFunctionArguments() const {
+  return FunctionArgumentArrayRef(getArguments(), [](SILArgument *arg) {
+    return cast<SILFunctionArgument>(arg);
   });
 }
 
