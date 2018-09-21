@@ -110,7 +110,7 @@ Swift 4.2
   
   var mt = MersenneTwister()
   let diceRoll = Int.random(in: 1 ... 6, using: &mt)
-  let randomUnit = Double.random(in: 0 ..< 1, &mt)
+  let randomUnit = Double.random(in: 0 ..< 1, using: &mt)
   let randomBool = Bool.random(using: &mt)
   
   // Collection additions
