@@ -6094,7 +6094,8 @@ class UncheckedOwnershipConversionInst
 
 public:
   ValueOwnershipKind getConversionOwnershipKind() const {
-    return SILInstruction::Bits.UncheckedOwnershipConversionInst.Kind;
+    unsigned kind = SILInstruction::Bits.UncheckedOwnershipConversionInst.Kind;
+    return ValueOwnershipKind(kind);
   }
 };
 
