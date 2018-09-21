@@ -817,6 +817,13 @@ public:
     case NodeMatchReason::Removed:
       assert(!Right);
       Left->annotate(NodeAnnotation::Removed);
+      if (auto *LT = dyn_cast<SDKNodeType>(Left)) {
+        if (auto *AT = dyn_cast<SDKNodeDeclAssociatedType>(LT->getParent())) {
+          Ctx.getDiags().diagnose(SourceLoc(),
+                                  diag::default_associated_type_removed,
+                                  AT->getScreenInfo(), LT->getPrintedName());
+        }
+      }
       return;
     case NodeMatchReason::FuncToProperty:
     case NodeMatchReason::ModernizeEnum:

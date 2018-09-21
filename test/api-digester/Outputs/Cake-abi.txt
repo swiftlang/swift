@@ -47,3 +47,6 @@ cake2: Var fixedLayoutStruct.lazy_d.storage is added to a non-resilient type
 cake1: Protocol P3 has added inherited protocol P4
 cake1: Protocol P3 has removed inherited protocol P2
 cake1: Struct fixedLayoutStruct has removed conformance to P1
+
+/* Protocol Requirement Change */
+cake1: AssociatedType AssociatedTypePro.T1 has removed default type Int
