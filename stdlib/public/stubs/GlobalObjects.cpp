@@ -66,12 +66,14 @@ swift::_SwiftEmptyDictionarySingleton swift::_swiftEmptyDictionarySingleton = {
     0, // int count;
     0, // int capacity;                                    
     0, // int scale;
-    0, // uint64 seed;
+    0, // uint64 seed0;
+    0, // uint64 seed1;
     (void *)1, // void* keys; (non-null garbage)
     (void *)1  // void* values; (non-null garbage)
   },
 
-  ~1UL // int metadata; (bucket 0 is unoccupied; other buckets are out-of-bounds)
+  // bucket 0 is unoccupied; other buckets are out-of-bounds
+  static_cast<__swift_uintptr_t>(~1) // int metadata; 
 };
 
 SWIFT_RUNTIME_STDLIB_API
@@ -89,11 +91,13 @@ swift::_SwiftEmptySetSingleton swift::_swiftEmptySetSingleton = {
     0, // int count;
     0, // int capacity;                                    
     0, // int scale;
-    0, // uint64 seed;
+    0, // uint64 seed0;
+    0, // uint64 seed1;
     (void *)1, // void *rawElements; (non-null garbage)
   },
 
-  ~1UL // int metadata; (bucket 0 is unoccupied; other buckets are out-of-bounds)
+  // bucket 0 is unoccupied; other buckets are out-of-bounds
+  static_cast<__swift_uintptr_t>(~1) // int metadata;
 };
 
 static swift::_SwiftHashingParameters initializeHashingParameters() {

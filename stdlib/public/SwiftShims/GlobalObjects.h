@@ -44,7 +44,8 @@ struct _SwiftDictionaryBodyStorage {
   __swift_intptr_t count;
   __swift_intptr_t capacity;
   __swift_intptr_t scale;
-  __swift_uint64_t seed;
+  __swift_uint64_t seed0;
+  __swift_uint64_t seed1;
   void *rawKeys;
   void *rawValues;
 };
@@ -53,20 +54,21 @@ struct _SwiftSetBodyStorage {
   __swift_intptr_t count;
   __swift_intptr_t capacity;
   __swift_intptr_t scale;
-  __swift_uint64_t seed;
+  __swift_uint64_t seed0;
+  __swift_uint64_t seed1;
   void *rawElements;
 };
 
 struct _SwiftEmptyDictionarySingleton {
   struct HeapObject header;
   struct _SwiftDictionaryBodyStorage body;
-  __swift_uint64_t metadata;
+  __swift_uintptr_t metadata;
 };
 
 struct _SwiftEmptySetSingleton {
   struct HeapObject header;
   struct _SwiftSetBodyStorage body;
-  __swift_uint64_t metadata;
+  __swift_uintptr_t metadata;
 };
 
 SWIFT_RUNTIME_STDLIB_API
