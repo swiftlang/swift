@@ -820,6 +820,7 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from) {
     return {getAddrOfModuleContextDescriptor(cast<ModuleDecl>(parent)),
             ConstantReference::Direct};
   }
+  llvm_unreachable("unhandled kind");
 }
 
 /// Add the given global value to @llvm.used.
@@ -906,15 +907,13 @@ llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
     auto proto = getConstantReferenceForProtocolDescriptor(
                                                       assocType->getProtocol());
     B.addRelativeAddress(proto);
-    
-    // Find the offset of the associated type entry in witness tables of this
-    // protocol.
-    auto &protoInfo = getProtocolInfo(assocType->getProtocol(),
-                                      ProtocolInfoKind::RequirementSignature);
-    auto index = protoInfo.getAssociatedTypeIndex(AssociatedType(assocType))
-      .getValue();
-    
-    B.addInt32(index);
+
+    // Add a reference to the associated type descriptor.
+    auto assocTypeDescriptor =
+      getAddrOfLLVMVariableOrGOTEquivalent(
+        LinkEntity::forAssociatedTypeDescriptor(assocType),
+      Alignment(4), ProtocolRequirementStructTy);
+    B.addRelativeAddress(assocTypeDescriptor);
   }
   
   // Null terminator.
@@ -1740,6 +1739,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   ResilienceExpansion expansion = getResilienceExpansionForLayout(var);
 
   llvm::Type *storageType;
+  llvm::Type *castStorageToType = nullptr;
   Size fixedSize;
   Alignment fixedAlignment;
   bool inFixedBuffer = false;
@@ -1769,6 +1769,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     storageType = Layout->getType();
     fixedSize = Layout->getSize();
     fixedAlignment = Layout->getAlignment();
+    castStorageToType = cast<FixedTypeInfo>(ti).getStorageType();
     assert(fixedAlignment >= TargetInfo.HeapObjectAlignment);
   } else if (isREPLVar || ti.isFixedSize(expansion)) {
     // Allocate static storage.
@@ -1864,7 +1865,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // to a reference to it).
     addr = llvm::ConstantExpr::getGetElementPtr(nullptr, gvar, Indices);
   }
-  addr = llvm::ConstantExpr::getBitCast(addr, storageType->getPointerTo());
+  addr = llvm::ConstantExpr::getBitCast(
+      addr,
+      castStorageToType ? castStorageToType : storageType->getPointerTo());
   return Address(addr, Alignment(gvar->getAlignment()));
 }
 
@@ -3358,6 +3361,50 @@ llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                ProtocolDescriptorStructTy, DebugTypeInfo());
 }
 
+llvm::Constant *IRGenModule::getAddrOfProtocolRequirementsBaseDescriptor(
+                                                         ProtocolDecl *proto) {
+  auto entity = LinkEntity::forProtocolRequirementsBaseDescriptor(proto);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                               ProtocolRequirementStructTy,
+                               DebugTypeInfo());
+}
+
+llvm::GlobalValue *IRGenModule::defineProtocolRequirementsBaseDescriptor(
+                                                ProtocolDecl *proto,
+                                                llvm::Constant *definition) {
+  auto entity = LinkEntity::forProtocolRequirementsBaseDescriptor(proto);
+  return defineAlias(entity, definition);
+}
+
+llvm::Constant *IRGenModule::getAddrOfAssociatedTypeDescriptor(
+                                               AssociatedTypeDecl *assocType) {
+  auto entity = LinkEntity::forAssociatedTypeDescriptor(assocType);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                               ProtocolRequirementStructTy,
+                               DebugTypeInfo());
+}
+
+llvm::GlobalValue *IRGenModule::defineAssociatedTypeDescriptor(
+                                                 AssociatedTypeDecl *assocType,
+                                                 llvm::Constant *definition) {
+  auto entity = LinkEntity::forAssociatedTypeDescriptor(assocType);
+  return defineAlias(entity, definition);
+}
+
+llvm::Constant *IRGenModule::getAddrOfAssociatedConformanceDescriptor(
+                                          AssociatedConformance conformance) {
+  auto entity = LinkEntity::forAssociatedConformanceDescriptor(conformance);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                               ProtocolRequirementStructTy, DebugTypeInfo());
+}
+
+llvm::GlobalValue *IRGenModule::defineAssociatedConformanceDescriptor(
+                                            AssociatedConformance conformance,
+                                            llvm::Constant *definition) {
+  auto entity = LinkEntity::forAssociatedConformanceDescriptor(conformance);
+  return defineAlias(entity, definition);
+}
+
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
                                 const NormalProtocolConformance *conformance,
                                 ConstantInit definition) {
@@ -3666,166 +3713,6 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   return address;
 }
 
-static llvm::Constant *getMetatypeDeclarationFor(IRGenModule &IGM,
-                                                 StringRef name) {
-  auto *storageType = IGM.ObjCClassStructTy;
-
-  // We may have defined the variable already.
-  if (auto existing = IGM.Module.getNamedGlobal(name))
-    return getElementBitCast(existing, storageType);
-
-  auto linkage = llvm::GlobalValue::ExternalLinkage;
-  auto visibility = llvm::GlobalValue::DefaultVisibility;
-  auto storageClass = llvm::GlobalValue::DefaultStorageClass;
-
-  auto var = new llvm::GlobalVariable(IGM.Module, storageType,
-                                      /*constant*/ false, linkage,
-                                      /*initializer*/ nullptr, name);
-  var->setVisibility(visibility);
-  var->setDLLStorageClass(storageClass);
-  var->setAlignment(IGM.getPointerAlignment().getValue());
-
-  return var;
-}
-#define STRINGIFY_IMPL(x) #x
-#define REALLY_STRINGIFY( x) STRINGIFY_IMPL(x)
-
-llvm::Constant *
-IRGenModule::getAddrOfGlobalConstantString(StringRef utf8) {
-  auto &entry = GlobalConstantStrings[utf8];
-  if (entry)
-    return entry;
-
-  // If not, create it.  This implicitly adds a trailing null.
-  auto data = llvm::ConstantDataArray::getString(LLVMContext, utf8);
-  auto *dataTy = data->getType();
-
-  llvm::Type *constantStringTy[] = {
-      RefCountedStructTy,
-      Int32Ty,
-      Int32Ty,
-      Int8Ty,
-      dataTy
-  };
-  auto *ConstantStringTy =
-      llvm::StructType::get(getLLVMContext(), constantStringTy,
-                            /*packed*/ false);
-
-  auto metaclass = getMetatypeDeclarationFor(
-      *this, REALLY_STRINGIFY(CLASS_METADATA_SYM(s20_Latin1StringStorage)));
-
-  metaclass = llvm::ConstantExpr::getBitCast(metaclass, TypeMetadataPtrTy);
-
-  // Get a reference count of two.
-  auto *refCountInit = llvm::ConstantInt::get(
-      IntPtrTy,
-      InlineRefCountBits(1 /* "extra" strong ref count*/, 1 /* unowned count */)
-          .getBitsValue());
-
-  auto *count = llvm::ConstantInt::get(Int32Ty, utf8.size());
-  // Capacity is length plus one because of the implicitly added '\0'
-  // character.
-  auto *capacity = llvm::ConstantInt::get(Int32Ty, utf8.size() + 1);
-  auto *flags = llvm::ConstantInt::get(Int8Ty, 0);
-
-  llvm::Constant *heapObjectHeaderFields[] = {
-      metaclass, refCountInit
-  };
-
-  auto *initRefCountStruct = llvm::ConstantStruct::get(
-      RefCountedStructTy, makeArrayRef(heapObjectHeaderFields));
-
-  llvm::Constant *fields[] = {
-      initRefCountStruct, count, capacity, flags, data};
-  auto *init =
-      llvm::ConstantStruct::get(ConstantStringTy, makeArrayRef(fields));
-
-  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
-                                         llvm::GlobalValue::PrivateLinkage,
-                                         init);
-  global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-
-  // Cache string entry.
-  entry = global;
-
-  return global;
-}
-
-llvm::Constant *
-IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
-  auto &entry = GlobalConstantUTF16Strings[utf8];
-  if (entry)
-    return entry;
-
-  // If not, first transcode it to UTF16.
-  SmallVector<llvm::UTF16, 128> buffer(utf8.size() + 1); // +1 for ending nulls.
-  const llvm::UTF8 *fromPtr = (const llvm::UTF8 *) utf8.data();
-  llvm::UTF16 *toPtr = &buffer[0];
-  (void) ConvertUTF8toUTF16(&fromPtr, fromPtr + utf8.size(),
-                            &toPtr, toPtr + utf8.size(),
-                            llvm::strictConversion);
-
-  // The length of the transcoded string in UTF-8 code points.
-  size_t utf16Length = toPtr - &buffer[0];
-
-  // Null-terminate the UTF-16 string.
-  *toPtr = 0;
-  ArrayRef<llvm::UTF16> utf16(&buffer[0], utf16Length + 1);
-
-  auto *data = llvm::ConstantDataArray::get(LLVMContext, utf16);
-  auto *dataTy = data->getType();
-
-  llvm::Type *constantUTFStringTy[] = {
-      RefCountedStructTy,
-      Int32Ty,
-      Int32Ty,
-      Int8Ty,
-      Int8Ty, // For 16-byte alignment.
-      dataTy
-  };
-  auto *ConstantUTFStringTy =
-      llvm::StructType::get(getLLVMContext(), constantUTFStringTy,
-                            /*packed*/ false);
-
-  auto metaclass = getMetatypeDeclarationFor(
-      *this, REALLY_STRINGIFY(CLASS_METADATA_SYM(s19_UTF16StringStorage)));
-
-  metaclass = llvm::ConstantExpr::getBitCast(metaclass, TypeMetadataPtrTy);
-
-  // Get a reference count of two.
-  auto *refCountInit = llvm::ConstantInt::get(
-      IntPtrTy,
-      InlineRefCountBits(1 /* "extra" strong ref count*/, 1 /* unowned count */)
-          .getBitsValue());
-
-  auto *count = llvm::ConstantInt::get(Int32Ty, utf16Length);
-  auto *capacity = llvm::ConstantInt::get(Int32Ty, utf16Length + 1);
-  auto *flags = llvm::ConstantInt::get(Int8Ty, 0);
-  auto *padding = llvm::ConstantInt::get(Int8Ty, 0);
-
-  llvm::Constant *heapObjectHeaderFields[] = {
-      metaclass, refCountInit
-  };
-
-  auto *initRefCountStruct = llvm::ConstantStruct::get(
-      RefCountedStructTy, makeArrayRef(heapObjectHeaderFields));
-
-  llvm::Constant *fields[] = {
-      initRefCountStruct, count, capacity, flags, padding, data};
-  auto *init =
-      llvm::ConstantStruct::get(ConstantUTFStringTy, makeArrayRef(fields));
-
-  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
-                                         llvm::GlobalValue::PrivateLinkage,
-                                         init);
-  global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-
-  // Cache string entry.
-  entry = global;
-
-  return global;
-}
-
 /// Do we have to use resilient access patterns when working with this
 /// declaration?
 ///
@@ -4068,6 +3955,44 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
   LinkEntity entity =
     LinkEntity::forAssociatedTypeWitnessTableAccessFunction(conformance,
                                                             association);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  auto signature = getAssociatedTypeWitnessTableAccessFunctionSignature();
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+llvm::Function *
+IRGenModule::getAddrOfDefaultAssociatedTypeMetadataAccessFunction(
+                                  AssociatedType association) {
+  auto forDefinition = ForDefinition;
+
+  LinkEntity entity =
+    LinkEntity::forDefaultAssociatedTypeMetadataAccessFunction(association);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  auto signature = getAssociatedTypeMetadataAccessFunctionSignature();
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+llvm::Function *
+IRGenModule::getAddrOfDefaultAssociatedConformanceAccessor(
+                                         AssociatedConformance requirement) {
+  auto forDefinition = ForDefinition;
+
+  LinkEntity entity =
+    LinkEntity::forDefaultAssociatedConformanceAccessor(requirement);
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
     if (forDefinition) updateLinkageForDefinition(*this, entry, entity);

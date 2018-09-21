@@ -330,6 +330,9 @@ extension _ExpressibleByColorLiteral {
   }
 }
 
+@available(swift, deprecated: 5.0, renamed: "KeyValuePairs")
+public typealias DictionaryLiteral<Key, Value> = KeyValuePairs<Key, Value>
+
 extension LazySequenceProtocol {
   /// Returns the non-`nil` results of mapping the given transformation over
   /// this sequence.

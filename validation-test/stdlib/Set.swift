@@ -742,7 +742,7 @@ SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate")
     expectEqual(identity1, s1._rawIdentifier())
 
     deleted = s1.remove(1010)
-    expectOptionalEqual(1010, deleted)
+    expectEqual(1010, deleted)
     expectEqual(identity1, s1._rawIdentifier())
 
     // Keep variables alive.
@@ -760,7 +760,7 @@ SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate")
     expectEqual(identity1, s2._rawIdentifier())
 
     deleted = s2.remove(1010)
-    expectOptionalEqual(1010, deleted)
+    expectEqual(1010, deleted)
     expectEqual(identity1, s1._rawIdentifier())
     expectNotEqual(identity1, s2._rawIdentifier())
 
@@ -781,7 +781,7 @@ SetTestSuite.test("COW.Slow.RemoveDoesNotReallocate")
     expectEqual(identity1, s1._rawIdentifier())
 
     deleted = s1.remove(TestKeyTy(1010))
-    expectOptionalEqual(TestKeyTy(1010), deleted)
+    expectEqual(TestKeyTy(1010), deleted)
     expectEqual(identity1, s1._rawIdentifier())
 
     // Keep variables alive.
@@ -799,7 +799,7 @@ SetTestSuite.test("COW.Slow.RemoveDoesNotReallocate")
     expectEqual(identity1, s2._rawIdentifier())
 
     deleted = s2.remove(TestKeyTy(1010))
-    expectOptionalEqual(TestKeyTy(1010), deleted)
+    expectEqual(TestKeyTy(1010), deleted)
     expectEqual(identity1, s1._rawIdentifier())
     expectNotEqual(identity1, s2._rawIdentifier())
 
@@ -3471,7 +3471,7 @@ SetTestSuite.test("Hashable") {
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,1") {
   var set = Set([1010, 1020, 1030])
   let iter = set.makeIterator()
-  expectOptionalEqual(1010, set.remove(1010))
+  expectEqual(1010, set.remove(1010))
 
   expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
@@ -3479,9 +3479,9 @@ SetTestSuite.test("mutationDoesNotAffectIterator/remove,1") {
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,all") {
   var set = Set([1010, 1020, 1030])
   let iter = set.makeIterator()
-  expectOptionalEqual(1010, set.remove(1010))
-  expectOptionalEqual(1020, set.remove(1020))
-  expectOptionalEqual(1030, set.remove(1030))
+  expectEqual(1010, set.remove(1010))
+  expectEqual(1020, set.remove(1020))
+  expectEqual(1030, set.remove(1030))
 
   expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
@@ -4217,7 +4217,7 @@ SetTestSuite.test("SetAlgebra.UpdateWith.SingleEntry") {
   expectNil(member1)
   
   let member2 = s.update(with: 1020)
-  expectOptionalEqual(1020, member2)
+  expectEqual(1020, member2)
 }
 
 SetTestSuite.test("SetAlgebra.UpdateWith.MultipleEntries") {
@@ -4233,7 +4233,7 @@ SetTestSuite.test("SetAlgebra.UpdateWith.MultipleEntries") {
   expectNil(member1)
   
   let member2 = s.update(with: 1050)
-  expectOptionalEqual(1050, member2)
+  expectEqual(1050, member2)
 }
 
 SetTestSuite.test("SetAlgebra.UpdateWith.EmptySet") {
@@ -4247,7 +4247,7 @@ SetTestSuite.test("SetAlgebra.UpdateWith.EmptySet") {
   expectNil(member1)
   
   let member2 = s.update(with: 1010)
-  expectOptionalEqual(1010, member2)
+  expectEqual(1010, member2)
 }
 
 SetTestSuite.test("localHashSeeds") {

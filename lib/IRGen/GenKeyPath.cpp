@@ -940,6 +940,8 @@ emitKeyPathComponent(IRGenModule &IGM,
       } else {
         if (auto overridden = declRef.getOverriddenVTableEntry())
           declRef = overridden;
+        if (auto overridden = declRef.getOverriddenWitnessTableEntry())
+          declRef = overridden;
 
         auto dc = declRef.getDecl()->getDeclContext();
 

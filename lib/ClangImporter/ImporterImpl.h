@@ -279,7 +279,8 @@ private:
 };
 }
 
-using LookupTableMap = llvm::StringMap<std::unique_ptr<SwiftLookupTable>>;
+using LookupTableMap =
+    llvm::DenseMap<StringRef, std::unique_ptr<SwiftLookupTable>>;
 
 /// The result of importing a clang type. It holds both the Swift Type
 /// as well as a bool in which 'true' indicates either:
@@ -488,10 +489,6 @@ public:
   importer::EnumKind getEnumKind(const clang::EnumDecl *decl) {
     return getNameImporter().getEnumKind(decl);
   }
-
-  // TODO: drop this accessor as soon as we further de-couple the swift name
-  // lookup tables from the Impl.
-  LookupTableMap &getLookupTables() { return LookupTables; }
 
 private:
   /// A mapping from imported declarations to their "alternate" declarations,

@@ -87,7 +87,17 @@ private:
   /// A map from Types and Decls to their serialized IDs.
   llvm::DenseMap<DeclTypeUnion, DeclID> DeclAndTypeIDs;
 
+  /// A map from non-identifier uniqued strings to their serialized IDs.
+  ///
+  /// Since we never remove items from this map, we can use a BumpPtrAllocator
+  /// to back the entries.
+  llvm::StringMap<IdentifierID, llvm::BumpPtrAllocator> UniquedStringIDs;
+
   /// A map from Identifiers to their serialized IDs.
+  ///
+  /// This is stored separately from \p UniquedStringIDs because it's faster
+  /// to do lookups in, even though that may lead to some duplication between
+  /// identifier and non-identifier strings.
   llvm::DenseMap<Identifier, IdentifierID> IdentifierIDs;
 
   /// A map from DeclContexts to their serialized IDs.
@@ -185,8 +195,9 @@ private:
   /// SILLayouts that need to be serialized.
   std::queue<SILLayout *> SILLayoutsToWrite;
 
-  /// All identifiers that need to be serialized.
-  std::vector<Identifier> IdentifiersToWrite;
+  /// All uniqued strings that need to be serialized (identifiers and
+  /// non-identifiers).
+  std::vector<StringRef> StringsToWrite;
 
   /// The abbreviation code for each record in the "decls-and-types" block.
   ///
@@ -252,11 +263,11 @@ private:
   /// The last assigned DeclID for types from this module.
   uint32_t /*TypeID*/ LastTypeID = 0;
 
-  /// The last assigned IdentifierID for types from this module.
+  /// The last assigned IdentifierID for uniqued strings from this module.
   ///
   /// Note that special module IDs and IDs of special names must not be valid
   /// IdentifierIDs, except that 0 will always represent the empty identifier.
-  uint32_t /*IdentifierID*/ LastIdentifierID =
+  uint32_t /*IdentifierID*/ LastUniquedStringID =
       serialization::NUM_SPECIAL_IDS - 1;
 
   /// The last assigned GenericSignatureID for generic signature from this
@@ -323,6 +334,10 @@ private:
 
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams);
+
+  /// Writes the body text of the provided funciton, if the function is
+  /// inlinable and has body text.
+  void writeInlinableBodyTextIfNeeded(const AbstractFunctionDecl *decl);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
@@ -452,6 +467,23 @@ public:
   ///
   /// \returns The ID for the given DeclBaseName in this module.
   IdentifierID addDeclBaseNameRef(DeclBaseName ident);
+
+  /// Records the use of the given string, which will only be stored once in
+  /// the resulting module file.
+  ///
+  /// \returns A pair containing the copy of the string now owned by the
+  /// Serializer and the ID for the string in this module.
+  /// \sa addUniquedStringRef
+  std::pair<StringRef, IdentifierID> addUniquedString(StringRef str);
+
+  /// Records the use of the given string, which will only be stored once in
+  /// the resulting module file.
+  ///
+  /// \returns The ID for the given string in this module.
+  /// \sa addUniquedString
+  IdentifierID addUniquedStringRef(StringRef str) {
+    return addUniquedString(str).second;
+  }
 
   /// Records the use of the given Decl.
   ///

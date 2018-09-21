@@ -873,7 +873,8 @@ private:
 
   /// A hash of all interface-contributing tokens that have been lexed for
   /// this source file so far.
-  llvm::MD5 InterfaceHash;
+  /// We only collect interface hash for primary input files.
+  llvm::Optional<llvm::MD5> InterfaceHash;
 
   /// \brief The ID for the memory buffer containing this file's source.
   ///
@@ -889,8 +890,6 @@ private:
 
   friend ASTContext;
   friend Impl;
-
-  ~SourceFile();
 public:
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
@@ -1117,20 +1116,26 @@ public:
   /// Set the root refinement context for the file.
   void setTypeRefinementContext(TypeRefinementContext *TRC);
 
-  void recordInterfaceToken(StringRef token) {
-    assert(!token.empty());
-    InterfaceHash.update(token);
-    // Add null byte to separate tokens.
-    uint8_t a[1] = {0};
-    InterfaceHash.update(a);
+  void enableInterfaceHash() {
+    assert(!hasInterfaceHash());
+    InterfaceHash.emplace();
   }
 
-  const llvm::MD5 &getInterfaceHashState() { return InterfaceHash; }
-  void setInterfaceHashState(const llvm::MD5 &state) { InterfaceHash = state; }
+  bool hasInterfaceHash() const {
+    return InterfaceHash.hasValue();
+  }
+
+  void recordInterfaceToken(StringRef token) {
+    assert(!token.empty());
+    InterfaceHash->update(token);
+    // Add null byte to separate tokens.
+    uint8_t a[1] = {0};
+    InterfaceHash->update(a);
+  }
 
   void getInterfaceHash(llvm::SmallString<32> &str) {
     llvm::MD5::MD5Result result;
-    InterfaceHash.final(result);
+    InterfaceHash->final(result);
     llvm::MD5::stringifyResult(result, str);
   }
 
@@ -1157,7 +1162,7 @@ private:
   /// If not None, the underlying vector should contain tokens of this source file.
   Optional<std::vector<Token>> AllCorrectedTokens;
 
-  SourceFileSyntaxInfo &SyntaxInfo;
+  std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
 };
 
 

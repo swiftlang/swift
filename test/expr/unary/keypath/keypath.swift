@@ -658,6 +658,20 @@ struct Container {
 
 var rdar32057712 = \Container.base?.i
 
+var identity1 = \Container.self
+var identity2: WritableKeyPath = \Container.self
+var identity3: WritableKeyPath<Container, Container> = \Container.self
+var identity4: WritableKeyPath<Container, Container> = \.self
+var identity5: KeyPath = \Container.self
+var identity6: KeyPath<Container, Container> = \Container.self
+var identity7: KeyPath<Container, Container> = \.self
+var identity8: PartialKeyPath = \Container.self
+var identity9: PartialKeyPath<Container> = \Container.self
+var identity10: PartialKeyPath<Container> = \.self
+var identity11: AnyKeyPath = \Container.self
+
+var interleavedIdentityComponents = \Container.self.base.self?.self.i.self
+
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;

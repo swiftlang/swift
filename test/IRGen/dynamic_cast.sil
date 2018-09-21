@@ -23,7 +23,7 @@ bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
-  // CHECK: [[T3:%.*]] = call swiftcc %swift.metadata_response @"$S12dynamic_cast1P_pMa"([[INT]] 0)
+  // CHECK: [[T3:%.*]] = call swiftcc %swift.metadata_response @"$s12dynamic_cast1P_pMa"([[INT]] 0)
   // CHECK: [[T4:%.*]] = extractvalue %swift.metadata_response [[T3]], 0
   // CHECK: call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], %swift.type* [[T4]], %swift.type* {{.*}}, [[INT]] 7)
   %1 = alloc_stack $S
@@ -34,7 +34,7 @@ bb0(%0 : $*P):
   return %2 : $()
 }
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$S12dynamic_cast1P_pMa"(
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s12dynamic_cast1P_pMa"(
 // CHECK:       call %swift.type* @swift_getExistentialTypeMetadata(
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testUnconditional1(
@@ -43,7 +43,7 @@ bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
-  // CHECK: [[T3:%.*]] = call swiftcc %swift.metadata_response @"$S12dynamic_cast1P_pMa"([[INT]] 0)
+  // CHECK: [[T3:%.*]] = call swiftcc %swift.metadata_response @"$s12dynamic_cast1P_pMa"([[INT]] 0)
   // CHECK: [[T4:%.*]] = extractvalue %swift.metadata_response [[T3]], 0
   // CHECK: call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], %swift.type* [[T4]], %swift.type* {{.*}}, [[INT]] 7)
   %1 = alloc_stack $S
@@ -60,7 +60,7 @@ bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
-  // CHECK: [[T3:%.*]] = call swiftcc %swift.metadata_response @"$S12dynamic_cast1P_pMa"([[INT]] 0)
+  // CHECK: [[T3:%.*]] = call swiftcc %swift.metadata_response @"$s12dynamic_cast1P_pMa"([[INT]] 0)
   // CHECK: [[T4:%.*]] = extractvalue %swift.metadata_response [[T3]], 0
   // CHECK: [[T5:%.*]] = call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], %swift.type* [[T4]], %swift.type* {{.*}}, [[INT]] 6)
   // CHECK: br i1 [[T5]],
@@ -83,7 +83,7 @@ bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
-  // CHECK: [[T3:%.*]] = call swiftcc %swift.metadata_response @"$S12dynamic_cast1P_pMa"([[INT]] 0)
+  // CHECK: [[T3:%.*]] = call swiftcc %swift.metadata_response @"$s12dynamic_cast1P_pMa"([[INT]] 0)
   // CHECK: [[T4:%.*]] = extractvalue %swift.metadata_response [[T3]], 0
   // CHECK: [[T5:%.*]] = call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], %swift.type* [[T4]], %swift.type* {{.*}}, [[INT]] 2)
   // CHECK: br i1 [[T5]],
@@ -106,7 +106,7 @@ bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
-  // CHECK: [[T3:%.*]] = call swiftcc %swift.metadata_response @"$S12dynamic_cast1P_pMa"([[INT]] 0)
+  // CHECK: [[T3:%.*]] = call swiftcc %swift.metadata_response @"$s12dynamic_cast1P_pMa"([[INT]] 0)
   // CHECK: [[T4:%.*]] = extractvalue %swift.metadata_response [[T3]], 0
   // CHECK: [[T5:%.*]] = call i1 @swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], %swift.type* [[T4]], %swift.type* {{.*}}, [[INT]] 0)
   // CHECK: br i1 [[T5]],

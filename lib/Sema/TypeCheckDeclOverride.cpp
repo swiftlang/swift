@@ -201,7 +201,6 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
     // Factory initializers cannot be overridden.
     if (parentCtor->isFactoryInit())
       return false;
-
   } else if (auto var = dyn_cast<VarDecl>(decl)) {
     auto parentVar = cast<VarDecl>(parentDecl);
     if (var->isStatic() != parentVar->isStatic())
@@ -482,8 +481,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
                                matchDecl->getDescriptiveKind(),
                                matchDecl->getFullName());
     if (attempt == OverrideCheckingAttempt::BaseName) {
-      fixDeclarationName(diag, cast<AbstractFunctionDecl>(decl),
-                         matchDecl->getFullName());
+      fixDeclarationName(diag, decl, matchDecl->getFullName());
     }
   }
 }
@@ -774,8 +772,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                isa<ConstructorDecl>(decl),
                                decl->getFullName(),
                                baseDecl->getFullName());
-    fixDeclarationName(diag, cast<AbstractFunctionDecl>(decl),
-                       baseDecl->getFullName());
+    fixDeclarationName(diag, decl, baseDecl->getFullName());
     emittedMatchError = true;
   }
 
@@ -861,6 +858,13 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     if (!shouldDiagnose && baseDecl->isSettable(dc)){
       auto matchASD = cast<AbstractStorageDecl>(baseDecl);
       if (matchASD->isSetterAccessibleFrom(dc)) {
+        // Match sure we've created the setter.
+        if (!matchASD->getSetter()) {
+          maybeAddAccessorsToStorage(
+                           *static_cast<TypeChecker *>(ctx.getLazyResolver()),
+                           matchASD);
+        }
+
         auto matchSetterAccessScope = matchASD->getSetter()
           ->getFormalAccessScope(dc);
         auto requiredSetterAccessScope =
@@ -1302,10 +1306,9 @@ OverrideRequiresKeyword swift::overrideRequiresKeyword(ValueDecl *overridden) {
   }
 
   if (auto ctor = dyn_cast<ConstructorDecl>(overridden)) {
-    if (ctor->isDesignatedInit() && !ctor->isRequired())
-      return OverrideRequiresKeyword::Always;
-
-    return OverrideRequiresKeyword::Never;
+    return !ctor->isDesignatedInit() || ctor->isRequired()
+      ? OverrideRequiresKeyword::Never
+      : OverrideRequiresKeyword::Always;
   }
 
   return OverrideRequiresKeyword::Always;
@@ -1753,8 +1756,14 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     // Check the various overridden storage declarations.
     SmallVector<OverrideMatch, 2> matches;
+    ASTContext &ctx = decl->getASTContext();
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
+      if (auto lazyResolver = ctx.getLazyResolver()) {
+        maybeAddAccessorsToStorage(*static_cast<TypeChecker *>(lazyResolver),
+                                   baseASD);
+      }
+
       auto kind = accessor->getAccessorKind();
 
       // If the base doesn't consider this an opaque accessor,

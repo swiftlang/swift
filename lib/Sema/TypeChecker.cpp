@@ -346,80 +346,6 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   nominal->addExtension(ext);
 }
 
-static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
-  if (ED->getExtendedType())
-    return;
-
-  // If we didn't parse a type, fill in an error type and bail out.
-  if (!ED->getExtendedTypeLoc().getTypeRepr()) {
-    ED->setInvalid();
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
-    return;
-  }
-
-  auto dc = ED->getDeclContext();
-
-  // Validate the representation.
-  // FIXME: Perform some kind of "shallow" validation here?
-  TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
-  options |= TypeResolutionFlags::AllowUnboundGenerics;
-  if (TC.validateType(ED->getExtendedTypeLoc(),
-                      TypeResolution::forContextual(dc), options)) {
-    ED->setInvalid();
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
-    return;
-  }
-
-  // Dig out the extended type.
-  auto extendedType = ED->getExtendedType();
-
-  // Hack to allow extending a generic typealias.
-  if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
-    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
-      auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
-      if (extendedNominal) {
-        extendedType = extendedNominal->getDeclaredType();
-        if (!isPassThroughTypealias(aliasDecl))
-          ED->getExtendedTypeLoc().setType(extendedType);
-      }
-    }
-  }
-
-  // Handle easy cases.
-
-  // Cannot extend a metatype.
-  if (extendedType->is<AnyMetatypeType>()) {
-    TC.diagnose(ED->getLoc(), diag::extension_metatype, extendedType)
-      .highlight(ED->getExtendedTypeLoc().getSourceRange());
-    ED->setInvalid();
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
-    return;
-  }
-
-  // Cannot extend a bound generic type.
-  if (extendedType->isSpecialized()) {
-    TC.diagnose(ED->getLoc(), diag::extension_specialization,
-                extendedType->getAnyNominal()->getName())
-      .highlight(ED->getExtendedTypeLoc().getSourceRange());
-    ED->setInvalid();
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
-    return;
-  }
-
-  // Dig out the nominal type being extended.
-  NominalTypeDecl *extendedNominal = extendedType->getAnyNominal();
-  if (!extendedNominal) {
-    TC.diagnose(ED->getLoc(), diag::non_nominal_extension, extendedType)
-      .highlight(ED->getExtendedTypeLoc().getSourceRange());
-    ED->setInvalid();
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
-    return;
-  }
-  assert(extendedNominal && "Should have the nominal type being extended");
-
-  bindExtensionToNominal(ED, extendedNominal);
-}
-
 static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
@@ -467,14 +393,8 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
     }
   } while(changed);
 
-  // Phase 3 - anything that remains on the worklist cannot be resolved, which
-  // means its invalid. Diagnose.
-  for (auto *ext : worklist)
-    bindExtensionDecl(ext, TC);
-}
-
-void TypeChecker::bindExtension(ExtensionDecl *ext) {
-  ::bindExtensionDecl(ext, *this);
+  // Any remaining extensions are invalid. They will be diagnosed later by
+  // typeCheckDecl().
 }
 
 static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {

@@ -787,6 +787,8 @@ struct TargetMethodDescriptor {
   // TODO: add method types or anything else needed for reflection.
 };
 
+using MethodDescriptor = TargetMethodDescriptor<InProcess>;
+
 /// Header for a class vtable descriptor. This is a variable-sized
 /// structure that describes how to find and parse a vtable
 /// within the type metadata for a class.
@@ -1441,7 +1443,7 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
   TargetTupleTypeMetadata() = default;
   constexpr TargetTupleTypeMetadata(const TargetMetadata<Runtime> &base,
-                                    StoredSize numElements,
+                                    uint32_t numElements,
                                     TargetPointer<Runtime, const char> labels)
     : TargetMetadata<Runtime>(base),
       NumElements(numElements),
@@ -1485,14 +1487,19 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     return getElements()[i];
   }
 
-  static constexpr StoredSize OffsetToNumElements = sizeof(TargetMetadata<Runtime>);
-
+  static constexpr StoredSize getOffsetToNumElements();
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Tuple;
   }
 };
 using TupleTypeMetadata = TargetTupleTypeMetadata<InProcess>;
   
+template <typename Runtime>
+constexpr inline auto
+TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements() -> StoredSize {
+  return offsetof(TargetTupleTypeMetadata<Runtime>, NumElements);
+}
+
 template <typename Runtime> struct TargetProtocolDescriptor;
 
 #if SWIFT_OBJC_INTEROP
@@ -2499,9 +2506,9 @@ public:
     /// The protocol the associated type belongs to.
     RelativeIndirectablePointer<TargetProtocolDescriptor<Runtime>,
                                 /*nullable*/ false> Protocol;
-    /// The index of the associated type metadata within a witness table for
-    /// the protocol.
-    unsigned Index;
+    /// A reference to the associated type descriptor within the protocol.
+    RelativeIndirectablePointer<TargetProtocolRequirement<Runtime>,
+                                /*nullable*/ false> Requirement;
   };
   
   /// A forward iterator that walks through the associated type path, which is

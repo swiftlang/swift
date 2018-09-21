@@ -297,6 +297,7 @@ public:
     case Kind::Destructor:
       return "deinit";
     }
+    llvm_unreachable("unhandled kind");
   }
 
   int compare(DeclBaseName other) const {

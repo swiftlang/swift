@@ -11,14 +11,14 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: sil @top_level_code
-// CHECK: function_ref @$S18def_generic_marker4testyxx_q_tAA16mmCollectionTypeRzAaCR_9Generator_7ElementQY_AD_AERTzr0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : mmCollectionType, τ_0_1 : mmCollectionType, τ_0_0.Generator.Element == τ_0_1.Generator.Element> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out τ_0_0
+// CHECK: function_ref @$s18def_generic_marker4testyxx_q_tAA16mmCollectionTypeRzAaCR_9Generator_7ElementQY_AD_AERTzr0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : mmCollectionType, τ_0_1 : mmCollectionType, τ_0_0.Generator.Element == τ_0_1.Generator.Element> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out τ_0_0
 sil @top_level_code : $@convention(thin) () -> () {
 bb0:
-  %43 = function_ref @$S18def_generic_marker4testyxx_q_tAA16mmCollectionTypeRzAaCR_9Generator_7ElementQY_AD_AERTzr0_lF : $@convention(thin) <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator.Element == EC2.Generator.Element> (@in_guaranteed EC1, @in_guaranteed EC2) -> @out EC1
+  %43 = function_ref @$s18def_generic_marker4testyxx_q_tAA16mmCollectionTypeRzAaCR_9Generator_7ElementQY_AD_AERTzr0_lF : $@convention(thin) <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator.Element == EC2.Generator.Element> (@in_guaranteed EC1, @in_guaranteed EC2) -> @out EC1
   %0 = tuple ()
   return %0 : $()
 }
 
 // Make sure the function body is deserialized.
-// CHECK-LABEL: @$S18def_generic_marker4testyxx_q_tAA16mmCollectionTypeRzAaCR_9Generator_7ElementQY_AD_AERTzr0_lF : $@convention(thin) <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator.Element == EC2.Generator.Element> (@in_guaranteed EC1, @in_guaranteed EC2) -> @out EC1 {
-sil @$S18def_generic_marker4testyxx_q_tAA16mmCollectionTypeRzAaCR_9Generator_7ElementQY_AD_AERTzr0_lF : $@convention(thin) <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator.Element == EC2.Generator.Element> (@in_guaranteed EC1, @in_guaranteed EC2) -> @out EC1
+// CHECK-LABEL: @$s18def_generic_marker4testyxx_q_tAA16mmCollectionTypeRzAaCR_9Generator_7ElementQY_AD_AERTzr0_lF : $@convention(thin) <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator.Element == EC2.Generator.Element> (@in_guaranteed EC1, @in_guaranteed EC2) -> @out EC1 {
+sil @$s18def_generic_marker4testyxx_q_tAA16mmCollectionTypeRzAaCR_9Generator_7ElementQY_AD_AERTzr0_lF : $@convention(thin) <EC1, EC2 where EC1 : mmCollectionType, EC2 : mmCollectionType, EC1.Generator.Element == EC2.Generator.Element> (@in_guaranteed EC1, @in_guaranteed EC2) -> @out EC1

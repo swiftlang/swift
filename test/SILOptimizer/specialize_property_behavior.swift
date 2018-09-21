@@ -21,5 +21,5 @@ public func exercise() {
   _ = Foo().x
 }
 
-// CHECK-LABEL: sil @$S28specialize_property_behavior8exerciseyyF
-// CHECK:         function_ref @$S28specialize_property_behavior8whateverxylFSi_Tg5 
+// CHECK-LABEL: sil @$s28specialize_property_behavior8exerciseyyF
+// CHECK:         function_ref @$s28specialize_property_behavior8whateverxylFSi_Tg5 

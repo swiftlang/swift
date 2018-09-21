@@ -89,6 +89,7 @@ VarDecl *getDisjointAccessLocation(const AccessedStorage &storage) {
   case AccessedStorage::Nested:
     llvm_unreachable("Unexpected Nested access.");
   }
+  llvm_unreachable("unhandled kind");
 }
 
 namespace {

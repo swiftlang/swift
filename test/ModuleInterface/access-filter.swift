@@ -96,3 +96,9 @@ extension UFIProto {
   // CHECK-NEXT: internal func ufiMethod(){{$}}
   @usableFromInline internal func ufiMethod() {}
 } // CHECK: {{^[}]$}}
+
+// CHECK: extension PublicStruct {{[{]$}}
+extension PublicStruct {
+  // CHECK: public private(set) static var secretlySettable: Int{{$}}
+  public private(set) static var secretlySettable: Int = 0
+} // CHECK: {{^[}]$}}

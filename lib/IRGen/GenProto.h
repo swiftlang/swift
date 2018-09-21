@@ -70,6 +70,14 @@ namespace irgen {
                                          SILDeclRef member,
                                          ProtocolConformanceRef conformance);
 
+  /// Compute the index into a witness table for a resilient protocol given
+  /// a reference to a descriptor of one of the requirements in that witness
+  /// table.
+  llvm::Value *computeResilientWitnessTableIndex(
+                                            IRGenFunction &IGF,
+                                            ProtocolDecl *proto,
+                                            llvm::Constant *reqtDescriptor);
+
   /// Given a type T and an associated type X of some protocol P to
   /// which T conforms, return the type metadata for T.X.
   ///

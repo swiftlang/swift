@@ -2351,7 +2351,8 @@ public:
   /// entities (classes, protocols, properties), this operation will
   /// return a zero-parameter selector with the appropriate name in its
   /// first slot.
-  Optional<ObjCSelector> getObjCRuntimeName() const;
+  Optional<ObjCSelector> getObjCRuntimeName(
+                                    bool skipIsObjCResolution = false) const;
 
   /// Determine whether the given declaration can infer @objc, or the
   /// Objective-C name, if used to satisfy the given requirement.
@@ -3673,9 +3674,8 @@ public:
   MutableArrayRef<AbstractFunctionDecl *> lookupDirect(ObjCSelector selector,
                                                        bool isInstance);
 
-  /// Record the presence of an @objc method whose Objective-C name has been
-  /// finalized.
-  void recordObjCMethod(AbstractFunctionDecl *method);
+  /// Record the presence of an @objc method with the given selector.
+  void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -3773,8 +3773,6 @@ private:
 ///   }
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
-
-  llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
 
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
@@ -3967,12 +3965,32 @@ public:
     Bits.ProtocolDecl.HasMissingRequirements = newValue;
   }
 
+  /// Returns the default type witness for an associated type, or a null
+  /// type if there is no default.
+  Type getDefaultTypeWitness(AssociatedTypeDecl *assocType) const;
+
+  /// Set the default type witness for an associated type.
+  void setDefaultTypeWitness(AssociatedTypeDecl *assocType, Type witness);
+
   /// Returns the default witness for a requirement, or nullptr if there is
   /// no default.
   Witness getDefaultWitness(ValueDecl *requirement) const;
 
   /// Record the default witness for a requirement.
   void setDefaultWitness(ValueDecl *requirement, Witness witness);
+
+  /// Returns the default associated conformance witness for an associated
+  /// type, or \c None if there is no default.
+  Optional<ProtocolConformanceRef> getDefaultAssociatedConformanceWitness(
+                                              CanType association,
+                                              ProtocolDecl *requirement) const;
+
+  /// Set the default associated conformance witness for the given
+  /// associated conformance.
+  void setDefaultAssociatedConformanceWitness(
+                                            CanType association,
+                                            ProtocolDecl *requirement,
+                                            ProtocolConformanceRef conformance);
 
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
@@ -4624,6 +4642,7 @@ public:
     case Specifier::InOut:
       return false;
     }
+    llvm_unreachable("unhandled specifier");
   }
   /// Is this an immutable 'let' property?
   bool isLet() const { return getSpecifier() == Specifier::Let; }
@@ -4645,6 +4664,7 @@ public:
     case Specifier::Owned:
       return ValueOwnership::Owned;
     }
+    llvm_unreachable("unhandled specifier");
   }
 
   /// Is this an element in a capture list?
@@ -4975,7 +4995,10 @@ public:
     TypeChecked,
 
     /// This is a memberwise initializer that will be synthesized by SILGen.
-    MemberwiseInitializer
+    MemberwiseInitializer,
+
+    /// Function body text was deserialized from a .swiftmodule.
+    Deserialized
 
     // This enum currently needs to fit in a 3-bit bitfield.
   };
@@ -4996,6 +5019,9 @@ protected:
     /// This enum member is active if getBodyKind() is BodyKind::Parsed or
     /// BodyKind::TypeChecked.
     BraceStmt *Body;
+
+    /// This enum member is active if getBodyKind() is BodyKind::Deserialized.
+    StringRef BodyStringRepresentation;
 
     /// This enum member is active if getBodyKind() == BodyKind::Synthesize.
     BodySynthesizer Synthesizer;
@@ -5091,6 +5117,11 @@ public:
     return getBodyKind() != BodyKind::None;
   }
 
+  /// Returns true if the text of this function's body can be retrieved either
+  /// by extracting the text from the source buffer or reading the inlinable
+  /// body from a deserialized swiftmodule.
+  bool hasInlinableBodyText() const;
+
   /// Returns the function body, if it was parsed, or nullptr otherwise.
   ///
   /// Note that a null return value does not imply that the source code did not
@@ -5154,6 +5185,18 @@ public:
       setBodyKind(BodyKind::TypeChecked);
   }
 
+  /// Gets the body of this function, stripping the unused portions of #if
+  /// configs inside the body. If this function was not deserialized from a
+  /// .swiftmodule, this body is reconstructed from the original
+  /// source buffer.
+  StringRef getInlinableBodyText(SmallVectorImpl<char> &scratch) const;
+
+  void setBodyStringRepresentation(StringRef body) {
+    assert(getBodyKind() == BodyKind::None);
+    setBodyKind(BodyKind::Deserialized);
+    BodyStringRepresentation = body;
+  }
+
   bool isBodyTypeChecked() const {
     return getBodyKind() == BodyKind::TypeChecked;
   }
@@ -5201,7 +5244,8 @@ public:
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   /// Retrieve the Objective-C selector that names this method.
-  ObjCSelector getObjCSelector(DeclName preferredName = DeclName()) const;
+  ObjCSelector getObjCSelector(DeclName preferredName = DeclName(),
+                               bool skipIsObjCResolution = false) const;
 
   /// Determine whether the given method would produce an Objective-C
   /// instance method.
@@ -6070,6 +6114,9 @@ public:
   SourceLoc getStartLoc() const { return getDestructorLoc(); }
   SourceRange getSourceRange() const;
 
+  /// Retrieve the Objective-C selector for destructors.
+  ObjCSelector getObjCSelector() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Destructor;
   }
@@ -6272,7 +6319,7 @@ class OperatorDecl : public Decl {
 
   Identifier DesignatedProtocolName;
   SourceLoc DesignatedProtocolNameLoc;
-  TypeLoc DesignatedProtocolTypeLoc;
+  ProtocolDecl *DesignatedProtocol = nullptr;
 
 public:
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
@@ -6282,6 +6329,12 @@ public:
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
         DesignatedProtocolName(DesignatedProtocolName),
         DesignatedProtocolNameLoc(DesignatedProtocolNameLoc) {}
+
+  OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
+               Identifier Name, SourceLoc NameLoc,
+               ProtocolDecl *DesignatedProtocol)
+      : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
+        DesignatedProtocol(DesignatedProtocol) {}
 
   SourceLoc getLoc() const { return NameLoc; }
 
@@ -6293,24 +6346,14 @@ public:
     return DesignatedProtocolName;
   }
 
-  void setDesignatedProtocolName(Identifier name) {
-    DesignatedProtocolName = name;
-  }
-
   SourceLoc getDesignatedProtocolNameLoc() const {
     return DesignatedProtocolNameLoc;
   }
 
-  void setDesignatedProtocolNameLoc(SourceLoc loc) {
-    DesignatedProtocolNameLoc = loc;
-  }
+  ProtocolDecl *getDesignatedProtocol() const { return DesignatedProtocol; }
 
-  TypeLoc getDesignatedProtocolTypeLoc() const {
-    return DesignatedProtocolTypeLoc;
-  }
-
-  void setDesignatedProtocolTypeLoc(TypeLoc typeLoc) {
-    DesignatedProtocolTypeLoc = typeLoc;
+  void setDesignatedProtocol(ProtocolDecl *protocol) {
+    DesignatedProtocol = protocol;
   }
 
   static bool classof(const Decl *D) {
@@ -6342,6 +6385,15 @@ public:
         ColonLoc(colonLoc), FirstIdentifierLoc(firstIdentifierLoc),
         SecondIdentifierLoc(secondIdentifierLoc),
         FirstIdentifier(firstIdentifier), SecondIdentifier(secondIdentifier) {}
+
+  InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
+                    SourceLoc nameLoc, SourceLoc colonLoc,
+                    Identifier firstIdentifier, SourceLoc firstIdentifierLoc,
+                    ProtocolDecl *designatedProtocol)
+      : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
+                     designatedProtocol),
+        ColonLoc(colonLoc), FirstIdentifierLoc(firstIdentifierLoc),
+        FirstIdentifier(firstIdentifier) {}
 
   SourceLoc getEndLoc() const {
     if (!SecondIdentifier.empty())
@@ -6391,6 +6443,11 @@ public:
       : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
                      DesignatedProtocolName, DesignatedProtocolNameLoc) {}
 
+  PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
+                     SourceLoc NameLoc, ProtocolDecl *DesignatedProtocol)
+      : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
+                     DesignatedProtocol) {}
+
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
   }
@@ -6419,6 +6476,11 @@ public:
                       SourceLoc DesignatedProtocolNameLoc = SourceLoc())
       : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
                      DesignatedProtocolName, DesignatedProtocolNameLoc) {}
+
+  PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
+                      SourceLoc NameLoc, ProtocolDecl *DesignatedProtocol)
+      : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
+                     DesignatedProtocol) {}
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
@@ -6463,9 +6525,8 @@ public:
 
   static MissingMemberDecl *
   forInitializer(ASTContext &ctx, DeclContext *DC, DeclName name,
-                 bool hasNormalVTableEntry,
-                 bool hasAllocatingVTableEntry) {
-    unsigned entries = hasNormalVTableEntry + hasAllocatingVTableEntry;
+                 bool hasVTableEntry) {
+    unsigned entries = hasVTableEntry ? 1 : 0;
     return new (ctx) MissingMemberDecl(DC, name, entries, 0);
   }
   

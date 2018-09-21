@@ -26,12 +26,6 @@
 
 using namespace swift;
 
-using AvailableValsTy = llvm::DenseMap<SILBasicBlock *, SILValue>;
-
-static AvailableValsTy &getAvailVals(void *AV) {
-  return *static_cast<AvailableValsTy *>(AV);
-}
-
 void *SILSSAUpdater::allocate(unsigned Size, unsigned Align) const {
   return AlignedAlloc(Size, Align);
 }
@@ -44,9 +38,7 @@ SILSSAUpdater::SILSSAUpdater(SmallVectorImpl<SILPHIArgument *> *PHIs)
     : AV(nullptr), PHISentinel(nullptr, deallocateSentinel),
       InsertedPHIs(PHIs) {}
 
-SILSSAUpdater::~SILSSAUpdater() {
-  delete static_cast<AvailableValsTy *>(AV);
-}
+SILSSAUpdater::~SILSSAUpdater() = default;
 
 void SILSSAUpdater::Initialize(SILType Ty) {
   ValType = Ty;
@@ -55,19 +47,19 @@ void SILSSAUpdater::Initialize(SILType Ty) {
       SILUndef::getSentinelValue(Ty, this), SILSSAUpdater::deallocateSentinel);
 
   if (!AV)
-    AV = new AvailableValsTy();
+    AV.reset(new AvailableValsTy());
   else
-    getAvailVals(AV).clear();
+    AV->clear();
 }
 
 bool SILSSAUpdater::HasValueForBlock(SILBasicBlock *BB) const {
-  return getAvailVals(AV).count(BB);
+  return AV->count(BB);
 }
 
 /// Indicate that a rewritten value is available in the specified block with the
 /// specified value.
 void SILSSAUpdater::AddAvailableValue(SILBasicBlock *BB, SILValue V) {
-  getAvailVals(AV)[BB] = V;
+  (*AV)[BB] = V;
 }
 
 /// Construct SSA form, materializing a value that is live at the end of the
@@ -77,7 +69,7 @@ SILValue SILSSAUpdater::GetValueAtEndOfBlock(SILBasicBlock *BB) {
 }
 
 /// Are all available values identicalTo each other.
-bool areIdentical(AvailableValsTy &Avails) {
+static bool areIdentical(llvm::DenseMap<SILBasicBlock *, SILValue> &Avails) {
   if (auto *First = dyn_cast<SingleValueInstruction>(Avails.begin()->second)) {
     for (auto Avail : Avails) {
       auto *Inst = dyn_cast<SingleValueInstruction>(Avail.second);
@@ -111,14 +103,14 @@ void SILSSAUpdater::RewriteUse(Operand &Op) {
   // Replicate function_refs to their uses. SILGen can't build phi nodes for
   // them and it would not make much sense anyways.
   if (auto *FR = dyn_cast<FunctionRefInst>(Op.get())) {
-    assert(areIdentical(getAvailVals(AV)) &&
+    assert(areIdentical(*AV) &&
            "The function_refs need to have the same value");
     SILInstruction *User = Op.getUser();
     auto *NewFR = cast<FunctionRefInst>(FR->clone(User));
     Op.set(NewFR);
     return;
   } else if (auto *IL = dyn_cast<IntegerLiteralInst>(Op.get()))
-    if (areIdentical(getAvailVals(AV))) {
+    if (areIdentical(*AV)) {
       // Some llvm intrinsics don't like phi nodes as their constant inputs (e.g
       // ctlz).
       SILInstruction *User = Op.getUser();
@@ -375,7 +367,7 @@ public:
 /// return it.  If not, construct SSA form by first calculating the required
 /// placement of PHIs and then inserting new PHIs where needed.
 SILValue SILSSAUpdater::GetValueAtEndOfBlockInternal(SILBasicBlock *BB){
-  AvailableValsTy &AvailableVals = getAvailVals(AV);
+  AvailableValsTy &AvailableVals = *AV;
   auto AI = AvailableVals.find(BB);
   if (AI != AvailableVals.end())
     return AI->second;

@@ -10,7 +10,7 @@
 // *NOTE* If something like templated protocols is ever implemented this file
 // needs to be updated.
 
-// CHECK-LABEL: sil @$S38devirt_specialized_inherited_interplay6driveryyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @$s38devirt_specialized_inherited_interplay6driveryyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK-NOT: alloc_ref
 // CHECK: [[F0:%[0-9]+]] = function_ref @unknown0 : $@convention(thin) () -> ()

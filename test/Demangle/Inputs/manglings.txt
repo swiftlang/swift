@@ -316,9 +316,20 @@ _$S3BBBBf0602365061_ ---> _$S3BBBBf0602365061_
 _$S3BBBBi0602365061_ ---> _$S3BBBBi0602365061_
 _$S3BBBBv0602365061_ ---> _$S3BBBBv0602365061_
 _T0lxxxmmmTk ---> _T0lxxxmmmTk
+$S11TestSupport20MockPackageContainerC12dependenciesSDySSSaySS9container_0D5Graph0dE10ConstraintV11RequirementOySS_SSAF0dE10IdentifierAAg_G11requirementtGGvg ---> TestSupport.MockPackageContainer.dependencies.getter : [Swift.String : [(container: Swift.String, requirement: PackageGraph.PackageContainerConstraint<Swift.String>.Requirement)]]
+$S3nix8MystructV1xACyxGx_tcfc7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.init(x: A) -> nix.Mystruct<A>
+$S3nix7MyclassCfd7MyaliasL_ayx__GD ---> Myalias #1 in nix.Myclass<A>.deinit
+$S3nix8MystructVyS2icig7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.subscript.getter : (Swift.Int) -> Swift.Int
+$S3nix8MystructV1x1uACyxGx_qd__tclufc7MyaliasL_ayx_qd___GD ---> Myalias #1 in nix.Mystruct<A>.<A1>(x: A, u: A1) -> nix.Mystruct<A>
+$S3nix8MystructV6testit1xyx_tF7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.testit(x: A) -> ()
+$S3nix8MystructV6testit1x1u1vyx_qd__qd_0_tr0_lF7MyaliasL_ayx_qd__qd_0__GD ---> Myalias #1 in nix.Mystruct<A>.testit<A1, B1>(x: A, u: A1, v: B1) -> ()
 $S4blah8PatatinoaySiGD ---> blah.Patatino<Swift.Int>
 $SSiSHsWP ---> protocol witness table for Swift.Int : Swift.Hashable in Swift
 $S7TestMod5OuterV3Fooayx_SiGD ---> TestMod.Outer<A>.Foo<Swift.Int>
 $Ss17_VariantSetBufferO05CocoaC0ayx_GD ---> Swift._VariantSetBuffer<A>.CocoaBuffer
 $S2t21QP22ProtocolTypeAliasThingayAA4BlahV5SomeQa_GSgD ---> t2.Blah.SomeQ as t2.Q.ProtocolTypeAliasThing?
 A.h<A>(A) -> ()inlined generic function <(A, A1)> of 
+$S1T19protocol_resilience17ResilientProtocolPTl --> associated type descriptor for T
+$S18resilient_protocol21ResilientBaseProtocolTL --> protocol requirements base descriptor for resilient_protocol.ResilientBaseProtocol
+$S1t1PP10AssocType2_AA1QTn --> associated conformance descriptor for t.P.AssocType2: t.Q
+$S1t1PP10AssocType2_AA1QTN --> default associated conformance accessor for t.P.AssocType2: t.Q

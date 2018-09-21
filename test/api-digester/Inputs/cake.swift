@@ -41,3 +41,12 @@ public func foo3(_ a: [Int: String]) {}
 public extension Int {
   public func foo() {}
 }
+
+@_fixed_layout
+public struct fixedLayoutStruct {
+  public var a = 1
+  private var b = 2
+  var c = 3
+}
+
+extension Int: P1 { public func bar() {} }

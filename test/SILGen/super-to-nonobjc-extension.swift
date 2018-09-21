@@ -6,7 +6,7 @@
 import Foundation
 
 class MyDictionary: NSDictionary {
-  // CHECK-LABEL: sil hidden @$S4main12MyDictionaryC31callSuperNonObjCExtensionMethodyySiF
+  // CHECK-LABEL: sil hidden @$s4main12MyDictionaryC31callSuperNonObjCExtensionMethodyySiF
   func callSuperNonObjCExtensionMethod(_ x: Int) {
     // CHECK-NOT: super_method {{.*}} #NSDictionary.nonObjCExtensionMethod
     super.nonObjCExtensionMethod(x)

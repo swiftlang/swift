@@ -661,6 +661,9 @@ bool IndexSwiftASTWalker::handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWit
         return;
 
       auto *decl = witness.getDecl();
+      if (decl == nullptr)
+        return;
+
       if (decl->getDeclContext() == DC) {
         explicitValueWitnesses.push_back(ValueWitness{decl, req});
       } else {

@@ -2,7 +2,7 @@
 
 // CHECK-NOT: _TMnCSo
 
-// CHECK: @"$SSo6ThingyCyxG32objc_bridged_generic_conformance1PADMc" = hidden constant %swift.protocol_conformance_descriptor {{.*}} @"\01l_OBJC_CLASS_REF_$_Thingy"
+// CHECK: @"$sSo6ThingyCyxG32objc_bridged_generic_conformance1PADMc" = hidden constant %swift.protocol_conformance_descriptor {{.*}} @"\01l_OBJC_CLASS_REF_$_Thingy"
 
 // CHECK-NOT: _TMnCSo
 

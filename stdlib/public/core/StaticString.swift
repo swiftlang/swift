@@ -130,7 +130,7 @@ public struct StaticString
   ///   `withUTF8Buffer(invoke:)` method. The pointer argument is valid only
   ///   for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure.
-  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   public func withUTF8Buffer<R>(
     _ body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
@@ -187,7 +187,6 @@ public struct StaticString
       : (0x1 as UInt8)._value
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_effects(readonly)
   @_transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
@@ -198,14 +197,12 @@ public struct StaticString
   ///
   /// Do not call this initializer directly. It may be used by the compiler
   /// when you initialize a static string with a Unicode scalar.
-  @inlinable // FIXME(sil-serialize-all)
   @_effects(readonly)
   @_transparent
   public init(unicodeScalarLiteral value: StaticString) {
     self = value
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_effects(readonly)
   @_transparent
   public init(
@@ -225,14 +222,12 @@ public struct StaticString
   ///
   /// Do not call this initializer directly. It may be used by the compiler
   /// when you initialize a static string using an extended grapheme cluster.
-  @inlinable // FIXME(sil-serialize-all)
   @_effects(readonly)
   @_transparent
   public init(extendedGraphemeClusterLiteral value: StaticString) {
     self = value
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_effects(readonly)
   @_transparent
   public init(
@@ -250,7 +245,6 @@ public struct StaticString
   ///
   /// Do not call this initializer directly. It may be used by the compiler
   /// when you initialize a static string using a string literal.
-  @inlinable // FIXME(sil-serialize-all)
   @_effects(readonly)
   @_transparent
   public init(stringLiteral value: StaticString) {
@@ -258,7 +252,6 @@ public struct StaticString
   }
 
   /// A string representation of the static string.
-  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
     return withUTF8Buffer { (buffer) in
       if isASCII {

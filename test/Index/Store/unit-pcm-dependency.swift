@@ -1,3 +1,5 @@
+// REQUIRES: objc_interop
+
 // RUN: rm -rf %t
 // RUN: %target-swift-frontend -index-store-path %t/idx -primary-file %s -o %t/s1.o -I %S/Inputs -typecheck -module-cache-path %t/mcp
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck %s -check-prefix=FILE1
@@ -16,8 +18,6 @@
 // RUN: %FileCheck %s -check-prefix=FILE1 < %t/both.txt
 // RUN: %FileCheck %s -check-prefix=FILE2 < %t/both.txt
 
-
-// XFAIL: linux
 
 import ClangModuleB
 import ClangModuleC.Sub1

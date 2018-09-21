@@ -23,6 +23,7 @@
 #include <vector>
 
 namespace swift {
+class ASTPrinter;
 class GenericEnvironment;
 class CanType;
 class Decl;
@@ -134,12 +135,31 @@ struct PrintOptions {
   /// \brief Whether to print *any* accessors on properties.
   bool PrintPropertyAccessors = true;
 
-  /// \brief Whether to print the accessors of a property abstractly,
-  /// i.e. always as get and set rather than the specific accessors
-  /// actually used to implement the property.
+  /// Whether to print the accessors of a property abstractly,
+  /// i.e. always as:
+  /// ```
+  /// var x: Int { get set }
+  /// ```
+  /// rather than the specific accessors actually used to implement the
+  /// property.
   ///
   /// Printing function definitions takes priority over this setting.
   bool AbstractAccessors = true;
+
+  /// Whether to print a property with only a single getter using the shorthand
+  /// ```
+  /// var x: Int { return y }
+  /// ```
+  /// vs.
+  /// ```
+  /// var x: Int {
+  ///   get { return y }
+  /// }
+  /// ```
+  bool CollapseSingleGetterProperty = true;
+
+  /// Whether to print the bodies of accessors in protocol context.
+  bool PrintAccessorBodiesInProtocols = false;
 
   /// \brief Whether to print type definitions.
   bool TypeDefinitions = false;
@@ -356,10 +376,9 @@ struct PrintOptions {
   QualifyNestedDeclarations ShouldQualifyNestedDeclarations =
       QualifyNestedDeclarations::Never;
 
-  /// \brief If this is not \c nullptr then functions (including accessors and
-  /// constructors) will be printed with a body that is determined by this
-  /// function.
-  std::function<std::string(const ValueDecl *)> FunctionBody;
+  /// \brief If this is not \c nullptr then function bodies (including accessors
+  /// and constructors) will be printed by this function.
+  std::function<void(const ValueDecl *, ASTPrinter &)> FunctionBody;
 
   BracketOptions BracketOptions;
 

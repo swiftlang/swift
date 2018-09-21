@@ -183,15 +183,19 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (extension == conformanceExtension)
       return true;
 
-    tc.bindExtension(extension);
+    auto *extendedNominal = extension->getExtendedNominal();
+
+    // Invalid case.
+    if (extendedNominal == nullptr)
+      return true;
 
     // Assume unconstrained concrete extensions we found witnesses in are
     // always viable.
-    if (!extension->getExtendedType()->isAnyExistentialType()) {
-      // TODO: When constrained extensions are a thing, we'll need an "is
-      // as specialized as" kind of check here.
+    if (!isa<ProtocolDecl>(extendedNominal))
       return !extension->isConstrainedExtension();
-    }
+
+    // Build a generic signature.
+    tc.validateExtension(extension);
 
     // The extension may not have a generic signature set up yet, as a
     // recursion breaker, in which case we can't yet confidently reject its
@@ -758,8 +762,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
   return inferred;
 }
 
-/// Find an associated type declarations that provides a default definition.
-static AssociatedTypeDecl *findDefaultedAssociatedType(
+AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
                                              TypeChecker &tc,
                                              AssociatedTypeDecl *assocType) {
   // If this associated type has a default, we're done.
@@ -775,11 +778,11 @@ static AssociatedTypeDecl *findDefaultedAssociatedType(
     if (!overriddenDefault) continue;
 
     Type overriddenType =
-      overriddenDefault->getDefaultDefinitionLoc().getType();
+      overriddenDefault->getDefaultDefinitionType();
     assert(overriddenType);
     if (!overriddenType) continue;
 
-    CanType key = overriddenType->mapTypeOutOfContext()->getCanonicalType();
+    CanType key = overriddenType->getCanonicalType();
     if (canonicalTypes.insert(key).second)
       results.push_back(overriddenDefault);
   }
@@ -851,20 +854,14 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
     }
   }
 
-  Type defaultType = defaultedAssocType->getDefaultDefinitionLoc().getType();
+  Type defaultType = defaultedAssocType->getDefaultDefinitionType();
 
   // FIXME: Circularity
   if (!defaultType)
     return Type();
 
-  // If the associated type came from a different protocol, map it into our
-  // protocol's context.
-  if (defaultedAssocType->getDeclContext() != proto) {
-    defaultType = defaultType->mapTypeOutOfContext();
-    defaultType = proto->mapTypeIntoContext(defaultType);
-    if (!defaultType) return Type();
-  }
-
+  // Map it into our protocol's context.
+  defaultType = proto->mapTypeIntoContext(defaultType);
   defaultType = defaultType.subst(
                           QueryTypeSubstitutionMap{substitutions},
                           LookUpConformanceInModule(dc->getParentModule()));
@@ -1182,6 +1179,7 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
   case RequirementCheckResult::Failure:
     return true;
   }
+  llvm_unreachable("unhandled result");
 }
 
 void AssociatedTypeInference::findSolutions(

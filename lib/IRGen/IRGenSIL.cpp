@@ -72,17 +72,13 @@
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenModule.h"
+#include "MetadataLayout.h"
 #include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
 #include "ReferenceTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
-
-// FIXME: Remove this option entirely and turn this on by default.
-llvm::cl::opt<bool> DebugInfoInlinedGenerics(
-    "debug-info-inlined-generics", llvm::cl::init(false),
-    llvm::cl::desc("Emit variable debug info for inlined generic functions"));
 
 namespace {
 
@@ -724,31 +720,25 @@ public:
   }
 
   /// To make it unambiguous whether a `var` binding has been initialized,
-  /// zero-initialize the first pointer-sized field. LLDB uses this to
-  /// recognize to detect uninitizialized variables. This can be removed once
-  /// swiftc switches to @llvm.dbg.addr() intrinsics.
+  /// zero-initialize the shadow copy alloca. LLDB uses the first pointer-sized
+  /// field to recognize to detect uninitizialized variables. This can be
+  /// removed once swiftc switches to @llvm.dbg.addr() intrinsics.
   void zeroInit(llvm::AllocaInst *AI) {
     if (!AI)
       return;
 
     // Only do this at -Onone.
-    if (IGM.IRGen.Opts.shouldOptimize())
-      return;
-
-    auto &DL = IGM.DataLayout;
-    if (DL.getTypeSizeInBits(AI->getAllocatedType()) <
-        DL.getPointerSizeInBits())
+    uint64_t Size = *AI->getAllocationSizeInBits(IGM.DataLayout) / 8;
+    if (IGM.IRGen.Opts.shouldOptimize() || !Size)
       return;
 
     llvm::IRBuilder<> ZeroInitBuilder(AI->getNextNode());
 
     // No debug location is how LLVM marks prologue instructions.
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
-    auto *BC =
-        ZeroInitBuilder.CreateBitCast(AI, IGM.OpaquePtrTy->getPointerTo());
-    ZeroInitBuilder.CreateAlignedStore(
-        llvm::ConstantPointerNull::get(IGM.OpaquePtrTy), BC,
-        IGM.getPointerAlignment().getValue());
+    ZeroInitBuilder.CreateMemSet(
+        AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
+        Size, AI->getAlignment());
   }
 
   /// Account for bugs in LLVM.
@@ -773,10 +763,10 @@ public:
 
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, Name}}];
     if (!Alloca.isValid())
-      Alloca = createAlloca(Storage->getType(), Align, Name+".addr");
-    zeroInit(dyn_cast<llvm::AllocaInst>(Alloca.getAddress()));
+      Alloca = createAlloca(Storage->getType(), Align, Name+".debug");
+    zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
 
-    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();
   }
@@ -852,21 +842,11 @@ public:
 
     SILType Type = SILVal->getType();
     auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
-    auto Alloca = LTI.allocateStack(*this, Type, "debug.copy");
-    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
+    auto Alloca = LTI.allocateStack(*this, Type, Name+".debug");
+    zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress().getAddress()));
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     LTI.initialize(*this, e, Alloca.getAddress(), false /* isOutlined */);
     copy.push_back(Alloca.getAddressPointer());
-  }
-
-  /// Determine whether a generic variable has been inlined.
-  static bool isInlinedGeneric(VarDecl *VarDecl, const SILDebugScope *DS) {
-    if (DebugInfoInlinedGenerics)
-      return false;
-    if (!DS->InlinedCallSite)
-      return false;
-    if (VarDecl->hasType())
-      return VarDecl->getType()->hasArchetype();
-    return VarDecl->getInterfaceType()->hasTypeParameter();
   }
 
   /// Force all archetypes referenced by the type to be bound by this point.
@@ -891,14 +871,9 @@ public:
                                     StringRef Name,
                                     unsigned ArgNo = 0,
                                     IndirectionKind Indirection = DirectValue) {
-    // FIXME: The debug info type of all inlined instances of a variable must be
-    // the same as the type of the abstract variable.
-    if (isInlinedGeneric(VarDecl, DS))
-      return;
-
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
-      PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
+      PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
                                              Name, ArgNo, Indirection);
     } else
@@ -946,7 +921,6 @@ public:
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);
   void visitStringLiteralInst(StringLiteralInst *i);
-  void visitConstStringLiteralInst(ConstStringLiteralInst *i);
 
   void visitLoadInst(LoadInst *i);
   void visitStoreInst(StoreInst *i);
@@ -1576,7 +1550,8 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   // emitPolymorphicParameters() may create function calls, so we need
   // to initialize the debug location here.
-  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo, IGF.Builder);
+  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(),
+                         IGF.Builder);
   
   // Bind polymorphic arguments. This can only be done after binding
   // all the value parameters, and must be done even for non-polymorphic
@@ -2573,22 +2548,6 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
     addr = emitObjCSelectorRefLoad(i->getValue());
   else
     addr = emitAddrOfConstantString(IGM, i);
-
-  Explosion e;
-  e.add(addr);
-  setLoweredExplosion(i, e);
-}
-
-void IRGenSILFunction::visitConstStringLiteralInst(
-    swift::ConstStringLiteralInst *i) {
-
-  llvm::Constant *addr;
-  if (i->getEncoding() == ConstStringLiteralInst::Encoding::UTF8)
-    addr = IGM.getAddrOfGlobalConstantString(i->getValue());
-  else
-    addr = IGM.getAddrOfGlobalUTF16ConstantString(i->getValue());
-
-  addr = llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);
 
   Explosion e;
   e.add(addr);
@@ -4222,9 +4181,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
       RealType, type);
 
-  if (isInlinedGeneric(Decl, i->getDebugScope()))
-    return;
-
   auto Storage = emitShadowCopyIfNeeded(
       boxWithAddr.getAddress(), i->getDebugScope(), Name, 0, IsAnonymous);
 
@@ -5398,19 +5354,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
 
-  // Find the original entry in the witness table.
-  bool wasOverriding = false;
-  while (auto overridden = member.getOverridden()) {
-    member = overridden;
-    wasOverriding = true;
-  }
-
-  // If the requirement given override another requirement, adjust the
-  // conformance appropriately.
-  if (wasOverriding) {
-    auto memberProto = cast<ProtocolDecl>(member.getDecl()->getDeclContext());
-    conformance = conformance.getInheritedConformanceRef(memberProto);
-  }
+  assert(member.requiresNewWitnessTableEntry());
 
   if (IGM.isResilient(conformance.getRequirement(),
                       ResilienceExpansion::Maximal)) {
@@ -5506,8 +5450,74 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   auto baseType = i->getOperand()->getType();
   llvm::Value *baseValue = base.claimNext();
 
-  auto method = i->getMember();
+  auto method = i->getMember().getOverriddenVTableEntry();
   auto methodType = i->getType().castTo<SILFunctionType>();
+
+  auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
+
+  // If the class defining the vtable entry is resilient, we cannot assume
+  // its offset since methods can be re-ordered resiliently. Instead, we call
+  // the class method lookup function, passing in a reference to the
+  // method descriptor.
+  if (IGM.isResilient(classDecl, ResilienceExpansion::Maximal)) {
+    // Load the superclass of the static type of the 'self' value.
+    llvm::Value *superMetadata;
+    auto instanceTy = CanType(baseType.getASTType()->getMetatypeInstanceType());
+    if (!IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
+                         ResilienceExpansion::Maximal)) {
+      // It's still possible that the static type of 'self' is not resilient, in
+      // which case we can assume its superclass.
+      //
+      // An example is the following hierarchy, where ModuleA is resilient and
+      // we're inside ModuleB:
+      //
+      // ModuleA.Base <-- defines method
+      // |
+      // \- ModuleB.Middle
+      //    |
+      //    \- ModuleB.Derived <-- static type of 'self'
+      //
+      // It's OK to know that the superclass of Derived is Middle, but the
+      // method requires using a resilient access pattern.
+      auto superTy = instanceTy->getSuperclass();
+      superMetadata = emitClassHeapMetadataRef(*this, superTy->getCanonicalType(),
+                                               MetadataValueType::TypeMetadata,
+                                               MetadataState::Complete);
+    } else {
+      // Otherwise, we're in the most general case; the superclass might change,
+      // so we have to load it dynamically from the metadata of the static type
+      // of 'self'.
+      auto *metadata = emitClassHeapMetadataRef(*this, instanceTy,
+                                                MetadataValueType::TypeMetadata,
+                                                MetadataState::Complete);
+
+      auto superField = emitAddressOfSuperclassRefInClassMetadata(*this, metadata);
+      superMetadata = Builder.CreateLoad(superField);
+    }
+
+    // Get the method descriptor.
+    auto *methodDescriptor =
+      IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
+
+    // Get the method lookup function for the class defining the method.
+    auto *lookupFn = IGM.getAddrOfMethodLookupFunction(classDecl,
+                                                       NotForDefinition);
+
+    // Call the lookup function.
+    llvm::Value *fnPtr = Builder.CreateCall(lookupFn,
+                                            {superMetadata, methodDescriptor});
+
+    // The function returns an i8*; cast it to the correct type.
+    auto sig = IGM.getSignature(methodType);
+    fnPtr = Builder.CreateBitCast(fnPtr, sig.getType()->getPointerTo());
+
+    FunctionPointer fn(fnPtr, sig);
+
+    setLoweredFunctionPointer(i, fn);
+    return;
+  }
+
+  // Non-resilient case.
 
   auto fn = emitVirtualMethodValue(*this, baseValue, baseType,
                                    method, methodType,
@@ -5529,14 +5539,12 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *baseValue = base.claimNext();
 
-  SILDeclRef method = i->getMember();
+  SILDeclRef method = i->getMember().getOverriddenVTableEntry();
   auto methodType = i->getType().castTo<SILFunctionType>();
 
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
-
   if (IGM.isResilient(classDecl,
                       ResilienceExpansion::Maximal)) {
-    method = method.getOverriddenVTableEntry();
     auto *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
     auto sig = IGM.getSignature(methodType);
     FunctionPointer fn(fnPtr, sig);

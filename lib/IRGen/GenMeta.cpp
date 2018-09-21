@@ -637,12 +637,24 @@ namespace {
 
       if (entry.isAssociatedType()) {
         auto flags = Flags(Flags::Kind::AssociatedTypeAccessFunction);
-        return { flags, nullptr };
+
+        // Look for a default witness.
+        llvm::Constant *defaultImpl =
+          findDefaultTypeWitness(entry.getAssociatedType());
+
+        return { flags, defaultImpl };
       }
 
       if (entry.isAssociatedConformance()) {
         auto flags = Flags(Flags::Kind::AssociatedConformanceAccessFunction);
-        return { flags, nullptr };
+
+        // Look for a default witness.
+        llvm::Constant *defaultImpl =
+          findDefaultAssociatedConformanceWitness(
+            entry.getAssociatedConformancePath(),
+            entry.getAssociatedConformanceRequirement());
+
+        return { flags, defaultImpl };
       }
 
       assert(entry.isFunction());
@@ -667,14 +679,53 @@ namespace {
       B.fillPlaceholderWithInt(*NumRequirements, IGM.Int32Ty,
                                pi.getNumWitnesses());
 
+      if (pi.getNumWitnesses() > 0) {
+        // Define the protocol requirements "base" descriptor, which references
+        // the beginning of the protocol requirements, offset so that
+        // subtracting this address from the address of a given protocol
+        // requirements gives the corresponding offset into the witness
+        // table.
+        auto address =
+          B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy);
+        int offset = WitnessTableFirstRequirementOffset;
+        auto firstReqAdjustment = llvm::ConstantInt::get(IGM.Int32Ty, -offset);
+        address = llvm::ConstantExpr::getGetElementPtr(nullptr, address,
+                                                       firstReqAdjustment);
+
+        IGM.defineProtocolRequirementsBaseDescriptor(Proto, address);
+      }
+
       for (auto &entry : pi.getWitnessEntries()) {
-        if (Resilient && entry.isFunction()) {
-          // Define the method descriptor.
-          SILDeclRef func(entry.getFunction());
-          auto *descriptor =
-            B.getAddrOfCurrentPosition(
-              IGM.ProtocolRequirementStructTy);
-          IGM.defineMethodDescriptor(func, Proto, descriptor);
+        if (Resilient) {
+          if (entry.isFunction()) {
+            // Define the method descriptor.
+            SILDeclRef func(entry.getFunction());
+            auto *descriptor =
+              B.getAddrOfCurrentPosition(
+                IGM.ProtocolRequirementStructTy);
+            IGM.defineMethodDescriptor(func, Proto, descriptor);
+          }
+        }
+
+        if (entry.isAssociatedType()) {
+          auto assocType = entry.getAssociatedType();
+          // Define the associated type descriptor to point to the current
+          // position in the protocol descriptor.
+          IGM.defineAssociatedTypeDescriptor(
+              assocType,
+              B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
+        }
+
+        if (entry.isAssociatedConformance()) {
+          // Define the associated conformance descriptor to point to the
+          // current position in the protocol descriptor.
+          AssociatedConformance conformance(
+                                  Proto,
+                                  entry.getAssociatedConformancePath(),
+                                  entry.getAssociatedConformanceRequirement());
+          IGM.defineAssociatedConformanceDescriptor(
+              conformance,
+              B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
         }
 
         auto reqt = B.beginStruct(IGM.ProtocolRequirementStructTy);
@@ -695,12 +746,150 @@ namespace {
       if (!DefaultWitnesses) return nullptr;
 
       for (auto &entry : DefaultWitnesses->getEntries()) {
-        if (!entry.isValid() || entry.getRequirement() != func)
+        if (!entry.isValid() || entry.getKind() != SILWitnessTable::Method ||
+            entry.getMethodWitness().Requirement != func)
           continue;
-        return IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition);
+        return IGM.getAddrOfSILFunction(entry.getMethodWitness().Witness,
+                                        NotForDefinition);
       }
 
       return nullptr;
+    }
+
+    llvm::Constant *findDefaultTypeWitness(AssociatedTypeDecl *assocType) {
+      if (!DefaultWitnesses) return nullptr;
+
+      for (auto &entry : DefaultWitnesses->getEntries()) {
+        if (!entry.isValid() ||
+            entry.getKind() != SILWitnessTable::AssociatedType ||
+            entry.getAssociatedTypeWitness().Requirement != assocType)
+          continue;
+
+        auto witness = entry.getAssociatedTypeWitness().Witness;
+        return getDefaultAssociatedTypeMetadataAccessFunction(
+                 AssociatedType(assocType), witness);
+      }
+
+      return nullptr;
+    }
+
+    /// Create an associated type metadata access function for the default
+    /// associated type witness.
+    llvm::Constant *getDefaultAssociatedTypeMetadataAccessFunction(
+                      AssociatedType requirement, CanType witness) {
+      auto accessor =
+        IGM.getAddrOfDefaultAssociatedTypeMetadataAccessFunction(requirement);
+
+      IRGenFunction IGF(IGM, accessor);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
+
+      Explosion parameters = IGF.collectParameters();
+      auto request = DynamicMetadataRequest(parameters.claimNext());
+
+      llvm::Value *self = parameters.claimNext();
+      llvm::Value *wtable = parameters.claimNext();
+
+      CanType selfInContext =
+          Proto->mapTypeIntoContext(Proto->getProtocolSelfType())
+            ->getCanonicalType();
+
+      // Bind local Self type data from the metadata argument.
+      IGF.bindLocalTypeDataFromTypeMetadata(selfInContext, IsExact, self,
+                                            MetadataState::Abstract);
+      IGF.setUnscopedLocalTypeData(
+          selfInContext,
+          LocalTypeDataKind::forAbstractProtocolWitnessTable(Proto),
+          wtable);
+
+      // Emit a reference to the type metadata.
+      auto response = IGF.emitTypeMetadataRef(witness, request);
+      response.ensureDynamicState(IGF);
+      auto returnValue = response.combine(IGF);
+      IGF.Builder.CreateRet(returnValue);
+      return accessor;
+    }
+
+    llvm::Constant *findDefaultAssociatedConformanceWitness(
+                                                  CanType association,
+                                                  ProtocolDecl *requirement) {
+      if (!DefaultWitnesses) return nullptr;
+
+      for (auto &entry : DefaultWitnesses->getEntries()) {
+        if (!entry.isValid() ||
+            entry.getKind() != SILWitnessTable::AssociatedTypeProtocol ||
+            entry.getAssociatedTypeProtocolWitness().Protocol != requirement ||
+            entry.getAssociatedTypeProtocolWitness().Requirement != association)
+          continue;
+
+        auto witness = entry.getAssociatedTypeProtocolWitness().Witness;
+        return getDefaultAssociatedConformanceAccessFunction(
+                 AssociatedConformance(Proto, association, requirement),
+                 witness);
+      }
+
+      return nullptr;
+    }
+
+    llvm::Constant *getDefaultAssociatedConformanceAccessFunction(
+                      AssociatedConformance requirement,
+                      ProtocolConformanceRef conformance) {
+      auto accessor =
+        IGM.getAddrOfDefaultAssociatedConformanceAccessor(requirement);
+
+      IRGenFunction IGF(IGM, accessor);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
+
+      Explosion parameters = IGF.collectParameters();
+
+      llvm::Value *associatedTypeMetadata = parameters.claimNext();
+      llvm::Value *self = parameters.claimNext();
+      llvm::Value *wtable = parameters.claimNext();
+
+      bool hasArchetype =
+        !conformance.isConcrete() ||
+        conformance.getConcrete()->getType()->hasArchetype();
+      if (hasArchetype) {
+        // Bind local Self type data from the metadata argument.
+        CanType selfInContext =
+            Proto->mapTypeIntoContext(Proto->getProtocolSelfType())
+              ->getCanonicalType();
+        IGF.bindLocalTypeDataFromTypeMetadata(selfInContext, IsExact, self,
+                                              MetadataState::Abstract);
+        IGF.setUnscopedLocalTypeData(
+            selfInContext,
+            LocalTypeDataKind::forAbstractProtocolWitnessTable(Proto),
+            wtable);
+
+        // Bind the associated type metadata.
+        IGF.bindLocalTypeDataFromTypeMetadata(requirement.getAssociation(),
+                                              IsExact,
+                                              associatedTypeMetadata,
+                                              MetadataState::Abstract);
+      }
+
+      // For a concrete witness table, call it.
+      ProtocolDecl *associatedProtocol = requirement.getAssociatedRequirement();
+      if (conformance.isConcrete()) {
+        auto conformanceI = &IGM.getConformanceInfo(associatedProtocol,
+                                                    conformance.getConcrete());
+        auto returnValue = conformanceI->getTable(IGF, &associatedTypeMetadata);
+        IGF.Builder.CreateRet(returnValue);
+        return accessor;
+      }
+
+      // For an abstract table, emit a reference to the witness table.
+      CanType associatedTypeInContext
+        = Proto->mapTypeIntoContext(requirement.getAssociation())
+            ->getCanonicalType();
+      auto returnValue =
+          emitArchetypeWitnessTableRef(
+            IGF,
+            cast<ArchetypeType>(associatedTypeInContext),
+            associatedProtocol);
+      IGF.Builder.CreateRet(returnValue);
+      return accessor;
     }
 
     void addAssociatedTypeNames() {
@@ -1313,6 +1502,11 @@ namespace {
     void addVTable() {
       if (VTableEntries.empty())
         return;
+
+      // Only emit a method lookup function if the class is resilient
+      // and has a non-empty vtable.
+      if (IGM.isResilient(getType(), ResilienceExpansion::Minimal))
+        IGM.emitMethodLookupFunction(getType());
 
       auto offset = MetadataLayout->hasResilientSuperclass()
                       ? MetadataLayout->getRelativeVTableOffset()
@@ -3870,8 +4064,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::BridgedStoredNSError:
   case KnownProtocolKind::CFObject:
   case KnownProtocolKind::ErrorCodeProtocol:
-  case KnownProtocolKind::ExpressibleByBuiltinConstStringLiteral:
-  case KnownProtocolKind::ExpressibleByBuiltinConstUTF16StringLiteral:
   case KnownProtocolKind::CodingKey:
   case KnownProtocolKind::Encodable:
   case KnownProtocolKind::Decodable:

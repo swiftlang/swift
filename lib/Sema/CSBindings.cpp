@@ -849,7 +849,7 @@ bool TypeVarBindingProducer::computeNext() {
   return true;
 }
 
-void TypeVariableBinding::attempt(ConstraintSystem &cs) const {
+bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto type = Binding.BindingType;
   auto *locator = TypeVar->getImpl().getLocator();
 
@@ -878,4 +878,6 @@ void TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding())
     cs.DefaultedConstraints.push_back(Binding.DefaultableBinding);
+
+  return !cs.failedConstraint && !cs.simplify();
 }

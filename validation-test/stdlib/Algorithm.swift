@@ -227,7 +227,7 @@ Algorithm.test("sort3/simple")
     [1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1]
   ]) {
     var input = $0
-    input.sort()
+    input._sort3(0, 1, 2, by: <)
     expectEqual([1, 2, 3], input)
 }
 
@@ -284,7 +284,7 @@ Algorithm.test("heapSort") {
   } // addOne end.
 
   // Test binary number size.
-  let numberLength = 21
+  let numberLength = 11
   var binaryNumber = [Int](repeating: 0, count: numberLength)
 
   // We are testing sort on all permutations off 0-1s of size `numberLength`

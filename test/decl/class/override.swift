@@ -277,6 +277,17 @@ class Derived24646184 : Base24646184 {
 }
 
 
+// Subscripts
+
+class SubscriptBase {
+  subscript(a a: Int) -> Int { return a }
+}
+
+class SubscriptDerived : SubscriptBase {
+  override subscript(a: Int) -> Int { return a }
+  // expected-error@-1 {{argument labels for method 'subscript' do not match those of overridden method 'subscript(a:)'}}
+}
+
 // Generic subscripts
 
 class GenericSubscriptBase {

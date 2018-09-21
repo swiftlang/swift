@@ -309,7 +309,6 @@ NO_OPERAND_INST(ObjCProtocol)
 NO_OPERAND_INST(RetainValue)
 NO_OPERAND_INST(RetainValueAddr)
 NO_OPERAND_INST(StringLiteral)
-NO_OPERAND_INST(ConstStringLiteral)
 NO_OPERAND_INST(StrongRetain)
 NO_OPERAND_INST(Unreachable)
 NO_OPERAND_INST(Unwind)
@@ -966,6 +965,7 @@ visitFullApply(FullApplySite apply) {
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Unexpected non-trivial parameter convention.");
   }
+  llvm_unreachable("unhandled convension");
 }
 
 OwnershipUseCheckerResult
@@ -1021,6 +1021,7 @@ OwnershipCompatibilityUseChecker::visitYieldInst(YieldInst *I) {
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Unexpected non-trivial parameter convention.");
   }
+  llvm_unreachable("unhandled convension");
 }
 
 OwnershipUseCheckerResult

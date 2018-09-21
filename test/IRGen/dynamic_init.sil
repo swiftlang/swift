@@ -11,13 +11,13 @@ class C {
   required init()
 }
 
-sil @$S12dynamic_init1CCACycACmcfC : $@convention(method) (@thick C.Type) -> @owned C
-sil @$S12dynamic_init1CCACycACmcfc : $@convention(method) (@owned C) -> @owned C
-sil @$S12dynamic_init1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject
-sil @$S12dynamic_init1CCfD : $@convention(method) (@owned C) -> ()
+sil @$s12dynamic_init1CCACycACmcfC : $@convention(method) (@thick C.Type) -> @owned C
+sil @$s12dynamic_init1CCACycACmcfc : $@convention(method) (@owned C) -> @owned C
+sil @$s12dynamic_init1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject
+sil @$s12dynamic_init1CCfD : $@convention(method) (@owned C) -> ()
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S12dynamic_init15testDynamicInityAA1CCm2cm_tF"
-sil @$S12dynamic_init15testDynamicInityAA1CCm2cm_tF : $@convention(method) (@thick C.Type) -> () {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s12dynamic_init15testDynamicInityAA1CCm2cm_tF"
+sil @$s12dynamic_init15testDynamicInityAA1CCm2cm_tF : $@convention(method) (@thick C.Type) -> () {
 bb0(%0 : $@thick C.Type):
   // CHECK:   [[META:%[0-9]+]] = bitcast %swift.type* %0 to %T12dynamic_init1CC* (%swift.type*)**
   // CHECK:   [[VTABLE_OFFSET:%[0-9]+]] = getelementptr inbounds %T12dynamic_init1CC* (%swift.type*)*, %T12dynamic_init1CC* (%swift.type*)** [[META]], i64 10
@@ -33,5 +33,5 @@ bb0(%0 : $@thick C.Type):
 }
 
 sil_vtable C {
-  #C.init!allocator.1: @$S12dynamic_init1CCACycACmcfC // dynamic_init.C.__allocating_init (dynamic_init.C.Type)() -> dynamic_init.C
+  #C.init!allocator.1: @$s12dynamic_init1CCACycACmcfC // dynamic_init.C.__allocating_init (dynamic_init.C.Type)() -> dynamic_init.C
 }

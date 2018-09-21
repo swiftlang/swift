@@ -373,11 +373,6 @@ BUILTIN_SIL_OPERATION(AllocWithTailElems, "allocWithTailElems", Special)
 /// Projects the first tail-allocated element of type E from a class C.
 BUILTIN_SIL_OPERATION(ProjectTailElems, "projectTailElems", Special)
 
-/// identityKeyPath : <T> () -> WritableKeyPath<T, T>
-///
-/// Creates an identity key path object. (TODO: replace with proper syntax)
-BUILTIN_SIL_OPERATION(IdentityKeyPath, "identityKeyPath", Special)
-
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.

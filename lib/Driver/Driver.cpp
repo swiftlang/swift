@@ -297,6 +297,11 @@ std::unique_ptr<sys::TaskQueue> Driver::buildTaskQueue(const Compilation &C) {
       return nullptr;
     }
   }
+  if (environmentVariableRequestedMaximumDeterminism()) {
+      NumberOfParallelCommands = 1;
+      Diags.diagnose(SourceLoc(), diag::remark_max_determinism_overriding,
+                     "-j");
+  }
 
   const bool DriverSkipExecution =
     ArgList.hasArg(options::OPT_driver_skip_execution,
@@ -586,7 +591,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
     // If a file was removed, we've lost its dependency info. Rebuild everything.
     // FIXME: Can we do better?
     if (ShowIncrementalBuildDecisions) {
-      llvm::StringSet<> inputArgs;
+      llvm::DenseSet<StringRef> inputArgs;
       for (auto &inputPair : inputs) {
         inputArgs.insert(inputPair.second->getValue());
       }
@@ -1181,7 +1186,7 @@ static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
 void Driver::buildInputs(const ToolChain &TC,
                          const DerivedArgList &Args,
                          InputFileList &Inputs) const {
-  llvm::StringMap<StringRef> SourceFileNames;
+  llvm::DenseMap<StringRef, StringRef> SourceFileNames;
 
   for (Arg *A : Args) {
     if (A->getOption().getKind() == Option::InputClass) {
@@ -3005,4 +3010,5 @@ bool OutputInfo::mightHaveExplicitPrimaryInputs(
   case Mode::REPL:
     llvm_unreachable("REPL and immediate modes handled elsewhere");
   }
+  llvm_unreachable("unhandled mode");
 }

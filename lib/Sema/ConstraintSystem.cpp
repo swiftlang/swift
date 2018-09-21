@@ -683,26 +683,12 @@ bool ConstraintSystem::isAnyHashableType(Type type) {
   return false;
 }
 
-static Type withParens(ConstraintSystem &cs, Type type, ParenType *parenType) {
-  auto flags = parenType->getParameterFlags().withInOut(type->is<InOutType>());
-  return ParenType::get(cs.getASTContext(), type->getInOutObjectType(), flags);
-}
-
 Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              TypeMatchOptions &flags,
-                                             bool wantRValue,
-                                             bool retainParens) {
+                                             bool wantRValue) {
 
   if (wantRValue)
     type = type->getRValueType();
-
-  if (auto *parenTy = dyn_cast<ParenType>(type.getPointer())) {
-    if (retainParens) {
-      auto fixed = getFixedTypeRecursive(parenTy->getUnderlyingType(), flags,
-                                         wantRValue, retainParens);
-      return withParens(*this, fixed, parenTy);
-    }
-  }
 
   if (auto depMemType = type->getAs<DependentMemberType>()) {
     if (!depMemType->getBase()->isTypeVariableOrMember()) return type;
@@ -715,12 +701,12 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
     // new constraint.
     flags |= TMF_GenerateConstraints;
 
-    return getFixedTypeRecursive(newType, flags, wantRValue, retainParens);
+    return getFixedTypeRecursive(newType, flags, wantRValue);
   }
 
   if (auto typeVar = type->getAs<TypeVariableType>()) {
     if (auto fixed = getFixedType(typeVar))
-      return getFixedTypeRecursive(fixed, flags, wantRValue, retainParens);
+      return getFixedTypeRecursive(fixed, flags, wantRValue);
 
     return getRepresentative(typeVar);
   }
@@ -2064,6 +2050,7 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
   case FunctionRefKind::DoubleApply:
     return true;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
@@ -2085,7 +2072,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     state.recordFixes = true;
 
     // Solve the system.
-    solveRec(viable);
+    solve(viable);
 
     // Check whether we have a best solution; this can happen if we found
     // a series of fixes that worked.

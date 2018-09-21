@@ -8,8 +8,6 @@
 
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck %s
 
-// XFAIL: linux
-
 import SwiftModuleA
 import SwiftModuleB
 

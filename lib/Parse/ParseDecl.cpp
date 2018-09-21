@@ -181,11 +181,21 @@ namespace {
 } // end anonymous namespace
 
 void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
-  if (!hasDelayedDeclList(IDC))
-    return;
   SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
+  assert(!SF.hasInterfaceHash() &&
+    "Cannot delay parsing if we care about the interface hash.");
+  assert(SF.Kind != SourceFileKind::SIL && "cannot delay parsing SIL");
   unsigned BufferID = *SF.getBufferID();
-  Parser TheParser(BufferID, SF, nullptr, this);
+
+  // MarkedPos is not useful for delayed parsing because we know where we should
+  // jump the parser to. However, we should recover the MarkedPos here in case
+  // the PersistentParserState will be used to continuously parse the rest of
+  // the file linearly.
+  llvm::SaveAndRestore<ParserPosition> Pos(MarkedPos, ParserPosition());
+
+  // Lexer diaganostics have been emitted during skipping, so we disable lexer's
+  // diagnostic engine here.
+  Parser TheParser(BufferID, SF, /*No Lexer Diags*/nullptr, nullptr, this);
   // Disable libSyntax creation in the delayed parsing.
   TheParser.SyntaxContext->disable();
   TheParser.parseDeclListDelayed(IDC);
@@ -300,6 +310,12 @@ bool Parser::parseTopLevel() {
 static Optional<StringRef>
 getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
                                   StringRef DiagText) {
+  // FIXME: Support extended escaping string literal.
+  if (Tok.getCustomDelimiterLen()) {
+    P.diagnose(Loc, diag::attr_extended_escaping_string, DiagText);
+    return None;
+  }
+
   SmallVector<Lexer::StringSegment, 1> Segments;
   P.L->getStringLiteralSegments(Tok, Segments);
   if (Segments.size() != 1 ||
@@ -2275,7 +2291,8 @@ static unsigned skipUntilMatchingRBrace(Parser &P, bool &HasPoundDirective,
   SyntaxParsingContext BodyContext(SyntaxContext, SyntaxKind::TokenList);
   unsigned OpenBraces = 1;
   while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
-    HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line);
+    HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line,
+      tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
     if (P.consumeIf(tok::l_brace)) {
       OpenBraces++;
       continue;
@@ -2885,6 +2902,15 @@ void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
                   ParseDeclOptions(DelayedState->Flags),
                   [&] (Decl *D) { ext->addMember(D); });
     ext->setBraces({LBLoc, RBLoc});
+  } else if (auto *cd = dyn_cast<ClassDecl>(D)) {
+    auto handler = [&] (Decl *D) {
+      cd->addMember(D);
+      if (isa<DestructorDecl>(D))
+        cd->setHasDestructor();
+    };
+    parseDeclList(cd->getBraces().Start, RBLoc, Id,
+                  ParseDeclOptions(DelayedState->Flags), handler);
+    cd->setBraces({LBLoc, RBLoc});
   } else {
     auto *ntd = cast<NominalTypeDecl>(D);
     parseDeclList(ntd->getBraces().Start, RBLoc, Id,
@@ -3331,7 +3357,14 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
   return !RBLoc.isValid();
 }
 
-bool Parser::canDelayBodyParsing() {
+bool Parser::canDelayMemberDeclParsing() {
+  // There's no fundamental reasons that SIL cannnot be lasily parsed. We need
+  // to keep SILParserTUStateBase persistent to make it happen.
+  if (isInSILMode())
+    return false;
+  // Calculating interface hash requires tokens consumed in the original order.
+  if (SF.hasInterfaceHash())
+    return false;
   if (SF.Kind == SourceFileKind::REPL)
     return false;
   // We always collect the entire syntax tree for IDE uses.
@@ -3418,7 +3451,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     ContextChange CC(*this, ext);
     Scope S(this, ScopeKind::Extension);
     ParseDeclOptions Options(PD_HasContainerType | PD_InExtension);
-    if (canDelayBodyParsing()) {
+    if (canDelayMemberDeclParsing()) {
       if (Tok.is(tok::r_brace)) {
         RBLoc = consumeToken();
       } else {
@@ -3550,7 +3583,6 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
   
   unsigned StartLine = 0;
   Optional<StringRef> Filename;
-  const char *LastTokTextEnd;
   if (!isLine) {
     // #sourceLocation()
     // #sourceLocation(file: "foo", line: 42)
@@ -3607,10 +3639,10 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       consumeToken(tok::integer_literal);
     }
 
-    LastTokTextEnd = Tok.getText().end();
-    if (parseToken(tok::r_paren, diag::sourceLocation_expected, ")"))
+    if (Tok.isNot(tok::r_paren)) {
+      diagnose(Tok, diag::sourceLocation_expected, ")");
       return makeParserError();
-    
+    }
   } else {  // Legacy #line syntax.
   
     // #line\n returns to the main buffer.
@@ -3646,10 +3678,10 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
                                                  "#line");
     if (!Filename.hasValue())
       return makeParserError();
-    LastTokTextEnd = Tok.getText().end();
-    consumeToken(tok::string_literal);
   }
-  
+
+  const char *LastTokTextEnd = Tok.getText().end();
+
   // Skip over trailing whitespace and a single \n to the start of the next
   // line.
   while (*LastTokTextEnd == ' ' || *LastTokTextEnd == '\t')
@@ -3669,6 +3701,9 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
   bool isNewFile = SourceMgr.openVirtualFile(nextLineStartLoc,
                                              Filename.getValue(), LineOffset);
   assert(isNewFile);(void)isNewFile;
+
+  // Lexing of next token must be deferred until after virtual file setup.
+  consumeToken(isLine ? tok::string_literal : tok::r_paren);
 
   InPoundLineEnvironment = true;
   return makeParserSuccess();
@@ -4183,9 +4218,10 @@ struct Parser::ParsedAccessors {
   }
 };
 
-static bool parseAccessorIntroducer(Parser &P, bool parsingLimitedSyntax,
-                                    DeclAttributes &Attributes, AccessorKind &Kind,
-                                    AddressorKind &addressorKind, SourceLoc &Loc) {
+static bool parseAccessorIntroducer(Parser &P, DeclAttributes &Attributes,
+                                    AccessorKind &Kind,
+                                    AddressorKind &addressorKind,
+                                    SourceLoc &Loc) {
   bool FoundCCToken;
   P.parseDeclAttributeList(Attributes, FoundCCToken);
 
@@ -4240,20 +4276,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
   // SIL mode and textual interfaces use the same syntax.
   // Otherwise, we have a normal var or subscript declaration and we need
   // parse the full complement of specifiers, along with their bodies.
-  bool parsingLimitedSyntax = Flags.contains(PD_InProtocol);
-  if (!parsingLimitedSyntax) {
-    switch (SF.Kind) {
-    case SourceFileKind::Interface:
-      // FIXME: Textual interfaces /can/ have inlinable code but don't have to.
-    case SourceFileKind::SIL:
-      parsingLimitedSyntax = true;
-      break;
-    case SourceFileKind::Library:
-    case SourceFileKind::Main:
-    case SourceFileKind::REPL:
-      break;
-    }
-  }
+  bool parsingLimitedSyntax = Flags.contains(PD_InProtocol) ||
+                              SF.Kind == SourceFileKind::SIL;
 
   SyntaxParsingContext AccessorListCtx(SyntaxContext,
                                        SyntaxKind::AccessorBlock);
@@ -4308,7 +4332,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
     AddressorKind addressorKind = AddressorKind::NotAddressor;
     SourceLoc Loc;
     bool NotAccessor = parseAccessorIntroducer(
-        *this, parsingLimitedSyntax, Attributes, Kind, addressorKind, Loc);
+        *this, Attributes, Kind, addressorKind, Loc);
     if (NotAccessor) {
       AccessorCtx->setTransparent();
       AccessorCtx.reset();
@@ -4372,6 +4396,9 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
 
     // It's okay not to have a body if there's an external asm name.
     if (!Tok.is(tok::l_brace)) {
+      // Accessors don't need bodies in textual interfaces
+      if (SF.Kind == SourceFileKind::Interface)
+        continue;
       // _silgen_name'd accessors don't need bodies.
       if (!Attributes.hasAttribute<SILGenNameAttr>()) {
         diagnose(Tok, diag::expected_lbrace_accessor,
@@ -5535,7 +5562,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   } else {
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement | PD_InEnum);
-    if (canDelayBodyParsing()) {
+    if (canDelayMemberDeclParsing()) {
       if (Tok.is(tok::r_brace)) {
         RBLoc = consumeToken();
       } else {
@@ -5811,6 +5838,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   // Make the entities of the struct as a code block.
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
+  SourceLoc PosBeforeLB = Tok.getLoc();
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
     LBLoc = PreviousLoc;
     RBLoc = LBLoc;
@@ -5819,9 +5847,20 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     // Parse the body.
     Scope S(this, ScopeKind::StructBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_InStruct);
-    if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
-                      Options, [&](Decl *D) {SD->addMember(D);}))
-      Status.setIsParseError();
+    if (canDelayMemberDeclParsing()) {
+      if (Tok.is(tok::r_brace)) {
+        RBLoc = consumeToken();
+      } else {
+        RBLoc = Tok.getLoc();
+        Status.setIsParseError();
+      }
+      State->delayDeclList(SD, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
+                           PosBeforeLB);
+    } else {
+      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
+                        Options, [&](Decl *D) {SD->addMember(D);}))
+        Status.setIsParseError();
+    }
   }
 
   SD->setBraces({LBLoc, RBLoc});
@@ -5922,6 +5961,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
+  auto PosBeforeLB = Tok.getLoc();
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class)) {
     LBLoc = PreviousLoc;
     RBLoc = LBLoc;
@@ -5931,14 +5971,25 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor |
                              PD_InClass);
-    auto Handler = [&] (Decl *D) {
-      CD->addMember(D);
-      if (isa<DestructorDecl>(D))
-        CD->setHasDestructor();
-    };
-    if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_class,
-                      Options, Handler))
-      Status.setIsParseError();
+    if (canDelayMemberDeclParsing()) {
+      if (Tok.is(tok::r_brace)) {
+        RBLoc = consumeToken();
+      } else {
+        RBLoc = Tok.getLoc();
+        Status.setIsParseError();
+      }
+      State->delayDeclList(CD, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
+                           PosBeforeLB);
+    } else {
+      auto Handler = [&] (Decl *D) {
+        CD->addMember(D);
+        if (isa<DestructorDecl>(D))
+          CD->setHasDestructor();
+      };
+      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_class,
+                        Options, Handler))
+        Status.setIsParseError();
+    }
   }
 
   CD->setBraces({LBLoc, RBLoc});
@@ -6020,6 +6071,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
     SourceLoc LBraceLoc;
     SourceLoc RBraceLoc;
+    SourceLoc PosBeforeLB = Tok.getLoc();
     if (parseToken(tok::l_brace, LBraceLoc, diag::expected_lbrace_protocol)) {
       LBraceLoc = PreviousLoc;
       RBraceLoc = LBraceLoc;
@@ -6029,9 +6081,21 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       ParseDeclOptions Options(PD_HasContainerType |
                                PD_DisallowInit |
                                PD_InProtocol);
-      if (parseDeclList(LBraceLoc, RBraceLoc, diag::expected_rbrace_protocol,
-                        Options, [&](Decl *D) {Proto->addMember(D);}))
-        Status.setIsParseError();
+      if (canDelayMemberDeclParsing()) {
+        if (Tok.is(tok::r_brace)) {
+          RBraceLoc = consumeToken();
+        } else {
+          RBraceLoc = Tok.getLoc();
+          Status.setIsParseError();
+        }
+        State->delayDeclList(Proto, Options.toRaw(), CurDeclContext,
+                             { LBraceLoc, RBraceLoc },
+                             PosBeforeLB);
+      } else {
+        if (parseDeclList(LBraceLoc, RBraceLoc, diag::expected_rbrace_protocol,
+                          Options, [&](Decl *D) {Proto->addMember(D);}))
+          Status.setIsParseError();
+      }
     }
 
     // Install the protocol elements.

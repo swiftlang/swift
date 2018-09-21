@@ -659,3 +659,20 @@ func sr4214() {
   }
 }
 
+struct SS {
+  var i: Int
+  let j: Float
+
+  init(i: Int, j: Float) {
+    i = i // expected-error {{cannot assign to value: 'i' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'SS'}}{{5-5=self.}}
+    j = j // expected-error {{cannot assign to value: 'j' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'SS'}}{{5-5=self.}}
+  }
+
+  mutating func foo(i: Int, j: Float) {
+    i = i // expected-error {{cannot assign to value: 'i' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'SS'}}{{5-5=self.}}
+    j = j // expected-error {{cannot assign to value: 'j' is a 'let' constant}}
+  }
+}

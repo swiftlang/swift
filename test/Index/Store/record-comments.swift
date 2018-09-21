@@ -2,8 +2,6 @@
 // RUN: %target-swift-frontend -index-store-path %t/idx -o %t.o -typecheck %s
 // RUN: c-index-test core -print-record %t/idx | %FileCheck %s
 
-// XFAIL: linux
-
 // CHECK: record-comments.swift
 // CHECK: ------------
 // CHECK: comment-tag/Swift | <no-name> | t:this_is_a_tag | <no-cgname> | Def -

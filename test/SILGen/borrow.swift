@@ -13,7 +13,7 @@ final class C {
 
 func useD(_ d: D) {}
 
-// CHECK-LABEL: sil hidden @$S6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}} : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$s6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}} : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var C }, var, name "c"
 // CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
@@ -26,10 +26,10 @@ func useD(_ d: D) {}
 // CHECK:   end_borrow [[BORROWED_CLASS]]
 // CHECK:   destroy_value [[CLASS]]
 // CHECK:   [[BORROWED_LOADED_VALUE:%.*]] = begin_borrow [[LOADED_VALUE]]
-// CHECK:   [[FUNC:%.*]] = function_ref @$S6borrow4useD{{.*}} : $@convention(thin) (@guaranteed D) -> ()
+// CHECK:   [[FUNC:%.*]] = function_ref @$s6borrow4useD{{.*}} : $@convention(thin) (@guaranteed D) -> ()
 // CHECK:   apply [[FUNC]]([[BORROWED_LOADED_VALUE]])
 // CHECK:   destroy_value [[BOX]]
-// CHECK: } // end sil function '$S6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}}'
+// CHECK: } // end sil function '$s6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}}'
 func lvalueBorrowShouldBeAtEndOfFormalAccessScope() {
   var c = C()
   useD(c.d)

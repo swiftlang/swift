@@ -171,6 +171,7 @@ public:
 %   end
 % end
     }
+    llvm_unreachable("unhandled kind");
   }
 
   bool isComment() const;
@@ -384,6 +385,7 @@ struct WrapperTypeTraits<syntax::TriviaKind> {
   case syntax::TriviaKind::${trivia.name}: return ${trivia.serialization_code};
 % end
     }
+    llvm_unreachable("unhandled kind");
   }
 
   static void write(ByteTreeWriter &Writer, const syntax::TriviaKind &Kind,
@@ -459,6 +461,7 @@ struct ScalarReferenceTraits<syntax::TriviaKind> {
       return "\"${trivia.name}\"";
 % end
     }
+    llvm_unreachable("unhandled kind");
   }
 
   static bool mustQuote(StringRef) {

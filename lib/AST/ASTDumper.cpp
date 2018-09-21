@@ -368,10 +368,6 @@ getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
   switch (value) {
     case StringLiteralExpr::UTF8: return "utf8";
     case StringLiteralExpr::UTF16: return "utf16";
-    case StringLiteralExpr::UTF8ConstString:
-      return "utf8_const_string";
-    case StringLiteralExpr::UTF16ConstString:
-      return "utf16_const_string";
     case StringLiteralExpr::OneUnicodeScalar: return "unicodeScalar";
   }
 
@@ -2600,6 +2596,10 @@ public:
         OS << '\n';
         component.getIndexExpr()->print(OS, Indent + 4);
         OS.indent(Indent + 4);
+        break;
+      case KeyPathExpr::Component::Kind::Identity:
+        OS << "identity";
+        OS << '\n';
         break;
       }
       OS << "type=";

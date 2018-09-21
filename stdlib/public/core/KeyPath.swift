@@ -329,16 +329,6 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   }
 }
 
-extension WritableKeyPath where Root == Value {
-  // FIXME: Replace with proper surface syntax
-
-  /// Returns an identity key path that references the entire input value.
-  @inlinable
-  public static var _identity: WritableKeyPath<Root, Root> {
-    return Builtin.identityKeyPath()
-  }
-}
-
 /// A key path that supports reading from and writing to the resulting value
 /// with reference semantics.
 public class ReferenceWritableKeyPath<

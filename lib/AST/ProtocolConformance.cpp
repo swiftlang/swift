@@ -256,6 +256,7 @@ ValueDecl *ProtocolConformance::getWitnessDecl(ValueDecl *requirement,
     return cast<SpecializedProtocolConformance>(this)
       ->getGenericConformance()->getWitnessDecl(requirement, resolver);
   }
+  llvm_unreachable("unhandled kind");
 }
 
 /// Determine whether the witness for the given requirement
@@ -467,7 +468,8 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     return;
   }
 
-  auto nominal = DC->getSelfNominalTypeDecl();
+  auto *ext = cast<ExtensionDecl>(DC);
+  auto nominal = ext->getExtendedNominal();
   auto typeSig = nominal->getGenericSignature();
 
   // A non-generic type won't have conditional requirements.
@@ -476,17 +478,25 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     return;
   }
 
-  auto extensionSig = DC->getGenericSignatureOfContext();
+  auto extensionSig = ext->getGenericSignature();
   if (!extensionSig) {
     if (auto lazyResolver = ctxt.getLazyResolver()) {
-      lazyResolver->resolveExtension(cast<ExtensionDecl>(DC));
-      extensionSig = DC->getGenericSignatureOfContext();
+      lazyResolver->resolveExtension(ext);
+      extensionSig = ext->getGenericSignature();
     }
   }
 
   // The type is generic, but the extension doesn't have a signature yet, so
-  // we can't do any differencing.
+  // we might be in a recursive validation situation.
   if (!extensionSig) {
+    // If the extension is invalid, it won't ever get a signature, so we
+    // "succeed" with an empty result instead.
+    if (ext->isInvalid()) {
+      success({});
+      return;
+    }
+
+    // Otherwise we'll try again later.
     failure();
     return;
   }

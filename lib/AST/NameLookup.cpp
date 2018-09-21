@@ -564,6 +564,9 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
 
   ASTContext &ctx = proto->getASTContext();
   TinyPtrVector<NominalTypeDecl *> result;
+  if (!ext->getGenericParams())
+    return result;
+
   for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
     // We only care about type constraints.
     if (req.getKind() != RequirementReprKind::TypeConstraint)
@@ -709,6 +712,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   };
 
   if (Loc.isValid() &&
+      DC->getParentSourceFile() &&
       DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
       Ctx.LangOpts.EnableASTScopeLookup) {
     // Find the source file in which we are performing the lookup.
@@ -1009,12 +1013,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (!isCascadingUse.hasValue())
             isCascadingUse = ACE->isCascadingContextForLookup(false);
         } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-          auto ExtendedNominal = ED->getExtendedNominal();
-          if (!ExtendedNominal) {
-            DC = ED->getParent();
-            continue;
-          }
-
           if (shouldLookupMembers(ED, Loc))
             populateLookupDeclsFromContext(ED);
 
@@ -1720,14 +1718,14 @@ ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return { stored.Methods.begin(), stored.Methods.end() };
 }
 
-void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
+void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
+                                 ObjCSelector selector) {
   if (!ObjCMethodLookup) {
     createObjCMethodLookup();
   }
 
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
-  auto selector = method->getObjCSelector();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
 
   // In a non-empty vector, we could have duplicates or conflicts.
@@ -2422,6 +2420,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::ImplicitlyUnwrappedOptional:
     return { 1, ctx.getOptionalDecl() };
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static DirectlyReferencedTypeDecls directReferencesForType(Type type) {

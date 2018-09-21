@@ -240,8 +240,8 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
 
       StringRef Text = SM.extractText({ Loc, Len });
       Token NewTok;
-      NewTok.setToken(tok::string_literal, Text,
-                      IsMultiline, CustomDelimiterLen);
+      NewTok.setToken(tok::string_literal, Text);
+      NewTok.setStringLiteral(IsMultiline, CustomDelimiterLen);
       Toks.push_back(NewTok);
 
     } else {
@@ -331,12 +331,18 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
+
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
+               PersistentParserState *PersistentState)
+    : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState) {}
+
+Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
+               SILParserTUStateBase *SIL,
                PersistentParserState *PersistentState)
     : Parser(
           std::unique_ptr<Lexer>(new Lexer(
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
-              BufferID, &SF.getASTContext().Diags,
+              BufferID, LexerDiags,
               /*InSILMode=*/SIL != nullptr,
               SF.Kind == SourceFileKind::Main
                   ? HashbangMode::Allowed

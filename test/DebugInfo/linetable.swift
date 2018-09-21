@@ -22,14 +22,14 @@ func call_me(_ code: @escaping () -> Void)
 }
 
 func main(_ x: Int64) -> Void
-// CHECK-LABEL: define hidden {{.*}} void @"$S9linetable4main{{[_0-9a-zA-Z]*}}F"
+// CHECK-LABEL: define hidden {{.*}} void @"$s9linetable4main{{[_0-9a-zA-Z]*}}F"
 {
     var my_class = MyClass(input: 10)
 // Linetable continuity. Don't go into the closure expression.
 // ASM-CHECK: .loc [[FILEID:[0-9]]] [[@LINE+1]] 5
     call_me (
 // ASM-CHECK-NOT: .loc [[FILEID]] [[@LINE+1]] 5
-// CHECK-LABEL: define {{.*}} @"$S9linetable4mainyys5Int64VFyycfU_Tf2in_n"({{.*}})
+// CHECK-LABEL: define {{.*}} @"$s9linetable4mainyys5Int64VFyycfU_Tf2in_n"({{.*}})
         {
             var result = my_class.do_something(x)
             markUsed(result)
@@ -49,7 +49,7 @@ func main(_ x: Int64) -> Void
 // ASM-CHECK: ret
 }
 
-// ASM-CHECK: {{^_?\$S9linetable4mainyys5Int64VFyycfU_Tf2in_n:}}
+// ASM-CHECK: {{^_?\$s9linetable4mainyys5Int64VFyycfU_Tf2in_n:}}
 // ASM-CHECK-NOT: retq
 // The end-of-prologue should have a valid location (0 is ok, too).
 // ASM-CHECK: .loc [[FILEID]] {{0|34}} {{[0-9]+}} prologue_end

@@ -59,6 +59,7 @@ Globals
   global ::= nominal-type 'Ml'           // in-place type initialization cache
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
+  global ::= nominal-type 'Mu'           // class method lookup function
   global ::= module 'MXM'                // module descriptor
   global ::= context 'MXE'               // extension descriptor
   global ::= context 'MXX'               // anonymous context descriptor
@@ -136,6 +137,12 @@ types where the metadata itself has unknown layout.)
   global ::= entity generic-signature? type type* 'Tk' // key path setter
   global ::= type generic-signature 'TH' // key path equality
   global ::= type generic-signature 'Th' // key path hasher
+
+  global ::= protocol 'TL'               // protocol requirements base descriptor
+  global ::= assoc-type-name 'Tl'        // associated type descriptor
+  global ::= assoc-type-name 'TM'        // default associated type witness accessor
+  global ::= type assoc-type-path protocol 'Tn' // associated conformance descriptor
+  global ::= type assoc-type-path protocol 'TN' // default associated conformance witness accessor
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk helper function
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk

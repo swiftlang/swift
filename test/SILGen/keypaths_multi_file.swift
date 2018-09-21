@@ -18,12 +18,12 @@ func foo(x: Int) -> KeyPath<A, Int> {
 }
 
 // A.x setter
-// CHECK-LABEL: sil hidden_external @$S8keypaths1AV1xSivs
-// DEFINITION-LABEL: sil hidden @$S8keypaths1AV1xSivs
+// CHECK-LABEL: sil hidden_external @$s8keypaths1AV1xSivs
+// DEFINITION-LABEL: sil hidden @$s8keypaths1AV1xSivs
 
 // A.subscript setter
-// CHECK-LABEL: sil hidden_external @$S8keypaths1AVyS2icis
-// DEFINITION-LABEL: sil hidden @$S8keypaths1AVyS2icis
+// CHECK-LABEL: sil hidden_external @$s8keypaths1AVyS2icis
+// DEFINITION-LABEL: sil hidden @$s8keypaths1AVyS2icis
 
 func bar<T>(_: T) {
   _ = \C<T>.b
