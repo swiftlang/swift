@@ -129,6 +129,7 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
 static ValidationInfo
 validateControlBlock(llvm::BitstreamCursor &cursor,
                      SmallVectorImpl<uint64_t> &scratch,
+                     std::pair<uint16_t, uint16_t> expectedVersion,
                      ExtendedValidationInfo *extendedInfo) {
   // The control block is malformed until we've at least read a major version
   // number.
@@ -174,9 +175,9 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       }
 
       uint16_t versionMajor = scratch[0];
-      if (versionMajor > SWIFTMODULE_VERSION_MAJOR)
+      if (versionMajor > expectedVersion.first)
         result.status = Status::FormatTooNew;
-      else if (versionMajor < SWIFTMODULE_VERSION_MAJOR)
+      else if (versionMajor < expectedVersion.first)
         result.status = Status::FormatTooOld;
       else
         result.status = Status::Valid;
@@ -184,8 +185,8 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       // Major version 0 does not have stable minor versions.
       if (versionMajor == 0) {
         uint16_t versionMinor = scratch[1];
-        if (versionMinor != SWIFTMODULE_VERSION_MINOR) {
-          if (versionMinor < SWIFTMODULE_VERSION_MINOR)
+        if (versionMinor != expectedVersion.second) {
+          if (versionMinor < expectedVersion.second)
             result.status = Status::FormatTooOld;
           else
             result.status = Status::FormatTooNew;
@@ -263,7 +264,10 @@ ValidationInfo serialization::validateSerializedAST(
 
     if (topLevelEntry.ID == CONTROL_BLOCK_ID) {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
-      result = validateControlBlock(cursor, scratch, extendedInfo);
+      result = validateControlBlock(cursor, scratch,
+                                    {SWIFTMODULE_VERSION_MAJOR,
+                                     SWIFTMODULE_VERSION_MINOR},
+                                    extendedInfo);
       if (result.status == Status::Malformed)
         return result;
     } else {
@@ -1106,7 +1110,10 @@ bool ModuleFile::readModuleDocIfPresent() {
     case CONTROL_BLOCK_ID: {
       docCursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      info = validateControlBlock(docCursor, scratch, /*extendedInfo*/nullptr);
+      info = validateControlBlock(docCursor, scratch,
+                                  {SWIFTDOC_VERSION_MAJOR,
+                                   SWIFTDOC_VERSION_MINOR},
+                                  /*extendedInfo*/nullptr);
       if (info.status != Status::Valid)
         return false;
       // Check that the swiftdoc is actually for this module.
@@ -1174,7 +1181,10 @@ ModuleFile::ModuleFile(
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      info = validateControlBlock(cursor, scratch, extInfo);
+      info = validateControlBlock(cursor, scratch,
+                                  {SWIFTMODULE_VERSION_MAJOR,
+                                   SWIFTMODULE_VERSION_MINOR},
+                                  extInfo);
       if (info.status != Status::Valid) {
         error(info.status);
         return;

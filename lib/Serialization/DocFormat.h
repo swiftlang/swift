@@ -33,6 +33,26 @@ using llvm::BCVBR;
 /// Magic number for serialized documentation files.
 const unsigned char SWIFTDOC_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x07 };
 
+/// Serialized swiftdoc format major version number.
+///
+/// Increment this value when making a backwards-incompatible change, which
+/// should be rare. When incrementing this value, reset SWIFTDOC_VERSION_MINOR
+/// to 0.
+const uint16_t SWIFTDOC_VERSION_MAJOR = 1;
+
+/// Serialized swiftdoc format minor version number.
+///
+/// Increment this value when making a backwards-compatible change that might
+/// be interesting to test for. However, if old swiftdoc files are fully
+/// compatible with the new change, you do not need to increment this.
+///
+/// To ensure that two separate changes don't silently get merged into one
+/// in source control, you should also update the comment to briefly
+/// describe what change you made. The content of this comment isn't important;
+/// it just ensures a conflict if two people change the module format.
+/// Don't worry about adhering to the 80-column limit for this line.
+const uint16_t SWIFTDOC_VERSION_MINOR = 1; // Last change: skipping 0 for testing purposes
+
 /// The record types within the comment block.
 ///
 /// Be very careful when changing this block; it must remain stable. Adding new

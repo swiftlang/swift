@@ -472,8 +472,7 @@ void DocSerializer::writeDocHeader() {
     control_block::TargetLayout Target(Out);
 
     auto& LangOpts = M->getASTContext().LangOpts;
-    Metadata.emit(ScratchRecord,
-                  SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR,
+    Metadata.emit(ScratchRecord, SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR,
                   /*short version string length*/0, /*compatibility length*/0,
                   version::getSwiftFullVersion(
                     LangOpts.EffectiveLanguageVersion));
