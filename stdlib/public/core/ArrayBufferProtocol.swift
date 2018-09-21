@@ -30,7 +30,7 @@ internal protocol _ArrayBufferProtocol
   /// memory starting at `target`.  Return a pointer "past the end" of the
   /// just-initialized memory.
   @discardableResult
-  func _copyContents(
+  __consuming func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element>
@@ -74,7 +74,7 @@ internal protocol _ArrayBufferProtocol
   mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,
-    elementsOf newValues: C
+    elementsOf newValues: __owned C
   ) where C : Collection, C.Element == Element
 
   /// Returns a `_SliceBuffer` containing the elements in `bounds`.
@@ -149,7 +149,7 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,
-    elementsOf newValues: C
+    elementsOf newValues: __owned C
   ) where C : Collection, C.Element == Element {
     _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
     let oldCount = self.count

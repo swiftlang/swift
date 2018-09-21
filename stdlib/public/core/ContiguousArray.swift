@@ -729,7 +729,7 @@ extension ContiguousArray: RangeReplaceableCollection, ArrayProtocol {
   @_semantics("array.mutate_unknown")
   internal mutating func _appendElementAssumeUniqueAndCapacity(
     _ oldCount: Int,
-    newElement: Element
+    newElement: __owned Element
   ) {
     _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
     _sanityCheck(_buffer.capacity >= _buffer.count + 1)
@@ -891,7 +891,7 @@ extension ContiguousArray: RangeReplaceableCollection, ArrayProtocol {
   /// - Complexity: O(*n*), where *n* is the length of the array. If
   ///   `i == endIndex`, this method is equivalent to `append(_:)`.
   @inlinable
-  public mutating func insert(_ newElement: Element, at i: Int) {
+  public mutating func insert(_ newElement: __owned Element, at i: Int) {
     _checkIndex(i)
     self.replaceSubrange(i..<i, with: CollectionOfOne(newElement))
   }
@@ -926,7 +926,7 @@ extension ContiguousArray: RangeReplaceableCollection, ArrayProtocol {
   }
 
   @inlinable
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
       return ContiguousArray(_buffer: n)
     }
@@ -1086,7 +1086,7 @@ extension ContiguousArray {
   }
 
   @inlinable
-  public func _copyContents(
+  public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
 
@@ -1157,7 +1157,7 @@ extension ContiguousArray {
   @_semantics("array.mutate_unknown")
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
-    with newElements: C
+    with newElements: __owned C
   ) where C: Collection, C.Element == Element {
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "ContiguousArray replace: subrange start is negative")

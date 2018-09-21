@@ -42,7 +42,7 @@ extension _SequenceWrapper  {
 
 extension _SequenceWrapper where Iterator == Base.Iterator {
   @inlinable // generic-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return self._base.makeIterator()
   }
   
@@ -64,7 +64,7 @@ extension _SequenceWrapper {
   }
   
   @inlinable // generic-performance
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
     return try _base.filter(isIncluded)
@@ -83,7 +83,7 @@ extension _SequenceWrapper {
   }
   
   @inlinable // generic-performance
-  public func _copyToContiguousArray()
+  public __consuming func _copyToContiguousArray()
     -> ContiguousArray<Element> {
     return _base._copyToContiguousArray()
   }
@@ -91,38 +91,38 @@ extension _SequenceWrapper {
 
 extension _SequenceWrapper where SubSequence == Base.SubSequence {
   @inlinable // generic-performance
-  public func dropFirst(_ n: Int) -> SubSequence {
+  public __consuming func dropFirst(_ n: Int) -> SubSequence {
     return _base.dropFirst(n)
   }
   @inlinable // generic-performance
-  public func dropLast(_ n: Int) -> SubSequence {
+  public __consuming func dropLast(_ n: Int) -> SubSequence {
     return _base.dropLast(n)
   }
   @inlinable // generic-performance
-  public func prefix(_ maxLength: Int) -> SubSequence {
+  public __consuming func prefix(_ maxLength: Int) -> SubSequence {
     return _base.prefix(maxLength)
   }
   @inlinable // generic-performance
-  public func suffix(_ maxLength: Int) -> SubSequence {
+  public __consuming func suffix(_ maxLength: Int) -> SubSequence {
     return _base.suffix(maxLength)
   }
 
   @inlinable // generic-performance
-  public func drop(
+  public __consuming func drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     return try _base.drop(while: predicate)
   }
 
   @inlinable // generic-performance
-  public func prefix(
+  public __consuming func prefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     return try _base.prefix(while: predicate)
   }
   
   @inlinable // generic-performance
-  public func split(
+  public __consuming func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
     whereSeparator isSeparator: (Element) throws -> Bool
   ) rethrows -> [SubSequence] {

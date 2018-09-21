@@ -79,7 +79,7 @@ extension LazyCollection : Sequence {
   ///
   /// - Complexity: O(1).
   @inlinable
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return _base.makeIterator()
   }
 

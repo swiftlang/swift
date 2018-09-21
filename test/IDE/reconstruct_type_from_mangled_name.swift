@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | %FileCheck %s -implicit-check-not="FAILURE"
+// XFAIL: *
 
 struct Mystruct1 {
 // CHECK: decl: struct Mystruct1
@@ -64,7 +65,7 @@ class Myclass2 {
 
     arr1.append(1)
 // FIXME: missing append()
-// CHECK: dref: FAILURE	for 'append' usr=s:Sa6appendyyxF
+// CHECK: dref: FAILURE	for 'append' usr=s:Sa6appendyyxnF
 // CHECK: type: (inout Array<Int>) -> (Int) -> ()
 
     var arr2 : [Mystruct1]
