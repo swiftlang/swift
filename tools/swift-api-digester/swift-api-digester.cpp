@@ -817,6 +817,13 @@ public:
     case NodeMatchReason::Removed:
       assert(!Right);
       Left->annotate(NodeAnnotation::Removed);
+      if (auto *LT = dyn_cast<SDKNodeType>(Left)) {
+        if (auto *AT = dyn_cast<SDKNodeDeclAssociatedType>(LT->getParent())) {
+          Ctx.getDiags().diagnose(SourceLoc(),
+                                  diag::default_associated_type_removed,
+                                  AT->getScreenInfo(), LT->getPrintedName());
+        }
+      }
       return;
     case NodeMatchReason::FuncToProperty:
     case NodeMatchReason::ModernizeEnum:
@@ -860,6 +867,7 @@ public:
       break;
     }
 
+    case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclFunction:
     case SDKNodeKind::DeclSetter:
     case SDKNodeKind::DeclGetter:
@@ -1731,6 +1739,10 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
       if (Node->getPrintedName() != Count->getPrintedName())
         Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
           Descriptor, Node->getPrintedName(), Count->getPrintedName());
+      break;
+    case SDKNodeKind::DeclAssociatedType:
+      Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
+                     "default", Node->getPrintedName(), Count->getPrintedName());
       break;
     default:
       break;
