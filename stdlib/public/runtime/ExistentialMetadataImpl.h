@@ -386,13 +386,13 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
     swift_getHeapObjectExtraInhabitantCount();
   
   static void storeExtraInhabitant(Container *dest, int index) {
-    swift_storeHeapObjectExtraInhabitant((HeapObject**)&dest->Header.Type,
-                                         index);
+    swift_storeHeapObjectExtraInhabitant(
+                            (HeapObject**)(uintptr_t)&dest->Header.Type, index);
   }
 
   static int getExtraInhabitantIndex(const Container *src) {
     return swift_getHeapObjectExtraInhabitantIndex(
-                                  (HeapObject* const *)&src->Header.Type);
+                             (HeapObject* const *)(uintptr_t)&src->Header.Type);
   }
 };
 
