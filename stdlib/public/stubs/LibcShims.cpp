@@ -37,10 +37,11 @@
 #include <string.h>
 #if __has_include(<sys/random.h>)
 #include <sys/random.h>
-#elif defined(__NR_getrandom)
-#include <sys/syscall.h>
 #endif
 #include <sys/stat.h>
+#if __has_include(<sys/syscall.h>)
+#include <sys/syscall.h>
+#endif
 #include <sys/types.h>
 #include <type_traits>
 
@@ -342,25 +343,18 @@ void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
   while (nbytes > 0) {
     __swift_ssize_t actual_nbytes = -1;
 
-#if defined(GRND_RANDOM)
+#if defined(__NR_getrandom)
     static const bool getrandom_available =
-      !(getrandom(nullptr, 0, 0) == -1 && errno == ENOSYS);
-      
+      !(syscall(SYS_getrandom, nullptr, 0, 0) == -1 && errno == ENOSYS);
+  
     if (getrandom_available) {
-      actual_nbytes = WHILE_EINTR(getrandom(buf, nbytes, 0));
+      actual_nbytes = WHILE_EINTR(syscall(SYS_getrandom, buf, nbytes, 0));
     }
-#elif defined(__Fuchsia__)
+#elif __has_include(<sys/random.h>) && (defined(__CYGWIN__) || defined(__Fuchsia__))
     __swift_size_t getentropy_nbytes = std::min(nbytes, __swift_size_t{256});
     
     if (0 == getentropy(buf, getentropy_nbytes)) {
       actual_nbytes = getentropy_nbytes;
-    }
-#elif defined(__NR_getrandom)
-    static const bool = getrandom_available =
-      !(syscall(SYS_getrandom, nullptr, 0, 0) == -1 && errno == ENOSYS);
-      
-    if (getrandom_available) {
-      actual_nbytes = WHILE_EINTR(syscall(SYS_getrandom, buf, nbytes, 0));
     }
 #endif
 
