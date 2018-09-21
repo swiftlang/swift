@@ -160,33 +160,6 @@ macro(configure_sdk_darwin
   _report_sdk("${prefix}")
 endmacro()
 
-macro(_configure_sdk_android_specific
-    prefix name lib_subdir triple_name architectures triple sdkpath)
-
-  foreach(arch ${architectures})
-    if("${arch}" STREQUAL "armv7")
-      set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "arm-linux-androideabi")
-      set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "arm")
-    else()
-      message(FATAL_ERROR "unkonwn arch for android SDK: ${arch}")
-    endif()
-
-    # Get the prebuilt suffix to create the correct toolchain path when using the NDK
-    if("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Darwin")
-      set(_swift_android_prebuilt_suffix "darwin-x86_64")
-    elseif("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Linux")
-      set(_swift_android_prebuilt_suffix "linux-x86_64")
-    endif()
-    set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
-      "${SWIFT_ANDROID_NDK_PATH}/toolchains/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_suffix}")
-
-    # Resolve the correct linker based on the file name of CMAKE_LINKER (being 'ld' or 'ld.gold' the options)
-    get_filename_component(SWIFT_ANDROID_LINKER_NAME "${CMAKE_LINKER}" NAME)
-    set(SWIFT_SDK_ANDROID_ARCH_${arch}_LINKER
-      "${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH}/bin/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_LINKER_NAME}")
-  endforeach()
-endmacro()
-
 macro(configure_sdk_unix
     prefix name lib_subdir triple_name architectures triple sdkpath)
   # Note: this has to be implemented as a macro because it sets global
@@ -207,16 +180,36 @@ macro(configure_sdk_unix
   endif()
 
   foreach(arch ${architectures})
-    set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${sdkpath}")
-    set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "${triple}")
+    if("${prefix}" STREQUAL "ANDROID")
+      if("${arch}" STREQUAL "armv7")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "arm-linux-androideabi")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "arm")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${sdkpath}")
+      else()
+        message(FATAL_ERROR "unknown arch for android SDK: ${arch}")
+      endif()
+
+      # Get the prebuilt suffix to create the correct toolchain path when using the NDK
+      if("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Darwin")
+        set(_swift_android_prebuilt_suffix "darwin-x86_64")
+      elseif("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Linux")
+        set(_swift_android_prebuilt_suffix "linux-x86_64")
+      endif()
+      set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
+          "${SWIFT_ANDROID_NDK_PATH}/toolchains/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_suffix}")
+
+      # Resolve the correct linker based on the file name of CMAKE_LINKER (being 'ld' or 'ld.gold' the options)
+      get_filename_component(SWIFT_ANDROID_LINKER_NAME "${CMAKE_LINKER}" NAME)
+      set(SWIFT_SDK_ANDROID_ARCH_${arch}_LINKER
+          "${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH}/bin/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_LINKER_NAME}")
+    else()
+      set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${sdkpath}")
+      set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "${triple}")
+    endif()
   endforeach()
 
   # Add this to the list of known SDKs.
   list(APPEND SWIFT_CONFIGURED_SDKS "${prefix}")
-
-  if("${prefix}" STREQUAL "ANDROID")
-    _configure_sdk_android_specific(${prefix} ${name} ${lib_subdir} ${triple_name} ${architectures} ${triple} ${sdkpath})
-  endif()
 
   _report_sdk("${prefix}")
 endmacro()
