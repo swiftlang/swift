@@ -187,8 +187,6 @@ set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
 set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
   "The GCC version to use when building for Android. Currently only 4.9 is supported.")
-set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
-  "Path to the directory that contains the Android SDK tools that will be passed to the swiftc frontend")
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
 
@@ -637,7 +635,6 @@ endif()
 # To fix it, we would need to append the architecture to the SDKs,
 # for example: 'OSX-x86_64;IOS-armv7;...etc'.
 # We could easily do that - we have all of that information in build-script-impl.
-# Also, we would need to be provided with the sysroot for each SDK (see SWIFT_ANDROID_SDK_PATH/SWIFT_SDK_ANDROID_PATH).
 # Darwin targets cheat and use `xcrun`.
 
 if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
@@ -770,7 +767,7 @@ if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
   endif()
 
-  configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi" "${SWIFT_ANDROID_SDK_PATH}")
+  configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi" "")
 endif()
 
 # Should we cross-compile the standard library for Windows?
