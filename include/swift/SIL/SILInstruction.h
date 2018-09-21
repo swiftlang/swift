@@ -7554,6 +7554,10 @@ public:
     }
   }
 
+  ApplySiteKind getKind() const {
+    return ApplySiteKind(Inst->getKind());
+  }
+
   explicit operator bool() const {
     return Inst != nullptr;
   }
@@ -7895,6 +7899,10 @@ public:
     case FullApplySiteKind::TryApplyInst:
       return FullApplySite(cast<TryApplyInst>(node));
     }
+  }
+
+  FullApplySiteKind getKind() const {
+    return FullApplySiteKind(getInstruction()->getKind());
   }
 
   bool hasIndirectSILResults() const {
