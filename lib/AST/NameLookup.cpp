@@ -1621,11 +1621,9 @@ maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
   return result;
 }
 
-
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
-                                                  bool ignoreNewExtensions,
-                                                  bool includeAttrImplements) {
+                                                  OptionSet<LookupDirectFlags> flags) {
   ASTContext &ctx = getASTContext();
   if (auto s = ctx.Stats) {
     ++s->getFrontendCounters().NominalTypeLookupDirectCount;
@@ -1635,6 +1633,12 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   // not yet loaded all the members into the IDC list in the first place.
   bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
                                     hasLazyMembers());
+
+  bool ignoreNewExtensions =
+      flags.contains(LookupDirectFlags::IgnoreNewExtensions);
+
+  bool includeAttrImplements =
+      flags.contains(LookupDirectFlags::IncludeAttrImplements);
 
   // FIXME: At present, lazy member loading conflicts with a bunch of other code
   // that appears to special-case initializers (clang-imported initializer
@@ -2036,10 +2040,10 @@ bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
-    bool includeAttrImplements = options & NL_IncludeAttributeImplements;
-    for (auto decl : current->lookupDirect(member,
-                                           /*ignoreNewExtensions=*/false,
-                                           includeAttrImplements)) {
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    if (options & NL_IncludeAttributeImplements)
+      flags |= NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements;
+    for (auto decl : current->lookupDirect(member, flags)) {
       // If we're performing a type lookup, don't even attempt to validate
       // the decl if its not a type.
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))

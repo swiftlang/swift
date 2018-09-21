@@ -3252,8 +3252,10 @@ void ClassDecl::addImplicitDestructor() {
 
 bool ClassDecl::hasMissingDesignatedInitializers() const {
   auto *mutableThis = const_cast<ClassDecl *>(this);
+  auto flags = OptionSet<LookupDirectFlags>();
+  flags |= LookupDirectFlags::IgnoreNewExtensions;
   (void)mutableThis->lookupDirect(DeclBaseName::createConstructor(),
-                                  /*ignoreNewExtensions*/true);
+                                  flags);
   return Bits.ClassDecl.HasMissingDesignatedInitializers;
 }
 

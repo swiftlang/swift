@@ -797,8 +797,9 @@ namespace {
         if (attr->getProtocolKind() ==
             KnownProtocolKind::BridgedStoredNSError) {
           auto &ctx = nominal->getASTContext();
-          auto lookup = nominal->lookupDirect(ctx.Id_Code,
-                                              /*ignoreNewExtensions=*/true);
+          auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+          flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+          auto lookup = nominal->lookupDirect(ctx.Id_Code, flags);
           for (auto found : lookup) {
             if (auto codeDecl = dyn_cast<TypeDecl>(found))
               return codeDecl;
