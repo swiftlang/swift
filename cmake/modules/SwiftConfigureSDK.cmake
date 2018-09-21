@@ -191,12 +191,12 @@ macro(configure_sdk_unix
 
       # Get the prebuilt suffix to create the correct toolchain path when using the NDK
       if("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Darwin")
-        set(_swift_android_prebuilt_suffix "darwin-x86_64")
+        set(_swift_android_prebuilt_build "darwin-x86_64")
       elseif("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Linux")
-        set(_swift_android_prebuilt_suffix "linux-x86_64")
+        set(_swift_android_prebuilt_build "linux-x86_64")
       endif()
       set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
-          "${SWIFT_ANDROID_NDK_PATH}/toolchains/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_suffix}")
+          "${SWIFT_ANDROID_NDK_PATH}/toolchains/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_build}")
 
       # Resolve the correct linker based on the file name of CMAKE_LINKER (being 'ld' or 'ld.gold' the options)
       get_filename_component(SWIFT_ANDROID_LINKER_NAME "${CMAKE_LINKER}" NAME)
