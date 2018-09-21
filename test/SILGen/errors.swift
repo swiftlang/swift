@@ -326,7 +326,7 @@ func testForceTry(_ fn: () -> Int) {
 // CHECK: [[FUNC:%.*]] = function_ref @$s6errors9createIntyySiyXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @error Error
 // CHECK: try_apply [[FUNC]]([[ARG]])
 // CHECK: return
-// CHECK: builtin "unexpectedError"
+// CHECK: function_ref @swift_unexpectedError
 // CHECK: unreachable
 
 func testForceTryMultiple() {
@@ -346,7 +346,8 @@ func testForceTryMultiple() {
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]([[ERROR:%.+]] : @owned $Error):
-// CHECK-NEXT: = builtin "unexpectedError"([[ERROR]] : $Error)
+// CHECK: [[UNEXPECTED_ERROR:%.+]] = function_ref @swift_unexpectedError
+// CHECK-NEXT: apply [[UNEXPECTED_ERROR]]([[ERROR]]
 // CHECK-NEXT: unreachable
 // CHECK: [[CLEANUPS_1]]([[ERROR:%.+]] : @owned $Error):
 // CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)

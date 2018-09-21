@@ -1269,7 +1269,7 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
 }
 
 SILGenFunction::ForceTryEmission::ForceTryEmission(SILGenFunction &SGF,
-                                                   Expr *loc)
+                                                   ForceTryExpr *loc)
     : SGF(SGF), Loc(loc), OldThrowDest(SGF.ThrowDest) {
   assert(loc && "cannot pass a null location");
 
@@ -1292,11 +1292,24 @@ void SILGenFunction::ForceTryEmission::finish() {
     // Otherwise, we need to emit it.
     SILGenSavedInsertionPoint scope(SGF, catchBB, FunctionSection::Postmatter);
 
-    ASTContext &ctx = SGF.getASTContext();
-    auto error = catchBB->createPhiArgument(SILType::getExceptionType(ctx),
-                                            ValueOwnershipKind::Owned);
-    SGF.B.createBuiltin(Loc, ctx.getIdentifier("unexpectedError"),
-                        SGF.SGM.Types.getEmptyTupleType(), {}, {error});
+    if (auto diagnoseError = SGF.getASTContext().getDiagnoseUnexpectedError(nullptr)) {
+      ASTContext &ctx = SGF.getASTContext();
+      auto error = SGF.B.createOwnedPhiArgument(SILType::getExceptionType(ctx));
+      auto args = SGF.emitSourceLocationArgs(Loc->getExclaimLoc(), Loc);
+
+      SGF.emitApplyOfLibraryIntrinsic(
+              Loc,
+              diagnoseError,
+              SubstitutionMap(),
+              {
+                error,
+                args.filenameStartPointer,
+                args.filenameLength,
+                args.filenameIsAscii,
+                args.line
+              },
+              SGFContext());
+    }
     SGF.B.createUnreachable(Loc);
   }
 
