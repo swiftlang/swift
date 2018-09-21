@@ -1223,5 +1223,44 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
   return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
 }
 
+const Metadata *
+SubstGenericParametersFromMetadata::operator()(
+                                        unsigned depth, unsigned index) const {
+  // On first access, compute the descriptor path.
+  if (descriptorPath.empty()) {
+    if (auto *baseDesc = base->getTypeContextDescriptor()) {
+      const auto *parent = reinterpret_cast<
+                              const ContextDescriptor *>(baseDesc);
+      while (parent) {
+        if (parent->isGeneric())
+          descriptorPath.push_back(parent);
+
+        parent = parent->Parent.get();
+      }
+    }
+  }
+
+  if (depth >= descriptorPath.size())
+    return nullptr;
+
+  unsigned currentDepth = 0;
+  unsigned flatIndex = index;
+  const ContextDescriptor *currentContext = descriptorPath.back();
+
+  for (const auto *context : llvm::reverse(descriptorPath)) {
+    if (currentDepth >= depth)
+      break;
+
+    flatIndex += context->getNumGenericParams();
+    currentContext = context;
+    ++currentDepth;
+  }
+
+  if (index >= currentContext->getNumGenericParams())
+    return nullptr;
+
+  return base->getGenericArgs()[flatIndex];
+}
+
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"

@@ -235,6 +235,22 @@ public:
   using SubstGenericParameterFn =
     llvm::function_ref<const Metadata *(unsigned depth, unsigned index)>;
 
+  /// Function object that produces substitutions for the generic parameters
+  /// that occur within a mangled name, using the generic arguments from
+  /// the given metadata.
+  ///
+  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
+  class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
+    const Metadata *base;
+    mutable std::vector<const ContextDescriptor *> descriptorPath;
+
+  public:
+    explicit SubstGenericParametersFromMetadata(const Metadata *base)
+      : base(base) { }
+
+    const Metadata *operator()(unsigned depth, unsigned index) const;
+  };
+
   /// Retrieve the type metadata described by the given type name.
   ///
   /// \p substGenericParam Function that provides generic argument metadata
