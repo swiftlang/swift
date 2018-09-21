@@ -1199,7 +1199,7 @@ func platypus<T>(a: [T]) {
 func badTypes() {
   let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
   let array = [Int](sequence)
-  // expected-error@-1 {{initializer 'init' requires the types 'Int' and '[Int]' be equivalent}}
+  // expected-error@-1 {{initializer requires the types 'Int' and '[Int]' be equivalent}}
 }
 
 // rdar://34357545
