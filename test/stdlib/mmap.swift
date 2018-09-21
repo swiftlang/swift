@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-#if os(Linux)
+#if os(Linux) || os(Android)
   import Glibc
 #else
   import Darwin
