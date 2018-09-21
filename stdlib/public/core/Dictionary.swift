@@ -3548,7 +3548,7 @@ extension Dictionary._Variant {
     }
   }
 
-  @inlinable
+  @usableFromInline // FIMXE: Should be @inlinable (rdar://problem/44612356)
   internal mutating func lookupOrInsert(
     _ key: Key,
     default defaultValue: () -> Value
