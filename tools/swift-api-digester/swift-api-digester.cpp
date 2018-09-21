@@ -1740,6 +1740,10 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
         Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
           Descriptor, Node->getPrintedName(), Count->getPrintedName());
       break;
+    case SDKNodeKind::DeclAssociatedType:
+      Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
+                     "default", Node->getPrintedName(), Count->getPrintedName());
+      break;
     default:
       break;
     }

@@ -80,4 +80,5 @@ extension fixedLayoutStruct: P2 {}
 public protocol AssociatedTypePro {
   associatedtype T1
   associatedtype T2
+  associatedtype T3 = C6
 }

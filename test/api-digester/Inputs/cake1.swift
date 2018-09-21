@@ -73,4 +73,5 @@ extension fixedLayoutStruct: P1 {}
 public protocol AssociatedTypePro {
   associatedtype T1 = Int
   associatedtype T2
+  associatedtype T3 = C1
 }
