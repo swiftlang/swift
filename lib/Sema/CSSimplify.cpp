@@ -2150,21 +2150,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return matchTypes(
             type1, function2->getResult(), kind, subflags,
             locator.withPathElement(ConstraintLocator::AutoclosureResult));
-
-      // A KeyPath<Type, Result> can be converted to function type (Type) ->
-      // Result.
-      auto params = function2->getParams();
-      if (auto bgt = type1->getAs<BoundGenericType>()) {
-        auto decl = bgt->getDecl();
-        auto &ast = getASTContext();
-        if (params.size() == 1 &&
-            (decl == ast.getKeyPathDecl() ||
-             decl == ast.getWritableKeyPathDecl() ||
-             decl == ast.getReferenceWritableKeyPathDecl())) {
-          conversionsOrFixes.push_back(
-              ConversionRestrictionKind::KeyPathToFunction);
-        }
-      }
     }
 
     // It is never legal to form an autoclosure that results in these
@@ -4272,11 +4257,19 @@ done:
              && capability >= Writable)
       kpDecl = getASTContext().getWritableKeyPathDecl();
   }
-  
-  auto resolvedKPTy = BoundGenericType::get(kpDecl, nullptr,
-                                            {rootTy, valueTy});
-  return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind,
-                    subflags, locator);
+
+  Type resolvedKPTy = BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
+  Type fnType = FunctionType::get(
+      {AnyFunctionType::Param(rootTy)}, valueTy,
+      AnyFunctionType::ExtInfo().withNoEscape(true).withThrows(false));
+  llvm::SmallVector<Constraint *, 2> constraints;
+  auto loc = locator.getBaseLocator();
+  constraints.push_back(Constraint::create(*this, ConstraintKind::Bind,
+                                           keyPathTy, resolvedKPTy, loc));
+  constraints.push_back(
+      Constraint::create(*this, ConstraintKind::Bind, keyPathTy, fnType, loc));
+  addDisjunctionConstraint(constraints, locator);
+  return SolutionKind::Solved;
 }
 
 ConstraintSystem::SolutionKind
@@ -4927,16 +4920,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       bridgedObjCClass->getDeclaredInterfaceType(),
                       ConstraintKind::Subtype, subflags, locator);
   }
-
-  case ConversionRestrictionKind::KeyPathToFunction: {
-    auto generic1 = type1->getAs<BoundGenericType>();
-    auto extInfo =
-        AnyFunctionType::ExtInfo().withThrows(false).withNoEscape(true);
-    auto function1 = FunctionType::get(
-        {AnyFunctionType::Param(generic1->getGenericArgs()[0])},
-        generic1->getGenericArgs()[1], extInfo);
-    return matchTypes(function1, type2, matchKind, subflags, locator);
-  }
   }
   
   llvm_unreachable("bad conversion restriction");
@@ -4948,7 +4931,6 @@ static bool recordRestriction(ConversionRestrictionKind restriction) {
   switch(restriction) {
     case ConversionRestrictionKind::TupleToTuple:
     case ConversionRestrictionKind::LValueToRValue:
-    case ConversionRestrictionKind::KeyPathToFunction:
       return false;
     default:
       return true;

@@ -216,8 +216,6 @@ enum class ConversionRestrictionKind {
   /// Implicit conversion from an Objective-C class type to its
   /// toll-free-bridged CF type.
   ObjCTollFreeBridgeToCF,
-  /// KeyPath<Root, Value> to (Root) -> Value
-  KeyPathToFunction,
 };
 
 /// Return a string representation of a conversion restriction.

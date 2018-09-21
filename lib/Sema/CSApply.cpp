@@ -4267,12 +4267,13 @@ namespace {
 
       // Resolve each of the components.
       bool didOptionalChain = false;
+      bool isFunctionType = false;
       Type baseTy, leafTy;
       Type exprType = cs.getType(E);
       if (auto fnTy = exprType->getAs<FunctionType>()) {
         baseTy = fnTy->getParams()[0].getType();
         leafTy = fnTy->getResult();
-
+        isFunctionType = true;
         // Reset the expr type to be KeyPath so that we'll
         // perform the KeyPath<Base,Leaf> to (Base)->Leaf coercion.
         auto kpDecl = cs.getASTContext().getKeyPathDecl();
@@ -4571,7 +4572,37 @@ namespace {
       assert(!baseTy || baseTy->hasUnresolvedType()
              || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
 
-      return coerceToType(E, exprType, cs.getConstraintLocator(E));
+      if (!isFunctionType)
+        return E;
+
+      // Construct an implicit closure which applies this KeyPath.
+      auto &ctx = cs.getASTContext();
+      auto toFunc = exprType->getAs<FunctionType>();
+      auto argTy = toFunc->getParams()[0].getType();
+      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
+      auto closure = new (ctx)
+          AutoClosureExpr(E, toFunc->getResult(), discriminator, cs.DC);
+      auto param = new (ctx) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+                                       SourceLoc(), Identifier(), SourceLoc(),
+                                       ctx.getIdentifier("$0"), closure);
+      param->setType(argTy);
+      param->setInterfaceType(argTy->mapTypeOutOfContext());
+      auto *paramRef =
+          new (ctx) DeclRefExpr(param, DeclNameLoc(), /*Implicit=*/true);
+      paramRef->setType(argTy);
+      cs.cacheType(paramRef);
+      auto *application = new (ctx)
+          KeyPathApplicationExpr(paramRef, SourceLoc(), E, SourceLoc(),
+                                 toFunc->getResult(), /*implicit=*/true);
+      cs.cacheType(application);
+      closure->setParameterList(ParameterList::create(ctx, {param}));
+      closure->setBody(application);
+
+      auto resultTy = toFunc->withExtInfo(
+          toFunc->getExtInfo().withNoEscape(true).withThrows(false));
+      closure->setType(resultTy);
+      cs.cacheType(closure);
+      return coerceToType(closure, exprType, cs.getConstraintLocator(E));
     }
 
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
@@ -6275,7 +6306,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::TupleToTuple:
     case ConversionRestrictionKind::LValueToRValue:
-    case ConversionRestrictionKind::KeyPathToFunction:
       // Restrictions that don't need to be recorded.
       // Should match recordRestriction() in CSSimplify
       break;
@@ -6553,43 +6583,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   // Coercions to function type.
   if (auto toFunc = toType->getAs<FunctionType>()) {
-
-    // Coercions from KeyPath to function type:
-    // Construct an implicit closure which applies this KeyPath.
-    if (auto bgt = fromType->getAs<BoundGenericType>()) {
-      auto &ctx = cs.getASTContext();
-      if (bgt->getDecl() == ctx.getKeyPathDecl() ||
-          bgt->getDecl() == ctx.getWritableKeyPathDecl() ||
-          bgt->getDecl() == ctx.getReferenceWritableKeyPathDecl()) {
-        auto argTy = toFunc->getParams()[0].getType();
-        auto discriminator = AutoClosureExpr::InvalidDiscriminator;
-        auto closure = new (ctx)
-            AutoClosureExpr(expr, toFunc->getResult(), discriminator, cs.DC);
-        auto param = new (ctx) ParamDecl(
-            VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), Identifier(),
-            SourceLoc(), ctx.getIdentifier("$0"), closure);
-        param->setType(argTy);
-        param->setInterfaceType(argTy->mapTypeOutOfContext());
-        auto *paramRef =
-            new (ctx) DeclRefExpr(param, DeclNameLoc(), /*Implicit=*/true);
-        paramRef->setType(argTy);
-        cs.cacheType(paramRef);
-        auto *application = new (ctx)
-            KeyPathApplicationExpr(paramRef, SourceLoc(), expr, SourceLoc(),
-                                   toFunc->getResult(), /*implicit=*/true);
-        cs.cacheType(application);
-        closure->setParameterList(ParameterList::create(ctx, {param}));
-        closure->setBody(application);
-
-        // KeyPaths are noescape and non-throwing, so we may still need to do
-        // additional function conversion as well.
-        fromType = toFunc->withExtInfo(
-            toFunc->getExtInfo().withNoEscape(true).withThrows(false));
-        closure->setType(fromType);
-        expr = cs.cacheType(closure);
-      }
-    }
-
     // Default argument generator must return escaping functions. Therefore, we
     // leave an explicit escape to noescape cast here such that SILGen can skip
     // the cast and emit a code for the escaping function.
