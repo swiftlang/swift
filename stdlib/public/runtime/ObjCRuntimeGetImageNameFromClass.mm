@@ -336,14 +336,16 @@ static void patchGetImageNameInImage(const struct mach_header *mh,
 void swift::setUpObjCRuntimeGetImageNameFromClass() {
   assert(defaultGetImageNameFromClass == nullptr && "already set up");
 
-  // FIXME: This is from a later version of <objc/runtime.h>. Once the
-  // declaration is available in SDKs, we can access this directly instead of
-  // using dlsym.
-  if (void *setHookPtr = dlsym(RTLD_DEFAULT, "objc_setHook_getImageName")) {
-    auto setHook = reinterpret_cast<
-        void(*)(objc_hook_getImageName _Nonnull,
-                objc_hook_getImageName _Nullable * _Nonnull)>(setHookPtr);
-    setHook(replacementGetImageNameFromClass, &defaultGetImageNameFromClass);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability"
+  // If we're on a newer OS, install the customized class_getImageName through
+  // the ObjC runtime.
+  // Note: We're checking this the old-fashioned way instead of using @available
+  // to make it easier to build from open-source.
+  if (&objc_setHook_getImageName != nullptr) {
+    objc_setHook_getImageName(replacementGetImageNameFromClass,
+                              &defaultGetImageNameFromClass);
+#pragma clang diagnostic pop
 
   } else {
     // On older OSs, manually patch in our new implementation of
