@@ -3863,7 +3863,8 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
                               ArrayRef<SILParameterInfo> params,
                               ArrayRef<SILYieldInfo> yields,
                               ArrayRef<SILResultInfo> results,
-                              Optional<SILResultInfo> errorResult) {
+                              Optional<SILResultInfo> errorResult,
+                              Optional<ProtocolConformanceRef> conformance) {
   id.AddPointer(genericParams);
   id.AddInteger(info.getFuncAttrKey());
   id.AddInteger(unsigned(coroutineKind));
@@ -3881,6 +3882,8 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
   // Just allow the profile length to implicitly distinguish the
   // presence of an error result.
   if (errorResult) errorResult->profile(id);
+  if (conformance)
+    id.AddPointer(conformance->getRequirement());
 }
 
 SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
@@ -4016,8 +4019,9 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
 
   llvm::FoldingSetNodeID id;
-  SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee,
-                           params, yields, normalResults, errorResult);
+  SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
+                           yields, normalResults, errorResult,
+                           witnessMethodConformance);
 
   // Do we already have this generic function type?
   void *insertPos;
