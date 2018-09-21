@@ -20,6 +20,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/TransformArrayRef.h"
+#include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
@@ -192,12 +193,15 @@ public:
   }
 
   ArrayRef<SILArgument *> getArguments() const { return ArgumentList; }
-  using PHIArgumentArrayRefTy =
-      TransformArrayRef<SILPHIArgument *(*)(SILArgument *)>;
-  PHIArgumentArrayRefTy getPHIArguments() const;
-  using FunctionArgumentArrayRefTy =
-      TransformArrayRef<SILFunctionArgument *(*)(SILArgument *)>;
-  FunctionArgumentArrayRefTy getFunctionArguments() const;
+
+  /// Returns a transform array ref that performs llvm::cast<SILPHIArgument> on
+  /// each argument and then returns the downcasted value.
+  PHIArgumentArrayRef getPHIArguments() const;
+
+  /// Returns a transform array ref that performs
+  /// llvm::cast<SILFunctionArgument> on each argument and then returns the
+  /// downcasted value.
+  FunctionArgumentArrayRef getFunctionArguments() const;
 
   unsigned getNumArguments() const { return ArgumentList.size(); }
   const SILArgument *getArgument(unsigned i) const { return ArgumentList[i]; }
