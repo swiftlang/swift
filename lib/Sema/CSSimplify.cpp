@@ -5276,6 +5276,25 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     }
   }
 
+  // If we're bound to a (Root) -> Value function type, use that for context.
+  if (auto fnTy = keyPathTy->getAs<FunctionType>()) {
+    if (fnTy->getParams().size() == 1) {
+      Type boundRoot = fnTy->getParams()[0].getPlainType();
+      Type boundValue = fnTy->getResult();
+
+      if (matchTypes(boundRoot, rootTy, ConstraintKind::Bind, subflags, locator)
+              .isFailure())
+        return SolutionKind::Error;
+
+      if (matchTypes(boundValue, valueTy, ConstraintKind::Bind, subflags,
+                     locator)
+              .isFailure())
+        return SolutionKind::Error;
+
+      return SolutionKind::Solved;
+    }
+  }
+
   // See if we resolved overloads for all the components involved.
   enum {
     ReadOnly,
@@ -5403,10 +5422,16 @@ done:
   
   auto resolvedKPTy = BoundGenericType::get(kpDecl, nullptr,
                                             {rootTy, valueTy});
-  // Let's check whether deduced key path type would match
-  // expected contextual one.
-  return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
-                    locator.withPathElement(ConstraintLocator::ContextualType));
+  Type fnType = FunctionType::get({AnyFunctionType::Param(rootTy)}, valueTy,
+                                  AnyFunctionType::ExtInfo().withThrows(false));
+  llvm::SmallVector<Constraint *, 2> constraints;
+  auto loc = locator.getBaseLocator();
+  constraints.push_back(Constraint::create(*this, ConstraintKind::Bind,
+                                           keyPathTy, resolvedKPTy, loc));
+  constraints.push_back(
+      Constraint::create(*this, ConstraintKind::Bind, keyPathTy, fnType, loc));
+  addDisjunctionConstraint(constraints, locator);
+  return SolutionKind::Solved;
 }
 
 ConstraintSystem::SolutionKind

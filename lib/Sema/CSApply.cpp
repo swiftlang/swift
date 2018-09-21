@@ -4252,9 +4252,18 @@ namespace {
 
       // Resolve each of the components.
       bool didOptionalChain = false;
-      auto keyPathTy = cs.getType(E)->castTo<BoundGenericType>();
-      Type baseTy = keyPathTy->getGenericArgs()[0];
-      Type leafTy = keyPathTy->getGenericArgs()[1];
+      bool isFunctionType = false;
+      Type baseTy, leafTy;
+      Type exprType = cs.getType(E);
+      if (auto fnTy = exprType->getAs<FunctionType>()) {
+        baseTy = fnTy->getParams()[0].getPlainType();
+        leafTy = fnTy->getResult();
+        isFunctionType = true;
+      } else {
+        auto keyPathTy = exprType->castTo<BoundGenericType>();
+        baseTy = keyPathTy->getGenericArgs()[0];
+        leafTy = keyPathTy->getGenericArgs()[1];
+      }
 
       // Updates the constraint system with the type of the last resolved
       // component. We do it this way because we sometimes insert new
@@ -4459,7 +4468,46 @@ namespace {
       // key path.
       assert(!baseTy || baseTy->hasUnresolvedType()
              || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
-      return E;
+
+      if (!isFunctionType)
+        return E;
+
+      // Construct an implicit closure which applies this KeyPath.
+      auto resultTy = cs.getType(E);
+      auto &ctx = cs.getASTContext();
+      auto toFunc = exprType->getAs<FunctionType>();
+      auto argTy = toFunc->getParams()[0].getPlainType();
+      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
+      auto closure = new (ctx)
+          AutoClosureExpr(E, toFunc->getResult(), discriminator, cs.DC);
+      auto param = new (ctx) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+                                       SourceLoc(), Identifier(), SourceLoc(),
+                                       ctx.getIdentifier("$0"), closure);
+      param->setType(argTy);
+      param->setInterfaceType(argTy->mapTypeOutOfContext());
+      auto *paramRef = new (ctx)
+          DeclRefExpr(param, DeclNameLoc(E->getLoc()), /*Implicit=*/true);
+      paramRef->setType(argTy);
+      cs.cacheType(paramRef);
+
+      if (resultTy->is<FunctionType>()) {
+        auto kpDecl = cs.getASTContext().getKeyPathDecl();
+        E->setType(BoundGenericType::get(kpDecl, nullptr,
+                                         {argTy, toFunc->getResult()}));
+        cs.cacheType(E);
+      }
+      auto *application = new (ctx)
+          KeyPathApplicationExpr(paramRef, E->getStartLoc(), E, E->getEndLoc(),
+                                 toFunc->getResult(), /*implicit=*/true);
+      cs.cacheType(application);
+      closure->setParameterList(ParameterList::create(ctx, {param}));
+      closure->setBody(application);
+
+      if (!resultTy->is<FunctionType>())
+        resultTy = toFunc->withExtInfo(toFunc->getExtInfo().withThrows(false));
+      closure->setType(resultTy);
+      cs.cacheType(closure);
+      return coerceToType(closure, exprType, cs.getConstraintLocator(E));
     }
 
     KeyPathExpr::Component
