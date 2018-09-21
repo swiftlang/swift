@@ -20,8 +20,6 @@
 // CHECK-32: @"$s13objc_subclass10SwiftGizmoC1xSivpWvd" = hidden global i32 4, align [[WORD_SIZE_IN_BYTES:4]]
 // CHECK-64: @"$s13objc_subclass10SwiftGizmoC1xSivpWvd" = hidden global i64 8, align [[WORD_SIZE_IN_BYTES:8]]
 
-// CHECK-32: [[STRING_EMPTY:@.*]] = private unnamed_addr constant [1 x i8] zeroinitializer
-
 // CHECK: @"OBJC_METACLASS_$__TtC13objc_subclass10SwiftGizmo" = hidden global [[OBJC_CLASS]] { [[OBJC_CLASS]]* @"OBJC_METACLASS_$_NSObject", [[OBJC_CLASS]]* @"OBJC_METACLASS_$_Gizmo", [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null, [[LLVM_PTRSIZE_INT]] ptrtoint ({{.*}} @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo to [[LLVM_PTRSIZE_INT]]) }
 
 // CHECK: [[STRING_SWIFTGIZMO:@.*]] = private unnamed_addr constant [32 x i8] c"_TtC13objc_subclass10SwiftGizmo\00"
@@ -173,7 +171,7 @@
 // CHECK-32:   [1 x { i32*, i8*, i8*, i32, i32 }] [{ i32*, i8*, i8*, i32, i32 } {
 // CHECK-32:     i32* @"$s13objc_subclass10SwiftGizmoC1xSivpWvd",
 // CHECK-32:     i8* getelementptr inbounds ([2 x i8], [2 x i8]* [[STRING_X]], i32 0, i32 0),
-// CHECK-32:     i8* getelementptr inbounds ([1 x i8], [1 x i8]* [[STRING_EMPTY]], i32 0, i32 0),
+// CHECK-32:     i8* getelementptr inbounds ([1 x i8], [1 x i8]* {{.*}}, i32 0, i32 0),
 // CHECK-32:     i32 2,
 // CHECK-32:     i32 4 }]
 // CHECK-32: }, section "__DATA, __objc_const", align 4
