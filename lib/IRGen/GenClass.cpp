@@ -1745,22 +1745,17 @@ namespace {
     ///   uint32_t size;
     /// };
     void buildIvar(ConstantArrayBuilder &ivars, VarDecl *ivar) {
+      assert(FieldLayout && "can't build ivar for category");
+
       auto fields = ivars.beginStruct();
 
       // For now, we never try to emit specialized versions of the
       // metadata statically, so compute the field layout using the
       // originally-declared type.
-      SILType fieldType =
-          IGM.getLoweredType(IGM.getSILTypes().getAbstractionPattern(ivar),
-                             ivar->getDeclContext()
-                                 ->mapTypeIntoContext(ivar->getInterfaceType())
-                                 ->getCanonicalType());
-
-      assert(FieldLayout && "can't build ivar for category");
-      auto &ivarTI = IGM.getTypeInfo(fieldType);
+      auto pair = FieldLayout->getFieldAccessAndElement(ivar);
 
       llvm::Constant *offsetPtr;
-      switch (FieldLayout->getFieldAccessAndElement(ivar).first) {
+      switch (pair.first) {
       case FieldAccess::ConstantDirect:
       case FieldAccess::NonConstantDirect: {
         // If the field offset is fixed relative to the start of the superclass,
@@ -1788,7 +1783,7 @@ namespace {
 
       Size size;
       Alignment alignment;
-      if (auto fixedTI = dyn_cast<FixedTypeInfo>(&ivarTI)) {
+      if (auto fixedTI = dyn_cast<FixedTypeInfo>(&pair.second.getType())) {
         size = fixedTI->getFixedSize();
         alignment = fixedTI->getFixedAlignment();
       } else {
@@ -1858,7 +1853,7 @@ namespace {
     void buildPropertyAttributes(VarDecl *prop, SmallVectorImpl<char> &out) {
       llvm::raw_svector_ostream outs(out);
 
-      auto propTy = prop->getInterfaceType()->getReferenceStorageReferent();
+      auto propTy = prop->getValueInterfaceType();
 
       // Emit the type encoding for the property.
       outs << 'T';
