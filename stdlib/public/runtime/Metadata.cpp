@@ -2016,6 +2016,95 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
 /*** Classes ***************************************************************/
 /***************************************************************************/
 
+static MetadataAllocator &getResilientMetadataAllocator() {
+  // This should be constant-initialized, but this is safe.
+  static MetadataAllocator allocator;
+  return allocator;
+}
+
+ClassMetadata *
+swift::swift_relocateClassMetadata(ClassDescriptor *description,
+                                   ResilientClassMetadataPattern *pattern) {
+  auto bounds = description->getMetadataBounds();
+
+  auto metadata = reinterpret_cast<ClassMetadata *>(
+      (char*) getResilientMetadataAllocator().Allocate(
+        bounds.getTotalSizeInBytes(), sizeof(void*)) +
+        bounds.getAddressPointInBytes());
+
+  auto fullMetadata = asFullMetadata(metadata);
+  char *rawMetadata = reinterpret_cast<char*>(metadata);
+
+  // Zero out the entire immediate-members section.
+  void **immediateMembers =
+    reinterpret_cast<void**>(rawMetadata + bounds.ImmediateMembersOffset);
+  memset(immediateMembers, 0, description->getImmediateMembersSize());
+
+  // Initialize the header:
+
+  // Heap destructor.
+  fullMetadata->destroy = pattern->Destroy.get();
+
+  // Value witness table.
+#if SWIFT_OBJC_INTEROP
+  fullMetadata->ValueWitnesses =
+    (pattern->Flags & ClassFlags::UsesSwiftRefcounting)
+       ? &VALUE_WITNESS_SYM(Bo)
+       : &VALUE_WITNESS_SYM(BO);
+#else
+  fullMetadata->ValueWitnesses = &VALUE_WITNESS_SYM(Bo);
+#endif
+
+  // MetadataKind / isa.
+#if SWIFT_OBJC_INTEROP
+  metadata->setClassISA(pattern->Metaclass.get());
+#else
+  metadata->setKind(MetadataKind::Class);
+#endif
+
+  // Superclass.
+  metadata->Superclass = nullptr;
+
+#if SWIFT_OBJC_INTEROP
+  // Cache data.  Install the same initializer that the compiler is
+  // required to use.  We don't need to do this in non-ObjC-interop modes.
+  metadata->CacheData[0] = &_objc_empty_cache;
+  metadata->CacheData[1] = nullptr;
+#endif
+
+  // RO-data pointer.
+#if SWIFT_OBJC_INTEROP
+  auto classRO = pattern->Data.get();
+  metadata->Data =
+    reinterpret_cast<uintptr_t>(classRO) | SWIFT_CLASS_IS_SWIFT_MASK;
+#else
+  metadata->Data = SWIFT_CLASS_IS_SWIFT_MASK;
+#endif
+
+  // Class flags.
+  metadata->Flags = pattern->Flags;
+
+  // Instance layout.
+  metadata->InstanceAddressPoint = 0;
+  metadata->InstanceSize = 0;
+  metadata->InstanceAlignMask = 0;
+
+  // Reserved.
+  metadata->Reserved = 0;
+
+  // Class metadata layout.
+  metadata->ClassSize = bounds.getTotalSizeInBytes();
+  metadata->ClassAddressPoint = bounds.getAddressPointInBytes();
+
+  // Class descriptor.
+  metadata->setDescription(description);
+
+  // I-var destroyer.
+  metadata->IVarDestroyer = pattern->IVarDestroyer;
+
+  return metadata;
+}
+
 namespace {
   /// The structure of ObjC class ivars as emitted by compilers.
   struct ClassIvarEntry {
@@ -2156,95 +2245,6 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass,
     = (const ClassMetadata *)object_getClass(id_const_cast(theSuperclass));
   theMetaclass->Superclass = theSuperMetaclass;
 #endif
-}
-
-#if SWIFT_OBJC_INTEROP
-static MetadataAllocator &getResilientMetadataAllocator() {
-  // This should be constant-initialized, but this is safe.
-  static MetadataAllocator allocator;
-  return allocator;
-}
-#endif
-
-ClassMetadata *
-swift::swift_relocateClassMetadata(ClassDescriptor *description,
-                                   ResilientClassMetadataPattern *pattern) {
-  auto bounds = description->getMetadataBounds();
-
-  auto metadata = reinterpret_cast<ClassMetadata *>(
-      (char*) malloc(bounds.getTotalSizeInBytes()) +
-      bounds.getAddressPointInBytes());
-  auto fullMetadata = asFullMetadata(metadata);
-  char *rawMetadata = reinterpret_cast<char*>(metadata);
-
-  // Zero out the entire immediate-members section.
-  void **immediateMembers =
-    reinterpret_cast<void**>(rawMetadata + bounds.ImmediateMembersOffset);
-  memset(immediateMembers, 0, description->getImmediateMembersSize());
-
-  // Initialize the header:
-
-  // Heap destructor.
-  fullMetadata->destroy = pattern->Destroy.get();
-
-  // Value witness table.
-#if SWIFT_OBJC_INTEROP
-  fullMetadata->ValueWitnesses =
-    (pattern->Flags & ClassFlags::UsesSwiftRefcounting)
-       ? &VALUE_WITNESS_SYM(Bo)
-       : &VALUE_WITNESS_SYM(BO);
-#else
-  fullMetadata->ValueWitnesses = &VALUE_WITNESS_SYM(Bo);
-#endif
-
-  // MetadataKind / isa.
-#if SWIFT_OBJC_INTEROP
-  metadata->setClassISA(pattern->Metaclass.get());
-#else
-  metadata->setKind(MetadataKind::Class);
-#endif
-
-  // Superclass.
-  metadata->Superclass = nullptr;
-
-#if SWIFT_OBJC_INTEROP
-  // Cache data.  Install the same initializer that the compiler is
-  // required to use.  We don't need to do this in non-ObjC-interop modes.
-  metadata->CacheData[0] = &_objc_empty_cache;
-  metadata->CacheData[1] = nullptr;
-#endif
-
-  // RO-data pointer.
-#if SWIFT_OBJC_INTEROP
-  auto classRO = pattern->Data.get();
-  metadata->Data =
-    reinterpret_cast<uintptr_t>(classRO) | SWIFT_CLASS_IS_SWIFT_MASK;
-#else
-  metadata->Data = SWIFT_CLASS_IS_SWIFT_MASK;
-#endif
-
-  // Class flags.
-  metadata->Flags = pattern->Flags;
-
-  // Instance layout.
-  metadata->InstanceAddressPoint = 0;
-  metadata->InstanceSize = 0;
-  metadata->InstanceAlignMask = 0;
-
-  // Reserved.
-  metadata->Reserved = 0;
-
-  // Class metadata layout.
-  metadata->ClassSize = bounds.getTotalSizeInBytes();
-  metadata->ClassAddressPoint = bounds.getAddressPointInBytes();
-
-  // Class descriptor.
-  metadata->setDescription(description);
-
-  // I-var destroyer.
-  metadata->IVarDestroyer = pattern->IVarDestroyer;
-
-  return metadata;
 }
 
 /// Initialize the field offset vector for a dependent-layout class, using the
