@@ -50,3 +50,8 @@ public struct fixedLayoutStruct {
 }
 
 extension Int: P1 { public func bar() {} }
+
+public protocol ProWithAssociatedType {
+  associatedtype A
+  associatedtype B = Int
+}

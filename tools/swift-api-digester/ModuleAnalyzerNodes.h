@@ -440,6 +440,15 @@ public:
   static bool classof(const SDKNode *N);
 };
 
+class SDKNodeDeclAssociatedType: public SDKNodeDecl {
+public:
+  SDKNodeDeclAssociatedType(SDKNodeInitInfo Info);
+  const SDKNodeType* getDefault() const {
+    return getChildrenCount() ? getOnlyChild()->getAs<SDKNodeType>(): nullptr;
+  }
+  static bool classof(const SDKNode *N);
+};
+
 class SDKNodeDeclVar : public SDKNodeDecl {
   Optional<unsigned> FixedBinaryOrder;
 public:

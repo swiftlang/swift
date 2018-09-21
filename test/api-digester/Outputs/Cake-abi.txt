@@ -17,6 +17,7 @@ cake1: Func S1.foo5(x:y:) has been renamed to Func S1.foo5(x:y:z:)
 cake1: Struct Somestruct2 has been renamed to Struct NSSomestruct2
 
 /* Type Changes */
+cake1: AssociatedType AssociatedTypePro.T3 has default type change from C1 to C6
 cake1: Constructor S1.init(_:) has parameter 0 type change from Int to Double
 cake1: Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
 cake1: Func C7.foo(_:_:) has removed default argument from parameter 0
@@ -47,3 +48,6 @@ cake2: Var fixedLayoutStruct.lazy_d.storage is added to a non-resilient type
 cake1: Protocol P3 has added inherited protocol P4
 cake1: Protocol P3 has removed inherited protocol P2
 cake1: Struct fixedLayoutStruct has removed conformance to P1
+
+/* Protocol Requirement Change */
+cake1: AssociatedType AssociatedTypePro.T1 has removed default type Int
