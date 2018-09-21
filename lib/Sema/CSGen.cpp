@@ -3065,7 +3065,7 @@ namespace {
       auto rvalueBase = CS.createTypeVariable(baseLocator,
                                               TVO_CanBindToNoEscape);
       CS.addConstraint(ConstraintKind::Equal, base, rvalueBase, locator);
-      
+
       // The result is a KeyPath from the root to the end component.
       Type kpTy;
       if (didOptionalChain) {
