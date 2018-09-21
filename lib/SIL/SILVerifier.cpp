@@ -379,7 +379,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   const SILArgument *CurArgument = nullptr;
-  DominanceInfo *Dominance = nullptr;
+  std::unique_ptr<DominanceInfo> Dominance;
 
   // Used for dominance checking within a basic block.
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
@@ -590,17 +590,12 @@ public:
         InstNumbers[&I] = InstIdx++;
     }
 
-    Dominance = new DominanceInfo(const_cast<SILFunction *>(&F));
+    Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
     require(DebugScope->Parent.get<SILFunction *>() == &F,
             "Scope of SIL function points to different function");
-  }
-
-  ~SILVerifier() {
-    if (Dominance)
-      delete Dominance;
   }
 
   // Checks dominance between two instructions.
@@ -5008,10 +5003,11 @@ void SILWitnessTable::verify(const SILModule &M) const {
 void SILDefaultWitnessTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
   for (const Entry &E : getEntries()) {
-    if (!E.isValid())
+    // FIXME: associated type witnesses.
+    if (!E.isValid() || E.getKind() != SILWitnessTable::Method)
       continue;
 
-    SILFunction *F = E.getWitness();
+    SILFunction *F = E.getMethodWitness().Witness;
 
 #if 0
     // FIXME: For now, all default witnesses are private.
@@ -5065,7 +5061,7 @@ void SILModule::verify() const {
     return;
 #endif
   // Uniquing set to catch symbol name collisions.
-  llvm::StringSet<> symbolNames;
+  llvm::DenseSet<StringRef> symbolNames;
 
   // When merging partial modules, we only link functions from the current
   // module, without enabling "LinkAll" mode or running the SILLinker pass;

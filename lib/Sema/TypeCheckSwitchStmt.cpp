@@ -184,6 +184,7 @@ namespace {
           return acc;
         }
         }
+        llvm_unreachable("unhandled kind");
       }
 
       explicit Space(Type T, Identifier NameForPrinting)
@@ -858,6 +859,7 @@ namespace {
           return result;
         }
         }
+        llvm_unreachable("unhandled kind");
       }
     };
 
@@ -1595,6 +1597,7 @@ namespace {
                                      conArgSpace);
       }
       }
+      llvm_unreachable("unhandled kind");
     }
   };
 } // end anonymous namespace

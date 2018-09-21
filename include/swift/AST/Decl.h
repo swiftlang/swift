@@ -3774,8 +3774,6 @@ private:
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
-  llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
-
   /// The generic signature representing exactly the new requirements introduced
   /// by this protocol.
   const Requirement *RequirementSignature = nullptr;
@@ -3967,12 +3965,32 @@ public:
     Bits.ProtocolDecl.HasMissingRequirements = newValue;
   }
 
+  /// Returns the default type witness for an associated type, or a null
+  /// type if there is no default.
+  Type getDefaultTypeWitness(AssociatedTypeDecl *assocType) const;
+
+  /// Set the default type witness for an associated type.
+  void setDefaultTypeWitness(AssociatedTypeDecl *assocType, Type witness);
+
   /// Returns the default witness for a requirement, or nullptr if there is
   /// no default.
   Witness getDefaultWitness(ValueDecl *requirement) const;
 
   /// Record the default witness for a requirement.
   void setDefaultWitness(ValueDecl *requirement, Witness witness);
+
+  /// Returns the default associated conformance witness for an associated
+  /// type, or \c None if there is no default.
+  Optional<ProtocolConformanceRef> getDefaultAssociatedConformanceWitness(
+                                              CanType association,
+                                              ProtocolDecl *requirement) const;
+
+  /// Set the default associated conformance witness for the given
+  /// associated conformance.
+  void setDefaultAssociatedConformanceWitness(
+                                            CanType association,
+                                            ProtocolDecl *requirement,
+                                            ProtocolConformanceRef conformance);
 
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
@@ -4624,6 +4642,7 @@ public:
     case Specifier::InOut:
       return false;
     }
+    llvm_unreachable("unhandled specifier");
   }
   /// Is this an immutable 'let' property?
   bool isLet() const { return getSpecifier() == Specifier::Let; }
@@ -4645,6 +4664,7 @@ public:
     case Specifier::Owned:
       return ValueOwnership::Owned;
     }
+    llvm_unreachable("unhandled specifier");
   }
 
   /// Is this an element in a capture list?
@@ -4975,7 +4995,10 @@ public:
     TypeChecked,
 
     /// This is a memberwise initializer that will be synthesized by SILGen.
-    MemberwiseInitializer
+    MemberwiseInitializer,
+
+    /// Function body text was deserialized from a .swiftmodule.
+    Deserialized
 
     // This enum currently needs to fit in a 3-bit bitfield.
   };
@@ -4996,6 +5019,9 @@ protected:
     /// This enum member is active if getBodyKind() is BodyKind::Parsed or
     /// BodyKind::TypeChecked.
     BraceStmt *Body;
+
+    /// This enum member is active if getBodyKind() is BodyKind::Deserialized.
+    StringRef BodyStringRepresentation;
 
     /// This enum member is active if getBodyKind() == BodyKind::Synthesize.
     BodySynthesizer Synthesizer;
@@ -5091,6 +5117,11 @@ public:
     return getBodyKind() != BodyKind::None;
   }
 
+  /// Returns true if the text of this function's body can be retrieved either
+  /// by extracting the text from the source buffer or reading the inlinable
+  /// body from a deserialized swiftmodule.
+  bool hasInlinableBodyText() const;
+
   /// Returns the function body, if it was parsed, or nullptr otherwise.
   ///
   /// Note that a null return value does not imply that the source code did not
@@ -5152,6 +5183,18 @@ public:
   void setBodyTypeCheckedIfPresent() {
     if (getBodyKind() == BodyKind::Parsed)
       setBodyKind(BodyKind::TypeChecked);
+  }
+
+  /// Gets the body of this function, stripping the unused portions of #if
+  /// configs inside the body. If this function was not deserialized from a
+  /// .swiftmodule, this body is reconstructed from the original
+  /// source buffer.
+  StringRef getInlinableBodyText(SmallVectorImpl<char> &scratch) const;
+
+  void setBodyStringRepresentation(StringRef body) {
+    assert(getBodyKind() == BodyKind::None);
+    setBodyKind(BodyKind::Deserialized);
+    BodyStringRepresentation = body;
   }
 
   bool isBodyTypeChecked() const {
@@ -6482,9 +6525,8 @@ public:
 
   static MissingMemberDecl *
   forInitializer(ASTContext &ctx, DeclContext *DC, DeclName name,
-                 bool hasNormalVTableEntry,
-                 bool hasAllocatingVTableEntry) {
-    unsigned entries = hasNormalVTableEntry + hasAllocatingVTableEntry;
+                 bool hasVTableEntry) {
+    unsigned entries = hasVTableEntry ? 1 : 0;
     return new (ctx) MissingMemberDecl(DC, name, entries, 0);
   }
   

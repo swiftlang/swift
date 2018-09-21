@@ -124,6 +124,8 @@ struct ASTContext::Implementation {
   /// lazy parsers for imported module files and source files.
   llvm::SmallPtrSet<LazyMemberParser*, 2> lazyParsers;
 
+  // FIXME: This is a StringMap rather than a StringSet because StringSet
+  // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
 
   /// The declaration of Swift.AssignmentPrecedence.
@@ -274,6 +276,19 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 
   /// Overridden declarations.
   llvm::DenseMap<const ValueDecl *, ArrayRef<ValueDecl *>> Overrides;
+
+  /// Default witnesses.
+  llvm::DenseMap<std::pair<const ProtocolDecl *, ValueDecl *>, Witness>
+    DefaultWitnesses;
+
+  /// Default type witnesses for protocols.
+  llvm::DenseMap<std::pair<const ProtocolDecl *, AssociatedTypeDecl *>, Type>
+    DefaultTypeWitnesses;
+
+  /// Default associated conformance witnesses for protocols.
+  llvm::DenseMap<std::tuple<const ProtocolDecl *, CanType, ProtocolDecl *>,
+                 ProtocolConformanceRef>
+    DefaultAssociatedConformanceWitnesses;
 
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
@@ -1652,6 +1667,77 @@ void OverriddenDeclsRequest::cacheResult(
   auto overriddenCopy =
     ctx.AllocateCopy(value.operator ArrayRef<ValueDecl *>());
   (void)ctx.getImpl().Overrides.insert({decl, overriddenCopy});
+}
+
+/// Returns the default witness for a requirement, or nullptr if there is
+/// no default.
+Witness ProtocolDecl::getDefaultWitness(ValueDecl *requirement) const {
+  loadAllMembers();
+
+  ASTContext &ctx = getASTContext();
+  auto found = ctx.getImpl().DefaultWitnesses.find({this, requirement});
+  if (found == ctx.getImpl().DefaultWitnesses.end())
+    return Witness();
+  return found->second;
+}
+
+/// Record the default witness for a requirement.
+void ProtocolDecl::setDefaultWitness(ValueDecl *requirement, Witness witness) {
+  assert(witness);
+  ASTContext &ctx = getASTContext();
+  auto pair = ctx.getImpl().DefaultWitnesses.insert(
+                std::make_pair(std::make_pair(this, requirement), witness));
+  assert(pair.second && "Already have a default witness!");
+  (void) pair;
+}
+
+/// Returns the default type witness for an associated type, or a null
+/// type if there is no default.
+Type ProtocolDecl::getDefaultTypeWitness(AssociatedTypeDecl *assocType) const {
+  auto &ctx = getASTContext();
+  auto found = ctx.getImpl().DefaultTypeWitnesses.find({this, assocType});
+  if (found == ctx.getImpl().DefaultTypeWitnesses.end())
+    return Type();
+
+  return found->second;
+}
+
+/// Set the default type witness for an associated type.
+void ProtocolDecl::setDefaultTypeWitness(AssociatedTypeDecl *assocType,
+                                         Type witness) {
+  assert(witness);
+  assert(!witness->hasArchetype() && "Only record interface types");
+  ASTContext &ctx = getASTContext();
+  auto pair = ctx.getImpl().DefaultTypeWitnesses.insert(
+                std::make_pair(std::make_pair(this, assocType), witness));
+  assert(pair.second && "Already have a default witness");
+  (void)pair;
+}
+
+Optional<ProtocolConformanceRef>
+ProtocolDecl::getDefaultAssociatedConformanceWitness(
+                                             CanType association,
+                                             ProtocolDecl *requirement) const {
+  auto &ctx = getASTContext();
+  auto found =
+    ctx.getImpl().DefaultAssociatedConformanceWitnesses.find(
+      std::make_tuple(this, association, requirement));
+  if (found == ctx.getImpl().DefaultAssociatedConformanceWitnesses.end())
+    return None;
+
+  return found->second;
+}
+
+void ProtocolDecl::setDefaultAssociatedConformanceWitness(
+                                          CanType association,
+                                          ProtocolDecl *requirement,
+                                          ProtocolConformanceRef conformance) {
+  auto &ctx = getASTContext();
+  auto pair = ctx.getImpl().DefaultAssociatedConformanceWitnesses.insert(
+                std::make_pair(std::make_tuple(this, association, requirement),
+                               conformance));
+  assert(pair.second && "Already have a default associated conformance");
+  (void)pair;
 }
 
 bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
@@ -4249,10 +4335,6 @@ TypeCheckerDebugConsumer::~TypeCheckerDebugConsumer() { }
 CapturingTypeCheckerDebugConsumer::CapturingTypeCheckerDebugConsumer()
     : Log(new raw_capturing_ostream(*this)) {
   Log->SetUnbuffered();
-}
-
-CapturingTypeCheckerDebugConsumer::~CapturingTypeCheckerDebugConsumer() {
-  delete Log;
 }
 
 void SubstitutionMap::Storage::Profile(

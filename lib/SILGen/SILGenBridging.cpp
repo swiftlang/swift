@@ -1377,6 +1377,21 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
 void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   assert(thunk.isForeign);
   SILDeclRef native = thunk.asForeign(false);
+
+  // If we're calling a native non-designated class initializer, we have to
+  // discard the `self` object we were given, since
+  // Swift convenience initializers only have allocating entry points that
+  // create whole new objects.
+  bool isInitializingToAllocatingInitThunk = false;
+  if (native.kind == SILDeclRef::Kind::Initializer) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(native.getDecl())) {
+      if (!ctor->isDesignatedInit()) {
+        isInitializingToAllocatingInitThunk = true;
+        native = SILDeclRef(ctor, SILDeclRef::Kind::Allocator);
+      }
+    }
+  }
+
   auto nativeInfo = getConstantInfo(native);
   auto subs = F.getForwardingSubstitutionMap();
   auto substTy = nativeInfo.SILFnType->substGenericArgs(SGM.M, subs);
@@ -1454,6 +1469,24 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
                                          foreignErrorSlot, foreignError,
                                          nativeFormalResultType,
                                          bridgedFormalResultType);
+
+  // Throw away the partially-initialized `self` value we were given if we're
+  // bridging from an initializing to allocating entry point.
+  if (isInitializingToAllocatingInitThunk) {
+    auto oldSelf = args.pop_back_val();
+    auto oldSelfTy = B.createValueMetatype(loc,
+         SILType::getPrimitiveObjectType(
+           CanMetatypeType::get(oldSelf->getType().getASTType(),
+                                MetatypeRepresentation::Thick)),
+         oldSelf);
+    
+    B.createDeallocPartialRef(loc, oldSelf, oldSelfTy);
+    
+    // Pass the dynamic type on to the native allocating initializer.
+    args.push_back(oldSelfTy);
+    native = SILDeclRef(native.getDecl(), SILDeclRef::Kind::Allocator);
+  }
+
   SILFunctionConventions objcConv(CanSILFunctionType(objcFnTy), SGM.M);
   SILFunctionConventions nativeConv(CanSILFunctionType(nativeInfo.SILFnType),
                                     SGM.M);

@@ -5,27 +5,27 @@ import c_layout
 
 // CHECK: [[HAS_NESTED_UNION_NAME:@.*]] = private constant [15 x i8] c"HasNestedUnion\00"
 
-// CHECK-LABEL: @"$SSo14HasNestedUnionVMn" = linkonce_odr hidden constant
+// CHECK-LABEL: @"$sSo14HasNestedUnionVMn" = linkonce_odr hidden constant
 // CHECK-SAME: [[HAS_NESTED_UNION_NAME]]
-// CHECK-SAME: @"$SSo14HasNestedUnionVMa"
+// CHECK-SAME: @"$sSo14HasNestedUnionVMa"
 
 // CHECK: [[AMAZING_COLOR_NAME:@.*]] = private constant [13 x i8] c"AmazingColor\00"
 
-// CHECK-LABEL: @"$SSo12AmazingColorVMn" = linkonce_odr hidden constant
+// CHECK-LABEL: @"$sSo12AmazingColorVMn" = linkonce_odr hidden constant
 // CHECK-SAME: [[AMAZING_COLOR_NAME]]
-// CHECK-SAME: @"$SSo12AmazingColorVMa"
+// CHECK-SAME: @"$sSo12AmazingColorVMa"
 
-// CHECK-LABEL: @"$SSo14HasNestedUnionV18__Unnamed_struct_sVN" = linkonce_odr hidden constant
-// CHECK-SAME:  @"$SSo14HasNestedUnionV18__Unnamed_struct_sVWV"
+// CHECK-LABEL: @"$sSo14HasNestedUnionV18__Unnamed_struct_sVN" = linkonce_odr hidden constant
+// CHECK-SAME:  @"$sSo14HasNestedUnionV18__Unnamed_struct_sVWV"
 // CHECK-SAME:  [[INT]] 512,
-// CHECK-SAME:  @"$SSo14HasNestedUnionV18__Unnamed_struct_sVMn"
+// CHECK-SAME:  @"$sSo14HasNestedUnionV18__Unnamed_struct_sVMn"
 // CHECK-SAME:  i32 0,
 // CHECK-SAME:  i32 4 }
 
 // CHECK-LABEL: @"\01l_type_metadata_table" = private constant
-// CHECK-SAME: @"$SSo14HasNestedUnionVMn"
-// CHECK-SAME: @"$SSo12AmazingColorVMn"
-// CHECK-SAME: @"$SSo14HasNestedUnionV18__Unnamed_struct_sVMn"
+// CHECK-SAME: @"$sSo14HasNestedUnionVMn"
+// CHECK-SAME: @"$sSo12AmazingColorVMn"
+// CHECK-SAME: @"$sSo14HasNestedUnionV18__Unnamed_struct_sVMn"
 
 sil @test0 : $() -> () {
 bb0:
@@ -36,8 +36,8 @@ bb0:
   return %ret : $()
 }
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo14HasNestedUnionVMa"(
-// CHECK: call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, {{.*}}$SSo14HasNestedUnionVN
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo14HasNestedUnionVMa"(
+// CHECK: call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, {{.*}}$sSo14HasNestedUnionVN
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo12AmazingColorVMa"(
-// CHECK: call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, {{.*}}@"$SSo12AmazingColorVN"
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo12AmazingColorVMa"(
+// CHECK: call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, {{.*}}@"$sSo12AmazingColorVN"

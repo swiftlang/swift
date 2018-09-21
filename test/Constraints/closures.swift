@@ -497,8 +497,8 @@ sr3520_1 { $0 = 1 } // expected-error {{cannot convert value of type '()' to clo
 struct S_3520 {
   var number1: Int
 }
-func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {}
-sr3520_set_via_closure({ $0.number1 = $1 }) // expected-error {{type of expression is ambiguous without more context}}
+func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
+sr3520_set_via_closure({ $0.number1 = $1 }) // expected-error {{generic parameter 'S' could not be inferred}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 

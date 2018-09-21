@@ -564,6 +564,9 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
 
   ASTContext &ctx = proto->getASTContext();
   TinyPtrVector<NominalTypeDecl *> result;
+  if (!ext->getGenericParams())
+    return result;
+
   for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
     // We only care about type constraints.
     if (req.getKind() != RequirementReprKind::TypeConstraint)
@@ -709,6 +712,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   };
 
   if (Loc.isValid() &&
+      DC->getParentSourceFile() &&
       DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
       Ctx.LangOpts.EnableASTScopeLookup) {
     // Find the source file in which we are performing the lookup.
@@ -2416,6 +2420,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::ImplicitlyUnwrappedOptional:
     return { 1, ctx.getOptionalDecl() };
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static DirectlyReferencedTypeDecls directReferencesForType(Type type) {

@@ -3067,6 +3067,8 @@ namespace {
           base = OptionalType::get(base);
           break;
         }
+        case KeyPathExpr::Component::Kind::Identity:
+          continue;
         }
       }
       
@@ -3208,6 +3210,7 @@ namespace {
         return MetatypeType::get(ctx.TheAnyType)->getCanonicalType();
       }
       }
+      llvm_unreachable("unhandled operation");
     }
   };
 
@@ -3756,6 +3759,7 @@ getMemberDecls(InterestedMemberKind Kind) {
   case InterestedMemberKind::All:
     return Result;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 ResolvedMemberResult

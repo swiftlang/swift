@@ -950,6 +950,7 @@ public:
 
   // NOTE: if you change the layout of this type, you'll also need
   // to update tuple_getValueWitnesses().
+  unsigned ExtraInhabitantProvidingElement;
   ExtraInhabitantsValueWitnessTable Witnesses;
   FullMetadata<TupleTypeMetadata> Data;
 
@@ -994,7 +995,7 @@ public:
     // Order by the cheaper comparisons first:
 
     // The number of elements.
-    if (auto result = compareIntegers(key.NumElements, Data.NumElements))
+    if (auto result = compareIntegers(key.NumElements,(size_t)Data.NumElements))
       return result;
 
     // The element types.
@@ -1220,15 +1221,41 @@ static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
   return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
 }
 
+static void tuple_storeExtraInhabitant(OpaqueValue *tuple,
+                                       int index,
+                                       const Metadata *_metatype) {
+  auto &metatype = *(const TupleTypeMetadata*) _metatype;
+  auto cacheEntry = TupleCacheStorage::resolveExistingEntry(&metatype);
+  auto &eltInfo =
+    metatype.getElement(cacheEntry->ExtraInhabitantProvidingElement);
+
+  auto *elt = (OpaqueValue*)((uintptr_t)tuple + eltInfo.Offset);
+
+  eltInfo.Type->vw_storeExtraInhabitant(elt, index);
+}
+
+static int tuple_getExtraInhabitantIndex(const OpaqueValue *tuple,
+                                         const Metadata *_metatype) {
+  auto &metatype = *(const TupleTypeMetadata*) _metatype;
+
+  auto cacheEntry = TupleCacheStorage::resolveExistingEntry(&metatype);
+  auto &eltInfo =
+    metatype.getElement(cacheEntry->ExtraInhabitantProvidingElement);
+
+  auto *elt = (const OpaqueValue*)((uintptr_t)tuple + eltInfo.Offset);
+  return eltInfo.Type->vw_getExtraInhabitantIndex(elt);
+}
+
 template <bool IsPOD, bool IsInline>
 static unsigned tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
                                               unsigned numEmptyCases,
                                               const Metadata *self) {
-  auto *witnesses = self->getValueWitnesses();
+  
+  auto *witnesses = tuple_getValueWitnesses(self);
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
-  auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
+  auto getExtraInhabitantIndex = numExtraInhabitants > 0
+    ? tuple_getExtraInhabitantIndex : nullptr;
 
   return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
                                      numExtraInhabitants,
@@ -1239,37 +1266,14 @@ template <bool IsPOD, bool IsInline>
 static void
 tuple_storeEnumTagSinglePayload(OpaqueValue *enumAddr, unsigned whichCase,
                                 unsigned numEmptyCases, const Metadata *self) {
-  auto *witnesses = self->getValueWitnesses();
+  auto *witnesses = tuple_getValueWitnesses(self);
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
-  auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
+  auto storeExtraInhabitant = numExtraInhabitants > 0
+    ? tuple_storeExtraInhabitant : nullptr;
 
   storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self, size,
                                 numExtraInhabitants, storeExtraInhabitant);
-}
-
-static void tuple_storeExtraInhabitant(OpaqueValue *tuple,
-                                       int index,
-                                       const Metadata *_metatype) {
-  auto &metatype = *(const TupleTypeMetadata*) _metatype;
-  auto &eltInfo = metatype.getElement(0);
-
-  assert(eltInfo.Offset == 0);
-  OpaqueValue *elt = tuple;
-
-  eltInfo.Type->vw_storeExtraInhabitant(elt, index);
-}
-
-static int tuple_getExtraInhabitantIndex(const OpaqueValue *tuple,
-                                         const Metadata *_metatype) {
-  auto &metatype = *(const TupleTypeMetadata*) _metatype;
-  auto &eltInfo = metatype.getElement(0);
-
-  assert(eltInfo.Offset == 0);
-  const OpaqueValue *elt = tuple;
-
-  return eltInfo.Type->vw_getExtraInhabitantIndex(elt);
 }
 
 /// Various standard witness table for tuples.
@@ -1400,12 +1404,24 @@ void swift::swift_getTupleTypeLayout(TypeLayout *result,
                                      TupleTypeFlags flags,
                                      const TypeLayout * const *elements) {
   *result = TypeLayout();
+  unsigned numExtraInhabitants = 0;
   performBasicLayout(*result, elements, flags.getNumElements(),
     [](const TypeLayout *elt) { return elt; },
-    [elementOffsets](size_t i, const TypeLayout *elt, size_t offset) {
+    [elementOffsets, &numExtraInhabitants]
+    (size_t i, const TypeLayout *elt, size_t offset) {
       if (elementOffsets)
         elementOffsets[i] = uint32_t(offset);
+      numExtraInhabitants = std::max(numExtraInhabitants,
+                                     elt->getNumExtraInhabitants());
     });
+  
+  if (numExtraInhabitants > 0) {
+    *result = TypeLayout(result->size,
+                         result->flags.withExtraInhabitants(true),
+                         result->stride,
+                         ExtraInhabitantFlags()
+                           .withNumExtraInhabitants(numExtraInhabitants));
+  }
 }
 
 MetadataResponse
@@ -1540,14 +1556,25 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
   Witnesses.flags = layout.flags;
   Witnesses.stride = layout.stride;
 
-  // We have extra inhabitants if the first element does.
-  // FIXME: generalize this.
-  bool hasExtraInhabitants = false;
-  if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
-                                Data.getElement(0).Type->getValueWitnesses())) {
-    hasExtraInhabitants = true;
+  // We have extra inhabitants if any element does.
+  // Pick the element with the most, favoring the earliest element in a tie.
+  unsigned extraInhabitantProvidingElement = ~0u;
+  unsigned numExtraInhabitants = 0;
+  for (unsigned i = 0, e = Data.NumElements; i < e; ++i) {
+    if (auto eltEIVWI = dyn_cast<ExtraInhabitantsValueWitnessTable>(
+                                Data.getElement(i).Type->getValueWitnesses())) {
+      unsigned eltEI = eltEIVWI->extraInhabitantFlags.getNumExtraInhabitants();
+      if (eltEI > numExtraInhabitants) {
+        extraInhabitantProvidingElement = i;
+        numExtraInhabitants = eltEI;
+      }
+    }
+  }
+  if (numExtraInhabitants > 0) {
+    ExtraInhabitantProvidingElement = extraInhabitantProvidingElement;
     Witnesses.flags = Witnesses.flags.withExtraInhabitants(true);
-    Witnesses.extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
+    Witnesses.extraInhabitantFlags = ExtraInhabitantFlags()
+      .withNumExtraInhabitants(numExtraInhabitants);
     Witnesses.storeExtraInhabitant = tuple_storeExtraInhabitant;
     Witnesses.getExtraInhabitantIndex = tuple_getExtraInhabitantIndex;
   }
@@ -1557,13 +1584,19 @@ TupleCacheEntry::tryInitialize(Metadata *metadata,
   if (!proposedWitnesses) {
     // Try to pattern-match into something better than the generic witnesses.
     if (layout.flags.isInlineStorage() && layout.flags.isPOD()) {
-      if (!hasExtraInhabitants && layout.size == 8 && layout.flags.getAlignmentMask() == 7)
+      if (numExtraInhabitants == 0
+          && layout.size == 8
+          && layout.flags.getAlignmentMask() == 7)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi64_);
-      else if (!hasExtraInhabitants && layout.size == 4 && layout.flags.getAlignmentMask() == 3)
+      else if (numExtraInhabitants == 0
+               && layout.size == 4
+               && layout.flags.getAlignmentMask() == 3)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi32_);
-      else if (!hasExtraInhabitants && layout.size == 2 && layout.flags.getAlignmentMask() == 1)
+      else if (numExtraInhabitants == 0
+               && layout.size == 2
+               && layout.flags.getAlignmentMask() == 1)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi16_);
-      else if (!hasExtraInhabitants && layout.size == 1)
+      else if (numExtraInhabitants == 0 && layout.size == 1)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi8_);
       else
         proposedWitnesses = &tuple_witnesses_pod_inline;
@@ -2741,7 +2774,7 @@ public:
 
 class OpaqueExistentialValueWitnessTableCacheEntry {
 public:
-  ValueWitnessTable Data;
+  ExtraInhabitantsValueWitnessTable Data;
 
   OpaqueExistentialValueWitnessTableCacheEntry(unsigned numTables);
 
@@ -2798,9 +2831,11 @@ public:
 /// The uniquing structure for existential type metadata.
 static SimpleGlobalCache<ExistentialCacheEntry> ExistentialTypes;
 
-static const ValueWitnessTable OpaqueExistentialValueWitnesses_0 =
+static const ExtraInhabitantsValueWitnessTable
+OpaqueExistentialValueWitnesses_0 =
   ValueWitnessTableForBox<OpaqueExistentialBox<0>>::table;
-static const ValueWitnessTable OpaqueExistentialValueWitnesses_1 =
+static const ExtraInhabitantsValueWitnessTable
+OpaqueExistentialValueWitnesses_1 =
   ValueWitnessTableForBox<OpaqueExistentialBox<1>>::table;
 
 /// The standard metadata for Any.
@@ -2855,7 +2890,6 @@ OpaqueExistentialValueWitnessTableCacheEntry::
 OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
   using Box = NonFixedOpaqueExistentialBox;
   using Witnesses = NonFixedValueWitnesses<Box, /*known allocated*/ true>;
-  static_assert(!Witnesses::hasExtraInhabitants, "no extra inhabitants");
 
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
@@ -2869,8 +2903,14 @@ OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
     .withPOD(false)
     .withBitwiseTakable(true)
     .withInlineStorage(false)
-    .withExtraInhabitants(false);
+    .withExtraInhabitants(true);
   Data.stride = Box::Container::getStride(numWitnessTables);
+  
+  // Extra inhabitant behavior does not change with the number of witnesses.
+  constexpr auto extraInhabitantFlags = Witnesses::extraInhabitantFlags;
+  Data.extraInhabitantFlags = extraInhabitantFlags;
+  Data.getExtraInhabitantIndex = Witnesses::getExtraInhabitantIndex;
+  Data.storeExtraInhabitant = Witnesses::storeExtraInhabitant;
 
   assert(getNumWitnessTables() == numWitnessTables);
 }
@@ -3613,11 +3653,13 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
     return false;
   }
 
-  // If we don't have resilient witnesses, the template must provide
-  // everything.
-  assert (genericTable->WitnessTableSizeInWords ==
+  // If we don't have the exact number of witnesses expected, we require
+  // instantiation.
+  if (genericTable->WitnessTableSizeInWords !=
           (genericTable->Protocol->NumRequirements +
-           WitnessTableFirstRequirementOffset));
+           WitnessTableFirstRequirementOffset)) {
+    return false;
+  }
 
   // If we have an instantiation function or private data, we require
   // instantiation.
@@ -3636,40 +3678,46 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
   auto protocol = genericTable->Protocol.get();
 
   auto requirements = protocol->getRequirements();
-  auto witnesses = genericTable->ResilientWitnesses->getWitnesses();
+  llvm::ArrayRef<TargetResilientWitness<InProcess>> witnesses;
+  if (auto resilientWitnesses = genericTable->ResilientWitnesses.get())
+    witnesses = resilientWitnesses->getWitnesses();
 
+  // Loop over the provided witnesses, filling in appropriate entry.
+  for (const auto &witness : witnesses) {
+    // Retrieve the requirement descriptor.
+    auto reqDescriptor = witness.Requirement.get();
+
+    // The requirement descriptor may be NULL, in which case this is a
+    // requirement introduced in a later version of the protocol./
+    if (!reqDescriptor) continue;
+
+    // If the requirement descriptor doesn't land within the bounds of the
+    // requirements, abort.
+    if (reqDescriptor < requirements.begin() ||
+        reqDescriptor >= requirements.end()) {
+      fatalError(0, "generic witness table at %p contains out-of-bounds "
+                 "requirement descriptor %p\n",
+                 genericTable, reqDescriptor);
+    }
+
+    unsigned witnessIndex = (reqDescriptor - requirements.data()) +
+      WitnessTableFirstRequirementOffset;
+
+    table[witnessIndex] = witness.Witness.get();
+  }
+
+  // Loop over the requirements, filling in default implementations where
+  // needed.
   for (size_t i = 0, e = protocol->NumRequirements; i < e; ++i) {
-    auto &reqt = requirements[i];
-
-    // Only function-like requirements are filled in from the
-    // resilient witness table.
-    switch (reqt.Flags.getKind()) {
-    case ProtocolRequirementFlags::Kind::Method:
-    case ProtocolRequirementFlags::Kind::Init:
-    case ProtocolRequirementFlags::Kind::Getter:
-    case ProtocolRequirementFlags::Kind::Setter:
-    case ProtocolRequirementFlags::Kind::ReadCoroutine:
-    case ProtocolRequirementFlags::Kind::ModifyCoroutine:
-      break;
-    case ProtocolRequirementFlags::Kind::BaseProtocol:
-    case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
-    case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
-      continue;
-    }
-
-    void *impl = reqt.DefaultImplementation.get();
-
-    // Find the witness if there is one, otherwise we use the default.
-    for (auto &witness : witnesses) {
-      if (witness.Requirement.get() == &reqt) {
-        impl = witness.Witness.get();
-        break;
-      }
-    }
-
-    assert(impl != nullptr && "no implementation for witness");
-
     unsigned witnessIndex = WitnessTableFirstRequirementOffset + i;
+
+    // If we already have a witness, there's nothing to do.
+    if (table[witnessIndex])
+      continue;
+
+    // Otherwise, fill in a default implementation.
+    auto &reqt = requirements[i];
+    void *impl = reqt.DefaultImplementation.get();
     table[witnessIndex] = impl;
   }
 }
@@ -3710,8 +3758,7 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   }
 
   // Fill in any default requirements.
-  if (genericTable->ResilientWitnesses)
-    initializeResilientWitnessTable(genericTable, table);
+  initializeResilientWitnessTable(genericTable, table);
 
   auto castTable = reinterpret_cast<WitnessTable*>(table);
 

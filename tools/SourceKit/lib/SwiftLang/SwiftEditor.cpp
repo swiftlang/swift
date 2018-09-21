@@ -1673,8 +1673,13 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
 }
 
 void SwiftEditorDocument::updateSemaInfo() {
-  if (Impl.SemanticInfo) {
-    Impl.SemanticInfo->processLatestSnapshotAsync(Impl.EditableBuffer);
+  Impl.AccessMtx.lock();
+  auto EditableBuffer = Impl.EditableBuffer;
+  auto SemanticInfo = Impl.SemanticInfo;
+  Impl.AccessMtx.unlock(); // Not a recursive mutex, so unlock before processing
+
+  if (SemanticInfo) {
+    SemanticInfo->processLatestSnapshotAsync(EditableBuffer);
   }
 }
 
@@ -1978,6 +1983,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
 }
 
 ImmutableTextSnapshotRef SwiftEditorDocument::getLatestSnapshot() const {
+  llvm::sys::ScopedLock L(Impl.AccessMtx);
   return Impl.EditableBuffer->getSnapshot();
 }
 

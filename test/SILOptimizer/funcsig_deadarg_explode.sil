@@ -31,5 +31,5 @@ bb0(%0 : $S):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil shared @$S6calleeTf4dxd_n : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-LABEL: sil shared @$s6calleeTf4dxd_n : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: bb0([[KLASS:%[0-9]+]] : $Klass):

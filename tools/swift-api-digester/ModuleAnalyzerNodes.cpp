@@ -1,4 +1,5 @@
 #include <ModuleAnalyzerNodes.h>
+#include <algorithm>
 
 using namespace swift;
 using namespace ide;
@@ -42,11 +43,13 @@ struct swift::ide::api::SDKNodeInitInfo {
   StringRef USR;
   StringRef Location;
   StringRef ModuleName;
+  bool IsImplicit = false;
   bool IsThrowing = false;
   bool IsMutating = false;
   bool IsStatic = false;
   bool IsDeprecated = false;
   Optional<uint8_t> SelfIndex;
+  Optional<unsigned> FixedBinaryOrder;
   ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
   std::vector<DeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
@@ -81,8 +84,8 @@ SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root)
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
       : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.USR),
         Location(Info.Location), ModuleName(Info.ModuleName),
-        DeclAttributes(Info.DeclAttrs), IsStatic(Info.IsStatic),
-        IsDeprecated(Info.IsDeprecated),
+        DeclAttributes(Info.DeclAttrs), IsImplicit(Info.IsImplicit),
+        IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
         GenericSig(Info.GenericSig) {}
 
@@ -108,7 +111,8 @@ SDKNodeDeclTypeAlias::SDKNodeDeclTypeAlias(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclTypeAlias) {}
 
 SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info): 
-  SDKNodeDecl(Info, SDKNodeKind::DeclVar) {}
+  SDKNodeDecl(Info, SDKNodeKind::DeclVar),
+  FixedBinaryOrder(Info.FixedBinaryOrder) {}
 
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
@@ -153,8 +157,10 @@ bool SDKNodeType::classof(const SDKNode *N) {
   }
 }
 
-unsigned SDKNode::getChildIndex(NodePtr Child) const {
-  return std::find(Children.begin(), Children.end(), Child) - Children.begin();
+unsigned SDKNode::getChildIndex(const SDKNode* Child) const {
+  auto It = std::find(Children.begin(), Children.end(), Child);
+  assert(It != Children.end() && "cannot find the child");
+  return It - Children.begin();
 }
 
 SDKNode* SDKNode::getOnlyChild() const {
@@ -503,6 +509,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       case KeyKind::KK_selfIndex:
         Info.SelfIndex = getAsInt(Pair.getValue());
         break;
+      case KeyKind::KK_fixedbinaryorder:
+        Info.FixedBinaryOrder = getAsInt(Pair.getValue());
+        break;
       case KeyKind::KK_usr:
         Info.USR = GetScalarString(Pair.getValue());
         break;
@@ -554,6 +563,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         break;
       case KeyKind::KK_deprecated:
         Info.IsDeprecated = true;
+        break;
+      case KeyKind::KK_implicit:
+        Info.IsImplicit = true;
         break;
       case KeyKind::KK_ownership:
         Info.ReferenceOwnership =
@@ -631,6 +643,25 @@ bool SDKNode::hasSameChildren(const SDKNode &Other) const {
   return true;
 }
 
+void swift::ide::api::stringSetDifference(ArrayRef<StringRef> Left,
+                                          ArrayRef<StringRef> Right,
+                                          std::vector<StringRef> &LeftMinusRight,
+                                          std::vector<StringRef> &RightMinusLeft) {
+  std::set<StringRef> LS(Left.begin(), Left.end());
+  std::set<StringRef> RS(Right.begin(), Right.end());
+  std::set_difference(LS.begin(), LS.end(), RS.begin(), RS.end(),
+                      std::back_inserter(LeftMinusRight));
+  std::set_difference(RS.begin(), RS.end(), LS.begin(), LS.end(),
+                      std::back_inserter(RightMinusLeft));
+}
+
+static bool hasSameContents(ArrayRef<StringRef> Left,
+                            ArrayRef<StringRef> Right) {
+  std::vector<StringRef> LeftMinusRight, RightMinusLeft;
+  stringSetDifference(Left, Right, LeftMinusRight, RightMinusLeft);
+  return LeftMinusRight.empty() && RightMinusLeft.empty();
+}
+
 bool SDKNode::operator==(const SDKNode &Other) const {
   auto *LeftAlias = dyn_cast<SDKNodeTypeAlias>(this);
   auto *RightAlias = dyn_cast<SDKNodeTypeAlias>(&Other);
@@ -653,6 +684,8 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       auto Right = (&Other)->getAs<SDKNodeType>();
       if (!Left->getTypeAttributes().equals(Right->getTypeAttributes()))
         return false;
+      if (Left->hasDefaultArgument() != Right->hasDefaultArgument())
+        return false;
       if (Left->getPrintedName() == Right->getPrintedName())
         return true;
       return Left->getName() == Right->getName() &&
@@ -671,8 +704,33 @@ bool SDKNode::operator==(const SDKNode &Other) const {
         return false;
       LLVM_FALLTHROUGH;
     }
-    case SDKNodeKind::DeclType:
-    case SDKNodeKind::DeclVar:
+
+    case SDKNodeKind::DeclVar: {
+      if (getSDKContext().checkingABI()) {
+        // If we're checking ABI, the definition order matters.
+        // If they're both members for fixed layout types, we never consider
+        // them equal because we need to check definition orders.
+        if (auto *LV = dyn_cast<SDKNodeDeclVar>(this)) {
+          if (auto *RV = dyn_cast<SDKNodeDeclVar>(&Other)) {
+            if (LV->hasFixedBinaryOrder() && RV->hasFixedBinaryOrder()) {
+              if (LV->getFixedBinaryOrder() != RV->getFixedBinaryOrder())
+                return false;
+            }
+          }
+        }
+      }
+      LLVM_FALLTHROUGH;
+    }
+    case SDKNodeKind::DeclType: {
+      auto *Left = dyn_cast<SDKNodeDeclType>(this);
+      auto *Right = dyn_cast<SDKNodeDeclType>(&Other);
+      if (Left && Right) {
+        if (!hasSameContents(Left->getAllProtocols(), Right->getAllProtocols())) {
+          return false;
+        }
+      }
+      LLVM_FALLTHROUGH;
+    }
     case SDKNodeKind::DeclTypeAlias: {
       auto Left = this->getAs<SDKNodeDecl>();
       auto Right = (&Other)->getAs<SDKNodeDecl>();
@@ -684,6 +742,7 @@ bool SDKNode::operator==(const SDKNode &Other) const {
         return false;
       if (Left->getGenericSignature() != Right->getGenericSignature())
         return false;
+
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::Root: {
@@ -902,6 +961,39 @@ static StringRef printGenericSignature(SDKContext &Ctx, ValueDecl *VD) {
   return StringRef();
 }
 
+static Optional<unsigned> getFixedBinaryOrder(ValueDecl *VD) {
+  auto D = VD->getDeclContext()->getAsDecl();
+  if (!D)
+    return None;
+
+  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+    auto Check = [](Decl *M) {
+      return isa<EnumElementDecl>(M);
+    };
+    if (!ED->isResilient() && Check(VD)) {
+      auto Members = ED->getMembers();
+      auto End = std::find(Members.begin(), Members.end(), VD);
+      assert(End != Members.end());
+      return std::count_if(Members.begin(), End, Check);
+    }
+  }
+  if (auto *SD = dyn_cast<StructDecl>(D)) {
+    auto Check = [](Decl *M) {
+      if (auto *STD = dyn_cast<AbstractStorageDecl>(M)) {
+        return STD->hasStorage() && !STD->isStatic();
+      }
+      return false;
+    };
+    if (!SD->isResilient() && Check(VD)) {
+      auto Members = SD->getMembers();
+      auto End = std::find(Members.begin(), Members.end(), VD);
+      assert(End != Members.end());
+      return std::count_if(Members.begin(), End, Check);
+    }
+  }
+  return llvm::None;
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
                                  TypeInitInfo TypeInfo) :
     Ctx(Ctx), Name(getTypeName(Ctx, Ty, TypeInfo.IsImplicitlyUnwrappedOptional)),
@@ -921,10 +1013,12 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
       PrintedName(getPrintedName(Ctx, VD)), DKind(VD->getKind()),
       USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
       ModuleName(VD->getModuleContext()->getName().str()),
+      IsImplicit(VD->isImplicit()),
       IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
       IsStatic(VD->isStatic()),
       IsDeprecated(VD->getAttrs().getDeprecated(VD->getASTContext())),
-      SelfIndex(getSelfIndex(VD)), ReferenceOwnership(getReferenceOwnership(VD)),
+      SelfIndex(getSelfIndex(VD)), FixedBinaryOrder(getFixedBinaryOrder(VD)),
+      ReferenceOwnership(getReferenceOwnership(VD)),
       GenericSig(printGenericSignature(Ctx, VD)) {
 
   // Calculate usr for its super class.
@@ -1054,7 +1148,7 @@ static SDKNode* constructInitNode(SDKContext &Ctx, ConstructorDecl *CD) {
   return Func;
 }
 
-static bool shouldIgnore(Decl *D, const Decl* Parent) {
+static bool shouldIgnore(Decl *D, const Decl* Parent, SDKContext &Ctx) {
   if (D->isPrivateStdlibDecl(false))
     return true;
   if (AvailableAttr::isUnavailable(D))
@@ -1072,6 +1166,10 @@ static bool shouldIgnore(Decl *D, const Decl* Parent) {
     case AccessLevel::Internal:
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
+      // Private vars with fixed binary orders can have ABI-impact, so we should
+      // whitelist them if we're checking ABI.
+      if (Ctx.checkingABI() && getFixedBinaryOrder(VD).hasValue())
+        break;
       return true;
     case AccessLevel::Public:
     case AccessLevel::Open:
@@ -1118,13 +1216,16 @@ static SDKNode *constructTypeDeclNode(SDKContext &Ctx, NominalTypeDecl *NTD,
 /// synthesize this type node to include those extension members, since these
 /// extension members are legit members of the module.
 static SDKNode *constructExternalExtensionNode(SDKContext &Ctx, SDKNode *Root,
-                                               ExtensionDecl *Ext,
+                                               NominalTypeDecl *NTD,
+                                               ArrayRef<ExtensionDecl*> AllExts,
                                         std::set<ExtensionDecl*> &HandledExts) {
-  auto *TypeNode = SDKNodeInitInfo(Ctx, Ext->getSelfNominalTypeDecl())
-      .createSDKNode(SDKNodeKind::DeclType);
+  auto *TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::DeclType);
 
-  // The members of the extension are the only members of this synthesized type.
-  addMembersToRoot(Ctx, TypeNode, Ext, HandledExts);
+  // The members of the extensions are the only members of this synthesized type.
+  for (auto *Ext: AllExts) {
+    HandledExts.insert(Ext);
+    addMembersToRoot(Ctx, TypeNode, Ext, HandledExts);
+  }
   return TypeNode;
 }
 
@@ -1153,7 +1254,7 @@ static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
                              IterableDeclContext *Context,
                              std::set<ExtensionDecl*> &HandledExts) {
   for (auto *Member : Context->getMembers()) {
-    if (shouldIgnore(Member, Context->getDecl()))
+    if (shouldIgnore(Member, Context->getDecl(), Ctx))
       continue;
     if (auto Func = dyn_cast<FuncDecl>(Member)) {
       Root->addChild(constructFunctionNode(Ctx, Func, SDKNodeKind::DeclFunction));
@@ -1182,7 +1283,7 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
     llvm::SmallVector<Decl*, 512> Decls;
     M->getDisplayDecls(Decls);
     for (auto D : Decls) {
-      if (shouldIgnore(D, nullptr))
+      if (shouldIgnore(D, nullptr, Ctx))
         continue;
       if (KnownDecls.count(D))
         continue;
@@ -1204,15 +1305,19 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
   for (auto *VD : ClangMacros)
     processDecl(VD);
 
-  // For all known decls, collect those unhandled extensions and handle them
-  // separately.
+  // Collect extensions to types from other modules and synthesize type nodes
+  // for them.
+  llvm::MapVector<NominalTypeDecl*, llvm::SmallVector<ExtensionDecl*, 4>> ExtensionMap;
   for (auto *D: KnownDecls) {
     if (auto *Ext = dyn_cast<ExtensionDecl>(D)) {
       if (HandledExtensions.find(Ext) == HandledExtensions.end()) {
-        RootNode->addChild(constructExternalExtensionNode(Ctx, RootNode, Ext,
-                                                          HandledExtensions));
+        ExtensionMap[Ext->getExtendedNominal()].push_back(Ext);
       }
     }
+  }
+  for (auto Pair: ExtensionMap) {
+    RootNode->addChild(constructExternalExtensionNode(Ctx, RootNode,
+      Pair.first, Pair.second, HandledExtensions));
   }
 }
 
@@ -1300,6 +1405,16 @@ struct ObjectTraits<SDKNode *> {
       if (bool isDeprecated = D->isDeprecated())
         out.mapRequired(getKeyContent(Ctx, KeyKind::KK_deprecated).data(),
                         isDeprecated);
+      if (bool isImplicit = D->isImplicit())
+        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_implicit).data(),
+                        isImplicit);
+      if (auto V = dyn_cast<SDKNodeDeclVar>(value)) {
+        if (V->hasFixedBinaryOrder()) {
+          auto Order = V->getFixedBinaryOrder();
+          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(),
+                          Order);
+        }
+      }
       if (auto F = dyn_cast<SDKNodeDeclAbstractFunc>(value)) {
         if (bool isThrowing = F->isThrowing())
           out.mapRequired(getKeyContent(Ctx, KeyKind::KK_throwing).data(),

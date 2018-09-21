@@ -17,16 +17,16 @@ public struct JoinedSequence<Base : Sequence> where Base.Element : Sequence {
 
   public typealias Element = Base.Element.Element
   
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline // lazy-performance
   internal var _base: Base
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline // lazy-performance
   internal var _separator: ContiguousArray<Element>
 
   /// Creates an iterator that presents the elements of the sequences
   /// traversed by `base`, concatenated using `separator`.
   ///
   /// - Complexity: O(`separator.count`).
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // lazy-performance
   public init<Separator : Sequence>(base: Base, separator: Separator)
     where Separator.Element == Element {
     self._base = base
@@ -126,7 +126,7 @@ extension JoinedSequence: Sequence {
   ///
   /// - Complexity: O(1).
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(base: _base.makeIterator(), separator: _separator)
   }
 
@@ -184,7 +184,7 @@ extension Sequence where Element : Sequence {
   ///   sequence's elements.
   /// - Returns: The joined sequence of elements.
   @inlinable // lazy-performance
-  public func joined<Separator : Sequence>(
+  public __consuming func joined<Separator : Sequence>(
     separator: Separator
   ) -> JoinedSequence<Self>
     where Separator.Element == Element.Element {

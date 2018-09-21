@@ -44,9 +44,9 @@ let bigStructGlobalArray : [BigStruct] = [
   BigStruct()
 ]
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc void @"$S22big_types_corner_cases21OptionalInoutFuncTypeC7executeyys5Error_pSgFyyXEfU_"(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_Sg* nocapture dereferenceable({{.*}})
-// CHECK: call void @"$S22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWOe
-// CHECK: call void @"$S22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWOy
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc void @"$s22big_types_corner_cases21OptionalInoutFuncTypeC7executeyys5Error_pSgFyyXEfU_"(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_Sg* nocapture dereferenceable({{.*}})
+// CHECK: call void @"$s22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWOe
+// CHECK: call void @"$s22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWOy
 // CHECK: ret void
 
 public func f1_returns_BigType(_ x: BigStruct) -> BigStruct {
@@ -63,9 +63,9 @@ public func f3_uses_f2() {
   let _ = useOfF2(x)
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases10f3_uses_f2yyF"()
-// CHECK: call swiftcc void @"$S22big_types_corner_cases9BigStructVACycfC"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret 
-// CHECK: call swiftcc { i8*, %swift.refcounted* } @"$S22big_types_corner_cases13f2_returns_f1AA9BigStructVADcyF"()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10f3_uses_f2yyF"()
+// CHECK: call swiftcc void @"$s22big_types_corner_cases9BigStructVACycfC"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret 
+// CHECK: call swiftcc { i8*, %swift.refcounted* } @"$s22big_types_corner_cases13f2_returns_f1AA9BigStructVADcyF"()
 // CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructV* noalias nocapture sret {{.*}}, %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) {{.*}}, %swift.refcounted* swiftself {{.*}})
 // CHECK: ret void
 
@@ -76,8 +76,8 @@ public func f4_tuple_use_of_f2() {
   let _ = useOfF2(x)
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases18f4_tuple_use_of_f2yyF"()
-// CHECK: [[TUPLE:%.*]] = call swiftcc { i8*, %swift.refcounted* } @"$S22big_types_corner_cases13f2_returns_f1AA9BigStructVADcyF"()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases18f4_tuple_use_of_f2yyF"()
+// CHECK: [[TUPLE:%.*]] = call swiftcc { i8*, %swift.refcounted* } @"$s22big_types_corner_cases13f2_returns_f1AA9BigStructVADcyF"()
 // CHECK: [[TUPLE_EXTRACT:%.*]] = extractvalue { i8*, %swift.refcounted* } [[TUPLE]], 0
 // CHECK: [[CAST_EXTRACT:%.*]] = bitcast i8* [[TUPLE_EXTRACT]] to void (%T22big_types_corner_cases9BigStructV*, %T22big_types_corner_cases9BigStructV*, %swift.refcounted*)*
 // CHECK:  call swiftcc void [[CAST_EXTRACT]](%T22big_types_corner_cases9BigStructV* noalias nocapture sret {{.*}}, %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) {{.*}}, %swift.refcounted* swiftself %{{.*}})
@@ -94,7 +94,7 @@ public class BigClass {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$S22big_types_corner_cases8BigClassC03useE6Struct0aH0yAA0eH0V_tF"(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}), %T22big_types_corner_cases8BigClassC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases8BigClassC03useE6Struct0aH0yAA0eH0V_tF"(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}), %T22big_types_corner_cases8BigClassC* swiftself)
 // CHECK: [[BITCAST:%.*]] = bitcast i8* {{.*}} to void (%T22big_types_corner_cases9BigStructV*, %swift.refcounted*)*
 // CHECK: call swiftcc void [[BITCAST]](%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) %0, %swift.refcounted* swiftself 
 // CHECK: ret void
@@ -115,7 +115,7 @@ class Foo {
   func myMethod(_ callback: (MyStruct, Int) -> Void) -> Void { }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden swiftcc { i8*, %swift.refcounted* } @"$S22big_types_corner_cases3FooC8myMethodyyyAA8MyStructV_SitXEFTc"(%T22big_types_corner_cases3FooC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden swiftcc { i8*, %swift.refcounted* } @"$s22big_types_corner_cases3FooC8myMethodyyyAA8MyStructV_SitXEFTc"(%T22big_types_corner_cases3FooC*)
 // CHECK: getelementptr inbounds %T22big_types_corner_cases3FooC, %T22big_types_corner_cases3FooC*
 // CHECK: getelementptr inbounds void (i8*, %swift.opaque*, %T22big_types_corner_cases3FooC*)*, void (i8*, %swift.opaque*, %T22big_types_corner_cases3FooC*)**
 // CHECK: call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata*
@@ -138,19 +138,19 @@ public func enumCallee(_ x: LargeEnum) {
     case .Empty2: break
   }
 }
-// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases10enumCalleeyAA9LargeEnumOF"(%T22big_types_corner_cases9LargeEnumO* noalias nocapture dereferenceable({{.*}})) #0 {
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10enumCalleeyAA9LargeEnumOF"(%T22big_types_corner_cases9LargeEnumO* noalias nocapture dereferenceable({{.*}})) #0 {
 // CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO05InnerF0O
 // CHECK-64: alloca %T22big_types_corner_cases9LargeEnumO
 // CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
 // CHECK-64: call void @llvm.memcpy.p0i8.p0i8.i64
-// CHECK-64: $Ss5print_9separator10terminatoryypd_S2StF
+// CHECK-64: $ss5print_9separator10terminatoryypd_S2StF
 // CHECK-64: ret void
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc void @"$S22big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc void @"$s22big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*)
 // CHECK-64: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
-// CHECK-64: call swiftcc void @"$S22big_types_corner_cases9SuperBaseC4boomAA9BigStructVyF"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %T22big_types_corner_cases9SuperBaseC* swiftself {{.*}})
+// CHECK-64: call swiftcc void @"$s22big_types_corner_cases9SuperBaseC4boomAA9BigStructVyF"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %T22big_types_corner_cases9SuperBaseC* swiftself {{.*}})
 // CHECK: ret void
 class SuperBase {
   func boom() -> BigStruct {
@@ -169,7 +169,7 @@ class SuperSub : SuperBase {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgvg"(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret, %T22big_types_corner_cases10MUseStructV* noalias nocapture swiftself dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10MUseStructV16superclassMirrorAA03BigF0VSgvg"(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret, %T22big_types_corner_cases10MUseStructV* noalias nocapture swiftself dereferenceable({{.*}}))
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK: [[LOAD:%.*]] = load %swift.refcounted*, %swift.refcounted** %.callInternalLet.data
 // CHECK: call swiftcc void %7(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret [[ALLOC]], %swift.refcounted* swiftself [[LOAD]])
@@ -183,8 +183,8 @@ public struct MUseStruct {
   internal let callInternalLet: () -> BigStruct?
 }
 
-// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases18stringAndSubstringSS_s0G0VtyF"(<{ %TSS, %Ts9SubstringV }>* noalias nocapture sret) #0 {
-// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases18stringAndSubstringSS_s0G0VtyF"(<{ %TSS, [4 x i8], %Ts9SubstringV }>* noalias nocapture sret) #0 {
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases18stringAndSubstringSS_s0G0VtyF"(<{ %TSS, %Ts9SubstringV }>* noalias nocapture sret) #0 {
+// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases18stringAndSubstringSS_s0G0VtyF"(<{ %TSS, [4 x i8], %Ts9SubstringV }>* noalias nocapture sret) #0 {
 // CHECK: alloca %TSs
 // CHECK: alloca %TSs
 // CHECK: ret void
@@ -198,24 +198,24 @@ func bigStructGet() -> BigStruct {
   return BigStruct()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases11testGetFuncyyF"()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases11testGetFuncyyF"()
 // CHECK: ret void
 public func testGetFunc() {
   let testGetPtr: @convention(thin) () -> BigStruct = bigStructGet
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$S22big_types_corner_cases7TestBigC4testyyF"(%T22big_types_corner_cases7TestBigC* swiftself)
-// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$SSayy22big_types_corner_cases9BigStructVcSgGMa"
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases7TestBigC4testyyF"(%T22big_types_corner_cases7TestBigC* swiftself)
+// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$sSayy22big_types_corner_cases9BigStructVcSgGMa"
 // CHECK: [[CALL1:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK: [[CALL2:%.*]] = call i8** @"$SSayy22big_types_corner_cases9BigStructVcSgGSayxGSlsWl
-// CHECK: call swiftcc void @"$SSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(%TSq.{{.*}}* noalias nocapture sret {{.*}}, i8* bitcast (i1 (%T22big_types_corner_cases9BigStructVytIegnr_Sg*, %swift.refcounted*, %swift.error**)* @"$S22big_types_corner_cases9BigStructVIegy_SgSbs5Error_pIggdzo_ACytIegnr_SgSbsAE_pIegndzo_TRTA" to i8*), %swift.opaque* {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself
+// CHECK: [[CALL2:%.*]] = call i8** @"$sSayy22big_types_corner_cases9BigStructVcSgGSayxGSlsWl
+// CHECK: call swiftcc void @"$sSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(%TSq.{{.*}}* noalias nocapture sret {{.*}}, i8* bitcast (i1 (%T22big_types_corner_cases9BigStructVytIegnr_Sg*, %swift.refcounted*, %swift.error**)* @"$s22big_types_corner_cases9BigStructVIegy_SgSbs5Error_pIggdzo_ACytIegnr_SgSbsAE_pIegndzo_TRTA" to i8*), %swift.opaque* {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself
 // CHECK: ret void
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$S22big_types_corner_cases7TestBigC5test2yyF"(%T22big_types_corner_cases7TestBigC* swiftself)
-// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$SSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGMa"
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases7TestBigC5test2yyF"(%T22big_types_corner_cases7TestBigC* swiftself)
+// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$sSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGMa"
 // CHECK: [[CALL1:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK: [[CALL2:%.*]] = call i8** @"$SSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGSayxGSlsWl"
-// CHECK: call swiftcc void @"$SSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF"(%Ts16IndexingIteratorV* noalias nocapture sret {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself {{.*}})
+// CHECK: [[CALL2:%.*]] = call i8** @"$sSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGSayxGSlsWl"
+// CHECK: call swiftcc void @"$sSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF"(%Ts16IndexingIteratorV* noalias nocapture sret {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself {{.*}})
 // CHECK: ret void
 class TestBig {
     typealias Handler = (BigStruct) -> Void
@@ -240,8 +240,8 @@ struct BigStructWithFunc {
     var foo: ((BigStruct) -> Void)?
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$S22big_types_corner_cases20UseBigStructWithFuncC5crashyyF"(%T22big_types_corner_cases20UseBigStructWithFuncC* swiftself)
-// CHECK: call swiftcc void @"$S22big_types_corner_cases20UseBigStructWithFuncC10callMethod
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases20UseBigStructWithFuncC5crashyyF"(%T22big_types_corner_cases20UseBigStructWithFuncC* swiftself)
+// CHECK: call swiftcc void @"$s22big_types_corner_cases20UseBigStructWithFuncC10callMethod
 // CHECK: ret void
 class UseBigStructWithFunc {
     var optBigStructWithFunc: BigStructWithFunc?
@@ -299,7 +299,7 @@ public protocol sr8076_QueryHandler: sr8076_ProtoQueryHandler {
 
 public extension sr8076_QueryHandler {
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_15queryyqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_15queryyqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
 // CHECK: call swiftcc void {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
 // CHECK: ret void
     func forceHandle_1<Q: sr8076_Query>(query: Q) -> Void {
@@ -309,7 +309,7 @@ public extension sr8076_QueryHandler {
         body(query)
     }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_25query8ReturnedQyd___AA9BigStructVSgtqd___tAA0e1_F0Rd__lF"(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_25query8ReturnedQyd___AA9BigStructVSgtqd___tAA0e1_F0Rd__lF"(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret [[ALLOC]], %swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
 // CHECK: ret void
@@ -320,11 +320,11 @@ public extension sr8076_QueryHandler {
         return body(query)
     }
 
-// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
 // CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
 // CHECK-64: ret { i64, i64 }
 
-// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
+// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself)
 // CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
 // CHECK-32: ret { i32, i32 }
     func forceHandle_3<Q: sr8076_Query>(query: Q) -> (Q.Returned, sr8076_Filter?) {
@@ -334,11 +334,11 @@ public extension sr8076_QueryHandler {
         return body(query)
     }
 
-// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself, %swift.error** swifterror)
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself, %swift.error** swifterror)
 // CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** noalias nocapture swifterror {{.*}})
 // CHECK-64: ret { i64, i64 }
 
-// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$S22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself, %swift.error** swifterror)
+// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself, %swift.error** swifterror)
 // CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** noalias nocapture {{.*}})
 // CHECK-32: ret { i32, i32 }
     func forceHandle_4<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?) {

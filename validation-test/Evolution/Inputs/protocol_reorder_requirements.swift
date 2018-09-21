@@ -52,6 +52,10 @@ public protocol Baby : Wiggler, Eater {
 
 #endif
 
+public protocol Adoring {
+  func adore() -> String
+}
+
 public func goodDay<B : Baby>(for baby: B,
                               sleepingIn bed: B.Bassinet,
                               wearing outfit: B.Onesie) {

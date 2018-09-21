@@ -466,7 +466,7 @@ public:
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
-  IRGenDebugInfo *DebugInfo;
+  std::unique_ptr<IRGenDebugInfo> DebugInfo;
 
   /// A global variable which stores the hash of the module. Used for
   /// incremental compilation.
@@ -1224,6 +1224,22 @@ public:
   llvm::Constant *getAddrOfObjCModuleContextDescriptor();
   llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();
   ConstantReference getAddrOfParentContextDescriptor(DeclContext *from);
+  llvm::Constant *getAddrOfProtocolRequirementsBaseDescriptor(
+                                                  ProtocolDecl *proto);
+  llvm::GlobalValue *defineProtocolRequirementsBaseDescriptor(
+                                                  ProtocolDecl *proto,
+                                                  llvm::Constant *definition);
+  llvm::Constant *getAddrOfAssociatedTypeDescriptor(
+                                                AssociatedTypeDecl *assocType);
+  llvm::GlobalValue *defineAssociatedTypeDescriptor(
+                                                  AssociatedTypeDecl *assocType,
+                                                  llvm::Constant *definition);
+  llvm::Constant *getAddrOfAssociatedConformanceDescriptor(
+                                            AssociatedConformance conformance);
+  llvm::GlobalValue *defineAssociatedConformanceDescriptor(
+                                              AssociatedConformance conformance,
+                                              llvm::Constant *definition);
+
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfProtocolConformanceDescriptor(
@@ -1273,6 +1289,10 @@ public:
   llvm::Function *getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                      const NormalProtocolConformance *C,
                                      const AssociatedConformance &association);
+  llvm::Function *getAddrOfDefaultAssociatedTypeMetadataAccessFunction(
+                                           AssociatedType association);
+  llvm::Function *getAddrOfDefaultAssociatedConformanceAccessor(
+                                           AssociatedConformance requirement);
 
   Address getAddrOfObjCISAMask();
 

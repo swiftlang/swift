@@ -299,6 +299,7 @@ static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
   case InputFileKind::None:
     return false;
   }
+  llvm_unreachable("unhandled input kind");
 }
 
 bool CompilerInstance::setUpInputs() {
@@ -430,6 +431,10 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   return None;
 }
 
+std::unique_ptr<SILModule> CompilerInstance::takeSILModule() {
+  return std::move(TheSILModule);
+}
+
 ModuleDecl *CompilerInstance::getMainModule() {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
@@ -512,7 +517,9 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   }
 
   FrontendStatsTracer tracer(Context->Stats, "perform-sema");
-  Context->LoadedModules[MainModule->getName()] = getMainModule();
+
+  ModuleDecl *mainModule = getMainModule();
+  Context->LoadedModules[mainModule->getName()] = mainModule;
 
   if (Invocation.getInputKind() == InputFileKind::SIL) {
     assert(!InputSourceCodeBufferIDs.empty());

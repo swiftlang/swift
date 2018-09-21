@@ -1738,20 +1738,10 @@ DeclBaseName ModuleFile::getDeclBaseName(IdentifierID IID) {
   assert(rawID < Identifiers.size() && "invalid identifier ID");
   auto &identRecord = Identifiers[rawID];
 
-  if (identRecord.Offset == 0)
-    return identRecord.Ident;
-
-  assert(!IdentifierData.empty() && "no identifier data in module");
-
-  StringRef rawStrPtr = IdentifierData.substr(identRecord.Offset);
-  size_t terminatorOffset = rawStrPtr.find('\0');
-  assert(terminatorOffset != StringRef::npos &&
-         "unterminated identifier string data");
-
-  // Cache the resulting identifier.
-  identRecord.Ident =
-      getContext().getIdentifier(rawStrPtr.slice(0, terminatorOffset));
-  identRecord.Offset = 0;
+  if (identRecord.Ident.empty()) {
+    StringRef text = getIdentifierText(IID);
+    identRecord.Ident = getContext().getIdentifier(text);
+  }
   return identRecord.Ident;
 }
 
@@ -1759,6 +1749,28 @@ Identifier ModuleFile::getIdentifier(IdentifierID IID) {
   auto name = getDeclBaseName(IID);
   assert(!name.isSpecial());
   return name.getIdentifier();
+}
+
+StringRef ModuleFile::getIdentifierText(IdentifierID IID) {
+  if (IID == 0)
+    return StringRef();
+
+  assert(IID >= NUM_SPECIAL_IDS);
+
+  size_t rawID = IID - NUM_SPECIAL_IDS;
+  assert(rawID < Identifiers.size() && "invalid identifier ID");
+  auto identRecord = Identifiers[rawID];
+
+  if (!identRecord.Ident.empty())
+    return identRecord.Ident.str();
+
+  assert(!IdentifierData.empty() && "no identifier data in module");
+
+  StringRef rawStrPtr = IdentifierData.substr(identRecord.Offset);
+  size_t terminatorOffset = rawStrPtr.find('\0');
+  assert(terminatorOffset != StringRef::npos &&
+         "unterminated identifier string data");
+  return rawStrPtr.slice(0, terminatorOffset);
 }
 
 DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
@@ -2785,11 +2797,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       errorFlags |= DeclDeserializationError::NeedsVTableEntry;
       DeclAttributes attrs;
       attrs.setRawAttributeChain(DAttrs);
-      if (attrs.hasAttribute<RequiredAttr>())
-        errorFlags |= DeclDeserializationError::NeedsAllocatingVTableEntry;
     }
-    if (firstTimeRequired)
-      errorFlags |= DeclDeserializationError::NeedsAllocatingVTableEntry;
 
     auto overridden = getDeclChecked(overriddenID);
     if (!overridden) {
@@ -2840,6 +2848,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
+
+    if (auto bodyText = maybeReadInlinableBodyText())
+      ctor->setBodyStringRepresentation(*bodyText);
 
     if (isImplicit)
       ctor->setImplicit();
@@ -3232,6 +3243,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     if (auto errorConvention = maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
+
+    if (auto bodyText = maybeReadInlinableBodyText())
+      fn->setBodyStringRepresentation(*bodyText);
 
     fn->setOverriddenDecl(cast_or_null<FuncDecl>(overridden.get()));
     if (fn->getOverriddenDecl())
@@ -3661,7 +3675,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     DeclContextID contextID;
     bool isImplicit; bool hasPayload; bool isNegative;
     unsigned rawValueKindID;
-    IdentifierID blobData;
+    IdentifierID rawValueData;
     uint8_t rawResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
@@ -3669,7 +3683,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                isImplicit, hasPayload,
                                                rawValueKindID, isNegative,
-                                               blobData,
+                                               rawValueData,
                                                rawResilienceExpansion,
                                                numArgNames,
                                                argNameAndDependencyIDs);
@@ -3713,8 +3727,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     case EnumElementRawValueKind::None:
       break;
     case EnumElementRawValueKind::IntegerLiteral: {
-      auto literalText = getIdentifier(blobData);
-      auto literal = new (getContext()) IntegerLiteralExpr(literalText.get(),
+      auto literalText = getIdentifierText(rawValueData);
+      auto literal = new (getContext()) IntegerLiteralExpr(literalText,
                                                            SourceLoc(),
                                                            /*implicit*/ true);
       if (isNegative)
@@ -3936,6 +3950,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     auto dtor = createDecl<DestructorDecl>(SourceLoc(), DC);
     declOrOffset = dtor;
+
+    if (auto bodyText = maybeReadInlinableBodyText())
+      dtor->setBodyStringRepresentation(*bodyText);
 
     configureGenericEnvironment(dtor, genericEnvID);
 
@@ -4189,10 +4206,12 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     DeclID typealiasID;
     TypeID parentTypeID;
     TypeID underlyingTypeID;
+    TypeID substitutedTypeID;
     SubstitutionMapID substitutionsID;
     decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
                                                  parentTypeID,
                                                  underlyingTypeID,
+                                                 substitutedTypeID,
                                                  substitutionsID);
     auto aliasOrError = getDeclChecked(typealiasID);
     if (!aliasOrError)
@@ -4219,10 +4238,15 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       underlyingType = getType(underlyingTypeID);
     }
 
+    // Read the substituted type.
+    auto substitutedTypeOrError = getTypeChecked(substitutedTypeID);
+    if (!substitutedTypeOrError)
+      return substitutedTypeOrError.takeError();
+
+    auto substitutedType = substitutedTypeOrError.get();
+
     // Read the substitutions.
     auto subMap = getSubstitutionMap(substitutionsID);
-    underlyingType = underlyingType.subst(subMap);
-    assert(underlyingType);
 
     auto parentTypeOrError = getTypeChecked(parentTypeID);
     if (!parentTypeOrError) {
@@ -4247,7 +4271,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
     auto parentType = parentTypeOrError.get();
     typeOrOffset = NameAliasType::get(alias, parentType, subMap,
-                                      underlyingType);
+                                      substitutedType);
     break;
   }
   case decls_block::NOMINAL_TYPE: {
@@ -4943,13 +4967,12 @@ Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
   auto handleMissingClassMember = [&](const DeclDeserializationError &error) {
     if (error.isDesignatedInitializer())
       containingClass->setHasMissingDesignatedInitializers();
-    if (error.needsVTableEntry() || error.needsAllocatingVTableEntry())
+    if (error.needsVTableEntry())
       containingClass->setHasMissingVTableEntries();
 
     if (error.getName().getBaseName() == DeclBaseName::createConstructor()) {
       suppliedMissingMember = MissingMemberDecl::forInitializer(
-          context, containingClass, error.getName(), error.needsVTableEntry(),
-          error.needsAllocatingVTableEntry());
+          context, containingClass, error.getName(), error.needsVTableEntry());
     } else if (error.needsVTableEntry()) {
       suppliedMissingMember = MissingMemberDecl::forMethod(
           context, containingClass, error.getName(), error.needsVTableEntry());
@@ -4971,14 +4994,13 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
 
   auto handleMissingProtocolMember =
       [&](const DeclDeserializationError &error) {
-        assert(!error.needsAllocatingVTableEntry());
         if (error.needsVTableEntry())
           containingProto->setHasMissingRequirements(true);
 
         if (error.getName().getBaseName() == DeclBaseName::createConstructor()) {
           suppliedMissingMember = MissingMemberDecl::forInitializer(
               context, containingProto, error.getName(),
-              error.needsVTableEntry(), error.needsAllocatingVTableEntry());
+              error.needsVTableEntry());
               return;
         }
         if (error.needsVTableEntry()) {
@@ -5343,6 +5365,25 @@ decodeRawStableForeignErrorConventionKind(uint8_t kind) {
   default:
     return None;
   }
+}
+
+Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 8> scratch;
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  StringRef blobData;
+
+  auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return None;
+
+  unsigned recKind = DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
+  if (recKind != INLINABLE_BODY_TEXT)
+    return None;
+
+  restoreOffset.reset();
+  return blobData;
 }
 
 Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {

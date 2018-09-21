@@ -47,7 +47,7 @@ struct meters : ExpressibleByIntegerLiteral {
 struct supermeters : ExpressibleByIntegerLiteral { // expected-error{{type 'supermeters' does not conform to protocol 'ExpressibleByIntegerLiteral'}}
   var value : meters
   
-  typealias IntegerLiteralType = meters // expected-note{{possibly intended match 'IntegerLiteralType' (aka 'meters') does not conform to '_ExpressibleByBuiltinIntegerLiteral'}}
+  typealias IntegerLiteralType = meters // expected-note{{possibly intended match 'supermeters.IntegerLiteralType' (aka 'meters') does not conform to '_ExpressibleByBuiltinIntegerLiteral'}}
   init(_integerLiteral value: meters) {
     self.value = value
   }

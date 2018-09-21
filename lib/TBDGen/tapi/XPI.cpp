@@ -99,6 +99,7 @@ std::string XPI::getAnnotatedName(bool demangle) const {
   case XPIKind::ObjCProtocol:
     return name + "(ObjC Protocol) " + _name.str();
   }
+  llvm_unreachable("unknown kind");
 }
 
 void XPI::print(raw_ostream &os) const {

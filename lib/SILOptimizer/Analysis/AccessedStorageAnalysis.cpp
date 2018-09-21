@@ -293,6 +293,7 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     // because we don't have any better placeholder for a callee-defined object.
     return storage;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool FunctionAccessedStorage::mergeFromApply(

@@ -171,6 +171,30 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::ProtocolDescriptor:
     return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
 
+  case Kind::ProtocolRequirementsBaseDescriptor:
+    return mangler.mangleProtocolRequirementsBaseDescriptor(
+                                                 cast<ProtocolDecl>(getDecl()));
+
+  case Kind::AssociatedTypeDescriptor:
+    return mangler.mangleAssociatedTypeDescriptor(
+                                          cast<AssociatedTypeDecl>(getDecl()));
+
+  case Kind::AssociatedConformanceDescriptor: {
+    auto assocConformance = getAssociatedConformance();
+    return mangler.mangleAssociatedConformanceDescriptor(
+             cast<ProtocolDecl>(getDecl()),
+             assocConformance.first,
+             assocConformance.second);
+  }
+
+  case Kind::DefaultAssociatedConformanceAccessor: {
+    auto assocConformance = getAssociatedConformance();
+    return mangler.mangleDefaultAssociatedConformanceAccessor(
+             cast<ProtocolDecl>(getDecl()),
+             assocConformance.first,
+             assocConformance.second);
+  }
+
   case Kind::ProtocolConformanceDescriptor:
     return mangler.mangleProtocolConformanceDescriptor(
                    cast<NormalProtocolConformance>(getProtocolConformance()));
@@ -213,6 +237,10 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::AssociatedTypeMetadataAccessFunction:
     return mangler.mangleAssociatedTypeMetadataAccessFunction(
                 getProtocolConformance(), getAssociatedType()->getNameStr());
+
+  case Kind::DefaultAssociatedTypeMetadataAccessFunction:
+    return mangler.mangleDefaultAssociatedTypeMetadataAccessFunction(
+                getAssociatedType());
 
   case Kind::AssociatedTypeWitnessTableAccessFunction: {
     auto assocConf = getAssociatedConformance();
@@ -437,14 +465,20 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILLinkage(getDeclLinkage(getterDecl), forDefinition);
   }
 
+  case Kind::AssociatedConformanceDescriptor:
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
   case Kind::NominalTypeDescriptor:
   case Kind::ClassMetadataBaseOffset:
   case Kind::ProtocolDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::MethodLookupFunction:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
+
+  case Kind::AssociatedTypeDescriptor:
+    return getSILLinkage(getDeclLinkage(getAssociatedType()->getProtocol()),
+                         forDefinition);
 
   case Kind::DirectProtocolWitnessTable:
   case Kind::ProtocolWitnessTableAccessFunction:
@@ -470,7 +504,9 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   }
 
   case Kind::AssociatedTypeMetadataAccessFunction:
+  case Kind::DefaultAssociatedTypeMetadataAccessFunction:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
+  case Kind::DefaultAssociatedConformanceAccessor:
   case Kind::GenericProtocolWitnessTableCache:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return SILLinkage::Private;
@@ -568,13 +604,20 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     // FIXME: Removing this triggers a linker bug
     return true;
 
+  case Kind::AssociatedConformanceDescriptor:
   case Kind::SwiftMetaclassStub:
   case Kind::ClassMetadataBaseOffset:
   case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
   case Kind::ProtocolDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::MethodLookupFunction:
     return ::isAvailableExternally(IGM, getDecl());
+
+  case Kind::AssociatedTypeDescriptor:
+    return ::isAvailableExternally(
+                           IGM,
+                           (const Decl *)getAssociatedType()->getProtocol());
 
   case Kind::EnumCase:
     return ::isAvailableExternally(IGM, getDecl());
@@ -594,6 +637,8 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::TypeMetadataSingletonInitializationCache:
   case Kind::TypeMetadataCompletionFunction:
   case Kind::TypeMetadataPattern:
+  case Kind::DefaultAssociatedTypeMetadataAccessFunction:
+  case Kind::DefaultAssociatedConformanceAccessor:
     return false;
 
   case Kind::ValueWitness:

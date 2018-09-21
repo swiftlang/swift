@@ -42,22 +42,22 @@
 // cbA
 // RUN: %target-swift-emit-silgen -enable-sil-ownership %S/Inputs/inherited_protocol_conformance_other_file_2_c.swift %S/Inputs/inherited_protocol_conformance_other_file_2_b.swift -primary-file %s -module-name main | %FileCheck %s --check-prefix=FILE_A
 
-// FILE_A-NOT: sil [transparent] [thunk] @$S4main5ThingVSQAAsADP2eeoi{{[_0-9a-zA-Z]*}}FZTW
-// FILE_A-NOT: sil [transparent] [thunk] @$S4main5ThingVSkAAsADP9hashValueSivgTW
+// FILE_A-NOT: sil [transparent] [thunk] @$s4main5ThingVSQAAsADP2eeoi{{[_0-9a-zA-Z]*}}FZTW
+// FILE_A-NOT: sil [transparent] [thunk] @$s4main5ThingVSkAAsADP9hashValueSivgTW
 // FILE_A-NOT: sil_witness_table Thing: Hashable module main
 // FILE_A-NOT: sil_witness_table Thing: Equatable module main
 
-// FILE_B-NOT: sil [transparent] [thunk] @$S4main5ThingVSQAAsADP2eeoi{{[_0-9a-zA-Z]*}}FZTW
-// FILE_B: sil private [transparent] [thunk] @$S4main5ThingVSHAASH9hashValueSivgTW
-// FILE_B-NOT: sil [transparent] [thunk] @$S4main5ThingVSQAAsADP2eeoi{{[_0-9a-zA-Z]*}}FZTW
+// FILE_B-NOT: sil [transparent] [thunk] @$s4main5ThingVSQAAsADP2eeoi{{[_0-9a-zA-Z]*}}FZTW
+// FILE_B: sil private [transparent] [thunk] @$s4main5ThingVSHAASH9hashValueSivgTW
+// FILE_B-NOT: sil [transparent] [thunk] @$s4main5ThingVSQAAsADP2eeoi{{[_0-9a-zA-Z]*}}FZTW
 
 // FILE_B-NOT: sil_witness_table hidden Thing: Equatable module main
 // FILE_B: sil_witness_table hidden Thing: Hashable module main
 // FILE_B-NOT: sil_witness_table hidden Thing: Equatable module main
 
-// FILE_C-NOT: sil [transparent] [thunk] @$S4main5ThingVSkAAsADP9hashValueSivgTW
-// FILE_C: sil private [transparent] [thunk] @$S4main5ThingVSQAASQ2eeoiySbx_xtFZTW
-// FILE_C-NOT: sil [transparent] [thunk] @$S4main5ThingVSkAAsADP9hashValueSivgTW
+// FILE_C-NOT: sil [transparent] [thunk] @$s4main5ThingVSkAAsADP9hashValueSivgTW
+// FILE_C: sil private [transparent] [thunk] @$s4main5ThingVSQAASQ2eeoiySbx_xtFZTW
+// FILE_C-NOT: sil [transparent] [thunk] @$s4main5ThingVSkAAsADP9hashValueSivgTW
 
 // FILE_C-NOT: sil_witness_table hidden Thing: Hashable module main
 // FILE_C: sil_witness_table hidden Thing: Equatable module main

@@ -119,6 +119,7 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC)->getDefaultAccessLevel();
   }
+  llvm_unreachable("unhandled kind");
 }
 
 void AccessLevelRequest::diagnoseCycle(DiagnosticEngine &diags) const {

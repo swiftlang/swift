@@ -16,6 +16,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/IRGen/ValueWitness.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 namespace swift {
 
@@ -160,6 +161,55 @@ public:
     return finalize();
   }
 
+  std::string mangleProtocolRequirementsBaseDescriptor(
+                                                    const ProtocolDecl *Decl) {
+    beginMangling();
+    appendProtocolName(Decl);
+    appendOperator("TL");
+    return finalize();
+  }
+
+  std::string mangleAssociatedTypeDescriptor(
+                                         const AssociatedTypeDecl *assocType) {
+    // Don't optimize away the protocol name, because we need it to distinguish
+    // among the type descriptors of different protocols.
+    llvm::SaveAndRestore<bool> optimizeProtocolNames(OptimizeProtocolNames,
+                                                     false);
+    beginMangling();
+    bool isAssocTypeAtDepth = false;
+    (void)appendAssocType(
+        assocType->getDeclaredInterfaceType()->castTo<DependentMemberType>(),
+        isAssocTypeAtDepth);
+    appendOperator("Tl");
+    return finalize();
+  }
+
+  std::string mangleAssociatedConformanceDescriptor(
+      const ProtocolDecl *proto,
+      CanType subject,
+      const ProtocolDecl *requirement) {
+    beginMangling();
+    appendAnyGenericType(proto);
+    bool isFirstAssociatedTypeIdentifier = true;
+    appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    appendProtocolName(requirement);
+    appendOperator("Tn");
+    return finalize();
+  }
+
+  std::string mangleDefaultAssociatedConformanceAccessor(
+      const ProtocolDecl *proto,
+      CanType subject,
+      const ProtocolDecl *requirement) {
+    beginMangling();
+    appendAnyGenericType(proto);
+    bool isFirstAssociatedTypeIdentifier = true;
+    appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    appendProtocolName(requirement);
+    appendOperator("TN");
+    return finalize();
+  }
+
   std::string mangleProtocolConformanceDescriptor(
                                  const ProtocolConformance *Conformance) {
     beginMangling();
@@ -234,6 +284,21 @@ public:
     appendProtocolConformance(Conformance);
     appendIdentifier(AssocTyName);
     appendOperator("Wt");
+    return finalize();
+  }
+
+  std::string mangleDefaultAssociatedTypeMetadataAccessFunction(
+                                      const AssociatedTypeDecl *assocType) {
+    // Don't optimize away the protocol name, because we need it to distinguish
+    // among the type descriptors of different protocols.
+    llvm::SaveAndRestore<bool> optimizeProtocolNames(OptimizeProtocolNames,
+                                                     false);
+    beginMangling();
+    bool isAssocTypeAtDepth = false;
+    (void)appendAssocType(
+        assocType->getDeclaredInterfaceType()->castTo<DependentMemberType>(),
+        isAssocTypeAtDepth);
+    appendOperator("TM");
     return finalize();
   }
 
@@ -374,13 +439,6 @@ public:
 
   std::string manglePartialApplyForwarder(StringRef FuncName);
   
-  std::string mangleForProtocolDescriptor(ProtocolType *Proto) {
-    beginMangling();
-    appendProtocolName(Proto->getDecl(), /*allowStandardSubstitution=*/false);
-    appendOperator("P");
-    return finalize();
-  }
-
   std::string mangleTypeForForeignMetadataUniquing(Type type) {
     return mangleTypeWithoutPrefix(type);
   }

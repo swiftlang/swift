@@ -441,6 +441,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
   }
+  llvm_unreachable("unhandled output type");
 }
 
 void ToolChain::JobContext::addFrontendInputAndOutputArguments(
@@ -503,7 +504,7 @@ void ToolChain::JobContext::addFrontendCommandLineInputArguments(
     const bool mayHavePrimaryInputs, const bool useFileList,
     const bool usePrimaryFileList, const bool filterByType,
     ArgStringList &arguments) const {
-  llvm::StringSet<> primaries;
+  llvm::DenseSet<StringRef> primaries;
 
   if (mayHavePrimaryInputs) {
     for (const Action *A : InputActions) {

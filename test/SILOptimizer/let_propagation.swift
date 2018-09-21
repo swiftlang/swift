@@ -55,7 +55,7 @@ final public class A0 {
 // DISABLECHECK-NOT: ref_element_addr
 // DISABLECHECK-NOT: struct_element_addr
 // DISABLECHECK-NOT: bb1
-// DISABLECHECK: function_ref @$S15let_propagation6actionyyF
+// DISABLECHECK: function_ref @$s15let_propagation6actionyyF
 // DISABLECHECK: apply
 // DISABLECHECK: apply
 // DISABLECHECK: apply
@@ -152,8 +152,8 @@ func sum3() -> Int32 {
 // Check that gx and gy are loaded only once and then reused.
 // DISABLECHECK-LABEL: sil {{.*}}testUseGlobalLet
 // DISABLECHECK: bb0
-// DISABLECHECK: global_addr @$S15let_propagation2gys5Int32Vv
-// DISABLECHECK: global_addr @$S15let_propagation2gxs5Int32Vv
+// DISABLECHECK: global_addr @$s15let_propagation2gys5Int32Vv
+// DISABLECHECK: global_addr @$s15let_propagation2gxs5Int32Vv
 // DISABLECHECK: struct_element_addr
 // DISABLECHECK: load
 // DISABLECHECK: struct_element_addr
@@ -189,7 +189,7 @@ struct A1 {
     }
   }
 
-  // CHECK-LABEL: sil hidden @$S15let_propagation2A1V2f1{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$s15let_propagation2A1V2f1{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0
   // CHECK: struct_extract {{.*}}#A1.x
   // CHECK: struct_extract {{.*}}#Int32._value
@@ -204,7 +204,7 @@ struct A1 {
     return x + x
   }
 
-  // CHECK-LABEL: sil hidden @$S15let_propagation2A1V2f2{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$s15let_propagation2A1V2f2{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0
   // CHECK: integer_literal $Builtin.Int32, 200
   // CHECK-NEXT: struct $Int32
@@ -219,7 +219,7 @@ struct A1 {
 
 class A2 {
   let x: B2 = B2()
-  // CHECK-LABEL: sil hidden @$S15let_propagation2A2C2af{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$s15let_propagation2A2C2af{{[_0-9a-zA-Z]*}}F
   // bb0
   // CHECK: %[[X:[0-9]+]] = ref_element_addr {{.*}}A2.x
   // CHECK-NEXT: load %[[X]]

@@ -2001,6 +2001,7 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
        == ParameterConvention::Indirect_Inout;
   }
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static void

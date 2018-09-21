@@ -2510,7 +2510,9 @@ struct _ObjectiveCBridgeableWitnessTable {
                 "Witness table layout changed");
 
   // associatedtype _ObjectiveCType : class
-  const Metadata * (*ObjectiveCType)(
+  SWIFT_CC(swift)
+  MetadataResponse (*ObjectiveCType)(
+                     MetadataRequest request,
                      const Metadata *parentMetadata,
                      const _ObjectiveCBridgeableWitnessTable *witnessTable);
 
@@ -2632,7 +2634,8 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
                DynamicCastFlags flags) {
   // Determine the class type to which the target value type is bridged.
   auto targetBridgedClass =
-    targetBridgeWitness->ObjectiveCType(targetType, targetBridgeWitness);
+    targetBridgeWitness->ObjectiveCType(MetadataState::Complete, targetType,
+                                        targetBridgeWitness).Value;
 
   // Dynamic cast the source object to the class type to which the target value
   // type is bridged. If we succeed, we can bridge from there; if we fail,
@@ -2885,7 +2888,8 @@ const Metadata *_getBridgedNonVerbatimObjectiveCType(
   // Check if the type conforms to _BridgedToObjectiveC, in which case
   // we'll extract its associated type.
   if (const auto *bridgeWitness = findBridgeWitness(T)) {
-    return bridgeWitness->ObjectiveCType(T, bridgeWitness);
+    return bridgeWitness->ObjectiveCType(MetadataState::Complete, T,
+                                         bridgeWitness).Value;
   }
   
   return nullptr;
@@ -2976,7 +2980,8 @@ _bridgeNonVerbatimFromObjectiveC(
     // Check if sourceValue has the _ObjectiveCType type required by the
     // protocol.
     const Metadata *objectiveCType =
-        bridgeWitness->ObjectiveCType(nativeType, bridgeWitness);
+        bridgeWitness->ObjectiveCType(MetadataState::Complete, nativeType,
+                                      bridgeWitness).Value;
       
     auto sourceValueAsObjectiveCType =
         const_cast<void*>(swift_dynamicCastUnknownClass(sourceValue,
@@ -3026,7 +3031,8 @@ _bridgeNonVerbatimFromObjectiveCConditional(
   // Dig out the Objective-C class type through which the native type
   // is bridged.
   const Metadata *objectiveCType =
-    bridgeWitness->ObjectiveCType(nativeType, bridgeWitness);
+    bridgeWitness->ObjectiveCType(MetadataState::Complete, nativeType,
+                                  bridgeWitness).Value;
         
   // Check whether we can downcast the source value to the Objective-C
   // type.

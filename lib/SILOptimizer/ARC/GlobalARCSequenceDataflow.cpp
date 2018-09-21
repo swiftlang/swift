@@ -419,11 +419,9 @@ bool ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
   return NestingDetected;
 }
 
-ARCSequenceDataflowEvaluator::~ARCSequenceDataflowEvaluator() {
-  // We use a malloced pointer here so we don't need to expose the type to the
-  // outside world.
-  delete BBStateInfo;
-}
+// We put the destructor here so we don't need to expose the type of
+// BBStateInfo to the outside world.
+ARCSequenceDataflowEvaluator::~ARCSequenceDataflowEvaluator() = default;
 
 void ARCSequenceDataflowEvaluator::clear() { BBStateInfo->clear(); }
 

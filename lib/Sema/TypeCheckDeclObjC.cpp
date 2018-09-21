@@ -53,6 +53,7 @@ bool swift::shouldDiagnoseObjCReason(ObjCReason reason, ASTContext &ctx) {
   case ObjCReason::Accessor:
     return false;
   }
+  llvm_unreachable("unhandled reason");
 }
 
 unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
@@ -78,6 +79,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::Accessor:
     llvm_unreachable("should not diagnose this @objc reason");
   }
+  llvm_unreachable("unhandled reason");
 }
 
 /// Emit an additional diagnostic describing why we are applying @objc to the
@@ -965,7 +967,7 @@ void swift::checkBridgedFunctions(ASTContext &ctx) {
   }
 }
 
-#pragma mark @objc declaration handling
+#pragma mark "@objc declaration handling"
 
 /// Whether this declaration is a member of a class extension marked @objc.
 static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {

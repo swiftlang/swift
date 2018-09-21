@@ -310,13 +310,9 @@ bool Parser::parseTopLevel() {
 static Optional<StringRef>
 getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
                                   StringRef DiagText) {
-  // FIXME: Support extended escaping / multiline string literal.
+  // FIXME: Support extended escaping string literal.
   if (Tok.getCustomDelimiterLen()) {
     P.diagnose(Loc, diag::attr_extended_escaping_string, DiagText);
-    return None;
-  }
-  if (Tok.isMultilineString()) {
-    P.diagnose(Loc, diag::attr_multiline_string, DiagText);
     return None;
   }
 
@@ -3587,7 +3583,6 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
   
   unsigned StartLine = 0;
   Optional<StringRef> Filename;
-  const char *LastTokTextEnd;
   if (!isLine) {
     // #sourceLocation()
     // #sourceLocation(file: "foo", line: 42)
@@ -3644,10 +3639,10 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       consumeToken(tok::integer_literal);
     }
 
-    LastTokTextEnd = Tok.getText().end();
-    if (parseToken(tok::r_paren, diag::sourceLocation_expected, ")"))
+    if (Tok.isNot(tok::r_paren)) {
+      diagnose(Tok, diag::sourceLocation_expected, ")");
       return makeParserError();
-    
+    }
   } else {  // Legacy #line syntax.
   
     // #line\n returns to the main buffer.
@@ -3683,10 +3678,10 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
                                                  "#line");
     if (!Filename.hasValue())
       return makeParserError();
-    LastTokTextEnd = Tok.getText().end();
-    consumeToken(tok::string_literal);
   }
-  
+
+  const char *LastTokTextEnd = Tok.getText().end();
+
   // Skip over trailing whitespace and a single \n to the start of the next
   // line.
   while (*LastTokTextEnd == ' ' || *LastTokTextEnd == '\t')
@@ -3706,6 +3701,9 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
   bool isNewFile = SourceMgr.openVirtualFile(nextLineStartLoc,
                                              Filename.getValue(), LineOffset);
   assert(isNewFile);(void)isNewFile;
+
+  // Lexing of next token must be deferred until after virtual file setup.
+  consumeToken(isLine ? tok::string_literal : tok::r_paren);
 
   InPoundLineEnvironment = true;
   return makeParserSuccess();
@@ -4220,9 +4218,10 @@ struct Parser::ParsedAccessors {
   }
 };
 
-static bool parseAccessorIntroducer(Parser &P, bool parsingLimitedSyntax,
-                                    DeclAttributes &Attributes, AccessorKind &Kind,
-                                    AddressorKind &addressorKind, SourceLoc &Loc) {
+static bool parseAccessorIntroducer(Parser &P, DeclAttributes &Attributes,
+                                    AccessorKind &Kind,
+                                    AddressorKind &addressorKind,
+                                    SourceLoc &Loc) {
   bool FoundCCToken;
   P.parseDeclAttributeList(Attributes, FoundCCToken);
 
@@ -4277,20 +4276,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
   // SIL mode and textual interfaces use the same syntax.
   // Otherwise, we have a normal var or subscript declaration and we need
   // parse the full complement of specifiers, along with their bodies.
-  bool parsingLimitedSyntax = Flags.contains(PD_InProtocol);
-  if (!parsingLimitedSyntax) {
-    switch (SF.Kind) {
-    case SourceFileKind::Interface:
-      // FIXME: Textual interfaces /can/ have inlinable code but don't have to.
-    case SourceFileKind::SIL:
-      parsingLimitedSyntax = true;
-      break;
-    case SourceFileKind::Library:
-    case SourceFileKind::Main:
-    case SourceFileKind::REPL:
-      break;
-    }
-  }
+  bool parsingLimitedSyntax = Flags.contains(PD_InProtocol) ||
+                              SF.Kind == SourceFileKind::SIL;
 
   SyntaxParsingContext AccessorListCtx(SyntaxContext,
                                        SyntaxKind::AccessorBlock);
@@ -4345,7 +4332,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
     AddressorKind addressorKind = AddressorKind::NotAddressor;
     SourceLoc Loc;
     bool NotAccessor = parseAccessorIntroducer(
-        *this, parsingLimitedSyntax, Attributes, Kind, addressorKind, Loc);
+        *this, Attributes, Kind, addressorKind, Loc);
     if (NotAccessor) {
       AccessorCtx->setTransparent();
       AccessorCtx.reset();
@@ -4409,6 +4396,9 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
 
     // It's okay not to have a body if there's an external asm name.
     if (!Tok.is(tok::l_brace)) {
+      // Accessors don't need bodies in textual interfaces
+      if (SF.Kind == SourceFileKind::Interface)
+        continue;
       // _silgen_name'd accessors don't need bodies.
       if (!Attributes.hasAttribute<SILGenNameAttr>()) {
         diagnose(Tok, diag::expected_lbrace_accessor,

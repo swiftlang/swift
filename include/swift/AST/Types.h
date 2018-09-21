@@ -3077,7 +3077,7 @@ END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 /// Map the given parameter list onto a bitvector describing whether
 /// the argument type at each index has a default argument associated with
 /// it.
-llvm::SmallBitVector
+SmallBitVector
 computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
                   const ValueDecl *paramOwner, unsigned level);
 

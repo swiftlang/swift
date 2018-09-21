@@ -573,7 +573,11 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   case SILFunctionType::Representation::Thick: {
     SpareBitVector spareBits;
     spareBits.append(IGM.getFunctionPointerSpareBits());
-    spareBits.append(IGM.getHeapObjectSpareBits());
+    // Although the context pointer of a closure (at least, an escaping one)
+    // is a refcounted pointer, we'd like to reserve the right to pack small
+    // contexts into the pointer value, so let's not take any spare bits from
+    // it.
+    spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
     
     if (T->isNoEscape()) {
       // @noescape thick functions are trivial types.
@@ -706,6 +710,7 @@ static CanType getArgumentLoweringType(CanType type,
   case ParameterConvention::Indirect_InoutAliasable:
     return CanInOutType::get(type);
   }
+  llvm_unreachable("unhandled convention");
 }
 
 static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,

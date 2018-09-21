@@ -108,6 +108,7 @@ public:
       case RecordedAccessKind::NoescapeClosureCapture:
         return ClosureAccessKind;
     };
+    llvm_unreachable("unhandled kind");
   }
 
   SILLocation getAccessLoc() const {
@@ -117,6 +118,7 @@ public:
       case RecordedAccessKind::NoescapeClosureCapture:
         return ClosureAccessLoc;
     };
+    llvm_unreachable("unhandled kind");
   }
 
   const IndexTrieNode *getSubPath() const {

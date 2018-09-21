@@ -52,6 +52,16 @@ ERROR(decl_attr_change,none,"%0 changes from %1 to %2", (StringRef, StringRef, S
 
 ERROR(decl_new_attr,none,"%0 is now %1", (StringRef, StringRef))
 
+ERROR(decl_reorder,none,"%0 in a non-resilient type changes position from %1 to %2", (StringRef, unsigned, unsigned))
+
+ERROR(decl_added,none,"%0 is added to a non-resilient type", (StringRef))
+
+ERROR(default_arg_removed,none,"%0 has removed default argument from %1", (StringRef, StringRef))
+
+ERROR(conformance_removed,none,"%0 has removed %select{conformance to|inherited protocol}2 %1", (StringRef, StringRef, bool))
+
+ERROR(conformance_added,none,"%0 has added inherited protocol %1", (StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

@@ -114,8 +114,8 @@ bb0(%0 : $Error):
 // rdar://21084084 - Partial application of throwing functions.
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_single(%T6errors1AC*)
-// CHECK:       insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*, %swift.error**)* @"$S27partial_apply_single_helperTA" to i8*), %swift.refcounted* undef },
-// CHECK: define internal swiftcc void @"$S27partial_apply_single_helperTA"(%swift.refcounted* swiftself, %swift.error** noalias nocapture{{( )?}}[[SWIFTERROR]]{{( )?}}dereferenceable({{.}}))
+// CHECK:       insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*, %swift.error**)* @"$s27partial_apply_single_helperTA" to i8*), %swift.refcounted* undef },
+// CHECK: define internal swiftcc void @"$s27partial_apply_single_helperTA"(%swift.refcounted* swiftself, %swift.error** noalias nocapture{{( )?}}[[SWIFTERROR]]{{( )?}}dereferenceable({{.}}))
 // CHECK:       [[T0:%.*]] = bitcast %swift.refcounted* {{%.*}} to %T6errors1AC*
 // CHECK-NEXT:  tail call swiftcc void @partial_apply_single_helper(%T6errors1AC* [[T0]], %swift.refcounted* swiftself undef, %swift.error** noalias nocapture{{( )?}}[[SWIFTERROR]]{{( )?}}dereferenceable({{.}}){{( )?}}{{%.*}})
 // CHECK-NEXT:  ret void

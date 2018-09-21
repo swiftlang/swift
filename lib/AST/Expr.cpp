@@ -2135,13 +2135,16 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
                      Kind kind,
                      Type type,
                      SourceLoc loc)
-    : Decl(decl), SubscriptIndexExprAndKind(indexExpr, kind),
-      SubscriptLabels(subscriptLabels.empty()
-                       ? subscriptLabels
-                       : ctxForCopyingLabels->AllocateCopy(subscriptLabels)),
-      SubscriptHashableConformances(indexHashables),
+    : Decl(decl), SubscriptIndexExpr(indexExpr), KindValue(kind),
       ComponentType(type), Loc(loc)
-  {}
+{
+  assert(subscriptLabels.size() == indexHashables.size()
+         || indexHashables.empty());
+  SubscriptLabelsData = subscriptLabels.data();
+  SubscriptHashableConformancesData = indexHashables.empty()
+    ? nullptr : indexHashables.data();
+  SubscriptSize = subscriptLabels.size();
+}
 
 KeyPathExpr::Component
 KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
@@ -2157,8 +2160,10 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
     ArrayRef<ProtocolConformanceRef> hashables) {
   switch (getKind()) {
   case Kind::Subscript:
-    SubscriptHashableConformances = getComponentType()->getASTContext()
-      .AllocateCopy(hashables);
+    assert(hashables.size() == SubscriptSize);
+    SubscriptHashableConformancesData = getComponentType()->getASTContext()
+      .AllocateCopy(hashables)
+      .data();
     return;
     
   case Kind::UnresolvedSubscript:
@@ -2168,6 +2173,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::OptionalForce:
   case Kind::UnresolvedProperty:
   case Kind::Property:
+  case Kind::Identity:
     llvm_unreachable("no hashable conformances for this kind");
   }
 }

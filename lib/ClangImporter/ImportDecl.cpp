@@ -2821,6 +2821,7 @@ namespace {
           // Assume this is a context other than the enum.
           return false;
         }
+        llvm_unreachable("unhandled kind");
       };
 
       for (auto constant : decl->enumerators()) {
@@ -4280,7 +4281,7 @@ namespace {
         SmallVector<Type, 2> genericArgs;
         for (auto paramTy :
              env->getGenericSignature()->getInnermostGenericParams()) {
-          genericArgs.push_back(env->mapTypeIntoContext(paramTy));
+          genericArgs.push_back(paramTy);
         }
         Type extendedType =
           BoundGenericClassType::get(objcClass, nullptr, genericArgs);

@@ -820,6 +820,7 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from) {
     return {getAddrOfModuleContextDescriptor(cast<ModuleDecl>(parent)),
             ConstantReference::Direct};
   }
+  llvm_unreachable("unhandled kind");
 }
 
 /// Add the given global value to @llvm.used.
@@ -906,15 +907,13 @@ llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
     auto proto = getConstantReferenceForProtocolDescriptor(
                                                       assocType->getProtocol());
     B.addRelativeAddress(proto);
-    
-    // Find the offset of the associated type entry in witness tables of this
-    // protocol.
-    auto &protoInfo = getProtocolInfo(assocType->getProtocol(),
-                                      ProtocolInfoKind::RequirementSignature);
-    auto index = protoInfo.getAssociatedTypeIndex(AssociatedType(assocType))
-      .getValue();
-    
-    B.addInt32(index);
+
+    // Add a reference to the associated type descriptor.
+    auto assocTypeDescriptor =
+      getAddrOfLLVMVariableOrGOTEquivalent(
+        LinkEntity::forAssociatedTypeDescriptor(assocType),
+      Alignment(4), ProtocolRequirementStructTy);
+    B.addRelativeAddress(assocTypeDescriptor);
   }
   
   // Null terminator.
@@ -1740,6 +1739,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   ResilienceExpansion expansion = getResilienceExpansionForLayout(var);
 
   llvm::Type *storageType;
+  llvm::Type *castStorageToType = nullptr;
   Size fixedSize;
   Alignment fixedAlignment;
   bool inFixedBuffer = false;
@@ -1769,6 +1769,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     storageType = Layout->getType();
     fixedSize = Layout->getSize();
     fixedAlignment = Layout->getAlignment();
+    castStorageToType = cast<FixedTypeInfo>(ti).getStorageType();
     assert(fixedAlignment >= TargetInfo.HeapObjectAlignment);
   } else if (isREPLVar || ti.isFixedSize(expansion)) {
     // Allocate static storage.
@@ -1864,7 +1865,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // to a reference to it).
     addr = llvm::ConstantExpr::getGetElementPtr(nullptr, gvar, Indices);
   }
-  addr = llvm::ConstantExpr::getBitCast(addr, storageType->getPointerTo());
+  addr = llvm::ConstantExpr::getBitCast(
+      addr,
+      castStorageToType ? castStorageToType : storageType->getPointerTo());
   return Address(addr, Alignment(gvar->getAlignment()));
 }
 
@@ -3358,6 +3361,50 @@ llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                ProtocolDescriptorStructTy, DebugTypeInfo());
 }
 
+llvm::Constant *IRGenModule::getAddrOfProtocolRequirementsBaseDescriptor(
+                                                         ProtocolDecl *proto) {
+  auto entity = LinkEntity::forProtocolRequirementsBaseDescriptor(proto);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                               ProtocolRequirementStructTy,
+                               DebugTypeInfo());
+}
+
+llvm::GlobalValue *IRGenModule::defineProtocolRequirementsBaseDescriptor(
+                                                ProtocolDecl *proto,
+                                                llvm::Constant *definition) {
+  auto entity = LinkEntity::forProtocolRequirementsBaseDescriptor(proto);
+  return defineAlias(entity, definition);
+}
+
+llvm::Constant *IRGenModule::getAddrOfAssociatedTypeDescriptor(
+                                               AssociatedTypeDecl *assocType) {
+  auto entity = LinkEntity::forAssociatedTypeDescriptor(assocType);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                               ProtocolRequirementStructTy,
+                               DebugTypeInfo());
+}
+
+llvm::GlobalValue *IRGenModule::defineAssociatedTypeDescriptor(
+                                                 AssociatedTypeDecl *assocType,
+                                                 llvm::Constant *definition) {
+  auto entity = LinkEntity::forAssociatedTypeDescriptor(assocType);
+  return defineAlias(entity, definition);
+}
+
+llvm::Constant *IRGenModule::getAddrOfAssociatedConformanceDescriptor(
+                                          AssociatedConformance conformance) {
+  auto entity = LinkEntity::forAssociatedConformanceDescriptor(conformance);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), ConstantInit(),
+                               ProtocolRequirementStructTy, DebugTypeInfo());
+}
+
+llvm::GlobalValue *IRGenModule::defineAssociatedConformanceDescriptor(
+                                            AssociatedConformance conformance,
+                                            llvm::Constant *definition) {
+  auto entity = LinkEntity::forAssociatedConformanceDescriptor(conformance);
+  return defineAlias(entity, definition);
+}
+
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
                                 const NormalProtocolConformance *conformance,
                                 ConstantInit definition) {
@@ -3908,6 +3955,44 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
   LinkEntity entity =
     LinkEntity::forAssociatedTypeWitnessTableAccessFunction(conformance,
                                                             association);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  auto signature = getAssociatedTypeWitnessTableAccessFunctionSignature();
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+llvm::Function *
+IRGenModule::getAddrOfDefaultAssociatedTypeMetadataAccessFunction(
+                                  AssociatedType association) {
+  auto forDefinition = ForDefinition;
+
+  LinkEntity entity =
+    LinkEntity::forDefaultAssociatedTypeMetadataAccessFunction(association);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  auto signature = getAssociatedTypeMetadataAccessFunctionSignature();
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+llvm::Function *
+IRGenModule::getAddrOfDefaultAssociatedConformanceAccessor(
+                                         AssociatedConformance requirement) {
+  auto forDefinition = ForDefinition;
+
+  LinkEntity entity =
+    LinkEntity::forDefaultAssociatedConformanceAccessor(requirement);
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
     if (forDefinition) updateLinkageForDefinition(*this, entry, entity);

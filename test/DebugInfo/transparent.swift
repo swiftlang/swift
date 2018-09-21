@@ -15,7 +15,7 @@ let z = transparent(0)
 use(z)
 
 // Check that a transparent function has no debug information.
-// CHECK: define {{.*}}$S11transparentAA
+// CHECK: define {{.*}}$s11transparentAA
 // CHECK-SAME: !dbg ![[SP:[0-9]+]]
 // CHECK-NEXT: entry:
 // CHECK-NEXT: !dbg ![[ZERO:[0-9]+]]

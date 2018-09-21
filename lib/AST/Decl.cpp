@@ -2838,25 +2838,11 @@ void NominalTypeDecl::computeType() {
 
 enum class DeclTypeKind : unsigned {
   DeclaredType,
-  DeclaredTypeInContext,
   DeclaredInterfaceType
 };
 
 static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   ASTContext &ctx = decl->getASTContext();
-
-  // Handle the declared type in context.
-  if (kind == DeclTypeKind::DeclaredTypeInContext) {
-    auto interfaceType =
-      computeNominalType(decl, DeclTypeKind::DeclaredInterfaceType);
-
-    if (!decl->isGenericContext())
-      return interfaceType;
-
-    auto *genericEnv = decl->getGenericEnvironmentOfContext();
-    return GenericEnvironment::mapTypeIntoContext(
-        genericEnv, interfaceType);
-  }
 
   // Get the parent type.
   Type Ty;
@@ -2867,20 +2853,14 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       auto *nominal = dc->getSelfNominalTypeDecl();
       if (nominal)
         Ty = nominal->getDeclaredType();
-      else
-        Ty = ErrorType::get(ctx);
       break;
     }
-    case DeclTypeKind::DeclaredTypeInContext:
-      llvm_unreachable("Handled above");
     case DeclTypeKind::DeclaredInterfaceType:
       Ty = dc->getDeclaredInterfaceType();
+      if (Ty->is<ErrorType>())
+        Ty = Type();
       break;
     }
-    if (!Ty)
-      return Type();
-    if (Ty->is<ErrorType>())
-      Ty = Type();
   }
 
   if (decl->getGenericParams() &&
@@ -2888,8 +2868,6 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
     switch (kind) {
     case DeclTypeKind::DeclaredType:
       return UnboundGenericType::get(decl, Ty, ctx);
-    case DeclTypeKind::DeclaredTypeInContext:
-      llvm_unreachable("Handled above");
     case DeclTypeKind::DeclaredInterfaceType: {
       // Note that here, we need to be able to produce a type
       // before the decl has been validated, so we rely on
@@ -2923,8 +2901,10 @@ Type NominalTypeDecl::getDeclaredTypeInContext() const {
     return DeclaredTyInContext;
 
   auto *decl = const_cast<NominalTypeDecl *>(this);
-  decl->DeclaredTyInContext = computeNominalType(decl,
-                                                 DeclTypeKind::DeclaredTypeInContext);
+
+  auto interfaceType = getDeclaredInterfaceType();
+  decl->DeclaredTyInContext = mapTypeIntoContext(interfaceType);
+
   return DeclaredTyInContext;
 }
 
@@ -3022,14 +3002,17 @@ void TypeAliasDecl::setUnderlyingType(Type underlying) {
     // Set the interface type of this declaration.
     ASTContext &ctx = getASTContext();
 
-    // If we can set a sugared type, do so.
-    if (!getGenericSignature()) {
-      auto sugaredType =
-        NameAliasType::get(this, Type(), SubstitutionMap(), underlying);
-      setInterfaceType(MetatypeType::get(sugaredType, ctx));
-    } else {
-      setInterfaceType(MetatypeType::get(underlying, ctx));
-    }
+    auto *genericSig = getGenericSignature();
+    auto subs = SubstitutionMap::get(
+        genericSig, [&](SubstitutableType *type) -> Type { return type; },
+        MakeAbstractConformanceForGenericType());
+
+    Type parent;
+    auto parentDC = getDeclContext();
+    if (parentDC->isTypeContext())
+      parent = parentDC->getDeclaredInterfaceType();
+    auto sugaredType = NameAliasType::get(this, parent, subs, underlying);
+    setInterfaceType(MetatypeType::get(sugaredType, ctx));
   }
 }
 
@@ -4050,29 +4033,6 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
   }
 }
 
-/// Returns the default witness for a requirement, or nullptr if there is
-/// no default.
-Witness ProtocolDecl::getDefaultWitness(ValueDecl *requirement) const {
-  loadAllMembers();
-
-  auto found = DefaultWitnesses.find(requirement);
-  if (found == DefaultWitnesses.end())
-    return Witness();
-  return found->second;
-}
-
-/// Record the default witness for a requirement.
-void ProtocolDecl::setDefaultWitness(ValueDecl *requirement, Witness witness) {
-  assert(witness);
-  // The first type we insert a default witness, register a destructor for
-  // this type.
-  if (DefaultWitnesses.empty())
-    getASTContext().addDestructorCleanup(DefaultWitnesses);
-  auto pair = DefaultWitnesses.insert(std::make_pair(requirement, witness));
-  assert(pair.second && "Already have a default witness!");
-  (void) pair;
-}
-
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
   setFieldsFromImplInfo(implInfo);
   Accessors.getPointer()->overwriteImplInfo(implInfo);
@@ -4857,6 +4817,7 @@ ParamDecl::getDefaultValueStringRepresentation(
   case DefaultArgumentKind::EmptyArray: return "[]";
   case DefaultArgumentKind::EmptyDictionary: return "[:]";
   }
+  llvm_unreachable("unhandled kind");
 }
 
 void
@@ -5064,6 +5025,7 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   switch (getBodyKind()) {
   case BodyKind::None:
   case BodyKind::MemberwiseInitializer:
+  case BodyKind::Deserialized:
     return SourceRange();
 
   case BodyKind::Parsed:
@@ -5253,6 +5215,18 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   // Dynamic methods are always accessed by objc_msgSend().
   if (decl->isFinal() || decl->isDynamic() || decl->hasClangNode())
     return false;
+  
+  // Initializers are not normally inherited, but required initializers can
+  // be overridden for invocation from dynamic types, and convenience initializers
+  // are conditionally inherited when all designated initializers are available,
+  // working by dynamically invoking the designated initializer implementation
+  // from the subclass. Convenience initializers can also override designated
+  // initializer implementations from their superclass.
+  if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+    if (!ctor->isRequired() && !ctor->isDesignatedInit()) {
+      return false;
+    }
+  }
 
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
     // Check to see if it's one of the opaque accessors for the declaration.
@@ -5264,6 +5238,16 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   auto base = decl->getOverriddenDecl();
   if (!base || base->hasClangNode() || base->isDynamic())
     return true;
+  
+  // As above, convenience initializers are not formally overridable in Swift
+  // vtables, although same-named initializers are modeled as overriding for
+  // various QoI and objc interop reasons. Even if we "override" a non-required
+  // convenience init, we still need a distinct vtable entry.
+  if (auto baseCtor = dyn_cast<ConstructorDecl>(base)) {
+    if (!baseCtor->isRequired() && !baseCtor->isDesignatedInit()) {
+      return true;
+    }
+  }
 
   // If the method overrides something, we only need a new entry if the
   // override has a more general AST type. However an abstraction
@@ -5417,6 +5401,34 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
   // Compute the type of the 'self' parameter if we're created one already.
   if (hasSelf)
     computeSelfDeclType();
+}
+
+bool AbstractFunctionDecl::hasInlinableBodyText() const {
+  switch (getBodyKind()) {
+  case BodyKind::Deserialized:
+    return true;
+  case BodyKind::Parsed:
+  case BodyKind::TypeChecked:
+    return getBody() && !getBody()->isImplicit();
+  case BodyKind::None:
+  case BodyKind::Unparsed:
+  case BodyKind::Synthesize:
+  case BodyKind::Skipped:
+  case BodyKind::MemberwiseInitializer:
+    return false;
+  }
+}
+
+StringRef AbstractFunctionDecl::getInlinableBodyText(
+  SmallVectorImpl<char> &scratch) const {
+  assert(hasInlinableBodyText() &&
+         "can't get string representation of function with no text");
+
+  if (getBodyKind() == BodyKind::Deserialized)
+    return BodyStringRepresentation;
+
+  auto body = getBody();
+  return extractInlinableText(getASTContext().SourceMgr, body, scratch);
 }
 
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,

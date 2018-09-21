@@ -114,7 +114,7 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   }
   
   auto params = levelTy->getParams();
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(params, decl, parameterDepth);
 
   MatchCallArgumentListener listener;
@@ -138,7 +138,7 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 bool constraints::
 matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
-                   const llvm::SmallBitVector &defaultMap,
+                   const SmallBitVector &defaultMap,
                    bool hasTrailingClosure,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
@@ -638,6 +638,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     case KeyPathExpr::Component::Kind::OptionalForce:
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalWrap:
+    case KeyPathExpr::Component::Kind::Identity:
       return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
     }
 
@@ -769,7 +770,7 @@ constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
   std::tie(callee, calleeLevel, argLabels, hasTrailingClosure) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
 
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(params, callee, calleeLevel);
 
   // Apply labels to arguments.
@@ -2464,6 +2465,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       case SolutionKind::Unsolved:
         return getTypeMatchAmbiguous();
     }
+    llvm_unreachable("unhandled kind");
   };
 
   // Handle restrictions.
@@ -4136,6 +4138,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     
     switch (component.getKind()) {
     case KeyPathExpr::Component::Kind::Invalid:
+    case KeyPathExpr::Component::Kind::Identity:
       break;
       
     case KeyPathExpr::Component::Kind::Property:
@@ -4294,6 +4297,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       case SolutionKind::Unsolved:
         llvm_unreachable("should have generated constraints");
       }
+      llvm_unreachable("unhandled match");
     };
 
     if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {

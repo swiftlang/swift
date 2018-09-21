@@ -7,7 +7,7 @@ func closure(_ a: Int, b: Int) -> Bool {
 // Check that closure() is inlined into call_closure after call_closure is
 // specialized for it.
 
-// CHECK-LABEL: sil shared [noinline] @$S4test12call_closureySbSi_SiSbSi_SitXEtF27$S4test7closure_1bSbSi_SitFTf1nnc_n
+// CHECK-LABEL: sil shared [noinline] @$s4test12call_closureySbSi_SiSbSi_SitXEtF27$s4test7closure_1bSbSi_SitFTf1nnc_n
 // CHECK-NOT: apply
 // CHECK: builtin "cmp_slt_Int
 // CHECK-NOT: apply

@@ -240,8 +240,8 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
 
       StringRef Text = SM.extractText({ Loc, Len });
       Token NewTok;
-      NewTok.setToken(tok::string_literal, Text,
-                      IsMultiline, CustomDelimiterLen);
+      NewTok.setToken(tok::string_literal, Text);
+      NewTok.setStringLiteral(IsMultiline, CustomDelimiterLen);
       Toks.push_back(NewTok);
 
     } else {

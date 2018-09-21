@@ -588,7 +588,7 @@ extension Dictionary {
   /// - Returns: A dictionary of the key-value pairs that `isIncluded` allows.
   @inlinable
   @available(swift, introduced: 4.0)
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Key: Value] {
     var result = Dictionary()

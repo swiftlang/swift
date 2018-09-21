@@ -661,6 +661,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
       case ObjCMessageKind::Super:
         return IGF.IGM.getObjCMsgSendSuperStret2Fn();
       }
+      llvm_unreachable("unhandled kind");
     } else {
       switch (kind) {
       case ObjCMessageKind::Normal:
@@ -672,6 +673,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
       case ObjCMessageKind::Super:
         return IGF.IGM.getObjCMsgSendSuper2Fn();
       }
+      llvm_unreachable("unhandled kind");
     }
   }();
 

@@ -37,11 +37,10 @@ public:
 
 /// \brief A base class for a custom consumer of type checker debug output.
 class CapturingTypeCheckerDebugConsumer : public TypeCheckerDebugConsumer {
-  raw_ostream *Log;
+  std::unique_ptr<raw_ostream> Log;
 
 public:
   CapturingTypeCheckerDebugConsumer();
-  ~CapturingTypeCheckerDebugConsumer();
 
   raw_ostream &getStream() override {
     return *Log;

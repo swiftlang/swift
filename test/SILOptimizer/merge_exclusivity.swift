@@ -9,9 +9,9 @@ func sum(_ x: UInt64, _ y: UInt64) -> UInt64 {
   return x &+ y
 }
 
-// TESTSIL-LABEL: sil [noinline] @$S17merge_exclusivity10MergeTest1yySiF : $@convention(thin)
+// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest1yySiF : $@convention(thin)
 // TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$S17merge_exclusivity5checks6UInt64Vvp
+// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: bb5
@@ -30,7 +30,7 @@ func sum(_ x: UInt64, _ y: UInt64) -> UInt64 {
 // TESTSIL: store {{.*}} to [[B4]]
 // TESTSIL: end_access [[B4]]
 // TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$S17merge_exclusivity10MergeTest1yySiF'
+// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest1yySiF'
 @inline(never)
 public func MergeTest1(_ N: Int) {
   let range = 0..<10000
@@ -48,9 +48,9 @@ public func MergeTest1(_ N: Int) {
   }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$S17merge_exclusivity10MergeTest2yySiF : $@convention(thin)
+// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest2yySiF : $@convention(thin)
 // TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$S17merge_exclusivity5checks6UInt64Vvp
+// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: bb6
@@ -64,7 +64,7 @@ public func MergeTest1(_ N: Int) {
 // TESTSIL: store {{.*}} to [[B3]]
 // TESTSIL: end_access [[B3]]
 // TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$S17merge_exclusivity10MergeTest2yySiF'
+// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest2yySiF'
 @inline(never)
 public func MergeTest2(_ N: Int) {
   let range = 0..<10000
@@ -81,13 +81,13 @@ public func MergeTest2(_ N: Int) {
   }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$S17merge_exclusivity10MergeTest3yySiF : $@convention(thin)
+// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest3yySiF : $@convention(thin)
 // TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$S17merge_exclusivity5checks6UInt64Vvp
+// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$S17merge_exclusivity10MergeTest3yySiF'
+// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest3yySiF'
 @inline(never)
 public func MergeTest3(_ N: Int) {
   let range = 0..<10000
@@ -99,9 +99,9 @@ public func MergeTest3(_ N: Int) {
   }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$S17merge_exclusivity10MergeTest4yySiF : $@convention(thin)
+// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest4yySiF : $@convention(thin)
 // TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$S17merge_exclusivity5checks6UInt64Vvp
+// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: bb7
@@ -115,7 +115,7 @@ public func MergeTest3(_ N: Int) {
 // TESTSIL: store {{.*}} to [[B3]]
 // TESTSIL: end_access [[B3]]
 // TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$S17merge_exclusivity10MergeTest4yySiF'
+// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest4yySiF'
 @inline(never)
 public func MergeTest4(_ N: Int) {
   let range = 0..<10000
@@ -130,9 +130,9 @@ public func MergeTest4(_ N: Int) {
   }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$S17merge_exclusivity10MergeTest5yySiF : $@convention(thin)
+// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest5yySiF : $@convention(thin)
 // TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$S17merge_exclusivity5checks6UInt64Vvp
+// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: bb6
@@ -151,7 +151,7 @@ public func MergeTest4(_ N: Int) {
 // TESTSIL: store {{.*}} to [[B4]]
 // TESTSIL: end_access [[B4]]
 // TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$S17merge_exclusivity10MergeTest5yySiF'
+// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest5yySiF'
 @inline(never)
 public func MergeTest5(_ N: Int) {
   let range = 0..<10000
@@ -169,13 +169,13 @@ public func MergeTest5(_ N: Int) {
   }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$S17merge_exclusivity10MergeTest6yySiF : $@convention(thin)
+// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest6yySiF : $@convention(thin)
 // TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$S17merge_exclusivity5checks6UInt64Vvp
+// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$S17merge_exclusivity10MergeTest6yySiF'
+// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest6yySiF'
 @inline(never)
 public func MergeTest6(_ N: Int) {
   let range = 0..<10000
@@ -195,13 +195,13 @@ public func MergeTest6(_ N: Int) {
 public func foo() {
 }
 
-// TESTSIL-LABEL: sil [noinline] @$S17merge_exclusivity10MergeTest7yySiF : $@convention(thin)
+// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest7yySiF : $@convention(thin)
 // TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$S17merge_exclusivity5checks6UInt64Vvp
+// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$S17merge_exclusivity10MergeTest7yySiF'
+// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest7yySiF'
 @inline(never)
 public func MergeTest7(_ N: Int) {
   let range = 0..<10000
@@ -217,13 +217,13 @@ public func MergeTest7(_ N: Int) {
   }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$S17merge_exclusivity10MergeTest8yySiF : $@convention(thin)
+// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest8yySiF : $@convention(thin)
 // TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$S17merge_exclusivity5checks6UInt64Vvp
+// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$S17merge_exclusivity10MergeTest8yySiF'
+// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest8yySiF'
 @inline(never)
 public func MergeTest8(_ N: Int) {
   let range = 0..<10000
@@ -325,7 +325,7 @@ private struct EscapedTransforme<T>: WriteProt {
     }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$S17merge_exclusivity14run_MergeTest9yySiF : $@convention(thin)
+// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity14run_MergeTest9yySiF : $@convention(thin)
 // TESTSIL: [[REFADDR:%.*]] = ref_element_addr {{.*}} : $StreamClass, #StreamClass.buffer
 // TESTSIL-NEXT: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFADDR]]
 // TESTSIL: end_access [[B1]]
@@ -338,7 +338,7 @@ private struct EscapedTransforme<T>: WriteProt {
 // TESTSIL: [[BCONF:%.*]] = begin_access [modify] [dynamic] [[REFADDR]]
 // TESTSIL: apply {{.*}} : $@convention(method) (Int, @inout Array<UInt8>) -> ()
 // TESTSIL: end_access [[BCONF]]
-// TESTSIL-LABEL: } // end sil function '$S17merge_exclusivity14run_MergeTest9yySiF'
+// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity14run_MergeTest9yySiF'
 @inline(never)
 public func run_MergeTest9(_ N: Int) {
   struct Thing {

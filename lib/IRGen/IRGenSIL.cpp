@@ -720,31 +720,25 @@ public:
   }
 
   /// To make it unambiguous whether a `var` binding has been initialized,
-  /// zero-initialize the first pointer-sized field. LLDB uses this to
-  /// recognize to detect uninitizialized variables. This can be removed once
-  /// swiftc switches to @llvm.dbg.addr() intrinsics.
+  /// zero-initialize the shadow copy alloca. LLDB uses the first pointer-sized
+  /// field to recognize to detect uninitizialized variables. This can be
+  /// removed once swiftc switches to @llvm.dbg.addr() intrinsics.
   void zeroInit(llvm::AllocaInst *AI) {
     if (!AI)
       return;
 
     // Only do this at -Onone.
-    if (IGM.IRGen.Opts.shouldOptimize())
-      return;
-
-    auto &DL = IGM.DataLayout;
-    if (DL.getTypeSizeInBits(AI->getAllocatedType()) <
-        DL.getPointerSizeInBits())
+    uint64_t Size = *AI->getAllocationSizeInBits(IGM.DataLayout) / 8;
+    if (IGM.IRGen.Opts.shouldOptimize() || !Size)
       return;
 
     llvm::IRBuilder<> ZeroInitBuilder(AI->getNextNode());
 
     // No debug location is how LLVM marks prologue instructions.
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
-    auto *BC =
-        ZeroInitBuilder.CreateBitCast(AI, IGM.OpaquePtrTy->getPointerTo());
-    ZeroInitBuilder.CreateAlignedStore(
-        llvm::ConstantPointerNull::get(IGM.OpaquePtrTy), BC,
-        IGM.getPointerAlignment().getValue());
+    ZeroInitBuilder.CreateMemSet(
+        AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
+        Size, AI->getAlignment());
   }
 
   /// Account for bugs in LLVM.
@@ -769,10 +763,10 @@ public:
 
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, Name}}];
     if (!Alloca.isValid())
-      Alloca = createAlloca(Storage->getType(), Align, Name+".addr");
-    zeroInit(dyn_cast<llvm::AllocaInst>(Alloca.getAddress()));
+      Alloca = createAlloca(Storage->getType(), Align, Name+".debug");
+    zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
 
-    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();
   }
@@ -848,8 +842,9 @@ public:
 
     SILType Type = SILVal->getType();
     auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
-    auto Alloca = LTI.allocateStack(*this, Type, "debug.copy");
-    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
+    auto Alloca = LTI.allocateStack(*this, Type, Name+".debug");
+    zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress().getAddress()));
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     LTI.initialize(*this, e, Alloca.getAddress(), false /* isOutlined */);
     copy.push_back(Alloca.getAddressPointer());
   }
@@ -878,7 +873,7 @@ public:
                                     IndirectionKind Indirection = DirectValue) {
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
-      PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
+      PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
                                              Name, ArgNo, Indirection);
     } else
@@ -1555,7 +1550,8 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   // emitPolymorphicParameters() may create function calls, so we need
   // to initialize the debug location here.
-  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo, IGF.Builder);
+  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(),
+                         IGF.Builder);
   
   // Bind polymorphic arguments. This can only be done after binding
   // all the value parameters, and must be done even for non-polymorphic
@@ -5358,19 +5354,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
 
-  // Find the original entry in the witness table.
-  bool wasOverriding = false;
-  while (auto overridden = member.getOverridden()) {
-    member = overridden;
-    wasOverriding = true;
-  }
-
-  // If the requirement given override another requirement, adjust the
-  // conformance appropriately.
-  if (wasOverriding) {
-    auto memberProto = cast<ProtocolDecl>(member.getDecl()->getDeclContext());
-    conformance = conformance.getInheritedConformanceRef(memberProto);
-  }
+  assert(member.requiresNewWitnessTableEntry());
 
   if (IGM.isResilient(conformance.getRequirement(),
                       ResilienceExpansion::Maximal)) {

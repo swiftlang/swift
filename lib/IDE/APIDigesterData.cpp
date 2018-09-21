@@ -282,6 +282,7 @@ bool APIDiffItem::operator==(const APIDiffItem &Other) const {
   case APIDiffItemKind::ADK_SpecialCaseDiffItem:
     return true;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 namespace {
@@ -295,6 +296,7 @@ static const char* getKeyContent(DiffItemKeyKind KK) {
 #define DIFF_ITEM_KEY_KIND(NAME) case DiffItemKeyKind::KK_##NAME: return #NAME;
 #include "swift/IDE/DigesterEnums.def"
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static DiffItemKeyKind parseKeyKind(StringRef Content) {
@@ -367,6 +369,7 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
       SpecialCaseDiffItem(Usr, SpecialCaseId);
   }
   }
+  llvm_unreachable("unhandled kind");
 }
 } // end anonymous namespace
 

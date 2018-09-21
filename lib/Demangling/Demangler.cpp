@@ -168,6 +168,12 @@ bool swift::Demangle::isSwiftSymbol(const char *mangledName) {
   return isSwiftSymbol(mangledNameRef);
 }
 
+bool swift::Demangle::isObjCSymbol(llvm::StringRef mangledName) {
+  StringRef nameWithoutPrefix = dropSwiftManglingPrefix(mangledName);
+  return nameWithoutPrefix.startswith("So") ||
+         nameWithoutPrefix.startswith("SC");
+}
+
 bool swift::Demangle::isOldFunctionTypeMangling(llvm::StringRef mangledName) {
   return mangledName.startswith("_T");
 }
@@ -1812,6 +1818,38 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       }
       return result;
     }
+    case 'l': {
+      auto assocTypeName = popAssocTypeName();
+      if (!assocTypeName)
+        return nullptr;
+
+      return createWithChild(Node::Kind::AssociatedTypeDescriptor,
+                             assocTypeName);
+    }
+    case 'L':
+      return createWithChild(Node::Kind::ProtocolRequirementsBaseDescriptor,
+                             popProtocol());
+    case 'M':
+      return createWithChild(Node::Kind::DefaultAssociatedTypeMetadataAccessor,
+                             popAssocTypeName());
+
+    case 'n': {
+      NodePointer requirementTy = popProtocol();
+      auto assocTypePath = popAssocTypePath();
+      NodePointer protoTy = popNode(Node::Kind::Type);
+      return createWithChildren(Node::Kind::AssociatedConformanceDescriptor,
+                                protoTy, assocTypePath, requirementTy);
+    }
+
+    case 'N': {
+      NodePointer requirementTy = popProtocol();
+      auto assocTypePath = popAssocTypePath();
+      NodePointer protoTy = popNode(Node::Kind::Type);
+      return createWithChildren(
+                            Node::Kind::DefaultAssociatedConformanceAccessor,
+                            protoTy, assocTypePath, requirementTy);
+    }
+
     case 'H':
     case 'h': {
       auto nodeKind = c == 'H' ? Node::Kind::KeyPathEqualsThunkHelper

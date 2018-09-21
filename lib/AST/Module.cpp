@@ -774,16 +774,16 @@ struct SourceFile::SourceFileSyntaxInfo {
 };
 
 bool SourceFile::hasSyntaxRoot() const {
-  return SyntaxInfo.SyntaxRoot.hasValue();
+  return SyntaxInfo->SyntaxRoot.hasValue();
 }
 
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
   assert(hasSyntaxRoot() && "no syntax root is set.");
-  return *SyntaxInfo.SyntaxRoot;
+  return *SyntaxInfo->SyntaxRoot;
 }
 
 void SourceFile::setSyntaxRoot(syntax::SourceFileSyntax &&Root) {
-  SyntaxInfo.SyntaxRoot.emplace(Root);
+  SyntaxInfo->SyntaxRoot.emplace(Root);
 }
 
 template<typename OP_DECL>
@@ -1431,7 +1431,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        bool KeepParsedTokens, bool BuildSyntaxTree)
   : FileUnit(FileUnitKind::Source, M),
     BufferID(bufferID ? *bufferID : -1),
-    Kind(K), SyntaxInfo(*new SourceFileSyntaxInfo(BuildSyntaxTree)) {
+    Kind(K), SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
   M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 
@@ -1444,8 +1444,6 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     AllCorrectedTokens = std::vector<Token>();
   }
 }
-
-SourceFile::~SourceFile() { delete &SyntaxInfo; }
 
 std::vector<Token> &SourceFile::getTokenVector() {
   assert(shouldCollectToken() && "Disabled");
@@ -1467,6 +1465,7 @@ bool SourceFile::shouldCollectToken() const {
   case SourceFileKind::SIL:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool SourceFile::shouldBuildSyntaxTree() const {
@@ -1474,11 +1473,12 @@ bool SourceFile::shouldBuildSyntaxTree() const {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::Interface:
-    return SyntaxInfo.Enable;
+    return SyntaxInfo->Enable;
   case SourceFileKind::REPL:
   case SourceFileKind::SIL:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool FileUnit::walk(ASTWalker &walker) {

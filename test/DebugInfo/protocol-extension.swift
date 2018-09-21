@@ -5,7 +5,7 @@ public protocol P {
 }
 
 public extension P {
-  // CHECK: define {{.*}}swiftcc i32 @"$S4main1PPAAE1fs5Int32VyF"
+  // CHECK: define {{.*}}swiftcc i32 @"$s4main1PPAAE1fs5Int32VyF"
   public func f() -> Int32 {
     // CHECK-NEXT: entry:
     // CHECK-NEXT: %[[ALLOCA:.*]] = alloca %swift.type*,
