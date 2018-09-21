@@ -3253,18 +3253,20 @@ extension Set.Iterator: IteratorProtocol {
   @inlinable
   @inline(__always)
   public mutating func next() -> Element? {
+#if _runtime(_ObjC)
     switch _variant {
     case .native:
       return _asNative.next()
-#if _runtime(_ObjC)
     case .cocoa(let cocoaIterator):
       _cocoaPath()
       if let cocoaElement = cocoaIterator.next() {
         return _forceBridgeFromObjectiveC(cocoaElement, Element.self)
       }
       return nil
-#endif
     }
+#else
+    return _asNative.next()
+#endif
   }
 }
 
