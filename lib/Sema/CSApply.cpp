@@ -6569,9 +6569,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             AutoClosureExpr(expr, fnTy->getResult(), discriminator, cs.DC);
         auto param = new (context) ParamDecl(
             VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), Identifier(),
-            SourceLoc(), argTy->getNominalOrBoundGenericNominal()->getName(),
-            closure);
-        param->setInterfaceType(fnTy->getParams()[0].getType());
+            SourceLoc(), context.getIdentifier("$0"), closure);
+        param->setType(argTy);
+        param->setInterfaceType(argTy->mapTypeOutOfContext());
         auto *paramRef =
             new (context) DeclRefExpr(param, DeclNameLoc(), /*Implicit=*/true);
         paramRef->setType(argTy);
