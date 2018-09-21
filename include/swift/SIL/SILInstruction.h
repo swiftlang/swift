@@ -29,6 +29,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
+#include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILLocation.h"
@@ -6604,6 +6605,14 @@ public:
       return BB == SuccBB;
     });
   }
+
+  using SuccessorBlockArgumentsListTy =
+      TransformRange<ConstSuccessorListTy,
+                     function_ref<PHIArgumentArrayRef(const SILSuccessor &)>>;
+
+  /// Return the range of Argument arrays for each successor of this
+  /// block.
+  SuccessorBlockArgumentsListTy getSuccessorBlockArguments() const;
 
   using SuccessorBlockListTy =
       TransformRange<SuccessorListTy,
