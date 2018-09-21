@@ -860,6 +860,7 @@ public:
       break;
     }
 
+    case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclFunction:
     case SDKNodeKind::DeclSetter:
     case SDKNodeKind::DeclGetter:

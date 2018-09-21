@@ -965,6 +965,43 @@
     },
     {
       "kind": "TypeDecl",
+      "name": "ProWithAssociatedType",
+      "printedName": "ProWithAssociatedType",
+      "declKind": "Protocol",
+      "usr": "s:4cake21ProWithAssociatedTypeP",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "AssociatedType",
+          "name": "A",
+          "printedName": "A",
+          "declKind": "AssociatedType",
+          "usr": "s:4cake21ProWithAssociatedTypeP1AQa",
+          "location": "",
+          "moduleName": "cake"
+        },
+        {
+          "kind": "AssociatedType",
+          "name": "B",
+          "printedName": "B",
+          "declKind": "AssociatedType",
+          "usr": "s:4cake21ProWithAssociatedTypeP1BQa",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
       "name": "Int",
       "printedName": "Int",
       "declKind": "Struct",

@@ -130,6 +130,9 @@ SDKNodeDeclGetter::SDKNodeDeclGetter(SDKNodeInitInfo Info):
 SDKNodeDeclSetter::SDKNodeDeclSetter(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclSetter) {}
 
+SDKNodeDeclAssociatedType::SDKNodeDeclAssociatedType(SDKNodeInitInfo Info):
+  SDKNodeDecl(Info, SDKNodeKind::DeclAssociatedType) {};
+
 StringRef SDKNodeDecl::getHeaderName() const {
   if (Location.empty())
     return StringRef();
@@ -348,6 +351,7 @@ bool SDKNodeDecl::classof(const SDKNode *N) {
     case SDKNodeKind::DeclTypeAlias:
     case SDKNodeKind::DeclType:
     case SDKNodeKind::DeclVar:
+    case SDKNodeKind::DeclAssociatedType:
       return true;
     case SDKNodeKind::Root:
     case SDKNodeKind::TypeNominal:
@@ -731,6 +735,7 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       }
       LLVM_FALLTHROUGH;
     }
+    case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclTypeAlias: {
       auto Left = this->getAs<SDKNodeDecl>();
       auto Right = (&Other)->getAs<SDKNodeDecl>();
@@ -1250,6 +1255,16 @@ static SDKNode *constructTypeAliasNode(SDKContext &Ctx,TypeAliasDecl *TAD) {
   return Alias;
 }
 
+static SDKNode *constructAssociatedTypeNode(SDKContext &Ctx,
+                                            AssociatedTypeDecl *ATD) {
+  auto Asso = SDKNodeInitInfo(Ctx, ATD).
+    createSDKNode(SDKNodeKind::DeclAssociatedType);
+  if (auto DT = ATD->getDefaultDefinitionType()) {
+    Asso->addChild(constructTypeNode(Ctx, DT));
+  }
+  return Asso;
+}
+
 static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
                              IterableDeclContext *Context,
                              std::set<ExtensionDecl*> &HandledExts) {
@@ -1268,6 +1283,8 @@ static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
       Root->addChild(constructVarNode(Ctx, EED));
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(Member)) {
       Root->addChild(constructTypeDeclNode(Ctx, NTD, HandledExts));
+    } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
+      Root->addChild(constructAssociatedTypeNode(Ctx, ATD));
     }
   }
 }

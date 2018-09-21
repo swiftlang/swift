@@ -45,6 +45,7 @@ NODE_KIND(DeclGetter, Getter)
 NODE_KIND(DeclSetter, Setter)
 NODE_KIND(DeclVar, Var)
 NODE_KIND(DeclTypeAlias, TypeAlias)
+NODE_KIND(DeclAssociatedType, AssociatedType)
 
 NODE_ANNOTATION(Added)
 NODE_ANNOTATION(Removed)
