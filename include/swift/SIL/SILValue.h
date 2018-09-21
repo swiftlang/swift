@@ -123,7 +123,7 @@ struct ValueOwnershipKind {
                 "ownership value?!");
 
   ValueOwnershipKind(innerty NewValue) : Value(NewValue) {}
-  ValueOwnershipKind(unsigned NewValue) : Value(innerty(NewValue)) {}
+  explicit ValueOwnershipKind(unsigned NewValue) : Value(innerty(NewValue)) {}
   ValueOwnershipKind(SILModule &M, SILType Type,
                      SILArgumentConvention Convention);
 
