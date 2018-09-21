@@ -6561,32 +6561,30 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (bgt->getDecl() == ctx.getKeyPathDecl() ||
           bgt->getDecl() == ctx.getWritableKeyPathDecl() ||
           bgt->getDecl() == ctx.getReferenceWritableKeyPathDecl()) {
-        auto fnTy = toType->getAs<FunctionType>();
-        auto argTy = fnTy->getParams()[0].getType();
-        auto &context = cs.getASTContext();
+        auto argTy = toFunc->getParams()[0].getType();
         auto discriminator = AutoClosureExpr::InvalidDiscriminator;
-        auto closure = new (context)
-            AutoClosureExpr(expr, fnTy->getResult(), discriminator, cs.DC);
-        auto param = new (context) ParamDecl(
+        auto closure = new (ctx)
+            AutoClosureExpr(expr, toFunc->getResult(), discriminator, cs.DC);
+        auto param = new (ctx) ParamDecl(
             VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), Identifier(),
-            SourceLoc(), context.getIdentifier("$0"), closure);
+            SourceLoc(), ctx.getIdentifier("$0"), closure);
         param->setType(argTy);
         param->setInterfaceType(argTy->mapTypeOutOfContext());
         auto *paramRef =
-            new (context) DeclRefExpr(param, DeclNameLoc(), /*Implicit=*/true);
+            new (ctx) DeclRefExpr(param, DeclNameLoc(), /*Implicit=*/true);
         paramRef->setType(argTy);
         cs.cacheType(paramRef);
-        auto *application = new (context)
+        auto *application = new (ctx)
             KeyPathApplicationExpr(paramRef, SourceLoc(), expr, SourceLoc(),
-                                   fnTy->getResult(), /*implicit=*/true);
+                                   toFunc->getResult(), /*implicit=*/true);
         cs.cacheType(application);
-        closure->setParameterList(ParameterList::create(context, {param}));
+        closure->setParameterList(ParameterList::create(ctx, {param}));
         closure->setBody(application);
 
         // KeyPaths are noescape and non-throwing, so we may still need to do
         // additional function conversion as well.
-        fromType = fnTy->withExtInfo(
-            fnTy->getExtInfo().withNoEscape(true).withThrows(false));
+        fromType = toFunc->withExtInfo(
+            toFunc->getExtInfo().withNoEscape(true).withThrows(false));
         closure->setType(fromType);
         expr = cs.cacheType(closure);
       }
