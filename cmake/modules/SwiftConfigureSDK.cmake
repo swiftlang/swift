@@ -185,6 +185,7 @@ macro(configure_sdk_unix
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "arm-linux-androideabi")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "arm")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NDK_PATH}/platforms/android-${SWIFT_ANDROID_API_LEVEL}/arch-arm")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE "armv7-none-linux-androideabi")
       else()
         message(FATAL_ERROR "unknown arch for android SDK: ${arch}")
       endif()
