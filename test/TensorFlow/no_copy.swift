@@ -24,9 +24,9 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testSelect
  CHECK: sil private @{{.*}}testSelect{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Bool>, TensorHandle<Float>) -> TensorHandle<Float> {
  CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Bool>, %2 : @unowned $TensorHandle<Float>):
- CHECK:       [[A:%.*]] = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>
- CHECK:       [[B:%.*]] = graph_op "Select,i,i,i"(%1 : $TensorHandle<Bool>, [[A]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
- CHECK:      [[C:%.*]] = graph_op "Mul,i,i"([[B]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
+ CHECK:       [[A:%.*]] = graph_op "Add"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>
+ CHECK:       [[B:%.*]] = graph_op "Select"(%1 : $TensorHandle<Bool>, [[A]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
+ CHECK:      [[C:%.*]] = graph_op "Mul"([[B]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
  CHECK-NEXT:  return [[C]] : $TensorHandle<Float>
  CHECK-NEXT:}
 */
@@ -40,7 +40,7 @@ public func testEmptyScalarsArray() {
  CHECK: sil private @{{.*}}testEmptyScalarsArray{{.*}} : $@callee_owned () -> () {
  CHECK: bb0:
  CHECK: graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: ], shape$shape: [$Int32: (i32 0), (i32 20), (i32 30)],
- CHECK: graph_op "Add,i,i"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
+ CHECK: graph_op "Add"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
  */
 
 // This tests the attributes necessary to get arrays of integers and strings going.
@@ -52,7 +52,7 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
 // CHECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
-// CHECK: [[A:%.*]] = graph_op "Conv2D,i,i"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)], __device: "/device:CPU:0"} : $TensorHandle<Float>
+// CHECK: [[A:%.*]] = graph_op "Conv2D"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)], __device: "/device:CPU:0"} : $TensorHandle<Float>
 // CHECK-NEXT:  return [[A]] : $TensorHandle<Float>
 // CHECK-NEXT:}
 

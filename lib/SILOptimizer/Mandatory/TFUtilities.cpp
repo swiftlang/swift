@@ -497,7 +497,7 @@ tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
                            GraphFunctionDeviceInfo &deviceInfo) {
   ASTContext &context = builder.getASTContext();
   GraphOperationBuilder opBuilder("tf_tensor_to_i1");
-  opBuilder.addTFTensorToI1Operand(value);
+  opBuilder.addOperand(value);
   deviceInfo.handleDevicePlacement(
       "tf_tensor_to_i1",
       /*opDevice*/ getDeviceString(DeviceType::ALL),

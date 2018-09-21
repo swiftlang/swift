@@ -37,13 +37,13 @@ let y = Tensor<Float>(2.0)
 let y2 = y*y*y*y
 
 // CHECK:   [[ONE:%.*]] = graph_op "Const"(){{.*}} /* 1 */
-// CHECK:   [[ADD1:%.*]] = graph_op "Add,i,i"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
-// CHECK:   [[ADD2:%.*]] = graph_op "Add,i,i"([[ADD1]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
-// CHECK:   graph_op "Sub,i,i"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
+// CHECK:   [[ADD1:%.*]] = graph_op "Add"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
+// CHECK:   [[ADD2:%.*]] = graph_op "Add"([[ADD1]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
+// CHECK:   graph_op "Sub"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
 // CHECK:   [[TWO:%.*]] = graph_op "Const"(){{.*}} /* 2 */
-// CHECK:   [[MUL1:%.*]] = graph_op "Mul,i,i"([[TWO]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
-// CHECK:   [[MUL2:%.*]] = graph_op "Mul,i,i"([[MUL1]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
-// CHECK:   [[MUL3:%.*]] = graph_op "Mul,i,i"([[MUL2]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
+// CHECK:   [[MUL1:%.*]] = graph_op "Mul"([[TWO]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
+// CHECK:   [[MUL2:%.*]] = graph_op "Mul"([[MUL1]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
+// CHECK:   [[MUL3:%.*]] = graph_op "Mul"([[MUL2]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
 
 // b/76155918
 let a: Tensor<Float> = [1, 2, 3]

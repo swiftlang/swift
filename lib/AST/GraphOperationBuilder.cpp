@@ -20,7 +20,10 @@ namespace tf {
 
 /// Start building a GraphOperationInst for op `OpName`.
 GraphOperationBuilder::GraphOperationBuilder(StringRef OpName)
-    : MangledName(OpName) {}
+    : MangledName(OpName) {
+  assert(MangledName.find(',') == StringRef::npos &&
+         "graph_op name cannot include ','");
+}
 
 /// Add a single operand to the GraphOperationInst, with an optional name.
 void GraphOperationBuilder::addOperand(SILValue operand, StringRef name) {
@@ -48,21 +51,6 @@ GraphOperationAttribute &GraphOperationBuilder::addAttribute(
     const GraphOperationAttribute &attribute) {
   Attributes.push_back(attribute);
   return Attributes.back();
-}
-
-/// Special method that should only be used for "tfc.scalarToTensor"'s operand,
-/// because it has special name mangling. (Marker is "s").
-void GraphOperationBuilder::addScalarOperand(SILValue operand) {
-  MangledName += ",s";
-  Operands.push_back(operand);
-}
-
-/// Special method that should only be used for "tf_tensor_to_i1"'s operand,
-/// because it has special name mangling. (No marker for its operand).
-/// TODO: Make "tf_tensor_to_i1" support normal name mangling, and then remove
-/// this.
-void GraphOperationBuilder::addTFTensorToI1Operand(SILValue operand) {
-  Operands.push_back(operand);
 }
 
 /// Build the GraphOperationInst.

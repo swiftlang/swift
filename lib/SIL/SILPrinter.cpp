@@ -22,6 +22,7 @@
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/CFG.h"
 // SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/GraphOperationInfo.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCoverageMap.h"
@@ -1248,11 +1249,30 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitGraphOperationInst(GraphOperationInst *GI) {
-    *this << QuotedString(GI->getName().str());
+    tf::GraphOperationInfo info(GI);
+    SmallVector<tf::GraphOperationInfo::StructuredOperand, 4> operands;
+    auto opName = info.decodeName(operands);
+
+    *this << QuotedString(opName);
 
     *this << "(";
-    interleave(GI->getArguments(), [&](SILValue v) {
-      *this << getIDAndType(v);
+    interleave(operands, [&](tf::GraphOperationInfo::StructuredOperand operand) {
+      if (!operand.getName().empty())
+        *this << operand.getName() << " ";
+      switch (operand.getKind()) {
+      case tf::GraphOperationInfo::SOK_Single:
+        *this << getIDAndType(operand.getSingleOperand());
+        break;
+      case tf::GraphOperationInfo::SOK_List:
+        *this << "[";
+        interleave(operand.getOperandList(), [&](SILValue v) {
+          *this << getIDAndType(v);
+        }, [&] {
+          *this << ", ";
+        });
+        *this << "]";
+        break;
+      }
     }, [&] {
       *this << ", ";
     });

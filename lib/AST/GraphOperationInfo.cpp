@@ -92,13 +92,6 @@ StringRef GraphOperationInfo::decodeName(
     StringRef thisMarkerName = thisMarker.drop_front(2);
     assert(thisMarker.size() >= 2 && "marker too short");
     switch (thisMarker[1]) {
-    case 's':
-      // Push a SOK_Scalar.
-      assert(thisMarkerName.empty() && "SOK_Scalar should not have name");
-      structuredOperands.emplace_back(SOK_Scalar, StringRef(),
-                                      remainingOperands.front().get());
-      remainingOperands = remainingOperands.drop_front(1);
-      break;
     case 'i':
       // Push a SOK_Single.
       structuredOperands.emplace_back(SOK_Single, thisMarkerName,

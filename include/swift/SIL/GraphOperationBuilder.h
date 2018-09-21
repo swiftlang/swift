@@ -56,16 +56,6 @@ public:
   GraphOperationAttribute &addAttribute(
       const GraphOperationAttribute &attribute);
 
-  /// Special method that should only be used for "tfc.scalarToTensor"'s operand,
-  /// because it has special name mangling. (Marker is "s").
-  void addScalarOperand(SILValue operand);
-
-  /// Special method that should only be used for "tf_tensor_to_i1"'s operand,
-  /// because it has special name mangling. (No marker for its operand).
-  /// TODO: Make "tf_tensor_to_i1" support normal name mangling, and then remove
-  /// this.
-  void addTFTensorToI1Operand(SILValue operand);
-
   /// Build the GraphOperationInst.
   GraphOperationInst* build(
       SILBuilder &B, ASTContext &C, SILLocation loc,
