@@ -376,6 +376,9 @@ public:
   StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
 
+  /// The number of type variables associated with this component.
+  unsigned typeVariableCount() const { return TypeVars.size(); }
+
   // The number of disjunction constraints associated with this component.
   unsigned disjunctionCount() const { return NumDisjunctions; }
 

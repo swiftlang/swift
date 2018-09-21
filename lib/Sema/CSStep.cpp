@@ -192,7 +192,19 @@ void SplitterStep::computeFollowupSteps(
   std::sort(componentSteps.begin(), componentSteps.end(),
             [](const std::unique_ptr<ComponentStep> &lhs,
                const std::unique_ptr<ComponentStep> &rhs) {
-              return lhs->disjunctionCount() > rhs->disjunctionCount();
+              auto numTypeVarsA = lhs->typeVariableCount();
+              auto numTypeVarsB = rhs->typeVariableCount();
+
+              // If left-hand side doesn't have any type variables,
+              // it's an "orphan" component and has to be scheduled
+              // with the lowest priority, because it's the least
+              // likely to fail.
+              if (numTypeVarsA == 0)
+                return numTypeVarsB != 0;
+
+              return (numTypeVarsA <= numTypeVarsB)
+                      ? lhs->disjunctionCount() > rhs->disjunctionCount()
+                      : true;
             });
 }
 
