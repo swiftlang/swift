@@ -12,17 +12,17 @@ extension Super {
 
   // CHECK: @objc dynamic var prop: Super
   @objc var prop: Super {
-    // CHECK: @objc dynamic get
+    // CHECK: @objc get
     get { return Super() }
-    // CHECK: @objc dynamic set
+    // CHECK: @objc set
     set { }
   }
 
   // CHECK: @objc dynamic subscript(sup: Super) -> Super
   @objc subscript(sup: Super) -> Super {
-    // CHECK: @objc dynamic get
+    // CHECK: @objc get
     get { return sup }
-    // CHECK: @objc dynamic set
+    // CHECK: @objc set
     set { }
   }
 }
@@ -37,17 +37,17 @@ extension Sub {
 
   // CHECK: @objc override dynamic var prop: Super
   override var prop: Super {
-    // CHECK: @objc dynamic get
+    // CHECK: @objc get
     get { return Super() }
-    // CHECK: @objc dynamic set
+    // CHECK: @objc set
     set { }
   }
 
   // CHECK: @objc override dynamic subscript(sup: Super) -> Super
   override subscript(sup: Super) -> Super {
-    // CHECK: @objc dynamic get
+    // CHECK: @objc get
     get { return sup }
-    // CHECK: @objc dynamic set
+    // CHECK: @objc set
     set { }
   }
 
