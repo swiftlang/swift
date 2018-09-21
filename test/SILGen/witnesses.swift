@@ -337,7 +337,7 @@ protocol IUOFailableRequirement {
 struct NonFailableModel: FailableRequirement, NonFailableRefinement, IUOFailableRequirement {
   // CHECK-LABEL: sil private [transparent] [thunk] @$s9witnesses16NonFailableModelVAA0C11Requirement{{[_0-9a-zA-Z]*}}fCTW : $@convention(witness_method: FailableRequirement) (Int, @thick NonFailableModel.Type) -> @out Optional<NonFailableModel>
   // CHECK-LABEL: sil private [transparent] [thunk] @$s9witnesses16NonFailableModelVAA0bC10Refinement{{[_0-9a-zA-Z]*}}fCTW : $@convention(witness_method: NonFailableRefinement) (Int, @thick NonFailableModel.Type) -> @out NonFailableModel
-  // CHECK-LABEL: sil private [transparent] [thunk] @$s9witnesses16NonFailableModelVAA22IUOFailableRequirement{{[_0-9a-zA-Z]*}}fCTW : $@convention(witness_method: FailableRequirement) (Int, @thick NonFailableModel.Type) -> @out Optional<NonFailableModel>
+  // CHECK-LABEL: sil private [transparent] [thunk] @$s9witnesses16NonFailableModelVAA22IUOFailableRequirement{{[_0-9a-zA-Z]*}}fCTW : $@convention(witness_method: IUOFailableRequirement) (Int, @thick NonFailableModel.Type) -> @out Optional<NonFailableModel>
   init(foo: Int) {}
 }
 
@@ -380,7 +380,7 @@ protocol IUOFailableClassRequirement: class {
 final class NonFailableClassModel: FailableClassRequirement, NonFailableClassRefinement, IUOFailableClassRequirement {
   // CHECK-LABEL: sil private [transparent] [thunk] @$s9witnesses21NonFailableClassModelCAA0cD11Requirement{{[_0-9a-zA-Z]*}}fCTW : $@convention(witness_method: FailableClassRequirement) (Int, @thick NonFailableClassModel.Type) -> @owned Optional<NonFailableClassModel>
   // CHECK-LABEL: sil private [transparent] [thunk] @$s9witnesses21NonFailableClassModelCAA0bcD10Refinement{{[_0-9a-zA-Z]*}}fCTW : $@convention(witness_method: NonFailableClassRefinement) (Int, @thick NonFailableClassModel.Type) -> @owned NonFailableClassModel
-  // CHECK-LABEL: sil private [transparent] [thunk] @$s9witnesses21NonFailableClassModelCAA011IUOFailableD11Requirement{{[_0-9a-zA-Z]*}}fCTW : $@convention(witness_method: FailableClassRequirement) (Int, @thick NonFailableClassModel.Type) -> @owned Optional<NonFailableClassModel>
+  // CHECK-LABEL: sil private [transparent] [thunk] @$s9witnesses21NonFailableClassModelCAA011IUOFailableD11Requirement{{[_0-9a-zA-Z]*}}fCTW : $@convention(witness_method: IUOFailableClassRequirement) (Int, @thick NonFailableClassModel.Type) -> @owned Optional<NonFailableClassModel>
   init(foo: Int) {}
 }
 
@@ -559,3 +559,22 @@ protocol InoutFunctionReq {
 struct InoutFunction : InoutFunctionReq {
   func updateFunction(x: inout () -> ()) {}
 }
+
+
+protocol Base {
+  func foo()
+}
+
+protocol Sub : Base {
+  func bar()
+}
+
+struct MyImpl :Sub {
+  func bar() {}
+	func foo() {}
+}
+
+// protocol witness for witnesses.Sub.bar() -> () in conformance witnesses.MyImpl : witnesses.Sub in witnesses
+// CHECK: sil private [transparent] [thunk] @$s9witnesses6MyImplVAA3SubA2aDP3baryyFTW : $@convention(witness_method: Sub) (@in_guaranteed MyImpl) -> ()
+// protocol witness for witnesses.Base.foo() -> () in conformance witnesses.MyImpl : witnesses.Base in witnesses
+// CHECK: sil private [transparent] [thunk] @$s9witnesses6MyImplVAA4BaseA2aDP3fooyyFTW : $@convention(witness_method: Base) (@in_guaranteed MyImpl) -> ()
