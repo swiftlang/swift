@@ -142,15 +142,31 @@ bool RequirementFailure::diagnoseAsError() {
   auto *genericCtx = AffectedDecl->getAsGenericContext();
 
   auto declName = AffectedDecl->getFullName();
+  bool shouldSkipName = false;
+
+  {
+    const ParameterList *params;
+    if (auto *SD = dyn_cast<SubscriptDecl>(AffectedDecl))
+      params = SD->getIndices();
+
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(AffectedDecl))
+      params = AFD->getParameters();
+
+    shouldSkipName =
+        declName.isSpecial() && params &&
+        (params->size() == 0 ||
+         (params->size() == 1 && params->get(0)->getArgumentName().empty()));
+  }
+
   if (reqDC != genericCtx) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
     emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
-                   AffectedDecl->getDescriptiveKind(), declName.isSpecial(),
-                   declName, NTD->getDeclaredType(), getLHS(), getRHS());
+                   AffectedDecl->getDescriptiveKind(), shouldSkipName, declName,
+                   NTD->getDeclaredType(), getLHS(), getRHS());
   } else {
     emitDiagnostic(anchor->getLoc(), getDiagnosticOnDecl(),
-                   AffectedDecl->getDescriptiveKind(), declName.isSpecial(),
-                   declName, getLHS(), getRHS());
+                   AffectedDecl->getDescriptiveKind(), shouldSkipName, declName,
+                   getLHS(), getRHS());
   }
 
   emitRequirementNote(reqDC->getAsDecl());
