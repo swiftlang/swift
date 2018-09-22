@@ -2161,7 +2161,7 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
   return (ClassROData*) (theClass->Data & ~uintptr_t(1));
 }
 
-static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
+static void initGenericClassObjCName(ClassMetadata *theClass) {
   // Use the remangler to generate a mangled name from the type metadata.
   Demangle::Demangler Dem;
   // Resolve symbolic references to a unique mangling that can be encoded in
@@ -2432,6 +2432,9 @@ static void initGenericObjCClass(ClassMetadata *self,
                                  size_t numFields,
                                  const TypeLayout * const *fieldTypes,
                                  size_t *fieldOffsets) {
+  // If the class is generic, we need to give it a name for Objective-C.
+  initGenericClassObjCName(self);
+
   ClassROData *rodata = getROData(self);
 
   // In ObjC interop mode, we have up to two places we need each correct
@@ -2554,10 +2557,6 @@ swift::swift_initClassMetadata(ClassMetadata *self,
     (void)unused;
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
-
-  // If the class is generic, we need to give it a name for Objective-C.
-  if (self->getDescription()->isGeneric())
-    _swift_initGenericClassObjCName(self);
 #endif
 
   // Copy field offsets, generic arguments and (if necessary) vtable entries
