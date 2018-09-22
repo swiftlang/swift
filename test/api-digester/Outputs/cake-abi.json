@@ -808,33 +808,6 @@
                   "usr": "s:Si"
                 }
               ]
-            },
-            {
-              "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Accessor",
-              "usr": "s:4cake17fixedLayoutStructV1b33_3D8926C30F7417F2EF9A277D0C73FBDBLLSivs",
-              "location": "",
-              "moduleName": "cake",
-              "implicit": true,
-              "mutating": true,
-              "declAttributes": [
-                "Transparent"
-              ],
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Void",
-                  "printedName": "()"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int",
-                  "usr": "s:Si"
-                }
-              ]
             }
           ]
         },
@@ -870,33 +843,6 @@
                 "Transparent"
               ],
               "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int",
-                  "usr": "s:Si"
-                }
-              ]
-            },
-            {
-              "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
-              "declKind": "Accessor",
-              "usr": "s:4cake17fixedLayoutStructV1cSivs",
-              "location": "",
-              "moduleName": "cake",
-              "implicit": true,
-              "mutating": true,
-              "declAttributes": [
-                "Transparent"
-              ],
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Void",
-                  "printedName": "()"
-                },
                 {
                   "kind": "TypeNominal",
                   "name": "Int",
@@ -990,6 +936,66 @@
           "location": "",
           "moduleName": "cake",
           "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "SubsContainer",
+      "printedName": "SubsContainer",
+      "declKind": "Protocol",
+      "usr": "s:4cake13SubsContainerP",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "Subscript",
+          "name": "subscript",
+          "printedName": "subscript(getter:)",
+          "declKind": "Subscript",
+          "usr": "s:4cake13SubsContainerP6getterS2i_tcip",
+          "location": "",
+          "moduleName": "cake",
+          "genericSig": "<τ_0_0 where τ_0_0 : SubsContainer>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        },
+        {
+          "kind": "Subscript",
+          "name": "subscript",
+          "printedName": "subscript(setter:)",
+          "declKind": "Subscript",
+          "usr": "s:4cake13SubsContainerP6setterS2i_tcip",
+          "location": "",
+          "moduleName": "cake",
+          "genericSig": "<τ_0_0 where τ_0_0 : SubsContainer>",
+          "hasSetter": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
             {
               "kind": "TypeNominal",
               "name": "Int",

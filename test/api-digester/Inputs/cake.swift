@@ -55,3 +55,8 @@ public protocol ProWithAssociatedType {
   associatedtype A
   associatedtype B = Int
 }
+
+public protocol SubsContainer {
+  subscript(getter i: Int) -> Int { get }
+  subscript(setter i: Int) -> Int { get set }
+}

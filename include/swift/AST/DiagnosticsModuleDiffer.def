@@ -42,6 +42,8 @@ ERROR(raw_type_change,none,"%0(%1) is now %2 representable", (StringRef, StringR
 
 ERROR(removed_decl,none,"%0 has been removed%select{| (deprecated)}1", (StringRef, bool))
 
+ERROR(removed_setter,none,"%0 has removed its setter", (StringRef))
+
 ERROR(moved_decl,none,"%0 has been moved to %1", (StringRef, StringRef))
 
 ERROR(renamed_decl,none,"%0 has been renamed to %1", (StringRef, StringRef))
