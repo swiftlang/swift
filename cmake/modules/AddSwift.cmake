@@ -132,10 +132,11 @@ function(_add_variant_c_compile_link_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND result
-      "--sysroot=${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_PATH}"
-      # Use the linker included in the Android NDK.
-      "-B" "${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_PREBUILT_PATH}/${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_TRIPLE}/bin/")
+    # lld can handle targeting the android build.  However, if lld is not
+    # enabled, then fallback to the linker included in the android NDK.
+    if(NOT SWIFT_ENABLE_LLD_LINKER)
+      list(APPEND result "-B" "${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_PREBUILT_PATH}/${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_TRIPLE}/bin")
+    endif()
   endif()
 
   if(IS_DARWIN)
