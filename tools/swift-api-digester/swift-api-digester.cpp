@@ -867,7 +867,16 @@ public:
       break;
     }
 
-    case SDKNodeKind::DeclSubscript:
+    case SDKNodeKind::DeclSubscript: {
+      if (auto *LS = dyn_cast<SDKNodeDeclSubscript>(Left)) {
+        auto *RS = cast<SDKNodeDeclSubscript>(Right);
+        if (LS->hasSetter() && !RS->hasSetter()) {
+          Ctx.getDiags().diagnose(SourceLoc(), diag::removed_setter,
+                                  LS->getScreenInfo());
+        }
+      }
+      LLVM_FALLTHROUGH;
+    }
     case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclFunction:
     case SDKNodeKind::DeclSetter:

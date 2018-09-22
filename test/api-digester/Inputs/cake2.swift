@@ -85,5 +85,8 @@ public protocol AssociatedTypePro {
 
 public class RemoveSetters {
   public private(set) var Value = 4
+  public subscript(_ idx: Int) -> Int {
+    get { return 1 }
+  }
 }
 

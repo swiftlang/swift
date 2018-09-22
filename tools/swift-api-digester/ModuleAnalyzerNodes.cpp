@@ -762,7 +762,13 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::DeclAssociatedType:
-    case SDKNodeKind::DeclSubscript:
+    case SDKNodeKind::DeclSubscript: {
+      auto *Left = dyn_cast<SDKNodeDeclSubscript>(this);
+      auto *Right = dyn_cast<SDKNodeDeclSubscript>(&Other);
+      if (Left && Right && Left->hasSetter() != Right->hasSetter())
+        return false;
+      LLVM_FALLTHROUGH;
+    }
     case SDKNodeKind::DeclTypeAlias: {
       auto Left = this->getAs<SDKNodeDecl>();
       auto Right = (&Other)->getAs<SDKNodeDecl>();
