@@ -82,3 +82,11 @@ public protocol AssociatedTypePro {
   associatedtype T2
   associatedtype T3 = C6
 }
+
+public class RemoveSetters {
+  public private(set) var Value = 4
+  public subscript(_ idx: Int) -> Int {
+    get { return 1 }
+  }
+}
+

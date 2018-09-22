@@ -867,6 +867,16 @@ public:
       break;
     }
 
+    case SDKNodeKind::DeclSubscript: {
+      if (auto *LS = dyn_cast<SDKNodeDeclSubscript>(Left)) {
+        auto *RS = cast<SDKNodeDeclSubscript>(Right);
+        if (LS->hasSetter() && !RS->hasSetter()) {
+          Ctx.getDiags().diagnose(SourceLoc(), diag::removed_setter,
+                                  LS->getScreenInfo());
+        }
+      }
+      LLVM_FALLTHROUGH;
+    }
     case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclFunction:
     case SDKNodeKind::DeclSetter:
@@ -885,10 +895,16 @@ public:
     }
 
     case SDKNodeKind::DeclVar: {
-      auto LC = Left->getChildren()[0];
-      auto RC = Right->getChildren()[0];
+      auto LVar = cast<SDKNodeDeclVar>(Left);
+      auto RVar = cast<SDKNodeDeclVar>(Right);
+      auto LC = LVar->getType();
+      auto RC = RVar->getType();
       if (!(*LC == *RC))
         foundMatch(LC, RC, NodeMatchReason::Sequential);
+      if (LVar->getSetter() && !RVar->getSetter()) {
+          Ctx.getDiags().diagnose(SourceLoc(), diag::removed_setter,
+                                  LVar->getScreenInfo());
+      }
       break;
     }
     }

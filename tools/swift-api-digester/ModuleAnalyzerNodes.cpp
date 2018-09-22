@@ -58,6 +58,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   StringRef EnumRawTypeName;
   TypeInitInfo TypeInfo;
   StringRef GenericSig;
+  bool HasSetter = false;
 
   SDKNodeInitInfo(SDKContext &Ctx) : Ctx(Ctx) {}
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
@@ -133,10 +134,30 @@ SDKNodeDeclSetter::SDKNodeDeclSetter(SDKNodeInitInfo Info):
 SDKNodeDeclAssociatedType::SDKNodeDeclAssociatedType(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclAssociatedType) {};
 
+SDKNodeDeclSubscript::SDKNodeDeclSubscript(SDKNodeInitInfo Info):
+  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclSubscript),
+  HasSetter(Info.HasSetter) {}
+
 StringRef SDKNodeDecl::getHeaderName() const {
   if (Location.empty())
     return StringRef();
   return llvm::sys::path::filename(Location.split(":").first);
+}
+
+SDKNodeDeclGetter *SDKNodeDeclVar::getGetter() const {
+  if (getChildrenCount() > 1)
+    return cast<SDKNodeDeclGetter>(childAt(1));
+  return nullptr;
+}
+
+SDKNodeDeclSetter *SDKNodeDeclVar::getSetter() const {
+  if (getChildrenCount() > 2)
+    return cast<SDKNodeDeclSetter>(childAt(2));
+  return nullptr;
+}
+
+SDKNodeType *SDKNodeDeclVar::getType() const {
+  return cast<SDKNodeType>(childAt(0));
 }
 
 NodePtr UpdatedNodesMap::findUpdateCounterpart(const SDKNode *Node) const {
@@ -352,6 +373,7 @@ bool SDKNodeDecl::classof(const SDKNode *N) {
     case SDKNodeKind::DeclType:
     case SDKNodeKind::DeclVar:
     case SDKNodeKind::DeclAssociatedType:
+    case SDKNodeKind::DeclSubscript:
       return true;
     case SDKNodeKind::Root:
     case SDKNodeKind::TypeNominal:
@@ -439,6 +461,7 @@ bool SDKNodeDeclAbstractFunc::classof(const SDKNode *N) {
     case SDKNodeKind::DeclSetter:
     case SDKNodeKind::DeclGetter:
     case SDKNodeKind::DeclConstructor:
+    case SDKNodeKind::DeclSubscript:
       return true;
 
     default:
@@ -570,6 +593,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         break;
       case KeyKind::KK_implicit:
         Info.IsImplicit = true;
+        break;
+      case KeyKind::KK_hasSetter:
+        Info.HasSetter = true;
         break;
       case KeyKind::KK_ownership:
         Info.ReferenceOwnership =
@@ -736,6 +762,13 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::DeclAssociatedType:
+    case SDKNodeKind::DeclSubscript: {
+      auto *Left = dyn_cast<SDKNodeDeclSubscript>(this);
+      auto *Right = dyn_cast<SDKNodeDeclSubscript>(&Other);
+      if (Left && Right && Left->hasSetter() != Right->hasSetter())
+        return false;
+      LLVM_FALLTHROUGH;
+    }
     case SDKNodeKind::DeclTypeAlias: {
       auto Left = this->getAs<SDKNodeDecl>();
       auto Right = (&Other)->getAs<SDKNodeDecl>();
@@ -868,9 +901,8 @@ static StringRef getEscapedName(DeclBaseName name) {
 
 static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
   llvm::SmallString<32> Result;
-  if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    auto DM = FD->getFullName();
-
+  DeclName DM = VD->getFullName();
+  if (isa<AbstractFunctionDecl>(VD) || isa<SubscriptDecl>(VD)) {
     if (DM.getBaseName().empty()) {
       Result.append("_");
     } else {
@@ -885,7 +917,6 @@ static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
     Result.append(")");
     return Ctx.buffer(Result.str());
   }
-  auto DM = VD->getFullName();
   Result.append(getEscapedName(DM.getBaseName()));
   return Ctx.buffer(Result.str());
 }
@@ -1051,6 +1082,11 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
         EnumRawTypeName = D->getName().str();
       }
     }
+  }
+
+  // Record whether a subscript has getter/setter.
+  if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
+    HasSetter = SD->getSetter();
   }
 }
 
@@ -1243,8 +1279,10 @@ static SDKNode *constructVarNode(SDKContext &Ctx, ValueDecl *VD) {
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
     if (auto Getter = VAD->getGetter())
       Var->addChild(constructFunctionNode(Ctx, Getter, SDKNodeKind::DeclGetter));
-    if (auto Setter = VAD->getSetter())
-      Var->addChild(constructFunctionNode(Ctx, Setter, SDKNodeKind::DeclSetter));
+    if (auto Setter = VAD->getSetter()) {
+      if (Setter->getFormalAccess() > AccessLevel::Internal)
+        Var->addChild(constructFunctionNode(Ctx, Setter, SDKNodeKind::DeclSetter));
+    }
   }
   return Var;
 }
@@ -1263,6 +1301,14 @@ static SDKNode *constructAssociatedTypeNode(SDKContext &Ctx,
     Asso->addChild(constructTypeNode(Ctx, DT));
   }
   return Asso;
+}
+
+static SDKNode *constructSubscriptDeclNode(SDKContext &Ctx, SubscriptDecl *SD) {
+  auto Subs = SDKNodeInitInfo(Ctx, SD).createSDKNode(SDKNodeKind::DeclSubscript);
+  Subs->addChild(constructTypeNode(Ctx, SD->getElementInterfaceType()));
+  for (auto *Node: createParameterNodes(Ctx, SD->getIndices()))
+    Subs->addChild(Node);
+  return Subs;
 }
 
 static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
@@ -1285,6 +1331,14 @@ static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
       Root->addChild(constructTypeDeclNode(Ctx, NTD, HandledExts));
     } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
       Root->addChild(constructAssociatedTypeNode(Ctx, ATD));
+    } else if (auto SD = dyn_cast<SubscriptDecl>(Member)) {
+      Root->addChild(constructSubscriptDeclNode(Ctx, SD));
+    } else if (isa<PatternBindingDecl>(Member)) {
+      // All containing variables should have been handled.
+    } else if (isa<DestructorDecl>(Member)) {
+      // deinit has no impact.
+    } else {
+      llvm_unreachable("unhandled member decl kind.");
     }
   }
 }
@@ -1443,6 +1497,12 @@ struct ObjectTraits<SDKNode *> {
           auto Index = F->getSelfIndex();
           out.mapRequired(getKeyContent(Ctx, KeyKind::KK_selfIndex).data(),
                           Index);
+        }
+        if (auto S = dyn_cast<SDKNodeDeclSubscript>(value)) {
+          if (bool hasSetter = S->hasSetter()) {
+            out.mapRequired(getKeyContent(Ctx, KeyKind::KK_hasSetter).data(),
+                            hasSetter);
+          }
         }
       }
       if (auto *TD = dyn_cast<SDKNodeDeclType>(value)) {
