@@ -2054,8 +2054,8 @@ let comparisonTestCases = [
     "ae\u{302}🧀",
     "ae\u{303}",
     "\u{f90b}\u{f90c}\u{f90d}", // Normalizes to BMP scalars
+    "\u{FFEE}", // half width CJK dot
     "🧀", // D83E DDC0 -- aka a really big scalar
-    "\u{FFEE}" // half width CJK dot
   ], .less),
   
   ComparisonTestCase(["ư̴̵̶̷̸̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡", "ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .greater),
