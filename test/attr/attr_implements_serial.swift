@@ -3,6 +3,7 @@
 // RUN: %target-swiftc_driver -module-name AttrImplFP -emit-module -emit-module-path %t/AttrImplFP.swiftmodule -emit-library -o %t/library.%target-dylib-extension %S/attr_implements_fp.swift
 // RUN: %target-swiftc_driver -I %t -o %t/a.out %s %t/main.swift %t/library.%target-dylib-extension
 // RUN: %target-codesign %t/a.out
+// RUN: %target-codesign %t/library.%target-dylib-extension
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
