@@ -918,8 +918,13 @@ extension Dictionary {
       return _variant.lookup(key) ?? defaultValue()
     }
     _modify {
-      let index = _variant.lookupOrInsert(key, default: defaultValue)
-      let address = _variant.asNative._values + index.bucket
+      let (index, found) = _variant.mutatingFind(key)
+      let native = _variant.asNative
+      if !found {
+        let value = defaultValue()
+        native._insert(at: index, key: key, value: value)
+      }
+      let address = native._values + index.bucket
       yield &address.pointee
       _fixLifetime(self)
     }
@@ -3542,19 +3547,6 @@ extension Dictionary._Variant {
       return result
 #endif
     }
-  }
-
-  @usableFromInline // FIMXE: Should be @inlinable (rdar://problem/44612356)
-  internal mutating func lookupOrInsert(
-    _ key: Key,
-    default defaultValue: () -> Value
-  ) -> _NativeDictionary<Key, Value>.Index {
-    let (index, found) = mutatingFind(key)
-    if !found {
-      let value = defaultValue()
-      asNative._insert(at: index, key: key, value: value)
-    }
-    return index
   }
 
   /// Ensure uniquely held native storage, while preserving the given index.
