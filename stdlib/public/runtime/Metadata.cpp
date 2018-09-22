@@ -2586,6 +2586,36 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 #endif
 }
 
+#if SWIFT_OBJC_INTEROP
+void
+swift::swift_updateClassMetadata(ClassMetadata *self,
+                                 ClassMetadata *super,
+                                 ClassLayoutFlags layoutFlags,
+                                 size_t numFields,
+                                 const TypeLayout * const *fieldTypes,
+                                 size_t *fieldOffsets) {
+  if (!super)
+    assert(self->Superclass == getRootSuperclass());
+  else
+    assert(self->Superclass == super);
+
+  // FIXME: Plumb this through
+#if 1
+  swift_getInitializedObjCClass((Class)self);
+#else
+  initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
+  initObjCClass(self, numFields, fieldTypes, fieldOffsets);
+
+  // Register this class with the runtime. This will also cause the
+  // runtime to slide the field offsets stored in the field offset
+  // globals. Note that the field offset vector is *not* updated;
+  // however we should not be using it for anything in a non-generic
+  // class.
+  swift_getInitializedObjCClassWithoutCallback(self);
+#endif
+}
+#endif
+
 #ifndef NDEBUG
 static bool isAncestorOf(const ClassMetadata *metadata,
                          ClassDescriptor *description) {

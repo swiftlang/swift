@@ -621,6 +621,24 @@ void swift_initClassMetadata(ClassMetadata *self,
                              const TypeLayout * const *fieldTypes,
                              size_t *fieldOffsets);
 
+#if SWIFT_OBJC_INTEROP
+/// Initialize various fields of the class metadata.
+///
+/// This is a special function only used to re-initialize metadata of
+/// classes that are visible to Objective-C and have resilient fields.
+///
+/// This means the class does not have generic or resilient ancestry,
+/// and is itself not generic. However, it might have fields whose
+/// size is not known at compile time.
+SWIFT_RUNTIME_EXPORT
+void swift_updateClassMetadata(ClassMetadata *self,
+                               ClassMetadata *super,
+                               ClassLayoutFlags flags,
+                               size_t numFields,
+                               const TypeLayout * const *fieldTypes,
+                               size_t *fieldOffsets);
+#endif
+
 /// Given class metadata, a class descriptor and a method descriptor, look up
 /// and load the vtable entry from the given metadata. The metadata must be of
 /// the same class or a subclass of the descriptor.

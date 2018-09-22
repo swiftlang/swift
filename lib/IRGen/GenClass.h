@@ -161,6 +161,12 @@ namespace irgen {
   bool doesClassMetadataRequireInitialization(IRGenModule &IGM,
                                               ClassDecl *theClass);
 
+  /// Does the class require at least an in-place update on newer Objective-C
+  /// runtimes? If the class requires full initialization or relocation, this
+  /// also returns true.
+  bool doesClassMetadataRequireUpdate(IRGenModule &IGM,
+                                      ClassDecl *theClass);
+
   /// Load the instance size and alignment mask from a reference to
   /// class type metadata of the given type.
   std::pair<llvm::Value *, llvm::Value *>

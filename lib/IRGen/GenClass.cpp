@@ -2265,6 +2265,16 @@ bool irgen::doesClassMetadataRequireInitialization(IRGenModule &IGM,
   return layout.doesMetadataRequireInitialization();
 }
 
+bool irgen::doesClassMetadataRequireUpdate(IRGenModule &IGM,
+                                           ClassDecl *theClass) {
+  SILType selfType = getSelfType(theClass);
+  auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+
+  auto &layout = selfTI.getClassLayout(IGM, selfType,
+                                       /*forBackwardDeployment=*/false);
+  return layout.doesMetadataRequireInitialization();
+}
+
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
   // This needs to be kept up-to-date with getIsaEncodingForType.
 
