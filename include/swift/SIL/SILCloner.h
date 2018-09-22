@@ -1607,7 +1607,7 @@ void SILCloner<ImplClass>::visitGraphOperationInst(GraphOperationInst *Inst) {
     getOpValueArray<4>(OperandValueArrayRef(Inst->getArguments()));
   SmallVector<SILType, 4> resultTypes;
   for (auto result : Inst->getResults())
-    resultTypes.push_back(result->getType());
+    resultTypes.push_back(getOpType(result->getType()));
   doPostProcess(Inst,
       getBuilder().createGraphOperation(getOpLocation(Inst->getLoc()),
                                         Inst->getName(), arguments,

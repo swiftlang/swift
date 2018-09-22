@@ -110,7 +110,7 @@ namespace {
     bool changedFunction = false;
 
     /// This is the list of tensor operations in the current function, filled in
-    /// by simplifyTensorOperands.  This contains both the builtin instructions
+    /// by simplifyTensorOperands.  This contains both the graph_op instructions
     /// that reflect the #tfop() invocations, as well as any retain/release
     /// instructions using TensorHandle values.
     SmallVector<SILInstruction*, 32> tensorOps;
@@ -142,9 +142,10 @@ namespace {
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
     void propagateSSAValues();
     void checkAttributesAndFormGraphOps();
-    void formGraphOp(SILTensorOpInfo &opInfo,
-                     DenseMap<SILValue, SymbolicValue> &constants,
-                     GraphFunctionDeviceInfo &deviceInfo);
+    void evaluateAttributesAndDoPacking(
+        GraphOperationInfo &opInfo,
+        DenseMap<SILValue, SymbolicValue> &constants,
+        GraphFunctionDeviceInfo &deviceInfo);
     void cleanupDeadInstructions();
   };
 }  // end anonymous namespace
@@ -328,11 +329,11 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
   return value;
 }
 
-/// Scan the operand list of the builtin.  If any operand is passed indirectly
+/// Scan the operand list of the graph_op.  If any operand is passed indirectly
 /// (i.e., an address of a stack location is passed instead of the value itself)
-/// then rewrite the builtin to use a loaded version of that value.
+/// then rewrite the graph_op to use a loaded version of that value.
 ///
-/// Similarly, if an operand is an indirect output, then rewrite the builtin to
+/// Similarly, if an operand is an indirect output, then rewrite the graph_op to
 /// return the value directly, and emit an instruction that stores the direct
 /// value to the indirect output address.
 ///
@@ -341,10 +342,15 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
 ///
 /// Returns nullptr on error.
 ///
-static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
-                                     TFDeabstraction &TFDA) {
-  auto origInst = opInfo.inst;
-  auto &ctx = origInst->getType().getASTContext();
+static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
+                                            TFDeabstraction &TFDA) {
+  assert(origInst->getNumResults() == 1 &&
+         "SILGen should have generated a graph_op with 1 result");
+  auto origResult = origInst->getResult(0);
+  auto &ctx = origResult->getType().getASTContext();
+  GraphOperationInfo opInfo(origInst);
+  SmallVector<GraphOperationInfo::StructuredOperand, 4> origOperands;
+  auto origName = opInfo.decodeName(origOperands);
 
   /// Return a VarDecl if this is a struct wrapping a single field which is a
   /// primitive integer or floating point value.  We accept multiple layers of
@@ -383,19 +389,19 @@ static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
   // rewritten - either to load an address argument or expand a struct
   // parameter.
   auto canSimplifyOperand =
-      [&](SILType type, GraphOperationInfo::OperandClass operandClass) -> bool {
+      [&](SILType type, GraphOperationInfo::OperandLowering lowering) -> bool {
     return isLoadableAddressType(type) ||
            getPrimitiveStructField(type.getASTType()) != nullptr ||
-           operandClass == GraphOperationInfo::OperandClass::Out;
+           lowering == GraphOperationInfo::OperandLowering::Out;
   };
 
-  // If we don't have to change any operands, don't rewrite the builtin.
+  // If we don't have to change any operands, don't rewrite the graph_op.
   bool mustChangeBuiltin = false;
-  for (auto operandAndClass : zip(origInst->getAllOperands(),
-                                  opInfo.operandClasses)) {
-    auto operand = std::get<0>(operandAndClass).get();
-    auto operandClass = std::get<1>(operandAndClass);
-    if (canSimplifyOperand(operand->getType(), operandClass.second)) {
+  for (auto &operand : origOperands) {
+    assert(operand.getKind() == GraphOperationInfo::SOK_Single &&
+           "SILGen should not have generated a list operand");
+    if (canSimplifyOperand(operand.getSingleOperand()->getType(),
+                           std::get<1>(operand.decodeName()))) {
       mustChangeBuiltin = true;
       break;
     }
@@ -408,19 +414,20 @@ static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
 
   // Okay, we do have to simplify something.  Scan through and rewrite operands.
   SILBuilder B(origInst);
-  SmallVector<SILValue, 8> operands;
-  SmallVector<std::pair<StringRef, GraphOperationInfo::OperandClass>, 4>
-      operandClasses;
+  GraphOperationBuilder opBuilder(origName);
   SILValue outParameterAddress;
-  for (auto operandAndClass : zip(origInst->getAllOperands(),
-                                  opInfo.operandClasses)) {
-    auto operand = std::get<0>(operandAndClass).get();
-    auto operandClass = std::get<1>(operandAndClass);
+  for (auto &operand : origOperands) {
+    // auto operand = std::get<0>(operandAndClass).get();
+    // auto operandClass = std::get<1>(operandAndClass);
+    assert(operand.getKind() == GraphOperationInfo::SOK_Single &&
+           "SILGen should not have generated a list operand");
+    auto operandValue = operand.getSingleOperand();
+    auto operandLowering = std::get<1>(operand.decodeName());
 
     // If this is an out parameter, take note of it (so that we can deal with it
     // later), and exclude it from the list of rewritten operands.
-    if (operandClass.second == GraphOperationInfo::OperandClass::Out) {
-      auto operandType = operand->getType();
+    if (operandLowering == GraphOperationInfo::OperandLowering::Out) {
+      auto operandType = operandValue->getType();
       assert(operandType.isAddress());
       if (!operandType.isLoadable(origInst->getModule())) {
         auto astType = operandType.getASTType();
@@ -434,44 +441,41 @@ static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
         return nullptr;
       }
       assert(!outParameterAddress && "there is more than one out parameter");
-      outParameterAddress = operand;
+      outParameterAddress = operandValue;
       continue;
     }
 
     // If this is an address operand, emit a load of the value.
-    if (isLoadableAddressType(operand->getType())) {
+    if (isLoadableAddressType(operandValue->getType())) {
       bool hasOwnership = origInst->getFunction()->hasQualifiedOwnership();
       auto loadOwnership = hasOwnership ? LoadOwnershipQualifier::Trivial
                                         : LoadOwnershipQualifier::Unqualified;
-      auto load = B.createLoad(origInst->getLoc(), operand, loadOwnership);
+      auto load = B.createLoad(origInst->getLoc(), operandValue, loadOwnership);
       load->setDebugLocation(origInst->getDebugLocation());
-      operand = load;
+      operandValue = load;
     }
 
     // If the operand is a StructInst building the value that we want to
     // extract, just get the element out of it, to avoid generating bloated IR.
-    operand = lookThroughSingleElementStructInsts(operand);
+    operandValue = lookThroughSingleElementStructInsts(operandValue);
 
     // If this is a struct value, emit struct extraction instruction(s).
     while (auto fieldDecl = getPrimitiveStructField(
-                                     operand->getType().getASTType())) {
-      auto extract = B.createStructExtract(origInst->getLoc(), operand, fieldDecl);
+                                     operandValue->getType().getASTType())) {
+      auto extract = B.createStructExtract(origInst->getLoc(), operandValue,
+                                           fieldDecl);
       extract->setDebugLocation(origInst->getDebugLocation());
-      operand = extract;
+      operandValue = extract;
     }
 
-    operands.push_back(operand);
-    operandClasses.push_back(operandClass);
+    opBuilder.addOperand(operandValue, operand.getNameWithSuffix());
   }
 
-  // Now that we've rebuilt the operand list, create a new builtin and replace
+  // Now that we've rebuilt the operand list, create a new graph_op and replace
   // the old one.
-  auto newName = opInfo.getBuiltinNameWithNewOperands(operandClasses);
   auto newType = outParameterAddress ?
-      outParameterAddress->getType().getObjectType() : origInst->getType();
-  auto newInst =
-    B.createBuiltin(origInst->getLoc(), ctx.getIdentifier(newName), newType,
-                    SubstitutionMap(), operands);
+      outParameterAddress->getType().getObjectType() : origResult->getType();
+  auto newInst = opBuilder.build(B, ctx, origInst->getLoc(), newType);
   newInst->setDebugLocation(origInst->getDebugLocation());
 
   // If the original instruction had an out parameter, store the new
@@ -480,8 +484,10 @@ static BuiltinInst *simplifyOperands(const SILTensorOpInfo &opInfo,
     auto hasOwnership = newInst->getFunction()->hasQualifiedOwnership();
     auto storeOwnership = hasOwnership ? StoreOwnershipQualifier::Trivial
                                        : StoreOwnershipQualifier::Unqualified;
-    B.createStore(origInst->getLoc(), newInst, outParameterAddress,
-                  storeOwnership);
+    assert(newInst->getNumResults() == 1 &&
+           "simplified graph_op should still only have one result");
+    B.createStore(origInst->getLoc(), newInst->getResult(0),
+                  outParameterAddress, storeOwnership);
   }
 
   // Replace the old with the new and delete the old instruction.
@@ -575,7 +581,7 @@ static bool explodeAggregateInst(SILInstruction *inst,
 
 /// Identify all of the tensor operations in the current function, and scan them
 /// to see if there are any indirect arguments, where the address of a stack
-/// allocation is passed to the builtin.  These occur when the tensor op was in
+/// allocation is passed to the graph_op.  These occur when the tensor op was in
 /// a generic context and was passed a scalar attribute value of generic type.
 ///
 /// If we find one of these indirect values, transform it into a load of the
@@ -597,7 +603,7 @@ static bool explodeAggregateInst(SILInstruction *inst,
 ///
 bool TFDeabstraction::simplifyTensorOperands() {
   llvm::PrettyStackTraceFormat X("TFDeabstraction::simplifyTensorOperands");
-  bool containsOpBuiltin = false;
+  bool containsGraphOp = false;
   bool hasError = false;
 
   bool alreadyPrinted = false;
@@ -613,11 +619,11 @@ bool TFDeabstraction::simplifyTensorOperands() {
       auto *inst = &*I++;
 
       // Try to decode this instruction as an op.  If it isn't one, ignore it.
-      if (auto opInfo = SILTensorOpInfo::decode(inst)) {
+      if (auto *graphOpInst = dyn_cast<GraphOperationInst>(inst)) {
         logIfFirstChange();
 
         // Simplify operands if possible.
-        auto newInst = simplifyOperands(*opInfo, *this);
+        auto newInst = simplifyOperands(graphOpInst, *this);
 
         if (!newInst) {
           hasError = true;
@@ -626,7 +632,7 @@ bool TFDeabstraction::simplifyTensorOperands() {
 
         // Remember this for later passes.
         tensorOps.push_back(newInst);
-        containsOpBuiltin = true;
+        containsGraphOp = true;
         continue;
       }
 
@@ -639,7 +645,7 @@ bool TFDeabstraction::simplifyTensorOperands() {
           logIfFirstChange();
           // Remember this for later passes.
           tensorOps.push_back(apply);
-          containsOpBuiltin = true;
+          containsGraphOp = true;
           continue;
         }
       }
@@ -681,10 +687,10 @@ bool TFDeabstraction::simplifyTensorOperands() {
   }
 
   // If the tensorOps list just contained retain/release instructions but had
-  // no actual tensor builtins, we'll ignore the function because there is
+  // no actual tensor graph_ops, we'll ignore the function because there is
   // nothing to partition out of it.  This is probably something actually
   // working on the host-side tensor operation.
-  if (!containsOpBuiltin)
+  if (!containsGraphOp)
     tensorOps.clear();
 
   return hasError;
@@ -1594,7 +1600,7 @@ propagateSSAOperand(SILValue v, SmallPtrSet<SILPHIArgument *, 8> &checkedPhis) {
       // %189 = struct $SimpleIter(...: $ResourceHandle, %188 :$TensorShape)
       // %190 = struct_extract %189 : $SimpleIter, #SimpleIter.elementShape
       // store %190 to %185 : $*TensorShape
-      // %193 = builtin "__tfop_Foo,...,shapes"(..., %181 : $Array<TensorShape>
+      // %193 = graph_op "Foo"(..., shapes %181 : $Array<TensorShape>
       ArrayElementDecoder arrayDecoder;
       if (!arrayDecoder.decode(extract))
         continue;
@@ -1849,17 +1855,18 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   for (auto *&inst : tensorOps) {
     // If this is a normal tensor operation, validate it and transform it into a
     // graphOp instruction.
-    if (auto opInfo = SILTensorOpInfo::decode(inst)) {
+    if (auto *graphOpInst = dyn_cast<GraphOperationInst>(inst)) {
+      GraphOperationInfo opInfo(graphOpInst);
       // Do not translate this special inst into a graph op, since it will get
       // removed at the beginning of the partition pass.
       // TODO: remove this inst in the getForFunction() call above, once
       // the partition pass is folded into deabstraction.
       // FIXME: consider defining constexpr strings for these literals.
-      if (opInfo->opName == "tfc.configureTPU" ||
-          opInfo->opName == "tfc.configureGPU" ||
-          opInfo->opName == "tfc.configureCPU")
+      if (opInfo.getName() == "tfc.configureTPU" ||
+          opInfo.getName() == "tfc.configureGPU" ||
+          opInfo.getName() == "tfc.configureCPU")
         continue;
-      formGraphOp(*opInfo, constants, deviceInfo);
+      evaluateAttributesAndDoPacking(opInfo, constants, deviceInfo);
     }
 
     // Take a look at the various well known function calls that we can promote
@@ -2082,17 +2089,25 @@ static bool collectInnermostTensorFlowDTypes(
   return false;
 }
 
-/// Replace the specified tensor operation with a GraphOperation instruction,
-/// emitting errors if attribute arguments could not be constant folded, or if
-/// the operand/attribute types are incorrect.
-void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
-                                  DenseMap<SILValue, SymbolicValue> &constants,
-                                  GraphFunctionDeviceInfo &deviceInfo) {
-  auto *inst = opInfo.inst;
-  auto &context = inst->getFunction()->getASTContext();
+/// Replace the specified GraphOperationInst with a new GraphOperationInst
+/// with the following transformations applied:
+///  - attribute operands with known constant values become GraphOperationInst
+///    attributes.
+//   - inputs get unpacked to raw tensor types before being fed into the
+//     GraphOperationInst.
+//   - outputs are raw tensor types, which get packed into whatever types the
+//     original GraphOperationInst was returning.
+void TFDeabstraction::evaluateAttributesAndDoPacking(
+    GraphOperationInfo &opInfo, DenseMap<SILValue, SymbolicValue> &constants,
+    GraphFunctionDeviceInfo &deviceInfo) {
+  auto *origInst = opInfo.inst;
+  assert(origInst->getNumResults() == 1 &&
+         "SILGen should have generated a graph_op with 1 result");
+  auto origResult = origInst->getResult(0);
+  auto &context = origInst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
-  SILBuilder B(opInfo.inst);
-  auto instLoc = getUserSourceLocation(inst);
+  SILBuilder B(origInst);
+  auto origInstLoc = getUserSourceLocation(origInst);
 
   // This is a helper function to emit a diagnostic.
   auto diagnoseInvalid = [&](SILLocation loc, const Twine &message,
@@ -2104,7 +2119,9 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       diagnose(context, userNoteLoc.getSourceLoc(), diag::tf_value_used_here);
   };
 
-  GraphOperationBuilder opBuilder(opInfo.opName.str());
+  SmallVector<GraphOperationInfo::StructuredOperand, 4> origOperands;
+  auto opName = opInfo.decodeName(origOperands);
+  GraphOperationBuilder opBuilder(opName);
 
   // Find the device attribute specified for the instruction if present.
   StringRef opDevice;
@@ -2118,24 +2135,23 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
   // A cache for calls to `unwrapAggregateInstructions`.
   llvm::DenseMap<SILValue, SILValue> unwrapCache;
 
-  for (unsigned i = 0, e = opInfo.operandClasses.size(); i != e; ++i) {
-    auto operand = inst->getOperand(i);
-    auto operandTy = operand->getType();
-    auto operandClass = opInfo.operandClasses[i];
-    auto operandLoc = getUserSourceLocation(operand);
+  for (auto i : range(origOperands.size())) {
+    auto operand = origOperands[i];
+    assert(operand.getKind() == GraphOperationInfo::SOK_Single &&
+           "SILGen should not have generated a list operand");
+    auto operandValue = operand.getSingleOperand();
+    auto operandTy = operandValue->getType();
+    auto operandNameAndLowering = operand.decodeName();
+    auto operandLoc = getUserSourceLocation(operandValue);
 
     // Collect and validate input operands.
-    if (opInfo.isInput(i)) {
-
-      // Each input gets a marker mangled into the op name, because we need to
-      // be able to distinguish between normal inputs and elements of an input
-      // list.
-
+    if (std::get<1>(operandNameAndLowering) ==
+        GraphOperationInfo::OperandLowering::Input) {
       // If this is tfc.scalarToTensor, then the input must be a valid scalar.
-      if (opInfo.opName == "tfc.scalarToTensor") {
+      if (opName == "tfc.scalarToTensor") {
         auto scalarType = operandTy.getASTType();
         if (convertSwiftTypeToTF(scalarType) == 0) {
-          diagnoseInvalid(instLoc,
+          diagnoseInvalid(origInstLoc,
                           "scalarToTensor requires scalar value; unrecognized"
                           " type '" + scalarType->getString() +
                           "' is not allowed");
@@ -2144,35 +2160,34 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
 
         // Check to see if it was constant foldable.  If so, we can turn this
         // into a Const node to avoid a send.
-        auto it = constants.find(operand);
+        auto it = constants.find(operandValue);
         if (it != constants.end() && it->second.isConstant()) {
           // Dig the element type out of the TensorHandle result type.
           auto eltType =
-            getTensorHandleElementType(inst->getType().getASTType());
+              getTensorHandleElementType(origResult->getType().getASTType());
           // We use int32 as the element type of the zero-d shape array.
           auto int32Ty =
             context.getInt32Decl()->getDeclaredType()->getCanonicalType();
           auto constant =
             createConstTensor(eltType, it->second,
                               SymbolicValue::getArray({}, int32Ty, allocator),
-                              inst->getType(),  getUserSourceLocation(inst),
-                              DeviceType::ALL, B);
-          inst->replaceAllUsesWith(constant->getResult(0));
-          inst->eraseFromParent();
+                              origResult->getType(),
+                              getUserSourceLocation(origInst), DeviceType::ALL, B);
+          origResult->replaceAllUsesWith(constant->getResult(0));
+          origInst->eraseFromParent();
           return;
         }
 
-        opBuilder.addOperand(operand);
+        opBuilder.addOperand(operandValue);
         continue;
       }
 
       // Remove the operand so decodeArrayElements doesn't see the use.
-      inst->setOperand(i, SILUndef::get(operand->getType(),
-                                        fn.getModule()));
+      origInst->setOperand(i, SILUndef::get(operandTy, fn.getModule()));
 
       // Handle the case where this is an array, representing an input list.
       ArrayElementDecoder arrayDecoder;
-      auto elementType = arrayDecoder.decode(operand);
+      auto elementType = arrayDecoder.decode(operandValue);
       SmallVector<SILValue, 4> inputList;
       if (elementType) {
         // Add each element to the input list we're building, drilling down
@@ -2187,7 +2202,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
             return;
           }
 
-          if (unpackTensorAggregates(inst->getLoc(), B, store->getSrc(),
+          if (unpackTensorAggregates(origInst->getLoc(), B, store->getSrc(),
                                      loweredTupleElts, loweredStructFields,
                                      unwrapCache, inputList)) {
             diagnoseInvalid(operandLoc,
@@ -2202,9 +2217,9 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       }
 
       // Otherwise, this must be a single input.
-      if (unpackTensorAggregates(inst->getLoc(), B, operand, loweredTupleElts,
-                                 loweredStructFields, unwrapCache,
-                                 inputList)) {
+      if (unpackTensorAggregates(origInst->getLoc(), B, operandValue,
+                                 loweredTupleElts, loweredStructFields,
+                                 unwrapCache, inputList)) {
         // FIXME: Since TFDeabstraction happens after mandatory inlining,
         // numeric operands will appear as having a builtin type such as
         // `Builtin.FPIEEE32`. This is undesirable for user-facing diagnostics.
@@ -2226,7 +2241,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         // location.
         diagnoseInvalid(operandLoc, "argument of type '" + astTypeString +
                         "' must contain exactly one TensorFlow value",
-                        instLoc);
+                        origInstLoc);
         return;
       }
       opBuilder.addOperand(inputList[0]);
@@ -2235,27 +2250,22 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
 
     // Helper to diagnose invalid attributes.
     auto diagnoseInvalidAttr = [&](const Twine &message) {
-      diagnoseInvalid(instLoc,
-                      Twine("attribute '") + operandClass.first.str() +
+      diagnoseInvalid(origInstLoc,
+                      Twine("attribute '") +
+                      std::get<0>(operandNameAndLowering) +
                       "' " + message.str());
     };
-
-    // Name mangle the attribute classification into the operand list so we can
-    // know the difference between a shape and an array, and a shape array, etc.
-    auto attrName =
-        operandClass.first.str() +
-        GraphOperationInfo::getOperandClassSuffix(operandClass.second);
 
     // Ok, we have an attribute operand, we should have been able to fold it
     // through our constexpr evaluation logic -- unless we're doing dynamic
     // compilation.
-    auto it = constants.find(operand);
+    auto it = constants.find(operandValue);
     if (it == constants.end() || !it->second.isConstant()) {
       if (llvm::TFDynamicCompilation) {
         // Since we're doing dynamic compilation, we can simply pass this
         // unknown attribute as a named operand to the graph_op, and IRGen will
         // deal with it.
-        opBuilder.addOperand(operand, attrName);
+        opBuilder.addOperand(operandValue, operand.getNameWithSuffix());
         continue;
       } else {
         // TODO: improve the diagnostic to talk about the parameter label in
@@ -2267,7 +2277,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         // notes.
         if (it != constants.end() &&
             it->second.getKind() == SymbolicValue::Unknown)
-          it->second.emitUnknownDiagnosticNotes(opInfo.inst->getLoc());
+          it->second.emitUnknownDiagnosticNotes(origInstLoc);
         return;
       }
     }
@@ -2278,13 +2288,13 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     // Clone it out of the ConstExpr pool into the global SILModule pool.
     constValue = constValue.cloneInto(allocator);
 
-    auto attrIdentifier = context.getIdentifier(attrName);
+    auto attrIdentifier = context.getIdentifier(operand.getNameWithSuffix());
     auto &currentAttr = opBuilder.addAttribute({ attrIdentifier, constValue });
 
     // FIXME: Do we detect and reject duplicate attribute names already?
 
     // If it's a device attribute, get the device value.
-    if (operandClass.first == DEVICE_ATTR) {
+    if (std::get<0>(operandNameAndLowering) == DEVICE_ATTR) {
       if (constValue.getKind() != SymbolicValue::String)
         return diagnoseInvalidAttr("must be a string");
       opDevice = constValue.getStringValue();
@@ -2358,44 +2368,43 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       }
       return ret;
     };
-    // Verify that the type of this attribute is ok for the OperandClass we
+    // Verify that the type of this attribute is ok for the OperandLowering we
     // have.
-    switch (operandClass.second) {
-    case GraphOperationInfo::OperandClass::Out:
+    switch (std::get<1>(operandNameAndLowering)) {
+    case GraphOperationInfo::OperandLowering::Input:
+      llvm_unreachable("Attributes cannot be inputs");
+    case GraphOperationInfo::OperandLowering::Out:
       llvm_unreachable("Attributes cannot be output parameters");
-    case GraphOperationInfo::OperandClass::Input:
-    case GraphOperationInfo::OperandClass::Normal: // No modifier.
+    case GraphOperationInfo::OperandLowering::NormalAttribute:
       if (verifyNormalAttr(constValue))
         return; // error already emitted.
       break;
-    case GraphOperationInfo::OperandClass::Array: {
-      if (constValue.getKind() == SymbolicValue::Array)
-        break;
-      if (constValue.getKind() == SymbolicValue::Metatype) {
-        SmallVector<SymbolicValue, 8> dtypes;
-        if (!collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
-                                              dtypes))
-          return diagnoseInvalidAttr("requires a TensorFlow value or an "
-                                     "aggregate of TensorFlow values");
-        // Drop '$array' from the attribute name.
-        currentAttr.name = context.getIdentifier(operandClass.first);
-        // Replace the single metatype with a list of metatypes each
-        // representing a dtype.
-        auto *dtypeProto =
-            context.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
-        currentAttr.value = SymbolicValue::getArray(
-            dtypes, dtypeProto->getInterfaceType()->getCanonicalType(),
-            context.getAllocator());
-        break;
-      }
-      return diagnoseInvalidAttr("requires an array or a metatype");
+    case GraphOperationInfo::OperandLowering::TypeListAttribute: {
+      if (constValue.getKind() != SymbolicValue::Metatype)
+        return diagnoseInvalidAttr("requires a metatype");
+      SmallVector<SymbolicValue, 8> dtypes;
+      if (!collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
+                                            dtypes))
+        return diagnoseInvalidAttr("requires a TensorFlow value or an "
+                                   "aggregate of TensorFlow values");
+      // Drop '$typeList' from the attribute name.
+      currentAttr.name = context.getIdentifier(
+          std::get<0>(operandNameAndLowering));
+      // Replace the single metatype with a list of metatypes each
+      // representing a dtype.
+      auto *dtypeProto =
+          context.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
+      currentAttr.value = SymbolicValue::getArray(
+          dtypes, dtypeProto->getInterfaceType()->getCanonicalType(),
+          context.getAllocator());
+      break;
     }
-    case GraphOperationInfo::OperandClass::Shape:
+    case GraphOperationInfo::OperandLowering::ShapeAttribute:
       // A shape attr must be an int array.
       if (getIntArrayProduct(constValue) < 0)
         return; // error already emitted.
       break;
-    case GraphOperationInfo::OperandClass::UnknownShapeList: {
+    case GraphOperationInfo::OperandLowering::UnknownShapeListAttribute: {
       if (constValue.getKind() != SymbolicValue::Metatype)
         return diagnoseInvalidAttr("requires a metatype");
       auto type = constValue.getMetatypeValue();
@@ -2404,7 +2413,8 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         return diagnoseInvalidAttr("requires a TensorFlow value or an "
                                    "aggregate or TensorFlow values");
       // Drop '$unknownShapeList' from the attribute name.
-      currentAttr.name = context.getIdentifier(operandClass.first);
+      currentAttr.name = context.getIdentifier(
+          std::get<0>(operandNameAndLowering));
       auto tensorShapeType =
           context.getTensorShapeDecl()->getDeclaredInterfaceType();
       auto tensorShapeOptional =
@@ -2418,7 +2428,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                                                   context.getAllocator());
       break;
     }
-    case GraphOperationInfo::OperandClass::Tensor:
+    case GraphOperationInfo::OperandLowering::TensorAttribute:
       if (constValue.getKind() == SymbolicValue::Integer ||
           constValue.getKind() == SymbolicValue::Float   ||
           constValue.getKind() == SymbolicValue::String)
@@ -2432,12 +2442,16 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       // returns the number of elements as given by the shape attr. e.g. a
       // tensor with shape [2, 3] has 6 elements.
       auto getNumEltsFromShapeAttr = [&]() -> long long {
-        if (i + 1 >= opInfo.operandClasses.size() ||
-            opInfo.operandClasses[i + 1].second !=
-                GraphOperationInfo::OperandClass::Shape)
+        if (i + 1 >= origOperands.size())
           return -1;
-        auto operand = inst->getOperand(i + 1);
-        auto it = constants.find(operand);
+        auto nextOperand = origOperands[i + 1];
+        auto nextOperandLowering = std::get<1>(nextOperand.decodeName());
+        if (nextOperandLowering !=
+            GraphOperationInfo::OperandLowering::ShapeAttribute)
+          return -1;
+        assert(nextOperand.getKind() == GraphOperationInfo::SOK_Single &&
+               "SILGen should not have generated a list operand");
+        auto it = constants.find(nextOperand.getSingleOperand());
         if (it == constants.end() || !it->second.isConstant())
           return -1;
         auto constValue = it->second.lookThroughSingleElementAggregates();
@@ -2496,15 +2510,15 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
   // Finally, set a device attribute for this if there wasn't already one
   // specified.
   if (opDevice.empty()) {
-    deviceInfo.handleDevicePlacement(opInfo.opName, opDevice, context,
+    deviceInfo.handleDevicePlacement(opInfo.getName(), opDevice, context,
                                      &opBuilder);
   }
   // Okay, if we got this far then we have all valid attributes and inputs.
   // Figure out the result list.
   SmallVector<Type, 4> resultTypes;
-  auto userResultTy = inst->getType().getASTType();
+  auto userResultTy = origResult->getType().getASTType();
   if (!tf::flattenTensorFlowValueAggregate(userResultTy, resultTypes)) {
-    auto loc = getUserSourceLocation(inst);
+    auto loc = getUserSourceLocation(origInst);
     diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
              diag::tf_op_result_not_value_or_aggregate, userResultTy)
       .highlight(loc.getSourceRange());
@@ -2513,7 +2527,7 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
   auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
       return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 
-  auto loc = getUserSourceLocation(inst);
+  auto loc = getUserSourceLocation(origInst);
   auto op = opBuilder.build(B, context, loc, resultSILTypes);
 
   // Recursively pack results to a value with the user-specified aggregate type.
@@ -2538,12 +2552,12 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     }
     llvm_unreachable("Non-TF type should have been diagnosed");
   };
-  auto result = packResultsToAggregate(inst->getType());
+  auto result = packResultsToAggregate(origResult->getType());
   assert(resultIt == op->getResults().end()
          && "All result types should've been processed");
-  // Replace any use of the old builtin result with the newly packed aggregate.
-  inst->replaceAllUsesWith(result);
-  inst->eraseFromParent();
+  // Replace any use of the old graph_op result with the newly packed aggregate.
+  origResult->replaceAllUsesWith(result);
+  origInst->eraseFromParent();
 
   // TODO: Analyze the operands to the instruction and remove them if they are
   // now dead.

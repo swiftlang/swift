@@ -40,6 +40,8 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/DynamicCasts.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -2914,53 +2916,41 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
     return visit(E->getSemanticExpr(), C);
 
   // If this is a tensorflow operation, we have a bit more work to do: we emit
-  // a builtin instruction with the operation name and the attribute names
-  // name mangled together.
+  // a GraphOperationInst.
   auto tuple = dyn_cast<TupleExpr>(E->getArg());
 
   auto opNameArg = tuple ? tuple->getElement(0) : E->getArg();
   opNameArg = opNameArg->getSemanticsProvidingExpr();
   auto opName = cast<StringLiteralExpr>(opNameArg)->getValue();
+  tf::GraphOperationBuilder opBuilder(opName);
 
-  std::string name = "__tfop_" + opName.str();
-  SmallVector<SILValue, 4> args;
-
-  // Attribute names are specified with keyword arguments, and inputs are
-  // unlabeled.  Add markers to the builtin name to mark the inputs and
-  // attributes, separated by commas.
   if (tuple) {
     for (unsigned i = 1, e = tuple->getNumElements(); i != e; ++i) {
-      if (tuple->getElementName(i).empty())
-        name += ",$in";
-      else
-        name += "," + tuple->getElementName(i).str().str();
-    }
-
-    // Emit the tensor arguments as well as the attribute values.
-    for (auto &elt : tuple->getElements().drop_front()) {
-      // Arguments of this builtin will be taken at +0 instead of +1, for
+      // Arguments of this graph_op will be taken at +0 instead of +1, for
       // consistency with the default calling convention of taking function
       // parameters as @guaranteed instead of @owned.
       // e.g. Say E represents #tfop("Add", x, x). x can be passed into this
       // expression without having to do a strong_retain (or copy_value) first.
-      args.push_back(
-          SGF.emitRValueAsSingleValue(elt, SGFContext::AllowGuaranteedPlusZero)
-              .getValue());
+      auto operand =
+          SGF.emitRValueAsSingleValue(tuple->getElement(i),
+                                      SGFContext::AllowGuaranteedPlusZero)
+             .getValue();
+      opBuilder.addOperand(operand, tuple->getElementName(i).str());
     }
   }
 
   auto &resultTL = SGF.getTypeLowering(E->getType());
   if (resultTL.isLoadable()) {
-    auto res = SGF.B.createBuiltin(E, SGF.getASTContext().getIdentifier(name),
-                                   resultTL.getLoweredType(), {}, args);
-    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(res, resultTL));
+    auto graphOpInst = opBuilder.build(SGF.B, SGF.getASTContext(), E,
+                                       resultTL.getLoweredType());
+    return RValue(SGF, E,
+                  SGF.emitManagedRValueWithCleanup(graphOpInst->getResult(0),
+                                                   resultTL));
   } else {
     auto address = SGF.getBufferForExprResult(E, resultTL.getLoweredType(), C);
-    args.push_back(address);
-    name += ",$out";
+    opBuilder.addOperand(address, "$out");
     auto voidTy = SGF.getLoweredType(SGF.getASTContext().TheEmptyTupleType);
-    SGF.B.createBuiltin(E, SGF.getASTContext().getIdentifier(name), voidTy,
-                        {}, args);
+    opBuilder.build(SGF.B, SGF.getASTContext(), E, voidTy);
     return RValue(SGF, E, SGF.manageBufferForExprResult(address, resultTL, C));
   }
 }

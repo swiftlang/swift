@@ -1257,8 +1257,8 @@ public:
 
     *this << "(";
     interleave(operands, [&](tf::GraphOperationInfo::StructuredOperand operand) {
-      if (!operand.getName().empty())
-        *this << operand.getName() << " ";
+      if (!operand.getNameWithSuffix().empty())
+        *this << operand.getNameWithSuffix() << " ";
       switch (operand.getKind()) {
       case tf::GraphOperationInfo::SOK_Single:
         *this << getIDAndType(operand.getSingleOperand());

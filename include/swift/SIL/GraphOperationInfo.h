@@ -30,57 +30,56 @@ namespace tf {
 /// Holds information about a TensorFlow operation as represented in SIL
 /// as GraphOperationInst.
 struct GraphOperationInfo {
-  /// One of these records exists for every operand that the BuiltinInst has,
-  /// classifying the operand into a couple of buckets.  The most coarse grain
-  /// classification is "input" vs "attribute": the inputs come first,
-  /// followed by the attributes.  However, we need to be able to model the
-  /// fact that some input arguments are aggregated together into a single
-  /// input that is an array of tensors.  An integer attribute may be either
-  /// a Tensor value or an integer-encoded DType, etc.
-  enum class OperandClass {
-    /// Indicates one of the following:
-    /// 1) A normal tensor input: the value is a TensorHandle.
-    /// 2) An normal attribute (without modifier).
-    /// 3) A tensor or shape attribute (need a modifier for proper lowering).
-    /// 4) An array attribute (needed for parsing tfop, and dropped before graph
-    ///    lowering).
+  /// Indicates how the operand should be lowered to the TF graph.
+  enum class OperandLowering {
+    /// This is a TensorFlow value type, aggregate of TensorFlow value types,
+    /// array of TensorFlow value types, or array of aggregates of TensorFlow
+    /// value types. It should be lowered to an Input or InputList.
+    ///
+    /// Written as unnamed operand.
     Input,
 
-    /// No modifier.
-    Normal,
+    /// This should be lowered to an attribute, in the most direct way. e.g.
+    /// integers should be lowered to integer attributes, metatypes should be
+    /// lowered to type attributes, TensorShapes should be lowered to shape
+    /// attributes, etc.
+    ///
+    /// Written as named operand without "$" suffix.
+    NormalAttribute,
 
-    /// Indicates that the array or scalar should be turned into a TF_Tensor.
-    Tensor,
+    /// An array or scalar that should be converted to a Tensor before lowering
+    /// to an attribute.
+    ///
+    /// Written as named operand with "$tensor" suffix.
+    TensorAttribute,
 
-    /// Indicates that the array of integers should be interpreted as a shape.
-    Shape,
+    /// An array of integers that should be lowered to a shape attribute.
+    ///
+    /// Written as named operand with "$shape" suffix.
+    ShapeAttribute,
 
-    /// Indicates the metatype of a TensorFlow value type or an aggregate of
-    /// TensorFlow value types should be turned into a list of unknown shapes.
-    UnknownShapeList,
+    /// A metatype of a TensorFlow value type or aggregate of TensorFlow value
+    /// types that should be lowered into a list of unknown shape attributes.
+    ///
+    /// Written as named operand with "$unknownShapeList" suffix.
+    UnknownShapeListAttribute,
 
-    /// Indicates that the operand should be interpreted as an array. When
-    /// applied to the metatype of a TensorFlow value type or an aggregate of
-    /// TensorFlow value types, it will be flattened into an array of dtypes of
-    /// each TensorFlow value type as a Normal operand.
-    Array,
+    /// A metatype of a TensorFlow value type or aggregate of TensorFlow value
+    /// types that should be lowered into a list of type attributes.
+    ///
+    /// Written as named operand with "$typeList" suffix.
+    TypeListAttribute,
 
     /// An operand specifying the address where an indirect output should be
-    /// stored.  This occurs when the tfop exists in a context where its output
-    /// is address-only.  Deabstraction eliminates Out operands before forming
-    /// graph_ops, by rewriting the tfop to return the value directly.  This
-    /// rewriting is possible because tfop outputs must always be loadable in
-    /// deabstraction scopes.
+    /// stored. This occurs when the graph_op exists in a context where its
+    /// output is address-only.
+    ///
+    /// Written as operand with name "$out".
     Out,
   };
 
-  /// Return the string suffix for the specified attribute modifier.
-  static const char *
-  getOperandClassSuffix(GraphOperationInfo::OperandClass opClass);
-
-  /// Return the operand class of the specified string form like "tensor"
-  static llvm::Optional<GraphOperationInfo::OperandClass>
-  getOperandClass(StringRef suffix);
+  /// Return the string suffix for the specified OperandLowering.
+  static const char * getOperandLoweringSuffix(OperandLowering lowering);
 
   /// The instruction being analyzed.
   GraphOperationInst *inst;
@@ -132,7 +131,8 @@ struct GraphOperationInfo {
       return Kind;
     }
 
-    StringRef getName() const {
+    /// Returns the name, including a suffix that denotes the OperandLowering.
+    StringRef getNameWithSuffix() const {
       return Name;
     }
 
@@ -145,18 +145,27 @@ struct GraphOperationInfo {
       assert(getKind() == SOK_List);
       return OperandList;
     }
+
+    /// Returns the result of GraphOperationInfo::decodeOperandName on this
+    /// operand.
+    std::pair<StringRef, OperandLowering> decodeName() const;
   };
+
+  /// Get the TensorFlow op name.
+  llvm::StringRef getName() const;
 
   /// Decode the name of a graph_op into its TensorFlow op name and a list of
   /// StructuredOperands.
   llvm::StringRef decodeName(
       llvm::SmallVectorImpl<StructuredOperand> &structuredOperands) const;
 
-  /// Given an attribute name like foo$tensor, decode the name and the class.
-  /// If there is no modifier specified, this defaults to
-  /// OperandClass::Normal.
-  static std::pair<llvm::StringRef, OperandClass>
-  decodeAttributeName(Identifier name);
+  /// Given an operand name like foo$tensor, decode the name and the
+  /// OperandLowering.  If the name is empty, this defaults to
+  /// OperandLowering::Input.  If the name is non-empty but there is no
+  /// modifier specified, then this defaults to
+  /// OperandLowering::NormalAttribute.
+  static std::pair<llvm::StringRef, OperandLowering>
+  decodeOperandName(StringRef Name);
 
   /// Get an int-typed attribute at `attrIdx`, which must have `attrName`.
   int64_t getIntAttr(unsigned attrIdx, llvm::StringRef attrName) const;

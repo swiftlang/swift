@@ -1868,25 +1868,65 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// Injects printf + abort function calls to abort with an error message.
+static void abortOnGraphOp(IRGenFunction &IGF, llvm::StringRef errMessage) {
+  auto &llvmModule = IGF.IGM.Module;
+  auto &llvmContext = llvmModule.getContext();
+  auto printfFunc = llvmModule.getOrInsertFunction(
+      "printf", llvm::TypeBuilder<int(char *, ...), false>::get(llvmContext));
+  auto strConstant =
+      llvm::ConstantDataArray::getString(llvmContext, errMessage);
+  auto GVStr =
+      new llvm::GlobalVariable(llvmModule, strConstant->getType(), true,
+                               llvm::GlobalValue::InternalLinkage, strConstant);
+  llvm::Constant *zero = llvm::Constant::getNullValue(
+      llvm::IntegerType::getInt32Ty(llvmContext));
+  llvm::Constant *zeroes[] = {zero, zero};
+  llvm::Constant *strVal = llvm::ConstantExpr::getGetElementPtr(
+      GVStr->getValueType(), GVStr, zeroes, true);
+  IGF.Builder.CreateCall(printfFunc, {strVal});
+
+  auto abortFunc = llvmModule.getOrInsertFunction(
+      "abort", llvm::FunctionType::get(
+                   llvm::Type::getVoidTy(llvmContext), {}, false));
+  IGF.Builder.CreateCall(abortFunc, {});
+}
+
 /// For now we lower any graph_op inst into a const TF node. (super fast tensor
 /// computation, but those who don't care about correctness. :-) )
 /// TODO: Fix this mis-compilation.
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
-  if (!llvm::TFDynamicCompilation)
-    llvm_unreachable("graph_op is not valid in canonical SIL");
-
-  auto &llvmModule = IGM.Module;
-  auto &llvmContext = llvmModule.getContext();
-
   tf::GraphOperationInfo opInfo(i);
   SmallVector<tf::GraphOperationInfo::StructuredOperand, 4> structuredOperands;
   auto opName = opInfo.decodeName(structuredOperands);
+
+  if (!llvm::TFDynamicCompilation) {
+    // graph_ops do make it here when building the TensorFlow module itself.
+    // For those cases, we abort here with an error message.
+    const std::string errMessage = "!!! Compiler bug -- graph_op " +
+                              opInfo.getName().str() +
+                              " cannot be lowered to LLVM IR !!!\n";
+    abortOnGraphOp(*this, errMessage.c_str());
+
+    // Finally, we set up our explosion results full of undef values.
+    auto result = i->getResult(0);
+    ExplosionSchema schema = getTypeInfo(result->getType()).getSchema();
+    Explosion e;
+    for (auto &elt : schema)
+      e.add(llvm::UndefValue::get(elt.getScalarType()));
+    setLoweredExplosion(result, e);
+    return;
+  }
+
+  auto &llvmModule = IGM.Module;
+  auto &llvmContext = llvmModule.getContext();
 
   // TODO: Remove these. They are a temporary way of testing that dynamic
   // attributes make it here.
   LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: " << opName << "\n");
   LLVM_DEBUG(for (auto structuredOperand : structuredOperands) {
-    llvm::dbgs() << "  operand: " << structuredOperand.getName() << "\n";
+    llvm::dbgs() << "  operand: " << structuredOperand.getNameWithSuffix()
+                 << "\n";
   });
   LLVM_DEBUG(llvm::dbgs() << "end operands\n");
 

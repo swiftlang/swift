@@ -2031,9 +2031,6 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
     for (auto bbi = BB->begin(), e = BB->end(); bbi != e; ++bbi) {
       auto *inst = &*bbi;
 
-      assert(!SILTensorOpInfo::decode(inst) &&
-             "The input to partition pass should not have any builtin TFops!");
-
       // Graph operations are tensor ops.
       auto *graphOp = dyn_cast<GraphOperationInst>(inst);
       if (!graphOp)
@@ -2642,7 +2639,7 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
   return createSomeIntegerValue(value, B, loc, intDecl, ILI);
 }
 
-/// Add a RecvFromHost builtin to the accelerator function, as a placeholder for
+/// Add a RecvFromHost graph_op to the accelerator function, as a placeholder for
 /// the subsequent graph lowering pass to generate the appropriate TF graph
 /// nodes to receive tensors from Swift host.
 /// `isScalar` specifies whether the value being received is a promoted scalar.
@@ -2744,7 +2741,7 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
                        /*isNonThrowing*/ false);
 }
 
-/// Add a SendToHost builtin to the accelerator function, as a placeholder for
+/// Add a SendToHost graph_op to the accelerator function, as a placeholder for
 /// the subsequent graph lowering pass to generate the appropriate TF graph
 /// nodes to send tensors to Swift host.
 ///
@@ -3360,7 +3357,7 @@ bool PartitionCloner::finalizeOriginal() {
     auto inst = instructionsToRemove[idx];
 
 #ifndef NDEBUG
-    // When removing a builtin or ApplyInst tensor op instruction TO, for each
+    // When removing a graph_op or ApplyInst tensor op instruction TO, for each
     // tensor argument TA of it, since we know TA is taken at +0, we need not
     // rebalance the retain/release count of TA.
     if (isa<BuiltinInst>(inst)) {

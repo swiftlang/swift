@@ -31,7 +31,6 @@
 
 using namespace swift;
 using namespace tf;
-typedef GraphOperationInfo::OperandClass OperandClass;
 
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
@@ -285,107 +284,6 @@ SubstitutionMap tf::getSingleSubstitutionMapForElementType(Type ty,
   return getSingleSubstitutionMapForElementTypeAndSignature(ty, genericSig);
 }
 
-/// Analyze the specified SIL instruction and return a SILTensorOpInfo result if
-/// the instruction is a valid tensor operation.  This is the way that
-/// SILTensorOpInfo's are created.
-Optional<SILTensorOpInfo> SILTensorOpInfo::decode(SILInstruction *inst) {
-  // Tensor operations are builtin instructions and apply instructions.
-  if (auto *builtin = dyn_cast<BuiltinInst>(inst)) {
-    SILTensorOpInfo toiInfo(builtin);
-    if (toiInfo.decodeBuiltin())
-      return toiInfo;
-  }
-  return None;
-}
-
-typedef std::pair<StringRef, OperandClass> AttributeEntry;
-
-/// Given a builtin name that refer to a tensorflow op function, this returns
-/// the op name and operand clases and returns an empty string.  If the string
-/// provided is invalid, this returns an error message to present.
-static std::string
-decodeTensorOpName(StringRef name, StringRef &opName,
-                   SmallVectorImpl<AttributeEntry> &operandClasses) {
-  // Decode the base name for the op.
-  auto pos = name.find(",");
-  opName = name.substr(0, pos);
-  if (pos == StringRef::npos)
-    return "";
-  name = name.substr(pos);
-
-  // Parse out operand information.
-  while (!name.empty()) {
-    assert(name[0] == ',');
-    name = name.drop_front(1);
-
-    pos = name.find(",");
-    if (pos == StringRef::npos)
-      pos = name.size();
-
-    // Parse out the attribute name.  If it contains a $, then parse out the
-    // OperandClass as well.
-    auto attrName = name.substr(0, pos);
-
-    // Figure out what the suffix is (if any) and reject invalid suffixes if
-    // present.
-    auto dollarLoc = attrName.find('$');
-
-    auto opClass = OperandClass::Normal;
-    if (dollarLoc != StringRef::npos) {
-      auto suffix = attrName.drop_front(dollarLoc + 1);
-      if (auto res = GraphOperationInfo::getOperandClass(suffix))
-        opClass = res.getValue();
-      else {
-        return "invalid attribute modifier '" + attrName.str() + "'";
-      }
-    }
-
-    // Slice the suffix off the attribute name and add the decoded version.
-    operandClasses.push_back({attrName.substr(0, dollarLoc), opClass});
-    name = name.substr(pos);
-  }
-
-  return "";
-}
-
-/// The vast majority of interesting tensor operations are builtin instructions,
-/// which come from the user-exposed #tfop() syntax.
-bool SILTensorOpInfo::decodeBuiltin() {
-  builtinName = inst->getName().str();
-
-  // If the builtin doesn't start with our magic prefix, then it isn't an op.
-  if (!builtinName.startswith("__tfop_"))
-    return false;
-
-  // This helper emits a diagnostic if the #tfop descriptor is malformed in a
-  // way that prevents it from ever working.  Errors that are a result of a
-  // client's misuse of the op is checked by checkAttributeConstants, because
-  // the location information is far more important to get right there.
-  auto diagInvalid = [&](std::string problem) {
-    diagnose(inst->getModule().getASTContext(), inst->getLoc().getSourceLoc(),
-             diag::tfop_invalid_tfop, problem);
-  };
-
-  // Ok, it is, decode and validate it.
-  auto errStr = decodeTensorOpName(builtinName.substr(strlen("__tfop_")),
-                                   opName, operandClasses);
-  if (!errStr.empty()) {
-    diagInvalid(errStr);
-    return false;
-  }
-
-  // Validate that this instruction is ok.
-  if (inst->getNumOperands() != operandClasses.size()) {
-    diagInvalid("op has " + llvm::utostr(operandClasses.size()) +
-                " operand classes, but " +
-                llvm::utostr(inst->getNumOperands()) +
-                " inputs and attributes");
-    return false;
-  }
-
-  return true;
-}
-
 //===----------------------------------------------------------------------===//
 // Source Location Manipulation Helpers
 //===----------------------------------------------------------------------===//
@@ -469,15 +367,15 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
        SymbolicValue::getMetatype(elementType->getCanonicalType())});
 
   // Add an attribute for the value$tensor attribute.
-  auto tensorSuffix = GraphOperationInfo::getOperandClassSuffix(
-      GraphOperationInfo::OperandClass::Tensor);
+  auto tensorSuffix = GraphOperationInfo::getOperandLoweringSuffix(
+      GraphOperationInfo::OperandLowering::TensorAttribute);
   opBuilder.addAttribute(
       {context.getIdentifier(std::string("value") + tensorSuffix), scalars});
 
   // Add the shape$shape attribute if we have an array value.
   if (scalars.getKind() == SymbolicValue::Array) {
-    auto shapeId = GraphOperationInfo::OperandClass::Shape;
-    auto shapeSuffix = GraphOperationInfo::getOperandClassSuffix(shapeId);
+    auto shapeId = GraphOperationInfo::OperandLowering::ShapeAttribute;
+    auto shapeSuffix = GraphOperationInfo::getOperandLoweringSuffix(shapeId);
     opBuilder.addAttribute(
         {context.getIdentifier(std::string("shape") + shapeSuffix), shape});
   }

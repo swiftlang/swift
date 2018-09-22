@@ -19,40 +19,55 @@ using llvm::SmallVectorImpl;
 using llvm::StringRef;
 using namespace swift;
 using namespace tf;
-typedef GraphOperationInfo::OperandClass OperandClass;
 
-/// Return the string suffix for the specified attribute modifier.
-const char *GraphOperationInfo::getOperandClassSuffix(OperandClass opClass) {
-  switch (opClass) {
-  case OperandClass::Input:
-    return "$in";
-  case OperandClass::Normal:
+/// Return the string suffix for the specified OperandLowering.
+const char *
+GraphOperationInfo::getOperandLoweringSuffix(OperandLowering lowering) {
+  switch (lowering) {
+  case OperandLowering::Input:
     return "";
-  case OperandClass::Tensor:
+  case OperandLowering::NormalAttribute:
+    return "";
+  case OperandLowering::TensorAttribute:
     return "$tensor";
-  case OperandClass::Shape:
+  case OperandLowering::ShapeAttribute:
     return "$shape";
-  case OperandClass::UnknownShapeList:
+  case OperandLowering::UnknownShapeListAttribute:
     return "$unknownShapeList";
-  case OperandClass::Array:
-    return "$array";
-  case OperandClass::Out:
+  case OperandLowering::TypeListAttribute:
+    return "$typeList";
+  case OperandLowering::Out:
     return "$out";
   }
 }
 
-/// Return the operand class of the specified string form like "tensor"
-llvm::Optional<OperandClass>
-GraphOperationInfo::getOperandClass(StringRef suffix) {
-  return llvm::StringSwitch<llvm::Optional<OperandClass>>(suffix)
-      .Case("in", OperandClass::Input)
-      .Case("", OperandClass::Normal)
-      .Case("tensor", OperandClass::Tensor)
-      .Case("shape", OperandClass::Shape)
-      .Case("unknownShapeList", OperandClass::UnknownShapeList)
-      .Case("array", OperandClass::Array)
-      .Case("out", OperandClass::Out)
-      .Default(None);
+/// Given an operand name like foo$tensor, decode the name and the
+/// OperandLowering.  If the name is empty, this defaults to
+/// OperandLowering::Input.  If the name is non-empty but there is no
+/// modifier specified, then this defaults to
+/// OperandLowering::NormalAttribute.
+std::pair<StringRef, GraphOperationInfo::OperandLowering>
+GraphOperationInfo::decodeOperandName(StringRef Name) {
+  if (Name.empty())
+    return {Name, OperandLowering::Input};
+
+  auto dollarLoc = Name.find('$');
+  auto lowering = OperandLowering::NormalAttribute;
+  if (dollarLoc != StringRef::npos) {
+    auto suffix = Name.drop_front(dollarLoc + 1);
+    auto loweringOpt =
+        llvm::StringSwitch<llvm::Optional<OperandLowering>>(suffix)
+          .Case("", OperandLowering::NormalAttribute)
+          .Case("tensor", OperandLowering::TensorAttribute)
+          .Case("shape", OperandLowering::ShapeAttribute)
+          .Case("unknownShapeList", OperandLowering::UnknownShapeListAttribute)
+          .Case("typeList", OperandLowering::TypeListAttribute)
+          .Case("out", OperandLowering::Out)
+          .Default(None);
+    assert(loweringOpt && "invalid attribute modifier");
+    lowering = *loweringOpt;
+  }
+  return {Name.substr(0, dollarLoc), lowering};
 }
 
 /// Return the device attribute associated with `inst`, which is required to
@@ -71,6 +86,11 @@ void GraphOperationInfo::assertWithDump(bool cond,
   inst->dump();
   llvm_unreachable(assertMsg);
 #endif // NDEBUG
+}
+
+StringRef GraphOperationInfo::getName() const {
+  auto mangled = inst->getName().str();
+  return mangled.substr(0, mangled.find(','));
 }
 
 /// Decode the name of a graph_op into its TensorFlow op name and a list of
@@ -124,33 +144,17 @@ StringRef GraphOperationInfo::decodeName(
   return opName;
 }
 
-/// Given an attribute name like foo$tensor, decode the name and the class.  If
-/// there is no modifier specified, this defaults to OperandClass::Normal.
-std::pair<StringRef, GraphOperationInfo::OperandClass>
-GraphOperationInfo::decodeAttributeName(Identifier name) {
-  auto nameStr = name.str();
-  // Figure out what the suffix is (if any).
-  auto dollarLoc = nameStr.find('$');
-
-  auto opClass = OperandClass::Normal;
-  if (dollarLoc != StringRef::npos) {
-    auto suffix = nameStr.drop_front(dollarLoc + 1);
-    if (auto res = getOperandClass(suffix))
-      opClass = res.getValue();
-    else {
-      std::string msg = "invalid attribute modifier '" + name.str().str() + "'";
-      llvm_unreachable(msg.c_str());
-    }
-  }
-
-  // Slice the suffix off the attribute name and add the decoded version.
-  return {nameStr.substr(0, dollarLoc), opClass};
+/// Returns the result of GraphOperationInfo::decodeOperandName on this
+/// operand.
+std::pair<StringRef, GraphOperationInfo::OperandLowering>
+GraphOperationInfo::StructuredOperand::decodeName() const {
+  return decodeOperandName(Name);
 }
 
 int64_t GraphOperationInfo::getIntAttr(unsigned attrIdx,
                                        StringRef attrName) const {
   auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
+  auto attrInfo = GraphOperationInfo::decodeOperandName(attr.name.str());
   assert(attrInfo.first == attrName);
   auto attrValue = attr.value;
   return attrValue.getIntegerValue().getLimitedValue();
@@ -159,7 +163,7 @@ int64_t GraphOperationInfo::getIntAttr(unsigned attrIdx,
 std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
                                               StringRef attrName) const {
   auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
+  auto attrInfo = GraphOperationInfo::decodeOperandName(attr.name.str());
   assert(attrInfo.first == attrName);
   auto attrValue = attr.value;
   return attrValue.getStringValue().str();

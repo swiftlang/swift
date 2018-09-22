@@ -253,11 +253,6 @@ public func testMultiResultOp_send_recv() {
   _hostOp(y)
 }
 
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testMultiResultOp_send_recv{{.*}}
-// CHECK:  builtin "__tfop_tfc.SendToHost
-// CHECK:  builtin "__tfop_tfc.SendToHost
-// CHECK:  builtin "__tfop_tfc.RecvFromHost
-
 var globalThing: Int32!
 
 public func testStructExtractBBArg(x: Tensor<Float>) -> Tensor<Int32> {
@@ -276,12 +271,6 @@ public func SR8191() {
     i += 1
   } while i < 10
 }
-
-// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}SR8191{{.*}}
-// CHECK:    [sequence
-// CHECK:      <while Preheader: bb0, Header: bb1, exit: bb3
-// CHECK:        block bb2>
-// CHECK:      block bb3]
 
 // `a` and `b` are both arguments to the tensor program, which starts at
 // "let _= a + b", and ends in that BB. So the tensor start point and tensor end

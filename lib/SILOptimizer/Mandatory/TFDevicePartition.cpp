@@ -76,12 +76,13 @@ GraphFunctionDeviceInfo::getForFunction(SILFunction &fn,
   for (auto &bb : fn) {
     for (auto &inst : bb) {
       // Scan for the device configuration ops if present.
-      auto tfopInfo = SILTensorOpInfo::decode(&inst);
-      if (!tfopInfo)
+      auto graphOpInst = dyn_cast<GraphOperationInst>(&inst);
+      if (!graphOpInst)
         continue;
-      bool isConfigOp = tfopInfo->opName == "tfc.configureTPU" ||
-                        tfopInfo->opName == "tfc.configureGPU" ||
-                        tfopInfo->opName == "tfc.configureCPU";
+      GraphOperationInfo opInfo(graphOpInst);
+      bool isConfigOp = opInfo.getName() == "tfc.configureTPU" ||
+                        opInfo.getName() == "tfc.configureGPU" ||
+                        opInfo.getName() == "tfc.configureCPU";
       if (!isConfigOp)
         continue;
 
@@ -101,15 +102,15 @@ GraphFunctionDeviceInfo::getForFunction(SILFunction &fn,
 
       // Eventually we'll support multiple different configuration ops, so
       // we recheck the opcode here.
-      if (tfopInfo->opName == "tfc.configureTPU") {
+      if (opInfo.getName() == "tfc.configureTPU") {
         // Decode: tfc.configureTPU(isInfeedEnabled: bool)
         deviceType = DeviceType::TPU;
         auto infeedEnabled = cast<IntegerLiteralInst>(inst.getOperand(0));
         isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
-      } else if (tfopInfo->opName == "tfc.configureGPU") {
+      } else if (opInfo.getName() == "tfc.configureGPU") {
         deviceType = DeviceType::GPU;
       } else {
-        assert(tfopInfo->opName == "tfc.configureCPU" &&
+        assert(opInfo.getName() == "tfc.configureCPU" &&
                "unknown device configuration op");
         deviceType = DeviceType::CPU;
       }
@@ -281,20 +282,20 @@ class DevicePartitionCloner
     return true;
   }
 
-  /// A TensorTransfer builtin sends a tensor value from a specific src TF
+  /// A TensorTransfer graph_op sends a tensor value from a specific src TF
   /// device to one or ALL dest TF devices, where the src and dest devices must
   /// be different.
   /// For example, if tensor value x is produced on CPU, and has a use on GPU of
-  /// form foo(x), we will insert a TensorTransfer builtin so that the code
+  /// form foo(x), we will insert a TensorTransfer graph_op so that the code
   /// becomes:
   ///   x = <inst defining x, running on CPU>
   ///   x' = TensorTransfer(x, ...)  // src is CPU, and dest is GPU
   ///   foo(x') // this runs on GPU
   ///
-  /// This builtin helps maintain the invariant that for any instruction I
+  /// This graph_op helps maintain the invariant that for any instruction I
   /// running on some device D, for any operand OP of I, OP must be present on D
   /// (either because OP is produced on D, or it is transferred via this
-  /// builtin).
+  /// graph_op).
   ///
   /// `tensorShapeAttrIdx` points to the optional shape array attr in
   /// `graphOpInfo`. It is used when generating the TPU flavor of send/recv ops
@@ -454,7 +455,7 @@ void DevicePartitionCloner::visitTensorTransferInst(
   auto destDeviceStr = graphOpInfo.getStringAttr(2, "destDevice");
   auto destDevice = getOpDeviceType(destDeviceStr);
   assert(srcDevice != destDevice);
-  // This builtin cannot have src device set to ALL, but dest device can be ALL.
+  // This graph_op cannot have src device set to ALL, but dest device can be ALL.
   assert(srcDevice != DeviceType::ALL);
   bool shouldRunTransferAsSrcDevice = srcDevice == thisDeviceType;
   bool shouldRunTransferAsDestDevice =
@@ -740,7 +741,7 @@ public:
 
  private:
   /// Track the tensor ops on a per device basis, and insert "TensorTransfer"
-  /// builtin's for cross-device TF tensor sends/recvs.
+  /// graph_op's for cross-device TF tensor sends/recvs.
   void markFunctionAndInsertTensorTransfers() {
     for (auto *BB : llvm::depth_first(&srcFn)) {
       processBlock(BB);
@@ -887,7 +888,7 @@ public:
       if (auto *graphOpInst = dyn_cast<GraphOperationInst>(operandInst)) {
         for (unsigned i = 0, e = graphOpInst->getNumAttributes(); i != e; ++i) {
           auto attr = graphOpInst->getAttribute(i);
-          auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
+          auto attrInfo = GraphOperationInfo::decodeOperandName(attr.name.str());
           if (!tf::isShapeArrayPseudoAttr(attrInfo.first, attr.value))
             continue;
           newInstBuilder.addAttribute(attr);

@@ -101,53 +101,6 @@ SubstitutionMap getSingleSubstitutionMapForElementTypeAndSignature(
 SubstitutionMap getSingleSubstitutionMapForElementType(Type ty,
                                                        ASTContext &ctx);
 
-/// Holds information about a TensorFlow operation as represented in SIL
-/// as Builtin instructions.
-struct SILTensorOpInfo {
-  /// The instruction being analyzed.
-  BuiltinInst *inst;
-
-  /// This is the name for the entire builtin that we'll partition out.
-  StringRef builtinName;
-
-  /// This is the TensorFlow name for the op.
-  StringRef opName;
-
-  /// These are the names of any attribute operands at the end of the list.
-  SmallVector<std::pair<StringRef, GraphOperationInfo::OperandClass>, 4>
-      operandClasses;
-
-  /// Return true if the specified operand is an input (not an attribute).
-  bool isInput(unsigned operandNumber) const {
-    return operandClasses[operandNumber].second ==
-           GraphOperationInfo::OperandClass::Input;
-  }
-
-  /// Returns the full name that this builtin would have if its operands
-  /// changed to the passed-in values.
-  std::string getBuiltinNameWithNewOperands(
-      const SmallVectorImpl<
-          std::pair<StringRef, GraphOperationInfo::OperandClass>>
-          &newOperandClasses) const {
-    std::string name = "__tfop_" + opName.str();
-    for (const auto &newOperandClass : newOperandClasses) {
-      name += ",";
-      name += newOperandClass.first;
-      name += GraphOperationInfo::getOperandClassSuffix(newOperandClass.second);
-    }
-    return name;
-  }
-
-  /// Analyze the specified SIL instruction and return a SILTensorOpInfo
-  /// result if the instruction is a valid tensor operation.  This is the
-  /// way that SILTensorOpInfo's are created.
-  static Optional<SILTensorOpInfo> decode(SILInstruction *inst);
-
-private:
-  SILTensorOpInfo(BuiltinInst *inst) : inst(inst) {}
-  bool decodeBuiltin();
-};
-
 /// `inst` must have a single result, and return that result value.
 static inline SILValue getSingleValueResult(GraphOperationInst *inst) {
   assert(inst->getNumResults() == 1);
