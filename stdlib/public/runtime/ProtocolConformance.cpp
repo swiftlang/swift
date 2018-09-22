@@ -689,12 +689,10 @@ static const Metadata *resolveGenericParamRef(
         protocolDescriptor->getRequirements().data();
 
     // Call the associated type access function.
-    using AssociatedTypeAccessFn =
-      const Metadata *(*)(const Metadata *base, const WitnessTable *);
     unsigned adjustedIndex = index + WitnessTableFirstRequirementOffset;
     current =
-      ((const AssociatedTypeAccessFn *)witnessTable)[adjustedIndex]
-        (current, witnessTable);
+      ((AssociatedTypeAccessFunction * const *)witnessTable)[adjustedIndex]
+        (MetadataState::Abstract, current, witnessTable).Value;
     if (!current) return nullptr;
   }
 
