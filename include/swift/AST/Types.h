@@ -4034,7 +4034,8 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getExtInfo(), getCoroutineKind(),
             getCalleeConvention(), getParameters(), getYields(),
-            getResults(), getOptionalErrorResult());
+            getResults(), getOptionalErrorResult(),
+            getWitnessMethodConformanceOrNone());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericSignature *genericSig,
@@ -4044,7 +4045,8 @@ public:
                       ArrayRef<SILParameterInfo> params,
                       ArrayRef<SILYieldInfo> yields,
                       ArrayRef<SILResultInfo> results,
-                      Optional<SILResultInfo> errorResult);
+                      Optional<SILResultInfo> errorResult,
+                      Optional<ProtocolConformanceRef> conformance);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
