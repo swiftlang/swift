@@ -111,10 +111,22 @@
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
+        "HashTable.swift",
         "Dictionary.swift",
+        "NativeDictionary.swift",
+        "DictionaryBridging.swift",
+        "DictionaryBuilder.swift",
+        "DictionaryCasting.swift",
+        "DictionaryStorage.swift",
+        "DictionaryVariant.swift",
         "Set.swift",
-        "HashedCollectionsAnyHashableExtensions.swift",
-        "HashTable.swift"
+        "NativeSet.swift",
+        "SetAnyHashableExtensions.swift",
+        "SetBridging.swift",
+        "SetBuilder.swift",
+        "SetCasting.swift",
+        "SetStorage.swift",
+        "SetVariant.swift"
       ]
     }
   ],
