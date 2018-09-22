@@ -654,7 +654,36 @@ void Lexer::lexIdentifier() {
   // Lex [a-zA-Z_$0-9[[:XID_Continue:]]]*
   while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
 
-  tok Kind = kindOfIdentifier(StringRef(TokStart, CurPtr-TokStart), InSILMode);
+  StringRef Identifier(TokStart, CurPtr-TokStart);
+  const auto &Custom = LangOpts.getCustomCompilationFlags();
+  if (Custom.find(Identifier) != Custom.end()) {
+    std::string Value = Custom.at(Identifier);
+    tok Kind = tok::unknown;
+
+    const char *Start = Value.data(), *End = Value.data() + Value.size();
+    if (End - Start > 1 && *Start == '"' && *(End - 1) == '"')
+      Kind = tok::string_literal;
+    else {
+      char *Parsed;
+      (void)strtoll(Start, &Parsed, 10);
+      if (Parsed == End)
+        Kind = tok::integer_literal;
+      else {
+        (void)strtod(Start, &Parsed);
+        if (Parsed == End)
+          Kind = tok::floating_literal;
+      }
+    }
+
+    if (Kind != tok::unknown)
+      return NextToken.setToken(Kind, SourceMgr.getEntireTextForBuffer(
+        const_cast<SourceManager *>(&SourceMgr)->addMemBufferCopy(Value)));
+    else if (Value != "true" && Value != "false")
+      diagnose(TokStart, diag::lex_invalid_compilation_flag,
+               StringRef(Value), Identifier);
+  }
+
+  tok Kind = kindOfIdentifier(Identifier, InSILMode);
   return formToken(Kind, TokStart);
 }
 

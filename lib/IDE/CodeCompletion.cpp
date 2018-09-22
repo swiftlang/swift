@@ -4938,12 +4938,12 @@ static void addPlatformConditions(CodeCompletionResultSink &Sink) {
 /// Add flags specified by '-D' to completion results.
 static void addConditionalCompilationFlags(ASTContext &Ctx,
                                            CodeCompletionResultSink &Sink) {
-  for (auto Flag : Ctx.LangOpts.getCustomConditionalCompilationFlags()) {
+  for (auto &Flag : Ctx.LangOpts.getCustomCompilationFlags()) {
     // TODO: Should we filter out some flags?
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::ExpressionSpecific, {});
-    Builder.addTextChunk(Flag);
+    Builder.addTextChunk(Flag.first);
   }
 }
 

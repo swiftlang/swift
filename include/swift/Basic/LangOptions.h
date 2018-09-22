@@ -33,6 +33,7 @@
 #include "llvm/Support/VersionTuple.h"
 #include <string>
 #include <vector>
+#include <map>
 
 namespace swift {
 
@@ -333,21 +334,25 @@ namespace swift {
 
     /// Explicit conditional compilation flags, initialized via the '-D'
     /// compiler flag.
-    void addCustomConditionalCompilationFlag(StringRef Name) {
+    void addCustomCompilationFlag(StringRef Name) {
       assert(!Name.empty());
-      CustomConditionalCompilationFlags.push_back(Name);
+      size_t pos = Name.find('=');
+      if (pos != StringRef::npos)
+        CustomCompilationFlags[Name.substr(0, pos)] = Name.substr(pos + 1);
+      else
+        CustomCompilationFlags[Name] = "true";
     }
 
     /// Determines if a given conditional compilation flag has been set.
-    bool isCustomConditionalCompilationFlagSet(StringRef Name) const;
+    bool isCustomCompilationFlagSet(StringRef Name) const;
 
     ArrayRef<std::pair<PlatformConditionKind, std::string>>
     getPlatformConditionValues() const {
       return PlatformConditionValues;
     }
 
-    ArrayRef<std::string> getCustomConditionalCompilationFlags() const {
-      return CustomConditionalCompilationFlags;
+    const std::map<std::string, std::string> &getCustomCompilationFlags() const {
+      return CustomCompilationFlags;
     }
 
     /// Whether our effective Swift version is in the Swift 3 family
@@ -387,7 +392,7 @@ namespace swift {
   private:
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 5>
         PlatformConditionValues;
-    llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
+    std::map<std::string, std::string> CustomCompilationFlags;
   };
 } // end namespace swift
 

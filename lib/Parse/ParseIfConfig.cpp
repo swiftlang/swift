@@ -381,7 +381,7 @@ public:
 
   bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     auto Name = getDeclRefStr(E);
-    return Ctx.LangOpts.isCustomConditionalCompilationFlagSet(Name);
+    return Ctx.LangOpts.isCustomCompilationFlagSet(Name);
   }
 
   bool visitCallExpr(CallExpr *E) {

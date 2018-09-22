@@ -59,11 +59,11 @@ class C {
 // CONDITION-DAG: Keyword[false]/None:                false[#Bool#]; name=false
 // CONDITION-NOT: globalVar
 
-// WITHFLAG: Keyword/ExprSpecific:               FOO; name=FOO
 // WITHFLAG: Keyword/ExprSpecific:               BAR; name=BAR
+// WITHFLAG: Keyword/ExprSpecific:               FOO; name=FOO
 
-// NOFLAG-NOT: FOO 
 // NOFLAG-NOT: BAR
+// NOFLAG-NOT: FOO
 
 var globalVar = 1
 extension C {

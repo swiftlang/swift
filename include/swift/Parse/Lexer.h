@@ -415,7 +415,8 @@ public:
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegmentImpl(
-        StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
+        StringRef(static_cast<const char *>(Segment.Loc
+                  .getOpaquePointerValue()), Segment.Length),
         Buffer, Segment.IsFirstSegment, Segment.IsLastSegment,
         Segment.IndentToStrip, Segment.CustomDelimiterLen);
   }

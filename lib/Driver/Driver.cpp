@@ -210,16 +210,16 @@ static void validateCompilationConditionArgs(DiagnosticEngine &diags,
                                              const ArgList &args) {
   for (const Arg *A : args.filtered(options::OPT_D)) {
     StringRef name = A->getValue();
-    if (name.find('=') != StringRef::npos) {
-      diags.diagnose(SourceLoc(),
-                     diag::cannot_assign_value_to_conditional_compilation_flag,
-                     name);
-    } else if (name.startswith("-D")) {
+    if (name.startswith("-D")) {
       diags.diagnose(SourceLoc(), diag::redundant_prefix_compilation_flag,
                      name);
-    } else if (!Lexer::isIdentifier(name)) {
-      diags.diagnose(SourceLoc(), diag::invalid_conditional_compilation_flag,
-                     name);
+    } else {
+      size_t pos = name.find('=');
+      if (pos != StringRef::npos)
+        name = name.substr(0, pos);
+      if (!Lexer::isIdentifier(name))
+        diags.diagnose(SourceLoc(), diag::invalid_conditional_compilation_flag,
+                       name);
     }
   }
 }

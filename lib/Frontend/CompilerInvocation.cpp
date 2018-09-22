@@ -303,7 +303,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   
   for (const Arg *A : Args.filtered(OPT_D)) {
-    Opts.addCustomConditionalCompilationFlag(A->getValue());
+    Opts.addCustomCompilationFlag(A->getValue());
   }
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
