@@ -2634,7 +2634,9 @@ ClangModuleUnit::lookupNestedType(Identifier name,
       isa<StructDecl>(baseType) && !baseType->hasLazyMembers() &&
       baseType->isChildContextOf(this)) {
     auto *mutableBase = const_cast<NominalTypeDecl *>(baseType);
-    auto codeEnum = mutableBase->lookupDirect(name,/*ignoreNewExtensions*/true);
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    auto codeEnum = mutableBase->lookupDirect(name, flags);
     // Double-check that we actually have a good result. It's possible what we
     // found is /not/ a synthesized error struct, but just something that looks
     // like it. But if we still found a good result we should return that.

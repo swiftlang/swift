@@ -418,6 +418,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     auto req = dyn_cast<ValueDecl>(member);
     if (!req)
       continue;
+    if (!req->isProtocolRequirement())
+      continue;
 
     // Infer type witnesses for associated types.
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(req)) {
@@ -1076,9 +1078,10 @@ AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
         // Find an associated type with the same name in the given
         // protocol.
         AssociatedTypeDecl *foundAssocType = nullptr;
+        auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+        flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
         for (auto result : thisProto->lookupDirect(
-                                             assocType->getName(),
-                                             /*ignoreNewExtensions=*/true)) {
+                                             assocType->getName(), flags)) {
           foundAssocType = dyn_cast<AssociatedTypeDecl>(result);
           if (foundAssocType) break;
         }

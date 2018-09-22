@@ -231,8 +231,9 @@ static ClangNode getEffectiveClangNode(const Decl *decl) {
   if (auto nominal =
         const_cast<NominalTypeDecl *>(dyn_cast<NominalTypeDecl>(decl))) {
     auto &ctx = nominal->getASTContext();
-    for (auto code : nominal->lookupDirect(ctx.Id_Code,
-                                           /*ignoreNewExtensions=*/true)) {
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    for (auto code : nominal->lookupDirect(ctx.Id_Code, flags)) {
       if (auto clangDecl = code->getClangDecl())
         return clangDecl;
     }

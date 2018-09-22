@@ -214,7 +214,9 @@ FuncDecl *SILGenModule::getBridgeToObjectiveCRequirement(SILLocation loc) {
   auto &ctx = getASTContext();
   FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
-  for (auto member : proto->lookupDirect(name, true)) {
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto member : proto->lookupDirect(name, flags)) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       found = func;
       break;
@@ -245,7 +247,9 @@ FuncDecl *SILGenModule::getUnconditionallyBridgeFromObjectiveCRequirement(
   FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));
-  for (auto member : proto->lookupDirect(name, true)) {
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto member : proto->lookupDirect(name, flags)) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       found = func;
       break;
@@ -275,7 +279,9 @@ SILGenModule::getBridgedObjectiveCTypeRequirement(SILLocation loc) {
   auto &ctx = getASTContext();
   AssociatedTypeDecl *found = nullptr;
   DeclName name(ctx.Id_ObjectiveCType);
-  for (auto member : proto->lookupDirect(name, true)) {
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto member : proto->lookupDirect(name, flags)) {
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       found = assocType;
       break;
@@ -325,7 +331,9 @@ VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
   // Look for _nsError.
   auto &ctx = getASTContext();
   VarDecl *found = nullptr;
-  for (auto member : proto->lookupDirect(ctx.Id_nsError, true)) {
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto member : proto->lookupDirect(ctx.Id_nsError, flags)) {
     if (auto var = dyn_cast<VarDecl>(member)) {
       found = var;
       break;

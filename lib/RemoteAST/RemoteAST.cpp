@@ -402,8 +402,10 @@ public:
     if (!base->isTypeParameter())
       return Type();
 
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
     for (auto member : protocol->lookupDirect(Ctx.getIdentifier(member),
-                                              /*ignoreNew=*/true)) {
+                                              flags)) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
         return DependentMemberType::get(base, assocType);
     }
