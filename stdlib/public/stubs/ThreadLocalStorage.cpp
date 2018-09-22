@@ -23,15 +23,13 @@ void _stdlib_destroyTLS(void *);
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void *_stdlib_createTLS(void);
 
-#ifndef SWIFT_THREAD_GETSPECIFIC
+#if defined(_WIN32) && !defined(__CYGWIN__)
 
-# if defined(_WIN32) && !defined(__CYGWIN__)
-
-#  if defined(_M_IX86)
-typedef __stdcall void (*__swift_thread_key_destructor)(void *);
-#  else
-typedef void (*__swift_thread_key_destructor)(void *);
-#  endif
+typedef
+#if defined(_M_IX86)
+__stdcall
+#endif
+void (*__swift_thread_key_destructor)(void *);
 
 static void
 #if defined(_M_IX86)
@@ -47,8 +45,6 @@ _stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
   *key = FlsAlloc(destroyTLS_CCAdjustmentThunk);
   return *key != FLS_OUT_OF_INDEXES;
 }
-
-# endif
 
 #endif
 
