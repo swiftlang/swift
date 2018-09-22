@@ -689,12 +689,10 @@ static const Metadata *resolveGenericParamRef(
         protocolDescriptor->getRequirements().data();
 
     // Call the associated type access function.
-    using AssociatedTypeAccessFn =
-      const Metadata *(*)(const Metadata *base, const WitnessTable *);
     unsigned adjustedIndex = index + WitnessTableFirstRequirementOffset;
     current =
-      ((const AssociatedTypeAccessFn *)witnessTable)[adjustedIndex]
-        (current, witnessTable);
+      ((AssociatedTypeAccessFunction * const *)witnessTable)[adjustedIndex]
+        (MetadataState::Abstract, current, witnessTable).Value;
     if (!current) return nullptr;
   }
 
@@ -766,6 +764,8 @@ bool swift::_checkGenericRequirements(
 
       // Check whether it's dynamically castable, which works as a superclass
       // check.
+      // FIXME: We should be explicitly checking the superclass, so we
+      // don't require the subject type to be complete.
       if (!swift_dynamicCastMetatype(subjectType, baseType)) return true;
 
       continue;

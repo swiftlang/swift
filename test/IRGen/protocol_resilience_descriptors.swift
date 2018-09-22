@@ -14,7 +14,7 @@
 
 // Protocol descriptor
 // CHECK-DEFINITION-LABEL: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsMp" ={{( protected)?}} constant
-// CHECK-DEFINITION-SAME: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2_AA014OtherResilientC0TN"
+// CHECK-DEFINITION-SAME: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0TN"
 // CHECK-DEFINITION-SAME: $s2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPTM
 // CHECK-DEFINITION-SAME: $s2T218resilient_protocol29ProtocolWithAssocTypeDefaultsPTM
 
@@ -24,10 +24,10 @@
 // Associated type and conformance
 
 // CHECK-DEFINITION: @"$s1T18resilient_protocol24ProtocolWithRequirementsPTl" ={{( dllexport)?}}{{( protected)?}} alias
-// CHECK-DEFINITION: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2_AA014OtherResilientC0Tn" ={{( dllexport)?}}{{( protected)?}} alias
+// CHECK-DEFINITION: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0Tn" ={{( dllexport)?}}{{( protected)?}} alias
 
 // Default associated conformance witnesses
-// CHECK-DEFINITION-LABEL: define internal swiftcc i8** @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2_AA014OtherResilientC0TN"
+// CHECK-DEFINITION-LABEL: define internal swiftcc i8** @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0TN"
 
 // Default associated type witnesses
 // CHECK-DEFINITION-LABEL: define internal swiftcc %swift.metadata_response @"$s2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPTM"
@@ -58,15 +58,15 @@ public struct ConditionallyConforms<Element> { }
 public struct Y { }
 
 // CHECK-USAGE: @"$s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAWr" = internal
-// CHECK-USAGE-SAME: $s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2_AA014OtherResilientC0Tn
-// CHECK-USAGE-SAME: $s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAA2T2_AD014OtherResilientI0PWT
+// CHECK-USAGE-SAME: $s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0Tn
+// CHECK-USAGE-SAME: $s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAA2T2AdEP_AD014OtherResilientI0PWT
 public struct ConformsWithAssocRequirements : ProtocolWithAssocTypeDefaults {
 }
 
-// CHECK-USAGE: @"$sx1T_MXA" =
+// CHECK-USAGE: @"$sx1T18resilient_protocol24ProtocolWithRequirementsP_MXA" =
 // CHECK-USAGE-SAME: i32 0
 // CHECK-USAGE-SAME: @"{{got.|__imp_}}$s18resilient_protocol24ProtocolWithRequirementsMp"
-// CHECK-USAGE-SAME: @"$sx1T_MXA"
+// CHECK-USAGE-SAME: @"$sx1T18resilient_protocol24ProtocolWithRequirementsP_MXA"
 // CHECK-USAGE-SAME: %swift.protocol_requirement** @"{{got.|__imp_}}$s1T18resilient_protocol24ProtocolWithRequirementsPTl"
 
 // CHECK-USAGE: @"$s31protocol_resilience_descriptors21ConditionallyConformsVyxG010resilient_A024ProtocolWithRequirementsAaeFRzAA1YV1TRtzlMc"

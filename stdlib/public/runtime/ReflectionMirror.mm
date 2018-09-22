@@ -371,6 +371,13 @@ getFieldAt(const Metadata *base, unsigned index) {
         return base->getGenericArgs()[flatIndex];
       });
 
+  // Complete the type metadata before returning it to the caller.
+  if (typeInfo) {
+    typeInfo = TypeInfo(swift_checkMetadataState(MetadataState::Complete,
+                                                 typeInfo).Value,
+                        typeInfo.getReferenceOwnership());
+  }
+
   // If demangling the type failed, pretend it's an empty type instead with
   // a log message.
   if (typeInfo == nullptr) {
