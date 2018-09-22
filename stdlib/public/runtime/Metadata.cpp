@@ -2369,6 +2369,58 @@ static void initClassFieldOffsetVector(ClassMetadata *self,
 }
 
 #if SWIFT_OBJC_INTEROP
+/// Non-generic classes only. Initialize the Objective-C ivar descriptors and
+/// field offset globals. Does *not* register the class with the Objective-C
+/// runtime; that must be done by the caller.
+///
+/// This function copies the ivar descriptors and updates each ivar global with
+/// the corresponding offset in \p fieldOffsets, before asking the Objective-C
+/// runtime to realize the class. The Objective-C runtime will then slide the
+/// offsets stored in those globals.
+///
+/// Note that \p fieldOffsets remains unchanged in this case.
+static void initObjCClass(ClassMetadata *self,
+                          size_t numFields,
+                          const TypeLayout * const *fieldTypes,
+                          size_t *fieldOffsets) {
+  ClassROData *rodata = getROData(self);
+
+  // Always clone the ivar descriptors.
+  if (numFields) {
+    const ClassIvarList *dependentIvars = rodata->IvarList;
+    assert(dependentIvars->Count == numFields);
+    assert(dependentIvars->EntrySize == sizeof(ClassIvarEntry));
+
+    auto ivarListSize = sizeof(ClassIvarList) +
+                        numFields * sizeof(ClassIvarEntry);
+    auto ivars = (ClassIvarList*) getResilientMetadataAllocator()
+      .Allocate(ivarListSize, alignof(ClassIvarList));
+    memcpy(ivars, dependentIvars, ivarListSize);
+    rodata->IvarList = ivars;
+
+    for (unsigned i = 0; i != numFields; ++i) {
+      auto *eltLayout = fieldTypes[i];
+
+      ClassIvarEntry &ivar = ivars->getIvars()[i];
+
+      // Fill in the field offset global, if this ivar has one.
+      if (ivar.Offset) {
+        if (*ivar.Offset != fieldOffsets[i])
+          *ivar.Offset = fieldOffsets[i];
+      }
+
+      // If the ivar's size doesn't match the field layout we
+      // computed, overwrite it and give it better type information.
+      if (ivar.Size != eltLayout->size) {
+        ivar.Size = eltLayout->size;
+        ivar.Type = nullptr;
+        ivar.Log2Alignment =
+          getLog2AlignmentFromMask(eltLayout->flags.getAlignmentMask());
+      }
+    }
+  }
+}
+
 /// Generic classes only. Initialize the Objective-C ivar descriptors and field
 /// offset globals and register the class with the runtime.
 ///
@@ -2520,7 +2572,18 @@ swift::swift_initClassMetadata(ClassMetadata *self,
   initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
 
 #if SWIFT_OBJC_INTEROP
-  initGenericObjCClass(self, numFields, fieldTypes, fieldOffsets);
+  if (self->getDescription()->isGeneric())
+    initGenericObjCClass(self, numFields, fieldTypes, fieldOffsets);
+  else {
+    initObjCClass(self, numFields, fieldTypes, fieldOffsets);
+
+    // Register this class with the runtime. This will also cause the
+    // runtime to slide the field offsets stored in the field offset
+    // globals. Note that the field offset vector is *not* updated;
+    // however we should not be using it for anything in a non-generic
+    // class.
+    swift_instantiateObjCClass(self);
+  }
 #endif
 }
 
