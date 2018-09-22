@@ -222,7 +222,8 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str) {
 }
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
-                                             const SymbolicMangling &mangling) {
+                                             const SymbolicMangling &mangling,
+                                             unsigned alignment) {
   // Create a symbol name for the symbolic mangling. This is used as the
   // uniquing key both for ODR coalescing and within this TU.
   IRGenMangler mangler;
@@ -230,9 +231,12 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
     mangler.mangleSymbolNameForSymbolicMangling(mangling);
 
   // See if we emitted the constant already.
+  // FIXME: Make sure the existing variable has enough alignment. Otherwise,
+  // replace it.
   auto &entry = StringsForTypeRef[symbolName];
-  if (entry.second)
+  if (entry.second && entry.first->getAlignment() >= alignment) {
     return entry.second;
+  }
   
   ConstantInitBuilder B(*this);
   auto S = B.beginStruct();
@@ -284,7 +288,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
                                       nullptr,
                                       symbolName);
   var->setVisibility(llvm::GlobalValue::HiddenVisibility);
-  var->setAlignment(1);
+  var->setAlignment(alignment);
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
   

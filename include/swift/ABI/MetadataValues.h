@@ -580,6 +580,12 @@ public:
   bool isInstance() const { return Value & IsInstanceMask; }
 
   int_type getIntValue() const { return Value; }
+
+  enum : uintptr_t {
+    /// Bit used to indicate that an associated type witness is a pointer to
+    /// a mangled name (vs. a pointer to metadata).
+    AssociatedTypeMangledNameMask = 0x01
+  };
 };
 
 /// Flags that go in a TargetConformanceDescriptor structure.

@@ -993,9 +993,10 @@ public:
   /// reflection metadata.
   llvm::SetVector<const StructDecl *> ImportedStructs;
 
-  llvm::Constant *getTypeRef(CanType type);
+  llvm::Constant *getTypeRef(CanType type, unsigned alignment = 1);
   llvm::Constant *getAddrOfStringForTypeRef(StringRef mangling);
-  llvm::Constant *getAddrOfStringForTypeRef(const SymbolicMangling &mangling);
+  llvm::Constant *getAddrOfStringForTypeRef(const SymbolicMangling &mangling,
+                                            unsigned alignment = 1);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
@@ -1003,6 +1004,9 @@ public:
                                              SubstitutionMap subs,
                                              const HeapLayout &layout);
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
+
+  /// Produce an associated type witness that refers to the given type.
+  llvm::Constant *getAssociatedTypeWitness(CanType type);
 
   void emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance);
   void emitFieldMetadataRecord(const NominalTypeDecl *Decl);

@@ -164,10 +164,10 @@ public:
   }
 };
 
-llvm::Constant *IRGenModule::getTypeRef(CanType type) {
+llvm::Constant *IRGenModule::getTypeRef(CanType type, unsigned alignment) {
   IRGenMangler Mangler;
   auto SymbolicName = Mangler.mangleTypeForReflection(*this, type);
-  return getAddrOfStringForTypeRef(SymbolicName);
+  return getAddrOfStringForTypeRef(SymbolicName, alignment);
 }
 
 class ReflectionMetadataBuilder {

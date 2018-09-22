@@ -3915,6 +3915,76 @@ swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
   return result.second;
 }
 
+MetadataResponse
+swift::swift_getAssociatedTypeWitness(MetadataRequest request,
+                                      WitnessTable *wtable,
+                                      const Metadata *conformingType,
+                                      const ProtocolRequirement *assocType) {
+  const ProtocolConformanceDescriptor *conformance = wtable->Description;
+  const ProtocolDescriptor *protocol = conformance->getProtocol();
+
+  auto requirements = protocol->getRequirements();
+  if (assocType < requirements.begin() ||
+      assocType >= requirements.end()) {
+    fatalError(0,
+               "associated type descriptor %p is out of range for protocol %s;"
+               "requirement range is %p--%p\n",
+               assocType, protocol->Name.get(), requirements.begin(),
+               requirements.end());
+  }
+
+  const auto &req = *assocType;
+  if (req.Flags.getKind() !=
+        ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction) {
+    fatalError(0, "associated type descriptor %p refers to non-associated "
+               "type requirement in protocol %s\n",
+               assocType, protocol->Name.get());
+  }
+
+  // If the low bit of the witness is clear, it's already a metadata pointer.
+  unsigned witnessIndex = (assocType - requirements.begin()) +
+    WitnessTableFirstRequirementOffset;
+  auto witness = ((const void* const *)wtable)[witnessIndex];
+  if ((uintptr_t(witness) &
+         ProtocolRequirementFlags::AssociatedTypeMangledNameMask) == 0) {
+    return swift_checkMetadataState(request, (const Metadata *)witness);
+  }
+
+  // Demangle the associated type name.
+  const char *mangledName =
+    (const char *)(uintptr_t(witness) &
+                   ~ProtocolRequirementFlags::AssociatedTypeMangledNameMask);
+  const Metadata *assocTypeMetadata;
+  if (witness == req.DefaultImplementation) {
+    // The protocol's Self is the only generic parameter that can occur in the
+    // type.
+    assocTypeMetadata =
+      _getTypeByMangledName(mangledName,
+         [conformingType](unsigned depth, unsigned index) -> const Metadata * {
+        if (depth == 0 && index == 0)
+          return conformingType;
+
+        return nullptr;
+      });
+  } else {
+    // The generic parameters in the associated type name are those of the
+    // conforming type.
+    SubstGenericParametersFromMetadata substitutions(conformingType);
+    assocTypeMetadata = _getTypeByMangledName(mangledName, substitutions);
+  }
+
+  if (!assocTypeMetadata) {
+    fatalError(0,
+               "failed to demangle associated type at %p in protocol '%s' with "
+               "mangled name '%s'\n",
+               assocType, protocol->Name.get(), mangledName);
+  }
+
+  // Update the witness table.
+  ((const void**)wtable)[witnessIndex] = assocTypeMetadata;
+  return swift_checkMetadataState(request, assocTypeMetadata);
+}
+
 /***************************************************************************/
 /*** Recursive metadata dependencies ***************************************/
 /***************************************************************************/
