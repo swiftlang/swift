@@ -246,12 +246,8 @@ namespace swift {
                        bool wholeModuleCompilation = false);
 
   /// Turn a source file into SIL IR.
-  ///
-  /// If \p StartElem is provided, the module is assumed to be only part of the
-  /// SourceFile, and any optimizations should take that into account.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, SILOptions &options,
-                       Optional<unsigned> StartElem = None);
+  performSILGeneration(FileUnit &SF, SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
@@ -283,7 +279,6 @@ namespace swift {
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       llvm::LLVMContext &LLVMContext,
-                      unsigned StartElem = 0,
                       llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run

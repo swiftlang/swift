@@ -832,7 +832,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   // once for each such input.
   std::deque<PostSILGenInputs> PSGIs;
   for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-    auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
+    auto SM = performSILGeneration(*PrimaryFile, SILOpts);
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
     PSGIs.push_back(PostSILGenInputs{std::move(SM), true, PrimaryFile, PSPs});
@@ -846,7 +846,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
       if (Invocation.getFrontendOptions().InputsAndOutputs.isInputPrimary(
               SASTF->getFilename())) {
         assert(PSGIs.empty() && "Can only handle one primary AST input");
-        auto SM = performSILGeneration(*SASTF, SILOpts, None);
+        auto SM = performSILGeneration(*SASTF, SILOpts);
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         PSGIs.push_back(
@@ -1130,7 +1130,7 @@ static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
   IRModule = MSF.is<SourceFile *>()
                  ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
                                        std::move(SM), OutputFilename, PSPs,
-                                       LLVMContext, 0, &HashGlobal)
+                                       LLVMContext, &HashGlobal)
                  : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
                                        std::move(SM), OutputFilename, PSPs,
                                        LLVMContext, parallelOutputFilenames,

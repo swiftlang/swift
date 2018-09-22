@@ -343,10 +343,9 @@ public:
   /// should contain source files.
   ///
   /// If a source file is provided, SIL will only be emitted for decls in that
-  /// source file, starting from the specified element number.
+  /// source file.
   static std::unique_ptr<SILModule>
   constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr,
-               Optional<unsigned> startElem = None,
                bool isWholeModule = false);
 
   /// \brief Create and return an empty SIL module that we can
