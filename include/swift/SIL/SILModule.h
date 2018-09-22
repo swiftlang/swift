@@ -345,8 +345,7 @@ public:
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file.
   static std::unique_ptr<SILModule>
-  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr,
-               bool isWholeModule = false);
+  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.

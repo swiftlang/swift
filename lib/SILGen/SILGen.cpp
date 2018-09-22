@@ -1602,8 +1602,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
-                        bool isWholeModule) {
+SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
   SharedTimer timer("SILGen");
   const DeclContext *DC;
   if (SF) {
@@ -1613,7 +1612,7 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
   }
 
   std::unique_ptr<SILModule> M(
-      new SILModule(mod, options, DC, isWholeModule));
+      new SILModule(mod, options, DC, /*wholeModule*/ SF == nullptr));
   SILGenModule SGM(*M, mod);
 
   if (SF) {
@@ -1670,13 +1669,11 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(ModuleDecl *mod,
-                            SILOptions &options,
-                            bool wholeModuleCompilation) {
-  return SILModule::constructSIL(mod, options, nullptr, wholeModuleCompilation);
+swift::performSILGeneration(ModuleDecl *mod, SILOptions &options) {
+  return SILModule::constructSIL(mod, options, nullptr);
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(FileUnit &sf, SILOptions &options) {
-  return SILModule::constructSIL(sf.getParentModule(), options, &sf, false);
+  return SILModule::constructSIL(sf.getParentModule(), options, &sf);
 }

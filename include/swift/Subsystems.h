@@ -237,13 +237,10 @@ namespace swift {
 
   /// Turn the given module into SIL IR.
   ///
-  /// The module must contain source files.
-  ///
-  /// if \p wholeModuleCompilation is true, the optimizer assumes that the SIL
-  /// of all files in the module is present in the SILModule.
+  /// The module must contain source files. The optimizer will assume that the
+  /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
-  performSILGeneration(ModuleDecl *M, SILOptions &options,
-                       bool wholeModuleCompilation = false);
+  performSILGeneration(ModuleDecl *M, SILOptions &options);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>

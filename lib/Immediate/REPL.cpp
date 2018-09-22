@@ -873,7 +873,9 @@ private:
     std::unique_ptr<SILModule> sil;
     
     if (!CI.getASTContext().hadError()) {
-      sil = performSILGeneration(M, CI.getSILOptions());
+      // We don't want anything to get stripped, so pretend we're doing a
+      // non-whole-module generation.
+      sil = performSILGeneration(*M->getFiles().front(), CI.getSILOptions());
       runSILDiagnosticPasses(*sil);
       runSILLoweringPasses(*sil);
     }
