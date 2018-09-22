@@ -345,10 +345,10 @@ void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
 
 #if defined(__NR_getrandom)
     static const bool getrandom_available =
-      !(syscall(SYS_getrandom, nullptr, 0, 0) == -1 && errno == ENOSYS);
+      !(syscall(__NR_getrandom, nullptr, 0, 0) == -1 && errno == ENOSYS);
   
     if (getrandom_available) {
-      actual_nbytes = WHILE_EINTR(syscall(SYS_getrandom, buf, nbytes, 0));
+      actual_nbytes = WHILE_EINTR(syscall(__NR_getrandom, buf, nbytes, 0));
     }
 #elif __has_include(<sys/random.h>) && (defined(__CYGWIN__) || defined(__Fuchsia__))
     __swift_size_t getentropy_nbytes = std::min(nbytes, __swift_size_t{256});
