@@ -2238,12 +2238,16 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass,
   }
 
 #if SWIFT_OBJC_INTEROP
-  // Set up the superclass of the metaclass, which is the metaclass of the
-  // superclass.
-  auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
-  auto theSuperMetaclass
-    = (const ClassMetadata *)object_getClass(id_const_cast(theSuperclass));
-  theMetaclass->Superclass = theSuperMetaclass;
+  if (theClass->getDescription()->isGeneric() ||
+      (theSuperclass->isTypeMetadata() &&
+       theSuperclass->getDescription()->isGeneric())) {
+    // Set up the superclass of the metaclass, which is the metaclass of the
+    // superclass.
+    auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
+    auto theSuperMetaclass
+      = (const ClassMetadata *)object_getClass(id_const_cast(theSuperclass));
+    theMetaclass->Superclass = theSuperMetaclass;
+  }
 #endif
 }
 
