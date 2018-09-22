@@ -144,6 +144,22 @@ StringRef SDKNodeDecl::getHeaderName() const {
   return llvm::sys::path::filename(Location.split(":").first);
 }
 
+SDKNodeDeclGetter *SDKNodeDeclVar::getGetter() const {
+  if (getChildrenCount() > 1)
+    return cast<SDKNodeDeclGetter>(childAt(1));
+  return nullptr;
+}
+
+SDKNodeDeclSetter *SDKNodeDeclVar::getSetter() const {
+  if (getChildrenCount() > 2)
+    return cast<SDKNodeDeclSetter>(childAt(2));
+  return nullptr;
+}
+
+SDKNodeType *SDKNodeDeclVar::getType() const {
+  return cast<SDKNodeType>(childAt(0));
+}
+
 NodePtr UpdatedNodesMap::findUpdateCounterpart(const SDKNode *Node) const {
   assert(Node->isAnnotatedAs(NodeAnnotation::Updated) && "Not update operation.");
   auto FoundPair = std::find_if(MapImpl.begin(), MapImpl.end(),

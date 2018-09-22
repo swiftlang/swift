@@ -75,3 +75,7 @@ public protocol AssociatedTypePro {
   associatedtype T2
   associatedtype T3 = C1
 }
+
+public class RemoveSetters {
+  public var Value = 4
+}

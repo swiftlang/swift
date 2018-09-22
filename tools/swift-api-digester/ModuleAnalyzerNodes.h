@@ -207,7 +207,8 @@ enum class KnownProtocolKind: uint8_t {
 };
 
 class SDKNodeRoot;
-
+class SDKNodeDeclGetter;
+class SDKNodeDeclSetter;
 struct SDKNodeInitInfo;
 
 class SDKNode {
@@ -456,6 +457,9 @@ public:
   static bool classof(const SDKNode *N);
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
   unsigned getFixedBinaryOrder() const { return *FixedBinaryOrder; }
+  SDKNodeDeclGetter *getGetter() const;
+  SDKNodeDeclSetter *getSetter() const;
+  SDKNodeType *getType() const;
 };
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {

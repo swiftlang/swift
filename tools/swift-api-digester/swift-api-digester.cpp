@@ -886,10 +886,16 @@ public:
     }
 
     case SDKNodeKind::DeclVar: {
-      auto LC = Left->getChildren()[0];
-      auto RC = Right->getChildren()[0];
+      auto LVar = cast<SDKNodeDeclVar>(Left);
+      auto RVar = cast<SDKNodeDeclVar>(Right);
+      auto LC = LVar->getType();
+      auto RC = RVar->getType();
       if (!(*LC == *RC))
         foundMatch(LC, RC, NodeMatchReason::Sequential);
+      if (LVar->getSetter() && !RVar->getSetter()) {
+          Ctx.getDiags().diagnose(SourceLoc(), diag::removed_setter,
+                                  LVar->getScreenInfo());
+      }
       break;
     }
     }
