@@ -766,6 +766,8 @@ bool swift::_checkGenericRequirements(
 
       // Check whether it's dynamically castable, which works as a superclass
       // check.
+      // FIXME: We should be explicitly checking the superclass, so we
+      // don't require the subject type to be complete.
       if (!swift_dynamicCastMetatype(subjectType, baseType)) return true;
 
       continue;

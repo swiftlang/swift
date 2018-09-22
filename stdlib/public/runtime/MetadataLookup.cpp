@@ -1024,7 +1024,7 @@ public:
     auto accessFunction = typeDecl->getAccessFunction();
     if (!accessFunction) return BuiltType();
 
-    return accessFunction(MetadataState::Complete, allGenericArgs).Value;
+    return accessFunction(MetadataState::Abstract, allGenericArgs).Value;
   }
 
   BuiltType createBuiltinType(StringRef mangledName) const {
@@ -1102,7 +1102,7 @@ public:
     auto flags = TupleTypeFlags().withNumElements(elements.size());
     if (!labels.empty())
       flags = flags.withNonConstantLabels(true);
-    return swift_getTupleTypeMetadata(MetadataState::Complete,
+    return swift_getTupleTypeMetadata(MetadataState::Abstract,
                                       flags, elements.data(),
                                       labels.empty() ? nullptr : labels.c_str(),
                                       /*proposedWitnesses=*/nullptr).Value;
@@ -1189,10 +1189,8 @@ swift::_getTypeByMangledName(StringRef typeName,
       if (!assocTypeReqIndex) return nullptr;
 
       // Call the associated type access function.
-      // TODO: can we just request abstract metadata?  If so, do we have
-      //   a responsibility to try to finish it later?
       return ((AssociatedTypeAccessFunction * const *)witnessTable)[*assocTypeReqIndex]
-                (MetadataState::Complete, base, witnessTable).Value;
+                (MetadataState::Abstract, base, witnessTable).Value;
     });
 
   auto type = Demangle::decodeMangledType(builder, node);
@@ -1205,7 +1203,7 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
                            size_t *parametersPerLevel,
                            const Metadata * const *flatSubstitutions) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
-  return _getTypeByMangledName(typeName,
+  auto metadata = _getTypeByMangledName(typeName,
     [&](unsigned depth, unsigned index) -> const Metadata * {
       if (depth >= numberOfLevels)
         return nullptr;
@@ -1219,6 +1217,10 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
 
       return flatSubstitutions[flatIndex];
     });
+
+  if (!metadata) return nullptr;
+
+  return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
 }
 
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE

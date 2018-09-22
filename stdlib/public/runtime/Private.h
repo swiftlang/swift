@@ -69,6 +69,10 @@ public:
   bool isWeak() const { return ReferenceOwnership.isWeak(); }
   bool isUnowned() const { return ReferenceOwnership.isUnowned(); }
   bool isUnmanaged() const { return ReferenceOwnership.isUnmanaged(); }
+
+  TypeReferenceOwnership getReferenceOwnership() const {
+    return ReferenceOwnership;
+  }
 };
 
 #if SWIFT_HAS_ISA_MASKING
