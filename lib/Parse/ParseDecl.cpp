@@ -288,6 +288,12 @@ bool Parser::parseTopLevel() {
 static Optional<StringRef>
 getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
                                   StringRef DiagText) {
+  // FIXME: Support extended escaping string literal.
+  if (Tok.getCustomDelimiterLen()) {
+    P.diagnose(Loc, diag::attr_extended_escaping_string, DiagText);
+    return None;
+  }
+
   SmallVector<Lexer::StringSegment, 1> Segments;
   P.L->getStringLiteralSegments(Tok, Segments);
   if (Segments.size() != 1 ||
