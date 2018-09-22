@@ -134,6 +134,10 @@ struct ValueOwnershipKind {
 
   operator innerty() const { return Value; }
 
+  bool operator==(const swift::ValueOwnershipKind::innerty& b) {
+    return Value == b;
+  }
+
   Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;
 
   bool isTrivialOr(ValueOwnershipKind Kind) const {
