@@ -929,8 +929,7 @@ private:
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
     
-    if (IRGenImportedModules(CI, *NewModule, ImportedModules, InitFns,
-                             IRGenOpts, SILOpts))
+    if (autolinkImportedModules(getMainModule(), IRGenOpts))
       return false;
     
     llvm::Module *TempModule = NewModule.get();
