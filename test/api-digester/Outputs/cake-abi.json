@@ -1002,6 +1002,66 @@
     },
     {
       "kind": "TypeDecl",
+      "name": "SubsContainer",
+      "printedName": "SubsContainer",
+      "declKind": "Protocol",
+      "usr": "s:4cake13SubsContainerP",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "Subscript",
+          "name": "subscript",
+          "printedName": "subscript(getter:)",
+          "declKind": "Subscript",
+          "usr": "s:4cake13SubsContainerP6getterS2i_tcip",
+          "location": "",
+          "moduleName": "cake",
+          "genericSig": "<τ_0_0 where τ_0_0 : SubsContainer>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        },
+        {
+          "kind": "Subscript",
+          "name": "subscript",
+          "printedName": "subscript(setter:)",
+          "declKind": "Subscript",
+          "usr": "s:4cake13SubsContainerP6setterS2i_tcip",
+          "location": "",
+          "moduleName": "cake",
+          "genericSig": "<τ_0_0 where τ_0_0 : SubsContainer>",
+          "hasSetter": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
       "name": "Int",
       "printedName": "Int",
       "declKind": "Struct",

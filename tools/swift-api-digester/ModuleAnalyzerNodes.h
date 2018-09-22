@@ -475,6 +475,14 @@ public:
   static StringRef getTypeRoleDescription(SDKContext &Ctx, unsigned Index);
 };
 
+class SDKNodeDeclSubscript: public SDKNodeDeclAbstractFunc {
+  bool HasSetter;
+public:
+  SDKNodeDeclSubscript(SDKNodeInitInfo Info);
+  static bool classof(const SDKNode *N);
+  bool hasSetter() const { return HasSetter; }
+};
+
 class SDKNodeDeclFunction: public SDKNodeDeclAbstractFunc {
 public:
   SDKNodeDeclFunction(SDKNodeInitInfo Info);
