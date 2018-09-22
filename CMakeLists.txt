@@ -767,7 +767,10 @@ if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
   endif()
 
-  configure_sdk_unix(ANDROID "Android" "android" "android" "armv7;aarch64" "" "")
+  if("${SWIFT_SDK_ANDROID_ARCHITECTURES}" STREQUAL "")
+    set(SWIFT_SDK_ANDROID_ARCHITECTURES armv7;aarch)
+  endif()
+  configure_sdk_unix(ANDROID "Android" "android" "android" "${SWIFT_SDK_ANDROID_ARCHITECTURES}" "" "")
 endif()
 
 # Should we cross-compile the standard library for Windows?
