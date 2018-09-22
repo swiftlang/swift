@@ -51,7 +51,7 @@ import resilient_protocol
 
 // Requirement signature
 // CHECK-SAME:   i32 128,
-// CHECK-SAME:   @"$sx1T_MXA"
+// CHECK-SAME:   @"$sx1T19protocol_resilience17ResilientProtocolP_MXA"
 // CHECK-SAME:   @"$s19protocol_resilience17ResilientProtocolMp"
 
 // Protocol requirements

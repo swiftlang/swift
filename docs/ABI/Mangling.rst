@@ -64,7 +64,7 @@ Globals
   global ::= context 'MXE'               // extension descriptor
   global ::= context 'MXX'               // anonymous context descriptor
   global ::= context identifier 'MXY'    // anonymous context descriptor
-  global ::= type assoc_type_path 'MXA'  // generic parameter ref
+  global ::= type assoc-type-list 'MXA'  // generic parameter ref
   global ::= protocol 'Mp'               // protocol descriptor
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
@@ -91,14 +91,12 @@ Globals
   global ::= type protocol-conformance 'WL'   // lazy protocol witness table cache variable
 
   global ::= protocol-conformance identifier 'Wt' // associated type metadata accessor
-  global ::= protocol-conformance assoc_type_path nominal-type 'WT' // associated type witness table accessor
+  global ::= protocol-conformance assoc-type-list nominal-type 'WT' // associated type witness table accessor
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
 
   global ::= type 'WV'                   // value witness table
   global ::= entity 'Wvd'                // field offset
   global ::= entity 'WC'                 // resilient enum tag index
-
-  assoc_type_path ::= identifier '_' identifier*
 
 A direct symbol resolves directly to the address of an object.  An
 indirect symbol resolves to the address of a pointer to the object.

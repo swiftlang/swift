@@ -1666,10 +1666,10 @@ NodePointer Demangler::popAssocTypePath() {
   bool firstElem = false;
   do {
     firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
-    NodePointer AssocTyName = popNode(isDeclName);
-    if (!AssocTyName)
+    NodePointer AssocTy = popAssocTypeName();
+    if (!AssocTy)
       return nullptr;
-    AssocTypePath->addChild(AssocTyName, *this);
+    AssocTypePath->addChild(AssocTy, *this);
   } while (!firstElem);
   AssocTypePath->reverseChildren();
   return AssocTypePath;
