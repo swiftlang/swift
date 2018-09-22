@@ -6093,9 +6093,11 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   SmallVector<AnyFunctionType::Param, 4> allocParams;
   bodyParams->getParams(allocParams);
 
-  bool ignoreNewExtensions = isa<ClassDecl>(dc);
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  if (isa<ClassDecl>(dc))
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
   for (auto other : ownerNominal->lookupDirect(importedName.getDeclName(),
-                                               ignoreNewExtensions)) {
+                                               flags)) {
     auto ctor = dyn_cast<ConstructorDecl>(other);
     if (!ctor || ctor->isInvalid() ||
         ctor->getAttrs().isUnavailable(Impl.SwiftContext) ||
