@@ -329,7 +329,7 @@ public:
   void appendAssociatedTypePath(CanType associatedType, bool &isFirst) {
     if (auto memberType = dyn_cast<DependentMemberType>(associatedType)) {
       appendAssociatedTypePath(memberType.getBase(), isFirst);
-      appendIdentifier(memberType->getName().str());
+      appendAssociatedTypeName(memberType);
       appendListSeparator(isFirst);
     } else {
       assert(isa<GenericTypeParamType>(associatedType));
