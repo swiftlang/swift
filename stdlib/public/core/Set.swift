@@ -2156,6 +2156,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
   }
 
   private func bridgedElement(at index: _HashTable.Index) -> AnyObject {
+    _sanityCheck(base.hashTable.isOccupied(index))
     if let bridgedElements = self.bridgedElements {
       return bridgedElements[index]
     }
@@ -2233,10 +2234,6 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     super.init()
   }
 
-  deinit {
-    _bridgedElements?.deinitialize(elementsFrom: native.hashTable)
-  }
-
   /// Returns the pointer to the stored property, which contains bridged
   /// Set elements.
   @nonobjc
@@ -2256,10 +2253,8 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
   /// Attach a buffer for bridged Set elements.
   @nonobjc
-  private func _initializeBridgedElements(
-    _ storage: _BridgingHashBuffer
-  ) -> Bool {
-    return _stdlib_atomicInitializeARCRef(
+  private func _initializeBridgedElements(_ storage: _BridgingHashBuffer) {
+    _stdlib_atomicInitializeARCRef(
       object: _bridgedElementsPtr,
       desired: storage)
   }
@@ -2270,19 +2265,16 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
     // Allocate and initialize heap storage for bridged objects.
     let bridged = _BridgingHashBuffer.allocate(
-      bucketCount: native._storage._bucketCount)
+      owner: native._storage,
+      hashTable: native.hashTable)
     for index in native.hashTable {
       let object = _bridgeAnythingToObjectiveC(native.element(at: index))
       bridged.initialize(at: index, to: object)
     }
 
     // Atomically put the bridged elements in place.
-    if !_initializeBridgedElements(bridged) {
-      // Lost the race.
-      bridged.deinitialize(elementsFrom: native.hashTable)
-      return _bridgedElements!
-    }
-    return bridged
+    _initializeBridgedElements(bridged)
+    return _bridgedElements!
   }
 
   @objc

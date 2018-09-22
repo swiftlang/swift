@@ -2831,7 +2831,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   @nonobjc
   private var _bridgedKeys_DoNotUse: AnyObject?
 
-  // This stored property must be stored at offset zero.  We perform atomic
+  // This stored property must be stored at offset one.  We perform atomic
   // operations on it.
   //
   // Do not access this property directly.
@@ -2856,11 +2856,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     count: Int
   ) {
     _sanityCheckFailure("don't call this designated initializer")
-  }
-
-  deinit {
-    _bridgedKeys?.deinitialize(elementsFrom: native.hashTable)
-    _bridgedValues?.deinitialize(elementsFrom: native.hashTable)
   }
 
   @nonobjc
@@ -2894,20 +2889,14 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
   /// Attach a buffer for bridged Dictionary keys.
   @nonobjc
-  private func _initializeBridgedKeys(_ storage: _BridgingHashBuffer) -> Bool {
-    return _stdlib_atomicInitializeARCRef(
-      object: _bridgedKeysPtr,
-      desired: storage)
+  private func _initializeBridgedKeys(_ storage: _BridgingHashBuffer) {
+    _stdlib_atomicInitializeARCRef(object: _bridgedKeysPtr, desired: storage)
   }
 
   /// Attach a buffer for bridged Dictionary values.
   @nonobjc
-  private func _initializeBridgedValues(
-    _ storage: _BridgingHashBuffer
-  ) -> Bool {
-    return _stdlib_atomicInitializeARCRef(
-      object: _bridgedValuesPtr,
-      desired: storage)
+  private func _initializeBridgedValues(_ storage: _BridgingHashBuffer) {
+    _stdlib_atomicInitializeARCRef(object: _bridgedValuesPtr, desired: storage)
   }
 
   @nonobjc
@@ -2917,19 +2906,16 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
     // Allocate and initialize heap storage for bridged keys.
     let bridged = _BridgingHashBuffer.allocate(
-      bucketCount: native._storage._bucketCount)
+      owner: native._storage,
+      hashTable: native.hashTable)
     for index in native.hashTable {
       let object = _bridgeAnythingToObjectiveC(native.uncheckedKey(at: index))
       bridged.initialize(at: index, to: object)
     }
 
     // Atomically put the bridged keys in place.
-    if !_initializeBridgedKeys(bridged) {
-      // Lost the race.
-      bridged.deinitialize(elementsFrom: native.hashTable)
-      return _bridgedKeys!
-    }
-    return bridged
+    _initializeBridgedKeys(bridged)
+    return _bridgedKeys!
   }
 
   @nonobjc
@@ -2939,19 +2925,16 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
     // Allocate and initialize heap storage for bridged values.
     let bridged = _BridgingHashBuffer.allocate(
-      bucketCount: native._storage._bucketCount)
+      owner: native._storage,
+      hashTable: native.hashTable)
     for index in native.hashTable {
       let object = _bridgeAnythingToObjectiveC(native.uncheckedValue(at: index))
       bridged.initialize(at: index, to: object)
     }
 
     // Atomically put the bridged values in place.
-    if !_initializeBridgedValues(bridged) {
-      // Lost the race.
-      bridged.deinitialize(elementsFrom: native.hashTable)
-      return _bridgedValues!
-    }
-    return bridged
+    _initializeBridgedValues(bridged)
+    return _bridgedValues!
   }
 
   @usableFromInline
