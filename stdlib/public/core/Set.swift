@@ -2130,11 +2130,12 @@ extension _NativeSet { // Deletion
 final internal class _SwiftSetNSEnumerator<Element: Hashable>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
 
-  internal var base: _NativeSet<Element>
-  internal var bridgedElements: _BridgingHashBuffer?
-  internal var nextIndex: _NativeSet<Element>.Index
-  internal var endIndex: _NativeSet<Element>.Index
+  @nonobjc internal var base: _NativeSet<Element>
+  @nonobjc internal var bridgedElements: _BridgingHashBuffer?
+  @nonobjc internal var nextIndex: _NativeSet<Element>.Index
+  @nonobjc internal var endIndex: _NativeSet<Element>.Index
 
+  @objc
   internal override required init() {
     _sanityCheckFailure("don't call this designated initializer")
   }
@@ -2147,6 +2148,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     self.endIndex = base.endIndex
   }
 
+  @nonobjc
   internal init(_ deferred: _SwiftDeferredNSSet<Element>) {
     _sanityCheck(!_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = deferred.native

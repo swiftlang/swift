@@ -2743,11 +2743,12 @@ extension _NativeDictionary { // High-level operations
 final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
 
-  internal var base: _NativeDictionary<Key, Value>
-  internal var bridgedKeys: _BridgingHashBuffer?
-  internal var nextIndex: _NativeDictionary<Key, Value>.Index
-  internal var endIndex: _NativeDictionary<Key, Value>.Index
+  @nonobjc internal var base: _NativeDictionary<Key, Value>
+  @nonobjc internal var bridgedKeys: _BridgingHashBuffer?
+  @nonobjc internal var nextIndex: _NativeDictionary<Key, Value>.Index
+  @nonobjc internal var endIndex: _NativeDictionary<Key, Value>.Index
 
+  @objc
   internal override required init() {
     _sanityCheckFailure("don't call this designated initializer")
   }
@@ -2760,6 +2761,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     self.endIndex = base.endIndex
   }
 
+  @nonobjc
   internal init(_ deferred: _SwiftDeferredNSDictionary<Key, Value>) {
     _sanityCheck(!_isBridgedVerbatimToObjectiveC(Key.self))
     self.base = deferred.native
