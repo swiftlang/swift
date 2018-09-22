@@ -253,7 +253,7 @@ struct V27515965 {
 
 func test(x: S27515965) -> V27515965 {
   return V27515965(x)
-  // expected-error@-1 {{initializer requires the types 'Any' and 'Float' be equivalent}}
+  // expected-error@-1 {{initializer 'init' requires the types 'Any' and 'Float' be equivalent}}
 }
 
 protocol BaseProto {}
@@ -331,14 +331,14 @@ func testFixIts() {
   _ = AnyClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{28-28=<<#Foo: SubProto & AnyObject#>>}}
   _ = AnyClassAndProtoBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{29-29=<<#Foo: SubProto & AnyObject#>>}}
 
-  _ = ClassAndProtoBound() // expected-error {{referencing initializer on 'ClassAndProtoBound' requires that 'X' conform to 'SubProto'}}
+  _ = ClassAndProtoBound() // expected-error {{referencing initializer 'init()' on 'ClassAndProtoBound' requires that 'X' conform to 'SubProto'}}
 
   _ = ClassAndProtosBound() 
-  // expected-error@-1 {{referencing initializer on 'ClassAndProtosBound' requires that 'X' conform to 'NSCopyish'}}
-  // expected-error@-2 {{referencing initializer on 'ClassAndProtosBound' requires that 'X' conform to 'SubProto'}}
+  // expected-error@-1 {{referencing initializer 'init()' on 'ClassAndProtosBound' requires that 'X' conform to 'NSCopyish'}}
+  // expected-error@-2 {{referencing initializer 'init()' on 'ClassAndProtosBound' requires that 'X' conform to 'SubProto'}}
   _ = ClassAndProtosBound2()
-  // expected-error@-1 {{referencing initializer on 'ClassAndProtosBound2' requires that 'X' conform to 'NSCopyish'}}
-  // expected-error@-2 {{referencing initializer on 'ClassAndProtosBound2' requires that 'X' conform to 'SubProto'}}
+  // expected-error@-1 {{referencing initializer 'init()' on 'ClassAndProtosBound2' requires that 'X' conform to 'NSCopyish'}}
+  // expected-error@-2 {{referencing initializer 'init()' on 'ClassAndProtosBound2' requires that 'X' conform to 'SubProto'}}
 
   _ = Pair() // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<Any, Any>}}
   _ = Pair(first: S()) // expected-error {{generic parameter 'U' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<S, Any>}}
@@ -610,7 +610,7 @@ func rdar40537858() {
   }
 
   var arr: [S] = []
-  _ = List(arr, id: \.id) // expected-error {{referencing initializer on 'List' requires that 'S.Id' conform to 'Hashable'}}
+  _ = List(arr, id: \.id) // expected-error {{referencing initializer 'init(_:id:)' on 'List' requires that 'S.Id' conform to 'Hashable'}}
 
   enum E<T: P> { // expected-note 2 {{where 'T' = 'S'}}
     case foo(T)
