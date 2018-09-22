@@ -2190,8 +2190,8 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
 
 /// Initialize the invariant superclass components of a class metadata,
 /// such as the generic type arguments, field offsets, and so on.
-static void _swift_initializeSuperclass(ClassMetadata *theClass,
-                                        ClassLayoutFlags layoutFlags) {
+static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
+                                             ClassLayoutFlags layoutFlags) {
   const ClassMetadata *theSuperclass = theClass->Superclass;
   if (theSuperclass == nullptr)
     return;
@@ -2251,75 +2251,49 @@ static void _swift_initializeSuperclass(ClassMetadata *theClass,
 #endif
 }
 
-/// Initialize the field offset vector for a dependent-layout class, using the
-/// "Universal" layout strategy.
-void
-swift::swift_initClassMetadata(ClassMetadata *self,
-                               ClassMetadata *super,
-                               ClassLayoutFlags layoutFlags,
-                               size_t numFields,
-                               const TypeLayout * const *fieldTypes,
-                               size_t *fieldOffsets) {
-  self->Superclass = super;
+/// Using the information in the class context descriptor, fill in in the
+/// immediate vtable entries for the class and install overrides of any
+/// superclass vtable entries.
+static void initClassVTable(ClassMetadata *self) {
+  const auto *description = self->getDescription();
+  auto *classWords = reinterpret_cast<void **>(self);
 
-#if SWIFT_OBJC_INTEROP
-  // Set the superclass to SwiftObject if this is a root class.
-  if (!super)
-    self->Superclass = getRootSuperclass();
-
-  // Register our custom implementation of class_getImageName.
-  static swift_once_t onceToken;
-  swift_once(&onceToken, [](void *unused) {
-    (void)unused;
-    setUpObjCRuntimeGetImageNameFromClass();
-  }, nullptr);
-
-  // If the class is generic, we need to give it a name for Objective-C.
-  if (self->getDescription()->isGeneric())
-    _swift_initGenericClassObjCName(self);
-#endif
-
-  // Copy vtable entries and field offsets from our superclass.
-  _swift_initializeSuperclass(self, layoutFlags);
-
-  // Copy the class's immediate methods from the nominal type descriptor
-  // to the class metadata.
-  if (!hasStaticVTable(layoutFlags)) {
-    const auto *description = self->getDescription();
-    auto *classWords = reinterpret_cast<void **>(self);
-
-    if (description->hasVTable()) {
-      auto *vtable = description->getVTableDescriptor();
-      auto vtableOffset = vtable->getVTableOffset(description);
-      for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i)
-        classWords[vtableOffset + i] = description->getMethod(i);
-    }
-
-    if (description->hasOverrideTable()) {
-      auto *overrideTable = description->getOverrideTable();
-      auto overrideDescriptors = description->getMethodOverrideDescriptors();
-
-      for (unsigned i = 0, e = overrideTable->NumEntries; i < e; ++i) {
-        auto &descriptor = overrideDescriptors[i];
-
-        // Get the base class and method.
-        auto *baseClass = descriptor.Class.get();
-        auto *baseMethod = descriptor.Method.get();
-
-        // Calculate the base method's vtable offset from the
-        // base method descriptor. The offset will be relative
-        // to the base class's vtable start offset.
-        auto baseClassMethods = baseClass->getMethodDescriptors().data();
-        auto offset = baseMethod - baseClassMethods;
-
-        // Install the method override in our vtable.
-        auto baseVTable = baseClass->getVTableDescriptor();
-        classWords[baseVTable->getVTableOffset(baseClass) + offset]
-          = descriptor.Impl.get();
-      }
-    }
+  if (description->hasVTable()) {
+    auto *vtable = description->getVTableDescriptor();
+    auto vtableOffset = vtable->getVTableOffset(description);
+    for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i)
+      classWords[vtableOffset + i] = description->getMethod(i);
   }
 
+  if (description->hasOverrideTable()) {
+    auto *overrideTable = description->getOverrideTable();
+    auto overrideDescriptors = description->getMethodOverrideDescriptors();
+
+    for (unsigned i = 0, e = overrideTable->NumEntries; i < e; ++i) {
+      auto &descriptor = overrideDescriptors[i];
+
+      // Get the base class and method.
+      auto *baseClass = descriptor.Class.get();
+      auto *baseMethod = descriptor.Method.get();
+
+      // Calculate the base method's vtable offset from the
+      // base method descriptor. The offset will be relative
+      // to the base class's vtable start offset.
+      auto baseClassMethods = baseClass->getMethodDescriptors().data();
+      auto offset = baseMethod - baseClassMethods;
+
+      // Install the method override in our vtable.
+      auto baseVTable = baseClass->getVTableDescriptor();
+      classWords[baseVTable->getVTableOffset(baseClass) + offset]
+        = descriptor.Impl.get();
+    }
+  }
+}
+
+static void initClassFieldOffsetVector(ClassMetadata *self,
+                                       size_t numFields,
+                                       const TypeLayout * const *fieldTypes,
+                                       size_t *fieldOffsets) {
   // Start layout by appending to a standard heap object header.
   size_t size, alignMask;
 
@@ -2329,6 +2303,8 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 
   // If we have a superclass, start from its size and alignment instead.
   if (classHasSuperclass(self)) {
+    auto *super = self->Superclass;
+
     // This is straightforward if the superclass is Swift.
 #if SWIFT_OBJC_INTEROP
     if (super->isTypeMetadata()) {
@@ -2355,6 +2331,57 @@ swift::swift_initClassMetadata(ClassMetadata *self,
   }
 
 #if SWIFT_OBJC_INTEROP
+  // Ensure that Objective-C does layout starting from the right
+  // offset.  This needs to exactly match the superclass rodata's
+  // InstanceSize in cases where the compiler decided that we didn't
+  // really have a resilient ObjC superclass, because the compiler
+  // might hardcode offsets in that case, so we can't slide ivars.
+  // Fortunately, the cases where that happens are exactly the
+  // situations where our entire superclass hierarchy is defined
+  // in Swift.  (But note that ObjC might think we have a superclass
+  // even if Swift doesn't, because of SwiftObject.)
+  rodata->InstanceStart = size;
+#endif
+
+  // Okay, now do layout.
+  for (unsigned i = 0; i != numFields; ++i) {
+    auto *eltLayout = fieldTypes[i];
+
+    // Skip empty fields.
+    if (fieldOffsets[i] == 0 && eltLayout->size == 0)
+      continue;
+    auto offset = roundUpToAlignMask(size,
+                                     eltLayout->flags.getAlignmentMask());
+    fieldOffsets[i] = offset;
+    size = offset + eltLayout->size;
+    alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
+  }
+
+  // Save the final size and alignment into the metadata record.
+  assert(self->isTypeMetadata());
+  self->setInstanceSize(size);
+  self->setInstanceAlignMask(alignMask);
+
+#if SWIFT_OBJC_INTEROP
+  // Save the size into the Objective-C metadata as well.
+  rodata->InstanceSize = size;
+#endif
+}
+
+#if SWIFT_OBJC_INTEROP
+/// Generic classes only. Initialize the Objective-C ivar descriptors and field
+/// offset globals and register the class with the runtime.
+///
+/// This function copies the ivar descriptors and points each ivar offset at the
+/// corresponding entry in \p fieldOffsets, before asking the Objective-C
+/// runtime to realize the class. The Objective-C runtime will then slide the
+/// offsets in \p fieldOffsets.
+static void initGenericObjCClass(ClassMetadata *self,
+                                 size_t numFields,
+                                 const TypeLayout * const *fieldTypes,
+                                 size_t *fieldOffsets) {
+  ClassROData *rodata = getROData(self);
+
   // In ObjC interop mode, we have up to two places we need each correct
   // ivar offset to end up:
   //
@@ -2376,7 +2403,7 @@ swift::swift_initClassMetadata(ClassMetadata *self,
   // the global ivar offset.
   //
   // So we need to the remember the addresses of the global ivar offsets.
-  // We use this lazily-filled SmallVector to do so.
+  // We use this lazily-filled array to do so.
   const unsigned NumInlineGlobalIvarOffsets = 8;
   size_t *_inlineGlobalIvarOffsets[NumInlineGlobalIvarOffsets];
   size_t **_globalIvarOffsets = nullptr;
@@ -2393,17 +2420,6 @@ swift::swift_initClassMetadata(ClassMetadata *self,
     }
     return _globalIvarOffsets;
   };
-
-  // Ensure that Objective-C does layout starting from the right
-  // offset.  This needs to exactly match the superclass rodata's
-  // InstanceSize in cases where the compiler decided that we didn't
-  // really have a resilient ObjC superclass, because the compiler
-  // might hardcode offsets in that case, so we can't slide ivars.
-  // Fortunately, the cases where that happens are exactly the
-  // situations where our entire superclass hierarchy is defined
-  // in Swift.  (But note that ObjC might think we have a superclass
-  // even if Swift doesn't, because of SwiftObject.)
-  rodata->InstanceStart = size;
 
   // Always clone the ivar descriptors.
   if (numFields) {
@@ -2442,33 +2458,9 @@ swift::swift_initClassMetadata(ClassMetadata *self,
       }
     }
   }
-#endif
 
-  // Okay, now do layout.
-  for (unsigned i = 0; i != numFields; ++i) {
-    auto *eltLayout = fieldTypes[i];
-
-    // Skip empty fields.
-    if (fieldOffsets[i] == 0 && eltLayout->size == 0)
-      continue;
-    auto offset = roundUpToAlignMask(size,
-                                     eltLayout->flags.getAlignmentMask());
-    fieldOffsets[i] = offset;
-    size = offset + eltLayout->size;
-    alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
-  }
-
-  // Save the final size and alignment into the metadata record.
-  assert(self->isTypeMetadata());
-  self->setInstanceSize(size);
-  self->setInstanceAlignMask(alignMask);
-
-#if SWIFT_OBJC_INTEROP
-  // Save the size into the Objective-C metadata as well.
-  rodata->InstanceSize = size;
-
-  // Register this class with the runtime.  This will also cause the
-  // runtime to lay us out.
+  // Register this class with the runtime. This will also cause the
+  // runtime to slide the entries in the field offset vector.
   swift_instantiateObjCClass(self);
 
   // If we saved any global ivar offsets, make sure we write back to them.
@@ -2487,6 +2479,48 @@ swift::swift_initClassMetadata(ClassMetadata *self,
       delete [] _globalIvarOffsets;
     }
   }
+}
+#endif
+
+void
+swift::swift_initClassMetadata(ClassMetadata *self,
+                               ClassMetadata *super,
+                               ClassLayoutFlags layoutFlags,
+                               size_t numFields,
+                               const TypeLayout * const *fieldTypes,
+                               size_t *fieldOffsets) {
+  self->Superclass = super;
+
+#if SWIFT_OBJC_INTEROP
+  // Set the superclass to SwiftObject if this is a root class.
+  if (!super)
+    self->Superclass = getRootSuperclass();
+
+  // Register our custom implementation of class_getImageName.
+  static swift_once_t onceToken;
+  swift_once(&onceToken, [](void *unused) {
+    (void)unused;
+    setUpObjCRuntimeGetImageNameFromClass();
+  }, nullptr);
+
+  // If the class is generic, we need to give it a name for Objective-C.
+  if (self->getDescription()->isGeneric())
+    _swift_initGenericClassObjCName(self);
+#endif
+
+  // Copy field offsets, generic arguments and (if necessary) vtable entries
+  // from our superclass.
+  copySuperclassMetadataToSubclass(self, layoutFlags);
+
+  // Copy the class's immediate methods from the nominal type descriptor
+  // to the class metadata.
+  if (!hasStaticVTable(layoutFlags))
+    initClassVTable(self);
+
+  initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
+
+#if SWIFT_OBJC_INTEROP
+  initGenericObjCClass(self, numFields, fieldTypes, fieldOffsets);
 #endif
 }
 
