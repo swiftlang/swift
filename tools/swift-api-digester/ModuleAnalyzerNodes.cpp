@@ -1257,8 +1257,10 @@ static SDKNode *constructVarNode(SDKContext &Ctx, ValueDecl *VD) {
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
     if (auto Getter = VAD->getGetter())
       Var->addChild(constructFunctionNode(Ctx, Getter, SDKNodeKind::DeclGetter));
-    if (auto Setter = VAD->getSetter())
-      Var->addChild(constructFunctionNode(Ctx, Setter, SDKNodeKind::DeclSetter));
+    if (auto Setter = VAD->getSetter()) {
+      if (Setter->getFormalAccess() > AccessLevel::Internal)
+        Var->addChild(constructFunctionNode(Ctx, Setter, SDKNodeKind::DeclSetter));
+    }
   }
   return Var;
 }
