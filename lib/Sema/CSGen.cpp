@@ -2043,28 +2043,29 @@ namespace {
     void getClosureParams(ClosureExpr *closureExpr,
                           SmallVectorImpl<AnyFunctionType::Param> &params) {
       auto *paramList = closureExpr->getParameters();
-      for (auto i : indices(paramList->getArray())) {
-        auto *param = paramList->get(i);
+      unsigned i = 0;
+      paramList->getParams(params, [&](ParamDecl *param) {
         auto *locator = CS.getConstraintLocator(
-            closureExpr, LocatorPathElt::getTupleElement(i));
+            closureExpr, LocatorPathElt::getTupleElement(i++));
+        Type paramType, internalType;
 
         // If a type was explicitly specified, use its opened type.
         if (auto type = param->getTypeLoc().getType()) {
           // FIXME: Need a better locator for a pattern as a base.
-          CS.setType(param, CS.openUnboundGenericType(type, locator));
-          continue;
+          paramType = CS.openUnboundGenericType(type, locator);
+          internalType = paramType;
+          if (param->isInOut())
+            internalType = LValueType::get(internalType);
+        } else {
+          // Otherwise, create fresh type variables.
+          paramType = CS.createTypeVariable(locator, TVO_CanBindToInOut);
+          internalType = CS.createTypeVariable(locator, TVO_CanBindToLValue);
+          CS.addConstraint(ConstraintKind::BindParam, paramType, internalType,
+                           locator);
         }
-
-        // Otherwise, create a fresh type variable. It might become an InOutType
-        // later; when applying the solution, we strip off the InOutType and
-        // change the ParamDecl's ownership specifier if this is the case.
-        CS.setType(param, CS.createTypeVariable(locator, TVO_CanBindToInOut));
-      }
-
-      paramList->getParams(params,
-                           [&](ParamDecl *param) {
-                             return CS.getType(param);
-                           });
+        CS.setType(param, internalType);
+        return paramType;
+      });
     }
 
     /// \brief Produces a type for the given pattern, filling in any missing

@@ -869,6 +869,8 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
     type = cs.openUnboundGenericType(UGT, locator);
     type = type->reconstituteSugar(/*recursive=*/false);
+  } else if (type->is<InOutType>() && !TypeVar->getImpl().canBindToInOut()) {
+    type = LValueType::get(type->getInOutObjectType());
   }
 
   // FIXME: We want the locator that indicates where the binding came

@@ -6308,20 +6308,6 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     // Coerce parameter types here only if there are no unresolved
     if (CS.TC.coerceParameterListToType(params, CE, fnType))
       return true;
-
-    for (auto param : *params) {
-      auto paramType = param->getType();
-      // If this is unresolved 'inout' parameter, it's better to drop
-      // 'inout' from type because that might help to diagnose actual problem
-      // e.g. type inference doesn't give us much information anyway.
-      if (param->isInOut() && paramType->hasUnresolvedType()) {
-        assert(!param->isImmutable() || !paramType->is<InOutType>());
-        param->setType(CS.getASTContext().TheUnresolvedType);
-        param->setInterfaceType(paramType->getInOutObjectType());
-        param->setSpecifier(swift::VarDecl::Specifier::Default);
-      }
-    }
-
     expectedResultType = fnType->getResult();
   }
 
