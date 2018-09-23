@@ -66,6 +66,8 @@ ERROR(conformance_added,none,"%0 has added inherited protocol %1", (StringRef, S
 
 ERROR(default_associated_type_removed,none,"%0 has removed default type %1", (StringRef, StringRef))
 
+ERROR(protocol_req_added,none,"%0 has been added as a protocol requirement", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

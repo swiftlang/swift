@@ -278,6 +278,7 @@ class SDKNodeDecl: public SDKNode {
   bool IsImplicit;
   bool IsStatic;
   bool IsDeprecated;
+  bool IsProtocolReq;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
 
@@ -301,6 +302,7 @@ public:
   StringRef getFullyQualifiedName() const;
   bool isSDKPrivate() const;
   bool isDeprecated() const { return IsDeprecated; };
+  bool isProtocolRequirement() const { return IsProtocolReq; }
   bool hasDeclAttribute(DeclAttrKind DAKind) const;
   bool isImplicit() const { return IsImplicit; };
   bool isStatic() const { return IsStatic; };

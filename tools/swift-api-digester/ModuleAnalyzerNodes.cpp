@@ -48,6 +48,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   bool IsMutating = false;
   bool IsStatic = false;
   bool IsDeprecated = false;
+  bool IsProtocolReq = false;
   Optional<uint8_t> SelfIndex;
   Optional<unsigned> FixedBinaryOrder;
   ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
@@ -87,6 +88,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         Location(Info.Location), ModuleName(Info.ModuleName),
         DeclAttributes(Info.DeclAttrs), IsImplicit(Info.IsImplicit),
         IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
+        IsProtocolReq(Info.IsProtocolReq),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
         GenericSig(Info.GenericSig) {}
 
@@ -591,6 +593,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       case KeyKind::KK_deprecated:
         Info.IsDeprecated = true;
         break;
+      case KeyKind::KK_protocolReq:
+        Info.IsProtocolReq = true;
+        break;
       case KeyKind::KK_implicit:
         Info.IsImplicit = true;
         break;
@@ -1053,6 +1058,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
       IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
       IsStatic(VD->isStatic()),
       IsDeprecated(VD->getAttrs().getDeprecated(VD->getASTContext())),
+      IsProtocolReq(isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement()),
       SelfIndex(getSelfIndex(VD)), FixedBinaryOrder(getFixedBinaryOrder(VD)),
       ReferenceOwnership(getReferenceOwnership(VD)),
       GenericSig(printGenericSignature(Ctx, VD)) {
@@ -1476,6 +1482,10 @@ struct ObjectTraits<SDKNode *> {
       if (bool isDeprecated = D->isDeprecated())
         out.mapRequired(getKeyContent(Ctx, KeyKind::KK_deprecated).data(),
                         isDeprecated);
+      if (bool isProtocolReq = D->isProtocolRequirement()) {
+        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_protocolReq).data(),
+                        isProtocolReq);
+      }
       if (bool isImplicit = D->isImplicit())
         out.mapRequired(getKeyContent(Ctx, KeyKind::KK_implicit).data(),
                         isImplicit);

@@ -90,3 +90,9 @@ public class RemoveSetters {
   }
 }
 
+public protocol RequiementChanges {
+  associatedtype addedTypeWithDefault = Int
+  associatedtype addedTypeWithoutDefault
+  func addedFunc()
+  var addedVar: Int { get }
+}
