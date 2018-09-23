@@ -248,6 +248,7 @@ public:
     explicit SubstGenericParametersFromMetadata(const Metadata *base)
       : base(base) { }
 
+    const Metadata *operator()(unsigned flatIndex) const;
     const Metadata *operator()(unsigned depth, unsigned index) const;
   };
 

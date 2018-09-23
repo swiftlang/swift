@@ -1224,6 +1224,12 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
 }
 
 const Metadata *
+SubstGenericParametersFromMetadata::operator()(unsigned flatIndex) const {
+  // FIXME: Adjust for non-key arguments.
+  return base->getGenericArgs()[flatIndex];
+}
+
+const Metadata *
 SubstGenericParametersFromMetadata::operator()(
                                         unsigned depth, unsigned index) const {
   // On first access, compute the descriptor path.
@@ -1259,6 +1265,7 @@ SubstGenericParametersFromMetadata::operator()(
   if (index >= currentContext->getNumGenericParams())
     return nullptr;
 
+  // FIXME: Adjust for non-key arguments.
   return base->getGenericArgs()[flatIndex];
 }
 
