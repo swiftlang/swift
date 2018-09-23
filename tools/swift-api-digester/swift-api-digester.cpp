@@ -813,6 +813,20 @@ public:
           }
         }
       }
+      // Complain about added protocol requirements
+      if (auto *D = dyn_cast<SDKNodeDecl>(Right)) {
+        if (D->isProtocolRequirement()) {
+          bool ShouldComplain = true;
+          // We should allow added associated types with default.
+          if (auto ATD = dyn_cast<SDKNodeDeclAssociatedType>(D)) {
+            if (ATD->getDefault())
+              ShouldComplain = false;
+          }
+          if (ShouldComplain)
+            Ctx.getDiags().diagnose(SourceLoc(), diag::protocol_req_added,
+                                    D->getScreenInfo());
+        }
+      }
       return;
     case NodeMatchReason::Removed:
       assert(!Right);

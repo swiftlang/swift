@@ -83,3 +83,9 @@ public class RemoveSetters {
     set(newValue) {}
   }
 }
+
+public protocol RequiementChanges {
+  func removedFunc()
+  associatedtype removedType
+  var removedVar: Int {get}
+}
