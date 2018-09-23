@@ -227,8 +227,8 @@ function(_add_variant_c_compile_flags)
     # -D_MD or D_MDd either, as CMake does this automatically.
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
       list(APPEND result -Xclang;--dependent-lib=oldnames)
-      # TODO(compnerd) handle /MT, /MTd, /MD, /MDd
-      if("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+      # TODO(compnerd) handle /MT, /MTd
+      if("${CFLAGS_BUILD_TYPE}" STREQUAL "Debug")
         list(APPEND result "-D_MDd")
         list(APPEND result -Xclang;--dependent-lib=msvcrtd)
       else()
