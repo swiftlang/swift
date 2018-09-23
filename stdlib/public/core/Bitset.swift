@@ -337,3 +337,238 @@ extension _UnsafeBitset.Word: Sequence, IteratorProtocol {
     return bit
   }
 }
+
+
+/// A simple bitmap of a fixed number of bits, implementing a partial SetAlgebra
+/// of small nonnegative Int values.
+///
+/// Because `_Bitset` implements a flat bit vector, it isn't suitable for
+/// holding arbitrarily large integers. The maximal element a bitset can store
+/// is fixed at its initialization; it uses this to determine how much space it
+/// needs to allocate for storage. Storage is allocated up front.
+///
+@_fixed_layout
+@usableFromInline
+internal struct _Bitset {
+  /// FIXME: Conform to the full SetAlgebra protocol. Allow resizing after init.
+  @usableFromInline
+  typealias Word = _UnsafeBitset.Word
+
+  @usableFromInline
+  internal var count: Int
+
+  @usableFromInline
+  internal var word0: Word
+
+  @usableFromInline
+  internal var storage: Storage?
+
+  @inlinable
+  internal init(capacity: Int) {
+    _internalInvariant(capacity >= 0)
+    self.count = 0
+    let wordCount = _UnsafeBitset.wordCount(forCapacity: capacity)
+    self.word0 = .empty
+    self.storage = (wordCount > 1
+      ? Storage.allocate(wordCount: wordCount - 1)
+      : nil)
+    _internalInvariant(self.capacity >= capacity)
+  }
+}
+
+extension _Bitset {
+  @inlinable
+  @inline(__always)
+  internal func isValid(_ element: Int) -> Bool {
+    return element >= 0 && element <= capacity
+  }
+
+  @inlinable
+  @inline(__always)
+  internal mutating func isUniquelyReferenced() -> Bool {
+    return _isUnique_native(&storage)
+  }
+  @inlinable
+  @inline(__always)
+  internal mutating func ensureUnique() {
+    let isUnique = isUniquelyReferenced()
+    if !isUnique, let storage = self.storage {
+      self.storage = storage.copy()
+    }
+  }
+}
+
+extension _Bitset {
+  @inlinable
+  internal var capacity: Int {
+    @inline(__always) get {
+      return Word.capacity + (storage?.bitset.capacity ?? 0)
+    }
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func uncheckedContains(_ element: Int) -> Bool {
+    _internalInvariant(isValid(element))
+    if element < Word.capacity {
+      return word0.uncheckedContains(element)
+    }
+    defer { _fixLifetime(storage) }
+    return storage!.bitset.uncheckedContains(element &- Word.capacity)
+  }
+
+  @inlinable
+  @inline(__always)
+  @discardableResult
+  internal mutating func uncheckedInsert(_ element: Int) -> Bool {
+    _internalInvariant(isValid(element))
+    let inserted: Bool
+    if element < Word.capacity {
+      inserted = word0.uncheckedInsert(element)
+    } else {
+      ensureUnique()
+      defer { _fixLifetime(storage) }
+      inserted = storage!.bitset.uncheckedInsert(element &- Word.capacity)
+    }
+    if inserted {
+      count += 1
+      _internalInvariant(count <= capacity)
+    }
+    return inserted
+  }
+
+  @inlinable
+  @inline(__always)
+  @discardableResult
+  internal mutating func uncheckedRemove(_ element: Int) -> Bool {
+    _internalInvariant(isValid(element))
+    let removed: Bool
+    if element < Word.capacity {
+      removed = word0.uncheckedRemove(element)
+    } else {
+      ensureUnique()
+      defer { _fixLifetime(storage) }
+      removed = storage!.bitset.uncheckedRemove(element &- Word.capacity)
+    }
+    if removed {
+      count -= 1
+      _internalInvariant(count >= 0)
+    }
+    return removed
+  }
+}
+
+extension _Bitset: Sequence {
+  @usableFromInline
+  internal typealias Element = Int
+
+  @inlinable
+  internal var underestimatedCount: Int {
+    @inline(__always) get { return count }
+  }
+
+  @inlinable
+  func makeIterator() -> Iterator {
+    return Iterator(self)
+  }
+
+  @usableFromInline
+  @_fixed_layout
+  internal struct Iterator: IteratorProtocol {
+    @usableFromInline
+    internal var word: Word
+    @usableFromInline
+    internal var wordIndex: Int
+    @usableFromInline
+    internal let storage: Storage?
+
+    @inlinable
+    internal init(_ bitset: _Bitset) {
+      self.word = bitset.word0
+      self.wordIndex = 0
+      self.storage = bitset.storage
+    }
+
+    @inlinable
+    internal mutating func next() -> Int? {
+      if let v = word.next() {
+        return wordIndex * Word.capacity + v
+      }
+      guard let storage = self.storage else { return nil }
+      while wordIndex < storage._wordCount {
+        word = storage._words[wordIndex]
+        // Note that _wordIndex is offset by 1 due to word0;
+        // this is why the index needs to be incremented at exactly this point.
+        wordIndex += 1
+        if let v = word.next() {
+          return wordIndex * Word.capacity + v
+        }
+      }
+      return nil
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+extension _Bitset {
+  /// A simple bitmap storage class with room for a specific number of
+  /// tail-allocated bits.
+  @_fixed_layout
+  @usableFromInline
+  internal final class Storage {
+    @usableFromInline
+    internal fileprivate(set) var _wordCount: Int
+
+    internal init(_doNotCall: ()) {
+      _internalInvariantFailure("This class cannot be directly initialized")
+    }
+  }
+}
+
+extension _Bitset.Storage {
+  @usableFromInline
+  internal typealias Word = _Bitset.Word
+
+  internal static func _allocateUninitialized(
+    wordCount: Int
+  ) -> _Bitset.Storage {
+    let storage = Builtin.allocWithTailElems_1(
+      _Bitset.Storage.self,
+      wordCount._builtinWordValue, Word.self)
+    storage._wordCount = wordCount
+    return storage
+  }
+
+  @usableFromInline
+  @_effects(releasenone)
+  internal static func allocate(wordCount: Int) -> _Bitset.Storage {
+    let storage = _allocateUninitialized(wordCount: wordCount)
+    storage._words.initialize(repeating: .empty, count: storage._wordCount)
+    return storage
+  }
+
+  @usableFromInline
+  @_effects(releasenone)
+  internal func copy() -> _Bitset.Storage {
+    let storage = _Bitset.Storage._allocateUninitialized(wordCount: _wordCount)
+    storage._words.initialize(from: self._words, count: storage._wordCount)
+    return storage
+  }
+
+  @inlinable
+  internal var _words: UnsafeMutablePointer<Word> {
+    @inline(__always)
+    get {
+      let addr = Builtin.projectTailElems(self, Word.self)
+      return UnsafeMutablePointer(addr)
+    }
+  }
+
+  @inlinable
+  internal var bitset: _UnsafeBitset {
+    @inline(__always) get {
+      return _UnsafeBitset(words: _words, wordCount: _wordCount)
+    }
+  }
+}
