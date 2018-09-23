@@ -798,6 +798,23 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
   swift_runtime_unreachable("associated type names don't line up");
 }
 
+/// Retrieve the generic parameters introduced in this context.
+static ArrayRef<GenericParamDescriptor> getLocalGenericParams(
+    const ContextDescriptor *context) {
+  if (!context->isGeneric())
+    return { };
+
+  // Determine where to start looking at generic parameters.
+  unsigned startParamIndex;
+  if (auto parent = context->Parent.get())
+    startParamIndex = parent->getNumGenericParams();
+  else
+    startParamIndex = 0;
+
+  auto genericContext = context->getGenericContext();
+  return genericContext->getGenericParams().slice(startParamIndex);
+}
+
 /// Constructs metadata by decoding a mangled type name, for use with
 /// \c TypeDecoder.
 class DecodedMetadataBuilder {
@@ -1223,49 +1240,106 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
   return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
 }
 
+unsigned SubstGenericParametersFromMetadata::
+buildDescriptorPath(const ContextDescriptor *context) const {
+  // Terminating condition: we don't have a context.
+  if (!context)
+    return 0;
+
+  // Add the parent's contributino to the descriptor path.
+  unsigned numKeyGenericParamsInParent =
+    buildDescriptorPath(context->Parent.get());
+
+  // If this context is non-generic, we're done.
+  if (!context->isGeneric())
+    return numKeyGenericParamsInParent;
+
+  // Count the number of key generic params at this level.
+  unsigned numKeyGenericParamsHere = 0;
+  bool hasNonKeyGenericParams = false;
+  for (const auto &genericParam : getLocalGenericParams(context)) {
+    if (genericParam.hasKeyArgument())
+      ++numKeyGenericParamsHere;
+    else
+      hasNonKeyGenericParams = true;
+  }
+
+  // Form the path element.
+  descriptorPath.push_back(PathElement{context, numKeyGenericParamsInParent,
+                                       numKeyGenericParamsHere,
+                                       hasNonKeyGenericParams});
+  return numKeyGenericParamsInParent + numKeyGenericParamsHere;
+}
+
+void SubstGenericParametersFromMetadata::setup() const {
+  if (!descriptorPath.empty() || !base)
+    return;
+
+  buildDescriptorPath(base->getTypeContextDescriptor());
+}
+
 const Metadata *
 SubstGenericParametersFromMetadata::operator()(unsigned flatIndex) const {
-  // FIXME: Adjust for non-key arguments.
-  return base->getGenericArgs()[flatIndex];
+  // On first access, compute the descriptor path.
+  setup();
+
+  // Find the depth at which this parameter occurs.
+  unsigned depth = descriptorPath.size();
+  unsigned index = flatIndex;
+  for (const auto &pathElement : descriptorPath) {
+    // If the flat index is beyond the element at this position, we're done.
+    if (flatIndex >= pathElement.context->getNumGenericParams()) {
+      // Subtract off the number of parameters.
+      index -= pathElement.context->getNumGenericParams();
+      break;
+    }
+
+    --depth;
+  }
+
+  // Perform the access based on depth/index.
+  return (*this)(depth, index);
 }
 
 const Metadata *
 SubstGenericParametersFromMetadata::operator()(
                                         unsigned depth, unsigned index) const {
   // On first access, compute the descriptor path.
-  if (descriptorPath.empty()) {
-    if (auto *baseDesc = base->getTypeContextDescriptor()) {
-      const auto *parent = reinterpret_cast<
-                              const ContextDescriptor *>(baseDesc);
-      while (parent) {
-        if (parent->isGeneric())
-          descriptorPath.push_back(parent);
+  setup();
 
-        parent = parent->Parent.get();
-      }
-    }
-  }
-
+  // If the depth is too great, there is nothing to do.
   if (depth >= descriptorPath.size())
     return nullptr;
 
-  unsigned currentDepth = 0;
-  unsigned flatIndex = index;
-  const ContextDescriptor *currentContext = descriptorPath.back();
+  /// Retrieve the descriptor path element at this depth.
+  auto &pathElement = descriptorPath[depth];
+  auto currentContext = pathElement.context;
 
-  for (const auto *context : llvm::reverse(descriptorPath)) {
-    if (currentDepth >= depth)
-      break;
-
-    flatIndex += context->getNumGenericParams();
-    currentContext = context;
-    ++currentDepth;
-  }
-
+  // Check whether the index is clearly out of bounds.
   if (index >= currentContext->getNumGenericParams())
     return nullptr;
 
-  // FIXME: Adjust for non-key arguments.
+  // Compute the flat index.
+  unsigned flatIndex = pathElement.numKeyGenericParamsInParent;
+  if (pathElement.hasNonKeyGenericParams > 0) {
+    // We have non-key generic parameters at this level, so the index needs to
+    // be checked more carefully.
+    auto genericParams = getLocalGenericParams(currentContext);
+
+    // Make sure that the requested parameter itself has a key argument.
+    if (!genericParams[index].hasKeyArgument())
+      return nullptr;
+
+    // Increase the flat index for each parameter with a key argument, up to
+    // the given index.
+    for (const auto &genericParam : genericParams.slice(0, index)) {
+      if (genericParam.hasKeyArgument())
+        ++flatIndex;
+    }
+  } else {
+    flatIndex += index;
+  }
+
   return base->getGenericArgs()[flatIndex];
 }
 

@@ -242,9 +242,37 @@ public:
   /// Use with \c _getTypeByMangledName to decode potentially-generic types.
   class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
     const Metadata *base;
-    mutable std::vector<const ContextDescriptor *> descriptorPath;
+
+    /// An element in the descriptor path.
+    struct PathElement {
+      /// The context described by this path element.
+      const ContextDescriptor *context;
+
+      /// The number of key parameters in the parent.
+      unsigned numKeyGenericParamsInParent;
+
+      /// The number of key parameters locally introduced here.
+      unsigned numKeyGenericParamsHere;
+
+      /// Whether this context has any non-key generic parameters.
+      bool hasNonKeyGenericParams;
+    };
+
+    /// Information about the generic context descriptors that make up \c
+    /// descriptor, from the outermost to the innermost.
+    mutable std::vector<PathElement> descriptorPath;
+
+    /// Builds the descriptor path.
+    ///
+    /// \returns a pair containing the number of key generic parameters in
+    /// the path up to this point.
+    unsigned buildDescriptorPath(const ContextDescriptor *context) const;
+
+    // Set up the state we need to compute substitutions.
+    void setup() const;
 
   public:
+    /// Produce substitutions entirely from the given metadata.
     explicit SubstGenericParametersFromMetadata(const Metadata *base)
       : base(base) { }
 
