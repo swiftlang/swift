@@ -60,3 +60,9 @@ public protocol SubsContainer {
   subscript(getter i: Int) -> Int { get }
   subscript(setter i: Int) -> Int { get set }
 }
+
+public extension ProWithAssociatedType {
+  func NonReqFunc() {}
+  var NonReqVar: Int { return 1 }
+  typealias NonReqAlias = Int
+}
