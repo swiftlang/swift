@@ -911,7 +911,7 @@ def assignmentOperatorComment(operator, fixedWidth):
 # by the related operator:
 #     +   addingReportingOverflow(_:)
 #     -   subtractingReportingOverflow(_:)
-#     *   multiplyingReportingOverflow(_:)
+#     *   multipliedReportingOverflow(by:)
 #     /   dividedReportingOverflow(by:)
 #     %   remainderReportingOverflow(dividingBy:)
 def overflowOperationComment(operator):
