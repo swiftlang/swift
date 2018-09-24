@@ -12,6 +12,7 @@ protocol SomeProtocol {
   lazy var x : Int  // expected-error {{'lazy' isn't allowed on a protocol requirement}} {{3-8=}}
   // expected-error@-1 {{property in protocol must have explicit { get } or { get set } specifier}}
   // expected-error@-2 {{lazy properties must have an initializer}}
+  // {{18-18= { get set \}}}
   lazy var y : Int { get } // expected-error {{'lazy' isn't allowed on a protocol requirement}} {{3-8=}}
   // expected-error@-1 {{'lazy' must not be used on a computed property}}
   // expected-error@-2 {{lazy properties must have an initializer}}

@@ -14,15 +14,15 @@ protocol Test {
   var creator: String { get }
   var major : Int { get }
   var minor : Int { get }
-  var subminor : Int  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-  static var staticProperty: Int // expected-error{{property in protocol must have explicit { get } or { get set } specifier}}
+  var subminor : Int  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{21-21= { get <#set#> \}}}
+  static var staticProperty: Int // expected-error{{property in protocol must have explicit { get } or { get set } specifier}} {{33-33= { get <#set#> \}}}
 }
 
 protocol Test2 {
   var property: Int { get }
 
-  var title: String = "The Art of War" { get } // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-  static var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
+  var title: String = "The Art of War" { get } // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{20-20= { get <#set#> \}}}
+  static var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{28-28= { get <#set#> \}}}
 
   associatedtype mytype
   associatedtype mybadtype = Int
@@ -454,7 +454,7 @@ protocol ShouldntCrash {
   let fullName: String { get }  // expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
   
   // <rdar://problem/17200672> Let in protocol causes unclear errors and crashes
-  let fullName2: String  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  let fullName2: String  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}} {{24-24= { get \}}}
 
   // <rdar://problem/16789886> Assert on protocol property requirement without a type
   var propertyWithoutType { get } // expected-error {{type annotation missing in pattern}}
@@ -502,6 +502,7 @@ protocol LetThereBeCrash {
   let x: Int
   // expected-error@-1 {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
   // expected-note@-2 {{declared here}}
+  // {{13-13= { get \}}}
 }
 
 extension LetThereBeCrash {
