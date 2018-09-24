@@ -16,6 +16,8 @@ cake1: Var RemoveSetters.Value has removed its setter
 cake1: Var RequiementChanges.removedVar has been removed
 
 /* Moved Decls */
+cake1: Class ClassToStruct has been changed to a Struct
+cake1: Protocol ProtocolToEnum has been changed to a Enum
 
 /* Renamed Decls */
 cake1: Func S1.foo5(x:y:) has been renamed to Func S1.foo5(x:y:z:)

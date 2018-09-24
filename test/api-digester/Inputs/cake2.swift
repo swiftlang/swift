@@ -98,3 +98,6 @@ public protocol RequiementChanges {
 }
 
 public class SuperClassRemoval {}
+
+public struct ClassToStruct {}
+public enum ProtocolToEnum {}

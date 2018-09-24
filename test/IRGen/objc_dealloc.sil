@@ -6,7 +6,7 @@
 // REQUIRES: objc_interop
 
 // CHECK: [[SGIZMO:%T12objc_dealloc10SwiftGizmoC]] = type
-// CHECK: [[GIZMO:%TSo5GizmoC]] = type opaque
+// CHECK: [[GIZMO:%TSo5GizmoC]] = type <{ %objc_class* }>
 
 sil_stage raw
 

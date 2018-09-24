@@ -773,6 +773,21 @@ FUNCTION(InitClassMetadata,
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
+// struct FieldInfo { size_t Size; size_t AlignMask; };
+// void swift_updateClassMetadata(Metadata *self,
+//                                Metadata *super,
+//                                ClassLayoutFlags flags,
+//                                size_t numFields,
+//                                TypeLayout * const *fieldTypes,
+//                                size_t *fieldOffsets);
+FUNCTION(UpdateClassMetadata,
+         swift_updateClassMetadata, C_CC,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, SizeTy, SizeTy,
+              Int8PtrPtrTy->getPointerTo(),
+              SizeTy->getPointerTo()),
+         ATTRS(NoUnwind))
+
 // void *swift_lookUpClassMethod(Metadata *metadata,
 //                               ClassDescriptor *description,
 //                               MethodDescriptor *method);

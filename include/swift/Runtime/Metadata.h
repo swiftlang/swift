@@ -580,13 +580,39 @@ void swift_initStructMetadata(StructMetadata *self,
 ///
 /// This function is only intended to be called from the relocation function
 /// of a resilient class pattern.
+///
+/// The metadata completion function must complete the metadata by calling
+/// swift_initClassMetadata().
 SWIFT_RUNTIME_EXPORT
 ClassMetadata *
 swift_relocateClassMetadata(ClassDescriptor *descriptor,
                             ResilientClassMetadataPattern *pattern);
 
-/// Initialize the field offset vector for a dependent-layout class, using the
-/// "Universal" layout strategy.
+/// Initialize various fields of the class metadata.
+///
+/// Namely:
+/// - The superclass field is set to \p super.
+/// - If the class metadata was allocated at runtime, copies the
+///   vtable entries from the superclass and installs the class's
+///   own vtable entries and overrides of superclass vtable entries.
+/// - Copies the field offsets and generic parameters and conformances
+///   from the superclass.
+/// - Initializes the field offsets using the runtime type layouts
+///   passed in \p fieldTypes.
+///
+/// This initialization pattern in the following cases:
+/// - The class has generic ancestry, or resiliently-sized fields.
+///   In this case the metadata was emitted statically but is incomplete,
+///   because, the superclass field, generic parameters and conformances,
+///   and field offset vector entries require runtime completion.
+///
+/// - The class is not generic, and has resilient ancestry.
+///   In this case the class metadata was allocated from a resilient
+///   class metadata pattern by swift_relocateClassMetadata().
+///
+/// - The class is generic.
+///   In this case the class metadata was allocated from a generic
+///   class metadata pattern by swift_allocateGenericClassMetadata().
 SWIFT_RUNTIME_EXPORT
 void swift_initClassMetadata(ClassMetadata *self,
                              ClassMetadata *super,
@@ -594,6 +620,24 @@ void swift_initClassMetadata(ClassMetadata *self,
                              size_t numFields,
                              const TypeLayout * const *fieldTypes,
                              size_t *fieldOffsets);
+
+#if SWIFT_OBJC_INTEROP
+/// Initialize various fields of the class metadata.
+///
+/// This is a special function only used to re-initialize metadata of
+/// classes that are visible to Objective-C and have resilient fields.
+///
+/// This means the class does not have generic or resilient ancestry,
+/// and is itself not generic. However, it might have fields whose
+/// size is not known at compile time.
+SWIFT_RUNTIME_EXPORT
+void swift_updateClassMetadata(ClassMetadata *self,
+                               ClassMetadata *super,
+                               ClassLayoutFlags flags,
+                               size_t numFields,
+                               const TypeLayout * const *fieldTypes,
+                               size_t *fieldOffsets);
+#endif
 
 /// Given class metadata, a class descriptor and a method descriptor, look up
 /// and load the vtable entry from the given metadata. The metadata must be of

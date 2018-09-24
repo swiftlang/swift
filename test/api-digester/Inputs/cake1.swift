@@ -91,3 +91,6 @@ public protocol RequiementChanges {
 }
 
 public class SuperClassRemoval: C3 {}
+
+public class ClassToStruct {}
+public protocol ProtocolToEnum {}
