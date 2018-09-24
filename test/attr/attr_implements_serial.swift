@@ -4,7 +4,7 @@
 // RUN: %target-swiftc_driver -I %t -o %t/a.out %s %t/main.swift %t/library.%target-dylib-extension
 // RUN: %target-codesign %t/a.out
 // RUN: %target-codesign %t/library.%target-dylib-extension
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-run %t/a.out %t/library.%target-dylib-extension | %FileCheck %s
 // REQUIRES: executable_test
 
 // This test just checks that the lookup-table entries for @_implements are
