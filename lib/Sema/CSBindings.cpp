@@ -366,6 +366,11 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
       return None;
   }
 
+  if (type->is<InOutType>() && !typeVar->getImpl().canBindToInOut())
+    type = LValueType::get(type->getInOutObjectType());
+  if (type->is<LValueType>() && !typeVar->getImpl().canBindToLValue())
+    type = type->getRValueType();
+
   // BindParam constraints are not reflexive and must be treated specially.
   if (constraint->getKind() == ConstraintKind::BindParam) {
     if (kind == AllowedBindingKind::Subtypes) {
@@ -869,8 +874,6 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
     type = cs.openUnboundGenericType(UGT, locator);
     type = type->reconstituteSugar(/*recursive=*/false);
-  } else if (type->is<InOutType>() && !TypeVar->getImpl().canBindToInOut()) {
-    type = LValueType::get(type->getInOutObjectType());
   }
 
   // FIXME: We want the locator that indicates where the binding came

@@ -2054,8 +2054,6 @@ namespace {
           // FIXME: Need a better locator for a pattern as a base.
           paramType = CS.openUnboundGenericType(type, locator);
           internalType = paramType;
-          if (param->isInOut())
-            internalType = LValueType::get(internalType);
         } else {
           // Otherwise, create fresh type variables.
           paramType = CS.createTypeVariable(locator, TVO_CanBindToInOut);
