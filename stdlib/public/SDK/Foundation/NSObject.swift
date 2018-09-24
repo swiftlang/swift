@@ -84,7 +84,7 @@ fileprivate extension NSObject {
     
     @nonobjc static var keyPathTableLock = NSLock()
     
-    @nonobjc fileprivate static func _bridgeKeyPath(_ keyPath:AnyKeyPath) -> String {
+    @nonobjc fileprivate static func _bridgeKeyPath(_ keyPath: __owned AnyKeyPath) -> String {
         guard let keyPathString = keyPath._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \(keyPath)") }
         __KVOKeyPathBridgeMachinery.keyPathTableLock.lock()
         defer { __KVOKeyPathBridgeMachinery.keyPathTableLock.unlock() }
@@ -205,27 +205,27 @@ extension _KeyValueCodingAndObserving {
         return result
     }
     
-    public func willChangeValue<Value>(for keyPath: KeyPath<Self, Value>) {
+    public func willChangeValue<Value>(for keyPath: __owned KeyPath<Self, Value>) {
         (self as! NSObject).willChangeValue(forKey: _bridgeKeyPathToString(keyPath))
     }
     
-    public func willChange<Value>(_ changeKind: NSKeyValueChange, valuesAt indexes: IndexSet, for keyPath: KeyPath<Self, Value>) {
+    public func willChange<Value>(_ changeKind: NSKeyValueChange, valuesAt indexes: IndexSet, for keyPath: __owned KeyPath<Self, Value>) {
         (self as! NSObject).willChange(changeKind, valuesAt: indexes, forKey: _bridgeKeyPathToString(keyPath))
     }
     
-    public func willChangeValue<Value>(for keyPath: KeyPath<Self, Value>, withSetMutation mutation: NSKeyValueSetMutationKind, using set: Set<Value>) -> Void {
+    public func willChangeValue<Value>(for keyPath: __owned KeyPath<Self, Value>, withSetMutation mutation: NSKeyValueSetMutationKind, using set: Set<Value>) -> Void {
         (self as! NSObject).willChangeValue(forKey: _bridgeKeyPathToString(keyPath), withSetMutation: mutation, using: set)
     }
     
-    public func didChangeValue<Value>(for keyPath: KeyPath<Self, Value>) {
+    public func didChangeValue<Value>(for keyPath: __owned KeyPath<Self, Value>) {
         (self as! NSObject).didChangeValue(forKey: _bridgeKeyPathToString(keyPath))
     }
     
-    public func didChange<Value>(_ changeKind: NSKeyValueChange, valuesAt indexes: IndexSet, for keyPath: KeyPath<Self, Value>) {
+    public func didChange<Value>(_ changeKind: NSKeyValueChange, valuesAt indexes: IndexSet, for keyPath: __owned KeyPath<Self, Value>) {
         (self as! NSObject).didChange(changeKind, valuesAt: indexes, forKey: _bridgeKeyPathToString(keyPath))
     }
     
-    public func didChangeValue<Value>(for keyPath: KeyPath<Self, Value>, withSetMutation mutation: NSKeyValueSetMutationKind, using set: Set<Value>) -> Void {
+    public func didChangeValue<Value>(for keyPath: __owned KeyPath<Self, Value>, withSetMutation mutation: NSKeyValueSetMutationKind, using set: Set<Value>) -> Void {
         (self as! NSObject).didChangeValue(forKey: _bridgeKeyPathToString(keyPath), withSetMutation: mutation, using: set)
     }
 }

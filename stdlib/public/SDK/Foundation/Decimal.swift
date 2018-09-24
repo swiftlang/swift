@@ -452,7 +452,7 @@ extension Decimal {
 }
 
 extension Decimal : CustomStringConvertible {
-    public init?(string: String, locale: Locale? = nil) {
+    public init?(string: __shared String, locale: __shared Locale? = nil) {
         let scan = Scanner(string: string)
         var theDecimal = Decimal()
         scan.locale = locale
