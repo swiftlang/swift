@@ -380,4 +380,17 @@ extension Set._Variant {
 #endif
     return asNative.isSubset(of: possibleSuperset)
   }
+
+  @inlinable
+  @inline(__always)
+  public func isStrictSubset<S: Sequence>(of possibleStrictSuperset: S) -> Bool
+  where S.Element == Element {
+#if _runtime(_ObjC)
+    guard isNative else {
+      return _NativeSet<Element>(asCocoa)
+        .isStrictSubset(of: possibleStrictSuperset)
+    }
+#endif
+    return asNative.isStrictSubset(of: possibleStrictSuperset)
+  }
 }

@@ -743,9 +743,11 @@ extension Set: SetAlgebra {
   @inlinable
   public func isStrictSubset<S: Sequence>(of possibleStrictSuperset: S) -> Bool
   where S.Element == Element {
-    // FIXME: code duplication.
-    let other = Set(possibleStrictSuperset)
-    return isStrictSubset(of: other)
+    defer { _fixLifetime(self) }
+    if let s = possibleStrictSuperset as? Set<Element> {
+      return isStrictSubset(of: s)
+    }
+    return _variant.isStrictSubset(of: possibleStrictSuperset)
   }
 
   /// Returns a Boolean value that indicates whether the set is a superset of
@@ -1208,7 +1210,7 @@ extension Set {
   ///   `other`; otherwise, `false`.
   @inlinable
   public func isStrictSubset(of other: Set<Element>) -> Bool {
-    return other.isStrictSuperset(of: self)
+    return self.count < other.count && self.isSubset(of: other)
   }
 
   /// Returns a new set with the elements that are common to both this set and
