@@ -203,8 +203,8 @@ set(SWIFTLIB_SOURCES
   SIMDVectorN.swift.gyb
   SIMDInteger.swift
   SIMDIntegerTypes.swift.gyb
-  SIMDPredicate.swift
-  SIMDPredicateTypes.swift.gyb
+  SIMDMask.swift
+  SIMDMaskTypes.swift.gyb
   SIMDFloatingPoint.swift
   SIMDFloatingPointTypes.swift.gyb
   SliceBuffer.swift

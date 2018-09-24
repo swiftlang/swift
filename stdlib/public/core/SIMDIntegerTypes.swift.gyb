@@ -50,12 +50,12 @@ public extension ${Element} {
       }
     }
 
-    public typealias Predicate = SIMDPredicate${bits}x${count}
+    public typealias Mask = SIMD.Mask${bits}.Vector${count}
 
 %   sext = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + LLVM
     @_transparent
-    public static func ==(lhs: ${Self}, rhs: ${Self}) -> Predicate {
-      return Predicate(Int${bits}.Vector${count}(${sext}(
+    public static func ==(lhs: ${Self}, rhs: ${Self}) -> Mask {
+      return Mask(Int${bits}.Vector${count}(${sext}(
         Builtin.cmp_eq_${LLVM}(lhs._value, rhs._value))))
     }
 
@@ -78,8 +78,8 @@ public extension ${Element} {
 
     // Conformance to SIMDIntegerVector --------------------------------------
     @inlinable
-    public init(bitMaskFrom predicate: Predicate) {
-      self._value = predicate._value._value
+    public init(bitMaskFrom mask: Mask) {
+      self._value = mask._value._value
     }
 
     // - Functions
@@ -123,8 +123,8 @@ public extension ${Element} {
 %   prefix = 's' if signed else 'u'
 %   for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
     @_transparent
-    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Predicate {
-      return Predicate(Int${bits}.Vector${count}(${sext}(
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Mask {
+      return Mask(Int${bits}.Vector${count}(${sext}(
         Builtin.cmp_${prefix}${inst}_${LLVM}(lhs._value, rhs._value)
       )))
     }

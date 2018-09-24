@@ -1,12 +1,12 @@
 public protocol SIMDIntegerVector : SIMDVector
                     where Element : FixedWidthInteger {
   
-  /// Creates a bitmask vector from `predicate`.
+  /// Creates a bitmask vector from `mask`.
   ///
   /// The value of the mask is all 1 bits (i.e. `-1` if the element type is
-  /// signed, .max if it is unsigned) in each lane where `predicate` is true,
-  /// and all 0 bits in each lane where `predicate` is false.
-  init(bitMaskFrom predicate: Predicate)
+  /// signed, .max if it is unsigned) in each lane where `mask` is true,
+  /// and all 0 bits in each lane where `mask` is false.
+  init(bitMaskFrom mask: Mask)
   
   /// A vector where each element is the count of leading zero bits in the
   /// corresponding lane of this vector.
@@ -32,13 +32,13 @@ public protocol SIMDIntegerVector : SIMDVector
   /// The ordering of elements within the vector is unchanged.
   var elementBytesSwapped: Self { get }
   
-  static func <(lhs: Self, rhs: Self) -> Predicate
+  static func <(lhs: Self, rhs: Self) -> Mask
   
-  static func <=(lhs: Self, rhs: Self) -> Predicate
+  static func <=(lhs: Self, rhs: Self) -> Mask
   
-  static func >(lhs: Self, rhs: Self) -> Predicate
+  static func >(lhs: Self, rhs: Self) -> Mask
   
-  static func >=(lhs: Self, rhs: Self) -> Predicate
+  static func >=(lhs: Self, rhs: Self) -> Mask
   
   static prefix func ~(rhs: Self) -> Self
   
@@ -70,81 +70,81 @@ public extension SIMDIntegerVector {
   // the scalar is outside the range of representable values for the vector
   // element type correctly, as with heterogeneous scalar integer comparisons.
   @inlinable
-  static func == <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  static func == <Scalar>(lhs: Self, rhs: Scalar) -> Mask
   where Scalar : BinaryInteger {
-    guard rhs >= Element.min else { return Predicate(repeating: false) }
-    guard rhs <= Element.max else { return Predicate(repeating: false) }
+    guard rhs >= Element.min else { return Mask(repeating: false) }
+    guard rhs <= Element.max else { return Mask(repeating: false) }
     return lhs == Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
   @inlinable
-  static func != <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  static func != <Scalar>(lhs: Self, rhs: Scalar) -> Mask
   where Scalar : BinaryInteger {
-    guard rhs >= Element.min else { return Predicate(repeating: true) }
-    guard rhs <= Element.max else { return Predicate(repeating: true) }
+    guard rhs >= Element.min else { return Mask(repeating: true) }
+    guard rhs <= Element.max else { return Mask(repeating: true) }
     return lhs != Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
   @inlinable
-  static func < <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  static func < <Scalar>(lhs: Self, rhs: Scalar) -> Mask
   where Scalar : BinaryInteger {
-    guard rhs >= Element.min else { return Predicate(repeating: false) }
-    guard rhs <= Element.max else { return Predicate(repeating: true) }
+    guard rhs >= Element.min else { return Mask(repeating: false) }
+    guard rhs <= Element.max else { return Mask(repeating: true) }
     return lhs < Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
   @inlinable
-  static func <= <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  static func <= <Scalar>(lhs: Self, rhs: Scalar) -> Mask
   where Scalar : BinaryInteger {
-    guard rhs >= Element.min else { return Predicate(repeating: false) }
-    guard rhs <= Element.max else { return Predicate(repeating: true) }
+    guard rhs >= Element.min else { return Mask(repeating: false) }
+    guard rhs <= Element.max else { return Mask(repeating: true) }
     return lhs <= Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
   @inlinable
-  static func > <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  static func > <Scalar>(lhs: Self, rhs: Scalar) -> Mask
   where Scalar : BinaryInteger {
     return !(lhs <= rhs)
   }
   
   @inlinable
-  static func >= <Scalar>(lhs: Self, rhs: Scalar) -> Predicate
+  static func >= <Scalar>(lhs: Self, rhs: Scalar) -> Mask
   where Scalar : BinaryInteger {
     return !(lhs < rhs)
   }
   
   @inlinable
-  static func == <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  static func == <Scalar>(lhs: Scalar, rhs: Self) -> Mask
   where Scalar : BinaryInteger {
     return rhs == lhs
   }
   
   @inlinable
-  static func != <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  static func != <Scalar>(lhs: Scalar, rhs: Self) -> Mask
   where Scalar : BinaryInteger {
     return rhs != lhs
   }
   
   @inlinable
-  static func < <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  static func < <Scalar>(lhs: Scalar, rhs: Self) -> Mask
   where Scalar : BinaryInteger {
     return rhs > lhs
   }
   
   @inlinable
-  static func <= <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  static func <= <Scalar>(lhs: Scalar, rhs: Self) -> Mask
   where Scalar : BinaryInteger {
     return rhs >= lhs
   }
   
   @inlinable
-  static func > <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  static func > <Scalar>(lhs: Scalar, rhs: Self) -> Mask
   where Scalar : BinaryInteger {
     return rhs < lhs
   }
   
   @inlinable
-  static func >= <Scalar>(lhs: Scalar, rhs: Self) -> Predicate
+  static func >= <Scalar>(lhs: Scalar, rhs: Self) -> Mask
   where Scalar : BinaryInteger {
     return rhs <= rhs
   }
@@ -376,11 +376,11 @@ public extension SIMDIntegerVector {
   }
   
   /// A vector where the value in each lane is selected from the corresponding
-  /// lane of `self` (if that lane of `predicate` is `false`) or `other` (if
-  /// that lane of `predicate` is `true`).
+  /// lane of `self` (if that lane of `mask` is `false`) or `other` (if
+  /// that lane of `mask` is `true`).
   @_transparent
-  func replacing(with other: Self, where predicate: Predicate) -> Self {
-    return replacingBits(with: other, where: Self(bitMaskFrom: predicate))
+  func replacing(with other: Self, where mask: Mask) -> Self {
+    return replacingBits(with: other, where: Self(bitMaskFrom: mask))
   }
   
   /// A vector where each bit is selected from the corresponding bit of this

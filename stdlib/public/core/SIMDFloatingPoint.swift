@@ -2,13 +2,13 @@ public protocol SIMDFloatingPointVector : SIMDVector
                           where Element : BinaryFloatingPoint,
                  Element.RawSignificand : FixedWidthInteger {
   
-  static func <(lhs: Self, rhs: Self) -> Predicate
+  static func <(lhs: Self, rhs: Self) -> Mask
   
-  static func <=(lhs: Self, rhs: Self) -> Predicate
+  static func <=(lhs: Self, rhs: Self) -> Mask
   
-  static func >(lhs: Self, rhs: Self) -> Predicate
+  static func >(lhs: Self, rhs: Self) -> Mask
   
-  static func >=(lhs: Self, rhs: Self) -> Predicate
+  static func >=(lhs: Self, rhs: Self) -> Mask
   
   static func +(lhs: Self, rhs: Self) -> Self
   
@@ -29,62 +29,62 @@ public extension SIMDFloatingPointVector {
   
   // MARK: Vector-scalar comparisons
   @inlinable
-  static func ==(lhs: Self, rhs: Element) -> Predicate {
+  static func ==(lhs: Self, rhs: Element) -> Mask {
     return lhs == Self(repeating: rhs)
   }
   
   @inlinable
-  static func !=(lhs: Self, rhs: Element) -> Predicate {
+  static func !=(lhs: Self, rhs: Element) -> Mask {
     return lhs != Self(repeating: rhs)
   }
 
   @inlinable
-  static func <(lhs: Self, rhs: Element) -> Predicate {
+  static func <(lhs: Self, rhs: Element) -> Mask {
     return lhs < Self(repeating: rhs)
   }
   
   @inlinable
-  static func <=(lhs: Self, rhs: Element) -> Predicate {
+  static func <=(lhs: Self, rhs: Element) -> Mask {
     return lhs <= Self(repeating: rhs)
   }
   
   @inlinable
-  static func >(lhs: Self, rhs: Element) -> Predicate {
+  static func >(lhs: Self, rhs: Element) -> Mask {
     return lhs > Self(repeating: rhs)
   }
   
   @inlinable
-  static func >=(lhs: Self, rhs: Element) -> Predicate {
+  static func >=(lhs: Self, rhs: Element) -> Mask {
     return lhs >= Self(repeating: rhs)
   }
   
   @inlinable
-  static func ==(lhs: Element, rhs: Self) -> Predicate {
+  static func ==(lhs: Element, rhs: Self) -> Mask {
     return Self(repeating: lhs) == rhs
   }
   
   @inlinable
-  static func !=(lhs: Element, rhs: Self) -> Predicate {
+  static func !=(lhs: Element, rhs: Self) -> Mask {
     return Self(repeating: lhs) != rhs
   }
   
   @inlinable
-  static func <(lhs: Element, rhs: Self) -> Predicate {
+  static func <(lhs: Element, rhs: Self) -> Mask {
     return Self(repeating: lhs) < rhs
   }
   
   @inlinable
-  static func <=(lhs: Element, rhs: Self) -> Predicate {
+  static func <=(lhs: Element, rhs: Self) -> Mask {
     return Self(repeating: lhs) <= rhs
   }
   
   @inlinable
-  static func >(lhs: Element, rhs: Self) -> Predicate {
+  static func >(lhs: Element, rhs: Self) -> Mask {
     return Self(repeating: lhs) > rhs
   }
   
   @inlinable
-  static func >=(lhs: Element, rhs: Self) -> Predicate {
+  static func >=(lhs: Element, rhs: Self) -> Mask {
     return Self(repeating: lhs) >= rhs
   }
   

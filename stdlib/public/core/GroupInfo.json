@@ -166,8 +166,8 @@
         "SIMDVectorN.swift",
         "SIMDInteger.swift",
         "SIMDIntegerTypes.swift",
-        "SIMDPredicate.swift",
-        "SIMDPredicateTypes.swift",
+        "SIMDMask.swift",
+        "SIMDMaskTypes.swift",
         "SIMDFloatingPoint.swift",
         "SIMDFloatingPointTypes.swift"
       ]

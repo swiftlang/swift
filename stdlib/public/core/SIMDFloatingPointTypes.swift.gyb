@@ -52,12 +52,12 @@ public extension ${Element} {
       }
     }
 
-    public typealias Predicate = SIMDPredicate${bits}x${N}
+    public typealias Mask = SIMD.Mask${bits}.Vector${N}
 
 %   sext = 'Builtin.sext_Vec' + str(llvmN) + 'xInt1_' + BitPatternLLVM
     @_transparent
-    public static func ==(lhs: ${Self}, rhs: ${Self}) -> Predicate {
-      return Predicate(Int${bits}.Vector${N}(${sext}(
+    public static func ==(lhs: ${Self}, rhs: ${Self}) -> Mask {
+      return Mask(Int${bits}.Vector${N}(${sext}(
         Builtin.fcmp_oeq_${LLVM}(lhs._value, rhs._value))))
     }
 
@@ -72,9 +72,9 @@ public extension ${Element} {
     }
 
     @_transparent
-    public func replacing(with other: ${Self}, where predicate: Predicate) -> ${Self} {
+    public func replacing(with other: ${Self}, where mask: Mask) -> ${Self} {
       return ${Self}(bitPattern: ${BitPattern}(bitPattern: self).replacing(
-        with: ${BitPattern}(bitPattern: other), where: predicate
+        with: ${BitPattern}(bitPattern: other), where: mask
       ))
     }
 
@@ -98,8 +98,8 @@ public extension ${Element} {
     // Conformance to SIMDFloatingPointVector --------------------------------
 %   for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
     @_transparent
-    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Predicate {
-      return Predicate(Int${bits}.Vector${N}(${sext}(
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Mask {
+      return Mask(Int${bits}.Vector${N}(${sext}(
         Builtin.fcmp_o${inst}_${LLVM}(lhs._value, rhs._value)
       )))
     }

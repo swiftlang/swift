@@ -35,88 +35,88 @@ public protocol SIMDVector : RandomAccessCollection,
   ///
   /// This vector of comparison results is itself a vector with the same
   /// number of elements as the vectors being compared.
-  associatedtype Predicate : SIMDPredicate
+  associatedtype Mask : SIMDMask
   
   /// Elementwise equality test.
   ///
-  /// The result is a predicate vector where each lane is `true` if and only
+  /// The result is a mask vector where each lane is `true` if and only
   /// if the corresponding lane of the vector `lhs` is equal to `rhs`.
   ///
   /// There are two `==` and `!=` operators defined on SIMD vectors; the
   /// "normal" equality operator required by `Equatable`, which returns
   /// `Bool`, and this operator which returns a vector of `Bool`, called
-  /// `Predicate`.
+  /// `Mask`.
   // Note: the corresponding `!=` operator and the `Bool` operators are defined
   // in terms of this operation in extensions. SIMD types should only define
   // this operator, and use the default implementations of the others.
-  static func ==(lhs: Self, rhs: Self) -> Predicate
+  static func ==(lhs: Self, rhs: Self) -> Mask
   
   /// A vector formed from the corresponding lane of this vector where
   /// prediate is false, and from the corresponding lane of other where
-  /// predicate is true.
+  /// mask is true.
   ///
-  /// See Also: replacing(with: Element, where: Predicate), and the in-place
+  /// See Also: replacing(with: Element, where: Mask), and the in-place
   /// operations replace(with:,where:).
-  func replacing(with other: Self, where predicate: Predicate) -> Self
+  func replacing(with other: Self, where mask: Mask) -> Self
 }
 
 //  Non-customizable operations on SIMDVector
 public extension SIMDVector {
   
-  /// A predicate vector where each lane is `true` if and only if the
+  /// A mask vector where each lane is `true` if and only if the
   /// corresponding lane of the vector `rhs` is equal to `lhs`.
   @_transparent
-  static func ==(lhs: Element, rhs: Self) -> Predicate {
+  static func ==(lhs: Element, rhs: Self) -> Mask {
     return Self(repeating: lhs) == rhs
   }
   
-  /// A predicate vector where each lane is `true` if and only if the
+  /// A mask vector where each lane is `true` if and only if the
   /// corresponding lane of the vector `lhs` is equal to `rhs`.
   @_transparent
-  static func ==(lhs: Self, rhs: Element) -> Predicate {
+  static func ==(lhs: Self, rhs: Element) -> Mask {
     return rhs == lhs
   }
   
-  /// A predicate vector where each lane is `true` if and only if the
+  /// A mask vector where each lane is `true` if and only if the
   /// corresponding lanes of the two arguments are not equal.
   @_transparent
-  static func !=(lhs: Self, rhs: Self) -> Predicate {
+  static func !=(lhs: Self, rhs: Self) -> Mask {
     return !(lhs == rhs)
   }
   
-  /// A predicate vector where each lane is `true` if and only if the
+  /// A mask vector where each lane is `true` if and only if the
   /// corresponding lane of the vector `rhs` is not equal to `lhs`.
   @_transparent
-  static func !=(lhs: Element, rhs: Self) -> Predicate {
+  static func !=(lhs: Element, rhs: Self) -> Mask {
     return !(lhs == rhs)
   }
   
-  /// A predicate vector where each lane is `true` if and only if the
+  /// A mask vector where each lane is `true` if and only if the
   /// corresponding lane of the vector `lhs` is not equal to `rhs`.
   @_transparent
-  static func !=(lhs: Self, rhs: Element) -> Predicate {
+  static func !=(lhs: Self, rhs: Element) -> Mask {
     return !(lhs == rhs)
   }
   
   /// Replaces elements of this vector with elements of `other` in the lanes
-  /// where `predicate` is `true`.
+  /// where `mask` is `true`.
   @inlinable
-  mutating func replace(with other: Self, where predicate: Predicate) {
-    self = self.replacing(with: other, where: predicate)
+  mutating func replace(with other: Self, where mask: Mask) {
+    self = self.replacing(with: other, where: mask)
   }
   
   /// A vector formed by making a copy of this vector, and replacing lanes
-  /// where `predicate` is true with `other`.
+  /// where `mask` is true with `other`.
   @inlinable
-  func replacing(with other: Element, where predicate: Predicate) -> Self {
-    return self.replacing(with: Self(repeating: other), where: predicate)
+  func replacing(with other: Element, where mask: Mask) -> Self {
+    return self.replacing(with: Self(repeating: other), where: mask)
   }
   
   /// Replaces elements of this vector with `other` in the lanes where
-  /// `predicate` is `true`.
+  /// `mask` is `true`.
   @inlinable
-  mutating func replace(with other: Element, where predicate: Predicate) {
-    self = self.replacing(with: Self(repeating: other), where: predicate)
+  mutating func replace(with other: Element, where mask: Mask) {
+    self = self.replacing(with: Self(repeating: other), where: mask)
   }
 }
 

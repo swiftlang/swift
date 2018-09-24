@@ -1,6 +1,6 @@
 %for N in [2,3,4,8,16,32,64]:
 /// A computational vector with ${N} elements.
-public protocol SIMDVector${N} : SIMDVector where Predicate : SIMDVector${N} {
+public protocol SIMDVector${N} : SIMDVector where Mask : SIMDVector${N} {
 % if N >= 4:
   /// A type representing half of the vector.
   associatedtype HalfVector: SIMDVector${N/2} where HalfVector.Element == Element
