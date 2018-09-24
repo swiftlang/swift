@@ -235,6 +235,51 @@ public:
   using SubstGenericParameterFn =
     llvm::function_ref<const Metadata *(unsigned depth, unsigned index)>;
 
+  /// Function object that produces substitutions for the generic parameters
+  /// that occur within a mangled name, using the generic arguments from
+  /// the given metadata.
+  ///
+  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
+  class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
+    const Metadata *base;
+
+    /// An element in the descriptor path.
+    struct PathElement {
+      /// The context described by this path element.
+      const ContextDescriptor *context;
+
+      /// The number of key parameters in the parent.
+      unsigned numKeyGenericParamsInParent;
+
+      /// The number of key parameters locally introduced here.
+      unsigned numKeyGenericParamsHere;
+
+      /// Whether this context has any non-key generic parameters.
+      bool hasNonKeyGenericParams;
+    };
+
+    /// Information about the generic context descriptors that make up \c
+    /// descriptor, from the outermost to the innermost.
+    mutable std::vector<PathElement> descriptorPath;
+
+    /// Builds the descriptor path.
+    ///
+    /// \returns a pair containing the number of key generic parameters in
+    /// the path up to this point.
+    unsigned buildDescriptorPath(const ContextDescriptor *context) const;
+
+    // Set up the state we need to compute substitutions.
+    void setup() const;
+
+  public:
+    /// Produce substitutions entirely from the given metadata.
+    explicit SubstGenericParametersFromMetadata(const Metadata *base)
+      : base(base) { }
+
+    const Metadata *operator()(unsigned flatIndex) const;
+    const Metadata *operator()(unsigned depth, unsigned index) const;
+  };
+
   /// Retrieve the type metadata described by the given type name.
   ///
   /// \p substGenericParam Function that provides generic argument metadata
