@@ -594,4 +594,21 @@ extension _NativeSet {
     }
     return false
   }
+
+  @inlinable
+  internal func isStrictSuperset<S: Sequence>(of possibleSubset: S) -> Bool
+    where S.Element == Element {
+    // Allocate a temporary bitset to mark elements in self that we've seen in
+    // possibleStrictSubset.
+    var seen = _Bitset(capacity: self.bucketCount)
+    for element in possibleSubset {
+      let (bucket, found) = find(element)
+      guard found else { return false }
+      let inserted = seen.uncheckedInsert(bucket.offset)
+      if inserted, seen.count == self.count {
+        return false
+      }
+    }
+    return true
+  }
 }
