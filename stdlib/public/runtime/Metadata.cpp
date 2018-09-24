@@ -3956,9 +3956,11 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
   }
 
   // Demangle the associated type name.
-  const char *mangledName =
-    (const char *)(uintptr_t(witness) &
-                   ~ProtocolRequirementFlags::AssociatedTypeMangledNameMask);
+  StringRef mangledName =
+    Demangle::makeSymbolicMangledNameStringRef(
+      (const char *)(uintptr_t(witness) &
+                     ~ProtocolRequirementFlags::AssociatedTypeMangledNameMask));
+
   const Metadata *assocTypeMetadata;
   if (witness == req.DefaultImplementation) {
     // The protocol's Self is the only generic parameter that can occur in the
