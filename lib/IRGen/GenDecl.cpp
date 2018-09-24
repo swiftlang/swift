@@ -3685,7 +3685,7 @@ llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
     {
       // WitnessTableSizeInWords
       Int16Ty,
-      // WitnessTablePrivateSizeInWords
+      // WitnessTablePrivateSizeInWords + RequiresInstantiation bit
       Int16Ty,
       // Protocol
       RelativeAddressTy,

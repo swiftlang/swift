@@ -1371,6 +1371,8 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
       auto associate =
         Conformance.getTypeWitness(requirement.getAssociation(), nullptr)
           ->getCanonicalType();
+      if (associate->hasTypeParameter())
+        RequiresSpecialization = true;
       llvm::Constant *witness = IGM.getAssociatedTypeWitness(associate);
       Table.addBitCast(witness, IGM.Int8PtrTy);
     }
@@ -1951,7 +1953,9 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   //    /// The amount of private storage to allocate before the address point,
   //    /// in words. This memory is zeroed out in the instantiated witness table
   //    /// template.
-  //    uint16_t WitnessTablePrivateSizeInWords;
+  //    /// The low bit is used to indicate whether this witness table is known
+  //    /// to require instantiation.
+  //    uint16_t WitnessTablePrivateSizeInWordsAndRequiresInstantiation;
   //
   //    /// The protocol.
   //    RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
@@ -2001,8 +2005,9 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   auto cacheData = cacheInitBuilder.beginStruct(cacheTy);
   // WitnessTableSizeInWords
   cacheData.addInt(IGM.Int16Ty, TableSize);
-  // WitnessTablePrivateSizeInWords
-  cacheData.addInt(IGM.Int16Ty, NextPrivateDataIndex);
+  // WitnessTablePrivateSizeInWordsAndRequiresInstantiation
+  cacheData.addInt(IGM.Int16Ty,
+                   (NextPrivateDataIndex << 1) | RequiresSpecialization);
   // RelativeIndirectablePointer<ProtocolDescriptor>
   cacheData.addRelativeAddress(descriptorRef);
   // RelativePointer<WitnessTable>
@@ -2354,6 +2359,27 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   return *info;
 }
 
+/// Whether the witness table will be constant.
+static bool isConstantWitnessTable(SILWitnessTable *wt) {
+  for (const auto &entry : wt->getEntries()) {
+    switch (entry.getKind()) {
+    case SILWitnessTable::Invalid:
+    case SILWitnessTable::AssociatedTypeProtocol:
+    case SILWitnessTable::BaseProtocol:
+    case SILWitnessTable::Method:
+      continue;
+
+    case SILWitnessTable::AssociatedType:
+      // Associated types are cached in the witness table.
+      // FIXME: If we start emitting constant references to type metadata here,
+      // we will need to ask the witness table builder for this information.
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Don't emit a witness table if it is a declaration.
   if (wt->isDeclaration())
@@ -2385,7 +2411,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     isDependent
       ? getAddrOfWitnessTablePattern(conf, initializer)
       : getAddrOfWitnessTable(conf, initializer));
-  global->setConstant(true);
+  global->setConstant(isDependent || isConstantWitnessTable(wt));
   global->setAlignment(getWitnessTableAlignment().getValue());
 
   // Always emit an accessor function.

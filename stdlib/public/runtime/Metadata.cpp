@@ -3746,7 +3746,7 @@ public:
 
   static size_t getWitnessTableSize(GenericWitnessTable *genericTable) {
     auto protocol = genericTable->Protocol.get();
-    size_t numPrivateWords = genericTable->WitnessTablePrivateSizeInWords;
+    size_t numPrivateWords = genericTable->getWitnessTablePrivateSizeInWords();
     size_t numRequirementWords =
       WitnessTableFirstRequirementOffset + protocol->NumRequirements;
     return (numPrivateWords + numRequirementWords) * sizeof(void*);
@@ -3778,6 +3778,11 @@ static GenericWitnessTableCache &getCache(GenericWitnessTable *gen) {
 /// are present, we don't have to instantiate anything; just return the
 /// witness table template.
 static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
+  // If the table says it requires instantiation, it does.
+  if (genericTable->requiresInstantiation()) {
+    return false;
+  }
+
   // If we have resilient witnesses, we require instantiation.
   if (!genericTable->ResilientWitnesses.isNull()) {
     return false;
@@ -3794,7 +3799,7 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
   // If we have an instantiation function or private data, we require
   // instantiation.
   if (!genericTable->Instantiator.isNull() ||
-      genericTable->WitnessTablePrivateSizeInWords > 0) {
+      genericTable->getWitnessTablePrivateSizeInWords() > 0) {
     return false;
   }
 
@@ -3869,7 +3874,7 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   (void)numRequirements;
 
   // Number of bytes for any private storage used by the conformance itself.
-  size_t privateSizeInWords = genericTable->WitnessTablePrivateSizeInWords;
+  size_t privateSizeInWords = genericTable->getWitnessTablePrivateSizeInWords();
 
   // Find the allocation.
   void **fullTable = reinterpret_cast<void**>(this + 1);
@@ -3981,7 +3986,9 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
   }
 
   // Update the witness table.
-  ((const void**)wtable)[witnessIndex] = assocTypeMetadata;
+  assert((uintptr_t(assocTypeMetadata) &
+            ProtocolRequirementFlags::AssociatedTypeMangledNameMask) == 0);
+  reinterpret_cast<const void**>(wtable)[witnessIndex] = assocTypeMetadata;
   return swift_checkMetadataState(request, assocTypeMetadata);
 }
 
