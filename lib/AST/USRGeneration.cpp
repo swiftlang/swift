@@ -170,6 +170,8 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl* D) 
     return std::string(); // Ignore.
   if (D->getModuleContext()->isBuiltinModule())
     return std::string(); // Ignore.
+  if (isa<ModuleDecl>(D))
+    return std::string(); // Ignore.
 
   auto interpretAsClangNode = [](const ValueDecl *D)->ClangNode {
     ClangNode ClangN = D->getClangNode();
@@ -238,7 +240,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl* D) 
     return std::string();
 
   // Invalid code.
-  if (!isa<ModuleDecl>(D) && D->getInterfaceType().findIf([](Type t) -> bool {
+  if (D->getInterfaceType().findIf([](Type t) -> bool {
         return t->is<ModuleType>();
       }))
     return std::string();
