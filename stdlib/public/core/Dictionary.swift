@@ -1289,8 +1289,11 @@ extension Dictionary {
     get {
       return Values(_dictionary: self)
     }
-    set {
-      self._variant = newValue._variant
+    _modify {
+      var values = Values(_variant: _variant)
+      _variant = .native(_NativeDictionary())
+      yield &values
+      self._variant = values._variant
     }
   }
 
