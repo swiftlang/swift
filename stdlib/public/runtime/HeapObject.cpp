@@ -61,7 +61,7 @@ using namespace swift;
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
 static inline bool isValidPointerForNativeRetain(const void *p) {
-#if defined(__x86_64__) || defined(__arm64__)
+#if defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
   // On these platforms, the upper half of address space is reserved for the
   // kernel, so we can assume that pointer values in this range are invalid.
   return (intptr_t)p > 0;

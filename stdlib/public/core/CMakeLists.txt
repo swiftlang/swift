@@ -31,6 +31,7 @@ set(SWIFTLIB_ESSENTIAL
   Assert.swift
   AssertCommon.swift
   BidirectionalCollection.swift
+  Bitset.swift
   Bool.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
@@ -51,6 +52,11 @@ set(SWIFTLIB_ESSENTIAL
   CTypes.swift
   DebuggerSupport.swift
   Dictionary.swift
+  DictionaryBridging.swift
+  DictionaryBuilder.swift
+  DictionaryCasting.swift
+  DictionaryStorage.swift
+  DictionaryVariant.swift
   DropWhile.swift
   Dump.swift
   EmptyCollection.swift
@@ -68,9 +74,9 @@ set(SWIFTLIB_ESSENTIAL
   # if we do so, the compiler crashes.
   AnyHashable.swift
   # END WORKAROUND
-  HashedCollectionsAnyHashableExtensions.swift
   Hasher.swift
   Hashing.swift
+  HashTable.swift
   HeapBuffer.swift
   ICU.swift
   Indices.swift
@@ -90,6 +96,8 @@ set(SWIFTLIB_ESSENTIAL
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
+  NativeDictionary.swift
+  NativeSet.swift
   NewtypeWrapper.swift
   NormalizedCodeUnitIterator.swift
   ObjectIdentifier.swift
@@ -116,6 +124,12 @@ set(SWIFTLIB_ESSENTIAL
   SequenceWrapper.swift
   Set.swift
   SetAlgebra.swift
+  SetAnyHashableExtensions.swift
+  SetBridging.swift
+  SetBuilder.swift
+  SetCasting.swift
+  SetStorage.swift
+  SetVariant.swift
   ShadowProtocols.swift
   Shims.swift
   Slice.swift
@@ -158,7 +172,6 @@ set(SWIFTLIB_ESSENTIAL
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
-  UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
   UnsafePointer.swift

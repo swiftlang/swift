@@ -2124,8 +2124,9 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     ProtocolDecl *proto = conforms.first;
 
     // Look for an associated type and/or concrete type with this name.
-    for (auto member : proto->lookupDirect(name,
-                                           /*ignoreNewExtensions=*/true)) {
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    for (auto member : proto->lookupDirect(name, flags)) {
       // If this is an associated type, record whether it is the best
       // associated type we've seen thus far.
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {

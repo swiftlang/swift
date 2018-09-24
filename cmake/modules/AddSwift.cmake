@@ -132,10 +132,11 @@ function(_add_variant_c_compile_link_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND result
-      "--sysroot=${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_PATH}"
-      # Use the linker included in the Android NDK.
-      "-B" "${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_PREBUILT_PATH}/${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_TRIPLE}/bin/")
+    # lld can handle targeting the android build.  However, if lld is not
+    # enabled, then fallback to the linker included in the android NDK.
+    if(NOT SWIFT_ENABLE_LLD_LINKER)
+      list(APPEND result "-B" "${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_PREBUILT_PATH}/${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_TRIPLE}/bin")
+    endif()
   endif()
 
   if(IS_DARWIN)
@@ -227,8 +228,8 @@ function(_add_variant_c_compile_flags)
     # -D_MD or D_MDd either, as CMake does this automatically.
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
       list(APPEND result -Xclang;--dependent-lib=oldnames)
-      # TODO(compnerd) handle /MT, /MTd, /MD, /MDd
-      if("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+      # TODO(compnerd) handle /MT, /MTd
+      if("${CFLAGS_BUILD_TYPE}" STREQUAL "Debug")
         list(APPEND result "-D_MDd")
         list(APPEND result -Xclang;--dependent-lib=msvcrtd)
       else()

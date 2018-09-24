@@ -69,3 +69,23 @@ public class C7 {
 public protocol P3: P2, P1 {}
 
 extension fixedLayoutStruct: P1 {}
+
+public protocol AssociatedTypePro {
+  associatedtype T1 = Int
+  associatedtype T2
+  associatedtype T3 = C1
+}
+
+public class RemoveSetters {
+  public var Value = 4
+  public subscript(_ idx: Int) -> Int {
+    get { return 1 }
+    set(newValue) {}
+  }
+}
+
+public protocol RequiementChanges {
+  func removedFunc()
+  associatedtype removedType
+  var removedVar: Int {get}
+}

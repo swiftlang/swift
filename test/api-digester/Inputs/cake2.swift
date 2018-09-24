@@ -76,3 +76,23 @@ public protocol P3: P1, P4 {}
 public protocol P4 {}
 
 extension fixedLayoutStruct: P2 {}
+
+public protocol AssociatedTypePro {
+  associatedtype T1
+  associatedtype T2
+  associatedtype T3 = C6
+}
+
+public class RemoveSetters {
+  public private(set) var Value = 4
+  public subscript(_ idx: Int) -> Int {
+    get { return 1 }
+  }
+}
+
+public protocol RequiementChanges {
+  associatedtype addedTypeWithDefault = Int
+  associatedtype addedTypeWithoutDefault
+  func addedFunc()
+  var addedVar: Int { get }
+}

@@ -207,7 +207,8 @@ enum class KnownProtocolKind: uint8_t {
 };
 
 class SDKNodeRoot;
-
+class SDKNodeDeclGetter;
+class SDKNodeDeclSetter;
 struct SDKNodeInitInfo;
 
 class SDKNode {
@@ -277,6 +278,7 @@ class SDKNodeDecl: public SDKNode {
   bool IsImplicit;
   bool IsStatic;
   bool IsDeprecated;
+  bool IsProtocolReq;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
 
@@ -300,6 +302,7 @@ public:
   StringRef getFullyQualifiedName() const;
   bool isSDKPrivate() const;
   bool isDeprecated() const { return IsDeprecated; };
+  bool isProtocolRequirement() const { return IsProtocolReq; }
   bool hasDeclAttribute(DeclAttrKind DAKind) const;
   bool isImplicit() const { return IsImplicit; };
   bool isStatic() const { return IsStatic; };
@@ -440,6 +443,15 @@ public:
   static bool classof(const SDKNode *N);
 };
 
+class SDKNodeDeclAssociatedType: public SDKNodeDecl {
+public:
+  SDKNodeDeclAssociatedType(SDKNodeInitInfo Info);
+  const SDKNodeType* getDefault() const {
+    return getChildrenCount() ? getOnlyChild()->getAs<SDKNodeType>(): nullptr;
+  }
+  static bool classof(const SDKNode *N);
+};
+
 class SDKNodeDeclVar : public SDKNodeDecl {
   Optional<unsigned> FixedBinaryOrder;
 public:
@@ -447,6 +459,9 @@ public:
   static bool classof(const SDKNode *N);
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
   unsigned getFixedBinaryOrder() const { return *FixedBinaryOrder; }
+  SDKNodeDeclGetter *getGetter() const;
+  SDKNodeDeclSetter *getSetter() const;
+  SDKNodeType *getType() const;
 };
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
@@ -464,6 +479,14 @@ public:
   bool hasSelfIndex() const { return SelfIndex.hasValue(); }
   static bool classof(const SDKNode *N);
   static StringRef getTypeRoleDescription(SDKContext &Ctx, unsigned Index);
+};
+
+class SDKNodeDeclSubscript: public SDKNodeDeclAbstractFunc {
+  bool HasSetter;
+public:
+  SDKNodeDeclSubscript(SDKNodeInitInfo Info);
+  static bool classof(const SDKNode *N);
+  bool hasSetter() const { return HasSetter; }
 };
 
 class SDKNodeDeclFunction: public SDKNodeDeclAbstractFunc {

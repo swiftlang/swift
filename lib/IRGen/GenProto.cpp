@@ -2196,6 +2196,135 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
   return fn;
 }
 
+namespace {
+  /// Builds a protocol conformance descriptor.
+  class ProtocolConformanceDescriptorBuilder {
+    IRGenModule &IGM;
+    ConstantStructBuilder &B;
+    const NormalProtocolConformance *Conformance;
+    ConformanceFlags Flags;
+
+  public:
+    ProtocolConformanceDescriptorBuilder(
+                                 IRGenModule &IGM,
+                                 ConstantStructBuilder &B,
+                                 const NormalProtocolConformance *conformance)
+    : IGM(IGM), B(B), Conformance(conformance) { }
+
+    void layout() {
+      addProtocol();
+      addConformingType();
+      addWitnessTable();
+      addFlags();
+      addContext();
+      addConditionalRequirements();
+
+      B.suggestType(IGM.ProtocolConformanceDescriptorTy);
+    }
+
+    void addProtocol() {
+      // Relative reference to the protocol descriptor.
+      auto protocol = Conformance->getProtocol();
+      auto descriptorRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+                    LinkEntity::forProtocolDescriptor(protocol),
+                    IGM.getPointerAlignment(), IGM.ProtocolDescriptorStructTy);
+      B.addRelativeAddress(descriptorRef);
+    }
+
+    void addConformingType() {
+      // Add a relative reference to the type, with the type reference
+      // kind stored in the flags.
+      auto ref =
+        IGM.getTypeEntityReference(Conformance->getType()->getAnyNominal());
+      B.addRelativeAddress(ref.getValue());
+      Flags = Flags.withTypeReferenceKind(ref.getKind());
+    }
+
+    void addWitnessTable() {
+      using ConformanceKind = ConformanceFlags::ConformanceKind;
+
+      // Figure out what kind of witness table we have.
+      llvm::Constant *witnessTableVar;
+
+      if (Conformance->getConditionalRequirements().empty()) {
+        if (!isDependentConformance(Conformance) &&
+            !Conformance->isSynthesizedNonUnique()) {
+          Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
+          witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
+        } else {
+          Flags = Flags.withConformanceKind(
+                                        ConformanceKind::WitnessTableAccessor);
+          witnessTableVar = IGM.getAddrOfWitnessTableAccessFunction(
+              Conformance, ForDefinition);
+        }
+      } else {
+        Flags =
+          Flags.withConformanceKind(
+              ConformanceKind::ConditionalWitnessTableAccessor)
+            .withNumConditionalRequirements(
+              Conformance->getConditionalRequirements().size());
+
+        witnessTableVar = IGM.getAddrOfWitnessTableAccessFunction(
+          Conformance, ForDefinition);
+      }
+
+      // Relative reference to the witness table.
+      auto witnessTableRef =
+        ConstantReference(witnessTableVar, ConstantReference::Direct);
+      B.addRelativeAddress(witnessTableRef);
+    }
+
+    void addFlags() {
+      // Miscellaneous flags.
+      Flags = Flags.withIsRetroactive(Conformance->isRetroactive());
+      Flags =
+        Flags.withIsSynthesizedNonUnique(Conformance->isSynthesizedNonUnique());
+
+      // Add the flags.
+      B.addInt32(Flags.getIntValue());
+    }
+
+    void addContext() {
+      if (!Conformance->isRetroactive())
+        return;
+
+      auto moduleContext =
+        Conformance->getDeclContext()->getModuleScopeContext();
+      ConstantReference moduleContextRef =
+        IGM.getAddrOfParentContextDescriptor(moduleContext);
+      B.addRelativeAddress(moduleContextRef);
+    }
+
+    void addConditionalRequirements() {
+      if (Conformance->getConditionalRequirements().empty())
+        return;
+
+      auto nominal = Conformance->getType()->getAnyNominal();
+      irgen::addGenericRequirements(IGM, B,
+        nominal->getGenericSignatureOfContext(),
+        Conformance->getConditionalRequirements());
+    }
+  };
+}
+
+void IRGenModule::emitProtocolConformance(
+                                const NormalProtocolConformance *conformance) {
+  // Emit additional metadata to be used by reflection.
+  emitAssociatedTypeMetadataRecord(conformance);
+
+  // Form the protocol conformance descriptor.
+  ConstantInitBuilder initBuilder(*this);
+  auto init = initBuilder.beginStruct();
+  ProtocolConformanceDescriptorBuilder builder(*this, init, conformance);
+  builder.layout();
+
+  auto var =
+    cast<llvm::GlobalVariable>(
+          getAddrOfProtocolConformanceDescriptor(conformance,
+                                                 init.finishAndCreateFuture()));
+  var->setConstant(true);
+}
+
 void IRGenModule::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
   // Only resilient conformances use relative pointers for witness methods.
   if (wt.isDeclaration() || isAvailableExternally(wt.getLinkage()) ||

@@ -501,3 +501,10 @@ protocol RefinesAssocWithDefault: HasAssoc {
 struct Foo: RefinesAssocWithDefault {
 }
 
+protocol P20 {
+  associatedtype T // expected-note{{protocol requires nested type 'T'; do you want to add it?}}
+  typealias TT = T?
+}
+struct S19 : P20 {  // expected-error{{type 'S19' does not conform to protocol 'P20'}}
+  typealias TT = Int?
+}

@@ -813,10 +813,31 @@ public:
           }
         }
       }
+      // Complain about added protocol requirements
+      if (auto *D = dyn_cast<SDKNodeDecl>(Right)) {
+        if (D->isProtocolRequirement()) {
+          bool ShouldComplain = true;
+          // We should allow added associated types with default.
+          if (auto ATD = dyn_cast<SDKNodeDeclAssociatedType>(D)) {
+            if (ATD->getDefault())
+              ShouldComplain = false;
+          }
+          if (ShouldComplain)
+            Ctx.getDiags().diagnose(SourceLoc(), diag::protocol_req_added,
+                                    D->getScreenInfo());
+        }
+      }
       return;
     case NodeMatchReason::Removed:
       assert(!Right);
       Left->annotate(NodeAnnotation::Removed);
+      if (auto *LT = dyn_cast<SDKNodeType>(Left)) {
+        if (auto *AT = dyn_cast<SDKNodeDeclAssociatedType>(LT->getParent())) {
+          Ctx.getDiags().diagnose(SourceLoc(),
+                                  diag::default_associated_type_removed,
+                                  AT->getScreenInfo(), LT->getPrintedName());
+        }
+      }
       return;
     case NodeMatchReason::FuncToProperty:
     case NodeMatchReason::ModernizeEnum:
@@ -860,6 +881,17 @@ public:
       break;
     }
 
+    case SDKNodeKind::DeclSubscript: {
+      if (auto *LS = dyn_cast<SDKNodeDeclSubscript>(Left)) {
+        auto *RS = cast<SDKNodeDeclSubscript>(Right);
+        if (LS->hasSetter() && !RS->hasSetter()) {
+          Ctx.getDiags().diagnose(SourceLoc(), diag::removed_setter,
+                                  LS->getScreenInfo());
+        }
+      }
+      LLVM_FALLTHROUGH;
+    }
+    case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclFunction:
     case SDKNodeKind::DeclSetter:
     case SDKNodeKind::DeclGetter:
@@ -877,10 +909,16 @@ public:
     }
 
     case SDKNodeKind::DeclVar: {
-      auto LC = Left->getChildren()[0];
-      auto RC = Right->getChildren()[0];
+      auto LVar = cast<SDKNodeDeclVar>(Left);
+      auto RVar = cast<SDKNodeDeclVar>(Right);
+      auto LC = LVar->getType();
+      auto RC = RVar->getType();
       if (!(*LC == *RC))
         foundMatch(LC, RC, NodeMatchReason::Sequential);
+      if (LVar->getSetter() && !RVar->getSetter()) {
+          Ctx.getDiags().diagnose(SourceLoc(), diag::removed_setter,
+                                  LVar->getScreenInfo());
+      }
       break;
     }
     }
@@ -1731,6 +1769,10 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
       if (Node->getPrintedName() != Count->getPrintedName())
         Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
           Descriptor, Node->getPrintedName(), Count->getPrintedName());
+      break;
+    case SDKNodeKind::DeclAssociatedType:
+      Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
+                     "default", Node->getPrintedName(), Count->getPrintedName());
       break;
     default:
       break;

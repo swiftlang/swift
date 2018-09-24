@@ -320,11 +320,10 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
   const char *Ptr = InputBuf->getBufferStart();
   const char *End = InputBuf->getBufferEnd();
   const char *LineStart = Ptr;
-  for (; Ptr < End; ++Ptr) {
+  --Line;
+  for (; Line && (Ptr < End); ++Ptr) {
     if (*Ptr == '\n') {
       --Line;
-      if (Line == 0)
-        break;
       LineStart = Ptr+1;
     }
   }

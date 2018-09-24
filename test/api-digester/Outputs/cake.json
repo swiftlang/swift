@@ -841,6 +841,177 @@
     },
     {
       "kind": "TypeDecl",
+      "name": "ProWithAssociatedType",
+      "printedName": "ProWithAssociatedType",
+      "declKind": "Protocol",
+      "usr": "s:4cake21ProWithAssociatedTypeP",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "AssociatedType",
+          "name": "A",
+          "printedName": "A",
+          "declKind": "AssociatedType",
+          "usr": "s:4cake21ProWithAssociatedTypeP1AQa",
+          "location": "",
+          "moduleName": "cake",
+          "protocolReq": true
+        },
+        {
+          "kind": "AssociatedType",
+          "name": "B",
+          "printedName": "B",
+          "declKind": "AssociatedType",
+          "usr": "s:4cake21ProWithAssociatedTypeP1BQa",
+          "location": "",
+          "moduleName": "cake",
+          "protocolReq": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "NonReqFunc",
+          "printedName": "NonReqFunc()",
+          "declKind": "Func",
+          "usr": "s:4cake21ProWithAssociatedTypePAAE10NonReqFuncyyF",
+          "location": "",
+          "moduleName": "cake",
+          "genericSig": "<Self where Self : ProWithAssociatedType>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ]
+        },
+        {
+          "kind": "Var",
+          "name": "NonReqVar",
+          "printedName": "NonReqVar",
+          "declKind": "Var",
+          "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivp",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "Getter",
+              "name": "_",
+              "printedName": "_()",
+              "declKind": "Accessor",
+              "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivg",
+              "location": "",
+              "moduleName": "cake",
+              "genericSig": "<Self where Self : ProWithAssociatedType>",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "NonReqAlias",
+          "printedName": "NonReqAlias",
+          "declKind": "TypeAlias",
+          "usr": "s:4cake21ProWithAssociatedTypePAAE11NonReqAliasa",
+          "location": "",
+          "moduleName": "cake",
+          "genericSig": "<Self where Self : ProWithAssociatedType>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "SubsContainer",
+      "printedName": "SubsContainer",
+      "declKind": "Protocol",
+      "usr": "s:4cake13SubsContainerP",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "Subscript",
+          "name": "subscript",
+          "printedName": "subscript(getter:)",
+          "declKind": "Subscript",
+          "usr": "s:4cake13SubsContainerP6getterS2i_tcip",
+          "location": "",
+          "moduleName": "cake",
+          "genericSig": "<Self where Self : SubsContainer>",
+          "protocolReq": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        },
+        {
+          "kind": "Subscript",
+          "name": "subscript",
+          "printedName": "subscript(setter:)",
+          "declKind": "Subscript",
+          "usr": "s:4cake13SubsContainerP6setterS2i_tcip",
+          "location": "",
+          "moduleName": "cake",
+          "genericSig": "<Self where Self : SubsContainer>",
+          "protocolReq": true,
+          "hasSetter": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
       "name": "Int",
       "printedName": "Int",
       "declKind": "Struct",
