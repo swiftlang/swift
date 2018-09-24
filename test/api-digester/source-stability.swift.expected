@@ -20,6 +20,10 @@ Func FixedWidthInteger.divideWithOverflow(_:_:) has been removed
 Func FixedWidthInteger.multiplyWithOverflow(_:_:) has been removed
 Func FixedWidthInteger.remainderWithOverflow(_:_:) has been removed
 Func FixedWidthInteger.subtractWithOverflow(_:_:) has been removed
+Func FixedWidthInteger.unsafeAdding(_:) has been removed
+Func FixedWidthInteger.unsafeDivided(by:) has been removed
+Func FixedWidthInteger.unsafeMultiplied(by:) has been removed
+Func FixedWidthInteger.unsafeSubtracting(_:) has been removed
 Func FloatingPoint.abs(_:) has been removed (deprecated)
 Func FloatingPoint.add(_:) has been removed
 Func FloatingPoint.adding(_:) has been removed

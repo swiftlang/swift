@@ -383,6 +383,30 @@ extension FixedWidthInteger {
   /// The empty bitset.
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
+  
+  @available(*, unavailable, message:
+    "Use operators or addingReportingOverflow instead.")
+  public func unsafeAdding(_ other: Self) -> Self {
+    fatalError("unavailable")
+  }
+  
+  @available(*, unavailable, message:
+    "Use operators or subtractingReportingOverflow instead.")
+  public func unsafeSubtracting(_ other: Self) -> Self {
+    fatalError("unavailable")
+  }
+  
+  @available(*, unavailable, message:
+    "Use operators or multipliedReportingOverflow(by:) instead.")
+  public func unsafeMultiplied(by other: Self) -> Self {
+    fatalError("unavailable")
+  }
+  
+  @available(*, unavailable, message:
+    "Use operators or dividedReportingOverflow(by:) instead.")
+  public func unsafeDivided(by other: Self) -> Self {
+    fatalError("unavailable")
+  }
 }
 
 extension LazyCollectionProtocol {
