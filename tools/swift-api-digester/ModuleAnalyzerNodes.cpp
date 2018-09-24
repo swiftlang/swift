@@ -15,14 +15,6 @@ enum class KeyKind {
 #include "swift/IDE/DigesterEnums.def"
 };
 
-/// The additional information we need to create a type node.
-struct TypeInitInfo {
-  bool IsImplicitlyUnwrappedOptional = false;
-  /// When this type node represents a function parameter, this boolean value
-  /// indicates whether the parameter has default argument.
-  bool hasDefaultArgument = false;
-};
-
 static StringRef getAttrName(DeclAttrKind Kind) {
   switch (Kind) {
 #define DECL_ATTR(NAME, CLASS, ...)                                           \
@@ -57,13 +49,14 @@ struct swift::ide::api::SDKNodeInitInfo {
   std::vector<StringRef> ConformingProtocols;
   StringRef SuperclassUsr;
   StringRef EnumRawTypeName;
-  TypeInitInfo TypeInfo;
+  bool hasDefaultArgument = false;
   StringRef GenericSig;
   bool HasSetter = false;
 
   SDKNodeInitInfo(SDKContext &Ctx) : Ctx(Ctx) {}
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
-  SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info = TypeInitInfo());
+  SDKNodeInitInfo(SDKContext &Ctx, Type Ty, bool IsImplicitlyUnwrappedOptional,
+                  bool hasDefaultArgument);
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
 
@@ -94,7 +87,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   SDKNode(Info, Kind), TypeAttributes(Info.TypeAttrs),
-  HasDefaultArg(Info.TypeInfo.hasDefaultArgument) {}
+  HasDefaultArg(Info.hasDefaultArgument) {}
 
 SDKNodeTypeNominal::SDKNodeTypeNominal(SDKNodeInitInfo Info):
   SDKNodeType(Info, SDKNodeKind::TypeNominal), USR(Info.USR) {}
@@ -585,7 +578,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         Info.IsMutating = true;
         break;
       case KeyKind::KK_hasDefaultArg:
-        Info.TypeInfo.hasDefaultArgument = true;
+        Info.hasDefaultArgument = true;
         break;
       case KeyKind::KK_static:
         Info.IsStatic = true;
@@ -1036,10 +1029,11 @@ static Optional<unsigned> getFixedBinaryOrder(ValueDecl *VD) {
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
-                                 TypeInitInfo TypeInfo) :
-    Ctx(Ctx), Name(getTypeName(Ctx, Ty, TypeInfo.IsImplicitlyUnwrappedOptional)),
-    PrintedName(getPrintedName(Ctx, Ty, TypeInfo.IsImplicitlyUnwrappedOptional)),
-    TypeInfo(TypeInfo) {
+                                 bool IsImplicitlyUnwrappedOptional = false,
+                                 bool hasDefaultArgument = false) :
+    Ctx(Ctx), Name(getTypeName(Ctx, Ty, IsImplicitlyUnwrappedOptional)),
+    PrintedName(getPrintedName(Ctx, Ty, IsImplicitlyUnwrappedOptional)),
+    hasDefaultArgument(hasDefaultArgument) {
   if (isFunctionTypeNoEscape(Ty))
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
   // If this is a nominal type, get its Usr.
@@ -1109,17 +1103,19 @@ case SDKNodeKind::X:                                                           \
 
 // Recursively construct a node that represents a type, for instance,
 // representing the return value type of a function decl.
-static SDKNode *constructTypeNode(SDKContext &Ctx, Type T,
-                                  TypeInitInfo InitInfo = TypeInitInfo()) {
+SDKNode *swift::ide::api::
+SwiftDeclCollector::constructTypeNode(Type T,
+                                      bool IsImplicitlyUnwrappedOptional,
+                                      bool hasDefaultArgument) {
   if (Ctx.checkingABI()) {
     T = T->getCanonicalType();
   }
-  SDKNode* Root = SDKNodeInitInfo(Ctx, T, InitInfo)
-    .createSDKNode(SDKNodeKind::TypeNominal);
+  SDKNode* Root = SDKNodeInitInfo(Ctx, T, IsImplicitlyUnwrappedOptional,
+    hasDefaultArgument).createSDKNode(SDKNodeKind::TypeNominal);
 
   if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
     SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeAlias);
-    Root->addChild(constructTypeNode(Ctx, NAT->getCanonicalType()));
+    Root->addChild(constructTypeNode(NAT->getCanonicalType()));
     return Root;
   }
 
@@ -1127,46 +1123,42 @@ static SDKNode *constructTypeNode(SDKContext &Ctx, Type T,
     SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeFunc);
 
     // Still, return type first
-    Root->addChild(constructTypeNode(Ctx, Fun->getResult()));
-    Root->addChild(constructTypeNode(Ctx, Fun->getInput()));
+    Root->addChild(constructTypeNode(Fun->getResult()));
+    Root->addChild(constructTypeNode(Fun->getInput()));
     return Root;
   }
 
   // Keep paren type as a stand-alone level.
   if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
-    Root->addChild(constructTypeNode(Ctx, PT->getSinglyDesugaredType()));
+    Root->addChild(constructTypeNode(PT->getSinglyDesugaredType()));
     return Root;
   }
 
   // Handle the case where Type has sub-types.
   if (auto BGT = T->getAs<BoundGenericType>()) {
     for (auto Arg : BGT->getGenericArgs()) {
-      Root->addChild(constructTypeNode(Ctx, Arg));
+      Root->addChild(constructTypeNode(Arg));
     }
   } else if (auto Tup = T->getAs<TupleType>()) {
     for (auto Elt : Tup->getElementTypes())
-      Root->addChild(constructTypeNode(Ctx, Elt));
+      Root->addChild(constructTypeNode(Elt));
   } else if (auto MTT = T->getAs<AnyMetatypeType>()) {
-    Root->addChild(constructTypeNode(Ctx, MTT->getInstanceType()));
+    Root->addChild(constructTypeNode(MTT->getInstanceType()));
   } else if (auto ATT = T->getAs<ArchetypeType>()) {
     for (auto Pro : ATT->getConformsTo()) {
-      Root->addChild(constructTypeNode(Ctx, Pro->getDeclaredType()));
+      Root->addChild(constructTypeNode(Pro->getDeclaredType()));
     }
   }
   return Root;
 }
 
-static std::vector<SDKNode*>
-createParameterNodes(SDKContext &Ctx, ParameterList *PL) {
+std::vector<SDKNode*> swift::ide::api::
+SwiftDeclCollector::createParameterNodes(ParameterList *PL) {
   std::vector<SDKNode*> Result;
   for (auto param: *PL) {
-    TypeInitInfo TypeInfo;
-    TypeInfo.IsImplicitlyUnwrappedOptional = param->getAttrs().
-      hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-    TypeInfo.hasDefaultArgument = param->getDefaultArgumentKind() !=
-      DefaultArgumentKind::None;
-    Result.push_back(constructTypeNode(Ctx, param->getInterfaceType(),
-                                       TypeInfo));
+    Result.push_back(constructTypeNode(param->getInterfaceType(),
+      param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>(),
+      param->getDefaultArgumentKind() != DefaultArgumentKind::None));
   }
   return Result;
 }
@@ -1175,27 +1167,28 @@ createParameterNodes(SDKContext &Ctx, ParameterList *PL) {
 // is guaranteed to be the return value type of this function.
 // We sometimes skip the first parameter because it can be metatype of dynamic
 // this if the function is a member function.
-static SDKNode *constructFunctionNode(SDKContext &Ctx, FuncDecl* FD,
-                                      SDKNodeKind Kind) {
+SDKNode *swift::ide::api::
+SwiftDeclCollector::constructFunctionNode(FuncDecl* FD,
+                                          SDKNodeKind Kind) {
   auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
-  TypeInitInfo TypeInfo;
-  TypeInfo.IsImplicitlyUnwrappedOptional = FD->getAttrs().
-    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-  Func->addChild(constructTypeNode(Ctx, FD->getResultInterfaceType(), TypeInfo));
-  for (auto *Node : createParameterNodes(Ctx, FD->getParameters()))
+  Func->addChild(constructTypeNode(FD->getResultInterfaceType(),
+    FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()));
+  for (auto *Node : createParameterNodes(FD->getParameters()))
     Func->addChild(Node);
   return Func;
 }
 
-static SDKNode* constructInitNode(SDKContext &Ctx, ConstructorDecl *CD) {
+SDKNode* swift::ide::api::
+SwiftDeclCollector::constructInitNode(ConstructorDecl *CD) {
   auto Func = SDKNodeInitInfo(Ctx, CD).createSDKNode(SDKNodeKind::DeclConstructor);
-  Func->addChild(constructTypeNode(Ctx, CD->getResultInterfaceType()));
-  for (auto *Node : createParameterNodes(Ctx, CD->getParameters()))
+  Func->addChild(constructTypeNode(CD->getResultInterfaceType()));
+  for (auto *Node : createParameterNodes(CD->getParameters()))
     Func->addChild(Node);
   return Func;
 }
 
-static bool shouldIgnore(Decl *D, const Decl* Parent, SDKContext &Ctx) {
+bool swift::ide::api::
+SwiftDeclCollector::shouldIgnore(Decl *D, const Decl* Parent) {
   if (D->isPrivateStdlibDecl(false))
     return true;
   if (AvailableAttr::isUnavailable(D))
@@ -1242,17 +1235,13 @@ static bool shouldIgnore(Decl *D, const Decl* Parent, SDKContext &Ctx) {
   return false;
 }
 
-static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
-                             IterableDeclContext *Context,
-                             std::set<ExtensionDecl*> &HandledExts);
-
-static SDKNode *constructTypeDeclNode(SDKContext &Ctx, NominalTypeDecl *NTD,
-                                      std::set<ExtensionDecl*> &HandledExts) {
+SDKNode *swift::ide::api::
+SwiftDeclCollector::constructTypeDeclNode(NominalTypeDecl *NTD) {
   auto TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::DeclType);
-  addMembersToRoot(Ctx, TypeNode, NTD, HandledExts);
+  addMembersToRoot(TypeNode, NTD);
   for (auto Ext : NTD->getExtensions()) {
-    HandledExts.insert(Ext);
-    addMembersToRoot(Ctx, TypeNode, Ext, HandledExts);
+    HandledExtensions.insert(Ext);
+    addMembersToRoot(TypeNode, Ext);
   }
   return TypeNode;
 }
@@ -1262,83 +1251,82 @@ static SDKNode *constructTypeDeclNode(SDKContext &Ctx, NominalTypeDecl *NTD,
 /// extended types. If the extended types are from a different module, we have to
 /// synthesize this type node to include those extension members, since these
 /// extension members are legit members of the module.
-static SDKNode *constructExternalExtensionNode(SDKContext &Ctx, SDKNode *Root,
-                                               NominalTypeDecl *NTD,
-                                               ArrayRef<ExtensionDecl*> AllExts,
-                                        std::set<ExtensionDecl*> &HandledExts) {
+SDKNode *swift::ide::api::
+SwiftDeclCollector::constructExternalExtensionNode(NominalTypeDecl *NTD,
+                                            ArrayRef<ExtensionDecl*> AllExts) {
   auto *TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::DeclType);
 
   // The members of the extensions are the only members of this synthesized type.
   for (auto *Ext: AllExts) {
-    HandledExts.insert(Ext);
-    addMembersToRoot(Ctx, TypeNode, Ext, HandledExts);
+    HandledExtensions.insert(Ext);
+    addMembersToRoot(TypeNode, Ext);
   }
   return TypeNode;
 }
 
-static SDKNode *constructVarNode(SDKContext &Ctx, ValueDecl *VD) {
+SDKNode *swift::ide::api::
+SwiftDeclCollector::constructVarNode(ValueDecl *VD) {
   auto Var = SDKNodeInitInfo(Ctx, VD).createSDKNode(SDKNodeKind::DeclVar);
-  TypeInitInfo TypeInfo;
-  TypeInfo.IsImplicitlyUnwrappedOptional = VD->getAttrs().
-    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-  Var->addChild(constructTypeNode(Ctx, VD->getInterfaceType(), TypeInfo));
+  Var->addChild(constructTypeNode(VD->getInterfaceType(),
+    VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
     if (auto Getter = VAD->getGetter())
-      Var->addChild(constructFunctionNode(Ctx, Getter, SDKNodeKind::DeclGetter));
+      Var->addChild(constructFunctionNode(Getter, SDKNodeKind::DeclGetter));
     if (auto Setter = VAD->getSetter()) {
       if (Setter->getFormalAccess() > AccessLevel::Internal)
-        Var->addChild(constructFunctionNode(Ctx, Setter, SDKNodeKind::DeclSetter));
+        Var->addChild(constructFunctionNode(Setter, SDKNodeKind::DeclSetter));
     }
   }
   return Var;
 }
 
-static SDKNode *constructTypeAliasNode(SDKContext &Ctx,TypeAliasDecl *TAD) {
+SDKNode *swift::ide::api::
+SwiftDeclCollector::constructTypeAliasNode(TypeAliasDecl *TAD) {
   auto Alias = SDKNodeInitInfo(Ctx, TAD).createSDKNode(SDKNodeKind::DeclTypeAlias);
-  Alias->addChild(constructTypeNode(Ctx, TAD->getUnderlyingTypeLoc().getType()));
+  Alias->addChild(constructTypeNode(TAD->getUnderlyingTypeLoc().getType()));
   return Alias;
 }
 
-static SDKNode *constructAssociatedTypeNode(SDKContext &Ctx,
-                                            AssociatedTypeDecl *ATD) {
+SDKNode *swift::ide::api::
+SwiftDeclCollector::constructAssociatedTypeNode(AssociatedTypeDecl *ATD) {
   auto Asso = SDKNodeInitInfo(Ctx, ATD).
     createSDKNode(SDKNodeKind::DeclAssociatedType);
   if (auto DT = ATD->getDefaultDefinitionType()) {
-    Asso->addChild(constructTypeNode(Ctx, DT));
+    Asso->addChild(constructTypeNode(DT));
   }
   return Asso;
 }
 
-static SDKNode *constructSubscriptDeclNode(SDKContext &Ctx, SubscriptDecl *SD) {
+SDKNode *swift::ide::api::
+SwiftDeclCollector::constructSubscriptDeclNode(SubscriptDecl *SD) {
   auto Subs = SDKNodeInitInfo(Ctx, SD).createSDKNode(SDKNodeKind::DeclSubscript);
-  Subs->addChild(constructTypeNode(Ctx, SD->getElementInterfaceType()));
-  for (auto *Node: createParameterNodes(Ctx, SD->getIndices()))
+  Subs->addChild(constructTypeNode(SD->getElementInterfaceType()));
+  for (auto *Node: createParameterNodes(SD->getIndices()))
     Subs->addChild(Node);
   return Subs;
 }
 
-static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
-                             IterableDeclContext *Context,
-                             std::set<ExtensionDecl*> &HandledExts) {
+void swift::ide::api::
+SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context) {
   for (auto *Member : Context->getMembers()) {
-    if (shouldIgnore(Member, Context->getDecl(), Ctx))
+    if (shouldIgnore(Member, Context->getDecl()))
       continue;
     if (auto Func = dyn_cast<FuncDecl>(Member)) {
-      Root->addChild(constructFunctionNode(Ctx, Func, SDKNodeKind::DeclFunction));
+      Root->addChild(constructFunctionNode(Func, SDKNodeKind::DeclFunction));
     } else if (auto CD = dyn_cast<ConstructorDecl>(Member)) {
-      Root->addChild(constructInitNode(Ctx, CD));
+      Root->addChild(constructInitNode(CD));
     } else if (auto VD = dyn_cast<VarDecl>(Member)) {
-      Root->addChild(constructVarNode(Ctx, VD));
+      Root->addChild(constructVarNode(VD));
     } else if (auto TAD = dyn_cast<TypeAliasDecl>(Member)) {
-      Root->addChild(constructTypeAliasNode(Ctx, TAD));
+      Root->addChild(constructTypeAliasNode(TAD));
     } else if (auto EED = dyn_cast<EnumElementDecl>(Member)) {
-      Root->addChild(constructVarNode(Ctx, EED));
+      Root->addChild(constructVarNode(EED));
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(Member)) {
-      Root->addChild(constructTypeDeclNode(Ctx, NTD, HandledExts));
+      Root->addChild(constructTypeDeclNode(NTD));
     } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
-      Root->addChild(constructAssociatedTypeNode(Ctx, ATD));
+      Root->addChild(constructAssociatedTypeNode(ATD));
     } else if (auto SD = dyn_cast<SubscriptDecl>(Member)) {
-      Root->addChild(constructSubscriptDeclNode(Ctx, SD));
+      Root->addChild(constructSubscriptDeclNode(SD));
     } else if (isa<PatternBindingDecl>(Member)) {
       // All containing variables should have been handled.
     } else if (isa<DestructorDecl>(Member)) {
@@ -1360,7 +1348,7 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
     llvm::SmallVector<Decl*, 512> Decls;
     M->getDisplayDecls(Decls);
     for (auto D : Decls) {
-      if (shouldIgnore(D, nullptr, Ctx))
+      if (shouldIgnore(D, nullptr))
         continue;
       if (KnownDecls.count(D))
         continue;
@@ -1393,22 +1381,21 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
     }
   }
   for (auto Pair: ExtensionMap) {
-    RootNode->addChild(constructExternalExtensionNode(Ctx, RootNode,
-      Pair.first, Pair.second, HandledExtensions));
+    RootNode->addChild(constructExternalExtensionNode(Pair.first, Pair.second));
   }
 }
 
 void SwiftDeclCollector::processDecl(ValueDecl *VD) {
   if (auto FD = dyn_cast<FuncDecl>(VD)) {
-    RootNode->addChild(constructFunctionNode(Ctx, FD, SDKNodeKind::DeclFunction));
+    RootNode->addChild(constructFunctionNode(FD, SDKNodeKind::DeclFunction));
   } else if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    RootNode->addChild(constructTypeDeclNode(Ctx, NTD, HandledExtensions));
+    RootNode->addChild(constructTypeDeclNode(NTD));
   }
   if (auto VAD = dyn_cast<VarDecl>(VD)) {
-    RootNode->addChild(constructVarNode(Ctx, VAD));
+    RootNode->addChild(constructVarNode(VAD));
   }
   if (auto TAD = dyn_cast<TypeAliasDecl>(VD)) {
-    RootNode->addChild(constructTypeAliasNode(Ctx, TAD));
+    RootNode->addChild(constructTypeAliasNode(TAD));
   }
 }
 
