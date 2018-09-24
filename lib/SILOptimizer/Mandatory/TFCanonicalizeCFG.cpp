@@ -496,9 +496,15 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
       SILBasicBlock *current = *worklist.begin();
       blocksToBeMoved.insert(current);
       worklist.erase(current);
-      unsigned edgeIdx = 0;
-      for (SILBasicBlock *succ : current->getSuccessorBlocks()) {
-        ++edgeIdx;
+      for (unsigned edgeIdx : indices(current->getSuccessors())) {
+        // We have to look up the successors each time around the loop
+        // since if we split an edge, `current` block will have a new terminator
+        // implying a new successor list. The new edge will be placed at the
+        // same spot in the new terminator where the old edge was in the old
+        // terminator. Thus as long as we use indices, we will visit all edges
+        // appropriately and not deal with touching stale memory.
+        auto succs = current->getSuccessors();
+        auto *succ = succs[edgeIdx].getBB();
         // Skip if (1) already processed, (2) reached common pd, or (3)
         // block has in edges from outside the loop. In the last case, we will
         // need to clone the blocks.
@@ -509,7 +515,7 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
           // Split this edge so that we don't mess up arguments passed in
           // from other predecessors of succ.
           if (succ->getNumArguments() > 0) {
-            splitEdge(current->getTerminator(), edgeIdx - 1, DI, LI);
+            splitEdge(current->getTerminator(), edgeIdx, DI, LI);
           }
           continue;
         }
