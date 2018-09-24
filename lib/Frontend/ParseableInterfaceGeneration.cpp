@@ -10,12 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ParseableInterfaceGeneration.h"
-
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/Frontend/ParseableInterfaceGeneration.h"
 #include "clang/Basic/Module.h"
 
 using namespace swift;

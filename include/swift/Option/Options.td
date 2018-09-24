@@ -47,6 +47,10 @@ def DoesNotAffectIncrementalBuild : OptionFlag;
 // current working directory.
 def ArgumentIsPath : OptionFlag;
 
+// The option should be written into a .swiftinterface textual interface file,
+// and read/parsed from there when reconstituting a .swiftmodule from it.
+def TextualInterfaceOption : OptionFlag;
+
 /////////
 // Options
 
