@@ -185,20 +185,6 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
   override var indices: Indices { get }
   
-  // TODO: swift-3-indexing-model: tests.
-  /// The last element of the collection.
-  ///
-  /// If the collection is empty, the value of this property is `nil`.
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let lastNumber = numbers.last {
-  ///         print(lastNumber)
-  ///     }
-  ///     // Prints "50"
-  ///     
-  /// - Complexity: O(1)
-  var last: Element? { get }
-
   /// Accesses a contiguous subrange of the collection's elements.
   ///
   /// The accessed slice uses the same indices for the same elements as the

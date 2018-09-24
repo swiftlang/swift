@@ -560,8 +560,8 @@ CollectionTypeTests.test("Collection.makeIterator()/CustomImplementation") {
 CollectionTypeTests.test("subscript(_: Range<Index>)/Dispatch") {
   let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
   _ = tester[tester.startIndex..<tester.endIndex]
-  let log = tester.log
-  let log2 = tester.log.subscriptRange
+  _ = tester.log
+  _ = tester.log.subscriptRange
   expectCustomizable(tester, tester.log.subscriptRange)
 }
 
@@ -573,8 +573,7 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/writeback") {
   let i = collection.startIndex
   let j = collection.index(i, offsetBy: 5)
   collection[i..<j].sort()
-  expectEqualSequence(
-    [ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
+  expectEqualSequence([ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
 }
 
 CollectionTypeTests.test("subscript(_: Range<Index>)/defaultImplementation/sliceTooLarge")
@@ -601,16 +600,6 @@ CollectionTypeTests.test("isEmpty/dispatch") {
   let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
   _ = tester.isEmpty
   expectCustomizable(tester, tester.log.isEmpty)
-}
-
-//===----------------------------------------------------------------------===//
-// first
-//===----------------------------------------------------------------------===//
-
-CollectionTypeTests.test("first/dispatch") {
-  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.first
-  expectCustomizable(tester, tester.log.first)
 }
 
 //===----------------------------------------------------------------------===//

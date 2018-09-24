@@ -1199,36 +1199,6 @@ extension Collection {
     return startIndex == endIndex
   }
 
-  /// The first element of the collection.
-  ///
-  /// If the collection is empty, the value of this property is `nil`.
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let firstNumber = numbers.first {
-  ///         print(firstNumber)
-  ///     }
-  ///     // Prints "10"
-  @inlinable
-  public var first: Element? {
-    @inline(__always)
-    get {
-      // NB: Accessing `startIndex` may not be O(1) for some lazy collections,
-      // so instead of testing `isEmpty` and then returning the first element,
-      // we'll just rely on the fact that the iterator always yields the
-      // first element first.
-      var i = makeIterator()
-      return i.next()
-    }
-  }
-  
-  // TODO: swift-3-indexing-model - uncomment and replace above ready (or should we still use the iterator one?)
-  /// Returns the first element of `self`, or `nil` if `self` is empty.
-  ///
-  /// - Complexity: O(1)
-  //  public var first: Element? {
-  //    return isEmpty ? nil : self[startIndex]
-  //  }
-
   /// A value less than or equal to the number of elements in the collection.
   ///
   /// - Complexity: O(1) if the collection conforms to

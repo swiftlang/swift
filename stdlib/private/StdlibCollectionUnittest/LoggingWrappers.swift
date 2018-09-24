@@ -107,14 +107,12 @@ public class SequenceLog {
   public static var isEmpty = TypeIndexed(0)
   public static var count = TypeIndexed(0)
   public static var _customIndexOfEquatableElement = TypeIndexed(0)
-  public static var first = TypeIndexed(0)
   public static var advance = TypeIndexed(0)
   public static var advanceLimit = TypeIndexed(0)
   public static var distance = TypeIndexed(0)
   // BidirectionalCollection
   public static var predecessor = TypeIndexed(0)
   public static var formPredecessor = TypeIndexed(0)
-  public static var last = TypeIndexed(0)
   // MutableCollection
   public static var subscriptIndexSet = TypeIndexed(0)
   public static var subscriptRangeSet = TypeIndexed(0)
@@ -406,11 +404,6 @@ extension LoggingCollection: Collection {
     return base._customIndexOfEquatableElement(element)
   }
 
-  public var first: Element? {
-    CollectionLog.first[selfType] += 1
-    return base.first
-  }
-
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     CollectionLog.advance[selfType] += 1
     return base.index(i, offsetBy: n)
@@ -442,11 +435,6 @@ extension LoggingBidirectionalCollection: BidirectionalCollection {
   public func formIndex(before i: inout Index) {
     BidirectionalCollectionLog.formPredecessor[selfType] += 1
     base.formIndex(before: &i)
-  }
-
-  public var last: Element? {
-    BidirectionalCollectionLog.last[selfType] += 1
-    return base.last
   }
 }
 

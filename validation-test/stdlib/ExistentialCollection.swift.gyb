@@ -331,23 +331,6 @@ tests.test("${TestedType}: dispatch to wrapped, CollectionLog") {
     _blackHole(x)
   }
 %   end
-
-  Log.first.expectIncrement(Base.self) {
-    Log.startIndex.expectUnchanged(Base.self) {
-      Log.makeIterator.expectUnchanged(Base.self) {
-        _ = c.first
-      }
-    }
-  }
-
-%   if Traversal in ['Bidirectional', 'RandomAccess']:
-  BidirectionalCollectionLog.last.expectIncrement(Base.self) {
-    Log.endIndex.expectUnchanged(Base.self) {
-      _ = c.last
-    }
-  }
-%   end
-
 }
 %   end
 % end

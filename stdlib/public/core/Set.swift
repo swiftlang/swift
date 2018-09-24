@@ -375,20 +375,6 @@ extension Set: Collection {
   public var isEmpty: Bool {
     return count == 0
   }
-
-  /// The first element of the set.
-  ///
-  /// The first element of the set is not necessarily the first element added
-  /// to the set. Don't expect any particular ordering of set elements.
-  ///
-  /// If the set is empty, the value of this property is `nil`.
-  @inlinable
-  public var first: Element? {
-    // FIXME: It'd better to use an iterator than to subscript with startIndex,
-    // because startIndex is currently O(n) in bridged sets. However,
-    // enumerators aren't guaranteed to have the same element order as allKeys.
-    return count > 0 ? self[startIndex] : nil
-  }
 }
 
 // FIXME: rdar://problem/23549059 (Optimize == for Set)
