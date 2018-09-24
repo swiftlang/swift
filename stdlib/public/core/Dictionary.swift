@@ -1584,7 +1584,7 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
     _canonical.hash(into: &hasher)
   }
 
-  internal func _rawHashValue(_seed: Hasher._Seed) -> Int {
+  internal func _rawHashValue(_seed: Int) -> Int {
     return _canonical._rawHashValue(seed: _seed)
   }
 

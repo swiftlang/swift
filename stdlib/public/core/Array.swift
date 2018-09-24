@@ -1836,7 +1836,7 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
     }
   }
 
-  func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+  func _rawHashValue(_seed: Int) -> Int {
     var hasher = Hasher(_seed: _seed)
     self._hash(into: &hasher)
     return hasher._finalize()

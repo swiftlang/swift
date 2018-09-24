@@ -464,8 +464,15 @@ extension Set: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
     // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
+
+    // Generate a seed from a snapshot of the hasher.  This makes members' hash
+    // values depend on the state of the hasher, which improves hashing
+    // quality. (E.g., it makes it possible to resolve collisions by passing in
+    // a different hasher.)
+    var copy = hasher
+    let seed = copy._finalize()
+
     var hash = 0
-    let seed = hasher._generateSeed()
     for member in self {
       hash ^= member._rawHashValue(seed: seed)
     }
@@ -511,7 +518,7 @@ internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
     _canonical.hash(into: &hasher)
   }
 
-  internal func _rawHashValue(_seed: Hasher._Seed) -> Int {
+  internal func _rawHashValue(_seed: Int) -> Int {
     return _canonical._rawHashValue(seed: _seed)
   }
 
