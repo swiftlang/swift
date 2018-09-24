@@ -72,7 +72,7 @@ from SwiftVectorTypes import all_vector_counts
       public init<D>(gathering source: D, at index: ${Index})
       where D : SIMDVector, D.Element == Element {
         self.init()
-        for i in indices {
+        for i in 0 ..< count {
           if index[i] >= 0 && index[i] < source.count {
             self[i] = source[Int(index[i])]
           }
@@ -88,11 +88,29 @@ from SwiftVectorTypes import all_vector_counts
 
 %   end
 
+      // TODO: replace with call to header inline C func specialized on
+      // architecture once we have importer support.
+      @inlinable
+      public func _all() -> Bool {
+        var result = true
+        for i in 0 ..< count { result = result && self[i] }
+        return result
+      }
+
+      // TODO: replace with call to header inline C func specialized on
+      // architecture once we have importer support.
+      @inlinable
+      public func _any() -> Bool {
+        var result = false
+        for i in 0 ..< count { result = result || self[i] }
+        return result
+      }
+
       // Operations not required for protocol conformance --------------------
       @inlinable
       public init<Other>(_ other: Other) where Other : SIMDVector${N} & SIMDMask {
         self.init()
-        for i in indices { self[i] = other[i] }
+        for i in 0 ..< count { self[i] = other[i] }
       }
 
       // TODO: we shouldn't need the concrete conversions that follow; we

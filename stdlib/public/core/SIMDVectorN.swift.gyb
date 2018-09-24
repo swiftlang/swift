@@ -20,6 +20,9 @@ public protocol SIMDVector${N} : SIMDVector where Mask : SIMDVector${N} {
 //  Non-customizable operations on SIMDVector${N}
 public extension SIMDVector${N} {
 
+  @_transparent
+  var count: Int { return ${N} }
+
   @inlinable
   init(${', '.join(['_ v' + str(n) + ': Element' for n in range(N)])}) {
     self.init()
@@ -48,19 +51,11 @@ public extension SIMDVector${N} {
   where D : SIMDVector, D.Element == Element,
         I : SIMDIntegerVector & SIMDVector${N} {
     self.init()
-    for i in indices {
+    for i in 0 ..< count {
       if index[i] >= 0 && index[i] < source.count {
         self[i] = source[Int(index[i])]
       }
     }
-  }
-}
-
-//  Defaulted conformance to RandomAccessCollection.
-public extension SIMDVector${N} {
-  @inlinable
-  var endIndex: Int {
-    return ${N}
   }
 }
 
@@ -80,7 +75,7 @@ public extension SIMDVector${N} {
   init(fromArray array: [Element]) {
     _precondition(array.count == ${N})
     self.init()
-    for i in indices { self[i] = array[i] }
+    for i in 0 ..< count { self[i] = array[i] }
   }
 }
 % if N >= 4:
@@ -105,13 +100,13 @@ public extension SIMDVector${N} {
     @inlinable
     get {
       var result = HalfVector()
-      for i in result.indices { result[i] = self[${indx}] }
+      for i in 0 ..< result.count { result[i] = self[${indx}] }
       return result
     }
 
     @inlinable
     set {
-      for i in newValue.indices { self[${indx}] = newValue[i] }
+      for i in 0 ..< newValue.count { self[${indx}] = newValue[i] }
     }
   }
 %  end

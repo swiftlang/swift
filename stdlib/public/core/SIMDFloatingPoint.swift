@@ -202,7 +202,7 @@ public extension SIMDFloatingPointVector {
   @inlinable
   func squareRoot( ) -> Self {
     var result = Self()
-    for i in indices { result[i] = self[i].squareRoot() }
+    for i in 0 ..< count { result[i] = self[i].squareRoot() }
     return result
   }
   
@@ -219,7 +219,7 @@ public extension SIMDFloatingPointVector {
     using generator: inout T
   ) -> Self {
     var result = Self()
-    for i in result.indices {
+    for i in 0 ..< result.count {
       result[i] = Element.random(in: range, using: &generator)
     }
     return result
@@ -237,7 +237,7 @@ public extension SIMDFloatingPointVector {
     using generator: inout T
   ) -> Self {
     var result = Self()
-    for i in result.indices {
+    for i in 0 ..< result.count {
       result[i] = Element.random(in: range, using: &generator)
     }
     return result

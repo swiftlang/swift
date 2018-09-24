@@ -88,7 +88,7 @@ public extension ${Element} {
     public init<D>(gathering source: D, at index: ${Index})
     where D : SIMDVector, D.Element == Element {
       self.init()
-      for i in indices {
+      for i in 0 ..< count {
         if index[i] >= 0 && index[i] < source.count {
           self[i] = source[Int(index[i])]
         }

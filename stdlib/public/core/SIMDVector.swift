@@ -1,11 +1,9 @@
 /// A computational vector type.
-public protocol SIMDVector : RandomAccessCollection,
-                             MutableCollection,
-                             Hashable,
+public protocol SIMDVector : Hashable,
                              CustomStringConvertible,
-                             ExpressibleByArrayLiteral
-                      where  Index == Int,
-                             Element : Hashable {
+                             ExpressibleByArrayLiteral {
+  
+  associatedtype Element : Hashable
   
   /// A vector with zero in all lanes.
   init()
@@ -22,6 +20,14 @@ public protocol SIMDVector : RandomAccessCollection,
   ///
   /// A default implementation is provided by SIMDVectorN.
   init(fromArray array: [Element])
+  
+  /// The number of elements in the vector.
+  var count: Int { get }
+  
+  /// Element access to the vector.
+  ///
+  /// Precondition: `index` must be in `0 ..< count`.
+  subscript(index: Int) -> Element { get set }
   
   /// A type representing the result of lanewise comparison.
   ///
@@ -120,14 +126,6 @@ public extension SIMDVector {
   }
 }
 
-//  Defaulted conformance to RandomAccessCollection.
-public extension SIMDVector {
-  @inlinable
-  var startIndex: Int {
-    return 0
-  }
-}
-
 //  Defaulted conformance to Equatable.
 public extension SIMDVector {
   @_transparent
@@ -141,7 +139,7 @@ public extension SIMDVector {
   //  We don't get an implementation automatically created for us because these
   //  structs wrap Builtin.Vectors, which are not themselves hashable.
   func hash(into hasher: inout Hasher) {
-    for i in indices {
+    for i in 0 ..< count {
       hasher.combine(self[i])
     }
   }
@@ -152,7 +150,9 @@ public extension SIMDVector {
   @inlinable
   var description: String {
     get {
-      return "\(Self.self)(" + self.map({"\($0)"}).joined(separator: ", ") + ")"
+      return "\(Self.self)(" + (0 ..< count).map({
+        "\(self[$0])"
+      }).joined(separator: ", ") + ")"
     }
   }
 }

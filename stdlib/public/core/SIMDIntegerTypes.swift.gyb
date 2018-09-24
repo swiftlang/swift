@@ -69,7 +69,7 @@ public extension ${Element} {
     public init<D>(gathering source: D, at index: ${Index})
     where D : SIMDVector, D.Element == Element {
       self.init()
-      for i in indices {
+      for i in 0 ..< count {
         if index[i] >= 0 && index[i] < source.count {
           self[i] = source[Int(index[i])]
         }
@@ -104,7 +104,7 @@ public extension ${Element} {
       return self
 %   else:
       var result = ${Self}()
-      for i in indices {
+      for i in 0 ..< count {
         result[i] = Element(Builtin.int_bswap_Int${bits}(self[i]._value))
       }
       return result
@@ -204,7 +204,7 @@ public extension ${Element} {
     public init<Other>(truncatingIfNeeded other: Other)
     where Other : SIMDVector${count} & SIMDIntegerVector {
       self.init()
-      for i in indices { self[i] = Element(truncatingIfNeeded: other[i]) }
+      for i in 0 ..< count { self[i] = Element(truncatingIfNeeded: other[i]) }
     }
 
     @inlinable

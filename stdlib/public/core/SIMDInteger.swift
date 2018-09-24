@@ -397,7 +397,7 @@ public extension SIMDIntegerVector {
     using generator: inout T
   ) -> Self {
     var result = Self()
-    for i in result.indices {
+    for i in 0 ..< result.count {
       result[i] = Element.random(in: range, using: &generator)
     }
     return result
@@ -415,7 +415,7 @@ public extension SIMDIntegerVector {
     using generator: inout T
   ) -> Self {
     var result = Self()
-    for i in result.indices {
+    for i in 0 ..< result.count {
       result[i] = Element.random(in: range, using: &generator)
     }
     return result

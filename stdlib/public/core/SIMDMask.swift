@@ -20,6 +20,9 @@ public protocol SIMDMask : SIMDVector
   /// A mask vector with each lane is true where the corresponding
   /// lanes of either argument is true, and false otherwise.
   static func |(lhs: Self, rhs: Self) -> Self
+  
+  func _all() -> Bool
+  func _any() -> Bool
 }
 
 // Non-customizable extensions
@@ -57,7 +60,7 @@ public extension SIMDMask {
   @inlinable
   static func random<T: RandomNumberGenerator>(using generator: inout T) -> Self {
     var result = Self()
-    for i in result.indices {
+    for i in 0 ..< result.count {
       result[i] = Bool.random(using: &generator)
     }
     return result
@@ -89,10 +92,10 @@ public extension SIMDMask {
 // Free functions
 @_transparent
 public func all<P>(_ mask: P) -> Bool where P: SIMDMask {
-  return mask.reduce(true) { $0 && $1 }
+  return mask._all()
 }
 
 @_transparent
 public func any<P>(_ mask: P) -> Bool where P: SIMDMask {
-  return mask.reduce(false) { $0 || $1 }
+  return mask._any()
 }
