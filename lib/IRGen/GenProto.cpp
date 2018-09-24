@@ -3482,23 +3482,6 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   return emitWitnessMethodValue(IGF, wtable, member);
 }
 
-Signature IRGenModule::getAssociatedTypeMetadataAccessFunctionSignature() {
-  auto &fnType = AssociatedTypeMetadataAccessFunctionTy;
-  if (!fnType) {
-    fnType = llvm::FunctionType::get(TypeMetadataResponseTy,
-                                     { SizeTy,
-                                       TypeMetadataPtrTy,
-                                       WitnessTablePtrTy },
-                                     /*varargs*/ false);
-  }
-
-  auto attrs = llvm::AttributeList::get(getLLVMContext(),
-                                        llvm::AttributeList::FunctionIndex,
-                                        llvm::Attribute::NoUnwind);
-
-  return Signature(fnType, attrs, SwiftCC);
-}
-
 llvm::Value *irgen::computeResilientWitnessTableIndex(
                                             IRGenFunction &IGF,
                                             ProtocolDecl *proto,
