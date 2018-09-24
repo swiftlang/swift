@@ -1536,34 +1536,21 @@ function(add_swift_library name)
   # library itself.
   if(SWIFTLIB_HAS_SWIFT_CONTENT AND NOT SWIFTLIB_IS_STDLIB_CORE)
     list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
-  endif()
 
-  if((NOT "${SWIFT_BUILD_STDLIB}") AND
-     (NOT "${SWIFTLIB_SWIFT_MODULE_DEPENDS}" STREQUAL ""))
-    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
-        Core)
-  endif()
-
-  if(SWIFTLIB_HAS_SWIFT_CONTENT AND NOT SWIFTLIB_IS_STDLIB_CORE)
-    # All Swift code depends on the SwiftOnoneSupport in non-optimized mode,
-    # except for the standard library itself.
-    is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" optimized)
-    if(NOT optimized)
-      list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
+    # swiftSwiftOnoneSupport does not depend on itself, obviously.
+    if(NOT ${name} STREQUAL swiftSwiftOnoneSupport)
+      # All Swift code depends on the SwiftOnoneSupport in non-optimized mode,
+      # except for the standard library itself.
+      is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" optimized)
+      if(NOT optimized)
+        list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
+      endif()
     endif()
   endif()
 
   if((NOT "${SWIFT_BUILD_STDLIB}") AND
-    (NOT "${SWIFTLIB_SWIFT_MODULE_DEPENDS}" STREQUAL ""))
-    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
-        SwiftOnoneSupport)
-  endif()
-
-  # swiftSwiftOnoneSupport does not depend on itself,
-  # obviously.
-  if("${name}" STREQUAL "swiftSwiftOnoneSupport")
-    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
-        SwiftOnoneSupport)
+     (NOT "${SWIFTLIB_SWIFT_MODULE_DEPENDS}" STREQUAL ""))
+    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS Core SwiftOnoneSupport)
   endif()
 
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
