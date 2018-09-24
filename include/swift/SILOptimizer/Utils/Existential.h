@@ -15,6 +15,7 @@
 
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 
