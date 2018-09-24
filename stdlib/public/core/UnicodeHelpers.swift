@@ -122,7 +122,7 @@ internal func _utf8ScalarLength(_ x: UInt8) -> Int {
 @inlinable @inline(__always)
 internal func _utf8ScalarLength(
   _ utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
-) -> Int {
+  ) -> Int {
   var len = 1
   while _isContinuation(utf8[i &- len]) {
     len += 1
@@ -383,13 +383,5 @@ extension String.Index {
   internal func _next() -> String.Index {
     let offset = self.encodedOffset
     return String.Index(encodedOffset: offset + 1)
-  }
-}
-
-extension UnsafeBufferPointer where Element == UInt8 {
-  @usableFromInline @inline(__always)
-  internal func _utf8ScalarLength(at index: Int) -> Int {
-    let x: UInt8 = self[index]
-    return Swift._utf8ScalarLength(x)
   }
 }
