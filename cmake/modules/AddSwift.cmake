@@ -1869,32 +1869,30 @@ function(add_swift_library name)
         set(resource_dir_sdk_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
         precondition(resource_dir_sdk_subdir)
 
-        if(SWIFTLIB_TARGET_LIBRARY)
-          if(SWIFTLIB_SHARED)
-            set(resource_dir "swift")
-            set(file_permissions
-                OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                GROUP_READ GROUP_EXECUTE
-                WORLD_READ WORLD_EXECUTE)
-          else()
-            set(resource_dir "swift_static")
-            set(file_permissions
-                OWNER_READ OWNER_WRITE
-                GROUP_READ
-                WORLD_READ)
-          endif()
+        if(SWIFTLIB_SHARED)
+          set(resource_dir "swift")
+          set(file_permissions
+              OWNER_READ OWNER_WRITE OWNER_EXECUTE
+              GROUP_READ GROUP_EXECUTE
+              WORLD_READ WORLD_EXECUTE)
+        else()
+          set(resource_dir "swift_static")
+          set(file_permissions
+              OWNER_READ OWNER_WRITE
+              GROUP_READ
+              WORLD_READ)
+        endif()
 
-          swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
-              FILES "${UNIVERSAL_LIBRARY_NAME}"
-              DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
-              PERMISSIONS ${file_permissions})
-          swift_is_installing_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" is_installing)
+        swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+            FILES "${UNIVERSAL_LIBRARY_NAME}"
+            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+            PERMISSIONS ${file_permissions})
+        swift_is_installing_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" is_installing)
 
-          if(NOT is_installing)
-            set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${VARIANT_NAME})
-          else()
-            set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${VARIANT_NAME})
-          endif()
+        if(NOT is_installing)
+          set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${VARIANT_NAME})
+        else()
+          set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${VARIANT_NAME})
         endif()
 
         # If we built static variants of the library, create a lipo target for
@@ -1928,26 +1926,24 @@ function(add_swift_library name)
 
         # Add Swift standard library targets as dependencies to the top-level
         # convenience target.
-        if(SWIFTLIB_TARGET_LIBRARY)
-          set(FILTERED_UNITTESTS
-                swiftStdlibCollectionUnittest
-                swiftStdlibUnicodeUnittest)
+        set(FILTERED_UNITTESTS
+              swiftStdlibCollectionUnittest
+              swiftStdlibUnicodeUnittest)
 
-          foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-            set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-            if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND
-               TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
-              add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
+        foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+          set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+          if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND
+             TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
+            add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
+                ${lipo_target}
+                ${lipo_target_static})
+            if(NOT "${name}" IN_LIST FILTERED_UNITTESTS)
+              add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
                   ${lipo_target}
                   ${lipo_target_static})
-              if(NOT "${name}" IN_LIST FILTERED_UNITTESTS)
-                add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
-                    ${lipo_target}
-                    ${lipo_target_static})
-              endif()
             endif()
-          endforeach()
-        endif()
+          endif()
+        endforeach()
       endif()
     endforeach()
   else()
