@@ -246,12 +246,9 @@ FixedPoint.test("${Self}.hash(into:)") {
 
 %     reference = prepare_bit_pattern(bit_pattern, self_ty.bits, False)
 %     if self_ty.bits == 64:
-    let expected = Hasher._hash(seed: Hasher._seed, ${reference} as UInt64)
+    let expected = Hasher._hash(seed: 0, ${reference} as UInt64)
 %     else:
-    let expected = Hasher._hash(
-      seed: Hasher._seed,
-      bytes: ${reference},
-      count: ${self_ty.bits / 8})
+    let expected = Hasher._hash(seed: 0, bytes: ${reference}, count: ${self_ty.bits / 8})
 %     end
     expectEqual(expected, output, "input: \(input)")
   }

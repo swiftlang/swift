@@ -698,5 +698,5 @@ class SwiftAnyEnjoyer: NSIdLover, NSIdLoving {
 // CHECK-NEXT: base_protocol Equatable: GenericOption: Equatable module objc_generics
 // CHECK-NEXT: method #Hashable.hashValue!getter.1: {{.*}} : @$sSo13GenericOptionaSHSCSH9hashValueSivgTW
 // CHECK-NEXT: method #Hashable.hash!1: {{.*}} : @$sSo13GenericOptionaSHSCSH4hash4intoys6HasherVz_tFTW
-// CHECK-NEXT: method #Hashable._rawHashValue!1: {{.*}} : @$sSo13GenericOptionaSHSCSH13_rawHashValue4seedSis6UInt64V_AFt_tFTW
+// CHECK-NEXT: method #Hashable._rawHashValue!1: {{.*}} : @$sSo13GenericOptionaSHSCSH13_rawHashValue4seedS2i_tFTW
 // CHECK-NEXT: }

@@ -44,7 +44,7 @@ internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
   internal final var _scale: Int
 
   @usableFromInline
-  internal final var _seed: Hasher._Seed
+  internal final var _seed: Int
 
   @usableFromInline
   @nonobjc
@@ -287,9 +287,8 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     // FIXME: Use true per-instance seeding instead. Per-capacity seeding still
     // leaves hash values the same in same-sized tables, which may affect
     // operations on two tables at once. (E.g., union.)
-    storage._seed = (
-      Hasher._seed.0 ^ UInt64(truncatingIfNeeded: scale),
-      Hasher._seed.1)
+    storage._seed = scale
+
     // Initialize hash table metadata.
     storage._hashTable.clear()
     return storage

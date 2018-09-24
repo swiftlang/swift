@@ -44,8 +44,7 @@ struct _SwiftDictionaryBodyStorage {
   __swift_intptr_t count;
   __swift_intptr_t capacity;
   __swift_intptr_t scale;
-  __swift_uint64_t seed0;
-  __swift_uint64_t seed1;
+  __swift_intptr_t seed;
   void *rawKeys;
   void *rawValues;
 };
@@ -54,8 +53,7 @@ struct _SwiftSetBodyStorage {
   __swift_intptr_t count;
   __swift_intptr_t capacity;
   __swift_intptr_t scale;
-  __swift_uint64_t seed0;
-  __swift_uint64_t seed1;
+  __swift_intptr_t seed;
   void *rawElements;
 };
 
