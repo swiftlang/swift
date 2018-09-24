@@ -126,6 +126,23 @@ generateOptimizationRemarkRegex(DiagnosticEngine &Diags, ArgList &Args,
   return Pattern;
 }
 
+/// \brief Save a copy of any flags marked as TextualInterfaceOption, if running
+/// in a mode that is going to emit a .swiftinterface file.
+static void SaveTextualInterfaceArgs(TextualInterfaceOptions &Opts,
+                                     ArgList &Args, DiagnosticEngine &Diags) {
+  if (!Args.hasArg(options::OPT_emit_interface_path))
+    return;
+  ArgStringList RenderedArgs;
+  for (auto A : Args) {
+    if (A->getOption().hasFlag(options::TextualInterfaceOption))
+      A->render(Args, RenderedArgs);
+  }
+  llvm::raw_string_ostream OS(Opts.TextualInterfaceFlags);
+  interleave(RenderedArgs,
+             [&](const char *Argument) { OS << Argument; },
+             [&] { OS << " "; });
+}
+
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
                           const FrontendOptions &FrontendOpts) {
@@ -610,9 +627,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       return true;
     }
-  }
-  if (Args.hasArg(OPT_sil_existential_specializer)) {
-    Opts.ExistentialSpecializer = true;
   }
   if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
@@ -1163,6 +1177,8 @@ bool CompilerInvocation::parseArgs(
     }
     return true;
   }
+
+  SaveTextualInterfaceArgs(TextualInterfaceOpts, ParsedArgs, Diags);
 
   if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
                         ConfigurationFileBuffers)) {
