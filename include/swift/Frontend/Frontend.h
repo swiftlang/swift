@@ -31,6 +31,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/TextualInterfaceGeneration.h"
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
@@ -72,6 +73,7 @@ class CompilerInvocation {
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
   TBDGenOptions TBDGenOpts;
+  TextualInterfaceOptions TextualInterfaceOpts;
   /// The \c SyntaxParsingCache to use when parsing the main file of this
   /// invocation
   SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
@@ -201,6 +203,9 @@ public:
 
   TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
   const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }
+
+  TextualInterfaceOptions &getTextualInterfaceOptions() { return TextualInterfaceOpts; }
+  const TextualInterfaceOptions &getTextualInterfaceOptions() const { return TextualInterfaceOpts; }
 
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
