@@ -912,16 +912,14 @@ extension Set: SetAlgebra {
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
   @inlinable
-  public __consuming func subtracting<S: Sequence>(
-    _ other: __owned S
-  ) -> Set<Element>
+  public __consuming func subtracting<S: Sequence>(_ other: S) -> Set<Element>
   where S.Element == Element {
     return self._subtracting(other)
   }
 
   @inlinable
   internal __consuming func _subtracting<S: Sequence>(
-    _ other: __owned S
+    _ other: S
   ) -> Set<Element>
   where S.Element == Element {
     var newSet = self
@@ -943,13 +941,13 @@ extension Set: SetAlgebra {
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   @inlinable
-  public mutating func subtract<S: Sequence>(_ other: __owned S)
+  public mutating func subtract<S: Sequence>(_ other: S)
   where S.Element == Element {
     _subtract(other)
   }
 
   @inlinable
-  internal mutating func _subtract<S: Sequence>(_ other: __owned S)
+  internal mutating func _subtract<S: Sequence>(_ other: S)
   where S.Element == Element {
     for item in other {
       remove(item)
@@ -973,9 +971,7 @@ extension Set: SetAlgebra {
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
   @inlinable
-  public __consuming func intersection<S: Sequence>(
-    _ other: __owned S
-  ) -> Set<Element>
+  public __consuming func intersection<S: Sequence>(_ other: S) -> Set<Element>
   where S.Element == Element {
     let otherSet = Set(other)
     return intersection(otherSet)
@@ -995,7 +991,7 @@ extension Set: SetAlgebra {
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   @inlinable
-  public mutating func formIntersection<S: Sequence>(_ other: __owned S)
+  public mutating func formIntersection<S: Sequence>(_ other: S)
   where S.Element == Element {
     // Because `intersect` needs to both modify and iterate over
     // the left-hand side, the index may become invalidated during
