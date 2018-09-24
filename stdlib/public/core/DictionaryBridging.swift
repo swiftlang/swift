@@ -58,7 +58,7 @@ extension _NativeDictionary { // Bridging
 /// An NSEnumerator that works with any _NativeDictionary of
 /// verbatim bridgeable elements. Used by the various NSDictionary impls.
 final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
-  : _SwiftNativeNSEnumerator, _NSEnumerator {
+  : __SwiftNativeNSEnumerator, _NSEnumerator {
 
   @nonobjc internal var base: _NativeDictionary<Key, Value>
   @nonobjc internal var bridgedKeys: _BridgingHashBuffer?
@@ -139,7 +139,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
 /// toll-free bridging isn't possible. On first access, a _NativeDictionary
 /// of AnyObject will be constructed containing all the bridged elements.
 final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
-  : _SwiftNativeNSDictionary, _NSDictionaryCore {
+  : __SwiftNativeNSDictionary, _NSDictionaryCore {
 
   // This stored property must be stored at offset zero.  We perform atomic
   // operations on it.

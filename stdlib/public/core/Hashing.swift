@@ -72,7 +72,7 @@ internal struct _UnmanagedAnyObjectArray {
 /// An NSEnumerator implementation returning zero elements. This is useful when
 /// a concrete element type is not recoverable from the empty singleton.
 final internal class _SwiftEmptyNSEnumerator
-  : _SwiftNativeNSEnumerator, _NSEnumerator {
+  : __SwiftNativeNSEnumerator, _NSEnumerator {
   internal override required init() {}
 
   @objc

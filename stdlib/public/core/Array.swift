@@ -1761,7 +1761,7 @@ extension Array {
     _ source: AnyObject
   ) -> Array? {
     // If source is deferred, we indirect to get its native storage
-    let maybeNative = (source as? _SwiftDeferredNSArray)?._nativeStorage ?? source
+    let maybeNative = (source as? __SwiftDeferredNSArray)?._nativeStorage ?? source
 
     return (maybeNative as? _ContiguousArrayStorage<Element>).map {
       Array(_ContiguousArrayBuffer($0))

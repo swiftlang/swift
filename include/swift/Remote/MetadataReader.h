@@ -309,7 +309,7 @@ public:
     // error existential with NSError-compatible layout.
     std::string ObjCClassName;
     if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
-      if (ObjCClassName == "_SwiftNativeNSError")
+      if (ObjCClassName == "__SwiftNativeNSError")
         isObjC = true;
     } else {
       // Otherwise, we can check to see if this is a class metadata with the

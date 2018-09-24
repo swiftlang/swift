@@ -24,9 +24,9 @@
 
 namespace swift {
 // FIXME(ABI)#76 : does this declaration need SWIFT_RUNTIME_STDLIB_API?
-// _direct type metadata for Swift._EmptyArrayStorage
+// _direct type metadata for Swift.__EmptyArrayStorage
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s18_EmptyArrayStorage);
+ClassMetadata CLASS_METADATA_SYM(s19__EmptyArrayStorage);
 
 // _direct type metadata for Swift._EmptyDictionarySingleton
 SWIFT_RUNTIME_STDLIB_API
@@ -41,7 +41,7 @@ SWIFT_RUNTIME_STDLIB_API
 swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   // HeapObject header;
   {
-    &swift::CLASS_METADATA_SYM(s18_EmptyArrayStorage), // isa pointer
+    &swift::CLASS_METADATA_SYM(s19__EmptyArrayStorage), // isa pointer
   },
   
   // _SwiftArrayBodyStorage body;

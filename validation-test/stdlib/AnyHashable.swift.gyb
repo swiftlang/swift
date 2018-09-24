@@ -1002,7 +1002,7 @@ AnyHashableTests.test("AnyHashable(Dictionary)/Hashable") {
   checkHashableGroups(groups)
 }
 
-AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftError))/Hashable") {
+AnyHashableTests.test("AnyHashable(__SwiftNativeNSError(MinimalHashablePODSwiftError))/Hashable") {
   let swiftErrors: [MinimalHashablePODSwiftError] = [
     .caseA, .caseA,
     .caseB, .caseB,
@@ -1019,7 +1019,7 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftEr
   expectEqual(
     "ObjCClassWrapper",
     SwiftRuntime.metadataKind(of: nsErrors[0]))
-  expectEqual("_SwiftNativeNSError", String(describing: type(of: nsErrors[0])))
+  expectEqual("__SwiftNativeNSError", String(describing: type(of: nsErrors[0])))
 
   func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
     // Swift errors compare equal to the `NSError`s that have the same domain
@@ -1034,17 +1034,17 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftEr
 
   // FIXME(id-as-any): run `checkHashable` on an array of mixed
   // `AnyHashable(MinimalHashablePODSwiftError)` and
-  // `AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftError))`.  For
+  // `AnyHashable(__SwiftNativeNSError(MinimalHashablePODSwiftError))`.  For
   // this to succeed, we need to eagerly bridge Swift errors into the Swift
   // representation when wrapped in `AnyHashable`.
 }
 
-AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftError)).base") {
+AnyHashableTests.test("AnyHashable(__SwiftNativeNSError(MinimalHashablePODSwiftError)).base") {
   let ah = AnyHashable(MinimalHashablePODSwiftError.caseA as NSError)
   expectTrue(type(of: ah.base) is NSError.Type)
 }
 
-AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftError))/Hashable") {
+AnyHashableTests.test("AnyHashable(__SwiftNativeNSError(MinimalHashableRCSwiftError))/Hashable") {
   let swiftErrors: [MinimalHashableRCSwiftError] = [
     .caseA(LifetimeTracked(1)), .caseA(LifetimeTracked(1)),
     .caseA(LifetimeTracked(2)), .caseA(LifetimeTracked(2)),
@@ -1071,7 +1071,7 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftErr
   expectEqual(
     "ObjCClassWrapper",
     SwiftRuntime.metadataKind(of: nsErrors[0]))
-  expectEqual("_SwiftNativeNSError", String(describing: type(of: nsErrors[0])))
+  expectEqual("__SwiftNativeNSError", String(describing: type(of: nsErrors[0])))
 
   expectEqual(
     "ObjCClassWrapper",
@@ -1116,12 +1116,12 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftErr
 
   // FIXME(id-as-any): run `checkHashable` on an array of mixed
   // `AnyHashable(MinimalHashableRCSwiftError)` and
-  // `AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftError))`.  For
+  // `AnyHashable(__SwiftNativeNSError(MinimalHashableRCSwiftError))`.  For
   // this to succeed, we need to eagerly bridge Swift errors into the Swift
   // representation when wrapped in `AnyHashable`.
 }
 
-AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftError)).base") {
+AnyHashableTests.test("AnyHashable(__SwiftNativeNSError(MinimalHashableRCSwiftError)).base") {
   let ah = AnyHashable(
     MinimalHashableRCSwiftError.caseA(LifetimeTracked(1)) as NSError)
   expectTrue(type(of: ah.base) is NSError.Type)

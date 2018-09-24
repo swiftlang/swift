@@ -59,7 +59,7 @@ extension _NativeSet { // Bridging
 /// An NSEnumerator that works with any _NativeSet of verbatim bridgeable
 /// elements. Used by the various NSSet impls.
 final internal class _SwiftSetNSEnumerator<Element: Hashable>
-  : _SwiftNativeNSEnumerator, _NSEnumerator {
+  : __SwiftNativeNSEnumerator, _NSEnumerator {
 
   @nonobjc internal var base: _NativeSet<Element>
   @nonobjc internal var bridgedElements: _BridgingHashBuffer?
@@ -146,7 +146,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
 /// possible. On first access, a _NativeSet of AnyObject will be constructed
 /// containing all the bridged elements.
 final internal class _SwiftDeferredNSSet<Element: Hashable>
-  : _SwiftNativeNSSet, _NSSetCore {
+  : __SwiftNativeNSSet, _NSSetCore {
 
   // This stored property must be stored at offset zero.  We perform atomic
   // operations on it.

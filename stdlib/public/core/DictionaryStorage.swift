@@ -25,7 +25,7 @@ import SwiftShims
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
-internal class _RawDictionaryStorage: _SwiftNativeNSDictionary {
+internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
   /// The current number of occupied entries in this dictionary.
   @usableFromInline
   @nonobjc
