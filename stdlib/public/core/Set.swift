@@ -168,13 +168,13 @@ public struct Set<Element: Hashable> {
 
   /// Private initializer.
   @inlinable
-  internal init(_native: _NativeSet<Element>) {
+  internal init(_native: __owned _NativeSet<Element>) {
     _variant = .native(_native)
   }
 
 #if _runtime(_ObjC)
   @inlinable
-  internal init(_cocoa: _CocoaSet) {
+  internal init(_cocoa: __owned _CocoaSet) {
     _variant = .cocoa(_cocoa)
   }
 
@@ -187,7 +187,7 @@ public struct Set<Element: Hashable> {
   ///   is a reference type).
   @inlinable
   public // SPI(Foundation)
-  init(_immutableCocoaSet: _NSSet) {
+  init(_immutableCocoaSet: __owned _NSSet) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variant only when the member type can be bridged verbatim to Objective-C")
     self.init(_cocoa: _CocoaSet(_immutableCocoaSet))
@@ -329,7 +329,10 @@ extension Set: Collection {
   /// Accesses the member at the given position.
   @inlinable
   public subscript(position: Index) -> Element {
-    return _variant.element(at: position)
+    //FIXME(accessors): Provide a _read
+    get {
+      return _variant.element(at: position)
+    }
   }
 
   @inlinable
@@ -474,7 +477,7 @@ extension Set: Hashable {
 }
 
 extension Set: _HasCustomAnyHashableRepresentation {
-  public func _toCustomAnyHashable() -> AnyHashable? {
+  public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _SetAnyHashableBox(self))
   }
 }
@@ -483,7 +486,7 @@ internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
   internal let _value: Set<Element>
   internal let _canonical: Set<AnyHashable>
 
-  internal init(_ value: Set<Element>) {
+  internal init(_ value: __owned Set<Element>) {
     self._value = value
     self._canonical = value as Set<AnyHashable>
   }
@@ -563,7 +566,7 @@ extension Set: SetAlgebra {
   @inlinable
   @discardableResult
   public mutating func insert(
-    _ newMember: Element
+    _ newMember: __owned Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
     return _variant.insert(newMember)
   }
@@ -590,7 +593,7 @@ extension Set: SetAlgebra {
   ///   other means.
   @inlinable
   @discardableResult
-  public mutating func update(with newMember: Element) -> Element? {
+  public mutating func update(with newMember: __owned Element) -> Element? {
     return _variant.update(with: newMember)
   }
 
@@ -701,8 +704,8 @@ extension Set: SetAlgebra {
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
   @inlinable
-  public init<Source: Sequence>(_ sequence: Source)
-    where Source.Element == Element {
+  public init<Source: Sequence>(_ sequence: __owned Source)
+  where Source.Element == Element {
     self.init(minimumCapacity: sequence.underestimatedCount)
     if let s = sequence as? Set<Element> {
       // If this sequence is actually a native `Set`, then we can quickly
@@ -732,8 +735,8 @@ extension Set: SetAlgebra {
   /// - Returns: `true` if the set is a subset of `possibleSuperset`;
   ///   otherwise, `false`.
   @inlinable
-  public func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
-    where S.Element == Element {
+  public func isSubset<S: Sequence>(of possibleSuperset: __owned S) -> Bool
+  where S.Element == Element {
     // FIXME(performance): isEmpty fast path, here and elsewhere.
     let other = Set(possibleSuperset)
     return isSubset(of: other)
@@ -760,8 +763,10 @@ extension Set: SetAlgebra {
   /// - Returns: `true` is the set is strict subset of
   ///   `possibleStrictSuperset`; otherwise, `false`.
   @inlinable
-  public func isStrictSubset<S: Sequence>(of possibleStrictSuperset: S) -> Bool
-    where S.Element == Element {
+  public func isStrictSubset<S: Sequence>(
+    of possibleStrictSuperset: __owned S
+  ) -> Bool
+  where S.Element == Element {
     // FIXME: code duplication.
     let other = Set(possibleStrictSuperset)
     return isStrictSubset(of: other)
@@ -783,7 +788,7 @@ extension Set: SetAlgebra {
   /// - Returns: `true` if the set is a superset of `possibleSubset`;
   ///   otherwise, `false`.
   @inlinable
-  public func isSuperset<S: Sequence>(of possibleSubset: S) -> Bool
+  public func isSuperset<S: Sequence>(of possibleSubset: __owned S) -> Bool
     where S.Element == Element {
     // FIXME(performance): Don't build a set; just ask if every element is in
     // `self`.
@@ -810,8 +815,10 @@ extension Set: SetAlgebra {
   /// - Returns: `true` if the set is a strict superset of
   ///   `possibleStrictSubset`; otherwise, `false`.
   @inlinable
-  public func isStrictSuperset<S: Sequence>(of possibleStrictSubset: S) -> Bool
-    where S.Element == Element {
+  public func isStrictSuperset<S: Sequence>(
+    of possibleStrictSubset: __owned S
+  ) -> Bool
+  where S.Element == Element {
     let other = Set(possibleStrictSubset)
     return other.isStrictSubset(of: self)
   }
@@ -831,8 +838,8 @@ extension Set: SetAlgebra {
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
   @inlinable
-  public func isDisjoint<S: Sequence>(with other: S) -> Bool
-    where S.Element == Element {
+  public func isDisjoint<S: Sequence>(with other: __owned S) -> Bool
+  where S.Element == Element {
     // FIXME(performance): Don't need to build a set.
     let otherSet = Set(other)
     return isDisjoint(with: otherSet)
@@ -862,8 +869,8 @@ extension Set: SetAlgebra {
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set with the unique elements of this set and `other`.
   @inlinable
-  public func union<S: Sequence>(_ other: S) -> Set<Element>
-    where S.Element == Element {
+  public __consuming func union<S: Sequence>(_ other: __owned S) -> Set<Element>
+  where S.Element == Element {
     var newSet = self
     newSet.formUnion(other)
     return newSet
@@ -883,8 +890,8 @@ extension Set: SetAlgebra {
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   @inlinable
-  public mutating func formUnion<S: Sequence>(_ other: S)
-    where S.Element == Element {
+  public mutating func formUnion<S: Sequence>(_ other: __owned S)
+  where S.Element == Element {
     for item in other {
       insert(item)
     }
@@ -905,14 +912,18 @@ extension Set: SetAlgebra {
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
   @inlinable
-  public func subtracting<S: Sequence>(_ other: S) -> Set<Element>
-    where S.Element == Element {
+  public __consuming func subtracting<S: Sequence>(
+    _ other: __owned S
+  ) -> Set<Element>
+  where S.Element == Element {
     return self._subtracting(other)
   }
 
   @inlinable
-  internal func _subtracting<S: Sequence>(_ other: S) -> Set<Element>
-    where S.Element == Element {
+  internal __consuming func _subtracting<S: Sequence>(
+    _ other: __owned S
+  ) -> Set<Element>
+  where S.Element == Element {
     var newSet = self
     newSet.subtract(other)
     return newSet
@@ -932,14 +943,14 @@ extension Set: SetAlgebra {
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   @inlinable
-  public mutating func subtract<S: Sequence>(_ other: S)
-    where S.Element == Element {
+  public mutating func subtract<S: Sequence>(_ other: __owned S)
+  where S.Element == Element {
     _subtract(other)
   }
 
   @inlinable
-  internal mutating func _subtract<S: Sequence>(_ other: S)
-    where S.Element == Element {
+  internal mutating func _subtract<S: Sequence>(_ other: __owned S)
+  where S.Element == Element {
     for item in other {
       remove(item)
     }
@@ -962,8 +973,10 @@ extension Set: SetAlgebra {
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
   @inlinable
-  public func intersection<S: Sequence>(_ other: S) -> Set<Element>
-    where S.Element == Element {
+  public __consuming func intersection<S: Sequence>(
+    _ other: __owned S
+  ) -> Set<Element>
+  where S.Element == Element {
     let otherSet = Set(other)
     return intersection(otherSet)
   }
@@ -982,8 +995,8 @@ extension Set: SetAlgebra {
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   @inlinable
-  public mutating func formIntersection<S: Sequence>(_ other: S)
-    where S.Element == Element {
+  public mutating func formIntersection<S: Sequence>(_ other: __owned S)
+  where S.Element == Element {
     // Because `intersect` needs to both modify and iterate over
     // the left-hand side, the index may become invalidated during
     // traversal so an intermediate set must be created.
@@ -1017,8 +1030,10 @@ extension Set: SetAlgebra {
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
   @inlinable
-  public func symmetricDifference<S: Sequence>(_ other: S) -> Set<Element>
-    where S.Element == Element {
+  public __consuming func symmetricDifference<S: Sequence>(
+    _ other: __owned S
+  ) -> Set<Element>
+  where S.Element == Element {
     var newSet = self
     newSet.formSymmetricDifference(other)
     return newSet
@@ -1041,8 +1056,9 @@ extension Set: SetAlgebra {
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   @inlinable
-  public mutating func formSymmetricDifference<S: Sequence>(_ other: S)
-    where S.Element == Element {
+  public mutating func formSymmetricDifference<S: Sequence>(
+    _ other: __owned S)
+  where S.Element == Element {
     let otherSet = Set(other)
     formSymmetricDifference(otherSet)
   }
@@ -1161,7 +1177,7 @@ extension Set {
   /// - Parameter other: Another set.
   /// - Returns: A new set.
   @inlinable
-  public func subtracting(_ other: Set<Element>) -> Set<Element> {
+  public __consuming func subtracting(_ other: Set<Element>) -> Set<Element> {
     return self._subtracting(other)
   }
 
@@ -1228,7 +1244,7 @@ extension Set {
   /// - Parameter other: Another set.
   /// - Returns: A new set.
   @inlinable
-  public func intersection(_ other: Set<Element>) -> Set<Element> {
+  public __consuming func intersection(_ other: Set<Element>) -> Set<Element> {
     var newSet = Set<Element>()
     for member in self {
       if other.contains(member) {
@@ -1256,7 +1272,7 @@ extension Set {
   ///
   /// - Parameter other: Another set.
   @inlinable
-  public mutating func formSymmetricDifference(_ other: Set<Element>) {
+  public mutating func formSymmetricDifference(_ other: __owned Set<Element>) {
     for member in other {
       if contains(member) {
         remove(member)
@@ -1292,7 +1308,7 @@ extension Set {
 
     @inlinable
     @inline(__always)
-    internal init(_variant: _Variant) {
+    internal init(_variant: __owned _Variant) {
       self._variant = _variant
     }
 
@@ -1305,7 +1321,7 @@ extension Set {
 #if _runtime(_ObjC)
     @inlinable
     @inline(__always)
-    internal init(_cocoa index: _CocoaSet.Index) {
+    internal init(_cocoa index: __owned _CocoaSet.Index) {
       self.init(_variant: .cocoa(index))
     }
 #endif
@@ -1445,18 +1461,18 @@ extension Set {
     internal var _variant: _Variant
 
     @inlinable
-    internal init(_variant: _Variant) {
+    internal init(_variant: __owned _Variant) {
       self._variant = _variant
     }
 
     @inlinable
-    internal init(_native: _NativeSet<Element>.Iterator) {
+    internal init(_native: __owned _NativeSet<Element>.Iterator) {
       self.init(_variant: .native(_native))
     }
 
 #if _runtime(_ObjC)
     @usableFromInline
-    internal init(_cocoa: _CocoaSet.Iterator) {
+    internal init(_cocoa: __owned _CocoaSet.Iterator) {
       self.init(_variant: .cocoa(_cocoa))
     }
 #endif

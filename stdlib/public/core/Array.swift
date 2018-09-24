@@ -1784,7 +1784,7 @@ extension Array {
 
 extension Array: _HasCustomAnyHashableRepresentation
   where Element: Hashable {
-  public func _toCustomAnyHashable() -> AnyHashable? {
+  __consuming public func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _ArrayAnyHashableBox(self))
   }
 }

@@ -34,7 +34,7 @@ public protocol _HasCustomAnyHashableRepresentation {
   ///         // Correct:
   ///         return AnyHashable(customRepresentation as Base)
   ///       }
-  func _toCustomAnyHashable() -> AnyHashable?
+  __consuming func _toCustomAnyHashable() -> AnyHashable?
 }
 
 @usableFromInline // FIXME(sil-serialize-all)
