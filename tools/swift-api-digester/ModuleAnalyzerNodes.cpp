@@ -764,6 +764,9 @@ bool SDKNode::operator==(const SDKNode &Other) const {
         if (Left->getSuperClassName() != Right->getSuperClassName()) {
           return false;
         }
+        if (Left->getDeclKind() != Right->getDeclKind()) {
+          return false;
+        }
       }
       LLVM_FALLTHROUGH;
     }
