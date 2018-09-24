@@ -368,3 +368,16 @@ extension Set._Variant {
   }
 }
 
+extension Set._Variant {
+  @inlinable
+  @inline(__always)
+  internal func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
+  where S.Element == Element {
+#if _runtime(_ObjC)
+    guard isNative else {
+      return _NativeSet<Element>(asCocoa).isSubset(of: possibleSuperset)
+    }
+#endif
+    return asNative.isSubset(of: possibleSuperset)
+  }
+}

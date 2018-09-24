@@ -70,6 +70,13 @@ extension _NativeSet { // Primitive fields
   }
 
   @inlinable
+  internal var bucketCount: Int {
+    @inline(__always) get {
+      return _assumeNonNegative(_storage._bucketCount)
+    }
+  }
+
+  @inlinable
   internal var hashTable: _HashTable {
     @inline(__always) get {
       return _storage._hashTable
@@ -542,5 +549,25 @@ extension _NativeSet.Iterator: IteratorProtocol {
   internal mutating func next() -> Element? {
     guard let index = iterator.next() else { return nil }
     return base.uncheckedElement(at: index)
+  }
+}
+
+extension _NativeSet {
+  @inlinable
+  internal func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
+  where S.Element == Element {
+    // Allocate a temporary bitset to mark elements in self that we've seen in
+    // possibleSuperset.
+    var seen = _Bitset(capacity: self.bucketCount)
+    for element in possibleSuperset {
+      // Found a new element of self in possibleSuperset.
+      let (bucket, found) = find(element)
+      guard found else { continue }
+      let inserted = seen.uncheckedInsert(bucket.offset)
+      if inserted, seen.count == self.count {
+        return true
+      }
+    }
+    return false
   }
 }
