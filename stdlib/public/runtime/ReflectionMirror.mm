@@ -332,44 +332,10 @@ getFieldAt(const Metadata *base, unsigned index) {
   if (!field.hasMangledTypeName())
     return {name, FieldType().withIndirect(field.isIndirectCase())};
 
-  std::vector<const ContextDescriptor *> descriptorPath;
-  {
-    const auto *parent = reinterpret_cast<
-                            const ContextDescriptor *>(baseDesc);
-    while (parent) {
-      if (parent->isGeneric())
-        descriptorPath.push_back(parent);
-
-      parent = parent->Parent.get();
-    }
-  }
-
   auto typeName = field.getMangledTypeName(0);
 
-  auto typeInfo = _getTypeByMangledName(
-      typeName,
-      [&](unsigned depth, unsigned index) -> const Metadata * {
-        if (depth >= descriptorPath.size())
-          return nullptr;
-
-        unsigned currentDepth = 0;
-        unsigned flatIndex = index;
-        const ContextDescriptor *currentContext = descriptorPath.back();
-
-        for (const auto *context : llvm::reverse(descriptorPath)) {
-          if (currentDepth >= depth)
-            break;
-
-          flatIndex += context->getNumGenericParams();
-          currentContext = context;
-          ++currentDepth;
-        }
-
-        if (index >= currentContext->getNumGenericParams())
-          return nullptr;
-
-        return base->getGenericArgs()[flatIndex];
-      });
+  SubstGenericParametersFromMetadata substitutions(base);
+  auto typeInfo = _getTypeByMangledName(typeName, substitutions);
 
   // Complete the type metadata before returning it to the caller.
   if (typeInfo) {

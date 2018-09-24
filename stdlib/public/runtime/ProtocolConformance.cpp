@@ -177,26 +177,11 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
 
   case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
     // Check the conditional requirements.
-    std::vector<unsigned> genericParamCounts;
-    (void)_gatherGenericParameterCounts(type->getTypeContextDescriptor(),
-                                        genericParamCounts);
-    auto genericArgs = type->getGenericArgs();
+    SubstGenericParametersFromMetadata substitutions(type);
     std::vector<const void *> conditionalArgs;
     bool failed =
       _checkGenericRequirements(getConditionalRequirements(), conditionalArgs,
-        [&](unsigned flatIndex) {
-          // FIXME: Adjust for non-key type parameters.
-          return genericArgs[flatIndex];
-        },
-        [&](unsigned depth, unsigned index) -> const Metadata *  {
-          // FIXME: Adjust for non-key type parameters.
-          if (auto flatIndex = _depthIndexToFlatIndex(depth, index,
-                                                      genericParamCounts)) {
-            return genericArgs[*flatIndex];
-          }
-
-          return nullptr;
-        });
+                                substitutions, substitutions);
     if (failed) return nullptr;
 
     return getWitnessTableAccessor()(
