@@ -70,6 +70,7 @@ class XRefTracePath {
       case Kind::Unknown:
         return Identifier();
       }
+      llvm_unreachable("unhandled kind");
     }
 
     void print(raw_ostream &os) const {
@@ -227,8 +228,7 @@ public:
   enum Flag : unsigned {
     DesignatedInitializer = 1 << 0,
     NeedsVTableEntry = 1 << 1,
-    NeedsAllocatingVTableEntry = 1 << 2,
-    NeedsFieldOffsetVectorEntry = 1 << 3,
+    NeedsFieldOffsetVectorEntry = 1 << 2,
   };
   using Flags = OptionSet<Flag>;
 
@@ -246,9 +246,6 @@ public:
   }
   bool needsVTableEntry() const {
     return flags.contains(Flag::NeedsVTableEntry);
-  }
-  bool needsAllocatingVTableEntry() const {
-    return flags.contains(Flag::NeedsAllocatingVTableEntry);
   }
   bool needsFieldOffsetVectorEntry() const {
     return flags.contains(Flag::NeedsFieldOffsetVectorEntry);

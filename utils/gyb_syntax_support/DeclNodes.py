@@ -669,7 +669,7 @@ DECL_NODES = [
                    is_optional=True),
          ]),
 
-    # infix-operator-group -> ':' identifier
+    # infix-operator-group -> ':' identifier ','? identifier?
     Node('InfixOperatorGroup', kind='Syntax',
          description='''
          A clause to specify precedence group in infix operator declaration.
@@ -680,6 +680,13 @@ DECL_NODES = [
                    description='''
                    The name of the precedence group for the operator
                    '''),
+             Child('TrailingComma', kind='CommaToken',
+                   is_optional=True),
+             Child('ProtocolName', kind='IdentifierToken',
+                   description='''
+                   The protocol associated with the operator
+                   ''',
+                   is_optional=True),
          ]),
 
     # precedence-group-decl -> attributes? modifiers? 'precedencegroup'

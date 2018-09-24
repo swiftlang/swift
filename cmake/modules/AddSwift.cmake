@@ -132,10 +132,11 @@ function(_add_variant_c_compile_link_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND result
-      "--sysroot=${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_PATH}"
-      # Use the linker included in the Android NDK.
-      "-B" "${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_PREBUILT_PATH}/${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_TRIPLE}/bin/")
+    # lld can handle targeting the android build.  However, if lld is not
+    # enabled, then fallback to the linker included in the android NDK.
+    if(NOT SWIFT_ENABLE_LLD_LINKER)
+      list(APPEND result "-B" "${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_PREBUILT_PATH}/${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_TRIPLE}/bin")
+    endif()
   endif()
 
   if(IS_DARWIN)
@@ -227,8 +228,8 @@ function(_add_variant_c_compile_flags)
     # -D_MD or D_MDd either, as CMake does this automatically.
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
       list(APPEND result -Xclang;--dependent-lib=oldnames)
-      # TODO(compnerd) handle /MT, /MTd, /MD, /MDd
-      if("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+      # TODO(compnerd) handle /MT, /MTd
+      if("${CFLAGS_BUILD_TYPE}" STREQUAL "Debug")
         list(APPEND result "-D_MDd")
         list(APPEND result -Xclang;--dependent-lib=msvcrtd)
       else()
@@ -246,7 +247,9 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-DLLVM_ON_WIN32")
     list(APPEND result "-D_CRT_SECURE_NO_WARNINGS")
     list(APPEND result "-D_CRT_NONSTDC_NO_WARNINGS")
-    list(APPEND result "-D_CRT_USE_BUILTIN_OFFSETOF")
+    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+      list(APPEND result "-D_CRT_USE_BUILTIN_OFFSETOF")
+    endif()
     # TODO(compnerd) permit building for different families
     list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
     if("${CFLAGS_ARCH}" MATCHES arm)
@@ -408,9 +411,14 @@ function(_add_variant_link_flags)
   elseif("${LFLAGS_SDK}" STREQUAL "HAIKU")
     list(APPEND result "-lbsd" "-latomic" "-Wl,-Bsymbolic")
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND result
-        "-ldl" "-llog" "-latomic" "-licudataswift" "-licui18nswift" "-licuucswift"
-        "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so")
+    list(APPEND result "-ldl" "-llog" "-latomic" "-licudataswift" "-licui18nswift" "-licuucswift")
+    if("${LFLAGS_ARCH}" MATCHES armv7)
+      list(APPEND result "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so")
+    elseif("${LFLAGS_ARCH}" MATCHES aarch64)
+      list(APPEND result "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/arm64-v8a/libc++_shared.so")
+    else()
+      message(SEND_ERROR "unknown architecture (${LFLAGS_ARCH}) for android")
+    endif()
     swift_android_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
     foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
       list(APPEND library_search_directories ${path}) 
@@ -800,11 +808,13 @@ function(_add_swift_library_single target name)
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
-    swift_windows_generate_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS)
-    foreach(flag ${SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS})
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;${flag})
-      list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS ${flag})
-    endforeach()
+    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+      swift_windows_generate_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS)
+      foreach(flag ${SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS})
+        list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;${flag})
+        list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS ${flag})
+      endforeach()
+    endif()
     foreach(directory ${SWIFTLIB_INCLUDE})
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-I${directory})
     endforeach()
@@ -1572,6 +1582,13 @@ function(add_swift_library name)
   endif()
 
   if(SWIFTLIB_TARGET_LIBRARY)
+    # In the standard library and overlays, warn about implicit overrides
+    # as a reminder to consider when inherited protocols need different
+    # behavior for their requirements.
+    if (SWIFTLIB_IS_STDLIB)
+      list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
+    endif()
+
     if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE)
       list(APPEND SWIFTLIB_DEPENDS clang)
     endif()

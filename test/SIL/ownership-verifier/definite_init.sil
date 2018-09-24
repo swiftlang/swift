@@ -322,7 +322,7 @@ bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Builtin.Int32):
   assign %1 to %13 : $*Builtin.Int32
   %14 = tuple_element_addr %12 : $*(Builtin.Int32, Builtin.Int32), 1
   assign %1 to %14 : $*Builtin.Int32
-  end_borrow %4 from %3 : $RootClassWithIVars, $RootClassWithIVars
+  end_borrow %4 : $RootClassWithIVars
   return %3 : $RootClassWithIVars
 }
 
@@ -349,7 +349,7 @@ bb0(%0 : @owned $DerivedClassWithIVars):
   %8 = load_borrow %3 : $*DerivedClassWithIVars
   %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
   assign %7 to %9 : $*Builtin.Int32
-  end_borrow %8 from %3 : $DerivedClassWithIVars, $*DerivedClassWithIVars
+  end_borrow %8 : $DerivedClassWithIVars
 
   %11 = load [take] %3 : $*DerivedClassWithIVars
   %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
@@ -428,7 +428,7 @@ bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   %5 = begin_borrow %4 : $RootClassWithNontrivialStoredProperties
   %2 = ref_element_addr %5 : $RootClassWithNontrivialStoredProperties, #RootClassWithNontrivialStoredProperties.x
   assign %1 to %2 : $*SomeClass
-  end_borrow %5 from %4 : $RootClassWithNontrivialStoredProperties, $RootClassWithNontrivialStoredProperties
+  end_borrow %5 : $RootClassWithNontrivialStoredProperties
   destroy_value %4 : $RootClassWithNontrivialStoredProperties
   %13 = tuple ()
   return %13 : $()
@@ -456,7 +456,7 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   %9 = load_borrow %4 : $*DerivedClassWithNontrivialStoredProperties
   %10 = ref_element_addr %9 : $DerivedClassWithNontrivialStoredProperties, #DerivedClassWithNontrivialStoredProperties.a
   assign %8 to %10 : $*SomeClass
-  end_borrow %9 from %4 : $DerivedClassWithNontrivialStoredProperties, $*DerivedClassWithNontrivialStoredProperties
+  end_borrow %9 : $DerivedClassWithNontrivialStoredProperties
 
   destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
   dealloc_stack %1 : $*DerivedClassWithNontrivialStoredProperties
@@ -509,14 +509,14 @@ bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Builtin.Int32):
   %8 = load_borrow %3 : $*DerivedClassWithIVars
   %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
   assign %i to %9 : $*Builtin.Int32
-  end_borrow %8 from %3 : $DerivedClassWithIVars, $*DerivedClassWithIVars
+  end_borrow %8 : $DerivedClassWithIVars
 
   %a = load [take] %3 : $*DerivedClassWithIVars
   %b = upcast %a : $DerivedClassWithIVars to $RootClassWithIVars
   %borrowed_b = begin_borrow %b : $RootClassWithIVars
   %c = ref_element_addr %borrowed_b : $RootClassWithIVars, #RootClassWithIVars.x
   load [trivial] %c : $*Builtin.Int32
-  end_borrow %borrowed_b from %b : $RootClassWithIVars, $RootClassWithIVars
+  end_borrow %borrowed_b : $RootClassWithIVars
   %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%b) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 

@@ -303,7 +303,7 @@ extension SignedNumeric {
 ///
 /// - Parameter x: A signed number.
 /// - Returns: The absolute value of `x`.
-@_transparent
+@inlinable
 public func abs<T : SignedNumeric>(_ x: T) -> T
   where T.Magnitude == T {
   return x.magnitude
@@ -322,9 +322,9 @@ public func abs<T : SignedNumeric>(_ x: T) -> T
 ///
 /// - Parameter x: A signed number.
 /// - Returns: The absolute value of `x`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func abs<T : SignedNumeric & Comparable>(_ x: T) -> T {
-  return x < 0 ? -x : x
+  return x < (0 as T) ? -x : x
 }
 
 extension Numeric {
@@ -630,13 +630,12 @@ public protocol BinaryInteger :
   /// - Parameter source: An integer to convert to this type.
   init<T : BinaryInteger>(clamping source: T)
 
-  // FIXME: Should be `Words : Collection where Words.Element == UInt`
-  // See <rdar://problem/31798916> for why it isn't.
   /// A type that represents the words of a binary integer.
   ///
-  /// The `Words` type must conform to the `Collection` protocol with an
-  /// `Element` type of `UInt`.
-  associatedtype Words : Sequence where Words.Element == UInt
+  /// The `Words` type must conform to the `RandomAccessCollection` protocol
+  /// with an `Element` type of `UInt` and `Index` type of `Int.
+  associatedtype Words : RandomAccessCollection
+      where Words.Element == UInt, Words.Index == Int
 
   /// A collection containing the words of this value's binary
   /// representation, in order from the least significant to most significant.
@@ -758,14 +757,14 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +(lhs: Self, rhs: Self) -> Self
+  override static func +(lhs: Self, rhs: Self) -> Self
 
   /// Adds two values and stores the result in the left-hand-side variable.
   ///
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +=(lhs: inout Self, rhs: Self)
+  override static func +=(lhs: inout Self, rhs: Self)
 
   /// Subtracts one value from another and produces their difference.
   ///
@@ -787,7 +786,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -(lhs: Self, rhs: Self) -> Self
+  override static func -(lhs: Self, rhs: Self) -> Self
 
   /// Subtracts the second value from the first and stores the difference in the
   /// left-hand-side variable.
@@ -795,7 +794,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -=(lhs: inout Self, rhs: Self)
+  override static func -=(lhs: inout Self, rhs: Self)
 
   /// Multiplies two values and produces their product.
   ///
@@ -817,7 +816,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *(lhs: Self, rhs: Self) -> Self
+  override static func *(lhs: Self, rhs: Self) -> Self
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable.
@@ -825,7 +824,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *=(lhs: inout Self, rhs: Self)
+  override static func *=(lhs: inout Self, rhs: Self)
 
   /// Returns the inverse of the bits set in the argument.
   ///
@@ -1151,6 +1150,21 @@ public protocol BinaryInteger :
   func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self)
 
+  /// Returns true if this value is a multiple of `other`, and false otherwise.
+  ///
+  /// For two integers a and b, a is a multiple of b if there exists a third
+  /// integer q such that a = q*b. For example, 6 is a multiple of 3, because
+  /// 6 = 2*3, and zero is a multiple of everything, because 0 = 0*x, for any
+  /// integer x.
+  ///
+  /// Two edge cases are worth particular attention:
+  /// - `x.isMultiple(of: 0)` is `true` if `x` is zero and `false` otherwise.
+  /// - `T.min.isMultiple(of: -1)` is `true` for signed integer `T`, even
+  ///   though the quotient `T.min / -1` is not representable in type `T`.
+  ///
+  /// - Parameter other: the value to test.
+  func isMultiple(of other: Self) -> Bool
+
   /// Returns `-1` if this value is negative and `1` if it's positive;
   /// otherwise, `0`.
   ///
@@ -1171,7 +1185,7 @@ extension BinaryInteger {
   ///
   /// - Returns: The sign of this number, expressed as an integer of the same
   ///   type.
-  @_transparent
+  @inlinable
   public func signum() -> Self {
     return (self > (0 as Self) ? 1 : 0) - (self < (0 as Self) ? 1 : 0)
   }
@@ -1182,7 +1196,7 @@ extension BinaryInteger {
     return it.next() ?? 0
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _binaryLogarithm() -> Int {
     _precondition(self > (0 as Self))
     var (quotient, remainder) =
@@ -1219,10 +1233,20 @@ extension BinaryInteger {
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the quotient and remainder of this value
   ///   divided by `rhs`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self) {
     return (self / rhs, self % rhs)
+  }
+  
+  @inlinable
+  public func isMultiple(of other: Self) -> Bool {
+    // Nothing but zero is a multiple of zero.
+    if other == 0 { return self == 0 }
+    // Do the test in terms of magnitude, which guarantees there are no other
+    // edge cases. If we write this as `self % other` instead, it could trap
+    // for types that are not symmetric around zero.
+    return self.magnitude % other.magnitude == 0
   }
 
 //===----------------------------------------------------------------------===//
@@ -1346,7 +1370,7 @@ extension BinaryInteger {
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the right.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable
+  @_transparent
   public static func >> <RHS: BinaryInteger>(lhs: Self, rhs: RHS) -> Self {
     var r = lhs
     r >>= rhs
@@ -1392,7 +1416,7 @@ extension BinaryInteger {
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the left.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable
+  @_transparent
   public static func << <RHS: BinaryInteger>(lhs: Self, rhs: RHS) -> Self {
     var r = lhs
     r <<= rhs
@@ -1469,7 +1493,6 @@ extension BinaryInteger {
   }
 
   /// A textual representation of this value.
-  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
     return _description(radix: 10, uppercase: false)
   }
@@ -1481,7 +1504,6 @@ extension BinaryInteger {
 //===----------------------------------------------------------------------===//
 
 extension BinaryInteger {
-  // FIXME(ABI): using Int as the return type is wrong.
   /// Returns the distance from this value to the given value, expressed as a
   /// stride.
   ///
@@ -1490,7 +1512,7 @@ extension BinaryInteger {
   ///
   /// - Parameter other: The value to calculate the distance to.
   /// - Returns: The distance from this value to `other`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public func distance(to other: Self) -> Int {
     if !Self.isSigned {
@@ -1518,7 +1540,6 @@ extension BinaryInteger {
     _preconditionFailure("Distance is not representable in Int")
   }
 
-  // FIXME(ABI): using Int as the parameter type is wrong.
   /// Returns a value that is offset the specified distance from this value.
   ///
   /// Use the `advanced(by:)` method in generic code to offset a value by a
@@ -1530,7 +1551,7 @@ extension BinaryInteger {
   ///
   /// - Parameter n: The distance to advance this value.
   /// - Returns: A value that is offset from this value by `n`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public func advanced(by n: Int) -> Self {
     if !Self.isSigned {
@@ -1570,8 +1591,7 @@ extension BinaryInteger {
   /// - Parameters:
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   public static func == <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Bool {
@@ -1645,8 +1665,7 @@ extension BinaryInteger {
   /// - Parameters:
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   public static func < <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     let lhsNegative = Self.isSigned && lhs < (0 as Self)
     let rhsNegative = Other.isSigned && rhs < (0 as Other)
@@ -1689,7 +1708,6 @@ extension BinaryInteger {
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
   @_transparent
-  //@inline(__always)
   public static func <= <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     return !(rhs < lhs)
   }
@@ -1705,7 +1723,6 @@ extension BinaryInteger {
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
   @_transparent
-  //@inline(__always)
   public static func >= <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     return !(lhs < rhs)
   }
@@ -1721,7 +1738,6 @@ extension BinaryInteger {
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
   @_transparent
-  //@inline(__always)
   public static func > <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     return rhs < lhs
   }
@@ -1749,20 +1765,17 @@ extension BinaryInteger {
     return !(lhs == rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   public static func <= (lhs: Self, rhs: Self) -> Bool {
     return !(rhs < lhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   public static func >= (lhs: Self, rhs: Self) -> Bool {
     return !(lhs < rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   public static func > (lhs: Self, rhs: Self) -> Bool {
     return rhs < lhs
   }
@@ -2190,7 +2203,7 @@ extension FixedWidthInteger {
   @inlinable
   public var bitWidth: Int { return Self.bitWidth }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _binaryLogarithm() -> Int {
     _precondition(self > (0 as Self))
     return Self.bitWidth &- (leadingZeroBitCount &+ 1)
@@ -2201,7 +2214,7 @@ extension FixedWidthInteger {
   ///
   /// - Parameter value: A value to use as the little-endian representation of
   ///   the new integer.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(littleEndian value: Self) {
 #if _endian(little)
     self = value
@@ -2215,7 +2228,7 @@ extension FixedWidthInteger {
   ///
   /// - Parameter value: A value to use as the big-endian representation of the
   ///   new integer.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(bigEndian value: Self) {
 #if _endian(big)
     self = value
@@ -2229,7 +2242,7 @@ extension FixedWidthInteger {
   /// If necessary, the byte order of this value is reversed from the typical
   /// byte order of this integer type. On a little-endian platform, for any
   /// integer `x`, `x == x.littleEndian`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var littleEndian: Self {
 #if _endian(little)
     return self
@@ -2243,7 +2256,7 @@ extension FixedWidthInteger {
   /// If necessary, the byte order of this value is reversed from the typical
   /// byte order of this integer type. On a big-endian platform, for any
   /// integer `x`, `x == x.bigEndian`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var bigEndian: Self {
 #if _endian(big)
     return self
@@ -2286,7 +2299,6 @@ extension FixedWidthInteger {
   ///   - rhs: The number of bits to shift `lhs` to the right. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func &>> (lhs: Self, rhs: Self) -> Self {
@@ -2330,7 +2342,7 @@ extension FixedWidthInteger {
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable
+  @_transparent
   public static func &>> <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Self {
@@ -2365,7 +2377,6 @@ extension FixedWidthInteger {
   ///   - rhs: The number of bits to shift `lhs` to the right. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func &>>= <
@@ -2408,7 +2419,6 @@ extension FixedWidthInteger {
   ///   - rhs: The number of bits to shift `lhs` to the left. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func &<< (lhs: Self, rhs: Self) -> Self {
@@ -2452,7 +2462,7 @@ extension FixedWidthInteger {
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable
+  @_transparent
   public static func &<< <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Self {
@@ -2487,7 +2497,6 @@ extension FixedWidthInteger {
   ///   - rhs: The number of bits to shift `lhs` to the left. If `rhs` is
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func &<<= <
@@ -2511,6 +2520,12 @@ extension FixedWidthInteger {
   ///     // Prints "7"
   ///     // Prints "44"
   ///     // Prints "21"
+  ///
+  /// - Note: The algorithm used to create random values may change in a future
+  ///   version of Swift. If you're passing a generator that results in the
+  ///   same sequence of integer values each time you run your program, that
+  ///   sequence may change when your program is compiled using a different
+  ///   version of Swift.
   ///
   /// - Parameters:
   ///   - range: The range in which to create a random value.
@@ -2634,8 +2649,8 @@ extension FixedWidthInteger {
   ///     // Prints "64"
   ///     // Prints "5"
   ///
-  /// This method is equivalent to calling the version that takes a generator,
-  /// passing in the system's default random generator.
+  /// This method is equivalent to calling `random(in:using:)`, passing in the
+  /// system's default random generator.
   ///
   /// - Parameter range: The range in which to create a random value.
   /// - Returns: A random value within the bounds of `range`.
@@ -2726,7 +2741,6 @@ extension FixedWidthInteger {
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the right.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func >> <
@@ -2755,8 +2769,7 @@ extension FixedWidthInteger {
     lhs = _nonMaskingRightShift(lhs, shift)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   public static func _nonMaskingRightShift(_ lhs: Self, _ rhs: Int) -> Self {
     let overshiftR = Self.isSigned ? lhs &>> (Self.bitWidth - 1) : 0
     let overshiftL: Self = 0
@@ -2815,7 +2828,6 @@ extension FixedWidthInteger {
   /// - Parameters:
   ///   - lhs: The value to shift.
   ///   - rhs: The number of bits to shift `lhs` to the left.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func << <
@@ -2844,8 +2856,7 @@ extension FixedWidthInteger {
     lhs = _nonMaskingLeftShift(lhs, shift)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_transparent
   public static func _nonMaskingLeftShift(_ lhs: Self, _ rhs: Int) -> Self {
     let overshiftR = Self.isSigned ? lhs &>> (Self.bitWidth - 1) : 0
     let overshiftL: Self = 0
@@ -2942,9 +2953,8 @@ extension FixedWidthInteger {
   ///     // y == nil
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inline(__always)
+  @inlinable
   public init?<T : BinaryFloatingPoint>(exactly source: T) {
     let (temporary, exact) = Self._convert(from: source)
     guard exact, let value = temporary else {
@@ -2973,7 +2983,7 @@ extension FixedWidthInteger {
   ///     // y == 0
   ///
   /// - Parameter source: An integer to convert to this type.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @_semantics("optimize.sil.specialize.generic.partial.never")
   public init<Other : BinaryInteger>(clamping source: Other) {
     if _slowPath(source < Self.min) {
@@ -2983,134 +2993,6 @@ extension FixedWidthInteger {
       self = Self.max
     }
     else { self = Self(truncatingIfNeeded: source) }
-  }
-
-  /// Returns the sum of this value and the given value without checking for
-  /// arithmetic overflow.
-  ///
-  /// Use this function only to avoid the cost of overflow checking when you
-  /// are certain that the operation won't overflow. In optimized builds (`-O`)
-  /// the compiler is free to assume that overflow won't occur. Failure to
-  /// satisfy that assumption is a serious programming error and could lead to
-  /// statements being unexpectedly executed or skipped.
-  ///
-  /// In debug builds (`-Onone`) a runtime error is still triggered if the
-  /// operation overflows.
-  ///
-  /// This method is not a synonym for the masking addition operator (`&+`).
-  /// Use that operator instead of this method when you want to discard any
-  /// overflow that results from an addition operation.
-  ///
-  /// - Parameter rhs: The value to add to this value.
-  /// - Returns: The sum of this value and `rhs`.
-  @_transparent
-  public func unsafeAdding(_ other: Self) -> Self {
-    let (result, overflow) = self.addingReportingOverflow(other)
-
-    if overflow {
-      if (_isDebugAssertConfiguration()) {
-        _preconditionFailure("Overflow in unsafeAdding")
-      }
-      else {
-        Builtin.conditionallyUnreachable()
-      }
-    }
-    return result
-  }
-
-  /// Returns the difference obtained by subtracting the given value from this
-  /// value without checking for arithmetic overflow.
-  ///
-  /// Use this function only to avoid the cost of overflow checking when you
-  /// are certain that the operation won't overflow. In optimized builds (`-O`)
-  /// the compiler is free to assume that overflow won't occur. Failure to
-  /// satisfy that assumption is a serious programming error and could lead to
-  /// statements being unexpectedly executed or skipped.
-  ///
-  /// In debug builds (`-Onone`) a runtime error is still triggered if the
-  /// operation overflows.
-  ///
-  /// This method is not a synonym for the masking subtraction operator (`&-`).
-  /// Use that operator instead of this method when you want to discard any
-  /// overflow that results from a subtraction operation.
-  ///
-  /// - Parameter rhs: The value to subtract from this value.
-  /// - Returns: The result of subtracting `rhs` from this value.
-  @_transparent
-  public func unsafeSubtracting(_ other: Self) -> Self {
-    let (result, overflow) = self.subtractingReportingOverflow(other)
-
-    if overflow {
-      if (_isDebugAssertConfiguration()) {
-        _preconditionFailure("Overflow in unsafeSubtracting")
-      }
-      else {
-        Builtin.conditionallyUnreachable()
-      }
-    }
-    return result
-  }
-
-  /// Returns the product of this value and the given value without checking
-  /// for arithmetic overflow.
-  ///
-  /// Use this function only to avoid the cost of overflow checking when you
-  /// are certain that the operation won't overflow. In optimized builds (`-O`)
-  /// the compiler is free to assume that overflow won't occur. Failure to
-  /// satisfy that assumption is a serious programming error and could lead to
-  /// statements being unexpectedly executed or skipped.
-  ///
-  /// In debug builds (`-Onone`) a runtime error is still triggered if the
-  /// operation overflows.
-  ///
-  /// This method is not a synonym for the masking multiplication operator
-  /// (`&*`). Use that operator instead of this method when you want to discard
-  /// any overflow that results from an addition operation.
-  ///
-  /// - Parameter rhs: The value to multiply by this value.
-  /// - Returns: The product of this value and `rhs`.
-  @_transparent
-  public func unsafeMultiplied(by other: Self) -> Self {
-    let (result, overflow) = self.multipliedReportingOverflow(by: other)
-
-    if overflow {
-      if (_isDebugAssertConfiguration()) {
-        _preconditionFailure("Overflow in unsafeMultiplied")
-      }
-      else {
-        Builtin.conditionallyUnreachable()
-      }
-    }
-    return result
-  }
-
-  /// Returns the quotient obtained by dividing this value by the given value
-  /// without checking for arithmetic overflow.
-  ///
-  /// Use this function only to avoid the cost of overflow checking when you
-  /// are certain that the operation won't overflow. In optimized builds (`-O`)
-  /// the compiler is free to assume that overflow won't occur. Failure to
-  /// satisfy that assumption is a serious programming error and could lead to
-  /// statements being unexpectedly executed or skipped.
-  ///
-  /// In debug builds (`-Onone`) a runtime error is still triggered if the
-  /// operation overflows.
-  ///
-  /// - Parameter rhs: The value to divide this value by.
-  /// - Returns: The result of dividing this value by `rhs`.
-  @_transparent
-  public func unsafeDivided(by other: Self) -> Self {
-    let (result, overflow) = self.dividedReportingOverflow(by: other)
-
-    if overflow {
-      if (_isDebugAssertConfiguration()) {
-        _preconditionFailure("Overflow in unsafeDivided")
-      }
-      else {
-        Builtin.conditionallyUnreachable()
-      }
-    }
-    return result
   }
 
   /// Creates a new instance from the bit pattern of the given instance by
@@ -3149,7 +3031,6 @@ extension FixedWidthInteger {
   ///     // 'y' has a binary representation of 11111111_11101011
   ///
   /// - Parameter source: An integer to convert to this type.
-  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public init<T : BinaryInteger>(truncatingIfNeeded source: T) {
     if Self.bitWidth <= Int.bitWidth {
@@ -3391,14 +3272,18 @@ extension UnsignedInteger {
   /// to find an absolute value. In addition, because `abs(_:)` always returns
   /// a value of the same type, even in a generic context, using the function
   /// instead of the `magnitude` property is encouraged.
-  @_transparent
-  public var magnitude: Self { return self }
+  public var magnitude: Self {
+    @inline(__always)
+    get { return self }
+  }
 
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// This property is always `false` for unsigned integer types.
-  @_transparent
-  public static var isSigned: Bool { return false }
+  public static var isSigned: Bool {
+    @inline(__always)
+    get { return false }
+  }
 }
 
 extension UnsignedInteger where Self : FixedWidthInteger {
@@ -3421,7 +3306,6 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   ///
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
@@ -3452,7 +3336,6 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   ///     // y == nil
   ///
   /// - Parameter source: A value to convert to this type of integer.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
@@ -3473,17 +3356,13 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   /// For unsigned integer types, this value is `(2 ** bitWidth) - 1`, where
   /// `**` is exponentiation.
   @_transparent
-  public static var max: Self {
-    return ~0
-  }
+  public static var max: Self { return ~0 }
 
   /// The minimum representable integer in this type.
   ///
   /// For unsigned integer types, this value is always `0`.
   @_transparent
-  public static var min: Self {
-    return 0
-  }
+  public static var min: Self { return 0 }
 }
 
 
@@ -3502,8 +3381,10 @@ extension SignedInteger {
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// This property is always `true` for signed integer types.
-  @_transparent
-  public static var isSigned: Bool { return true }
+  public static var isSigned: Bool {
+    @inline(__always)
+    get { return true }
+  }
 }
 
 extension SignedInteger where Self : FixedWidthInteger {
@@ -3526,7 +3407,6 @@ extension SignedInteger where Self : FixedWidthInteger {
   ///
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
@@ -3559,7 +3439,6 @@ extension SignedInteger where Self : FixedWidthInteger {
   ///     // y == nil
   ///
   /// - Parameter source: A value to convert to this type of integer.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
@@ -3581,9 +3460,7 @@ extension SignedInteger where Self : FixedWidthInteger {
   /// For signed integer types, this value is `(2 ** (bitWidth - 1)) - 1`,
   /// where `**` is exponentiation.
   @_transparent
-  public static var max: Self {
-    return ~min
-  }
+  public static var max: Self { return ~min }
 
   /// The minimum representable integer in this type.
   ///
@@ -3592,6 +3469,16 @@ extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public static var min: Self {
     return (-1 as Self) &<< Self._highBitIndex
+  }
+  
+  @inlinable
+  public func isMultiple(of other: Self) -> Bool {
+    // Nothing but zero is a multiple of zero.
+    if other == 0 { return self == 0 }
+    // Special case to avoid overflow on .min / -1 for signed types.
+    if other == -1 { return true }
+    // Having handled those special cases, this is safe.
+    return self % other == 0
   }
 }
 
@@ -3617,7 +3504,7 @@ extension SignedInteger where Self : FixedWidthInteger {
 ///
 /// - Parameter x: The integer to convert, and instance of type `T`.
 /// - Returns: The value of `x` converted to type `U`.
-@_transparent
+@inlinable
 public func numericCast<T : BinaryInteger, U : BinaryInteger>(_ x: T) -> U {
   return U(x)
 }
@@ -3629,7 +3516,6 @@ public func numericCast<T : BinaryInteger, U : BinaryInteger>(_ x: T) -> U {
 // At the same time, since they are obsolete in Swift 4, this will not cause
 // `u8 << -1` to fail due to an overflow in an unsigned value.
 extension FixedWidthInteger {
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
@@ -3639,7 +3525,6 @@ extension FixedWidthInteger {
     return lhs
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
@@ -3647,7 +3532,6 @@ extension FixedWidthInteger {
     _nonMaskingRightShiftGeneric(&lhs, rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
@@ -3657,7 +3541,6 @@ extension FixedWidthInteger {
     return lhs
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
@@ -3667,9 +3550,8 @@ extension FixedWidthInteger {
 }
 
 extension FixedWidthInteger {
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Use addingReportingOverflow(_:) instead.")
-  @_transparent
+  @inlinable
   public static func addWithOverflow(
     _ lhs: Self, _ rhs: Self
   ) -> (Self, overflow: Bool) {
@@ -3678,9 +3560,8 @@ extension FixedWidthInteger {
     return (partialValue, overflow: overflow)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Use subtractingReportingOverflow(_:) instead.")
-  @_transparent
+  @inlinable
   public static func subtractWithOverflow(
     _ lhs: Self, _ rhs: Self
   ) -> (Self, overflow: Bool) {
@@ -3689,9 +3570,8 @@ extension FixedWidthInteger {
     return (partialValue, overflow: overflow)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, obsoleted: 4, message: "Use multipliedReportingOverflow(by:) instead.")
-  @_transparent
   public static func multiplyWithOverflow(
     _ lhs: Self, _ rhs: Self
   ) -> (Self, overflow: Bool) {
@@ -3700,9 +3580,8 @@ extension FixedWidthInteger {
     return (partialValue, overflow: overflow)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, obsoleted: 4, message: "Use dividedReportingOverflow(by:) instead.")
-  @_transparent
   public static func divideWithOverflow(
     _ lhs: Self, _ rhs: Self
   ) -> (Self, overflow: Bool) {
@@ -3711,9 +3590,8 @@ extension FixedWidthInteger {
     return (partialValue, overflow: overflow)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, obsoleted: 4, message: "Use remainderReportingOverflow(dividingBy:) instead.")
-  @_transparent
   public static func remainderWithOverflow(
     _ lhs: Self, _ rhs: Self
   ) -> (Self, overflow: Bool) {
@@ -3724,7 +3602,7 @@ extension FixedWidthInteger {
 }
 
 extension BinaryInteger {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, obsoleted: 3.2,
     message: "Please use FixedWidthInteger protocol as a generic constraint and addingReportingOverflow(_:) method instead.")
   public static func addWithOverflow(
@@ -3733,7 +3611,7 @@ extension BinaryInteger {
     fatalError("Unavailable")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, obsoleted: 3.2,
     message: "Please use FixedWidthInteger protocol as a generic constraint and subtractingReportingOverflow(_:) method instead.")
   public static func subtractWithOverflow(
@@ -3742,7 +3620,7 @@ extension BinaryInteger {
     fatalError("Unavailable")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, obsoleted: 3.2,
     message: "Please use FixedWidthInteger protocol as a generic constraint and multipliedReportingOverflow(by:) method instead.")
   public static func multiplyWithOverflow(
@@ -3751,7 +3629,7 @@ extension BinaryInteger {
     fatalError("Unavailable")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, obsoleted: 3.2,
     message: "Please use FixedWidthInteger protocol as a generic constraint and dividedReportingOverflow(by:) method instead.")
   public static func divideWithOverflow(
@@ -3760,7 +3638,7 @@ extension BinaryInteger {
     fatalError("Unavailable")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @available(swift, obsoleted: 3.2,
     message: "Please use FixedWidthInteger protocol as a generic constraint and remainderReportingOverflow(dividingBy:) method instead.")
   public static func remainderWithOverflow(
@@ -3780,24 +3658,24 @@ extension BinaryInteger {
 //    var _  = (x &+ (y - 1)) < x
 //                      ^
 extension SignedInteger {
-  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   public static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self {
     fatalError("Should be overridden in a more specific type")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   @available(swift, obsoleted: 4.0,
       message: "Please use 'FixedWidthInteger' instead of 'SignedInteger' to get '&+' in generic code.")
   public static func &+ (lhs: Self, rhs: Self) -> Self {
     return _maskingAdd(lhs, rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   public static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self {
     fatalError("Should be overridden in a more specific type")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   @available(swift, obsoleted: 4.0,
       message: "Please use 'FixedWidthInteger' instead of 'SignedInteger' to get '&-' in generic code.")
   public static func &- (lhs: Self, rhs: Self) -> Self {
@@ -3808,7 +3686,7 @@ extension SignedInteger {
 extension SignedInteger where Self : FixedWidthInteger {
   // This overload is supposed to break the ambiguity between the
   // implementations on SignedInteger and FixedWidthInteger
-  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   public static func &+ (lhs: Self, rhs: Self) -> Self {
     return _maskingAdd(lhs, rhs)
   }
@@ -3820,7 +3698,7 @@ extension SignedInteger where Self : FixedWidthInteger {
 
   // This overload is supposed to break the ambiguity between the
   // implementations on SignedInteger and FixedWidthInteger
-  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   public static func &- (lhs: Self, rhs: Self) -> Self {
     return _maskingSubtract(lhs, rhs)
   }

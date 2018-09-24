@@ -16,8 +16,11 @@
 
 import SwiftShims
 
+// FIXME: Remove @usableFromInline once Hasher is resilient.
+// rdar://problem/38549901
+@usableFromInline
 internal protocol _HasherCore {
-  init(seed: (UInt64, UInt64))
+  init(seed: Hasher._Seed)
   mutating func compress(_ value: UInt64)
   mutating func finalize(tailAndByteCount: UInt64) -> UInt64
 
@@ -30,7 +33,7 @@ internal protocol _HasherCore {
   /// This comes handy when type's _hash(into:) implementation needs to perform
   /// one-shot hashing for some of its components. (E.g., for commutative
   /// hashing.)
-  func _generateSeed() -> (UInt64, UInt64)
+  func _generateSeed() -> Hasher._Seed
 }
 
 @inline(__always)
@@ -74,6 +77,9 @@ internal func _loadPartialUnalignedUInt64LE(
 /// trailing bytes, while the most significant 8 bits hold the count of bytes
 /// appended so far, modulo 256. The count of bytes currently stored in the
 /// buffer is in the lower three bits of the byte count.)
+// FIXME: Remove @usableFromInline and @_fixed_layout once Hasher is resilient.
+// rdar://problem/38549901
+@usableFromInline @_fixed_layout
 internal struct _HasherTailBuffer {
   // msb                                                             lsb
   // +---------+-------+-------+-------+-------+-------+-------+-------+
@@ -146,12 +152,15 @@ internal struct _HasherTailBuffer {
   }
 }
 
+// FIXME: Remove @usableFromInline and @_fixed_layout once Hasher is resilient.
+// rdar://problem/38549901
+@usableFromInline @_fixed_layout
 internal struct _BufferingHasher<Core: _HasherCore> {
   private var _buffer: _HasherTailBuffer
   private var _core: Core
 
   @inline(__always)
-  internal init(seed: (UInt64, UInt64)) {
+  internal init(seed: Hasher._Seed) {
     self._buffer = _HasherTailBuffer()
     self._core = Core(seed: seed)
   }
@@ -243,7 +252,7 @@ internal struct _BufferingHasher<Core: _HasherCore> {
   // Generate a seed value from the current state of this hasher.
   // FIXME(hasher): Remove
   @inline(__always)
-  internal func _generateSeed() -> (UInt64, UInt64) {
+  internal func _generateSeed() -> Hasher._Seed {
     return _core._generateSeed()
   }
 
@@ -278,8 +287,17 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 ///   versions of the standard library.
 @_fixed_layout // FIXME: Should be resilient (rdar://problem/38549901)
 public struct Hasher {
+  // FIXME: Remove @usableFromInline once Hasher is resilient.
+  // rdar://problem/38549901
+  @usableFromInline
   internal typealias RawCore = _SipHash13Core
+  // FIXME: Remove @usableFromInline once Hasher is resilient.
+  // rdar://problem/38549901
+  @usableFromInline
   internal typealias Core = _BufferingHasher<RawCore>
+
+  @usableFromInline
+  internal typealias _Seed = (UInt64, UInt64)
 
   internal var _core: Core
 
@@ -295,7 +313,7 @@ public struct Hasher {
   /// Initialize a new hasher using the specified seed value.
   @usableFromInline
   @_effects(releasenone)
-  internal init(_seed seed: (UInt64, UInt64)) {
+  internal init(_seed seed: _Seed) {
     self._core = Core(seed: seed)
   }
 
@@ -316,7 +334,7 @@ public struct Hasher {
   /// The 128-bit hash seed used to initialize the hasher state. Initialized
   /// once during process startup.
   @inlinable
-  internal static var _seed: (UInt64, UInt64) {
+  internal static var _seed: _Seed {
     @inline(__always)
     get {
       // The seed itself is defined in C++ code so that it is initialized during
@@ -413,13 +431,13 @@ public struct Hasher {
   // FIXME(hasher): Remove
   @_effects(readnone)
   @usableFromInline
-  internal func _generateSeed() -> (UInt64, UInt64) {
+  internal func _generateSeed() -> Hasher._Seed {
     return _core._generateSeed()
   }
 
   @_effects(readnone)
   @usableFromInline
-  internal static func _hash(seed: (UInt64, UInt64), _ value: UInt64) -> Int {
+  internal static func _hash(seed: _Seed, _ value: UInt64) -> Int {
     var core = RawCore(seed: seed)
     core.compress(value)
     let tbc = _HasherTailBuffer(tail: 0, byteCount: 8)
@@ -428,7 +446,7 @@ public struct Hasher {
 
   @_effects(readnone)
   @usableFromInline
-  internal static func _hash(seed: (UInt64, UInt64), _ value: UInt) -> Int {
+  internal static func _hash(seed: _Seed, _ value: UInt) -> Int {
     var core = RawCore(seed: seed)
 #if arch(i386) || arch(arm)
     _sanityCheck(UInt.bitWidth < UInt64.bitWidth)
@@ -446,7 +464,7 @@ public struct Hasher {
   @_effects(readnone)
   @usableFromInline
   internal static func _hash(
-    seed: (UInt64, UInt64),
+    seed: _Seed,
     bytes value: UInt64,
     count: Int) -> Int {
     _sanityCheck(count >= 0 && count < 8)
@@ -458,7 +476,7 @@ public struct Hasher {
   @_effects(readnone)
   @usableFromInline
   internal static func _hash(
-    seed: (UInt64, UInt64),
+    seed: _Seed,
     bytes: UnsafeRawBufferPointer) -> Int {
     var core = Core(seed: seed)
     core.combine(bytes: bytes)

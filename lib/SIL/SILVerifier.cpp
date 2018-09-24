@@ -379,7 +379,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   const SILArgument *CurArgument = nullptr;
-  DominanceInfo *Dominance = nullptr;
+  std::unique_ptr<DominanceInfo> Dominance;
 
   // Used for dominance checking within a basic block.
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
@@ -590,17 +590,12 @@ public:
         InstNumbers[&I] = InstIdx++;
     }
 
-    Dominance = new DominanceInfo(const_cast<SILFunction *>(&F));
+    Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
     require(DebugScope->Parent.get<SILFunction *>() == &F,
             "Scope of SIL function points to different function");
-  }
-
-  ~SILVerifier() {
-    if (Dominance)
-      delete Dominance;
   }
 
   // Checks dominance between two instructions.
@@ -1531,13 +1526,6 @@ public:
     require(
         F.hasQualifiedOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
-    // We allow for end_borrow to express relationships in between addresses and
-    // values, but we require that the types are the same ignoring value
-    // category.
-    require(EBI->getBorrowedValue()->getType().getObjectType() ==
-                EBI->getOriginalValue()->getType().getObjectType(),
-            "end_borrow can only relate the same types ignoring value "
-            "category");
   }
 
   template <class AI>
@@ -2522,6 +2510,9 @@ public:
       require(AMI->getModule().lookUpWitnessTable(conformance, false),
               "Could not find witness table for conformance");
     }
+
+    require(AMI->getMember().requiresNewWitnessTableEntry(),
+            "method does not have a witness table entry");
   }
 
   // Get the expected type of a dynamic method reference.
@@ -2847,12 +2838,6 @@ public:
         case SILInstructionKind::DestroyAddrInst:
           return true;
         case SILInstructionKind::UncheckedAddrCastInst: {
-          // Don't be too conservative here, we have a new case:
-          // sil-combine producing a new code pattern for devirtualizer
-          // open_existential_addr immutable_access -> witness_method
-          // witness_method gets transformed into unchecked_addr_cast
-          // we are "OK" If one of the new users is an non-consuming apply
-          // we are also "OK" if we have a single non-consuming user
           auto isCastToNonConsuming = [=](UncheckedAddrCastInst *I) -> bool {
             for (auto *use : I->getUses()) {
               auto *inst = use->getUser();
@@ -2860,22 +2845,16 @@ public:
               case SILInstructionKind::ApplyInst:
               case SILInstructionKind::TryApplyInst:
               case SILInstructionKind::PartialApplyInst:
-                if (!isConsumingOrMutatingApplyUse(use))
-                  return true;
-                break;
-              case SILInstructionKind::StructElementAddrInst:
-              case SILInstructionKind::LoadInst:
-              case SILInstructionKind::DebugValueAddrInst:
-                if (I->hasOneUse())
-                  return true;
-                break;
+                if (isConsumingOrMutatingApplyUse(use))
+                  return false;
+                continue;
               default:
-                break;
+                continue;
               }
             }
-            return false;
+            return true;
           };
-          if (isCastToNonConsuming(dyn_cast<UncheckedAddrCastInst>(inst))) {
+          if (isCastToNonConsuming(cast<UncheckedAddrCastInst>(inst))) {
             break;
           }
           return true;
@@ -5024,10 +5003,11 @@ void SILWitnessTable::verify(const SILModule &M) const {
 void SILDefaultWitnessTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
   for (const Entry &E : getEntries()) {
-    if (!E.isValid())
+    // FIXME: associated type witnesses.
+    if (!E.isValid() || E.getKind() != SILWitnessTable::Method)
       continue;
 
-    SILFunction *F = E.getWitness();
+    SILFunction *F = E.getMethodWitness().Witness;
 
 #if 0
     // FIXME: For now, all default witnesses are private.
@@ -5081,7 +5061,7 @@ void SILModule::verify() const {
     return;
 #endif
   // Uniquing set to catch symbol name collisions.
-  llvm::StringSet<> symbolNames;
+  llvm::DenseSet<StringRef> symbolNames;
 
   // When merging partial modules, we only link functions from the current
   // module, without enabling "LinkAll" mode or running the SILLinker pass;

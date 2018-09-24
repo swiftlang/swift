@@ -204,10 +204,6 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Get the 'self' decl and type.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
   auto &lowering = getTypeLowering(selfDecl->getType());
-  SILType selfTy = lowering.getLoweredType();
-  (void)selfTy;
-  assert(!selfTy.getClassOrBoundGenericClass()
-         && "can't emit a class ctor here");
 
   // Decide if we need to do extra work to warn on unsafe behavior in pre-Swift-5
   // modes.
@@ -485,9 +481,9 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Allocate the 'self' value.
   bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
 
-  if (ctor->isConvenienceInit() || ctor->hasClangNode()) {
-    // For a convenience initializer or an initializer synthesized
-    // for an Objective-C class, allocate using the metatype.
+  if (ctor->hasClangNode()) {
+    // For an allocator thunk synthesized for an Objective-C init method,
+    // allocate using the metatype.
     SILValue allocArg = selfMetaValue;
 
     // When using Objective-C allocation, convert the metatype
@@ -503,6 +499,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     selfValue = B.createAllocRefDynamic(Loc, allocArg, selfTy,
                                         useObjCAllocation, {}, {});
   } else {
+    assert(ctor->isDesignatedInit());
     // For a designated initializer, we know that the static type being
     // allocated is the type of the class that defines the designated
     // initializer.

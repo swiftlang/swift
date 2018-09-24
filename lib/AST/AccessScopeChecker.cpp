@@ -32,13 +32,6 @@ AccessScopeChecker::visitDecl(ValueDecl *VD) {
   if (!VD || isa<GenericTypeParamDecl>(VD))
     return true;
 
-  // FIXME: Figure out why AssociatedTypeDecls don't always have an access
-  // level here.
-  if (!VD->hasAccess()) {
-    if (isa<AssociatedTypeDecl>(VD))
-      return true;
-  }
-
   auto AS = VD->getFormalAccessScope(File, TreatUsableFromInlineAsPublic);
   Scope = Scope->intersectWith(AS);
   return Scope.hasValue();

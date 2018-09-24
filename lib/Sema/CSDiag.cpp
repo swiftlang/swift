@@ -3039,7 +3039,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     
     // If we have a candidate function around, compute the position of its
     // default arguments.
-    llvm::SmallBitVector defaultMap(params.size());
+    SmallBitVector defaultMap(params.size());
     if (!candidates.empty()) {
       defaultMap = computeDefaultMap(params, candidates[0].getDecl(),
                                      candidates[0].level);
@@ -3201,6 +3201,14 @@ void ConstraintSystem::diagnoseDeprecatedConditionalConformanceOuterAccess(
       choiceBaseName, choiceKind);
 }
 
+static SmallVector<AnyFunctionType::Param, 4>
+decomposeArgType(Type argType, ArrayRef<Identifier> argLabels) {
+  SmallVector<AnyFunctionType::Param, 4> result;
+  AnyFunctionType::decomposeInput(argType, result);
+  AnyFunctionType::relabelParams(result, argLabels);
+  return result;
+}
+
 static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
                                        CalleeCandidateInfo &CCI,
                                        ArrayRef<Identifier> argLabels,
@@ -3311,7 +3319,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
                                    candidates, CCI.hasTrailingClosure, CS,
                                    base);
 
-    calleeInfo.filterList(argType, argLabels);
+    calleeInfo.filterListArgs(decomposeArgType(argType, argLabels));
 
     auto diagnostic = diag::member_shadows_global_function_near_match;
     switch (calleeInfo.closeness) {
@@ -3641,7 +3649,7 @@ class ArgumentMatcher : public MatchCallArgumentListener {
   Expr *FnExpr;
   Expr *ArgExpr;
   ArrayRef<AnyFunctionType::Param> &Parameters;
-  const llvm::SmallBitVector &DefaultMap;
+  const SmallBitVector &DefaultMap;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
 
   CalleeCandidateInfo CandidateInfo;
@@ -3659,7 +3667,7 @@ class ArgumentMatcher : public MatchCallArgumentListener {
 public:
   ArgumentMatcher(Expr *fnExpr, Expr *argExpr,
                   ArrayRef<AnyFunctionType::Param> &params,
-                  const llvm::SmallBitVector &defaultMap,
+                  const SmallBitVector &defaultMap,
                   SmallVectorImpl<AnyFunctionType::Param> &args,
                   CalleeCandidateInfo &CCI, bool isSubscript)
       : TC(CCI.CS.TC), FnExpr(fnExpr), ArgExpr(argExpr), Parameters(params),
@@ -4001,7 +4009,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
 
   auto params = candidate.getParameters();
 
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(params, candidate.getDecl(), candidate.level);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
@@ -4558,7 +4566,7 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
     return false;
 
   // Let's filter our candidate list based on that type.
-  candidates.filterList(argType, argLabels);
+  candidates.filterListArgs(decomposeArgType(argType, argLabels));
 
   if (candidates.closeness == CC_ExactMatch)
     return false;
@@ -4610,7 +4618,7 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
 
   // Filter list of the unviable candidates based on the
   // already established type of the argument expression.
-  unviableCandidates.filterList(argType, argLabels);
+  unviableCandidates.filterListArgs(decomposeArgType(argType, argLabels));
 
   // If one of the unviable candidates matches arguments exactly,
   // that means that actual problem is related to function attributes.
@@ -4649,7 +4657,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   auto params = candidate.getParameters();
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(params, candidate.getDecl(), candidate.level);
   auto args = decomposeArgType(CS.getType(argExpr), argLabels);
 
@@ -5101,7 +5109,7 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
                                     callArgHasTrailingClosure(argExpr),
                                     CS, true);
 
-  auto params = swift::decomposeArgType(CS.getType(argExpr), argLabels);
+  auto params = decomposeArgType(CS.getType(argExpr), argLabels);
   using ClosenessPair = CalleeCandidateInfo::ClosenessResultTy;
 
   candidateInfo.filterList([&](UncurriedCandidate cand) -> ClosenessPair {
@@ -5496,7 +5504,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (!argExpr)
     return true; // already diagnosed.
 
-  calleeInfo.filterList(CS.getType(argExpr), argLabels);
+  calleeInfo.filterListArgs(decomposeArgType(CS.getType(argExpr), argLabels));
 
   if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(), argExpr,
                               argLabels))
@@ -6627,6 +6635,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
       break;
 
     case KeyPathExpr::Component::Kind::Invalid:
+    case KeyPathExpr::Component::Kind::Identity:
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalForce:
       // FIXME: Diagnose optional chaining and forcing properly.

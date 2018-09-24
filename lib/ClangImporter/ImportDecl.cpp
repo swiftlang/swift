@@ -117,10 +117,7 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
   Pattern *P = new (Ctx) NamedPattern(decl);
   P->setType(ty);
   P->setImplicit();
-  P = new (Ctx) TypedPattern(P, TypeLoc::withoutLoc(ty));
-  P->setType(ty);
-  P->setImplicit();
-  return P;
+  return TypedPattern::createImplicit(Ctx, P, ty);
 }
 
 /// Create a var member for this struct, along with its pattern binding, and add
@@ -2824,6 +2821,7 @@ namespace {
           // Assume this is a context other than the enum.
           return false;
         }
+        llvm_unreachable("unhandled kind");
       };
 
       for (auto constant : decl->enumerators()) {
@@ -3758,7 +3756,8 @@ namespace {
       if (auto contextTy = decl->getDeclContext()->getDeclaredInterfaceType()) {
         if (auto classDecl = contextTy->getClassOrBoundGenericClass()) {
           if (auto method = dyn_cast<AbstractFunctionDecl>(decl)) {
-            classDecl->recordObjCMethod(method);
+            if (name)
+              classDecl->recordObjCMethod(method, *name);
           }
         }
       }
@@ -4282,7 +4281,7 @@ namespace {
         SmallVector<Type, 2> genericArgs;
         for (auto paramTy :
              env->getGenericSignature()->getInnermostGenericParams()) {
-          genericArgs.push_back(env->mapTypeIntoContext(paramTy));
+          genericArgs.push_back(paramTy);
         }
         Type extendedType =
           BoundGenericClassType::get(objcClass, nullptr, genericArgs);
@@ -6094,9 +6093,11 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   SmallVector<AnyFunctionType::Param, 4> allocParams;
   bodyParams->getParams(allocParams);
 
-  bool ignoreNewExtensions = isa<ClassDecl>(dc);
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  if (isa<ClassDecl>(dc))
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
   for (auto other : ownerNominal->lookupDirect(importedName.getDeclName(),
-                                               ignoreNewExtensions)) {
+                                               flags)) {
     auto ctor = dyn_cast<ConstructorDecl>(other);
     if (!ctor || ctor->isInvalid() ||
         ctor->getAttrs().isUnavailable(Impl.SwiftContext) ||

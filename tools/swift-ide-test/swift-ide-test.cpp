@@ -1475,7 +1475,8 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 
   llvm::raw_ostream &OS = llvm::outs();
   OS << SourceFilename << ": ";
-  if (isSourceInputComplete(std::move(FileBufOrErr.get())).IsComplete) {
+  if (isSourceInputComplete(std::move(FileBufOrErr.get()),
+                            SourceFileKind::REPL).IsComplete) {
     OS << "IS_COMPLETE\n";
   } else {
     OS << "IS_INCOMPLETE\n";
@@ -1627,6 +1628,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       case NodeKind::Class:
       case NodeKind::Enum:
       case NodeKind::OtherNominalType:
+      case NodeKind::TypeAlias:
         break;
 
       case NodeKind::BoundGenericStructure:

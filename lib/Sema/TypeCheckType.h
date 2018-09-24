@@ -141,8 +141,9 @@ class TypeResolutionOptions {
   Context context = Context::None;
   // TypeResolutionFlags
   uint16_t flags = 0;
-  static_assert(sizeof(flags) == sizeof(TypeResolutionFlags),
-      "Flags size error");
+  static_assert(sizeof(TypeResolutionOptions::flags) ==
+                    sizeof(TypeResolutionFlags),
+                "Flags size error");
 
 public:
   ~TypeResolutionOptions() = default;
@@ -211,6 +212,7 @@ public:
     case Context::AbstractFunctionDecl:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   /// Determine whether all of the given options are set.

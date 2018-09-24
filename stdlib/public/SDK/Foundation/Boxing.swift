@@ -19,7 +19,7 @@ internal final class _MutableHandle<MutableType : NSObject>
   where MutableType : NSCopying {
     fileprivate var _pointer : MutableType
     
-    init(reference : MutableType) {
+    init(reference : __shared MutableType) {
         _pointer = reference.copy() as! MutableType
     }
     

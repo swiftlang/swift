@@ -85,6 +85,15 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
 
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
   for (auto decl : decls) {
+    // Don't look at the overrides of operators in protocols. The global
+    // lookup of operators means that we can find overriding operators that
+    // aren't relevant to the types in hand, and will fail to type check.
+    if (isa<ProtocolDecl>(decl->getDeclContext())) {
+      if (auto func = dyn_cast<FuncDecl>(decl))
+        if (func->isOperator())
+          continue;
+    }
+
     while (auto overrides = decl->getOverriddenDecl()) {
       overridden.insert(overrides);
 
@@ -555,6 +564,9 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
 
   ASTContext &ctx = proto->getASTContext();
   TinyPtrVector<NominalTypeDecl *> result;
+  if (!ext->getGenericParams())
+    return result;
+
   for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
     // We only care about type constraints.
     if (req.getKind() != RequirementReprKind::TypeConstraint)
@@ -584,6 +596,43 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
     auto rhsNominals = resolveTypeDeclsToNominal(evaluator, ctx, rhsDecls,
                                                  modulesFound, anyObject);
     result.insert(result.end(), rhsNominals.begin(), rhsNominals.end());
+  }
+
+  return result;
+}
+
+TinyPtrVector<TypeDecl *>
+TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
+                                          ExtensionDecl *ext) const {
+  ASTContext &ctx = ext->getASTContext();
+
+  TinyPtrVector<TypeDecl *> result;
+  for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
+    auto resolve = [&](TypeLoc loc) {
+      DirectlyReferencedTypeDecls decls;
+      if (auto *typeRepr = loc.getTypeRepr())
+        decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+      else if (Type type = loc.getType())
+        decls = directReferencesForType(type);
+
+      result.insert(result.end(), decls.begin(), decls.end());
+    };
+
+    switch (req.getKind()) {
+    case RequirementReprKind::TypeConstraint:
+      resolve(req.getSubjectLoc());
+      resolve(req.getConstraintLoc());
+      break;
+
+    case RequirementReprKind::SameType:
+      resolve(req.getFirstTypeLoc());
+      resolve(req.getSecondTypeLoc());
+      break;
+
+    case RequirementReprKind::LayoutConstraint:
+      resolve(req.getSubjectLoc());
+      break;
+    }
   }
 
   return result;
@@ -663,6 +712,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   };
 
   if (Loc.isValid() &&
+      DC->getParentSourceFile() &&
       DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
       Ctx.LangOpts.EnableASTScopeLookup) {
     // Find the source file in which we are performing the lookup.
@@ -963,12 +1013,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (!isCascadingUse.hasValue())
             isCascadingUse = ACE->isCascadingContextForLookup(false);
         } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-          auto ExtendedNominal = ED->getExtendedNominal();
-          if (!ExtendedNominal) {
-            DC = ED->getParent();
-            continue;
-          }
-
           if (shouldLookupMembers(ED, Loc))
             populateLookupDeclsFromContext(ED);
 
@@ -1295,8 +1339,11 @@ void MemberLookupTable::addMember(Decl *member) {
   if (!vd)
     return;
 
-  // Unnamed entities cannot be found by name lookup.
-  if (!vd->hasName())
+  // @_implements members get added under their declared name.
+  auto A = vd->getAttrs().getAttribute<ImplementsAttr>();
+
+  // Unnamed entities w/o @_implements synonyms cannot be found by name lookup.
+  if (!A && !vd->hasName())
     return;
 
   // If this declaration is already in the lookup table, don't add it
@@ -1309,6 +1356,10 @@ void MemberLookupTable::addMember(Decl *member) {
   // Add this declaration to the lookup set under its compound name and simple
   // name.
   vd->getFullName().addToLookupTable(Lookup, vd);
+
+  // And if given a synonym, under that name too.
+  if (A)
+    A->getMemberName().addToLookupTable(Lookup, vd);
 }
 
 void MemberLookupTable::addMembers(DeclRange members) {
@@ -1548,11 +1599,32 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
   LookupTable.getPointer()->addMember(member);
 }
 
+
+static TinyPtrVector<ValueDecl *>
+maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
+                             DeclName name,
+                             bool includeAttrImplements) {
+  if (includeAttrImplements)
+    return decls;
+  TinyPtrVector<ValueDecl*> result;
+  for (auto V : decls) {
+    // Filter-out any decl that doesn't have the name we're looking for
+    // (asserting as a consistency-check that such entries all have
+    // @_implements attrs for the name!)
+    if (V->getFullName().matchesRef(name)) {
+      result.push_back(V);
+    } else {
+      auto A = V->getAttrs().getAttribute<ImplementsAttr>();
+      assert(A && A->getMemberName().matchesRef(name));
+    }
+  }
+  return result;
+}
+
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
-                                                  bool ignoreNewExtensions) {
+                                                  OptionSet<LookupDirectFlags> flags) {
   ASTContext &ctx = getASTContext();
-  FrontendStatsTracer tracer(ctx.Stats, "lookup-direct", this);
   if (auto s = ctx.Stats) {
     ++s->getFrontendCounters().NominalTypeLookupDirectCount;
   }
@@ -1561,6 +1633,12 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   // not yet loaded all the members into the IDC list in the first place.
   bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
                                     hasLazyMembers());
+
+  bool ignoreNewExtensions =
+      flags.contains(LookupDirectFlags::IgnoreNewExtensions);
+
+  bool includeAttrImplements =
+      flags.contains(LookupDirectFlags::IncludeAttrImplements);
 
   // FIXME: At present, lazy member loading conflicts with a bunch of other code
   // that appears to special-case initializers (clang-imported initializer
@@ -1620,7 +1698,8 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
 
     // We found something; return it.
     if (known != LookupTable.getPointer()->end())
-      return known->second;
+      return maybeFilterOutAttrImplements(known->second, name,
+                                          includeAttrImplements);
 
     // If we have no more second chances, stop now.
     if (!useNamedLazyMemberLoading || i > 0)
@@ -1675,14 +1754,14 @@ ClassDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return { stored.Methods.begin(), stored.Methods.end() };
 }
 
-void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
+void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
+                                 ObjCSelector selector) {
   if (!ObjCMethodLookup) {
     createObjCMethodLookup();
   }
 
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
-  auto selector = method->getObjCSelector();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
 
   // In a non-empty vector, we could have duplicates or conflicts.
@@ -1961,7 +2040,10 @@ bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
-    for (auto decl : current->lookupDirect(member)) {
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    if (options & NL_IncludeAttributeImplements)
+      flags |= NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements;
+    for (auto decl : current->lookupDirect(member, flags)) {
       // If we're performing a type lookup, don't even attempt to validate
       // the decl if its not a type.
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
@@ -2377,6 +2459,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::ImplicitlyUnwrappedOptional:
     return { 1, ctx.getOptionalDecl() };
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static DirectlyReferencedTypeDecls directReferencesForType(Type type) {

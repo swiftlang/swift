@@ -247,7 +247,7 @@ public:
     return {NewValue, SubElementNumber, InsertionPoints};
   }
 
-  void dump() const __attribute__((used));
+  void dump() const LLVM_ATTRIBUTE_USED;
   void print(llvm::raw_ostream &os) const;
 
 private:
@@ -379,7 +379,7 @@ public:
   SILValue aggregateValues(SILType LoadTy, SILValue Address, unsigned FirstElt);
 
   void print(llvm::raw_ostream &os) const;
-  void dump() const __attribute__((used));
+  void dump() const LLVM_ATTRIBUTE_USED;
 
 private:
   SILValue aggregateFullyAvailableValue(SILType LoadTy, unsigned FirstElt);
@@ -600,7 +600,7 @@ public:
   bool computeAvailableValues(SILInstruction *StartingFrom,
                               unsigned FirstEltOffset,
                               unsigned NumLoadSubElements,
-                              llvm::SmallBitVector &RequiredElts,
+                              SmallBitVector &RequiredElts,
                               SmallVectorImpl<AvailableValue> &Result);
 
   /// Return true if the box has escaped at the specified instruction.  We are
@@ -615,16 +615,16 @@ private:
   SILModule &getModule() const { return TheMemory->getModule(); }
 
   void updateAvailableValues(SILInstruction *Inst,
-                             llvm::SmallBitVector &RequiredElts,
+                             SmallBitVector &RequiredElts,
                              SmallVectorImpl<AvailableValue> &Result,
-                             llvm::SmallBitVector &ConflictingValues);
+                             SmallBitVector &ConflictingValues);
   void computeAvailableValuesFrom(
       SILBasicBlock::iterator StartingFrom, SILBasicBlock *BB,
-      llvm::SmallBitVector &RequiredElts,
+      SmallBitVector &RequiredElts,
       SmallVectorImpl<AvailableValue> &Result,
-      llvm::SmallDenseMap<SILBasicBlock *, llvm::SmallBitVector, 32>
+      llvm::SmallDenseMap<SILBasicBlock *, SmallBitVector, 32>
           &VisitedBlocks,
-      llvm::SmallBitVector &ConflictingValues);
+      SmallBitVector &ConflictingValues);
 };
 
 } // end anonymous namespace
@@ -661,9 +661,9 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
 }
 
 void AvailableValueDataflowContext::updateAvailableValues(
-    SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
+    SILInstruction *Inst, SmallBitVector &RequiredElts,
     SmallVectorImpl<AvailableValue> &Result,
-    llvm::SmallBitVector &ConflictingValues) {
+    SmallBitVector &ConflictingValues) {
   // Handle store.
   if (auto *SI = dyn_cast<StoreInst>(Inst)) {
     unsigned StartSubElt = computeSubelement(SI->getDest(), TheMemory);
@@ -739,23 +739,23 @@ void AvailableValueDataflowContext::updateAvailableValues(
   // Otherwise, this is some unknown instruction, conservatively assume that all
   // values are clobbered.
   RequiredElts.clear();
-  ConflictingValues = llvm::SmallBitVector(Result.size(), true);
+  ConflictingValues = SmallBitVector(Result.size(), true);
   return;
 }
 
 bool AvailableValueDataflowContext::computeAvailableValues(
     SILInstruction *StartingFrom, unsigned FirstEltOffset,
-    unsigned NumLoadSubElements, llvm::SmallBitVector &RequiredElts,
+    unsigned NumLoadSubElements, SmallBitVector &RequiredElts,
     SmallVectorImpl<AvailableValue> &Result) {
-  llvm::SmallDenseMap<SILBasicBlock*, llvm::SmallBitVector, 32> VisitedBlocks;
-  llvm::SmallBitVector ConflictingValues(Result.size());
+  llvm::SmallDenseMap<SILBasicBlock*, SmallBitVector, 32> VisitedBlocks;
+  SmallBitVector ConflictingValues(Result.size());
 
   computeAvailableValuesFrom(StartingFrom->getIterator(),
                              StartingFrom->getParent(), RequiredElts, Result,
                              VisitedBlocks, ConflictingValues);
   // If there are no values available at this load point, then we fail to
   // promote this load and there is nothing to do.
-  llvm::SmallBitVector AvailableValueIsPresent(NumMemorySubElements);
+  SmallBitVector AvailableValueIsPresent(NumMemorySubElements);
 
   for (unsigned i :
        range(FirstEltOffset, FirstEltOffset + NumLoadSubElements)) {
@@ -792,10 +792,10 @@ bool AvailableValueDataflowContext::computeAvailableValues(
 
 void AvailableValueDataflowContext::computeAvailableValuesFrom(
     SILBasicBlock::iterator StartingFrom, SILBasicBlock *BB,
-    llvm::SmallBitVector &RequiredElts, SmallVectorImpl<AvailableValue> &Result,
-    llvm::SmallDenseMap<SILBasicBlock *, llvm::SmallBitVector, 32>
+    SmallBitVector &RequiredElts, SmallVectorImpl<AvailableValue> &Result,
+    llvm::SmallDenseMap<SILBasicBlock *, SmallBitVector, 32>
         &VisitedBlocks,
-    llvm::SmallBitVector &ConflictingValues) {
+    SmallBitVector &ConflictingValues) {
   assert(!RequiredElts.none() && "Scanning with a goal of finding nothing?");
   
   // If there is a potential modification in the current block, scan the block
@@ -853,7 +853,7 @@ void AvailableValueDataflowContext::computeAvailableValuesFrom(
     }
     
     // Make sure to pass in the same set of required elements for each pred.
-    llvm::SmallBitVector Elts = RequiredElts;
+    SmallBitVector Elts = RequiredElts;
     computeAvailableValuesFrom(PredBB->end(), PredBB, Elts, Result,
                                VisitedBlocks, ConflictingValues);
     
@@ -1103,7 +1103,7 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
   
   // Set up the bitvector of elements being demanded by the load.
-  llvm::SmallBitVector RequiredElts(NumMemorySubElements);
+  SmallBitVector RequiredElts(NumMemorySubElements);
   RequiredElts.set(FirstElt, FirstElt+NumLoadSubElements);
 
   SmallVector<AvailableValue, 8> AvailableValues;
@@ -1172,7 +1172,7 @@ bool AllocOptimize::canPromoteDestroyAddr(
   unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
   
   // Set up the bitvector of elements being demanded by the load.
-  llvm::SmallBitVector RequiredElts(NumMemorySubElements);
+  SmallBitVector RequiredElts(NumMemorySubElements);
   RequiredElts.set(FirstElt, FirstElt+NumLoadSubElements);
 
   // Find out if we have any available values.  If no bits are demanded, we

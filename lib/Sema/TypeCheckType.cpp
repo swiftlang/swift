@@ -105,6 +105,7 @@ GenericSignature *TypeResolution::getGenericSignature() const {
   case TypeResolutionStage::Structural:
     return nullptr;
   }
+  llvm_unreachable("unhandled stage");
 }
 
 bool TypeResolution::usesArchetypes() const {
@@ -116,6 +117,7 @@ bool TypeResolution::usesArchetypes() const {
   case TypeResolutionStage::Contextual:
     return true;
   }
+  llvm_unreachable("unhandled stage");
 }
 
 Type TypeResolution::mapTypeIntoContext(Type type) const {
@@ -127,6 +129,7 @@ Type TypeResolution::mapTypeIntoContext(Type type) const {
   case TypeResolutionStage::Contextual:
     return GenericEnvironment::mapTypeIntoContext(genericEnv, type);
   }
+  llvm_unreachable("unhandled stage");
 }
 
 Type TypeResolution::resolveDependentMemberType(
@@ -1694,6 +1697,7 @@ namespace {
 
 Type TypeResolution::resolveType(TypeRepr *TyR,
                               TypeResolutionOptions options) {
+  FrontendStatsTracer StatsTracer(getASTContext().Stats, "resolve-type", TyR);
   PrettyStackTraceTypeRepr stackTrace(getASTContext(), "resolving", TyR);
 
   TypeResolver typeResolver(*this);
@@ -3170,16 +3174,6 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   }
 
   return resultType;
-}
-
-Type TypeChecker::getSuperClassOf(Type type) {
-  if (auto *parenTy = dyn_cast<ParenType>(type.getPointer())) {
-    auto superclassTy = getSuperClassOf(parenTy->getUnderlyingType());
-    if (!superclassTy)
-      return Type();
-    return ParenType::get(Context, superclassTy);
-  }
-  return type->getSuperclass();
 }
 
 namespace {

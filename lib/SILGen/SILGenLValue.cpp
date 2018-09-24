@@ -1595,7 +1595,7 @@ namespace {
                                               Storage, IsSuper,
                                               std::move(peekedIndices),
                                               IndexExprForDiagnostics));
-      pushWriteback(SGF, loc, std::move(component), ManagedValue(),
+      pushWriteback(SGF, loc, std::move(component), /*for diagnostics*/ base,
                     MaterializedLValue());
 
       auto decl = cast<AccessorDecl>(Accessor.getFuncDecl());
@@ -1671,7 +1671,7 @@ namespace {
     ManagedValue mutableOffset(
                    SILGenFunction &SGF, SILLocation loc, ManagedValue base) && {
       auto &C = SGF.getASTContext();
-      auto keyPathTy = KeyPath.getSubstType()->castTo<BoundGenericType>();
+      auto keyPathTy = KeyPath.getSubstRValueType()->castTo<BoundGenericType>();
 
       FuncDecl *projectionFunction;
       if (keyPathTy->getDecl() == C.getWritableKeyPathDecl()) {
@@ -3449,6 +3449,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
 #include "swift/AST/ReferenceStorage.def"
 #undef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER
   }
+  llvm_unreachable("unhandled ownership");
 }
 
 /// Given that the type-of-rvalue differs from the type-of-storage,

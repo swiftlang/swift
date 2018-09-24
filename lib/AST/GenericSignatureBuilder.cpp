@@ -1066,6 +1066,7 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
       rootType = parentType;
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }).isNull();
 
   // If we didn't already find a redundancy, check our end state.
@@ -1327,6 +1328,7 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
     return parent->withoutRedundantSubpath(builder, start, end)
       ->viaSuperclass(builder, getProtocolConformance());
   }
+  llvm_unreachable("unhandled kind");
 }
 
 const RequirementSource *RequirementSource::getRoot() const {
@@ -1401,6 +1403,7 @@ RequirementSource::visitPotentialArchetypesAlongPath(
     return replaceSelfWithType(parentType, getStoredType());
   }
   }
+  llvm_unreachable("unhandled kind");
 }
 
 Type RequirementSource::getStoredType() const {
@@ -1752,6 +1755,7 @@ bool FloatingRequirementSource::isExplicit() const {
       return false;
     }
   }
+  llvm_unreachable("unhandled kind");
 }
 
 
@@ -1771,6 +1775,7 @@ FloatingRequirementSource FloatingRequirementSource::asInferred(
                                   protocolReq.protocol, typeRepr,
                                   /*inferred=*/true);
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool FloatingRequirementSource::isRecursive(
@@ -2119,8 +2124,9 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     ProtocolDecl *proto = conforms.first;
 
     // Look for an associated type and/or concrete type with this name.
-    for (auto member : proto->lookupDirect(name,
-                                           /*ignoreNewExtensions=*/true)) {
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    for (auto member : proto->lookupDirect(name, flags)) {
       // If this is an associated type, record whether it is the best
       // associated type we've seen thus far.
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
@@ -2586,6 +2592,7 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
   case UnresolvedHandlingKind::GenerateUnresolved:
     return ConstraintResult::Unresolved;
   }
+  llvm_unreachable("unhandled handling");
 }
 
 bool GenericSignatureBuilder::addConditionalRequirements(
@@ -4381,9 +4388,12 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
       bool shouldWarnAboutRedeclaration =
         source->kind == RequirementSource::RequirementSignatureSelf &&
+        !assocTypeDecl->getAttrs().hasAttribute<NonOverrideAttr>() &&
+        !assocTypeDecl->getAttrs().hasAttribute<OverrideAttr>() &&
         assocTypeDecl->getDefaultDefinitionLoc().isNull() &&
         (!assocTypeDecl->getInherited().empty() ||
-         assocTypeDecl->getTrailingWhereClause());
+         assocTypeDecl->getTrailingWhereClause() ||
+         getASTContext().LangOpts.WarnImplicitOverrides);
       for (auto inheritedType : knownInherited->second) {
         // If we have inherited associated type...
         if (auto inheritedAssocTypeDecl =

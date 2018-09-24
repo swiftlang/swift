@@ -590,21 +590,6 @@ public:
         getSILDebugLocation(Loc), text.toStringRef(Out), encoding, getModule()));
   }
 
-  ConstStringLiteralInst *
-  createConstStringLiteral(SILLocation Loc, StringRef text,
-                           ConstStringLiteralInst::Encoding encoding) {
-    return insert(ConstStringLiteralInst::create(getSILDebugLocation(Loc), text,
-                                                 encoding, getModule()));
-  }
-
-  ConstStringLiteralInst *
-  createConstStringLiteral(SILLocation Loc, const Twine &text,
-                           ConstStringLiteralInst::Encoding encoding) {
-    SmallVector<char, 256> Out;
-    return insert(ConstStringLiteralInst::create(
-        getSILDebugLocation(Loc), text.toStringRef(Out), encoding, getModule()));
-  }
-
   /// If \p LV is non-trivial, return a \p Qualifier load of \p LV. If \p LV is
   /// trivial, use trivial instead.
   ///
@@ -716,16 +701,15 @@ public:
     return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
-  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue BorrowedValue,
-                                 SILValue OriginalValue) {
-    return insert(new (getModule()) EndBorrowInst(
-        getSILDebugLocation(Loc), BorrowedValue, OriginalValue));
+  EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue) {
+    return insert(new (getModule())
+                      EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
   }
 
-  EndBorrowArgumentInst *createEndBorrowArgument(SILLocation Loc,
-                                                 SILValue Arg) {
-    return insert(new (getModule()) EndBorrowArgumentInst(
-        getSILDebugLocation(Loc), cast<SILArgument>(Arg)));
+  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue BorrowedValue,
+                                 SILValue OriginalValue) {
+    return insert(new (getModule())
+                      EndBorrowInst(getSILDebugLocation(Loc), BorrowedValue));
   }
 
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,

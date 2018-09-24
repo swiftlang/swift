@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -720,9 +720,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     return;
 
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
-  bool isCascading = true;
-  if (current->hasAccess())
-    isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
+  bool isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitions;
@@ -1498,7 +1496,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // No behavior, no problems.
   if (!decl->hasBehavior())
     return;
-  
+
   // Don't try to check the behavior if we already encountered an error.
   if (decl->getType()->hasError())
     return;
@@ -2063,6 +2061,33 @@ PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
   return group;
 }
 
+static void checkDesignatedProtocol(OperatorDecl *OD, Identifier name,
+                                    SourceLoc loc, TypeChecker &tc,
+                                    ASTContext &ctx) {
+  auto *dc = OD->getDeclContext();
+  auto *TyR = new (ctx) SimpleIdentTypeRepr(loc, name);
+  TypeLoc typeLoc = TypeLoc(TyR);
+
+  TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
+  if (tc.validateType(typeLoc, TypeResolution::forContextual(dc), options)) {
+    typeLoc.setInvalidType(ctx);
+  }
+
+  if (!typeLoc.isError()) {
+    auto *decl = typeLoc.getType()->getNominalOrBoundGenericNominal();
+    if (!decl || !isa<ProtocolDecl>(decl)) {
+      tc.diagnose(typeLoc.getLoc(),
+                  diag::operators_designated_protocol_not_a_protocol,
+                  typeLoc.getType());
+      OD->setInvalid();
+    } else {
+      OD->setDesignatedProtocol(cast<ProtocolDecl>(decl));
+      // FIXME: verify this operator has a declaration within this
+      //        protocol with the same arity and fixity
+    }
+  }
+}
+
 /// Validate the given operator declaration.
 ///
 /// This establishes key invariants, such as an InfixOperatorDecl's
@@ -2072,38 +2097,65 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
   checkDeclAttributesEarly(OD);
   checkDeclAttributes(OD);
 
-  if (auto IOD = dyn_cast<InfixOperatorDecl>(OD)) {
-    if (!IOD->getPrecedenceGroup()) {
-      PrecedenceGroupDecl *group = nullptr;
+  auto IOD = dyn_cast<InfixOperatorDecl>(OD);
 
-      // If a name was given, try to look it up.
-      Identifier name = IOD->getPrecedenceGroupName();
-      if (!name.empty()) {
-        auto loc = IOD->getPrecedenceGroupNameLoc();
-        group = lookupPrecedenceGroupPrimitive(OD->getDeclContext(), name, loc);
-        if (!group && !IOD->isInvalid()) {
-          diagnose(loc, diag::unknown_precedence_group, name);
-          IOD->setInvalid();
-        }
+  auto enableOperatorDesignatedProtocols =
+      getLangOpts().EnableOperatorDesignatedProtocols;
+
+  // Pre- or post-fix operator?
+  if (!IOD) {
+    auto *protocol = OD->getDesignatedProtocol();
+    auto protocolId = OD->getDesignatedProtocolName();
+    if (!protocol && !protocolId.empty() &&
+        enableOperatorDesignatedProtocols) {
+      auto protocolIdLoc = OD->getDesignatedProtocolNameLoc();
+      checkDesignatedProtocol(OD, protocolId, protocolIdLoc, *this, Context);
+    }
+    return;
+  }
+
+  if (!IOD->getPrecedenceGroup()) {
+    PrecedenceGroupDecl *group = nullptr;
+
+    auto firstId = IOD->getFirstIdentifier();
+    auto firstIdLoc = IOD->getFirstIdentifierLoc();
+
+    // If a name was given, try to look it up.
+    if (!firstId.empty()) {
+      group = lookupPrecedenceGroupPrimitive(IOD->getDeclContext(), firstId,
+                                             firstIdLoc);
+    }
+
+    auto secondId = IOD->getSecondIdentifier();
+    auto *protocol = IOD->getDesignatedProtocol();
+    if (!protocol && enableOperatorDesignatedProtocols) {
+      auto secondIdLoc = IOD->getSecondIdentifierLoc();
+      assert(secondId.empty() || !firstId.empty());
+
+      auto protocolId = group ? secondId : firstId;
+      auto protocolIdLoc = group ? secondIdLoc : firstIdLoc;
+      if (!protocolId.empty())
+        checkDesignatedProtocol(IOD, protocolId, protocolIdLoc, *this, Context);
+    }
+
+    if (!group && !IOD->isInvalid()) {
+      if (!firstId.empty() &&
+          (!secondId.empty() || !IOD->getDesignatedProtocol())) {
+        diagnose(firstIdLoc, diag::unknown_precedence_group, firstId);
+        IOD->setInvalid();
       }
 
-      // If that fails, or if a name was not given, use the default
-      // precedence group.
-      if (!group) {
-        group = lookupPrecedenceGroupPrimitive(OD->getDeclContext(),
-                                               Context.Id_DefaultPrecedence,
-                                               SourceLoc());
-        if (!group && name.empty() && !IOD->isInvalid()) {
-          diagnose(OD->getLoc(), diag::missing_builtin_precedence_group,
-                   Context.Id_DefaultPrecedence);
-        }
+      group = lookupPrecedenceGroupPrimitive(
+          IOD->getDeclContext(), Context.Id_DefaultPrecedence, SourceLoc());
+      if (!group && firstId.empty() && !IOD->isInvalid()) {
+        diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
+                 Context.Id_DefaultPrecedence);
       }
+    }
 
-      // Validate the precedence group.
-      if (group) {
-        validateDecl(group);
-        IOD->setPrecedenceGroup(group);
-      }
+    if (group) {
+      validateDecl(group);
+      IOD->setPrecedenceGroup(group);
     }
   }
 }
@@ -2210,9 +2262,6 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
   storage->setIsGetterMutating(computeIsGetterMutating(TC, storage));
   storage->setIsSetterMutating(computeIsSetterMutating(TC, storage));
 
-  // Add any mandatory accessors now.
-  maybeAddAccessorsToStorage(TC, storage);
-
   // Everything else about the accessors can wait until finalization.
   // This will validate all the accessors.
   TC.DeclsToFinalize.insert(storage);
@@ -2222,9 +2271,15 @@ static void finalizeAbstractStorageDecl(TypeChecker &TC,
                                         AbstractStorageDecl *storage) {
   TC.validateDecl(storage);
 
+  // Add any mandatory accessors now.
+  maybeAddAccessorsToStorage(TC, storage);
+
   for (auto accessor : storage->getAllAccessors()) {
     // Are there accessors we can safely ignore here, like maybe observers?
     TC.validateDecl(accessor);
+
+    // Finalize the accessors as well.
+    TC.DeclsToFinalize.insert(accessor);
   }
 }
 
@@ -2250,6 +2305,7 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
         case RequirementKind::SameType:
           return false;
         }
+        llvm_unreachable("unhandled kind");
       });
 }
 
@@ -2320,6 +2376,9 @@ public:
 
   void visitBoundVariable(VarDecl *VD) {
     TC.validateDecl(VD);
+
+    // Set up accessors.
+    maybeAddAccessorsToStorage(TC, VD);
 
     // Check the behavior.
     checkVarBehavior(VD, TC);
@@ -2563,8 +2622,7 @@ public:
 
     TC.checkDeclAttributes(PBD);
 
-    AccessControlChecker::checkAccessControl(TC, PBD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, PBD);
+    checkAccessControl(TC, PBD);
 
     // If the initializers in the PBD aren't checked yet, do so now.
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
@@ -2584,8 +2642,7 @@ public:
 
     TC.checkDeclAttributes(SD);
 
-    AccessControlChecker::checkAccessControl(TC, SD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, SD);
+    checkAccessControl(TC, SD);
 
     if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
@@ -2608,8 +2665,7 @@ public:
     TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
 
-    AccessControlChecker::checkAccessControl(TC, TAD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, TAD);
+    checkAccessControl(TC, TAD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
@@ -2630,8 +2686,7 @@ public:
                   proto->getName());
     }
 
-    AccessControlChecker::checkAccessControl(TC, AT);
-    UsableFromInlineChecker::checkUsableFromInline(TC, AT);
+    checkAccessControl(TC, AT);
 
     // Trigger the checking for overridden declarations.
     (void)AT->getOverriddenDecls();
@@ -2704,8 +2759,7 @@ public:
 
     checkInheritanceClause(ED);
 
-    AccessControlChecker::checkAccessControl(TC, ED);
-    UsableFromInlineChecker::checkUsableFromInline(TC, ED);
+    checkAccessControl(TC, ED);
 
     if (ED->hasRawType() && !ED->isObjC()) {
       // ObjC enums have already had their raw values checked, but pure Swift
@@ -2736,8 +2790,7 @@ public:
 
     checkInheritanceClause(SD);
 
-    AccessControlChecker::checkAccessControl(TC, SD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, SD);
+    checkAccessControl(TC, SD);
 
     SD->getAllConformances();
 
@@ -2969,8 +3022,7 @@ public:
 
     checkInheritanceClause(CD);
 
-    AccessControlChecker::checkAccessControl(TC, CD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, CD);
+    checkAccessControl(TC, CD);
 
     TC.checkDeclCircularity(CD);
     TC.ConformanceContexts.push_back(CD);
@@ -3008,8 +3060,7 @@ public:
 
     TC.checkDeclAttributes(PD);
 
-    AccessControlChecker::checkAccessControl(TC, PD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, PD);
+    checkAccessControl(TC, PD);
 
     checkInheritanceClause(PD);
     checkProtocolSelfRequirements(PD, PD);
@@ -3099,8 +3150,7 @@ public:
       TC.checkProtocolSelfRequirements(FD);
     }
 
-    AccessControlChecker::checkAccessControl(TC, FD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, FD);
+    checkAccessControl(TC, FD);
 
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
@@ -3135,8 +3185,7 @@ public:
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
 
-    AccessControlChecker::checkAccessControl(TC, EED);
-    UsableFromInlineChecker::checkUsableFromInline(TC, EED);
+    checkAccessControl(TC, EED);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -3185,33 +3234,8 @@ public:
     if (!ED->isInvalid())
       TC.checkDeclAttributes(ED);
 
-    if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>()) {
-      const auto access = AA->getAccess();
-      AccessScope desiredAccessScope = AccessScope::getPublic();
-      switch (access) {
-      case AccessLevel::Private:
-        assert((ED->isInvalid() ||
-                ED->getDeclContext()->isModuleScopeContext()) &&
-               "non-top-level extensions make 'private' != 'fileprivate'");
-        LLVM_FALLTHROUGH;
-      case AccessLevel::FilePrivate: {
-        const DeclContext *DC = ED->getModuleScopeContext();
-        bool isPrivate = access == AccessLevel::Private;
-        desiredAccessScope = AccessScope(DC, isPrivate);
-        break;
-      }
-      case AccessLevel::Internal:
-        desiredAccessScope = AccessScope(ED->getModuleContext());
-        break;
-      case AccessLevel::Public:
-      case AccessLevel::Open:
-        break;
-      }
-
-      AccessControlChecker ACC(TC);
-      ACC.checkGenericParamAccess(ED->getGenericParams(), ED,
-                                  desiredAccessScope, access);
-    }
+    if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>())
+      checkExtensionGenericParamAccess(TC, ED, AA->getAccess());
 
     // Trigger the creation of all of the conformances associated with this
     // nominal type.
@@ -3265,7 +3289,8 @@ public:
           attr->setInvalid();
         } else if (attr->isImplicit()) {
           // Don't diagnose implicit attributes.
-        } else if (!overrideRequiresKeyword(CD->getOverriddenDecl())) {
+        } else if (overrideRequiresKeyword(CD->getOverriddenDecl())
+                     == OverrideRequiresKeyword::Never) {
           // Special case: we are overriding a 'required' initializer, so we
           // need (only) the 'required' keyword.
           if (cast<ConstructorDecl>(CD->getOverriddenDecl())->isRequired()) {
@@ -3347,8 +3372,7 @@ public:
 
     TC.checkDeclAttributes(CD);
 
-    AccessControlChecker::checkAccessControl(TC, CD);
-    UsableFromInlineChecker::checkUsableFromInline(TC, CD);
+    checkAccessControl(TC, CD);
 
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
@@ -3746,11 +3770,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   PrettyStackTraceDecl StackTrace("validating", D);
+  FrontendStatsTracer StatsTracer(Context.Stats, "validate-decl", D);
 
   if (hasEnabledForbiddenTypecheckPrefix())
     checkForForbiddenPrefix(D);
-
-  (void) D->getFormalAccess();
 
   // Validate the context.
   auto dc = D->getDeclContext();
@@ -3805,7 +3828,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (!defaultDefinition.isNull()) {
       if (validateType(
             defaultDefinition,
-            TypeResolution::forContextual(
+            TypeResolution::forInterface(
               assocType->getDeclContext()),
             None)) {
         defaultDefinition.setInvalidType(Context);
@@ -3813,7 +3836,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         // associatedtype X = X is invalid
         auto mentionsItself =
             defaultDefinition.getType().findIf([&](Type type) {
-              if (auto DMT = type->getAs<ArchetypeType>()) {
+              if (auto DMT = type->getAs<DependentMemberType>()) {
                 return DMT->getAssocType() == assocType;
               }
               return false;
@@ -4305,9 +4328,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     checkDeclAttributesEarly(DD);
 
-    if (auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext()))
-      DD->copyFormalAccessFrom(enclosingClass, /*sourceIsParentContext*/true);
-
     validateGenericFuncSignature(DD);
 
     DD->setSignatureIsValidated();
@@ -4557,6 +4577,7 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
     // because if they never get validated at all then conformance checkers
     // will complain about selector mismatches.
     if (storage->isObjC()) {
+      maybeAddAccessorsToStorage(*this, storage);
       for (auto accessor : storage->getAllAccessors()) {
         requestMemberLayout(accessor);
       }
@@ -4657,6 +4678,9 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
     finalizeAbstractStorageDecl(*this, storage);
   }
 
+  // Compute access level.
+  (void)decl->getFormalAccess();
+
   // Compute overrides.
   (void)decl->getOverriddenDecls();
 
@@ -4665,7 +4689,25 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
   (void)decl->isDynamic();
 }
 
-bool swift::isPassThroughTypealias(TypeAliasDecl *typealias) {
+/// Determine whether this is a "pass-through" typealias, which has the
+/// same type parameters as the nominal type it references and specializes
+/// the underlying nominal type with exactly those type parameters.
+/// For example, the following typealias \c GX is a pass-through typealias:
+///
+/// \code
+/// struct X<T, U> { }
+/// typealias GX<A, B> = X<A, B>
+/// \endcode
+///
+/// whereas \c GX2 and \c GX3 are not pass-through because \c GX2 has
+/// different type parameters and \c GX3 doesn't pass its type parameters
+/// directly through.
+///
+/// \code
+/// typealias GX2<A> = X<A, A>
+/// typealias GX3<A, B> = X<B, A>
+/// \endcode
+static bool isPassThroughTypealias(TypeAliasDecl *typealias) {
   // Pass-through only makes sense when the typealias refers to a nominal
   // type.
   Type underlyingType = typealias->getUnderlyingTypeLoc().getType();
@@ -4842,9 +4884,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                          ext, inferExtendedTypeReqs,
                                          mustInferRequirements);
 
-  Type extContextType =
-    env->mapTypeIntoContext(extInterfaceType);
-  return { env, extContextType };
+  return { env, extInterfaceType };
 }
 
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
@@ -4853,31 +4893,78 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (ext->hasValidationStarted())
     return;
 
-  bindExtension(ext);
-
   DeclValidationRAII IBV(ext);
 
-  // If the extension is already known to be invalid, we're done.
-  if (ext->isInvalid())
-    return;
+  auto dc = ext->getDeclContext();
 
-  // FIXME: We need to check whether anything is specialized, because
-  // the innermost extended type might itself be a non-generic type
-  // within a generic type.
+  // If we didn't parse a type, fill in an error type and bail out.
+  if (!ext->getExtendedTypeLoc().getTypeRepr()) {
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Validate the extended type.
+  TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
+  options |= TypeResolutionFlags::AllowUnboundGenerics;
+  if (validateType(ext->getExtendedTypeLoc(),
+                   TypeResolution::forInterface(dc), options)) {
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Dig out the extended type.
   auto extendedType = ext->getExtendedType();
 
-  if (extendedType.isNull() || extendedType->hasError())
+  // Hack to allow extending a generic typealias.
+  if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
+      auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
+      if (extendedNominal) {
+        extendedType = extendedNominal->getDeclaredType();
+        if (!isPassThroughTypealias(aliasDecl))
+          ext->getExtendedTypeLoc().setType(extendedType);
+      }
+    }
+  }
+
+  // Cannot extend a metatype.
+  if (extendedType->is<AnyMetatypeType>()) {
+    diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
+      .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Cannot extend a bound generic type.
+  if (extendedType->isSpecialized()) {
+    diagnose(ext->getLoc(), diag::extension_specialization,
+             extendedType->getAnyNominal()->getName())
+      .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  auto *nominal = extendedType->getAnyNominal();
+
+  // Cannot extend function types, tuple types, etc.
+  if (nominal == nullptr) {
+    diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
+      .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    ext->setInvalid();
+    ext->getExtendedTypeLoc().setInvalidType(Context);
+    return;
+  }
+
+  // Extensions nested inside other declarations are invalid and we
+  // do not bind them.
+  if (!isa<SourceFile>(dc))
     return;
 
   // Validate the nominal type declaration being extended.
-  NominalTypeDecl *nominal = extendedType->getAnyNominal();
-  if (!nominal) {
-    auto unbound = cast<UnboundGenericType>(extendedType.getPointer());
-    auto typealias = cast<TypeAliasDecl>(unbound->getDecl());
-    validateDecl(typealias);
-
-    nominal = typealias->getUnderlyingTypeLoc().getType()->getAnyNominal();
-  }
   validateDecl(nominal);
 
   if (nominal->getGenericParamsOfContext()) {
@@ -5185,7 +5272,6 @@ static void diagnoseMissingRequiredInitializer(
   std::string initializerText;
   {
     PrintOptions options;
-    options.PrintDefaultParameterPlaceholder = false;
     options.PrintImplicitAttrs = false;
 
     // Render the text.
@@ -5485,6 +5571,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       // We have a designated initializer. Create an override of it.
+      // FIXME: Validation makes sure we get a generic signature here.
+      validateDecl(classDecl);
       if (auto ctor = createDesignatedInitOverride(
                         *this, classDecl, superclassCtor, kind)) {
         Context.addSynthesizedDecl(ctor);
@@ -5589,6 +5677,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
 }
 
 void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
+  FrontendStatsTracer StatsTracer(Context.Stats, "define-default-ctor", decl);
   PrettyStackTraceDecl stackTrace("defining default constructor for",
                                   decl);
 

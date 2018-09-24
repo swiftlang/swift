@@ -37,6 +37,7 @@
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -52,8 +53,6 @@ namespace constraints {
 class ConstraintGraph;
 class ConstraintGraphNode;
 class ConstraintSystem;
-class Disjunction;
-class TypeVarBindingGenerator;
 
 } // end namespace constraints
 
@@ -925,7 +924,13 @@ public:
   friend class DisjunctionChoice;
   friend class Component;
   friend class FailureDiagnostic;
-  friend class TypeVarBindingGenerator;
+  friend class TypeVarBindingProducer;
+  friend class TypeVariableBinding;
+  friend class StepScope;
+  friend class SolverStep;
+  friend class SplitterStep;
+  friend class ComponentStep;
+  friend class TypeVariableStep;
 
   class SolverScope;
 
@@ -1139,13 +1144,16 @@ private:
 
   /// \brief Describes the current solver state.
   struct SolverState {
-    SolverState(Expr *const expr, ConstraintSystem &cs);
+    SolverState(Expr *const expr, ConstraintSystem &cs,
+                FreeTypeVariableBinding allowFreeTypeVariables);
     ~SolverState();
 
     llvm::DenseMap<Expr *, unsigned> ExprWeights;
 
     /// The constraint system.
     ConstraintSystem &CS;
+
+    FreeTypeVariableBinding AllowFreeTypeVariables;
 
     /// Old value of DebugConstraintSolver.
     /// FIXME: Move the "debug constraint solver" bit into the constraint 
@@ -1286,6 +1294,12 @@ private:
       }
 
       generatedConstraints.erase(genStart, genEnd);
+    }
+
+    /// Check whether constraint system is allowed to form solutions
+    /// even with unbound type variables present.
+    bool allowsFreeTypeVariables() const {
+      return AllowFreeTypeVariables != FreeTypeVariableBinding::Disallow;
     }
 
   private:
@@ -1507,7 +1521,7 @@ private:
   /// it.
   ///
   /// \returns the solution.
-  Solution finalize(FreeTypeVariableBinding allowFreeTypeVariables);
+  Solution finalize();
 
   /// \brief Apply the given solution to the current constraint system.
   ///
@@ -2014,12 +2028,9 @@ public:
   ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
-  ///
-  /// param retainParens Whether to retain parentheses.
-  Type getFixedTypeRecursive(Type type, bool wantRValue,
-                             bool retainParens = false) {
+  Type getFixedTypeRecursive(Type type, bool wantRValue) {
     TypeMatchOptions flags = None;
-    return getFixedTypeRecursive(type, flags, wantRValue, retainParens);
+    return getFixedTypeRecursive(type, flags, wantRValue);
   }
 
   /// Retrieve the fixed type corresponding to a given type variable,
@@ -2034,11 +2045,8 @@ public:
   ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
-  ///
-  /// param retainParens Whether to retain parentheses.
   Type getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
-                             bool wantRValue,
-                             bool retainParens = false);
+                             bool wantRValue);
 
   /// Determine whether the given type variable occurs within the given type.
   ///
@@ -2947,12 +2955,6 @@ private:
       bool &addOptionalSupertypeBindings);
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
 
-  bool
-  tryTypeVariableBindings(TypeVariableType *typeVar,
-                          ArrayRef<ConstraintSystem::PotentialBinding> bindings,
-                          SmallVectorImpl<Solution> &solutions,
-                          FreeTypeVariableBinding allowFreeTypeVariables);
-
 private:
   /// \brief Add a constraint to the constraint system.
   SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,
@@ -2962,36 +2964,13 @@ private:
   /// \brief Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
-  /// \brief Attempt find a solution involving the options in a
-  ///        disjunction.
-  ///
-  /// \returns true if we failed to find any solutions, false otherwise.
-  bool solveForDisjunction(Constraint *disjunction,
-                           SmallVectorImpl<Solution> &solutions,
-                           FreeTypeVariableBinding allowFreeTypeVariables);
-
-  /// \brief Attempt to solve for some subset of the constraints in a
-  ///        disjunction, skipping constraints that we decide do not
-  ///        need to be solved for because they would not result in
-  ///        the best solution to the constraint system.
-  ///
-  /// \returns true if we failed to find any solutions, false otherwise.
-  bool
-  solveForDisjunctionChoices(Disjunction &disjunction,
-                             SmallVectorImpl<Solution> &solutions,
-                             FreeTypeVariableBinding allowFreeTypeVariables);
-
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
   ///
   /// \param solutions The set of solutions to this system of constraints.
   ///
-  /// \param allowFreeTypeVariables How to bind free type variables in
-  /// the solution.
-  ///
   /// \returns true if an error occurred, false otherwise.
-  bool solveSimplified(SmallVectorImpl<Solution> &solutions,
-                       FreeTypeVariableBinding allowFreeTypeVariables);
+  bool solveSimplified(SmallVectorImpl<Solution> &solutions);
 
   /// \brief Find reduced domains of disjunction constraints for given
   /// expression, this is achieved to solving individual sub-expressions
@@ -3073,17 +3052,6 @@ public:
 
   /// \brief Solve the system of constraints.
   ///
-  /// \param solutions The set of solutions to this system of constraints.
-  ///
-  /// \param allowFreeTypeVariables How to bind free type variables in
-  /// the solution.
-  ///
-  /// \returns true if there are no solutions
-  bool solveRec(SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables);
-
-  /// \brief Solve the system of constraints.
-  ///
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
@@ -3093,6 +3061,14 @@ public:
                                     = FreeTypeVariableBinding::Disallow);
 
 private:
+  /// \brief Solve the system of constraints.
+  ///
+  /// This method responsible for running search/solver algorithm.
+  /// It doesn't filter solutions, that's the job of top-level `solve` methods.
+  ///
+  /// \param solutions The set of solutions to this system of constraints.
+  void solve(SmallVectorImpl<Solution> &solutions);
+
   /// \brief Compare two solutions to the same set of constraints.
   ///
   /// \param cs The constraint system.
@@ -3312,7 +3288,7 @@ public:
 /// \returns true if the call arguments could not be matched to the parameters.
 bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                         ArrayRef<AnyFunctionType::Param> params,
-                        const llvm::SmallBitVector &defaultMap,
+                        const SmallBitVector &defaultMap,
                         bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
@@ -3370,22 +3346,17 @@ void simplifyLocator(Expr *&anchor,
 Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 
 class DisjunctionChoice {
-  ConstraintSystem *CS;
   unsigned Index;
   Constraint *Choice;
   bool ExplicitConversion;
 
 public:
-  DisjunctionChoice(ConstraintSystem *const cs, unsigned index,
-                    Constraint *choice, bool explicitConversion)
-      : CS(cs), Index(index), Choice(choice),
-        ExplicitConversion(explicitConversion) {}
-
-  ConstraintSystem &getCS() const { return *CS; }
-
-  Constraint *operator->() const { return Choice; }
+  DisjunctionChoice(unsigned index, Constraint *choice, bool explicitConversion)
+      : Index(index), Choice(choice), ExplicitConversion(explicitConversion) {}
 
   unsigned getIndex() const { return Index; }
+
+  bool attempt(ConstraintSystem &cs) const;
 
   bool isDisabled() const { return Choice->isDisabled(); }
 
@@ -3401,19 +3372,21 @@ public:
   bool isGenericOperator() const;
   bool isSymmetricOperator() const;
 
-  /// \brief Apply given choice to the system and try to solve it.
-  Optional<Score> solve(SmallVectorImpl<Solution> &solutions,
-                        FreeTypeVariableBinding allowFreeTypeVariables);
+  void print(llvm::raw_ostream &Out, SourceManager *SM) const {
+    Out << "disjunction choice ";
+    Choice->print(Out, SM);
+  }
 
   operator Constraint *() { return Choice; }
+  operator Constraint *() const { return Choice; }
 
 private:
   /// \brief If associated disjunction is an explicit conversion,
   /// let's try to propagate its type early to prune search space.
-  void propagateConversionInfo() const;
+  void propagateConversionInfo(ConstraintSystem &cs) const;
 
-  ValueDecl *getOperatorDecl() const {
-    auto *decl = getDecl(Choice);
+  static ValueDecl *getOperatorDecl(Constraint *choice) {
+    auto *decl = getDecl(choice);
     if (!decl)
       return nullptr;
 
@@ -3432,13 +3405,56 @@ private:
   }
 };
 
-class TypeVarBindingGenerator {
+class TypeVariableBinding {
+  TypeVariableType *TypeVar;
+  ConstraintSystem::PotentialBinding Binding;
+
+public:
+  TypeVariableBinding(TypeVariableType *typeVar,
+                      ConstraintSystem::PotentialBinding &binding)
+      : TypeVar(typeVar), Binding(binding) {}
+
+  bool isDefaultable() const { return Binding.isDefaultableBinding(); }
+
+  bool hasDefaultedProtocol() const { return Binding.DefaultedProtocol; }
+
+  bool attempt(ConstraintSystem &cs) const;
+
+  void print(llvm::raw_ostream &Out, SourceManager *) const {
+    Out << "type variable " << TypeVar->getString()
+        << " := " << Binding.BindingType->getString();
+  }
+};
+
+template<typename Choice>
+class BindingProducer {
+  ConstraintLocator *Locator;
+
+protected:
+  ConstraintSystem &CS;
+
+public:
+  BindingProducer(ConstraintSystem &cs, ConstraintLocator *locator)
+      : Locator(locator), CS(cs) {}
+
+  virtual ~BindingProducer() {}
+  virtual Optional<Choice> operator()() = 0;
+
+  ConstraintLocator *getLocator() const { return Locator; }
+
+  /// Check whether generator would have to compute next
+  /// batch of bindings because it freshly ran out of current one.
+  /// This is useful to be able to exhaustively attempt bindings
+  /// for type variables found at one level, before proceeding to
+  /// supertypes or literal defaults etc.
+  virtual bool needsToComputeNext() const { return false; }
+};
+
+class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
   using BindingKind = ConstraintSystem::AllowedBindingKind;
   using Binding = ConstraintSystem::PotentialBinding;
 
-  ConstraintSystem &CS;
   TypeVariableType *TypeVar;
-
   llvm::SmallVector<Binding, 8> Bindings;
 
   // The index pointing to the offset in the bindings
@@ -3450,27 +3466,25 @@ class TypeVarBindingGenerator {
   llvm::SmallPtrSet<TypeBase *, 4> BoundTypes;
 
 public:
-  TypeVarBindingGenerator(ConstraintSystem &cs, TypeVariableType *typeVar,
-                          ArrayRef<Binding> initialBindings)
-      : CS(cs), TypeVar(typeVar),
-        Bindings(initialBindings.begin(), initialBindings.end()) {}
+  using Element = TypeVariableBinding;
 
-  Optional<Binding> operator()() {
+  TypeVarBindingProducer(ConstraintSystem &cs,
+                         ConstraintSystem::PotentialBindings &bindings)
+      : BindingProducer(cs, bindings.TypeVar->getImpl().getLocator()),
+        TypeVar(bindings.TypeVar),
+        Bindings(bindings.Bindings.begin(), bindings.Bindings.end()) {}
+
+  Optional<Element> operator()() override {
     // Once we reach the end of the current bindings
     // let's try to compute new ones, e.g. supertypes,
     // literal defaults, if that fails, we are done.
     if (needsToComputeNext() && !computeNext())
       return None;
 
-    return Bindings[Index++];
+    return TypeVariableBinding(TypeVar, Bindings[Index++]);
   }
 
-  /// Check whether generator would have to compute next
-  /// batch of bindings because it freshly ran out of current one.
-  /// This is useful to be able to exhaustively attempt bindings
-  /// found at one level, before proceeding to supertypes or
-  /// literal defaults etc.
-  bool needsToComputeNext() const { return Index >= Bindings.size(); }
+  bool needsToComputeNext() const override { return Index >= Bindings.size(); }
 
 private:
   /// Compute next batch of bindings if possible, this could
@@ -3485,85 +3499,40 @@ private:
 /// Iterator over disjunction choices, makes it
 /// easy to work with disjunction and encapsulates
 /// some other important information such as locator.
-class Disjunction {
-  ConstraintSystem &CS;
+class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
   ArrayRef<Constraint *> Choices;
-  ConstraintLocator *Locator;
   bool IsExplicitConversion;
 
   unsigned Index = 0;
 
 public:
-  Disjunction(ConstraintSystem &cs, ArrayRef<Constraint *> choices,
-              ConstraintLocator *locator, bool explicitConversion)
-      : CS(cs), Choices(choices), Locator(locator),
+  using Element = DisjunctionChoice;
+
+  DisjunctionChoiceProducer(ConstraintSystem &cs, Constraint *disjunction)
+      : BindingProducer(cs, disjunction->shouldRememberChoice()
+                                ? disjunction->getLocator()
+                                : nullptr),
+        Choices(disjunction->getNestedConstraints()),
+        IsExplicitConversion(disjunction->isExplicitConversion()) {
+    assert(disjunction->getKind() == ConstraintKind::Disjunction);
+    assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
+  }
+
+  DisjunctionChoiceProducer(ConstraintSystem &cs,
+                            ArrayRef<Constraint *> choices,
+                            ConstraintLocator *locator, bool explicitConversion)
+      : BindingProducer(cs, locator), Choices(choices),
         IsExplicitConversion(explicitConversion) {}
 
-  const Disjunction &begin() const { return *this; }
-  const Disjunction &end() const { return *this; }
+  Optional<Element> operator()() override {
+    unsigned currIndex = Index;
+    if (currIndex >= Choices.size())
+      return None;
 
-  bool operator!=(const Disjunction &) const { return Index < Choices.size(); }
-
-  void operator++() { ++Index; }
-
-  DisjunctionChoice operator*() const {
-    return {&CS, Index, Choices[Index], IsExplicitConversion};
+    ++Index;
+    return DisjunctionChoice(currIndex, Choices[currIndex],
+                             IsExplicitConversion);
   }
-
-  ConstraintLocator *getLocator() const { return Locator; }
-};
-
-/// \brief Constraint System "component" represents
-/// a single solvable unit, but the process of assigning
-/// types in some cases allows it to be further split into
-/// multiple smaller parts.
-///
-/// This helps to abstract away logic of holding and
-/// returning sub-set of the constraints in the system,
-/// as well as its partial solving and result tracking.
-class Component {
-  ConstraintList Constraints;
-  SmallVector<Constraint *, 8> Disjunctions;
-
-public:
-  void reinstateTo(ConstraintList &workList) {
-    workList.splice(workList.end(), Constraints);
-  }
-
-  void record(Constraint *constraint) {
-    Constraints.push_back(constraint);
-    if (constraint->getKind() == ConstraintKind::Disjunction)
-      Disjunctions.push_back(constraint);
-  }
-
-  bool solve(ConstraintSystem &cs, SmallVectorImpl<Solution> &solutions,
-             FreeTypeVariableBinding allowFreeTypeVariables) {
-    // Return constraints from the bucket back into circulation.
-    reinstateTo(cs.InactiveConstraints);
-
-    // Solve for this component. If it fails, we're done.
-    bool failed;
-
-    {
-      // Introduce a scope for this partial solution.
-      ConstraintSystem::SolverScope scope(cs);
-      llvm::SaveAndRestore<ConstraintSystem::SolverScope *>
-          partialSolutionScope(cs.solverState->PartialSolutionScope, &scope);
-
-      failed = cs.solveSimplified(solutions, allowFreeTypeVariables);
-    }
-
-    // Put the constraints back into their original bucket.
-    Constraints.splice(Constraints.end(), cs.InactiveConstraints);
-    return failed;
-  }
-
-  bool operator<(const Component &other) const {
-    return disjunctionCount() < other.disjunctionCount();
-  }
-
-private:
-  unsigned disjunctionCount() const { return Disjunctions.size(); }
 };
 } // end namespace constraints
 
@@ -3628,7 +3597,7 @@ public:
 /// in the custom function when necessary.
 class InputMatcher {
   size_t NumSkippedParameters;
-  const llvm::SmallBitVector DefaultValueMap;
+  const SmallBitVector DefaultValueMap;
   const ArrayRef<AnyFunctionType::Param> Params;
 
 public:
@@ -3644,7 +3613,7 @@ public:
   };
 
   InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-               const llvm::SmallBitVector &defaultValueMap);
+               const SmallBitVector &defaultValueMap);
 
   /// Matching a given array of inputs.
   ///

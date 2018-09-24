@@ -373,11 +373,6 @@ BUILTIN_SIL_OPERATION(AllocWithTailElems, "allocWithTailElems", Special)
 /// Projects the first tail-allocated element of type E from a class C.
 BUILTIN_SIL_OPERATION(ProjectTailElems, "projectTailElems", Special)
 
-/// identityKeyPath : <T> () -> WritableKeyPath<T, T>
-///
-/// Creates an identity key path object. (TODO: replace with proper syntax)
-BUILTIN_SIL_OPERATION(IdentityKeyPath, "identityKeyPath", Special)
-
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
@@ -386,9 +381,6 @@ BUILTIN_SIL_OPERATION(IdentityKeyPath, "identityKeyPath", Special)
 #define BUILTIN_RUNTIME_CALL(Id, Name, Attrs) \
   BUILTIN(Id, Name, Attrs)
 #endif
-
-/// willThrow: Error -> ()
-BUILTIN_RUNTIME_CALL(WillThrow, "willThrow", "n")
 
 /// unexpectedError: Error -> ()
 BUILTIN_RUNTIME_CALL(UnexpectedError, "unexpectedError", "")
@@ -538,6 +530,9 @@ BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
 // Swift3ImplicitObjCEntrypoint has type () -> ()
 BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
+
+/// willThrow: Error -> ()
+BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
 #undef BUILTIN_MISC_OPERATION
 

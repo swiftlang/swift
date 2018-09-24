@@ -338,8 +338,8 @@ public protocol Collection: Sequence where SubSequence: Collection {
   @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
   typealias IndexDistance = Int  
 
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
+  // FIXME: Associated type inference requires this.
+  override associatedtype Element
 
   /// A type that represents a position in the collection.
   ///
@@ -378,11 +378,11 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// type.
   associatedtype Iterator = IndexingIterator<Self>
 
-  // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
-  // a custom `makeIterator()` function.  Otherwise we get an
-  // `IndexingIterator`. <rdar://problem/21539115>
+  // FIXME: Only needed for associated type inference. Otherwise,
+  // we get an `IndexingIterator` rather than properly deducing the
+  // Iterator type from makeIterator(). <rdar://problem/21539115>
   /// Returns an iterator over the elements of the collection.
-  func makeIterator() -> Iterator
+  override func makeIterator() -> Iterator
 
   /// A sequence that represents a contiguous subrange of the collection's
   /// elements.
@@ -1029,14 +1029,19 @@ extension Collection {
   ///     let randomName = names.randomElement(using: &myGenerator)!
   ///     // randomName == "Amani"
   ///
-  /// - Parameter generator: The random number generator to use when choosing
-  ///   a random element.
+  /// - Parameter generator: The random number generator to use when choosing a
+  ///   random element.
   /// - Returns: A random element from the collection. If the collection is
   ///   empty, the method returns `nil`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
-  ///   the collection.
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
+  ///   of the collection.
+  /// - Note: The algorithm used to select a random element may change in a
+  ///   future version of Swift. If you're passing a generator that results in
+  ///   the same sequence of elements each time you run your program, that
+  ///   sequence may change when your program is compiled using a different
+  ///   version of Swift.
   @inlinable
   public func randomElement<T: RandomNumberGenerator>(
     using generator: inout T
@@ -1059,15 +1064,15 @@ extension Collection {
   ///     let randomName = names.randomElement()!
   ///     // randomName == "Amani"
   ///
-  /// This method is equivalent to calling the version that takes a generator, 
-  /// passing in the system's default random generator.
+  /// This method is equivalent to calling `randomElement(using:)`, passing in
+  /// the system's default random generator.
   ///
   /// - Returns: A random element from the collection. If the collection is
   ///   empty, the method returns `nil`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
-  ///   the collection.
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
+  ///   of the collection.
   @inlinable
   public func randomElement() -> Element? {
     var g = SystemRandomNumberGenerator()
@@ -1115,7 +1120,7 @@ extension Collection where Iterator == IndexingIterator<Self> {
   /// Returns an iterator over the elements of the collection.
   @inlinable // trivial-implementation
   @inline(__always)
-  public func makeIterator() -> IndexingIterator<Self> {
+  public __consuming func makeIterator() -> IndexingIterator<Self> {
     return IndexingIterator(_elements: self)
   }
 }
@@ -1351,7 +1356,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to drop from the beginning of the collection.
   @inlinable
-  public func dropFirst(_ k: Int) -> SubSequence {
+  public __consuming func dropFirst(_ k: Int) -> SubSequence {
     _precondition(k >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(startIndex,
       offsetBy: k, limitedBy: endIndex) ?? endIndex
@@ -1379,7 +1384,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
   ///   the collection.
   @inlinable
-  public func dropLast(_ k: Int) -> SubSequence {
+  public __consuming func dropLast(_ k: Int) -> SubSequence {
     _precondition(
       k >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, count - k)
@@ -1398,7 +1403,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public func drop(
+  public __consuming func drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     var start = startIndex
@@ -1429,7 +1434,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to select from the beginning of the collection.
   @inlinable
-  public func prefix(_ maxLength: Int) -> SubSequence {
+  public __consuming func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a prefix of negative length from a collection")
@@ -1448,7 +1453,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public func prefix(
+  public __consuming func prefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     var end = startIndex
@@ -1479,7 +1484,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
   ///   the collection.
   @inlinable
-  public func suffix(_ maxLength: Int) -> SubSequence {
+  public __consuming func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
@@ -1524,7 +1529,7 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   @inlinable
-  public func prefix(upTo end: Index) -> SubSequence {
+  public __consuming func prefix(upTo end: Index) -> SubSequence {
     return self[startIndex..<end]
   }
 
@@ -1562,7 +1567,7 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   @inlinable
-  public func suffix(from start: Index) -> SubSequence {
+  public __consuming func suffix(from start: Index) -> SubSequence {
     return self[start..<endIndex]
   }
 
@@ -1596,7 +1601,7 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   @inlinable
-  public func prefix(through position: Index) -> SubSequence {
+  public __consuming func prefix(through position: Index) -> SubSequence {
     return prefix(upTo: index(after: position))
   }
 
@@ -1649,7 +1654,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public func split(
+  public __consuming func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
     whereSeparator isSeparator: (Element) throws -> Bool
@@ -1744,7 +1749,7 @@ extension Collection where Element : Equatable {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public func split(
+  public __consuming func split(
     separator: Element,
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true

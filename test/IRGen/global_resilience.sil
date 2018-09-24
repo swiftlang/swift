@@ -109,7 +109,7 @@ bb0:
 // CHECK-LABEL: define {{.*}} @testOtherGlobal
 sil @testOtherGlobal : $@convention(thin) () -> () {
 bb0:
-  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 0)
+  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
   // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: call %swift.opaque* @__swift_allocate_value_buffer(%swift.type* [[METADATA]], %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
     alloc_global @otherGlobal

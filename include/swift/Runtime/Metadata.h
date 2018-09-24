@@ -595,6 +595,15 @@ void swift_initClassMetadata(ClassMetadata *self,
                              const TypeLayout * const *fieldTypes,
                              size_t *fieldOffsets);
 
+/// Given class metadata, a class descriptor and a method descriptor, look up
+/// and load the vtable entry from the given metadata. The metadata must be of
+/// the same class or a subclass of the descriptor.
+SWIFT_RUNTIME_EXPORT
+void *
+swift_lookUpClassMethod(ClassMetadata *metadata,
+                        MethodDescriptor *method,
+                        ClassDescriptor *description);
+
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
 const MetatypeMetadata *

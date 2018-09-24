@@ -41,3 +41,28 @@ public func foo3(_ a: [Int: String]) {}
 public extension Int {
   public func foo() {}
 }
+
+@_fixed_layout
+public struct fixedLayoutStruct {
+  public var a = 1
+  private var b = 2
+  var c = 3
+}
+
+extension Int: P1 { public func bar() {} }
+
+public protocol ProWithAssociatedType {
+  associatedtype A
+  associatedtype B = Int
+}
+
+public protocol SubsContainer {
+  subscript(getter i: Int) -> Int { get }
+  subscript(setter i: Int) -> Int { get set }
+}
+
+public extension ProWithAssociatedType {
+  func NonReqFunc() {}
+  var NonReqVar: Int { return 1 }
+  typealias NonReqAlias = Int
+}

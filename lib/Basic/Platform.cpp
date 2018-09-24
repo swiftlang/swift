@@ -90,6 +90,7 @@ DarwinPlatformKind swift::getNonSimulatorPlatform(DarwinPlatformKind platform) {
   case DarwinPlatformKind::WatchOSSimulator:
     return DarwinPlatformKind::WatchOS;
   }
+  llvm_unreachable("Unsupported Darwin platform");
 }
 
 static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {

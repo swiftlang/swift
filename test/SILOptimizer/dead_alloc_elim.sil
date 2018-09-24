@@ -18,7 +18,7 @@ class NontrivialDestructor {
   init()
 }
 
-sil @$S4main17TrivialDestructorCfD : $@convention(method) (@owned TrivialDestructor) -> () {
+sil @$s4main17TrivialDestructorCfD : $@convention(method) (@owned TrivialDestructor) -> () {
 bb0(%0 : $TrivialDestructor):
   // Alloc/Dealloc stack should not disrupt elimination of the
   // alloc_ref.

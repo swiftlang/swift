@@ -69,6 +69,10 @@ public:
   bool isWeak() const { return ReferenceOwnership.isWeak(); }
   bool isUnowned() const { return ReferenceOwnership.isUnowned(); }
   bool isUnmanaged() const { return ReferenceOwnership.isUnmanaged(); }
+
+  TypeReferenceOwnership getReferenceOwnership() const {
+    return ReferenceOwnership;
+  }
 };
 
 #if SWIFT_HAS_ISA_MASKING
@@ -231,6 +235,51 @@ public:
   using SubstGenericParameterFn =
     llvm::function_ref<const Metadata *(unsigned depth, unsigned index)>;
 
+  /// Function object that produces substitutions for the generic parameters
+  /// that occur within a mangled name, using the generic arguments from
+  /// the given metadata.
+  ///
+  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
+  class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
+    const Metadata *base;
+
+    /// An element in the descriptor path.
+    struct PathElement {
+      /// The context described by this path element.
+      const ContextDescriptor *context;
+
+      /// The number of key parameters in the parent.
+      unsigned numKeyGenericParamsInParent;
+
+      /// The number of key parameters locally introduced here.
+      unsigned numKeyGenericParamsHere;
+
+      /// Whether this context has any non-key generic parameters.
+      bool hasNonKeyGenericParams;
+    };
+
+    /// Information about the generic context descriptors that make up \c
+    /// descriptor, from the outermost to the innermost.
+    mutable std::vector<PathElement> descriptorPath;
+
+    /// Builds the descriptor path.
+    ///
+    /// \returns a pair containing the number of key generic parameters in
+    /// the path up to this point.
+    unsigned buildDescriptorPath(const ContextDescriptor *context) const;
+
+    // Set up the state we need to compute substitutions.
+    void setup() const;
+
+  public:
+    /// Produce substitutions entirely from the given metadata.
+    explicit SubstGenericParametersFromMetadata(const Metadata *base)
+      : base(base) { }
+
+    const Metadata *operator()(unsigned flatIndex) const;
+    const Metadata *operator()(unsigned depth, unsigned index) const;
+  };
+
   /// Retrieve the type metadata described by the given type name.
   ///
   /// \p substGenericParam Function that provides generic argument metadata
@@ -332,15 +381,5 @@ public:
                            const WitnessTable **conformance);
 
 } // end namespace swift
-
-// ADT uses report_bad_alloc_error to report an error when it can't allocate
-// elements for a data structure. The swift runtime uses ADT without linking
-// against libSupport, so here we provide a stub to make sure we don't fail
-// to link. Give it `weak` linkage so, in case the `strong` definition of
-// the function is available, that has precedence.
-namespace llvm {
-  __attribute__((weak))
-  void report_bad_alloc_error(const char *Reason, bool GenCrashDiag) {};
-} // end namespace llvm
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

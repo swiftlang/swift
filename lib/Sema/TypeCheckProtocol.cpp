@@ -240,6 +240,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
       case ReadImplKind::Get:
         llvm_unreachable("should have a getter");
       }
+      llvm_unreachable("unhandled kind");
     };
 
     auto isStoredSetterMutating = [&] {
@@ -263,6 +264,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
       case WriteImplKind::InheritedWithObservers:
         llvm_unreachable("should have a setter");
       }
+      llvm_unreachable("unhandled kind");
     };
 
     auto isReadWriteMutating = [&] {
@@ -278,6 +280,7 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
       case ReadWriteImplKind::Immutable:
         llvm_unreachable("asking for setter for immutable storage");
       }
+      llvm_unreachable("unhandled kind");
     };
 
     switch (reqtAsAccessor->getAccessorKind()) {
@@ -864,10 +867,49 @@ swift::matchWitness(TypeChecker &tc,
   return matchWitness(tc, dc, req, witness, setup, matchTypes, finalize);
 }
 
+static bool
+witnessHasImplementsAttrForRequiredName(ValueDecl *witness,
+                                        ValueDecl *requirement) {
+  if (auto A = witness->getAttrs().getAttribute<ImplementsAttr>()) {
+    return A->getMemberName() == requirement->getFullName();
+  }
+  return false;
+}
+
+static bool
+witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
+                                            ValueDecl *requirement) {
+  assert(requirement->isProtocolRequirement());
+  auto *PD = cast<ProtocolDecl>(requirement->getDeclContext());
+  if (auto A = witness->getAttrs().getAttribute<ImplementsAttr>()) {
+    Type T = A->getProtocolType().getType();
+    if (T->castTo<ProtocolType>()->getDecl() == PD) {
+      return A->getMemberName() == requirement->getFullName();
+    }
+  }
+  return false;
+}
+
 /// \brief Determine whether one requirement match is better than the other.
 static bool isBetterMatch(TypeChecker &tc, DeclContext *dc,
+                          ValueDecl *requirement,
                           const RequirementMatch &match1,
                           const RequirementMatch &match2) {
+
+  // Special case to prefer a witness with @_implements(Foo, bar) over one without
+  // it, when the requirement was exactly for Foo.bar.
+  bool match1ImplementsAttr =
+    witnessHasImplementsAttrForExactRequirement(match1.Witness,
+                                                requirement);
+  bool match2ImplementsAttr =
+    witnessHasImplementsAttrForExactRequirement(match2.Witness,
+                                                requirement);
+  if (match1ImplementsAttr && !match2ImplementsAttr) {
+    return true;
+  } else if (!match1ImplementsAttr && match2ImplementsAttr) {
+    return false;
+  }
+
   // Check whether one declaration is better than the other.
   switch (tc.compareDeclarations(dc, match1.Witness, match2.Witness)) {
   case Comparison::Better:
@@ -891,41 +933,19 @@ static bool isBetterMatch(TypeChecker &tc, DeclContext *dc,
 
 WitnessChecker::WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
                                Type adoptee, DeclContext *dc)
-    : TC(tc), Proto(proto), Adoptee(adoptee), DC(dc) {
-  if (auto N = DC->getSelfNominalTypeDecl()) {
-    for (auto D : N->getMembers()) {
-      if (auto V = dyn_cast<ValueDecl>(D)) {
-        if (!V->hasName())
-          continue;
-        if (auto A = V->getAttrs().getAttribute<ImplementsAttr>()) {
-          A->getMemberName().addToLookupTable(ImplementsTable, V);
-        }
-      }
-    }
-  }
-}
+    : TC(tc), Proto(proto), Adoptee(adoptee), DC(dc) {}
 
 void
 WitnessChecker::lookupValueWitnessesViaImplementsAttr(
     ValueDecl *req, SmallVector<ValueDecl *, 4> &witnesses) {
-  if (!req->isProtocolRequirement())
-    return;
-  if (!req->hasName())
-    return;
-  auto *PD = dyn_cast<ProtocolDecl>(req->getDeclContext());
-  if (!PD)
-    return;
-  auto i = ImplementsTable.find(req->getFullName());
-  if (i == ImplementsTable.end())
-    return;
-  for (auto candidate : i->second) {
-    if (auto A = candidate->getAttrs().getAttribute<ImplementsAttr>()) {
-      Type T = A->getProtocolType().getType();
-      if (auto *PT = T->getAs<ProtocolType>()) {
-        if (PT->getDecl() == PD) {
-          witnesses.push_back(candidate);
-        }
-      }
+  auto lookupOptions = defaultMemberTypeLookupOptions;
+  lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+  lookupOptions |= NameLookupFlags::IncludeAttributeImplements;
+  auto candidates = TC.lookupMember(DC, Adoptee, req->getFullName(),
+                                    lookupOptions);
+  for (auto candidate : candidates) {
+    if (witnessHasImplementsAttrForExactRequirement(candidate.getValueDecl(), req)) {
+      witnesses.push_back(candidate.getValueDecl());
     }
   }
 }
@@ -933,7 +953,8 @@ WitnessChecker::lookupValueWitnessesViaImplementsAttr(
 SmallVector<ValueDecl *, 4>
 WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
-  
+  assert(req->isProtocolRequirement());
+
   SmallVector<ValueDecl *, 4> witnesses;
 
   // Do an initial check to see if there are any @_implements remappings
@@ -1110,7 +1131,7 @@ bool WitnessChecker::findBestWitness(
     // Find the best match.
     bestIdx = 0;
     for (unsigned i = 1, n = matches.size(); i != n; ++i) {
-      if (isBetterMatch(TC, DC, matches[i], matches[bestIdx]))
+      if (isBetterMatch(TC, DC, requirement, matches[i], matches[bestIdx]))
         bestIdx = i;
     }
 
@@ -1119,7 +1140,7 @@ bool WitnessChecker::findBestWitness(
       if (i == bestIdx)
         continue;
 
-      if (!isBetterMatch(TC, DC, matches[bestIdx], matches[i])) {
+      if (!isBetterMatch(TC, DC, requirement, matches[bestIdx], matches[i])) {
         isReallyBest = false;
         break;
       }
@@ -2394,7 +2415,15 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.AccessFilter = AccessLevel::Private;
     Options.PrintAccess = false;
     Options.SkipAttributes = true;
-    Options.FunctionBody = [](const ValueDecl *VD) { return getCodePlaceholder(); };
+    Options.FunctionDefinitions = true;
+    Options.PrintAccessorBodiesInProtocols = true;
+    Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
+      Printer << " {";
+      Printer.printNewline();
+      Printer << ExtraIndent << getCodePlaceholder();
+      Printer.printNewline();
+      Printer << "}";
+    };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
     if (!Adopter->isExtensionContext()) {
@@ -2517,15 +2546,6 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     clearGlobalMissingWitnesses();
     return;
   }
-}
-
-static bool
-witnessHasImplementsAttrForRequirement(ValueDecl *witness,
-                                       ValueDecl *requirement) {
-  if (auto A = witness->getAttrs().getAttribute<ImplementsAttr>()) {
-    return A->getMemberName() == requirement->getFullName();
-  }
-  return false;
 }
 
 /// Determine the given witness has a same-type constraint constraining the
@@ -2786,7 +2806,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     // If the name didn't actually line up, complain.
     if (ignoringNames &&
         requirement->getFullName() != best.Witness->getFullName() &&
-        !witnessHasImplementsAttrForRequirement(best.Witness, requirement)) {
+        !witnessHasImplementsAttrForRequiredName(best.Witness, requirement)) {
 
       diagnoseOrDefer(requirement, false,
         [witness, requirement](NormalProtocolConformance *conformance) {
@@ -4782,9 +4802,10 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           continue;
 
         bool valueIsType = isa<TypeDecl>(value);
+        auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+        flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
         for (auto requirement
-                : diag.Protocol->lookupDirect(value->getFullName(),
-                                              /*ignoreNewExtensions=*/true)) {
+                : diag.Protocol->lookupDirect(value->getFullName(), flags)) {
           auto requirementIsType = isa<TypeDecl>(requirement);
           if (valueIsType != requirementIsType)
             continue;
@@ -4980,7 +5001,9 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     if (!proto->isObjC()) continue;
 
     Optional<ProtocolConformance *> conformance;
-    for (auto req : proto->lookupDirect(name, true)) {
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    for (auto req : proto->lookupDirect(name, flags)) {
       // Skip anything in a protocol extension.
       if (req->getDeclContext() != proto) continue;
 
@@ -5243,6 +5266,25 @@ void DefaultWitnessChecker::recordWitness(
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   DefaultWitnessChecker checker(*this, proto);
 
+  // Find the default for the given associated type.
+  auto findAssociatedTypeDefault =
+      [&](AssociatedTypeDecl *assocType,
+      AssociatedTypeDecl **defaultedAssocTypeOut = nullptr) -> Type {
+    auto defaultedAssocType =
+      AssociatedTypeInference::findDefaultedAssociatedType(*this, assocType);
+    if (!defaultedAssocType)
+      return nullptr;;
+
+    Type defaultType = defaultedAssocType->getDefaultDefinitionType();
+    if (!defaultType)
+      return nullptr;
+
+    if (defaultedAssocTypeOut)
+      *defaultedAssocTypeOut = defaultedAssocType;
+
+    return defaultType;
+  };
+
   for (auto *requirement : proto->getMembers()) {
     if (requirement->isInvalid())
       continue;
@@ -5251,6 +5293,15 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (!valueDecl)
       continue;
 
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(valueDecl)) {
+      if (assocType->getOverriddenDecls().empty()) {
+        if (Type defaultType = findAssociatedTypeDefault(assocType))
+          proto->setDefaultTypeWitness(assocType, defaultType);
+      }
+
+      continue;
+    }
+
     if (isa<TypeDecl>(valueDecl))
       continue;
 
@@ -5258,6 +5309,77 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       continue;
 
     checker.resolveWitnessViaLookup(valueDecl);
+  }
+
+  // Find defaults for any associated conformances rooted on defaulted
+  // associated types.
+  for (const auto &req : proto->getRequirementSignature()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+    if (req.getFirstType()->isEqual(proto->getProtocolSelfType()))
+      continue;
+
+    // Find the innermost dependent member type (e.g., Self.AssocType), so
+    // we can look at the associated type.
+    auto depMemTy = req.getFirstType()->getAs<DependentMemberType>();
+    if (!depMemTy)
+      continue;
+
+    while (auto innerDepMemTy =
+             depMemTy->getBase()->getAs<DependentMemberType>())
+      depMemTy = innerDepMemTy;
+
+    if (!depMemTy->getBase()->isEqual(proto->getProtocolSelfType()))
+      continue;
+
+    auto assocType = depMemTy->getAssocType();
+    if (!assocType)
+      continue;
+
+    // Find the associated type nearest our own protocol, which might have
+    // a default not available in the associated type referenced by the
+    // (canonicalized) requirement.
+    if (assocType->getProtocol() != proto) {
+      SmallVector<ValueDecl *, 2> found;
+      proto->getModuleContext()->lookupQualified(
+                           proto, assocType->getFullName(),
+                           NL_QualifiedDefault|NL_ProtocolMembers|NL_OnlyTypes,
+                           found);
+      if (found.size() == 1 && isa<AssociatedTypeDecl>(found[0]))
+        assocType = cast<AssociatedTypeDecl>(found[0]);
+    }
+
+    // Dig out the default associated type definition.
+    AssociatedTypeDecl *defaultedAssocType = nullptr;
+    Type defaultAssocType = findAssociatedTypeDefault(assocType,
+                                                      &defaultedAssocType);
+    if (!defaultAssocType)
+      continue;
+
+    Type defaultAssocTypeInContext =
+      proto->mapTypeIntoContext(defaultAssocType);
+    auto requirementProto =
+      req.getSecondType()->castTo<ProtocolType>()->getDecl();
+    auto conformance = conformsToProtocol(defaultAssocTypeInContext,
+                                          requirementProto, proto,
+                                          ConformanceCheckFlags::Used);
+    if (!conformance) {
+      // Diagnose the lack of a conformance. This is potentially an ABI
+      // incompatibility.
+      diagnose(proto, diag::assoc_type_default_conformance_failed,
+               defaultAssocType, assocType->getFullName(), req.getFirstType(),
+               req.getSecondType());
+      diagnose(defaultedAssocType, diag::assoc_type_default_here,
+               assocType->getFullName(), defaultAssocType)
+        .highlight(
+          defaultedAssocType->getDefaultDefinitionLoc().getSourceRange());
+
+      continue;
+    }
+
+    // Record the default associated conformance.
+    proto->setDefaultAssociatedConformanceWitness(
+        req.getFirstType()->getCanonicalType(), requirementProto, *conformance);
   }
 }
 

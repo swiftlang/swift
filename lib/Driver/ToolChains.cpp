@@ -182,6 +182,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_warn_swift3_objc_inference_minimal,
                        options::OPT_warn_swift3_objc_inference_complete);
+  inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
@@ -440,6 +441,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
   }
+  llvm_unreachable("unhandled output type");
 }
 
 void ToolChain::JobContext::addFrontendInputAndOutputArguments(
@@ -502,7 +504,7 @@ void ToolChain::JobContext::addFrontendCommandLineInputArguments(
     const bool mayHavePrimaryInputs, const bool useFileList,
     const bool usePrimaryFileList, const bool filterByType,
     ArgStringList &arguments) const {
-  llvm::StringSet<> primaries;
+  llvm::DenseSet<StringRef> primaries;
 
   if (mayHavePrimaryInputs) {
     for (const Action *A : InputActions) {

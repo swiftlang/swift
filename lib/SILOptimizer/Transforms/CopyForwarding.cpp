@@ -1200,8 +1200,19 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
 
   // If DestroyPoint is a block terminator, we must hoist.
   bool MustHoist = (DestroyPoint == BB->getTerminator());
+  // If we haven't seen anything significant, avoid useless hoisting.
+  bool ShouldHoist = MustHoist;
 
-  bool IsWorthHoisting = MustHoist;
+  auto tryToInsertHoistedDestroyAfter = [&](SILInstruction *afterInst) {
+    if (!ShouldHoist)
+      return false;
+    LLVM_DEBUG(llvm::dbgs() << "  Hoisting to Use:" << *afterInst);
+    SILBuilderWithScope(std::next(afterInst->getIterator()), afterInst)
+        .createDestroyAddr(DestroyLoc, CurrentDef);
+    HasChanged = true;
+    return true;
+  };
+
   auto SI = DestroyPoint->getIterator(), SE = BB->begin();
   while (SI != SE) {
     --SI;
@@ -1219,10 +1230,10 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
         // destroy_addr CurrentDef
         LLVM_DEBUG(llvm::dbgs() << "  Cannot hoist above stored value use:"
                                 << *Inst);
-        return false;
+        return tryToInsertHoistedDestroyAfter(Inst);
       }
-      if (!IsWorthHoisting && isa<ApplyInst>(Inst))
-        IsWorthHoisting = true;
+      if (!ShouldHoist && isa<ApplyInst>(Inst))
+        ShouldHoist = true;
       continue;
     }
     if (auto *CopyInst = dyn_cast<CopyAddrInst>(Inst)) {
@@ -1233,19 +1244,15 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
           return true;
       }
     }
-    // We reached a user of CurrentDef. If we haven't seen anything significant,
-    // avoid useless hoisting.
-    if (!IsWorthHoisting)
-      return false;
-
-    LLVM_DEBUG(llvm::dbgs() << "  Hoisting to Use:" << *Inst);
-    SILBuilderWithScope(std::next(SI), Inst)
-        .createDestroyAddr(DestroyLoc, CurrentDef);
-    HasChanged = true;
-    return true;
+    return tryToInsertHoistedDestroyAfter(Inst);
   }
-  if (!DoGlobalHoisting)
+  if (!DoGlobalHoisting) {
+    // If DoGlobalHoisting is set, then we should never mark a DeadInBlock, so
+    // MustHoist should be false.
+    assert(!MustHoist &&
+           "Cannot hoist above a terminator with global hoisting disabled.");
     return false;
+  }
   DeadInBlocks.insert(BB);
   return true;
 }

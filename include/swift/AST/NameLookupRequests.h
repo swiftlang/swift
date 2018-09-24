@@ -68,7 +68,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   DirectlyReferencedTypeDecls evaluate(
@@ -114,7 +114,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   DirectlyReferencedTypeDecls evaluate(
@@ -140,7 +140,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<ClassDecl *>
@@ -165,7 +165,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<NominalTypeDecl *>
@@ -193,7 +193,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::TinyPtrVector<NominalTypeDecl *> evaluate(Evaluator &evaluator,
@@ -202,6 +202,31 @@ private:
 public:
   // Cycle handling
   llvm::TinyPtrVector<NominalTypeDecl *> breakCycle() const { return { }; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+
+/// Request all type aliases and nominal types that appear in the "where"
+/// clause of an extension.
+class TypeDeclsFromWhereClauseRequest :
+    public SimpleRequest<TypeDeclsFromWhereClauseRequest,
+                         CacheKind::Uncached,
+                         DirectlyReferencedTypeDecls,
+                         ExtensionDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  DirectlyReferencedTypeDecls evaluate(Evaluator &evaluator,
+                                       ExtensionDecl *ext) const;
+
+public:
+  // Cycle handling
+  DirectlyReferencedTypeDecls breakCycle() const { return { }; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };

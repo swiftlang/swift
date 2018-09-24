@@ -253,7 +253,7 @@ void EditTest::doubleOpenWithDelay(useconds_t delay, bool closeDoc) {
   // be queried, since the semantic info from the first open is unreachable.
   for (int i = 0; i < 2; ++i) {
     bool expired = waitForDocUpdate(/*reset=*/true);
-    ASSERT_FALSE(expired) << "no second notification";
+    ASSERT_FALSE(expired) << "no " << (i ? "second " : "") << "notification";
     replaceText(DocName, 0, 0, StringRef(), Consumer);
     if (!Consumer.Diags.empty())
       break;
@@ -262,6 +262,8 @@ void EditTest::doubleOpenWithDelay(useconds_t delay, bool closeDoc) {
 
   ASSERT_EQ(1u, Consumer.Diags.size());
   EXPECT_STREQ("use of unresolved identifier 'unknown_name'", Consumer.Diags[0].Description.c_str());
+
+  close(DocName);
 }
 
 // This test is failing occassionally in CI: rdar://42483323

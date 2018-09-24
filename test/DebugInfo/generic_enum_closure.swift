@@ -5,7 +5,7 @@ struct CErrorOr<T>
  {
   var value : T?
   init(x : __CurrentErrno) {
-    // CHECK: define hidden {{.*}}void @"$S20generic_enum_closure8CErrorOrV1xACyxGAA14__CurrentErrnoV_tcfC"
+    // CHECK: define hidden {{.*}}void @"$s20generic_enum_closure8CErrorOrV1xACyxGAA14__CurrentErrnoV_tcfC"
     // CHECK-NOT: define
     // This is a SIL-level debug_value_addr instruction.
     // CHECK: call void @llvm.dbg.declare
@@ -16,7 +16,7 @@ struct CErrorOr<T>
     // CHECK-DAG: store i8* %[[DYN:.*]], i8** %[[SHADOW]]
     // CHECK-DAG: %[[DYN]] = alloca i8, i{{32|64}} %
     // CHECK-DAG: ![[SELF]] = !DILocalVariable(name: "self", scope:{{.*}}, type: ![[T1:.*]])
-    // CHECK-DAG: ![[T1]] = !DICompositeType({{.*}}, identifier: "$S20generic_enum_closure8CErrorOrVyxGD")
+    // CHECK-DAG: ![[T1]] = !DICompositeType({{.*}}, identifier: "$s20generic_enum_closure8CErrorOrVyxGD")
     value = .none
   }
 }

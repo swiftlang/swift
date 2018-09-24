@@ -1005,6 +1005,7 @@ private:
       return {VoidTy, ExitState::Negative};
     }
     }
+    llvm_unreachable("unhandled kind");
   }
 
   ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {

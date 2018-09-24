@@ -1560,7 +1560,7 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 /// that is of type () -> ().
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(funcType->getParams(), FD,
                       /*level*/ FD->isInstanceMember() ? 1 : 0);
   
@@ -2104,7 +2104,7 @@ public:
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
     if (!VD->hasName() ||
-        (VD->hasAccess() && !VD->isAccessibleFrom(CurrDeclContext)) ||
+        !VD->isAccessibleFrom(CurrDeclContext) ||
         shouldHideDeclFromCompletionResults(VD))
       return;
 
@@ -2751,7 +2751,7 @@ public:
                          DeclVisibilityKind Reason,
                          bool HasTypeContext) {
     if (!EED->hasName() ||
-        (EED->hasAccess() && !EED->isAccessibleFrom(CurrDeclContext)) ||
+        !EED->isAccessibleFrom(CurrDeclContext) ||
         shouldHideDeclFromCompletionResults(EED))
       return;
 
@@ -4125,7 +4125,6 @@ public:
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
         Options.setBaseType(transformType);
-      Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(TAK_escaping);
       Options.PrintOverrideKeyword = false;
@@ -4222,7 +4221,6 @@ public:
       PrintOptions Options;
       Options.PrintImplicitAttrs = false;
       Options.SkipAttributes = true;
-      Options.PrintDefaultParameterPlaceholder = false;
       CD->print(OS, Options);
     }
     Builder.addTextChunk(DeclStr);

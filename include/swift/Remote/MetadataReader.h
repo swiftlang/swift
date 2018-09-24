@@ -265,12 +265,12 @@ public:
     return start;
   }
 
-  /// Given a pointer to an address, attemp to read the pointed value.
-  Optional<StoredPointer> readPointedValue(StoredPointer Address) {
-    StoredPointer PointedVal;
-    if (!Reader->readInteger(RemoteAddress(Address), &PointedVal))
+  /// Given a pointer to an address, attemp to read the pointer value.
+  Optional<StoredPointer> readPointerValue(StoredPointer Address) {
+    StoredPointer PointerVal;
+    if (!Reader->readInteger(RemoteAddress(Address), &PointerVal))
       return None;
-    return Optional<StoredPointer>(PointedVal);
+    return Optional<StoredPointer>(PointerVal);
   }
 
   /// Given a pointer to the metadata, attempt to read the value
@@ -309,7 +309,7 @@ public:
     // error existential with NSError-compatible layout.
     std::string ObjCClassName;
     if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
-      if (ObjCClassName == "_SwiftNativeNSError")
+      if (ObjCClassName == "__SwiftNativeNSError")
         isObjC = true;
     } else {
       // Otherwise, we can check to see if this is a class metadata with the
@@ -1087,8 +1087,8 @@ protected:
         return _readMetadata<TargetStructMetadata>(address);
       case MetadataKind::Tuple: {
         auto numElementsAddress = address +
-          TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
-        StoredSize numElements;
+          TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements();
+        uint32_t numElements;
         if (!Reader->readInteger(RemoteAddress(numElementsAddress),
                                  &numElements))
           return nullptr;

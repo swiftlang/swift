@@ -30,6 +30,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APInt.h"
@@ -1721,7 +1722,6 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
 
   // Pre-order visit of a sequence foo.bar[0]?.baz, which means that the
   // components are pushed in reverse order.
-
   auto traversePath = [&](Expr *expr, bool isInParsedPath,
                           bool emitErrors = true) {
     Expr *outermostExpr = expr;
@@ -1738,7 +1738,12 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
       }
 
       // Recurring cases:
-      if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+      if (auto SE = dyn_cast<DotSelfExpr>(expr)) {
+        // .self, the identity component.
+        components.push_back(KeyPathExpr::Component::forIdentity(
+          SE->getSelfLoc()));
+        expr = SE->getSubExpr();
+      } else if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
         // .foo
         components.push_back(KeyPathExpr::Component::forUnresolvedProperty(
             UDE->getName(), UDE->getLoc()));
@@ -1815,7 +1820,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
     traversePath(root, /*isInParsedPath=*/false);
   }
 
-  // Key paths must have at least one component.
+  // Key paths must be spelled with at least one component.
   if (components.empty()) {
     TC.diagnose(KPE->getLoc(), diag::expr_swift_keypath_empty);
     // Passes further down the pipeline expect keypaths to always have at least
@@ -1949,6 +1954,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeCheckExprOptions options,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
+  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // First, pre-check the expression, validating any types that occur in the
@@ -2077,6 +2083,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
                                    ConcreteDeclRef &referencedDecl,
                                  FreeTypeVariableBinding allowFreeTypeVariables,
                                    ExprTypeCheckListener *listener) {
+  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr-no-apply", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
   referencedDecl = nullptr;
 
@@ -2158,6 +2165,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
     Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
     FreeTypeVariableBinding allowFreeTypeVariables,
     ExprTypeCheckListener *listener) {
+  FrontendStatsTracer StatsTracer(Context.Stats, "get-possible-types-no-apply", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.
@@ -2185,6 +2193,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
 }
 
 bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
+  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-completion-seq", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.
@@ -2261,6 +2270,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
 }
 
 bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
+  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr-shallow", expr);
   PrettyStackTraceExpr stackTrace(Context, "shallow type-checking", expr);
 
   // Construct a constraint system from this expression.
@@ -2793,6 +2803,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
 /// value of a given type.
 bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                        Type rhsType) {
+  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr-pattern", EP);
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
   // Create a 'let' binding to stand in for the RHS value.

@@ -152,6 +152,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   };
   SmallVector<Entity, 6> EntitiesStack;
   SmallVector<Expr *, 8> ExprStack;
+  SmallVector<const AccessorDecl *, 4> ManuallyVisitedAccessorStack;
   bool Cancelled = false;
 
   struct NameAndUSR {
@@ -265,7 +266,10 @@ public:
       : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr), BufferID(BufferID),
         enableWarnings(IdxConsumer.enableWarnings()) {}
 
-  ~IndexSwiftASTWalker() override { assert(Cancelled || EntitiesStack.empty()); }
+  ~IndexSwiftASTWalker() override {
+    assert(Cancelled || EntitiesStack.empty());
+    assert(Cancelled || ManuallyVisitedAccessorStack.empty());
+  }
 
   void visitModule(ModuleDecl &Mod, StringRef Hash);
   void visitDeclContext(DeclContext *DC);
@@ -282,8 +286,8 @@ private:
     if (AvailableAttr::isUnavailable(D))
       return false;
     if (auto *AD = dyn_cast<AccessorDecl>(D)) {
-      auto *Parent = getParentDecl();
-      if (Parent && Parent != AD->getStorage())
+      if (ManuallyVisitedAccessorStack.empty() ||
+          ManuallyVisitedAccessorStack.back() != AD)
         return false; // already handled as part of the var decl.
     }
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -550,7 +554,12 @@ private:
 void IndexSwiftASTWalker::visitDeclContext(DeclContext *Context) {
   IsModuleFile = false;
   isSystemModule = Context->getParentModule()->isSystemModule();
+  auto accessor = dyn_cast<AccessorDecl>(Context);
+  if (accessor)
+    ManuallyVisitedAccessorStack.push_back(accessor);
   walk(Context);
+  if (accessor)
+    ManuallyVisitedAccessorStack.pop_back();
 }
 
 void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod, StringRef KnownHash) {
@@ -691,6 +700,9 @@ bool IndexSwiftASTWalker::handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWit
         return;
 
       auto *decl = witness.getDecl();
+      if (decl == nullptr)
+        return;
+
       if (decl->getDeclContext() == DC) {
         explicitValueWitnesses.push_back(ValueWitness{decl, req});
       } else {
@@ -996,13 +1008,29 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
              accessor->getAccessorKind() == AccessorKind::Set))
           continue;
 
+        ManuallyVisitedAccessorStack.push_back(accessor);
         SourceEntityWalker::walk(cast<Decl>(accessor));
+        ManuallyVisitedAccessorStack.pop_back();
         if (Cancelled)
           return false;
       }
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       if (!reportInheritedTypeRefs(NTD->getInherited(), NTD))
         return false;
+    }
+  } else {
+    // Even if we don't record a local property we still need to walk its
+    // accessor bodies.
+    if (auto StoreD = dyn_cast<AbstractStorageDecl>(D)) {
+      for (auto accessor : StoreD->getAllAccessors()) {
+        if (accessor->isImplicit())
+          continue;
+        ManuallyVisitedAccessorStack.push_back(accessor);
+        SourceEntityWalker::walk(cast<Decl>(accessor));
+        ManuallyVisitedAccessorStack.pop_back();
+        if (Cancelled)
+          return false;
+      }
     }
   }
 

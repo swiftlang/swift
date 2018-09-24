@@ -2,16 +2,10 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/inherits_NSObject
 // RUN: %target-codesign %t/inherits_NSObject
 
-// Link %target-swift-reflection-test into %t to convince %target-run to copy
-// it.
-// RUN: ln -s %target-swift-reflection-test %t/swift-reflection-test
-// RUN: %target-run %t/swift-reflection-test %t/inherits_NSObject | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/inherits_NSObject | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
-
-// FIXME: Handle different forms of %target-run more robustly
-// REQUIRES: OS=macosx
 
 import Foundation
 import simd

@@ -135,6 +135,7 @@ const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
   case Unidentified:
     return nullptr;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
@@ -156,6 +157,7 @@ const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
   case Class:
     return "Class";
   }
+  llvm_unreachable("unhandled kind");
 }
 
 void AccessedStorage::print(raw_ostream &os) const {
@@ -527,6 +529,10 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       builtin->dump();
       llvm_unreachable("unexpected bulitin memory access.");
 
+      // WillThrow exists for the debugger, does nothing.
+    case BuiltinValueKind::WillThrow:
+      return;
+
       // Buitins that affect memory but can't be formal accesses.
     case BuiltinValueKind::UnexpectedError:
     case BuiltinValueKind::ErrorInMain:
@@ -695,7 +701,6 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::EndApplyInst:
-  case SILInstructionKind::EndBorrowArgumentInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::EndUnpairedAccessInst:
   case SILInstructionKind::EndLifetimeInst:

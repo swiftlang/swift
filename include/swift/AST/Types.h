@@ -3073,18 +3073,11 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
     return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  
-/// Break an argument type into an array of \c AnyFunctionType::Params.
-///
-/// \param type The type to decompose.
-/// \param argumentLabels The argument labels to use.
-SmallVector<AnyFunctionType::Param, 4>
-decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 
 /// Map the given parameter list onto a bitvector describing whether
 /// the argument type at each index has a default argument associated with
 /// it.
-llvm::SmallBitVector
+SmallBitVector
 computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
                   const ValueDecl *paramOwner, unsigned level);
 
@@ -4095,7 +4088,8 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getExtInfo(), getCoroutineKind(),
             getCalleeConvention(), getParameters(), getYields(),
-            getResults(), getOptionalErrorResult());
+            getResults(), getOptionalErrorResult(),
+            getWitnessMethodConformanceOrNone());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericSignature *genericSig,
@@ -4105,7 +4099,8 @@ public:
                       ArrayRef<SILParameterInfo> params,
                       ArrayRef<SILYieldInfo> yields,
                       ArrayRef<SILResultInfo> results,
-                      Optional<SILResultInfo> errorResult);
+                      Optional<SILResultInfo> errorResult,
+                      Optional<ProtocolConformanceRef> conformance);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

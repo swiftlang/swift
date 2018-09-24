@@ -918,13 +918,12 @@ struct NonFixedValueWitnesses :
 
   static void storeExtraInhabitant(OpaqueValue *dest, int index,
                                    const Metadata *self) {
-    Box::storeExtraInhabitant((typename Box::type*) dest, index, self);
+    Box::storeExtraInhabitant((typename Box::type*) dest, index);
   }
 
   static int getExtraInhabitantIndex(const OpaqueValue *src,
                                      const Metadata *self) {
-    return Box::getExtraInhabitantIndex((typename Box::type const *) src,
-                                        self);
+    return Box::getExtraInhabitantIndex((typename Box::type const *) src);
   }
 };
 

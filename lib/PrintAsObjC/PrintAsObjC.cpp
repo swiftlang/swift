@@ -65,8 +65,8 @@ static bool isAnyObjectOrAny(Type type) {
 
 /// Returns true if \p name matches a keyword in any Clang language mode.
 static bool isClangKeyword(Identifier name) {
-  static const llvm::StringSet<> keywords = []{
-    llvm::StringSet<> set;
+  static const llvm::DenseSet<StringRef> keywords = []{
+    llvm::DenseSet<StringRef> set;
     // FIXME: clang::IdentifierInfo /nearly/ has the API we need to do this
     // in a more principled way, but not quite.
 #define KEYWORD(SPELLING, FLAGS) \
@@ -1027,17 +1027,40 @@ private:
     return true;
   }
 
+  /// Returns whether \p ty is the C type \c CFTypeRef, or some typealias
+  /// thereof.
   bool isCFTypeRef(Type ty) {
-    if (ID_CFTypeRef.empty())
-      ID_CFTypeRef = M.getASTContext().getIdentifier("CFTypeRef");
-
     const TypeAliasDecl *TAD = nullptr;
     while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
       TAD = aliasTy->getDecl();
       ty = aliasTy->getSinglyDesugaredType();
     }
 
-    return TAD && TAD->getName() == ID_CFTypeRef && TAD->hasClangNode();
+    if (!TAD || !TAD->hasClangNode())
+      return false;
+
+    if (ID_CFTypeRef.empty())
+      ID_CFTypeRef = M.getASTContext().getIdentifier("CFTypeRef");
+    return TAD->getName() == ID_CFTypeRef;
+  }
+
+  /// Returns true if \p ty can be used with Objective-C reference-counting
+  /// annotations like \c strong and \c weak.
+  bool isObjCReferenceCountableObjectType(Type ty) {
+    if (auto classDecl = ty->getClassOrBoundGenericClass()) {
+      switch (classDecl->getForeignClassKind()) {
+      case ClassDecl::ForeignKind::Normal:
+      case ClassDecl::ForeignKind::RuntimeOnly:
+        return true;
+      case ClassDecl::ForeignKind::CFType:
+        return false;
+      }
+    }
+
+    if (ty->isObjCExistentialType() && !isCFTypeRef(ty))
+      return true;
+
+    return false;
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -1065,22 +1088,27 @@ private:
       os << ", readonly";
 
     // Print the ownership semantics, if relevant.
-    // We treat "unowned" as "assign" (even though it's more like
-    // "safe_unretained") because we want people to think twice about
-    // allowing that object to disappear.
     Type ty = VD->getInterfaceType();
-    if (auto weakTy = ty->getAs<WeakStorageType>()) {
-      auto innerTy = weakTy->getReferentType()->getOptionalObjectType();
-      auto innerClass = innerTy->getClassOrBoundGenericClass();
-      if ((innerClass &&
-           innerClass->getForeignClassKind()!=ClassDecl::ForeignKind::CFType) ||
-          (innerTy->isObjCExistentialType() && !isCFTypeRef(innerTy))) {
-        os << ", weak";
+    if (auto referenceStorageTy = ty->getAs<ReferenceStorageType>()) {
+      switch (referenceStorageTy->getOwnership()) {
+      case ReferenceOwnership::Strong:
+        llvm_unreachable("not represented with a ReferenceStorageType");
+      case ReferenceOwnership::Weak: {
+        auto innerTy =
+            referenceStorageTy->getReferentType()->getOptionalObjectType();
+        if (isObjCReferenceCountableObjectType(innerTy))
+          os << ", weak";
+        break;
       }
-    } else if (ty->is<UnownedStorageType>()) {
-      os << ", assign";
-    } else if (ty->is<UnmanagedStorageType>()) {
-      os << ", unsafe_unretained";
+      case ReferenceOwnership::Unowned:
+      case ReferenceOwnership::Unmanaged:
+        // We treat "unowned" as "unsafe_unretained" (even though it's more
+        // like "safe_unretained") because we want people to think twice about
+        // allowing that object to disappear. "unowned(unsafe)" (and
+        // Swift.Unmanaged, handled below) really are "unsafe_unretained".
+        os << ", unsafe_unretained";
+        break;
+      }
     } else {
       Type copyTy = ty;
       bool isOptional = false;
@@ -1117,10 +1145,7 @@ private:
         case FunctionTypeRepresentation::CFunctionPointer:
           break;
         }
-      } else if ((nominal && isa<ClassDecl>(nominal) &&
-                  cast<ClassDecl>(nominal)->getForeignClassKind() !=
-                    ClassDecl::ForeignKind::CFType) ||
-                 (copyTy->isObjCExistentialType() && !isCFTypeRef(copyTy))) {
+      } else if (isObjCReferenceCountableObjectType(copyTy)) {
         os << ", strong";
       }
     }
@@ -2654,15 +2679,6 @@ public:
     return import == importer->getImportedHeaderModule();
   }
 
-  static void getClangSubmoduleReversePath(SmallVectorImpl<StringRef> &path,
-                                           const clang::Module *module) {
-    // FIXME: This should be an API on clang::Module.
-    do {
-      path.push_back(module->Name);
-      module = module->Parent;
-    } while (module);
-  }
-
   static int compareImportModulesByName(const ImportModuleTy *left,
                                         const ImportModuleTy *right) {
     auto *leftSwiftModule = left->dyn_cast<ModuleDecl *>();
@@ -2692,10 +2708,10 @@ public:
     assert(rightClangModule->isSubModule() &&
            "top-level modules should use a normal swift::ModuleDecl");
 
-    SmallVector<StringRef, 8> leftReversePath;
-    SmallVector<StringRef, 8> rightReversePath;
-    getClangSubmoduleReversePath(leftReversePath, leftClangModule);
-    getClangSubmoduleReversePath(rightReversePath, rightClangModule);
+    SmallVector<StringRef, 8> leftReversePath(
+        ModuleDecl::ReverseFullNameIterator(leftClangModule), {});
+    SmallVector<StringRef, 8> rightReversePath(
+        ModuleDecl::ReverseFullNameIterator(rightClangModule), {});
 
     assert(leftReversePath != rightReversePath &&
            "distinct Clang modules should not have the same full name");
@@ -2734,11 +2750,7 @@ public:
         assert(clangModule->isSubModule() &&
                "top-level modules should use a normal swift::ModuleDecl");
         out << "@import ";
-        SmallVector<StringRef, 8> submoduleNames;
-        getClangSubmoduleReversePath(submoduleNames, clangModule);
-        interleave(submoduleNames.rbegin(), submoduleNames.rend(),
-                   [&out](StringRef next) { out << next; },
-                   [&out] { out << "."; });
+        ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
         out << ";\n";
       }
     }

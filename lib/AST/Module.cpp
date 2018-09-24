@@ -34,7 +34,9 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Parse/Token.h"
+#include "swift/Strings.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -772,16 +774,16 @@ struct SourceFile::SourceFileSyntaxInfo {
 };
 
 bool SourceFile::hasSyntaxRoot() const {
-  return SyntaxInfo.SyntaxRoot.hasValue();
+  return SyntaxInfo->SyntaxRoot.hasValue();
 }
 
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
   assert(hasSyntaxRoot() && "no syntax root is set.");
-  return *SyntaxInfo.SyntaxRoot;
+  return *SyntaxInfo->SyntaxRoot;
 }
 
 void SourceFile::setSyntaxRoot(syntax::SourceFileSyntax &&Root) {
-  SyntaxInfo.SyntaxRoot.emplace(Root);
+  SyntaxInfo->SyntaxRoot.emplace(Root);
 }
 
 template<typename OP_DECL>
@@ -1003,6 +1005,84 @@ bool ModuleDecl::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
   });
 }
 
+ModuleDecl::ReverseFullNameIterator::ReverseFullNameIterator(
+    const ModuleDecl *M) {
+  assert(M);
+  // Note: This will look through overlays as well, but that's fine for name
+  // generation purposes. The point of an overlay is to
+  if (auto *clangModule = M->findUnderlyingClangModule())
+    current = clangModule;
+  else
+    current = M;
+}
+
+StringRef ModuleDecl::ReverseFullNameIterator::operator*() const {
+  assert(current && "all name components exhausted");
+
+  if (auto *swiftModule = current.dyn_cast<const ModuleDecl *>())
+    return swiftModule->getName().str();
+
+  auto *clangModule =
+      static_cast<const clang::Module *>(current.get<const void *>());
+  return clangModule->Name;
+}
+
+ModuleDecl::ReverseFullNameIterator &
+ModuleDecl::ReverseFullNameIterator::operator++() {
+  if (!current)
+    return *this;
+
+  if (auto *swiftModule = current.dyn_cast<const ModuleDecl *>()) {
+    current = nullptr;
+    return *this;
+  }
+
+  auto *clangModule =
+      static_cast<const clang::Module *>(current.get<const void *>());
+  if (clangModule->Parent)
+    current = clangModule->Parent;
+  else
+    current = nullptr;
+  return *this;
+}
+
+void
+ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out) const {
+  SmallVector<StringRef, 8> elements(*this, {});
+  swift::interleave(swift::reversed(elements),
+                    [&out](StringRef next) { out << next; },
+                    [&out] { out << '.'; });
+}
+
+void
+ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
+  std::sort(imports.begin(), imports.end(),
+            [](const ImportedModule &lhs, const ImportedModule &rhs) -> bool {
+    // Arbitrarily sort by name to get a deterministic order.
+    if (lhs.second != rhs.second) {
+      return std::lexicographical_compare(
+          lhs.second->getReverseFullModuleName(), {},
+          rhs.second->getReverseFullModuleName(), {});
+    }
+    using AccessPathElem = std::pair<Identifier, SourceLoc>;
+    return std::lexicographical_compare(lhs.first.begin(), lhs.first.end(),
+                                        rhs.first.begin(), rhs.first.end(),
+                                        [](const AccessPathElem &lElem,
+                                           const AccessPathElem &rElem) {
+      return lElem.first.str() < rElem.first.str();
+    });
+  });
+  auto last = std::unique(imports.begin(), imports.end(),
+                          [](const ImportedModule &lhs,
+                             const ImportedModule &rhs) -> bool {
+    if (lhs.second != rhs.second)
+      return false;
+    return ModuleDecl::isSameAccessPath(lhs.first, rhs.first);
+  });
+  imports.erase(last, imports.end());
+}
+
+
 StringRef ModuleDecl::getModuleFilename() const {
   // FIXME: Audit uses of this function and figure out how to migrate them to
   // per-file names. Modules can consist of more than one file.
@@ -1031,6 +1111,10 @@ bool ModuleDecl::isStdlibModule() const {
 
 bool ModuleDecl::isSwiftShimsModule() const {
   return !getParent() && getName() == getASTContext().SwiftShimsModuleName;
+}
+
+bool ModuleDecl::isOnoneSupportModule() const {
+  return !getParent() && getName().str() == SWIFT_ONONE_SUPPORT;
 }
 
 bool ModuleDecl::isBuiltinModule() const {
@@ -1347,7 +1431,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        bool KeepParsedTokens, bool BuildSyntaxTree)
   : FileUnit(FileUnitKind::Source, M),
     BufferID(bufferID ? *bufferID : -1),
-    Kind(K), SyntaxInfo(*new SourceFileSyntaxInfo(BuildSyntaxTree)) {
+    Kind(K), SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
   M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 
@@ -1360,8 +1444,6 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     AllCorrectedTokens = std::vector<Token>();
   }
 }
-
-SourceFile::~SourceFile() { delete &SyntaxInfo; }
 
 std::vector<Token> &SourceFile::getTokenVector() {
   assert(shouldCollectToken() && "Disabled");
@@ -1383,6 +1465,7 @@ bool SourceFile::shouldCollectToken() const {
   case SourceFileKind::SIL:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool SourceFile::shouldBuildSyntaxTree() const {
@@ -1390,11 +1473,12 @@ bool SourceFile::shouldBuildSyntaxTree() const {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::Interface:
-    return SyntaxInfo.Enable;
+    return SyntaxInfo->Enable;
   case SourceFileKind::REPL:
   case SourceFileKind::SIL:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool FileUnit::walk(ASTWalker &walker) {
@@ -1544,4 +1628,29 @@ const ModuleDecl* ModuleEntity::getAsSwiftModule() const {
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
     return SwiftMod;
   return nullptr;
+}
+
+// See swift/Basic/Statistic.h for declaration: this enables tracing SourceFiles, is
+// defined here to avoid too much layering violation / circular linkage
+// dependency.
+
+struct SourceFileTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const SourceFile *SF = static_cast<const SourceFile *>(Entity);
+    OS << llvm::sys::path::filename(SF->getFilename());
+  }
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    // SourceFiles don't have SourceLocs of their own; they contain them.
+  }
+};
+
+static SourceFileTraceFormatter TF;
+
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const SourceFile *>() {
+  return &TF;
 }

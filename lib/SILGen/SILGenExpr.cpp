@@ -163,22 +163,21 @@ SILGenFunction::emitManagedBeginBorrow(SILLocation loc, SILValue v,
 namespace {
 
 struct EndBorrowCleanup : Cleanup {
-  SILValue originalValue;
   SILValue borrowedValue;
 
-  EndBorrowCleanup(SILValue originalValue, SILValue borrowedValue)
-      : originalValue(originalValue), borrowedValue(borrowedValue) {}
+  EndBorrowCleanup(SILValue borrowedValue)
+      : borrowedValue(borrowedValue) {}
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
-    SGF.B.createEndBorrow(l, borrowedValue, originalValue);
+    SGF.B.createEndBorrow(l, borrowedValue);
   }
 
   void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "EndBorrowCleanup "
                  << "State:" << getState() << "\n"
-                 << "original:" << originalValue << "borrowed:" << borrowedValue
+                 << "borrowed:" << borrowedValue
                  << "\n";
 #endif
   }
@@ -271,29 +270,6 @@ SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
   return ManagedValue(borrowed, CleanupHandle::invalid());
 }
 
-namespace {
-
-struct EndBorrowArgumentCleanup : Cleanup {
-  SILPHIArgument *arg;
-
-  EndBorrowArgumentCleanup(SILPHIArgument *arg) : arg(arg) {}
-
-  void emit(SILGenFunction &SGF, CleanupLocation l,
-            ForUnwind_t forUnwind) override {
-    SGF.B.createEndBorrowArgument(l, arg);
-  }
-
-  void dump(SILGenFunction &) const override {
-#ifndef NDEBUG
-    llvm::errs() << "EndBorrowArgumentCleanup "
-                 << "State:" << getState() << "\n"
-                 << "argument: " << *arg << "\n";
-#endif
-  }
-};
-
-} // end anonymous namespace
-
 ManagedValue
 SILGenFunction::emitManagedBorrowedArgumentWithCleanup(SILPHIArgument *arg) {
   if (arg->getOwnershipKind() == ValueOwnershipKind::Trivial ||
@@ -302,7 +278,7 @@ SILGenFunction::emitManagedBorrowedArgumentWithCleanup(SILPHIArgument *arg) {
   }
 
   assert(arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed);
-  Cleanups.pushCleanup<EndBorrowArgumentCleanup>(arg);
+  Cleanups.pushCleanup<EndBorrowCleanup>(arg);
   return ManagedValue(arg, CleanupHandle::invalid());
 }
 
@@ -327,7 +303,7 @@ ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
     return ManagedValue::forUnmanaged(borrowed);
 
   if (borrowed->getType().isObject()) {
-    Cleanups.pushCleanup<EndBorrowCleanup>(original, borrowed);
+    Cleanups.pushCleanup<EndBorrowCleanup>(borrowed);
   }
 
   return ManagedValue(borrowed, CleanupHandle::invalid());
@@ -2832,20 +2808,23 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
   if (!isa<SubscriptDecl>(storage))
     return PreparedArguments();
 
-  SmallVector<TupleTypeElt, 2> indexElts;
+  SmallVector<AnyFunctionType::Param, 8> indexParams;
   for (auto &elt : indexes) {
-    indexElts.push_back(SGF.F.mapTypeIntoContext(elt.first));
+    // FIXME: Varargs?
+    indexParams.emplace_back(SGF.F.mapTypeIntoContext(elt.first));
   }
   
-  auto indexTupleTy = TupleType::get(indexElts, SGF.getASTContext())
-                        ->getCanonicalType();
-  PreparedArguments indexValues(indexTupleTy, /*scalar*/ indexes.size() == 1);
+  PreparedArguments indexValues(indexParams, /*scalar*/ indexes.size() == 1);
   if (indexes.empty()) {
     assert(indexValues.isValid());
     return indexValues;
   }
 
-  auto indexLoweredTy = SGF.getLoweredType(indexTupleTy);
+  auto indexLoweredTy =
+    SGF.getLoweredType(
+      AnyFunctionType::composeInput(SGF.getASTContext(), indexParams,
+                                    /*canonicalVararg=*/false));
+
   auto addr = SGF.B.createPointerToAddress(loc, pointer,
                                            indexLoweredTy.getAddressType(),
                                            /*isStrict*/ false);
@@ -2876,6 +2855,23 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                          ArrayRef<IndexTypePair> indexes,
                          CanType baseType,
                          CanType propertyType) {
+  // If the storage declaration is from a protocol, chase the override chain
+  // back to the declaration whose getter introduced the witness table
+  // entry.
+  if (auto origProto = dyn_cast<ProtocolDecl>(property->getDeclContext())) {
+    auto getter = property->getGetter();
+    if (!SILDeclRef::requiresNewWitnessTableEntry(getter)) {
+      // Find the getter that does have a witness table entry.
+      auto wtableGetter =
+        cast<AccessorDecl>(SILDeclRef::getOverriddenWitnessTableEntry(getter));
+
+      // Substitute the 'Self' type of the base protocol.
+      subs = SILGenModule::mapSubstitutionsForWitnessOverride(
+              getter, wtableGetter, subs);
+      property = wtableGetter->getStorage();
+    }
+  }
+
   auto genericSig = genericEnv
     ? genericEnv->getGenericSignature()->getCanonicalSignature()
     : nullptr;
@@ -2990,6 +2986,23 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                           ArrayRef<IndexTypePair> indexes,
                           CanType baseType,
                           CanType propertyType) {
+  // If the storage declaration is from a protocol, chase the override chain
+  // back to the declaration whose setter introduced the witness table
+  // entry.
+  if (auto origProto = dyn_cast<ProtocolDecl>(property->getDeclContext())) {
+    auto setter = property->getSetter();
+    if (!SILDeclRef::requiresNewWitnessTableEntry(setter)) {
+      // Find the setter that does have a witness table entry.
+      auto wtableSetter =
+        cast<AccessorDecl>(SILDeclRef::getOverriddenWitnessTableEntry(setter));
+
+      // Substitute the 'Self' type of the base protocol.
+      subs = SILGenModule::mapSubstitutionsForWitnessOverride(
+              setter, wtableSetter, subs);
+      property = wtableSetter->getStorage();
+    }
+  }
+
   auto genericSig = genericEnv
     ? genericEnv->getGenericSignature()->getCanonicalSignature()
     : nullptr;
@@ -3836,6 +3849,9 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                     KeyPathPatternComponent::forOptional(loweredKind, baseTy));
       break;
     }
+    
+    case KeyPathExpr::Component::Kind::Identity:
+      continue;
         
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:

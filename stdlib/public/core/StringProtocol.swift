@@ -29,6 +29,8 @@ public protocol StringProtocol
 
   associatedtype UnicodeScalarView : BidirectionalCollection
   where UnicodeScalarView.Element == Unicode.Scalar
+  
+  associatedtype SubSequence = Substring
 
   var utf8: UTF8View { get }
   var utf16: UTF16View { get }

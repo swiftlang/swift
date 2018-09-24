@@ -91,17 +91,17 @@ public func testTopLevel() {
 #endif
 }
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo10PrivFooSubCMa{{.*}} {
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo10PrivFooSubCMa{{.*}} {
 // CHECK: %objc_class** @"\01l_OBJC_CLASS_REF_$_PrivFooSub"
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$SSo3BarC8__noArgsABSgyt_tcfcTO"
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC8__noArgsABSgyt_tcfcTO"
 // CHECK: @"\01L_selector(initWithNoArgs)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$SSo3BarC8__oneArgABSgs5Int32V_tcfcTO"
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC8__oneArgABSgs5Int32V_tcfcTO"
 // CHECK: @"\01L_selector(initWithOneArg:)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$SSo3BarC9__twoArgs5otherABSgs5Int32V_AGtcfcTO"
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC9__twoArgs5otherABSgs5Int32V_AGtcfcTO"
 // CHECK: @"\01L_selector(initWithTwoArgs:other:)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$SSo3BarC2__ABSgs5Int32V_tcfcTO"
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC2__ABSgs5Int32V_tcfcTO"
 // CHECK: @"\01L_selector(init:)"
 
 _ = __PrivAnonymousA

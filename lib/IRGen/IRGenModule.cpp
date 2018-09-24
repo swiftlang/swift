@@ -235,7 +235,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ProtocolRequirementStructTy =
       createStructType(*this, "swift.protocol_requirement", {
     Int32Ty,                // flags
-    Int32Ty                 // default implementation
+    RelativeAddressTy,      // default implementation
   });
   
   // A tuple type metadata record has a couple extra fields.
@@ -349,8 +349,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   MethodDescriptorStructTy
     = createStructType(*this, "swift.method_descriptor", {
+      Int32Ty,
       RelativeAddressTy,
-      Int32Ty
+    });
+
+  MethodOverrideDescriptorStructTy
+    = createStructType(*this, "swift.method_override_descriptor", {
+      RelativeAddressTy,
+      RelativeAddressTy,
+      RelativeAddressTy
     });
 
   TypeMetadataRecordTy
@@ -453,7 +460,6 @@ IRGenModule::~IRGenModule() {
   destroyClangTypeConverter();
   destroyMetadataLayoutMap();
   delete &Types;
-  delete DebugInfo;
 }
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);

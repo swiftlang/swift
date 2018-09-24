@@ -719,16 +719,6 @@ SILCloner<ImplClass>::visitStringLiteralInst(StringLiteralInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitConstStringLiteralInst(
-    ConstStringLiteralInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-                getBuilder().createConstStringLiteral(
-                    getOpLocation(Inst->getLoc()), Inst->getValue(),
-                    Inst->getEncoding()));
-}
-
-template <typename ImplClass>
 void SILCloner<ImplClass>::visitLoadInst(LoadInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createLoad(getOpLocation(Inst->getLoc()),
@@ -773,19 +763,9 @@ void SILCloner<ImplClass>::visitStoreBorrowInst(StoreBorrowInst *Inst) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitEndBorrowInst(EndBorrowInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(
-      Inst, getBuilder().createEndBorrow(getOpLocation(Inst->getLoc()),
-                                         getOpValue(Inst->getBorrowedValue()),
-                                         getOpValue(Inst->getOriginalValue())));
-}
-
-template <typename ImplClass>
-void SILCloner<ImplClass>::visitEndBorrowArgumentInst(
-    EndBorrowArgumentInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(
-      Inst, getBuilder().createEndBorrowArgument(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+  doPostProcess(Inst, getBuilder().createEndBorrow(
+                          getOpLocation(Inst->getLoc()),
+                          getOpValue(Inst->getOperand()), SILValue()));
 }
 
 template <typename ImplClass>

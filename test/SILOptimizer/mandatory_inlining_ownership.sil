@@ -22,7 +22,7 @@ bb(%0 : @guaranteed $C):
 // CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
 // CHECK:   [[VAL:%.*]] = load [trivial] [[ADDR]] : $*Builtin.Int64
-// CHECK:   end_borrow [[BORROW]] from %0 : $C, $C
+// CHECK:   end_borrow [[BORROW]] : $C
 // CHECK:   destroy_value %0 : $C
 // CHECK:   return [[VAL]] : $Builtin.Int64
 // CHECK-LABEL: } // end sil function 'callerWithOwned'
@@ -58,11 +58,11 @@ bb2:
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
 // CHECK:   [[VAL:%.*]] = load [trivial] [[ADDR]] : $*Builtin.Int64
 // CHECK: bb{{.*}}([[RET:%.*]] : @trivial $Builtin.Int64):
-// CHECK:   end_borrow [[BORROW]] from %0 : $C, $C
+// CHECK:   end_borrow [[BORROW]] : $C
 // CHECK:   destroy_value %0 : $C
 // CHECK:   return [[RET]] : $Builtin.Int64
 // CHECK: bb{{.*}}([[ERR:%.*]] : @owned $Error):
-// CHECK:   end_borrow [[BORROW]] from %0 : $C, $C
+// CHECK:   end_borrow [[BORROW]] : $C
 // CHECK:   destroy_value %0 : $C
 // CHECK:   throw [[ERR]] : $Error
 // CHECK-LABEL: } // end sil function 'callerWithThrow'

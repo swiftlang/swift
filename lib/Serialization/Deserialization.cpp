@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -381,9 +381,11 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       return subPattern;
     }
 
-    auto result = new (getContext()) TypedPattern(subPattern.get(), TypeLoc(),
+    auto type = getType(typeID);
+    auto result = new (getContext()) TypedPattern(subPattern.get(),
+                                                  /*typeRepr*/nullptr,
                                                   isImplicit);
-    recordPatternType(result, getType(typeID));
+    recordPatternType(result, type);
     restoreOffset.reset();
     return result;
   }
@@ -1589,6 +1591,7 @@ giveUpFastPath:
             return nullptr;
           }
           values.front() = storage->getAccessor(*actualKind);
+          assert(values.front() && "missing accessor");
         }
         break;
       }
@@ -1706,6 +1709,7 @@ giveUpFastPath:
                                        getXRefDeclNameForError());
   }
 
+  assert(values.front() != nullptr);
   return values.front();
 }
 
@@ -1732,10 +1736,33 @@ DeclBaseName ModuleFile::getDeclBaseName(IdentifierID IID) {
 
   size_t rawID = IID - NUM_SPECIAL_IDS;
   assert(rawID < Identifiers.size() && "invalid identifier ID");
+  auto &identRecord = Identifiers[rawID];
+
+  if (identRecord.Ident.empty()) {
+    StringRef text = getIdentifierText(IID);
+    identRecord.Ident = getContext().getIdentifier(text);
+  }
+  return identRecord.Ident;
+}
+
+Identifier ModuleFile::getIdentifier(IdentifierID IID) {
+  auto name = getDeclBaseName(IID);
+  assert(!name.isSpecial());
+  return name.getIdentifier();
+}
+
+StringRef ModuleFile::getIdentifierText(IdentifierID IID) {
+  if (IID == 0)
+    return StringRef();
+
+  assert(IID >= NUM_SPECIAL_IDS);
+
+  size_t rawID = IID - NUM_SPECIAL_IDS;
+  assert(rawID < Identifiers.size() && "invalid identifier ID");
   auto identRecord = Identifiers[rawID];
 
-  if (identRecord.Offset == 0)
-    return identRecord.Ident;
+  if (!identRecord.Ident.empty())
+    return identRecord.Ident.str();
 
   assert(!IdentifierData.empty() && "no identifier data in module");
 
@@ -1743,14 +1770,7 @@ DeclBaseName ModuleFile::getDeclBaseName(IdentifierID IID) {
   size_t terminatorOffset = rawStrPtr.find('\0');
   assert(terminatorOffset != StringRef::npos &&
          "unterminated identifier string data");
-
-  return getContext().getIdentifier(rawStrPtr.slice(0, terminatorOffset));
-}
-
-Identifier ModuleFile::getIdentifier(IdentifierID IID) {
-  auto name = getDeclBaseName(IID);
-  assert(!name.isSpecial());
-  return name.getIdentifier();
+  return rawStrPtr.slice(0, terminatorOffset);
 }
 
 DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
@@ -2777,11 +2797,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       errorFlags |= DeclDeserializationError::NeedsVTableEntry;
       DeclAttributes attrs;
       attrs.setRawAttributeChain(DAttrs);
-      if (attrs.hasAttribute<RequiredAttr>())
-        errorFlags |= DeclDeserializationError::NeedsAllocatingVTableEntry;
     }
-    if (firstTimeRequired)
-      errorFlags |= DeclDeserializationError::NeedsAllocatingVTableEntry;
 
     auto overridden = getDeclChecked(overriddenID);
     if (!overridden) {
@@ -2833,6 +2849,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (auto errorConvention = maybeReadForeignErrorConvention())
       ctor->setForeignErrorConvention(*errorConvention);
 
+    if (auto bodyText = maybeReadInlinableBodyText())
+      ctor->setBodyStringRepresentation(*bodyText);
+
     if (isImplicit)
       ctor->setImplicit();
     ctor->setIsObjC(isObjC);
@@ -2840,8 +2859,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       ctor->setStubImplementation(true);
     if (initKind.hasValue())
       ctor->setInitKind(initKind.getValue());
-    if (auto overriddenCtor = cast_or_null<ConstructorDecl>(overridden.get()))
-      ctor->setOverriddenDecl(overriddenCtor);
+    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
     ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
 
     if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
@@ -2965,10 +2983,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       var->setImplicit();
     var->setIsObjC(isObjC);
 
-    if (auto overriddenVar = cast_or_null<VarDecl>(overridden.get())) {
-      var->setOverriddenDecl(overriddenVar);
+    var->setOverriddenDecl(cast_or_null<VarDecl>(overridden.get()));
+    if (var->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
-    }
 
     break;
   }
@@ -3227,10 +3244,12 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (auto errorConvention = maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
 
-    if (auto overriddenFunc = cast_or_null<FuncDecl>(overridden.get())) {
-      fn->setOverriddenDecl(overriddenFunc);
+    if (auto bodyText = maybeReadInlinableBodyText())
+      fn->setBodyStringRepresentation(*bodyText);
+
+    fn->setOverriddenDecl(cast_or_null<FuncDecl>(overridden.get()));
+    if (fn->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
-    }
 
     if (isImplicit)
       fn->setImplicit();
@@ -3377,27 +3396,43 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
   case decls_block::PREFIX_OPERATOR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
+    DeclID protoID;
 
-    decls_block::PrefixOperatorLayout::readRecord(scratch, nameID,
-                                                  contextID);
+    decls_block::PrefixOperatorLayout::readRecord(scratch, nameID, contextID,
+                                                  protoID);
     auto DC = getDeclContext(contextID);
-    declOrOffset = createDecl<PrefixOperatorDecl>(DC, SourceLoc(),
-                                                  getIdentifier(nameID),
-                                                  SourceLoc());
+
+    Expected<Decl *> protocol = getDeclChecked(protoID);
+    if (!protocol)
+      return protocol.takeError();
+
+    auto result = createDecl<PrefixOperatorDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(),
+        cast_or_null<ProtocolDecl>(protocol.get()));
+
+    declOrOffset = result;
     break;
   }
 
   case decls_block::POSTFIX_OPERATOR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
+    DeclID protoID;
 
-    decls_block::PostfixOperatorLayout::readRecord(scratch, nameID,
-                                                   contextID);
+    decls_block::PostfixOperatorLayout::readRecord(scratch, nameID, contextID,
+                                                   protoID);
 
     auto DC = getDeclContext(contextID);
-    declOrOffset = createDecl<PostfixOperatorDecl>(DC, SourceLoc(),
-                                                   getIdentifier(nameID),
-                                                   SourceLoc());
+
+    Expected<Decl *> protocol = getDeclChecked(protoID);
+    if (!protocol)
+      return protocol.takeError();
+
+    auto result = createDecl<PostfixOperatorDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(),
+        cast_or_null<ProtocolDecl>(protocol.get()));
+
+    declOrOffset = result;
     break;
   }
 
@@ -3405,9 +3440,10 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     IdentifierID nameID;
     DeclContextID contextID;
     DeclID precedenceGroupID;
+    DeclID protoID;
 
     decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                 precedenceGroupID);
+                                                 precedenceGroupID, protoID);
 
     PrecedenceGroupDecl *precedenceGroup = nullptr;
     Identifier precedenceGroupName;
@@ -3421,11 +3457,14 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     auto DC = getDeclContext(contextID);
 
-    auto result = createDecl<InfixOperatorDecl>(DC, SourceLoc(),
-                                                 getIdentifier(nameID),
-                                                 SourceLoc(), SourceLoc(),
-                                                 precedenceGroupName,
-                                                 SourceLoc());
+    Expected<Decl *> protocol = getDeclChecked(protoID);
+    if (!protocol)
+      return protocol.takeError();
+
+    auto result = createDecl<InfixOperatorDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(), SourceLoc(),
+        precedenceGroupName, SourceLoc(),
+        cast_or_null<ProtocolDecl>(protocol.get()));
     result->setPrecedenceGroup(precedenceGroup);
 
     declOrOffset = result;
@@ -3636,7 +3675,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     DeclContextID contextID;
     bool isImplicit; bool hasPayload; bool isNegative;
     unsigned rawValueKindID;
-    IdentifierID blobData;
+    IdentifierID rawValueData;
     uint8_t rawResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
@@ -3644,7 +3683,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                isImplicit, hasPayload,
                                                rawValueKindID, isNegative,
-                                               blobData,
+                                               rawValueData,
                                                rawResilienceExpansion,
                                                numArgNames,
                                                argNameAndDependencyIDs);
@@ -3688,8 +3727,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     case EnumElementRawValueKind::None:
       break;
     case EnumElementRawValueKind::IntegerLiteral: {
-      auto literalText = getIdentifier(blobData);
-      auto literal = new (getContext()) IntegerLiteralExpr(literalText.get(),
+      auto literalText = getIdentifierText(rawValueData);
+      auto literal = new (getContext()) IntegerLiteralExpr(literalText,
                                                            SourceLoc(),
                                                            /*implicit*/ true);
       if (isNegative)
@@ -3810,10 +3849,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (isImplicit)
       subscript->setImplicit();
     subscript->setIsObjC(isObjC);
-    if (auto overriddenSub = cast_or_null<SubscriptDecl>(overridden.get())) {
-      subscript->setOverriddenDecl(overriddenSub);
+    subscript->setOverriddenDecl(cast_or_null<SubscriptDecl>(overridden.get()));
+    if (subscript->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
-    }
     break;
   }
 
@@ -3912,6 +3950,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     auto dtor = createDecl<DestructorDecl>(SourceLoc(), DC);
     declOrOffset = dtor;
+
+    if (auto bodyText = maybeReadInlinableBodyText())
+      dtor->setBodyStringRepresentation(*bodyText);
 
     configureGenericEnvironment(dtor, genericEnvID);
 
@@ -4165,49 +4206,72 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     DeclID typealiasID;
     TypeID parentTypeID;
     TypeID underlyingTypeID;
+    TypeID substitutedTypeID;
     SubstitutionMapID substitutionsID;
     decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
                                                  parentTypeID,
                                                  underlyingTypeID,
+                                                 substitutedTypeID,
                                                  substitutionsID);
     auto aliasOrError = getDeclChecked(typealiasID);
     if (!aliasOrError)
       return aliasOrError.takeError();
     auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
 
+    bool formSugaredType = true;
+
     Type underlyingType;
     if (ctx.LangOpts.EnableDeserializationRecovery) {
-      Expected<Type> expectedType = getTypeChecked(underlyingTypeID);
-      if (!expectedType)
-        return expectedType.takeError();
-      if (expectedType.get()) {
-        if (!alias ||
-            !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
-          // Fall back to the canonical type.
-          typeOrOffset = expectedType.get()->getCanonicalType();
-          break;
-        }
+      auto underlyingTypeOrError = getTypeChecked(underlyingTypeID);
+      if (!underlyingTypeOrError)
+        return underlyingTypeOrError.takeError();
+
+      underlyingType = underlyingTypeOrError.get();
+
+      if (!alias ||
+          !alias->getDeclaredInterfaceType()->isEqual(underlyingType)) {
+        // Fall back to the canonical type.
+        formSugaredType = false;
       }
 
-      underlyingType = expectedType.get();
     } else {
       underlyingType = getType(underlyingTypeID);
     }
 
-    Type parentType = getType(parentTypeID);
+    // Read the substituted type.
+    auto substitutedTypeOrError = getTypeChecked(substitutedTypeID);
+    if (!substitutedTypeOrError)
+      return substitutedTypeOrError.takeError();
+
+    auto substitutedType = substitutedTypeOrError.get();
 
     // Read the substitutions.
-    SubstitutionMap subMap = getSubstitutionMap(substitutionsID);
+    auto subMap = getSubstitutionMap(substitutionsID);
 
-    // Look through compatibility aliases that are now unavailable.
-    if (alias->getAttrs().isUnavailable(ctx) &&
-        alias->isCompatibilityAlias()) {
-      typeOrOffset = alias->getUnderlyingTypeLoc().getType();
+    auto parentTypeOrError = getTypeChecked(parentTypeID);
+    if (!parentTypeOrError) {
+      typeOrOffset = underlyingType;
       break;
     }
 
+    // Look through compatibility aliases that are now unavailable.
+    if (alias &&
+        alias->getAttrs().isUnavailable(ctx) &&
+        alias->isCompatibilityAlias()) {
+      underlyingType = alias->getUnderlyingTypeLoc().getType().subst(subMap);
+      assert(underlyingType);
+      typeOrOffset = underlyingType;
+      break;
+    }
+
+    if (!formSugaredType) {
+      typeOrOffset = underlyingType;
+      break;
+    }
+
+    auto parentType = parentTypeOrError.get();
     typeOrOffset = NameAliasType::get(alias, parentType, subMap,
-                                      underlyingType);
+                                      substitutedType);
     break;
   }
   case decls_block::NOMINAL_TYPE: {
@@ -4903,13 +4967,12 @@ Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
   auto handleMissingClassMember = [&](const DeclDeserializationError &error) {
     if (error.isDesignatedInitializer())
       containingClass->setHasMissingDesignatedInitializers();
-    if (error.needsVTableEntry() || error.needsAllocatingVTableEntry())
+    if (error.needsVTableEntry())
       containingClass->setHasMissingVTableEntries();
 
     if (error.getName().getBaseName() == DeclBaseName::createConstructor()) {
       suppliedMissingMember = MissingMemberDecl::forInitializer(
-          context, containingClass, error.getName(), error.needsVTableEntry(),
-          error.needsAllocatingVTableEntry());
+          context, containingClass, error.getName(), error.needsVTableEntry());
     } else if (error.needsVTableEntry()) {
       suppliedMissingMember = MissingMemberDecl::forMethod(
           context, containingClass, error.getName(), error.needsVTableEntry());
@@ -4931,14 +4994,13 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
 
   auto handleMissingProtocolMember =
       [&](const DeclDeserializationError &error) {
-        assert(!error.needsAllocatingVTableEntry());
         if (error.needsVTableEntry())
           containingProto->setHasMissingRequirements(true);
 
         if (error.getName().getBaseName() == DeclBaseName::createConstructor()) {
           suppliedMissingMember = MissingMemberDecl::forInitializer(
               context, containingProto, error.getName(),
-              error.needsVTableEntry(), error.needsAllocatingVTableEntry());
+              error.needsVTableEntry());
               return;
         }
         if (error.needsVTableEntry()) {
@@ -5303,6 +5365,25 @@ decodeRawStableForeignErrorConventionKind(uint8_t kind) {
   default:
     return None;
   }
+}
+
+Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
+  using namespace decls_block;
+
+  SmallVector<uint64_t, 8> scratch;
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  StringRef blobData;
+
+  auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return None;
+
+  unsigned recKind = DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
+  if (recKind != INLINABLE_BODY_TEXT)
+    return None;
+
+  restoreOffset.reset();
+  return blobData;
 }
 
 Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {

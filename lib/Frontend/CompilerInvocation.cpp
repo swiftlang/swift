@@ -161,6 +161,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
+  Opts.EnableOperatorDesignatedProtocols |=
+      Args.hasArg(OPT_enable_operator_designated_protocols);
+
   if (auto A = Args.getLastArg(OPT_enable_deserialization_recovery,
                                OPT_disable_deserialization_recovery)) {
     Opts.EnableDeserializationRecovery
@@ -320,6 +323,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Complete;
     }
   }
+
+  Opts.WarnImplicitOverrides =
+    Args.hasArg(OPT_warn_implicit_overrides);
 
   Opts.EnableNSKeyedArchiverDiagnostics =
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
@@ -608,8 +614,13 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       return true;
     }
+    if (environmentVariableRequestedMaximumDeterminism()) {
+      Opts.NumThreads = 1;
+      Diags.diagnose(SourceLoc(), diag::remark_max_determinism_overriding,
+                     "-num-threads");
+    }
   }
-  
+
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 

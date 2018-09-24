@@ -6,9 +6,15 @@
 // RUN: %api-digester -dump-sdk -module cake1 -o %t.dump1.json -module-cache-path %t.module-cache %clang-importer-sdk-nosource -I %t.mod -I %S/Inputs/APINotesLeft
 // RUN: %api-digester -dump-sdk -module cake2 -o %t.dump2.json -module-cache-path %t.module-cache %clang-importer-sdk-nosource -I %t.mod -I %S/Inputs/APINotesRight
 // RUN: %api-digester -diagnose-sdk -print-module --input-paths %t.dump1.json -input-paths %t.dump2.json > %t.result
-// RUN: diff -u %S/Outputs/Cake.txt %t.result
+
+// RUN: %clang -E -P -x c %S/Outputs/Cake.txt -o - | sed '/^\s*$/d' > %t.expected
+// RUN: %clang -E -P -x c %t.result -o - | sed '/^\s*$/d' > %t.result.tmp
+// RUN: diff -u %t.expected %t.result.tmp
 
 // RUN: %api-digester -dump-sdk -module cake1 -o %t.dump1.json -module-cache-path %t.module-cache %clang-importer-sdk-nosource -I %t.mod -I %S/Inputs/APINotesLeft -abi
 // RUN: %api-digester -dump-sdk -module cake2 -o %t.dump2.json -module-cache-path %t.module-cache %clang-importer-sdk-nosource -I %t.mod -I %S/Inputs/APINotesRight -abi
 // RUN: %api-digester -diagnose-sdk -print-module --input-paths %t.dump1.json -input-paths %t.dump2.json -abi > %t.result
-// RUN: diff -u %S/Outputs/Cake-abi.txt %t.result
+
+// RUN: %clang -E -P -x c %S/Outputs/Cake-abi.txt -o - | sed '/^\s*$/d' > %t.expected
+// RUN: %clang -E -P -x c %t.result -o - | sed '/^\s*$/d' > %t.result.tmp
+// RUN: diff -u %t.expected %t.result.tmp

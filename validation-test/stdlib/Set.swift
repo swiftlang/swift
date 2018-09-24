@@ -123,7 +123,11 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
 #if _runtime(_ObjC)
 func isNativeNSSet(_ s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(type(of: s)) as NSString
-  return ["_SwiftDeferredNSSet", "NativeSetStorage"].contains {
+  return [
+    "_SwiftDeferredNSSet",
+    "_EmptySetSingleton",
+    "_SetStorage"
+  ].contains {
     className.range(of: $0).length > 0
   }
 }
@@ -742,7 +746,7 @@ SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate")
     expectEqual(identity1, s1._rawIdentifier())
 
     deleted = s1.remove(1010)
-    expectOptionalEqual(1010, deleted)
+    expectEqual(1010, deleted)
     expectEqual(identity1, s1._rawIdentifier())
 
     // Keep variables alive.
@@ -760,7 +764,7 @@ SetTestSuite.test("COW.Fast.RemoveDoesNotReallocate")
     expectEqual(identity1, s2._rawIdentifier())
 
     deleted = s2.remove(1010)
-    expectOptionalEqual(1010, deleted)
+    expectEqual(1010, deleted)
     expectEqual(identity1, s1._rawIdentifier())
     expectNotEqual(identity1, s2._rawIdentifier())
 
@@ -781,7 +785,7 @@ SetTestSuite.test("COW.Slow.RemoveDoesNotReallocate")
     expectEqual(identity1, s1._rawIdentifier())
 
     deleted = s1.remove(TestKeyTy(1010))
-    expectOptionalEqual(TestKeyTy(1010), deleted)
+    expectEqual(TestKeyTy(1010), deleted)
     expectEqual(identity1, s1._rawIdentifier())
 
     // Keep variables alive.
@@ -799,7 +803,7 @@ SetTestSuite.test("COW.Slow.RemoveDoesNotReallocate")
     expectEqual(identity1, s2._rawIdentifier())
 
     deleted = s2.remove(TestKeyTy(1010))
-    expectOptionalEqual(TestKeyTy(1010), deleted)
+    expectEqual(TestKeyTy(1010), deleted)
     expectEqual(identity1, s1._rawIdentifier())
     expectNotEqual(identity1, s2._rawIdentifier())
 
@@ -1791,12 +1795,14 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove")
 SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var s = getBridgedVerbatimSet([])
-    let identity1 = s._rawIdentifier()
     expectTrue(isCocoaSet(s))
     expectEqual(0, s.count)
 
+    let emptySet = Set<Int>()
+    expectNotEqual(emptySet._rawIdentifier(), s._rawIdentifier())
+
     s.removeAll()
-    expectEqual(identity1, s._rawIdentifier())
+    expectEqual(emptySet._rawIdentifier(), s._rawIdentifier())
     expectEqual(0, s.count)
   }
 
@@ -1853,12 +1859,14 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var s = getBridgedNonverbatimSet([])
-    let identity1 = s._rawIdentifier()
     expectTrue(isNativeSet(s))
     expectEqual(0, s.count)
 
+    let emptySet = Set<Int>()
+    expectNotEqual(emptySet._rawIdentifier(), s._rawIdentifier())
+
     s.removeAll()
-    expectEqual(identity1, s._rawIdentifier())
+    expectEqual(emptySet._rawIdentifier(), s._rawIdentifier())
     expectEqual(0, s.count)
   }
 
@@ -3070,6 +3078,7 @@ SetTestSuite.test("formSymmetricDifference")
   .code {
   // Overlap with 4040, 5050, 6060
   var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
+  let s1_copy = s1
   let s2 = Set([1010])
   let result = Set([2020, 3030, 4040, 5050, 6060])
 
@@ -3077,10 +3086,11 @@ SetTestSuite.test("formSymmetricDifference")
   let identity1 = s1._rawIdentifier()
   s1.formSymmetricDifference(s2)
 
-  // Removing just one element shouldn't cause an identity change
-  expectEqual(identity1, s1._rawIdentifier())
+  // COW should trigger a copy
+  expectNotEqual(identity1, s1._rawIdentifier())
 
   expectEqual(s1, result)
+  expectEqual(s1_copy, Set([1010, 2020, 3030, 4040, 5050, 6060]))
 
   // A ⨁ A == {}
   s1.formSymmetricDifference(s1)
@@ -3471,7 +3481,7 @@ SetTestSuite.test("Hashable") {
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,1") {
   var set = Set([1010, 1020, 1030])
   let iter = set.makeIterator()
-  expectOptionalEqual(1010, set.remove(1010))
+  expectEqual(1010, set.remove(1010))
 
   expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
@@ -3479,9 +3489,9 @@ SetTestSuite.test("mutationDoesNotAffectIterator/remove,1") {
 SetTestSuite.test("mutationDoesNotAffectIterator/remove,all") {
   var set = Set([1010, 1020, 1030])
   let iter = set.makeIterator()
-  expectOptionalEqual(1010, set.remove(1010))
-  expectOptionalEqual(1020, set.remove(1020))
-  expectOptionalEqual(1030, set.remove(1030))
+  expectEqual(1010, set.remove(1010))
+  expectEqual(1020, set.remove(1020))
+  expectEqual(1030, set.remove(1030))
 
   expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
@@ -4217,7 +4227,7 @@ SetTestSuite.test("SetAlgebra.UpdateWith.SingleEntry") {
   expectNil(member1)
   
   let member2 = s.update(with: 1020)
-  expectOptionalEqual(1020, member2)
+  expectEqual(1020, member2)
 }
 
 SetTestSuite.test("SetAlgebra.UpdateWith.MultipleEntries") {
@@ -4233,7 +4243,7 @@ SetTestSuite.test("SetAlgebra.UpdateWith.MultipleEntries") {
   expectNil(member1)
   
   let member2 = s.update(with: 1050)
-  expectOptionalEqual(1050, member2)
+  expectEqual(1050, member2)
 }
 
 SetTestSuite.test("SetAlgebra.UpdateWith.EmptySet") {
@@ -4247,7 +4257,7 @@ SetTestSuite.test("SetAlgebra.UpdateWith.EmptySet") {
   expectNil(member1)
   
   let member2 = s.update(with: 1010)
-  expectOptionalEqual(1010, member2)
+  expectEqual(1010, member2)
 }
 
 SetTestSuite.test("localHashSeeds") {

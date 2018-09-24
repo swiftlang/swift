@@ -22,6 +22,7 @@
 #include "swift/Basic/AnyValue.h"
 #include "swift/Basic/CycleDiagnosticKind.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SetVector.h"
@@ -338,7 +339,8 @@ private:
 
     PrettyStackTraceRequest<Request> prettyStackTrace(request);
 
-    /// Update statistics.
+    // Trace and/or count statistics.
+    FrontendStatsTracer statsTracer = make_tracer(stats, request);
     if (stats) reportEvaluatedRequest(*stats, request);
 
     return getRequestFunction<Request>()(request, *this);

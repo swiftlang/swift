@@ -203,6 +203,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     // TODO: Perhaps we can map subscript components to dictionary keys.
     switch (auto kind = component.getKind()) {
     case KeyPathExpr::Component::Kind::Invalid:
+    case KeyPathExpr::Component::Kind::Identity:
       continue;
 
     case KeyPathExpr::Component::Kind::UnresolvedProperty:

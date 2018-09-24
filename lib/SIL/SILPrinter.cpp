@@ -1202,22 +1202,6 @@ public:
     *this << '"' << llvm::toHex(SLI->getValue()) << '"';
   }
 
-  static StringRef
-  getStringEncodingName(ConstStringLiteralInst::Encoding kind) {
-    switch (kind) {
-    case ConstStringLiteralInst::Encoding::UTF8:
-      return "utf8 ";
-    case ConstStringLiteralInst::Encoding::UTF16:
-      return "utf16 ";
-    }
-    llvm_unreachable("bad string literal encoding");
-  }
-
-  void visitConstStringLiteralInst(ConstStringLiteralInst *SLI) {
-    *this << getStringEncodingName(SLI->getEncoding())
-          << QuotedString(SLI->getValue());
-  }
-
   void printLoadOwnershipQualifier(LoadOwnershipQualifier Qualifier) {
     switch (Qualifier) {
     case LoadOwnershipQualifier::Unqualified:
@@ -1275,14 +1259,7 @@ public:
   }
 
   void visitEndBorrowInst(EndBorrowInst *EBI) {
-    *this << Ctx.getID(EBI->getBorrowedValue()) << " from "
-          << Ctx.getID(EBI->getOriginalValue()) << " : "
-          << EBI->getBorrowedValue()->getType() << ", "
-          << EBI->getOriginalValue()->getType();
-  }
-
-  void visitEndBorrowArgumentInst(EndBorrowArgumentInst *EBAI) {
-    *this << getIDAndType(EBAI->getOperand());
+    *this << getIDAndType(EBI->getOperand());
   }
 
   void visitAssignInst(AssignInst *AI) {
@@ -2663,7 +2640,6 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     Options.SkipImplicit = false;
     Options.PrintGetSetOnRWProperties = true;
     Options.PrintInSILBody = false;
-    Options.PrintDefaultParameterPlaceholder = false;
     bool WholeModuleMode = (M == AssociatedDeclContext);
 
     SmallVector<Decl *, 32> topLevelDecls;
@@ -2786,6 +2762,68 @@ static bool printAssociatedTypePath(llvm::raw_ostream &OS, CanType path) {
   }
 }
 
+void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
+                                   const PrintOptions &options) const {
+  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  out << "  ";
+  switch (getKind()) {
+  case WitnessKind::Invalid:
+    out << "no_default";
+    break;
+  case WitnessKind::Method: {
+    // method #declref: @function
+    auto &methodWitness = getMethodWitness();
+    out << "method ";
+    methodWitness.Requirement.print(out);
+    out << ": ";
+    QualifiedSILTypeOptions.CurrentModule =
+        methodWitness.Requirement.getDecl()
+            ->getDeclContext()
+            ->getParentModule();
+    methodWitness.Requirement.getDecl()->getInterfaceType().print(
+        out, QualifiedSILTypeOptions);
+    out << " : ";
+    if (methodWitness.Witness) {
+      methodWitness.Witness->printName(out);
+      out << "\t// "
+         << demangleSymbol(methodWitness.Witness->getName());
+    } else {
+      out << "nil";
+    }
+    break;
+  }
+  case WitnessKind::AssociatedType: {
+    // associated_type AssociatedTypeName: ConformingType
+    auto &assocWitness = getAssociatedTypeWitness();
+    out << "associated_type ";
+    out << assocWitness.Requirement->getName() << ": ";
+    assocWitness.Witness->print(out, options);
+    break;
+  }
+  case WitnessKind::AssociatedTypeProtocol: {
+    // associated_type_protocol (AssociatedTypeName: Protocol): <conformance>
+    auto &assocProtoWitness = getAssociatedTypeProtocolWitness();
+    out << "associated_type_protocol (";
+    (void) printAssociatedTypePath(out, assocProtoWitness.Requirement);
+    out << ": " << assocProtoWitness.Protocol->getName() << "): ";
+    if (assocProtoWitness.Witness.isConcrete())
+      assocProtoWitness.Witness.getConcrete()->printName(out, options);
+    else
+      out << "dependent";
+    break;
+  }
+  case WitnessKind::BaseProtocol: {
+    // base_protocol Protocol: <conformance>
+    auto &baseProtoWitness = getBaseProtocolWitness();
+    out << "base_protocol "
+        << baseProtoWitness.Requirement->getName() << ": ";
+    baseProtoWitness.Witness->printName(out, options);
+    break;
+  }
+  }
+  out << '\n';
+}
+
 void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   PrintOptions Options = PrintOptions::printSIL();
   PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
@@ -2806,62 +2844,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << " {\n";
   
   for (auto &witness : getEntries()) {
-    OS << "  ";
-    switch (witness.getKind()) {
-    case Invalid:
-      llvm_unreachable("invalid witness?!");
-    case Method: {
-      // method #declref: @function
-      auto &methodWitness = witness.getMethodWitness();
-      OS << "method ";
-      methodWitness.Requirement.print(OS);
-      OS << ": ";
-      QualifiedSILTypeOptions.CurrentModule =
-          methodWitness.Requirement.getDecl()
-              ->getDeclContext()
-              ->getParentModule();
-      methodWitness.Requirement.getDecl()->getInterfaceType().print(
-          OS, QualifiedSILTypeOptions);
-      OS << " : ";
-      if (methodWitness.Witness) {
-        methodWitness.Witness->printName(OS);
-        OS << "\t// "
-           << demangleSymbol(methodWitness.Witness->getName());
-      } else {
-        OS << "nil";
-      }
-      break;
-    }
-    case AssociatedType: {
-      // associated_type AssociatedTypeName: ConformingType
-      auto &assocWitness = witness.getAssociatedTypeWitness();
-      OS << "associated_type ";
-      OS << assocWitness.Requirement->getName() << ": ";
-      assocWitness.Witness->print(OS, Options);
-      break;
-    }
-    case AssociatedTypeProtocol: {
-      // associated_type_protocol (AssociatedTypeName: Protocol): <conformance>
-      auto &assocProtoWitness = witness.getAssociatedTypeProtocolWitness();
-      OS << "associated_type_protocol (";
-      (void) printAssociatedTypePath(OS, assocProtoWitness.Requirement);
-      OS << ": " << assocProtoWitness.Protocol->getName() << "): ";
-      if (assocProtoWitness.Witness.isConcrete())
-        assocProtoWitness.Witness.getConcrete()->printName(OS, Options);
-      else
-        OS << "dependent";
-      break;
-    }
-    case BaseProtocol: {
-      // base_protocol Protocol: <conformance>
-      auto &baseProtoWitness = witness.getBaseProtocolWitness();
-      OS << "base_protocol "
-         << baseProtoWitness.Requirement->getName() << ": ";
-      baseProtoWitness.Witness->printName(OS, Options);
-      break;
-    }
-    }
-    OS << '\n';
+    witness.print(OS, Verbose, Options);
   }
 
   for (auto conditionalConformance : getConditionalConformances()) {
@@ -2893,25 +2876,11 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   printLinkage(OS, getLinkage(), ForDefinition);
   OS << getProtocol()->getName() << " {\n";
   
-  for (auto &witness : getEntries()) {
-    if (!witness.isValid()) {
-      OS << "  no_default\n";
-      continue;
-    }
+  PrintOptions options = PrintOptions::printSIL();
+  options.GenericEnv = Protocol->getGenericEnvironmentOfContext();
 
-    // method #declref: @function
-    OS << "  method ";
-    witness.getRequirement().print(OS);
-    OS << ": ";
-    QualifiedSILTypeOptions.CurrentModule =
-        witness.getRequirement().getDecl()->getDeclContext()->getParentModule();
-    witness.getRequirement().getDecl()->getInterfaceType().print(
-        OS, QualifiedSILTypeOptions);
-    OS << " : ";
-    witness.getWitness()->printName(OS);
-    OS << "\t// "
-       << Demangle::demangleSymbolAsString(witness.getWitness()->getName());
-    OS << '\n';
+  for (auto &witness : getEntries()) {
+    witness.print(OS, Verbose, options);
   }
   
   OS << "}\n\n";

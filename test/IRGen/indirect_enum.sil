@@ -2,8 +2,8 @@
 
 import Swift
 
-// CHECK-64: @"$S13indirect_enum5TreeAOWV" = internal constant {{.*}} i8* inttoptr ([[WORD:i64]] 8 to i8*), i8* inttoptr (i64 2162695 to i8*), i8* inttoptr (i64 8 to i8*)
-// CHECK-32: @"$S13indirect_enum5TreeAOWV" = internal constant {{.*}} i8* inttoptr ([[WORD:i32]] 4 to i8*), i8* inttoptr (i32 2162691 to i8*), i8* inttoptr (i32 4 to i8*)
+// CHECK-64: @"$s13indirect_enum5TreeAOWV" = internal constant {{.*}} i8* inttoptr ([[WORD:i64]] 8 to i8*), i8* inttoptr (i64 2162695 to i8*), i8* inttoptr (i64 8 to i8*)
+// CHECK-32: @"$s13indirect_enum5TreeAOWV" = internal constant {{.*}} i8* inttoptr ([[WORD:i32]] 4 to i8*), i8* inttoptr (i32 2162691 to i8*), i8* inttoptr (i32 4 to i8*)
 
 // CHECK-NOT: define{{( protected)?}} private %swift.type** @get_field_types_TreeA
 indirect enum TreeA<T> {

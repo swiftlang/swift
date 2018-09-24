@@ -12,6 +12,10 @@ struct ArrayIntBuffer {
   var storage : Builtin.NativeObject
 }
 
+final class StorageBase {
+  @sil_stored var header: Int64
+}
+
 struct ArrayInt{
   var buffer : ArrayIntBuffer
 }
@@ -658,6 +662,68 @@ bb4:
   %43 = struct_extract %42 : $UnsafeMutablePointerInt, #UnsafeMutablePointerInt._rawValue
   %44 = pointer_to_address %43 : $Builtin.RawPointer to [strict] $*Int32
   store %0 to %44 : $*Int32
+  br bb1(%21 : $Builtin.Int32)
+
+bb3:
+  %23 = struct $Int32 (%4 : $Builtin.Int32)
+  return %23 : $Int32
+}
+
+// HOIST-LABEL: sil @hoist_rangechecked_ref_tail_addr
+// HOIST: bb0
+// HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
+// HOIST: bb1:
+// HOIST: br bb6
+// HOIST: bb2:
+// HOIST:   [[CB:%[0-9]+]] = function_ref @checkbounds
+// HOIST:    apply [[CB]]
+// HOIST:   br bb3{{.*}}
+// HOIST: bb3{{.*}}:
+// HOIST-NOT: function_ref @checkbounds
+// HOIST-NOT:    apply [[CB]]
+// HOIST:   cond_br {{.*}}, bb5{{.*}}, bb4{{.*}}
+// HOIST: bb4
+// HOIST:   br bb3
+// HOIST: bb5
+// HOIST:   br bb6
+// HOIST: bb6{{.*}}:
+// HOIST:  return
+
+sil @hoist_rangechecked_ref_tail_addr : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
+bb0(%0 : $Int32, %24 : $*ArrayInt):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
+  %1 = struct_extract %0 : $Int32, #Int32._value
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  %61 = builtin "cmp_sle_Int32"(%2 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  %14 = builtin "xor_Int1"(%61 : $Builtin.Int1, %3 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %14 : $Builtin.Int1
+  br bb1(%2 : $Builtin.Int32)
+
+bb1(%4 : $Builtin.Int32):
+  %8 = builtin "cmp_eq_Int32"(%4 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb3, bb4
+
+bb4:
+  %37 = struct $Int32(%4 : $Builtin.Int32)
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %53 = load %24 : $*ArrayInt
+  %54 = struct_extract %53 : $ArrayInt, #ArrayInt.buffer
+  %55 = struct_extract %54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %55 : $Builtin.NativeObject
+  %58 = apply %52(%37, %101, %53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %10 = integer_literal $Builtin.Int32, 1
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
+
+  retain_value %55 : $Builtin.NativeObject
+
+  %69 = unchecked_ref_cast %55 : $Builtin.NativeObject to $StorageBase
+  %70 = ref_tail_addr %69 : $StorageBase, $Int32
+  %71 = index_addr %70 : $*Int32, %4 : $Builtin.Int32
+  store %0 to %71 : $*Int32
   br bb1(%21 : $Builtin.Int32)
 
 bb3:

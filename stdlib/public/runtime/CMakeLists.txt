@@ -31,7 +31,7 @@ set(swift_runtime_objc_sources
     SwiftObject.mm
     SwiftValue.mm
     ReflectionMirror.mm
-    ObjCRuntimeGetImageNameFromClass.cpp
+    ObjCRuntimeGetImageNameFromClass.mm
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
@@ -57,6 +57,7 @@ set(swift_runtime_sources
     ImageInspectionELF.cpp
     ImageInspectionCOFF.cpp
     KnownMetadata.cpp
+    LLVMSupport.cpp
     Metadata.cpp
     MetadataLookup.cpp
     MutexPThread.cpp

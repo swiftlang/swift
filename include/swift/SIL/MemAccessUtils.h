@@ -237,6 +237,7 @@ public:
     case Class:
       return objProj == other.objProj;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   /// Return true if the storage is guaranteed local.
@@ -253,6 +254,7 @@ public:
     case Unidentified:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   bool isUniquelyIdentified() const {
@@ -268,6 +270,7 @@ public:
     case Unidentified:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   bool isDistinctFrom(const AccessedStorage &other) const {

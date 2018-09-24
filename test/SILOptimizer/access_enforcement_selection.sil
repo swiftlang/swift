@@ -211,7 +211,7 @@ sil @borrowClosure : $@convention(thin) () -> () {
   // closure is borrowed.
   %borrow = begin_borrow %closure : $@callee_guaranteed () -> ()
   %closure_copy = copy_value %borrow : $@callee_guaranteed () -> ()
-  end_borrow %borrow from %closure : $@callee_guaranteed () -> (), $@callee_guaranteed () -> ()
+  end_borrow %borrow : $@callee_guaranteed () -> ()
 
   destroy_value %closure_copy : $@callee_guaranteed () -> ()
   destroy_value %closure : $@callee_guaranteed () -> ()

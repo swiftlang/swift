@@ -1374,7 +1374,7 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
   { $0 == $1 }
   
   do {
-    let d2: [MinimalHashableValue : Int] = [
+    var d2: [MinimalHashableValue : Int] = [
       MinimalHashableValue(10): 1010,
       MinimalHashableValue(20): 1020,
       MinimalHashableValue(30): 1030,
@@ -1385,6 +1385,8 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
       MinimalHashableValue(80): 1080,
       MinimalHashableValue(90): 1090,
     ]
+    // Make collisions less likely
+    d2.reserveCapacity(1000)
     
     // Find the last key in the dictionary
     var lastKey: MinimalHashableValue = d2.first!.key
@@ -2591,12 +2593,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var d = getBridgedVerbatimDictionary([:])
-    let identity1 = d._rawIdentifier()
     assert(isCocoaDictionary(d))
     assert(d.count == 0)
 
+    let empty = Dictionary<Int, Int>()
+    expectNotEqual(empty._rawIdentifier(), d._rawIdentifier())
+
     d.removeAll()
-    assert(identity1 == d._rawIdentifier())
+    assert(empty._rawIdentifier() == d._rawIdentifier())
     assert(d.count == 0)
   }
 
@@ -2674,12 +2678,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var d = getBridgedNonverbatimDictionary([:])
-    let identity1 = d._rawIdentifier()
     assert(isNativeDictionary(d))
     assert(d.count == 0)
 
+    let empty = Dictionary<Int, Int>()
+    expectNotEqual(empty._rawIdentifier(), d._rawIdentifier())
+
     d.removeAll()
-    assert(identity1 == d._rawIdentifier())
+    assert(empty._rawIdentifier() == d._rawIdentifier())
     assert(d.count == 0)
   }
 
@@ -4425,7 +4431,7 @@ DictionaryTestSuite.test("mutationDoesNotAffectIterator/subscript/store") {
 DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,1") {
   var dict = getDerivedAPIsDictionary()
   let iter = dict.makeIterator()
-  expectOptionalEqual(1010, dict.removeValue(forKey: 10))
+  expectEqual(1010, dict.removeValue(forKey: 10))
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
@@ -4435,9 +4441,9 @@ DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,1") {
 DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,all") {
   var dict = getDerivedAPIsDictionary()
   let iter = dict.makeIterator()
-  expectOptionalEqual(1010, dict.removeValue(forKey: 10))
-  expectOptionalEqual(1020, dict.removeValue(forKey: 20))
-  expectOptionalEqual(1030, dict.removeValue(forKey: 30))
+  expectEqual(1010, dict.removeValue(forKey: 10))
+  expectEqual(1020, dict.removeValue(forKey: 20))
+  expectEqual(1030, dict.removeValue(forKey: 30))
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
@@ -4479,16 +4485,16 @@ DictionaryTestSuite.test("misc") {
     dict["Swift"] = 3
 
     // Access
-    expectOptionalEqual(1, dict["Hello"])
-    expectOptionalEqual(2, dict["World"])
-    expectOptionalEqual(3, dict["Swift"])
+    expectEqual(1, dict["Hello"])
+    expectEqual(2, dict["World"])
+    expectEqual(3, dict["Swift"])
     expectNil(dict["Universe"])
 
     // Overwriting existing value
     dict["Hello"] = 0
-    expectOptionalEqual(0, dict["Hello"])
-    expectOptionalEqual(2, dict["World"])
-    expectOptionalEqual(3, dict["Swift"])
+    expectEqual(0, dict["Hello"])
+    expectEqual(2, dict["World"])
+    expectEqual(3, dict["Swift"])
     expectNil(dict["Universe"])
   }
 
@@ -4496,9 +4502,9 @@ DictionaryTestSuite.test("misc") {
     // Dictionaries with other types
     var d = [ 1.2: 1, 2.6: 2 ]
     d[3.3] = 3
-    expectOptionalEqual(1, d[1.2])
-    expectOptionalEqual(2, d[2.6])
-    expectOptionalEqual(3, d[3.3])
+    expectEqual(1, d[1.2])
+    expectEqual(2, d[2.6])
+    expectEqual(3, d[3.3])
   }
 
   do {
@@ -4508,11 +4514,11 @@ DictionaryTestSuite.test("misc") {
     d["three"] = 3
     d["four"] = 4
     d["five"] = 5
-    expectOptionalEqual(1, d["one"])
-    expectOptionalEqual(2, d["two"])
-    expectOptionalEqual(3, d["three"])
-    expectOptionalEqual(4, d["four"])
-    expectOptionalEqual(5, d["five"])
+    expectEqual(1, d["one"])
+    expectEqual(2, d["two"])
+    expectEqual(3, d["three"])
+    expectEqual(4, d["four"])
+    expectEqual(5, d["five"])
 
     // Iterate over (key, value) tuples as a silly copy
     var d3 = Dictionary<String,Int>(minimumCapacity: 13)
@@ -4520,11 +4526,11 @@ DictionaryTestSuite.test("misc") {
     for (k, v) in d {
       d3[k] = v
     }
-    expectOptionalEqual(1, d3["one"])
-    expectOptionalEqual(2, d3["two"])
-    expectOptionalEqual(3, d3["three"])
-    expectOptionalEqual(4, d3["four"])
-    expectOptionalEqual(5, d3["five"])
+    expectEqual(1, d3["one"])
+    expectEqual(2, d3["two"])
+    expectEqual(3, d3["three"])
+    expectEqual(4, d3["four"])
+    expectEqual(5, d3["five"])
 
     expectEqual(3, d.values[d.keys.firstIndex(of: "three")!])
     expectEqual(4, d.values[d.keys.firstIndex(of: "four")!])

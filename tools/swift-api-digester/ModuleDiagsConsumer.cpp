@@ -33,6 +33,7 @@ enum LocalDiagID : uint32_t {
 static StringRef getCategoryName(uint32_t ID) {
   switch(ID) {
   case LocalDiagID::removed_decl:
+  case LocalDiagID::removed_setter:
     return "/* Removed Decls */";
   case LocalDiagID::moved_decl:
     return "/* Moved Decls */";
@@ -41,12 +42,22 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::decl_attr_change:
   case LocalDiagID::decl_new_attr:
     return "/* Decl Attribute changes */";
+  case LocalDiagID::default_arg_removed:
   case LocalDiagID::decl_type_change:
     return "/* Type Changes */";
   case LocalDiagID::raw_type_change:
     return "/* RawRepresentable Changes */";
   case LocalDiagID::generic_sig_change:
     return "/* Generic Signature Changes */";
+  case LocalDiagID::decl_added:
+  case LocalDiagID::decl_reorder:
+    return "/* Fixed-layout Type Changes */";
+  case LocalDiagID::conformance_added:
+  case LocalDiagID::conformance_removed:
+    return "/* Protocol Conformance Change */";
+  case LocalDiagID::default_associated_type_removed:
+  case LocalDiagID::protocol_req_added:
+    return "/* Protocol Requirement Change */";
   default:
     return StringRef();
   }

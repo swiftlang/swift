@@ -187,12 +187,6 @@ protected:
     Length : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ConstStringLiteralInst, LiteralInst, 1+32,
-    TheEncoding : 1,
-    : NumPadBits,
-    Length : 32
-  );
-
   SWIFT_INLINE_BITFIELD(DeallocRefInst, DeallocationInst, 1,
     OnStack : 1
   );

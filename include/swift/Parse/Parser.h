@@ -346,6 +346,9 @@ public:
   SyntaxParsingContext *SyntaxContext;
 
 public:
+  Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
+         SILParserTUStateBase *SIL,
+         PersistentParserState *PersistentState);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
          PersistentParserState *PersistentState = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
@@ -408,6 +411,7 @@ public:
     }
 
     ~BacktrackingScope();
+    bool willBacktrack() const { return Backtrack; }
 
     void cancelBacktrack() {
       Backtrack = false;
@@ -415,6 +419,7 @@ public:
       SynContext.reset();
       DT.commit();
     }
+
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -765,6 +770,8 @@ public:
                                llvm::function_ref<void(Decl*)> Handler);
 
   void parseDeclDelayed();
+
+  void parseDeclListDelayed(IterableDeclContext *IDC);
 
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
                                             DeclAttributes &Attributes);
@@ -1396,6 +1403,8 @@ public:
   parsePlatformVersionConstraintSpec();
   ParserResult<LanguageVersionConstraintAvailabilitySpec>
   parseLanguageVersionConstraintSpec();
+
+  bool canDelayMemberDeclParsing();
 };
 
 /// Describes a parsed declaration name.

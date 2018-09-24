@@ -991,15 +991,6 @@ static ValueDecl *getTypeJoinMetaOperation(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
-static ValueDecl *getIdentityKeyPathOperation(ASTContext &Context,
-                                              Identifier Id) {
-  BuiltinGenericSignatureBuilder builder(Context, 1);
-  auto arg = makeGenericParam();
-  builder.setResult(makeBoundGenericType(Context.getWritableKeyPathDecl(),
-                                         arg, arg));
-  return builder.build(Id);
-}
-
 static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
                                              Identifier Id) {
   // <T> T.Type -> Builtin.Int8
@@ -1600,11 +1591,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAllocWithTailElemsOperation(Context, Id, NumTailTypes);
   }
 
-  auto BV = BuiltinValueKind::None;
-#define BUILTIN(id, name, Attrs) \
-  if (name == OperationName) { BV = BuiltinValueKind::id; } else
+  auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
+#define BUILTIN(id, name, Attrs) .Case(name, BuiltinValueKind::id)
 #include "swift/AST/Builtins.def"
-  /* final "else" */ {}
+    .Default(BuiltinValueKind::None);
 
   // Filter out inappropriate overloads.
   OverloadedBuiltinKind OBK = OverloadedBuiltinKinds[unsigned(BV)];
@@ -1880,10 +1870,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getTypeJoinInoutOperation(Context, Id);
 
   case BuiltinValueKind::TypeJoinMeta:
-    return getTypeJoinMetaOperation(Context, Id);
-      
-  case BuiltinValueKind::IdentityKeyPath:
-    return getIdentityKeyPathOperation(Context, Id);
+    return getTypeJoinMetaOperation(Context, Id);      
   }
 
   llvm_unreachable("bad builtin value!");

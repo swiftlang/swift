@@ -41,16 +41,16 @@ func genericLayer<T: Bar>(_ x: T) {
 // See that we devirtualize/inline enough to get down to the @inline(never)
 // function calls.
 
-// CHECK-LABEL: sil @$S30devirt_conditional_conformance12throughLayeryyF : $@convention(thin) () -> ()
-// CHECK: function_ref @$S30devirt_conditional_conformance10foo_markeryyF
-// CHECK: function_ref @$S30devirt_conditional_conformance10bar_markeryyF
+// CHECK-LABEL: sil @$s30devirt_conditional_conformance12throughLayeryyF : $@convention(thin) () -> ()
+// CHECK: function_ref @$s30devirt_conditional_conformance10foo_markeryyF
+// CHECK: function_ref @$s30devirt_conditional_conformance10bar_markeryyF
 public func throughLayer() {
   genericLayer(Inner())
 }
 
-// CHECK-LABEL: sil @$S30devirt_conditional_conformance6directyyF : $@convention(thin) () -> ()
-// CHECK: function_ref @$S30devirt_conditional_conformance10foo_markeryyF
-// CHECK: function_ref @$S30devirt_conditional_conformance10bar_markeryyF
+// CHECK-LABEL: sil @$s30devirt_conditional_conformance6directyyF : $@convention(thin) () -> ()
+// CHECK: function_ref @$s30devirt_conditional_conformance10foo_markeryyF
+// CHECK: function_ref @$s30devirt_conditional_conformance10bar_markeryyF
 public func direct() {
   callFoo(Outer(x: Inner()))
 }

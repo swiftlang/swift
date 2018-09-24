@@ -742,68 +742,10 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
-SmallVector<AnyFunctionType::Param, 4>
-swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
-  SmallVector<AnyFunctionType::Param, 4> result;
-  switch (type->getKind()) {
-  case TypeKind::Tuple: {
-    auto tupleTy = cast<TupleType>(type.getPointer());
-    
-    // If we have one argument label but a tuple argument with > 1 element,
-    // put the whole tuple into the argument.
-    // FIXME: This horribleness is due to the mis-modeling of arguments as
-    // ParenType or TupleType.
-    if (argumentLabels.size() == 1 && tupleTy->getNumElements() > 1) {
-      // Break out to do the default thing below.
-      break;
-    }
-    
-    for (auto i : range(0, tupleTy->getNumElements())) {
-      const auto &elt = tupleTy->getElement(i);
-      assert(!(elt.getParameterFlags().isAutoClosure() ||
-              elt.getParameterFlags().isVariadic()) &&
-             "Vararg or autoclosure argument tuple doesn't make sense");
-      result.push_back(AnyFunctionType::Param(elt.getRawType(),
-                                              argumentLabels[i],
-                                              elt.getParameterFlags()));
-    }
-    return result;
-  }
-    
-  case TypeKind::Paren: {
-    auto parenTy = cast<ParenType>(type.getPointer());
-    result.push_back(AnyFunctionType::Param(parenTy->getUnderlyingType()->getInOutObjectType(),
-                                            Identifier(),
-                                            parenTy->getParameterFlags()));
-    return result;
-  }
-
-  // If `Void` has been explicitly specified, resulting decomposition
-  // should be empty, just like empty tuple would be.
-  case TypeKind::NameAlias: {
-    auto &ctx = type->getASTContext();
-    auto *typealias = cast<NameAliasType>(type.getPointer());
-    if (typealias->getDecl() == ctx.getVoidDecl())
-      return result;
-    break;
-  }
-
-  default:
-    // Default behavior below; inject the argument as the sole parameter.
-    break;
-  }
-  
-  // Just inject this parameter.
-  assert(result.empty() && (argumentLabels.size() == 1));
-  result.push_back(AnyFunctionType::Param(type->getInOutObjectType(), argumentLabels[0],
-                                          ParameterTypeFlags().withInOut(type->is<InOutType>())));
-  return result;
-}
-
-llvm::SmallBitVector
+SmallBitVector
 swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
                          const ValueDecl *paramOwner, unsigned level) {
-  llvm::SmallBitVector resultVector(params.size());
+  SmallBitVector resultVector(params.size());
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
   //
@@ -3349,7 +3291,8 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
 
   auto type = memberType.subst(subs, SubstFlags::UseErrorType);
 
-  if (isa<AbstractFunctionDecl>(baseDecl)) {
+  if (isa<AbstractFunctionDecl>(baseDecl) &&
+      !baseDecl->getDeclContext()->getSelfProtocolDecl()) {
     type = type->replaceSelfParameterType(this);
     if (auto func = dyn_cast<FuncDecl>(baseDecl)) {
       if (func->hasDynamicSelf()) {

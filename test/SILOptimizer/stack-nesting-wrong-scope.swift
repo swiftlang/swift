@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s -Onone -Xllvm \
 // RUN:   -sil-print-after=allocbox-to-stack -Xllvm \
-// RUN:   -sil-print-only-functions=$S3red19ThrowAddrOnlyStructV016throwsOptionalToG0ACyxGSgSi_tcfC \
+// RUN:   -sil-print-only-functions=$s3red19ThrowAddrOnlyStructV016throwsOptionalToG0ACyxGSgSi_tcfC \
 // RUN:   -Xllvm -sil-print-debuginfo -o /dev/null 2>&1 | %FileCheck %s
 
 // CHECK: bb5(%27 : @owned $Error):

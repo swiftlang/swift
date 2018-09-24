@@ -207,8 +207,6 @@ static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
   // Print var declarations separately, one variable per decl.
   AdjustedOptions.ExplodePatternBindingDecls = true;
   AdjustedOptions.VarInitializers = false;
-
-  AdjustedOptions.PrintDefaultParameterPlaceholder = true;
 }
 
 ArrayRef<StringRef>
@@ -233,8 +231,9 @@ static ClangNode getEffectiveClangNode(const Decl *decl) {
   if (auto nominal =
         const_cast<NominalTypeDecl *>(dyn_cast<NominalTypeDecl>(decl))) {
     auto &ctx = nominal->getASTContext();
-    for (auto code : nominal->lookupDirect(ctx.Id_Code,
-                                           /*ignoreNewExtensions=*/true)) {
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    for (auto code : nominal->lookupDirect(ctx.Id_Code, flags)) {
       if (auto clangDecl = code->getClangDecl())
         return clangDecl;
     }
@@ -365,7 +364,6 @@ void swift::ide::printSubmoduleInterface(
     // Skip declarations that are not accessible.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (Options.AccessFilter > AccessLevel::Private &&
-          VD->hasAccess() &&
           VD->getFormalAccess() < Options.AccessFilter)
         continue;
     }
