@@ -94,9 +94,12 @@ static void printImports(raw_ostream &out, ModuleDecl *M) {
   }
 }
 
-bool swift::emitParseableInterface(raw_ostream &out, ModuleDecl *M) {
+bool swift::emitParseableInterface(raw_ostream &out,
+                                   TextualInterfaceOptions const &Opts,
+                                   ModuleDecl *M) {
   assert(M);
 
+  printToolVersionAndFlagsComment(out, Opts, M);
   printImports(out, M);
 
   const PrintOptions printOptions = PrintOptions::printParseableInterfaceFile();
