@@ -44,81 +44,51 @@ if(SWIFT_BUILD_STATIC_STDLIB)
   list(APPEND SWIFT_STDLIB_LIBRARY_BUILD_TYPES STATIC)
 endif()
 
-add_custom_target(swift-stdlib-all)
-add_custom_target(swift-stdlib-sib-all)
-add_custom_target(swift-stdlib-sibopt-all)
-add_custom_target(swift-stdlib-sibgen-all)
-foreach(SDK ${SWIFT_SDKS})
-  add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-  add_custom_target("swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-  add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sib")
-  add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibopt")
-  add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibgen")
+function(define_stdlib_build_targets target suffix all_variant)
+  if(${all_variant})
+    add_custom_target(${target}${suffix}-all)
+    set_target_properties(${target}${suffix}-all
+                          PROPERTIES
+                            FOLDER "Swift libraries/Aggregate")
+  endif()
 
-  set_property(TARGET
-      "swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-      "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-      "swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sib"
-      "swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibopt"
-      "swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibgen"
-      PROPERTY FOLDER "Swift libraries/Aggregate")
+  foreach(SDK ${SWIFT_SDKS})
+    add_custom_target(${target}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}${suffix})
+    set_target_properties(${target}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}${suffix}
+                          PROPERTIES
+                            FOLDER "Swift libraries/Aggregate")
 
-  foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
-    set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-    add_custom_target("swift-stdlib${VARIANT_SUFFIX}")
-    add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sib")
-    add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sibopt")
-    add_custom_target("swift-stdlib${VARIANT_SUFFIX}-sibgen")
-    add_custom_target("swift-test-stdlib${VARIANT_SUFFIX}")
+    foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
+      compute_variant_suffix(VARIANT_SUFFIX "${SDK}" "${ARCH}")
+      add_custom_target(${target}${VARIANT_SUFFIX}${suffix})
+      set_target_properties(${target}${VARIANT_SUFFIX}${suffix}
+                            PROPERTIES
+                              FOLDER "Swift libraries/Aggregate")
 
-    set_property(TARGET
-        "swift-stdlib${VARIANT_SUFFIX}"
-        "swift-stdlib${VARIANT_SUFFIX}-sib"
-        "swift-stdlib${VARIANT_SUFFIX}-sibopt"
-        "swift-stdlib${VARIANT_SUFFIX}-sibgen"
-        "swift-test-stdlib${VARIANT_SUFFIX}"
-        PROPERTY FOLDER "Swift libraries/Aggregate")
-
-    add_dependencies(swift-stdlib-all "swift-stdlib${VARIANT_SUFFIX}")
-    add_dependencies(swift-stdlib-sib-all "swift-stdlib${VARIANT_SUFFIX}-sib")
-    add_dependencies(swift-stdlib-sibopt-all "swift-stdlib${VARIANT_SUFFIX}-sibopt")
-    add_dependencies(swift-stdlib-sibgen-all "swift-stdlib${VARIANT_SUFFIX}-sibgen")
-
-    add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-      "swift-stdlib${VARIANT_SUFFIX}")
-    add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sib"
-      "swift-stdlib${VARIANT_SUFFIX}-sib")
-    add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibopt"
-        "swift-stdlib${VARIANT_SUFFIX}-sibopt")
-    add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-sibgen"
-        "swift-stdlib${VARIANT_SUFFIX}-sibgen")
-
-    add_dependencies("swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-        "swift-test-stdlib${VARIANT_SUFFIX}")
+      add_dependencies(${target}${suffix}-all
+                       ${target}${VARIANT_SUFFIX}${suffix})
+      add_dependencies(${target}-${SWIFT_SDK_${SDK}_LIB_SUBDIR}${suffix}
+                       ${target}${VARIANT_SUFFIX}${suffix})
+    endforeach()
   endforeach()
-endforeach()
-add_custom_target(swift-stdlib
-    DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}")
-add_custom_target(swift-stdlib-sib
-  DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}-sib")
-add_custom_target(swift-stdlib-sibopt
-  DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}-sibopt")
-add_custom_target(swift-stdlib-sibgen
-    DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}-sibgen")
-add_custom_target(swift-test-stdlib ALL
-    DEPENDS "swift-test-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}")
 
-set_property(TARGET
-    swift-stdlib-all
-    swift-stdlib-sib-all
-    swift-stdlib-sibopt-all
-    swift-stdlib-sibgen-all
-    swift-stdlib
-    swift-stdlib-sib
-    swift-stdlib-sibopt
-    swift-stdlib-sibgen
-    swift-test-stdlib
-    PROPERTY FOLDER "Swift libraries/Aggregate")
+  if(NOT ${all_variant})
+    set(ALL_FLAG ALL)
+  endif()
+  add_custom_target(${target}${suffix}
+                    ${ALL_FLAG}
+                    DEPENDS
+                      ${target}${SWIFT_PRIMARY_VARIANT_SUFFIX}${suffix})
+  set_target_properties(${target}${suffix}
+                        PROPERTIES
+                          FOLDER "Swift libraries/Aggregate")
+endfunction()
+
+define_stdlib_build_targets("swift-stdlib" "" TRUE)
+define_stdlib_build_targets("swift-stdlib" "-sib" TRUE)
+define_stdlib_build_targets("swift-stdlib" "-sibopt" TRUE)
+define_stdlib_build_targets("swift-stdlib" "-sibgen" TRUE)
+define_stdlib_build_targets("swift-test-stdlib" "" FALSE)
 
 add_subdirectory(public)
 add_subdirectory(private)

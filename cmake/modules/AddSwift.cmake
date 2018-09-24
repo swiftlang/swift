@@ -27,12 +27,6 @@ function(add_dependencies_multiple_targets)
   endif()
 endfunction()
 
-# Compute the library subdirectory to use for the given sdk and
-# architecture, placing the result in 'result_var_name'.
-function(compute_library_subdir result_var_name sdk arch)
-  set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
-endfunction()
-
 function(_compute_lto_flag option out_var)
   string(TOLOWER "${option}" lowercase_option)
   if (lowercase_option STREQUAL "full")
@@ -720,8 +714,7 @@ function(_add_swift_library_single target name)
   endif()
 
   # Determine the subdirectory where this library will be installed.
-  set(SWIFTLIB_SINGLE_SUBDIR
-      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
+  compute_library_subdir(SWIFTLIB_SINGLE_SUBDIR "${SWIFTLIB_SINGLE_SDK}" "${SWIFTLIB_SINGLE_ARCHITECTURE}")
 
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
@@ -860,7 +853,7 @@ function(_add_swift_library_single target name)
 
   # If there were any swift sources, then a .swiftmodule may have been created.
   # If that is the case, then add a target which is an alias of the module files.
-  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
+  compute_variant_suffix(VARIANT_SUFFIX "${SWIFTLIB_SINGLE_SDK}" "${SWIFTLIB_SINGLE_ARCHITECTURE}")
   if(NOT "${SWIFTLIB_SINGLE_MODULE_TARGET}" STREQUAL "" AND NOT "${swift_module_dependency_target}" STREQUAL "")
     add_custom_target("${SWIFTLIB_SINGLE_MODULE_TARGET}"
       DEPENDS ${swift_module_dependency_target})
@@ -922,7 +915,7 @@ function(_add_swift_library_single target name)
       # to a version which supports it.
       # target_sources(${target}
       #                PRIVATE
-      #                  $<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}>)
+      #                  $<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}${VARIANT_SUFFIX}>)
       target_sources(${target}
                      PRIVATE
                        "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
@@ -1158,6 +1151,8 @@ function(_add_swift_library_single target name)
   set(library_search_directories
       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
+      # NOTE(compnerd) this is specifically for Darwin which does fat binaries
+      # instead of architecture specific paths
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
 
   # Add variant-specific flags.
@@ -1300,6 +1295,8 @@ function(_add_swift_library_single target name)
     set(library_search_directories
         "${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
+        # NOTE(compnerd) this is specifically for Darwin which does fat binaries
+        # instead of architecture specific subdirectories.
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
     swift_target_link_search_directories("${target_static}" "${library_search_directories}")
     target_link_libraries("${target_static}" PRIVATE
@@ -1614,7 +1611,7 @@ function(add_swift_library name)
       # For each architecture supported by this SDK
       foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
         # Configure variables for this subdirectory.
-        set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+        compute_variant_suffix(VARIANT_SUFFIX "${sdk}" "${arch}")
         set(VARIANT_NAME "${name}${VARIANT_SUFFIX}")
         set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
         set(MODULE_VARIANT_NAME "${name}${MODULE_VARIANT_SUFFIX}")
@@ -1933,7 +1930,7 @@ function(add_swift_library name)
                 swiftStdlibUnicodeUnittest)
 
           foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-            set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+            compute_variant_suffix(VARIANT_SUFFIX "${sdk}" "${arch}")
             if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND
                TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
               add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
@@ -2194,7 +2191,7 @@ function(add_swift_target_executable name)
 
   foreach(sdk ${SWIFT_SDKS})
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-      set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+      compute_variant_suffix(VARIANT_SUFFIX "${sdk}" "${arch}")
       set(VARIANT_NAME "${name}${VARIANT_SUFFIX}")
 
       set(SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT
@@ -2345,12 +2342,11 @@ function(add_swift_host_tool executable)
       ${ARGN})
 
   # Configure variables for this subdirectory.
-  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-  set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
+  set(MODULE_VARIANT_SUFFIX "-swiftmodule${SWIFT_HOST_VARIANT_SUFFIX}")
 
   foreach(mod ${ADDSWIFTHOSTTOOL_SWIFT_MODULE_DEPENDS})
     list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${MODULE_VARIANT_SUFFIX}")
-    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${VARIANT_SUFFIX}")
+    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${SWIFT_HOST_VARIANT_SUFFIX}")
   endforeach()
 
   # Create the executable rule.

@@ -9,7 +9,7 @@ if (SWIFT_INCLUDE_TESTS)
   foreach(SDK ${SWIFT_SDKS})
     if("${SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
       foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
-        set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
+        compute_variant_suffix(VARIANT_SUFFIX "${SDK}" "${ARCH}")
         add_dependencies(
           "swiftSwiftReflectionTest${VARIANT_SUFFIX}"
           "swift-reflection-test${VARIANT_SUFFIX}")
