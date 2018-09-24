@@ -48,6 +48,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   std::vector<TypeAttrKind> TypeAttrs;
   std::vector<StringRef> ConformingProtocols;
   StringRef SuperclassUsr;
+  StringRef SuperclassName;
   StringRef EnumRawTypeName;
   bool hasDefaultArgument = false;
   StringRef GenericSig;
@@ -100,6 +101,7 @@ SDKNodeTypeAlias::SDKNodeTypeAlias(SDKNodeInitInfo Info):
 
 SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info): 
   SDKNodeDecl(Info, SDKNodeKind::DeclType), SuperclassUsr(Info.SuperclassUsr),
+  SuperclassName(Info.SuperclassName),
   ConformingProtocols(Info.ConformingProtocols),
   EnumRawTypeName(Info.EnumRawTypeName) {}
 
@@ -568,6 +570,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       case KeyKind::KK_superclassUsr:
         Info.SuperclassUsr = GetScalarString(Pair.getValue());
         break;
+      case KeyKind::KK_superclassName:
+        Info.SuperclassName = GetScalarString(Pair.getValue());
+        break;
       case KeyKind::KK_genericSig:
         Info.GenericSig = GetScalarString(Pair.getValue());
         break;
@@ -754,6 +759,9 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       auto *Right = dyn_cast<SDKNodeDeclType>(&Other);
       if (Left && Right) {
         if (!hasSameContents(Left->getAllProtocols(), Right->getAllProtocols())) {
+          return false;
+        }
+        if (Left->getSuperClassName() != Right->getSuperClassName()) {
           return false;
         }
       }
@@ -1059,8 +1067,10 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
 
   // Calculate usr for its super class.
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
-    if (auto *Super = CD->getSuperclassDecl())
+    if (auto *Super = CD->getSuperclassDecl()) {
       SuperclassUsr = calculateUsr(Ctx, Super);
+      SuperclassName = Super->getName().str();
+    }
   }
 
   // Capture all attributes.
@@ -1507,6 +1517,11 @@ struct ObjectTraits<SDKNode *> {
         if (!Super.empty()) {
           out.mapRequired(getKeyContent(Ctx, KeyKind::KK_superclassUsr).data(),
                           Super);
+        }
+        auto SuperName = TD->getSuperClassName();
+        if (!SuperName.empty()) {
+          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_superclassName).data(),
+                          SuperName);
         }
         auto Pros = TD->getAllProtocols();
         if (!Pros.empty()) {

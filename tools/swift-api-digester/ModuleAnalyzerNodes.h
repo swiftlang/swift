@@ -407,12 +407,14 @@ public:
 
 class SDKNodeDeclType : public SDKNodeDecl {
   StringRef SuperclassUsr;
+  StringRef SuperclassName;
   std::vector<StringRef> ConformingProtocols;
   StringRef EnumRawTypeName;
 public:
   SDKNodeDeclType(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
   StringRef getSuperClassUsr() const { return SuperclassUsr; }
+  StringRef getSuperClassName() const { return SuperclassName; }
   ArrayRef<StringRef> getAllProtocols() const { return ConformingProtocols; }
 
 #define NOMINAL_TYPE_DECL(ID, PARENT) \
