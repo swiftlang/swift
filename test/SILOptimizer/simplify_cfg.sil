@@ -1684,6 +1684,32 @@ exit:
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil @dont_crash_jump_threading_single_case_switch_enums
+// CHECK-NOT: switch_enum
+// CHECK: } // end sil function
+sil @dont_crash_jump_threading_single_case_switch_enums : $@convention(thin) () -> () {
+bb0:
+  br bb1(undef : $OneCase)
+
+bb1(%19 : $OneCase):
+  switch_enum %19 : $OneCase, case #OneCase.First!enumelt.1: bb2
+
+bb2:
+  switch_enum %19 : $OneCase, case #OneCase.First!enumelt.1: bb3
+
+bb3:
+  %48 = enum $OneCase, #OneCase.First!enumelt.1
+  cond_br undef, bb6, bb7
+
+bb6:
+  %72 = tuple ()
+  return %72 : $()
+
+bb7:
+  br bb1(%48 : $OneCase)
+}
+
+
 enum IntEnum : Int32 {
   case E0
   case E1
