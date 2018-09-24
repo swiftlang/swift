@@ -1519,7 +1519,7 @@ extension ${Self} : Hashable {
   }
 
   @inlinable
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  public func _rawHashValue(seed: Int) -> Int {
     // To satisfy the axiom that equality implies hash equality, we need to
     // finesse the hash value of -0.0 to match +0.0.
     let v = isZero ? 0 : self
@@ -1839,7 +1839,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   }
 
   internal var _hashValue: Int {
-    return _rawHashValue(_seed: Hasher._seed)
+    return _rawHashValue(_seed: 0)
   }
 
   internal func _hash(into hasher: inout Hasher) {
@@ -1848,7 +1848,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
     hasher.combine(_value)
   }
 
-  internal func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+  internal func _rawHashValue(_seed: Int) -> Int {
     var hasher = Hasher(_seed: _seed)
     _hash(into: &hasher)
     return hasher.finalize()

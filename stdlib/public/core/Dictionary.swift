@@ -1289,8 +1289,11 @@ extension Dictionary {
     get {
       return Values(_dictionary: self)
     }
-    set {
-      self._variant = newValue._variant
+    _modify {
+      var values = Values(_dictionary: self)
+      _variant = .native(_NativeDictionary())
+      yield &values
+      self._variant = values._variant
     }
   }
 
@@ -1584,7 +1587,7 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
     _canonical.hash(into: &hasher)
   }
 
-  internal func _rawHashValue(_seed: Hasher._Seed) -> Int {
+  internal func _rawHashValue(_seed: Int) -> Int {
     return _canonical._rawHashValue(seed: _seed)
   }
 
