@@ -34,7 +34,8 @@ extension StringProtocol {
   ///   of this instance.
   @inlinable
   public func hash(into hasher: inout Hasher) {
-    unimplemented_utf8()
+    // TODO(UTF8 perf): skip extra copy
+    _ephemeralString.hash(into: &hasher)
   }
 }
 
