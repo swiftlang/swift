@@ -735,7 +735,7 @@ extension Set: SetAlgebra {
   /// - Returns: `true` if the set is a subset of `possibleSuperset`;
   ///   otherwise, `false`.
   @inlinable
-  public func isSubset<S: Sequence>(of possibleSuperset: __owned S) -> Bool
+  public func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
   where S.Element == Element {
     // FIXME(performance): isEmpty fast path, here and elsewhere.
     let other = Set(possibleSuperset)
@@ -763,9 +763,7 @@ extension Set: SetAlgebra {
   /// - Returns: `true` is the set is strict subset of
   ///   `possibleStrictSuperset`; otherwise, `false`.
   @inlinable
-  public func isStrictSubset<S: Sequence>(
-    of possibleStrictSuperset: __owned S
-  ) -> Bool
+  public func isStrictSubset<S: Sequence>(of possibleStrictSuperset: S) -> Bool
   where S.Element == Element {
     // FIXME: code duplication.
     let other = Set(possibleStrictSuperset)
@@ -815,9 +813,7 @@ extension Set: SetAlgebra {
   /// - Returns: `true` if the set is a strict superset of
   ///   `possibleStrictSubset`; otherwise, `false`.
   @inlinable
-  public func isStrictSuperset<S: Sequence>(
-    of possibleStrictSubset: __owned S
-  ) -> Bool
+  public func isStrictSuperset<S: Sequence>(of possibleStrictSubset: S) -> Bool
   where S.Element == Element {
     let other = Set(possibleStrictSubset)
     return other.isStrictSubset(of: self)
@@ -838,7 +834,7 @@ extension Set: SetAlgebra {
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
   @inlinable
-  public func isDisjoint<S: Sequence>(with other: __owned S) -> Bool
+  public func isDisjoint<S: Sequence>(with other: S) -> Bool
   where S.Element == Element {
     // FIXME(performance): Don't need to build a set.
     let otherSet = Set(other)
