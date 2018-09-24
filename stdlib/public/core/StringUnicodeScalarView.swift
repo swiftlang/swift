@@ -10,44 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension _StringGuts {
-  @usableFromInline @inline(__always)
-  internal func fastUTF8Scalar(startingAt i: Int) -> Unicode.Scalar {
-    return fastUTF8ScalarAndLength(startingAt: i).0
-  }
-  
-  @usableFromInline @inline(__always)
-  internal func fastUTF8ScalarAndLength(startingAt i: Int) -> (Unicode.Scalar, Int) {
-    _sanityCheck(isFastUTF8)
-    return self.withFastUTF8 { utf8 in
-      return utf8.utf8ScalarAndLength(startingAt: i)
-    }
-  }
-}
-
-extension UnsafeBufferPointer where Element == UInt8 {
-  @usableFromInline @inline(__always)
-  internal func utf8ScalarAndLength(startingAt i: Int) -> (Unicode.Scalar, Int) {
-    let cu0 = self[i]
-    assert(!_isContinuation(cu0))
-    let length = Swift._utf8ScalarLength(cu0)
-    let scalar: Unicode.Scalar
-    switch length {
-    case 1: scalar = _decodeUTF8(cu0)
-    case 2: scalar = _decodeUTF8(cu0, self[i &+ 1])
-    case 3: scalar = _decodeUTF8(cu0, self[i &+ 1], self[i &+ 2])
-    case 4: scalar = _decodeUTF8(cu0, self[i &+ 1], self[i &+ 2], self[i &+ 3])
-    default: Builtin.unreachable()
-    }
-    return (scalar, length)
-  }
-  
-  @usableFromInline @inline(__always)
-  internal func utf8Scalar(startingAt i: Int) -> Unicode.Scalar {
-    return utf8ScalarAndLength(startingAt: i).0
-  }
-}
-
 extension String.UnicodeScalarView {
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}

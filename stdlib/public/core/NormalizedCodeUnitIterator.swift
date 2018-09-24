@@ -38,7 +38,7 @@ extension Unicode.Scalar {
 
 internal func _tryNormalize(
   _ input: UnsafeBufferPointer<UInt16>,
-  into outputBuffer: 
+  into outputBuffer:
     UnsafeMutablePointer<_Normalization._SegmentOutputBuffer>
 ) -> Int? {
   return _tryNormalize(input, into: _castOutputBuffer(outputBuffer))
@@ -108,49 +108,7 @@ internal func _castOutputBuffer(
   return UnsafeBufferPointer<UInt16>(rebasing: bufPtr[..<endIdx])
 }
 
-extension UnsafeBufferPointer where Element == UInt8 {
-  internal func isStartOfLastCodeUnit(_ index: Int) -> Bool {
-    let nextIndex = index + 1
-    return nextIndex >= self.count
-  }
-  
-  internal func hasNormalizationBoundary(after index: Int) -> Bool {
-    if isStartOfLastCodeUnit(index) {
-      return true
-    }
-
-    if _isContinuation(self[index+1]) {
-      return false
-    }
-
-    let nextCU = utf8Scalar(startingAt: index+1)
-    return _hasNormalizationBoundary(before: nextCU)
-  }
-  
-  internal func hasNormalizationBoundary(before index: Int) -> Bool {
-    if index == 0 || index == count {
-      return true
-    }
-    
-    assert(!_isContinuation(self[index]))
-    
-    let cu = utf8Scalar(startingAt: index)
-    return _hasNormalizationBoundary(before: cu)
-  }
-}
-
 extension _StringGuts {
-  internal func foreignHasNormalizationBoundary(
-    after index: String.Index
-  ) -> Bool {
-    if foreignIsStartOfLastCodeUnit(index) {
-      return true
-    }
-    
-    let nextCU = foreignErrorCorrectedUTF16CodeUnit(at: index._next())
-    return _hasNormalizationBoundary(before: nextCU)
-  }
-  
   internal func foreignHasNormalizationBoundary(
     before index: String.Index
   ) -> Bool {
@@ -158,59 +116,56 @@ extension _StringGuts {
     if offset == 0 || offset == count {
       return true
     }
-    
+
     let cu = foreignErrorCorrectedUTF16CodeUnit(at: index)
-    return _hasNormalizationBoundary(before: cu)
-  }
-  
-  internal func foreignIsStartOfLastCodeUnit(_ index: String.Index) -> Bool {
-    let offset = index.encodedOffset
-    let nextOffset = offset + 1
-    return nextOffset >= self.count
+    return Unicode.Scalar(cu)?._hasNormalizationBoundaryBefore ?? false
   }
 }
+extension UnsafeBufferPointer where Element == UInt8 {
+  internal func hasNormalizationBoundary(before index: Int) -> Bool {
+    if index == 0 || index == count {
+      return true
+    }
 
-internal func _hasNormalizationBoundary(before cu: UInt16) -> Bool {
-  guard !_isSurrogate(cu) else { return false }
-  return UnicodeScalar(_unchecked: UInt32(cu))._hasNormalizationBoundaryBefore
-}
+    assert(!_isContinuation(self[index]))
 
-internal func _hasNormalizationBoundary(before cu: Unicode.Scalar) -> Bool {
-  return cu._hasNormalizationBoundaryBefore
+    let cu = _decodeScalar(self, startingAt: index).0
+    return cu._hasNormalizationBoundaryBefore
+  }
 }
 
 internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
   internal typealias CodeUnit = UInt8
-  
+
   var utf16Iterator: _NormalizedCodeUnitIterator
   var utf8Buffer = _FixedArray4<CodeUnit>(allZeros:())
   var bufferIndex = 0
   var bufferCount = 0
-  
+
   internal init(_ guts: _StringGuts, range: Range<String.Index>) {
     utf16Iterator = _NormalizedCodeUnitIterator(guts, range)
   }
-  
+
   internal init(_ buffer: UnsafeBufferPointer<UInt8>, range: Range<Int>) {
     utf16Iterator = _NormalizedCodeUnitIterator(buffer, range)
   }
-  
+
   internal mutating func next() -> UInt8? {
     if bufferIndex == bufferCount {
       bufferIndex = 0
       bufferCount = 0
-      
+
       guard let cu = utf16Iterator.next() else {
         return nil
       }
-      
+
       var array = _FixedArray2<UInt16>()
       array.append(cu)
       if _isSurrogate(cu) {
         guard let nextCU = utf16Iterator.next() else {
           fatalError("unpaired surrogate")
         }
-        
+
         array.append(nextCU)
       }
       let iterator = array.makeIterator()
@@ -218,24 +173,24 @@ internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
         stoppingOnError: false) { codeUnit in
           _sanityCheck(bufferCount < 4)
           _sanityCheck(bufferIndex < 4)
-          
+
           utf8Buffer[bufferIndex] = codeUnit
           bufferIndex += 1
           bufferCount += 1
       }
       bufferIndex = 0
     }
-    
+
     defer { bufferIndex += 1 }
-    
+
     return utf8Buffer[bufferIndex]
   }
-  
+
   internal mutating func compare(
     with other: _NormalizedUTF8CodeUnitIterator
   ) -> _StringComparison {
     var mutableOther = other
-    
+
     for cu in self {
       if let otherCU = mutableOther.next() {
         let result = _lexicographicalCompare(cu, otherCU)
@@ -249,7 +204,7 @@ internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
         return .greater
       }
     }
-    
+
     //we ran out of code units, either we are equal, or only we ran out and
     //other is greater
     if let _ = mutableOther.next() {
@@ -257,18 +212,6 @@ internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
     } else {
       return .equal
     }
-  }
-}
-
-extension UInt8 {
-  var hex: String {
-    return String(self, radix: 16)
-  }
-}
-
-extension UInt16 {
-  var hex: String {
-    return String(self, radix: 16)
   }
 }
 
@@ -281,20 +224,20 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
   var overflowBuffer: [CodeUnit]? = nil
   var normalizationBuffer: [CodeUnit]? = nil
   var source: _SegmentSource
-  
+
   var segmentBufferIndex = 0
   var segmentBufferCount = 0
   var overflowBufferIndex = 0
   var overflowBufferCount = 0
-  
+
   init(_ guts: _StringGuts, _ range: Range<String.Index>) {
     source = _ForeignStringGutsSource(guts, range)
   }
-  
+
   init(_ buffer: UnsafeBufferPointer<UInt8>, _ range: Range<Int>) {
     source = _UTF8BufferSource(buffer, range)
   }
-  
+
   mutating func compare(
     with other: _NormalizedCodeUnitIterator
   ) -> _StringComparison {
@@ -312,7 +255,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
         return .greater
       }
     }
-    
+
     //we ran out of code units, either we are equal, or only we ran out and
     //other is greater
     if let _ = mutableOther.next() {
@@ -332,13 +275,13 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
     var buffer: UnsafeBufferPointer<UInt8>
     var index: Int
     var range: Range<Int>
-  
+
     init(_ buffer: UnsafeBufferPointer<UInt8>, _ range: Range<Int>) {
       self.buffer = buffer
       self.range = range
       index = range.lowerBound
     }
-  
+
     mutating func tryFill(
       into output: UnsafeMutableBufferPointer<UInt16>
     ) -> Int? {
@@ -354,8 +297,8 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
           index = originalIndex
           return nil
         }
-        
-        let (cu, utf8Length) = buffer.utf8ScalarAndLength(startingAt: index)
+
+        let (cu, nextIndex) = _decodeScalar(buffer, startingAt: index)
         let utf16 = cu.utf16
         switch utf16.count {
         case 1:
@@ -372,12 +315,12 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
         default:
           _conditionallyUnreachable()
         }
-        index += utf8Length
+        index = nextIndex
       } while !buffer.hasNormalizationBoundary(before: index)
       return outputIndex
     }
   }
-  
+
   struct _ForeignStringGutsSource: _SegmentSource {
     var remaining: Int {
       // not exact since we skip invalid CUs but it's just to get an approximate
@@ -391,13 +334,13 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
     var guts: _StringGuts
     var index: String.Index
     var range: Range<String.Index>
-    
+
     init(_ guts: _StringGuts, _ range: Range<String.Index>) {
       self.guts = guts
       self.range = range
       index = range.lowerBound
     }
-    
+
     mutating func tryFill(
       into output: UnsafeMutableBufferPointer<UInt16>
     ) -> Int? {
@@ -407,39 +350,39 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
         guard index != range.upperBound else {
           break
         }
-        
+
         guard outputIndex < output.count else {
           //The buffer isn't big enough for the current segment
           index = originalIndex
           return nil
         }
-        
+
         let cu = guts.foreignErrorCorrectedUTF16CodeUnit(at: index)
         output[outputIndex] = cu
         index = index._next()
         outputIndex += 1
       } while !guts.foreignHasNormalizationBoundary(before: index)
-      
+
       return outputIndex
     }
   }
-  
+
   mutating func next() -> UInt16? {
     if segmentBufferCount == segmentBufferIndex {
       segmentBuffer = _FixedArray16<CodeUnit>(allZeros:())
       segmentBufferCount = 0
       segmentBufferIndex = 0
     }
-    
+
     if overflowBufferCount == overflowBufferIndex {
       overflowBufferCount = 0
       overflowBufferIndex = 0
     }
-    
+
     if source.isEmpty
-    && segmentBufferCount == 0 
+    && segmentBufferCount == 0
     && overflowBufferCount == 0 {
-      // Our source of code units to normalize is empty and our buffers from 
+      // Our source of code units to normalize is empty and our buffers from
       // previous normalizations are also empty.
       return nil
     }
@@ -447,14 +390,14 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
       //time to fill a buffer if possible. Otherwise we are done, return nil
       // Normalize segment, and then compare first code unit
       var intermediateBuffer = _FixedArray16<CodeUnit>(allZeros:())
-      if overflowBuffer == nil, 
-         let filled = source.tryFill(into: &intermediateBuffer) 
+      if overflowBuffer == nil,
+         let filled = source.tryFill(into: &intermediateBuffer)
       {
         guard let count = _tryNormalize(
-          _castOutputBuffer(&intermediateBuffer, 
-          endingAt: filled), 
+          _castOutputBuffer(&intermediateBuffer,
+          endingAt: filled),
           into: &segmentBuffer
-        ) 
+        )
         else {
           fatalError("Output buffer was not big enough, this should not happen")
         }
@@ -465,32 +408,32 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
           overflowBuffer = Array(repeating: 0, count: size)
           normalizationBuffer = Array(repeating:0, count: size)
         }
-        
+
         guard let count = normalizationBuffer!.withUnsafeMutableBufferPointer({
           (normalizationBufferPtr) -> Int? in
-          guard let filled = source.tryFill(into: normalizationBufferPtr) 
+          guard let filled = source.tryFill(into: normalizationBufferPtr)
           else {
             fatalError("Invariant broken, buffer should have space")
           }
-          return overflowBuffer!.withUnsafeMutableBufferPointer { 
+          return overflowBuffer!.withUnsafeMutableBufferPointer {
             (overflowBufferPtr) -> Int? in
             return _tryNormalize(
-              UnsafeBufferPointer(rebasing: normalizationBufferPtr[..<filled]), 
+              UnsafeBufferPointer(rebasing: normalizationBufferPtr[..<filled]),
               into: overflowBufferPtr
             )
           }
         }) else {
           fatalError("Invariant broken, overflow buffer should have space")
         }
-        
+
         overflowBufferCount = count
       }
     }
-    
+
     //exactly one of the buffers should have code units for us to return
-    _sanityCheck((segmentBufferCount == 0) 
+    _sanityCheck((segmentBufferCount == 0)
               != ((overflowBuffer?.count ?? 0) == 0))
-    
+
     if segmentBufferIndex < segmentBufferCount {
       let index = segmentBufferIndex
       segmentBufferIndex += 1
