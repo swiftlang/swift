@@ -68,6 +68,8 @@ ERROR(default_associated_type_removed,none,"%0 has removed default type %1", (St
 
 ERROR(protocol_req_added,none,"%0 has been added as a protocol requirement", (StringRef))
 
+ERROR(super_class_removed,none,"%0 has removed its super class %1", (StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

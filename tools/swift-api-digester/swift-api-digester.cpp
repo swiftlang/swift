@@ -694,6 +694,14 @@ static void diagnoseNominalTypeDeclChange(SDKNodeDeclType *L, SDKNodeDeclType *R
                      Name);
     });
   }
+  auto LSuperClass = L->getSuperClassName();
+  auto RSuperClass = R->getSuperClassName();
+  if (!LSuperClass.empty()) {
+    if (RSuperClass.empty()) {
+      Diags.diagnose(SourceLoc(), diag::super_class_removed, L->getScreenInfo(),
+                     LSuperClass);
+    }
+  }
 }
 
 static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
