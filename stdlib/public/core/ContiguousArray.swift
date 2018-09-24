@@ -947,13 +947,13 @@ extension ContiguousArray: CustomReflectable {
 extension ContiguousArray: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {
-    return _makeCollectionDescription(for: self, withTypeName: nil)
+    return _makeCollectionDescription()
   }
 
   /// A textual representation of the array and its elements, suitable for
   /// debugging.
   public var debugDescription: String {
-    return _makeCollectionDescription(for: self, withTypeName: "ContiguousArray")
+    return _makeCollectionDescription(withTypeName: "ContiguousArray")
   }
 }
 

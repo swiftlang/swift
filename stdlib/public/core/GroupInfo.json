@@ -76,6 +76,7 @@
     "WriteBackMutableSlice.swift",
     "UnfoldSequence.swift",
     "UIntBuffer.swift",
+    "KeyValuePairs.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
