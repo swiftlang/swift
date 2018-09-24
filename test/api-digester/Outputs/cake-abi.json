@@ -198,7 +198,9 @@
       "location": "",
       "moduleName": "cake",
       "superclassUsr": "s:4cake2C0C",
-      "superclassName": "C0",
+      "superclassNames": [
+        "C0"
+      ],
       "children": [
         {
           "kind": "Function",
