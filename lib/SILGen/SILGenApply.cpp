@@ -4558,7 +4558,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   }
 
   // Emit the raw application.
-  auto genericSig =
+  GenericSignature *genericSig =
     fn.getType().castTo<SILFunctionType>()->getGenericSignature();
 
   // When calling a closure that's defined in a generic context but does not
