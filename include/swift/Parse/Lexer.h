@@ -451,11 +451,12 @@ public:
   static void getStringLiteralSegments(
       const Token &Str,
       SmallVectorImpl<StringSegment> &Segments,
-      DiagnosticEngine *Diags);
+      DiagnosticEngine *Diags, const LangOptions *LangOpts = nullptr,
+                  const SourceManager *SourceMgr = nullptr);
 
   void getStringLiteralSegments(const Token &Str,
                                 SmallVectorImpl<StringSegment> &Segments) {
-    return getStringLiteralSegments(Str, Segments, Diags);
+    return getStringLiteralSegments(Str, Segments, Diags, &LangOpts, &SourceMgr);
   }
 
   static SourceLoc getSourceLoc(const char *Loc) {

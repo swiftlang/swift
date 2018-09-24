@@ -246,10 +246,6 @@ ERROR(invalid_conditional_compilation_flag,none,
       "conditional compilation flags must be valid Swift identifiers "
       "(rather than '%0')", (StringRef))
 
-WARNING(cannot_assign_value_to_conditional_compilation_flag,none,
-        "conditional compilation flags do not have values in Swift; they are "
-        "either present or absent (rather than '%0')", (StringRef))
-
 ERROR(error_optimization_remark_pattern, none, "%0 in '%1'",
       (StringRef, StringRef))
 

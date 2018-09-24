@@ -655,13 +655,14 @@ void Lexer::lexIdentifier() {
   while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
 
   StringRef Identifier(TokStart, CurPtr-TokStart);
+  tok Kind = kindOfIdentifier(Identifier, InSILMode);
   const auto &Custom = LangOpts.getCustomCompilationFlags();
-  if (Custom.find(Identifier) != Custom.end()) {
+  bool IsCustomCompilationFlag = Custom.find(Identifier) != Custom.end();
+  if (IsCustomCompilationFlag) {
     std::string Value = Custom.at(Identifier);
-    tok Kind = tok::unknown;
-
     const char *Start = Value.data(), *End = Value.data() + Value.size();
-    if (End - Start > 1 && *Start == '"' && *(End - 1) == '"')
+
+    if (End - Start >= 2 && *Start == '"' && *(End - 1) == '"')
       Kind = tok::string_literal;
     else {
       char *Parsed;
@@ -672,19 +673,15 @@ void Lexer::lexIdentifier() {
         (void)strtod(Start, &Parsed);
         if (Parsed == End)
           Kind = tok::floating_literal;
+        else if (Value != "true" && Value != "false")
+          diagnose(TokStart, diag::lex_invalid_compilation_flag,
+                   StringRef(Value), Identifier);
       }
     }
-
-    if (Kind != tok::unknown)
-      return NextToken.setToken(Kind, SourceMgr.getEntireTextForBuffer(
-        const_cast<SourceManager *>(&SourceMgr)->addMemBufferCopy(Value)));
-    else if (Value != "true" && Value != "false")
-      diagnose(TokStart, diag::lex_invalid_compilation_flag,
-               StringRef(Value), Identifier);
   }
 
-  tok Kind = kindOfIdentifier(Identifier, InSILMode);
-  return formToken(Kind, TokStart);
+  formToken(Kind, TokStart);
+  NextToken.setCustomCompilationFlag(IsCustomCompilationFlag);
 }
 
 /// lexHash - Handle #], #! for shebangs, and the family of #identifiers.
@@ -2215,7 +2212,9 @@ StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
 
     // String interpolation.
     case '(':
-      llvm_unreachable("string contained interpolated segments");
+      TempString.push_back('\\');
+      TempString.push_back('(');
+      continue;       // String is the result of applying compilation flag.
         
       // Unicode escapes of various lengths.
     case 'u':  //  \u HEX HEX HEX HEX
@@ -2248,10 +2247,15 @@ StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
 void Lexer::getStringLiteralSegments(
               const Token &Str,
               SmallVectorImpl<StringSegment> &Segments,
-              DiagnosticEngine *Diags) {
+              DiagnosticEngine *Diags, const LangOptions *LangOpts,
+                                     const SourceManager *SourceMgr) {
   assert(Str.is(tok::string_literal));
   // Get the bytes behind the string literal, dropping any double quotes.
   StringRef Bytes = getStringLiteralContent(Str);
+  if (Str.isCustomCompilationFlag() && LangOpts && SourceMgr)
+    Bytes = const_cast<SourceManager *>(SourceMgr)
+              ->bufferedCompilationFlag(Str.getText(), *LangOpts)
+                  .drop_front().drop_back();
 
   // Are substitutions required either for indent stripping or line ending
   // normalization?
@@ -2272,6 +2276,12 @@ void Lexer::getStringLiteralSegments(
     if (!delimiterMatches(CustomDelimiterLen, BytesPtr, Diags) ||
         *BytesPtr++ != '(')
       continue;
+
+    if (Str.isCustomCompilationFlag() && Diags) {
+      Diags->diagnose(Lexer::getSourceLoc(BytesPtr),
+                      diag::lex_invalid_interpolation_in_flag);
+      continue;
+    }
 
     // String interpolation.
 

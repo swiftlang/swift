@@ -1441,6 +1441,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   switch (Tok.getKind()) {
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
+    if (Tok.isCustomCompilationFlag())
+      Text = SourceMgr.bufferedCompilationFlag(Tok.getText(), Context.LangOpts);
     SourceLoc Loc = consumeToken(tok::integer_literal);
     ExprContext.setCreateSyntax(SyntaxKind::IntegerLiteralExpr);
     return makeParserResult(new (Context)
@@ -1449,6 +1451,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   }
   case tok::floating_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
+    if (Tok.isCustomCompilationFlag())
+      Text = SourceMgr.bufferedCompilationFlag(Tok.getText(), Context.LangOpts);
     SourceLoc Loc = consumeToken(tok::floating_literal);
     ExprContext.setCreateSyntax(SyntaxKind::FloatLiteralExpr);
     return makeParserResult(new (Context) FloatLiteralExpr(Text, Loc,

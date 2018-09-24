@@ -142,6 +142,11 @@ ERROR(lex_invalid_escape_delimiter,none,
       "too many '#' characters in delimited escape", ())
 ERROR(lex_invalid_closing_delimiter,none,
       "too many '#' characters in closing delimiter", ())
+ERROR(lex_invalid_compilation_flag,none,
+      "unable to parse token from compilation flag value '%0' for identifier '%1'",
+      (StringRef, StringRef))
+WARNING(lex_invalid_interpolation_in_flag,none,
+      "interolations are ignored inside compilation flag values", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
       "invalid unicode scalar", ())

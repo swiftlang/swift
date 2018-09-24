@@ -23,6 +23,8 @@
 
 namespace swift {
 
+class LangOptions;
+
 /// \brief This class manages and owns source buffers.
 class SourceManager {
   llvm::SourceMgr LLVMSourceMgr;
@@ -128,6 +130,9 @@ public:
   /// Creates a copy of a \c MemoryBuffer and adds it to the \c SourceManager,
   /// taking ownership of the copy.
   unsigned addMemBufferCopy(llvm::MemoryBuffer *Buffer);
+
+  /// Create a buffer to hold custom compilation flag value
+  StringRef bufferedAlias(StringRef Name, const LangOptions &LangOpts);
 
   /// Creates and adds a memory buffer to the \c SourceManager, taking
   /// ownership of the newly created copy.
