@@ -59,3 +59,7 @@ cake1: AssociatedType AssociatedTypePro.T1 has removed default type Int
 cake2: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
 cake2: Func RequiementChanges.addedFunc() has been added as a protocol requirement
 cake2: Var RequiementChanges.addedVar has been added as a protocol requirement
+
+/* Class Inheritance Change */
+cake1: Class C4 has changed its super class from OldType to NewType
+cake1: Class SuperClassRemoval has removed its super class C3

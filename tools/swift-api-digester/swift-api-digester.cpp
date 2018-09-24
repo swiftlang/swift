@@ -694,6 +694,19 @@ static void diagnoseNominalTypeDeclChange(SDKNodeDeclType *L, SDKNodeDeclType *R
                      Name);
     });
   }
+  auto LSuperClass = L->getSuperClassName();
+  auto RSuperClass = R->getSuperClassName();
+  if (!LSuperClass.empty() && LSuperClass != RSuperClass) {
+    if (RSuperClass.empty()) {
+      Diags.diagnose(SourceLoc(), diag::super_class_removed, L->getScreenInfo(),
+                     LSuperClass);
+    } else {
+      // FIXME: This will be a false positive if the new subclass is a subclass
+      // of the old type.
+      Diags.diagnose(SourceLoc(), diag::super_class_changed, L->getScreenInfo(),
+                     LSuperClass, RSuperClass);
+    }
+  }
 }
 
 static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {

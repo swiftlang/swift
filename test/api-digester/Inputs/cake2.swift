@@ -96,3 +96,5 @@ public protocol RequiementChanges {
   func addedFunc()
   var addedVar: Int { get }
 }
+
+public class SuperClassRemoval {}

@@ -89,3 +89,5 @@ public protocol RequiementChanges {
   associatedtype removedType
   var removedVar: Int {get}
 }
+
+public class SuperClassRemoval: C3 {}
