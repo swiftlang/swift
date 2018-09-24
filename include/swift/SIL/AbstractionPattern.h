@@ -1017,6 +1017,10 @@ public:
   /// the abstraction pattern for one of its parameter types.
   AbstractionPattern getFunctionParamType(unsigned index) const;
 
+  /// Given that the value being abstracted is a function type, return
+  /// the number of parameters.
+  unsigned getNumFunctionParams() const;
+
   /// Given that the value being abstracted is optional, return the
   /// abstraction pattern for its object type.
   AbstractionPattern getOptionalObjectType() const;
