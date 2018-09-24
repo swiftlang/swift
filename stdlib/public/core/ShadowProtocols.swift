@@ -94,7 +94,7 @@ public protocol _NSDictionaryCore :
   var count: Int { get }
 
   @objc(objectForKey:)
-  func objectFor(_ aKey: AnyObject) -> AnyObject?
+  func object(forKey aKey: AnyObject) -> AnyObject?
 
   func keyEnumerator() -> _NSEnumerator
 

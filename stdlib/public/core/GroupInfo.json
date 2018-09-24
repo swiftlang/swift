@@ -112,8 +112,9 @@
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
         "Dictionary.swift",
-        "HashedCollectionsAnyHashableExtensions.swift",
         "Set.swift",
+        "HashedCollectionsAnyHashableExtensions.swift",
+        "HashTable.swift"
       ]
     }
   ],
@@ -165,12 +166,16 @@
   "Playground": [
     "PlaygroundDisplay.swift"
   ],
-  "Misc": [
-    "AnyHashable.swift",
-    "Interval.swift",
-    "Hashing.swift",
-    "SipHash.swift",
+  "Hashing": [
+    "Hashable.swift",
     "Hasher.swift",
+    "SipHash.swift",
+    "AnyHashable.swift",
+    "Hashing.swift",
+    "Bitset.swift"
+  ],
+  "Misc": [
+    "Interval.swift",
     "ErrorType.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
@@ -191,11 +196,9 @@
     "CommandLine.swift",
     "Tuple.swift",
     "NewtypeWrapper.swift",
-    "UnsafeBitMap.swift",
     "DebuggerSupport.swift",
     "Equatable.swift",
     "Comparable.swift",
-    "Hashable.swift",
     "Codable.swift",
     "MigrationSupport.swift"
   ]

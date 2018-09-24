@@ -1374,7 +1374,7 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
   { $0 == $1 }
   
   do {
-    let d2: [MinimalHashableValue : Int] = [
+    var d2: [MinimalHashableValue : Int] = [
       MinimalHashableValue(10): 1010,
       MinimalHashableValue(20): 1020,
       MinimalHashableValue(30): 1030,
@@ -1385,6 +1385,8 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
       MinimalHashableValue(80): 1080,
       MinimalHashableValue(90): 1090,
     ]
+    // Make collisions less likely
+    d2.reserveCapacity(1000)
     
     // Find the last key in the dictionary
     var lastKey: MinimalHashableValue = d2.first!.key
@@ -2591,12 +2593,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var d = getBridgedVerbatimDictionary([:])
-    let identity1 = d._rawIdentifier()
     assert(isCocoaDictionary(d))
     assert(d.count == 0)
 
+    let empty = Dictionary<Int, Int>()
+    expectNotEqual(empty._rawIdentifier(), d._rawIdentifier())
+
     d.removeAll()
-    assert(identity1 == d._rawIdentifier())
+    assert(empty._rawIdentifier() == d._rawIdentifier())
     assert(d.count == 0)
   }
 
@@ -2674,12 +2678,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var d = getBridgedNonverbatimDictionary([:])
-    let identity1 = d._rawIdentifier()
     assert(isNativeDictionary(d))
     assert(d.count == 0)
 
+    let empty = Dictionary<Int, Int>()
+    expectNotEqual(empty._rawIdentifier(), d._rawIdentifier())
+
     d.removeAll()
-    assert(identity1 == d._rawIdentifier())
+    assert(empty._rawIdentifier() == d._rawIdentifier())
     assert(d.count == 0)
   }
 
