@@ -31,7 +31,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
-#include "clang/Index/USRGeneration.h"
 
 using namespace swift;
 using namespace swift::index;
@@ -198,7 +197,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     SmallString<128> storage;
     {
       llvm::raw_svector_ostream OS(storage);
-      if (clang::generateFullUSRForTopLevelModuleName(Mod.getName(), OS))
+      if (ide::printModuleUSR(Mod, OS))
         return true;
       USR = stringStorage.copyString(OS.str());
     }
@@ -399,10 +398,8 @@ private:
     std::tie(Info.line, Info.column) = getLineCol(Loc);
     Info.roles |= (unsigned)SymbolRole::Reference;
     Info.name = Mod.getName();
+    Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleUSR(Mod, Info.USR);
-
-    const ModuleDecl *D = Mod.getAsSwiftModule();
-    Info.symInfo = getSymbolInfoForDecl(D);
 
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;

@@ -134,6 +134,13 @@ static SymbolKind getVarSymbolKind(const VarDecl *VD) {
   return SymbolKind::Variable;
 }
 
+SymbolInfo index::getSymbolInfoForModule(ModuleEntity Mod) {
+  SymbolInfo info{ SymbolKind::Unknown, SymbolSubKind::None,
+                   SymbolLanguage::Swift, SymbolPropertySet() };
+  info.Kind = SymbolKind::Module;
+  return info;
+}
+
 SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
   SymbolInfo info{ SymbolKind::Unknown, SymbolSubKind::None,
                    SymbolLanguage::Swift, SymbolPropertySet() };

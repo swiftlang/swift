@@ -1288,6 +1288,7 @@ public:
   bool isSystemModule() const;
   bool isBuiltinModule() const;
   const ModuleDecl *getAsSwiftModule() const;
+  const clang::Module *getAsClangModule() const;
 
   explicit operator bool() const { return !Mod.isNull(); }
 };

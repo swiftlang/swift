@@ -1630,6 +1630,11 @@ const ModuleDecl* ModuleEntity::getAsSwiftModule() const {
   return nullptr;
 }
 
+const clang::Module* ModuleEntity::getAsClangModule() const {
+  assert(!Mod.isNull());
+  return getClangModule(Mod);
+}
+
 // See swift/Basic/Statistic.h for declaration: this enables tracing SourceFiles, is
 // defined here to avoid too much layering violation / circular linkage
 // dependency.
