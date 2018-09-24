@@ -767,7 +767,11 @@ extension Set: SetAlgebra {
   ///   otherwise, `false`.
   @inlinable
   public func isSuperset<S: Sequence>(of possibleSubset: __owned S) -> Bool
-    where S.Element == Element {
+  where S.Element == Element {
+    defer { _fixLifetime(self) }
+    if let s = possibleSubset as? Set<Element> {
+      return isSuperset(of: s)
+    }
     for member in possibleSubset {
       if !contains(member) {
         return false
