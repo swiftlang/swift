@@ -14,7 +14,7 @@ import SwiftShims
 
 @_fixed_layout
 @usableFromInline
-class _SwiftRawStringStorage : _SwiftNativeNSString {
+class _SwiftRawStringStorage : __SwiftNativeNSString {
   @nonobjc
   @usableFromInline
   final var capacity: Int
