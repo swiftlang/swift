@@ -52,7 +52,7 @@ public struct Locale : Hashable, Equatable, ReferenceConvertible {
         _autoupdating = false
     }
     
-    fileprivate init(reference: NSLocale) {
+    fileprivate init(reference: __shared NSLocale) {
         _wrapped = reference.copy() as! NSLocale
         if __NSLocaleIsAutoupdating(reference) {
             _autoupdating = true
