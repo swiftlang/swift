@@ -19,6 +19,14 @@ namespace swift {
 
 class ModuleDecl;
 
+/// Options for controlling the generation of the .swiftinterface output.
+struct TextualInterfaceOptions {
+  /// Copy of all the command-line flags passed at .swiftinterface
+  /// generation time, re-applied to CompilerInvocation when reading
+  /// back .swiftinterface and reconstructing .swiftmodule.
+  std::string TextualInterfaceFlags;
+};
+
 /// Emit a stable, parseable interface for \p M, which can be used by a client
 /// source file to import this module.
 ///

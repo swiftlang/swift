@@ -19,6 +19,9 @@
 
 using namespace swift;
 
+static std::string SWIFT_TOOLS_VERSION_KEY = "swift-tools-version";
+static std::string SWIFT_MODULE_FLAGS_KEY = "swift-module-flags";
+
 /// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
 /// access path. These are not yet supported by parseable interfaces, since the
 /// information about the declaration kind is not preserved through the binary
@@ -34,6 +37,18 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
     diags.diagnose(importPair.first.front().second,
                    diag::parseable_interface_scoped_import_unsupported);
   }
+}
+
+/// Prints to \p out a comment containing a tool-versions identifier as well
+/// as any relevant command-line flags in \p Opts used to construct \p M.
+static void printToolVersionAndFlagsComment(raw_ostream &out,
+                                            TextualInterfaceOptions const &Opts,
+                                            ModuleDecl *M) {
+  auto &Ctx = M->getASTContext();
+  out << "// " << SWIFT_TOOLS_VERSION_KEY << ": "
+      << Ctx.LangOpts.EffectiveLanguageVersion << "\n";
+  out << "// " << SWIFT_MODULE_FLAGS_KEY << ": "
+      << Opts.TextualInterfaceFlags << "\n";
 }
 
 /// Prints the imported modules in \p M to \p out in the form of \c import
