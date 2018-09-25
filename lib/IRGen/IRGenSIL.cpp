@@ -4190,8 +4190,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   IGM.DebugInfo->emitVariableDeclaration(
       Builder,
       Storage,
-      DbgTy, i->getDebugScope(), Decl, Name, 0,
-      DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
+      DbgTy, i->getDebugScope(), Decl, Name, 0, IndirectValue);
 }
 
 void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
