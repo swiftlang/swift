@@ -233,7 +233,7 @@ r23331567 { $0 += 1 }
 // <rdar://problem/30685195> Compiler crash with invalid assignment
 struct G<T> {
   subscript(x: Int) -> T { get { } nonmutating set { } }
-  // expected-note@-1 {{'subscript' declared here}}
+  // expected-note@-1 {{'subscript(_:)' declared here}}
 }
 
 func wump<T>(to: T, _ body: (G<T>) -> ()) {}

@@ -325,7 +325,7 @@ class LazyProperties {
 
 // CHECK-EXPANDED:        TypeDecl {{.*}} StructContainsAbstractStorageDecls [114:1 - 130:1] expanded
 // CHECK-EXPANDED-NEXT: `-TypeOrExtensionBody {{.*}} 'StructContainsAbstractStorageDecls' [114:43 - 130:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}  |-Accessors {{.*}} scope_map.(file).StructContainsAbstractStorageDecls.subscript@{{.*}}scope_map.swift:115:3 [115:37 - 121:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}  |-Accessors {{.*}} scope_map.(file).StructContainsAbstractStorageDecls.subscript(_:_:)@{{.*}}scope_map.swift:115:3 [115:37 - 121:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  |-AbstractFunctionDecl {{.*}} _ [116:5 - 117:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionParams {{.*}} _ param 0:0 [116:5 - 117:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-AbstractFunctionParams {{.*}} _ param 1:0 [116:5 - 117:5] expanded
@@ -404,7 +404,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT: {{^}}            `-BraceStmt {{.*}} [167:32 - 167:42] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-AbstractFunctionParams {{.*}} defaultArguments(i:j:) param 0:1 [167:48 - 175:1] expanded
 
-// CHECK-EXPANDED: -Accessors {{.*}} scope_map.(file).ProtoWithSubscript.subscript@{{.*}}scope_map.swift:183:3 [183:33 - 183:43] expanded
+// CHECK-EXPANDED: -Accessors {{.*}} scope_map.(file).ProtoWithSubscript.subscript(_:)@{{.*}}scope_map.swift:183:3 [183:33 - 183:43] expanded
 // CHECK-EXPANDED-NEXT:     |-AbstractFunctionDecl {{.*}} _ [183:35 - 183:35] expanded
 // CHECK-EXPANDED-NEXT:       `-AbstractFunctionParams {{.*}} _ param 0:0 [183:35 - 183:35] expanded
 // CHECK-EXPANDED-NEXT:         `-AbstractFunctionParams {{.*}} _ param 1:0 [183:35 - 183:35] expanded

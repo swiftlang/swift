@@ -27,7 +27,7 @@ struct A {
 }
 
 extension A: K {
-    static let j = S(\A.id + "id") // expected-error {{initializer 'init' requires that 'String' conform to 'K'}}
+    static let j = S(\A.id + "id") // expected-error {{initializer 'init(_:)' requires that 'String' conform to 'K'}}
 }
 
 // SR-5034
