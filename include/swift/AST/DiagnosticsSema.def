@@ -4175,6 +4175,11 @@ ERROR(possibly_non_exhaustive_switch,none,
       "the compiler is unable to check that this switch is exhaustive in reasonable time",
       ())
 
+ERROR(case_keyword_used_as_identifier,none,
+      "keyword '%0' cannot be used as an identifier here", (StringRef))
+NOTE(case_use_backticks_to_escape,none,
+     "use backticks to escape it", ())
+
 NOTE(missing_several_cases,none,
      "do you want to add "
      "%select{missing cases|a default clause}0"
