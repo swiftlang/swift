@@ -977,26 +977,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
-
-  // If this is a let-param whose type is a type variable, this is an untyped
-  // closure param that may be bound to an inout type later. References to the
-  // param should have lvalue type instead. Express the relationship with a new
-  // constraint.
-  if (auto *param = dyn_cast<ParamDecl>(varDecl)) {
-    if (param->isLet() && valueType->is<TypeVariableType>()) {
-      auto found = OpenedParameterTypes.find(param);
-      if (found != OpenedParameterTypes.end())
-        return { found->second, found->second };
-
-      auto typeVar = createTypeVariable(getConstraintLocator(locator),
-                                        TVO_CanBindToLValue);
-      addConstraint(ConstraintKind::BindParam, valueType, typeVar,
-                    getConstraintLocator(locator));
-      OpenedParameterTypes.insert(std::make_pair(param, typeVar));
-      return { typeVar, typeVar };
-    }
-  }
-
   return { valueType, valueType };
 }
 
