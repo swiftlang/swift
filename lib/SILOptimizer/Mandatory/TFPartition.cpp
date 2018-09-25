@@ -3448,7 +3448,7 @@ bool PartitionCloner::finalizeOriginal() {
     // block, as indicated by the BitVector.
     //
     // Collect all predecessor blocks before removing values from branches as
-    // invaldiate pred_iterators when removing formal values.
+    // pred_iterators get invalidated when removing formal values.
     SmallPtrSet<SILBasicBlock*, 8> predBlocks(bb->pred_begin(), bb->pred_end());
     for (auto pi : predBlocks) {
       auto *br = cast<BranchInst>(pi->getTerminator());
