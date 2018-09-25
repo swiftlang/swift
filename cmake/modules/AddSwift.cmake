@@ -1669,11 +1669,9 @@ function(add_swift_library name)
 
       # Collect architecture agnostic SDK linker flags
       set(swiftlib_link_flags_all ${SWIFTLIB_LINK_FLAGS})
-      if(${sdk} STREQUAL IOS_SIMULATOR)
-        if(${name} STREQUAL swiftMediaPlayer)
-          # message("DISABLING AUTOLINK FOR swiftMediaPlayer")
-          list(APPEND swiftlib_link_flags_all "-Xlinker" "-ignore_auto_link")
-        endif()
+      if(${sdk} STREQUAL IOS_SIMULATOR AND ${name} STREQUAL swiftMediaPlayer)
+        # message("DISABLING AUTOLINK FOR swiftMediaPlayer")
+        list(APPEND swiftlib_link_flags_all "-Xlinker" "-ignore_auto_link")
       endif()
 
       # We unconditionally removed "-z,defs" from CMAKE_SHARED_LINKER_FLAGS in
