@@ -992,11 +992,6 @@ public:
     llvm_unreachable("bad kind");
   }
 
-  class TupleElementRange;
-
-  /// Return a range over the tuple elements.
-  TupleElementRange getTupleElements() const;
-
   /// Given that the value being abstracted is a tuple type, return
   /// the abstraction pattern for its object type.
   AbstractionPattern getTupleElementType(unsigned index) const;
@@ -1017,6 +1012,10 @@ public:
   /// the abstraction pattern for one of its parameter types.
   AbstractionPattern getFunctionParamType(unsigned index) const;
 
+  /// Given that the value being abstracted is a function type, return
+  /// the number of parameters.
+  unsigned getNumFunctionParams() const;
+
   /// Given that the value being abstracted is optional, return the
   /// abstraction pattern for its object type.
   AbstractionPattern getOptionalObjectType() const;
@@ -1029,56 +1028,10 @@ public:
   void print(raw_ostream &OS) const;
 };
 
-/// A range of abstraction patterns for the tuple elements of an
-/// abstraction pattern.
-class AbstractionPattern::TupleElementRange {
-  AbstractionPattern Parent;
-  unsigned NumElements;
-public:
-  TupleElementRange(AbstractionPattern parent, unsigned numElements)
-    : Parent(parent), NumElements(numElements) {}
-
-  struct iterator {
-    const TupleElementRange *Range;
-    unsigned Index;
-
-    AbstractionPattern operator*() const {
-      return Range->Parent.getTupleElementType(Index);
-    }
-
-    iterator &operator++() {
-      assert(Index < Range->NumElements);
-      Index++;
-      return *this;
-    }
-    iterator operator++(int _) {
-      iterator saved = *this;
-      operator++();
-      return saved;
-    }
-
-    bool operator==(const iterator &other) const {
-      assert(Range == other.Range);
-      return Index == other.Index;
-    }
-    bool operator!=(const iterator &other) const {
-      return !operator==(other);
-    }
-  };
-
-  iterator begin() const { return { this, 0 }; }
-  iterator end() const { return { this, NumElements }; }
-};
-
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
                                      const AbstractionPattern &pattern) {
   pattern.print(out);
   return out;
-}
-
-inline AbstractionPattern::TupleElementRange
-AbstractionPattern::getTupleElements() const {
-  return TupleElementRange(*this, getNumTupleElements());
 }
 
 }
