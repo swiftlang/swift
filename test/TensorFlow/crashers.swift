@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
 
 // This file contains various regression tests that crashed the compiler.
 
@@ -253,6 +253,11 @@ public func testMultiResultOp_send_recv() {
   _hostOp(y)
 }
 
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testMultiResultOp_send_recv{{.*}}
+// CHECK:  graph_op "tfc.SendToHost"
+// CHECK:  graph_op "tfc.SendToHost"
+// CHECK:  graph_op "tfc.RecvFromHost"
+
 var globalThing: Int32!
 
 public func testStructExtractBBArg(x: Tensor<Float>) -> Tensor<Int32> {
@@ -271,6 +276,16 @@ public func SR8191() {
     i += 1
   } while i < 10
 }
+
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}SR8191{{.*}}
+// CHECK: [sequence
+// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb4
+// CHECK:     [sequence
+// CHECK:       {condition Header: bb1
+// CHECK:         block bb3
+// CHECK:         block bb2}
+// CHECK:       block bb6]>
+// CHECK:   block bb4]
 
 // `a` and `b` are both arguments to the tensor program, which starts at
 // "let _= a + b", and ends in that BB. So the tensor start point and tensor end
