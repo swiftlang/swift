@@ -1166,7 +1166,7 @@ public func _GetGlobalEagerContext() -> CTFEContext {
   return _ExecutionContext.global.eagerContext
 }
 
-// TODO: replace these functions with the generic versions commented out below.
+// TODO: replace these functions with generic ones that do not hard-code Float.
 @inlinable
 @_silgen_name("_swift_tfc_ExtractFloatCTensorHandle")
 public func _ExtractCTensorHandle(
