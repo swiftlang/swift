@@ -416,7 +416,11 @@ extension Range: Codable where Bound: Codable {
     let lowerBound = try container.decode(Bound.self, forKey: .lowerBound)
     let upperBound = try container.decode(Bound.self, forKey: .upperBound)
     guard lowerBound <= upperBound else {
-      throw DecodingError.dataCorruptedError(forKey: CodingKeys.upperBound, in: container, debugDescription: "upperBound (upTo) cannot be lower than lowerBound (from)")
+      throw DecodingError.dataCorruptedError(
+        forKey: CodingKeys.upperBound,
+        in: container,
+        debugDescription: "upperBound (upTo) cannot be less than lowerBound (from)"
+      )
     }
     self = lowerBound..<upperBound
   }
@@ -472,7 +476,7 @@ extension PartialRangeUpTo: RangeExpression {
 
 extension PartialRangeUpTo: Codable where Bound: Codable {
   private enum CodingKeys: String, CodingKey {
-    case upperBound = "beginningUpTo"
+    case upperBound = "fromStartUpTo"
   }
 
   public init(from decoder: Decoder) throws {
@@ -529,7 +533,7 @@ extension PartialRangeThrough: RangeExpression {
 
 extension PartialRangeThrough: Codable where Bound: Codable {
   private enum CodingKeys: String, CodingKey {
-    case upperBound = "beginningTo"
+    case upperBound = "fromStartThrough"
   }
 
   public init(from decoder: Decoder) throws {
