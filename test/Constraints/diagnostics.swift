@@ -681,7 +681,7 @@ func r23641896() {
   var g = "Hello World"
   g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot convert value of type 'ClosedRange<Int>' to expected argument type 'Range<String.Index>'}}
 
-  _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
+  _ = g[12]  // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 
 }
 
@@ -1199,7 +1199,7 @@ func platypus<T>(a: [T]) {
 func badTypes() {
   let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
   let array = [Int](sequence)
-  // expected-error@-1 {{initializer 'init' requires the types 'Int' and '[Int]' be equivalent}}
+  // expected-error@-1 {{initializer 'init(_:)' requires the types 'Int' and '[Int]' be equivalent}}
 }
 
 // rdar://34357545

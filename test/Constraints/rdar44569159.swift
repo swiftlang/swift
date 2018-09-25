@@ -13,6 +13,6 @@ struct A {
 
 func foo(_ v: Double) {
   _ = A()[S(value: v)]
-// expected-error@-1 {{subscript 'subscript' requires that 'Double' conform to 'P'}}
+// expected-error@-1 {{subscript 'subscript(_:)' requires that 'Double' conform to 'P'}}
 // expected-error@-2 {{referencing initializer 'init(value:)' on 'S' requires that 'Double' conform to 'P'}}
 }
