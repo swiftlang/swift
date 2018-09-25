@@ -611,8 +611,8 @@ class SwiftDocumentSemanticInfo :
 
 public:
   SwiftDocumentSemanticInfo(StringRef Filename,
-                            std::shared_ptr<SwiftASTManager> ASTMgr,
-                            std::shared_ptr<NotificationCenter> NotificationCtr)
+                            std::weak_ptr<SwiftASTManager> ASTMgr,
+                            std::weak_ptr<NotificationCenter> NotificationCtr)
       : Filename(Filename), ASTMgr(ASTMgr), NotificationCtr(NotificationCtr) {}
 
   SwiftInvocationRef getInvocation() const {
@@ -1029,7 +1029,9 @@ void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
 }
 
 struct SwiftEditorDocument::Implementation {
-  SwiftLangSupport &LangSupport;
+  std::weak_ptr<SwiftASTManager> ASTMgr;
+  std::weak_ptr<NotificationCenter> NotificationCtr;
+
   const std::string FilePath;
   EditableTextBufferRef EditableBuffer;
 
@@ -1057,10 +1059,11 @@ struct SwiftEditorDocument::Implementation {
 
   Implementation(StringRef FilePath, SwiftLangSupport &LangSupport,
                  CodeFormatOptions options)
-      : LangSupport(LangSupport), FilePath(FilePath), FormatOptions(options) {
-    SemanticInfo = new SwiftDocumentSemanticInfo(
-        FilePath, LangSupport.getASTManager().shared_from_this(),
-        LangSupport.getNotificationCenter());
+      : ASTMgr(LangSupport.getASTManager().shared_from_this()),
+        NotificationCtr(LangSupport.getNotificationCenter()),
+        FilePath(FilePath), FormatOptions(options) {
+    SemanticInfo =
+        new SwiftDocumentSemanticInfo(FilePath, ASTMgr, NotificationCtr);
   }
 };
 
@@ -1635,9 +1638,8 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
   Impl.SyntaxMap.Tokens.clear();
   Impl.AffectedRange = {0, static_cast<unsigned>(Buf->getBufferSize())};
 
-  Impl.SemanticInfo = new SwiftDocumentSemanticInfo(
-      Impl.FilePath, Impl.LangSupport.getASTManager().shared_from_this(),
-      Impl.LangSupport.getNotificationCenter());
+  Impl.SemanticInfo = new SwiftDocumentSemanticInfo(Impl.FilePath, Impl.ASTMgr,
+                                                    Impl.NotificationCtr);
   Impl.SemanticInfo->setCompilerArgs(Args);
   return Impl.EditableBuffer->getSnapshot();
 }
