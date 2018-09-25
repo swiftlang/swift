@@ -3650,9 +3650,10 @@ public:
     assert(Args.isValid());
   }
 
-  // FIXME: Remove this entry point.
-  CallSite(SILLocation loc, ArgumentSource &&value, CanType resultType,
-           bool throws)
+  // FIXME: Remove this entry point or refactor it so that isScalar is always
+  // false.
+  CallSite(SILLocation loc, ArgumentSource &&value, bool isScalar,
+           CanType resultType, bool throws)
       : Loc(loc), SubstResultType(resultType), Throws(throws) {
 
     auto type = (value.hasLValueType()
@@ -3660,13 +3661,15 @@ public:
                  : value.getSubstRValueType());
     SmallVector<AnyFunctionType::Param, 8> params;
     AnyFunctionType::decomposeInput(type, params);
-    Args.emplace(params, /*scalar*/true);
+    Args.emplace(params, isScalar);
     Args.addArbitrary(std::move(value));
     assert(Args.isValid());
   }
 
-  CallSite(SILLocation loc, ArgumentSource &&value, CanAnyFunctionType fnType)
-      : CallSite(loc, std::move(value), fnType.getResult(), fnType->throws()) {}
+  CallSite(SILLocation loc, ArgumentSource &&value, bool isScalar,
+           CanAnyFunctionType fnType)
+      : CallSite(loc, std::move(value), isScalar,
+                 fnType.getResult(), fnType->throws()) {}
 
   CallSite(SILLocation loc, PreparedArguments &&args, CanAnyFunctionType fnType)
       : CallSite(loc, std::move(args), fnType.getResult(), fnType->throws()) {}
@@ -4435,7 +4438,8 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, Expr *e) {
 
   // Apply 'self' if provided.
   if (apply.selfParam) {
-    emission.addCallSite(RegularLocation(e), std::move(apply.selfParam),
+    emission.addCallSite(RegularLocation(e),
+                         std::move(apply.selfParam), /*scalar*/ false,
                          apply.selfType->getCanonicalType(), /*throws*/ false);
   }
 
@@ -5056,10 +5060,13 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
                                              selfMetaVal.getType()
                                                .getASTType(),
                                              std::move(selfMetaVal))),
+                       /*scalar*/ false,
                        substFormalType);
 
-  // Arguments
-  emission.addCallSite(loc, ArgumentSource(loc, std::move(args)),
+  // Arguments.
+  // FIXME: Rework this so that scalar=false.
+  emission.addCallSite(loc,
+                       ArgumentSource(loc, std::move(args)), /*scalar*/ true,
                        cast<FunctionType>(substFormalType.getResult()));
 
   // Perform the call.
@@ -5599,7 +5606,8 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   CallEmission emission(*this, std::move(getter), std::move(writebackScope));
   // Self ->
   if (hasSelf) {
-    emission.addCallSite(loc, std::move(selfValue), accessType);
+    emission.addCallSite(loc, std::move(selfValue), /*scalar*/ false,
+                         accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
@@ -5630,16 +5638,16 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   CallEmission emission(*this, std::move(setter), std::move(writebackScope));
   // Self ->
   if (hasSelf) {
-    emission.addCallSite(loc, std::move(selfValue), accessType);
+    emission.addCallSite(loc, std::move(selfValue), /*scalar*/ false,
+                         accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
 
   // (value)  or (value, indices...)
-  bool isScalar = subscriptIndices.isNull() ||
-                  std::move(subscriptIndices).getSources().empty();
-  PreparedArguments values(accessType->getParams(), isScalar);
+  PreparedArguments values(accessType->getParams(), /*scalar*/ false);
   values.addArbitrary(std::move(setValue));
-  if (!isScalar) {
+
+  if (!subscriptIndices.isNull()) {
     unsigned paramIndex = 1;
     for (auto &component : std::move(subscriptIndices).getSources()) {
       auto param = accessType.getParams()[paramIndex++];
@@ -5682,7 +5690,8 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
   CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
   if (hasSelf) {
-    emission.addCallSite(loc, std::move(selfValue), accessType);
+    emission.addCallSite(loc, std::move(selfValue), /*scalar*/ false,
+                         accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
@@ -5770,7 +5779,8 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
   if (hasSelf) {
-    emission.addCallSite(loc, std::move(selfValue), accessType);
+    emission.addCallSite(loc, std::move(selfValue), /*scalar*/ false,
+                         accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.

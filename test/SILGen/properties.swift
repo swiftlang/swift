@@ -1242,3 +1242,16 @@ var globalOptionalComputed: Int? {
 func updateGlobalOptionalComputed() {
   globalOptionalComputed? = 123
 }
+
+struct TupleStruct {
+  var v: (Int, Int) { get { } set { } }
+  var vv: (w: Int, h: Int) { get { } set { } }
+}
+
+func assign_to_tuple() {
+  var s = TupleStruct()
+  s.v = (1, 2)
+
+  let v = (3, 4)
+  s.vv = v
+}
