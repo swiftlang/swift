@@ -1176,34 +1176,22 @@ public func _GetCTensorHandleFromSwift(
 @inlinable
 @_silgen_name("_swift_tfc_CreateTensorHandleFromC")
 public func _CreateTensorHandleFromC(
-  _ cHandle: CTensorHandle, _ dtype: TF_DataType
+  _ cHandle: CTensorHandle
 ) -> _AnyTensorHandle {
+  let dtype = TFE_TensorHandleDataType(cHandle)
   switch dtype {
-  case TF_BFLOAT16:
-    return TensorHandle<BFloat16>(owning: cHandle)
-  case TF_UINT8:
-    return TensorHandle<UInt8>(owning: cHandle)
-  case TF_INT8:
-    return TensorHandle<Int8>(owning: cHandle)
-  case TF_UINT16:
-    return TensorHandle<UInt16>(owning: cHandle)
-  case TF_INT16:
-    return TensorHandle<Int16>(owning: cHandle)
-  case TF_UINT32:
-    return TensorHandle<UInt32>(owning: cHandle)
-  case TF_INT32:
-    return TensorHandle<Int32>(owning: cHandle)
-  case TF_UINT64:
-    return TensorHandle<UInt64>(owning: cHandle)
-  case TF_INT64:
-    return TensorHandle<Int64>(owning: cHandle)
-  case TF_FLOAT:
-    return TensorHandle<Float>(owning: cHandle)
-  case TF_DOUBLE:
-    return TensorHandle<Double>(owning: cHandle)
-  case TF_BOOL:
-    return TensorHandle<Bool>(owning: cHandle)
-  default:
-    fatalError("Unsupported dtype \(dtype)")
+  case TF_BFLOAT16: return TensorHandle<BFloat16>(owning: cHandle)
+  case TF_UINT8: return TensorHandle<UInt8>(owning: cHandle)
+  case TF_INT8: return TensorHandle<Int8>(owning: cHandle)
+  case TF_UINT16: return TensorHandle<UInt16>(owning: cHandle)
+  case TF_INT16: return TensorHandle<Int16>(owning: cHandle)
+  case TF_UINT32: return TensorHandle<UInt32>(owning: cHandle)
+  case TF_INT32: return TensorHandle<Int32>(owning: cHandle)
+  case TF_UINT64: return TensorHandle<UInt64>(owning: cHandle)
+  case TF_INT64: return TensorHandle<Int64>(owning: cHandle)
+  case TF_FLOAT: return TensorHandle<Float>(owning: cHandle)
+  case TF_DOUBLE: return TensorHandle<Double>(owning: cHandle)
+  case TF_BOOL: return TensorHandle<Bool>(owning: cHandle)
+  default: fatalError("Unsupported dtype \(dtype)")
   }
 }

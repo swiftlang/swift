@@ -26,26 +26,12 @@ public class _AnyTensorHandle {
   /// - Note: The compiler knows that `_AnyTensorHandle` has a single stored
   /// property, and assumes that this is it. Changing the design of
   /// `TensorHandle` will require tweaking the compiler.
-  public let cTensorHandle: CTensorHandle
-
-  @usableFromInline
-  init(copyingFromCTensor cTensor: CTensor) {
-    let status = TF_NewStatus()
-    let cTensorHandle = TFE_NewTensorHandle(cTensor, status)
-    checkOk(status)
-    self.cTensorHandle = cTensorHandle!
-    TF_DeleteStatus(status)
-  }
-
-  @usableFromInline
-  init(owning cTensorHandle: CTensorHandle) {
-    self.cTensorHandle = cTensorHandle
-  }
-
-  deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(cTensorHandle)
-    debugLog("Returning from deinit of TensorHandle.")
+  @usableFromInline let cTensorHandle: CTensorHandle
+  
+  /// Private initializer from a `CTensorHandle`. Should only be called from
+  /// `TensorHandle<Scalar>.init`.
+  fileprivate init(base: CTensorHandle) {
+    self.cTensorHandle = base
   }
 }
 
@@ -56,6 +42,26 @@ public class _AnyTensorHandle {
 @_fixed_layout // required because the compiler accesses cTensorHandle directly.
 public final class TensorHandle<Scalar> : _AnyTensorHandle
   where Scalar : AccelerableByTensorFlow {
+  @usableFromInline
+  init(owning cTensorHandle: CTensorHandle) {
+    super.init(base: cTensorHandle)
+  }
+  
+  @usableFromInline
+  convenience init(copyingFromCTensor cTensor: CTensor) {
+    let status = TF_NewStatus()
+    let cTensorHandle = TFE_NewTensorHandle(cTensor, status)
+    checkOk(status)
+    self.init(owning: cTensorHandle!)
+    TF_DeleteStatus(status)
+  }
+
+  deinit {
+    debugLog("De-initializing TensorHandle.")
+    TFE_DeleteTensorHandle(cTensorHandle)
+    debugLog("Returning from deinit of TensorHandle.")
+  }
+  
   /// Create a `TensorHandle` with a closure that initializes the underlying
   /// buffer.
   ///

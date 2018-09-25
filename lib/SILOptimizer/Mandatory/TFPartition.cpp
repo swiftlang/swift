@@ -93,17 +93,12 @@ static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
   return isa<RefCountingInst>(inst);
 }
 
-/// Given a decl for a struct that has a single field (typically because it is
-/// known to be a standard library type like Int or Float), return the canonical
-/// type of the single member, asserting and aborting if we get something
-/// unexpected.
+/// Given a decl for a struct or class that has a single field (typically
+/// because it is known to be a standard library type like Int or Float), return
+/// the canonical type of the single member, asserting and aborting if we get
+/// something unexpected.
 static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
   auto *field = tf::getFieldIfContainsSingleField(decl);
-  if (!field)
-    if (auto *cd = decl->getAsClassOrClassExtensionContext())
-      if (auto superclass = cd->getSuperclass())
-        if (auto *superclassDecl = superclass->getAnyNominal())
-          field = getFieldIfContainsSingleField(superclassDecl);
   assert(field && "Struct should have one member");
   return field->getType()->getCanonicalType();
 }

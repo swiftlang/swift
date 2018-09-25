@@ -19,7 +19,7 @@ RuntimeEntryPointTests.testCPUOrGPU("RoundTrip_CTensorHandle_AnyTensorHandle") {
   cHandle = TFE_TensorHandleCopySharingTensor(cHandle, status)
   expectEqual(TF_GetCode(status), TF_OK)
   TF_DeleteStatus(status)
-  let anyHandle = _CreateTensorHandleFromC(cHandle, TF_FLOAT)
+  let anyHandle = _CreateTensorHandleFromC(cHandle)
   let tensor = Tensor(handle: anyHandle as! TensorHandle<Float>)
   print(tensor)
   expectTrue(tensor == Tensor(0.0))
