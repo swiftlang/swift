@@ -60,7 +60,7 @@ public extension Dataset {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
     self.init(
       _handle: #tfop("RandomDataset", seed1, seed2,
-                     output_types$array: Element.self,
+                     output_types$typeList: Element.self,
                      output_shapes$unknownShapeList: Element.self)
     )
   }
@@ -74,7 +74,7 @@ public extension Dataset {
     self.init(
       _handle: #tfop(
         "TensorSliceDataset", [elements],
-        Toutput_types$array: Element.self,
+        Toutput_types$typeList: Element.self,
         output_shapes$unknownShapeList: Element.self
       )
     )
@@ -88,7 +88,7 @@ extension Dataset : Sequence {
   @inlinable @inline(__always)
   public func makeIterator() -> DatasetIterator<Element> {
     let resource: ResourceHandle =
-      #tfop("AnonymousIterator", output_types$array: Element.self,
+      #tfop("AnonymousIterator", output_types$typeList: Element.self,
             output_shapes$unknownShapeList: Element.self)
     #tfop("MakeIterator", _handle, resource) as Void
     return DatasetIterator(_handle: resource)
@@ -111,7 +111,7 @@ public extension Dataset where Element == Tensor<Float> {
       _handle: #tfop(
         "MapDataset", _handle, [Tensor<Int32>(0)], f: transform,
         Targuments: [Int32.self],
-        output_types$array: Element.self,
+        output_types$typeList: Element.self,
         output_shapes$unknownShapeList: Element.self
       )
     )
@@ -130,7 +130,7 @@ public extension Dataset where Element == Tensor<Float> {
       _handle: #tfop(
         "FilterDataset", _handle, [Tensor<Int32>(0)],
         predicate: isIncluded, Targuments: [Int32.self],
-        output_types$array: Element.self,
+        output_types$typeList: Element.self,
         output_shapes$unknownShapeList: Element.self
       )
     )
@@ -146,7 +146,7 @@ public extension Dataset {
     return Dataset(
       _handle: #tfop(
         "ShuffleDataset", _handle, Tensor<Int64>(sampleCount), seed1, seed2,
-        output_types$array: Element.self,
+        output_types$typeList: Element.self,
         output_shapes$unknownShapeList: Element.self
       )
     )
@@ -157,7 +157,7 @@ public extension Dataset {
     return Dataset(
       _handle: #tfop(
         "BatchDataset", _handle, Tensor<Int64>(batchSize),
-        output_types$array: Element.self,
+        output_types$typeList: Element.self,
         output_shapes$unknownShapeList: Element.self
       )
     )
@@ -182,13 +182,13 @@ extension DatasetIterator : IteratorProtocol {
   public mutating func next() -> Element? {
     let optional: VariantHandle =
       #tfop("IteratorGetNextAsOptional", _handle,
-            output_types$array: Element.self,
+            output_types$typeList: Element.self,
             output_shapes$unknownShapeList: Element.self)
     guard _TFGetScalarOrDie(#tfop("OptionalHasValue", optional)) else {
       return nil
     }
     return #tfop("OptionalGetValue", optional,
-                 output_types$array: Element.self,
+                 output_types$typeList: Element.self,
                  output_shapes$unknownShapeList: Element.self) as Element
   }
 }
@@ -199,6 +199,6 @@ public func zip<T>(
   _ dataset1: Dataset<T>, _ dataset2: Dataset<T>
 ) -> Dataset<(T, T)> {
   return #tfop("ZipDataset", [dataset1, dataset2],
-               output_types$array: (T, T).self,
+               output_types$typeList: (T, T).self,
                output_shapes$unknownShapeList: (T, T).self)
 }

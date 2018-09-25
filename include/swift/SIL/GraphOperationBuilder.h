@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the construction logic for a GraphOperationInst, in
-// particular encoding the mangled inst name string for the operands and
+// particular encoding the mangled inst name string for the arguments and
 // attributes.
 //
 //===----------------------------------------------------------------------===//
@@ -42,12 +42,12 @@ public:
   /// Start building a GraphOperationInst for op `OpName`.
   GraphOperationBuilder(llvm::StringRef OpName);
 
-  /// Add a single operand to the GraphOperationInst, with an optional name.
-  void addOperand(SILValue operand, llvm::StringRef name = llvm::StringRef());
+  /// Add a single argument to the GraphOperationInst, with an optional name.
+  void addArgument(SILValue argument, llvm::StringRef name = llvm::StringRef());
 
-  /// Add a list operand to the GraphOperationInst, with an optional name.
-  void addListOperand(llvm::ArrayRef<SILValue> operands,
-                      llvm::StringRef name = llvm::StringRef());
+  /// Add a list argument to the GraphOperationInst, with an optional name.
+  void addListArgument(llvm::ArrayRef<SILValue> arguments,
+                       llvm::StringRef name = llvm::StringRef());
 
   /// Add an attribute with known constant value to the GraphOperationInst.
   /// Returns a reference to the attribute, valid for the lifetime of the

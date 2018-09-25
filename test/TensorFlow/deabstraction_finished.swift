@@ -263,7 +263,7 @@ public func testExtractDTypeList() {
   // TODO: Support unpacking a struct value into an input list so that we can replace
   // `[elements.a, elements.b]` with `elements`.
   let _: VariantHandle = #tfop("TensorSliceDataset", [elements.a, elements.b],
-                               Toutput_types$array: Foo.self,
+                               Toutput_types$typeList: Foo.self,
                                output_shapes: [TensorShape()])
 }
 
@@ -273,7 +273,7 @@ public func testExtractDTypeList() {
 public func testExtractTupleDTypeList() {
     let bar: (a: Tensor<Int32>, b: Tensor<Int32>) = (Tensor(0), Tensor(1))
     let _: VariantHandle = #tfop("TensorSliceDataset", [bar.a, bar.b],
-                                 Toutput_types$array: type(of: bar),
+                                 Toutput_types$typeList: type(of: bar),
                                  output_shapes: [TensorShape()])
 }
 
