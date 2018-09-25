@@ -36,15 +36,9 @@ struct _SetBuilder<Element: Hashable> {
   }
 
   @inlinable
-  public mutating func take() -> Set<Element> {
-    _precondition(_target.capacity > 0 || _requestedCount == 0,
-      "Cannot take the result twice")
+  public __consuming func take() -> Set<Element> {
     _precondition(_target.count == _requestedCount,
       "The number of members added does not match the promised count")
-
-    // Prevent taking the result twice.
-    var result = _NativeSet<Element>()
-    swap(&result, &_target)
-    return Set(_native: result)
+    return Set(_native: _target)
   }
 }

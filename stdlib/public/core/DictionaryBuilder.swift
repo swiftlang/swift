@@ -34,15 +34,9 @@ struct _DictionaryBuilder<Key: Hashable, Value> {
   }
 
   @inlinable
-  public mutating func take() -> Dictionary<Key, Value> {
-    _precondition(_target.capacity > 0 || _requestedCount == 0,
-      "Cannot take the result twice")
+  public __consuming func take() -> Dictionary<Key, Value> {
     _precondition(_target.count == _requestedCount,
       "The number of members added does not match the promised count")
-
-    // Prevent taking the result twice.
-    var result = _NativeDictionary<Key, Value>()
-    swap(&result, &_target)
-    return Dictionary(_native: result)
+    return Dictionary(_native: _target)
   }
 }

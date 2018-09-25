@@ -31,7 +31,7 @@ internal struct _NativeDictionary<Key: Hashable, Value> {
 
   /// Constructs a dictionary adopting the given storage.
   @inlinable
-  internal init(_ storage: _RawDictionaryStorage) {
+  internal init(_ storage: __owned _RawDictionaryStorage) {
     self._storage = storage
   }
 
@@ -44,12 +44,12 @@ internal struct _NativeDictionary<Key: Hashable, Value> {
 
 #if _runtime(_ObjC)
   @inlinable
-  internal init(_ cocoa: _CocoaDictionary) {
+  internal init(_ cocoa: __owned _CocoaDictionary) {
     self.init(cocoa, capacity: cocoa.count)
   }
 
   @inlinable
-  internal init(_ cocoa: _CocoaDictionary, capacity: Int) {
+  internal init(_ cocoa: __owned _CocoaDictionary, capacity: Int) {
     _sanityCheck(cocoa.count <= capacity)
     self.init(capacity: capacity)
     for (key, value) in cocoa {
@@ -333,7 +333,7 @@ extension _NativeDictionary { // Insertions
   /// Storage must be uniquely referenced with adequate capacity.
   /// The `key` must not be already present in the Dictionary.
   @inlinable
-  internal func _unsafeInsertNew(key: Key, value: Value) {
+  internal func _unsafeInsertNew(key: __owned Key, value: __owned Value) {
     _sanityCheck(count + 1 <= capacity)
     let hashValue = self.hashValue(for: key)
     if _isDebugAssertConfiguration() {
@@ -358,7 +358,7 @@ extension _NativeDictionary { // Insertions
   /// Storage must be uniquely referenced.
   /// The `key` must not be already present in the Dictionary.
   @inlinable
-  internal mutating func insertNew(key: Key, value: Value) {
+  internal mutating func insertNew(key: __owned Key, value: __owned Value) {
     _ = ensureUnique(isUnique: true, capacity: count + 1)
     _unsafeInsertNew(key: key, value: value)
   }
@@ -393,7 +393,10 @@ extension _NativeDictionary { // Insertions
   }
 
   @inlinable
-  internal func _insert(at index: Index, key: Key, value: Value) {
+  internal func _insert(
+    at index: Index,
+    key: __owned Key,
+    value: __owned Value) {
     _sanityCheck(count < capacity)
     hashTable.insert(index)
     uncheckedInitialize(at: index, toKey: key, value: value)
@@ -402,7 +405,7 @@ extension _NativeDictionary { // Insertions
 
   @inlinable
   internal mutating func updateValue(
-    _ value: Value,
+    _ value: __owned Value,
     forKey key: Key,
     isUnique: Bool
   ) -> Value? {
@@ -422,7 +425,7 @@ extension _NativeDictionary { // Insertions
 
   @inlinable
   internal mutating func setValue(
-    _ value: Value,
+    _ value: __owned Value,
     forKey key: Key,
     isUnique: Bool
   ) {
@@ -521,7 +524,7 @@ extension _NativeDictionary { // High-level operations
 
   @inlinable
   internal mutating func merge<S: Sequence>(
-    _ keysAndValues: S,
+    _ keysAndValues: __owned S,
     isUnique: Bool,
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows where S.Element == (Key, Value) {
@@ -546,7 +549,7 @@ extension _NativeDictionary { // High-level operations
   @inlinable
   @inline(__always)
   internal init<S: Sequence>(
-    grouping values: S,
+    grouping values: __owned S,
     by keyForValue: (S.Element) throws -> Key
   ) rethrows where Value == [S.Element] {
     self.init()
@@ -574,14 +577,14 @@ extension _NativeDictionary: Sequence {
     internal var iterator: _HashTable.Iterator
 
     @inlinable
-    init(_ base: _NativeDictionary) {
+    init(_ base: __owned _NativeDictionary) {
       self.base = base
       self.iterator = base.hashTable.makeIterator()
     }
   }
 
   @inlinable
-  internal func makeIterator() -> Iterator {
+  internal __consuming func makeIterator() -> Iterator {
     return Iterator(self)
   }
 }

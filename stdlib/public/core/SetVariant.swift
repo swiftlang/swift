@@ -248,7 +248,7 @@ extension Set._Variant: _SetBuffer {
 
 extension Set._Variant {
   @inlinable
-  internal mutating func update(with value: Element) -> Element? {
+  internal mutating func update(with value: __owned Element) -> Element? {
     switch self {
     case .native:
       let isUnique = self.isUniquelyReferenced()
@@ -267,7 +267,7 @@ extension Set._Variant {
 
   @inlinable
   internal mutating func insert(
-    _ element: Element
+    _ element: __owned Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
     switch self {
     case .native:
@@ -377,7 +377,7 @@ extension Set._Variant {
   /// - Complexity: O(1).
   @inlinable
   @inline(__always)
-  __consuming internal func makeIterator() -> Set<Element>.Iterator {
+  internal __consuming func makeIterator() -> Set<Element>.Iterator {
     switch self {
     case .native(let native):
       return Set.Iterator(_native: native.makeIterator())

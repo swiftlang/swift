@@ -34,7 +34,7 @@ internal func _stdlib_NSSet_allObjects(
 
 extension _NativeSet { // Bridging
   @usableFromInline
-  internal func bridged() -> _NSSet {
+  internal __consuming func bridged() -> _NSSet {
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
 
@@ -71,7 +71,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  internal init(_ base: _NativeSet<Element>) {
+  internal init(_ base: __owned _NativeSet<Element>) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = base
     self.bridgedElements = nil
@@ -80,7 +80,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
   }
 
   @nonobjc
-  internal init(_ deferred: _SwiftDeferredNSSet<Element>) {
+  internal init(_ deferred: __owned _SwiftDeferredNSSet<Element>) {
     _sanityCheck(!_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = deferred.native
     self.bridgedElements = deferred.bridgeElements()
@@ -158,7 +158,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   /// The unbridged elements.
   internal var native: _NativeSet<Element>
 
-  internal init(_ native: _NativeSet<Element>) {
+  internal init(_ native: __owned _NativeSet<Element>) {
     _sanityCheck(native.count > 0)
     _sanityCheck(!_isBridgedVerbatimToObjectiveC(Element.self))
     self.native = native
@@ -290,7 +290,7 @@ internal struct _CocoaSet {
   internal let object: _NSSet
 
   @inlinable
-  internal init(_ object: _NSSet) {
+  internal init(_ object: __owned _NSSet) {
     self.object = object
   }
 }
@@ -412,14 +412,14 @@ extension _CocoaSet {
     internal var currentKeyIndex: Int
 
     @inlinable // FIXME(sil-serialize-all)
-    internal init(_ base: _CocoaSet, startIndex: ()) {
+    internal init(_ base: __owned _CocoaSet, startIndex: ()) {
       self.base = base
       self.allKeys = _stdlib_NSSet_allObjects(base.object)
       self.currentKeyIndex = 0
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    internal init(_ base: _CocoaSet, endIndex: ()) {
+    internal init(_ base: __owned _CocoaSet, endIndex: ()) {
       self.base = base
       self.allKeys = _stdlib_NSSet_allObjects(base.object)
       self.currentKeyIndex = allKeys.value
@@ -427,8 +427,8 @@ extension _CocoaSet {
 
     @inlinable // FIXME(sil-serialize-all)
     internal init(
-      _ base: _CocoaSet,
-      _ allKeys: _HeapBuffer<Int, AnyObject>,
+      _ base: __owned _CocoaSet,
+      _ allKeys: __owned _HeapBuffer<Int, AnyObject>,
       _ currentKeyIndex: Int
     ) {
       self.base = base
@@ -493,13 +493,13 @@ extension _CocoaSet: Sequence {
     internal var itemIndex: Int = 0
     internal var itemCount: Int = 0
 
-    internal init(_ base: _CocoaSet) {
+    internal init(_ base: __owned _CocoaSet) {
       self.base = base
     }
   }
 
   @usableFromInline
-  __consuming internal func makeIterator() -> Iterator {
+  internal __consuming func makeIterator() -> Iterator {
     return Iterator(self)
   }
 }
@@ -545,7 +545,7 @@ extension _CocoaSet.Iterator: IteratorProtocol {
 
 extension Set {
   @inlinable
-  public func _bridgeToObjectiveCImpl() -> _NSSetCore {
+  public __consuming func _bridgeToObjectiveCImpl() -> _NSSetCore {
     switch _variant {
     case .native(let nativeSet):
       return nativeSet.bridged()
@@ -557,7 +557,7 @@ extension Set {
   /// Returns the native Dictionary hidden inside this NSDictionary;
   /// returns nil otherwise.
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
-    _ s: AnyObject
+    _ s: __owned AnyObject
   ) -> Set<Element>? {
 
     // Try all three NSSet impls that we currently provide.

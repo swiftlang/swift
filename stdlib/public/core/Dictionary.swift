@@ -387,13 +387,13 @@ public struct Dictionary<Key: Hashable, Value> {
   internal var _variant: _Variant
 
   @inlinable
-  internal init(_native: _NativeDictionary<Key, Value>) {
+  internal init(_native: __owned _NativeDictionary<Key, Value>) {
     _variant = .native(_native)
   }
 
 #if _runtime(_ObjC)
   @inlinable
-  internal init(_cocoa: _CocoaDictionary) {
+  internal init(_cocoa: __owned _CocoaDictionary) {
     _variant = .cocoa(_cocoa)
   }
 
@@ -406,7 +406,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   are reference types).
   @inlinable
   public // SPI(Foundation)
-  init(_immutableCocoaDictionary: _NSDictionary) {
+  init(_immutableCocoaDictionary: __owned _NSDictionary) {
     _sanityCheck(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
@@ -464,7 +464,7 @@ public struct Dictionary<Key: Hashable, Value> {
   /// - Precondition: The sequence must not have duplicate keys.
   @inlinable
   public init<S: Sequence>(
-    uniqueKeysWithValues keysAndValues: S
+    uniqueKeysWithValues keysAndValues: __owned S
   ) where S.Element == (Key, Value) {
     if let d = keysAndValues as? Dictionary<Key, Value> {
       self = d
@@ -513,7 +513,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///     the final dictionary.
   @inlinable
   public init<S: Sequence>(
-    _ keysAndValues: S,
+    _ keysAndValues: __owned S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows where S.Element == (Key, Value) {
     var native = _NativeDictionary<Key, Value>(
@@ -546,7 +546,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///     `values`.
   @inlinable
   public init<S: Sequence>(
-    grouping values: S,
+    grouping values: __owned S,
     by keyForValue: (S.Element) throws -> Key
   ) rethrows where Value == [S.Element] {
     try self.init(_native: _NativeDictionary(grouping: values, by: keyForValue))
@@ -578,7 +578,7 @@ extension Dictionary: Sequence {
   ///   `(key: Key, value: Value)`.
   @inlinable
   @inline(__always)
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return _variant.makeIterator()
   }
 }
@@ -1019,7 +1019,10 @@ extension Dictionary {
   ///   was added.
   @inlinable
   @discardableResult
-  public mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
+  public mutating func updateValue(
+    _ value: __owned Value,
+    forKey key: Key
+  ) -> Value? {
     return _variant.updateValue(value, forKey: key)
   }
 
@@ -1052,7 +1055,7 @@ extension Dictionary {
   ///     dictionary.
   @inlinable
   public mutating func merge<S: Sequence>(
-    _ other: S,
+    _ other: __owned S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows where S.Element == (Key, Value) {
     try _variant.merge(other, uniquingKeysWith: combine)
@@ -1087,9 +1090,9 @@ extension Dictionary {
   ///     dictionary.
   @inlinable
   public mutating func merge(
-    _ other: [Key: Value],
-    uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows
-  {
+    _ other: __owned [Key: Value],
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) rethrows {
     try _variant.merge(
       other.lazy.map { ($0, $1) }, uniquingKeysWith: combine)
   }
@@ -1123,8 +1126,8 @@ extension Dictionary {
   /// - Returns: A new dictionary with the combined keys and values of this
   ///   dictionary and `other`.
   @inlinable
-  public func merging<S: Sequence>(
-    _ other: S,
+  public __consuming func merging<S: Sequence>(
+    _ other: __owned S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows -> [Key: Value] where S.Element == (Key, Value) {
     var result = self
@@ -1163,8 +1166,8 @@ extension Dictionary {
   /// - Returns: A new dictionary with the combined keys and values of this
   ///   dictionary and `other`.
   @inlinable
-  public func merging(
-    _ other: [Key: Value],
+  public __consuming func merging(
+    _ other: __owned [Key: Value],
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows -> [Key: Value] {
     var result = self
@@ -1265,7 +1268,10 @@ extension Dictionary {
   @inlinable
   @available(swift, introduced: 4.0)
   public var keys: Keys {
-    return Keys(_dictionary: self)
+    // FIXME(accessors): Provide a _read
+    get {
+      return Keys(_dictionary: self)
+    }
   }
 
   /// A collection containing just the values of the dictionary.
@@ -1286,6 +1292,7 @@ extension Dictionary {
   @inlinable
   @available(swift, introduced: 4.0)
   public var values: Values {
+    // FIXME(accessors): Provide a _read
     get {
       return Values(_dictionary: self)
     }
@@ -1308,7 +1315,7 @@ extension Dictionary {
     internal var _variant: Dictionary<Key, Value>._Variant
 
     @inlinable
-    internal init(_dictionary: Dictionary) {
+    internal init(_dictionary: __owned Dictionary) {
       self._variant = _dictionary._variant
     }
 
@@ -1409,7 +1416,12 @@ extension Dictionary {
     internal var _variant: Dictionary<Key, Value>._Variant
 
     @inlinable
-    internal init(_dictionary: Dictionary) {
+    internal init(_variant: __owned Dictionary<Key, Value>._Variant) {
+      self._variant = _variant
+    }
+
+    @inlinable
+    internal init(_dictionary: __owned Dictionary) {
       self._variant = _dictionary._variant
     }
 
@@ -1433,6 +1445,7 @@ extension Dictionary {
 
     @inlinable
     public subscript(position: Index) -> Element {
+      // FIXME(accessors): Provide a _read
       get {
         return _variant.value(at: position)
       }
@@ -1543,7 +1556,7 @@ extension Dictionary: Hashable where Value: Hashable {
 
 extension Dictionary: _HasCustomAnyHashableRepresentation
 where Value: Hashable {
-  public func _toCustomAnyHashable() -> AnyHashable? {
+  public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _DictionaryAnyHashableBox(self))
   }
 }
@@ -1553,7 +1566,7 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
   internal let _value: Dictionary<Key, Value>
   internal let _canonical: Dictionary<AnyHashable, AnyHashable>
 
-  internal init(_ value: Dictionary<Key, Value>) {
+  internal init(_ value: __owned Dictionary<Key, Value>) {
     self._value = value
     self._canonical = value as Dictionary<AnyHashable, AnyHashable>
   }
@@ -1683,7 +1696,7 @@ extension Dictionary {
 
     @inlinable
     @inline(__always)
-    internal init(_variant: _Variant) {
+    internal init(_variant: __owned _Variant) {
       self._variant = _variant
     }
 
@@ -1696,7 +1709,7 @@ extension Dictionary {
 #if _runtime(_ObjC)
     @inlinable
     @inline(__always)
-    internal init(_cocoa index: _CocoaDictionary.Index) {
+    internal init(_cocoa index: __owned _CocoaDictionary.Index) {
       self.init(_variant: .cocoa(index))
     }
 #endif
@@ -1831,18 +1844,18 @@ extension Dictionary {
     internal var _variant: _Variant
 
     @inlinable
-    internal init(_variant: _Variant) {
+    internal init(_variant: __owned _Variant) {
       self._variant = _variant
     }
 
     @inlinable
-    internal init(_native: _NativeDictionary<Key, Value>.Iterator) {
+    internal init(_native: __owned _NativeDictionary<Key, Value>.Iterator) {
       self.init(_variant: .native(_native))
     }
 
 #if _runtime(_ObjC)
     @inlinable
-    internal init(_cocoa: _CocoaDictionary.Iterator) {
+    internal init(_cocoa: __owned _CocoaDictionary.Iterator) {
       self.init(_variant: .cocoa(_cocoa))
     }
 #endif

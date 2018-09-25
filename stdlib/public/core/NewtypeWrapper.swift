@@ -40,13 +40,13 @@ extension _SwiftNewtypeWrapper where Self: Hashable, Self.RawValue: Hashable {
 }
 
 extension _SwiftNewtypeWrapper {
-  public func _toCustomAnyHashable() -> AnyHashable? {
+  public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return nil
   }
 }
 
 extension _SwiftNewtypeWrapper where Self: Hashable, Self.RawValue: Hashable {
-  public func _toCustomAnyHashable() -> AnyHashable? {
+  public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _NewtypeWrapperAnyHashableBox(self))
   }
 }
