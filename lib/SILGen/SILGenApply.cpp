@@ -2487,7 +2487,24 @@ public:
     assert(!specialDests || specialDests->size() == paramInfos.size());
   }
 
-  void emitTopLevel(ArgumentSource &&arg, AbstractionPattern origParamType) {
+  // origParamType is a parameter type.
+  void emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType) {
+    emit(std::move(arg), origParamType);
+    maybeEmitForeignErrorArgument();
+  }
+
+  // origFormalType is a function type.
+  //
+  // FIXME: This is all a bunch of hacks that can be removed once "scalar"
+  // PreparedArguments goes away.
+  void emitTopLevel(ArgumentSource &&arg, AbstractionPattern origFormalType) {
+    SmallVector<AbstractionPattern, 8> origParamTypes;
+    for (unsigned i = 0, e = origFormalType.getNumFunctionParams(); i < e; ++i) {
+      origParamTypes.push_back(origFormalType.getFunctionParamType(i));
+    }
+
+    auto origParamType = AbstractionPattern::getTuple(origParamTypes);
+
     if (arg.isShuffle()) {
       auto *shuffle = cast<TupleShuffleExpr>(std::move(arg).asKnownExpr());
       emitShuffle(shuffle, origParamType);
@@ -2495,10 +2512,33 @@ public:
       return;
     }
 
-    emit(std::move(arg), origParamType);
-    maybeEmitForeignErrorArgument();
+    if (arg.isLValue()) {
+      assert(origParamTypes.size() == 1);
+      emitSingleArg(std::move(arg), origParamTypes[0]);
+      return;
+    }
+
+    if (arg.isExpr()) {
+      if (origParamTypes.size() == 1) {
+        auto *e = std::move(arg).asKnownExpr();
+
+        origParamType = origParamTypes[0];
+        if (auto *paren = dyn_cast<ParenExpr>(e))
+          e = paren->getSubExpr();
+        else if (auto *tuple = dyn_cast<TupleExpr>(e)) {
+          assert(tuple->getNumElements() == 1);
+          e = tuple->getElement(0);
+        }
+
+        emitSingleArg(e, origParamType);
+        return;
+      }
+    }
+
+    emitSingleArg(std::move(arg), origParamType);
   }
 
+  // origFormalType is a function type.
   void emitPreparedArgs(PreparedArguments &&args,
                         AbstractionPattern origFormalType) {
     assert(args.isValid());
@@ -2506,13 +2546,11 @@ public:
 
     if (args.isScalar()) {
       assert(argSources.size() == 1);
-      emitTopLevel(std::move(argSources[0]),
-                   origFormalType.getFunctionInputType());
+      emitTopLevel(std::move(argSources[0]), origFormalType);
     } else {
       for (auto i : indices(argSources)) {
-        emit(std::move(argSources[i]),
-             origFormalType.getFunctionParamType(i));
-        maybeEmitForeignErrorArgument();
+        emitSingleArg(std::move(argSources[i]),
+                      origFormalType.getFunctionParamType(i));
       }
     }
   }
@@ -2564,8 +2602,6 @@ private:
     // If the caller takes the argument indirectly, the argument has an
     // inout type.
     if (param.isIndirectInOut()) {
-      origParamType = origParamType.getWithoutSpecifierType();
-
       assert(!specialDest);
       emitInOut(std::move(arg), loweredSubstArgType, loweredSubstParamType,
                 origParamType, substArgType);
@@ -2622,6 +2658,9 @@ private:
       if (CanTupleType substArgType =
               dyn_cast<TupleType>(arg.getSubstRValueType())) {
         // The original type isn't necessarily a tuple.
+        if (!origParamType.matchesTuple(substArgType))
+          origParamType = origParamType.getTupleElementType(0);
+
         assert(origParamType.matchesTuple(substArgType));
 
         auto loc = arg.getKnownRValueLocation();
@@ -3011,8 +3050,8 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                             loweredArgs, delayedArgs,
                             errorConvention, ImportAsMemberStatus());
   
-  emitter.emitTopLevel(ArgumentSource(info.loc, std::move(value)),
-                       info.origResultType);
+  emitter.emitSingleArg(ArgumentSource(info.loc, std::move(value)),
+                        info.origResultType);
   assert(delayedArgs.empty());
   assert(!errorConvention);
   
@@ -3132,12 +3171,8 @@ private:
   void emitDefaultArgsAndFinalize(ArgEmitter &parent);
 
   AbstractionPattern getOutputOrigElementType(unsigned index) {
-    if (isResultScalar) {
-      assert(index == 0);
-      return origParamType;
-    } else {
-      return origParamType.getTupleElementType(index);
-    }
+    assert(!isResultScalar || index == 0);
+    return origParamType.getTupleElementType(index);
   }
 
   VarargExpansionExpr *getVarargExpansion(unsigned innerIndex) {
@@ -3414,13 +3449,12 @@ void TupleShuffleArgEmitter::emit(ArgEmitter &parent) {
   // opaque pattern; otherwise, it's a tuple of the de-shuffled
   // tuple elements.
   innerOrigParamType = origParamType;
-  if (!origParamType.isTypeParameter()) {
-    // That "tuple" might not actually be a tuple.
-    if (innerElts.size() == 1 && !innerElts[0].hasName()) {
-      innerOrigParamType = origInnerElts[0];
-    } else {
-      innerOrigParamType = AbstractionPattern::getTuple(origInnerElts);
-    }
+
+  // That "tuple" might not actually be a tuple.
+  if (innerElts.size() == 1 && !innerElts[0].hasName()) {
+    innerOrigParamType = origInnerElts[0];
+  } else {
+    innerOrigParamType = AbstractionPattern::getTuple(origInnerElts);
   }
 
   flattenPatternFromInnerExtendIntoInnerParams(parent);
@@ -3432,7 +3466,7 @@ void TupleShuffleArgEmitter::emit(ArgEmitter &parent) {
                /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
                (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
                                   : Optional<ArgSpecialDestArray>()))
-        .emitTopLevel(ArgumentSource(inner), innerOrigParamType);
+        .emitSingleArg(ArgumentSource(inner), innerOrigParamType);
   }
 
   // Make a second pass to split the inner arguments correctly.
@@ -4774,7 +4808,7 @@ void SILGenFunction::emitYield(SILLocation loc,
                      ImportAsMemberStatus());
 
   for (auto i : indices(valueSources)) {
-    emitter.emitTopLevel(std::move(valueSources[i]), origTypes[i]);
+    emitter.emitSingleArg(std::move(valueSources[i]), origTypes[i]);
   }
 
   if (!delayedArgs.empty())
@@ -5559,8 +5593,7 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
                      /*foreign error*/None,
                      ImportAsMemberStatus());
 
-  emitter.emitTopLevel(indexExpr,
-                       AbstractionPattern(substFnType).getFunctionInputType());
+  emitter.emitTopLevel(indexExpr, AbstractionPattern(substFnType));
 
   // TODO: do something to preserve LValues in the delayed arguments?
   if (!delayedArgs.empty())
