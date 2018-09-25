@@ -67,38 +67,6 @@ public protocol RandomNumberGenerator {
 }
 
 extension RandomNumberGenerator {
-  @inlinable
-  public mutating func _fill(bytes buffer: UnsafeMutableRawBufferPointer) {
-    // FIXME: Optimize
-    var chunk: UInt64 = 0
-    var chunkBytes = 0
-    for i in 0..<buffer.count {
-      if chunkBytes == 0 {
-        chunk = next()
-        chunkBytes = UInt64.bitWidth / 8
-      }
-      buffer[i] = UInt8(truncatingIfNeeded: chunk)
-      chunk >>= UInt8.bitWidth
-      chunkBytes -= 1
-    }
-  }
-}
-
-extension RandomNumberGenerator {
-  /// Returns a value from a uniform, independent distribution of binary data.
-  ///
-  /// Use this method when you need random binary data to generate another
-  /// value. If you need an integer value within a specific range, use the
-  /// static `random(in:using:)` method on that integer type instead of this
-  /// method.
-  ///
-  /// - Returns: A random value of `T`. Bits are randomly distributed so that
-  ///   every value of `T` is equally likely to be returned.
-  @inlinable
-  public mutating func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
-    return T._random(using: &self)
-  }
-
   /// Returns a random value that is less than the given upper bound.
   ///
   /// Use this method when you need random binary data to generate another
@@ -111,7 +79,7 @@ extension RandomNumberGenerator {
   /// - Returns: A random value of `T` in the range `0..<upperBound`. Every
   ///   value in the range `0..<upperBound` is equally likely to be returned.
   @inlinable
-  public mutating func next<T: FixedWidthInteger & UnsignedInteger>(
+  internal mutating func next<T: FixedWidthInteger & UnsignedInteger>(
     upperBound: T
   ) -> T {
     _precondition(upperBound != 0, "upperBound cannot be zero.")
@@ -120,10 +88,26 @@ extension RandomNumberGenerator {
     var random: T = 0
 
     repeat {
-      random = next()
+      random = T._random(using: &self)
     } while random < range
 
     return random % upperBound
+  }
+  
+  @inlinable
+  public mutating func _fill(bytes buffer: UnsafeMutableRawBufferPointer) {
+    // FIXME: Optimize
+    var chunk: UInt64 = 0
+    var chunkBytes = 0
+    for i in 0..<buffer.count {
+      if chunkBytes == 0 {
+        chunk = UInt64._random(using: &self)
+        chunkBytes = UInt64.bitWidth / 8
+      }
+      buffer[i] = UInt8(truncatingIfNeeded: chunk)
+      chunk >>= UInt8.bitWidth
+      chunkBytes -= 1
+    }
   }
 }
 
