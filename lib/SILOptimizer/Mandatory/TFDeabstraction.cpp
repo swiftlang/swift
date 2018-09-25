@@ -1865,6 +1865,9 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
           opInfo.getName() == "tfc.configureCPU")
         continue;
       evaluateAttributesAndDoPacking(opInfo, constants, deviceInfo);
+      // evaluateAttributesAndDoPacking deletes inst. So, continue as the rest
+      // of the loop is irrelevant. (This also avoid memory errors.)
+      continue;
     }
 
     // Take a look at the various well known function calls that we can promote
@@ -2091,10 +2094,13 @@ static bool collectInnermostTensorFlowDTypes(
 /// with the following transformations applied:
 ///  - attribute operands with known constant values become GraphOperationInst
 ///    attributes.
-//   - inputs get unpacked to raw tensor types before being fed into the
-//     GraphOperationInst.
-//   - outputs are raw tensor types, which get packed into whatever types the
-//     original GraphOperationInst was returning.
+///  - inputs get unpacked to raw tensor types before being fed into the
+///    GraphOperationInst.
+///  - outputs are raw tensor types, which get packed into whatever types the
+///    original GraphOperationInst was returning.
+///
+/// This deletes the underlying inst in `opInfo` when a GraphOperation is
+/// created successfully.
 void TFDeabstraction::evaluateAttributesAndDoPacking(
     GraphOperationInfo &opInfo, DenseMap<SILValue, SymbolicValue> &constants,
     GraphFunctionDeviceInfo &deviceInfo) {
