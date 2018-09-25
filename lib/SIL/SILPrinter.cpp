@@ -20,6 +20,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/SIL/SILPrintContext.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCoverageMap.h"

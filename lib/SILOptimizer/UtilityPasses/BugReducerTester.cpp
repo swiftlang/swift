@@ -21,6 +21,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"

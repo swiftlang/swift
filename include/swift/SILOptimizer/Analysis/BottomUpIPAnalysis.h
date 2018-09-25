@@ -19,6 +19,7 @@
 
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/ApplySite.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {

@@ -40,6 +40,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
