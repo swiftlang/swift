@@ -52,10 +52,12 @@ bb1:
   strong_release %0 : $Builtin.NativeObject
 % end
 // CHECK-NEXT: cond_br
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
-// CHECK: bb2:
 bb2:
+  br bb1
+// CHECK: bb3:
+bb3:
 % if i & 8:
 // CHECK-NEXT: strong_release
   strong_release %0 : $Builtin.NativeObject
@@ -109,10 +111,13 @@ bb2:
 // CHECK-NEXT: strong_release
   strong_release %0 : $Builtin.NativeObject
 % end
-  cond_br undef, bb1, bb3
+  cond_br undef, bb3, bb4
 
-// CHECK: bb3:
 bb3:
+  br bb1
+
+// CHECK: bb4:
+bb4:
 % if i & 2:
 // CHECK-NEXT: strong_release
   strong_release %0 : $Builtin.NativeObject
