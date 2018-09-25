@@ -710,9 +710,7 @@ static void diagnoseNominalTypeDeclChange(SDKNodeDeclType *L, SDKNodeDeclType *R
       if (RSuperClass.empty()) {
         Diags.diagnose(SourceLoc(), diag::super_class_removed, L->getScreenInfo(),
                        LSuperClass);
-      } else {
-        // FIXME: This will be a false positive if the new subclass is a subclass
-        // of the old type.
+      } else if (!contains(R->getClassInheritanceChain(), LSuperClass)) {
         Diags.diagnose(SourceLoc(), diag::super_class_changed, L->getScreenInfo(),
                        LSuperClass, RSuperClass);
       }
