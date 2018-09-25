@@ -3920,6 +3920,32 @@ swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
   return result.second;
 }
 
+/// Find the name of the associated type with the given descriptor.
+static StringRef findAssociatedTypeName(const ProtocolDescriptor *protocol,
+                                        const ProtocolRequirement *assocType) {
+  // If we don't have associated type names, there's nothing to do.
+  const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
+  if (!associatedTypeNamesPtr) return StringRef();
+
+  StringRef associatedTypeNames(associatedTypeNamesPtr);
+  for (const auto &req : protocol->getRequirements()) {
+    if (req.Flags.getKind() !=
+          ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction)
+      continue;
+
+    // If we've found the requirement, we're done.
+    auto splitIdx = associatedTypeNames.find(' ');
+    if (&req == assocType) {
+      return associatedTypeNames.substr(0, splitIdx);
+    }
+
+    // Skip this associated type name.
+    associatedTypeNames = associatedTypeNames.substr(splitIdx).substr(1);
+  }
+
+  return StringRef();
+}
+
 MetadataResponse
 swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                       WitnessTable *wtable,
@@ -3981,10 +4007,17 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
   }
 
   if (!assocTypeMetadata) {
+    auto conformingTypeNameInfo = swift_getTypeName(conformingType, true);
+    StringRef conformingTypeName(conformingTypeNameInfo.data,
+                                 conformingTypeNameInfo.length);
+    StringRef assocTypeName = findAssociatedTypeName(protocol, assocType);
     fatalError(0,
-               "failed to demangle associated type at %p in protocol '%s' with "
-               "mangled name '%s'\n",
-               assocType, protocol->Name.get(), mangledName);
+               "failed to demangle witness for associated type '%s' in "
+               "conformance '%s: %s' from mangled name '%s'\n",
+               assocTypeName.str().c_str(),
+               conformingTypeName.str().c_str(),
+               protocol->Name.get(),
+               mangledName.str().c_str());
   }
 
   // Update the witness table.
