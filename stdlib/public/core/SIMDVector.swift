@@ -19,7 +19,7 @@ public protocol SIMDVector : Hashable,
   /// If it does not, a runtime error occurs.
   ///
   /// A default implementation is provided by SIMDVectorN.
-  init(fromArray array: [Element])
+  init(_ array: [Element])
   
   /// The number of elements in the vector.
   var count: Int { get }

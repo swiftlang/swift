@@ -68,11 +68,11 @@ public extension SIMDVector${N} {
 
   @inlinable
   init(arrayLiteral elements: Element...) {
-    self.init(fromArray: elements)
+    self.init(elements)
   }
 
   @inlinable
-  init(fromArray array: [Element]) {
+  init(_ array: [Element]) {
     _precondition(array.count == ${N})
     self.init()
     for i in 0 ..< count { self[i] = array[i] }
