@@ -926,6 +926,10 @@ public:
         if (auto *newPattern = TC.resolvePattern(pattern, DC,
                                                  /*isStmtCondition*/false)) {
           pattern = newPattern;
+
+          if (diagnoseInitUsedAsIdentifier(pattern))
+            limitExhaustivityChecks = true;
+
           // Coerce the pattern to the subject's type.
           TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
           if (!subjectType ||
@@ -1122,6 +1126,30 @@ public:
     return S;
   }
 
+private:
+  /// Diagnose an attempt to use 'init' keyword as identifier,
+  /// and suggest a fix-it to escape it.
+  bool diagnoseInitUsedAsIdentifier(Pattern *pattern) {
+    auto *EP = dyn_cast<ExprPattern>(pattern);
+    if (!EP)
+      return false;
+
+    auto *UME = dyn_cast<UnresolvedMemberExpr>(EP->getSubExpr());
+    if (!UME || !UME->getName().isSpecial())
+      return false;
+
+    auto baseName = UME->getName().getBaseName();
+    if (baseName.getKind() != DeclBaseName::Kind::Constructor)
+      return false;
+
+    auto name = baseName.userFacingName();
+    TC.diagnose(UME->getLoc(), diag::case_keyword_used_as_identifier, name);
+
+    auto nameLoc = UME->getNameLoc();
+    TC.diagnose(UME->getLoc(), diag::case_use_backticks_to_escape)
+        .fixItReplace(nameLoc.getSourceRange(), "`" + name.str() + "`");
+    return true;
+  }
 };
 } // end anonymous namespace
 
