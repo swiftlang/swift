@@ -38,6 +38,9 @@
 #include <sys/random.h>
 #endif
 #include <sys/stat.h>
+#if __has_include(<sys/syscall.h>)
+#include <sys/syscall.h>
+#endif
 #include <sys/types.h>
 #include <type_traits>
 
@@ -271,34 +274,30 @@ void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
   result;                                                                      \
 })
 
-#if defined(__ANDROID__)
-#include <android/api-level.h>
-#if __ANDROID_API__ >= 28 // Introduced in Android API 28 - P
-#define GETRANDOM_AVAILABLE
-#endif
-#elif defined(GRND_RANDOM)
-#define GETRANDOM_AVAILABLE
-#endif
-
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
   while (nbytes > 0) {
     __swift_ssize_t actual_nbytes = -1;
-#if defined(GETRANDOM_AVAILABLE)
+
+#if defined(__NR_getrandom)
     static const bool getrandom_available =
-      !(getrandom(nullptr, 0, 0) == -1 && errno == ENOSYS);
+      !(syscall(__NR_getrandom, nullptr, 0, 0) == -1 && errno == ENOSYS);
+  
     if (getrandom_available) {
-      actual_nbytes = WHILE_EINTR(getrandom(buf, nbytes, 0));
+      actual_nbytes = WHILE_EINTR(syscall(__NR_getrandom, buf, nbytes, 0));
     }
-#elif defined(__Fuchsia__)
+#elif __has_include(<sys/random.h>) && (defined(__CYGWIN__) || defined(__Fuchsia__))
     __swift_size_t getentropy_nbytes = std::min(nbytes, __swift_size_t{256});
+    
     if (0 == getentropy(buf, getentropy_nbytes)) {
       actual_nbytes = getentropy_nbytes;
     }
 #endif
+
     if (actual_nbytes == -1) {
-      static const int fd =
+      static const int fd = 
         WHILE_EINTR(_stdlib_open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
+        
       if (fd != -1) {
         static StaticMutex mutex;
         mutex.withLock([&] {
@@ -306,9 +305,11 @@ void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
         });
       }
     }
+    
     if (actual_nbytes == -1) {
       fatalError(0, "Fatal error: %d in '%s'\n", errno, __func__);
     }
+    
     buf = static_cast<uint8_t *>(buf) + actual_nbytes;
     nbytes -= actual_nbytes;
   }
