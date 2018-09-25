@@ -258,6 +258,50 @@ ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
   return result;
 }
 
+#if SWIFT_OBJC_INTEROP
+/// For a mangled node that refers to an Objective-C class or protocol,
+/// return the class or protocol name.
+static Optional<StringRef> getObjCClassOrProtocolName(
+                                           const Demangle::NodePointer &node) {
+  if (node->getKind() != Demangle::Node::Kind::Class &&
+      node->getKind() != Demangle::Node::Kind::Protocol)
+    return None;
+
+  if (node->getNumChildren() != 2)
+    return None;
+
+  // Check whether we have the __ObjC module.
+  auto moduleNode = node->getChild(0);
+  if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
+      moduleNode->getText() != MANGLING_MODULE_OBJC)
+    return None;
+
+  // Check whether we have an identifier.
+  auto nameNode = node->getChild(1);
+  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
+    return None;
+
+  return nameNode->getText();
+}
+
+/// Determine whether the two demangle trees both refer to the same
+/// Objective-C class or protocol referenced by name.
+static bool sameObjCTypeManglings(Demangle::NodePointer node1,
+                                  Demangle::NodePointer node2) {
+  // Entities need to be of the same kind.
+  if (node1->getKind() != node2->getKind())
+    return false;
+
+  auto name1 = getObjCClassOrProtocolName(node1);
+  if (!name1) return false;
+
+  auto name2 = getObjCClassOrProtocolName(node2);
+  if (!name2) return false;
+
+  return *name1 == *name2;
+}
+#endif
+
 bool
 swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                          Demangle::NodePointer node) {
@@ -315,10 +359,23 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         _findNominalTypeDescriptor(extendedContextNode, demangler);
       auto extendedDescriptorFromDemangled =
         _findNominalTypeDescriptor(extendedContextDemangled, demangler);
+
+      // Determine whether the contexts match.
+      bool contextsMatch =
+        extendedDescriptorFromNode && extendedDescriptorFromDemangled &&
+        equalContexts(extendedDescriptorFromNode,
+                      extendedDescriptorFromDemangled);
       
-      if (!extendedDescriptorFromNode || !extendedDescriptorFromDemangled ||
-          !equalContexts(extendedDescriptorFromNode,
-                         extendedDescriptorFromDemangled))
+#if SWIFT_OBJC_INTEROP
+      if (!contextsMatch &&
+          (!extendedDescriptorFromNode || !extendedDescriptorFromDemangled) &&
+          sameObjCTypeManglings(extendedContextNode,
+                                extendedContextDemangled)) {
+        contextsMatch = true;
+      }
+#endif
+
+      if (!contextsMatch)
         return false;
       
       // Check whether the generic signature of the extension matches the
@@ -682,33 +739,6 @@ public:
 } // namespace
 
 #pragma mark Metadata lookup via mangled name
-
-#if SWIFT_OBJC_INTEROP
-/// For a mangled node that refers to an Objective-C class or protocol,
-/// return the class or protocol name.
-static Optional<StringRef> getObjCClassOrProtocolName(
-                                           const Demangle::NodePointer &node) {
-  if (node->getKind() != Demangle::Node::Kind::Class &&
-      node->getKind() != Demangle::Node::Kind::Protocol)
-    return None;
-
-  if (node->getNumChildren() != 2)
-    return None;
-
-  // Check whether we have the __ObjC module.
-  auto moduleNode = node->getChild(0);
-  if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
-      moduleNode->getText() != MANGLING_MODULE_OBJC)
-    return None;
-
-  // Check whether we have an identifier.
-  auto nameNode = node->getChild(1);
-  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
-    return None;
-
-  return nameNode->getText();
-}
-#endif
 
 Optional<unsigned> swift::_depthIndexToFlatIndex(
                                               unsigned depth, unsigned index,
