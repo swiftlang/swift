@@ -144,7 +144,7 @@ struct XSubP0a : SubscriptP0 {
 
 struct XSubP0b : SubscriptP0 {
 // expected-error@-1{{type 'XSubP0b' does not conform to protocol 'SubscriptP0'}}
-  subscript (i: Int) -> Float { get { return Float(i) } } // expected-note{{inferred type 'Float' (by matching requirement 'subscript') is invalid: does not conform to 'PSimple'}}
+  subscript (i: Int) -> Float { get { return Float(i) } } // expected-note{{inferred type 'Float' (by matching requirement 'subscript(_:)') is invalid: does not conform to 'PSimple'}}
 }
 
 struct XSubP0c : SubscriptP0 {

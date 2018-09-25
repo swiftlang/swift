@@ -22,7 +22,7 @@ func testPopFirst() {
   dump(charSubView)
 
   var _ = String(str.utf8) ?? "" // expected-warning{{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}}
-  var _: String = String(str.utf8)! // expected-error{{'init' is unavailable: Please use non-failable String.init(_:UTF8View) instead}}
+  var _: String = String(str.utf8)! // expected-error{{'init(_:)' is unavailable: Please use non-failable String.init(_:UTF8View) instead}}
   var _: String = String(str.utf8) // ok
 }
 

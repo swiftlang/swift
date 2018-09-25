@@ -870,26 +870,26 @@ extension PConstrained6 {
   var prop2: Int { return 0 } // expected-note{{'prop2' previously declared here}}
 
   subscript (key: Int) -> Int { return key }
-  subscript (key: Double) -> Double { return key } // expected-note{{'subscript' previously declared here}}
+  subscript (key: Double) -> Double { return key } // expected-note{{'subscript(_:)' previously declared here}}
 }
 
 extension PConstrained6 {
   var prop2: Int { return 0 } // expected-error{{invalid redeclaration of 'prop2'}}
-  subscript (key: Double) -> Double { return key } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript (key: Double) -> Double { return key } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
 }
 
 extension PConstrained6 where Assoc : PConstrained5 {
   var prop1: Int { return 0 } // okay
   var prop3: Int { return 0 } // expected-note{{'prop3' previously declared here}}
   subscript (key: Int) -> Int { return key } // ok
-  subscript (key: String) -> String { return key } // expected-note{{'subscript' previously declared here}}
+  subscript (key: String) -> String { return key } // expected-note{{'subscript(_:)' previously declared here}}
 
   func foo() { } // expected-note{{'foo()' previously declared here}}
 }
 
 extension PConstrained6 where Assoc : PConstrained5 {
   var prop3: Int { return 0 } // expected-error{{invalid redeclaration of 'prop3'}}
-  subscript (key: String) -> String { return key } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript (key: String) -> String { return key } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
   func foo() { } // expected-error{{invalid redeclaration of 'foo()'}}
 }
 
