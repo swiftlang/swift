@@ -39,9 +39,13 @@
 
 using namespace swift;
 
+namespace {
+
 /// Instructions which can be hoisted:
 /// loads, function calls without side effects and (some) exclusivity checks
 using InstSet = llvm::SmallPtrSet<SILInstruction *, 8>;
+
+using InstVector = llvm::SmallVector<SILInstruction *, 8>;
 
 /// A subset of instruction which may have side effects.
 /// Doesn't contain ones that have special handling (e.g. fix_lifetime)
@@ -188,7 +192,6 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
   return Changed;
 }
 
-namespace {
 /// \brief Summary of may writes occurring in the loop tree rooted at \p
 /// Loop. This includes all writes of the sub loops and the loop itself.
 struct LoopNestSummary {
@@ -290,7 +293,7 @@ static bool sinkInstruction(DominanceInfo *DT,
 
 static bool sinkInstructions(std::unique_ptr<LoopNestSummary> &LoopSummary,
                              DominanceInfo *DT, SILLoopInfo *LI,
-                             InstSet &SinkDownSet) {
+                             InstVector &SinkDownSet) {
   auto *Loop = LoopSummary->Loop;
   LLVM_DEBUG(llvm::errs() << " Sink instructions attempt\n");
   SmallVector<SILBasicBlock *, 8> domBlocks;
@@ -323,7 +326,7 @@ static void getEndAccesses(BeginAccessInst *BI,
 
 static bool
 hoistSpecialInstruction(std::unique_ptr<LoopNestSummary> &LoopSummary,
-                        DominanceInfo *DT, SILLoopInfo *LI, InstSet &Special) {
+                        DominanceInfo *DT, SILLoopInfo *LI, InstVector &Special) {
   auto *Loop = LoopSummary->Loop;
   LLVM_DEBUG(llvm::errs() << " Hoist and Sink pairs attempt\n");
   auto Preheader = Loop->getLoopPreheader();
@@ -376,11 +379,11 @@ class LoopTreeOptimization {
   InstSet HoistUp;
 
   /// Instructions that we may be able to sink down
-  InstSet SinkDown;
+  InstVector SinkDown;
 
   /// Hoistable Instructions that need special treatment
   /// e.g. begin_access
-  InstSet SpecialHoist;
+  InstVector SpecialHoist;
 
 public:
   LoopTreeOptimization(SILLoop *TopLevelLoop, SILLoopInfo *LI,
@@ -657,7 +660,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
       }
       case SILInstructionKind::RefElementAddrInst: {
         auto *REA = static_cast<RefElementAddrInst *>(&Inst);
-        SpecialHoist.insert(REA);
+        SpecialHoist.push_back(REA);
         break;
       }
       case swift::SILInstructionKind::CondFailInst: {
@@ -715,7 +718,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
       continue;
     }
     if (!mayWriteTo(AA, MayWrites, FL) || !mayWritesMayRelease) {
-      SinkDown.insert(FL);
+      SinkDown.push_back(FL);
     }
   }
   for (auto *BI : BeginAccesses) {
@@ -726,7 +729,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     }
     if (analyzeBeginAccess(BI, BeginAccesses, fullApplies, MayWrites, ASA,
                            DomTree)) {
-      SpecialHoist.insert(BI);
+      SpecialHoist.push_back(BI);
     }
   }
 }
