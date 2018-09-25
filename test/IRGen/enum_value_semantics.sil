@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -enable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc --check-prefix=CHECK-objc-%target-ptrsize --check-prefix=CHECK-%target-os --check-prefix=CHECK-objc-%target-os
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -enable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc --check-prefix=CHECK-objc-simulator-%target-is-simulator --check-prefix=CHECK-objc-%target-ptrsize --check-prefix=CHECK-%target-os --check-prefix=CHECK-objc-%target-os
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -disable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native --check-prefix=CHECK-native-%target-ptrsize --check-prefix=CHECK-%target-os --check-prefix=CHECK-native-%target-os
 
 // REQUIRES: CPU=x86_64
@@ -287,8 +287,10 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK:        i64 0, label %[[DONE:[0-9]+]]
 // CHECK-native:      i64 1, label %[[DONE]]
 // CHECK-native:      i64 2, label %[[DONE]]
-// CHECK-objc:        i64 2, label %[[DONE]]
-// CHECK-objc:        i64 4, label %[[DONE]]
+// CHECK-objc-simulator-false:        i64 2, label %[[DONE]]
+// CHECK-objc-simulator-false:        i64 4, label %[[DONE]]
+// CHECK-objc-simulator-true:        i64 1, label %[[DONE]]
+// CHECK-objc-simulator-true:        i64 2, label %[[DONE]]
 // CHECK:      ]
 
 // CHECK:      ; <label>:[[RELEASE_PAYLOAD]]
