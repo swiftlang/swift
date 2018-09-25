@@ -941,11 +941,6 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   ParserStatus Status;
 
-  auto CheckForSourceLocation = [&]() {
-    while (Tok.is(tok::pound_sourceLocation))
-      Status |= parseLineDirective();
-  };
-
   auto IsConditionalsEnd = [&]() -> bool {
     return Elements && (Tok.is(tok::pound_elseif) ||
       Tok.is(tok::pound_else) || Tok.is(tok::pound_endif));
@@ -960,7 +955,6 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
     if (IfConfigMap) {
       while (true) {
-        CheckForSourceLocation();
         if (Tok.isNot(tok::pound_if))
           break;
         if (!Elements)
@@ -970,7 +964,6 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
             Status |= parseList(RightK, LeftLoc, RightLoc, AllowSepAfterLast,
                                 ErrorDiag, Kind, callback, IfConfigMap,
                                 &Elements, IsActive && SubIsActive);
-            CheckForSourceLocation();
         });
         Status |= IfConfigResult;
         if (auto ICD = IfConfigResult.getPtrOrNull()) {

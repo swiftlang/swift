@@ -3348,9 +3348,6 @@ ParserResult<Expr> Parser::parseExprCollection() {
                                 *this, LSquareLoc,
                                 StructureMarkerKind::OpenSquare);
 
-  while (Tok.is(tok::pound_sourceLocation))
-    parseLineDirective();
-
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
     if (SyntaxContext->isEnabled())

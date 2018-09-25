@@ -459,7 +459,8 @@ public:
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
     assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
     if (Result)
-      *Result = Context.getIdentifier(Tok.getText());
+      *Result = Context.getIdentifier(!Tok.isAlias() ? Tok.getText() :
+            SourceMgr.bufferedAlias(Tok.getText(), Context.LangOpts));
     return consumeToken();
   }
 
@@ -708,7 +709,8 @@ public:
   /// current AST collection model, a map is generated from the location
   /// of actual data values to the conditionals that directly preceed them.
   /// This is transferred to the CollectionExpr when the collection completes
-  /// and is used by the ATSDumper to provide a repsentation of the conditional.
+  /// and is used by the ATSDumper to provide a repsentation of the conditional
+  /// as well as by libSyntax to remove conditionals from module interfaces.
   /// Nested conditionals are elements of their outer IfConfigDecl structure.
   class ConfigMap {
     std::vector <IfConfigDecl *> OuterDecls, *PendingConditionals = &OuterDecls;
