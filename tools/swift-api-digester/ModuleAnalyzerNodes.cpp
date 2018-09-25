@@ -48,7 +48,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   std::vector<TypeAttrKind> TypeAttrs;
   std::vector<StringRef> ConformingProtocols;
   StringRef SuperclassUsr;
-  StringRef SuperclassName;
+  std::vector<StringRef> SuperclassNames;
   StringRef EnumRawTypeName;
   bool hasDefaultArgument = false;
   StringRef GenericSig;
@@ -101,7 +101,7 @@ SDKNodeTypeAlias::SDKNodeTypeAlias(SDKNodeInitInfo Info):
 
 SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info): 
   SDKNodeDecl(Info, SDKNodeKind::DeclType), SuperclassUsr(Info.SuperclassUsr),
-  SuperclassName(Info.SuperclassName),
+  SuperclassNames(Info.SuperclassNames),
   ConformingProtocols(Info.ConformingProtocols),
   EnumRawTypeName(Info.EnumRawTypeName) {}
 
@@ -570,8 +570,12 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       case KeyKind::KK_superclassUsr:
         Info.SuperclassUsr = GetScalarString(Pair.getValue());
         break;
-      case KeyKind::KK_superclassName:
-        Info.SuperclassName = GetScalarString(Pair.getValue());
+      case KeyKind::KK_superclassNames:
+        assert(Info.SuperclassNames.empty());
+        for (auto &Name : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
+          Info.SuperclassNames.push_back(GetScalarString(&Name));
+        }
+        break;
         break;
       case KeyKind::KK_genericSig:
         Info.GenericSig = GetScalarString(Pair.getValue());
@@ -1072,7 +1076,10 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
     if (auto *Super = CD->getSuperclassDecl()) {
       SuperclassUsr = calculateUsr(Ctx, Super);
-      SuperclassName = Super->getName().str();
+      while(Super) {
+        SuperclassNames.push_back(Super->getName().str());
+        Super = Super->getSuperclassDecl();
+      }
     }
   }
 
@@ -1521,10 +1528,10 @@ struct ObjectTraits<SDKNode *> {
           out.mapRequired(getKeyContent(Ctx, KeyKind::KK_superclassUsr).data(),
                           Super);
         }
-        auto SuperName = TD->getSuperClassName();
-        if (!SuperName.empty()) {
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_superclassName).data(),
-                          SuperName);
+        auto SuperNames = TD->getClassInheritanceChain();
+        if (!SuperNames.empty()) {
+          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_superclassNames).data(),
+                          SuperNames);
         }
         auto Pros = TD->getAllProtocols();
         if (!Pros.empty()) {

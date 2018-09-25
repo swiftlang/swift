@@ -71,6 +71,8 @@ public class C7: P1 {
   public func foo(_ a: Int, _ b: Int) {}
 }
 
+public class C8: C7 {}
+
 public protocol P3: P1, P4 {}
 
 public protocol P4 {}
@@ -101,3 +103,5 @@ public class SuperClassRemoval {}
 
 public struct ClassToStruct {}
 public enum ProtocolToEnum {}
+
+public class SuperClassChange: C8 {}
