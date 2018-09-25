@@ -957,8 +957,7 @@ extension Set: SetAlgebra {
   @inlinable
   public __consuming func intersection<S: Sequence>(_ other: S) -> Set<Element>
   where S.Element == Element {
-    let otherSet = Set(other)
-    return intersection(otherSet)
+    return Set(_native: _variant.intersection(other))
   }
 
   /// Removes the elements of the set that aren't also in the given sequence.
@@ -977,20 +976,10 @@ extension Set: SetAlgebra {
   @inlinable
   public mutating func formIntersection<S: Sequence>(_ other: S)
   where S.Element == Element {
-    // Because `intersect` needs to both modify and iterate over
-    // the left-hand side, the index may become invalidated during
-    // traversal so an intermediate set must be created.
-    //
-    // FIXME(performance): perform this operation at a lower level
-    // to avoid invalidating the index and avoiding a copy.
-    let result = self.intersection(other)
-
-    // The result can only have fewer or the same number of elements.
-    // If no elements were removed, don't perform a reassignment
-    // as this may cause an unnecessary uniquing COW.
-    if result.count != count {
-      self = result
-    }
+    // FIXME: This discards storage reserved with reserveCapacity.
+    // FIXME: Depending on the ratio of elements kept in the result, it may be
+    // faster to do the removals in place, in bulk.
+    self = self.intersection(other)
   }
 
   /// Returns a new set with the elements that are either in this set or in the
@@ -1239,13 +1228,7 @@ extension Set {
   /// - Returns: A new set.
   @inlinable
   public __consuming func intersection(_ other: Set<Element>) -> Set<Element> {
-    var newSet = Set<Element>()
-    for member in self {
-      if other.contains(member) {
-        newSet.insert(member)
-      }
-    }
-    return newSet
+    return Set(_native: _variant.intersection(other))
   }
 
   /// Removes the elements of the set that are also in the given sequence and

@@ -622,7 +622,20 @@ extension _NativeSet {
     for offset in bitset {
       result._unsafeInsertNew(self.uncheckedElement(at: Bucket(offset: offset)))
     }
+    _internalInvariant(result.count == bitset.count)
     return result
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func filteredBuckets(
+    _ isIncluded: (Bucket) throws -> Bool
+  ) rethrows -> _Bitset {
+    var bitset = _Bitset(capacity: bucketCount)
+    for bucket in hashTable where try isIncluded(bucket) {
+      bitset.uncheckedInsert(bucket.offset)
+    }
+    return bitset
   }
 
   @inlinable
@@ -653,9 +666,42 @@ extension _NativeSet {
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> _NativeSet<Element> {
     defer { _fixLifetime(self) }
-    var buckets = _Bitset(capacity: bucketCount)
-    for bucket in hashTable where try isIncluded(uncheckedElement(at: bucket)) {
-      buckets.uncheckedInsert(bucket.offset)
+    let buckets = try filteredBuckets { bucket in
+      try isIncluded(uncheckedElement(at: bucket))
+    }
+    return unsafeExtractSubset(using: buckets)
+  }
+
+  @inlinable
+  internal __consuming func intersection(
+    _ other: _NativeSet<Element>
+  ) -> _NativeSet<Element> {
+    // Prefer to iterate over the smaller set. However, we must be careful to
+    // only include elements from `self`, not `other`.
+    guard self.count <= other.count else {
+      return genericIntersection(other)
+    }
+    // Rather than directly creating a new set, mark common elements in a bitset
+    // first. This minimizes hashing, and ensures that we'll have an exact count
+    // for the result set, preventing rehashings during insertions.
+    let buckets = filteredBuckets { bucket in
+      other.find(uncheckedElement(at: bucket)).found
+    }
+    return unsafeExtractSubset(using: buckets)
+  }
+
+  @inlinable
+  internal __consuming func genericIntersection<S: Sequence>(
+    _ other: S
+  ) -> _NativeSet<Element>
+  where S.Element == Element {
+    // Rather than directly creating a new set, mark common elements in a bitset
+    // first. This minimizes hashing, and ensures that we'll have an exact count
+    // for the result set, preventing rehashings during insertions.
+    var buckets = _Bitset(capacity: self.bucketCount)
+    for element in other {
+      let (bucket, found) = find(element)
+      if found { buckets.uncheckedInsert(bucket.offset) }
     }
     return unsafeExtractSubset(using: buckets)
   }

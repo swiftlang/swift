@@ -428,4 +428,50 @@ extension Set._Variant {
 #endif
     return try asNative.filter(isIncluded)
   }
+
+  @inlinable
+  internal __consuming func intersection<S: Sequence>(
+    _ other: S
+  ) -> _NativeSet<Element>
+  where S.Element == Element {
+    if let other = other as? Set<Element> {
+      return self.intersection(other)
+    }
+#if _runtime(_ObjC)
+    guard isNative else {
+      return _NativeSet(asCocoa).genericIntersection(other)
+    }
+#endif
+    return asNative.genericIntersection(other)
+  }
+
+  @inlinable
+  internal __consuming func intersection(
+    _ other: Set<Element>
+  ) -> _NativeSet<Element> {
+    switch (self.isNative, other._variant.isNative) {
+    case (true, true):
+      return asNative.intersection(other._variant.asNative)
+#if _runtime(_ObjC)
+    case (true, false):
+      return asNative.genericIntersection(other)
+    case (false, false):
+      return _NativeSet(asCocoa).genericIntersection(other)
+    case (false, true):
+      // Note: It is tempting to implement this as `that.intersection(this)`,
+      // but intersection isn't symmetric -- the result should only contain
+      // elements from `self`.
+      let that = other._variant.asNative
+      var result = _NativeSet<Element>()
+      for cocoaElement in asCocoa {
+        let nativeElement = _forceBridgeFromObjectiveC(
+          cocoaElement, Element.self)
+        if that.contains(nativeElement) {
+          result.insertNew(nativeElement, isUnique: true)
+        }
+      }
+      return result
+#endif
+    }
+  }
 }
