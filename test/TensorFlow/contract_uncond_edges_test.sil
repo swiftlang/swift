@@ -30,16 +30,16 @@ bb3(%3 : $Builtin.Int32):
 // Conditionals
 sil @$condRegion : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
-  %2 = builtin "cmp_slt_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1 
+  %2 = builtin "cmp_slt_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %2, bb1, bb4
 
 bb1:
   br bb2(%0 : $Builtin.Int32)
 
-bb2(%3 : $Builtin.Int32): 
+bb2(%3 : $Builtin.Int32):
   br bb3(%3 : $Builtin.Int32)
 
-bb3(%4 : $Builtin.Int32): 
+bb3(%4 : $Builtin.Int32):
   br bb5(%4 : $Builtin.Int32)
 
 bb4:
@@ -57,7 +57,7 @@ bb5(%5 : $Builtin.Int32):
 // CHECK: --- XLA CFG Canonicalize end
 // CHECK: sil @$condRegion : $@convention(thin) {{.*}} {
 // CHECK: bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
-// CHECK:   cond_br %2, bb1, bb2                     
+// CHECK:   cond_br %2, bb1, bb2
 // CHECK: bb1:
 // CHECK:   br bb3(%0 : $Builtin.Int32)
 // CHECK: bb2:
@@ -69,13 +69,13 @@ bb5(%5 : $Builtin.Int32):
 // Simple loop
 sil @$simpleLoop : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
-  br bb1(%0 : $Builtin.Int32) 
+  br bb1(%0 : $Builtin.Int32)
 
 bb1(%2 : $Builtin.Int32):
   %3 = builtin "cmp_slt_Int32"(%2 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %3, bb3, bb2
 
-bb2:                         
+bb2:
   br bb6(%2 : $Builtin.Int32)
 
 bb3:
@@ -87,7 +87,7 @@ bb4(%4 : $Builtin.Int32):
 bb5(%5 : $Builtin.Int32):
   br bb1(%5 : $Builtin.Int32)
 
-bb6(%6 : $Builtin.Int32): 
+bb6(%6 : $Builtin.Int32):
   return %6 : $Builtin.Int32
 }
 // CHECK-LABEL:--- XLA CFG Canonicalize: $simpleLoop
