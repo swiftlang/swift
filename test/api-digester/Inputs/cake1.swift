@@ -90,9 +90,16 @@ public protocol RequiementChanges {
   var removedVar: Int {get}
 }
 
+/// This protocol shouldn't be complained because its requirements are all derived.
+public protocol DerivedProtocolRequiementChanges: RequiementChanges {}
+
 public class SuperClassRemoval: C3 {}
 
 public class ClassToStruct {}
 public protocol ProtocolToEnum {}
 
 public class SuperClassChange: C7 {}
+
+public class GenericClass<T> {}
+
+public class SubGenericClass: GenericClass<P1> {}

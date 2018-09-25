@@ -41,6 +41,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   bool IsStatic = false;
   bool IsDeprecated = false;
   bool IsProtocolReq = false;
+  bool IsOverriding = false;
   Optional<uint8_t> SelfIndex;
   Optional<unsigned> FixedBinaryOrder;
   ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
@@ -83,6 +84,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         DeclAttributes(Info.DeclAttrs), IsImplicit(Info.IsImplicit),
         IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
         IsProtocolReq(Info.IsProtocolReq),
+        IsOverriding(Info.IsOverriding),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
         GenericSig(Info.GenericSig) {}
 
@@ -595,6 +597,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       case KeyKind::KK_deprecated:
         Info.IsDeprecated = true;
         break;
+      case KeyKind::KK_overriding:
+        Info.IsOverriding = true;
+        break;
       case KeyKind::KK_protocolReq:
         Info.IsProtocolReq = true;
         break;
@@ -822,7 +827,7 @@ public:
 };
 
 static StringRef getPrintedName(SDKContext &Ctx, Type Ty,
-                                bool IsImplicitlyUnwrappedOptional) {
+                                bool IsImplicitlyUnwrappedOptional = false) {
   std::string S;
   llvm::raw_string_ostream OS(S);
   PrintOptions PO;
@@ -1068,6 +1073,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
       IsStatic(VD->isStatic()),
       IsDeprecated(VD->getAttrs().getDeprecated(VD->getASTContext())),
       IsProtocolReq(isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement()),
+      IsOverriding(VD->getOverriddenDecl()),
       SelfIndex(getSelfIndex(VD)), FixedBinaryOrder(getFixedBinaryOrder(VD)),
       ReferenceOwnership(getReferenceOwnership(VD)),
       GenericSig(printGenericSignature(Ctx, VD)) {
@@ -1076,9 +1082,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
     if (auto *Super = CD->getSuperclassDecl()) {
       SuperclassUsr = calculateUsr(Ctx, Super);
-      while(Super) {
-        SuperclassNames.push_back(Super->getName().str());
-        Super = Super->getSuperclassDecl();
+      for (auto T = CD->getSuperclass(); T; T = T->getSuperclass()) {
+        SuperclassNames.push_back(getPrintedName(Ctx, T));
       }
     }
   }
@@ -1493,6 +1498,11 @@ struct ObjectTraits<SDKNode *> {
         out.mapRequired(getKeyContent(Ctx, KeyKind::KK_protocolReq).data(),
                         isProtocolReq);
       }
+      if (bool isOverriding = D->isOverriding()) {
+        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_overriding).data(),
+                        isOverriding);
+      }
+
       if (bool isImplicit = D->isImplicit())
         out.mapRequired(getKeyContent(Ctx, KeyKind::KK_implicit).data(),
                         isImplicit);

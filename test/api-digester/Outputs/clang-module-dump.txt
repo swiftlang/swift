@@ -57,6 +57,7 @@
           "usr": "c:objc(cs)NSObject(im)init",
           "location": "",
           "moduleName": "Foo",
+          "overriding": true,
           "implicit": true,
           "declAttributes": [
             "Override",

@@ -842,7 +842,7 @@ public:
       // Complain about added protocol requirements
       if (auto *D = dyn_cast<SDKNodeDecl>(Right)) {
         if (D->isProtocolRequirement()) {
-          bool ShouldComplain = true;
+          bool ShouldComplain = !D->isOverriding();
           // We should allow added associated types with default.
           if (auto ATD = dyn_cast<SDKNodeDeclAssociatedType>(D)) {
             if (ATD->getDefault())

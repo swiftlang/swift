@@ -127,7 +127,7 @@ syn match swiftTypePair contained skipwhite nextgroup=swiftTypeParameters,swiftT
 " (Type[, Type]) (tuple)
 " FIXME: we should be able to use skip="," and drop swiftParamDelim
 syn region swiftType contained contains=swiftType,swiftParamDelim
-      \ matchgroup=Delimiter start="[^@](" end=")" matchgroup=NONE skip=","
+      \ matchgroup=Delimiter start="[^@]\?(" end=")" matchgroup=NONE skip=","
 syn match swiftParamDelim contained
       \ /,/
 " <Generic Clause> (generics)
