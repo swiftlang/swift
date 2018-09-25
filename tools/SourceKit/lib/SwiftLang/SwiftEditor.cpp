@@ -1058,7 +1058,7 @@ struct SwiftEditorDocument::Implementation {
 
   Implementation(StringRef FilePath, SwiftLangSupport &LangSupport,
                  CodeFormatOptions options)
-      : ASTMgr(LangSupport.getASTManager().shared_from_this()),
+      : ASTMgr(LangSupport.getASTManager()),
         NotificationCtr(LangSupport.getNotificationCenter()),
         FilePath(FilePath), FormatOptions(options) {
     SemanticInfo =
@@ -1735,7 +1735,7 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
     Args.push_back("-");
     std::string Error;
     // Ignore possible error(s)
-    Lang.getASTManager().
+    Lang.getASTManager()->
       initCompilerInvocation(CompInv, Args, StringRef(), Error);
   }
   CompInv.getLangOptions().BuildSyntaxTree = BuildSyntaxTree;

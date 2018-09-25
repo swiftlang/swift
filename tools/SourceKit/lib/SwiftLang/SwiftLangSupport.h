@@ -292,7 +292,7 @@ public:
 
   StringRef getRuntimeResourcePath() const { return RuntimeResourcePath; }
 
-  SwiftASTManager &getASTManager() { return *ASTMgr; }
+  std::shared_ptr<SwiftASTManager> getASTManager() { return ASTMgr; }
 
   std::shared_ptr<SwiftEditorDocumentFileMap> getEditorDocuments() { return EditorDocuments; }
   SwiftInterfaceGenMap &getIFaceGenContexts() { return IFaceGenContexts; }

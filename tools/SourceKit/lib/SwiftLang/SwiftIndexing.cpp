@@ -251,10 +251,10 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   CompilerInvocation Invocation;
   bool Failed = true;
   if (IsModuleIndexing) {
-    Failed = getASTManager().initCompilerInvocationNoInputs(
+    Failed = getASTManager()->initCompilerInvocationNoInputs(
         Invocation, Args, CI.getDiags(), Error);
   } else {
-    Failed = getASTManager().initCompilerInvocation(
+    Failed = getASTManager()->initCompilerInvocation(
         Invocation, Args, CI.getDiags(), InputFile, Error);
   }
   if (Failed) {
