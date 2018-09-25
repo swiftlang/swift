@@ -503,7 +503,7 @@ extension ClosedRange: Codable where Bound: Codable {
       throw DecodingError.dataCorruptedError(
         forKey: CodingKeys.upperBound,
         in: container,
-        debugDescription: "upperBound (to) cannot be less than lowerBound (through)"
+        debugDescription: "upperBound (through) cannot be less than lowerBound (from)"
       )
     }
     self = lowerBound...upperBound
