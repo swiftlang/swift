@@ -4002,7 +4002,12 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
   } else {
     // The generic parameters in the associated type name are those of the
     // conforming type.
-    SubstGenericParametersFromMetadata substitutions(conformingType);
+
+    // For a class, chase the superclass chain up until we hit the
+    // type that specified the conformance.
+    auto originalConformingType = findConformingSuperclass(conformingType,
+                                                           protocol);
+    SubstGenericParametersFromMetadata substitutions(originalConformingType);
     assocTypeMetadata = _getTypeByMangledName(mangledName, substitutions);
   }
 

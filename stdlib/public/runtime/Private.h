@@ -428,6 +428,11 @@ public:
                            ProtocolDescriptorRef protocol,
                            const WitnessTable **conformance);
 
+  /// Given a type that we know conforms to the given protocol, find the
+  /// superclass that introduced the conformance.
+  const Metadata *findConformingSuperclass(const Metadata *type,
+                                           const ProtocolDescriptor *protocol);
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

@@ -765,5 +765,21 @@ bool swift::_checkGenericRequirements(
   return false;
 }
 
+const Metadata *swift::findConformingSuperclass(
+                                          const Metadata *type,
+                                          const ProtocolDescriptor *protocol) {
+  const Metadata *conformingType = type;
+  while (true) {
+    const Metadata *superclass = _swift_class_getSuperclass(conformingType);
+    if (!superclass)
+      break;
+    if (!swift_conformsToProtocol(superclass, protocol))
+      break;
+    conformingType = superclass;
+  }
+
+  return conformingType;
+}
+
 #define OVERRIDE_PROTOCOLCONFORMANCE COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"
