@@ -12,7 +12,7 @@ let ArrayLowerBoundOutOfRangeErrorMsg = "Out of bounds: range begins before star
 let ArrayBoundsErrorMsg = "Index out of range"
 
 for i in [0,100] {
-  ArrayTraps.test("bounds/readEmpty/\(i)")
+  ArrayTraps.test("bounds/empty/read/\(i)")
   .skip(.custom(_isFastAssertConfiguration, reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? ArrayBoundsErrorMsg : "")
   .code {
@@ -21,7 +21,7 @@ for i in [0,100] {
     _ = a[i]
   }
   
-  ArrayTraps.test("bounds/writeEmpty/\(i)")
+  ArrayTraps.test("bounds/empty/write/\(i)")
   .skip(.custom(_isFastAssertConfiguration, reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ? ArrayBoundsErrorMsg : "")
   .code {
@@ -50,9 +50,15 @@ ArrayTraps.test("bounds/write/end")
 }
 
 for r in [-1..<1,0..<2,1..<2] {
-  let crashText = _isDebugAssertConfiguration() 
-    ? (r.lowerBound < 0 ? "Negative " : "") + "Array index is out of range"
-    : ""
+  let beforeOrAfter = r.lowerBound < 0
+  let crashText: String
+  if _isDebugAssertConfiguration() {
+    crashText = """
+      Out of bounds: range begins \(beforeOrAfter ? "before" : "after") \(beforeOrAfter ? "startIndex" : "bounds.upperBound")
+      """
+  } else {
+    crashText = ""
+  }
   
   ArrayTraps.test("sliceBounds/empty/read/\(r)")
   .skip(.custom(_isFastAssertConfiguration, reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -60,7 +66,7 @@ for r in [-1..<1,0..<2,1..<2] {
   .code {
     let a: Array<Int> = []
     expectCrashLater()
-    _ = a[-1..<1]
+    _ = a[r]
   }
 
   ArrayTraps.test("sliceBounds/empty/write/\(r)")
@@ -69,7 +75,7 @@ for r in [-1..<1,0..<2,1..<2] {
   .code {
     var a: Array<Int> = []
     expectCrashLater()
-    a[-1..<1] = []
+    a[r] = []
   }
 
   ArrayTraps.test("sliceBounds/single/read/\(r)")

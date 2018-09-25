@@ -236,11 +236,11 @@ extension Slice: MutableCollection where Base: MutableCollection {
   @inlinable // generic-performance
   public subscript(index: Index) -> Base.Element {
     get {
-      _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(index, bounds: _startIndex..<_endIndex)
       return _base[index]
     }
     _modify {
-      _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(index, bounds: _startIndex..<_endIndex)
       yield &_base[index]
       // MutableSlice requires that the underlying collection's subscript
       // setter does not invalidate indices, so our `startIndex` and `endIndex`
@@ -251,10 +251,11 @@ extension Slice: MutableCollection where Base: MutableCollection {
   @inlinable // generic-performance
   public subscript(bounds: Range<Index>) -> Slice<Base> {
     get {
-      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      _failEarlyRangeCheck(bounds, bounds: _startIndex..<_endIndex)
       return Slice(base: _base, bounds: bounds)
     }
     set {
+      _failEarlyRangeCheck(bounds, bounds: _startIndex..<_endIndex)
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
   }
