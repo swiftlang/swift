@@ -57,29 +57,32 @@ func _deallocateUninitializedArray<Element>(
 }
 
 
-
-// Utility method for collections that wish to implement CustomStringConvertible
-// and CustomDebugStringConvertible using a bracketed list of elements,
-// like an array.
-internal func _makeCollectionDescription<C: Collection>
-  (for items: C, withTypeName type: String?) -> String {
-  var result = ""
-  if let type = type {
-    result += "\(type)(["
-  } else {
-    result += "["
-  }
-  var first = true
-  for item in items {
-    if first {
-      first = false
+extension Collection {  
+  // Utility method for collections that wish to implement
+  // CustomStringConvertible and CustomDebugStringConvertible using a bracketed
+  // list of elements, like an array.
+  internal func _makeCollectionDescription(
+    withTypeName type: String? = nil
+  ) -> String {
+    var result = ""
+    if let type = type {
+      result += "\(type)(["
     } else {
-      result += ", "
+      result += "["
     }
-    debugPrint(item, terminator: "", to: &result)
+
+    var first = true
+    for item in self {
+      if first {
+        first = false
+      } else {
+        result += ", "
+      }
+      debugPrint(item, terminator: "", to: &result)
+    }
+    result += type != nil ? "])" : "]"
+    return result
   }
-  result += type != nil ? "])" : "]"
-  return result
 }
 
 extension _ArrayBufferProtocol {
