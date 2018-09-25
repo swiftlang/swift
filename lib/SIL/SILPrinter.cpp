@@ -1250,22 +1250,22 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitGraphOperationInst(GraphOperationInst *GI) {
     tf::GraphOperationInfo info(GI);
-    SmallVector<tf::GraphOperationInfo::StructuredOperand, 4> operands;
-    auto opName = info.decodeName(operands);
+    auto opName = info.getOperationName();
+    auto &arguments = info.getStructuredArguments();
 
     *this << QuotedString(opName);
 
     *this << "(";
-    interleave(operands, [&](tf::GraphOperationInfo::StructuredOperand operand) {
-      if (!operand.getNameWithSuffix().empty())
-        *this << operand.getNameWithSuffix() << " ";
-      switch (operand.getKind()) {
-      case tf::GraphOperationInfo::SOK_Single:
-        *this << getIDAndType(operand.getSingleOperand());
+    interleave(arguments, [&](tf::GraphOperationInfo::StructuredArgument argument) {
+      if (!argument.getArgumentNameWithSuffix().empty())
+        *this << argument.getArgumentNameWithSuffix() << " ";
+      switch (argument.getKind()) {
+      case tf::GraphOperationInfo::SAK_Single:
+        *this << getIDAndType(argument.getSingleArgument());
         break;
-      case tf::GraphOperationInfo::SOK_List:
+      case tf::GraphOperationInfo::SAK_List:
         *this << "[";
-        interleave(operand.getOperandList(), [&](SILValue v) {
+        interleave(argument.getArgumentList(), [&](SILValue v) {
           *this << getIDAndType(v);
         }, [&] {
           *this << ", ";

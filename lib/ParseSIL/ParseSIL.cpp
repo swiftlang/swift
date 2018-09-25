@@ -2991,14 +2991,14 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                                           parseListOperandElement);
         if (status.isError())
           return status;
-        opBuilder.addListOperand(elements, operandName);
+        opBuilder.addListArgument(elements, operandName);
         return makeParserSuccess();
       } else {
         // It is a single operand.
         SILValue value;
         if (parseTypedValueRef(value, B))
           return makeParserError();
-        opBuilder.addOperand(value, operandName);
+        opBuilder.addArgument(value, operandName);
         return makeParserSuccess();
       }
     };

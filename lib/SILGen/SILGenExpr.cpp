@@ -2935,7 +2935,7 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
           SGF.emitRValueAsSingleValue(tuple->getElement(i),
                                       SGFContext::AllowGuaranteedPlusZero)
              .getValue();
-      opBuilder.addOperand(operand, tuple->getElementName(i).str());
+      opBuilder.addArgument(operand, tuple->getElementName(i).str());
     }
   }
 
@@ -2948,7 +2948,7 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
                                                    resultTL));
   } else {
     auto address = SGF.getBufferForExprResult(E, resultTL.getLoweredType(), C);
-    opBuilder.addOperand(address, "$out");
+    opBuilder.addArgument(address, "$out");
     auto voidTy = SGF.getLoweredType(SGF.getASTContext().TheEmptyTupleType);
     opBuilder.build(SGF.B, SGF.getASTContext(), E, voidTy);
     return RValue(SGF, E, SGF.manageBufferForExprResult(address, resultTL, C));

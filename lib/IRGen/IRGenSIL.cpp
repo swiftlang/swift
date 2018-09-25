@@ -1897,14 +1897,12 @@ static void abortOnGraphOp(IRGenFunction &IGF, llvm::StringRef errMessage) {
 /// TODO: Fix this mis-compilation.
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   tf::GraphOperationInfo opInfo(i);
-  SmallVector<tf::GraphOperationInfo::StructuredOperand, 4> structuredOperands;
-  auto opName = opInfo.decodeName(structuredOperands);
 
   if (!llvm::TFDynamicCompilation) {
     // graph_ops do make it here when building the TensorFlow module itself.
     // For those cases, we abort here with an error message.
     const std::string errMessage = "!!! Compiler bug -- graph_op " +
-                              opInfo.getName().str() +
+                              opInfo.getOperationName().str() +
                               " cannot be lowered to LLVM IR !!!\n";
     abortOnGraphOp(*this, errMessage.c_str());
 
@@ -1923,9 +1921,10 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
   // TODO: Remove these. They are a temporary way of testing that dynamic
   // attributes make it here.
-  LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: " << opName << "\n");
-  LLVM_DEBUG(for (auto structuredOperand : structuredOperands) {
-    llvm::dbgs() << "  operand: " << structuredOperand.getNameWithSuffix()
+  LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: "
+                          << opInfo.getOperationName() << "\n");
+  LLVM_DEBUG(for (auto structuredArgument : opInfo.getStructuredArguments()) {
+    llvm::dbgs() << "  operand: " << structuredArgument.getArgumentNameWithSuffix()
                  << "\n";
   });
   LLVM_DEBUG(llvm::dbgs() << "end operands\n");

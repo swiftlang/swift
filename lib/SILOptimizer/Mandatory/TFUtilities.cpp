@@ -367,15 +367,15 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
        SymbolicValue::getMetatype(elementType->getCanonicalType())});
 
   // Add an attribute for the value$tensor attribute.
-  auto tensorSuffix = GraphOperationInfo::getOperandLoweringSuffix(
-      GraphOperationInfo::OperandLowering::TensorAttribute);
+  auto tensorSuffix = GraphOperationInfo::getArgumentLoweringSuffix(
+      GraphOperationInfo::ArgumentLowering::TensorAttribute);
   opBuilder.addAttribute(
       {context.getIdentifier(std::string("value") + tensorSuffix), scalars});
 
   // Add the shape$shape attribute if we have an array value.
   if (scalars.getKind() == SymbolicValue::Array) {
-    auto shapeId = GraphOperationInfo::OperandLowering::ShapeAttribute;
-    auto shapeSuffix = GraphOperationInfo::getOperandLoweringSuffix(shapeId);
+    auto shapeId = GraphOperationInfo::ArgumentLowering::ShapeAttribute;
+    auto shapeSuffix = GraphOperationInfo::getArgumentLoweringSuffix(shapeId);
     opBuilder.addAttribute(
         {context.getIdentifier(std::string("shape") + shapeSuffix), shape});
   }
@@ -395,7 +395,7 @@ tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
                            GraphFunctionDeviceInfo &deviceInfo) {
   ASTContext &context = builder.getASTContext();
   GraphOperationBuilder opBuilder("tf_tensor_to_i1");
-  opBuilder.addOperand(value);
+  opBuilder.addArgument(value);
   deviceInfo.handleDevicePlacement(
       "tf_tensor_to_i1",
       /*opDevice*/ getDeviceString(DeviceType::ALL),

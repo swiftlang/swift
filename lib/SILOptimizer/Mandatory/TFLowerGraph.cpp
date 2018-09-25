@@ -1094,10 +1094,10 @@ static void decodeShapeArrayAtAttr(const ASTContext &ctx,
                                    SmallVectorImpl<int64_t> &dims,
                                    SmallVectorImpl<int> &numDims,
                                    SmallVectorImpl<int64_t *> &dimPtrs) {
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeOperandName(attr.name.str());
-  assert(attrInfo.second == GraphOperationInfo::OperandLowering::NormalAttribute);
+  auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
+  assert(attrInfo.second == GraphOperationInfo::ArgumentLowering::NormalAttribute);
   assert(attrInfo.first == attrName);
   decodeShapeArray(ctx, attr.value, dims, numDims, dimPtrs);
 }
@@ -1112,7 +1112,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
 
   // Type check and process the parameters.
   // SendToHost has type <T> (input$T, tensorId$int, device$str) -> ()
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   assert(inst->getNumResults() == 1);
   assert(inst->getNumOperands() == 1);
   assert(inst->getNumAttributes() == 2);
@@ -1209,7 +1209,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
   // the while cond function.
   if (!graphFn.shouldLowerEffectfulOps) {
     internalError(
-        getUserSourceLocation(graphOpInfo.inst->getDebugLocation()),
+        getUserSourceLocation(graphOpInfo.getInst()->getDebugLocation()),
         "FIXME: cannot lower a Host->TF tensor transfer in a loop header",
         diag::tfop_invalid_tfop);
     return GLStatus::Error;
@@ -1219,7 +1219,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
   // recvFromHost has type <T> (tensorId$int, device$string) -> (T)
   // Optionally it can carry a shape array attr, only used for shape propagation
   // in XLA compilation.
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   assert(inst->getNumResults() == 1);
   assert(inst->getNumOperands() == 0);
   assert(inst->getNumAttributes() >= 2);
@@ -1414,7 +1414,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorRecvInst(
     GraphOperationInfo &graphOpInfo) {
   // Signature: "tfc.D2DTensorRecv {transferId,srcDevice,device}"
   // Can also carry an optional shape array.
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   assert(inst->getNumResults() == 1);
   assert(inst->getNumOperands() == 0);
   assert(inst->getNumAttributes() == 3 || inst->getNumAttributes() == 4);
@@ -1542,7 +1542,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorSendInst(
     GraphOperationInfo &graphOpInfo) {
   // Signature: "tfc.D2DTensorSend,$in {transferId,destDevice,device}"
   // Can also carry an optional shape array.
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   assert(inst->getNumResults() == 0);
   assert(inst->getNumOperands() == 1);
   assert(inst->getNumAttributes() == 3 || inst->getNumAttributes() == 4);
@@ -1693,8 +1693,8 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
   // Decode information about the graph_op.
   GraphOperationInfo decoder(inst);
-  SmallVector<GraphOperationInfo::StructuredOperand, 4> structuredOperands;
-  auto opName = decoder.decodeName(structuredOperands);
+  auto opName = decoder.getOperationName();
+  auto &structuredArguments = decoder.getStructuredArguments();
 
   // Swift host <-> TF device sends/recvs.
   if (opName == "tfc.RecvFromHost")
@@ -1729,36 +1729,36 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   bool hasDevice = false;
 
   // Process all inputs.
-  for (auto structuredOperand : structuredOperands) {
-    assert(structuredOperand.getNameWithSuffix().empty() &&
-           "cannot lower named operands");
-    switch (structuredOperand.getKind()) {
-    case GraphOperationInfo::SOK_Single: {
+  for (auto structuredArgument : structuredArguments) {
+    assert(structuredArgument.getArgumentNameWithSuffix().empty() &&
+           "cannot lower named arguments");
+    switch (structuredArgument.getKind()) {
+    case GraphOperationInfo::SAK_Single: {
       // Normal tensor inputs.
-      auto operand = structuredOperand.getSingleOperand();
-      auto valueKind = classifyTensorFlowValue(operand->getType());
+      auto argument = structuredArgument.getSingleArgument();
+      auto valueKind = classifyTensorFlowValue(argument->getType());
 
       // Keep track of whether we have any resource inputs.
       opHasSideEffects |= valueKind == TFValueKind::ResourceHandle;
       assert(valueKind != TFValueKind::Nope &&
              "all op inputs should be TensorFlow values");
-      auto opValue = getOperandValue(operand);
+      auto opValue = getOperandValue(argument);
       if (!opValue.oper)
         return GLStatus::Error;
       TF_AddInput(op, opValue);
       break;
     }
-    case GraphOperationInfo::SOK_List: {
+    case GraphOperationInfo::SAK_List: {
       // Collect all of the elements of the input list.
       SmallVector<TF_Output, 4> elements;
-      for (auto operand : structuredOperand.getOperandList()) {
-        auto valueKind = classifyTensorFlowValue(operand->getType());
+      for (auto argument : structuredArgument.getArgumentList()) {
+        auto valueKind = classifyTensorFlowValue(argument->getType());
 
         // Keep track of whether we have any resource inputs.
         opHasSideEffects |= valueKind == TFValueKind::ResourceHandle;
         assert(valueKind != TFValueKind::Nope &&
                "all op inputs should be TensorFlow values");
-        auto opValue = getOperandValue(operand);
+        auto opValue = getOperandValue(argument);
         if (!opValue.oper)
           return GLStatus::Error;
         elements.push_back(opValue);
@@ -1781,7 +1781,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
        nextAttributeNumber != e;) {
     // Look at which attribute comes next.
     auto attr = inst->getAttribute(nextAttributeNumber++);
-    auto attrInfo = GraphOperationInfo::decodeOperandName(attr.name.str());
+    auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
     auto attrValue = attr.value;
 
     // Convert the not-necessarily-nul-terminated StringRef to an std::string
@@ -1789,12 +1789,12 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     std::string name = attrInfo.first.str();
 
     switch (attrInfo.second) {
-    case GraphOperationInfo::OperandLowering::Input:
+    case GraphOperationInfo::ArgumentLowering::Input:
       assert(0 && "Input classes cannot exist for attributes");
-    case GraphOperationInfo::OperandLowering::Out:
+    case GraphOperationInfo::ArgumentLowering::Out:
       assert(0 && "Attributes cannot be output parameters");
 
-    case GraphOperationInfo::OperandLowering::NormalAttribute: // No modifier.
+    case GraphOperationInfo::ArgumentLowering::NormalAttribute: // No modifier.
       // We add attributes based on what the type of the value is.
       switch (attrValue.getKind()) {
       case SymbolicValue::Unknown:
@@ -1943,7 +1943,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       }
       // Done with normal attributes.
       break;
-    case GraphOperationInfo::OperandLowering::TensorAttribute: {
+    case GraphOperationInfo::ArgumentLowering::TensorAttribute: {
       if (!dtypeAttr) {
         inst->dump();
         llvm_unreachable("dtype attr must have been processed!");
@@ -1994,16 +1994,16 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         return GLStatus::Error;
       break;
     }
-    case GraphOperationInfo::OperandLowering::ShapeAttribute: {
+    case GraphOperationInfo::ArgumentLowering::ShapeAttribute: {
       SmallVector<int64_t, 4> shape;
       auto rank = decodeShapeAttr(SILFn.getASTContext(), attrValue, shape);
       TF_SetAttrShape(op, name.c_str(), shape.data(), rank);
       break;
     }
-    case GraphOperationInfo::OperandLowering::UnknownShapeListAttribute:
+    case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute:
       llvm_unreachable("UnknownShapeListAttribute should have been eliminated "
                        "by deabstraction");
-    case GraphOperationInfo::OperandLowering::TypeListAttribute:
+    case GraphOperationInfo::ArgumentLowering::TypeListAttribute:
       llvm_unreachable("TypeListAttribute should have been eliminated by "
                        "deabstraction");
     }

@@ -2496,7 +2496,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     operandRange = operandRange.drop_back();
 
   for (auto &op : operandRange)
-    opBuilder.addOperand(remapValue(op.get()));
+    opBuilder.addArgument(remapValue(op.get()));
 
   // The type of the new builtin is usually the same as the input type, but
   // "remapped", which turns Float into TensorHandle<Float>.
@@ -2753,7 +2753,7 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto opType = "tfc.SendToHost";
   GraphOperationBuilder opBuilder(opType);
-  opBuilder.addOperand({value});
+  opBuilder.addArgument({value});
   opBuilder.addAttribute(
       {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
   deviceInfo.handleDevicePlacement(opType, /*opDevice*/ "",
@@ -3061,8 +3061,8 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
       // Omit the metatype attr T for simplicity, and TF graphDef compiler can
       // infer the type.
       GraphOperationBuilder equalOpBuilder("Equal");
-      equalOpBuilder.addOperand(receivedCaseId);
-      equalOpBuilder.addOperand(constTensorWithCaseId);
+      equalOpBuilder.addArgument(receivedCaseId);
+      equalOpBuilder.addArgument(constTensorWithCaseId);
 
       auto boolFieldSILType =
           extractBuiltinTypeFromStdlibNumericType(ctx.getBoolDecl());

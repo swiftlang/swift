@@ -54,7 +54,7 @@ static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
 // Return the device attribute associated with `inst`, which is required to
 // exist.
 StringRef swift::tf::getDeviceString(const GraphOperationInfo &graphOpInfo) {
-  auto attr = graphOpInfo.inst->getAttributeNamed(DEVICE_ATTR);
+  auto attr = graphOpInfo.getInst()->getAttributeNamed(DEVICE_ATTR);
   assert(attr.hasValue() && "Tensor op instruction has no device string");
   return attr.getValue().getStringValue();
 }
@@ -80,9 +80,9 @@ GraphFunctionDeviceInfo::getForFunction(SILFunction &fn,
       if (!graphOpInst)
         continue;
       GraphOperationInfo opInfo(graphOpInst);
-      bool isConfigOp = opInfo.getName() == "tfc.configureTPU" ||
-                        opInfo.getName() == "tfc.configureGPU" ||
-                        opInfo.getName() == "tfc.configureCPU";
+      bool isConfigOp = opInfo.getOperationName() == "tfc.configureTPU" ||
+                        opInfo.getOperationName() == "tfc.configureGPU" ||
+                        opInfo.getOperationName() == "tfc.configureCPU";
       if (!isConfigOp)
         continue;
 
@@ -102,15 +102,15 @@ GraphFunctionDeviceInfo::getForFunction(SILFunction &fn,
 
       // Eventually we'll support multiple different configuration ops, so
       // we recheck the opcode here.
-      if (opInfo.getName() == "tfc.configureTPU") {
+      if (opInfo.getOperationName() == "tfc.configureTPU") {
         // Decode: tfc.configureTPU(isInfeedEnabled: bool)
         deviceType = DeviceType::TPU;
         auto infeedEnabled = cast<IntegerLiteralInst>(inst.getOperand(0));
         isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
-      } else if (opInfo.getName() == "tfc.configureGPU") {
+      } else if (opInfo.getOperationName() == "tfc.configureGPU") {
         deviceType = DeviceType::GPU;
       } else {
-        assert(opInfo.getName() == "tfc.configureCPU" &&
+        assert(opInfo.getOperationName() == "tfc.configureCPU" &&
                "unknown device configuration op");
         deviceType = DeviceType::CPU;
       }
@@ -335,11 +335,10 @@ class DevicePartitionCloner
 
 void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
   GraphOperationInfo decoder(inst);
-  SmallVector<GraphOperationInfo::StructuredOperand, 4> structuredOperands;
-  auto opName = decoder.decodeName(structuredOperands);
-  if (opName == "tfc.TensorTransfer") {
-    assert(structuredOperands.size() == 1);
-    assert(structuredOperands[0].getKind() == GraphOperationInfo::SOK_Single);
+  auto &structuredArguments = decoder.getStructuredArguments();
+  if (decoder.getOperationName() == "tfc.TensorTransfer") {
+    assert(structuredArguments.size() == 1);
+    assert(structuredArguments[0].getKind() == GraphOperationInfo::SAK_Single);
     visitTensorTransferInst(decoder);
     return;
   }
@@ -382,7 +381,7 @@ void DevicePartitionCloner::addD2DSend(GraphOperationInfo &graphOpInfo,
   assert(srcDevice != destDevice);
   auto &B = getBuilder();
   auto &ctx = B.getASTContext();
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
 
   // Insert a send inst, with type <T> (T) {int, str, str} -> ()
@@ -399,7 +398,7 @@ void DevicePartitionCloner::addD2DSend(GraphOperationInfo &graphOpInfo,
        SymbolicValue::getString(getDeviceString(thisDeviceType), allocator)});
 
   auto valueToSend = remapValue(inst->getOperand(0));
-  newInstBuilder.addOperand(valueToSend);
+  newInstBuilder.addArgument(valueToSend);
   if (inst->getNumAttributes() > tensorShapeAttrIdx)
     newInstBuilder.addAttribute(inst->getAttribute(tensorShapeAttrIdx));
   newInstBuilder.build(B, ctx, loc, {});
@@ -415,7 +414,7 @@ void DevicePartitionCloner::addD2DRecv(GraphOperationInfo &graphOpInfo,
   assert(srcDevice != destDevice);
   auto &B = getBuilder();
   auto &ctx = B.getASTContext();
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
 
   // Insert a recv inst, with type <T> {int, str, str} -> (T)
@@ -444,7 +443,7 @@ void DevicePartitionCloner::addD2DRecv(GraphOperationInfo &graphOpInfo,
 
 void DevicePartitionCloner::visitTensorTransferInst(
     GraphOperationInfo &graphOpInfo) {
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   assert(inst->getNumResults() == 1);
   assert(inst->getNumOperands() == 1);
   assert(inst->getNumAttributes() == 3 || inst->getNumAttributes() == 4);
@@ -806,7 +805,7 @@ public:
       // above is placed on the primary device), we rely on the backend graph
       // compiler (e.g. grappler) to optimize away this extraneous identity op.
       GraphOperationBuilder identityOpBuilder("Identity");
-      identityOpBuilder.addOperand(opValue);
+      identityOpBuilder.addArgument(opValue);
 
       // insert this new inst at the beginning of the function.
       SILBuilder B(&srcFn.front().front());
@@ -864,7 +863,7 @@ public:
       // <T> (T) {transferId$int, srcDevice$str, destDevice$str} -> T
       // Optionally, it also has a shape array attribute (needed for TPU).
       GraphOperationBuilder newInstBuilder("tfc.TensorTransfer");
-      newInstBuilder.addOperand(opValue);
+      newInstBuilder.addArgument(opValue);
 
       auto loc = inst->getLoc();
       // Insert the transfer right after the operandInst.
@@ -888,7 +887,7 @@ public:
       if (auto *graphOpInst = dyn_cast<GraphOperationInst>(operandInst)) {
         for (unsigned i = 0, e = graphOpInst->getNumAttributes(); i != e; ++i) {
           auto attr = graphOpInst->getAttribute(i);
-          auto attrInfo = GraphOperationInfo::decodeOperandName(attr.name.str());
+          auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
           if (!tf::isShapeArrayPseudoAttr(attrInfo.first, attr.value))
             continue;
           newInstBuilder.addAttribute(attr);

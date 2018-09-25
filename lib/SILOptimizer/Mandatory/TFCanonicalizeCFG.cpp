@@ -919,8 +919,8 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
     // Create a condition to compare exitIndex to a constant
     std::string equalOpName = "Equal";
     GraphOperationBuilder equalOpBuilder(equalOpName);
-    equalOpBuilder.addOperand(exitIndexArg);
-    equalOpBuilder.addOperand(
+    equalOpBuilder.addArgument(exitIndexArg);
+    equalOpBuilder.addArgument(
         createTFIntegerConst(*deviceInfo, builder, headerLocation,
                              /*bitwidth*/ 32, exitIndices.lookup(trueBlock)));
     deviceInfo->handleDevicePlacement(
