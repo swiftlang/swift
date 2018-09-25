@@ -158,7 +158,7 @@ syn match swiftOperator "\.\.[<.]" skipwhite nextgroup=swiftTypeParameters
 
 syn match swiftChar /'\([^'\\]\|\\\(["'tnr0\\]\|x[0-9a-fA-F]\{2}\|u[0-9a-fA-F]\{4}\|U[0-9a-fA-F]\{8}\)\)'/
 
-syn match swiftTupleIndexNumber nextgroup=swiftTupleIndexNumber contains=swiftDecimal
+syn match swiftTupleIndexNumber contains=swiftDecimal
       \ /\.[0-9]\+/
 syn match swiftDecimal contained
       \ /[0-9]\+/
