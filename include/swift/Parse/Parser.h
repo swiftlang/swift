@@ -459,8 +459,7 @@ public:
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
     assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
     if (Result)
-      *Result = Context.getIdentifier(!Tok.isAlias() ? Tok.getText() :
-            SourceMgr.bufferedAlias(Tok.getText(), Context.LangOpts));
+      *Result = Context.getIdentifier(Tok.getText());
     return consumeToken();
   }
 
