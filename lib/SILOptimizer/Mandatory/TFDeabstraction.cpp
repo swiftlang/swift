@@ -1860,6 +1860,9 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
           opInfo->opName == "tfc.configureCPU")
         continue;
       formGraphOp(*opInfo, constants, deviceInfo);
+      // formGraphOp deletes inst. So, continue as the rest of the loop is
+      // irrelevant. (This also avoid memory errors.)
+      continue;
     }
 
     // Take a look at the various well known function calls that we can promote
@@ -2084,7 +2087,8 @@ static bool collectInnermostTensorFlowDTypes(
 
 /// Replace the specified tensor operation with a GraphOperation instruction,
 /// emitting errors if attribute arguments could not be constant folded, or if
-/// the operand/attribute types are incorrect.
+/// the operand/attribute types are incorrect. This deletes the underlying inst
+/// in `opInfo` when a GraphOperation is created successfully.
 void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
                                   DenseMap<SILValue, SymbolicValue> &constants,
                                   GraphFunctionDeviceInfo &deviceInfo) {
