@@ -2982,10 +2982,6 @@ public:
     return getExtInfo().throws();
   }
 
-  /// Determine whether the given function input type is one of the
-  /// canonical forms.
-  static bool isCanonicalFunctionInputType(Type input);
-
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
@@ -3035,6 +3031,7 @@ inline AnyFunctionType::CanYield AnyFunctionType::Yield::getCanonical() const {
 /// For example:
 ///   let x : (Float, Int) -> Int
 class FunctionType final : public AnyFunctionType,
+    public llvm::FoldingSetNode,
     private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param> {
   friend TrailingObjects;
       
@@ -3049,7 +3046,15 @@ public:
   ArrayRef<Param> getParams() const {
     return {getTrailingObjects<Param>(), getNumParams()};
   }
-      
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getParams(), getResult(), getExtInfo());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ArrayRef<Param> params,
+                      Type result,
+                      ExtInfo info);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Function;
@@ -3057,9 +3062,10 @@ public:
       
 private:
   FunctionType(ArrayRef<Param> params,
-               Type Input, Type Result,
-               RecursiveTypeProperties properties,
-               ExtInfo Info);
+               Type input, Type result,
+               ExtInfo info,
+               const ASTContext *ctx,
+               RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   static CanFunctionType get(CanParamArrayRef params, CanType result,
@@ -3137,12 +3143,12 @@ public:
   FunctionType *substGenericArgs(SubstitutionMap subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getGenericSignature(), getInput(), getResult(),
+    Profile(ID, getGenericSignature(), getParams(), getResult(),
             getExtInfo());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericSignature *sig,
-                      Type input,
+                      ArrayRef<Param> params,
                       Type result,
                       ExtInfo info);
 

@@ -2680,17 +2680,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanTypes, HasExplicitAnyObject);
 }
 
-bool AnyFunctionType::isCanonicalFunctionInputType(Type input) {
-  // Canonically, we should have a tuple type or parenthesized type.
-  if (auto tupleTy = dyn_cast<TupleType>(input.getPointer()))
-    return tupleTy->isCanonical();
-  if (auto parenTy = dyn_cast<ParenType>(input.getPointer()))
-    return parenTy->getUnderlyingType()->isCanonical();
-
-  // FIXME: Still required for the constraint solver.
-  return isa<TypeVariableType>(input.getPointer());
-}
-
 FunctionType *
 GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
   auto substFn = Type(this).subst(subs)->castTo<AnyFunctionType>();
