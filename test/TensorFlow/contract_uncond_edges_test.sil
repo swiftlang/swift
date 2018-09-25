@@ -1,0 +1,113 @@
+// RUN: %target-sil-opt -tf-xla-cfg-canonicalize -tf-ensure-single-loop-exit -assume-parsing-unqualified-ownership-sil %s -o /dev/null | %FileCheck %s
+
+import Builtin
+import Swift
+import TensorFlow
+
+// Straight line blocks
+sil @$straightLine : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  br bb1(%0 : $Builtin.Int32)
+
+bb1(%1: $Builtin.Int32):
+  br bb2(%1 : $Builtin.Int32)
+
+bb2(%2: $Builtin.Int32):
+  br bb3(%2 : $Builtin.Int32)
+
+bb3(%3 : $Builtin.Int32):
+	return %3 : $Builtin.Int32
+}
+// CHECK-LABEL: --- XLA CFG Canonicalize: $straightLine
+// CHECK:  block bb0
+// CHECK: --- XLA CFG Canonicalize end
+// CHECK: sil @$straightLine : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+// CHECK: bb0(%0 : $Builtin.Int32):
+// CHECK-NEXT:  return %0 : $Builtin.Int32
+// CHECK: }
+
+
+// Conditionals
+sil @$condRegion : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = builtin "cmp_slt_Int32"(%0 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1 
+  cond_br %2, bb1, bb4
+
+bb1:
+  br bb2(%0 : $Builtin.Int32)
+
+bb2(%3 : $Builtin.Int32): 
+  br bb3(%3 : $Builtin.Int32)
+
+bb3(%4 : $Builtin.Int32): 
+  br bb5(%4 : $Builtin.Int32)
+
+bb4:
+  br bb5(%1 : $Builtin.Int32)
+
+bb5(%5 : $Builtin.Int32):
+	return %5 : $Builtin.Int32
+}
+// CHECK-LABEL: --- XLA CFG Canonicalize: $condRegion
+// CHECK:[sequence
+// CHECK:  {condition Header: bb0
+// CHECK:    block bb1
+// CHECK:    block bb2}
+// CHECK:  block bb3]
+// CHECK: --- XLA CFG Canonicalize end
+// CHECK: sil @$condRegion : $@convention(thin) {{.*}} {
+// CHECK: bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+// CHECK:   cond_br %2, bb1, bb2                     
+// CHECK: bb1:
+// CHECK:   br bb3(%0 : $Builtin.Int32)
+// CHECK: bb2:
+// CHECK:   br bb3(%1 : $Builtin.Int32)
+// CHECK: bb3([[A:%.*]] : $Builtin.Int32):
+// CHECK:   return [[A]] : $Builtin.Int32
+// CHECK: }
+
+// Simple loop
+sil @$simpleLoop : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  br bb1(%0 : $Builtin.Int32) 
+
+bb1(%2 : $Builtin.Int32):
+  %3 = builtin "cmp_slt_Int32"(%2 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %3, bb3, bb2
+
+bb2:                         
+  br bb6(%2 : $Builtin.Int32)
+
+bb3:
+  br bb4(%2 : $Builtin.Int32)
+
+bb4(%4 : $Builtin.Int32):
+  br bb5(%4 : $Builtin.Int32)
+
+bb5(%5 : $Builtin.Int32):
+  br bb1(%5 : $Builtin.Int32)
+
+bb6(%6 : $Builtin.Int32): 
+  return %6 : $Builtin.Int32
+}
+// CHECK-LABEL:--- XLA CFG Canonicalize: $simpleLoop
+// CHECK:[sequence
+// CHECK:  <while Preheader: bb0, Header: bb1, exit: bb2
+// CHECK:    block bb3>
+// CHECK:  block bb2]
+// CHECK:--- XLA CFG Canonicalize end
+// CHECK:sil @$simpleLoop : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+// CHECK:bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+// CHECK:  br bb1(%0 : $Builtin.Int32)
+// CHECK:bb1(%3 : $Builtin.Int32):
+// CHECK:  %4 = builtin "cmp_slt_Int32"(%3 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+// CHECK:  cond_br %4, bb3, bb2
+// CHECK:bb2:
+// CHECK:  return %3 : $Builtin.Int32
+// CHECK:bb3:
+// CHECK:  br bb1(%3 : $Builtin.Int32)
+// CHECK:}
+
+
+
+
