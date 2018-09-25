@@ -6,6 +6,7 @@ import StdlibUnittest
 import Foundation
 import CoreFoundation
 import CoreLocation
+import Dispatch
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadataObjC")
 
@@ -83,6 +84,11 @@ DemangleToMetadataTests.test("synthesized declarations") {
   let error = NSError(domain: NSCocoaErrorDomain, code: 0)
   let reflectionString = String(reflecting: CLError(_nsError: error))
   expectTrue(reflectionString.hasPrefix("__C_Synthesized.related decl 'e' for CLError(_nsError:"))
+}
+
+DemangleToMetadataTests.test("members of runtime-only Objective-C classes") {
+  expectEqual(DispatchQueue.Attributes.self,
+    _typeByMangledName("So17OS_dispatch_queueC8DispatchE10AttributesV")!)
 }
 
 runAllTests()
