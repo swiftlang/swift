@@ -552,7 +552,8 @@ extension _NativeDictionary { // Deletion
       let scale = self._storage._scale
       _storage = _DictionaryStorage<Key, Value>.allocate(
         scale: scale,
-        age: nil)
+        age: nil,
+        seed: nil)
       return
     }
     for bucket in hashTable {
